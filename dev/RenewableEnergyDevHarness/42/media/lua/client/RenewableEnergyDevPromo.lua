@@ -8,10 +8,14 @@
 -- Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
 -- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
 -- recipe and skill names in the game's language.
+-- The shots come in groups (GROUP_NAMES), and PROMO=<group>,... shoots only those, building only
+-- the setups they need, so art/promo/extract.py replaces only their captures.
 -- Shots of anything but the world are taken twice, on black (promo_<shot>_k.png) and on white
 -- (promo_<shot>_w.png), so that art/promo/extract.py can recover how transparent each pixel is.
--- Each item is shot at two zooms, and so is the empty floor at each, so that extract.py can find
--- the item by comparing its shot with the floor's.
+-- The empty floor is shot too, so that extract.py can find each item by comparing its shot with
+-- the floor's.
+-- The run draws as many frames a second as it can, so its steps wait for what they need, such as
+-- the lighting settling, and count frames only for drawing.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
@@ -29,6 +33,14 @@ local Promo = {}
 
 local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
+
+-- The groups of shots, in the order a run takes them: the status window first, so that it reads
+-- the same noon figures whatever else the run shoots, and the garden lights last, since they are
+-- at night. run-debug-client.sh reads this line to refuse an unknown PROMO name before the game
+-- starts.
+local GROUP_NAMES = { "status", "menu", "world", "icons", "models", "trailer", "gardenlights" }
+-- Frames for a change to reach the screen, where the screenshot reads it.
+local DRAW_FRAMES = 10
 
 -- The world shots are as wide as the README's images, in UI units.
 local WORLD_W = 1260
@@ -113,18 +125,19 @@ local MENU_ITEMS = { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Bat
 local MENU_AT = 100
 
 -- The item shots, on a patch of the road's own asphalt laid around the studio square that each
--- item lies on alone. The closest zoom the game offers is 25%, which the zoom options leave out
--- by default; items too big for it are shot again at 50%. The character stands off to the side,
--- (east, south) squares from the item, as far left of it on the screen at either zoom.
+-- item lies on alone, at the closest zoom the game offers, which the zoom options leave out by
+-- default. The character stands off to the side, (east, south) squares from the item, to its
+-- left on the screen.
 local STUDIO = {
     -- The open ground the patch needs, and how far around the studio square the asphalt goes
     -- where the ground is clear, and the plants go anyway, since the bigger items' shots reach
     -- past the patch.
     reach = 3,
     floorReach = 5,
-    zooms = { { percent = 25, player = { -1, 1 } }, { percent = 50, player = { -2, 2 } } },
-    -- What extract.py searches for the item, in UI units around its square's floor centre: wide
-    -- enough for most items, and clear of the character.
+    zoom = 25,
+    player = { -1, 1 },
+    -- What extract.py searches for the item, in UI units around its square's floor centre: room
+    -- for the tallest models, and clear of the character.
     window = { half = 360, up = 700, down = 300 },
     -- Turned so that the long side of most models faces the camera.
     rotation = 315,
@@ -232,6 +245,8 @@ end
 local steps = {}
 local shots = {}
 local tinted = {}
+-- The group whose steps are being added, which the shots name for extract.py.
+local currentGroup
 
 local function add(step)
     table.insert(steps, step)
@@ -245,49 +260,64 @@ local function elementRegion(name, element)
     return region(name, element:getAbsoluteX(), element:getAbsoluteY(), element:getWidth(), element:getHeight())
 end
 
+-- The game writes the file before the call returns (Core.TakeFullScreenshot), so no step waits
+-- after a shot.
 local function screenshot(file)
     Stage.screenshot("REPromo", file)
 end
 
--- Every tinted element, the backdrop first, takes the backdrop colour.
+-- Every tinted element, the backdrop first, takes the backdrop colour. Returns a runSteps wait
+-- until the backdrop has drawn DRAW_FRAMES times since: the UI redraws at its own rate
+-- (Core.StartFrameUI, the uiRenderFPS option) and the frames in between show its last drawing, so
+-- at an uncapped frame rate a count of frames can pass with no UI drawn at all.
 local function setLevel(level)
     for _, element in ipairs(tinted) do
         element.backgroundColor = { r = level, g = level, b = level, a = 1 }
+    end
+    local backdrop = tinted[1]
+    local start = backdrop.drawn
+    return function()
+        return backdrop.drawn - start >= DRAW_FRAMES
     end
 end
 
 -- Takes the shot on black and on white. regions() runs once the shot is laid out.
 local function addMatted(name, regions)
+    local group = currentGroup
     add(function()
-        setLevel(0)
-        return 10
+        return setLevel(0)
     end)
     add(function()
         screenshot("promo_" .. name .. "_k")
-        return 10
-    end)
-    add(function()
-        setLevel(1)
-        return 10
+        return setLevel(1)
     end)
     add(function()
         screenshot("promo_" .. name .. "_w")
-        table.insert(shots, { name = name, matte = true, regions = regions() })
-        return 10
+        table.insert(shots, { name = name, group = group, matte = true, regions = regions() })
     end)
 end
 
 local function addOpaque(name, regions)
+    local group = currentGroup
+    add(function()
+        return DRAW_FRAMES
+    end)
     add(function()
         screenshot("promo_" .. name)
-        table.insert(shots, { name = name, matte = false, regions = regions() })
-        return 10
+        table.insert(shots, { name = name, group = group, matte = false, regions = regions() })
     end)
 end
 
 local function newBackdrop()
     local backdrop = ISPanel:new(0, 0, getCore():getScreenWidth(), getCore():getScreenHeight())
     backdrop:initialise()
+    -- Counts its drawings for setLevel.
+    backdrop.drawn = 0
+    local prerender = backdrop.prerender
+    backdrop.prerender = function(self)
+        self.drawn = self.drawn + 1
+        prerender(self)
+    end
     backdrop:addToUIManager()
     backdrop:setVisible(true)
     tinted = { backdrop }
@@ -973,13 +1003,20 @@ local function buildStage0()
     perform("setBankOn", { bank = PowerBank.positionOf(stage0Box), on = true })
 end
 
--- Bank passes hour by hour from the morning to noon, as the game's own passes would have run.
+-- Bank passes hour by hour from the morning to noon, as the game's own passes would have run,
+-- then one of a minute: the window shows the sun averaged over the last pass, which would
+-- otherwise be the last hour of the morning.
 local function chargeThroughMorning()
     local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
     local system = PowerBank.serverSystem
     local banks = { system:getLuaObjectOnSquare(homesteadBank:getSquare()), system:getLuaObjectOnSquare(stage0Box:getSquare()) }
+    local hours = {}
     -- The first pass only starts the clock of a bank that has never run one.
     for hour = MORNING, NOON do
+        table.insert(hours, hour)
+    end
+    table.insert(hours, NOON + 1 / 60)
+    for _, hour in ipairs(hours) do
         getGameTime():setTimeOfDay(hour)
         for _, bank in ipairs(banks) do
             BankSystem.updateBank(bank)
@@ -1066,19 +1103,27 @@ local function cropped(name, squares)
     return region(name, left, top, right - left, bottom - top)
 end
 
+-- The squares the character has looked around from so far in the run. What it saw stays seen.
+local lookedFrom = {}
+
 -- Has the character look around from each of `squares` and stay on the last, since squares they
--- never saw are drawn dark, and sets the zoom `stepsOut` steps out from the closest.
+-- never saw are drawn dark, and sets the zoom `stepsOut` steps out from the closest. Of the others,
+-- it skips those it has looked around from already.
 local function goTo(squares, stepsOut)
-    for _, square in ipairs(squares) do
-        Stage.addLookAround(steps, getPlayer(), square)
+    for i, square in ipairs(squares) do
+        if i == #squares or not lookedFrom[square] then
+            Stage.addLookAround(steps, getPlayer(), square)
+            lookedFrom[square] = true
+        end
     end
     add(function()
         Stage.zoomOut(stepsOut)
-        return 200
+        return Stage.zoomSettled()
     end)
 end
 
-local function addWorld()
+-- What every group's shots share: a clear noon without grid power, and no radio captions.
+local function addWorldSettings()
     add(function()
         -- The grid would power the squares and leave the bank nothing to run.
         local option = getSandboxOptions():getOptionByName("ElecShutModifier")
@@ -1087,15 +1132,44 @@ local function addWorld()
         end
         getWorld():setHydroPowerOn(false)
         clearWeather()
+        getGameTime():setTimeOfDay(NOON)
+        silenceRadios({ origin, stage0Origin, roadCar, studio, walkOrigin })
+    end)
+end
+
+-- Logs each bank's status as the window reads it.
+local function logBanks()
+    for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
+        local status = PowerBank.statusOf(bank)
+        local reasons, kinds = {}, {}
+        for _, source in ipairs(status.sources) do
+            table.insert(reasons, tostring(source.reason))
+        end
+        for _, kind in ipairs(status.loadByKind) do
+            table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
+        end
+        print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
+            .. " %d of %d panel slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
+            table.concat(kinds, ", "), status.charge * 100, status.panelSlots.used, status.panelSlots.total,
+            table.concat(reasons, ",")))
+    end
+end
+
+-- Both setups, charged through the morning; the world, status and menu shots need them.
+local function addSetups()
+    add(function()
         getGameTime():setTimeOfDay(MORNING)
         Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
         Stage.removeTrees(stage0Origin:getX(), stage0Origin:getY(), stage0Origin:getZ())
-        silenceRadios({ origin, stage0Origin, roadCar, studio, walkOrigin })
         buildHomestead()
         buildStage0()
         chargeThroughMorning()
-        return 30
+        logBanks()
+        return DRAW_FRAMES
     end)
+end
+
+local function addWorld()
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
     local scouts = {}
     for _, spot in ipairs(HOMESTEAD.scouts) do
@@ -1112,7 +1186,7 @@ local function addWorld()
     -- The banner shows the whole homestead a step further out.
     add(function()
         getCore():doZoomScroll(0, 1)
-        return 200
+        return Stage.zoomSettled()
     end)
     addOpaque("world", function()
         return { rightAligned("world", homesteadSquares()) }
@@ -1138,14 +1212,16 @@ local function addStatus()
         window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(at(HOMESTEAD.bank)))
         window:setX(100)
         window:setY(100)
-        return 120
+        -- The window lays its rows out from the bank's status as it draws.
+        return function()
+            return (window.renderedFrames or 0) >= 2
+        end
     end)
     addMatted("status", function()
         return { elementRegion("status", window) }
     end)
     add(function()
         window:close()
-        return 1
     end)
     removeBackdrop()
 end
@@ -1218,9 +1294,9 @@ local function studioWindow(name)
     return region(name, left, top, right - left, bottom - top)
 end
 
--- Every item alone on the studio floor, at each of STUDIO.zooms. `models` gets one entry per
--- item, its shots closest zoom first.
+-- Every item alone on the studio floor. `models` gets one entry per item.
 local function addModels(items, models)
+    local group = currentGroup
     local zoomLevels
     add(function()
         local asphalt = roadCar:getFloor():getSprite():getName()
@@ -1235,37 +1311,39 @@ local function addModels(items, models)
             end
         end
         zoomLevels = { getCore():getOptionZoomLevels1x(), getCore():getOptionZoomLevels2x() }
-        getCore():setOptionZoomLevels1x(zoomLevels[1] .. ";25")
-        getCore():setOptionZoomLevels2x(zoomLevels[2] .. ";25")
+        getCore():setOptionZoomLevels1x(zoomLevels[1] .. ";" .. STUDIO.zoom)
+        getCore():setOptionZoomLevels2x(zoomLevels[2] .. ";" .. STUDIO.zoom)
         getCore():zoomLevelsChanged()
+        -- Every item at once, so that their models load while the character looks around: Lua
+        -- can't tell when a model has loaded, and a loaded one draws on the next frame.
+        for _, item in ipairs(items) do
+            studio:AddWorldInventoryItem(instanceItem(item.fullType), 0.5, 0.5, 0)
+        end
         return 30
     end)
+    goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]) }, 0)
+    local floor = "promo_models_floor"
+    add(function()
+        studio:removeAllWorldObjects()
+        return DRAW_FRAMES
+    end)
+    add(function()
+        screenshot(floor)
+    end)
     for _, item in ipairs(items) do
-        table.insert(models, { name = "model_" .. string.gsub(item.fullType, "%.", "_"), shots = {} })
-    end
-    for stepsOut, zoom in ipairs(STUDIO.zooms) do
-        goTo({ studioSquare(studio, zoom.player[1], zoom.player[2]) }, stepsOut - 1)
-        local floor = "promo_models_floor_" .. zoom.percent
+        local name = "model_" .. string.gsub(item.fullType, "%.", "_")
         add(function()
-            screenshot(floor)
-            return 10
+            local placed = instanceItem(item.fullType)
+            placed:setWorldZRotation(STUDIO.rotation)
+            studio:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
+            return DRAW_FRAMES
         end)
-        for i, item in ipairs(items) do
-            add(function()
-                local placed = instanceItem(item.fullType)
-                placed:setWorldZRotation(STUDIO.rotation)
-                studio:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
-                -- Long enough for the model to load and draw.
-                return 30
-            end)
-            add(function()
-                local file = "promo_" .. models[i].name .. "_" .. zoom.percent
-                screenshot(file)
-                table.insert(models[i].shots, { file = file, floor = floor, window = studioWindow(models[i].name) })
-                studio:removeAllWorldObjects()
-                return 2
-            end)
-        end
+        add(function()
+            local file = "promo_" .. name
+            screenshot(file)
+            table.insert(models, { name = name, group = group, file = file, floor = floor, window = studioWindow(name) })
+            studio:removeAllWorldObjects()
+        end)
     end
     add(function()
         getCore():setOptionZoomLevels1x(zoomLevels[1])
@@ -1282,6 +1360,41 @@ local function roadSquares()
         table.insert(squares, atRoad(spot))
     end
     return squares
+end
+
+-- Physics runs in real time, so the trailer steps wait for the vehicles to stand still: spawned,
+-- they settle onto their wheels, and a trailer hitched before then swings round as the hitch pulls
+-- it up to the car's tow bar. Vehicles at rest report a creep of about a tenth of a metre a second
+-- until their physics sleeps, seconds later.
+local STILL_MS = 250
+local STILL_SPEED = 0.2
+local HITCH_GAP = 0.1
+
+-- A runSteps wait until both of Stage.spawnTrailer's `pair` stand still on their squares, and with
+-- `hitch`, with the trailer's tow point at the car's.
+local function atRest(pair, hitch)
+    local velocity, towing, towed = Vector3f.new(), Vector3f.new(), Vector3f.new()
+    local since
+    return function()
+        local still = true
+        for _, vehicle in ipairs({ pair.car, pair.trailer }) do
+            local square = vehicle:getSquare()
+            still = still and square ~= nil and square:getVehicleContainer() == vehicle
+                and vehicle:getLinearVelocity(velocity):length() < STILL_SPEED
+        end
+        if still and hitch then
+            local a = pair.car:getTowingWorldPos("trailer", towing)
+            local b = pair.trailer:getTowedByWorldPos("trailer", towed)
+            still = a ~= nil and b ~= nil and pair.trailer:getVehicleTowedBy() == pair.car
+                and IsoUtils.DistanceToSquared(a:x(), a:y(), b:x(), b:y()) < HITCH_GAP * HITCH_GAP
+        end
+        if not still then
+            since = nil
+            return false
+        end
+        since = since or getTimestampMs()
+        return getTimestampMs() - since >= STILL_MS
+    end
 end
 
 -- The arrow board trailer hitched to a car on the road, cones behind it, a step out from the
@@ -1309,13 +1422,15 @@ local function addTrailer()
             placeTile(atRoad(spot), ROAD.cone)
         end
         pair = Stage.spawnTrailer(roadCar, roadHeading.facing)
-        return 30
+        return atRest(pair, false)
     end)
     add(function()
         Stage.hitchTrailer(pair, getPlayer(), "REPromo")
-        return 60
+        return atRest(pair, true)
     end)
-    goTo({ atRoad(ROAD.player) }, 1)
+    -- From the item floor first, as a full run's character has by now: the hedges and fences along
+    -- a road hide what lies past them from the road itself.
+    goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]), atRoad(ROAD.player) }, 1)
     addOpaque("trailer", function()
         return { centred("trailer", roadSquares()) }
     end)
@@ -1344,40 +1459,23 @@ local function addGardenLights()
                 { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh })
         end
         getGameTime():setTimeOfDay(WALK.hour)
-        return 30
+        -- The lighting takes most of a second to follow the clock.
+        return Stage.lightingSettled(getPlayer(), true)
     end)
     add(function()
-        -- Lit now, rather than at the next minute's pass.
+        -- Lit now, rather than at the next minute's pass. Their light shows while the character
+        -- looks around.
         for _, spot in ipairs(WALK.lights) do
             local light = SolarGardenLight.findOn(atWalk(spot))
             if light then
                 SolarGardenLight.update(light, 0)
             end
         end
-        return 10
     end)
     goTo({ atWalk(WALK.scout), atWalk(WALK.player) }, 0)
     addOpaque("gardenlights", function()
         return { centred("gardenlights", walkSquares()) }
     end)
-end
-
--- Logs each bank's status as the window reads it.
-local function logBanks()
-    for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
-        local status = PowerBank.statusOf(bank)
-        local reasons, kinds = {}, {}
-        for _, source in ipairs(status.sources) do
-            table.insert(reasons, tostring(source.reason))
-        end
-        for _, kind in ipairs(status.loadByKind) do
-            table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
-        end
-        print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
-            .. " %d of %d panel slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
-            table.concat(kinds, ", "), status.charge * 100, status.panelSlots.used, status.panelSlots.total,
-            table.concat(reasons, ",")))
-    end
 end
 
 -- Finds every setup's place, each clear of the ones before it, or names the first it can't find.
@@ -1410,8 +1508,45 @@ local function findPlaces(player)
         walkOrigin:getY(), walkSite.facing))
 end
 
-function Promo.capture(onDone)
-    print("REPromo START")
+-- The groups of GROUP_NAMES: whether they need both setups built, and what adds their steps.
+local GROUPS = {
+    world = { setups = true, add = addWorld },
+    status = { setups = true, add = addStatus },
+    menu = { setups = true, add = addMenu },
+    icons = { add = addIcons },
+    models = { add = function(data) addModels(data.items, data.models) end },
+    trailer = { add = addTrailer },
+    gardenlights = { add = addGardenLights },
+}
+
+-- Adds a step that starts a clock, and returns a function that adds a step logging, under
+-- "REPromo TIME", how long the steps added in between took.
+local function addTimer(label)
+    local started
+    add(function()
+        started = getTimestampMs()
+    end)
+    return function()
+        add(function()
+            print(string.format("REPromo TIME %s %.1f s", label, (getTimestampMs() - started) / 1000))
+        end)
+    end
+end
+
+--- Shoots the groups named in `selection`, comma-separated, or every group if it is empty, and
+--- calls onDone.
+function Promo.capture(selection, onDone)
+    selection = selection or ""
+    print("REPromo START " .. (selection ~= "" and selection or "all"))
+    local selected, any = {}, false
+    for name in string.gmatch(selection, "[^,%s]+") do
+        if not GROUPS[name] then
+            print("REPromo FAIL: no group " .. name .. "; the groups are " .. table.concat(GROUP_NAMES, ","))
+            getCore():quitToDesktop()
+            return
+        end
+        selected[name], any = true, true
+    end
     local player = getPlayer()
     local missing = findPlaces(player)
     if missing then
@@ -1425,31 +1560,38 @@ function Promo.capture(onDone)
     -- In a corner, where it hovers over nothing the shots show: the world outlines what it is
     -- over, and menus follow it.
     setMouseXY(0, 0)
-    local data = { items = itemsList(), recipes = {}, models = {} }
+    -- The names come with every run, since they cost no shot.
+    local data = { items = itemsList(), recipes = {}, models = {}, groups = {} }
     for _, name in ipairs(RenewableEnergy.Debug.recipeNames()) do
         table.insert(data.recipes, recipeEntry(name))
     end
     data.strings = {
         modName = getText("Sandbox_RenewableEnergy"),
     }
-    addWorld()
-    addStatus()
-    add(function()
-        logBanks()
-        return 1
-    end)
-    addMenu()
-    addIcons()
-    addModels(data.items, data.models)
-    addTrailer()
-    -- Last, since it is at night.
-    addGardenLights()
+    local endTotal = addTimer("total")
+    addWorldSettings()
+    local setupsBuilt = false
+    for _, name in ipairs(GROUP_NAMES) do
+        local group = GROUPS[name]
+        if selected[name] or not any then
+            table.insert(data.groups, name)
+            currentGroup = name
+            local endGroup = addTimer(name)
+            if group.setups and not setupsBuilt then
+                addSetups()
+                setupsBuilt = true
+            end
+            group.add(data)
+            endGroup()
+        end
+    end
+    endTotal()
     Stage.runSteps(steps, function()
         data.screen = { w = getCore():getScreenWidth(), h = getCore():getScreenHeight() }
         data.shots = shots
         writeJson("REPromo.json", data)
         onDone()
-    end)
+    end, "REPromo")
 end
 
 return Promo

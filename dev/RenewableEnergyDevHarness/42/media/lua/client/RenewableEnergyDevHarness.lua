@@ -234,18 +234,19 @@ local function serveReruns()
     idle()
 end
 
--- run-debug-client.sh writes the mode to <cachedir>/Lua/RenewableEnergyDevHarness.txt, the TESTS
--- prefixes on the next line and "stay" on the third for --stay.
+-- run-debug-client.sh writes the mode to <cachedir>/Lua/RenewableEnergyDevHarness.txt, then what
+-- to run, comma-separated (the TESTS prefixes, or the PROMO groups), and "stay" on the third line
+-- for --stay.
 local function readMode()
     local reader = getFileReader("RenewableEnergyDevHarness.txt", false)
     if not reader then
-        return "test", false
+        return "test", "", false
     end
     local mode = reader:readLine()
-    setFilters(reader:readLine())
+    local selection = reader:readLine() or ""
     local stay = reader:readLine() == "stay"
     reader:close()
-    return mode, stay
+    return mode, selection, stay
 end
 
 local function share(fraction)
@@ -318,11 +319,14 @@ local function quit()
     getCore():quitToDesktop()
 end
 
--- `stay` is true for --test --stay.
+-- `selection` is the second line of the mode file, and `stay` is true for --test --stay.
 local RUNS = {
-    test = function(stay) runTests(stay and serveReruns or quit) end,
+    test = function(selection, stay)
+        setFilters(selection)
+        runTests(stay and serveReruns or quit)
+    end,
     loot = reportLoot,
-    promo = function() Promo.capture(quitWhenDone("REPromo")) end,
+    promo = function(selection) Promo.capture(selection, quitWhenDone("REPromo")) end,
     art = function() Art.capture(quitWhenDone("REArt")) end,
 }
 
@@ -356,13 +360,14 @@ local function afterSettling(run)
     Events.OnTick.Add(onTick)
 end
 
-local mode, stay = readMode()
+local mode, selection, stay = readMode()
 -- Game time per second doesn't depend on the frame rate (FPSTracking), so more frames a second only
--- shorten what is counted in ticks: the tests' waits for the game to apply a change, and from here
--- on the world loading. Measured on an M3 Max, uncapped draws about 260 frames a second against 60.
--- The option can't do it: Core.loadOptions resets uncappedFPS to false and frameRate to 60. --art
--- and --promo keep 60, because their captures wait fixed tick counts for walking and lighting.
-if mode == "test" then
+-- shorten what is counted in ticks: the tests' waits for the game to apply a change, the promo's
+-- waits for drawing, and from here on the world loading. Measured on an M3 Max, uncapped draws
+-- about 260 frames a second against 60. The option can't do it: Core.loadOptions resets
+-- uncappedFPS to false and frameRate to 60. --art keeps 60, because its captures wait fixed tick
+-- counts for walking and lighting.
+if mode == "test" or mode == "promo" then
     getPerformance():setFramerateUncapped(true)
 end
 
@@ -370,5 +375,5 @@ local originalOnStart = scenario.onStart
 scenario.onStart = function()
     originalOnStart()
     local run = RUNS[mode] or RUNS.test
-    afterSettling(function() run(stay) end)
+    afterSettling(function() run(selection, stay) end)
 end

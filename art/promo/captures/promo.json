@@ -185,7 +185,7 @@
     {
       "name": "model_RenewableEnergy_SolarModule",
       "box": [
-        66,
+        67,
         133,
         447,
         230
@@ -194,7 +194,7 @@
     {
       "name": "model_RenewableEnergy_HomemadeSolarModule",
       "box": [
-        60,
+        61,
         137,
         452,
         233
@@ -212,10 +212,10 @@
     {
       "name": "model_RenewableEnergy_SolarFlat",
       "box": [
-        66,
+        67,
         133,
         447,
-        235
+        234
       ]
     },
     {
@@ -224,13 +224,13 @@
         54,
         142,
         459,
-        285
+        286
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarWallMetal",
       "box": [
-        66,
+        67,
         133,
         447,
         260
@@ -239,19 +239,19 @@
     {
       "name": "model_RenewableEnergy_SolarRackWood",
       "box": [
-        49,
+        50,
         111,
-        334,
-        428
+        333,
+        427
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarRackMetal",
       "box": [
-        49,
-        112,
-        333,
-        431
+        50,
+        111,
+        332,
+        430
       ]
     },
     {
@@ -259,7 +259,7 @@
       "box": [
         106,
         106,
-        363,
+        364,
         406
       ]
     },
@@ -284,7 +284,7 @@
     {
       "name": "model_RenewableEnergy_BatteryRackMetal",
       "box": [
-        67,
+        68,
         107,
         373,
         405
@@ -296,16 +296,16 @@
         58,
         25,
         321,
-        405
+        404
       ]
     },
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
         58,
-        23,
+        22,
         321,
-        399
+        398
       ]
     },
     {
@@ -322,8 +322,8 @@
       "box": [
         57,
         57,
-        221,
-        137
+        220,
+        138
       ]
     },
     {
@@ -341,7 +341,7 @@
         36,
         36,
         139,
-        101
+        100
       ]
     },
     {
@@ -350,7 +350,7 @@
         74,
         74,
         285,
-        166
+        165
       ]
     },
     {
@@ -359,7 +359,7 @@
         62,
         62,
         238,
-        223
+        222
       ]
     },
     {
@@ -374,10 +374,10 @@
     {
       "name": "model_RenewableEnergy_CarBatteryCase",
       "box": [
-        50,
-        50,
-        192,
-        190
+        49,
+        49,
+        190,
+        188
       ]
     },
     {
@@ -419,10 +419,10 @@
     {
       "name": "model_RenewableEnergy_WoodenBatteryPlatePattern",
       "box": [
-        25,
-        25,
-        96,
-        70
+        24,
+        24,
+        94,
+        69
       ]
     },
     {
@@ -430,7 +430,7 @@
       "box": [
         36,
         36,
-        139,
+        138,
         116
       ]
     },
@@ -439,7 +439,7 @@
       "box": [
         36,
         36,
-        139,
+        138,
         116
       ]
     },
@@ -457,8 +457,8 @@
       "box": [
         93,
         93,
-        358,
-        236
+        359,
+        235
       ]
     },
     {
@@ -467,34 +467,34 @@
         35,
         35,
         134,
-        78
+        79
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarGardenLight",
       "box": [
-        102,
-        102,
-        392,
-        175
+        101,
+        101,
+        390,
+        174
       ]
     },
     {
       "name": "model_RenewableEnergy_HomesteadPowerMag1",
       "box": [
-        40,
-        40,
-        153,
-        115
+        39,
+        39,
+        151,
+        114
       ]
     },
     {
       "name": "model_RenewableEnergy_HomesteadPowerMag2",
       "box": [
-        40,
-        40,
-        153,
-        115
+        39,
+        39,
+        151,
+        114
       ]
     },
     {
@@ -4281,5 +4281,137 @@
   ],
   "strings": {
     "modName": "Renewable Energy"
+  },
+  "captures": {
+    "gardenlights": [
+      "gardenlights"
+    ],
+    "icons": [
+      "icon_Base_Amplifier",
+      "icon_Base_BakingSoda",
+      "icon_Base_BlowTorch",
+      "icon_Base_Calculator",
+      "icon_Base_CarBattery1",
+      "icon_Base_CarBattery2",
+      "icon_Base_CarBattery3",
+      "icon_Base_Charcoal",
+      "icon_Base_Clay",
+      "icon_Base_ElectricWire",
+      "icon_Base_ElectronicsScrap",
+      "icon_Base_Epoxy",
+      "icon_Base_GlassPanel",
+      "icon_Base_Gloves_Dish",
+      "icon_Base_Gloves_LeatherGloves",
+      "icon_Base_Gloves_LeatherGlovesBlack",
+      "icon_Base_Gloves_LeatherGlovesBrown",
+      "icon_Base_Gloves_Surgical",
+      "icon_Base_Glue",
+      "icon_Base_Hammer",
+      "icon_Base_HandDrill",
+      "icon_Base_Matches",
+      "icon_Base_MetalBar",
+      "icon_Base_MetalPipe",
+      "icon_Base_Nails",
+      "icon_Base_Plank",
+      "icon_Base_Pliers",
+      "icon_Base_RemoteCraftedV3",
+      "icon_Base_RippedSheets",
+      "icon_Base_Saw",
+      "icon_Base_Screwdriver",
+      "icon_Base_Screws",
+      "icon_Base_SheetMetal",
+      "icon_Base_SmallSheetMetal",
+      "icon_Base_WaterBottle",
+      "icon_Base_WeldingMask",
+      "icon_Base_Wrench",
+      "icon_RenewableEnergy_BatteryBankMetal",
+      "icon_RenewableEnergy_BatteryBankWood",
+      "icon_RenewableEnergy_BatteryBoxMetal",
+      "icon_RenewableEnergy_BatteryBoxWood",
+      "icon_RenewableEnergy_BatteryElectrolyte",
+      "icon_RenewableEnergy_BatteryPlateMold",
+      "icon_RenewableEnergy_BatteryPlateMoldUnfired",
+      "icon_RenewableEnergy_BatteryPlates",
+      "icon_RenewableEnergy_BatteryRackMetal",
+      "icon_RenewableEnergy_BatteryRackWood",
+      "icon_RenewableEnergy_CarBatteryCase",
+      "icon_RenewableEnergy_ChargeController",
+      "icon_RenewableEnergy_DeepCycleBattery",
+      "icon_RenewableEnergy_DeepCycleBatteryCase",
+      "icon_RenewableEnergy_HomemadeSolarModule",
+      "icon_RenewableEnergy_HomesteadPowerMag1",
+      "icon_RenewableEnergy_HomesteadPowerMag2",
+      "icon_RenewableEnergy_InverterCharger",
+      "icon_RenewableEnergy_L16Battery",
+      "icon_RenewableEnergy_L16BatteryCase",
+      "icon_RenewableEnergy_PlugInInverter",
+      "icon_RenewableEnergy_PowerInverter",
+      "icon_RenewableEnergy_SolarCellCharger",
+      "icon_RenewableEnergy_SolarCells",
+      "icon_RenewableEnergy_SolarFailsafe",
+      "icon_RenewableEnergy_SolarFlat",
+      "icon_RenewableEnergy_SolarGardenLight",
+      "icon_RenewableEnergy_SolarMaintainer",
+      "icon_RenewableEnergy_SolarModule",
+      "icon_RenewableEnergy_SolarRackMetal",
+      "icon_RenewableEnergy_SolarRackWood",
+      "icon_RenewableEnergy_SolarWallMetal",
+      "icon_RenewableEnergy_SolarWallWood",
+      "icon_RenewableEnergy_WoodenBatteryPlatePattern",
+      "icon_RenewableEnergy_WornBatteryPlates"
+    ],
+    "menu": [
+      "menu"
+    ],
+    "models": [
+      "model_Base_CarBattery1",
+      "model_RenewableEnergy_BatteryBankMetal",
+      "model_RenewableEnergy_BatteryBankWood",
+      "model_RenewableEnergy_BatteryBoxMetal",
+      "model_RenewableEnergy_BatteryBoxWood",
+      "model_RenewableEnergy_BatteryElectrolyte",
+      "model_RenewableEnergy_BatteryPlateMold",
+      "model_RenewableEnergy_BatteryPlateMoldUnfired",
+      "model_RenewableEnergy_BatteryPlates",
+      "model_RenewableEnergy_BatteryRackMetal",
+      "model_RenewableEnergy_BatteryRackWood",
+      "model_RenewableEnergy_CarBatteryCase",
+      "model_RenewableEnergy_ChargeController",
+      "model_RenewableEnergy_DeepCycleBattery",
+      "model_RenewableEnergy_DeepCycleBatteryCase",
+      "model_RenewableEnergy_HomemadeSolarModule",
+      "model_RenewableEnergy_HomesteadPowerMag1",
+      "model_RenewableEnergy_HomesteadPowerMag2",
+      "model_RenewableEnergy_InverterCharger",
+      "model_RenewableEnergy_L16Battery",
+      "model_RenewableEnergy_L16BatteryCase",
+      "model_RenewableEnergy_PlugInInverter",
+      "model_RenewableEnergy_PowerInverter",
+      "model_RenewableEnergy_SolarCellCharger",
+      "model_RenewableEnergy_SolarCells",
+      "model_RenewableEnergy_SolarFailsafe",
+      "model_RenewableEnergy_SolarFlat",
+      "model_RenewableEnergy_SolarGardenLight",
+      "model_RenewableEnergy_SolarMaintainer",
+      "model_RenewableEnergy_SolarModule",
+      "model_RenewableEnergy_SolarRackMetal",
+      "model_RenewableEnergy_SolarRackWood",
+      "model_RenewableEnergy_SolarWallMetal",
+      "model_RenewableEnergy_SolarWallWood",
+      "model_RenewableEnergy_WoodenBatteryPlatePattern",
+      "model_RenewableEnergy_WornBatteryPlates"
+    ],
+    "status": [
+      "status"
+    ],
+    "trailer": [
+      "trailer"
+    ],
+    "world": [
+      "bank",
+      "homestead",
+      "stage0",
+      "world"
+    ]
   }
 }

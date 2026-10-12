@@ -9,21 +9,42 @@ Stage.SEARCH_RADIUS = 40
 -- How far from a place the trees go: near a building, a tree out of the character's sight draws
 -- as a black silhouette full of holes (IsoTree.render).
 local TREE_RADIUS = 30
--- The character faces the camera last.
+-- The character faces the camera last, after a wide turn: a short last turn can leave it shown in
+-- profile.
 local LOOK_AROUND = { IsoDirections.N, IsoDirections.E, IsoDirections.S, IsoDirections.W, IsoDirections.SE }
+-- How close the character's forward vector comes to the facing it turns to.
+local TURN_TOLERANCE = 0.02
+-- The lighting thread updates the squares every few dozen milliseconds, and shows a change of
+-- facing within about a tenth of a second, so lighting this long unchanged has settled.
+local SETTLE_MS = 300
+-- How far around the character the lighting has to settle, in squares.
+local SETTLE_RADIUS = 15
+-- How long a step's wait may poll before the run logs it and goes on.
+local WAIT_MAX_MS = 10000
 -- Steps to scroll in to reach the closest zoom.
 local STEPS_TO_CLOSEST = 8
 local TRAILER = "Base.RenewableEnergyArrowBoardTrailer"
 local TOWING_CAR = "Base.OffRoad"
--- How far behind its car the game's own debug command (attachTrailerToPlayerVehicle) puts a
--- trailer, which the hitch then pulls up to the tow bar.
+-- How far behind its car a trailer spawns, clear of it while both settle onto their wheels; the
+-- hitch then moves it up to the tow bar.
 local TRAILER_GAP = 5
 local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
 
---- Runs each step on its own tick, then waits as many ticks as the step returns, then calls onDone.
-function Stage.runSteps(steps, onDone)
-    local index, wait = 1, 0
+--- Runs each step on its own tick, then waits before the next: as many ticks as the step returns,
+--- or, if it returns a function, until that function returns true. A function polled for longer
+--- than WAIT_MAX_MS is logged under `mark` and given up. Then calls onDone.
+function Stage.runSteps(steps, onDone, mark)
+    local index, wait, poll, pollStart = 1, 0, nil, 0
     local function onTick()
+        if poll then
+            if poll() then
+                poll = nil
+            elseif getTimestampMs() - pollStart > WAIT_MAX_MS then
+                print(string.format("%s WAIT gave up on step %d after %d ms", mark or "Stage", index - 1, WAIT_MAX_MS))
+                poll = nil
+            end
+            return
+        end
         if wait > 0 then
             wait = wait - 1
             return
@@ -35,9 +56,62 @@ function Stage.runSteps(steps, onDone)
             return
         end
         index = index + 1
-        wait = step() or 0
+        local result = step()
+        if type(result) == "function" then
+            poll, pollStart = result, getTimestampMs()
+        else
+            wait = result or 0
+        end
     end
     Events.OnTick.Add(onTick)
+end
+
+-- Which squares around the character it has seen and how lit they are, as one comparable value.
+local function lightingState(player)
+    local here = player:getCurrentSquare()
+    if not here then
+        return nil
+    end
+    local playerNum = player:getPlayerNum()
+    local seen, light = 0, 0
+    for dx = -SETTLE_RADIUS, SETTLE_RADIUS do
+        for dy = -SETTLE_RADIUS, SETTLE_RADIUS do
+            local square = getCell():getGridSquare(here:getX() + dx, here:getY() + dy, here:getZ())
+            if square then
+                seen = seen + (square:isSeen(playerNum) and 1 or 0)
+                light = light + math.floor(square:getLightLevel(playerNum) * 100)
+            end
+        end
+    end
+    return seen .. "/" .. light
+end
+
+--- A runSteps wait until the lighting around the character has settled: no square newly seen and
+--- no light level changed for SETTLE_MS. With `change`, the lighting must change first, since a
+--- change of the clock or a new light source takes most of a second to show.
+function Stage.lightingSettled(player, change)
+    local last, since
+    local changed = not change
+    return function()
+        local state, now = lightingState(player), getTimestampMs()
+        if state ~= last or not since then
+            changed = changed or since ~= nil
+            last, since = state, now
+            return false
+        end
+        return changed and now - since >= SETTLE_MS
+    end
+end
+
+--- A runSteps wait until the zoom stops changing, which eases towards its target every frame.
+function Stage.zoomSettled()
+    local last
+    return function()
+        local zoom = getCore():getZoom(0)
+        local settled = zoom == last
+        last = zoom
+        return settled
+    end
 end
 
 --- The loaded square closest to the character, within SEARCH_RADIUS on its level, for which
@@ -73,18 +147,30 @@ function Stage.removeTrees(x, y, z)
 end
 
 --- Adds the steps that put the character on `square` and have it look around, since squares it
---- never saw are drawn dark.
+--- never saw are drawn dark. Its sight sweeps round with each turn, so only the last waits for the
+--- lighting to settle.
 function Stage.addLookAround(steps, player, square)
     table.insert(steps, function()
         player:teleportTo(square:getX() + 0.5, square:getY() + 0.5, square:getZ())
-        return 30
+        return function()
+            return player:getCurrentSquare() == square
+        end
     end)
     for _, direction in ipairs(LOOK_AROUND) do
+        local target = direction:ToVector()
+        local targetX, targetY = target:getX(), target:getY()
+        -- The character turns, and its sight with it, over about half a second.
         table.insert(steps, function()
             player:faceDirection(direction)
-            return 40
+            return function()
+                return not player:isTurning() and math.abs(player:getForwardDirectionX() - targetX) < TURN_TOLERANCE
+                    and math.abs(player:getForwardDirectionY() - targetY) < TURN_TOLERANCE
+            end
         end)
     end
+    table.insert(steps, function()
+        return Stage.lightingSettled(player)
+    end)
 end
 
 --- Sets the zoom `stepsOut` steps out from the closest.
@@ -104,8 +190,8 @@ function Stage.screenshot(mark, file)
 end
 
 --- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer
---- behind it, both repaired: { car, trailer }. A vehicle joins the cell's list, and gets its
---- physics, only on a later update, so hitch them some ticks later.
+--- behind it, both repaired: { car, trailer, facing }. A vehicle joins the cell's list, and gets
+--- its physics, only on a later update, so hitch them some ticks later.
 function Stage.spawnTrailer(square, facing)
     local behind = BEHIND[facing]
     local trailerSquare = getCell():getGridSquare(square:getX() + behind[1] * TRAILER_GAP,
@@ -113,16 +199,36 @@ function Stage.spawnTrailer(square, facing)
     local pair = {
         car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
         trailer = addVehicleDebug(TRAILER, IsoDirections[facing], 0, trailerSquare),
+        facing = facing,
     }
     pair.car:repair()
     pair.trailer:repair()
     return pair
 end
 
---- Hitches the trailer of Stage.spawnTrailer's `pair`, opens its battery box and puts a battery
---- in it, and logs under `mark` whether both worked.
+-- Turns both of `pair` square to its facing and moves the trailer so its coupler sits on the car's
+-- tow bar. addVehicleDebug skews each vehicle's heading at random, and a hitch left to pull the
+-- trailer in from where it spawned yanks it hard enough to jackknife it.
+local function lineUpTrailer(pair)
+    local car, trailer = pair.car, pair.trailer
+    -- The rotation addVehicleDebug gives a heading, before its random skew.
+    local yaw = ((IsoDirections[pair.facing]:toAngle() + math.pi) * 180 / math.pi) % 360
+    car:setAngles(0, yaw, 0)
+    trailer:setAngles(0, yaw, 0)
+    local towing = car:getTowingWorldPos("trailer", Vector3f.new())
+    local towed = trailer:getTowedByWorldPos("trailer", Vector3f.new())
+    local transform = trailer:getWorldTransform(Transform.new())
+    local origin = transform:getOrigin()
+    -- The transform's x and z are the world's x and y.
+    origin:set(origin:x() + towing:x() - towed:x(), origin:y(), origin:z() + towing:y() - towed:y())
+    trailer:setWorldTransform(transform)
+end
+
+--- Lines up and hitches the trailer of Stage.spawnTrailer's `pair`, opens its battery box and puts
+--- a battery in it, and logs under `mark` whether both worked.
 function Stage.hitchTrailer(pair, player, mark)
     local car, trailer = pair.car, pair.trailer
+    lineUpTrailer(pair)
     car:addPointConstraint(player, trailer, "trailer", "trailer")
     local lid = trailer:getPartById("TrunkDoor")
     local box = trailer:getPartById("RenewableEnergyBatteryBox")

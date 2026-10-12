@@ -20,7 +20,11 @@
 #                                    working array and captures the art for the README and the
 #                                    Workshop page, and art/promo/extract.py crops it into
 #                                    art/promo/captures (needs uv, https://docs.astral.sh/uv/);
-#                                    art/promo/compose.py then lays out art/promo/images
+#                                    art/promo/compose.py then lays out art/promo/images.
+#                                    PROMO=<group>,... shoots only those groups and replaces only
+#                                    their captures (e.g. PROMO=trailer); a bad name lists the
+#                                    groups. There is no --promo --stay: a rerun in the same world
+#                                    would shoot what the last run built.
 #   dev/run-debug-client.sh --art    the same, but instead of the tests the harness drops every item
 #                                    on the ground and places every tile, and saves close-ups as
 #                                    art_*.png in the screenshots folder, to check the models and tiles
@@ -31,8 +35,9 @@
 #
 # CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-client), JAVAC the compiler for
 # ClickToStart.java (default: javac from PATH; any JDK from 8 on works), TIMEOUT the seconds a
-# harness run may take (default 1200), and TESTS, a comma-separated list of test name prefixes,
-# limits --test to those tests (e.g. TESTS=renewable_energy_loot_).
+# harness run may take (default 1200), TESTS, a comma-separated list of test name prefixes,
+# limits --test to those tests (e.g. TESTS=renewable_energy_loot_), and PROMO, a comma-separated
+# list of groups, limits --promo to those groups.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -54,6 +59,21 @@ for arg in "$@"; do
 done
 if [ -n "$STAY" ] && [ "$MODE" != test ]; then
     usage
+fi
+# The groups --promo can shoot, as RenewableEnergyDevPromo.lua's GROUP_NAMES line lists them. An
+# unknown one fails here rather than after the game has started.
+if [ "$MODE" = promo ] && [ -n "${PROMO:-}" ]; then
+    PROMO_GROUPS=$(sed -n 's/^local GROUP_NAMES = { \(.*\) }$/\1/p' \
+        "$REPO/dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevPromo.lua" | tr -d '" ')
+    for group in ${PROMO//,/ }; do
+        case ",$PROMO_GROUPS," in
+            *",$group,"*) ;;
+            *)
+                echo "unknown PROMO group $group; the groups are $PROMO_GROUPS" >&2
+                exit 2
+                ;;
+        esac
+    done
 fi
 TIMEOUT=${TIMEOUT:-1200}
 LOG="$CACHE/console.txt"
@@ -138,8 +158,10 @@ prepare_cache() {
     mod = cf_renewable_energy_devharness,"
         mkdir -p "$CACHE/Lua"
         rm -f "$REQUEST_FILE"
-        # Then TESTS, comma-separated name prefixes that limit which tests run, and "stay" for --stay.
-        printf '%s\n%s\n%s\n' "$MODE" "${TESTS:-}" "$([ -n "$STAY" ] && echo stay || true)" > "$HARNESS_FILE"
+        # Then what to run, comma-separated: TESTS name prefixes, or PROMO groups for --promo; and
+        # "stay" for --stay.
+        printf '%s\n%s\n%s\n' "$MODE" "$([ "$MODE" = promo ] && echo "${PROMO:-}" || echo "${TESTS:-}")" \
+            "$([ -n "$STAY" ] && echo stay || true)" > "$HARNESS_FILE"
     else
         rm -f "$CACHE/mods/RenewableEnergyDevHarness"
     fi

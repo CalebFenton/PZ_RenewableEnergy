@@ -9,7 +9,16 @@
 --   art_fill.png      every bank tile, of every tier, with every battery overlay it has, and every
 --                     level of its charge meter
 --   art_trailer.png   the arrow board trailer hitched to a car, its battery box open and holding
---                     a battery; "REArt trailer" in console.txt says whether both worked
+--                     a battery; "REArt trailer" in console.txt says whether both worked. The
+--                     same view then shows its rear in each of these states:
+--     art_trailer_rust.png      rust at its full amount
+--     art_trailer_blood_right.png   blood on the right side only, which settles which side is which
+--     art_trailer_blood.png     blood on all four sides
+--     art_trailer_brake.png     the brake lights, lit while the towing car brakes
+--   art_trailer_front.png   a second trailer, alone and facing the other way, blood on all four
+--                     sides, for the front and left side; the same view then shows it clean with
+--     art_trailer_damage1.png   the battery box lid (TrunkDoor) at damage stage 1, then
+--     art_trailer_damage2.png   at stage 2
 
 require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
@@ -93,7 +102,63 @@ local SHOTS = {
     items = { name = "art_items", x = 4, y = 5, zoomSteps = 1 },
     fill = { name = "art_fill", x = 6, y = 12, zoomSteps = 3 },
     trailer = { name = "art_trailer", x = 8, y = 7, zoomSteps = 2 },
+    trailerFront = { name = "art_trailer_front", x = 3, y = 6, zoomSteps = 2 },
 }
+
+-- Damage stage 1 is a condition from 40 to 59, stage 2 below 40 (BaseVehicle.doDamageOverlay).
+local LID_STAGE_1, LID_STAGE_2 = 50, 20
+local BLOOD_SIDES = { "Front", "Rear", "Left", "Right" }
+
+local function setBlood(vehicle, sides)
+    for _, side in ipairs(BLOOD_SIDES) do
+        vehicle:setBloodIntensity(side, 0)
+    end
+    for _, side in ipairs(sides) do
+        vehicle:setBloodIntensity(side, 1)
+    end
+end
+
+-- The trailer's states, each set on a repaired trailer and shot from where the shot before stands.
+-- The hitched trailer shows its rear; the lone one, facing the other way, its front and the lid.
+local HITCHED_STATES = {
+    { name = "art_trailer_rust", set = function(pair) pair.trailer:setRust(1) end },
+    { name = "art_trailer_blood_right", set = function(pair) setBlood(pair.trailer, { "Right" }) end },
+    { name = "art_trailer_blood", set = function(pair) setBlood(pair.trailer, BLOOD_SIDES) end },
+    {
+        name = "art_trailer_brake",
+        set = function(pair)
+            -- A towed trailer's brake lights follow its car's, which need charge in the car's battery.
+            local battery = pair.car:getBattery() and pair.car:getBattery():getInventoryItem()
+            if battery then
+                battery:setCurrentUsesFloat(1)
+            end
+            pair.car:setStoplightsOn(true)
+        end,
+    },
+}
+local LONE_STATES = {
+    { name = "art_trailer_damage1", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setCondition(LID_STAGE_1) end },
+    { name = "art_trailer_damage2", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setCondition(LID_STAGE_2) end },
+}
+
+-- `pair` returns the current pair, which the steps only know once they run.
+local function addStates(steps, pair, states)
+    for _, state in ipairs(states) do
+        table.insert(steps, function()
+            pair().trailer:repair()
+            if pair().car then
+                pair().car:setStoplightsOn(false)
+            end
+            state.set(pair())
+            -- A part's new condition reaches the overlay on the vehicle's next update.
+            return 30
+        end)
+        table.insert(steps, function()
+            Stage.screenshot("REArt", state.name)
+            return 10
+        end)
+    end
+end
 
 local function isOpen(square)
     return square ~= nil and square:isOutside() and square:isSolidFloor() and square:getObjects():size() == 1
@@ -156,6 +221,42 @@ local function clearLot(lot)
         end
     end
     recalcLot(lot)
+end
+
+-- The world can park vehicles on and around the lot after it was chosen, as its chunks load, and
+-- one there hides the trailer or runs into it.
+local VEHICLE_MARGIN = 4
+
+local function clearVehicles(lot)
+    local found = {}
+    for x = -VEHICLE_MARGIN, AREA.w + VEHICLE_MARGIN - 1 do
+        for y = -VEHICLE_MARGIN, AREA.h + VEHICLE_MARGIN - 1 do
+            local square = lotSquare(lot, x, y)
+            local vehicle = square and square:getVehicleContainer()
+            if vehicle then
+                found[vehicle] = true
+            end
+        end
+    end
+    for vehicle in pairs(found) do
+        vehicle:permanentlyRemove()
+    end
+end
+
+-- How long the trailer must stay put to count as pulled up to its hitch.
+local TRAILER_STILL_MS = 1000
+
+--- A runSteps wait until the hitch has pulled `trailer` up to its car and it has stopped.
+local function trailerSettled(trailer)
+    local x, y, since
+    return function()
+        local now = getTimestampMs()
+        if not since or math.abs(trailer:getX() - x) + math.abs(trailer:getY() - y) > 0.01 then
+            x, y, since = trailer:getX(), trailer:getY(), now
+            return false
+        end
+        return now - since >= TRAILER_STILL_MS
+    end
 end
 
 local function placeTiles(lot, list)
@@ -286,16 +387,32 @@ function Art.capture(onDone)
     addShot(steps, player, lot, SHOTS.fill)
     table.insert(steps, function()
         clearLot(lot)
+        clearVehicles(lot)
         trailer = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
         -- A vehicle joins the cell's list, and gets its physics, only on a later update.
         return 30
     end)
     table.insert(steps, function()
         Stage.hitchTrailer(trailer, player, "REArt")
-        return 60
+        return trailerSettled(trailer.trailer)
     end)
     addShot(steps, player, lot, SHOTS.trailer)
-    Stage.runSteps(steps, onDone)
+    local function currentPair()
+        return trailer
+    end
+    addStates(steps, currentPair, HITCHED_STATES)
+    table.insert(steps, function()
+        clearVehicles(lot)
+        trailer = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")
+        -- From the camera's side a car facing this way would hide its trailer.
+        trailer.car:permanentlyRemove()
+        trailer.car = nil
+        setBlood(trailer.trailer, BLOOD_SIDES)
+        return 30
+    end)
+    addShot(steps, player, lot, SHOTS.trailerFront)
+    addStates(steps, currentPair, LONE_STATES)
+    Stage.runSteps(steps, onDone, "REArt")
 end
 
 return Art
