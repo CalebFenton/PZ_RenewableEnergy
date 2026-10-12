@@ -1,5 +1,6 @@
-"""Renders the mod list icon, 42/icon.png: a solar rack and a deep-cycle battery in afternoon sun,
-on a sky tile with the sun in its corner.
+"""Renders the mod list icon, 42/icon.png, and from the same picture at full size the mod's poster,
+42/poster.png, and the Workshop preview, preview.png: a solar rack and a deep-cycle battery in
+afternoon sun, on a sky tile with the sun in its corner.
 
     blender -b --factory-startup -P art/models/mod_icon.py
 
@@ -22,10 +23,13 @@ import items  # noqa: E402
 import kit  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(HERE))
-OUT = os.path.join(REPO, "Contents/mods/RenewableEnergy/42/icon.png")
+ICON = os.path.join(REPO, "Contents/mods/RenewableEnergy/42/icon.png")
+# The Workshop takes a square preview of 256 or 512 pixels, at most 1 MB; the mod list's poster
+# panel draws about that size too.
+FULL_SIZE = [os.path.join(REPO, "Contents/mods/RenewableEnergy/42/poster.png"), os.path.join(REPO, "preview.png")]
 SCRATCH = os.path.join(tempfile.gettempdir(), "renewable-energy-render")
 SIZE = 64
-RENDER = 512  # rendered larger, then averaged down
+RENDER = 512  # rendered larger, then averaged down for the icon
 
 SKY_TOP, SKY_BOTTOM = (0.20, 0.48, 0.82), (0.62, 0.82, 0.96)
 SUN = (1.0, 0.84, 0.25)
@@ -187,9 +191,10 @@ def main():
     bpy.context.scene.render.filepath = raw
     bpy.ops.render.render(write_still=True)
     full = compose(load_pixels(raw))
-    save_pixels(os.path.join(SCRATCH, "mod_icon_full.png"), full)
-    save_pixels(OUT, downsample(full, SIZE))
-    print("mod icon written to %s" % OUT)
+    save_pixels(ICON, downsample(full, SIZE))
+    for path in FULL_SIZE:
+        save_pixels(path, full)
+    print("mod icon, poster and preview written")
 
 
 main()

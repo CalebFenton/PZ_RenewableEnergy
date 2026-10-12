@@ -181,6 +181,332 @@
       "name": "Car Battery"
     }
   ],
+  "models": [
+    {
+      "name": "model_RenewableEnergy_SolarModule",
+      "box": [
+        66,
+        133,
+        447,
+        230
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomemadeSolarModule",
+      "box": [
+        60,
+        137,
+        452,
+        233
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarCells",
+      "box": [
+        33,
+        33,
+        127,
+        76
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarFlat",
+      "box": [
+        66,
+        133,
+        447,
+        235
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarWallWood",
+      "box": [
+        54,
+        142,
+        459,
+        285
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarWallMetal",
+      "box": [
+        66,
+        133,
+        447,
+        260
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarRackWood",
+      "box": [
+        49,
+        111,
+        334,
+        428
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarRackMetal",
+      "box": [
+        49,
+        112,
+        333,
+        431
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryBoxWood",
+      "box": [
+        106,
+        106,
+        363,
+        406
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryBoxMetal",
+      "box": [
+        105,
+        105,
+        360,
+        407
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryRackWood",
+      "box": [
+        67,
+        106,
+        371,
+        406
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryRackMetal",
+      "box": [
+        67,
+        107,
+        373,
+        405
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryBankWood",
+      "box": [
+        58,
+        25,
+        321,
+        405
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryBankMetal",
+      "box": [
+        58,
+        23,
+        321,
+        399
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_PlugInInverter",
+      "box": [
+        48,
+        48,
+        186,
+        94
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_PowerInverter",
+      "box": [
+        57,
+        57,
+        221,
+        137
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_InverterCharger",
+      "box": [
+        105,
+        105,
+        407,
+        271
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_ChargeController",
+      "box": [
+        36,
+        36,
+        139,
+        101
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarFailsafe",
+      "box": [
+        74,
+        74,
+        285,
+        166
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_DeepCycleBattery",
+      "box": [
+        62,
+        62,
+        238,
+        223
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_L16Battery",
+      "box": [
+        87,
+        87,
+        289,
+        335
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_CarBatteryCase",
+      "box": [
+        50,
+        50,
+        192,
+        190
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_DeepCycleBatteryCase",
+      "box": [
+        61,
+        61,
+        234,
+        215
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_L16BatteryCase",
+      "box": [
+        88,
+        88,
+        290,
+        338
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_WornBatteryPlates",
+      "box": [
+        31,
+        31,
+        102,
+        121
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryPlates",
+      "box": [
+        32,
+        32,
+        103,
+        124
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_WoodenBatteryPlatePattern",
+      "box": [
+        25,
+        25,
+        96,
+        70
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryPlateMoldUnfired",
+      "box": [
+        36,
+        36,
+        139,
+        116
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryPlateMold",
+      "box": [
+        36,
+        36,
+        139,
+        116
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryElectrolyte",
+      "box": [
+        45,
+        45,
+        90,
+        174
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarMaintainer",
+      "box": [
+        93,
+        93,
+        358,
+        236
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarCellCharger",
+      "box": [
+        35,
+        35,
+        134,
+        78
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarGardenLight",
+      "box": [
+        102,
+        102,
+        392,
+        175
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomesteadPowerMag1",
+      "box": [
+        40,
+        40,
+        153,
+        115
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomesteadPowerMag2",
+      "box": [
+        40,
+        40,
+        153,
+        115
+      ]
+    },
+    {
+      "name": "model_Base_CarBattery1",
+      "box": [
+        43,
+        43,
+        120,
+        167
+      ]
+    }
+  ],
   "recipes": [
     {
       "id": "RenewableEnergy_MakeSolarFailsafe",
@@ -247,7 +573,11 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Inverter/Charger",
+          "Solar Failsafe"
+        ]
       },
       "name": "Make Solar Failsafe",
       "outputs": [
@@ -358,7 +688,11 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Inverter/Charger",
+          "Wooden Battery Bank"
+        ]
       },
       "name": "Build Wooden Battery Bank",
       "outputs": [
@@ -436,7 +770,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Battery Plate Mold"
+        ]
       },
       "name": "Fire Battery Plate Mold",
       "outputs": [
@@ -484,7 +821,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Take Apart Solar Battery Charger",
       "outputs": [
@@ -544,7 +882,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Unfired Battery Plate Mold"
+        ]
       },
       "name": "Press Battery Plate Mold",
       "outputs": [
@@ -670,7 +1011,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Metal Solar Ground Rack",
+          "Solar Module"
+        ]
       },
       "name": "Make Metal Solar Ground Rack",
       "outputs": [
@@ -816,7 +1161,11 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Car Battery Case",
+          "Worn Battery Plates"
+        ]
       },
       "name": "Strip Car Battery",
       "outputs": [
@@ -916,7 +1265,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Flat Solar Panel",
+          "Solar Module"
+        ]
       },
       "name": "Make Flat Solar Panel",
       "outputs": [
@@ -1041,7 +1394,11 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Inverter/Charger",
+          "Metal Battery Bank"
+        ]
       },
       "name": "Build Metal Battery Bank",
       "outputs": [
@@ -1146,7 +1503,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Service Battery",
       "outputs": [],
@@ -1206,7 +1564,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Unmount Wooden Wall-Mounted Solar Panel",
       "outputs": [
@@ -1321,7 +1680,8 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": []
       },
       "name": "Repair Cracked Module",
       "outputs": [],
@@ -1367,7 +1727,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Unmount Flat Solar Panel",
       "outputs": [
@@ -1426,7 +1787,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Take Apart Shattered Module",
       "outputs": [
@@ -1479,7 +1841,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Take Apart Solar Battery Maintainer",
       "outputs": [
@@ -1532,7 +1895,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Take Apart Calculator",
       "outputs": [
@@ -1635,7 +1999,8 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": []
       },
       "name": "Recondition Battery",
       "outputs": [],
@@ -1681,7 +2046,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Unmount Metal Wall-Mounted Solar Panel",
       "outputs": [
@@ -1839,7 +2205,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "L-16 Battery"
+        ]
       },
       "name": "Rebuild L-16 Battery",
       "outputs": [
@@ -1987,7 +2356,11 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Deep Cycle Battery Case",
+          "Worn Battery Plates"
+        ]
       },
       "name": "Strip Deep Cycle Battery",
       "outputs": [
@@ -2159,7 +2532,11 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "L-16 Battery Case",
+          "Worn Battery Plates"
+        ]
       },
       "name": "Strip L-16 Battery",
       "outputs": [
@@ -2288,7 +2665,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Homemade Solar Module"
+        ]
       },
       "name": "Make Homemade Solar Module",
       "outputs": [
@@ -2376,7 +2756,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Wooden Battery Plate Pattern"
+        ]
       },
       "name": "Make Wooden Battery Plate Pattern",
       "outputs": [
@@ -2450,7 +2833,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Battery Plates"
+        ]
       },
       "name": "Recast Battery Plates",
       "outputs": [
@@ -2566,7 +2952,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Power Inverter",
+          "Wooden Battery Rack"
+        ]
       },
       "name": "Build Wooden Battery Rack",
       "outputs": [
@@ -2680,7 +3070,8 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": []
       },
       "name": "Rebuild Car Battery",
       "outputs": [],
@@ -2726,7 +3117,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Unmount Metal Solar Ground Rack",
       "outputs": [
@@ -2791,7 +3183,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Take Apart Solar Garden Light",
       "outputs": [
@@ -2893,7 +3286,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Plug-in Inverter",
+          "Wooden Battery Box"
+        ]
       },
       "name": "Make Wooden Battery Box",
       "outputs": [
@@ -3019,7 +3416,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Metal Wall-Mounted Solar Panel",
+          "Solar Module"
+        ]
       },
       "name": "Make Metal Wall-Mounted Solar Panel",
       "outputs": [
@@ -3145,7 +3546,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Solar Module",
+          "Wooden Wall-Mounted Solar Panel"
+        ]
       },
       "name": "Make Wooden Wall-Mounted Solar Panel",
       "outputs": [
@@ -3274,7 +3679,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Charge Controller"
+        ]
       },
       "name": "Make Charge Controller",
       "outputs": [
@@ -3391,7 +3799,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Solar Module",
+          "Wooden Solar Ground Rack"
+        ]
       },
       "name": "Make Wooden Solar Ground Rack",
       "outputs": [
@@ -3497,7 +3909,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Metal Battery Box",
+          "Plug-in Inverter"
+        ]
       },
       "name": "Make Metal Battery Box",
       "outputs": [
@@ -3631,7 +4047,11 @@
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Metal Battery Rack",
+          "Power Inverter"
+        ]
       },
       "name": "Build Metal Battery Rack",
       "outputs": [
@@ -3702,7 +4122,8 @@
       "learn": {
         "auto": [],
         "magazines": [],
-        "needed": false
+        "needed": false,
+        "research": []
       },
       "name": "Unmount Wooden Solar Ground Rack",
       "outputs": [
@@ -3836,7 +4257,10 @@
         "magazines": [
           "Homestead Power #2: Inverters & Control"
         ],
-        "needed": true
+        "needed": true,
+        "research": [
+          "Deep Cycle Marine Battery"
+        ]
       },
       "name": "Rebuild Deep Cycle Battery",
       "outputs": [

@@ -1,5 +1,6 @@
 -- Development only. What the --art and --promo captures share: finding a place near the
--- character, clearing its trees, and the steps that walk the character to a shot and frame it.
+-- character, clearing its trees, the steps that walk the character to a shot and frame it, and
+-- the arrow board trailer hitched to a car.
 
 local Stage = {}
 
@@ -12,6 +13,12 @@ local TREE_RADIUS = 30
 local LOOK_AROUND = { IsoDirections.N, IsoDirections.E, IsoDirections.S, IsoDirections.W, IsoDirections.SE }
 -- Steps to scroll in to reach the closest zoom.
 local STEPS_TO_CLOSEST = 8
+local TRAILER = "Base.RenewableEnergyArrowBoardTrailer"
+local TOWING_CAR = "Base.OffRoad"
+-- How far behind its car the game's own debug command (attachTrailerToPlayerVehicle) puts a
+-- trailer, which the hitch then pulls up to the tow bar.
+local TRAILER_GAP = 5
+local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
 
 --- Runs each step on its own tick, then waits as many ticks as the step returns, then calls onDone.
 function Stage.runSteps(steps, onDone)
@@ -94,6 +101,41 @@ end
 function Stage.screenshot(mark, file)
     getCore():TakeFullScreenshot(file .. ".png")
     print(mark .. " saved " .. file .. ".png")
+end
+
+--- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer
+--- behind it, both repaired: { car, trailer }. A vehicle joins the cell's list, and gets its
+--- physics, only on a later update, so hitch them some ticks later.
+function Stage.spawnTrailer(square, facing)
+    local behind = BEHIND[facing]
+    local trailerSquare = getCell():getGridSquare(square:getX() + behind[1] * TRAILER_GAP,
+        square:getY() + behind[2] * TRAILER_GAP, square:getZ())
+    local pair = {
+        car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
+        trailer = addVehicleDebug(TRAILER, IsoDirections[facing], 0, trailerSquare),
+    }
+    pair.car:repair()
+    pair.trailer:repair()
+    return pair
+end
+
+--- Hitches the trailer of Stage.spawnTrailer's `pair`, opens its battery box and puts a battery
+--- in it, and logs under `mark` whether both worked.
+function Stage.hitchTrailer(pair, player, mark)
+    local car, trailer = pair.car, pair.trailer
+    car:addPointConstraint(player, trailer, "trailer", "trailer")
+    local lid = trailer:getPartById("TrunkDoor")
+    local box = trailer:getPartById("RenewableEnergyBatteryBox")
+    local container = box and box:getItemContainer()
+    if lid and lid:getDoor() then
+        lid:getDoor():setOpen(true)
+    end
+    if container then
+        container:AddItem("RenewableEnergy.DeepCycleBattery")
+    end
+    print(string.format("%s trailer towedBy=%s lid=%s container=%s items=%d", mark,
+        tostring(trailer:getVehicleTowedBy() == car), tostring(lid ~= nil), tostring(container ~= nil),
+        container and container:getItems():size() or 0))
 end
 
 return Stage

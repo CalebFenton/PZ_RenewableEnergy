@@ -1,5 +1,5 @@
 version=1
-# No images yet: the repository isn't public, so the art in art/promo/images has no URL to link. Once it is, add [img]<raw URL of banner.png, setup.png, status.png, items.png, recipes.png>[/img] above the matching sections (SteamWorkshopItem.readWorkshopTxt skips lines starting with #).
+# No images yet: the repository isn't public, so the art in art/promo/images has no URL to link. Once it is, add [img]<raw URL of banner.png, setup.png, menu.png, status.png, gardenlights.png, items.png, models.png, recipes.png, trailer.png>[/img] above the matching sections (SteamWorkshopItem.readWorkshopTxt skips lines starting with #).
 title=Renewable Energy
 description=Sooner or later the grid goes down, and sooner or later the gas runs out too. A generator buys you time, but it's loud, it fumes up the house, and it eats scrap electronics to keep going.
 description=
@@ -14,7 +14,7 @@ description=An inverter is just a number of watts, though. Go over it and the ba
 description=
 description=[h2]How it plays[/h2]
 description=[list]
-description=[*]Before the grid goes, charge every battery you own with a car battery charger.
+description=[*]Before the grid goes, fill your car batteries on a car battery charger, or wire the charger into a battery box and let the grid fill it.
 description=[*]The first weeks: a battery box, two car batteries and a Plug-in Inverter run the TV and a lamp, or a mini fridge.
 description=[*]Weeks 3 to 6: a battery rack of deep cycle batteries and a 600 W inverter run the kitchen fridge.
 description=[*]Months 2 and 3: a battery bank of L-16s, an Inverter/Charger and a failsafe on the generator run the fridge and freezer all year.
@@ -29,7 +29,7 @@ description=[h2]Keeping it running[/h2]
 description=Service a worn battery with water and baking soda, recondition it, or strip it down, recast its plates at a furnace and rebuild it like new. Inverters and controllers wear and take scrap electronics to fix, like a generator.
 description=
 description=[h2]Finding it[/h2]
-description=Look where people had this stuff in 1993: campers, auto parts stores, farms, electricians' vans, the phone and power companies, and preppers' caches. Cracked modules turn up in garages, sheds and junkyards. There are solar sites to raid: stock tank pumps in the pastures, farmhouses, campers, the phone company's relay sheds, ranger stations, the Deer Valley Power yard, and solar arrow board trailers at road works and in highway pileups. Some houses have solar garden lights out front that still work.
+description=Look where people had this stuff in 1993: campers, auto parts stores, farms, electricians' vans, the phone and power companies, and preppers' caches. Some storage rooms hold a whole RV solar kit, and cracked modules turn up in garages, sheds and junkyards. There are solar sites to raid: stock tank pumps in the pastures, farmhouses, campers, the phone company's relay sheds, ranger stations, the Deer Valley Power yard, and solar arrow board trailers at road works and in highway pileups. Some houses have solar garden lights out front that still work.
 description=
 description=[h2]What's next[/h2]
 description=Biogas. Ferment kitchen scraps and manure into methane for cooking, light, and a generator that charges the bank at night.

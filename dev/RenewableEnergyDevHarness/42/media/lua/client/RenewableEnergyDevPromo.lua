@@ -2,13 +2,18 @@
 -- working setups near the scenario start at a clear noon, a homestead (a metal battery bank
 -- indoors against an outside wall, wall panels on that wall, racks, flat panels and a backup
 -- generator in the yard) and a stage-0 wooden battery box indoors by a window with its panels
--- outside, and saves the raw art that art/promo/compose.py lays out for the README and the
+-- outside. Around them it lays a plain floor where every item is shot alone, hitches the arrow
+-- board trailer to a car at road works, and at night lines a house's front walk with lit garden
+-- lights. It saves the raw art that art/promo/compose.py lays out for the README and the
 -- Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
 -- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
 -- recipe and skill names in the game's language.
 -- Shots of anything but the world are taken twice, on black (promo_<shot>_k.png) and on white
 -- (promo_<shot>_w.png), so that art/promo/extract.py can recover how transparent each pixel is.
+-- Each item is shot at two zooms, and so is the empty floor at each, so that extract.py can find
+-- the item by comparing its shot with the floor's.
 
+require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
@@ -17,6 +22,7 @@ require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/StatusWindow"
+require "RenewableEnergy/UI/Menu"
 local Stage = require "RenewableEnergyDevStage"
 
 local Promo = {}
@@ -94,8 +100,70 @@ local STAGE0 = {
     open = { along = { -1, 2 }, out = { 1, 2 } },
 }
 local STAGE0_BOX = { "Base.CarBattery1", "Base.CarBattery1", "RenewableEnergy.PlugInInverter", "Base.CarBatteryCharger" }
-local STAGE0_DISTANCE = 12
 local CELL_BATTERIES = 4
+-- Every setup stands at least this far from the others along x or y, out of each other's shots.
+local SITE_DISTANCE = 12
+
+-- The menu shot: the homestead bank's right-click menu with the bank's submenu and its Wire In
+-- submenu open, while the character carries these parts, and the tools, wire and scrap that
+-- wiring them in takes, so that only what the bank has no room for is refused.
+local MENU_ITEMS = { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery", "Base.CarBattery1",
+    "RenewableEnergy.ChargeController", "RenewableEnergy.PowerInverter", "Base.Screwdriver", "Base.Wrench",
+    "Base.ElectricWire", "Base.ElectricWire", "Base.ElectricWire", "Base.ElectronicsScrap" }
+local MENU_AT = 100
+
+-- The item shots, on a patch of the road's own asphalt laid around the studio square that each
+-- item lies on alone. The closest zoom the game offers is 25%, which the zoom options leave out
+-- by default; items too big for it are shot again at 50%. The character stands off to the side,
+-- (east, south) squares from the item, as far left of it on the screen at either zoom.
+local STUDIO = {
+    -- The open ground the patch needs, and how far around the studio square the asphalt goes
+    -- where the ground is clear, and the plants go anyway, since the bigger items' shots reach
+    -- past the patch.
+    reach = 3,
+    floorReach = 5,
+    zooms = { { percent = 25, player = { -1, 1 } }, { percent = 50, player = { -2, 2 } } },
+    -- What extract.py searches for the item, in UI units around its square's floor centre: wide
+    -- enough for most items, and clear of the character.
+    window = { half = 360, up = 700, down = 300 },
+    -- Turned so that the long side of most models faces the camera.
+    rotation = 315,
+}
+
+-- The trailer shot, on a road: positions are (ahead, side) squares from the car, `side` towards
+-- the far side of the road from the camera. Road cones taper across the lane behind the
+-- trailer, and the character stands at the trailer's battery box.
+local ROAD = {
+    -- The car faces north on a north-south road, else west on an east-west one, so that the
+    -- arrow board on the trailer's back faces the camera.
+    headings = { { facing = "N", ahead = { 0, -1 }, side = { -1, 0 } }, { facing = "W", ahead = { -1, 0 }, side = { 0, -1 } } },
+    -- The open road the setup needs: room on the near side keeps hedges and fences there from
+    -- hiding the car.
+    ahead = { -11, 3 },
+    side = { -3, 2 },
+    trailer = { -5, 0 },
+    cones = { { -8, 1 }, { -9, 0 }, { -10, -1 } },
+    cone = "street_decoration_01_26",
+    player = { -3, 1 },
+    -- Other vehicles this close to the car go, so that only the car and trailer are in the shot.
+    clearRadius = 14,
+}
+
+-- The garden lights shot, at night: lights on both sides of a house's front walk, the character
+-- at the door. Positions are (along, out) from the square outside the door, as the homestead's.
+local WALK = {
+    -- The door stands on the square at out 0, so the open ground starts past it. It reaches a
+    -- square past the lights, so that no fence stands between them and the camera.
+    open = { along = { -1, 1 }, out = { 1, 4 } },
+    lights = { { -1, 1 }, { 1, 1 }, { -1, 3 }, { 1, 3 } },
+    player = { 0, 0 },
+    scout = { 0, 4 },
+    -- Late enough for the sky to be dark in any season.
+    hour = 23,
+}
+-- How far around each setup radios and televisions are switched off, since their captions
+-- float over the shots.
+local QUIET_RADIUS = 25
 
 -- JSON -------------------------------------------------------------------------------------------
 
@@ -343,6 +411,31 @@ local function magazinesTeaching(name)
     return found
 end
 
+-- The names of the items that research each recipe, by recipe: the ones whose script lists it
+-- among its ResearchableRecipes, which the game extends with every recipe's own outputs
+-- (OutputMapper). Built once, since it walks every item script.
+local researchers
+
+local function researchedBy(name)
+    if not researchers then
+        researchers = {}
+        local scripts = getScriptManager():getAllItems()
+        for i = 0, scripts:size() - 1 do
+            local script = scripts:get(i)
+            local recipes = script:hasResearchableRecipes() and script:getResearchableRecipes()
+            for j = 0, (recipes and recipes:size() or 0) - 1 do
+                local recipe = recipes:get(j)
+                researchers[recipe] = researchers[recipe] or {}
+                table.insert(researchers[recipe], getItemNameFromFullType(script:getFullName()))
+            end
+        end
+        for _, names in pairs(researchers) do
+            table.sort(names)
+        end
+    end
+    return researchers[name] or {}
+end
+
 local function recipeEntry(name)
     local recipe = getScriptManager():getCraftRecipe(name)
     local entry = {
@@ -353,6 +446,7 @@ local function recipeEntry(name)
             needed = recipe:needToBeLearn(),
             magazines = magazinesTeaching(name),
             auto = skillList(recipe:getAutoLearnAnySkillCount(), function(i) return recipe:getAutoLearnAnySkill(i) end),
+            research = researchedBy(name),
         },
         inputs = {},
         outputs = {},
@@ -556,18 +650,116 @@ local function findSite(player)
     return nil
 end
 
+-- Whether `square` stands at least SITE_DISTANCE from each of `others` along x or y.
+local function isApart(square, others)
+    for _, other in ipairs(others) do
+        if math.abs(square:getX() - other:getX()) < SITE_DISTANCE and math.abs(square:getY() - other:getY()) < SITE_DISTANCE then
+            return false
+        end
+    end
+    return true
+end
+
 -- The closest place for stage 0 clear of the homestead: at a window if any, facing south first.
 local function findStage0(player, homestead)
     for _, needWindow in ipairs({ true, false }) do
         for _, site in ipairs(SITES) do
             local best = Stage.closestSquare(player, function(origin)
-                local clear = math.abs(origin:getX() - homestead:getX()) >= STAGE0_DISTANCE
-                    or math.abs(origin:getY() - homestead:getY()) >= STAGE0_DISTANCE
-                return clear and fitsStage0(site, origin, player, needWindow)
+                return isApart(origin, { homestead }) and fitsStage0(site, origin, player, needWindow)
             end)
             if best then
                 return site, best, needWindow
             end
+        end
+    end
+    return nil
+end
+
+local function studioSquare(studio, dx, dy)
+    return getCell():getGridSquare(studio:getX() + dx, studio:getY() + dy, studio:getZ())
+end
+
+-- The closest square clear of `others` with open ground all over the studio's floor.
+local function findStudio(player, others)
+    return Stage.closestSquare(player, function(studio)
+        if not isApart(studio, others) then
+            return false
+        end
+        for dx = -STUDIO.reach, STUDIO.reach do
+            for dy = -STUDIO.reach, STUDIO.reach do
+                if not isOpen(studioSquare(studio, dx, dy), player) then
+                    return false
+                end
+            end
+        end
+        return true
+    end)
+end
+
+local function startsWith(text, prefix)
+    return string.sub(text, 1, #prefix) == prefix
+end
+
+local function roadSquare(heading, car, position)
+    local ahead, side = position[1], position[2]
+    return getCell():getGridSquare(car:getX() + ahead * heading.ahead[1] + side * heading.side[1],
+        car:getY() + ahead * heading.ahead[2] + side * heading.side[2], car:getZ())
+end
+
+-- The markings and blends painted over a road's floor.
+local function isRoadPaint(object)
+    local sprite = object:getSprite()
+    local name = sprite and sprite:getName()
+    return name ~= nil and (startsWith(name, "floors_overlay") or startsWith(name, "blends_"))
+end
+
+local function isOpenRoad(square, player)
+    local floor = square and square:getFloor()
+    local name = floor and floor:getSprite() and floor:getSprite():getName()
+    return name ~= nil and startsWith(name, "blends_street") and isClear(square, isRoadPaint)
+        and square ~= player:getCurrentSquare()
+end
+
+-- The closest square clear of `others` for the car, with open road all around the car, the
+-- trailer and the cones, on a north-south road if any.
+local function findRoad(player, others)
+    for _, heading in ipairs(ROAD.headings) do
+        local best = Stage.closestSquare(player, function(car)
+            if not isApart(car, others) then
+                return false
+            end
+            for ahead = ROAD.ahead[1], ROAD.ahead[2] do
+                for side = ROAD.side[1], ROAD.side[2] do
+                    if not isOpenRoad(roadSquare(heading, car, { ahead, side }), player) then
+                        return false
+                    end
+                end
+            end
+            return true
+        end)
+        if best then
+            return heading, best
+        end
+    end
+    return nil
+end
+
+-- Outdoors, at a door into a room.
+local function hasDoor(site, origin)
+    local square, inside = siteSquare(site, origin, 0, 0), siteSquare(site, origin, 0, -1)
+    return square ~= nil and inside ~= nil and inside:getRoom() ~= nil and square:isOutside()
+        and instanceof(square:getDoorOrWindow(site.wallNorth), "IsoDoor")
+end
+
+-- The closest door clear of `others` with open ground in front of it for the walk, facing south
+-- first.
+local function findWalk(player, others)
+    for _, site in ipairs(SITES) do
+        local best = Stage.closestSquare(player, function(origin)
+            return isApart(origin, others) and hasDoor(site, origin) and isOpenArea(site, origin, player, WALK.open)
+        end)
+        if best then
+            return site, best
         end
     end
     return nil
@@ -614,9 +806,76 @@ local function clearWeather()
     end
 end
 
--- Switches on lights in the building around `square`, nearest first. They draw on the bank,
--- which is the only power with the grid off.
-local function switchOnLights(square)
+-- Whether `square` is in reach of a bank on `bankSquare`, as RenewableEnergy.Loads measures it.
+local function isInReach(bankSquare, square)
+    local radius = SandboxVars.GeneratorTileRange
+    return math.abs(square:getZ() - bankSquare:getZ()) <= SandboxVars.GeneratorVerticalPowerRange
+        and IsoUtils.DistanceToSquared(square:getX(), square:getY(), bankSquare:getX(), bankSquare:getY()) <= radius * radius
+end
+
+local function forSquaresInReach(bankSquare, fn)
+    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
+    for z = bankSquare:getZ() - levels, bankSquare:getZ() + levels do
+        for x = bankSquare:getX() - radius, bankSquare:getX() + radius do
+            for y = bankSquare:getY() - radius, bankSquare:getY() + radius do
+                local square = getCell():getGridSquare(x, y, z)
+                if square and isInReach(bankSquare, square) then
+                    fn(square)
+                end
+            end
+        end
+    end
+end
+
+-- Switches off every light in reach of the banks, which houses keep on once the grid goes, and
+-- takes away the fridges and freezers in reach of the stage-0 box: nothing switches those off,
+-- and one alone would overload its Plug-in Inverter.
+local function quietNeighbourhood(homesteadSquare, stage0Square)
+    local lights, fridges = 0, 0
+    for _, bankSquare in ipairs({ homesteadSquare, stage0Square }) do
+        forSquaresInReach(bankSquare, function(square)
+            local objects = square:getObjects()
+            for i = objects:size() - 1, 0, -1 do
+                local object = objects:get(i)
+                if instanceof(object, "IsoLightSwitch") and object:isActivated() then
+                    object:setActive(false, false, true)
+                    lights = lights + 1
+                elseif bankSquare == stage0Square and object:getPipedFuelAmount() <= 0
+                    and object:getContainerByEitherType("fridge", "freezer") then
+                    square:RemoveTileObject(object)
+                    fridges = fridges + 1
+                end
+            end
+        end)
+    end
+    print(string.format("REPromo switched off %d lights and took away %d fridges", lights, fridges))
+end
+
+-- Switches off the radios and televisions around each of `places`, which play with their
+-- captions floating over them.
+local function silenceRadios(places)
+    local silenced = 0
+    for _, place in ipairs(places) do
+        for x = place:getX() - QUIET_RADIUS, place:getX() + QUIET_RADIUS do
+            for y = place:getY() - QUIET_RADIUS, place:getY() + QUIET_RADIUS do
+                local square = getCell():getGridSquare(x, y, place:getZ())
+                local objects = square and square:getObjects()
+                for i = 0, (objects and objects:size() or 0) - 1 do
+                    local object = objects:get(i)
+                    if instanceof(object, "IsoWaveSignal") and object:getDeviceData():getIsTurnedOn() then
+                        object:getDeviceData():setIsTurnedOn(false)
+                        silenced = silenced + 1
+                    end
+                end
+            end
+        end
+    end
+    print("REPromo switched off " .. silenced .. " radios and televisions")
+end
+
+-- Switches on lights in the building around `square`, nearest first, out of reach of the bank
+-- on `otherBank`. They draw on the bank, which is the only power with the grid off.
+local function switchOnLights(square, otherBank)
     local building = square:getBuilding()
     local switched = 0
     for radius = 0, LIGHT_SEARCH do
@@ -624,7 +883,8 @@ local function switchOnLights(square)
             for dy = -radius, radius do
                 local near = math.max(math.abs(dx), math.abs(dy)) == radius
                     and getCell():getGridSquare(square:getX() + dx, square:getY() + dy, square:getZ())
-                local objects = near and building and near:getBuilding() == building and near:getObjects()
+                local objects = near and building and near:getBuilding() == building and not isInReach(otherBank, near)
+                    and near:getObjects()
                 for i = 0, (objects and objects:size() or 0) - 1 do
                     local object = objects:get(i)
                     if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and not object:isActivated()
@@ -639,6 +899,7 @@ local function switchOnLights(square)
 end
 
 local site, origin, stage0Site, stage0Origin
+local studio, roadHeading, roadCar, walkSite, walkOrigin
 local homesteadBank, stage0Box
 
 local function at(position)
@@ -649,7 +910,16 @@ local function atStage0(position)
     return siteSquare(stage0Site, stage0Origin, position[1], position[2])
 end
 
+local function atRoad(position)
+    return roadSquare(roadHeading, roadCar, position)
+end
+
+local function atWalk(position)
+    return siteSquare(walkSite, walkOrigin, position[1], position[2])
+end
+
 local function buildHomestead()
+    quietNeighbourhood(at(HOMESTEAD.bank), atStage0(STAGE0.box))
     for along = OPEN.along[1], OPEN.along[2] do
         for out = 0, OPEN.out[2] do
             clearGroundCover(at({ along, out }))
@@ -675,7 +945,7 @@ local function buildHomestead()
     generator:setFuel(generator:getMaxFuel() * 0.7)
     placeTile(generatorSquare, Sprites.failsafe)
     perform("setBankOn", { bank = PowerBank.positionOf(homesteadBank), on = true })
-    switchOnLights(homesteadBank:getSquare())
+    switchOnLights(homesteadBank:getSquare(), atStage0(STAGE0.box))
 end
 
 local function buildStage0()
@@ -820,6 +1090,7 @@ local function addWorld()
         getGameTime():setTimeOfDay(MORNING)
         Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
         Stage.removeTrees(stage0Origin:getX(), stage0Origin:getY(), stage0Origin:getZ())
+        silenceRadios({ origin, stage0Origin, roadCar, studio, walkOrigin })
         buildHomestead()
         buildStage0()
         chargeThroughMorning()
@@ -879,27 +1150,282 @@ local function addStatus()
     removeBackdrop()
 end
 
+-- The submenu of `menu`'s option named `name`, opened as if the mouse were over the option.
+local function openSubMenu(menu, name)
+    for i, option in ipairs(menu and menu.options or {}) do
+        if option.name == name and option.subOption then
+            menu.mouseOver = i
+            return menu:getSubMenu(option.subOption)
+        end
+    end
+    print("REPromo menu has no " .. name)
+end
+
+-- The homestead bank's right-click menu on a backdrop, with the bank's submenu and its Wire In
+-- submenu open and the first part the bank takes highlighted.
+local function addMenu()
+    local menus, carried = {}, {}
+    add(function()
+        newBackdrop()
+        -- In debug mode vanilla adds its debug options to every world menu unless told not to.
+        getDebugOptions():setBoolean("UI.HideDebugContextMenuOptions", true)
+        local inventory = getPlayer():getInventory()
+        for _, fullType in ipairs(MENU_ITEMS) do
+            table.insert(carried, inventory:AddItem(fullType))
+        end
+        local context = ISWorldObjectContextMenu.createMenu(0, { homesteadBank }, MENU_AT, MENU_AT)
+        local bankMenu = openSubMenu(context, RenewableEnergy.Menu.bankLabel(homesteadBank))
+        local wireIn = openSubMenu(bankMenu, getText("ContextMenu_RenewableEnergy_WireIn"))
+        menus = { context, bankMenu, wireIn }
+        wireIn.mouseOver = -1
+        for i, option in ipairs(wireIn.options) do
+            if not option.notAvailable then
+                wireIn.mouseOver = i
+                break
+            end
+        end
+        -- The world menu was made when the game started, under the backdrop.
+        context:bringToTop()
+        return 30
+    end)
+    addMatted("menu", function()
+        local left, top, right, bottom = math.huge, math.huge, 0, 0
+        for _, menu in ipairs(menus) do
+            left, top = math.min(left, menu:getAbsoluteX()), math.min(top, menu:getAbsoluteY())
+            right = math.max(right, menu:getAbsoluteX() + menu:getWidth())
+            bottom = math.max(bottom, menu:getAbsoluteY() + menu:getHeight())
+        end
+        return { region("menu", left, top, right - left, bottom - top) }
+    end)
+    add(function()
+        menus[1]:hideAndChildren()
+        for _, item in ipairs(carried) do
+            getPlayer():getInventory():Remove(item)
+        end
+        return 1
+    end)
+    removeBackdrop()
+end
+
+-- Where extract.py looks for the item in a studio shot: STUDIO.window around the studio
+-- square's floor centre, kept on the screen.
+local function studioWindow(name)
+    local x, y = onScreen(studio)
+    local window = STUDIO.window
+    local left, top = math.max(0, x - window.half), math.max(0, y - window.up)
+    local right = math.min(getCore():getScreenWidth(), x + window.half)
+    local bottom = math.min(getCore():getScreenHeight(), y + window.down)
+    return region(name, left, top, right - left, bottom - top)
+end
+
+-- Every item alone on the studio floor, at each of STUDIO.zooms. `models` gets one entry per
+-- item, its shots closest zoom first.
+local function addModels(items, models)
+    local zoomLevels
+    add(function()
+        local asphalt = roadCar:getFloor():getSprite():getName()
+        print("REPromo item floor " .. asphalt)
+        for dx = -STUDIO.floorReach, STUDIO.floorReach do
+            for dy = -STUDIO.floorReach, STUDIO.floorReach do
+                local square = studioSquare(studio, dx, dy)
+                clearGroundCover(square)
+                if isClear(square) then
+                    square:addFloor(asphalt)
+                end
+            end
+        end
+        zoomLevels = { getCore():getOptionZoomLevels1x(), getCore():getOptionZoomLevels2x() }
+        getCore():setOptionZoomLevels1x(zoomLevels[1] .. ";25")
+        getCore():setOptionZoomLevels2x(zoomLevels[2] .. ";25")
+        getCore():zoomLevelsChanged()
+        return 30
+    end)
+    for _, item in ipairs(items) do
+        table.insert(models, { name = "model_" .. string.gsub(item.fullType, "%.", "_"), shots = {} })
+    end
+    for stepsOut, zoom in ipairs(STUDIO.zooms) do
+        goTo({ studioSquare(studio, zoom.player[1], zoom.player[2]) }, stepsOut - 1)
+        local floor = "promo_models_floor_" .. zoom.percent
+        add(function()
+            screenshot(floor)
+            return 10
+        end)
+        for i, item in ipairs(items) do
+            add(function()
+                local placed = instanceItem(item.fullType)
+                placed:setWorldZRotation(STUDIO.rotation)
+                studio:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
+                -- Long enough for the model to load and draw.
+                return 30
+            end)
+            add(function()
+                local file = "promo_" .. models[i].name .. "_" .. zoom.percent
+                screenshot(file)
+                table.insert(models[i].shots, { file = file, floor = floor, window = studioWindow(models[i].name) })
+                studio:removeAllWorldObjects()
+                return 2
+            end)
+        end
+    end
+    add(function()
+        getCore():setOptionZoomLevels1x(zoomLevels[1])
+        getCore():setOptionZoomLevels2x(zoomLevels[2])
+        getCore():zoomLevelsChanged()
+        return 30
+    end)
+end
+
+-- What the trailer shot shows: the car's nose, the trailer, the character and the cones.
+local function roadSquares()
+    local squares = { atRoad({ 2, 0 }), atRoad(ROAD.trailer), atRoad(ROAD.player) }
+    for _, spot in ipairs(ROAD.cones) do
+        table.insert(squares, atRoad(spot))
+    end
+    return squares
+end
+
+-- The arrow board trailer hitched to a car on the road, cones behind it, a step out from the
+-- closest zoom.
+local function addTrailer()
+    local pair
+    add(function()
+        Stage.removeTrees(roadCar:getX(), roadCar:getY(), roadCar:getZ())
+        -- Found through the squares they stand on, since Lua can't walk the cell's set of them.
+        local parked, seen = {}, {}
+        for dx = -ROAD.clearRadius, ROAD.clearRadius do
+            for dy = -ROAD.clearRadius, ROAD.clearRadius do
+                local square = getCell():getGridSquare(roadCar:getX() + dx, roadCar:getY() + dy, roadCar:getZ())
+                local vehicle = square and square:getVehicleContainer()
+                if vehicle and not seen[vehicle] then
+                    seen[vehicle] = true
+                    table.insert(parked, vehicle)
+                end
+            end
+        end
+        for _, vehicle in ipairs(parked) do
+            vehicle:permanentlyRemove()
+        end
+        for _, spot in ipairs(ROAD.cones) do
+            placeTile(atRoad(spot), ROAD.cone)
+        end
+        pair = Stage.spawnTrailer(roadCar, roadHeading.facing)
+        return 30
+    end)
+    add(function()
+        Stage.hitchTrailer(pair, getPlayer(), "REPromo")
+        return 60
+    end)
+    goTo({ atRoad(ROAD.player) }, 1)
+    addOpaque("trailer", function()
+        return { centred("trailer", roadSquares()) }
+    end)
+end
+
+local function walkSquares()
+    local squares = { atWalk({ 0, -1 }), atWalk(WALK.player) }
+    for _, spot in ipairs(WALK.lights) do
+        table.insert(squares, atWalk(spot))
+    end
+    return squares
+end
+
+-- Garden lights along a house's front walk, charged and lit at night, at the closest zoom.
+local function addGardenLights()
+    local SolarGardenLight = RenewableEnergy.SolarGardenLight
+    add(function()
+        Stage.removeTrees(walkOrigin:getX(), walkOrigin:getY(), walkOrigin:getZ())
+        for along = WALK.open.along[1], WALK.open.along[2] do
+            for out = WALK.open.out[1], WALK.open.out[2] do
+                clearGroundCover(atWalk({ along, out }))
+            end
+        end
+        for _, spot in ipairs(WALK.lights) do
+            RenewableEnergy.WorldSpawns.placeMoveable(atWalk(spot), Sprites.gardenLight.off,
+                { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh })
+        end
+        getGameTime():setTimeOfDay(WALK.hour)
+        return 30
+    end)
+    add(function()
+        -- Lit now, rather than at the next minute's pass.
+        for _, spot in ipairs(WALK.lights) do
+            local light = SolarGardenLight.findOn(atWalk(spot))
+            if light then
+                SolarGardenLight.update(light, 0)
+            end
+        end
+        return 10
+    end)
+    goTo({ atWalk(WALK.scout), atWalk(WALK.player) }, 0)
+    addOpaque("gardenlights", function()
+        return { centred("gardenlights", walkSquares()) }
+    end)
+end
+
+-- Logs each bank's status as the window reads it.
+local function logBanks()
+    for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
+        local status = PowerBank.statusOf(bank)
+        local reasons, kinds = {}, {}
+        for _, source in ipairs(status.sources) do
+            table.insert(reasons, tostring(source.reason))
+        end
+        for _, kind in ipairs(status.loadByKind) do
+            table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
+        end
+        print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
+            .. " %d of %d panel slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
+            table.concat(kinds, ", "), status.charge * 100, status.panelSlots.used, status.panelSlots.total,
+            table.concat(reasons, ",")))
+    end
+end
+
+-- Finds every setup's place, each clear of the ones before it, or names the first it can't find.
+local function findPlaces(player)
+    local atWindow
+    site, origin = findSite(player)
+    if not site then
+        return "plain building wall with free floor indoors behind it and open ground in front"
+    end
+    stage0Site, stage0Origin, atWindow = findStage0(player, origin)
+    if not stage0Site then
+        return "outside wall with free floor indoors behind it and open ground in front, for stage 0"
+    end
+    roadHeading, roadCar = findRoad(player, { origin, stage0Origin })
+    if not roadHeading then
+        return "stretch of open road for the trailer"
+    end
+    studio = findStudio(player, { origin, stage0Origin, roadCar })
+    if not studio then
+        return "open ground for the item shots' floor"
+    end
+    walkSite, walkOrigin = findWalk(player, { origin, stage0Origin, roadCar, studio })
+    if not walkSite then
+        return "door with open ground in front, for the garden lights"
+    end
+    print(string.format("REPromo homestead %d,%d facing %s; stage 0 %d,%d facing %s, %s; trailer %d,%d facing %s;"
+        .. " items %d,%d; garden lights %d,%d facing %s", origin:getX(), origin:getY(), site.facing,
+        stage0Origin:getX(), stage0Origin:getY(), stage0Site.facing, atWindow and "at a window" or "at a wall",
+        roadCar:getX(), roadCar:getY(), roadHeading.facing, studio:getX(), studio:getY(), walkOrigin:getX(),
+        walkOrigin:getY(), walkSite.facing))
+end
+
 function Promo.capture(onDone)
     print("REPromo START")
     local player = getPlayer()
-    local atWindow
-    site, origin = findSite(player)
-    if site then
-        stage0Site, stage0Origin, atWindow = findStage0(player, origin)
-    end
-    if not (site and stage0Site) then
+    local missing = findPlaces(player)
+    if missing then
         -- Without "REPromo DONE", run-debug-client.sh reports the run as failed.
-        print("REPromo FAIL: within " .. Stage.SEARCH_RADIUS .. " squares, no " .. (site
-            and "outside wall with free floor indoors behind it and open ground in front, for stage 0"
-            or "plain building wall with free floor indoors behind it and open ground in front"))
+        print("REPromo FAIL: within " .. Stage.SEARCH_RADIUS .. " squares, no " .. missing)
         getCore():quitToDesktop()
         return
     end
-    print(string.format("REPromo homestead %d,%d facing %s; stage 0 %d,%d facing %s, %s", origin:getX(), origin:getY(),
-        site.facing, stage0Origin:getX(), stage0Origin:getY(), stage0Site.facing, atWindow and "at a window" or "at a wall"))
     -- Hides the HUD, the debug console and every other window; the shots add their own.
     ISUIHandler.setVisibleAllUI(false)
-    local data = { items = itemsList(), recipes = {} }
+    -- In a corner, where it hovers over nothing the shots show: the world outlines what it is
+    -- over, and menus follow it.
+    setMouseXY(0, 0)
+    local data = { items = itemsList(), recipes = {}, models = {} }
     for _, name in ipairs(RenewableEnergy.Debug.recipeNames()) do
         table.insert(data.recipes, recipeEntry(name))
     end
@@ -908,22 +1434,17 @@ function Promo.capture(onDone)
     }
     addWorld()
     addStatus()
+    add(function()
+        logBanks()
+        return 1
+    end)
+    addMenu()
     addIcons()
+    addModels(data.items, data.models)
+    addTrailer()
+    -- Last, since it is at night.
+    addGardenLights()
     Stage.runSteps(steps, function()
-        for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
-            local status = PowerBank.statusOf(bank)
-            local reasons, kinds = {}, {}
-            for _, source in ipairs(status.sources) do
-                table.insert(reasons, tostring(source.reason))
-            end
-            for _, kind in ipairs(status.loadByKind) do
-                table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
-            end
-            print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
-                .. " %d of %d panel slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
-                table.concat(kinds, ", "), status.charge * 100, status.panelSlots.used, status.panelSlots.total,
-                table.concat(reasons, ",")))
-        end
         data.screen = { w = getCore():getScreenWidth(), h = getCore():getScreenHeight() }
         data.shots = shots
         writeJson("REPromo.json", data)

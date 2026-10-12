@@ -666,6 +666,13 @@ local function houseNearCharacter()
     return houseNear(here:getX(), here:getY(), 60)
 end
 
+-- The runner teleports the character back to the start before each test, and after a test that
+-- went far away the start's chunks load again over the next frames.
+local HOUSE_LOAD_FRAMES = 3000
+local function waitForHouseNearCharacter()
+    T.waitUntil(function() return houseNearCharacter() ~= nil end, HOUSE_LOAD_FRAMES)
+end
+
 -- The garden lights around a house, by square key.
 local function lightsAround(def)
     local found = {}
@@ -694,23 +701,26 @@ end
 -- start was already rolled when its chunk loaded, so the test forgets that roll first.
 test("renewable_energy_world_garden_lights_once_per_house", {
     run = function(self)
-        local GardenLights = RenewableEnergy.GardenLights
-        local def = T.need(self, houseNearCharacter(), "a house near the character")
-        if not def then return end
-        local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), GardenLights.buildingKey(def)
-        local roll = store[key]
-        T.defer(self, function() store[key] = roll end)
-        self.before = lightsAround(def)
-        store[key] = nil
-        self.first = GardenLights.roll(def, true)
-        self.rolled = GardenLights.isRolled(def)
-        self.second = GardenLights.roll(def, true)
-        self.after = lightsAround(def)
-        for squareKey, light in pairs(self.after) do
-            if not self.before[squareKey] then
-                T.track(self, light)
+        waitForHouseNearCharacter()
+        T.step(function()
+            local GardenLights = RenewableEnergy.GardenLights
+            local def = T.need(self, houseNearCharacter(), "a house near the character")
+            if not def then return end
+            local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), GardenLights.buildingKey(def)
+            local roll = store[key]
+            T.defer(self, function() store[key] = roll end)
+            self.before = lightsAround(def)
+            store[key] = nil
+            self.first = GardenLights.roll(def, true)
+            self.rolled = GardenLights.isRolled(def)
+            self.second = GardenLights.roll(def, true)
+            self.after = lightsAround(def)
+            for squareKey, light in pairs(self.after) do
+                if not self.before[squareKey] then
+                    T.track(self, light)
+                end
             end
-        end
+        end)
     end,
     validate = function(self)
         local count = RenewableEnergy.GardenLights.COUNT
@@ -821,6 +831,7 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
 -- At 0 the Garden Lights option leaves every house without lights.
 test("renewable_energy_world_garden_lights_option_zero", {
     sandbox = { GardenLights = 0 },
+    run = waitForHouseNearCharacter,
     validate = function()
         local def = houseNearCharacter()
         if expect(def ~= nil, "no house near the character") then
@@ -910,18 +921,22 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
         if not self.trailer then return end
         -- A spawned vehicle may lack parts, and the box opens freely without its lid.
         self.trailer:repair()
-        local spot = T.need(self, self.trailer:getAreaCenter(ArrowBoard.BATTERY_BOX), "the battery box's area")
-        if not spot then return end
-        player():teleportTo(spot:getX(), spot:getY(), square:getZ())
     end,
     validate = function(self)
         local p = player()
         local lid, box = self.trailer:getPartById("TrunkDoor"), self.trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
         local container = box and box:getItemContainer()
+        local spot = self.trailer:getAreaCenter(RenewableEnergy.ArrowBoard.BATTERY_BOX)
         if not (expect(lid ~= nil and lid:getDoor() ~= nil, "the battery box has no lid")
-                and expect(container ~= nil, "the battery box holds nothing")) then
+                and expect(container ~= nil, "the battery box holds nothing")
+                and expect(spot ~= nil, "the battery box has no area")) then
             return
         end
+        -- teleportTo rounds down to the square's corner (IsoGameCharacter.teleportTo), which can
+        -- fall outside the box's one-square-deep area, so the exact spot is set after it.
+        p:teleportTo(spot:getX(), spot:getY(), self.trailer:getZ())
+        p:setX(spot:getX())
+        p:setY(spot:getY())
         expect(not lid:getDoor():isLocked(), "the battery box starts locked")
         expect(not self.trailer:canAccessContainer(box:getIndex(), p), "the battery box opens with its lid shut")
         lid:getDoor():setOpen(true)

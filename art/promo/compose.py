@@ -8,9 +8,10 @@ editing a layout; recapture only when the game's look or the mod's names change:
 
     art/promo/compose.py
 
-Writes images/{banner,setup,status,items,recipes}.png. Every image is 1260 pixels wide, which the
-Workshop page shows at 630, so it stays sharp on high-density screens. Icons are scaled by whole
-numbers with nearest-neighbour sampling, so their pixels stay crisp. Item, recipe and skill names
+Writes images/{banner,setup,status,menu,items,models,recipes,trailer,gardenlights}.png. Every image is
+1260 pixels wide, which the Workshop page shows at 630, so it stays sharp on high-density screens.
+Icons are scaled by whole numbers with nearest-neighbour sampling, so their pixels stay crisp. The
+item models are framed from the box extract.py found around each. Item, recipe and skill names
 come from captures/promo.json, which the game wrote in its own words; the stage captions are the
 README's.
 """
@@ -240,11 +241,11 @@ def setup():
     return image
 
 
-def status():
-    """The status window at one and a half times its size if that fits: three times with
+def window_card(name):
+    """A captured window or menu at one and a half times its size if that fits: three times with
     nearest-neighbour sampling, then halved, which keeps the text sharper than scaling straight
     to it."""
-    window = capture("status")
+    window = capture(name)
     margin = 40
     if window.width * 3 // 2 <= WIDTH - 2 * margin:
         window = pixels(window, 3)
@@ -254,13 +255,14 @@ def status():
     return image
 
 
-def items():
-    names = {item["icon"]: item["name"] for item in PROMO["items"]}
-    shown = {key for _, row in ITEM_ROWS for key in map(icon_key, row)}
-    missing = set(names) - shown
-    assert not missing, f"items.png has no place for {sorted(missing)}"
+def item_sheet(row, card):
+    """Every item in ITEM_ROWS, each kind under its caption, on a card `row` pixels tall that
+    card(image, full_type, name, box) fills."""
+    names = {item["fullType"]: item["name"] for item in PROMO["items"]}
+    missing = set(names) - {full_type for _, full_types in ITEM_ROWS for full_type in full_types}
+    assert not missing, f"the item sheets have no place for {sorted(missing)}"
     column = (WIDTH - 20) // ITEM_COLUMNS
-    heading, row = 44, 248
+    heading = 44
     lines = sum(math.ceil(len(full_types) / ITEM_COLUMNS) for _, full_types in ITEM_ROWS)
     image = canvas(20 + heading * len(ITEM_ROWS) + row * lines)
     top = 20
@@ -271,20 +273,75 @@ def items():
             line = full_types[start:start + ITEM_COLUMNS]
             left0 = (WIDTH - column * len(line)) / 2
             for c, full_type in enumerate(line):
-                key = icon_key(full_type)
                 left = left0 + c * column
-                panel(image, (left + 6, top, left + column - 6, top + row - 12))
-                x = left + column / 2
-                paste(image, icon(key, 96), (x, top + 70))
-                box = text(image, (x, top + 132), names[key], 17, "SemiBold", anchor="ma", width=column - 28)
-                assert box[3] <= top + row - 24, f"{names[key]} runs past its card"
+                box = (left + 6, top, left + column - 6, top + row - 12)
+                panel(image, box)
+                card(image, full_type, names[full_type], box)
             top += row
     return image
 
 
+def card_name(image, name, x, top, box):
+    """The item's name centred on x from top down, which must end inside its card's box."""
+    bottom = text(image, (x, top), name, 17, "SemiBold", anchor="ma", width=box[2] - box[0] - 16)[3]
+    assert bottom <= box[3] - 12, f"{name} runs past its card"
+
+
+def items():
+    def card(image, full_type, name, box):
+        x = (box[0] + box[2]) / 2
+        paste(image, icon(icon_key(full_type), 96), (x, box[1] + 70))
+        card_name(image, name, x, box[1] + 132, box)
+    return item_sheet(248, card)
+
+
+# models.png: how much room each model gets around it, as a share of its size, and how tall its
+# picture is on the card.
+MODEL_PADDING = 0.12
+MODEL_H = 140
+
+
+def framed_model(key, item_box, size):
+    """A model capture cropped around the item's box, with MODEL_PADDING, to the shape of size and
+    scaled to it. A crop that would run past the capture shrinks to fit it."""
+    image = capture(key).convert("RGB")
+    left, top, right, bottom = item_box
+    w = (right - left) * (1 + 2 * MODEL_PADDING)
+    h = (bottom - top) * (1 + 2 * MODEL_PADDING)
+    aspect = size[0] / size[1]
+    w, h = max(w, h * aspect), max(h, w / aspect)
+    fit = min(1, image.width / w, image.height / h)
+    w, h = w * fit, h * fit
+    x = min(max(0, (left + right - w) / 2), image.width - w)
+    y = min(max(0, (top + bottom - h) / 2), image.height - h)
+    return image.resize(size, Image.LANCZOS, box=(x, y, x + w, y + h))
+
+
+def models():
+    boxes = {model["name"]: model["box"] for model in PROMO["models"]}
+
+    def card(image, full_type, name, box):
+        size = (round(box[2] - box[0] - 16), MODEL_H)
+        key = "model_" + full_type.replace(".", "_")
+        picture = framed_model(key, boxes[key], size).convert("RGBA")
+        corners = Image.new("L", size, 0)
+        ImageDraw.Draw(corners).rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), 12, fill=255)
+        image.paste(picture, (round(box[0] + 8), box[1] + 8), corners)
+        card_name(image, name, (box[0] + box[2]) / 2, box[1] + 8 + MODEL_H + 10, box)
+    return item_sheet(276, card)
+
+
+def trailer():
+    return full_width("trailer")
+
+
+def gardenlights():
+    return full_width("gardenlights")
+
+
 # Recipe cards: the recipe's name, skills, how it's learned and its tools in a column on the left,
 # then a slot per input, an arrow and a slot per result. Cards share a row wherever they fit.
-CARD_H = 192
+CARD_H = 220
 CARD_GAP = 12
 CARD_PAD = 16
 NAME_W = 168
@@ -378,14 +435,23 @@ def card_width(parts):
 
 
 def learn_line(recipe):
-    """How the recipe is learned: the magazines that teach it, and the skill level at which a
-    character works it out alone."""
+    """How the recipe is learned: the magazines that teach it, the items whose research teaches
+    it, among them often its own result, and the skill level at which a character works it out
+    alone."""
     learn = recipe["learn"]
     if not learn["needed"]:
         return "No need to learn it"
-    ways = [name.split(":")[0] for name in learn["magazines"]]
+    ways = []
+    if learn["magazines"]:
+        ways.append("from " + ", or ".join(name.split(":")[0] for name in learn["magazines"]))
+    results = {item["name"] for item in recipe["outputs"]}
+    research = [name for name in learn["research"] if name not in results]
+    if len(research) < len(learn["research"]):
+        research.append("what it makes")
+    if research:
+        ways.append("by researching " + " or ".join(research))
     ways += [f"at {s['name']} {s['level']}" for s in learn["auto"]]
-    return "Learn from " + ", or ".join(ways) if learn["magazines"] else "Learn " + ", or ".join(ways)
+    return "Learn " + ", or ".join(ways)
 
 
 def recipe_card(base, recipe, parts, box):
@@ -458,8 +524,9 @@ def recipes():
 
 
 def main():
-    for name, make in [("banner", banner), ("setup", setup), ("status", status), ("items", items),
-                       ("recipes", recipes)]:
+    for name, make in [("banner", banner), ("setup", setup), ("status", lambda: window_card("status")),
+                       ("menu", lambda: window_card("menu")), ("items", items), ("models", models),
+                       ("recipes", recipes), ("trailer", trailer), ("gardenlights", gardenlights)]:
         save(make(), name)
 
 

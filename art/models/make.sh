@@ -6,6 +6,7 @@
 #                WorldItems) and scripts/RenewableEnergy/Models.txt
 #   render.py    tile sprites (tools/tiles), their depth map (common/media/depthmaps) and the
 #                32 x 32 item icons (tools/textures)
+#   mod_icon.py  the mod list icon, the mod's poster and the Workshop preview.png
 #   tools/make_tiles.py and tools/pack_textures.py   renewable_energy.tiles and the pack
 #   preview.py   review sheets of all of it, read back from the written files
 #

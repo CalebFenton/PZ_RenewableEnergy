@@ -21,8 +21,6 @@ local Sprites = RenewableEnergy.Sprites
 
 local SCALE_ITEM = "Base.CarBattery1"
 local ITEMS_PER_ROW = 10
-local TRAILER = "Base.RenewableEnergyArrowBoardTrailer"
-local TOWING_CAR = "Base.OffRoad"
 
 -- Vanilla brick walls: one on a square's north edge, one on its west edge.
 local WALL_NORTH = "walls_exterior_house_01_1"
@@ -228,32 +226,6 @@ function IconSheet:new()
     return o
 end
 
--- A car facing north with the trailer five squares behind it, as the game's own debug command
--- attachTrailerToPlayerVehicle places them.
-local function spawnTrailer(lot, stage)
-    stage.car = addVehicleDebug(TOWING_CAR, IsoDirections.N, 0, lotSquare(lot, 5, 3))
-    stage.trailer = addVehicleDebug(TRAILER, IsoDirections.N, 0, lotSquare(lot, 5, 8))
-    stage.car:repair()
-    stage.trailer:repair()
-end
-
--- Hitches the trailer, opens its battery box and puts a battery in it, and reports both.
-local function hitchTrailer(stage, player)
-    local car, trailer = stage.car, stage.trailer
-    car:addPointConstraint(player, trailer, "trailer", "trailer")
-    local lid = trailer:getPartById("TrunkDoor")
-    local box = trailer:getPartById("RenewableEnergyBatteryBox")
-    local container = box and box:getItemContainer()
-    if lid and lid:getDoor() then
-        lid:getDoor():setOpen(true)
-    end
-    if container then
-        container:AddItem("RenewableEnergy.DeepCycleBattery")
-    end
-    print(string.format("REArt trailer towedBy=%s lid=%s container=%s items=%d", tostring(trailer:getVehicleTowedBy() == car),
-        tostring(lid ~= nil), tostring(container ~= nil), container and container:getItems():size() or 0))
-end
-
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
 local function addShot(steps, player, lot, shot)
     Stage.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
@@ -276,7 +248,7 @@ function Art.capture(onDone)
         return
     end
     print(string.format("REArt stage at %d,%d", lot.x, lot.y))
-    local trailerStage = {}
+    local trailer
     local iconSheet = IconSheet:new()
     local steps = {}
     table.insert(steps, function()
@@ -314,12 +286,12 @@ function Art.capture(onDone)
     addShot(steps, player, lot, SHOTS.fill)
     table.insert(steps, function()
         clearLot(lot)
-        spawnTrailer(lot, trailerStage)
+        trailer = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
         -- A vehicle joins the cell's list, and gets its physics, only on a later update.
         return 30
     end)
     table.insert(steps, function()
-        hitchTrailer(trailerStage, player)
+        Stage.hitchTrailer(trailer, player, "REArt")
         return 60
     end)
     addShot(steps, player, lot, SHOTS.trailer)
