@@ -1,0 +1,11 @@
+id=cf_renewable_energy
+name=Renewable Energy
+modversion=0.1.0
+description=Harvest renewable power for the needs of your base.
+icon=icon.png
+poster=poster.png
+author=Caleb Fenton
+url=https://github.com/CalebFenton/PZ_RenewableEnergy
+pack=renewable_energy
+tiledef=renewable_energy 6142
+versionMin=42.20

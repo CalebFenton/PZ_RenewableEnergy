@@ -1,0 +1,106 @@
+module RenewableEnergy
+{
+    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel. */
+    model SolarModule_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarModule,
+        texture = WorldItems/RenewableEnergy_SolarModule,
+        scale = 1,
+    }
+    model SolarFlat_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarFlat,
+        texture = WorldItems/RenewableEnergy_SolarFlat,
+        scale = 1,
+    }
+    model SolarWall_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarWall,
+        texture = WorldItems/RenewableEnergy_SolarWall,
+        scale = 1,
+    }
+    model SolarRack_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarRack,
+        texture = WorldItems/RenewableEnergy_SolarRack,
+        scale = 1,
+    }
+    model BatteryBox_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryBox,
+        texture = WorldItems/RenewableEnergy_BatteryBox,
+        scale = 1,
+    }
+    model BatteryBank_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryBank,
+        texture = WorldItems/RenewableEnergy_BatteryBank,
+        scale = 1,
+    }
+    model PlugInInverter_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_PlugInInverter,
+        texture = WorldItems/RenewableEnergy_PlugInInverter,
+        scale = 1,
+    }
+    model PowerInverter_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_PowerInverter,
+        texture = WorldItems/RenewableEnergy_PowerInverter,
+        scale = 1,
+    }
+    model InverterCharger_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_InverterCharger,
+        texture = WorldItems/RenewableEnergy_InverterCharger,
+        scale = 1,
+    }
+    model ChargeController_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_ChargeController,
+        texture = WorldItems/RenewableEnergy_ChargeController,
+        scale = 1,
+    }
+    model SolarFailsafe_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarFailsafe,
+        texture = WorldItems/RenewableEnergy_SolarFailsafe,
+        scale = 1,
+    }
+    model DeepCycleBattery_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_DeepCycleBattery,
+        texture = WorldItems/RenewableEnergy_DeepCycleBattery,
+        scale = 1,
+    }
+    model L16Battery_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_L16Battery,
+        texture = WorldItems/RenewableEnergy_L16Battery,
+        scale = 1,
+    }
+    model SolarMaintainer_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarMaintainer,
+        texture = WorldItems/RenewableEnergy_SolarMaintainer,
+        scale = 1,
+    }
+    model SolarCellCharger_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarCellCharger,
+        texture = WorldItems/RenewableEnergy_SolarCellCharger,
+        scale = 1,
+    }
+    model HomesteadPowerMag1_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomesteadPowerMag1,
+        texture = WorldItems/RenewableEnergy_HomesteadPowerMag1,
+        scale = 1,
+    }
+    model HomesteadPowerMag2_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomesteadPowerMag2,
+        texture = WorldItems/RenewableEnergy_HomesteadPowerMag2,
+        scale = 1,
+    }
+}

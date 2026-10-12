@@ -1,0 +1,298 @@
+/*
+    Item scripts. Display names come from Translate/<LANG>/ItemName.json and tooltips from
+    Tooltip.json. Ratings (watts, watt-hours, cycles) live in lua/shared/RenewableEnergy/Specs.lua,
+    not here, so the power code reads one table.
+
+    Every item's Icon is RenewableEnergy_<Item> (common/media/textures/Item_RenewableEnergy_<Item>.png)
+    and its WorldStaticModel RenewableEnergy.<Item>_Ground (Models.txt), moveables included: the
+    crafting window draws the script's icon, and a moveable without one shows as an empty square.
+
+    base:ignorezombiedensity keeps the zombie density loot bonus, which is added to every entry
+    whatever its weight, from swamping the hardware's small loot weights.
+
+    Moveables name the tile they place in WorldObjectSprite (RenewableEnergy.Sprites); each tile
+    names its item back in CustomItem, so picking it up returns this item.
+*/
+module RenewableEnergy
+{
+    imports { Base }
+
+    /**************************** Solar panels ******************************/
+
+    /* A 50 W 1993 module. Research teaches the mounts it goes into. */
+    item SolarModule
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 4.0,
+        Icon = RenewableEnergy_SolarModule,
+        WorldStaticModel = RenewableEnergy.SolarModule_Ground,
+        MetalValue = 1.0,
+        ConditionMax = 100,
+        Tooltip = Tooltip_RenewableEnergy_SolarModule,
+        ResearchableRecipes = RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWall;RenewableEnergy_MakeSolarRack,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
+    }
+
+    item SolarFlat
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 4.0,
+        Icon = RenewableEnergy_SolarFlat,
+        WorldStaticModel = RenewableEnergy.SolarFlat_Ground,
+        WorldObjectSprite = renewable_energy_01_0,
+        Tooltip = Tooltip_RenewableEnergy_SolarFlat,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item SolarWall
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 5.0,
+        Icon = RenewableEnergy_SolarWall,
+        WorldStaticModel = RenewableEnergy.SolarWall_Ground,
+        WorldObjectSprite = renewable_energy_01_1,
+        Tooltip = Tooltip_RenewableEnergy_SolarWall,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item SolarRack
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 9.0,
+        Icon = RenewableEnergy_SolarRack,
+        WorldStaticModel = RenewableEnergy.SolarRack_Ground,
+        WorldObjectSprite = renewable_energy_01_3,
+        Tooltip = Tooltip_RenewableEnergy_SolarRack,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /**************************** Banks *************************************/
+    /*
+        Plain moveables, not base:generator: with that tag and a WorldObjectSprite, an item
+        dropped on the floor turns into a bare IsoGenerator (IsoGridSquare.AddWorldInventoryItem).
+    */
+    item BatteryBox
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 6.0,
+        Icon = RenewableEnergy_BatteryBox,
+        WorldStaticModel = RenewableEnergy.BatteryBox_Ground,
+        WorldObjectSprite = renewable_energy_01_8,
+        Tooltip = Tooltip_RenewableEnergy_BatteryBox,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item BatteryBank
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 20.0,
+        Icon = RenewableEnergy_BatteryBank,
+        WorldStaticModel = RenewableEnergy.BatteryBank_Ground,
+        WorldObjectSprite = renewable_energy_01_9,
+        Tooltip = Tooltip_RenewableEnergy_BatteryBank,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /* Starts the backup generator it sits under when the bank runs low. */
+    item SolarFailsafe
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 1.0,
+        Icon = RenewableEnergy_SolarFailsafe,
+        WorldStaticModel = RenewableEnergy.SolarFailsafe_Ground,
+        WorldObjectSprite = renewable_energy_01_7,
+        Tooltip = Tooltip_RenewableEnergy_SolarFailsafe,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /**************************** Bank parts ********************************/
+    /* Research on found inverters teaches the bank they go into. */
+    item PlugInInverter
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = RenewableEnergy_PlugInInverter,
+        WorldStaticModel = RenewableEnergy.PlugInInverter_Ground,
+        MetalValue = 0.5,
+        Tooltip = Tooltip_RenewableEnergy_PlugInInverter,
+        ResearchableRecipes = RenewableEnergy_MakeBatteryBox,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item PowerInverter
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 2.5,
+        Icon = RenewableEnergy_PowerInverter,
+        WorldStaticModel = RenewableEnergy.PowerInverter_Ground,
+        MetalValue = 1.0,
+        Tooltip = Tooltip_RenewableEnergy_PowerInverter,
+        ResearchableRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item InverterCharger
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 12.0,
+        Icon = RenewableEnergy_InverterCharger,
+        WorldStaticModel = RenewableEnergy.InverterCharger_Ground,
+        MetalValue = 3.0,
+        Tooltip = Tooltip_RenewableEnergy_InverterCharger,
+        ResearchableRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeSolarFailsafe,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item ChargeController
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 1.0,
+        Icon = RenewableEnergy_ChargeController,
+        WorldStaticModel = RenewableEnergy.ChargeController_Ground,
+        MetalValue = 0.5,
+        Tooltip = Tooltip_RenewableEnergy_ChargeController,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /**************************** Batteries *********************************/
+    /*
+        The drainable uses are the charge. UseDelta is the vanilla car battery's, fine enough
+        that a small panel's trickle is not rounded away (uses are whole steps of it).
+        cantBeConsolided keeps two half-charged batteries from merging into one.
+
+        The deep cycle battery also fits a vehicle's Battery part (Lua:
+        RenewableEnergy.VehicleBattery), where it runs the lights and radio longer with the engine
+        off. The L-16 doesn't: it is a 6 V battery, and a car's starter and lights need 12 V.
+    */
+    item DeepCycleBattery
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:drainable,
+        Weight = 8.0,
+        Icon = RenewableEnergy_DeepCycleBattery,
+        WorldStaticModel = RenewableEnergy.DeepCycleBattery_Ground,
+        UseDelta = 0.00001,
+        UseWhileEquipped = false,
+        cantBeConsolided = true,
+        KeepOnDeplete = true,
+        ConditionMax = 100,
+        MetalValue = 1.0,
+        Tooltip = Tooltip_RenewableEnergy_DeepCycleBattery,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
+    }
+
+    item L16Battery
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:drainable,
+        Weight = 16.0,
+        Icon = RenewableEnergy_L16Battery,
+        WorldStaticModel = RenewableEnergy.L16Battery_Ground,
+        UseDelta = 0.00001,
+        UseWhileEquipped = false,
+        cantBeConsolided = true,
+        KeepOnDeplete = true,
+        ConditionMax = 100,
+        MetalValue = 2.0,
+        Tooltip = Tooltip_RenewableEnergy_L16Battery,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
+    }
+
+    /**************************** Stage 0 gadgets ***************************/
+    /* Clipped to a vehicle (Lua: RenewableEnergy.SolarMaintainer), it trickle-charges the battery. */
+    item SolarMaintainer
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 1.0,
+        Icon = RenewableEnergy_SolarMaintainer,
+        WorldStaticModel = RenewableEnergy.SolarMaintainer_Ground,
+        MetalValue = 0.5,
+        Tooltip = Tooltip_RenewableEnergy_SolarMaintainer,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /*
+        Placed, its tile holds the batteries it charges (Lua: RenewableEnergy.SolarCellCharger).
+        A placed object is found again whenever its chunk loads, which an item lying on the
+        floor is not.
+    */
+    item SolarCellCharger
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 1.0,
+        Icon = RenewableEnergy_SolarCellCharger,
+        WorldStaticModel = RenewableEnergy.SolarCellCharger_Ground,
+        WorldObjectSprite = renewable_energy_01_10,
+        Tooltip = Tooltip_RenewableEnergy_SolarCellCharger,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /**************************** Literature ********************************/
+    item HomesteadPowerMag1
+    {
+        DisplayCategory = RecipeResource,
+        ItemType = base:literature,
+        Weight = 0.1,
+        Icon = RenewableEnergy_HomesteadPowerMag1,
+        StaticModel = Magazine,
+        WorldStaticModel = RenewableEnergy.HomesteadPowerMag1_Ground,
+        BoredomChange = -20,
+        StressChange = -15,
+        LearnedRecipes = RenewableEnergy_MakeBatteryBox;RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWall;RenewableEnergy_MakeSolarRack,
+        OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
+        Tags = base:magazine;base:ignorezombiedensity,
+    }
+
+    item HomesteadPowerMag2
+    {
+        DisplayCategory = RecipeResource,
+        ItemType = base:literature,
+        Weight = 0.1,
+        Icon = RenewableEnergy_HomesteadPowerMag2,
+        StaticModel = Magazine,
+        WorldStaticModel = RenewableEnergy.HomesteadPowerMag2_Ground,
+        BoredomChange = -20,
+        StressChange = -15,
+        LearnedRecipes = RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe,
+        OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
+        Tags = base:magazine;base:ignorezombiedensity,
+    }
+
+    /**************************** Maps **************************************/
+    item CrowcallRoadMap
+    {
+        DisplayCategory = Cartography,
+        ItemType = base:map,
+        Weight = 0.05,
+        Icon = Map,
+        Map = RenewableEnergy_CrowcallRoad,
+        StaticModel = MapInHand,
+        WorldStaticModel = Map,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item DixieTrailerParkMap
+    {
+        DisplayCategory = Cartography,
+        ItemType = base:map,
+        Weight = 0.05,
+        Icon = Map,
+        Map = RenewableEnergy_DixieTrailerPark,
+        StaticModel = MapInHand,
+        WorldStaticModel = Map,
+        Tags = base:ignorezombiedensity,
+    }
+}

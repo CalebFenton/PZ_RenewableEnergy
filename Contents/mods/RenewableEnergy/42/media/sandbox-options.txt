@@ -1,0 +1,63 @@
+VERSION = 1,
+/*
+    Sunlight multiplier: 1 is what 1993 modules really made in Kentucky; the default
+    of 3 lets a few modules carry a fridge in summer (design §2.3).
+*/
+option RenewableEnergy.SunlightMultiplier {
+	page = RenewableEnergy, translation = RenewableEnergy_SunlightMultiplier,
+	type = integer, min = 1, max = 5, default = 3,
+}
+option RenewableEnergy.ChargeFreq {
+	page = RenewableEnergy, translation = RenewableEnergy_ChargeFreq, valueTranslation = RenewableEnergy_ChargeFreq,
+	type = enum, numValues = 2, default = 1,
+}
+/* Percent of the wear batteries take from deep discharges and overcharging. */
+option RenewableEnergy.BatteryWear {
+	page = RenewableEnergy, translation = RenewableEnergy_BatteryWear,
+	type = integer, min = 0, max = 1000, default = 100,
+}
+/* Bank charge, in percent, below which a failsafe starts its generator and at which it stops it. */
+option RenewableEnergy.FailsafeStartCharge {
+	page = RenewableEnergy, translation = RenewableEnergy_FailsafeStartCharge,
+	type = integer, min = 0, max = 100, default = 20,
+}
+option RenewableEnergy.FailsafeStopCharge {
+	page = RenewableEnergy, translation = RenewableEnergy_FailsafeStopCharge,
+	type = integer, min = 0, max = 100, default = 80,
+}
+option RenewableEnergy.solarPanelWorldSpawns {
+	page = RenewableEnergy, translation = RenewableEnergy_solarPanelWorldSpawns,
+	type = integer, min = 0, max = 100, default = 25,
+}
+option RenewableEnergy.BatteryBankSpawn {
+	page = RenewableEnergy, translation = RenewableEnergy_BatteryBankSpawn,
+	type = enum, numValues = 4, default = 3,
+}
+option RenewableEnergy.StashMode {
+	page = RenewableEnergy, translation = RenewableEnergy_StashMode,
+	type = enum, numValues = 4, default = 1,
+}
+option RenewableEnergy.LRMSolarPanels {
+	page = RenewableEnergy, translation = RenewableEnergy_LRMSolarPanels,
+	type = double, min = 0, max = 100, default = 1,
+}
+option RenewableEnergy.LRMBatteries {
+	page = RenewableEnergy, translation = RenewableEnergy_LRMBatteries,
+	type = double, min = 0, max = 100, default = 1,
+}
+option RenewableEnergy.LRMMisc {
+	page = RenewableEnergy, translation = RenewableEnergy_LRMMisc,
+	type = double, min = 0, max = 100, default = 1,
+}
+/*
+    In-game minutes to connect one panel, at Electricity 3. Roughly a third of that at
+    10, roughly a quarter longer at 0.
+*/
+option RenewableEnergy.ConnectPanelMin {
+	page = RenewableEnergy, translation = RenewableEnergy_ConnectPanelMin,
+	type = integer, min = 1, max = 1440, default = 10,
+}
+option RenewableEnergy.enableExpandedRecipes {
+    page = RenewableEnergy, translation = RenewableEnergy_enableExpandedRecipes,
+    type = boolean, default = false,
+}

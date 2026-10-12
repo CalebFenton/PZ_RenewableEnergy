@@ -1,0 +1,5 @@
+name=Renewable Energy Dev Harness
+id=cf_renewable_energy_devharness
+require=cf_renewable_energy
+description=Development only. Auto-launches the Renewable Energy debug scenario and runs its tests. Not published.
+versionMin=42.20

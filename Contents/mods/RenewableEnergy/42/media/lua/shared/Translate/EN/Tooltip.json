@@ -1,0 +1,23 @@
+{
+    "Tooltip_RenewableEnergy_SolarModule": "A 50 W solar module. Mount it flat, on a wall or on a ground rack.",
+    "Tooltip_RenewableEnergy_SolarFlat": "One module lying flat, on a roof or the ground. Best in summer; snow settles on it.",
+    "Tooltip_RenewableEnergy_SolarWall": "One module on an outside wall, facing south or east. Best in winter; snow slides off.",
+    "Tooltip_RenewableEnergy_SolarRack": "Two modules tilted toward the sun. Sheds snow within a couple of hours.",
+    "Tooltip_RenewableEnergy_BatteryBox": "Holds 2 batteries and an inverter. Up to 2 modules may charge it without a controller.",
+    "Tooltip_RenewableEnergy_BatteryBank": "Holds 12 batteries, an inverter and up to 4 charge controllers.",
+    "Tooltip_RenewableEnergy_PlugInInverter": "Runs lights, a radio or a small TV from a battery bank.",
+    "Tooltip_RenewableEnergy_PowerInverter": "Runs a house's lights and a small fridge from a battery bank.",
+    "Tooltip_RenewableEnergy_InverterCharger": "Runs a whole house, and charges the bank from a running backup generator.",
+    "Tooltip_RenewableEnergy_ChargeController": "Keeps solar panels from overcharging a full battery bank.",
+    "Tooltip_RenewableEnergy_SolarFailsafe": "Place it under a backup generator. It starts the generator when the battery bank runs low.",
+    "Tooltip_RenewableEnergy_DeepCycleBattery": "Built to be run down and recharged. Goes in a battery bank, or in a vehicle, where it runs the lights and radio twice as long as a car battery.",
+    "Tooltip_RenewableEnergy_L16Battery": "A heavy 6 V battery for battery banks. Too low a voltage for a vehicle.",
+    "Tooltip_RenewableEnergy_SolarMaintainer": "Clip it to a vehicle to keep its battery charged in daylight.",
+    "Tooltip_RenewableEnergy_SolarCellCharger": "Place it outdoors and load it with up to 4 batteries. Charges them in daylight.",
+    "Tooltip_RenewableEnergy_NeedVehicleWire": "Needs %1 %2.",
+    "Tooltip_RenewableEnergy_NeedSnowTool": "Needs a broom or a snow shovel.",
+    "Tooltip_RenewableEnergy_NoBankInReach": "No battery bank within reach of this panel.",
+    "Tooltip_RenewableEnergy_PanelIndoors": "The panel has to be outdoors.",
+    "Tooltip_RenewableEnergy_NoInverter": "The bank has no inverter.",
+    "Tooltip_RenewableEnergy_NoPanelsInReach": "No unconnected panels within reach."
+}

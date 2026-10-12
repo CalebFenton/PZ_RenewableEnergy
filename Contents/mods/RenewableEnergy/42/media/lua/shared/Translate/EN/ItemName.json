@@ -1,0 +1,21 @@
+{
+    "RenewableEnergy.SolarModule": "Solar Module",
+    "RenewableEnergy.SolarFlat": "Flat Solar Panel",
+    "RenewableEnergy.SolarWall": "Wall-Mounted Solar Panel",
+    "RenewableEnergy.SolarRack": "Solar Ground Rack",
+    "RenewableEnergy.BatteryBox": "Battery Box",
+    "RenewableEnergy.BatteryBank": "Battery Bank",
+    "RenewableEnergy.PlugInInverter": "Plug-in Inverter",
+    "RenewableEnergy.PowerInverter": "Power Inverter",
+    "RenewableEnergy.InverterCharger": "Inverter/Charger",
+    "RenewableEnergy.ChargeController": "Charge Controller",
+    "RenewableEnergy.SolarFailsafe": "Solar Failsafe",
+    "RenewableEnergy.DeepCycleBattery": "Deep Cycle Marine Battery",
+    "RenewableEnergy.L16Battery": "L-16 Battery",
+    "RenewableEnergy.SolarMaintainer": "Solar Battery Maintainer",
+    "RenewableEnergy.SolarCellCharger": "Solar Battery Charger",
+    "RenewableEnergy.HomesteadPowerMag1": "Homestead Power #1: Sun & Batteries",
+    "RenewableEnergy.HomesteadPowerMag2": "Homestead Power #2: Inverters & Control",
+    "RenewableEnergy.CrowcallRoadMap": "Crowcall Road Map",
+    "RenewableEnergy.DixieTrailerParkMap": "Dixie Trailer Park Map"
+}

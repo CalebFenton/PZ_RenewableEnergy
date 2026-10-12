@@ -1,0 +1,14 @@
+{
+    "RenewableEnergy_MakeBatteryBox": "Make Battery Box",
+    "RenewableEnergy_BuildBatteryBankWood": "Build Wooden Battery Bank",
+    "RenewableEnergy_BuildBatteryBankMetal": "Build Metal Battery Bank",
+    "RenewableEnergy_MakeSolarFlat": "Make Flat Solar Panel",
+    "RenewableEnergy_MakeSolarWall": "Make Wall-Mounted Solar Panel",
+    "RenewableEnergy_MakeSolarRack": "Make Solar Ground Rack",
+    "RenewableEnergy_UnmountSolarFlat": "Unmount Flat Solar Panel",
+    "RenewableEnergy_UnmountSolarWall": "Unmount Wall-Mounted Solar Panel",
+    "RenewableEnergy_UnmountSolarRack": "Unmount Solar Ground Rack",
+    "RenewableEnergy_MakeChargeController": "Make Charge Controller",
+    "RenewableEnergy_MakeSolarFailsafe": "Make Solar Failsafe",
+    "RenewableEnergy_MakeSolarModule": "Make Solar Module"
+}
