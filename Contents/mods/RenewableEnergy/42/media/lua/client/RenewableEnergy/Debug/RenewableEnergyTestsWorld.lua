@@ -804,7 +804,7 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
             end
         end
         Events.OnTick.Add(onTick)
-        ISTimedActionQueue.add(RenewableEnergyTest.Wait:new(p, (count + 1) * VISIT_TICKS + 60))
+        RenewableEnergyTest.wait((count + 1) * VISIT_TICKS + 60)
     end,
     validate = function(self)
         for _, place in ipairs(self.places or {}) do

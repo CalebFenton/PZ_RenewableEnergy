@@ -179,15 +179,7 @@ local function placeObject(square, itemType, spriteName, modData)
     ISMoveableSpriteProps.new(spriteName):placeMoveable(player(), square, item:getWorldSprite(), true)
 end
 
-local function objectWithSprite(square, spriteName)
-    local objects = square and square:getObjects()
-    for i = 0, objects and objects:size() - 1 or -1 do
-        if objects:get(i):getTextureName() == spriteName then
-            return objects:get(i)
-        end
-    end
-    return nil
-end
+local objectWithSprite = RenewableEnergyTest.objectWithSprite
 
 local function placeCharger(self)
     self.square = outdoorSquare(2)

@@ -206,17 +206,7 @@ end
 
 -- Crafting ------------------------------------------------------------------------------------
 
--- A craft test (RenewableEnergyTest.craftTest) by a character skilled enough for every recipe.
-local function craftTest(name, spec)
-    local setup = spec.setup
-    spec.setup = function(self)
-        skilled(player())
-        if setup then
-            setup(self)
-        end
-    end
-    RenewableEnergyTest.craftTest(name, spec)
-end
+local craftTest = RenewableEnergyTest.craftTest
 
 local function first(fullType)
     return player():getInventory():getFirstTypeRecurse(fullType)
@@ -506,25 +496,6 @@ end
 -- Stripping a battery and rebuilding it from its own case, with the furnace's recast stood in
 -- for: the battery comes back new and empty, and its acid goes out and back in.
 
--- Runs `fn` once the actions queued before it are done.
-local Step = ISBaseTimedAction:derive("RenewableEnergyTestStep")
-
-function Step:new(character, fn)
-    local o = ISBaseTimedAction.new(self, character)
-    o.fn = fn
-    o.maxTime = 1
-    return o
-end
-
-function Step:isValid()
-    return true
-end
-
-function Step:perform()
-    self.fn()
-    ISBaseTimedAction.perform(self)
-end
-
 local function queueCraft(self, name, fromType)
     local recipe = getScriptManager():getCraftRecipe(name)
     local from = first(fromType)
@@ -564,7 +535,7 @@ for _, chain in ipairs(REBUILDS) do
                 inventory:AddItem("RenewableEnergy.BatteryElectrolyte"):getFluidContainer():Empty()
             end
             queueCraft(self, chain.strip, chain.battery)
-            ISTimedActionQueue.add(Step:new(p, function()
+            RenewableEnergyTest.step(function()
                 self.stripped = {
                     case = inventory:getCountTypeRecurse(chain.case),
                     worn = inventory:getCountTypeRecurse("RenewableEnergy.WornBatteryPlates"),
@@ -576,7 +547,7 @@ for _, chain in ipairs(REBUILDS) do
                 inventory:AddItem("Base.WaterBottle"):getFluidContainer():Empty()
                 refill("Base.WaterBottle", "Water", 1)
                 queueCraft(self, chain.rebuild, chain.case)
-            end))
+            end)
         end,
         validate = function(self)
             local s = self.stripped

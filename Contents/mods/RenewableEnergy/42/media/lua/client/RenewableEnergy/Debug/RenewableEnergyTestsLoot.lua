@@ -19,16 +19,7 @@ local function reapply()
     end
 end
 
-local function countPairs(items, fullType)
-    local count, weight = 0, nil
-    for i = 1, #items - 1, 2 do
-        if items[i] == fullType then
-            count = count + 1
-            weight = items[i + 1]
-        end
-    end
-    return count, weight
-end
+local countPairs = RenewableEnergyTest.countPairs
 
 -- Calls fn(items, path) for every items list of every room, bag, procedural and vehicle table.
 local function forEachItemsList(fn)

@@ -13,28 +13,7 @@ local Specs = RenewableEnergy.Specs
 
 local MATERIALS = { wood = "Wood", metal = "Metal" }
 
--- Placed tile -> the item picking it up gives, what Sprites.kindOf reports, and whether it holds
--- items.
-local PLACED = {
-    { sprite = Sprites.flat, item = "RenewableEnergy.SolarFlat", kind = "flat" },
-    { sprite = Sprites.failsafe, item = "RenewableEnergy.SolarFailsafe", kind = "failsafe" },
-    { sprite = Sprites.cellCharger, item = "RenewableEnergy.SolarCellCharger", kind = "cellCharger", container = true },
-    { sprite = Sprites.gardenLight.off, item = "RenewableEnergy.SolarGardenLight", kind = "gardenLight" },
-    { sprite = Sprites.gardenLight.lit, item = "RenewableEnergy.SolarGardenLight", kind = "gardenLight" },
-}
-for material, suffix in pairs(MATERIALS) do
-    for _, mount in ipairs({ "wall", "rack" }) do
-        local item = "RenewableEnergy.Solar" .. (mount == "wall" and "Wall" or "Rack") .. suffix
-        for facing, sprite in pairs(Sprites[mount][material]) do
-            table.insert(PLACED, { sprite = sprite, item = item, kind = mount, facing = facing, material = material })
-        end
-    end
-    for _, tier in ipairs({ "Box", "Rack", "Bank" }) do
-        local field = "battery" .. tier .. suffix
-        table.insert(PLACED, { sprite = Sprites[field], item = "RenewableEnergy.Battery" .. tier .. suffix, kind = field,
-            material = material, container = true })
-    end
-end
+local PLACED = RenewableEnergyTest.PLACED_TILES
 
 local function overlays()
     local all = { Sprites.crateOverlays.full, Sprites.crateOverlays.closed, Sprites.snow.flat }
@@ -188,8 +167,6 @@ local TOWING_CAR = "Base.OffRoad"
 -- the car is pushed a few squares north.
 local STRIP_AHEAD, STRIP_BEHIND = 7, 9
 
-local Wait = RenewableEnergyTest.Wait
-
 local function isClear(x, y, z)
     local square = getSquare(x, y, z)
     return square ~= nil and square:isOutside() and square:isFree(false) and not square:HasTree()
@@ -272,7 +249,7 @@ test("renewable_energy_art_trailer_tows", {
         if not (self.car and self.trailer) then return end
         local p = RenewableEnergyTest.player()
         self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
-        ISTimedActionQueue.add(Wait:new(p, SETTLE + PUSH + ROLL, function(tick)
+        RenewableEnergyTest.wait(SETTLE + PUSH + ROLL, function(tick)
             if tick == 2 then
                 self.car:addPointConstraint(p, self.trailer, "trailer", "trailer")
                 p:teleportTo(strip.x + 3.5, strip.y + 2.5, strip.z)
@@ -284,7 +261,7 @@ test("renewable_energy_art_trailer_tows", {
             elseif tick == SETTLE + PUSH + ROLL - 1 then
                 getCore():TakeFullScreenshot("renewable_energy_art_trailer.png")
             end
-        end))
+        end)
     end,
     validate = function(self)
         if not expect(self.car ~= nil and self.trailer ~= nil, "no room to spawn a car and the trailer") then return end
@@ -307,14 +284,14 @@ test("renewable_energy_art_trailer_battery_box", {
         if not self.trailer then return end
         local p = RenewableEnergyTest.player()
         self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
-        ISTimedActionQueue.add(Wait:new(p, 30, function(tick)
+        RenewableEnergyTest.wait(30, function(tick)
             if tick == 2 then
                 local spot = self.trailer:getAreaCenter("RenewableEnergyBatteryBox")
                 if spot then
                     p:teleportTo(spot:getX(), spot:getY(), strip.z)
                 end
             end
-        end))
+        end)
     end,
     validate = function(self)
         if not expect(self.trailer ~= nil, "no room to spawn the trailer") then return end
