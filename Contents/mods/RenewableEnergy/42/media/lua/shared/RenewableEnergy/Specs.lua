@@ -107,6 +107,8 @@ Specs.wiring = {
 -- Rated watts of the gadgets' cells.
 Specs.cellChargerWatts = 5
 Specs.maintainerWatts = 10
+-- The arrow board trailer's two built-in panels, a module's rating each.
+Specs.arrowBoardWatts = 2 * Specs.modules["RenewableEnergy.SolarModule"].watts
 
 -- A solar garden light: its cell's rated watts, the watt-hours its battery holds, what its lamp
 -- draws at night, and the radius it lights.

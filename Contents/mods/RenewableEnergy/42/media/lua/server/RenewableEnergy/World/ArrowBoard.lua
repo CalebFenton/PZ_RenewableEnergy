@@ -1,13 +1,16 @@
 require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sun"
+require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
 -- trailer with a lamp board and two panels, its batteries in a lockable box on the tongue. It
 -- turns up among junkyard and traffic jam wrecks and with tradesmen's vans, and at the road
 -- works of SolarSites.lua. Its battery box is stocked the first time the trailer spawns, from
--- Distributions' OnFillContainer.
+-- Distributions' OnFillContainer. Its panels charge the batteries in the box in daylight, wherever
+-- it stands or is towed (GadgetCharging runs it).
 
 RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
@@ -74,6 +77,55 @@ end
 ---@return BaseVehicle?
 function ArrowBoard.spawn(square, facing)
     return addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
+end
+
+-- The battery in the box with the lowest charge that isn't full, or nil.
+local function emptiestBattery(container)
+    local Battery = RenewableEnergy.Battery
+    local emptiest
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if Battery.nominalWh(item) > 0 and Battery.getCharge(item) < 1
+            and (not emptiest or Battery.getCharge(item) < Battery.getCharge(emptiest)) then
+            emptiest = item
+        end
+    end
+    return emptiest
+end
+
+--- Adds `hours` of its panels' current output to the batteries in its battery box, the emptiest
+--- first, so that a mixed set fills evenly. The panels count as flat, since the trailer may face
+--- any way, and make nothing under a roof. Authority only. Returns the watt-hours stored.
+---@param vehicle BaseVehicle
+function ArrowBoard.charge(vehicle, hours)
+    if vehicle:getScriptName() ~= ArrowBoard.SCRIPT then
+        return 0
+    end
+    local square = vehicle:getSquare()
+    local part = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
+    local container = part and part:getItemContainer()
+    if not (container and square and square:isOutside()) then
+        return 0
+    end
+    local Battery = RenewableEnergy.Battery
+    local wh = RenewableEnergy.Sun.panelWatts(RenewableEnergy.Specs.arrowBoardWatts, "flat") * hours
+    local stored = 0
+    local battery = wh > 0 and emptiestBattery(container)
+    while battery do
+        local before = Battery.getCharge(battery)
+        local room = (1 - before) * Battery.nominalWh(battery)
+        local added = math.min(wh, room)
+        -- Exactly full when it fills, so the loop moves on to the next battery.
+        Battery.setCharge(battery, added == room and 1 or before + added / Battery.nominalWh(battery))
+        -- As the maintainer does: clients hear of the charge once it shows at two decimals.
+        if VehicleUtils.compareFloats(before, Battery.getCharge(battery), 2) then
+            sendItemStats(battery)
+        end
+        wh, stored = wh - added, stored + added
+        battery = wh > 0 and emptiestBattery(container)
+    end
+    return stored
 end
 
 return ArrowBoard

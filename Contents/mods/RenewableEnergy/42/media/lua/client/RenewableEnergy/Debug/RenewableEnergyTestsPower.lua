@@ -807,7 +807,8 @@ local CLOCK_JUMP_HOURS = 1.25
 local PASS_FRAMES = 10
 
 -- What each fixture holds: the bank's Wh, the car battery's charge, the solar battery charger's
--- Wh in its cells and toward the next use, and the garden light's Wh.
+-- Wh in its cells and toward the next use, the garden light's Wh, and the charge of the battery
+-- in the arrow board's box.
 local function charges(self)
     local cellWh = self.charger:getModData()[CELL_CHARGER_STORED_KEY] or 0
     for _, cell in ipairs(self.cells) do
@@ -818,6 +819,7 @@ local function charges(self)
         car = self.carBattery:getCurrentUsesFloat(),
         charger = cellWh,
         light = SolarGardenLight.getCharge(self.light),
+        trailer = self.trailerBattery:getCurrentUsesFloat(),
     }
 end
 
@@ -831,8 +833,9 @@ local function allCharged(self)
 end
 
 -- The game's clock runs the banks and the gadgets: once it moves on at noon, a bank with a
--- connected panel, a car with a maintainer, a solar battery charger holding cells and a garden
--- light have all charged. The live weather sets how much, so this checks only that they did.
+-- connected panel, a car with a maintainer, a solar battery charger holding cells, a garden
+-- light and an arrow board's battery box have all charged. The live weather sets how much, so
+-- this checks only that they did.
 test("renewable_energy_power_clock_drives_banks_and_gadgets", {
     hour = 12,
     run = function(self)
@@ -840,8 +843,14 @@ test("renewable_energy_power_clock_drives_banks_and_gadgets", {
         if not bank then return end
         local panel, connected = T.panel(self, Sprites.flat, { near = bank, connect = true })
         local car, carBattery = T.vehicle(self, "Base.CarNormal", { battery = "Base.CarBattery1", charge = 0.5 })
+        local trailer = car and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT)
         local squares = T.need(self, T.squares(self, 2, { bare = true }), "two bare outdoor squares for the gadgets")
-        if not (panel and T.need(self, connected, "a panel connected to the bank") and car and squares) then return end
+        if not (panel and T.need(self, connected, "a panel connected to the bank") and trailer and squares) then return end
+        -- It may have spawned stocked; one battery, half charged, shows the panels charging.
+        local box = trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX):getItemContainer()
+        box:removeAllItems()
+        self.trailerBattery = box:AddItem("RenewableEnergy.DeepCycleBattery")
+        self.trailerBattery:setCurrentUsesFloat(0.5)
         local maintainer = player():getInventory():AddItem(SolarMaintainer.ITEM)
         if not T.need(self, SolarMaintainer.attach(player(), car, maintainer), "a maintainer on the car") then return end
         local charger = T.placeMoveable(self, squares[1], "RenewableEnergy.SolarCellCharger", Sprites.cellCharger)
@@ -876,5 +885,6 @@ test("renewable_energy_power_clock_drives_banks_and_gadgets", {
         charged("car", "the car with a maintainer")
         charged("charger", "the solar battery charger")
         charged("light", "the garden light")
+        charged("trailer", "the arrow board's battery box")
     end,
 })

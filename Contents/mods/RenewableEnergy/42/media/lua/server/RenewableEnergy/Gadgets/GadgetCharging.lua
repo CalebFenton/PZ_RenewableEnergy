@@ -1,9 +1,11 @@
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/World/ArrowBoard"
 
--- Runs the small solar gadgets, on the authority: single player or the server. Only loaded
--- vehicles, chargers and garden lights run, as vanilla's own battery chargers do.
+-- Runs the small solar gadgets and the arrow board trailers' panels, on the authority: single
+-- player or the server. Only loaded vehicles, chargers and garden lights run, as vanilla's own
+-- battery chargers do.
 if isClient() then
     return
 end
@@ -21,7 +23,9 @@ local lastHour
 function GadgetCharging.chargeVehicles(hours)
     local vehicles = getCell():getVehicles():iterator()
     while vehicles:hasNext() do
-        RenewableEnergy.SolarMaintainer.charge(vehicles:next(), hours)
+        local vehicle = vehicles:next()
+        RenewableEnergy.SolarMaintainer.charge(vehicle, hours)
+        RenewableEnergy.ArrowBoard.charge(vehicle, hours)
     end
 end
 

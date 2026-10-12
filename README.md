@@ -381,7 +381,7 @@ Solar arrow boards are the orange trailers road crews park at work zones, with a
 
 <p align="center"><img src="art/promo/images/trailer.png" alt="The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a white car on a road by traffic cones" width="100%"></p>
 
-Besides the road works, they turn up in junkyards, in highway pileups and parked with tradesmen's vans. The battery box on the tongue holds the two modules, often one of them cracked, 4 to 6 deep cycle batteries and a charge controller. Strip it where it stands or hitch it to a car and tow it home.
+Besides the road works, they turn up in junkyards, in highway pileups and parked with tradesmen's vans. The battery box on the tongue holds two spare modules, often one of them cracked, 4 to 6 deep cycle batteries and a charge controller. Strip it where it stands or hitch it to a car and tow it home. Its own two panels are built in and lie flat, so wherever it stands in the open they charge whatever car, deep cycle or L-16 batteries are in the box, the emptiest first. On a clear day at the default multiplier that's about 230 W at noon and 2 kWh a day in July, a deep cycle battery and a half, and 0.6 kWh a day in December. It shows dents on its battery box lid, rust and blood the way cars do, and its tail lamps light up when the car towing it brakes.
 
 ### Stash houses
 

@@ -948,6 +948,41 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
     end,
 })
 
+-- Its two 50 W panels charge the batteries in its box, the emptiest first: all of a pass goes to
+-- the emptier battery while it has room, and once batteries fill, the rest goes unstored.
+test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
+    hour = 12,
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+    end,
+    validate = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local box = self.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
+        box:removeAllItems()
+        local deepCycle = box:AddItem("RenewableEnergy.DeepCycleBattery")
+        local l16 = box:AddItem("RenewableEnergy.L16Battery")
+        -- The panels lie flat whichever way the trailer faces, so they see what a flat panel does.
+        local hourWh = RenewableEnergy.Sun.panelWatts(100, "flat")
+        if not expect(hourWh > 34, "the sun at noon gives only " .. hourWh .. " Wh an hour, too little to fill both") then
+            return
+        end
+
+        deepCycle:setCurrentUsesFloat(0.6)
+        l16:setCurrentUsesFloat(0.2)
+        expectNear("watt-hours stored in an hour", ArrowBoard.charge(self.trailer, 1), hourWh, 0.001)
+        expectNear("the emptier L-16's charge", l16:getCurrentUsesFloat(), 0.2 + hourWh / 2100, 0.0001)
+        expectNear("the fuller deep cycle's charge", deepCycle:getCurrentUsesFloat(), 0.6, 0.0001)
+
+        -- 21 Wh of room in the L-16 and 12.6 in the deep cycle: both fill, the rest is lost.
+        l16:setCurrentUsesFloat(0.99)
+        deepCycle:setCurrentUsesFloat(0.99)
+        expectNear("watt-hours stored with little room", ArrowBoard.charge(self.trailer, 1), 21 + 12.6, 0.01)
+        expect(l16:getCurrentUsesFloat() == 1 and deepCycle:getCurrentUsesFloat() == 1,
+            "the batteries aren't full: " .. l16:getCurrentUsesFloat() .. ", " .. deepCycle:getCurrentUsesFloat())
+    end,
+})
+
 local TOWING_CAR = "Base.OffRoad"
 -- How far ahead of the car, and behind the trailer, the strip they stand on runs, in squares:
 -- the car is pushed a few squares north.
