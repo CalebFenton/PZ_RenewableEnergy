@@ -1,0 +1,169 @@
+module Base
+{
+    /* In module Base, as vanilla's vehicles are: templates and model files are looked up by bare
+       name there. art/models/models.py writes the mesh and its textures; the body is built in the
+       frame of vanilla's Trailer, so the numbers below are that trailer's, multiplied out by its
+       model scale of 1.82, and read in metres. */
+    model RenewableEnergyArrowBoardTrailer
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer,
+        shader = vehicle_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+
+    vehicle RenewableEnergyArrowBoardTrailer
+    {
+        neverSpawnKey = true,
+        mechanicType = 1,
+        offRoadEfficiency = 0.8,
+        engineRepairLevel = 4,
+        playerDamageProtection = 0.8,
+        model
+        {
+            file = RenewableEnergyArrowBoardTrailer,
+            scale = 1.0,
+            offset = 0.0 0.34 0.25,
+        }
+        skin
+        {
+            texture = Vehicles/RenewableEnergy_ArrowBoardTrailer,
+        }
+        textureMask = Vehicles/RenewableEnergy_ArrowBoardTrailer_Mask,
+        textureLights = Vehicles/RenewableEnergy_ArrowBoardTrailer_Mask,
+        textureDamage1Overlay = Vehicles/Veh_Blood_Mask,
+        textureDamage2Overlay = Vehicles/Veh_Blood_Hvy,
+        textureDamage1Shell = Vehicles/Veh_Damage1,
+        textureDamage2Shell = Vehicles/Veh_Damage2,
+        textureRust = Vehicles/Veh_Rust,
+        extents = 1.14 0.4 1.7,
+        mass = 300,
+        physicsChassisShape = 1.14 0.4 1.7,
+        centerOfMassOffset = 0.0 0.4 -0.33,
+        shadowExtents = 1.5 2.4,
+        shadowOffset = 0.0 -0.1,
+        engineForce = 3600,
+        engineQuality = 60,
+        engineLoudness = 55,
+        maxSpeed = 70.0,
+        brakingForce = 1,
+        stoppingMovementForce = 2.0,
+        rollInfluence = 1.0,
+        steeringIncrement = 0.03,
+        steeringClamp = 0.3,
+        suspensionStiffness = 40.0,
+        suspensionCompression = 2.83,
+        suspensionDamping = 2.88,
+        maxSuspensionTravelCm = 18.2,
+        suspensionRestLength = 0.364,
+        wheelFriction = 4.0,
+        frontEndHealth = 150,
+        rearEndHealth = 150,
+        seats = 2,
+        /* The tongue's two rails and coupler, then the deck. */
+        physics box
+        {
+            offset = 0.2 0.18 0.98,
+            extents = 0.1 0.1 0.98,
+            rotate = 0.0 -20.0 0.0,
+        }
+        physics box
+        {
+            offset = -0.2 0.18 0.98,
+            extents = 0.1 0.1 0.98,
+            rotate = 0.0 20.0 0.0,
+        }
+        physics sphere
+        {
+            offset = 0.0 0.18 1.38,
+            radius = 0.1,
+        }
+        physics box
+        {
+            offset = 0.0 0.39 -0.34,
+            extents = 1.16 0.4 1.74,
+            rotate = 0.0 0.0 0.0,
+        }
+        useChassisPhysicsCollision = false,
+        wheel FrontLeft
+        {
+            front = true,
+            offset = 0.68 -0.34 -0.55,
+            radius = 0.273,
+            width = 0.2,
+        }
+        wheel FrontRight
+        {
+            front = true,
+            offset = -0.68 -0.34 -0.55,
+            radius = 0.273,
+            width = 0.2,
+        }
+        /* Where a character stands to reach the battery box on the tongue: either side of it or
+           in front. */
+        area RenewableEnergyBatteryBox
+        {
+            xywh = 0.0 0.85 2.0 1.0,
+        }
+        area TireFrontLeft
+        {
+            xywh = 0.97 -0.31 0.8 0.86,
+        }
+        area TireFrontRight
+        {
+            xywh = -0.97 -0.31 0.8 0.86,
+        }
+        template = Tire/part/TireFrontLeft,
+        template = Tire/part/TireFrontRight,
+        template = Suspension/part/SuspensionFrontLeft,
+        template = Suspension/part/SuspensionFrontRight,
+        template = TrunkDoor,
+        part TireFrontLeft
+        {
+            table install
+            {
+                requireInstalled = SuspensionFrontLeft,
+            }
+        }
+        part TireFrontRight
+        {
+            table install
+            {
+                requireInstalled = SuspensionFrontRight,
+            }
+        }
+        /* The battery box's lid. Vehicles.ContainerAccess.TruckBed opens a container only while
+           the part named TrunkDoor is open, so the lid takes that name, and its lock is the box's
+           lock. It starts closed and unlocked. A lua block replaces the template's whole list. */
+        part TrunkDoor
+        {
+            area = RenewableEnergyBatteryBox,
+            mechanicRequireKey = false,
+            lua
+            {
+                create = Vehicles.Create.TrunkDoorOpen,
+                init = Vehicles.Init.Door,
+                update = Vehicles.Update.TrunkDoor,
+                use = Vehicles.Use.TrunkDoor,
+            }
+        }
+        part RenewableEnergyBatteryBox
+        {
+            area = RenewableEnergyBatteryBox,
+            category = bodywork,
+            mechanicArea = Back,
+            container
+            {
+                capacity = 100,
+                test = Vehicles.ContainerAccess.TruckBed,
+            }
+        }
+        attachment trailer
+        {
+            offset = 0.0 -0.16 1.485,
+            rotate = 0.0 0.0 0.0,
+            canAttach = trailer,
+            updateconstraint = false,
+        }
+    }
+}

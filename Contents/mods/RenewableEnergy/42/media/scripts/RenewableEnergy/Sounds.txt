@@ -1,0 +1,24 @@
+module Base
+{
+    /* A battery bank is an IsoGenerator, and switching one plays the tile's GeneratorSound
+       prefix + Starting or Stopping (IsoGenerator.setActivated). The bank tiles name this
+       prefix (tools/make_tiles.py), so a bank clicks like a switch instead of pull-starting a
+       gas engine. It never plays the Loop: banks are taken off the generator update. */
+    sound RenewableEnergyBankStarting
+    {
+        category = Object,
+        clip
+        {
+            event = Object/Light/FlipSwitch,
+        }
+    }
+
+    sound RenewableEnergyBankStopping
+    {
+        category = Object,
+        clip
+        {
+            event = Object/Light/FlipSwitch,
+        }
+    }
+}

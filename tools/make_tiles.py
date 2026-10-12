@@ -34,7 +34,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 6
+COLUMNS, ROWS = 8, 15
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -49,27 +49,40 @@ def panel(group, item, level, **props):
     return moveable(item, level, CustomName="Solar Panel", GroupName=group, Material="Electric", **props)
 
 
-def rack(facing, offsets):
-    return panel("Ground Rack", "SolarRack", 3, Facing=facing, BlocksPlacement="", solidtrans="",
-                 **{side + "offset": str(offset) for side, offset in offsets.items()})
+def wall(item, facing):
+    if facing == "S":
+        return panel("Wall Mounted", item, 3, MoveType="WallObject", Facing="S", attachedN="", IsHigh="", Eoffset="1")
+    return panel("Wall Mounted", item, 3, MoveType="WallObject", Facing="E", attachedW="", IsHigh="", Soffset="-1")
+
+
+RACK_OFFSETS = {"S": {"E": 1, "N": 2, "W": 3}, "E": {"S": -1, "N": 1, "W": 2},
+                "N": {"S": -2, "E": -1, "W": 1}, "W": {"S": -3, "E": -2, "N": -1}}
+
+
+def rack(item, facing):
+    return panel("Ground Rack", item, 3, Facing=facing, BlocksPlacement="", solidtrans="",
+                 **{side + "offset": str(offset) for side, offset in RACK_OFFSETS[facing].items()})
+
+
+def storage(item, group, name, level, capacity, **props):
+    """A battery box, rack or bank: a container of its own type, scrapped by its own definition.
+    GeneratorSound names the sounds its generator plays when switched (scripts Sounds.txt)."""
+    return moveable(item, level, CustomName=name, GroupName=group, container="RenewableEnergy" + item,
+                    ContainerCapacity=str(capacity), Material="RenewableEnergy" + item, CanScrap="",
+                    BlocksPlacement="", solidtrans="", GeneratorSound="RenewableEnergyBank", **props)
+
+
+def garden_light():
+    # Lit and unlit both give the light back; it needs no tool, like a lamp.
+    return moveable("SolarGardenLight", tool=None, CustomName="Solar Garden Light", Material="Electric")
 
 
 TILES = {
     0: panel("Flat", "SolarFlat", 2, RenderLayer="Floor", IsLow=""),
-    1: panel("Wall Mounted", "SolarWall", 3, MoveType="WallObject", Facing="S", attachedN="", IsHigh="", Eoffset="1"),
-    2: panel("Wall Mounted", "SolarWall", 3, MoveType="WallObject", Facing="E", attachedW="", IsHigh="", Soffset="-1"),
-    3: rack("S", {"E": 1, "N": 2, "W": 3}),
-    4: rack("E", {"S": -1, "N": 1, "W": 2}),
-    5: rack("N", {"S": -2, "E": -1, "W": 1}),
-    6: rack("W", {"S": -3, "E": -2, "N": -1}),
     # Sits on the generator's square, which a floor rug's move type allows.
     7: moveable("SolarFailsafe", 3, CustomName="Solar Failsafe", MoveType="FloorRug", Material="Electric"),
-    8: moveable("BatteryBox", 1, CustomName="Battery Box", container="RenewableEnergyBatteryBox",
-                ContainerCapacity="40", ContainerPosition="Low", Material="RenewableEnergyBatteryBox", CanScrap="",
-                BlocksPlacement="", solidtrans="", IsLow=""),
-    9: moveable("BatteryBank", 3, CustomName="Battery Bank", container="RenewableEnergyBatteryBank",
-                ContainerCapacity="100", Material="RenewableEnergyBatteryBank", CanScrap="",
-                BlocksPlacement="", solidtrans=""),
+    8: storage("BatteryBoxWood", "Wooden", "Battery Box", 1, 40, ContainerPosition="Low", IsLow=""),
+    9: storage("BatteryBankMetal", "Metal", "Battery Bank", 4, 100),
     # Small enough for a table or counter, like the vanilla radios.
     10: moveable("SolarCellCharger", tool=None, CustomName="Solar Battery Charger",
                  container="RenewableEnergyCellCharger", ContainerCapacity="1", IsTableTop="", IsSurfaceOffset="",
@@ -77,7 +90,18 @@ TILES = {
     11: {"IsMoveAble": "", "CustomName": "Solar Box", "container": "RenewableEnergySolarBox", "ContainerCapacity": "50",
          "ContainerPosition": "Low", "Material": "Paper", "CanScrap": "", "PickUpWeight": "10", "BlocksPlacement": "",
          "solidtrans": "", "IsLow": "", "Surface": "14"},
+    14: garden_light(),
+    15: garden_light(),
+    23: storage("BatteryBoxMetal", "Metal", "Battery Box", 1, 40, ContainerPosition="Low", IsLow=""),
+    32: storage("BatteryRackWood", "Wooden", "Battery Rack", 3, 100),
+    33: storage("BatteryRackMetal", "Metal", "Battery Rack", 3, 100),
+    34: storage("BatteryBankWood", "Wooden", "Battery Bank", 4, 100),
 }
+for material, first_wall, first_rack in (("Metal", 1, 3), ("Wood", 21, 24)):
+    for offset, facing in enumerate("SE"):
+        TILES[first_wall + offset] = wall("SolarWall" + material, facing)
+    for offset, facing in enumerate("SENW"):
+        TILES[first_rack + offset] = rack("SolarRack" + material, facing)
 
 
 def main():

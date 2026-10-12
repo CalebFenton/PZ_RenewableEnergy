@@ -11,7 +11,7 @@ option RenewableEnergy.ChargeFreq {
 	page = RenewableEnergy, translation = RenewableEnergy_ChargeFreq, valueTranslation = RenewableEnergy_ChargeFreq,
 	type = enum, numValues = 2, default = 1,
 }
-/* Percent of the wear batteries take from deep discharges and overcharging. */
+/* Percent of the wear batteries take from deep discharges. */
 option RenewableEnergy.BatteryWear {
 	page = RenewableEnergy, translation = RenewableEnergy_BatteryWear,
 	type = integer, min = 0, max = 1000, default = 100,
@@ -25,9 +25,15 @@ option RenewableEnergy.FailsafeStopCharge {
 	page = RenewableEnergy, translation = RenewableEnergy_FailsafeStopCharge,
 	type = integer, min = 0, max = 100, default = 80,
 }
-option RenewableEnergy.solarPanelWorldSpawns {
-	page = RenewableEnergy, translation = RenewableEnergy_solarPanelWorldSpawns,
-	type = integer, min = 0, max = 100, default = 25,
+/* Percent chance that each named solar site is placed, rolled once per world. */
+option RenewableEnergy.SolarSites {
+	page = RenewableEnergy, translation = RenewableEnergy_SolarSites,
+	type = integer, min = 0, max = 100, default = 75,
+}
+/* Percent of the usual chance per house that it has solar garden lights. */
+option RenewableEnergy.GardenLights {
+	page = RenewableEnergy, translation = RenewableEnergy_GardenLights,
+	type = integer, min = 0, max = 1000, default = 100,
 }
 option RenewableEnergy.BatteryBankSpawn {
 	page = RenewableEnergy, translation = RenewableEnergy_BatteryBankSpawn,
@@ -57,7 +63,12 @@ option RenewableEnergy.ConnectPanelMin {
 	page = RenewableEnergy, translation = RenewableEnergy_ConnectPanelMin,
 	type = integer, min = 1, max = 1440, default = 10,
 }
-option RenewableEnergy.enableExpandedRecipes {
-    page = RenewableEnergy, translation = RenewableEnergy_enableExpandedRecipes,
-    type = boolean, default = false,
+option RenewableEnergy.StormDamage {
+	page = RenewableEnergy, translation = RenewableEnergy_StormDamage,
+	type = boolean, default = true,
+}
+/* Percent of the chance that a thunderstorm cracks a solar module. */
+option RenewableEnergy.StormDamageRate {
+	page = RenewableEnergy, translation = RenewableEnergy_StormDamageRate,
+	type = integer, min = 0, max = 1000, default = 100,
 }

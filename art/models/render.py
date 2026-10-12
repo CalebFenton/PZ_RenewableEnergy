@@ -258,6 +258,10 @@ def pixel_icon(pixels):
 
 
 def render_icons(camera, stage):
+    # Only item icons: an item that's gone leaves no icon behind.
+    for stale in os.listdir(ICON_DIR):
+        if stale.startswith("Item_RenewableEnergy_"):
+            os.remove(os.path.join(ICON_DIR, stale))
     for name, spec in items.ITEMS.items():
         clear(stage)
         build(stage, [tiles.layer(spec.get("icon", spec["model"]))])

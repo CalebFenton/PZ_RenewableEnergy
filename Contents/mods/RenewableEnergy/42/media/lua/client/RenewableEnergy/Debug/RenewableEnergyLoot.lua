@@ -27,6 +27,10 @@ local LABELS = {
     ["proc:GigamartHouseElectronics"] = "Department store electronics",
     ["proc:ToolStoreBooks"] = "Hardware store books",
     ["proc:ToolStoreFarming"] = "Hardware store farming",
+    ["proc:ToolStoreMisc"] = "Hardware store misc shelves",
+    ["proc:GardenStoreMisc"] = "Garden centre misc shelves",
+    ["proc:GardenStoreTools"] = "Garden centre tools",
+    ["proc:CrateGardening"] = "Gardening crates",
     ["proc:BookstoreBlueCollar"] = "Bookstore trade shelves",
     ["proc:BookstoreMisc"] = "Bookstore misc shelves",
     ["proc:BookstoreOutdoors"] = "Bookstore outdoors shelves",
@@ -322,6 +326,21 @@ function RenewableEnergyLoot.newContainer(square)
     return ItemContainer.new("crate", square, nil)
 end
 
+-- Takes the container's items, bags' contents included, off the cell's processed items, where
+-- ItemContainer.AddItem puts every new item. The report fills containers thousands of times in
+-- one frame, before the cell would drop them: left there they pile up, and every AddItem scans
+-- the whole list, until the run crawls and runs out of memory.
+local function forgetItems(container, processItems)
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        processItems:remove(item)
+        if item:IsInventoryContainer() then
+            forgetItems(item:getInventory(), processItems)
+        end
+    end
+end
+
 --- Calls fill(container) on an emptied `container` once and returns what it got: fullType ->
 --- count, of the mod's items, or of every item with `everything`.
 function RenewableEnergyLoot.fillOnce(fill, container, everything)
@@ -337,6 +356,7 @@ function RenewableEnergyLoot.fillOnce(fill, container, everything)
     else
         countItems(container, counts)
     end
+    forgetItems(container, getCell():getProcessItems())
     container:removeAllItems()
     return counts
 end
@@ -393,22 +413,31 @@ function RenewableEnergyLoot.squareOutsideRooms()
     return nil
 end
 
--- How WorldSpawns stocks the objects it places, each into a scratch container.
+-- How WorldSpawns and the arrow board stock the containers they place, each into a scratch
+-- container.
 local function worldStock()
     local WorldSpawns = RenewableEnergy.WorldSpawns
-    return {
-        {
-            label = "World battery boxes (sheds, garages, storage units)",
-            reference = "world:batteryBox",
-            fill = function(container) WorldSpawns.stockBank(container, "batteryBox") end,
-        },
-        {
-            label = "World battery racks (farm and electronics storage)",
-            reference = "world:batteryBank",
-            fill = function(container) WorldSpawns.stockBank(container, "batteryBank") end,
-        },
-        { label = "World solar crates", reference = "world:crate", fill = WorldSpawns.stockCrate },
-    }
+    local stocks = {}
+    local function add(label, reference, fill)
+        table.insert(stocks, { label = label, reference = reference, fill = fill })
+    end
+    local bankNames = {}
+    for name in pairs(WorldSpawns.BANK_STOCK) do
+        table.insert(bankNames, name)
+    end
+    table.sort(bankNames)
+    for _, name in ipairs(bankNames) do
+        add("World bank: " .. name .. " (" .. WorldSpawns.BANK_STOCK[name].sprite .. ")", "world:bank." .. name,
+            function(container) WorldSpawns.stockBank(container, name) end)
+    end
+    for _, name in ipairs({ "kit", "powerYard" }) do
+        add("World crate: " .. name, "world:crate." .. name, function(container) WorldSpawns.stockCrate(container, name) end)
+    end
+    add("Arrow board battery box", "world:arrowBoard", function(container)
+        RenewableEnergy.ArrowBoard.stockBatteryBox(container)
+        RenewableEnergy.Distributions.chargeFoundBatteries(container)
+    end)
+    return stocks
 end
 
 --- Measures every list the mod adds to, the stash crate, the room containers that pick the mod's
@@ -458,5 +487,328 @@ function RenewableEnergyLoot.report(samples)
             }
             return entries
         end)
+    end)
+end
+
+-- Module-watts report ------------------------------------------------------------------------------
+-- How many solar modules, and how many watts of them, a thorough player finds in a town: every
+-- container of every room, the crates world spawns put in rooms, the vehicles its stalls hold
+-- and the solar sites in its bounds, from dev/loot/census.py's counts times each one's expected
+-- modules. Expectations come from the loot tables' weights the way ItemPickerJava rolls them
+-- (DEVELOPMENT.md, Loot), so the report is exact for the lists and approximate where the game
+-- picks among them: a procedural container picks a list by weightChance, at most `max` per room,
+-- and lists forced by zone, tile or room are left out. Watts weigh each module by its condition;
+-- "repaired" is after one Repair Cracked Module on every module it helps.
+
+local MODULE = "RenewableEnergy.SolarModule"
+-- Repair Cracked Module: condition added, and the most it brings a factory module to.
+local REPAIR = { add = 30, cap = 80 }
+
+-- A count of modules with their summed condition, as found and as repaired.
+local function haul(count, condition, repaired)
+    return { count = count, condition = condition * count, repaired = repaired * count }
+end
+
+local function addHaul(total, part, times)
+    times = times or 1
+    total.count = total.count + part.count * times
+    total.condition = total.condition + part.condition * times
+    total.repaired = total.repaired + part.repaired * times
+end
+
+local function emptyHaul()
+    return haul(0, 0, 0)
+end
+
+-- One module whose condition is uniform over the range: { count = 1, condition, repaired }.
+local function moduleOver(range)
+    local sum, repairedSum, n = 0, 0, 0
+    for condition = range.min, range.max do
+        sum = sum + condition
+        repairedSum = repairedSum + (condition < REPAIR.cap and math.min(REPAIR.cap, condition + REPAIR.add) or condition)
+        n = n + 1
+    end
+    return haul(1, sum / n, repairedSum / n)
+end
+
+local function mix(share, a, b)
+    return haul(1, share * a.condition + (1 - share) * b.condition, share * a.repaired + (1 - share) * b.repaired)
+end
+
+local function moduleKinds()
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local cracked, weathered = moduleOver(WorldSpawns.CRACKED), moduleOver(WorldSpawns.WEATHERED)
+    return {
+        intact = haul(1, 100, 100),
+        cracked = cracked,
+        weathered = weathered,
+        site = mix(WorldSpawns.SITE_CRACKED_SHARE, cracked, weathered),
+        secondOnArrowBoard = mix(RenewableEnergy.ArrowBoard.STOCK.secondCrackedChance, cracked, weathered),
+    }
+end
+
+local function chancePerRoll(weight, multiplier)
+    return math.min(1, math.ceil(weight * 100 * multiplier) / 10000)
+end
+
+--- Expected count of `fullType` in one fill of a loot table, junk included.
+local function expectedIn(lootTable, fullType)
+    if type(lootTable) ~= "table" then
+        return 0
+    end
+    local total = 0
+    local multiplier = ItemPickerJava.getLootModifier(fullType)
+    local items = lootTable.items or {}
+    for i = 1, #items - 1, 2 do
+        if items[i] == fullType then
+            total = total + (lootTable.rolls or 1) * chancePerRoll(items[i + 1], multiplier)
+        end
+    end
+    local junk = lootTable.junk
+    for i = 1, #(junk and junk.items or {}) - 1, 2 do
+        if junk.items[i] == fullType then
+            total = total + (junk.rolls or 1) * chancePerRoll(junk.items[i + 1] * 1.4, 1)
+        end
+    end
+    return total
+end
+
+local function isForced(pick)
+    return pick.forceForZones or pick.forceForTiles or pick.forceForRooms or pick.forceForItems
+end
+
+--- Expected modules in `count` containers of `containerType` spread over `rooms` rooms named
+--- `roomName`.
+local function expectedInContainers(roomName, containerType, count, rooms)
+    local room = SuburbsDistributions[roomName]
+    local entry = room and room[containerType] or SuburbsDistributions.all[containerType]
+    if type(entry) ~= "table" then
+        return 0
+    end
+    if not entry.procedural then
+        return count * expectedIn(entry, MODULE)
+    end
+    local totalWeight = 0
+    for _, pick in ipairs(entry.procList or {}) do
+        if not isForced(pick) then
+            totalWeight = totalWeight + math.max(1, pick.weightChance or 1)
+        end
+    end
+    local perRoom = count / rooms
+    local total = 0
+    for _, pick in ipairs(entry.procList or {}) do
+        local list = ProceduralDistributions.list[pick.name]
+        if not isForced(pick) and list then
+            local picked = perRoom * math.max(1, pick.weightChance or 1) / totalWeight
+            total = total + rooms * math.min(picked, pick.max or picked) * expectedIn(list, MODULE)
+        end
+    end
+    return total
+end
+
+-- What the rooms of a town hold: list modules (whole), cracked modules and world crates.
+local function roomsHaul(town, kinds)
+    local Distributions, WorldSpawns = RenewableEnergy.Distributions, RenewableEnergy.WorldSpawns
+    local listed, cracked, crates = 0, 0, 0
+    for roomName, byType in pairs(town.containers) do
+        local rooms = math.max(1, town.rooms[roomName] or 0)
+        for containerType, count in pairs(byType) do
+            listed = listed + expectedInContainers(roomName, containerType, count, rooms)
+            local weight = Distributions.CRACKED_MODULE_CONTAINERS[containerType] and Distributions.CRACKED_MODULE_ROOMS[roomName]
+            if weight then
+                cracked = cracked + count * Distributions.crackedModuleChance(weight)
+            end
+        end
+    end
+    local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
+    local crateModules = 0
+    for _, line in ipairs(WorldSpawns.CRATE_STOCK.kit) do
+        if line[1] == MODULE then
+            crateModules = (line[2] + line[3]) / 2 * SandboxVars.RenewableEnergy[line[4]]
+        end
+    end
+    for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
+        if rarity then
+            crates = crates + (town.rooms[roomName] or 0) / (odds * rarity) * crateModules
+        end
+    end
+    return {
+        listed = haul(listed, kinds.intact.condition, kinds.intact.repaired),
+        cracked = haul(cracked, kinds.cracked.condition, kinds.cracked.repaired),
+        crates = haul(crates, kinds.site.condition, kinds.site.repaired),
+    }
+end
+
+local function arrowBoardHaul(kinds)
+    local stock = RenewableEnergy.ArrowBoard.STOCK
+    local total = emptyHaul()
+    local modules = stock.modules * SandboxVars.RenewableEnergy.LRMSolarPanels
+    addHaul(total, kinds.weathered, math.min(1, modules))
+    addHaul(total, kinds.secondOnArrowBoard, math.max(0, modules - 1))
+    return total
+end
+
+-- Expected modules in one vehicle of a script: its Normal loot, or one of its Specific sets at
+-- the vehicle's special loot chance (BaseVehicle.randomizeContainers: 8 in 100).
+local SPECIAL_LOOT_CHANCE = 0.08
+local function vehicleModules(script)
+    local name = string.gsub(script, "^Base%.", "")
+    local distribution = VehicleDistributions[1][name]
+    if not distribution then
+        return 0
+    end
+    local function setModules(set)
+        local total = 0
+        for part, lootTable in pairs(set or {}) do
+            if part ~= "specificId" then
+                total = total + expectedIn(lootTable, MODULE)
+            end
+        end
+        return total
+    end
+    local specific = distribution.Specific or {}
+    if #specific == 0 then
+        return setModules(distribution.Normal)
+    end
+    local specificTotal = 0
+    for _, set in ipairs(specific) do
+        specificTotal = specificTotal + setModules(set)
+    end
+    return (1 - SPECIAL_LOOT_CHANCE) * setModules(distribution.Normal) + SPECIAL_LOOT_CHANCE * specificTotal / #specific
+end
+
+--- Vehicles that come with a zone's stalls, by script, each { share, perStall }: the chance a
+--- stall holds one. As IsoChunk.AddVehicles_OnZone and VehicleType.getRandomVehicleType roll
+--- them, leaving out the special vehicles a few stalls of an ordinary zone turn into.
+local function zoneVehicles(zoneName)
+    local zone = VehicleZoneDistribution[zoneName]
+    if not zone or not zone.vehicles then
+        return {}
+    end
+    local spawn = math.min(1, ((zone.spawnRate or 16) + 1) / 100) * (1 - (zone.chanceToSpawnBurnt or 0) / 100)
+    local result = {}
+    local function addFrom(vehicles, share)
+        local total = 0
+        for _, entry in pairs(vehicles) do
+            total = total + entry.spawnChance
+        end
+        for script, entry in pairs(vehicles) do
+            result[script] = (result[script] or 0) + share * entry.spawnChance / total
+        end
+    end
+    local normal = zone.specialCar and (zone.chanceToSpawnNormal or 80) / 100 or 0
+    addFrom(zone.vehicles, spawn * (1 - normal))
+    if normal > 0 then
+        addFrom(VehicleZoneDistribution.parkingstall.vehicles, spawn * normal)
+    end
+    return result
+end
+
+local function vehiclesHaul(stalls, kinds)
+    local Distributions = RenewableEnergy.Distributions
+    local arrowBoard = RenewableEnergy.ArrowBoard.SCRIPT
+    local total, arrowBoards = emptyHaul(), 0
+    local cache = {}
+    for zoneName, count in pairs(stalls) do
+        for script, perStall in pairs(zoneVehicles(zoneName)) do
+            local vehicles = count * perStall
+            if script == arrowBoard then
+                arrowBoards = arrowBoards + vehicles
+                addHaul(total, arrowBoardHaul(kinds), vehicles)
+            else
+                cache[script] = cache[script] or vehicleModules(script)
+                addHaul(total, kinds.intact, vehicles * cache[script])
+                if zoneName == "junkyard" then
+                    addHaul(total, kinds.cracked, vehicles * Distributions.crackedModuleChance(Distributions.CRACKED_MODULE_JUNKYARD))
+                end
+            end
+        end
+    end
+    return total, arrowBoards
+end
+
+local function siteSpot(site)
+    local spot = (site.panels and site.panels[1]) or site.bank or site.arrowBoard
+    return spot[1], spot[2]
+end
+
+--- Expected modules of a site once placed.
+local function siteHaul(site, kinds)
+    local SolarSites, WorldSpawns = RenewableEnergy.SolarSites, RenewableEnergy.WorldSpawns
+    local kind = SolarSites.KINDS[site.kind]
+    local total = emptyHaul()
+    if kind.panels then
+        local panels = (kind.panels.min + math.min(kind.panels.max, #site.panels)) / 2
+        local perPanel = 0
+        for _, panel in ipairs(site.panels) do
+            local mount = RenewableEnergy.Sprites.kindOf(SolarSites.mountSprite(panel[4], panel[5]))
+            perPanel = perPanel + (kind.modules and (kind.modules.min + kind.modules.max) / 2 or RenewableEnergy.Specs.mounts[mount].modules)
+        end
+        addHaul(total, kinds.site, panels * perPanel / #site.panels)
+    end
+    for _, line in ipairs(kind.crate and WorldSpawns.CRATE_STOCK[kind.crate] or {}) do
+        if line[1] == MODULE then
+            addHaul(total, kinds.site, (line[2] + line[3]) / 2 * SandboxVars.RenewableEnergy[line[4]])
+        end
+    end
+    if site.arrowBoard then
+        addHaul(total, arrowBoardHaul(kinds))
+    end
+    return total
+end
+
+local function inTown(town, x, y)
+    return x >= town.x1 and x <= town.x2 and y >= town.y1 and y <= town.y2
+end
+
+--- The module report: for each town of the census, { name, listed, cracked, crates, vehicles,
+--- sites, total } hauls ({ count, condition, repaired }, condition summed over the modules);
+--- `sites`, each { name, kind, haul } at its Solar Sites chance; `arrowBoards`, the expected
+--- number on the map, { zones, roadWorks }. At the default loot settings and loot rarity
+--- options 1.
+function RenewableEnergyLoot.moduleReport(census)
+    return RenewableEnergyLoot.withMeasureOptions(function()
+        local saved = {}
+        for _, option in ipairs(LRM_OPTIONS) do
+            saved[option] = SandboxVars.RenewableEnergy[option]
+            SandboxVars.RenewableEnergy[option] = 1
+        end
+        RenewableEnergy.Distributions.apply()
+        local kinds = moduleKinds()
+        local siteChance = SandboxVars.RenewableEnergy.SolarSites / 100
+        local report = { towns = {}, sites = {} }
+        for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
+            table.insert(report.sites, { name = site.name, kind = site.kind, haul = siteHaul(site, kinds), site = site })
+        end
+        for _, town in ipairs(census.towns) do
+            local row = roomsHaul(town, kinds)
+            row.name = town.name
+            row.vehicles = vehiclesHaul(town.vehicleStalls, kinds)
+            row.sites = emptyHaul()
+            for _, entry in ipairs(report.sites) do
+                if inTown(town, siteSpot(entry.site)) then
+                    addHaul(row.sites, entry.haul, siteChance)
+                end
+            end
+            row.total = emptyHaul()
+            for _, part in ipairs({ row.listed, row.cracked, row.crates, row.vehicles, row.sites }) do
+                addHaul(row.total, part)
+            end
+            table.insert(report.towns, row)
+        end
+        local _, zoneBoards = vehiclesHaul(census.mapVehicleStalls, kinds)
+        local roadWorks = 0
+        for _, entry in ipairs(report.sites) do
+            if entry.site.arrowBoard then
+                roadWorks = roadWorks + siteChance
+            end
+        end
+        report.arrowBoards = { zones = zoneBoards, roadWorks = roadWorks }
+        report.siteChance = siteChance
+        for option, value in pairs(saved) do
+            SandboxVars.RenewableEnergy[option] = value
+        end
+        RenewableEnergy.Distributions.apply()
+        return report
     end)
 end

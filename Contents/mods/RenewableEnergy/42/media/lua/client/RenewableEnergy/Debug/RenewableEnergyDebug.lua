@@ -3,13 +3,19 @@ RenewableEnergyDebug = {}
 
 -- Every item this mod defines, in the order the README shows them.
 RenewableEnergyDebug.ITEMS = {
-    "RenewableEnergy.SolarModule",
-    "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWall", "RenewableEnergy.SolarRack",
-    "RenewableEnergy.BatteryBox", "RenewableEnergy.BatteryBank",
+    "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule", "RenewableEnergy.SolarCells",
+    "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWallWood", "RenewableEnergy.SolarWallMetal",
+    "RenewableEnergy.SolarRackWood", "RenewableEnergy.SolarRackMetal",
+    "RenewableEnergy.BatteryBoxWood", "RenewableEnergy.BatteryBoxMetal",
+    "RenewableEnergy.BatteryRackWood", "RenewableEnergy.BatteryRackMetal",
+    "RenewableEnergy.BatteryBankWood", "RenewableEnergy.BatteryBankMetal",
     "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger",
     "RenewableEnergy.ChargeController", "RenewableEnergy.SolarFailsafe",
     "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery",
-    "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger",
+    "RenewableEnergy.CarBatteryCase", "RenewableEnergy.DeepCycleBatteryCase", "RenewableEnergy.L16BatteryCase",
+    "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates", "RenewableEnergy.WoodenBatteryPlatePattern",
+    "RenewableEnergy.BatteryPlateMoldUnfired", "RenewableEnergy.BatteryPlateMold", "RenewableEnergy.BatteryElectrolyte",
+    "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
     "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
 }

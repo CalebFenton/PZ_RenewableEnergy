@@ -8,12 +8,12 @@
 if isClient() then return end
 
 require "Map/SGlobalObjectSystem"
-require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 
-local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
+local Specs, Sun, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sun, RenewableEnergy.PowerBank
 
 local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
 
@@ -94,8 +94,8 @@ local function makeBank(square, spriteName, index, from)
     return generator
 end
 
---- A working bank of tile `spriteName` (Sprites.batteryBox or Sprites.batteryBank) at
---- `index` on the square, or on top when `index` is nil or negative. Authority only.
+--- A working bank of tile `spriteName` (a bank's Sprites field value) at `index` on the
+--- square, or on top when `index` is nil or negative. Authority only.
 function PowerBank.place(square, spriteName, index)
     local top = square:getObjects():size()
     return makeBank(square, spriteName, (index and index >= 0) and index or top, nil)
@@ -162,14 +162,15 @@ local function loadBank(isoObject)
     BankSystem.instance:loadIsoObject(isoObject)
 end
 
-for _, name in ipairs({ Sprites.batteryBox, Sprites.batteryBank }) do
+for _, name in ipairs(PowerBank.bankSprites()) do
     MapObjects.OnLoadWithSprite(name, loadBank, 6)
 end
 
 -- The charge pass ------------------------------------------------------------------------
 
---- What every bank in this pass shares: the weather, and the light on each mount averaged
---- over the `hours` up to now.
+--- What every bank in this pass shares: the weather, the light on each mount averaged over
+--- the `hours` up to now (and what it would be under a clear sky), and the hours of storm
+--- that can crack modules.
 function BankSystem.passContext(hours)
     local climate = getClimateManager()
     local weather = Sun.weatherNow()
@@ -178,25 +179,30 @@ function BankSystem.passContext(hours)
     for i = 1, steps do
         table.insert(suns, Sun.positionNow(hours * (i - 0.5) / steps))
     end
-    local cache = {}
-    local context = {
+    local function averaged(skies)
+        local cache = {}
+        return function(kind, facing)
+            local key = kind .. (facing or "")
+            if not cache[key] then
+                local total = 0
+                for _, sun in ipairs(suns) do
+                    total = total + Sun.planeIrradiance(sun, kind, facing, skies)
+                end
+                cache[key] = total / steps
+            end
+            return cache[key]
+        end
+    end
+    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.windMin
+    return {
         weather = weather,
         precipitation = climate:getPrecipitationIntensity(),
         airC = climate:getTemperature(),
         elevation = Sun.elevation(),
+        stormHours = storming and hours or 0,
+        irradiance = averaged(weather),
+        clearIrradiance = averaged(Sun.CLEAR_WEATHER),
     }
-    function context.irradiance(kind, facing)
-        local key = kind .. (facing or "")
-        if not cache[key] then
-            local total = 0
-            for _, sun in ipairs(suns) do
-                total = total + Sun.planeIrradiance(sun, kind, facing, weather)
-            end
-            cache[key] = total / steps
-        end
-        return cache[key]
-    end
-    return context
 end
 
 --- Bring one bank up to now.

@@ -17,9 +17,12 @@ module RenewableEnergy
 {
     imports { Base }
 
-    /**************************** Solar panels ******************************/
+    /**************************** Solar modules *****************************/
 
-    /* A 50 W 1993 module. Research teaches the mounts it goes into. */
+    /*
+        A 50 W 1993 module. Its condition is the share of its rating it makes, and a mount keeps
+        each module's condition (RecipeCode.lua). Research teaches the mounts it goes into.
+    */
     item SolarModule
     {
         DisplayCategory = Electronics,
@@ -30,9 +33,36 @@ module RenewableEnergy
         MetalValue = 1.0,
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_SolarModule,
-        ResearchableRecipes = RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWall;RenewableEnergy_MakeSolarRack,
+        ResearchableRecipes = RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWallWood;RenewableEnergy_MakeSolarWallMetal;RenewableEnergy_MakeSolarRackWood;RenewableEnergy_MakeSolarRackMetal,
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
+
+    /* Salvaged cells under glass. Rated like a factory module, its ConditionMax caps it lower. */
+    item HomemadeSolarModule
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 4.5,
+        Icon = RenewableEnergy_HomemadeSolarModule,
+        WorldStaticModel = RenewableEnergy.HomemadeSolarModule_Ground,
+        ConditionMax = 60,
+        Tooltip = Tooltip_RenewableEnergy_HomemadeSolarModule,
+        Tags = base:ignorezombiedensity;base:showcondition,
+    }
+
+    /* An abstract unit of salvaged solar cells: what a gadget's little panel yields. */
+    item SolarCells
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.02,
+        Icon = RenewableEnergy_SolarCells,
+        WorldStaticModel = RenewableEnergy.SolarCells_Ground,
+        Tooltip = Tooltip_RenewableEnergy_SolarCells,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /**************************** Panel mounts ******************************/
 
     item SolarFlat
     {
@@ -46,56 +76,128 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
-    item SolarWall
+    item SolarWallWood
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
         Weight = 5.0,
-        Icon = RenewableEnergy_SolarWall,
-        WorldStaticModel = RenewableEnergy.SolarWall_Ground,
+        Icon = RenewableEnergy_SolarWallWood,
+        WorldStaticModel = RenewableEnergy.SolarWallWood_Ground,
+        WorldObjectSprite = renewable_energy_01_21,
+        Tooltip = Tooltip_RenewableEnergy_SolarWall,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item SolarWallMetal
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 5.0,
+        Icon = RenewableEnergy_SolarWallMetal,
+        WorldStaticModel = RenewableEnergy.SolarWallMetal_Ground,
         WorldObjectSprite = renewable_energy_01_1,
         Tooltip = Tooltip_RenewableEnergy_SolarWall,
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
-    item SolarRack
+    item SolarRackWood
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 11.0,
+        Icon = RenewableEnergy_SolarRackWood,
+        WorldStaticModel = RenewableEnergy.SolarRackWood_Ground,
+        WorldObjectSprite = renewable_energy_01_24,
+        Tooltip = Tooltip_RenewableEnergy_SolarRackWood,
+        Tags = base:heavyitem;base:ignorezombiedensity,
+    }
+
+    item SolarRackMetal
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
         Weight = 9.0,
-        Icon = RenewableEnergy_SolarRack,
-        WorldStaticModel = RenewableEnergy.SolarRack_Ground,
+        Icon = RenewableEnergy_SolarRackMetal,
+        WorldStaticModel = RenewableEnergy.SolarRackMetal_Ground,
         WorldObjectSprite = renewable_energy_01_3,
-        Tooltip = Tooltip_RenewableEnergy_SolarRack,
+        Tooltip = Tooltip_RenewableEnergy_SolarRackMetal,
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
 
-    /**************************** Banks *************************************/
+    /**************************** Battery storage ***************************/
     /*
         Plain moveables, not base:generator: with that tag and a WorldObjectSprite, an item
         dropped on the floor turns into a bare IsoGenerator (IsoGridSquare.AddWorldInventoryItem).
     */
-    item BatteryBox
+    item BatteryBoxWood
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
         Weight = 6.0,
-        Icon = RenewableEnergy_BatteryBox,
-        WorldStaticModel = RenewableEnergy.BatteryBox_Ground,
+        Icon = RenewableEnergy_BatteryBoxWood,
+        WorldStaticModel = RenewableEnergy.BatteryBoxWood_Ground,
         WorldObjectSprite = renewable_energy_01_8,
         Tooltip = Tooltip_RenewableEnergy_BatteryBox,
         Tags = base:ignorezombiedensity,
     }
 
-    item BatteryBank
+    item BatteryBoxMetal
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 5.0,
+        Icon = RenewableEnergy_BatteryBoxMetal,
+        WorldStaticModel = RenewableEnergy.BatteryBoxMetal_Ground,
+        WorldObjectSprite = renewable_energy_01_23,
+        Tooltip = Tooltip_RenewableEnergy_BatteryBox,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item BatteryRackWood
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 12.0,
+        Icon = RenewableEnergy_BatteryRackWood,
+        WorldStaticModel = RenewableEnergy.BatteryRackWood_Ground,
+        WorldObjectSprite = renewable_energy_01_32,
+        Tooltip = Tooltip_RenewableEnergy_BatteryRackWood,
+        Tags = base:heavyitem;base:ignorezombiedensity,
+    }
+
+    item BatteryRackMetal
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 14.0,
+        Icon = RenewableEnergy_BatteryRackMetal,
+        WorldStaticModel = RenewableEnergy.BatteryRackMetal_Ground,
+        WorldObjectSprite = renewable_energy_01_33,
+        Tooltip = Tooltip_RenewableEnergy_BatteryRackMetal,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item BatteryBankWood
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
         Weight = 20.0,
-        Icon = RenewableEnergy_BatteryBank,
-        WorldStaticModel = RenewableEnergy.BatteryBank_Ground,
+        Icon = RenewableEnergy_BatteryBankWood,
+        WorldStaticModel = RenewableEnergy.BatteryBankWood_Ground,
+        WorldObjectSprite = renewable_energy_01_34,
+        Tooltip = Tooltip_RenewableEnergy_BatteryBankWood,
+        Tags = base:heavyitem;base:ignorezombiedensity,
+    }
+
+    item BatteryBankMetal
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 25.0,
+        Icon = RenewableEnergy_BatteryBankMetal,
+        WorldStaticModel = RenewableEnergy.BatteryBankMetal_Ground,
         WorldObjectSprite = renewable_energy_01_9,
-        Tooltip = Tooltip_RenewableEnergy_BatteryBank,
+        Tooltip = Tooltip_RenewableEnergy_BatteryBankMetal,
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
 
@@ -113,7 +215,10 @@ module RenewableEnergy
     }
 
     /**************************** Bank parts ********************************/
-    /* Research on found inverters teaches the bank they go into. */
+    /*
+        Research on found inverters teaches the storage they go into. Inverters and controllers
+        wear while their bank runs, and Electronics Scrap repairs them (Lua: PowerBank).
+    */
     item PlugInInverter
     {
         DisplayCategory = Electronics,
@@ -122,9 +227,10 @@ module RenewableEnergy
         Icon = RenewableEnergy_PlugInInverter,
         WorldStaticModel = RenewableEnergy.PlugInInverter_Ground,
         MetalValue = 0.5,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_PlugInInverter,
-        ResearchableRecipes = RenewableEnergy_MakeBatteryBox,
-        Tags = base:hasmetal;base:ignorezombiedensity,
+        ResearchableRecipes = RenewableEnergy_MakeBatteryBoxWood;RenewableEnergy_MakeBatteryBoxMetal,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     item PowerInverter
@@ -135,9 +241,10 @@ module RenewableEnergy
         Icon = RenewableEnergy_PowerInverter,
         WorldStaticModel = RenewableEnergy.PowerInverter_Ground,
         MetalValue = 1.0,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_PowerInverter,
-        ResearchableRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal,
-        Tags = base:hasmetal;base:ignorezombiedensity,
+        ResearchableRecipes = RenewableEnergy_BuildBatteryRackWood;RenewableEnergy_BuildBatteryRackMetal,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     item InverterCharger
@@ -148,9 +255,10 @@ module RenewableEnergy
         Icon = RenewableEnergy_InverterCharger,
         WorldStaticModel = RenewableEnergy.InverterCharger_Ground,
         MetalValue = 3.0,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_InverterCharger,
         ResearchableRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeSolarFailsafe,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     item ChargeController
@@ -161,8 +269,9 @@ module RenewableEnergy
         Icon = RenewableEnergy_ChargeController,
         WorldStaticModel = RenewableEnergy.ChargeController_Ground,
         MetalValue = 0.5,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_ChargeController,
-        Tags = base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     /**************************** Batteries *********************************/
@@ -209,7 +318,120 @@ module RenewableEnergy
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
-    /**************************** Stage 0 gadgets ***************************/
+    /**************************** Battery rebuilding ************************/
+    /* A stripped battery's empty case, waiting for new plates and acid. */
+    item CarBatteryCase
+    {
+        DisplayCategory = VehicleMaintenance,
+        ItemType = base:normal,
+        Weight = 1.5,
+        Icon = RenewableEnergy_CarBatteryCase,
+        WorldStaticModel = RenewableEnergy.CarBatteryCase_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BatteryCase,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item DeepCycleBatteryCase
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 2.0,
+        Icon = RenewableEnergy_DeepCycleBatteryCase,
+        WorldStaticModel = RenewableEnergy.DeepCycleBatteryCase_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BatteryCase,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item L16BatteryCase
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 3.5,
+        Icon = RenewableEnergy_L16BatteryCase,
+        WorldStaticModel = RenewableEnergy.L16BatteryCase_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BatteryCase,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /* One set of lead plates: a car battery holds one, a deep cycle two, an L-16 three. */
+    item WornBatteryPlates
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 3.0,
+        Icon = RenewableEnergy_WornBatteryPlates,
+        WorldStaticModel = RenewableEnergy.WornBatteryPlates_Ground,
+        MetalValue = 3.0,
+        Tooltip = Tooltip_RenewableEnergy_WornBatteryPlates,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    item BatteryPlates
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 3.0,
+        Icon = RenewableEnergy_BatteryPlates,
+        WorldStaticModel = RenewableEnergy.BatteryPlates_Ground,
+        MetalValue = 3.0,
+        Tooltip = Tooltip_RenewableEnergy_BatteryPlates,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /* The plate mold's chain follows vanilla's ingot mold: wooden pattern, pressed clay, kiln. */
+    item WoodenBatteryPlatePattern
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = RenewableEnergy_WoodenBatteryPlatePattern,
+        WorldStaticModel = RenewableEnergy.WoodenBatteryPlatePattern_Ground,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item BatteryPlateMoldUnfired
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = RenewableEnergy_BatteryPlateMoldUnfired,
+        WorldStaticModel = RenewableEnergy.BatteryPlateMoldUnfired_Ground,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item BatteryPlateMold
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = RenewableEnergy_BatteryPlateMold,
+        WorldStaticModel = RenewableEnergy.BatteryPlateMold_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BatteryPlateMold,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /* Battery acid, which nothing in vanilla uses: Rebuild Battery takes it. */
+    item BatteryElectrolyte
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.3,
+        Icon = RenewableEnergy_BatteryElectrolyte,
+        WorldStaticModel = RenewableEnergy.BatteryElectrolyte_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BatteryElectrolyte,
+        Tags = base:ignorezombiedensity,
+        component FluidContainer
+        {
+            ContainerName = RenewableEnergy_ElectrolyteBottle,
+            Capacity = 1.0,
+            Fluids
+            {
+                fluid = Acid:1.0,
+            }
+        }
+    }
+
+    /**************************** Solar gadgets *****************************/
     /* Clipped to a vehicle (Lua: RenewableEnergy.SolarMaintainer), it trickle-charges the battery. */
     item SolarMaintainer
     {
@@ -240,6 +462,19 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
+    /* Placed outdoors, it charges by day and glows at night (Lua: RenewableEnergy.SolarGardenLight). */
+    item SolarGardenLight
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:moveable,
+        Weight = 0.5,
+        Icon = RenewableEnergy_SolarGardenLight,
+        WorldStaticModel = RenewableEnergy.SolarGardenLight_Ground,
+        WorldObjectSprite = renewable_energy_01_14,
+        Tooltip = Tooltip_RenewableEnergy_SolarGardenLight,
+        Tags = base:ignorezombiedensity,
+    }
+
     /**************************** Literature ********************************/
     item HomesteadPowerMag1
     {
@@ -251,7 +486,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag1_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_MakeBatteryBox;RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWall;RenewableEnergy_MakeSolarRack,
+        LearnedRecipes = RenewableEnergy_MakeBatteryBoxWood;RenewableEnergy_MakeBatteryBoxMetal;RenewableEnergy_BuildBatteryRackWood;RenewableEnergy_BuildBatteryRackMetal;RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWallWood;RenewableEnergy_MakeSolarWallMetal;RenewableEnergy_MakeSolarRackWood;RenewableEnergy_MakeSolarRackMetal;RenewableEnergy_RepairCrackedModule,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }
@@ -266,7 +501,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag2_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe,
+        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

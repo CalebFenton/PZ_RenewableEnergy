@@ -1,14 +1,16 @@
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
+require "ISUI/ISTextBox"
 ---@class RenewableEnergy
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/RenewableEnergyFormat"
 
--- The battery bank's status window: what comes in, what goes out and what is stored, on the left;
--- the batteries and the panels on the right. It draws the status snapshot the server sends with
--- the bank, so it reads the same in single player and multiplayer.
+-- The battery bank's status window: a few lines on what the bank is doing, then what comes in,
+-- what draws and the parts on the left, and the batteries and the panels on the right. It draws
+-- the status snapshot the server sends with the bank, so it reads the same in single player and
+-- multiplayer. Clicking a panel's row highlights that panel in the world.
 local StatusWindow = ISCollapsableWindow:derive("RenewableEnergyStatusWindow")
 
 local Format = RenewableEnergy.Format
@@ -19,8 +21,13 @@ local COLUMN_GAP = 24
 local LABEL_GAP = 16
 local MIN_COLUMN_WIDTH = 220
 local BAR_HEIGHT = 8
+local BUTTON_GAP = 8
 -- Lines of the right column kept for "and N more" when the panels don't fit.
 local MORE_LINE = 1
+-- How long a clicked panel stays highlighted, in real milliseconds.
+local HIGHLIGHT_MS = 5000
+-- Full sun on a flat panel, the irradiance at which panels are rated.
+local FULL_SUN = 1000
 
 -- One window per local player.
 StatusWindow.windows = {}
@@ -30,6 +37,7 @@ local COLORS = {
     label = { r = 0.8, g = 0.8, b = 0.8 },
     header = { r = 1, g = 1, b = 0.8 },
     dim = { r = 0.6, g = 0.6, b = 0.6 },
+    highlight = { r = 0.9, g = 1, b = 0, a = 1 },
 }
 
 local function color(name)
@@ -43,9 +51,72 @@ local function color(name)
     return COLORS[name] or COLORS.text
 end
 
+-- Summary -------------------------------------------------------------------------------------
+-- The lines across the top, { text, color }: charging or draining, the load against the limit,
+-- the panel slots, and what is wrong if the bank isn't running.
+
+local function chargingLine(status)
+    if #status.batteries == 0 then
+        return { text = getText("IGUI_RenewableEnergy_NoBatteries"), color = "bad" }
+    end
+    local watts, hours = status.charging.watts, status.charging.hours
+    if round(watts) > 0 then
+        local text = hours and getText("IGUI_RenewableEnergy_ChargingFullIn", Format.signedWatts(watts), Format.duration(hours))
+            or getText("IGUI_RenewableEnergy_Charging", Format.signedWatts(watts))
+        return { text = text, color = "good" }
+    elseif round(watts) < 0 then
+        local text = hours and getText("IGUI_RenewableEnergy_DrainingEmptyIn", Format.signedWatts(watts), Format.duration(hours))
+            or getText("IGUI_RenewableEnergy_Draining", Format.signedWatts(watts))
+        return { text = text, color = hours and hours < 12 and "bad" or nil }
+    end
+    return { text = getText("IGUI_RenewableEnergy_NotCharging"), color = "dim" }
+end
+
+local function loadLine(status)
+    if status.overloaded then
+        return { text = getText("IGUI_RenewableEnergy_Overloaded", Format.watts(status.loadW), Format.watts(status.limitW)), color = "bad" }
+    elseif status.limitW <= 0 then
+        return { text = getText("IGUI_RenewableEnergy_NoWorkingInverter"), color = "bad" }
+    end
+    return { text = getText("IGUI_RenewableEnergy_LoadOf", Format.watts(status.loadW), Format.watts(status.limitW)) }
+end
+
+local function panelSlotsLine(status)
+    local slots, controllers = status.panelSlots, #status.controllers
+    local text
+    if controllers == 0 then
+        text = getText("IGUI_RenewableEnergy_PanelSlots", slots.used, slots.total)
+    elseif controllers == 1 then
+        text = getText("IGUI_RenewableEnergy_PanelSlotsOneController", slots.used, slots.total)
+    else
+        text = getText("IGUI_RenewableEnergy_PanelSlotsControllers", slots.used, slots.total, controllers)
+    end
+    return { text = text, color = slots.used > slots.total and "bad" or nil }
+end
+
+-- Why a bank that has an inverter isn't carrying its load; overloads and missing inverters
+-- have their own line.
+local STATE_LINES = {
+    outdoors = { key = "IGUI_RenewableEnergy_StateOutdoors", color = "bad" },
+    off = { key = "IGUI_RenewableEnergy_StateOff", color = "dim" },
+    grid = { key = "IGUI_RenewableEnergy_StateGrid", color = "dim" },
+    empty = { key = "IGUI_RenewableEnergy_StateEmpty", color = "bad" },
+}
+
+--- The summary lines for a status snapshot.
+function StatusWindow.summary(status)
+    local lines = { chargingLine(status), loadLine(status), panelSlotsLine(status) }
+    local state = STATE_LINES[status.state]
+    if state then
+        table.insert(lines, { text = getText(state.key), color = state.color })
+    end
+    return lines
+end
+
 -- Rows ----------------------------------------------------------------------------------------
--- A row is { header = text }, { label = text, value = text, color = name }, { bar = 0..1 } or
--- { gap = true }. They are built from the status alone, so the tests can check them for any bank.
+-- A row is { header = text }, { label = text, value = text, color = name, source = entry },
+-- { bar = 0..1 } or { gap = true }. They are built from the status alone, so the tests can check
+-- them for any bank.
 
 local function header(rows, key, ...)
     if #rows > 0 then
@@ -54,160 +125,190 @@ local function header(rows, key, ...)
     table.insert(rows, { header = getText(key, ...) })
 end
 
-local function row(rows, key, value, colorName)
-    table.insert(rows, { label = getText(key), value = value, color = colorName })
+local function row(rows, label, value, colorName)
+    table.insert(rows, { label = label, value = value, color = colorName })
 end
-
--- Full sun on a flat panel, the irradiance at which panels are rated.
-local FULL_SUN = 1000
 
 local function powerRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Power")
     if status.sunElevation > 0 then
-        row(rows, "IGUI_RenewableEnergy_Sunlight", Format.percent(status.irradiance / FULL_SUN))
+        row(rows, getText("IGUI_RenewableEnergy_Sunlight"), Format.percent(status.irradiance / FULL_SUN))
     else
-        row(rows, "IGUI_RenewableEnergy_Sunlight", getText("IGUI_RenewableEnergy_Night"), "dim")
+        row(rows, getText("IGUI_RenewableEnergy_Sunlight"), getText("IGUI_RenewableEnergy_Night"), "dim")
     end
-    row(rows, "IGUI_RenewableEnergy_PanelsNow", Format.watts(status.solarW))
-    row(rows, "IGUI_RenewableEnergy_PanelsToday", Format.wattHours(status.solarWhToday))
-    if status.sunElevation > 0 then
-        row(rows, "IGUI_RenewableEnergy_PanelHeat", Format.change(status.panelTempFactor))
-    end
-    if status.vehicle then
-        local vehicle = status.vehicle
-        local value = vehicle.running and Format.watts(vehicle.watts) or getText("IGUI_RenewableEnergy_EngineOff")
-        row(rows, "IGUI_RenewableEnergy_Vehicle", value, not vehicle.running and "dim" or nil)
+    row(rows, getText("IGUI_RenewableEnergy_PanelsNow"), Format.watts(status.solarW))
+    row(rows, getText("IGUI_RenewableEnergy_PanelsToday"), Format.wattHours(status.solarWhToday))
+    if status.chargerW > 0 then
+        row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
     end
     if status.generator then
-        local generator = status.generator
-        local value = generator.running and Format.watts(generator.chargeW) or getText("IGUI_RenewableEnergy_GeneratorStopped")
-        row(rows, "IGUI_RenewableEnergy_Generator", value, not generator.running and "dim" or nil)
+        local running = status.generator.running
+        row(rows, getText("IGUI_RenewableEnergy_Generator"),
+            getText(running and "IGUI_RenewableEnergy_GeneratorRunning" or "IGUI_RenewableEnergy_GeneratorStopped"),
+            not running and "dim" or nil)
     end
-    row(rows, "IGUI_RenewableEnergy_Load", Format.watts(status.loadW))
-    row(rows, "IGUI_RenewableEnergy_UsedToday", Format.wattHours(status.loadWhToday))
-    local net = status.inW - status.drawW
-    row(rows, "IGUI_RenewableEnergy_Net", Format.signedWatts(net), net > 0 and "good" or net < 0 and "bad" or nil)
+    row(rows, getText("IGUI_RenewableEnergy_UsedToday"), Format.wattHours(status.loadWhToday))
+end
+
+local LOAD_KINDS = {
+    fridgeFreezer = "IGUI_RenewableEnergy_LoadFridgeFreezer",
+    fridge = "IGUI_RenewableEnergy_LoadFridge",
+    miniFridge = "IGUI_RenewableEnergy_LoadMiniFridge",
+    light = "IGUI_RenewableEnergy_LoadLight",
+    television = "IGUI_RenewableEnergy_LoadTelevision",
+    radio = "IGUI_RenewableEnergy_LoadRadio",
+    microwave = "IGUI_RenewableEnergy_LoadMicrowave",
+    range = "IGUI_RenewableEnergy_LoadRange",
+    washer = "IGUI_RenewableEnergy_LoadWasher",
+    dryer = "IGUI_RenewableEnergy_LoadDryer",
+    batteryCharger = "IGUI_RenewableEnergy_LoadBatteryCharger",
+    other = "IGUI_RenewableEnergy_LoadOther",
+}
+
+--- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`.
+function StatusWindow.loadLabel(entry)
+    local name = getText(LOAD_KINDS[entry.kind] or LOAD_KINDS.other)
+    if entry.count > 1 then
+        return getText("IGUI_RenewableEnergy_LoadCount", name, entry.count)
+    end
+    return name
+end
+
+local function loadRows(rows, status)
+    header(rows, "IGUI_RenewableEnergy_Drawing")
+    if #status.loadByKind == 0 then
+        row(rows, getText("IGUI_RenewableEnergy_NothingOn"), "", "dim")
+        return
+    end
+    for _, entry in ipairs(status.loadByKind) do
+        row(rows, StatusWindow.loadLabel(entry), Format.watts(entry.watts))
+    end
 end
 
 local function storageRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Storage")
     if #status.batteries == 0 then
-        row(rows, "IGUI_RenewableEnergy_Stored", getText("IGUI_RenewableEnergy_NoBatteries"), "bad")
+        row(rows, getText("IGUI_RenewableEnergy_Stored"), getText("IGUI_RenewableEnergy_NoBatteries"), "bad")
         return
     end
     table.insert(rows, { bar = status.charge })
-    row(rows, "IGUI_RenewableEnergy_Stored", Format.wattHours(status.storedWh) .. " / " .. Format.wattHours(status.capacityWh)
+    row(rows, getText("IGUI_RenewableEnergy_Stored"), Format.wattHours(status.storedWh) .. " / " .. Format.wattHours(status.capacityWh)
         .. " (" .. Format.percent(status.charge) .. ")")
-    local temperature = Format.temperature(status.tempC)
-    local cold = status.coldFactor < 0.995
-    if cold then
-        temperature = temperature .. " (" .. getText("IGUI_RenewableEnergy_CapacityChange", Format.change(status.coldFactor)) .. ")"
-    end
-    row(rows, "IGUI_RenewableEnergy_BankTemperature", temperature, cold and "bad" or nil)
-    row(rows, "IGUI_RenewableEnergy_CycleDepth", Format.percent(status.cycleDepth))
-    if status.hoursLeft then
-        row(rows, "IGUI_RenewableEnergy_EmptyIn", Format.duration(status.hoursLeft), status.hoursLeft < 12 and "bad" or nil)
-    end
+    row(rows, getText("IGUI_RenewableEnergy_CycleDepth"), Format.percent(status.cycleDepth))
 end
 
-local TRIPS = {
-    overload = "IGUI_RenewableEnergy_TripOverload",
-    surge = "IGUI_RenewableEnergy_TripSurge",
-    volts240 = "IGUI_RenewableEnergy_Trip240",
+local CHARGING_FROM = {
+    grid = "IGUI_RenewableEnergy_ChargingFromGrid",
+    generator = "IGUI_RenewableEnergy_ChargingFromGenerator",
 }
 
-local function inverterState(inverter)
-    if inverter.state == "tripped" then
-        local reason = getText(TRIPS[inverter.trip] or "IGUI_RenewableEnergy_TripOverload")
-        if inverter.tripW then
-            reason = reason .. ", " .. Format.watts(inverter.tripW)
+--- "84%, working" or "0%, broken": a part from Bank status `inverters`, `controllers` or
+--- `chargers`, and its color.
+function StatusWindow.partValue(part)
+    local condition = Format.condition(part.type, part.condition)
+    if not part.working then
+        return getText("IGUI_RenewableEnergy_PartBroken", condition), "bad"
+    elseif part.charging then
+        return getText("IGUI_RenewableEnergy_PartState", condition, getText(CHARGING_FROM[part.charging])), "good"
+    end
+    return getText("IGUI_RenewableEnergy_PartState", condition, getText("IGUI_RenewableEnergy_Working")), nil
+end
+
+local function partRows(rows, status)
+    header(rows, "IGUI_RenewableEnergy_Parts")
+    local count = 0
+    for _, list in ipairs({ status.inverters, status.controllers, status.chargers }) do
+        for _, part in ipairs(list) do
+            row(rows, getItemNameFromFullType(part.type), StatusWindow.partValue(part))
+            count = count + 1
         end
-        return getText("IGUI_RenewableEnergy_Tripped", reason), "bad"
-    elseif inverter.state == "empty" then
-        return getText("IGUI_RenewableEnergy_InverterEmpty"), "bad"
-    elseif inverter.state == "on" then
-        return getText("IGUI_RenewableEnergy_On"), "good"
     end
-    return getText("IGUI_RenewableEnergy_Off"), "dim"
+    if count == 0 then
+        row(rows, getText("IGUI_RenewableEnergy_NoParts"), "", "bad")
+    end
 end
 
-local function inverterRows(rows, status)
-    local inverter = status.inverter
-    header(rows, "IGUI_RenewableEnergy_Inverter")
-    if inverter.state == "none" then
-        row(rows, "IGUI_RenewableEnergy_Model", getText("IGUI_RenewableEnergy_NoInverter"), "bad")
-        return
+-- The cheapest repair that helps a battery of this condition (the recipes' limits), or nil
+-- for one in perfect shape.
+local function batteryRepair(condition)
+    if condition < 60 then
+        return "IGUI_RenewableEnergy_RepairService"
+    elseif condition < 85 then
+        return "IGUI_RenewableEnergy_RepairRecondition"
+    elseif condition < 100 then
+        return "IGUI_RenewableEnergy_RepairRebuild"
     end
-    row(rows, "IGUI_RenewableEnergy_Model", getItemNameFromFullType(inverter.fullType))
-    row(rows, "IGUI_RenewableEnergy_Rating", getText("IGUI_RenewableEnergy_RatingValue", Format.watts(inverter.watts), Format.watts(inverter.surge)))
-    row(rows, "IGUI_RenewableEnergy_State", inverterState(inverter))
 end
 
-local function controllerRows(rows, status)
-    local controllers = status.controllers
-    header(rows, "IGUI_RenewableEnergy_Controllers")
-    row(rows, "IGUI_RenewableEnergy_ControllerCount", controllers.count .. " (" .. Format.watts(controllers.ratedWatts) .. ")")
-    row(rows, "IGUI_RenewableEnergy_PanelRating", Format.watts(controllers.panelWatts))
-    -- The allowance already counts the controllers' rating and the modules a bank takes without one.
-    local headroom = controllers.allowanceWatts - controllers.panelWatts
-    row(rows, "IGUI_RenewableEnergy_Headroom", Format.watts(headroom), headroom < 0 and "bad" or nil)
-    if controllers.overcharging then
-        row(rows, "IGUI_RenewableEnergy_Overcharging", Format.watts(controllers.uncontrolledWatts), "bad")
+--- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
+function StatusWindow.batteryValue(battery)
+    local charge, condition = Format.percent(battery.charge), Format.condition(battery.fullType, battery.condition)
+    local repair = batteryRepair(battery.condition)
+    if repair then
+        return getText("IGUI_RenewableEnergy_BatteryValueRepair", charge, condition, getText(repair))
     end
+    return getText("IGUI_RenewableEnergy_BatteryValue", charge, condition)
 end
 
 local function batteryRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Batteries", #status.batteries)
     for _, battery in ipairs(status.batteries) do
-        local value
-        if battery.frozen then
-            value = getText("IGUI_RenewableEnergy_Frozen")
-        else
-            value = getText("IGUI_RenewableEnergy_BatteryValue", Format.percent(battery.charge), Format.percent(battery.condition / 100))
-        end
-        table.insert(rows, {
-            label = getItemNameFromFullType(battery.fullType),
-            value = value,
-            color = (battery.frozen or battery.condition <= 0) and "bad" or nil,
-        })
+        row(rows, getItemNameFromFullType(battery.fullType), StatusWindow.batteryValue(battery), battery.condition <= 0 and "bad" or nil)
     end
 end
 
-local SOURCE_KINDS = {
-    flat = "IGUI_RenewableEnergy_Flat",
-    wall = "IGUI_RenewableEnergy_Wall",
-    rack = "IGUI_RenewableEnergy_Rack",
+local MOUNTS = {
+    flat = "IGUI_RenewableEnergy_MountFlat",
+    wallwood = "IGUI_RenewableEnergy_MountWallWood",
+    wallmetal = "IGUI_RenewableEnergy_MountWallMetal",
+    rackwood = "IGUI_RenewableEnergy_MountRackWood",
+    rackmetal = "IGUI_RenewableEnergy_MountRackMetal",
 }
 
-local function sourceLabel(source)
-    local label = getText(SOURCE_KINDS[source.kind] or "IGUI_RenewableEnergy_Flat")
-    if source.facing then
-        label = label .. " (" .. Format.compass(source.facing) .. ")"
-    end
-    return label
+-- Why a panel makes less than it could (Bank status `reason`), and whether the player can do
+-- something about it.
+local REASONS = {
+    night = { key = "IGUI_RenewableEnergy_ReasonNight" },
+    cloud = { key = "IGUI_RenewableEnergy_ReasonCloud" },
+    angle = { key = "IGUI_RenewableEnergy_ReasonAngle" },
+    snow = { key = "IGUI_RenewableEnergy_ReasonSnow", fixable = true },
+    cracked = { key = "IGUI_RenewableEnergy_ReasonCracked", fixable = true },
+    noController = { key = "IGUI_RenewableEnergy_ReasonNoController", fixable = true },
+}
+
+--- "Wooden rack, 6 tiles north-east": a panel from Bank status `sources`, from the bank at `bank`.
+function StatusWindow.panelLabel(source, bank)
+    local mount = getText(MOUNTS[source.kind .. (source.material or "")] or MOUNTS.flat)
+    return getText("IGUI_RenewableEnergy_PanelWhere", mount, Format.away(bank, source))
 end
 
-local function sourceRows(rows, status)
+--- "45 W, 64% sun, cloudy", and its color.
+function StatusWindow.panelValue(source)
+    local value = getText("IGUI_RenewableEnergy_PanelOutput", Format.watts(source.watts), source.fullSunPct)
+    local reason = REASONS[source.reason]
+    if not reason then
+        return value, nil
+    end
+    return getText("IGUI_RenewableEnergy_PanelOutputReason", value, getText(reason.key)), reason.fixable and "bad" or "dim"
+end
+
+local function panelRows(rows, status, bank)
     header(rows, "IGUI_RenewableEnergy_Panels", #status.sources)
     for _, source in ipairs(status.sources) do
-        local value = Format.watts(source.watts)
-        local snowy = source.snow > 0
-        if snowy then
-            value = value .. ", " .. getText("IGUI_RenewableEnergy_Snow", Format.percent(source.snow))
-        end
-        table.insert(rows, { label = sourceLabel(source), value = value, color = snowy and "bad" or nil })
+        local value, colorName = StatusWindow.panelValue(source)
+        table.insert(rows, { label = StatusWindow.panelLabel(source, bank), value = value, color = colorName, source = source })
     end
 end
 
---- The rows of both columns for a status snapshot.
-function StatusWindow.rows(status)
+--- The rows of both columns for a status snapshot of the bank at `bank` ({ x, y, z }).
+function StatusWindow.rows(status, bank)
     local left, right = {}, {}
     powerRows(left, status)
+    loadRows(left, status)
     storageRows(left, status)
-    inverterRows(left, status)
-    controllerRows(left, status)
+    partRows(left, status)
     batteryRows(right, status)
-    sourceRows(right, status)
+    panelRows(right, status, bank)
     return left, right
 end
 
@@ -244,6 +345,14 @@ local function measure(rows)
     return { width = width, height = height, labelWidth = labelWidth }
 end
 
+local function measureSummary(lines)
+    local width = 0
+    for _, line in ipairs(lines) do
+        width = math.max(width, getTextManager():MeasureStringX(UIFont.Medium, line.text))
+    end
+    return { width = width, height = #lines * getTextManager():getFontHeight(UIFont.Medium) }
+end
+
 -- Keeps as many right-column rows as fit beside the left column, then one "and N more" line
 -- counting the entries left out.
 local function fit(rows, height)
@@ -267,25 +376,33 @@ end
 
 -- Window --------------------------------------------------------------------------------------
 
+local function addButton(self, title, onClick)
+    local button = ISButton:new(PAD, 0, 100, math.floor(lineHeight() * 1.5), title, self, onClick)
+    button:initialise()
+    self:addChild(button)
+    return button
+end
+
+local function fitButton(button, x, y)
+    button:setWidth(getTextManager():MeasureStringX(UIFont.Small, button:getTitle()) + 20)
+    button:setX(x)
+    button:setY(y)
+end
+
 function StatusWindow:createChildren()
     ISCollapsableWindow.createChildren(self)
-    local height = math.floor(lineHeight() * 1.5)
-    self.switchButton = ISButton:new(PAD, 0, 100, height, getText("ContextMenu_Turn_On"), self, StatusWindow.onSwitch)
-    self.switchButton:initialise()
-    self:addChild(self.switchButton)
-    self.resetButton = ISButton:new(PAD, 0, 100, height, getText("IGUI_RenewableEnergy_Reset"), self, StatusWindow.onReset)
-    self.resetButton:initialise()
-    self:addChild(self.resetButton)
+    self.switchButton = addButton(self, getText("ContextMenu_Turn_On"), StatusWindow.onSwitch)
+    self.renameButton = addButton(self, getText("ContextMenu_RenewableEnergy_Rename"), StatusWindow.onRename)
 end
 
 function StatusWindow:bankPosition()
-    return self.bank:getX(), self.bank:getY(), self.bank:getZ()
+    return { x = self.bank:getX(), y = self.bank:getY(), z = self.bank:getZ() }
 end
 
-function StatusWindow:queue(mode)
+function StatusWindow:queue(mode, bankName)
     local character = getSpecificPlayer(self.playerNum)
     if luautils.walkAdj(character, self.bank:getSquare(), true) then
-        ISTimedActionQueue.add(Action:new(character, mode, nil, self.bank))
+        ISTimedActionQueue.add(Action:new(character, mode, nil, self.bank, nil, nil, bankName))
     end
 end
 
@@ -293,38 +410,122 @@ function StatusWindow:onSwitch()
     self:queue(self.status and self.status.on and Action.TURN_OFF or Action.TURN_ON)
 end
 
-function StatusWindow:onReset()
-    self:queue(Action.RESET_INVERTER)
+--- Asks a local player for a new name for `bank` and queues the renaming. An empty name gives
+--- the bank back its tier's name.
+function StatusWindow.askName(playerNum, bank)
+    local status = RenewableEnergy.PowerBank.getStatus(bank:getX(), bank:getY(), bank:getZ())
+    local modal = ISTextBox:new(0, 0, 280, 180, getText("IGUI_RenewableEnergy_NameThisBank"), status and status.name or "",
+        nil, StatusWindow.onNameEntered, playerNum, playerNum, bank)
+    modal:initialise()
+    modal:addToUIManager()
+    if JoypadState.players[playerNum + 1] then
+        setJoypadFocus(playerNum, modal)
+    end
+    return modal
+end
+
+function StatusWindow.onNameEntered(target, button, playerNum, bank)
+    if button.internal ~= "OK" then
+        return
+    end
+    local character = getSpecificPlayer(playerNum)
+    if luautils.walkAdj(character, bank:getSquare(), true) then
+        ISTimedActionQueue.add(Action:new(character, Action.RENAME, nil, bank, nil, nil, button.parent.entry:getText()))
+    end
+end
+
+function StatusWindow:onRename()
+    StatusWindow.askName(self.playerNum, self.bank)
 end
 
 -- Rebuilds the rows and the layout when a new snapshot arrives.
 function StatusWindow:setStatus(status)
     self.status = status
     self.statusHour = status and status.hour
-    local th = self:titleBarHeight()
     if not status then
+        self.summaryLines = {}
         self.left, self.right = { { label = getText("IGUI_RenewableEnergy_Waiting"), value = "", color = "dim" } }, {}
     else
-        self.left, self.right = StatusWindow.rows(status)
+        self.summaryLines = StatusWindow.summary(status)
+        self.left, self.right = StatusWindow.rows(status, self:bankPosition())
     end
+    self.title = status and Format.bankName(status) or getText("IGUI_RenewableEnergy_StatusTitle")
+    local summary = measureSummary(self.summaryLines)
     local left = measure(self.left)
-    local right = measure(self.right)
     self.right = fit(self.right, math.max(left.height, lineHeight() * 8))
-    right = measure(self.right)
-    self.leftLayout, self.rightLayout = left, right
+    local right = measure(self.right)
+    self.summaryLayout, self.leftLayout, self.rightLayout = summary, left, right
 
-    local buttonY = th + PAD + math.max(left.height, right.height) + PAD
+    local top = self:titleBarHeight() + PAD
+    self.columnsTop = top + summary.height + (summary.height > 0 and PAD or 0)
+    local buttonY = self.columnsTop + math.max(left.height, right.height) + PAD
     self.switchButton:setTitle(getText(status and status.on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On"))
-    self.switchButton:setWidth(getTextManager():MeasureStringX(UIFont.Small, self.switchButton:getTitle()) + 20)
-    self.switchButton:setY(buttonY)
-    self.switchButton:setEnable(status ~= nil and (status.on or status.inverter.state ~= "none"))
-    self.resetButton:setWidth(getTextManager():MeasureStringX(UIFont.Small, self.resetButton:getTitle()) + 20)
-    self.resetButton:setX(self.switchButton:getRight() + PAD)
-    self.resetButton:setY(buttonY)
-    self.resetButton:setEnable(status ~= nil and status.inverter.state == "tripped")
+    fitButton(self.switchButton, PAD, buttonY)
+    self.switchButton:setEnable(status ~= nil and (status.on or status.limitW > 0))
+    fitButton(self.renameButton, PAD + self.switchButton:getWidth() + BUTTON_GAP, buttonY)
+    self.renameButton:setEnable(status ~= nil)
 
-    self:setWidth(PAD + left.width + COLUMN_GAP + right.width + PAD)
+    self:setWidth(math.max(PAD + left.width + COLUMN_GAP + right.width + PAD, PAD + summary.width + PAD))
     self:setHeight(buttonY + self.switchButton:getHeight() + PAD)
+end
+
+-- Highlighting a panel --------------------------------------------------------------------------
+
+local function panelObjectAt(source)
+    local square = getSquare(source.x, source.y, source.z)
+    local objects = square and square:getObjects()
+    for i = 0, (objects and objects:size() or 0) - 1 do
+        local object = objects:get(i)
+        if RenewableEnergy.PowerBank.sourceKind(object) then
+            return object
+        end
+    end
+end
+
+function StatusWindow:clearHighlight()
+    local highlight = self.highlight
+    if highlight then
+        highlight.object:setHighlighted(self.playerNum, false)
+        self.highlight = nil
+    end
+end
+
+--- Highlights the panel of a Bank status `sources` entry in the world for a few seconds, the
+--- way vanilla shows the object a moveable action works on. Returns the panel, or nil if its
+--- square isn't loaded.
+function StatusWindow:highlightPanel(source)
+    self:clearHighlight()
+    local object = panelObjectAt(source)
+    if not object then
+        return nil
+    end
+    local c = COLORS.highlight
+    object:setHighlightColor(self.playerNum, c.r, c.g, c.b, c.a)
+    object:setHighlighted(self.playerNum, true, false)
+    self.highlight = { object = object, source = source, untilMs = getTimestampMs() + HIGHLIGHT_MS }
+    return object
+end
+
+-- The panel row under a point in the window, if any.
+function StatusWindow:panelRowAt(x, y)
+    local layout = self.rightLayout
+    if not (layout and layout.x) or x < layout.x or x > layout.x + layout.width then
+        return nil
+    end
+    for _, r in ipairs(self.right or {}) do
+        if r.source and r.top and y >= r.top and y < r.top + rowHeight(r) then
+            return r
+        end
+    end
+end
+
+function StatusWindow:onMouseDown(x, y)
+    local r = not self.isCollapsed and self:panelRowAt(x, y)
+    if r then
+        self:highlightPanel(r.source)
+        return true
+    end
+    return ISCollapsableWindow.onMouseDown(self, x, y)
 end
 
 function StatusWindow:prerender()
@@ -332,16 +533,27 @@ function StatusWindow:prerender()
         self:close()
         return
     end
-    local status = RenewableEnergy.PowerBank.getStatus(self:bankPosition())
+    if self.highlight and getTimestampMs() >= self.highlight.untilMs then
+        self:clearHighlight()
+    end
+    local status = RenewableEnergy.PowerBank.getStatus(self.bank:getX(), self.bank:getY(), self.bank:getZ())
     if status ~= self.status or (status and status.hour ~= self.statusHour) or not self.left then
         self:setStatus(status)
     end
     ISCollapsableWindow.prerender(self)
 end
 
+local function isHighlighted(self, r)
+    local highlight = self.highlight
+    return highlight ~= nil and r.source ~= nil and r.source.x == highlight.source.x and r.source.y == highlight.source.y
+        and r.source.z == highlight.source.z
+end
+
 function StatusWindow:drawRows(rows, layout, x, y)
     local width = layout.width
+    layout.x = x
     for _, r in ipairs(rows) do
+        r.top = y
         if r.header then
             local c = COLORS.header
             self:drawText(r.header, x, y + 2, c.r, c.g, c.b, 1, UIFont.Small)
@@ -350,6 +562,10 @@ function StatusWindow:drawRows(rows, layout, x, y)
             local c = color(r.bar < 0.25 and "bad" or "good")
             self:drawProgressBar(x, y + 2, width, BAR_HEIGHT, r.bar, { r = c.r, g = c.g, b = c.b, a = 1 })
         elseif r.label then
+            if isHighlighted(self, r) then
+                local c = COLORS.highlight
+                self:drawRect(x - 2, y, width + 4, rowHeight(r), 0.2, c.r, c.g, c.b)
+            end
             local label, value = COLORS.label, color(r.color)
             self:drawText(r.label, x, y, label.r, label.g, label.b, 1, UIFont.Small)
             self:drawTextRight(r.value, x + width, y, value.r, value.g, value.b, 1, UIFont.Small)
@@ -358,17 +574,27 @@ function StatusWindow:drawRows(rows, layout, x, y)
     end
 end
 
+function StatusWindow:drawSummary(x, y)
+    local height = getTextManager():getFontHeight(UIFont.Medium)
+    for _, line in ipairs(self.summaryLines) do
+        local c = color(line.color)
+        self:drawText(line.text, x, y, c.r, c.g, c.b, 1, UIFont.Medium)
+        y = y + height
+    end
+end
+
 function StatusWindow:render()
     if not self.isCollapsed and self.left then
-        local top = self:titleBarHeight() + PAD
-        self:drawRows(self.left, self.leftLayout, PAD, top)
-        self:drawRows(self.right, self.rightLayout, PAD + self.leftLayout.width + COLUMN_GAP, top)
+        self:drawSummary(PAD, self:titleBarHeight() + PAD)
+        self:drawRows(self.left, self.leftLayout, PAD, self.columnsTop)
+        self:drawRows(self.right, self.rightLayout, PAD + self.leftLayout.width + COLUMN_GAP, self.columnsTop)
         self.renderedFrames = (self.renderedFrames or 0) + 1
     end
     ISCollapsableWindow.render(self)
 end
 
 function StatusWindow:close()
+    self:clearHighlight()
     self:removeFromUIManager()
     StatusWindow.windows[self.playerNum] = nil
     if JoypadState.players[self.playerNum + 1] then
@@ -387,6 +613,7 @@ function StatusWindow:new(x, y, playerNum, bank)
     o.title = getText("IGUI_RenewableEnergy_StatusTitle")
     o.playerNum = playerNum
     o.bank = bank
+    o.summaryLines = {}
     -- Nearly opaque: the vanilla 0.8 lets the text of windows behind show through the rows.
     o.backgroundColor = { r = 0, g = 0, b = 0, a = 0.95 }
     o:setResizable(false)
@@ -406,8 +633,7 @@ function StatusWindow.open(playerNum, bank)
     window:initialise()
     window:addToUIManager()
     StatusWindow.windows[playerNum] = window
-    local bx, by, bz = window:bankPosition()
-    RenewableEnergy.PowerBank.command(getSpecificPlayer(playerNum), "refresh", { bank = { x = bx, y = by, z = bz } })
+    RenewableEnergy.PowerBank.command(getSpecificPlayer(playerNum), "refresh", { bank = window:bankPosition() })
     if JoypadState.players[playerNum + 1] then
         setJoypadFocus(playerNum, window)
     end

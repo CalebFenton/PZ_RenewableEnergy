@@ -21,15 +21,13 @@ UPnP=false
 Public=false
 EOF
 # The in-game tests run the default options, so the server runs the ones that switch on more of
-# the mod: stash houses with map items and houses stocked from the start, the expanded recipes,
-# the other drain method and charge frequency, and the most battery banks. A new world each time,
-# so the stash houses known from the start are prepared again.
+# the mod: stash houses with map items and houses stocked from the start, the other charge
+# frequency, and the most battery banks. A new world each time, so the stash houses known from
+# the start are prepared again.
 cat > "$CACHE/Server/${NAME}_SandboxVars.lua" <<EOF
 SandboxVars = {
     RenewableEnergy = {
         StashMode = 3,
-        enableExpandedRecipes = true,
-        DrainCalc = 1,
         ChargeFreq = 2,
         BatteryBankSpawn = 4,
     },

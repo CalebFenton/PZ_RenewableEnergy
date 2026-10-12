@@ -7,34 +7,82 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_SolarModule,
         scale = 1,
     }
+    model HomemadeSolarModule_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomemadeSolarModule,
+        texture = WorldItems/RenewableEnergy_HomemadeSolarModule,
+        scale = 1,
+    }
+    model SolarCells_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarCells,
+        texture = WorldItems/RenewableEnergy_SolarCells,
+        scale = 1,
+    }
     model SolarFlat_Ground
     {
         mesh = WorldItems/RenewableEnergy_SolarFlat,
         texture = WorldItems/RenewableEnergy_SolarFlat,
         scale = 1,
     }
-    model SolarWall_Ground
+    model SolarWallWood_Ground
     {
-        mesh = WorldItems/RenewableEnergy_SolarWall,
-        texture = WorldItems/RenewableEnergy_SolarWall,
+        mesh = WorldItems/RenewableEnergy_SolarWallWood,
+        texture = WorldItems/RenewableEnergy_SolarWallWood,
         scale = 1,
     }
-    model SolarRack_Ground
+    model SolarWallMetal_Ground
     {
-        mesh = WorldItems/RenewableEnergy_SolarRack,
-        texture = WorldItems/RenewableEnergy_SolarRack,
+        mesh = WorldItems/RenewableEnergy_SolarWallMetal,
+        texture = WorldItems/RenewableEnergy_SolarWallMetal,
         scale = 1,
     }
-    model BatteryBox_Ground
+    model SolarRackWood_Ground
     {
-        mesh = WorldItems/RenewableEnergy_BatteryBox,
-        texture = WorldItems/RenewableEnergy_BatteryBox,
+        mesh = WorldItems/RenewableEnergy_SolarRackWood,
+        texture = WorldItems/RenewableEnergy_SolarRackWood,
         scale = 1,
     }
-    model BatteryBank_Ground
+    model SolarRackMetal_Ground
     {
-        mesh = WorldItems/RenewableEnergy_BatteryBank,
-        texture = WorldItems/RenewableEnergy_BatteryBank,
+        mesh = WorldItems/RenewableEnergy_SolarRackMetal,
+        texture = WorldItems/RenewableEnergy_SolarRackMetal,
+        scale = 1,
+    }
+    model BatteryBoxWood_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryBoxWood,
+        texture = WorldItems/RenewableEnergy_BatteryBoxWood,
+        scale = 1,
+    }
+    model BatteryBoxMetal_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryBoxMetal,
+        texture = WorldItems/RenewableEnergy_BatteryBoxMetal,
+        scale = 1,
+    }
+    model BatteryRackWood_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryRackWood,
+        texture = WorldItems/RenewableEnergy_BatteryRackWood,
+        scale = 1,
+    }
+    model BatteryRackMetal_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryRackMetal,
+        texture = WorldItems/RenewableEnergy_BatteryRackMetal,
+        scale = 1,
+    }
+    model BatteryBankWood_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryBankWood,
+        texture = WorldItems/RenewableEnergy_BatteryBankWood,
+        scale = 1,
+    }
+    model BatteryBankMetal_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryBankMetal,
+        texture = WorldItems/RenewableEnergy_BatteryBankMetal,
         scale = 1,
     }
     model PlugInInverter_Ground
@@ -89,6 +137,66 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_SolarCellCharger,
         texture = WorldItems/RenewableEnergy_SolarCellCharger,
+        scale = 1,
+    }
+    model SolarGardenLight_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarGardenLight,
+        texture = WorldItems/RenewableEnergy_SolarGardenLight,
+        scale = 1,
+    }
+    model CarBatteryCase_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_CarBatteryCase,
+        texture = WorldItems/RenewableEnergy_CarBatteryCase,
+        scale = 1,
+    }
+    model DeepCycleBatteryCase_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_DeepCycleBatteryCase,
+        texture = WorldItems/RenewableEnergy_DeepCycleBatteryCase,
+        scale = 1,
+    }
+    model L16BatteryCase_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_L16BatteryCase,
+        texture = WorldItems/RenewableEnergy_L16BatteryCase,
+        scale = 1,
+    }
+    model WornBatteryPlates_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_WornBatteryPlates,
+        texture = WorldItems/RenewableEnergy_WornBatteryPlates,
+        scale = 1,
+    }
+    model BatteryPlates_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryPlates,
+        texture = WorldItems/RenewableEnergy_BatteryPlates,
+        scale = 1,
+    }
+    model WoodenBatteryPlatePattern_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_WoodenBatteryPlatePattern,
+        texture = WorldItems/RenewableEnergy_WoodenBatteryPlatePattern,
+        scale = 1,
+    }
+    model BatteryPlateMoldUnfired_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryPlateMoldUnfired,
+        texture = WorldItems/RenewableEnergy_BatteryPlateMoldUnfired,
+        scale = 1,
+    }
+    model BatteryPlateMold_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryPlateMold,
+        texture = WorldItems/RenewableEnergy_BatteryPlateMold,
+        scale = 1,
+    }
+    model BatteryElectrolyte_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BatteryElectrolyte,
+        texture = WorldItems/RenewableEnergy_BatteryElectrolyte,
         scale = 1,
     }
     model HomesteadPowerMag1_Ground

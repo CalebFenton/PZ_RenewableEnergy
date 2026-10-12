@@ -36,6 +36,34 @@ function RenewableEnergyTest.expectCount(fullType, expected)
     return RenewableEnergyTest.expect(actual == expected, actual .. " " .. fullType .. " in the inventory, expected " .. expected)
 end
 
+-- Waits on the action queue for `total` ticks, so the runner validates only after the world has
+-- caught up (statuses arrive a tick after a change, light after the clock moves, chunks load
+-- after a teleport). `onTick(n)` runs every tick.
+RenewableEnergyTest.Wait = ISBaseTimedAction:derive("RenewableEnergyTestWait")
+local Wait = RenewableEnergyTest.Wait
+
+function Wait:isValid()
+    return true
+end
+
+function Wait:update()
+    self.ticks = self.ticks + 1
+    if self.onTick then
+        self.onTick(self.ticks)
+    end
+    if self.ticks >= self.total then
+        self:forceComplete()
+    end
+end
+
+function Wait:new(character, total, onTick)
+    local o = ISBaseTimedAction.new(self, character)
+    o.total, o.onTick, o.ticks = total, onTick, 0
+    o.stopOnWalk, o.stopOnRun, o.stopOnAim = false, false, false
+    o.maxTime = -1
+    return o
+end
+
 -- Registers a test. Before run(), the `spec.sandbox` options (SandboxVars.RenewableEnergy) take effect;
 -- validate() restores them, then runs spec.validate.
 function RenewableEnergyTest.test(name, spec)

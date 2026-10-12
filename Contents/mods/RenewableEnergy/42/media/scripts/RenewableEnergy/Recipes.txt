@@ -1,6 +1,7 @@
 /*
-    Craft recipes. Display names come from Translate/<LANG>/Recipes.json, keyed by recipe name.
-    Callbacks are in lua/shared/RenewableEnergy/RecipeCode.lua.
+    Craft recipes. Display names come from Translate/<LANG>/Recipes.json, keyed by recipe name,
+    and a recipe's Tooltip from Tooltip.json. Callbacks are in
+    lua/shared/RenewableEnergy/RecipeCode.lua.
 
     The recipes live in module Base, prefixed against name clashes: the game looks a recipe up
     by its bare name when researching an item and in a magazine's recipe list, and a bare name
@@ -8,18 +9,24 @@
 
     Conventions follow vanilla's electrical recipes: tools mode:keep with
     flags[Prop1;MayDegradeLight] and a table within reach (AnySurfaceCraft). Base.BlowTorch
-    inputs count uses on purpose.
+    inputs count uses on purpose. A battery input says flags[ItemCount], or it would count the
+    battery's charge as uses.
+
+    Fluids: an `item 1 [*]` line followed by `-fluid` takes that fluid from any container, and
+    one followed by `+fluid` pours it into an empty container the player keeps. Acid goes one
+    litre per container, so the litres a battery gives back when stripped are the ones it takes
+    when rebuilt, in bottles of BatteryElectrolyte or anything else that holds a litre.
 
     Learning: NeedToBeLearn recipes come from the Homestead Power magazines, from AutoLearnAny,
     or from researching a found item (the item's output recipe, plus its ResearchableRecipes).
-    Taking a panel mount apart needs no learning.
+    Unmounting a panel, taking gadgets apart and servicing a battery need no learning.
 */
 module Base
 {
-    /**************************** Stage 0 ***********************************/
+    /**************************** Battery storage ***************************/
+    /* Wood asks for more skill than metal, since planks are easy to come by. */
 
-    /* The stage-0 bank. Its inverter goes in the box's slot, so the recipe takes none. */
-    craftRecipe RenewableEnergy_MakeBatteryBox
+    craftRecipe RenewableEnergy_MakeBatteryBoxWood
     {
         timedAction = MakingElectrical,
         time = 200,
@@ -39,14 +46,35 @@ module Base
         }
         outputs
         {
-            item 1 RenewableEnergy.BatteryBox,
+            item 1 RenewableEnergy.BatteryBoxWood,
         }
     }
 
-    /**************************** Stage 1 ***********************************/
+    craftRecipe RenewableEnergy_MakeBatteryBoxMetal
+    {
+        timedAction = MakingElectrical,
+        time = 200,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:2,
+        SkillRequired = Electricity:1;MetalWelding:1,
+        xpAward = Electricity:10;MetalWelding:5,
+        inputs
+        {
+            item 1 tags[base:weldingmask] mode:keep,
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [Base.BlowTorch],
+            item 2 [Base.SmallSheetMetal],
+            item 2 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.BatteryBoxMetal,
+        }
+    }
 
-    /* The rack bank, built in wood or in welded metal. Neither takes an inverter. */
-    craftRecipe RenewableEnergy_BuildBatteryBankWood
+    craftRecipe RenewableEnergy_BuildBatteryRackWood
     {
         timedAction = MakingElectrical,
         time = 400,
@@ -54,7 +82,7 @@ module Base
         category = Electrical,
         NeedToBeLearn = true,
         AutoLearnAny = Electricity:4,
-        SkillRequired = Electricity:3;Woodwork:2,
+        SkillRequired = Electricity:3;Woodwork:4,
         xpAward = Electricity:25;Woodwork:15,
         inputs
         {
@@ -67,11 +95,11 @@ module Base
         }
         outputs
         {
-            item 1 RenewableEnergy.BatteryBank,
+            item 1 RenewableEnergy.BatteryRackWood,
         }
     }
 
-    craftRecipe RenewableEnergy_BuildBatteryBankMetal
+    craftRecipe RenewableEnergy_BuildBatteryRackMetal
     {
         timedAction = MakingElectrical,
         time = 400,
@@ -79,7 +107,7 @@ module Base
         category = Electrical,
         NeedToBeLearn = true,
         AutoLearnAny = Electricity:4,
-        SkillRequired = Electricity:3;MetalWelding:1,
+        SkillRequired = Electricity:3;MetalWelding:2,
         xpAward = Electricity:25;MetalWelding:15,
         inputs
         {
@@ -93,9 +121,64 @@ module Base
         }
         outputs
         {
-            item 1 RenewableEnergy.BatteryBank,
+            item 1 RenewableEnergy.BatteryRackMetal,
         }
     }
+
+    craftRecipe RenewableEnergy_BuildBatteryBankWood
+    {
+        timedAction = MakingElectrical,
+        time = 600,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        SkillRequired = Electricity:4;Woodwork:7,
+        xpAward = Electricity:40;Woodwork:25,
+        inputs
+        {
+            item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 10 [Base.Plank],
+            item 20 [Base.Nails],
+            item 6 [Base.ElectricWire],
+            item 8 [Base.Screws],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.BatteryBankWood,
+        }
+    }
+
+    craftRecipe RenewableEnergy_BuildBatteryBankMetal
+    {
+        timedAction = MakingElectrical,
+        time = 600,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        SkillRequired = Electricity:4;MetalWelding:4,
+        xpAward = Electricity:40;MetalWelding:25,
+        inputs
+        {
+            item 1 tags[base:weldingmask] mode:keep,
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 4 [Base.BlowTorch],
+            item 2 [Base.SheetMetal],
+            item 4 [Base.MetalBar],
+            item 6 [Base.ElectricWire],
+            item 8 [Base.Screws],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.BatteryBankMetal,
+        }
+    }
+
+    /**************************** Panel mounts ******************************/
+    /*
+        A mount records the type and condition of each module it takes (OnCreate), and its
+        Unmount gives those modules back, so a module keeps its condition through every move.
+    */
 
     craftRecipe RenewableEnergy_MakeSolarFlat
     {
@@ -107,10 +190,11 @@ module Base
         AutoLearnAny = Electricity:3,
         SkillRequired = Electricity:2,
         xpAward = Electricity:10,
+        OnCreate = RenewableEnergy.Recipes.mountModules,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
-            item 1 [RenewableEnergy.SolarModule],
+            item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
             item 3 [Base.ElectricWire],
             item 4 [Base.Screws],
         }
@@ -120,7 +204,33 @@ module Base
         }
     }
 
-    craftRecipe RenewableEnergy_MakeSolarWall
+    craftRecipe RenewableEnergy_MakeSolarWallWood
+    {
+        timedAction = MakingElectrical,
+        time = 160,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:4,
+        SkillRequired = Electricity:3;Woodwork:3,
+        xpAward = Electricity:15;Woodwork:5,
+        OnCreate = RenewableEnergy.Recipes.mountModules,
+        inputs
+        {
+            item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
+            item 2 [Base.Plank],
+            item 4 [Base.Nails],
+            item 3 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.SolarWallWood,
+        }
+    }
+
+    craftRecipe RenewableEnergy_MakeSolarWallMetal
     {
         timedAction = MakingElectrical,
         time = 160,
@@ -130,22 +240,48 @@ module Base
         AutoLearnAny = Electricity:4,
         SkillRequired = Electricity:3;MetalWelding:1,
         xpAward = Electricity:15;MetalWelding:5,
+        OnCreate = RenewableEnergy.Recipes.mountModules,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:drillmetal] mode:keep flags[MayDegradeLight],
-            item 1 [RenewableEnergy.SolarModule],
+            item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
             item 2 [Base.MetalBar],
             item 3 [Base.ElectricWire],
             item 4 [Base.Screws],
         }
         outputs
         {
-            item 1 RenewableEnergy.SolarWall,
+            item 1 RenewableEnergy.SolarWallMetal,
         }
     }
 
-    craftRecipe RenewableEnergy_MakeSolarRack
+    craftRecipe RenewableEnergy_MakeSolarRackWood
+    {
+        timedAction = MakingElectrical,
+        time = 240,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        SkillRequired = Electricity:3;Woodwork:4,
+        xpAward = Electricity:20;Woodwork:10,
+        OnCreate = RenewableEnergy.Recipes.mountModules,
+        inputs
+        {
+            item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 2 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
+            item 6 [Base.Plank],
+            item 12 [Base.Nails],
+            item 4 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.SolarRackWood,
+        }
+    }
+
+    craftRecipe RenewableEnergy_MakeSolarRackMetal
     {
         timedAction = MakingElectrical,
         time = 240,
@@ -154,11 +290,12 @@ module Base
         NeedToBeLearn = true,
         SkillRequired = Electricity:3;MetalWelding:2,
         xpAward = Electricity:20;MetalWelding:10,
+        OnCreate = RenewableEnergy.Recipes.mountModules,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:wrench] mode:keep flags[MayDegradeLight],
-            item 2 [RenewableEnergy.SolarModule],
+            item 2 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
             item 4 [Base.MetalPipe],
             item 1 [Base.SmallSheetMetal],
             item 6 [Base.Screws],
@@ -166,11 +303,11 @@ module Base
         }
         outputs
         {
-            item 1 RenewableEnergy.SolarRack,
+            item 1 RenewableEnergy.SolarRackMetal,
         }
     }
 
-    /* Mounts give their modules back, so a module can move to a better mount. */
+    /* The modules come back through OnCreate, as each one's own type at its own condition. */
     craftRecipe RenewableEnergy_UnmountSolarFlat
     {
         timedAction = DismantleElectrical,
@@ -178,6 +315,8 @@ module Base
         Tags = AnySurfaceCraft,
         category = Electrical,
         SkillRequired = Electricity:1,
+        Tooltip = Tooltip_RenewableEnergy_UnmountGivesModules,
+        OnCreate = RenewableEnergy.Recipes.unmountModules,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
@@ -185,51 +324,572 @@ module Base
         }
         outputs
         {
-            item 1 RenewableEnergy.SolarModule,
             item 2 Base.ElectricWire,
             item 2 Base.Screws,
         }
     }
 
-    craftRecipe RenewableEnergy_UnmountSolarWall
+    craftRecipe RenewableEnergy_UnmountSolarWallWood
     {
         timedAction = DismantleElectrical,
         time = 100,
         Tags = AnySurfaceCraft,
         category = Electrical,
         SkillRequired = Electricity:1,
+        Tooltip = Tooltip_RenewableEnergy_UnmountGivesModules,
+        OnCreate = RenewableEnergy.Recipes.unmountModules,
         inputs
         {
-            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
-            item 1 [RenewableEnergy.SolarWall] mode:destroy,
+            item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [RenewableEnergy.SolarWallWood] mode:destroy,
         }
         outputs
         {
-            item 1 RenewableEnergy.SolarModule,
-            item 2 Base.MetalBar,
+            item 2 Base.Plank,
             item 2 Base.ElectricWire,
         }
     }
 
-    craftRecipe RenewableEnergy_UnmountSolarRack
+    craftRecipe RenewableEnergy_UnmountSolarWallMetal
+    {
+        timedAction = DismantleElectrical,
+        time = 100,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        Tooltip = Tooltip_RenewableEnergy_UnmountGivesModules,
+        OnCreate = RenewableEnergy.Recipes.unmountModules,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarWallMetal] mode:destroy,
+        }
+        outputs
+        {
+            item 2 Base.MetalBar,
+            item 2 Base.ElectricWire,
+            item 2 Base.Screws,
+        }
+    }
+
+    craftRecipe RenewableEnergy_UnmountSolarRackWood
     {
         timedAction = DismantleElectrical,
         time = 160,
         Tags = AnySurfaceCraft,
         category = Electrical,
         SkillRequired = Electricity:1,
+        Tooltip = Tooltip_RenewableEnergy_UnmountGivesModules,
+        OnCreate = RenewableEnergy.Recipes.unmountModules,
         inputs
         {
-            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
-            item 1 [RenewableEnergy.SolarRack] mode:destroy,
+            item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [RenewableEnergy.SolarRackWood] mode:destroy,
         }
         outputs
         {
-            item 2 RenewableEnergy.SolarModule,
-            item 4 Base.MetalPipe,
+            item 4 Base.Plank,
             item 2 Base.ElectricWire,
         }
     }
+
+    craftRecipe RenewableEnergy_UnmountSolarRackMetal
+    {
+        timedAction = DismantleElectrical,
+        time = 160,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        Tooltip = Tooltip_RenewableEnergy_UnmountGivesModules,
+        OnCreate = RenewableEnergy.Recipes.unmountModules,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarRackMetal] mode:destroy,
+        }
+        outputs
+        {
+            item 4 Base.MetalPipe,
+            item 2 Base.ElectricWire,
+            item 4 Base.Screws,
+        }
+    }
+
+    /**************************** Solar modules *****************************/
+
+    /* New glass over the cracked cells. It can't bring a module back to new. */
+    craftRecipe RenewableEnergy_RepairCrackedModule
+    {
+        timedAction = MakingElectrical,
+        time = 200,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        SkillRequired = Electricity:3,
+        xpAward = Electricity:15,
+        Tooltip = Tooltip_RenewableEnergy_RepairCrackedModule,
+        OnTest = RenewableEnergy.Recipes.isModuleBelowRepairCap,
+        OnCreate = RenewableEnergy.Recipes.repairModule,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
+            item 1 [Base.GlassPanel],
+            item 1 [Base.Epoxy;2:Base.Glue],
+            item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+        }
+    }
+
+    /* Salvaged cells under a pane of glass, the self-sufficient way to a panel. */
+    craftRecipe RenewableEnergy_MakeHomemadeSolarModule
+    {
+        timedAction = MakingElectrical,
+        time = 400,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        SkillRequired = Electricity:4,
+        xpAward = Electricity:30,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 16 [RenewableEnergy.SolarCells],
+            item 1 [Base.GlassPanel],
+            item 1 [Base.SmallSheetMetal;4:Base.Plank],
+            item 1 [Base.Epoxy;2:Base.Glue],
+            item 2 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.HomemadeSolarModule,
+        }
+    }
+
+    /* Taking apart what has solar cells in it. Vanilla's own Dismantle stays as it is. */
+    craftRecipe RenewableEnergy_TakeApartCalculator
+    {
+        timedAction = DismantleElectrical,
+        time = 60,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:2,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [Base.Calculator] mode:destroy,
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.SolarCells,
+            item 1 Base.ElectronicsScrap,
+        }
+    }
+
+    craftRecipe RenewableEnergy_TakeApartSolarGardenLight
+    {
+        timedAction = DismantleElectrical,
+        time = 60,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:2,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarGardenLight] mode:destroy,
+        }
+        outputs
+        {
+            item 2 RenewableEnergy.SolarCells,
+        }
+    }
+
+    craftRecipe RenewableEnergy_TakeApartSolarCellCharger
+    {
+        timedAction = DismantleElectrical,
+        time = 80,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:3,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarCellCharger] mode:destroy,
+        }
+        outputs
+        {
+            item 4 RenewableEnergy.SolarCells,
+        }
+    }
+
+    craftRecipe RenewableEnergy_TakeApartSolarMaintainer
+    {
+        timedAction = DismantleElectrical,
+        time = 80,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:3,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarMaintainer] mode:destroy,
+        }
+        outputs
+        {
+            item 6 RenewableEnergy.SolarCells,
+        }
+    }
+
+    /* Only a shattered module: one that still works is worth more whole. */
+    craftRecipe RenewableEnergy_TakeApartShatteredModule
+    {
+        timedAction = DismantleElectrical,
+        time = 120,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:5,
+        Tooltip = Tooltip_RenewableEnergy_TakeApartShatteredModule,
+        OnTest = RenewableEnergy.Recipes.isShatteredModule,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarModule] mode:destroy flags[AllowDestroyedItem],
+        }
+        outputs
+        {
+            item 12 RenewableEnergy.SolarCells,
+        }
+    }
+
+    /**************************** Battery repairs ***************************/
+    /*
+        Cheap repairs fix less. Service tops up a tired battery and leaves its charge; Recondition
+        and Rebuild fix more and leave it empty. None of them lowers a battery's condition.
+    */
+
+    craftRecipe RenewableEnergy_ServiceBattery
+    {
+        timedAction = MakingElectrical,
+        time = 120,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:5,
+        Tooltip = Tooltip_RenewableEnergy_ServiceBattery,
+        OnTest = RenewableEnergy.Recipes.canServiceBattery,
+        OnCreate = RenewableEnergy.Recipes.serviceBattery,
+        inputs
+        {
+            item 1 [Base.CarBattery1;Base.CarBattery2;Base.CarBattery3;RenewableEnergy.DeepCycleBattery;RenewableEnergy.L16Battery] mode:keep flags[ItemCount],
+            item 1 [*],
+            -fluid 0.5 [Water],
+            item 1 [Base.RippedSheets;Base.BakingSoda],
+        }
+        outputs
+        {
+        }
+    }
+
+    craftRecipe RenewableEnergy_ReconditionBattery
+    {
+        timedAction = MakingElectrical,
+        time = 300,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        SkillRequired = Electricity:3,
+        xpAward = Electricity:15,
+        Tooltip = Tooltip_RenewableEnergy_ReconditionBattery,
+        OnTest = RenewableEnergy.Recipes.canReconditionBattery,
+        OnCreate = RenewableEnergy.Recipes.reconditionBattery,
+        inputs
+        {
+            item 1 [Base.CarBattery1;Base.CarBattery2;Base.CarBattery3;RenewableEnergy.DeepCycleBattery;RenewableEnergy.L16Battery] mode:keep flags[ItemCount],
+            item 1 [*],
+            -fluid 1.0 [Water],
+            item 2 [Base.BakingSoda],
+        }
+        outputs
+        {
+        }
+    }
+
+    /*
+        Stripping drains the battery's acid into empty containers, a litre each, and leaves its
+        case and its worn plates. Any battery strips, a dead one too.
+    */
+    craftRecipe RenewableEnergy_StripCarBattery
+    {
+        timedAction = DismantleElectrical,
+        time = 200,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Electricity:4,
+        xpAward = Electricity:10,
+        OnCreate = RenewableEnergy.Recipes.stripCarBattery,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [Base.Gloves_Dish;Base.Gloves_Surgical;Base.Gloves_LeatherGloves;Base.Gloves_LeatherGlovesBlack;Base.Gloves_LeatherGlovesBrown] mode:keep,
+            item 1 [Base.CarBattery1;Base.CarBattery2;Base.CarBattery3] mode:destroy flags[ItemCount;AllowDestroyedItem],
+            item 1 [*],
+            +fluid 1.0 Acid flags[IsEmpty;RespectCapacity],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.CarBatteryCase,
+            item 1 RenewableEnergy.WornBatteryPlates,
+        }
+    }
+
+    craftRecipe RenewableEnergy_StripDeepCycleBattery
+    {
+        timedAction = DismantleElectrical,
+        time = 250,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Electricity:4,
+        xpAward = Electricity:15,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [Base.Gloves_Dish;Base.Gloves_Surgical;Base.Gloves_LeatherGloves;Base.Gloves_LeatherGlovesBlack;Base.Gloves_LeatherGlovesBrown] mode:keep,
+            item 1 [RenewableEnergy.DeepCycleBattery] mode:destroy flags[ItemCount;AllowDestroyedItem],
+            item 1 [*],
+            +fluid 1.0 Acid flags[IsEmpty;RespectCapacity],
+            item 1 [*],
+            +fluid 1.0 Acid flags[IsEmpty;RespectCapacity],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.DeepCycleBatteryCase,
+            item 2 RenewableEnergy.WornBatteryPlates,
+        }
+    }
+
+    craftRecipe RenewableEnergy_StripL16Battery
+    {
+        timedAction = DismantleElectrical,
+        time = 300,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Electricity:4,
+        xpAward = Electricity:20,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [Base.Gloves_Dish;Base.Gloves_Surgical;Base.Gloves_LeatherGloves;Base.Gloves_LeatherGlovesBlack;Base.Gloves_LeatherGlovesBrown] mode:keep,
+            item 1 [RenewableEnergy.L16Battery] mode:destroy flags[ItemCount;AllowDestroyedItem],
+            item 1 [*],
+            +fluid 1.0 Acid flags[IsEmpty;RespectCapacity],
+            item 1 [*],
+            +fluid 1.0 Acid flags[IsEmpty;RespectCapacity],
+            item 1 [*],
+            +fluid 1.0 Acid flags[IsEmpty;RespectCapacity],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.L16BatteryCase,
+            item 3 RenewableEnergy.WornBatteryPlates,
+        }
+    }
+
+    /* Lead melts in the simplest furnace; the mold is fired clay and lasts. */
+    craftRecipe RenewableEnergy_RecastBatteryPlates
+    {
+        time = 200,
+        Tags = PrimitiveFurnace,
+        category = Blacksmithing,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Blacksmith:3,
+        xpAward = Blacksmith:10,
+        inputs
+        {
+            item 1 [RenewableEnergy.WornBatteryPlates],
+            item 4 tags[base:charcoal],
+            item 1 [RenewableEnergy.BatteryPlateMold] mode:keep,
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.BatteryPlates,
+        }
+    }
+
+    /*
+        New plates and acid in the old case: the battery as new, and empty. A car battery comes
+        from OnCreate, as whichever of vanilla's three the case came out of.
+    */
+    craftRecipe RenewableEnergy_RebuildCarBattery
+    {
+        timedAction = MakingElectrical,
+        time = 300,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Electricity:5,
+        xpAward = Electricity:25,
+        Tooltip = Tooltip_RenewableEnergy_RebuildCarBattery,
+        OnCreate = RenewableEnergy.Recipes.rebuildCarBattery,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.CarBatteryCase],
+            item 1 [RenewableEnergy.BatteryPlates],
+            item 1 [*],
+            -fluid 1.0 [Acid],
+            item 1 [*],
+            -fluid 0.5 [Water],
+        }
+        outputs
+        {
+        }
+    }
+
+    craftRecipe RenewableEnergy_RebuildDeepCycleBattery
+    {
+        timedAction = MakingElectrical,
+        time = 350,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Electricity:5,
+        xpAward = Electricity:30,
+        OnCreate = RenewableEnergy.Recipes.rebuildBattery,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.DeepCycleBatteryCase],
+            item 2 [RenewableEnergy.BatteryPlates],
+            item 1 [*],
+            -fluid 1.0 [Acid],
+            item 1 [*],
+            -fluid 1.0 [Acid],
+            item 1 [*],
+            -fluid 0.5 [Water],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.DeepCycleBattery,
+        }
+    }
+
+    craftRecipe RenewableEnergy_RebuildL16Battery
+    {
+        timedAction = MakingElectrical,
+        time = 400,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Electricity:5,
+        xpAward = Electricity:35,
+        OnCreate = RenewableEnergy.Recipes.rebuildBattery,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.L16BatteryCase],
+            item 3 [RenewableEnergy.BatteryPlates],
+            item 1 [*],
+            -fluid 1.0 [Acid],
+            item 1 [*],
+            -fluid 1.0 [Acid],
+            item 1 [*],
+            -fluid 1.0 [Acid],
+            item 1 [*],
+            -fluid 0.5 [Water],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.L16Battery,
+        }
+    }
+
+    /* The plate mold, made the way vanilla makes its ingot mold (MakeWoodenIngotCastMold on). */
+    craftRecipe RenewableEnergy_MakeBatteryPlatePattern
+    {
+        timedAction = Making,
+        time = 150,
+        Tags = AnySurfaceCraft;Carpentry,
+        category = Carpentry,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        SkillRequired = Woodwork:2,
+        xpAward = Woodwork:20,
+        inputs
+        {
+            item 1 tags[base:hammer] mode:keep flags[MayDegradeVeryLight],
+            item 1 tags[base:saw;base:smallsaw;base:crudesaw] mode:keep flags[MayDegradeLight;Prop1],
+            item 1 [Base.Plank] flags[Prop2],
+            item 1 [Base.Nails],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.WoodenBatteryPlatePattern,
+        }
+    }
+
+    craftRecipe RenewableEnergy_PressBatteryPlateMold
+    {
+        time = 100,
+        timedAction = UseHandPress,
+        Tags = HandPress,
+        category = Pottery,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        xpAward = Pottery:5,
+        inputs
+        {
+            item 1 [Base.Clay],
+            item 1 [RenewableEnergy.WoodenBatteryPlatePattern] mode:keep,
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.BatteryPlateMoldUnfired,
+        }
+    }
+
+    craftRecipe RenewableEnergy_FireBatteryPlateMold
+    {
+        time = 20,
+        timedAction = Making_With_Kiln,
+        Tags = KilnSmall;KilnLarge,
+        category = Pottery,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:6,
+        inputs
+        {
+            item 1 [RenewableEnergy.BatteryPlateMoldUnfired],
+            item 1 tags[base:startfire],
+            item 1 tags[base:log;base:charcoal],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.BatteryPlateMold,
+        }
+    }
+
+    /**************************** Bank parts ********************************/
 
     /* The Amplifier stands in for the power transistors a shunt controller switches with. */
     craftRecipe RenewableEnergy_MakeChargeController
@@ -277,40 +937,6 @@ module Base
         outputs
         {
             item 1 RenewableEnergy.SolarFailsafe,
-        }
-    }
-
-    /**************************** Expanded Recipes **************************/
-    /*
-        Salvaged cells under window glass. Off unless the Expanded Recipes sandbox option is on:
-        OnTest blocks the craft everywhere, the server included, and OnAddToMenu keeps it out
-        of the crafting window, which OnTest alone leaves listing it as missing items.
-    */
-    craftRecipe RenewableEnergy_MakeSolarModule
-    {
-        timedAction = MakingElectrical,
-        time = 400,
-        Tags = AnySurfaceCraft,
-        category = Electrical,
-        NeedToBeLearn = true,
-        AutoLearnAny = Electricity:7,
-        SkillRequired = Electricity:7,
-        xpAward = Electricity:40,
-        OnTest = RenewableEnergy.Recipes.expandedRecipesEnabled,
-        OnAddToMenu = RenewableEnergy_ExpandedRecipesEnabled,
-        OnCreate = RenewableEnergy.Recipes.salvagedModule,
-        inputs
-        {
-            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
-            item 2 [Base.BlowTorch],
-            item 1 [Base.GlassPanel],
-            item 10 [Base.ElectronicsScrap],
-            item 2 [Base.ElectricWire],
-            item 1 [Base.SmallSheetMetal],
-        }
-        outputs
-        {
-            item 1 RenewableEnergy.SolarModule,
         }
     }
 }

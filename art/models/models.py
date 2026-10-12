@@ -1,15 +1,18 @@
-"""Bakes and exports the ground model of every item in items.ITEMS, and writes Models.txt.
+"""Bakes and exports the ground model of every item in items.ITEMS and the body of every vehicle in
+items.VEHICLES, and writes Models.txt.
 
     blender -b --factory-startup -P art/models/models.py
 
-Each item's parts are merged into one mesh, unwrapped, and their materials baked into one texture
+Each model's parts are merged into one mesh, unwrapped, and their materials baked into one texture
 (colour, darkened by ambient occlusion so creases read without the renderer's light), because the
-game draws a world item with a single texture. The mesh goes to models_X/WorldItems and the
-texture to textures/WorldItems, both RenewableEnergy_<Item>, and Models.txt gets a model
-<Item>_Ground in module RenewableEnergy for the item's WorldStaticModel.
+game draws a world item or a vehicle body with a single texture. An item's mesh goes to
+models_X/WorldItems and its texture to textures/WorldItems, both RenewableEnergy_<Item>, and
+Models.txt gets a model <Item>_Ground in module RenewableEnergy for the item's WorldStaticModel. A
+vehicle's mesh goes to models_X/vehicles and its texture, with a mask texture, to
+textures/Vehicles; scripts/RenewableEnergy/Vehicles.txt names them.
 
-The exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the vertices
-(like HearingAid's ground model): the game draws a dropped item that way.
+An item's exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the
+vertices (like HearingAid's ground model): the game draws a dropped item that way.
 """
 import os
 import sys
@@ -26,11 +29,16 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 MOD = os.path.join(REPO, "Contents/mods/RenewableEnergy")
 MESH_DIR = os.path.join(MOD, "common/media/models_X/WorldItems")
 TEXTURE_DIR = os.path.join(MOD, "common/media/textures/WorldItems")
+VEHICLE_MESH_DIR = os.path.join(MOD, "common/media/models_X/vehicles")
+VEHICLE_TEXTURE_DIR = os.path.join(MOD, "common/media/textures/Vehicles")
 MODELS_TXT = os.path.join(MOD, "42/media/scripts/RenewableEnergy/Models.txt")
 PREFIX = "RenewableEnergy_"
+VEHICLE_TEXTURE_SIZE = 1024
 
 # Big flat things need more texels for their cells than a battery does.
-TEXTURE_SIZE = {"SolarModule": 512, "SolarFlat": 512, "SolarWall": 512, "SolarRack": 512, "BatteryBank": 512}
+TEXTURE_SIZE = {name: 512 for name in ("SolarModule", "HomemadeSolarModule", "SolarFlat", "SolarWallWood", "SolarWallMetal",
+                                       "SolarRackWood", "SolarRackMetal", "BatteryRackWood", "BatteryRackMetal",
+                                       "BatteryBankWood", "BatteryBankMetal")}
 DEFAULT_TEXTURE_SIZE = 256
 # Real size reads well on the ground next to the game's own items, which are drawn about life size.
 WORLD_SCALE = 1.0
@@ -158,7 +166,7 @@ def save_texture(path, pixels):
     return image
 
 
-def export(obj, name, image):
+def export(obj, name, image, path):
     """Swaps the baked texture in as the only material and writes the FBX."""
     obj.data.materials.clear()
     mat = bpy.data.materials.new(PREFIX + name)
@@ -171,9 +179,31 @@ def export(obj, name, image):
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.export_scene.fbx(filepath=os.path.join(MESH_DIR, PREFIX + name + ".fbx"), use_selection=True,
-                             object_types={"MESH"}, bake_space_transform=True, apply_scale_options="FBX_SCALE_ALL",
-                             add_leaf_bones=False, path_mode="STRIP", mesh_smooth_type="FACE")
+    bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={"MESH"}, bake_space_transform=True,
+                             apply_scale_options="FBX_SCALE_ALL", add_leaf_bones=False, path_mode="STRIP",
+                             mesh_smooth_type="FACE")
+
+
+def build_baked(stage, builder, name, size, to_ground):
+    """Builds one model's parts as a single mesh, unwrapped, and bakes its texture: colour
+    darkened by ambient occlusion. `to_ground` centres it standing on the ground; otherwise it
+    keeps the builder's origin. Returns the mesh object and the texture's pixels."""
+    clear(stage)
+    builder(stage)
+    bpy.context.view_layer.update()
+    parts = [obj for obj in stage.objects if obj.type == "MESH"]
+    offset = ground_offset(parts) if to_ground else (0, 0, 0)
+    low = merge([obj for obj in parts if not is_decal(obj)], name, offset)
+    high = merge(parts, name + "_Detail", offset)
+    stage.hide_render = True
+    unwrap(low)
+    colour = bake(low, "COLOR", size, "sRGB", source=high)
+    high.hide_render = True
+    occlusion = bake(low, "AO", size, "Non-Color")[..., :1]
+    colour[..., :3] *= 0.55 + 0.45 * occlusion
+    bpy.data.objects.remove(high)
+    stage.hide_render = False
+    return low, colour
 
 
 def models_txt(names):
@@ -190,36 +220,36 @@ def models_txt(names):
         f.write("\n".join(lines) + "\n")
 
 
-def main():
-    stage = setup()
-    os.makedirs(MESH_DIR, exist_ok=True)
-    os.makedirs(TEXTURE_DIR, exist_ok=True)
-    for folder in (MESH_DIR, TEXTURE_DIR):
+def clear_stale(folders):
+    for folder in folders:
+        os.makedirs(folder, exist_ok=True)
         for stale in os.listdir(folder):
             if stale.startswith(PREFIX):
                 os.remove(os.path.join(folder, stale))
+
+
+def main():
+    stage = setup()
+    clear_stale((MESH_DIR, TEXTURE_DIR, VEHICLE_MESH_DIR, VEHICLE_TEXTURE_DIR))
     for name, spec in items.ITEMS.items():
-        clear(stage)
-        spec["model"](stage)
-        bpy.context.view_layer.update()
-        parts = [obj for obj in stage.objects if obj.type == "MESH"]
-        offset = ground_offset(parts)
-        low = merge([obj for obj in parts if not is_decal(obj)], name, offset)
-        high = merge(parts, name + "_Detail", offset)
-        stage.hide_render = True
-        unwrap(low)
         size = TEXTURE_SIZE.get(name, DEFAULT_TEXTURE_SIZE)
-        colour = bake(low, "COLOR", size, "sRGB", source=high)
-        high.hide_render = True
-        occlusion = bake(low, "AO", size, "Non-Color")[..., :1]
-        colour[..., :3] *= 0.55 + 0.45 * occlusion
+        low, colour = build_baked(stage, spec["model"], name, size, to_ground=True)
         image = save_texture(os.path.join(TEXTURE_DIR, PREFIX + name + ".png"), colour)
-        export(low, name, image)
+        export(low, name, image, os.path.join(MESH_DIR, PREFIX + name + ".fbx"))
         print("model %s: %d faces, %d px texture" % (name, len(low.data.polygons), size))
         bpy.data.objects.remove(low)
-        bpy.data.objects.remove(high)
-        stage.hide_render = False
     models_txt(items.ITEMS)
+    for name, builder in items.VEHICLES.items():
+        low, colour = build_baked(stage, builder, name, VEHICLE_TEXTURE_SIZE, to_ground=False)
+        image = save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + ".png"), colour)
+        # White matches none of the vehicle shader's mask colours (vehicle_common.frag.h), so no
+        # part of the body is tinted as paint, a light, a window or a missing part.
+        save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + "_Mask.png"), np.ones((8, 8, 4), dtype=np.float32))
+        # Exported like the ground models: the game reads a mesh's vertices with Y up and -Z
+        # forward (it flips Z, to left-handed coordinates), so the body's +Y, the hitch, leads.
+        export(low, name, image, os.path.join(VEHICLE_MESH_DIR, PREFIX + name + ".fbx"))
+        print("vehicle %s: %d faces" % (name, len(low.data.polygons)))
+        bpy.data.objects.remove(low)
 
 
 main()

@@ -22,44 +22,60 @@ FACING_TURN = {"S": 0, "E": 90, "N": 180, "W": -90}
 WALL_PANEL_HEIGHT = 1.1
 
 
-def _rack(facing, snow=False):
+def _wall(material, facing):
+    """On the square's north edge facing south, or on its west edge facing east."""
+    at = (0, 0.5, WALL_PANEL_HEIGHT) if facing == "S" else (-0.5, 0, WALL_PANEL_HEIGHT)
+    return [layer(items.solar_wall, material=material, at=at, turn=FACING_TURN[facing])]
+
+
+def _rack(material, facing, snow=False):
     turn = FACING_TURN[facing]
     if snow:
-        return [layer(items.solar_rack, holdout=True, turn=turn), layer(items.solar_rack, snow=True, turn=turn)]
-    return [layer(items.solar_rack, turn=turn)]
+        return [layer(items.solar_rack, holdout=True, material=material, turn=turn),
+                layer(items.solar_rack, material=material, snow=True, turn=turn)]
+    return [layer(items.solar_rack, material=material, turn=turn)]
 
 
-def _bank_overlay(**options):
-    return [layer(items.battery_bank, holdout=True), layer(items.battery_bank, frame=False, **options)]
+def _overlay(build, **options):
+    return [layer(build, holdout=True), layer(build, frame=False, **options)]
 
 
 TILES = {
     0: [layer(items.solar_flat)],
-    # On the square's north edge facing south, and on its west edge facing east.
-    1: [layer(items.solar_wall, at=(0, 0.5, WALL_PANEL_HEIGHT))],
-    2: [layer(items.solar_wall, at=(-0.5, 0, WALL_PANEL_HEIGHT), turn=FACING_TURN["E"])],
-    3: _rack("S"),
-    4: _rack("E"),
-    5: _rack("N"),
-    6: _rack("W"),
     # The failsafe shares the generator's square, so it sits in the corner nearest the viewer's
     # left, where the generator doesn't cover it.
     7: [layer(items.solar_failsafe, at=(-0.28, -0.3, 0), turn=-20)],
-    8: [layer(items.battery_box)],
-    9: [layer(items.battery_bank)],
     10: [layer(items.solar_cell_charger, turn=-15)],
     11: [layer(items.solar_crate)],
     12: [layer(items.solar_crate, holdout=True), layer(items.solar_crate, box_=False, contents=True)],
     13: [layer(items.solar_crate, holdout=True), layer(items.solar_crate, box_=False, closed=True)],
+    14: [layer(items.solar_garden_light, stake=False)],
+    15: [layer(items.solar_garden_light, stake=False, lit=True)],
     16: [layer(items.solar_flat, holdout=True), layer(items.solar_flat, snow=True)],
-    17: _rack("S", snow=True),
-    18: _rack("E", snow=True),
-    19: _rack("N", snow=True),
-    20: _rack("W", snow=True),
-    36: [layer(items.battery_box, holdout=True), layer(items.battery_box, frame=False, batteries=1)],
-    37: [layer(items.battery_box, holdout=True), layer(items.battery_box, frame=False, batteries=2)],
 }
-for count in range(1, 13):
-    TILES[23 + count] = _bank_overlay(batteries=count)
-for level in range(1, 6):
-    TILES[39 + level] = _bank_overlay(meter_level=level)
+for material, first_wall, first_rack, first_snow in (("metal", 1, 3, 17), ("wood", 21, 24, 28)):
+    for offset, facing in enumerate("SE"):
+        TILES[first_wall + offset] = _wall(material, facing)
+    for offset, facing in enumerate("SENW"):
+        TILES[first_rack + offset] = _rack(material, facing)
+        TILES[first_snow + offset] = _rack(material, facing, snow=True)
+
+# Battery storage: the item type, its tile, its first battery overlay and its first meter
+# overlay. Overlay n of the batteries shows n of them, overlay n of the meter n LEDs lit.
+STORAGE_TILES = (
+    ("BatteryBoxWood", 8, 36, 48),
+    ("BatteryBoxMetal", 23, 38, 53),
+    ("BatteryRackWood", 32, 73, 58),
+    ("BatteryRackMetal", 33, 79, 63),
+    ("BatteryBankWood", 34, 87, 68),
+    ("BatteryBankMetal", 9, 99, 40),
+)
+STORAGE_CAPACITY = {"BatteryBoxWood": 2, "BatteryBoxMetal": 2, "BatteryRackWood": 6, "BatteryRackMetal": 8,
+                    "BatteryBankWood": 12, "BatteryBankMetal": 16}
+for item, base, first_battery, first_meter in STORAGE_TILES:
+    build = items.STORAGE[item]
+    TILES[base] = [layer(build)]
+    for count in range(1, STORAGE_CAPACITY[item] + 1):
+        TILES[first_battery + count - 1] = _overlay(build, batteries=count)
+    for level in range(1, 6):
+        TILES[first_meter + level - 1] = _overlay(build, meter_level=level)

@@ -20,11 +20,17 @@ Action.DISCONNECT_SOURCE = "DisconnectSource"
 Action.CLEAR_SNOW = "ClearSnow"
 Action.TURN_ON = "TurnOn"
 Action.TURN_OFF = "TurnOff"
-Action.RESET_INVERTER = "ResetInverter"
-Action.CONNECT_VEHICLE = "ConnectVehicle"
-Action.DISCONNECT_VEHICLE = "DisconnectVehicle"
 Action.ATTACH_MAINTAINER = "AttachMaintainer"
 Action.DETACH_MAINTAINER = "DetachMaintainer"
+Action.WIRE_IN = "WireIn"
+Action.UNWIRE = "Unwire"
+Action.REPAIR_PART = "RepairPart"
+Action.RENAME = "Rename"
+
+-- Jobs on the bank's wiring, which need light to see the terminals by.
+local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true }
+-- Jobs on a part already in the bank's container rather than in the character's inventory.
+local PART_IN_BANK = { [Action.UNWIRE] = true, [Action.REPAIR_PART] = true }
 
 -- What clears snow off a flat panel without scratching it: a broom sweeps, a snow shovel pushes.
 Action.SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
@@ -35,6 +41,10 @@ Action.SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.
 function Action.unitsPerMinute()
     return 2 * getGameTime():getMinutesPerDay()
 end
+
+-- At normal speed an action advances this many units each real second, whatever the day length:
+-- an in-game minute is 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
+local UNITS_PER_SECOND = 48
 
 local function position(object)
     return { x = object:getX(), y = object:getY(), z = object:getZ() }
@@ -78,16 +88,21 @@ function Action.isSnowTool(item)
     return item ~= nil and Action.SNOW_TOOLS[item:getFullType()] == true and not item:isBroken()
 end
 
--- The server takes the very wire PowerBank.findVehicleWire finds, so the client asks the same.
-function Action.hasVehicleWire(character)
-    return RenewableEnergy.PowerBank.findVehicleWire(character) ~= nil
-end
-
 -- The status of the action's bank, or nil when there is no bank or no status yet.
 local function bankStatus(self)
     if isBank(self.bank) then
         return statusOf(self.bank)
     end
+end
+
+-- Whether the action's item is where its job needs it: in the bank for a part already wired
+-- in, else anywhere in the character's inventory.
+local function holdsItem(self)
+    if PART_IN_BANK[self.mode] then
+        local container = isBank(self.bank) and self.bank:getContainer()
+        return container and container:contains(self.item) or false
+    end
+    return self.character:getInventory():containsRecursive(self.item)
 end
 
 -- Whether the job applies to the world as it is now. Both sides ask: the client to offer and
@@ -112,25 +127,26 @@ local CHECKS = {
         local status = bankStatus(self)
         return status ~= nil and status.on == true
     end,
-    [Action.RESET_INVERTER] = function(self)
-        local status = bankStatus(self)
-        return status ~= nil and status.inverter.state == "tripped"
-    end,
-    [Action.CONNECT_VEHICLE] = function(self)
-        local status = bankStatus(self)
-        return status ~= nil and status.vehicle == nil and self.vehicle ~= nil
-            and RenewableEnergy.PowerBank.vehicleInReach(position(self.bank), self.vehicle) and Action.hasVehicleWire(self.character)
-    end,
-    [Action.DISCONNECT_VEHICLE] = function(self)
-        local status = bankStatus(self)
-        return status ~= nil and status.vehicle ~= nil
-    end,
     [Action.ATTACH_MAINTAINER] = function(self)
         return self.vehicle ~= nil and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
             and self.character:getInventory():containsRecursive(self.item) and RenewableEnergy.SolarMaintainer.canAttach(self.vehicle)
     end,
     [Action.DETACH_MAINTAINER] = function(self)
         return self.vehicle ~= nil and RenewableEnergy.SolarMaintainer.isAttached(self.vehicle)
+    end,
+    [Action.WIRE_IN] = function(self)
+        return isBank(self.bank) and self.item ~= nil
+            and RenewableEnergy.PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil
+    end,
+    [Action.UNWIRE] = function(self)
+        return self.item ~= nil and holdsItem(self) and RenewableEnergy.PowerBank.partKind(self.item:getFullType()) ~= nil
+            and not self.character:tooDarkToRead()
+    end,
+    [Action.REPAIR_PART] = function(self)
+        return self.item ~= nil and holdsItem(self) and RenewableEnergy.PowerBank.repairRefusal(self.character, self.item) == nil
+    end,
+    [Action.RENAME] = function(self)
+        return isBank(self.bank) and type(self.bankName) == "string"
     end,
 }
 
@@ -156,14 +172,17 @@ local COMMANDS = {
     [Action.TURN_OFF] = function(self)
         return "setBankOn", { bank = position(self.bank), on = false }
     end,
-    [Action.RESET_INVERTER] = function(self)
-        return "resetInverter", { bank = position(self.bank) }
+    [Action.WIRE_IN] = function(self)
+        return "wireIn", { bank = position(self.bank), itemId = self.item:getID() }
     end,
-    [Action.CONNECT_VEHICLE] = function(self)
-        return "connectVehicle", { bank = position(self.bank), vehicle = self.vehicle:getId() }
+    [Action.UNWIRE] = function(self)
+        return "unwire", { bank = position(self.bank), itemId = self.item:getID() }
     end,
-    [Action.DISCONNECT_VEHICLE] = function(self)
-        return "disconnectVehicle", { bank = position(self.bank) }
+    [Action.REPAIR_PART] = function(self)
+        return "repairPart", { bank = position(self.bank), itemId = self.item:getID() }
+    end,
+    [Action.RENAME] = function(self)
+        return "rename", { bank = position(self.bank), name = self.bankName }
     end,
 }
 
@@ -172,11 +191,9 @@ local MINUTES = {
     [Action.CLEAR_SNOW] = 5,
     [Action.TURN_ON] = 0.5,
     [Action.TURN_OFF] = 0.5,
-    [Action.RESET_INVERTER] = 0.5,
-    [Action.CONNECT_VEHICLE] = 3,
-    [Action.DISCONNECT_VEHICLE] = 1,
     [Action.ATTACH_MAINTAINER] = 1,
     [Action.DETACH_MAINTAINER] = 1,
+    [Action.RENAME] = 0.5,
 }
 
 -- Full time at Electricity 3, about a third of it at 10, about a quarter longer at 0.
@@ -184,16 +201,37 @@ local function skillFactor(level)
     return 1 - 0.095 * (level - 3)
 end
 
+-- Wiring a part in takes PowerBank.wiringFor's seconds at Electricity 0, less with skill;
+-- unwiring takes half that. A part that is gone takes no time, and complete() refuses it.
+local function wiringUnits(self)
+    local wiring = self.item and RenewableEnergy.PowerBank.wiringFor(self.item:getFullType())
+    if not wiring then
+        return 1
+    end
+    local level = self.character:getPerkLevel(Perks.Electricity)
+    local seconds = wiring.seconds * skillFactor(level) / skillFactor(0)
+    if self.mode == Action.UNWIRE then
+        seconds = seconds / 2
+    end
+    return seconds * UNITS_PER_SECOND
+end
+
 function Action:getDuration()
     if self.character:isTimedActionInstant() then
         return 1
     end
+    local level = self.character:getPerkLevel(Perks.Electricity)
     if self.mode == Action.CONNECT_SOURCE or self.mode == Action.DISCONNECT_SOURCE then
-        local minutes = SandboxVars.RenewableEnergy.ConnectPanelMin * skillFactor(self.character:getPerkLevel(Perks.Electricity))
+        local minutes = SandboxVars.RenewableEnergy.ConnectPanelMin * skillFactor(level)
         if self.mode == Action.DISCONNECT_SOURCE then
             minutes = minutes / 2
         end
         return minutes * Action.unitsPerMinute()
+    elseif self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE then
+        return wiringUnits(self)
+    elseif self.mode == Action.REPAIR_PART then
+        -- As vanilla's ISFixGenerator.
+        return 150 - level * 3
     end
     return MINUTES[self.mode] * Action.unitsPerMinute()
 end
@@ -203,7 +241,13 @@ function Action:target()
 end
 
 function Action:isValid()
-    if self.item and not self.character:getInventory():containsRecursive(self.item) then
+    if self.item and not holdsItem(self) then
+        return false
+    end
+    -- The server can't tell whether a remote player stands in the dark
+    -- (IsoPlayer.tooDarkToRead), so the player's own side checks the light.
+    if NEEDS_LIGHT[self.mode] and self.character:tooDarkToRead() then
+        HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
         return false
     end
     -- A multiplayer client's copy of the bank's status can lag behind the server's, which
@@ -226,7 +270,8 @@ end
 function Action:start()
     if isClient() and self.item then
         -- Server syncs can replace the item objects while the action waits in the queue.
-        self.item = self.character:getInventory():getItemById(self.item:getID())
+        local container = PART_IN_BANK[self.mode] and self.bank:getContainer() or self.character:getInventory()
+        self.item = container:getItemWithIDRecursiv(self.item:getID())
     end
     if self.mode == Action.CLEAR_SNOW then
         if self.item and self.item:getType() == "SnowShovel" then
@@ -240,8 +285,11 @@ function Action:start()
     self:setActionAnim("Loot")
     self.character:SetVariable("LootPosition", self.vehicle and "Mid" or "Low")
     self.character:reportEvent("EventLootItem")
-    if self.mode == Action.CONNECT_SOURCE or self.mode == Action.CONNECT_VEHICLE or self.mode == Action.ATTACH_MAINTAINER then
+    if self.mode == Action.CONNECT_SOURCE or self.mode == Action.ATTACH_MAINTAINER
+        or self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE then
         self.sound = self.character:playSound("GeneratorConnect")
+    elseif self.mode == Action.REPAIR_PART then
+        self.sound = self.character:playSound("GeneratorRepair")
     end
 end
 
@@ -256,7 +304,7 @@ function Action:perform()
     if self.sound then
         self.character:stopOrTriggerSound(self.sound)
     end
-    if self.mode == Action.TURN_ON or self.mode == Action.TURN_OFF or self.mode == Action.RESET_INVERTER then
+    if self.mode == Action.TURN_ON or self.mode == Action.TURN_OFF then
         self.character:playSound("LightSwitch")
     end
     ISInventoryPage.renderDirty = true
@@ -280,14 +328,17 @@ end
 
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
 -- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel, `bank`
--- the bank's IsoGenerator, `item` the snow tool or the maintainer; unused ones are nil.
-function Action:new(character, mode, object, bank, vehicle, item)
+-- the bank's IsoGenerator, `item` the snow tool, the maintainer or the bank part, `bankName` the
+-- bank's new name; unused ones are nil. The name can't be a field called `name`, which
+-- NetTimedAction reads as the action's own name.
+function Action:new(character, mode, object, bank, vehicle, item, bankName)
     local o = ISBaseTimedAction.new(self, character)
     o.mode = mode
     o.object = object
     o.bank = bank
     o.vehicle = vehicle
     o.item = item
+    o.bankName = bankName
     o.stopOnWalk = true
     o.stopOnRun = true
     o.maxTime = o:getDuration()

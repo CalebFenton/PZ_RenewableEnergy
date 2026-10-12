@@ -621,6 +621,9 @@ def recipes(mod, game, report):
                                             "input can never be met" % tag)
                     elif prefix == "":
                         for entry in entries:
+                            # `2:Base.Glue` asks two of that item where the line asks one
+                            # (InputScript.Load).
+                            entry = entry.split(":")[-1]
                             if entry != "*" and not item_exists(mod, game, entry, module):
                                 report.fail("recipe-item", path, value.line, "%s is no item" % entry)
                 # An output names its item bare, as in `item 1 RenewableEnergy.BatteryBox`.

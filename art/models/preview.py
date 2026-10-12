@@ -2,7 +2,8 @@
 
     blender -b --factory-startup -P art/models/preview.py
 
-- models.png: every exported ground model (FBX plus its baked texture) from two sides.
+- models.png: every exported ground model and vehicle body (FBX plus its baked texture) from two
+  sides.
 - tiles.png: every tile at four times its size on a floor diamond, overlays drawn over their base.
 - icons.png: every icon at four times its size.
 
@@ -111,10 +112,12 @@ def model_sheet():
     scene.collection.objects.link(camera)
     scene.camera = camera
     cells = []
-    for name in items.ITEMS:
-        bpy.ops.import_scene.fbx(filepath=os.path.join(MEDIA, "models_X/WorldItems/RenewableEnergy_%s.fbx" % name))
+    models = [("WorldItems", name) for name in items.ITEMS] + [("vehicles", name) for name in items.VEHICLES]
+    for folder, name in models:
+        bpy.ops.import_scene.fbx(filepath=os.path.join(MEDIA, "models_X/%s/RenewableEnergy_%s.fbx" % (folder, name)))
         imported = list(bpy.context.selected_objects)
-        texture = bpy.data.images.load(os.path.join(MEDIA, "textures/WorldItems/RenewableEnergy_%s.png" % name))
+        texture_folder = "Vehicles" if folder == "vehicles" else folder
+        texture = bpy.data.images.load(os.path.join(MEDIA, "textures/%s/RenewableEnergy_%s.png" % (texture_folder, name)))
         for obj in imported:
             for mat in obj.data.materials:
                 nodes = [n for n in mat.node_tree.nodes if n.type == "TEX_IMAGE"]

@@ -1,8 +1,8 @@
 ---@class RenewableEnergy
 require "RenewableEnergy/Utilities"
 
--- Number formatting for the status window, the menus and the battery tooltip. Unit symbols are SI
--- and the same in every language, so they are not translated.
+-- Text for the status window, the menus and the battery tooltip. Unit symbols are SI and the
+-- same in every language, so they are not translated.
 local Format = {}
 
 -- Whole units below a thousand, then one decimal: "95 W", "1.5 kW". Real 1993 setups run from
@@ -38,18 +38,10 @@ function Format.percent(fraction)
     return string.format("%d%%", round((fraction or 0) * 100))
 end
 
--- A multiplier as the change it makes: 0.86 is "-14%", 1.04 is "+4%".
-function Format.change(factor)
-    local delta = round(((factor or 1) - 1) * 100)
-    if delta > 0 then
-        return "+" .. delta .. "%"
-    end
-    return delta .. "%"
-end
-
--- In the player's chosen scale, as the game's own thermometers show it.
-function Format.temperature(celsius)
-    return Temperature.getRoundedDisplayTemperature(celsius) .. " " .. Temperature.getTemperaturePostfix()
+-- "72%": an item's condition as a share of its type's ConditionMax, which is 10 for an item
+-- whose script names none, such as vanilla's Car Battery Charger.
+function Format.condition(fullType, condition)
+    return Format.percent(condition / getScriptManager():FindItem(fullType):getConditionMax())
 end
 
 -- Vanilla translates both forms of each unit into every language.
@@ -74,26 +66,35 @@ function Format.duration(hours)
     return amount(math.max(1, math.floor(hours * 60)), "minute")
 end
 
+-- Compass points clockwise from north, in eighths. +x is east and +y is south in the world.
 local COMPASS = {
-    N = "IGUI_RenewableEnergy_Compass_N",
-    NE = "IGUI_RenewableEnergy_Compass_NE",
-    E = "IGUI_RenewableEnergy_Compass_E",
-    SE = "IGUI_RenewableEnergy_Compass_SE",
-    S = "IGUI_RenewableEnergy_Compass_S",
-    SW = "IGUI_RenewableEnergy_Compass_SW",
-    W = "IGUI_RenewableEnergy_Compass_W",
-    NW = "IGUI_RenewableEnergy_Compass_NW",
+    "IGUI_RenewableEnergy_Compass_N",
+    "IGUI_RenewableEnergy_Compass_NE",
+    "IGUI_RenewableEnergy_Compass_E",
+    "IGUI_RenewableEnergy_Compass_SE",
+    "IGUI_RenewableEnergy_Compass_S",
+    "IGUI_RenewableEnergy_Compass_SW",
+    "IGUI_RenewableEnergy_Compass_W",
+    "IGUI_RenewableEnergy_Compass_NW",
 }
 
--- "north-east" for "NE".
-function Format.compass(point)
-    return getText(COMPASS[point])
+--- "6 tiles north-east": where `to` is from `from`, both { x, y }.
+function Format.away(from, to)
+    local dx, dy = to.x - from.x, to.y - from.y
+    local tiles = round(math.sqrt(dx * dx + dy * dy))
+    if tiles == 0 then
+        return getText("IGUI_RenewableEnergy_Here")
+    end
+    -- Kahlua's % truncates toward zero (KahluaThread.primitiveMath), so a negative eighth
+    -- would stay negative; the added turn keeps it in 0..7.
+    local eighth = (math.floor(math.deg(math.atan2(dx, -dy)) / 45 + 0.5) + 8) % 8
+    local key = tiles == 1 and "IGUI_RenewableEnergy_AwayOne" or "IGUI_RenewableEnergy_Away"
+    return getText(key, tiles, getText(COMPASS[eighth + 1]))
 end
 
--- A vehicle's name as vanilla shows it, from its script's car model name.
-function Format.vehicleName(modelName)
-    local key = "IGUI_VehicleName" .. modelName
-    return getText(key)
+--- A bank's name from its status: the one a player gave it, else its tier's.
+function Format.bankName(status)
+    return status.name or getItemNameFromFullType(status.bankType)
 end
 
 RenewableEnergy.Format = Format

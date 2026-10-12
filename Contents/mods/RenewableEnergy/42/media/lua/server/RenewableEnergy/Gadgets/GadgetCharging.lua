@@ -1,8 +1,9 @@
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 
--- Charges the stage-0 gadgets, on the authority: single player or the server. Only loaded
--- vehicles and chargers charge, as vanilla's own battery chargers do.
+-- Runs the small solar gadgets, on the authority: single player or the server. Only loaded
+-- vehicles, chargers and garden lights run, as vanilla's own battery chargers do.
 if isClient() then
     return
 end
@@ -34,6 +35,7 @@ function GadgetCharging.update()
     end
     GadgetCharging.chargeVehicles(hours)
     RenewableEnergy.SolarCellCharger.chargeAll(hours)
+    RenewableEnergy.SolarGardenLight.updateAll(hours)
 end
 
 Events.EveryTenMinutes.Add(GadgetCharging.update)

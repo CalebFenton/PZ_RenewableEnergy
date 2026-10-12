@@ -2,6 +2,8 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/UI/RenewableEnergyVehicleBattery"
 -- RenewableEnergy.GadgetCharging is server Lua, which single player loads only once a game
@@ -9,13 +11,15 @@ require "RenewableEnergy/UI/RenewableEnergyVehicleBattery"
 require "Moveables/ISMoveableSpriteProps"
 require "Moveables/ISMoveableDefinitions"
 
--- Stage-0 gadget tests: the maintainer, the cell charger, the deep cycle battery in a vehicle,
--- and picking placed objects back up. See RenewableEnergyTestLib.lua for how the runner works.
+-- Gadget tests: the maintainer, the cell charger, the deep cycle battery in a vehicle, the
+-- garden light, and picking placed objects back up. See RenewableEnergyTestLib.lua for how the
+-- runner works.
 
 local test = RenewableEnergyTest.test
 local expect, player = RenewableEnergyTest.expect, RenewableEnergyTest.player
 local Sprites = RenewableEnergy.Sprites
 local SolarMaintainer, SolarCellCharger = RenewableEnergy.SolarMaintainer, RenewableEnergy.SolarCellCharger
+local SolarGardenLight = RenewableEnergy.SolarGardenLight
 
 local NOON, MIDNIGHT = 12, 0
 
@@ -165,8 +169,12 @@ test("renewable_energy_gadgets_no_maintainer_no_charge", {
 
 -- Solar Battery Charger -------------------------------------------------------------------------
 
-local function placeObject(square, itemType, spriteName)
+-- Places a new `itemType` the way the moveables cursor does, with `modData` on the item first.
+local function placeObject(square, itemType, spriteName, modData)
     local item = instanceItem(itemType)
+    for key, value in pairs(modData or {}) do
+        item:getModData()[key] = value
+    end
     player():getInventory():AddItem(item)
     ISMoveableSpriteProps.new(spriteName):placeMoveable(player(), square, item:getWorldSprite(), true)
 end
@@ -480,23 +488,158 @@ test("renewable_energy_gadgets_deep_cycle_charges_from_vehicle", {
     end,
 })
 
+-- Solar Garden Light ----------------------------------------------------------------------------
+
+local function placeGardenLight(self, charge)
+    self.square = outdoorSquare(2)
+    if not self.square then return nil end
+    placeObject(self.square, SolarGardenLight.ITEM, Sprites.gardenLight.off, { [SolarGardenLight.CHARGE_KEY] = charge })
+    return SolarGardenLight.findOn(self.square)
+end
+
+local function pickUpGardenLight(self)
+    local light = self.square and SolarGardenLight.findOn(self.square)
+    if light then
+        ISMoveableSpriteProps.new(light:getTextureName()):pickUpMoveable(player(), self.square, false, true)
+    end
+end
+
+local function lampOn(square)
+    return getCell():getLightSourceAt(square:getX(), square:getY(), square:getZ())
+end
+
+-- Runs a placed light for `hours` at `hour` of the day, and notes what it shows.
+local function runGardenLight(self, hour, charge, hours)
+    local light = placeGardenLight(self, charge)
+    if not light then return end
+    setTime(self, hour)
+    self.lit = SolarGardenLight.update(light, hours)
+    self.sprite = light:getTextureName()
+    self.lamp = lampOn(self.square) ~= nil
+    self.charge = SolarGardenLight.getCharge(light)
+end
+
+local function gardenLightCleanup(self)
+    restoreTime(self)
+    pickUpGardenLight(self)
+end
+
+test("renewable_energy_gadgets_garden_light_lit_at_night", {
+    run = function(self)
+        runGardenLight(self, MIDNIGHT, 2, 0.5)
+    end,
+    validate = function(self)
+        if not expect(self.lit ~= nil, "no garden light was placed") then return end
+        expect(self.lit and self.sprite == Sprites.gardenLight.lit, "a charged light is dark at midnight")
+        expect(self.lamp, "the lit light gives no light")
+        RenewableEnergyTest.expectNear("charge after half an hour lit", self.charge,
+            2 - RenewableEnergy.Specs.gardenLight.nightWatts * 0.5)
+    end,
+    cleanup = gardenLightCleanup,
+})
+
+test("renewable_energy_gadgets_garden_light_dark_without_charge", {
+    run = function(self)
+        runGardenLight(self, MIDNIGHT, 0, 0.5)
+    end,
+    validate = function(self)
+        if not expect(self.lit ~= nil, "no garden light was placed") then return end
+        expect(not self.lit and self.sprite == Sprites.gardenLight.off, "an empty light is lit")
+        expect(not self.lamp, "an empty light gives light")
+    end,
+    cleanup = gardenLightCleanup,
+})
+
+-- It goes out once the night has drawn its battery empty.
+test("renewable_energy_gadgets_garden_light_runs_out", {
+    run = function(self)
+        runGardenLight(self, MIDNIGHT, 0.2, 1)
+    end,
+    validate = function(self)
+        if not expect(self.lit ~= nil, "no garden light was placed") then return end
+        expect(not self.lit and not self.lamp, "a light that ran out at night still shines")
+        RenewableEnergyTest.expectNear("charge after running out", self.charge, 0)
+    end,
+    cleanup = gardenLightCleanup,
+})
+
+-- By day it is dark and its cell charges the battery, never past full.
+test("renewable_energy_gadgets_garden_light_charges_by_day", {
+    run = function(self)
+        runGardenLight(self, NOON, 0, 2)
+    end,
+    validate = function(self)
+        if not expect(self.lit ~= nil, "no garden light was placed") then return end
+        expect(not self.lit and not self.lamp, "the light shines at noon")
+        expect(self.charge > 0 and self.charge <= RenewableEnergy.Specs.gardenLight.wh,
+            "two hours of noon sun left the light at " .. self.charge .. " Wh")
+    end,
+    cleanup = gardenLightCleanup,
+})
+
+-- Picking up a lit light takes its light away with it, by the next lighting pass.
+test("renewable_energy_gadgets_garden_light_pick_up_takes_light", {
+    run = function(self)
+        runGardenLight(self, MIDNIGHT, 2, 0.5)
+        if self.lamp then
+            pickUpGardenLight(self)
+        end
+    end,
+    validate = function(self)
+        if not expect(self.lamp, "the light never lit") then return end
+        expect(lampOn(self.square) == nil, "the light still shines where the garden light was")
+    end,
+    cleanup = restoreTime,
+})
+
+-- A garden light goes on the ground outdoors, where the sun reaches it.
+test("renewable_energy_gadgets_garden_light_refused_indoors", {
+    run = function(self)
+        local here = player():getCurrentSquare()
+        local indoor
+        for dx = -20, 20 do
+            for dy = -20, 20 do
+                local square = here and getCell():getGridSquare(here:getX() + dx, here:getY() + dy, 0)
+                if not indoor and square and not square:isOutside() and square:getFloor() and square:isFree(false) then
+                    indoor = square
+                end
+            end
+        end
+        local outdoor = outdoorSquare(2)
+        if not (indoor and outdoor) then return end
+        local props = ISMoveableSpriteProps.new(Sprites.gardenLight.off)
+        local item = instanceItem(SolarGardenLight.ITEM)
+        self.indoors = props:canPlaceMoveable(player(), indoor, item)
+        self.outdoors = props:canPlaceMoveable(player(), outdoor, item)
+    end,
+    validate = function(self)
+        if not expect(self.indoors ~= nil, "no indoor and outdoor squares near the character") then return end
+        expect(not self.indoors, "a garden light can be placed indoors")
+        expect(self.outdoors, "a garden light can't be placed outdoors")
+    end,
+})
+
 -- Picking up --------------------------------------------------------------------------------
 
 -- Every placed tile, with the item that places it and that picking it up must give back. The
 -- tiles' CustomItem decides it; without one the game hands back a generic Moveable.
 local PLACED = {
     { Sprites.flat, "RenewableEnergy.SolarFlat" },
-    { Sprites.wall.S, "RenewableEnergy.SolarWall" },
-    { Sprites.wall.E, "RenewableEnergy.SolarWall" },
-    { Sprites.rack.S, "RenewableEnergy.SolarRack" },
-    { Sprites.rack.E, "RenewableEnergy.SolarRack" },
-    { Sprites.rack.N, "RenewableEnergy.SolarRack" },
-    { Sprites.rack.W, "RenewableEnergy.SolarRack" },
     { Sprites.failsafe, "RenewableEnergy.SolarFailsafe" },
-    { Sprites.batteryBox, "RenewableEnergy.BatteryBox" },
-    { Sprites.batteryBank, "RenewableEnergy.BatteryBank" },
     { Sprites.cellCharger, "RenewableEnergy.SolarCellCharger" },
+    { Sprites.gardenLight.off, SolarGardenLight.ITEM },
 }
+for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
+    for _, sprite in pairs(Sprites.wall[material]) do
+        table.insert(PLACED, { sprite, "RenewableEnergy.SolarWall" .. suffix })
+    end
+    for _, sprite in pairs(Sprites.rack[material]) do
+        table.insert(PLACED, { sprite, "RenewableEnergy.SolarRack" .. suffix })
+    end
+end
+for field in pairs(Sprites.bankFill) do
+    table.insert(PLACED, { Sprites[field], "RenewableEnergy." .. field:gsub("^%l", string.upper) })
+end
 
 test("renewable_energy_gadgets_pick_up_returns_mod_item", {
     run = function(self)
@@ -533,12 +676,66 @@ test("renewable_energy_gadgets_pick_up_returns_mod_item", {
     end,
 })
 
+-- A mount keeps each module's condition, and a garden light its charge, from item to placed
+-- object and back.
+local MODULES = {
+    { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
+    { type = "RenewableEnergy.SolarModule", condition = 72 },
+}
+local CARRIED = {
+    { Sprites.rack.wood.S, "RenewableEnergy.SolarRackWood", RenewableEnergy.PowerBank.MODULES, MODULES },
+    { Sprites.flat, "RenewableEnergy.SolarFlat", RenewableEnergy.PowerBank.MODULES, { MODULES[1] } },
+    { Sprites.gardenLight.off, SolarGardenLight.ITEM, SolarGardenLight.CHARGE_KEY, 2.5 },
+}
+
+local function describe(value)
+    if type(value) ~= "table" then
+        return tostring(value)
+    end
+    local parts = {}
+    for _, module in ipairs(value) do
+        table.insert(parts, tostring(module.type) .. "@" .. tostring(module.condition))
+    end
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+test("renewable_energy_gadgets_pick_up_keeps_mod_data", {
+    run = function(self)
+        self.results = {}
+        local square = outdoorSquare(2)
+        if not square then return end
+        local inventory = player():getInventory()
+        for _, entry in ipairs(CARRIED) do
+            local spriteName, fullType, key, value = entry[1], entry[2], entry[3], entry[4]
+            inventory:clear()
+            placeObject(square, fullType, spriteName, { [key] = value })
+            local object = objectWithSprite(square, spriteName)
+            ISMoveableSpriteProps.new(spriteName):pickUpMoveable(player(), square, true, true)
+            local item = inventory:getFirstTypeRecurse(fullType)
+            table.insert(self.results, {
+                what = fullType,
+                expected = describe(value),
+                placed = describe(object and object:getModData()[key]),
+                pickedUp = describe(item and item:getModData()[key]),
+            })
+        end
+    end,
+    validate = function(self)
+        if not expect(#self.results > 0, "no free outdoor square") then return end
+        for _, r in ipairs(self.results) do
+            expect(r.placed == r.expected, "placed " .. r.what .. " holds " .. r.placed .. ", expected " .. r.expected)
+            expect(r.pickedUp == r.expected, "picked-up " .. r.what .. " holds " .. r.pickedUp .. ", expected " .. r.expected)
+        end
+    end,
+})
+
 -- Scrapping a bank finishes on the server, which only has shared Lua, so the definitions for the
 -- banks' tile Materials must come from shared Lua, with an Electricity check and parts back.
 test("renewable_energy_gadgets_bank_scrap_definitions", {
     validate = function()
         local defs = ISMoveableDefinitions:getInstance()
-        for _, material in ipairs({ "RenewableEnergyBatteryBox", "RenewableEnergyBatteryBank" }) do
+        for field in pairs(Sprites.bankFill) do
+            local material = "RenewableEnergy" .. field:gsub("^%l", string.upper)
             local def = defs.getScrapDefinition(material)
             if expect(def ~= nil and defs.isScrapDefinitionValid(material), material .. " has no valid scrap definition") then
                 expect(def.perk == Perks.Electricity, "scrapping " .. material .. " does not use Electricity")

@@ -1,5 +1,5 @@
 -- Battery banks and the panels wired to them, as both sides see them: what an object is,
--- what a bank holds, and the bank's status as the server last reported it.
+-- what a bank holds and what it may take, and the bank's status as the server last reported it.
 --
 -- The server runs the banks (server/RenewableEnergy/PowerBank) and adds perform() and
 -- place() to this table; the client adds command() and addStatusListener()
@@ -16,11 +16,12 @@ RenewableEnergy.PowerBank = PowerBank
 local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
--- A running vehicle is hooked to a bank with a few lengths of vanilla wire run from its battery
--- terminals. They are leads, not a build: the bank holds them while the vehicle is connected and
--- gives them back when it is unhooked, so moving the car costs nothing.
-PowerBank.VEHICLE_WIRE = "Base.ElectricWire"
-PowerBank.VEHICLE_WIRE_COUNT = 4
+PowerBank.WIRE = "Base.ElectricWire"
+PowerBank.SCRAP = "Base.ElectronicsScrap"
+-- Item modData: the item was wired into a bank once, which taught its Electricity XP.
+PowerBank.WIRED_ONCE = "RenewableEnergy_wiredOnce"
+-- Item and placed-object modData: the modules a panel mount holds, { { type, condition }, ... }.
+PowerBank.MODULES = "RenewableEnergy_modules"
 
 local SOURCE_KINDS = { flat = true, wall = true, rack = true }
 
@@ -28,6 +29,15 @@ local SOURCE_KINDS = { flat = true, wall = true, rack = true }
 local BANKS_BY_SPRITE = {}
 for fullType, bank in pairs(Specs.banks) do
     BANKS_BY_SPRITE[Sprites[bank.sprite]] = { fullType = fullType, spec = bank }
+end
+
+--- Every placed bank tile's sprite name.
+function PowerBank.bankSprites()
+    local names = {}
+    for name in pairs(BANKS_BY_SPRITE) do
+        table.insert(names, name)
+    end
+    return names
 end
 
 local function spriteName(isoObject)
@@ -49,47 +59,143 @@ function PowerBank.isBank(isoObject)
     return instanceof(isoObject, "IsoGenerator") and PowerBank.bankOfSprite(spriteName(isoObject)) ~= nil
 end
 
---- The mount of a placed panel, "flat", "wall" or "rack", and the way it faces; nil for
---- anything else.
+--- The mount of a placed panel, "flat", "wall" or "rack", the way it faces and what it is made
+--- of; nil for anything else.
 function PowerBank.sourceKind(isoObject)
-    local kind, facing = Sprites.kindOf(spriteName(isoObject))
+    local kind, facing, material = Sprites.kindOf(spriteName(isoObject))
     if SOURCE_KINDS[kind] then
-        return kind, facing
+        return kind, facing, material
     end
     return nil
 end
 
--- What goes in a bank's container ---------------------------------------------------------
+--- How likely a storm is to crack a module of a mount, relative to Specs.storm.chancePerHour.
+function PowerBank.stormFactor(kind, material)
+    local materialSpec = material and Specs.materials[material]
+    return Specs.mounts[kind].stormFactor * (materialSpec and materialSpec.stormFactor or 1)
+end
 
-local function countOf(container, category, except)
+--- Where a bank may stand: inside a building, out of the weather. Returns true, or false and
+--- the translation key of the reason.
+function PowerBank.canPlaceBank(square)
+    if square and square:getRoom() ~= nil and not square:isOutside() then
+        return true
+    end
+    return false, "Tooltip_RenewableEnergy_BankIndoorsOnly"
+end
+
+-- Parts --------------------------------------------------------------------------------------
+
+--- What kind of bank part an item type is: "battery", "inverter", "charger", "controller", or
+--- nil.
+function PowerBank.partKind(fullType)
+    if Specs.batteries[fullType] then
+        return "battery"
+    elseif Specs.inverters[fullType] then
+        return "inverter"
+    elseif fullType == Specs.charger then
+        return "charger"
+    elseif fullType == Specs.controller then
+        return "controller"
+    end
+    return nil
+end
+
+local MAX_FIELDS = { battery = "maxBatteries", inverter = "maxInverters", charger = "maxChargers", controller = "maxControllers" }
+
+--- How many parts of `kind` a bank of Specs.banks row `bankSpec` takes.
+function PowerBank.maxParts(bankSpec, kind)
+    return bankSpec[MAX_FIELDS[kind]]
+end
+
+--- How many parts of `kind` a bank container holds.
+function PowerBank.countParts(container, kind)
     local count = 0
     local items = container:getItems()
     for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item ~= except and category[item:getFullType()] then
+        if PowerBank.partKind(items:get(i):getFullType()) == kind then
             count = count + 1
         end
     end
     return count
 end
 
---- The bank container's filter (ItemContainer.isItemAllowed): batteries, one inverter and
---- the controllers the bank has room for.
+--- What wiring `fullType` into a bank takes (Specs.wiring), with the Electricity level filled
+--- in, or nil if it is no part.
+function PowerBank.wiringFor(fullType)
+    local kind = PowerBank.partKind(fullType)
+    if not kind then
+        return nil
+    end
+    local wiring = {}
+    for key, value in pairs(Specs.wiring[kind]) do
+        wiring[key] = value
+    end
+    if kind == "inverter" then
+        wiring.skill = Specs.inverters[fullType].wireSkill
+    end
+    return wiring
+end
+
+local function notBroken(item)
+    return not item:isBroken()
+end
+
+--- Whether the character carries a working tool with ItemTag field `tag`.
+function PowerBank.hasTool(character, tag)
+    return character:getInventory():containsTagEvalRecurse(ItemTag[tag], notBroken)
+end
+
+--- The bank container's filter (ItemContainer.isItemAllowed). Parts go in only by being wired
+--- in, which moves them without asking the filter, so it refuses every transfer.
 function PowerBank.acceptItem(container, item)
-    local parent = container and container:getParent()
-    local bank = PowerBank.bankOfSprite(spriteName(parent))
-    if not (bank and instanceof(item, "InventoryItem")) then
-        return false
-    end
-    local fullType = item:getFullType()
-    if Specs.batteries[fullType] then
-        return countOf(container, Specs.batteries, item) < bank.spec.maxBatteries
-    elseif Specs.inverters[fullType] then
-        return countOf(container, Specs.inverters, item) < 1
-    elseif Specs.controllers[fullType] then
-        return countOf(container, Specs.controllers, item) < bank.spec.maxControllers
-    end
     return false
+end
+
+--- Why `character` can't wire `item` into the bank `bankObject` now, as a translation key, or
+--- nil if they can.
+function PowerBank.wiringRefusal(character, bankObject, item)
+    local bank = PowerBank.bankOfSprite(spriteName(bankObject))
+    local container = bank and bankObject:getContainer()
+    local wiring = instanceof(item, "InventoryItem") and PowerBank.wiringFor(item:getFullType())
+    if not (container and wiring) then
+        return "Tooltip_RenewableEnergy_NotAPart"
+    end
+    local kind = PowerBank.partKind(item:getFullType())
+    if PowerBank.countParts(container, kind) >= PowerBank.maxParts(bank.spec, kind) then
+        return "Tooltip_RenewableEnergy_NoSlot"
+    elseif character:tooDarkToRead() then
+        return "Tooltip_RenewableEnergy_TooDark"
+    elseif character:getPerkLevel(Perks.Electricity) < wiring.skill then
+        return "Tooltip_RenewableEnergy_NeedSkill"
+    elseif not PowerBank.hasTool(character, wiring.tool) then
+        return "Tooltip_RenewableEnergy_NeedTool"
+    end
+    local inventory = character:getInventory()
+    if inventory:getCountTypeRecurse(PowerBank.WIRE) < wiring.wire then
+        return "Tooltip_RenewableEnergy_NeedWire"
+    elseif inventory:getCountTypeRecurse(PowerBank.SCRAP) < wiring.scrap then
+        return "Tooltip_RenewableEnergy_NeedScrap"
+    end
+    return nil
+end
+
+--- Why `character` can't repair the inverter or controller `item` with Electronics Scrap now,
+--- as a translation key, or nil if they can.
+function PowerBank.repairRefusal(character, item)
+    local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
+    if kind ~= "inverter" and kind ~= "controller" then
+        return "Tooltip_RenewableEnergy_NotRepairable"
+    elseif item:getCondition() >= item:getConditionMax() then
+        return "Tooltip_RenewableEnergy_NoRepairNeeded"
+    elseif character:tooDarkToRead() then
+        return "Tooltip_RenewableEnergy_TooDark"
+    elseif character:getPerkLevel(Perks.Electricity) < Specs.partRepair.skill then
+        return "Tooltip_RenewableEnergy_NeedSkill"
+    elseif character:getInventory():getCountTypeRecurse(PowerBank.SCRAP) < 1 then
+        return "Tooltip_RenewableEnergy_NeedScrap"
+    end
+    return nil
 end
 
 -- Banks as either side knows them ---------------------------------------------------------
@@ -116,7 +222,7 @@ local function bankAt(x, y, z)
     return globalObject and globalObject:getModData()
 end
 
---- The bank's status (see the Core API in .agent/release1-spec.md), or nil.
+--- The bank's status (see Bank:buildStatus), or nil.
 function PowerBank.getStatus(x, y, z)
     local bank = bankAt(x, y, z)
     return bank and bank.status
@@ -155,26 +261,6 @@ function PowerBank.bankOfSource(x, y, z)
         end
     end)
     return found
-end
-
--- Vehicles ------------------------------------------------------------------------------
-
-function PowerBank.vehicleInReach(bankPos, vehicle)
-    if not (vehicle and bankPos) or math.floor(vehicle:getZ()) ~= bankPos.z then
-        return false
-    end
-    local reach = Specs.vehicleReach
-    return IsoUtils.DistanceToSquared(vehicle:getX(), vehicle:getY(), bankPos.x + 0.5, bankPos.y + 0.5) <= reach * reach
-end
-
---- The wire connectVehicle would take from the player's inventory, bags included: an
---- ArrayList of VEHICLE_WIRE_COUNT items, or nil if there is less.
-function PowerBank.findVehicleWire(player)
-    if not player then
-        return nil
-    end
-    local wire = player:getInventory():getSomeTypeRecurse(PowerBank.VEHICLE_WIRE, PowerBank.VEHICLE_WIRE_COUNT)
-    return wire:size() >= PowerBank.VEHICLE_WIRE_COUNT and wire or nil
 end
 
 return PowerBank

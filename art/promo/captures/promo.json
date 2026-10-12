@@ -6,29 +6,69 @@
       "name": "Solar Module"
     },
     {
+      "fullType": "RenewableEnergy.HomemadeSolarModule",
+      "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+      "name": "Homemade Solar Module"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarCells",
+      "icon": "icon_RenewableEnergy_SolarCells",
+      "name": "Solar Cells"
+    },
+    {
       "fullType": "RenewableEnergy.SolarFlat",
       "icon": "icon_RenewableEnergy_SolarFlat",
       "name": "Flat Solar Panel"
     },
     {
-      "fullType": "RenewableEnergy.SolarWall",
-      "icon": "icon_RenewableEnergy_SolarWall",
-      "name": "Wall-Mounted Solar Panel"
+      "fullType": "RenewableEnergy.SolarWallWood",
+      "icon": "icon_RenewableEnergy_SolarWallWood",
+      "name": "Wooden Wall-Mounted Solar Panel"
     },
     {
-      "fullType": "RenewableEnergy.SolarRack",
-      "icon": "icon_RenewableEnergy_SolarRack",
-      "name": "Solar Ground Rack"
+      "fullType": "RenewableEnergy.SolarWallMetal",
+      "icon": "icon_RenewableEnergy_SolarWallMetal",
+      "name": "Metal Wall-Mounted Solar Panel"
     },
     {
-      "fullType": "RenewableEnergy.BatteryBox",
-      "icon": "icon_RenewableEnergy_BatteryBox",
-      "name": "Battery Box"
+      "fullType": "RenewableEnergy.SolarRackWood",
+      "icon": "icon_RenewableEnergy_SolarRackWood",
+      "name": "Wooden Solar Ground Rack"
     },
     {
-      "fullType": "RenewableEnergy.BatteryBank",
-      "icon": "icon_RenewableEnergy_BatteryBank",
-      "name": "Battery Bank"
+      "fullType": "RenewableEnergy.SolarRackMetal",
+      "icon": "icon_RenewableEnergy_SolarRackMetal",
+      "name": "Metal Solar Ground Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryBoxWood",
+      "icon": "icon_RenewableEnergy_BatteryBoxWood",
+      "name": "Wooden Battery Box"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryBoxMetal",
+      "icon": "icon_RenewableEnergy_BatteryBoxMetal",
+      "name": "Metal Battery Box"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryRackWood",
+      "icon": "icon_RenewableEnergy_BatteryRackWood",
+      "name": "Wooden Battery Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryRackMetal",
+      "icon": "icon_RenewableEnergy_BatteryRackMetal",
+      "name": "Metal Battery Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryBankWood",
+      "icon": "icon_RenewableEnergy_BatteryBankWood",
+      "name": "Wooden Battery Bank"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryBankMetal",
+      "icon": "icon_RenewableEnergy_BatteryBankMetal",
+      "name": "Metal Battery Bank"
     },
     {
       "fullType": "RenewableEnergy.PlugInInverter",
@@ -66,6 +106,51 @@
       "name": "L-16 Battery"
     },
     {
+      "fullType": "RenewableEnergy.CarBatteryCase",
+      "icon": "icon_RenewableEnergy_CarBatteryCase",
+      "name": "Car Battery Case"
+    },
+    {
+      "fullType": "RenewableEnergy.DeepCycleBatteryCase",
+      "icon": "icon_RenewableEnergy_DeepCycleBatteryCase",
+      "name": "Deep Cycle Battery Case"
+    },
+    {
+      "fullType": "RenewableEnergy.L16BatteryCase",
+      "icon": "icon_RenewableEnergy_L16BatteryCase",
+      "name": "L-16 Battery Case"
+    },
+    {
+      "fullType": "RenewableEnergy.WornBatteryPlates",
+      "icon": "icon_RenewableEnergy_WornBatteryPlates",
+      "name": "Worn Battery Plates"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryPlates",
+      "icon": "icon_RenewableEnergy_BatteryPlates",
+      "name": "Battery Plates"
+    },
+    {
+      "fullType": "RenewableEnergy.WoodenBatteryPlatePattern",
+      "icon": "icon_RenewableEnergy_WoodenBatteryPlatePattern",
+      "name": "Wooden Battery Plate Pattern"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryPlateMoldUnfired",
+      "icon": "icon_RenewableEnergy_BatteryPlateMoldUnfired",
+      "name": "Unfired Battery Plate Mold"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryPlateMold",
+      "icon": "icon_RenewableEnergy_BatteryPlateMold",
+      "name": "Battery Plate Mold"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryElectrolyte",
+      "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+      "name": "Battery Electrolyte"
+    },
+    {
       "fullType": "RenewableEnergy.SolarMaintainer",
       "icon": "icon_RenewableEnergy_SolarMaintainer",
       "name": "Solar Battery Maintainer"
@@ -74,6 +159,11 @@
       "fullType": "RenewableEnergy.SolarCellCharger",
       "icon": "icon_RenewableEnergy_SolarCellCharger",
       "name": "Solar Battery Charger"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarGardenLight",
+      "icon": "icon_RenewableEnergy_SolarGardenLight",
+      "name": "Solar Garden Light"
     },
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag1",
@@ -93,55 +183,62 @@
   ],
   "recipes": [
     {
-      "expanded": false,
       "id": "RenewableEnergy_MakeSolarFailsafe",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.RemoteCraftedV3",
               "icon": "icon_Base_RemoteCraftedV3",
               "name": "Remote Controller (Long-Range)"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 2,
           "items": [
             {
+              "count": 2,
               "fullType": "Base.ElectronicsScrap",
               "icon": "icon_Base_ElectronicsScrap",
               "name": "Scrap Electronics"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 2,
           "items": [
             {
+              "count": 2,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -169,91 +266,97 @@
       ]
     },
     {
-      "expanded": false,
       "id": "RenewableEnergy_BuildBatteryBankWood",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.Hammer",
               "icon": "icon_Base_Hammer",
               "name": "Claw Hammer"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
-          "count": 6,
+          "count": 10,
           "items": [
             {
+              "count": 10,
               "fullType": "Base.Plank",
               "icon": "icon_Base_Plank",
               "name": "Plank"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 12,
+          "count": 20,
           "items": [
             {
+              "count": 20,
               "fullType": "Base.Nails",
               "icon": "icon_Base_Nails",
               "name": "Nails"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 4,
+          "count": 6,
           "items": [
             {
+              "count": 6,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 4,
+          "count": 8,
           "items": [
             {
+              "count": 8,
               "fullType": "Base.Screws",
               "icon": "icon_Base_Screws",
               "name": "Screws"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
       "learn": {
-        "auto": [
-          {
-            "level": 4,
-            "name": "Electrical"
-          }
-        ],
+        "auto": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Homestead Power #2: Inverters & Control"
         ],
         "needed": true
       },
@@ -261,9 +364,321 @@
       "outputs": [
         {
           "count": 1,
-          "fullType": "RenewableEnergy.BatteryBank",
-          "icon": "icon_RenewableEnergy_BatteryBank",
-          "name": "Battery Bank"
+          "fullType": "RenewableEnergy.BatteryBankWood",
+          "icon": "icon_RenewableEnergy_BatteryBankWood",
+          "name": "Wooden Battery Bank"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        },
+        {
+          "level": 7,
+          "name": "Carpentry"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_FireBatteryPlateMold",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlateMoldUnfired",
+              "icon": "icon_RenewableEnergy_BatteryPlateMoldUnfired",
+              "name": "Unfired Battery Plate Mold"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Matches",
+              "icon": "icon_Base_Matches",
+              "name": "Matchbook"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Charcoal",
+              "icon": "icon_Base_Charcoal",
+              "name": "Charcoal"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Fire Battery Plate Mold",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.BatteryPlateMold",
+          "icon": "icon_RenewableEnergy_BatteryPlateMold",
+          "name": "Battery Plate Mold"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "RenewableEnergy_TakeApartSolarCellCharger",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarCellCharger",
+              "icon": "icon_RenewableEnergy_SolarCellCharger",
+              "name": "Solar Battery Charger"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Take Apart Solar Battery Charger",
+      "outputs": [
+        {
+          "count": 4,
+          "fullType": "RenewableEnergy.SolarCells",
+          "icon": "icon_RenewableEnergy_SolarCells",
+          "name": "Solar Cells"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_PressBatteryPlateMold",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Clay",
+              "icon": "icon_Base_Clay",
+              "name": "Clay"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WoodenBatteryPlatePattern",
+              "icon": "icon_RenewableEnergy_WoodenBatteryPlatePattern",
+              "name": "Wooden Battery Plate Pattern"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Press Battery Plate Mold",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.BatteryPlateMoldUnfired",
+          "icon": "icon_RenewableEnergy_BatteryPlateMoldUnfired",
+          "name": "Unfired Battery Plate Mold"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "RenewableEnergy_MakeSolarRackMetal",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            },
+            {
+              "count": 2,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.SmallSheetMetal",
+              "icon": "icon_Base_SmallSheetMetal",
+              "name": "Steel Sheet - Small"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
+        "needed": true
+      },
+      "name": "Make Metal Solar Ground Rack",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.SolarRackMetal",
+          "icon": "icon_RenewableEnergy_SolarRackMetal",
+          "name": "Metal Solar Ground Rack"
         }
       ],
       "skills": [
@@ -273,60 +688,221 @@
         },
         {
           "level": 2,
-          "name": "Carpentry"
+          "name": "Welding"
         }
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_MakeSolarFlat",
+      "id": "RenewableEnergy_StripCarBattery",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
-              "fullType": "RenewableEnergy.SolarModule",
-              "icon": "icon_RenewableEnergy_SolarModule",
-              "name": "Solar Module"
+              "count": 1,
+              "fullType": "Base.Gloves_Dish",
+              "icon": "icon_Base_Gloves_Dish",
+              "name": "Rubber Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Surgical",
+              "icon": "icon_Base_Gloves_Surgical",
+              "name": "Surgical Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGloves",
+              "icon": "icon_Base_Gloves_LeatherGloves",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBlack",
+              "icon": "icon_Base_Gloves_LeatherGlovesBlack",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBrown",
+              "icon": "icon_Base_Gloves_LeatherGlovesBrown",
+              "name": "Leather Gloves"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery1",
+              "icon": "icon_Base_CarBattery1",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery2",
+              "icon": "icon_Base_CarBattery2",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery3",
+              "icon": "icon_Base_CarBattery3",
+              "name": "Car Battery"
             }
           ],
           "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Strip Car Battery",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.CarBatteryCase",
+          "icon": "icon_RenewableEnergy_CarBatteryCase",
+          "name": "Car Battery Case"
+        },
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.WornBatteryPlates",
+          "icon": "icon_RenewableEnergy_WornBatteryPlates",
+          "name": "Worn Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeSolarFlat",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
+            }
+          ],
+          "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 3,
           "items": [
             {
+              "count": 3,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 4,
           "items": [
             {
+              "count": 4,
               "fullType": "Base.Screws",
               "icon": "icon_Base_Screws",
               "name": "Screws"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -359,103 +935,111 @@
       ]
     },
     {
-      "expanded": false,
       "id": "RenewableEnergy_BuildBatteryBankMetal",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.WeldingMask",
               "icon": "icon_Base_WeldingMask",
               "name": "Welder Mask"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
-          "count": 2,
+          "count": 4,
           "items": [
             {
+              "count": 4,
               "fullType": "Base.BlowTorch",
               "icon": "icon_Base_BlowTorch",
               "name": "Welding Torch"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": true
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "fullType": "Base.SmallSheetMetal",
-              "icon": "icon_Base_SmallSheetMetal",
-              "name": "Steel Sheet - Small"
-            }
-          ],
-          "keep": false,
-          "uses": false
         },
         {
           "count": 2,
           "items": [
             {
+              "count": 2,
+              "fullType": "Base.SheetMetal",
+              "icon": "icon_Base_SheetMetal",
+              "name": "Steel Sheet"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
               "fullType": "Base.MetalBar",
               "icon": "icon_Base_MetalBar",
               "name": "Steel Rod"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 4,
+          "count": 6,
           "items": [
             {
+              "count": 6,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 4,
+          "count": 8,
           "items": [
             {
+              "count": 8,
               "fullType": "Base.Screws",
               "icon": "icon_Base_Screws",
               "name": "Screws"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
       "learn": {
-        "auto": [
-          {
-            "level": 4,
-            "name": "Electrical"
-          }
-        ],
+        "auto": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Homestead Power #2: Inverters & Control"
         ],
         "needed": true
       },
@@ -463,48 +1047,320 @@
       "outputs": [
         {
           "count": 1,
-          "fullType": "RenewableEnergy.BatteryBank",
-          "icon": "icon_RenewableEnergy_BatteryBank",
-          "name": "Battery Bank"
+          "fullType": "RenewableEnergy.BatteryBankMetal",
+          "icon": "icon_RenewableEnergy_BatteryBankMetal",
+          "name": "Metal Battery Bank"
         }
       ],
       "skills": [
         {
-          "level": 3,
+          "level": 4,
           "name": "Electrical"
         },
         {
-          "level": 1,
+          "level": 4,
           "name": "Welding"
         }
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_UnmountSolarFlat",
+      "id": "RenewableEnergy_ServiceBattery",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.Screwdriver",
-              "icon": "icon_Base_Screwdriver",
-              "name": "Screwdriver"
+              "count": 1,
+              "fullType": "Base.CarBattery1",
+              "icon": "icon_Base_CarBattery1",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery2",
+              "icon": "icon_Base_CarBattery2",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery3",
+              "icon": "icon_Base_CarBattery3",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.DeepCycleBattery",
+              "icon": "icon_RenewableEnergy_DeepCycleBattery",
+              "name": "Deep Cycle Marine Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.L16Battery",
+              "icon": "icon_RenewableEnergy_L16Battery",
+              "name": "L-16 Battery"
             }
           ],
           "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 0.5,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
+              "fullType": "Base.RippedSheets",
+              "icon": "icon_Base_RippedSheets",
+              "name": "Rag"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.BakingSoda",
+              "icon": "icon_Base_BakingSoda",
+              "name": "Baking Soda"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Service Battery",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_UnmountSolarWallWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarWallWood",
+              "icon": "icon_RenewableEnergy_SolarWallWood",
+              "name": "Wooden Wall-Mounted Solar Panel"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Unmount Wooden Wall-Mounted Solar Panel",
+      "outputs": [
+        {
+          "count": 2,
+          "fullType": "Base.Plank",
+          "icon": "icon_Base_Plank",
+          "name": "Plank"
+        },
+        {
+          "count": 2,
+          "fullType": "Base.ElectricWire",
+          "icon": "icon_Base_ElectricWire",
+          "name": "Electrical Wire"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_RepairCrackedModule",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.GlassPanel",
+              "icon": "icon_Base_GlassPanel",
+              "name": "Glass Pane"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Epoxy",
+              "icon": "icon_Base_Epoxy",
+              "name": "Epoxy"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.Glue",
+              "icon": "icon_Base_Glue",
+              "name": "Glue"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
+        "needed": true
+      },
+      "name": "Repair Cracked Module",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_UnmountSolarFlat",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "RenewableEnergy.SolarFlat",
               "icon": "icon_RenewableEnergy_SolarFlat",
               "name": "Flat Solar Panel"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -516,10 +1372,324 @@
       "name": "Unmount Flat Solar Panel",
       "outputs": [
         {
+          "count": 2,
+          "fullType": "Base.ElectricWire",
+          "icon": "icon_Base_ElectricWire",
+          "name": "Electrical Wire"
+        },
+        {
+          "count": 2,
+          "fullType": "Base.Screws",
+          "icon": "icon_Base_Screws",
+          "name": "Screws"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_TakeApartShatteredModule",
+      "inputs": [
+        {
           "count": 1,
-          "fullType": "RenewableEnergy.SolarModule",
-          "icon": "icon_RenewableEnergy_SolarModule",
-          "name": "Solar Module"
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Take Apart Shattered Module",
+      "outputs": [
+        {
+          "count": 12,
+          "fullType": "RenewableEnergy.SolarCells",
+          "icon": "icon_RenewableEnergy_SolarCells",
+          "name": "Solar Cells"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_TakeApartSolarMaintainer",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarMaintainer",
+              "icon": "icon_RenewableEnergy_SolarMaintainer",
+              "name": "Solar Battery Maintainer"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Take Apart Solar Battery Maintainer",
+      "outputs": [
+        {
+          "count": 6,
+          "fullType": "RenewableEnergy.SolarCells",
+          "icon": "icon_RenewableEnergy_SolarCells",
+          "name": "Solar Cells"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_TakeApartCalculator",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Calculator",
+              "icon": "icon_Base_Calculator",
+              "name": "Calculator"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Take Apart Calculator",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.SolarCells",
+          "icon": "icon_RenewableEnergy_SolarCells",
+          "name": "Solar Cells"
+        },
+        {
+          "count": 1,
+          "fullType": "Base.ElectronicsScrap",
+          "icon": "icon_Base_ElectronicsScrap",
+          "name": "Scrap Electronics"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_ReconditionBattery",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery1",
+              "icon": "icon_Base_CarBattery1",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery2",
+              "icon": "icon_Base_CarBattery2",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.CarBattery3",
+              "icon": "icon_Base_CarBattery3",
+              "name": "Car Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.DeepCycleBattery",
+              "icon": "icon_RenewableEnergy_DeepCycleBattery",
+              "name": "Deep Cycle Marine Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.L16Battery",
+              "icon": "icon_RenewableEnergy_L16Battery",
+              "name": "L-16 Battery"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.BakingSoda",
+              "icon": "icon_Base_BakingSoda",
+              "name": "Baking Soda"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Recondition Battery",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_UnmountSolarWallMetal",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarWallMetal",
+              "icon": "icon_RenewableEnergy_SolarWallMetal",
+              "name": "Metal Wall-Mounted Solar Panel"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Unmount Metal Wall-Mounted Solar Panel",
+      "outputs": [
+        {
+          "count": 2,
+          "fullType": "Base.MetalBar",
+          "icon": "icon_Base_MetalBar",
+          "name": "Steel Rod"
         },
         {
           "count": 2,
@@ -542,79 +1712,847 @@
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_MakeSolarWall",
+      "id": "RenewableEnergy_RebuildL16Battery",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.Screwdriver",
-              "icon": "icon_Base_Screwdriver",
-              "name": "Screwdriver"
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.HandDrill",
-              "icon": "icon_Base_HandDrill",
-              "name": "Hand Drill"
-            }
-          ],
-          "keep": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "fullType": "RenewableEnergy.SolarModule",
-              "icon": "icon_RenewableEnergy_SolarModule",
-              "name": "Solar Module"
+              "count": 1,
+              "fullType": "RenewableEnergy.L16BatteryCase",
+              "icon": "icon_RenewableEnergy_L16BatteryCase",
+              "name": "L-16 Battery Case"
             }
           ],
           "keep": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "fullType": "Base.MetalBar",
-              "icon": "icon_Base_MetalBar",
-              "name": "Steel Rod"
-            }
-          ],
-          "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 3,
           "items": [
             {
+              "count": 3,
+              "fullType": "RenewableEnergy.BatteryPlates",
+              "icon": "icon_RenewableEnergy_BatteryPlates",
+              "name": "Battery Plates"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 0.5,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Rebuild L-16 Battery",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.L16Battery",
+          "icon": "icon_RenewableEnergy_L16Battery",
+          "name": "L-16 Battery"
+        }
+      ],
+      "skills": [
+        {
+          "level": 5,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_StripDeepCycleBattery",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Dish",
+              "icon": "icon_Base_Gloves_Dish",
+              "name": "Rubber Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Surgical",
+              "icon": "icon_Base_Gloves_Surgical",
+              "name": "Surgical Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGloves",
+              "icon": "icon_Base_Gloves_LeatherGloves",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBlack",
+              "icon": "icon_Base_Gloves_LeatherGlovesBlack",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBrown",
+              "icon": "icon_Base_Gloves_LeatherGlovesBrown",
+              "name": "Leather Gloves"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.DeepCycleBattery",
+              "icon": "icon_RenewableEnergy_DeepCycleBattery",
+              "name": "Deep Cycle Marine Battery"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Strip Deep Cycle Battery",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.DeepCycleBatteryCase",
+          "icon": "icon_RenewableEnergy_DeepCycleBatteryCase",
+          "name": "Deep Cycle Battery Case"
+        },
+        {
+          "count": 2,
+          "fullType": "RenewableEnergy.WornBatteryPlates",
+          "icon": "icon_RenewableEnergy_WornBatteryPlates",
+          "name": "Worn Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_StripL16Battery",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Dish",
+              "icon": "icon_Base_Gloves_Dish",
+              "name": "Rubber Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Surgical",
+              "icon": "icon_Base_Gloves_Surgical",
+              "name": "Surgical Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGloves",
+              "icon": "icon_Base_Gloves_LeatherGloves",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBlack",
+              "icon": "icon_Base_Gloves_LeatherGlovesBlack",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBrown",
+              "icon": "icon_Base_Gloves_LeatherGlovesBrown",
+              "name": "Leather Gloves"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.L16Battery",
+              "icon": "icon_RenewableEnergy_L16Battery",
+              "name": "L-16 Battery"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Strip L-16 Battery",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.L16BatteryCase",
+          "icon": "icon_RenewableEnergy_L16BatteryCase",
+          "name": "L-16 Battery Case"
+        },
+        {
+          "count": 3,
+          "fullType": "RenewableEnergy.WornBatteryPlates",
+          "icon": "icon_RenewableEnergy_WornBatteryPlates",
+          "name": "Worn Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeHomemadeSolarModule",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 16,
+          "items": [
+            {
+              "count": 16,
+              "fullType": "RenewableEnergy.SolarCells",
+              "icon": "icon_RenewableEnergy_SolarCells",
+              "name": "Solar Cells"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.GlassPanel",
+              "icon": "icon_Base_GlassPanel",
+              "name": "Glass Pane"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.SmallSheetMetal",
+              "icon": "icon_Base_SmallSheetMetal",
+              "name": "Steel Sheet - Small"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Epoxy",
+              "icon": "icon_Base_Epoxy",
+              "name": "Epoxy"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.Glue",
+              "icon": "icon_Base_Glue",
+              "name": "Glue"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Make Homemade Solar Module",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.HomemadeSolarModule",
+          "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+          "name": "Homemade Solar Module"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeBatteryPlatePattern",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Saw",
+              "icon": "icon_Base_Saw",
+              "name": "Hacksaw"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Make Wooden Battery Plate Pattern",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.WoodenBatteryPlatePattern",
+          "icon": "icon_RenewableEnergy_WoodenBatteryPlatePattern",
+          "name": "Wooden Battery Plate Pattern"
+        }
+      ],
+      "skills": [
+        {
+          "level": 2,
+          "name": "Carpentry"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_RecastBatteryPlates",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WornBatteryPlates",
+              "icon": "icon_RenewableEnergy_WornBatteryPlates",
+              "name": "Worn Battery Plates"
+            }
+          ],
+          "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 4,
           "items": [
             {
+              "count": 4,
+              "fullType": "Base.Charcoal",
+              "icon": "icon_Base_Charcoal",
+              "name": "Charcoal"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlateMold",
+              "icon": "icon_RenewableEnergy_BatteryPlateMold",
+              "name": "Battery Plate Mold"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Recast Battery Plates",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.BatteryPlates",
+          "icon": "icon_RenewableEnergy_BatteryPlates",
+          "name": "Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Blacksmithing"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_BuildBatteryRackWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 12,
+          "items": [
+            {
+              "count": 12,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
               "fullType": "Base.Screws",
               "icon": "icon_Base_Screws",
               "name": "Screws"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -630,13 +2568,13 @@
         ],
         "needed": true
       },
-      "name": "Make Wall-Mounted Solar Panel",
+      "name": "Build Wooden Battery Rack",
       "outputs": [
         {
           "count": 1,
-          "fullType": "RenewableEnergy.SolarWall",
-          "icon": "icon_RenewableEnergy_SolarWall",
-          "name": "Wall-Mounted Solar Panel"
+          "fullType": "RenewableEnergy.BatteryRackWood",
+          "icon": "icon_RenewableEnergy_BatteryRackWood",
+          "name": "Wooden Battery Rack"
         }
       ],
       "skills": [
@@ -645,73 +2583,303 @@
           "name": "Electrical"
         },
         {
-          "level": 1,
-          "name": "Welding"
+          "level": 4,
+          "name": "Carpentry"
         }
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_MakeBatteryBox",
+      "id": "RenewableEnergy_RebuildCarBattery",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.Hammer",
-              "icon": "icon_Base_Hammer",
-              "name": "Claw Hammer"
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
+              "fullType": "RenewableEnergy.CarBatteryCase",
+              "icon": "icon_RenewableEnergy_CarBatteryCase",
+              "name": "Car Battery Case"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlates",
+              "icon": "icon_RenewableEnergy_BatteryPlates",
+              "name": "Battery Plates"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 0.5,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Rebuild Car Battery",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 5,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_UnmountSolarRackMetal",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarRackMetal",
+              "icon": "icon_RenewableEnergy_SolarRackMetal",
+              "name": "Metal Solar Ground Rack"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Unmount Metal Solar Ground Rack",
+      "outputs": [
+        {
+          "count": 4,
+          "fullType": "Base.MetalPipe",
+          "icon": "icon_Base_MetalPipe",
+          "name": "Iron Pipe"
+        },
+        {
+          "count": 2,
+          "fullType": "Base.ElectricWire",
+          "icon": "icon_Base_ElectricWire",
+          "name": "Electrical Wire"
+        },
+        {
+          "count": 4,
+          "fullType": "Base.Screws",
+          "icon": "icon_Base_Screws",
+          "name": "Screws"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_TakeApartSolarGardenLight",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarGardenLight",
+              "icon": "icon_RenewableEnergy_SolarGardenLight",
+              "name": "Solar Garden Light"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [],
+        "needed": false
+      },
+      "name": "Take Apart Solar Garden Light",
+      "outputs": [
+        {
+          "count": 2,
+          "fullType": "RenewableEnergy.SolarCells",
+          "icon": "icon_RenewableEnergy_SolarCells",
+          "name": "Solar Cells"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeBatteryBoxWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 4,
           "items": [
             {
+              "count": 4,
               "fullType": "Base.Plank",
               "icon": "icon_Base_Plank",
               "name": "Plank"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 8,
           "items": [
             {
+              "count": 8,
               "fullType": "Base.Nails",
               "icon": "icon_Base_Nails",
               "name": "Nails"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 2,
           "items": [
             {
+              "count": 2,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -727,13 +2895,13 @@
         ],
         "needed": true
       },
-      "name": "Make Battery Box",
+      "name": "Make Wooden Battery Box",
       "outputs": [
         {
           "count": 1,
-          "fullType": "RenewableEnergy.BatteryBox",
-          "icon": "icon_RenewableEnergy_BatteryBox",
-          "name": "Battery Box"
+          "fullType": "RenewableEnergy.BatteryBoxWood",
+          "icon": "icon_RenewableEnergy_BatteryBoxWood",
+          "name": "Wooden Battery Box"
         }
       ],
       "skills": [
@@ -748,170 +2916,118 @@
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_UnmountSolarWall",
+      "id": "RenewableEnergy_MakeSolarWallMetal",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
-              "fullType": "RenewableEnergy.SolarWall",
-              "icon": "icon_RenewableEnergy_SolarWall",
-              "name": "Wall-Mounted Solar Panel"
-            }
-          ],
-          "keep": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "magazines": [],
-        "needed": false
-      },
-      "name": "Unmount Wall-Mounted Solar Panel",
-      "outputs": [
-        {
-          "count": 1,
-          "fullType": "RenewableEnergy.SolarModule",
-          "icon": "icon_RenewableEnergy_SolarModule",
-          "name": "Solar Module"
-        },
-        {
-          "count": 2,
-          "fullType": "Base.MetalBar",
-          "icon": "icon_Base_MetalBar",
-          "name": "Steel Rod"
-        },
-        {
-          "count": 2,
-          "fullType": "Base.ElectricWire",
-          "icon": "icon_Base_ElectricWire",
-          "name": "Electrical Wire"
-        }
-      ],
-      "skills": [
-        {
-          "level": 1,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
-      "expanded": false,
-      "id": "RenewableEnergy_MakeSolarRack",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "fullType": "Base.Screwdriver",
-              "icon": "icon_Base_Screwdriver",
-              "name": "Screwdriver"
+              "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.Wrench",
-              "icon": "icon_Base_Wrench",
-              "name": "Wrench"
-            }
-          ],
-          "keep": true,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
+              "count": 1,
               "fullType": "RenewableEnergy.SolarModule",
               "icon": "icon_RenewableEnergy_SolarModule",
               "name": "Solar Module"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 4,
+          "count": 2,
           "items": [
             {
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
+              "count": 2,
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 1,
+          "count": 3,
           "items": [
             {
-              "fullType": "Base.SmallSheetMetal",
-              "icon": "icon_Base_SmallSheetMetal",
-              "name": "Steel Sheet - Small"
-            }
-          ],
-          "keep": false,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "fullType": "Base.Screws",
-              "icon": "icon_Base_Screws",
-              "name": "Screws"
-            }
-          ],
-          "keep": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
+              "count": 3,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
       "learn": {
-        "auto": [],
+        "auto": [
+          {
+            "level": 4,
+            "name": "Electrical"
+          }
+        ],
         "magazines": [
           "Homestead Power #1: Sun & Batteries"
         ],
         "needed": true
       },
-      "name": "Make Solar Ground Rack",
+      "name": "Make Metal Wall-Mounted Solar Panel",
       "outputs": [
         {
           "count": 1,
-          "fullType": "RenewableEnergy.SolarRack",
-          "icon": "icon_RenewableEnergy_SolarRack",
-          "name": "Solar Ground Rack"
+          "fullType": "RenewableEnergy.SolarWallMetal",
+          "icon": "icon_RenewableEnergy_SolarWallMetal",
+          "name": "Metal Wall-Mounted Solar Panel"
         }
       ],
       "skills": [
@@ -920,97 +3036,236 @@
           "name": "Electrical"
         },
         {
-          "level": 2,
+          "level": 1,
           "name": "Welding"
         }
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_MakeChargeController",
+      "id": "RenewableEnergy_MakeSolarWallWood",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.Pliers",
-              "icon": "icon_Base_Pliers",
-              "name": "Pliers"
-            }
-          ],
-          "keep": true,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            },
             {
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
+              "count": 1,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 2,
           "items": [
             {
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
+              "count": 2,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
             }
           ],
           "keep": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "fullType": "Base.SmallSheetMetal",
-              "icon": "icon_Base_SmallSheetMetal",
-              "name": "Steel Sheet - Small"
-            }
-          ],
-          "keep": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "fullType": "Base.Amplifier",
-              "icon": "icon_Base_Amplifier",
-              "name": "Amplifier"
-            }
-          ],
-          "keep": false,
+          "tag": false,
           "uses": false
         },
         {
           "count": 4,
           "items": [
             {
+              "count": 4,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 4,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
+        "needed": true
+      },
+      "name": "Make Wooden Wall-Mounted Solar Panel",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.SolarWallWood",
+          "icon": "icon_RenewableEnergy_SolarWallWood",
+          "name": "Wooden Wall-Mounted Solar Panel"
+        }
+      ],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Electrical"
+        },
+        {
+          "level": 3,
+          "name": "Carpentry"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeChargeController",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Pliers",
+              "icon": "icon_Base_Pliers",
+              "name": "Pliers"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.SmallSheetMetal",
+              "icon": "icon_Base_SmallSheetMetal",
+              "name": "Steel Sheet - Small"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Amplifier",
+              "icon": "icon_Base_Amplifier",
+              "name": "Amplifier"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
               "fullType": "Base.Screws",
               "icon": "icon_Base_Screws",
               "name": "Screws"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -1038,134 +3293,409 @@
       ]
     },
     {
-      "expanded": true,
-      "id": "RenewableEnergy_MakeSolarModule",
+      "id": "RenewableEnergy_MakeSolarRackWood",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "Base.Screwdriver",
               "icon": "icon_Base_Screwdriver",
               "name": "Screwdriver"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 2,
           "items": [
             {
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
+              "count": 2,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            },
             {
-              "fullType": "Base.GlassPanel",
-              "icon": "icon_Base_GlassPanel",
-              "name": "Glass Pane"
+              "count": 2,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 10,
+          "count": 6,
           "items": [
             {
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
+              "count": 6,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
             }
           ],
           "keep": false,
+          "tag": false,
           "uses": false
         },
         {
-          "count": 2,
+          "count": 12,
           "items": [
             {
+              "count": 12,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
             }
           ],
           "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
+        "needed": true
+      },
+      "name": "Make Wooden Solar Ground Rack",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.SolarRackWood",
+          "icon": "icon_RenewableEnergy_SolarRackWood",
+          "name": "Wooden Solar Ground Rack"
+        }
+      ],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Electrical"
+        },
+        {
+          "level": 4,
+          "name": "Carpentry"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeBatteryBoxMetal",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WeldingMask",
+              "icon": "icon_Base_WeldingMask",
+              "name": "Welder Mask"
+            }
+          ],
+          "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.BlowTorch",
+              "icon": "icon_Base_BlowTorch",
+              "name": "Welding Torch"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
               "fullType": "Base.SmallSheetMetal",
               "icon": "icon_Base_SmallSheetMetal",
               "name": "Steel Sheet - Small"
             }
           ],
           "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
       "learn": {
         "auto": [
           {
-            "level": 7,
+            "level": 2,
             "name": "Electrical"
           }
         ],
-        "magazines": [],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
         "needed": true
       },
-      "name": "Make Solar Module",
+      "name": "Make Metal Battery Box",
       "outputs": [
         {
           "count": 1,
-          "fullType": "RenewableEnergy.SolarModule",
-          "icon": "icon_RenewableEnergy_SolarModule",
-          "name": "Solar Module"
+          "fullType": "RenewableEnergy.BatteryBoxMetal",
+          "icon": "icon_RenewableEnergy_BatteryBoxMetal",
+          "name": "Metal Battery Box"
         }
       ],
       "skills": [
         {
-          "level": 7,
+          "level": 1,
           "name": "Electrical"
+        },
+        {
+          "level": 1,
+          "name": "Welding"
         }
       ]
     },
     {
-      "expanded": false,
-      "id": "RenewableEnergy_UnmountSolarRack",
+      "id": "RenewableEnergy_BuildBatteryRackMetal",
       "inputs": [
         {
           "count": 1,
           "items": [
             {
-              "fullType": "Base.Wrench",
-              "icon": "icon_Base_Wrench",
-              "name": "Wrench"
+              "count": 1,
+              "fullType": "Base.WeldingMask",
+              "icon": "icon_Base_WeldingMask",
+              "name": "Welder Mask"
             }
           ],
           "keep": true,
+          "tag": true,
           "uses": false
         },
         {
           "count": 1,
           "items": [
             {
-              "fullType": "RenewableEnergy.SolarRack",
-              "icon": "icon_RenewableEnergy_SolarRack",
-              "name": "Solar Ground Rack"
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.BlowTorch",
+              "icon": "icon_Base_BlowTorch",
+              "name": "Welding Torch"
             }
           ],
           "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.SmallSheetMetal",
+              "icon": "icon_Base_SmallSheetMetal",
+              "name": "Steel Sheet - Small"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 4,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
+        "needed": true
+      },
+      "name": "Build Metal Battery Rack",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.BatteryRackMetal",
+          "icon": "icon_RenewableEnergy_BatteryRackMetal",
+          "name": "Metal Battery Rack"
+        }
+      ],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Electrical"
+        },
+        {
+          "level": 2,
+          "name": "Welding"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_UnmountSolarRackWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarRackWood",
+              "icon": "icon_RenewableEnergy_SolarRackWood",
+              "name": "Wooden Solar Ground Rack"
+            }
+          ],
+          "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -1174,19 +3704,13 @@
         "magazines": [],
         "needed": false
       },
-      "name": "Unmount Solar Ground Rack",
+      "name": "Unmount Wooden Solar Ground Rack",
       "outputs": [
         {
-          "count": 2,
-          "fullType": "RenewableEnergy.SolarModule",
-          "icon": "icon_RenewableEnergy_SolarModule",
-          "name": "Solar Module"
-        },
-        {
           "count": 4,
-          "fullType": "Base.MetalPipe",
-          "icon": "icon_Base_MetalPipe",
-          "name": "Iron Pipe"
+          "fullType": "Base.Plank",
+          "icon": "icon_Base_Plank",
+          "name": "Plank"
         },
         {
           "count": 2,
@@ -1201,10 +3725,137 @@
           "name": "Electrical"
         }
       ]
+    },
+    {
+      "id": "RenewableEnergy_RebuildDeepCycleBattery",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Wrench",
+              "icon": "icon_Base_Wrench",
+              "name": "Wrench"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.DeepCycleBatteryCase",
+              "icon": "icon_RenewableEnergy_DeepCycleBatteryCase",
+              "name": "Deep Cycle Battery Case"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "RenewableEnergy.BatteryPlates",
+              "icon": "icon_RenewableEnergy_BatteryPlates",
+              "name": "Battery Plates"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 0.5,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true
+      },
+      "name": "Rebuild Deep Cycle Battery",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.DeepCycleBattery",
+          "icon": "icon_RenewableEnergy_DeepCycleBattery",
+          "name": "Deep Cycle Marine Battery"
+        }
+      ],
+      "skills": [
+        {
+          "level": 5,
+          "name": "Electrical"
+        }
+      ]
     }
   ],
   "strings": {
-    "expandedOption": "Expanded Recipes",
     "modName": "Renewable Energy"
   }
 }

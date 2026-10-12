@@ -46,6 +46,13 @@ install_mod
 if [ ! -f "$CACHE/options.ini" ] && [ -f "$HOME/Zomboid/options.ini" ]; then
     cp "$HOME/Zomboid/options.ini" "$CACHE/options.ini"
 fi
+# Harness runs play no sound, so they don't blare while you work. Only the volumes are zeroed: the
+# sound engine still runs, so code that plays sounds runs the same. A plain run keeps your volumes.
+if [ -n "$MODE" ] && [ -f "$CACHE/options.ini" ]; then
+    for key in soundVolume musicVolume ambientVolume vehicleEngineVolume jumpScareVolume voiceVolumePlayers; do
+        sed -i '' "s/^$key=.*/$key=0/" "$CACHE/options.ini"
+    done
+fi
 # Without this file the client empties mods/default.txt on start, as it does the first time a cache
 # dir runs a new major release (ZomboidFileSystem.resetDefaultModsForNewRelease).
 echo "If this file does not exist, default.txt will be reset to empty (no mods active)." > "$CACHE/mods/reset-mods-42_00.txt"

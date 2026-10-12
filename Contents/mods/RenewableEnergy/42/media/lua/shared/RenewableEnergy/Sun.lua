@@ -13,8 +13,9 @@ RenewableEnergy.Sun = Sun
 local rad, sin, cos, tan, acos, max, min = math.rad, math.sin, math.cos, math.tan, math.acos, math.max, math.min
 
 -- Clear-sky light on a horizontal surface at a sun overhead, and how much it thins as the
--- sun drops (a fit to clear-sky models that stands in for air mass).
+-- sun drops (a fit to clear-sky models that stands in for air mass). Panels are rated at it.
 local CLEAR_SKY = 1000
+Sun.FULL_SUN = CLEAR_SKY
 local AIR_MASS_EXPONENT = 1.15
 -- The share of clear-sky light that comes from the whole sky rather than the sun's disc.
 -- With the cloud weighting below it puts a year's flat and south-wall output against a
@@ -28,13 +29,12 @@ local SNOWFALL_FACTOR = 0.5
 -- Ground reflection: grass and soil, and fresh snow, which lifts a wall panel's winter output.
 local GROUND_ALBEDO = 0.2
 local SNOW_ALBEDO = 0.7
--- Crystalline cells lose this fraction per °C above 25 °C, and run this much hotter than the
--- air in full sun.
-local CELL_TEMPERATURE_LOSS = 0.004
-local CELL_HEATING = 25
 -- Wiring, dust, mismatch, controller and battery charging losses between the panel's
 -- rating and what the bank stores.
 local SYSTEM_LOSSES = 0.8
+
+-- Weather without cloud, fog, rain or snow.
+Sun.CLEAR_WEATHER = { cloud = 0, fog = 0, rain = 0, snowing = false, groundSnow = 0 }
 
 -- Horizontal unit vectors (east, north) a panel facing each way leans towards.
 local FACINGS = { S = { 0, -1 }, N = { 0, 1 }, E = { 1, 0 }, W = { -1, 0 } }
@@ -94,17 +94,10 @@ function Sun.planeIrradiance(sun, kind, facing, weather)
     return direct * max(0, incidence) + diffuse * (1 + cos(tilt)) / 2 + horizontal * albedo * (1 - cos(tilt)) / 2
 end
 
---- Output relative to the rating from the cells' temperature, which the sun raises.
----@param airC number air temperature, °C
----@param irradiance number W/m² on the panel
-function Sun.temperatureFactor(airC, irradiance)
-    return 1 - CELL_TEMPERATURE_LOSS * (airC + CELL_HEATING * irradiance / CLEAR_SKY - 25)
-end
-
---- Watts a panel rated `ratedWatts` makes in `irradiance` at `airC`, under `snow` cover.
-function Sun.wattsFrom(ratedWatts, irradiance, airC, snow)
-    local watts = ratedWatts * irradiance / CLEAR_SKY * Sun.temperatureFactor(airC, irradiance)
-        * SYSTEM_LOSSES * SandboxVars.RenewableEnergy.SunlightMultiplier * (1 - (snow or 0))
+--- Watts a panel rated `ratedWatts` makes in `irradiance`, under `snow` cover from 0 to 1.
+function Sun.wattsFrom(ratedWatts, irradiance, snow)
+    local watts = ratedWatts * irradiance / CLEAR_SKY * SYSTEM_LOSSES
+        * SandboxVars.RenewableEnergy.SunlightMultiplier * (1 - (snow or 0))
     return max(0, watts)
 end
 
@@ -156,7 +149,20 @@ end
 --- Watts a panel rated `ratedWatts` on a `kind` mount facing `facing` makes now, under
 --- `snow` cover from 0 to 1.
 function Sun.panelWatts(ratedWatts, kind, facing, snow)
-    return Sun.wattsFrom(ratedWatts, Sun.irradiance(kind, facing), getClimateManager():getTemperature(), snow)
+    return Sun.wattsFrom(ratedWatts, Sun.irradiance(kind, facing), snow)
+end
+
+--- Light on a flat surface on `square` now, in W/m²: 0 under a roof or for no square.
+function Sun.squareIrradiance(square)
+    if not (square and square:isOutside()) then
+        return 0
+    end
+    return Sun.irradiance("flat")
+end
+
+--- Watts a flat cell rated `ratedWatts` lying on `square` makes now.
+function Sun.squareWatts(square, ratedWatts)
+    return Sun.wattsFrom(ratedWatts, Sun.squareIrradiance(square), 0)
 end
 
 return Sun

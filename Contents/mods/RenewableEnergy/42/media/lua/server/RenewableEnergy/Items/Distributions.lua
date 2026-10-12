@@ -3,6 +3,8 @@ require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/StashDescriptions"
+require "RenewableEnergy/World/WorldSpawns"
+require "RenewableEnergy/World/ArrowBoard"
 
 -- Where the mod's items spawn, 1993 style (design §7). Distributions.items lists every entry;
 -- apply() puts them into the game's loot tables in OnInitGlobalModData, scaled by the save's loot
@@ -50,7 +52,9 @@ procLists.RenewableEnergyBatteryStock = {
 -- nothing. addOwnContainersToRooms gives every room these, since a room's own "other" table comes
 -- before "all" (ItemPickerJava.fillContainer).
 local OWN_CONTAINER_TYPES = {
-    "RenewableEnergyBatteryBox", "RenewableEnergyBatteryBank", "RenewableEnergyCellCharger", "RenewableEnergySolarBox",
+    "RenewableEnergyBatteryBoxWood", "RenewableEnergyBatteryBoxMetal", "RenewableEnergyBatteryRackWood",
+    "RenewableEnergyBatteryRackMetal", "RenewableEnergyBatteryBankWood", "RenewableEnergyBatteryBankMetal",
+    "RenewableEnergyCellCharger", "RenewableEnergySolarBox",
 }
 for _, containerType in ipairs(OWN_CONTAINER_TYPES) do
     subDist.all[containerType] = { rolls = 0, items = {} }
@@ -315,6 +319,21 @@ Distributions.items = {
             { 0.5, "veh:CamperTruckBed" },
         }),
     },
+    {
+        -- Sold by the boxful at garden centres and hardware stores in the early 1990s, and
+        -- put away in sheds and garages once their batteries died.
+        fullType = "RenewableEnergy.SolarGardenLight",
+        option = "LRMMisc",
+        entries = {
+            { 6, "proc:GardenStoreMisc" },
+            { 3, "proc:GardenStoreTools" },
+            { 2, "proc:ToolStoreFarming" },
+            { 1, "proc:ToolStoreMisc" },
+            { 1, "proc:CrateGardening" },
+            { 1, "proc:GarageTools" },
+            { 0.5, "proc:BarnTools" },
+        },
+    },
     -- Stage 1 ---------------------------------------------------------------------------------
     {
         -- Half as common as #1 wherever both are, homes included.
@@ -465,6 +484,19 @@ Distributions.items = {
             { 6, "proc:RenewableEnergyBatteryStock" },
         }),
     },
+    {
+        -- Battery acid by the litre, for refilling rebuilt batteries: auto parts stores and
+        -- mechanics sold it for topping up, and battery plants stocked it by the crate.
+        fullType = "RenewableEnergy.BatteryElectrolyte",
+        option = "LRMBatteries",
+        entries = {
+            { 3, "proc:CarSupplyBatteries" },
+            { 1, "proc:CarSupplyTools" },
+            { 2, "proc:MechanicShelfElectric" },
+            { 0.5, "proc:GarageMechanics" },
+            { 4, "proc:CrateBatteries" },
+        },
+    },
 }
 
 -- Applying ---------------------------------------------------------------------------------------
@@ -572,11 +604,65 @@ function Distributions.chargeFoundBatteries(container)
     end
 end
 
+-- Cracked modules ---------------------------------------------------------------------------------
+-- Modules whose glass broke lie around where people kept junk and spares. They are added when a
+-- container is filled rather than through the loot lists, so that they come with their cracked
+-- condition and the lists' modules stay whole. Weights work like a loot list's: the chance per
+-- container is weight × the item's loot category multiplier × the solar module option / 100.
+
+-- Rooms, and the weight of each of their shelves, boxes, crates and cabinets.
+Distributions.CRACKED_MODULE_ROOMS = {
+    garage = 1.5,
+    garagestorage = 1.5,
+    shed = 1.5,
+    farmstorage = 3,
+    electronicsstorage = 3,
+}
+Distributions.CRACKED_MODULE_CONTAINERS = {
+    crate = true, smallcrate = true, cardboardbox = true, smallbox = true, metal_shelves = true,
+    shelves = true, toolcabinet = true, counter = true,
+}
+-- Weight for each trunk and truck bed of a vehicle in a junkyard (vanilla vehicle zone
+-- "junkyard"): someone pulled the panel off an RV.
+Distributions.CRACKED_MODULE_JUNKYARD = 3
+
+local function crackedModuleWeight(roomName, containerType, container)
+    local vehicle = container:getVehicle()
+    if vehicle then
+        local part = container:getVehiclePart()
+        local partId = part and part:getId() or ""
+        local isCargo = string.find(partId, "Trunk") or string.find(partId, "TruckBed")
+        return (vehicle:getZone() == "junkyard" and isCargo) and Distributions.CRACKED_MODULE_JUNKYARD or 0
+    end
+    if Distributions.CRACKED_MODULE_CONTAINERS[containerType] then
+        return Distributions.CRACKED_MODULE_ROOMS[roomName] or 0
+    end
+    return 0
+end
+
+--- The chance that a container of this weight gets a cracked module, at the save's options.
+function Distributions.crackedModuleChance(weight)
+    local module = RenewableEnergy.WorldSpawns.MODULE
+    return weight * ItemPickerJava.getLootModifier(module) * SandboxVars.RenewableEnergy.LRMSolarPanels / 100
+end
+
+--- Maybe adds a cracked module to a freshly filled container, if its room or vehicle keeps them.
+function Distributions.addCrackedModules(roomName, containerType, container)
+    local weight = crackedModuleWeight(roomName, containerType, container)
+    if weight > 0 and ZombRandFloat(0, 1) < Distributions.crackedModuleChance(weight) then
+        local WorldSpawns = RenewableEnergy.WorldSpawns
+        WorldSpawns.addModule(container, WorldSpawns.crackedCondition())
+    end
+end
+
 -- Rooms, vehicles and corpses fire this after rolling their loot; vanilla's own drainable
 -- randomizing (ItemPickerJava.rollItem) runs before it. Two callers pass a bag's loot table in
--- place of a container. Stash and safehouse fills (fillContainerType) don't fire it.
-local function onFillContainer(_roomName, _containerType, container)
+-- place of a container. Stash and safehouse fills (fillContainerType) don't fire it. The arrow
+-- board's battery box is stocked here, so that its batteries get their charge with the rest.
+local function onFillContainer(roomName, containerType, container)
     if instanceof(container, "ItemContainer") then
+        Distributions.addCrackedModules(roomName, containerType, container)
+        RenewableEnergy.ArrowBoard.stockIfBatteryBox(roomName, container)
         Distributions.chargeFoundBatteries(container)
     end
 end

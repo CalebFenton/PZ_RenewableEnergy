@@ -1,18 +1,29 @@
--- What a bank powers: every switched-on appliance in its reach, in watts (design §2.4).
+-- What a bank powers: every switched-on appliance in its reach, in watts (design §2.4), and
+-- the running generators whose reach covers the bank.
 --
--- The engine says whether an object draws power (getGeneratorPowerConsumption is 0 when it
--- is off) but its figures are fuel rates, so each kind of appliance gets its 1993 wattage
--- from Specs.loads. The reach is the engine's own for every generator: one radius from
--- the GeneratorTileRange sandbox option and GeneratorVerticalPowerRange floors up and down
--- (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power.
+-- The engine says whether an object draws power (getGeneratorPowerConsumption reads the
+-- appliance's own switch, powered or not, so a bank that cut its power still sees what would
+-- draw when it comes back) but its figures are fuel rates, so each kind of appliance gets its
+-- 1993 wattage from Specs.loads. The reach is the engine's own for every generator: one radius
+-- from the GeneratorTileRange sandbox option and GeneratorVerticalPowerRange floors up and down
+-- (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power. A generator
+-- powers a square exactly when the square is in that reach of the generator
+-- (IsoGenerator.isPoweringSquare), so the same scan finds the generators powering the bank.
 
 if isClient() then return end
 
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/PowerBank/PowerBank"
 
 local Loads = {}
 
 local LOADS = RenewableEnergy.Specs.loads
+local PowerBank = RenewableEnergy.PowerBank
+
+local function isMiniFridge(object)
+    local properties = object:getProperties()
+    return properties ~= nil and properties:get("GroupName") == "Mini"
+end
 
 -- Specs.loads names of what an object draws now, called with each one.
 local function eachLoad(object, add)
@@ -35,6 +46,8 @@ local function eachLoad(object, add)
     elseif instanceof(object, "IsoStackedWasherDryer") then
         if object:isWasherActivated() then add("washer") end
         if object:isDryerActivated() then add("dryer") end
+    elseif object:getPipedFuelAmount() <= 0 and object:getContainerByType("fridge") and isMiniFridge(object) then
+        add("miniFridge")
     elseif object:getPipedFuelAmount() <= 0 and object:getContainerByType("fridge") and object:getContainerByType("freezer") then
         add("fridgeFreezer")
     elseif object:getPipedFuelAmount() <= 0 and object:getContainerByEitherType("fridge", "freezer") then
@@ -44,9 +57,10 @@ local function eachLoad(object, add)
     end
 end
 
---- A new, empty load for Loads.add.
+--- A new, empty load for Loads.add: `watts` the inverters must carry, `averageWatts` the energy
+--- it takes, and per Specs.loads kind its count and watts.
 function Loads.new()
-    return { watts = 0, motors = {}, volts240 = false, counts = {} }
+    return { watts = 0, averageWatts = 0, kinds = {}, generators = {} }
 end
 
 --- Add an appliance of Specs.loads kind `name` to `load`.
@@ -54,13 +68,21 @@ function Loads.add(load, name, watts)
     local spec = LOADS[name]
     watts = watts or spec.watts
     load.watts = load.watts + watts
-    load.counts[name] = (load.counts[name] or 0) + 1
-    if spec.volts == 240 then
-        load.volts240 = true
+    load.averageWatts = load.averageWatts + watts * (spec.duty or 1)
+    local kind = load.kinds[name] or { count = 0, watts = 0 }
+    kind.count = kind.count + 1
+    kind.watts = kind.watts + watts
+    load.kinds[name] = kind
+end
+
+--- The load by kind, biggest first: { { kind, count, watts }, ... }.
+function Loads.byKind(load)
+    local list = {}
+    for name, kind in pairs(load.kinds) do
+        table.insert(list, { kind = name, count = kind.count, watts = kind.watts })
     end
-    if spec.surge then
-        table.insert(load.motors, { watts = watts, surge = spec.surge })
-    end
+    table.sort(list, function(a, b) return a.watts > b.watts end)
+    return list
 end
 
 -- Objects the engine would bill a generator here for (IsoGenerator.setSurroundingElectricity).
@@ -71,7 +93,12 @@ local function drawsFromGenerator(object, allowExterior)
         and (allowExterior or not object:getSquare():isOutside())
 end
 
---- Everything switched on within a bank's reach.
+local function isRunningGenerator(object)
+    return instanceof(object, "IsoGenerator") and object:isActivated() and not PowerBank.isBank(object)
+end
+
+--- Everything switched on within a bank's reach, and the running generators, banks aside,
+--- that power the bank's square.
 ---@param square IsoGridSquare the bank's square
 function Loads.scan(square)
     local load = Loads.new()
@@ -94,6 +121,8 @@ function Loads.scan(square)
                         local object = objects:get(i)
                         if drawsFromGenerator(object, allowExterior) then
                             eachLoad(object, add)
+                        elseif isRunningGenerator(object) then
+                            table.insert(load.generators, object)
                         end
                     end
                 end
@@ -101,26 +130,6 @@ function Loads.scan(square)
         end
     end
     return load
-end
-
---- The draw while the motors start: one of them, or all of them at once when power comes
---- back, each with a random start-up surge from its Specs.loads range.
-function Loads.surgeWatts(load, allMotors)
-    local motors = load.motors
-    if #motors == 0 then
-        return load.watts
-    end
-    local function extra(motor)
-        return ZombRandFloat(motor.surge.min, motor.surge.max) - motor.watts
-    end
-    if allMotors then
-        local total = load.watts
-        for _, motor in ipairs(motors) do
-            total = total + extra(motor)
-        end
-        return total
-    end
-    return load.watts + extra(motors[ZombRand(#motors) + 1])
 end
 
 return Loads

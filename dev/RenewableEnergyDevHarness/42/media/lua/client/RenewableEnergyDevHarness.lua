@@ -6,7 +6,8 @@
 -- failed=<n>" goes to console.txt. With --promo, RenewableEnergyDevPromo saves the art for the README and
 -- prints "REPromo DONE". With --art, RenewableEnergyDevArt saves close-ups of every item and tile and
 -- prints "REArt DONE". With --loot, RenewableEnergyLoot measures the loot and prints an "RELootReport"
--- line for each list, then "RELootReport DONE". Then the game quits.
+-- line for each list, then the modules a thorough player finds in each town of
+-- RenewableEnergyDevTownCensus (dev/loot/census.py), then "RELootReport DONE". Then the game quits.
 require "RenewableEnergy/Debug/RenewableEnergyDebugScenario"
 require "RenewableEnergy/Debug/RenewableEnergyTests"
 require "RenewableEnergy/Debug/RenewableEnergyTestsPower"
@@ -125,6 +126,27 @@ local function share(fraction)
     return string.format("%.2f%% (1 in %.0f)", fraction * 100, 1 / fraction)
 end
 
+-- A module haul as "modules (watts as found / repaired)".
+local function hauled(haul)
+    local watts = RenewableEnergy.Specs.modules["RenewableEnergy.SolarModule"].watts / 100
+    return string.format("%.1f (%.0f / %.0f W)", haul.count, haul.condition * watts, haul.repaired * watts)
+end
+
+local function reportModules()
+    local report = RenewableEnergyLoot.moduleReport(require "RenewableEnergyDevTownCensus")
+    print("RELootReport modules a thorough player finds, as count (watts as found / after Repair Cracked Module)")
+    for _, town in ipairs(report.towns) do
+        print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, vehicles %s, sites %s; total %s",
+            town.name, hauled(town.listed), hauled(town.cracked), hauled(town.crates), hauled(town.vehicles),
+            hauled(town.sites), hauled(town.total)))
+    end
+    for _, site in ipairs(report.sites) do
+        print(string.format("RELootReport modules at site %s (%s): %s when placed", site.name, site.kind, hauled(site.haul)))
+    end
+    print(string.format("RELootReport modules: sites are placed at %.0f%%; arrow boards per map: %.1f from vehicle zones, %.1f at road works",
+        report.siteChance * 100, report.arrowBoards.zones, report.arrowBoards.roadWorks))
+end
+
 local function reportLoot()
     ticks = ticks + 1
     if ticks < SETTLE_TICKS then
@@ -159,6 +181,7 @@ local function reportLoot()
         print(string.format("RELootReport %s [%s, %d samples]: %s", entry.label, entry.reference, entry.samples,
             #parts > 0 and table.concat(parts, "; ") or "nothing"))
     end
+    reportModules()
     print("RELootReport DONE")
     getCore():quitToDesktop()
 end

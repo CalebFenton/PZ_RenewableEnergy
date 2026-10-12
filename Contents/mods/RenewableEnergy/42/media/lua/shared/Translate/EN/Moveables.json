@@ -3,8 +3,13 @@
     "Wall_Mounted_Solar_Panel": "Wall-Mounted Solar Panel",
     "Ground_Rack_Solar_Panel": "Solar Ground Rack",
     "Solar_Failsafe": "Solar Failsafe",
-    "Battery_Box": "Battery Box",
-    "Battery_Bank": "Battery Bank",
+    "Wooden_Battery_Box": "Wooden Battery Box",
+    "Metal_Battery_Box": "Metal Battery Box",
+    "Wooden_Battery_Rack": "Wooden Battery Rack",
+    "Metal_Battery_Rack": "Metal Battery Rack",
+    "Wooden_Battery_Bank": "Wooden Battery Bank",
+    "Metal_Battery_Bank": "Metal Battery Bank",
     "Solar_Battery_Charger": "Solar Battery Charger",
+    "Solar_Garden_Light": "Solar Garden Light",
     "Solar_Box": "Solar Box"
 }

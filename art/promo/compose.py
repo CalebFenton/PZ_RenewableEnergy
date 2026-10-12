@@ -15,6 +15,7 @@ come from captures/promo.json, which the game wrote in its own words; the stage 
 README's.
 """
 import json
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -31,30 +32,60 @@ PANEL = (36, 39, 46)
 TEXT = (232, 234, 238)
 MUTED = (160, 166, 176)
 SOLAR = (86, 140, 214)
-AMBER = (232, 168, 64)
 STAGE0 = "Stage 0 · Scavenger"
 STAGES12 = "Stages 1 and 2 · RV / Cabin and Homestead"
-# items.png: one row per kind of thing, with its caption.
+BANK_INSET = "The bank, indoors"
+# items.png: one row per kind of thing, with its caption, wrapped at ITEM_COLUMNS.
 ITEM_ROWS = [
-    ("Panels and mounts", ["RenewableEnergy.SolarModule", "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWall",
-                           "RenewableEnergy.SolarRack"]),
-    ("Banks and what goes in them", ["RenewableEnergy.BatteryBox", "RenewableEnergy.BatteryBank",
-                                     "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter",
-                                     "RenewableEnergy.InverterCharger", "RenewableEnergy.ChargeController",
-                                     "RenewableEnergy.SolarFailsafe"]),
-    ("Batteries", ["Base.CarBattery1", "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery"]),
-    ("Gadgets and magazines", ["RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger",
-                               "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2"]),
+    ("Panels and mounts", ["RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule",
+                           "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWallWood",
+                           "RenewableEnergy.SolarWallMetal", "RenewableEnergy.SolarRackWood",
+                           "RenewableEnergy.SolarRackMetal"]),
+    ("Battery storage", ["RenewableEnergy.BatteryBoxWood", "RenewableEnergy.BatteryBoxMetal",
+                         "RenewableEnergy.BatteryRackWood", "RenewableEnergy.BatteryRackMetal",
+                         "RenewableEnergy.BatteryBankWood", "RenewableEnergy.BatteryBankMetal"]),
+    ("Parts", ["RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger",
+               "RenewableEnergy.ChargeController", "RenewableEnergy.SolarFailsafe"]),
+    ("Batteries and what rebuilds them", ["Base.CarBattery1", "RenewableEnergy.DeepCycleBattery",
+                                          "RenewableEnergy.L16Battery", "RenewableEnergy.CarBatteryCase",
+                                          "RenewableEnergy.DeepCycleBatteryCase", "RenewableEnergy.L16BatteryCase",
+                                          "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates",
+                                          "RenewableEnergy.WoodenBatteryPlatePattern",
+                                          "RenewableEnergy.BatteryPlateMoldUnfired", "RenewableEnergy.BatteryPlateMold",
+                                          "RenewableEnergy.BatteryElectrolyte"]),
+    ("Gadgets, cells and magazines", ["RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger",
+                                      "RenewableEnergy.SolarGardenLight", "RenewableEnergy.SolarCells",
+                                      "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2"]),
 ]
-# recipes.png: the recipes by stage. Expanded recipes follow, under their sandbox option.
+ITEM_COLUMNS = 7
+# recipes.png: the recipes by what they're for.
 RECIPE_SECTIONS = [
-    (STAGE0, ["RenewableEnergy_MakeBatteryBox"]),
-    (STAGES12, ["RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal",
-                "RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWall", "RenewableEnergy_MakeSolarRack",
-                "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe"]),
-    ("Moving modules to another mount", ["RenewableEnergy_UnmountSolarFlat", "RenewableEnergy_UnmountSolarWall",
-                                         "RenewableEnergy_UnmountSolarRack"]),
+    ("Battery storage", ["RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
+                         "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal",
+                         "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal"]),
+    ("Panel mounts", ["RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood",
+                      "RenewableEnergy_MakeSolarWallMetal", "RenewableEnergy_MakeSolarRackWood",
+                      "RenewableEnergy_MakeSolarRackMetal"]),
+    ("Moving modules to another mount", ["RenewableEnergy_UnmountSolarFlat", "RenewableEnergy_UnmountSolarWallWood",
+                                         "RenewableEnergy_UnmountSolarWallMetal", "RenewableEnergy_UnmountSolarRackWood",
+                                         "RenewableEnergy_UnmountSolarRackMetal"]),
+    ("Module repair and homemade modules", ["RenewableEnergy_RepairCrackedModule",
+                                            "RenewableEnergy_MakeHomemadeSolarModule"]),
+    ("Taking apart for solar cells", ["RenewableEnergy_TakeApartCalculator", "RenewableEnergy_TakeApartSolarGardenLight",
+                                      "RenewableEnergy_TakeApartSolarCellCharger",
+                                      "RenewableEnergy_TakeApartSolarMaintainer",
+                                      "RenewableEnergy_TakeApartShatteredModule"]),
+    ("Battery care and rebuilding", ["RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery",
+                                     "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery",
+                                     "RenewableEnergy_StripL16Battery", "RenewableEnergy_MakeBatteryPlatePattern",
+                                     "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
+                                     "RenewableEnergy_RecastBatteryPlates", "RenewableEnergy_RebuildCarBattery",
+                                     "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery"]),
+    ("Electronics", ["RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe"]),
 ]
+# The result shown for a recipe whose OnCreate gives it, which no output line names. A recipe that
+# improves an item it keeps shows that item.
+RECIPE_RESULTS = {"RenewableEnergy_RebuildCarBattery": "Base.CarBattery1"}
 
 
 def font(size, weight="Regular"):
@@ -189,7 +220,8 @@ def banner():
 
 
 def setup():
-    """Stage 0 above the homestead, each under its caption."""
+    """Stage 0 above the homestead, each under its caption, with the homestead's bank, which
+    stands indoors behind the wall panels, inset under the homestead's caption."""
     stage0, homestead = full_width("stage0"), full_width("homestead")
     gap = 12
     image = canvas(stage0.height + gap + homestead.height)
@@ -197,6 +229,14 @@ def setup():
     image.alpha_composite(homestead, (0, stage0.height + gap))
     caption(image, (24, 24), STAGE0)
     caption(image, (24, stage0.height + gap + 24), STAGES12)
+    bank = capture("bank")
+    top = stage0.height + gap + 24 + 44 + 16
+    width = min(round(WIDTH * 0.3), round(bank.width * (image.height - top - 24) / bank.height))
+    bank = bank.resize((width, round(bank.height * width / bank.width)), Image.LANCZOS)
+    framed = Image.new("RGBA", (bank.width + 8, bank.height + 8), TEXT + (255,))
+    framed.alpha_composite(bank, (4, 4))
+    paste(image, framed, (24 + framed.width / 2, top + framed.height / 2))
+    caption(image, (36, top + framed.height - 56), BANK_INSET)
     return image
 
 
@@ -219,36 +259,122 @@ def items():
     shown = {key for _, row in ITEM_ROWS for key in map(icon_key, row)}
     missing = set(names) - shown
     assert not missing, f"items.png has no place for {sorted(missing)}"
-    columns = max(len(row) for _, row in ITEM_ROWS)
-    column = (WIDTH - 20) // columns
-    heading, row = 44, 276
-    image = canvas(20 + (heading + row) * len(ITEM_ROWS))
+    column = (WIDTH - 20) // ITEM_COLUMNS
+    heading, row = 44, 248
+    lines = sum(math.ceil(len(full_types) / ITEM_COLUMNS) for _, full_types in ITEM_ROWS)
+    image = canvas(20 + heading * len(ITEM_ROWS) + row * lines)
     top = 20
     for title, full_types in ITEM_ROWS:
         text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
         top += heading
-        left0 = (WIDTH - column * len(full_types)) / 2
-        for c, full_type in enumerate(full_types):
-            key = icon_key(full_type)
-            left = left0 + c * column
-            panel(image, (left + 8, top, left + column - 8, top + row - 16))
-            x = left + column / 2
-            paste(image, icon(key, 128), (x, top + 84))
-            text(image, (x, top + 160), names[key], 18, "SemiBold", anchor="ma", width=column - 30)
-        top += row
+        for start in range(0, len(full_types), ITEM_COLUMNS):
+            line = full_types[start:start + ITEM_COLUMNS]
+            left0 = (WIDTH - column * len(line)) / 2
+            for c, full_type in enumerate(line):
+                key = icon_key(full_type)
+                left = left0 + c * column
+                panel(image, (left + 6, top, left + column - 6, top + row - 12))
+                x = left + column / 2
+                paste(image, icon(key, 96), (x, top + 70))
+                box = text(image, (x, top + 132), names[key], 17, "SemiBold", anchor="ma", width=column - 28)
+                assert box[3] <= top + row - 24, f"{names[key]} runs past its card"
+            top += row
     return image
 
 
-def recipe_slot(base, item, x, top, count=None, keep=False, uses=False):
-    """An item's icon centred on x with its name below, and how many the recipe takes or gives:
-    whole items in a badge, uses of a drainable item and kept tools under the name."""
-    image = icon(item["icon"], 64)
-    paste(base, image, (x, top + 52), shadow=False)
-    if count and count > 1 and not uses:
-        badge(base, (x + 46, top + 14), f"×{count}")
-    box = text(base, (x, top + 92), item["name"], 15, "Medium", TEXT, "ma", width=104)
-    if keep or uses:
-        text(base, (x, box[3] + 3), "kept" if keep else f"{count} uses", 14, "Medium", MUTED, "ma")
+# Recipe cards: the recipe's name, skills, how it's learned and its tools in a column on the left,
+# then a slot per input, an arrow and a slot per result. Cards share a row wherever they fit.
+CARD_H = 192
+CARD_GAP = 12
+CARD_PAD = 16
+NAME_W = 168
+SLOT = 72
+ARROW_W = 30
+ROW_W = WIDTH - 40
+
+
+def unique_names(items):
+    """The items, dropping any whose name an earlier one already shows."""
+    seen, kept = set(), []
+    for item in items:
+        if item["name"] not in seen:
+            seen.add(item["name"])
+            kept.append(item)
+    return kept
+
+
+def alternatives(items):
+    """What else an input line takes instead of its first item: "or Glue", or "or 4 more"."""
+    others = unique_names(items)[1:]
+    if not others:
+        return ""
+    return f"or {others[0]['name']}" if len(others) == 1 else f"or {len(others)} more"
+
+
+def recipe_parts(recipe, items_by_type):
+    """The recipe's tools, by name, and its inputs and results as slots, { item, count, uses,
+    others, fluid, litres }. Tools are what it keeps without working on. Lines that take the same
+    fluid from the same container make one slot, lines that pour a fluid into an empty container
+    are results, and a recipe without an output line shows what it gives back: its RECIPE_RESULTS
+    entry, or the item it keeps and works on."""
+    no_output = not recipe["outputs"] and not any(entry.get("fills") for entry in recipe["inputs"])
+    subject = None
+    if no_output and recipe["id"] not in RECIPE_RESULTS:
+        subject = next((e for e in recipe["inputs"] if e["keep"] and not e["tag"] and not e.get("fluid")), None)
+        assert subject, f"{recipe['id']} has no output and keeps nothing it works on: add it to RECIPE_RESULTS"
+    tools, inputs, results = [], [], []
+    for entry in recipe["inputs"]:
+        fluid = entry.get("fluid") or entry.get("fills")
+        item = entry["items"][0]
+        if fluid:
+            target = results if entry.get("fills") else inputs
+            last = target[-1] if target else None
+            if last and last.get("fluid") == fluid["name"] and last["item"]["icon"] == item["icon"]:
+                last["litres"] += fluid["litres"]
+            else:
+                target.append({"item": item, "fluid": fluid["name"], "litres": fluid["litres"]})
+        elif entry["keep"] and entry is not subject:
+            tools.append(" ".join(filter(None, [item["name"], alternatives(entry["items"])])))
+        else:
+            inputs.append({"item": item, "count": item.get("count") or entry["count"], "uses": entry["uses"],
+                           "others": alternatives(entry["items"])})
+    if no_output:
+        given = RECIPE_RESULTS.get(recipe["id"])
+        results.insert(0, {"item": items_by_type[given] if given else subject["items"][0]})
+    outputs = [{"item": item, "count": item["count"]} for item in recipe["outputs"]]
+    return tools, inputs, outputs + results
+
+
+def slot_caption(slot):
+    """What goes under an item's name: the fluid it holds or the uses of a drainable item it takes,
+    and what else the line takes instead."""
+    words = []
+    if slot.get("fluid"):
+        words.append(f"{slot['litres']:g} L {slot['fluid']}")
+    elif slot.get("uses"):
+        words.append(f"{slot['count']} uses")
+    if slot.get("others"):
+        words.append(slot["others"])
+    return ", ".join(words)
+
+
+def draw_slot(base, slot, x, top):
+    """A slot's icon centred on x with its name below, a badge with how many whole items, and a
+    caption. Returns the bottom of what it drew."""
+    item, count = slot["item"], slot.get("count")
+    paste(base, icon(item["icon"], 64), (x, top + 46), shadow=False)
+    if count and count > 1 and not slot.get("uses"):
+        badge(base, (x + 38, top + 10), f"×{count}")
+    box = text(base, (x, top + 84), item["name"], 13, "Medium", TEXT, "ma", width=SLOT - 6)
+    caption_text = slot_caption(slot)
+    if caption_text:
+        box = text(base, (x, box[3] + 3), caption_text, 12, "Medium", MUTED, "ma", width=SLOT - 4)
+    return box[3]
+
+
+def card_width(parts):
+    _, inputs, results = parts
+    return CARD_PAD + NAME_W + 14 + (len(inputs) + len(results)) * SLOT + ARROW_W + CARD_PAD
 
 
 def learn_line(recipe):
@@ -262,46 +388,72 @@ def learn_line(recipe):
     return "Learn from " + ", or ".join(ways) if learn["magazines"] else "Learn " + ", or ".join(ways)
 
 
-def recipe_card(base, recipe, top, height):
-    panel(base, (20, top, WIDTH - 20, top + height), AMBER if recipe["expanded"] else SOLAR)
-    box = text(base, (46, top + 24), recipe["name"], 22, "Bold", width=250)
+def recipe_card(base, recipe, parts, box):
+    left, top, right, bottom = box
+    panel(base, box, SOLAR)
+    tools, inputs, results = parts
+    x = left + CARD_PAD
+    lines = text(base, (x, top + 16), recipe["name"], 17, "Bold", width=NAME_W)
     skills = "  ·  ".join(f"{s['name']} {s['level']}" for s in recipe["skills"])
-    box = text(base, (46, box[3] + 8), skills, 17, "Medium", MUTED, width=250)
-    text(base, (46, box[3] + 8), learn_line(recipe), 14, "Medium", MUTED, width=250)
-    slot = 112
-    x = 360
-    for entry in recipe["inputs"]:
-        for i, item in enumerate(entry["items"]):
-            if i > 0:
-                text(base, (x - slot / 2, top + 52), "or", 16, "Medium", MUTED, "mm")
-            recipe_slot(base, item, x, top, entry["count"], entry["keep"], entry["uses"])
-            x += slot
-    arrow(base, (x - slot / 2 + 12, top + 52))
-    x += 24
-    for item in recipe["outputs"]:
-        recipe_slot(base, item, x, top, item["count"])
-        x += slot
-    assert x - slot / 2 <= WIDTH - 20, f"{recipe['id']} is too wide for its card"
+    for line, size in [(skills, 13), (learn_line(recipe), 12), ("Tools: " + ", ".join(tools) if tools else "", 12)]:
+        if line:
+            lines = text(base, (x, lines[3] + 6), line, size, "Medium", MUTED, width=NAME_W)
+    lowest = lines[3]
+    x = left + CARD_PAD + NAME_W + 14 + SLOT / 2
+    for slot in inputs:
+        lowest = max(lowest, draw_slot(base, slot, x, top))
+        x += SLOT
+    arrow(base, (x - SLOT / 2 + ARROW_W / 2, top + 46))
+    x += ARROW_W
+    for slot in results:
+        lowest = max(lowest, draw_slot(base, slot, x, top))
+        x += SLOT
+    assert lowest <= bottom - 10, f"{recipe['id']} runs past the bottom of its card"
+    assert x - SLOT / 2 <= right - CARD_PAD + 1, f"{recipe['id']} is too wide for its card"
+
+
+def card_rows(cards):
+    """Packs (recipe, parts, width) cards into rows as wide as the image allows, each into the
+    first row with room for it."""
+    rows = []
+    for card in cards:
+        assert card[2] <= ROW_W, f"{card[0]['id']} is too wide for the image"
+        row = next((row for row in rows if row[1] + CARD_GAP + card[2] <= ROW_W), None)
+        if row:
+            row[0].append(card)
+            row[1] += CARD_GAP + card[2]
+        else:
+            rows.append([[card], card[2]])
+    return [row for row, _ in rows]
 
 
 def recipes():
     by_id = {r["id"]: r for r in PROMO["recipes"]}
-    sections = [(title, [by_id[i] for i in ids]) for title, ids in RECIPE_SECTIONS]
-    expanded = [r for r in PROMO["recipes"] if r["expanded"]]
-    if expanded:
-        sections.append((f"Off by default: turn on {PROMO['strings']['expandedOption']} in the sandbox options", expanded))
-    placed = [r["id"] for _, section in sections for r in section]
+    items_by_type = {item["fullType"]: item for item in PROMO["items"]}
+    placed = [i for _, ids in RECIPE_SECTIONS for i in ids]
     assert sorted(placed) == sorted(by_id), f"recipes.png places {sorted(placed)}, the game has {sorted(by_id)}"
-    card, gap, heading = 172, 12, 60
-    image = canvas(20 + len(placed) * (card + gap) + len(sections) * heading)
+    sections = []
+    for title, ids in RECIPE_SECTIONS:
+        cards = []
+        for i in ids:
+            parts = recipe_parts(by_id[i], items_by_type)
+            cards.append((by_id[i], parts, card_width(parts)))
+        sections.append((title, card_rows(cards)))
+    heading = 52
+    rows = sum(len(section_rows) for _, section_rows in sections)
+    image = canvas(20 + len(sections) * heading + rows * (CARD_H + CARD_GAP))
     top = 20
-    for title, section in sections:
-        expanded_section = section[0]["expanded"]
-        text(image, (46, top + heading / 2), title, 22, "SemiBold", AMBER if expanded_section else MUTED, "lm")
+    for title, section_rows in sections:
+        text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
         top += heading
-        for recipe in section:
-            recipe_card(image, recipe, top, card)
-            top += card + gap
+        for row in section_rows:
+            # The row's spare width goes to its cards evenly, so every row spans the image.
+            spare = (ROW_W - sum(card[2] for card in row) - CARD_GAP * (len(row) - 1)) / len(row)
+            left = 20
+            for recipe, parts, width in row:
+                recipe_card(image, recipe, parts, (left, top, left + width + spare, top + CARD_H))
+                left += width + spare + CARD_GAP
+            top += CARD_H + CARD_GAP
     return image
 
 
@@ -311,4 +463,5 @@ def main():
         save(make(), name)
 
 
-main()
+if __name__ == "__main__":
+    main()

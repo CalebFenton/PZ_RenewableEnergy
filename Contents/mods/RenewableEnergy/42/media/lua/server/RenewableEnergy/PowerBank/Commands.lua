@@ -1,15 +1,21 @@
 -- What players do to banks, run on the authority: from a timed action's complete(), or from
 -- a client's PowerBank.command. Every command checks the world again, since a client's view
--- can be stale or forged.
+-- can be stale or forged. Each returns whether it did anything and, if not, why (a
+-- translation key where the player is told).
 
 if isClient() then return end
 
+require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/BankSystem"
 
-local PowerBank = RenewableEnergy.PowerBank
+local Specs, PowerBank, Wear = RenewableEnergy.Specs, RenewableEnergy.PowerBank, RenewableEnergy.Wear
 
 local Commands = {}
+
+-- Longest name a bank takes.
+local NAME_LENGTH = 32
 
 local function bankAt(position)
     local system = PowerBank.serverSystem
@@ -36,18 +42,36 @@ local function bankOfSource(position)
     return found and bankAt(found)
 end
 
+-- The bank's container, if its chunk is loaded.
+local function containerOf(bank)
+    local isoObject = bank:getIsoObject()
+    return isoObject and isoObject:getContainer()
+end
+
+-- Take `count` items of `fullType` from the character's inventory, bags included.
+local function consume(character, fullType, count)
+    if count <= 0 then return end
+    local items = character:getInventory():getSomeTypeRecurse(fullType, count)
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        local container = item:getContainer()
+        character:removeFromHands(item)
+        container:Remove(item)
+        sendRemoveItemFromContainer(container, item)
+    end
+end
+
+-- The bank looks at itself again after its parts changed.
+local function refreshBank(bank)
+    bank:powerUp()
+    bank:showBatteries()
+    bank:sendStatus()
+end
+
 function Commands.setBankOn(player, args)
     local bank = bankAt(args.bank)
     if not bank then return false, "no bank" end
     bank.on = args.on == true
-    bank:powerUp()
-    bank:sendStatus()
-    return true
-end
-
-function Commands.resetInverter(player, args)
-    local bank = bankAt(args.bank)
-    if not bank then return false, "no bank" end
     bank:powerUp()
     bank:sendStatus()
     return true
@@ -60,6 +84,11 @@ function Commands.connectSource(player, args)
     local x, y, z = source:getX(), source:getY(), source:getZ()
     if not (source:getSquare():isOutside() and PowerBank.isInReach(bank, x, y, z)) then
         return false, "out of reach"
+    end
+    -- The container is the truth about the controllers, whatever filled it since the last pass.
+    bank:recount()
+    if #bank.sources >= bank:panelSlots() then
+        return false, "Tooltip_RenewableEnergy_NoPanelSlot"
     end
     -- A panel feeds one bank.
     local previous = bankOfSource(args.source)
@@ -90,44 +119,76 @@ function Commands.clearSnow(player, args)
     return true
 end
 
-function Commands.connectVehicle(player, args)
+--- Wire the part `itemId` from the player's inventory into the bank. The bank's container
+--- filter refuses every transfer, so the part is moved here, past it.
+function Commands.wireIn(player, args)
     local bank = bankAt(args.bank)
-    if not bank then return false, "no bank" end
-    local id = args.vehicle
-    if type(id) ~= "number" then return false, "no vehicle" end
-    -- getVehicleById knows vehicles only on a server (BaseVehicle.createPhysics).
-    local vehicle = getVehicleById(id) or bank:findVehicle(function(candidate) return candidate:getId() == id end)
-    if not vehicle then return false, "no vehicle" end
-    if bank.vehicle then return false, "already connected" end
-    if not PowerBank.vehicleInReach(bank:position(), vehicle) then return false, "out of reach" end
-    local wire = PowerBank.findVehicleWire(player)
-    if not wire then return false, "no wire" end
-    for i = 0, wire:size() - 1 do
-        local item = wire:get(i)
-        local container = item:getContainer()
-        container:Remove(item)
-        sendRemoveItemFromContainer(container, item)
+    local container = bank and containerOf(bank)
+    if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
+    local item = player:getInventory():getItemWithIDRecursiv(args.itemId)
+    local refusal = PowerBank.wiringRefusal(player, bank:getIsoObject(), item)
+    if refusal then return false, refusal end
+    local wiring = PowerBank.wiringFor(item:getFullType())
+    consume(player, PowerBank.WIRE, wiring.wire)
+    consume(player, PowerBank.SCRAP, wiring.scrap)
+    local from = item:getContainer()
+    player:removeFromHands(item)
+    from:Remove(item)
+    sendRemoveItemFromContainer(from, item)
+    container:AddItem(item)
+    sendAddItemToContainer(container, item)
+    local data = item:getModData()
+    if not data[PowerBank.WIRED_ONCE] then
+        data[PowerBank.WIRED_ONCE] = true
+        addXp(player, Perks.Electricity, wiring.xp)
     end
-    local script = vehicle:getScript()
-    bank.vehicle = {
-        sqlId = vehicle:getSqlId(), id = vehicle:getId(),
-        name = script:getCarModelName() or script:getName(),
-    }
-    bank:sendStatus()
+    refreshBank(bank)
     return true
 end
 
-function Commands.disconnectVehicle(player, args)
+--- Unwire the part `itemId` from the bank: the player gets it back with its wire.
+function Commands.unwire(player, args)
     local bank = bankAt(args.bank)
-    if not (bank and bank.vehicle) then return false, "not connected" end
-    if player then
-        for _ = 1, PowerBank.VEHICLE_WIRE_COUNT do
-            Actions.addOrDropItem(player, instanceItem(PowerBank.VEHICLE_WIRE))
-        end
-        bank.vehicle = false
-    else
-        bank:dropVehicleWire()
+    local container = bank and containerOf(bank)
+    if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
+    local item = container:getItemWithID(args.itemId)
+    local wiring = item and PowerBank.wiringFor(item:getFullType())
+    if not wiring then return false, "Tooltip_RenewableEnergy_NotAPart" end
+    if player:tooDarkToRead() then return false, "Tooltip_RenewableEnergy_TooDark" end
+    -- The battery leaves with the bank's shared charge.
+    bank:writeBatteries(container, false)
+    container:Remove(item)
+    sendRemoveItemFromContainer(container, item)
+    Actions.addOrDropItem(player, item)
+    for _ = 1, wiring.wire do
+        Actions.addOrDropItem(player, instanceItem(PowerBank.WIRE))
     end
+    refreshBank(bank)
+    return true
+end
+
+--- Repair the inverter or controller `itemId` in the bank with one Electronics Scrap.
+function Commands.repairPart(player, args)
+    local bank = bankAt(args.bank)
+    local container = bank and containerOf(bank)
+    if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
+    local item = container:getItemWithID(args.itemId)
+    local refusal = PowerBank.repairRefusal(player, item)
+    if refusal then return false, refusal end
+    consume(player, PowerBank.SCRAP, 1)
+    Wear.setCondition(item, item:getCondition() + Specs.partRepair.condition)
+    sendItemStats(item)
+    addXp(player, Perks.Electricity, Specs.partRepair.xp)
+    refreshBank(bank)
+    return true
+end
+
+--- Name the bank; an empty name gives it back its tier's name.
+function Commands.rename(player, args)
+    local bank = bankAt(args.bank)
+    if not (bank and type(args.name) == "string") then return false, "no bank" end
+    local name = args.name:gsub("^%s+", ""):gsub("%s+$", ""):sub(1, NAME_LENGTH)
+    bank.name = name ~= "" and name or nil
     bank:sendStatus()
     return true
 end

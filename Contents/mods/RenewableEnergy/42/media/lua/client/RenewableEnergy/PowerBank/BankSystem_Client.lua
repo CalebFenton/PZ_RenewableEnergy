@@ -8,10 +8,9 @@
 
 require "Map/CGlobalObjectSystem"
 require "Map/CGlobalObject"
-require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 
-local Sprites, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.PowerBank
+local PowerBank = RenewableEnergy.PowerBank
 
 local ACCEPT_ITEM = "RenewableEnergy.PowerBank.acceptItem"
 
@@ -67,7 +66,7 @@ end
 
 CGlobalObjectSystem.RegisterSystemClass(BankSystem)
 
---- Send command `name` to the server (single player too). See the Core API.
+--- Send command `name` to the server (single player too). See Commands.lua.
 function PowerBank.command(player, name, args)
     if BankSystem.instance then
         BankSystem.instance:sendCommand(player, name, args)
@@ -80,7 +79,7 @@ function PowerBank.addStatusListener(listener)
 end
 
 if isClient() then
-    for _, name in ipairs({ Sprites.batteryBox, Sprites.batteryBank }) do
+    for _, name in ipairs(PowerBank.bankSprites()) do
         MapObjects.OnLoadWithSprite(name, adoptCopy, 6)
     end
 end

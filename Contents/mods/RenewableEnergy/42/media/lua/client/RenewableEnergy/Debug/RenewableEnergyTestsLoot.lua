@@ -404,8 +404,12 @@ test("renewable_energy_loot_found_batteries_part_charged", {
 -- Containers the player owns -----------------------------------------------------------------------
 
 local OWN_CONTAINERS = {
-    { sprite = "batteryBox", type = "RenewableEnergyBatteryBox" },
-    { sprite = "batteryBank", type = "RenewableEnergyBatteryBank" },
+    { sprite = "batteryBoxWood", type = "RenewableEnergyBatteryBoxWood" },
+    { sprite = "batteryBoxMetal", type = "RenewableEnergyBatteryBoxMetal" },
+    { sprite = "batteryRackWood", type = "RenewableEnergyBatteryRackWood" },
+    { sprite = "batteryRackMetal", type = "RenewableEnergyBatteryRackMetal" },
+    { sprite = "batteryBankWood", type = "RenewableEnergyBatteryBankWood" },
+    { sprite = "batteryBankMetal", type = "RenewableEnergyBatteryBankMetal" },
     { sprite = "cellCharger", type = "RenewableEnergyCellCharger" },
     { sprite = "crate", type = "RenewableEnergySolarBox" },
 }

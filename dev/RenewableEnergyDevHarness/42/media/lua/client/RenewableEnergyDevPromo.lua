@@ -1,16 +1,20 @@
 -- Development only; dev/run-debug-client.sh --promo runs it instead of the tests. It builds two
--- working setups near the scenario start at a clear noon, a homestead bank against a house and a
--- stage-0 battery box on open ground, and saves the raw art that art/promo/compose.py lays out
--- for the README and the Workshop page: screenshots named promo_<shot>.png in
--- <cachedir>/Screenshots, and <cachedir>/Lua/REPromo.json, which names the regions of every
--- screenshot and holds the item, recipe and skill names in the game's language.
+-- working setups near the scenario start at a clear noon, a homestead (a metal battery bank
+-- indoors against an outside wall, wall panels on that wall, racks, flat panels and a backup
+-- generator in the yard) and a stage-0 wooden battery box indoors by a window with its panels
+-- outside, and saves the raw art that art/promo/compose.py lays out for the README and the
+-- Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
+-- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
+-- recipe and skill names in the game's language.
 -- Shots of anything but the world are taken twice, on black (promo_<shot>_k.png) and on white
 -- (promo_<shot>_w.png), so that art/promo/extract.py can recover how transparent each pixel is.
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
+require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/RenewableEnergyMenu"
 require "RenewableEnergy/UI/RenewableEnergyStatusWindow"
 
@@ -29,54 +33,71 @@ local SEARCH_RADIUS = 40
 -- The banks charge through the morning, so the window shows a day's figures at noon.
 local MORNING, NOON = 8, 12
 -- Inputs that take any item with a tag show this one.
-local PREFER = { "Base.Hammer", "Base.Screwdriver", "Base.Pliers", "Base.Wrench", "Base.HandDrill", "Base.WeldingMask" }
+local PREFER = { "Base.Hammer", "Base.Screwdriver", "Base.Pliers", "Base.Wrench", "Base.HandDrill", "Base.WeldingMask",
+    "Base.Saw", "Base.Matches", "Base.Charcoal" }
+-- A recipe line that takes or fills any fluid container shows this one, by the fluid's type.
+local FLUID_CONTAINERS = { Acid = "RenewableEnergy.BatteryElectrolyte", Water = "Base.WaterBottle" }
 local MAGAZINES = { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2" }
 -- Banks take vanilla car batteries as they are, so the item sheet shows one.
 local VANILLA_ITEMS = { "Base.CarBattery1" }
 
--- The homestead: a battery bank against a building wall with open ground in front of it, in
--- either direction the camera sees the outside of: the north edge of a square south of a
--- building (preferred: the wall panels face south), or the west edge of one east of it.
--- `along` runs along the wall and `out` away from it; panels face `out`.
+-- Both setups stand at an outside wall that the camera sees: the north edge of a square south of
+-- a building (preferred: wall panels face south), or the west edge of one east of it. Positions
+-- are (along, out) from the square outside the wall: `along` runs along the wall, `out` away
+-- from it, so out -1 is indoors; panels face `out`.
 local SITES = {
     { wallNorth = true, along = { 1, 0 }, out = { 0, 1 }, facing = "S" },
     { wallNorth = false, along = { 0, 1 }, out = { 1, 0 }, facing = "E" },
 }
--- Where everything goes, as (along, out) from the bank's square. The character stands beside the
--- last wall panel, where nothing is behind them, and the backup generator in front of the bank.
+-- The homestead. Banks stand indoors, so the bank is behind the wall the wall panels hang on, out
+-- of the yard shots; the character stands beside it for a shot of its own. Outdoors, the character
+-- stands beside the last wall panel, where nothing is behind them, and the backup generator is
+-- within a failsafe's reach of the bank.
 local HOMESTEAD = {
+    bank = { 0, -1 },
+    indoors = { 1, -1 },
     generator = { -1, 1 },
-    bank = { 0, 0 },
-    wallPanels = { { 1, 0 }, { 2, 0 } },
+    wallPanels = { { 0, 0, "wood" }, { 1, 0, "wood" }, { 2, 0, "metal" } },
     player = { 3, 1 },
-    racks = { { -1, 3 }, { 0, 3 }, { 1, 3 }, { 2, 3 } },
+    racks = { { -1, 3, "wood" }, { 0, 3, "wood" }, { 1, 3, "metal" }, { 2, 3, "metal" } },
     flatPanels = { { 0, 5 }, { 1, 5 }, { 2, 5 }, { 3, 5 } },
     -- Where the character looks around first, out in the yard the shots also show.
     scouts = { { -4, 3 }, { -3, 8 }, { 2, 9 } },
 }
--- The ground that must be clear (grass and weeds are cleared), and the squares against the wall.
+-- The ground that must be clear (grass and weeds are cleared), and the plain wall the wall panels
+-- hang on.
 local OPEN = { along = { -1, 4 }, out = { 1, 5 } }
 local AT_WALL = { 0, 2 }
+-- The rack with a cracked module, wired in early so that its row shows in the status window.
+local CRACKED_RACK = 1
+local CRACKED_CONDITION = 30
+local MODULE = "RenewableEnergy.SolarModule"
 local HOMESTEAD_BANK = {
     "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery",
     "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery",
     "RenewableEnergy.InverterCharger", "RenewableEnergy.ChargeController", "RenewableEnergy.ChargeController",
+    "Base.CarBatteryCharger",
 }
+-- Lights switched on in the homestead's building, nearest the bank first, so that the status
+-- window lists what the bank powers.
+local HOUSE_LIGHTS = 3
+local LIGHT_SEARCH = 10
 local MORNING_CHARGE = 0.55
 
--- Stage 0, in a yard away from the homestead: squares east and south of the lot's north-west
--- corner. The lot is grass with a free square all round, since anything that blocks the
--- character's sight draws the ground behind it dark.
+-- Stage 0, at another building: a battery box indoors beside a window, the character at the
+-- window, and the panels, a solar battery charger and a garden light outside in their sight.
+-- Positions are (along, out) from the square outside the window, as the homestead's.
 local STAGE0 = {
-    area = { w = 7, h = 7 },
-    box = { 2, 2 },
-    flatPanel = { 3, 1 },
-    cellCharger = { 3, 3 },
-    -- Beside the box rather than in front of it.
-    player = { 1, 2 },
+    box = { 1, -1 },
+    player = { 0, -1 },
+    flatPanels = { { 0, 1 }, { 1, 2 } },
+    cellCharger = { -1, 1 },
+    gardenLight = { 2, 1 },
+    -- Where the character looks around first, among the panels.
+    scout = { 0, 2 },
+    open = { along = { -1, 2 }, out = { 1, 2 } },
 }
-local NATURAL_FLOOR = "^blends_natural"
-local STAGE0_BOX = { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" }
+local STAGE0_BOX = { "Base.CarBattery1", "Base.CarBattery1", "RenewableEnergy.PlugInInverter", "Base.CarBatteryCharger" }
 local STAGE0_DISTANCE = 12
 local CELL_BATTERIES = 4
 
@@ -276,10 +297,18 @@ local function pickInputItem(possible)
     return possible:get(0):getFullName()
 end
 
--- One input line: the items it names (every one, as alternatives), or for a tag the preferred
--- item that carries it.
+-- The fluid of a recipe line's fluid part and the litres it takes or gives: { name, litres }, and
+-- the fluid's type.
+local function fluidEntry(fluid, litres)
+    return { name = fluid:getTranslatedName(), litres = litres }, fluid:getFluidTypeString()
+end
+
+-- One input line: the items it names (every one, as alternatives, with what each takes), or for
+-- a tag or any item the preferred one. A line that takes a fluid from a container (`fluid`), or
+-- pours one into an empty container the player keeps (`fills`), says which and how much; `tag`
+-- marks a line whose item only stands for the many it takes.
 local function inputEntry(input)
-    local names = {}
+    local names, counts = {}, {}
     local listed = input:getItems()
     for i = 0, listed:size() - 1 do
         local fullType = listed:get(i)
@@ -287,20 +316,31 @@ local function inputEntry(input)
             fullType = "Base." .. fullType
         end
         table.insert(names, fullType)
+        table.insert(counts, input:getIntAmount(i))
+    end
+    local entry = { items = {}, count = input:getIntAmount(), keep = input:isKeep(), tag = #names == 0 }
+    local fluidType
+    if input:hasConsumeFromItem() then
+        local consume = input:getConsumeFromItemScript()
+        local fluids = consume:getPossibleInputFluids()
+        if fluids:size() > 0 then
+            entry.fluid, fluidType = fluidEntry(fluids:get(0), consume:getAmount())
+        end
+    elseif input:hasCreateToItem() then
+        local create = input:getCreateToItemScript()
+        if create:getFluid() then
+            entry.fills, fluidType = fluidEntry(create:getFluid(), create:getAmount())
+        end
     end
     if #names == 0 then
-        names = { pickInputItem(input:getPossibleInputItems()) }
+        names = { FLUID_CONTAINERS[fluidType] or pickInputItem(input:getPossibleInputItems()) }
+        counts = { entry.count }
     end
     local first = getScriptManager():getItem(names[1])
-    local entry = {
-        items = {},
-        count = input:getIntAmount(),
-        keep = input:isKeep(),
-        -- A drainable input counts uses unless it says ItemCount.
-        uses = first:isItemType(ItemType.DRAINABLE) and not input:isItemCount(),
-    }
-    for _, fullType in ipairs(names) do
-        table.insert(entry.items, itemEntry(fullType))
+    -- A drainable input counts uses unless it says ItemCount.
+    entry.uses = first:isItemType(ItemType.DRAINABLE) and not input:isItemCount()
+    for i, fullType in ipairs(names) do
+        table.insert(entry.items, itemEntry(fullType, counts[i]))
     end
     return entry
 end
@@ -333,8 +373,6 @@ local function recipeEntry(name)
     local entry = {
         id = name,
         name = getRecipeDisplayName(name),
-        -- Expanded recipes are listed only while their sandbox option is on.
-        expanded = recipe:getOnAddToMenu() ~= nil,
         skills = skillList(recipe:getRequiredSkillCount(), function(i) return recipe:getRequiredSkill(i) end),
         learn = {
             needed = recipe:needToBeLearn(),
@@ -492,15 +530,37 @@ local function isAtWall(site, origin, along, plain)
     return not plain or (square:getDoorOrWindow(site.wallNorth) == nil and square:getGarageDoor(site.wallNorth) == nil)
 end
 
-local function fits(site, origin, player)
-    for along = AT_WALL[1], AT_WALL[2] do
-        -- The bank may stand in front of any wall; the wall panels hang beside it.
-        if not isAtWall(site, origin, along, along ~= HOMESTEAD.bank[1]) then
-            return false
+-- Whether the outside wall at `along` has a window into a room.
+local function hasWindow(site, origin, along)
+    local square, inside = siteSquare(site, origin, along, 0), siteSquare(site, origin, along, -1)
+    return square ~= nil and inside ~= nil and inside:getRoom() ~= nil and square:isOutside()
+        and instanceof(square:getDoorOrWindow(site.wallNorth), "IsoWindow")
+end
+
+local function hasContainerOrGenerator(square)
+    local objects = square:getObjects()
+    for i = 0, objects:size() - 1 do
+        local object = objects:get(i)
+        if object:getContainer() or instanceof(object, "IsoGenerator") or RenewableEnergy.PowerBank.sourceKind(object) then
+            return true
         end
     end
-    for along = OPEN.along[1], OPEN.along[2] do
-        for out = OPEN.out[1], OPEN.out[2] do
+    return false
+end
+
+-- Indoors where a bank may stand, with nothing in the way, as the tests find one.
+local function isFreeIndoors(square)
+    return square ~= nil and RenewableEnergy.PowerBank.canPlaceBank(square) and square:isFree(false)
+        and square:getVehicleContainer() == nil and not hasContainerOrGenerator(square)
+end
+
+local function isFreeIndoorsAt(site, origin, position)
+    return isFreeIndoors(siteSquare(site, origin, position[1], position[2]))
+end
+
+local function isOpenArea(site, origin, player, area)
+    for along = area.along[1], area.along[2] do
+        for out = area.out[1], area.out[2] do
             if not isOpen(siteSquare(site, origin, along, out), player) then
                 return false
             end
@@ -509,22 +569,50 @@ local function fits(site, origin, player)
     return true
 end
 
--- The closest place to the character that takes the whole homestead, facing south if any does.
-local function findSite(player)
+local function fits(site, origin, player)
+    for along = AT_WALL[1], AT_WALL[2] do
+        if not isAtWall(site, origin, along, true) then
+            return false
+        end
+    end
+    return isFreeIndoorsAt(site, origin, HOMESTEAD.bank) and isFreeIndoorsAt(site, origin, HOMESTEAD.indoors)
+        and isOpenArea(site, origin, player, OPEN)
+end
+
+-- At a window if `needWindow`, else at any outside wall.
+local function fitsStage0(site, origin, player, needWindow)
+    local window = hasWindow(site, origin, 0)
+    if (needWindow and not window) or not (window or isAtWall(site, origin, 0, false)) then
+        return false
+    end
+    return isFreeIndoorsAt(site, origin, STAGE0.box) and isFreeIndoorsAt(site, origin, STAGE0.player)
+        and isOpenArea(site, origin, player, STAGE0.open)
+end
+
+-- The square closest to the character for which `accepts(origin)` holds, or nil.
+local function closest(player, accepts)
     local here = player:getCurrentSquare()
-    for _, site in ipairs(SITES) do
-        local best, bestDistance
-        for dx = -SEARCH_RADIUS, SEARCH_RADIUS do
-            for dy = -SEARCH_RADIUS, SEARCH_RADIUS do
-                local distance = dx * dx + dy * dy
-                if not bestDistance or distance < bestDistance then
-                    local origin = getCell():getGridSquare(here:getX() + dx, here:getY() + dy, here:getZ())
-                    if origin and fits(site, origin, player) then
-                        best, bestDistance = origin, distance
-                    end
+    local best, bestDistance
+    for dx = -SEARCH_RADIUS, SEARCH_RADIUS do
+        for dy = -SEARCH_RADIUS, SEARCH_RADIUS do
+            local distance = dx * dx + dy * dy
+            if not bestDistance or distance < bestDistance then
+                local origin = getCell():getGridSquare(here:getX() + dx, here:getY() + dy, here:getZ())
+                if origin and accepts(origin) then
+                    best, bestDistance = origin, distance
                 end
             end
         end
+    end
+    return best
+end
+
+-- The closest place to the character that takes the whole homestead, facing south if any does.
+local function findSite(player)
+    for _, site in ipairs(SITES) do
+        local best = closest(player, function(origin)
+            return fits(site, origin, player)
+        end)
         if best then
             return site, best
         end
@@ -532,35 +620,21 @@ local function findSite(player)
     return nil
 end
 
--- The north-west corner of the closest grass lot for stage 0 that is clear of the homestead.
-local function findLot(player, homestead)
-    local here = player:getCurrentSquare()
-    local best, bestDistance
-    local function isGrass(square)
-        local floor = isOpen(square, player) and square:getFloor()
-        return floor and string.find(floor:getSprite():getName() or "", NATURAL_FLOOR) ~= nil
-    end
-    local function lotFits(cornerX, cornerY, z)
-        for x = cornerX, cornerX + STAGE0.area.w - 1 do
-            for y = cornerY, cornerY + STAGE0.area.h - 1 do
-                if not isGrass(getCell():getGridSquare(x, y, z)) then
-                    return false
-                end
-            end
-        end
-        return true
-    end
-    for dx = -SEARCH_RADIUS, SEARCH_RADIUS do
-        for dy = -SEARCH_RADIUS, SEARCH_RADIUS do
-            local x, y = here:getX() + dx, here:getY() + dy
-            local distance = dx * dx + dy * dy
-            local clear = math.abs(x - homestead:getX()) >= STAGE0_DISTANCE or math.abs(y - homestead:getY()) >= STAGE0_DISTANCE
-            if clear and (not bestDistance or distance < bestDistance) and lotFits(x, y, here:getZ()) then
-                best, bestDistance = getCell():getGridSquare(x, y, here:getZ()), distance
+-- The closest place for stage 0 clear of the homestead: at a window if any, facing south first.
+local function findStage0(player, homestead)
+    for _, needWindow in ipairs({ true, false }) do
+        for _, site in ipairs(SITES) do
+            local best = closest(player, function(origin)
+                local clear = math.abs(origin:getX() - homestead:getX()) >= STAGE0_DISTANCE
+                    or math.abs(origin:getY() - homestead:getY()) >= STAGE0_DISTANCE
+                return clear and fitsStage0(site, origin, player, needWindow)
+            end)
+            if best then
+                return site, best, needWindow
             end
         end
     end
-    return best
+    return nil
 end
 
 local function removeTrees(center)
@@ -575,13 +649,20 @@ local function removeTrees(center)
     end
 end
 
-local function placeTile(square, spriteName)
+-- A placed tile, as the tests place one. A panel mount holds `modules` (a PowerBank.MODULES list),
+-- or without them whole factory modules.
+local function placeTile(square, spriteName, modules)
     local object = IsoObject.new(square, spriteName, spriteName)
+    if modules then
+        object:getModData()[RenewableEnergy.PowerBank.MODULES] = modules
+    end
     square:AddTileObject(object)
     square:RecalcAllWithNeighbours(true)
     return object
 end
 
+-- Puts the parts straight into the bank's container, as world spawns stock a bank, then has the
+-- bank count them.
 local function fillBank(bank, items, charge)
     local container = bank:getContainer()
     for _, fullType in ipairs(items) do
@@ -609,15 +690,39 @@ local function clearWeather()
     end
 end
 
-local site, origin, lot
+-- Switches on lights in the building around `square`, nearest first. They draw on the bank,
+-- which is the only power with the grid off.
+local function switchOnLights(square)
+    local building = square:getBuilding()
+    local switched = 0
+    for radius = 0, LIGHT_SEARCH do
+        for dx = -radius, radius do
+            for dy = -radius, radius do
+                local near = math.max(math.abs(dx), math.abs(dy)) == radius
+                    and getCell():getGridSquare(square:getX() + dx, square:getY() + dy, square:getZ())
+                local objects = near and building and near:getBuilding() == building and near:getObjects()
+                for i = 0, (objects and objects:size() or 0) - 1 do
+                    local object = objects:get(i)
+                    if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and not object:isActivated()
+                        and object:setActive(true, false, true) then
+                        switched = switched + 1
+                    end
+                end
+            end
+        end
+    end
+    print("REPromo switched on " .. switched .. " lights")
+end
+
+local site, origin, stage0Site, stage0Origin
 local homesteadBank, stage0Box
 
 local function at(position)
     return siteSquare(site, origin, position[1], position[2])
 end
 
-local function onLot(position)
-    return getCell():getGridSquare(lot:getX() + position[1], lot:getY() + position[2], lot:getZ())
+local function atStage0(position)
+    return siteSquare(stage0Site, stage0Origin, position[1], position[2])
 end
 
 local function buildHomestead()
@@ -626,36 +731,41 @@ local function buildHomestead()
             clearGroundCover(at({ along, out }))
         end
     end
-    homesteadBank = RenewableEnergy.PowerBank.place(at(HOMESTEAD.bank), Sprites.batteryBank, -1)
+    homesteadBank = RenewableEnergy.PowerBank.place(at(HOMESTEAD.bank), Sprites.batteryBankMetal, -1)
     fillBank(homesteadBank, HOMESTEAD_BANK, MORNING_CHARGE)
     for _, spot in ipairs(HOMESTEAD.wallPanels) do
-        connect(homesteadBank, placeTile(at(spot), Sprites.wall[site.facing]))
+        connect(homesteadBank, placeTile(at(spot), Sprites.wall[spot[3]][site.facing]))
     end
-    for _, spot in ipairs(HOMESTEAD.racks) do
-        connect(homesteadBank, placeTile(at(spot), Sprites.rack[site.facing]))
+    for i, spot in ipairs(HOMESTEAD.racks) do
+        local modules = i == CRACKED_RACK
+            and { { type = MODULE, condition = CRACKED_CONDITION }, { type = MODULE, condition = 100 } } or nil
+        connect(homesteadBank, placeTile(at(spot), Sprites.rack[spot[3]][site.facing], modules))
     end
     for _, spot in ipairs(HOMESTEAD.flatPanels) do
         connect(homesteadBank, placeTile(at(spot), Sprites.flat))
     end
-    -- A backup generator with a failsafe beside the bank, plugged in and waiting.
+    -- A backup generator with a failsafe outside the bank's wall, plugged in and waiting.
     local generatorSquare = at(HOMESTEAD.generator)
     local generator = IsoGenerator.new(instanceItem("Base.Generator"), getCell(), generatorSquare)
     generator:setConnected(true)
     generator:setFuel(generator:getMaxFuel() * 0.7)
     placeTile(generatorSquare, Sprites.failsafe)
     perform("setBankOn", { bank = position(homesteadBank), on = true })
+    switchOnLights(homesteadBank:getSquare())
 end
 
 local function buildStage0()
-    for x = 0, STAGE0.area.w - 1 do
-        for y = 0, STAGE0.area.h - 1 do
-            clearGroundCover(onLot({ x, y }))
+    for along = STAGE0.open.along[1], STAGE0.open.along[2] do
+        for out = STAGE0.open.out[1], STAGE0.open.out[2] do
+            clearGroundCover(atStage0({ along, out }))
         end
     end
-    stage0Box = RenewableEnergy.PowerBank.place(onLot(STAGE0.box), Sprites.batteryBox, -1)
+    stage0Box = RenewableEnergy.PowerBank.place(atStage0(STAGE0.box), Sprites.batteryBoxWood, -1)
     fillBank(stage0Box, STAGE0_BOX, MORNING_CHARGE)
-    connect(stage0Box, placeTile(onLot(STAGE0.flatPanel), Sprites.flat))
-    local charger = placeTile(onLot(STAGE0.cellCharger), Sprites.cellCharger)
+    for _, spot in ipairs(STAGE0.flatPanels) do
+        connect(stage0Box, placeTile(atStage0(spot), Sprites.flat))
+    end
+    local charger = placeTile(atStage0(STAGE0.cellCharger), Sprites.cellCharger)
     if not charger:getContainer() then
         charger:createContainersFromSpriteProperties()
     end
@@ -663,6 +773,9 @@ local function buildStage0()
         local battery = charger:getContainer():AddItem(RenewableEnergy.SolarCellCharger.BATTERY)
         battery:setCurrentUsesFloat(0.5)
     end
+    -- Set out the way garden light spawns set one out, charged and unlit by day.
+    RenewableEnergy.WorldSpawns.placeMoveable(atStage0(STAGE0.gardenLight), Sprites.gardenLight.off,
+        { [RenewableEnergy.SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh })
     perform("setBankOn", { bank = position(stage0Box), on = true })
 end
 
@@ -704,8 +817,9 @@ local function screenBox(squares)
     return box
 end
 
+-- What the yard shots show; the bank stands indoors behind the wall, out of them.
 local function homesteadSquares()
-    local squares = { at(HOMESTEAD.generator), at(HOMESTEAD.bank), at(HOMESTEAD.player) }
+    local squares = { at(HOMESTEAD.generator), at(HOMESTEAD.player) }
     for _, list in ipairs({ HOMESTEAD.wallPanels, HOMESTEAD.racks, HOMESTEAD.flatPanels }) do
         for _, spot in ipairs(list) do
             table.insert(squares, at(spot))
@@ -714,10 +828,14 @@ local function homesteadSquares()
     return squares
 end
 
+local function bankSquares()
+    return { at(HOMESTEAD.bank), at(HOMESTEAD.indoors) }
+end
+
 local function stage0Squares()
-    local squares = {}
-    for _, key in ipairs({ "box", "flatPanel", "cellCharger", "player" }) do
-        table.insert(squares, onLot(STAGE0[key]))
+    local squares = { atStage0(STAGE0.box), atStage0(STAGE0.player), atStage0(STAGE0.cellCharger), atStage0(STAGE0.gardenLight) }
+    for _, spot in ipairs(STAGE0.flatPanels) do
+        table.insert(squares, atStage0(spot))
     end
     return squares
 end
@@ -743,6 +861,15 @@ end
 local function centred(name, squares)
     local box = screenBox(squares)
     return worldRegion(name, (box.left + box.right - WORLD_W) / 2, box)
+end
+
+-- Just `squares`, for an inset.
+local function cropped(name, squares)
+    local box = screenBox(squares)
+    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
+    local left, top = math.max(0, box.left - CROP_MARGIN), math.max(0, box.top - CROP_MARGIN)
+    local right, bottom = math.min(screenW, box.right + CROP_MARGIN), math.min(screenH, box.bottom + CROP_MARGIN)
+    return region(name, left, top, right - left, bottom - top)
 end
 
 -- Has the character look around from each of `squares` and stay on the last, since squares they
@@ -783,13 +910,13 @@ local function addWorld()
         clearWeather()
         getGameTime():setTimeOfDay(MORNING)
         removeTrees(origin)
-        removeTrees(lot)
+        removeTrees(stage0Origin)
         buildHomestead()
         buildStage0()
         chargeThroughMorning()
         return 30
     end)
-    -- A step out from the closest zoom, which leaves too little of the house around the bank.
+    -- A step out from the closest zoom, which leaves too little of the house around the panels.
     local scouts = {}
     for _, spot in ipairs(HOMESTEAD.scouts) do
         local square = at(spot)
@@ -810,8 +937,14 @@ local function addWorld()
     addOpaque("world", function()
         return { rightAligned("world", homesteadSquares()) }
     end)
-    -- Stage 0 is small, so it gets the closest zoom.
-    goTo({ onLot(STAGE0.player) }, 0)
+    -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
+    goTo({ at(HOMESTEAD.indoors) }, 0)
+    addOpaque("bank", function()
+        return { cropped("bank", bankSquares()) }
+    end)
+    -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
+    -- among them, then from the window.
+    goTo({ atStage0(STAGE0.scout), atStage0(STAGE0.player) }, 0)
     addOpaque("stage0", function()
         return { centred("stage0", stage0Squares()) }
     end)
@@ -840,17 +973,21 @@ end
 function RenewableEnergyDevPromo.capture(onDone)
     print("REPromo START")
     local player = getPlayer()
+    local atWindow
     site, origin = findSite(player)
-    lot = site and findLot(player, origin)
-    if not (site and lot) then
+    if site then
+        stage0Site, stage0Origin, atWindow = findStage0(player, origin)
+    end
+    if not (site and stage0Site) then
         -- Without "REPromo DONE", run-debug-client.sh reports the run as failed.
-        print("REPromo FAIL: within " .. SEARCH_RADIUS .. " squares, no "
-            .. (site and "grass lot for stage 0" or "open ground against a plain building wall"))
+        print("REPromo FAIL: within " .. SEARCH_RADIUS .. " squares, no " .. (site
+            and "outside wall with free floor indoors behind it and open ground in front, for stage 0"
+            or "plain building wall with free floor indoors behind it and open ground in front"))
         getCore():quitToDesktop()
         return
     end
-    print(string.format("REPromo homestead %d,%d facing %s; stage 0 at %d,%d", origin:getX(), origin:getY(), site.facing,
-        lot:getX(), lot:getY()))
+    print(string.format("REPromo homestead %d,%d facing %s; stage 0 %d,%d facing %s, %s", origin:getX(), origin:getY(),
+        site.facing, stage0Origin:getX(), stage0Origin:getY(), stage0Site.facing, atWindow and "at a window" or "at a wall"))
     -- Hides the HUD, the debug console and every other window; the shots add their own.
     ISUIHandler.setVisibleAllUI(false)
     local data = { items = itemsList(), recipes = {} }
@@ -858,16 +995,26 @@ function RenewableEnergyDevPromo.capture(onDone)
         table.insert(data.recipes, recipeEntry(name))
     end
     data.strings = {
-        expandedOption = getText("Sandbox_RenewableEnergy_enableExpandedRecipes"),
         modName = getText("Sandbox_RenewableEnergy"),
     }
     addWorld()
     addStatus()
     addIcons()
     runSteps(function()
-        local status = RenewableEnergy.PowerBank.getStatus(homesteadBank:getX(), homesteadBank:getY(), homesteadBank:getZ())
-        print(string.format("REPromo homestead bank: %.0f W in, %.0f W load, %.0f%% charged, inverter %s", status.inW,
-            status.loadW, status.charge * 100, status.inverter.state))
+        for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
+            local status = RenewableEnergy.PowerBank.getStatus(bank:getX(), bank:getY(), bank:getZ())
+            local reasons, kinds = {}, {}
+            for _, source in ipairs(status.sources) do
+                table.insert(reasons, tostring(source.reason))
+            end
+            for _, kind in ipairs(status.loadByKind) do
+                table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
+            end
+            print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
+                .. " %d of %d panel slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
+                table.concat(kinds, ", "), status.charge * 100, status.panelSlots.used, status.panelSlots.total,
+                table.concat(reasons, ",")))
+        end
         data.screen = { w = getCore():getScreenWidth(), h = getCore():getScreenHeight() }
         data.shots = shots
         writeJson("REPromo.json", data)
