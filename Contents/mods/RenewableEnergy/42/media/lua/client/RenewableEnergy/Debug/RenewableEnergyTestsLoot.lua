@@ -6,20 +6,13 @@ require "RenewableEnergy/Sprites"
 -- loot in at OnInitGlobalModData; these tests check the result in the running game. Server Lua
 -- loads after client Lua, so RenewableEnergy.Distributions is looked up when a test runs.
 
-local test, expect, expectNear = RenewableEnergyTest.test, RenewableEnergyTest.expect, RenewableEnergyTest.expectNear
+local T = RenewableEnergyTest
+local test, expect, expectNear, countPairs = T.test, T.expect, T.expectNear, T.countPairs
 
 local function distributions()
     local D = RenewableEnergy.Distributions
     return expect(D ~= nil, "RenewableEnergy.Distributions did not load") and D
 end
-
-local function reapply()
-    if RenewableEnergy.Distributions then
-        RenewableEnergy.Distributions.apply()
-    end
-end
-
-local countPairs = RenewableEnergyTest.countPairs
 
 -- Calls fn(items, path) for every items list of every room, bag, procedural and vehicle table.
 local function forEachItemsList(fn)
@@ -106,9 +99,9 @@ local function checkSubList(where, name, stashTables)
     expect(ItemPickerJava.getItemContainer(room, container, nil, false) ~= nil, where .. ": the game has no " .. name)
 end
 
--- Entries once went to vanilla lists that no room or vehicle rolls, so those items never spawned
--- there. Every entry has to sit, once, in a list the game rolls: a room's procList, a vehicle's
--- container, a stash house's spawn table or a corpse's outfit list.
+-- Every entry names an item that exists, since the game drops an unknown item silently, and sits
+-- once in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
+-- table or a corpse's outfit list.
 test("renewable_energy_loot_lists_in_use", {
     validate = function()
         local D = distributions()
@@ -119,6 +112,7 @@ test("renewable_energy_loot_lists_in_use", {
         local vehicleTables = vehicleTablesInUse()
         local stashTables = stashSpawnTables()
         for _, spec in ipairs(D.items) do
+            expect(getScriptManager():FindItem(spec.fullType) ~= nil, spec.fullType .. " is no item")
             for _, entry in ipairs(spec.entries) do
                 local reference = entry[2]
                 local where = spec.fullType .. " in " .. reference
@@ -187,19 +181,6 @@ test("renewable_energy_loot_items_spawn", {
                 end
             end)
         end)
-    end,
-})
-
--- Every item the mod's scripts define as loot exists, so no entry is dropped silently by the game.
-test("renewable_energy_loot_items_exist", {
-    validate = function()
-        local D = distributions()
-        if not D then
-            return
-        end
-        for _, spec in ipairs(D.items) do
-            expect(getScriptManager():FindItem(spec.fullType) ~= nil, spec.fullType .. " is no item")
-        end
     end,
 })
 
@@ -284,86 +265,67 @@ test("renewable_energy_loot_vehicle_tables", {
 
 -- Rarity options ------------------------------------------------------------------------------
 
--- At 0 an option used to leave its items in at weight 0, and the zombie density bonus, which
--- ItemPickerJava adds to the weight, still spawned them in towns.
-test("renewable_energy_loot_lrm_zero_removes_items", {
-    sandbox = { LRMSolarPanels = 0, LRMBatteries = 0, LRMMisc = 0 },
-    validate = function()
-        local D = distributions()
-        if not D then
-            return
-        end
-        D.apply()
-        local managed = {}
-        for _, spec in ipairs(D.items) do
-            managed[spec.fullType] = true
-        end
-        forEachItemsList(function(items, path)
-            for i = 1, #items - 1, 2 do
-                if managed[items[i]] then
-                    expect(false, items[i] .. " is still in " .. path)
-                end
-            end
-        end)
-    end,
-    cleanup = reapply,
-})
+-- Values of the loot rarity options, one row per case.
+local RARITY_ROWS = {
+    { LRMSolarPanels = 0, LRMBatteries = 0, LRMMisc = 0 },
+    { LRMSolarPanels = 0, LRMBatteries = 1, LRMMisc = 1 },
+    { LRMSolarPanels = 2.5, LRMBatteries = 0.5, LRMMisc = 3 },
+}
 
-test("renewable_energy_loot_lrm_zero_keeps_other_items", {
-    sandbox = { LRMSolarPanels = 0, LRMBatteries = 1, LRMMisc = 1 },
-    validate = function()
+-- Each option scales the weights of its items in every list, the mod's own lists included. At 0
+-- it takes its items out of every list rather than leaving them at weight 0, because
+-- ItemPickerJava adds the zombie density bonus to every weight, so they would still spawn in
+-- towns; the other options' items stay. Applying the options again, as a second load does,
+-- replaces the entries instead of adding more.
+test("renewable_energy_loot_rarity_options_scale_weights", {
+    validate = function(self)
         local D = distributions()
         if not D then
             return
         end
-        D.apply()
-        forEachItemsList(function(items, path)
-            expect(countPairs(items, "RenewableEnergy.SolarModule") == 0, "RenewableEnergy.SolarModule is still in " .. path)
-        end)
-        for _, spec in ipairs(D.items) do
-            if spec.option ~= "LRMSolarPanels" then
-                for _, entry in ipairs(spec.entries) do
-                    local items = D.resolveItemList(entry[2])
-                    expect(items ~= nil and countPairs(items, spec.fullType) == 1, spec.fullType .. " is missing from " .. entry[2])
+        -- Pushed before the options change, so the loot is rebuilt once the world's options are back.
+        T.defer(self, D.apply)
+        for _, row in ipairs(RARITY_ROWS) do
+            local label = string.format("at %s/%s/%s", row.LRMSolarPanels, row.LRMBatteries, row.LRMMisc)
+            for option, value in pairs(row) do
+                T.setSandbox(self, option, value)
+            end
+            D.apply()
+            D.apply()
+            local removed = {}
+            for _, spec in ipairs(D.items) do
+                local multiplier = row[spec.option]
+                if multiplier == 0 then
+                    removed[spec.fullType] = true
+                else
+                    for _, entry in ipairs(spec.entries) do
+                        local where = label .. ": " .. spec.fullType .. " in " .. entry[2]
+                        local items = D.resolveItemList(entry[2])
+                        local count, weight = 0, nil
+                        if items then
+                            count, weight = countPairs(items, spec.fullType)
+                        end
+                        if expect(count == 1, where .. " " .. count .. " times") then
+                            expectNear(where .. " weight", weight, entry[1] * multiplier)
+                        end
+                    end
                 end
             end
+            forEachItemsList(function(items, path)
+                for i = 1, #items - 1, 2 do
+                    if removed[items[i]] then
+                        expect(false, label .. ": " .. items[i] .. " is still in " .. path)
+                    end
+                end
+            end)
         end
     end,
-    cleanup = reapply,
-})
-
--- The options scale every weight, the mod's own lists included, and applying them again (as a
--- test or a second load would) replaces the entries instead of adding more.
-test("renewable_energy_loot_lrm_scales_weights", {
-    sandbox = { LRMSolarPanels = 2.5, LRMBatteries = 0.5, LRMMisc = 3 },
-    validate = function()
-        local D = distributions()
-        if not D then
-            return
-        end
-        D.apply()
-        D.apply()
-        for _, spec in ipairs(D.items) do
-            local multiplier = SandboxVars.RenewableEnergy[spec.option]
-            for _, entry in ipairs(spec.entries) do
-                local items = D.resolveItemList(entry[2])
-                local count, weight = 0, nil
-                if items then
-                    count, weight = countPairs(items, spec.fullType)
-                end
-                if expect(count == 1, spec.fullType .. " is in " .. entry[2] .. " " .. count .. " times") then
-                    expectNear(spec.fullType .. " weight in " .. entry[2], weight, entry[1] * multiplier)
-                end
-            end
-        end
-    end,
-    cleanup = reapply,
 })
 
 -- Found batteries -------------------------------------------------------------------------------
 
--- Batteries that rooms, vehicles and corpses hand out hold 30-80%, once: a refill of the container
--- by loot respawn leaves a battery already there alone.
+-- Batteries that rooms, vehicles and corpses hand out hold a part charge, once: a refill of the
+-- container by loot respawn leaves a battery already there alone.
 test("renewable_energy_loot_found_batteries_part_charged", {
     validate = function()
         local D = distributions()
@@ -409,7 +371,7 @@ local OWN_CONTAINERS = {
 -- room type, and one square outside any room.
 local function sampleSquares(wanted)
     local squares, roomNames = {}, {}
-    local player, cell = RenewableEnergyTest.player(), getCell()
+    local player, cell = T.player(), getCell()
     local px, py = math.floor(player:getX()), math.floor(player:getY())
     for dx = -60, 60 do
         for dy = -60, 60 do

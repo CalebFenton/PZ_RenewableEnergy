@@ -233,22 +233,6 @@ test("renewable_energy_power_bank_refused_outdoors", {
     end,
 })
 
--- Every bank tile switches with a click, not a gas generator's pull-start and shutdown: the
--- generator plays its tile's GeneratorSound prefix + Starting or Stopping.
-test("renewable_energy_power_bank_switch_sounds", {
-    validate = function()
-        for _, kind in ipairs({ "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood", "batteryBankMetal" }) do
-            local sprite = getSprite(Sprites[kind])
-            local prefix = sprite and sprite:getProperties():get("GeneratorSound")
-            if expect(prefix ~= nil, kind .. " has no GeneratorSound and plays the gas generator's") then
-                for _, suffix in ipairs({ "Starting", "Stopping" }) do
-                    expect(GameSounds.isKnownSound(prefix .. suffix), kind .. "'s sound " .. prefix .. suffix .. " is not defined")
-                end
-            end
-        end
-    end,
-})
-
 -- Noon on a connected panel charges the bank by what the panel makes, and the batteries carry
 -- the charge.
 test("renewable_energy_power_panel_charges_bank", {

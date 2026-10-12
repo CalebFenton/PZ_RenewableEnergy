@@ -9,40 +9,10 @@ local Stash = require "RenewableEnergy/StashHouses"
 -- WorldSpawns, SolarSites, GardenLights, ArrowBoard and Distributions are looked up when a test
 -- runs.
 
-local test, expect, expectNear, player = RenewableEnergyTest.test, RenewableEnergyTest.expect,
-    RenewableEnergyTest.expectNear, RenewableEnergyTest.player
+local T = RenewableEnergyTest
+local test, expect, expectNear, player = T.test, T.expect, T.expectNear, T.player
 
 local Sprites = RenewableEnergy.Sprites
-
--- A free square next to the character, to put a spawn on.
-local function freeSquareNearPlayer()
-    local here = player():getSquare()
-    for _, direction in ipairs({ IsoDirections.N, IsoDirections.W, IsoDirections.S, IsoDirections.E,
-                                 IsoDirections.NW, IsoDirections.NE, IsoDirections.SW, IsoDirections.SE }) do
-        local square = here:getAdjacentSquare(direction)
-        if square and square:isFree(false) then
-            return square
-        end
-    end
-    return nil
-end
-
-local function findObjectWithSprite(square, spriteName)
-    local objects = square:getObjects()
-    for i = objects:size() - 1, 0, -1 do
-        local object = objects:get(i)
-        if object:getTextureName() == spriteName then
-            return object
-        end
-    end
-    return nil
-end
-
-local function removeObject(self)
-    if self.square and self.object then
-        self.square:transmitRemoveItemFromSquare(self.object)
-    end
-end
 
 local function stashCount()
     local count = 0
@@ -83,14 +53,29 @@ test("renewable_energy_world_stash_houses_resolve", {
     end,
 })
 
--- With Stash Houses at 2 or 3 the stashes join the list StashSystem reads, once however often the
--- game loads; at 1 they stay out of it. The test world runs at 1, so the list is put back after.
+-- Takes the mod's houses out of StashDescriptions.
+local function unregister()
+    for i = #StashDescriptions, 1, -1 do
+        if Stash.descriptions[StashDescriptions[i]] then
+            table.remove(StashDescriptions, i)
+        end
+    end
+end
+
+-- Unless Stash Houses is at 1 (none), the stashes join the list StashSystem reads, once however
+-- often the game loads.
 test("renewable_energy_world_stashes_register_by_option", {
     run = function(self)
+        -- Pushed before the option changes, so it runs once the world's option is back.
+        T.defer(self, function()
+            unregister()
+            Stash.register()
+        end)
         self.results = {}
         for _, mode in ipairs({ 1, 2, 3, 4 }) do
-            SandboxVars.RenewableEnergy.StashMode = mode
-            self.results[mode] = { registered = Stash.register() }
+            unregister()
+            T.setSandbox(self, "StashMode", mode)
+            local registered = Stash.register()
             Stash.register()
             local count = 0
             for _, description in ipairs(StashDescriptions) do
@@ -98,15 +83,9 @@ test("renewable_energy_world_stashes_register_by_option", {
                     count = count + 1
                 end
             end
-            self.results[mode].count = count
-            for i = #StashDescriptions, 1, -1 do
-                if Stash.descriptions[StashDescriptions[i]] then
-                    table.remove(StashDescriptions, i)
-                end
-            end
+            self.results[mode] = { registered = registered, count = count }
         end
     end,
-    sandbox = { StashMode = 1 },
     validate = function(self)
         local expected = stashCount()
         expect(not self.results[1].registered and self.results[1].count == 0, "Stash Houses 1 registered stashes")
@@ -151,29 +130,81 @@ test("renewable_energy_world_stash_maps_annotated", {
     end,
 })
 
--- Relisting a house makes newly found maps point at it again.
+local function isPossibleStash(name)
+    local possible = StashSystem.getPossibleStashes()
+    for i = 0, possible:size() - 1 do
+        if possible:get(i):getName() == name then
+            return true
+        end
+    end
+    return false
+end
+
+local function removePossibleStash(name)
+    local possible = StashSystem.getPossibleStashes()
+    for i = possible:size() - 1, 0, -1 do
+        if possible:get(i):getName() == name then
+            possible:remove(possible:get(i))
+        end
+    end
+end
+
+local RELIST_CASES = {
+    { visited = false, read = false, relisted = true },
+    { visited = true, read = false, relisted = false },
+    { visited = false, read = true, relisted = false },
+}
+
+-- A house missing from StashSystem's possible stashes goes back on the list unless someone
+-- entered it or read its map, so a map found later leads to a house still untouched. Each house
+-- goes through every case and is put back as it was.
 test("renewable_energy_world_unfound_stash_relisted", {
-    validate = function()
-        local possible = StashSystem.getPossibleStashes()
-        for stashMap in pairs(Stash.descriptions) do
-            for i = possible:size() - 1, 0, -1 do
-                if possible:get(i):getName() == stashMap.name then
-                    possible:remove(possible:get(i))
-                end
-            end
-        end
-        Stash.relistUnfound()
-        local present = {}
-        for i = 0, possible:size() - 1 do
-            present[possible:get(i):getName()] = true
-        end
+    run = function(self)
         local metaGrid = getWorld():getMetaGrid()
+        local houses = {}
         for stashMap in pairs(Stash.descriptions) do
             local room = metaGrid:getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
-            local building = room and room:getBuilding()
-            if building and not building:isHasBeenVisited() then
-                expect(present[stashMap.name], stashMap.name .. " was not restored")
+            local building = T.need(self, room and room:getBuilding(), "the building of " .. stashMap.name)
+            table.insert(houses, { name = stashMap.name, building = building })
+        end
+        if not T.need(self, #houses > 0, "a stash house") or #self.missing > 0 then return end
+        local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
+        local savedPossible = {}
+        for i = 0, possible:size() - 1 do
+            table.insert(savedPossible, possible:get(i))
+        end
+        self.results = {}
+        for _, house in ipairs(houses) do
+            local name, building = house.name, house.building
+            local visited, read = building:isHasBeenVisited(), alreadyRead:contains(name)
+            for _, case in ipairs(RELIST_CASES) do
+                removePossibleStash(name)
+                building:setHasBeenVisited(case.visited)
+                alreadyRead:remove(name)
+                if case.read then
+                    alreadyRead:add(name)
+                end
+                Stash.relistUnfound()
+                table.insert(self.results, { name = name, case = case, relisted = isPossibleStash(name) })
             end
+            building:setHasBeenVisited(visited)
+            alreadyRead:remove(name)
+            if read then
+                alreadyRead:add(name)
+            end
+        end
+        -- Last, since marking a house visited drops it from the list.
+        possible:clear()
+        for _, stash in ipairs(savedPossible) do
+            possible:add(stash)
+        end
+    end,
+    validate = function(self)
+        for _, result in ipairs(self.results) do
+            local case = result.case
+            expect(result.relisted == case.relisted, string.format("%s, %s and %s, was %s", result.name,
+                case.visited and "entered" or "never entered", case.read and "its map read" or "its map unread",
+                result.relisted and "relisted" or "not relisted"))
         end
     end,
 })
@@ -283,53 +314,35 @@ test("renewable_energy_world_stash_map_items_draw_their_area", {
     end,
 })
 
-local function hasPair(items, fullType, weight)
-    for i = 1, #items - 1, 2 do
-        if items[i] == fullType and items[i + 1] == weight then
-            return true
-        end
-    end
-    return false
-end
-
 -- With Stash Houses at 2 or 3 every stash's map goes into its outfits' corpse loot, once; at 1 or
 -- 4 none does.
 test("renewable_energy_world_stash_maps_in_corpse_loot", {
     run = function(self)
         local D = RenewableEnergy.Distributions
+        -- Pushed before the option changes, so the loot is rebuilt once the world's option is back.
+        T.defer(self, D.apply)
         self.found = {}
         for _, mode in ipairs({ 1, 2, 3, 4 }) do
-            SandboxVars.RenewableEnergy.StashMode = mode
+            T.setSandbox(self, "StashMode", mode)
             D.apply()
             D.apply()
-            local found = {}
             for stashMap, added in pairs(Stash.descriptions) do
                 for _, target in ipairs(added.targets or {}) do
-                    local items = SuburbsDistributions.all[target].items
-                    local count = 0
-                    for i = 1, #items - 1, 2 do
-                        if items[i] == stashMap.item then
-                            count = count + 1
-                        end
-                    end
-                    found[stashMap.name .. " in " .. target] = { count = count, weight = hasPair(items, stashMap.item, added.rarity) }
+                    local count, weight = T.countPairs(SuburbsDistributions.all[target].items, stashMap.item)
+                    table.insert(self.found, {
+                        mode = mode, where = stashMap.name .. " in " .. target, count = count, weight = weight, rarity = added.rarity,
+                    })
                 end
             end
-            self.found[mode] = found
         end
     end,
-    sandbox = { StashMode = 1 },
     validate = function(self)
-        for mode, found in pairs(self.found) do
-            local wanted = (mode == 2 or mode == 3) and 1 or 0
-            for where, result in pairs(found) do
-                expect(result.count == wanted, "Stash Houses " .. mode .. ": " .. where .. " " .. result.count .. " times")
-                expect(wanted == 0 or result.weight, "Stash Houses " .. mode .. ": " .. where .. " has the wrong weight")
-            end
+        for _, found in ipairs(self.found) do
+            local wanted = (found.mode == 2 or found.mode == 3) and 1 or 0
+            local label = "Stash Houses " .. found.mode .. ": " .. found.where
+            expect(found.count == wanted, label .. " " .. found.count .. " times")
+            expect(wanted == 0 or found.weight == found.rarity, label .. " at weight " .. tostring(found.weight))
         end
-    end,
-    cleanup = function()
-        RenewableEnergy.Distributions.apply()
     end,
 })
 
@@ -379,86 +392,68 @@ local function moduleConditions(container)
     return conditions
 end
 
--- The closest free square indoors, where a bank may stand.
-local function indoorSquareNearPlayer()
-    local here = player():getSquare()
-    for radius = 1, 40 do
-        for dx = -radius, radius do
-            for _, dy in ipairs({ -radius, radius }) do
-                local square = getSquare(here:getX() + dx, here:getY() + dy, 0)
-                if square and square:isFree(false) and RenewableEnergy.PowerBank.canPlaceBank(square)
-                        and square:getObjects():size() <= 2 then
-                    return square
-                end
-            end
-        end
-    end
-    return nil
-end
+-- Stock names of WorldSpawns.BANK_STOCK, one per bank tier.
+local SPAWNED_BANKS = { "shed", "electronicsStorage", "powerYard" }
 
 -- A bank appears stocked with era batteries at a part charge, explored so that neither its room's
 -- loot nor loot respawn ever adds to it. Placing needs no player, as on a dedicated server.
-for _, stockName in ipairs({ "shed", "electronicsStorage", "powerYard" }) do
-    test("renewable_energy_world_bank_" .. stockName .. "_spawns_stocked", {
-        sandbox = { LRMBatteries = 1, LRMMisc = 1 },
-        run = function(self)
-            self.square = indoorSquareNearPlayer()
-            if self.square then
-                self.object = RenewableEnergy.WorldSpawns.placeBank(self.square, stockName)
-            end
-        end,
-        validate = function(self)
-            if not expect(self.square ~= nil, "no free square indoors near the character") then
-                return
-            end
-            local container = self.object and self.object:getContainer()
-            if not expect(container ~= nil, "the bank has no container") then
-                return
-            end
+test("renewable_energy_world_bank_spawns_stocked", {
+    sandbox = { LRMBatteries = 1, LRMMisc = 1 },
+    run = function(self)
+        local squares = T.need(self, T.squares(self, #SPAWNED_BANKS, { indoors = true }), "free indoor squares for banks")
+        if not squares then return end
+        self.banks = {}
+        for i, stockName in ipairs(SPAWNED_BANKS) do
+            local bank = RenewableEnergy.WorldSpawns.placeBank(squares[i], stockName)
+            if not T.need(self, bank, "a " .. stockName .. " bank") then return end
+            self.banks[stockName] = T.track(self, bank)
+        end
+    end,
+    validate = function(self)
+        for stockName, bank in pairs(self.banks) do
             local stock = RenewableEnergy.WorldSpawns.BANK_STOCK[stockName]
-            expect(instanceof(self.object, "IsoGenerator"), "the bank is no generator")
-            expect(self.object:getTextureName() == Sprites[stock.sprite], "the bank has the wrong tile")
-            expect(container:isExplored(), "the bank is not explored")
+            local container = bank:getContainer()
+            local what = "the " .. stockName .. " bank"
+            expect(bank:getTextureName() == Sprites[stock.sprite], what .. " has the wrong tile")
+            expect(container:isExplored(), what .. " is not explored")
             local count, charges = countBatteries(container)
-            expect(count >= stock.batteries.min and count <= stock.batteries.max,
-                count .. " batteries in the bank, expected " .. stock.batteries.min .. " to " .. stock.batteries.max)
-            expectFoundCharges(charges, "the bank")
-        end,
-        cleanup = removeObject,
-    })
-end
+            expect(inRange(count, stock.batteries),
+                count .. " batteries in " .. what .. ", expected " .. stock.batteries.min .. " to " .. stock.batteries.max)
+            expectFoundCharges(charges, what)
+        end
+    end,
+})
 
 -- Banks only work indoors, so a world spawn never puts one on an outdoor square.
 test("renewable_energy_world_bank_refused_outdoors", {
     run = function(self)
-        self.square = freeSquareNearPlayer()
-        if self.square and not self.square:isOutside() then
-            self.square = nil
-        end
-        if self.square then
-            self.object = RenewableEnergy.WorldSpawns.placeBank(self.square, "shed")
+        self.square = (T.need(self, T.squares(self, 1), "a free outdoor square") or {})[1]
+        if not self.square then return end
+        local bank = RenewableEnergy.WorldSpawns.placeBank(self.square, "shed")
+        self.placed = bank ~= nil
+        if bank then
+            T.track(self, bank)
         end
     end,
     validate = function(self)
-        if not expect(self.square ~= nil, "no free square outdoors next to the character") then
-            return
-        end
-        expect(self.object == nil, "a bank was placed outdoors")
-        expect(findObjectWithSprite(self.square, Sprites.batteryBoxWood) == nil, "a battery box stands outdoors")
+        expect(not self.placed, "a bank was placed outdoors")
+        expect(T.objectWithSprite(self.square, Sprites.batteryBoxWood) == nil, "a battery box stands outdoors")
     end,
-    cleanup = removeObject,
 })
 
--- Over many banks, each part turns up about as often as BANK_STOCK says, and never in a bank
--- without a slot for it: a box takes no controller.
+-- Bank tiers whose tile is a battery box, which has no slot for a charge controller.
+local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
+
+-- Over many banks, each part turns up about as often as BANK_STOCK says, and a battery box never
+-- comes with a charge controller.
 test("renewable_energy_world_bank_stock_rates", {
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     validate = function()
         local WorldSpawns = RenewableEnergy.WorldSpawns
         local container = ItemContainer.new("crate", nil, nil)
-        for _, stockName in ipairs({ "shed", "farmStorage" }) do
-            local stock = WorldSpawns.BANK_STOCK[stockName]
-            local found, samples = { inverter = 0, controller = 0, charger = 0 }, 400
+        local samples = 400
+        local function partCounts(stockName)
+            local found = { inverter = 0, controller = 0, charger = 0 }
             for _ = 1, samples do
                 container:removeAllItems()
                 WorldSpawns.stockBank(container, stockName)
@@ -470,19 +465,26 @@ test("renewable_energy_world_bank_stock_rates", {
                     end
                 end
             end
-            for kind, count in pairs(found) do
-                local part = stock[kind]
-                expectNear(stockName .. " share holding a " .. kind, count / samples, part and part.chance or 0, 0.1)
+            return found
+        end
+        for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
+            local found = partCounts(stockName)
+            if stockName == "shed" or stockName == "farmStorage" then
+                for kind, count in pairs(found) do
+                    local part = stock[kind]
+                    expectNear(stockName .. " share holding a " .. kind, count / samples, part and part.chance or 0, 0.1)
+                end
+            end
+            if BOX_TILES[stock.sprite] then
+                expect(found.controller == 0, found.controller .. " of " .. samples .. " " .. stockName .. " battery boxes hold a charge controller")
             end
         end
-        local box = RenewableEnergy.Specs.banks["RenewableEnergy.BatteryBoxWood"]
-        expect(box.maxControllers == 0, "the battery box now takes controllers; update this test")
         container:removeAllItems()
     end,
 })
 
 -- At 0 the battery option leaves world banks empty of batteries.
-test("renewable_energy_world_bank_stock_lrm_zero", {
+test("renewable_energy_world_bank_stock_option_zero", {
     sandbox = { LRMBatteries = 0, LRMMisc = 0 },
     validate = function()
         local container = ItemContainer.new("crate", nil, nil)
@@ -497,16 +499,12 @@ test("renewable_energy_world_bank_stock_lrm_zero", {
 test("renewable_energy_world_crate_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
-        self.square = freeSquareNearPlayer()
-        if self.square then
-            self.object = RenewableEnergy.WorldSpawns.placeCrate(self.square, "kit")
-        end
+        local square = (T.need(self, T.squares(self, 1, { indoors = true }), "a free indoor square") or {})[1]
+        if not square then return end
+        self.crate = T.track(self, RenewableEnergy.WorldSpawns.placeCrate(square, "kit"))
     end,
     validate = function(self)
-        if not expect(self.square ~= nil, "no free square next to the character") then
-            return
-        end
-        local container = self.object and self.object:getContainer()
+        local container = self.crate:getContainer()
         if not expect(container ~= nil, "the crate has no container") then
             return
         end
@@ -520,9 +518,8 @@ test("renewable_energy_world_crate_spawns_stocked", {
         local _, charges = countBatteries(container)
         expect(#charges >= 1 and #charges <= 2, #charges .. " batteries in the crate, expected 1 or 2")
         expectFoundCharges(charges, "the crate")
-        expect(self.object:getOverlaySprite() ~= nil, "the full crate shows no overlay")
+        expect(self.crate:getOverlaySprite() ~= nil, "the full crate shows no overlay")
     end,
-    cleanup = removeObject,
 })
 
 -- Cracked modules -------------------------------------------------------------------------------
@@ -532,85 +529,72 @@ test("renewable_energy_world_crate_spawns_stocked", {
 -- chance; at the default the chance is small but there.
 test("renewable_energy_world_cracked_modules", {
     sandbox = { LRMSolarPanels = 100 },
-    validate = function()
-        local Distributions, WorldSpawns = RenewableEnergy.Distributions, RenewableEnergy.WorldSpawns
+    run = function(self)
+        local Distributions = RenewableEnergy.Distributions
         local container = ItemContainer.new("crate", nil, nil)
-        local samples = 200
-        for _ = 1, samples do
+        self.samples = 200
+        for _ = 1, self.samples do
             Distributions.addCrackedModules("farmstorage", "metal_shelves", container)
         end
-        local conditions = moduleConditions(container)
-        expect(#conditions == samples, #conditions .. " cracked modules on " .. samples .. " farm storage shelves")
-        for _, condition in ipairs(conditions) do
-            if not expect(inRange(condition, WorldSpawns.CRACKED), "a cracked module is at condition " .. condition) then
-                break
-            end
-        end
+        self.conditions = moduleConditions(container)
         container:removeAllItems()
-        for _ = 1, samples do
+        for _ = 1, self.samples do
             Distributions.addCrackedModules("bedroom", "wardrobe", container)
             Distributions.addCrackedModules("garage", "fridge", container)
         end
-        expect(container:getItems():size() == 0, container:getItems():size() .. " modules in bedrooms and garage fridges")
-        SandboxVars.RenewableEnergy.LRMSolarPanels = 1
-        local chance = Distributions.crackedModuleChance(Distributions.CRACKED_MODULE_ROOMS.garage)
-        expect(chance > 0 and chance < 0.1, "a garage shelf holds a cracked module with chance " .. chance)
+        self.elsewhere = container:getItems():size()
         container:removeAllItems()
+        T.setSandbox(self, "LRMSolarPanels", 1)
+        self.defaultChance = Distributions.crackedModuleChance(Distributions.CRACKED_MODULE_ROOMS.garage)
+    end,
+    validate = function(self)
+        expect(#self.conditions == self.samples, #self.conditions .. " cracked modules on " .. self.samples .. " farm storage shelves")
+        for _, condition in ipairs(self.conditions) do
+            if not expect(inRange(condition, RenewableEnergy.WorldSpawns.CRACKED), "a cracked module is at condition " .. condition) then
+                break
+            end
+        end
+        expect(self.elsewhere == 0, self.elsewhere .. " modules in bedrooms and garage fridges")
+        expect(self.defaultChance > 0 and self.defaultChance < 0.1, "a garage shelf holds a cracked module with chance " .. self.defaultChance)
     end,
 })
 
 -- Solar sites -----------------------------------------------------------------------------------
 
-local function countWithSprite(square, spriteName)
-    local count = 0
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        if objects:get(i):getTextureName() == spriteName then
-            count = count + 1
-        end
-    end
-    return count
-end
-
 -- A site goes down once when its chunk loads, and its spot is forgotten, so loading the chunk
 -- again places nothing. Its pump's pole mount holds 1 or 2 modules at site conditions.
 test("renewable_energy_world_site_placed_once", {
     run = function(self)
-        self.square = freeSquareNearPlayer()
-        if not (self.square and self.square:isOutside()) then
-            self.square = nil
-            return
-        end
+        local square = (T.need(self, T.squares(self, 1), "a free outdoor square") or {})[1]
+        if not square then return end
         local SolarSites = RenewableEnergy.SolarSites
-        local x, y = self.square:getX(), self.square:getY()
-        SolarSites.addSite({ kind = "stockTank", name = "test", panels = { { x, y, 0, "rackMetal", "S" } } })
-        self.waiting = SolarSites.spotAt(x, y, 0) ~= nil
-        SolarSites.placeChunk(math.floor(x / 8), math.floor(y / 8))
-        self.leftOver = SolarSites.spotAt(x, y, 0) ~= nil
-        SolarSites.placeChunk(math.floor(x / 8), math.floor(y / 8))
-        self.object = findObjectWithSprite(self.square, Sprites.rack.metal.S)
+        local x, y, z = square:getX(), square:getY(), square:getZ()
+        local chunkX, chunkY = math.floor(x / 8), math.floor(y / 8)
+        SolarSites.addSite({ kind = "stockTank", name = "test", panels = { { x, y, z, "rackMetal", "S" } } })
+        self.waiting = SolarSites.spotAt(x, y, z) ~= nil
+        SolarSites.placeChunk(chunkX, chunkY)
+        self.leftOver = SolarSites.spotAt(x, y, z) ~= nil
+        local objects = square:getObjects():size()
+        SolarSites.placeChunk(chunkX, chunkY)
+        self.addedAgain = square:getObjects():size() - objects
+        self.rack = T.need(self, T.objectWithSprite(square, Sprites.rack.metal.S), "the site's rack on its spot")
+        if self.rack then
+            T.track(self, self.rack)
+        end
     end,
     validate = function(self)
-        if not expect(self.square ~= nil, "no free square outdoors next to the character") then
-            return
-        end
         expect(self.waiting, "the site kept no spot to place")
         expect(not self.leftOver, "the site's spot was not forgotten once placed")
-        local racks = countWithSprite(self.square, Sprites.rack.metal.S)
-        expect(racks == 1, racks .. " racks on the spot after loading its chunk twice")
-        if not self.object then
-            return
-        end
-        expect(self.object:getProperties():get("CustomItem") == "RenewableEnergy.SolarRackMetal",
+        expect(self.addedAgain == 0, "loading the chunk again added " .. self.addedAgain .. " objects to the spot")
+        expect(self.rack:getProperties():get("CustomItem") == "RenewableEnergy.SolarRackMetal",
             "the rack does not give back RenewableEnergy.SolarRackMetal")
-        local modules = self.object:getModData()[RenewableEnergy.PowerBank.MODULES] or {}
+        local modules = self.rack:getModData()[RenewableEnergy.PowerBank.MODULES] or {}
         expect(#modules >= 1 and #modules <= 2, #modules .. " modules on the pump's mount, expected 1 or 2")
         for _, module in ipairs(modules) do
             expect(module.type == MODULE and isSiteCondition(module.condition),
                 "the pump's mount holds " .. tostring(module.type) .. " at " .. tostring(module.condition))
         end
     end,
-    cleanup = removeObject,
 })
 
 -- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
@@ -661,13 +645,12 @@ test("renewable_energy_world_sites_placed_sensibly", {
 
 -- Garden lights ---------------------------------------------------------------------------------
 
--- The closest house to the character.
-local function nearbyHouse()
-    local here = player():getSquare()
-    for radius = 1, 60 do
-        for dx = -radius, radius do
-            for _, dy in ipairs({ -radius, radius }) do
-                local square = getSquare(here:getX() + dx, here:getY() + dy, 0)
+-- The house nearest the square within `radius`, or nil.
+local function houseNear(x, y, radius)
+    for r = 0, radius do
+        for dx = -r, r do
+            for _, dy in ipairs({ -r, r }) do
+                local square = getSquare(x + dx, y + dy, 0)
                 local building = square and square:getBuilding()
                 if building and building:getDef():isResidential() then
                     return building:getDef()
@@ -676,6 +659,11 @@ local function nearbyHouse()
         end
     end
     return nil
+end
+
+local function houseNearCharacter()
+    local here = player():getSquare()
+    return houseNear(here:getX(), here:getY(), 60)
 end
 
 -- The garden lights around a house, by square key.
@@ -707,22 +695,24 @@ end
 test("renewable_energy_world_garden_lights_once_per_house", {
     run = function(self)
         local GardenLights = RenewableEnergy.GardenLights
-        self.def = nearbyHouse()
-        if not self.def then
-            return
+        local def = T.need(self, houseNearCharacter(), "a house near the character")
+        if not def then return end
+        local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), GardenLights.buildingKey(def)
+        local roll = store[key]
+        T.defer(self, function() store[key] = roll end)
+        self.before = lightsAround(def)
+        store[key] = nil
+        self.first = GardenLights.roll(def, true)
+        self.rolled = GardenLights.isRolled(def)
+        self.second = GardenLights.roll(def, true)
+        self.after = lightsAround(def)
+        for squareKey, light in pairs(self.after) do
+            if not self.before[squareKey] then
+                T.track(self, light)
+            end
         end
-        local store = ModData.getOrCreate(GardenLights.MOD_DATA)
-        self.before = lightsAround(self.def)
-        store[GardenLights.buildingKey(self.def)] = nil
-        self.first = GardenLights.roll(self.def, true)
-        self.rolled = GardenLights.isRolled(self.def)
-        self.second = GardenLights.roll(self.def, true)
-        self.after = lightsAround(self.def)
     end,
     validate = function(self)
-        if not expect(self.def ~= nil, "no house near the character") then
-            return
-        end
         local count = RenewableEnergy.GardenLights.COUNT
         expect(self.first >= count.min and self.first <= count.max, "the house got " .. self.first .. " lights")
         expect(self.rolled, "the house's roll was not kept")
@@ -738,92 +728,93 @@ test("renewable_energy_world_garden_lights_once_per_house", {
             end
         end
     end,
-    cleanup = function(self)
-        for key, light in pairs(self.after or {}) do
-            if not self.before[key] then
-                light:getSquare():transmitRemoveItemFromSquare(light)
-            end
-        end
-    end,
 })
 
--- Ticks to stay at each place: the map's town and trailer park zones are only there once the
--- cell around a place has loaded, as it has when a house there is rolled, and houses roll on the
--- first game minute after their surroundings load. The last visit, home, lets the start load
--- again before the next test.
-local VISIT_TICKS = 420
+-- Frames to wait at each place for it to load and its house to be rolled, and at the start for
+-- it to load again. Loading takes real time, so at an uncapped frame rate it takes many frames.
+local VISIT_FRAMES = 6000
+-- Houses are rolled on the game minute after their surroundings load; a faster clock brings that
+-- minute sooner.
+local VISIT_SPEED = 10
+-- How far around the start the squares must be loaded again before the next test: as far as
+-- T.squares looks for free squares.
+local HOME_RADIUS = 30
 
--- The house nearest the square, or nil.
-local function houseNear(x, y)
-    for radius = 0, 20 do
-        for dx = -radius, radius do
-            for _, dy in ipairs({ -radius, radius }) do
-                local square = getSquare(x + dx, y + dy, 0)
-                local building = square and square:getBuilding()
-                if building and building:getDef():isResidential() then
-                    return building:getDef()
-                end
+-- Whether every chunk within `radius` squares of the point is loaded: one square per chunk tells.
+local function loadedAround(x, y, z, radius)
+    for sx = x - radius, x + radius, 8 do
+        for sy = y - radius, y + radius, 8 do
+            if not getSquare(sx, sy, z) then
+                return false
             end
         end
     end
-    return nil
+    return getSquare(x + radius, y + radius, z) ~= nil
 end
 
 -- The neighbourhood sets the chance: a rich street (Riverside's Rich loot zone) most, a trailer
 -- park least, an ordinary street (the start, in Muldraugh) in between. A farmhouse counts as
 -- ordinary. And a house far from the start is rolled once the character has been there. The
--- character visits each place in turn and comes back; a teleport from inside a timed action
--- doesn't stick, so OnTick moves them.
+-- character visits each place in turn, staying until it has loaded and the house nearest it has
+-- been rolled, and comes back once the start has loaded again. A teleport from inside a timed
+-- action doesn't stick, so OnTick moves them.
 test("renewable_energy_world_garden_light_neighbourhoods", {
     run = function(self)
+        local GardenLights = RenewableEnergy.GardenLights
         local p = player()
-        self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
+        local homeX, homeY, homeZ = p:getX(), p:getY(), p:getZ()
         self.places = {
             { 6680, 5320, "rich" }, { 5370, 5945, "poor" }, { 7340, 5993, "ordinary" }, { 10835, 10144, "ordinary" },
         }
-        local count = #self.places
-        local tick = 0
-        local function onTick()
-            tick = tick + 1
-            local index = math.floor((tick - 1) / VISIT_TICKS) + 1
+        T.setMultiplier(self, VISIT_SPEED)
+        T.defer(self, function()
+            if math.abs(p:getX() - homeX) > 1 or math.abs(p:getY() - homeY) > 1 then
+                p:teleportTo(homeX, homeY, homeZ)
+            end
+        end)
+        local index, frames = 0, 0
+        local function leave()
+            index, frames = index + 1, 0
             local place = self.places[index]
-            local step = (tick - 1) % VISIT_TICKS
-            if step == 0 then
-                if place then
-                    p:teleportTo(place[1] + 0.5, place[2] + 0.5, 0)
-                else
-                    p:teleportTo(self.home.x, self.home.y, self.home.z)
-                    Events.OnTick.Remove(onTick)
-                end
-            elseif place and step == VISIT_TICKS - 1 then
-                place.loaded = getSquare(place[1], place[2], 0) ~= nil
-                place.found = RenewableEnergy.GardenLights.neighbourhood(place[1], place[2])
-                local house = houseNear(place[1], place[2])
-                place.house = house and RenewableEnergy.GardenLights.buildingKey(house)
-                place.rolled = house and RenewableEnergy.GardenLights.isRolled(house)
+            if place then
+                p:teleportTo(place[1] + 0.5, place[2] + 0.5, 0)
+            else
+                p:teleportTo(homeX, homeY, homeZ)
             end
         end
-        Events.OnTick.Add(onTick)
-        RenewableEnergyTest.wait((count + 1) * VISIT_TICKS + 60)
+        T.onTick(self, function()
+            if self.done then return end
+            frames = frames + 1
+            local place = self.places[index]
+            if index == 0 then
+                leave()
+            elseif place then
+                place.loaded = getSquare(place[1], place[2], 0) ~= nil
+                place.house = place.house or (place.loaded and houseNear(place[1], place[2], 20))
+                place.rolled = place.house and GardenLights.isRolled(place.house)
+                if place.rolled or frames >= VISIT_FRAMES then
+                    place.found = GardenLights.neighbourhood(place[1], place[2])
+                    leave()
+                end
+            else
+                self.homeLoaded = loadedAround(math.floor(homeX), math.floor(homeY), homeZ, HOME_RADIUS)
+                self.done = self.homeLoaded or frames >= VISIT_FRAMES
+            end
+        end)
+        T.waitUntil(function() return self.done end, (#self.places + 2) * VISIT_FRAMES)
     end,
     validate = function(self)
-        for _, place in ipairs(self.places or {}) do
+        for _, place in ipairs(self.places) do
             local where = place[1] .. "," .. place[2]
             if expect(place.loaded, where .. " never loaded") then
                 expect(place.found == place[3], where .. " is " .. tostring(place.found) .. ", expected " .. place[3])
-                if expect(place.house ~= nil, "no house near " .. where) then
-                    expect(place.rolled, "the house at " .. place.house .. " was never rolled for garden lights")
+                if expect(place.house, "no house near " .. where) then
+                    expect(place.rolled, "the house at " .. RenewableEnergy.GardenLights.buildingKey(place.house)
+                        .. " was never rolled for garden lights")
                 end
             end
         end
-        local chance = RenewableEnergy.GardenLights.CHANCE
-        expect(chance.rich > chance.ordinary and chance.ordinary > chance.poor, "the neighbourhood chances are out of order")
-    end,
-    cleanup = function(self)
-        local p = player()
-        if self.home and (math.abs(p:getX() - self.home.x) > 1 or math.abs(p:getY() - self.home.y) > 1) then
-            p:teleportTo(self.home.x, self.home.y, self.home.z)
-        end
+        expect(self.homeLoaded, "the start never loaded again")
     end,
 })
 
@@ -831,7 +822,7 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
 test("renewable_energy_world_garden_lights_option_zero", {
     sandbox = { GardenLights = 0 },
     validate = function()
-        local def = nearbyHouse()
+        local def = houseNearCharacter()
         if expect(def ~= nil, "no house near the character") then
             expect(RenewableEnergy.GardenLights.chanceFor(def) == 0, "houses get lights with the option at 0")
         end
@@ -840,27 +831,32 @@ test("renewable_energy_world_garden_lights_option_zero", {
 
 -- Arrow board -------------------------------------------------------------------------------------
 
-local function isClearForVehicle(x, y, z)
+local function isOpenGround(x, y, z)
     local square = getSquare(x, y, z)
     return square ~= nil and square:isOutside() and square:isFree(false) and not square:HasTree()
         and square:getVehicleContainer() == nil
 end
 
--- The closest square with open ground three squares across and seven along, for the trailer.
-local function openGround()
+-- The square nearest the character with open ground three squares across, from `ahead` squares
+-- north of it to `behind` squares south, clear of the character: room for vehicles facing north.
+local function openStrip(ahead, behind)
     local here = player():getSquare()
-    for radius = 3, 25 do
+    for radius = 1, 25 do
         for dx = -radius, radius do
-            for _, dy in ipairs({ -radius, radius }) do
-                local x, y, z = here:getX() + dx, here:getY() + dy, 0
-                local open = true
-                for sx = x - 1, x + 1 do
-                    for sy = y - 3, y + 3 do
-                        open = open and isClearForVehicle(sx, sy, z)
+            for dy = -radius, radius do
+                local onRing = math.max(math.abs(dx), math.abs(dy)) == radius
+                local coversCharacter = math.abs(dx) <= 1 and -dy >= -ahead and -dy <= behind
+                if onRing and not coversCharacter then
+                    local x, y, z = here:getX() + dx, here:getY() + dy, here:getZ()
+                    local open = true
+                    for sx = x - 1, x + 1 do
+                        for sy = y - ahead, y + behind do
+                            open = open and isOpenGround(sx, sy, z)
+                        end
                     end
-                end
-                if open then
-                    return getSquare(x, y, z)
+                    if open then
+                        return getSquare(x, y, z)
+                    end
                 end
             end
         end
@@ -868,24 +864,27 @@ local function openGround()
     return nil
 end
 
--- A spawned arrow board's battery box holds its two modules (the first weathered, the second
--- weathered or cracked), 4 to 6 deep cycle batteries at a part charge, and a charge controller;
--- and the trailer joins the junkyard and traffic jam vehicles.
-test("renewable_energy_world_arrow_board_battery_box", {
+-- The squares an arrow board takes north and south of its centre.
+local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
+
+-- A spawned arrow board's battery box holds its panels' modules, the first weathered and the
+-- second weathered or cracked, deep cycle batteries at a part charge, and a charge controller;
+-- and the trailer turns up among junkyard, traffic jam and tradesmen's vehicles.
+test("renewable_energy_world_arrow_board_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
-        local square = openGround()
-        self.vehicle = square and RenewableEnergy.ArrowBoard.spawn(square, "N")
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        if not square then return end
+        -- Only a vehicle in the world gets an id (BaseVehicle.createPhysics).
+        local trailer = RenewableEnergy.ArrowBoard.spawn(square, "N")
+        self.trailer = T.need(self, trailer and trailer:getId() ~= -1 and T.track(self, trailer), "room to spawn the arrow board")
     end,
     validate = function(self)
         local ArrowBoard, WorldSpawns = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns
         for _, zone in ipairs({ "junkyard", "trafficjamn", "trafficjams", "trades" }) do
             expect(VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] ~= nil, "no arrow boards in " .. zone)
         end
-        if not expect(self.vehicle ~= nil and self.vehicle:getId() ~= -1, "no room to spawn the arrow board") then
-            return
-        end
-        local part = self.vehicle:getPartById(ArrowBoard.BATTERY_BOX)
+        local part = self.trailer:getPartById(ArrowBoard.BATTERY_BOX)
         local container = part and part:getItemContainer()
         if not expect(container ~= nil, "the arrow board has no battery box") then
             return
@@ -895,15 +894,128 @@ test("renewable_energy_world_arrow_board_battery_box", {
         expect(conditions[1] == nil or inRange(conditions[1], WorldSpawns.WEATHERED), "its first module is at " .. tostring(conditions[1]))
         expect(conditions[2] == nil or isSiteCondition(conditions[2]), "its second module is at " .. tostring(conditions[2]))
         local count, charges = countBatteries(container)
-        local range = ArrowBoard.STOCK.batteries
-        expect(count >= range.min and count <= range.max, count .. " batteries in the battery box")
+        expect(inRange(count, ArrowBoard.STOCK.batteries), count .. " batteries in the battery box")
         expect(container:getCountType(ArrowBoard.STOCK.battery) == count, "the battery box holds other batteries")
         expectFoundCharges(charges, "the battery box")
         expect(container:getCountType(RenewableEnergy.Specs.controller) == 1, "the battery box has no charge controller")
     end,
-    cleanup = function(self)
-        if self.vehicle then
-            self.vehicle:permanentlyRemove()
+})
+
+-- Its battery box opens only with its lid open, from beside it, and takes a battery.
+test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
+    run = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, ArrowBoard.SCRIPT, { square = square })
+        if not self.trailer then return end
+        -- A spawned vehicle may lack parts, and the box opens freely without its lid.
+        self.trailer:repair()
+        local spot = T.need(self, self.trailer:getAreaCenter(ArrowBoard.BATTERY_BOX), "the battery box's area")
+        if not spot then return end
+        player():teleportTo(spot:getX(), spot:getY(), square:getZ())
+    end,
+    validate = function(self)
+        local p = player()
+        local lid, box = self.trailer:getPartById("TrunkDoor"), self.trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
+        local container = box and box:getItemContainer()
+        if not (expect(lid ~= nil and lid:getDoor() ~= nil, "the battery box has no lid")
+                and expect(container ~= nil, "the battery box holds nothing")) then
+            return
         end
+        expect(not lid:getDoor():isLocked(), "the battery box starts locked")
+        expect(not self.trailer:canAccessContainer(box:getIndex(), p), "the battery box opens with its lid shut")
+        lid:getDoor():setOpen(true)
+        expect(self.trailer:canAccessContainer(box:getIndex(), p), "the battery box doesn't open beside it with its lid open")
+        -- A spawned trailer may come stocked, so count from what it already holds.
+        local before = container:getCountType("RenewableEnergy.DeepCycleBattery")
+        container:AddItem("RenewableEnergy.DeepCycleBattery")
+        expect(container:getCountType("RenewableEnergy.DeepCycleBattery") == before + 1, "the battery box doesn't take a battery")
+    end,
+})
+
+local TOWING_CAR = "Base.OffRoad"
+-- How far ahead of the car, and behind the trailer, the strip they stand on runs, in squares:
+-- the car is pushed a few squares north.
+local STRIP_AHEAD, STRIP_BEHIND = 7, 9
+-- Frames to wait for the pair to join the cell and come to rest, to settle on the hitch, and to
+-- be pulled along. The physics runs in real time, so at an uncapped frame rate each takes many
+-- frames.
+local VEHICLE_FRAMES = 3000
+-- How close, in squares, the coupler sits on the hitch once the hitch has pulled the trailer in,
+-- and how slow, in squares a second, the pair then rolls once it has settled.
+local ON_HITCH, SETTLED_SPEED = 0.1, 0.2
+-- A car with nobody at the wheel holds its brakes, so each push has to beat them.
+local PUSH_IMPULSE = 6000
+-- The car is pushed whenever it rolls slower than this, in squares a second, until the trailer
+-- has followed it TOW_SQUARES. Pushed every frame, it would speed off the open strip, and a crash
+-- snaps a hitch more than two seconds old (Bullet.onVehicleConstraintImpulse).
+local PUSH_SPEED = 5
+local TOW_SQUARES = 2
+
+local function hitchGap(car, trailer)
+    local hitch = car:getTowingWorldPos("trailer", Vector3f.new())
+    local coupler = trailer:getTowedByWorldPos("trailer", Vector3f.new())
+    if not (hitch and coupler) then
+        return math.huge
+    end
+    return math.sqrt((hitch:x() - coupler:x()) ^ 2 + (hitch:y() - coupler:y()) ^ 2)
+end
+
+local function inCell(vehicle)
+    return getCell():getVehicles():contains(vehicle)
+end
+
+-- How far the trailer has moved since it settled on the hitch, in squares.
+local function towedSquares(self)
+    return math.sqrt((self.trailer:getX() - self.start.x) ^ 2 + (self.trailer:getY() - self.start.y) ^ 2)
+end
+
+-- It spawns, a vanilla car hitches it as the game's own attachTrailer command does, and when the
+-- car is pushed north the trailer follows, still on the hitch.
+test("renewable_energy_world_arrow_board_towed_by_car", {
+    run = function(self)
+        local strip = T.need(self, openStrip(STRIP_AHEAD, STRIP_BEHIND), "open ground for a car and the arrow board")
+        if not strip then return end
+        local x, y, z = strip:getX(), strip:getY(), strip:getZ()
+        local car = T.vehicle(self, TOWING_CAR, { square = strip })
+        local trailer = car and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = getSquare(x, y + 5, z) })
+        if not trailer then return end
+        self.car, self.trailer = car, trailer
+        -- A spawned vehicle may lack wheels or have flat tyres.
+        car:repair()
+        trailer:repair()
+        -- The game moves, and checks the hitch of, only vehicles that have joined the cell.
+        T.waitUntil(function()
+            return inCell(car) and inCell(trailer) and car:isAtRest() and trailer:isAtRest()
+        end, VEHICLE_FRAMES)
+        T.step(function()
+            local p = player()
+            car:addPointConstraint(p, trailer, "trailer", "trailer")
+            -- Out of the car's way; the runner puts the character back.
+            p:teleportTo(x + 3.5, y + 2.5, z)
+        end)
+        -- The hitch pulls the trailer in over the next physics steps.
+        T.waitUntil(function()
+            return hitchGap(car, trailer) < ON_HITCH and car:getSpeed2D() < SETTLED_SPEED and trailer:getSpeed2D() < SETTLED_SPEED
+        end, VEHICLE_FRAMES)
+        T.step(function()
+            self.start = { x = trailer:getX(), y = trailer:getY() }
+        end)
+        T.waitUntil(function()
+            if towedSquares(self) >= TOW_SQUARES then
+                return true
+            end
+            if car:getSpeed2D() < PUSH_SPEED then
+                car:applyImpulseGeneric(car:getX(), car:getY(), car:getZ(), 0, -1, 0, PUSH_IMPULSE)
+            end
+            return false
+        end, VEHICLE_FRAMES)
+    end,
+    validate = function(self)
+        expect(self.trailer:getVehicleTowedBy() == self.car, "the trailer is not hitched to the car")
+        local moved = towedSquares(self)
+        expect(moved >= TOW_SQUARES, string.format("the trailer moved %.2f squares behind the pushed car", moved))
+        local gap = hitchGap(self.car, self.trailer)
+        expect(gap < ON_HITCH, string.format("the trailer's coupler is %.2f squares off the car's hitch", gap))
     end,
 })

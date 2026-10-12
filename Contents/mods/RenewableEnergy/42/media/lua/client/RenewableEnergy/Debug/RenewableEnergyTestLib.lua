@@ -18,7 +18,7 @@ require "RenewableEnergy/Debug/RenewableEnergyDebug"
 -- - T.test gives every run a fresh `self`, sets the clock to `spec.hour` (DEFAULT_HOUR unless
 --   given), runs timed actions instantly when `spec.instant` (otherwise at their real duration),
 --   and applies `spec.sandbox`.
--- - Each T.set* call, T.defer, T.onTick and every fixture (T.bank, T.panel, T.tile,
+-- - Each T.set* call, T.defer, T.onTick and every fixture (T.bank, T.panel, T.tile, T.bench,
 --   T.placeMoveable, T.vehicle, T.track) pushes its undo onto the test's restore stack. After
 --   validate and `spec.cleanup`, the wrapper unwinds it newest first: it removes what the test
 --   placed (banks through PowerBank.remove, running generators switched off first, vehicles
@@ -64,11 +64,6 @@ end
 function T.expectNear(label, actual, expected, tolerance)
     return T.expect(type(actual) == "number" and math.abs(actual - expected) <= (tolerance or 0.0001),
         label .. " is " .. tostring(actual) .. ", expected " .. expected)
-end
-
-function T.expectCount(fullType, expected)
-    local actual = T.player():getInventory():getCountTypeRecurse(fullType)
-    return T.expect(actual == expected, actual .. " " .. fullType .. " in the inventory, expected " .. expected)
 end
 
 --- Returns `value`; when it is nil or false, records `what` (a noun phrase: "a free indoor square
@@ -393,13 +388,40 @@ function T.placeMoveable(self, square, itemType, sprite, modData)
     return T.need(self, object and T.track(self, object), "a placed " .. itemType)
 end
 
---- A vehicle of `script` on open ground near `opts.near` (the character by default), its
---- battery replaced by a new `opts.battery` (a full type) if given and charged to `opts.charge`
---- if given. Returns the vehicle and its battery.
+--- A workstation of the entity script `entity` (such as "Base.Kiln_Small"), drawn as `sprite`,
+--- on a free square next to the character, who is using it as its crafting window makes them.
+--- Returns the object.
+function T.bench(self, entity, sprite)
+    local script = T.need(self, getScriptManager():getGameEntityScript(entity), "the entity script " .. entity)
+    local here = T.player():getSquare()
+    local square
+    for _, direction in ipairs({ IsoDirections.S, IsoDirections.E, IsoDirections.N, IsoDirections.W }) do
+        local next = here:getAdjacentSquare(direction)
+        if not square and next and not self.used[next] and next:isFree(false) and not here:isBlockedTo(next) then
+            square = next
+        end
+    end
+    if not (script and T.need(self, square, "a free square next to the character for a " .. entity)) then
+        return nil
+    end
+    self.used[square] = true
+    local bench = IsoObject.new(square, sprite, entity)
+    GameEntityFactory.CreateIsoObjectEntity(bench, script, true)
+    square:AddTileObject(bench)
+    T.track(self, bench)
+    bench:setUsingPlayer(T.player())
+    return T.need(self, bench:getComponent(ComponentType.CraftBench) and bench, "a craft bench in " .. entity)
+end
+
+--- A vehicle of `script` facing north on `opts.square`, else on open ground near `opts.near`
+--- (the character by default), its battery replaced by a new `opts.battery` (a full type) if
+--- given and charged to `opts.charge` if given. Returns the vehicle and its battery.
 function T.vehicle(self, script, opts)
     opts = opts or {}
     -- Far enough that the vehicle doesn't land on the character.
-    for _, square in ipairs(freeSquares(self, VEHICLE_TRIES, { near = opts.near, minDistance = 4, bare = true })) do
+    local squares = opts.square and { opts.square }
+        or freeSquares(self, VEHICLE_TRIES, { near = opts.near, minDistance = 4, bare = true })
+    for _, square in ipairs(squares) do
         -- addVehicleDebug returns a vehicle even where it leaves it out of the world, as it does
         -- where it would hit another vehicle; only a vehicle in the world gets an id
         -- (BaseVehicle.createPhysics).
@@ -493,14 +515,27 @@ end
 
 -- Crafting -------------------------------------------------------------------------------------
 
--- Why the crafting window or the right-click menu would refuse to start this craft, or nil if
--- it would start it. Both refuse without saying why.
-function T.craftRefusal(recipe, selectedItem)
+-- The crafting logic the game starts `recipe` from the item `from` with: the right-click menu's,
+-- with a table in reach as the surface, or with `bench` (from T.bench) the bench window's.
+local function craftLogic(recipe, from, bench)
     local p = T.player()
-    local logic = HandcraftLogic.new(p, nil, nil)
-    logic:setIsoObject(logic:findCraftSurface(p, 2))
+    local logic
+    if bench then
+        logic = HandcraftLogic.new(p, bench:getComponent(ComponentType.CraftBench), bench)
+    else
+        logic = HandcraftLogic.new(p, nil, nil)
+        logic:setIsoObject(logic:findCraftSurface(p, 2))
+    end
     logic:setContainers(ISInventoryPaneContextMenu.getContainers(p))
-    logic:setRecipeFromContextClick(recipe, selectedItem)
+    logic:setRecipeFromContextClick(recipe, from)
+    return logic
+end
+
+-- Why the game would refuse to start this craft, or nil if it would start it. The menu and the
+-- crafting windows refuse without saying why.
+function T.craftRefusal(recipe, from, bench)
+    local p = T.player()
+    local logic = craftLogic(recipe, from, bench)
     if logic:canPerformCurrentRecipe() then
         return nil
     elseif not p:isRecipeActuallyKnown(recipe) then
@@ -523,13 +558,48 @@ function T.craftRefusal(recipe, selectedItem)
     return "missing " .. table.concat(missing, "; ")
 end
 
---- Registers a test that crafts `spec.recipe` the way the right-click menu does, from the first
---- `spec.from` item, instantly unless `spec.instant` is false. The character knows every recipe,
---- has at least the levels the recipe requires, stands by a table, and carries exactly the inputs
---- of one craft (RenewableEnergy.Debug.addRecipeInputs with `spec.prefer`) and whatever
---- `spec.setup(self)` adds. validate() expects the inventory counts in `spec.counts`, then runs
---- `spec.validate(self)`. A failing test also reports why the game refused the craft, since the
---- menu refuses without a word.
+--- Starts crafting `recipe` from the item `from` the way the right-click menu does or, with
+--- `bench` (from T.bench), the way the bench's crafting window does. Adds why the game refused
+--- to `self.refusal`.
+function T.startCraft(self, recipe, from, bench)
+    local refusal = T.craftRefusal(recipe, from, bench)
+    if refusal then
+        self.refusal = (self.refusal and self.refusal .. "; " or "") .. recipe:getName() .. ": " .. refusal
+    end
+    if bench then
+        ISEntityUI.HandcraftStart(T.player(), craftLogic(recipe, from, bench), false, true)
+    else
+        ISInventoryPaneContextMenu.OnNewCraft(from, recipe, T.player():getPlayerNum(), false)
+    end
+end
+
+-- How many `fullType` lie on the floor around the character, removing them. A craft whose output
+-- doesn't fit drops it at the character's feet (Actions.addOrDropItem).
+local function takeDropped(fullType)
+    local here, count = T.player():getCurrentSquare(), 0
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            local square = here and getSquare(here:getX() + dx, here:getY() + dy, here:getZ())
+            local objects = square and square:getWorldObjects()
+            for i = (objects and objects:size() or 0) - 1, 0, -1 do
+                if objects:get(i):getItem():getFullType() == fullType then
+                    count = count + 1
+                    square:removeWorldObject(objects:get(i))
+                end
+            end
+        end
+    end
+    return count
+end
+
+--- Registers a test that crafts `spec.recipe` from the first `spec.from` item the way the
+--- right-click menu does or, with `spec.bench` ({ entity script, sprite }, see T.bench), at that
+--- workstation the way its crafting window does; instantly unless `spec.instant` is false. The
+--- character knows every recipe, has at least the levels the recipe requires, stands by a table,
+--- and carries exactly the inputs of one craft (RenewableEnergy.Debug.addRecipeInputs with
+--- `spec.prefer`) and whatever `spec.setup(self)` adds. validate() expects the counts in
+--- `spec.counts`, in the inventory or dropped at the character's feet, then runs
+--- `spec.validate(self)`. A failing test also reports why the game refused the craft.
 function T.craftTest(name, spec)
     T.test(name, {
         sandbox = spec.sandbox,
@@ -541,6 +611,8 @@ function T.craftTest(name, spec)
             if not recipe then return end
             RenewableEnergy.Debug.learnRecipes(p)
             RenewableEnergy.Debug.placeWorkTable(p)
+            local bench = spec.bench and T.bench(self, spec.bench[1], spec.bench[2])
+            if spec.bench and not bench then return end
             for i = 0, recipe:getRequiredSkillCount() - 1 do
                 local skill = recipe:getRequiredSkill(i)
                 if p:getPerkLevel(skill:getPerk()) < skill:getLevel() then
@@ -554,13 +626,13 @@ function T.craftTest(name, spec)
             end
             local from = T.need(self, p:getInventory():getFirstTypeRecurse(spec.from), "a " .. spec.from .. " to craft from")
             if not from then return end
-            self.refusal = T.craftRefusal(recipe, from)
-            ISInventoryPaneContextMenu.OnNewCraft(from, recipe, p:getPlayerNum(), false)
+            T.startCraft(self, recipe, from, bench)
         end,
         validate = function(self)
             local before = #failures
             for fullType, count in pairs(spec.counts or {}) do
-                T.expectCount(fullType, count)
+                local actual = T.player():getInventory():getCountTypeRecurse(fullType) + takeDropped(fullType)
+                T.expect(actual == count, actual .. " " .. fullType .. ", expected " .. count)
             end
             if spec.validate then
                 spec.validate(self)
