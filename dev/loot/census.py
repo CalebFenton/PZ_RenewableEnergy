@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Counts what a thorough player could search in five towns of the Build 42 map: every room, every
+"""Counts what a thorough player could search in the TOWNS of the Build 42 map: every room, every
 container tile by the room it stands in, and every vehicle stall by its vehicle zone, and the
 whole map's vehicle stalls. Writes them to
 dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevTownCensus.lua, which the
@@ -15,14 +15,15 @@ map. It reads the files IsoMetaGrid and IsoLot read:
   run into the next cell), and objects.
 - <map>/world_<cx>_<cy>.lotpack: "LOTP", int32 version, int32 chunk count, then an int64 offset
   per 8 x 8 chunk (index x * 32 + y). Each chunk lists its squares level by level, x then y: an
-  int32 count; -1 and a count of squares to skip; or an int32 the game no longer uses for rooms
-  (it is -1) and count - 1 tile indexes into the header's names. Rooms come from the rects.
+  int32 count; -1 and a count of squares to skip; or an int32 the game skips (-1 in Build 42
+  maps) and count - 1 tile indexes into the header's names. Rooms come from the rects.
 - <map>/objects.lua: the map zones; a ParkingStall zone's name is its VehicleZoneDistribution.
 - *.tiles: each tile's properties; a container tile has a "container" property naming its type.
 
 Vehicle stalls are counted as IsoChunk.AddVehicles_OnZone lays them out: a stall every 3 squares
 across and 5 along a zone facing north or south, 5 across and 3 along one facing east or west.
 """
+import functools
 import os
 import re
 import struct
@@ -64,8 +65,12 @@ def container_types(media):
     return types
 
 
+@functools.lru_cache(maxsize=None)
 def read_header(path, cell):
-    data = open(path, "rb").read()
+    """The cell's tile names, its lowest and highest level, and its rooms as (name, level, rects),
+    with the rects in world squares."""
+    with open(path, "rb") as f:
+        data = f.read()
     at = 4 if data[:4] == b"LOTH" else 0
     (version,) = struct.unpack_from("<i", data, at)
     at += 4
@@ -76,10 +81,9 @@ def read_header(path, cell):
         end = data.index(b"\n", at)
         tiles.append(data[at:end].decode("latin-1"))
         at = end + 1
-    at += 1 if version == 0 else 0
     if version == 0:
-        _w, _h, levels = struct.unpack_from("<3i", data, at)
-        at += 12
+        _w, _h, levels = struct.unpack_from("<3i", data, at + 1)
+        at += 13
         min_level, max_level = 0, levels - 1
     else:
         _w, _h, min_level, max_level = struct.unpack_from("<4i", data, at)
@@ -130,20 +134,28 @@ def chunk_squares(pack, index, levels):
                     yield x, y, z, tiles
 
 
+def town_cells(folder, town, margin=0):
+    """(cx, cy, lotheader path) of each cell of the map under the town's bounds, and `margin`
+    cells around them."""
+    _name, x1, y1, x2, y2 = town
+    for cx in range(x1 // CELL - margin, x2 // CELL + 1 + margin):
+        for cy in range(y1 // CELL - margin, y2 // CELL + 1 + margin):
+            header = os.path.join(folder, "%d_%d.lotheader" % (cx, cy))
+            if os.path.exists(header):
+                yield cx, cy, header
+
+
 def room_names(folder, town):
     """(x, y, z) -> room name for the squares of the town's rooms, from the town's cells and
     their neighbours, whose rects can reach in."""
     _name, x1, y1, x2, y2 = town
     names = {}
-    for cx in range(x1 // CELL - 1, x2 // CELL + 2):
-        for cy in range(y1 // CELL - 1, y2 // CELL + 2):
-            header = os.path.join(folder, "%d_%d.lotheader" % (cx, cy))
-            if os.path.exists(header):
-                for name, level, rects in read_header(header, (cx, cy))[3]:
-                    for rx, ry, w, h in rects:
-                        for x in range(max(rx, x1), min(rx + w, x2 + 1)):
-                            for y in range(max(ry, y1), min(ry + h, y2 + 1)):
-                                names[x, y, level] = name
+    for cx, cy, header in town_cells(folder, town, margin=1):
+        for name, level, rects in read_header(header, (cx, cy))[3]:
+            for rx, ry, w, h in rects:
+                for x in range(max(rx, x1), min(rx + w, x2 + 1)):
+                    for y in range(max(ry, y1), min(ry + h, y2 + 1)):
+                        names[x, y, level] = name
     return names
 
 
@@ -151,27 +163,24 @@ def count_containers(folder, types, town):
     _name, x1, y1, x2, y2 = town
     rooms = room_names(folder, town)
     containers = {}
-    for cx in range(x1 // CELL, x2 // CELL + 1):
-        for cy in range(y1 // CELL, y2 // CELL + 1):
-            header = os.path.join(folder, "%d_%d.lotheader" % (cx, cy))
-            if not os.path.exists(header):
-                continue
-            tiles, min_level, max_level, _rooms = read_header(header, (cx, cy))
-            pack = open(os.path.join(folder, "world_%d_%d.lotpack" % (cx, cy)), "rb").read()
-            for chx in range(CELL // CHUNK):
-                for chy in range(CELL // CHUNK):
-                    ox, oy = cx * CELL + chx * CHUNK, cy * CELL + chy * CHUNK
-                    if ox + CHUNK <= x1 or ox > x2 or oy + CHUNK <= y1 or oy > y2:
+    for cx, cy, header in town_cells(folder, town):
+        tiles, min_level, max_level, _rooms = read_header(header, (cx, cy))
+        with open(os.path.join(folder, "world_%d_%d.lotpack" % (cx, cy)), "rb") as f:
+            pack = f.read()
+        for chx in range(CELL // CHUNK):
+            for chy in range(CELL // CHUNK):
+                ox, oy = cx * CELL + chx * CHUNK, cy * CELL + chy * CHUNK
+                if ox + CHUNK <= x1 or ox > x2 or oy + CHUNK <= y1 or oy > y2:
+                    continue
+                for lx, ly, z, indexes in chunk_squares(pack, chx * 32 + chy, (min_level, max_level)):
+                    room_name = rooms.get((ox + lx, oy + ly, z))
+                    if room_name is None:
                         continue
-                    for lx, ly, z, indexes in chunk_squares(pack, chx * 32 + chy, (min_level, max_level)):
-                        room_name = rooms.get((ox + lx, oy + ly, z))
-                        if room_name is None:
-                            continue
-                        for index in indexes:
-                            kind = types.get(tiles[index])
-                            if kind:
-                                by_type = containers.setdefault(room_name, {})
-                                by_type[kind] = by_type.get(kind, 0) + 1
+                    for index in indexes:
+                        kind = types.get(tiles[index])
+                        if kind:
+                            by_type = containers.setdefault(room_name, {})
+                            by_type[kind] = by_type.get(kind, 0) + 1
     return containers
 
 
@@ -179,13 +188,10 @@ def count_rooms(folder, town):
     """Room name -> how many rooms of that name start inside the town."""
     _name, x1, y1, x2, y2 = town
     counts = {}
-    for cx in range(x1 // CELL, x2 // CELL + 1):
-        for cy in range(y1 // CELL, y2 // CELL + 1):
-            header = os.path.join(folder, "%d_%d.lotheader" % (cx, cy))
-            if os.path.exists(header):
-                for name, _level, rects in read_header(header, (cx, cy))[3]:
-                    if rects and x1 <= rects[0][0] <= x2 and y1 <= rects[0][1] <= y2:
-                        counts[name] = counts.get(name, 0) + 1
+    for cx, cy, header in town_cells(folder, town):
+        for name, _level, rects in read_header(header, (cx, cy))[3]:
+            if rects and x1 <= rects[0][0] <= x2 and y1 <= rects[0][1] <= y2:
+                counts[name] = counts.get(name, 0) + 1
     return counts
 
 
@@ -203,11 +209,13 @@ def stalls_along(start, length, step):
 def vehicle_stalls(folder, town):
     _name, x1, y1, x2, y2 = town
     stalls = {}
-    text = open(os.path.join(folder, "objects.lua"), encoding="latin-1").read()
+    with open(os.path.join(folder, "objects.lua"), encoding="latin-1") as f:
+        text = f.read()
     for m in ZONE.finditer(text):
         name, x, y, w, h, direction = m.group(1), *map(int, m.groups()[1:5]), m.group(6)
         if not (x1 <= x + w / 2 <= x2 and y1 <= y + h / 2 <= y2):
             continue
+        # The engine's guess at the facing of a zone without a Direction (IsoChunk.AddVehicles_OnZone).
         facing = "N"
         if w in (4, 5, 6) and (h <= 3 or h >= 6):
             facing = "W"

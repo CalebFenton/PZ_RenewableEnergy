@@ -1,7 +1,7 @@
 /*
     Craft recipes. Display names come from Translate/<LANG>/Recipes.json, keyed by recipe name,
     and a recipe's Tooltip from Tooltip.json. Callbacks are in
-    lua/shared/RenewableEnergy/RecipeCode.lua.
+    lua/shared/RenewableEnergy/Recipes.lua.
 
     The recipes live in module Base, prefixed against name clashes: the game looks a recipe up
     by its bare name when researching an item and in a magazine's recipe list, and a bare name
@@ -23,7 +23,7 @@
 */
 module Base
 {
-    /**************************** Battery storage ***************************/
+    /**************************** Battery banks *****************************/
     /* Wood asks for more skill than metal, since planks are easy to come by. */
 
     craftRecipe RenewableEnergy_MakeBatteryBoxWood

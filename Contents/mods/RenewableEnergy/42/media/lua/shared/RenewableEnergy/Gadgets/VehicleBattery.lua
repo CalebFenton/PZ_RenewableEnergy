@@ -6,7 +6,7 @@ require "RenewableEnergy/Specs"
 -- itemType = Base.CarBattery, with the vehicle's mechanicType appended to every entry), and the
 -- game picks a new vehicle's battery at random from that list. So the deep cycle battery isn't
 -- added there, which would put one in half the cars of the world: the mechanics menu offers it
--- beside the car batteries instead (client/RenewableEnergy/UI/RenewableEnergyVehicleBattery.lua),
+-- beside the car batteries instead (client/RenewableEnergy/UI/VehicleBatteryMenu.lua),
 -- and vanilla's install action, which never checks the item's type, fits it.
 --
 -- Vanilla charges and drains a vehicle battery by a fraction of its charge, sized for a car
@@ -16,6 +16,7 @@ RenewableEnergy = RenewableEnergy or {}
 local VehicleBattery = {}
 RenewableEnergy.VehicleBattery = VehicleBattery
 
+-- The vehicle part id of the battery slot.
 VehicleBattery.PART = "Battery"
 -- The L-16 is left out: it is a 6 V battery, and a car's starter and lights need 12 V.
 VehicleBattery.ITEM = "RenewableEnergy.DeepCycleBattery"

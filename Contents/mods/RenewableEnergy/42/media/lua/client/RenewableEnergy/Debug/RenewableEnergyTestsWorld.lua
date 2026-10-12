@@ -2,7 +2,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Sprites"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
-local Stash = require "RenewableEnergy/StashDescriptions"
+local Stash = require "RenewableEnergy/StashHouses"
 
 -- Stash house, world spawn, solar site, garden light and arrow board tests. See
 -- RenewableEnergyTestLib.lua for how the runner works. Server Lua loads after client Lua, so
@@ -266,7 +266,7 @@ test("renewable_energy_world_prepper_map_targets", {
 })
 
 -- A map item of the mod's own shows the area of its stash house, found or not: its Map id is the
--- stash name, which RenewableEnergyMapDefinitions draws. Vanilla town maps keep their own look.
+-- stash name, which UI/MapDefinitions.lua draws. Vanilla town maps keep their own look.
 test("renewable_energy_world_stash_map_items_draw_their_area", {
     validate = function()
         for stashMap in pairs(Stash.descriptions) do

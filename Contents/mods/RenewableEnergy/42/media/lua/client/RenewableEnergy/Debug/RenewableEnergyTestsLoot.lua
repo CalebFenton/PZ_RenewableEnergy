@@ -163,13 +163,13 @@ test("renewable_energy_loot_items_spawn", {
         if not distributions() then
             return
         end
-        local targets = RenewableEnergyLoot.targets()
-        RenewableEnergyLoot.withMeasureOptions(function()
+        local targets = RenewableEnergy.Loot.targets()
+        RenewableEnergy.Loot.withMeasureOptions(function()
             local function build()
-                return RenewableEnergyLoot.tablesFor(targets, false)
+                return RenewableEnergy.Loot.tablesFor(targets, false)
             end
-            RenewableEnergyLoot.withLoot(100, build, function(parsed)
-                local container = RenewableEnergyLoot.newContainer(nil)
+            RenewableEnergy.Loot.withLoot(100, build, function(parsed)
+                local container = RenewableEnergy.Loot.newContainer(nil)
                 for i, target in ipairs(targets) do
                     local list = parsed["t" .. i]
                     if expect(list ~= nil, target.reference .. ": the game didn't parse it") then
@@ -179,7 +179,7 @@ test("renewable_energy_loot_items_spawn", {
                             remaining = remaining + 1
                         end
                         for _ = 1, 200 do
-                            for fullType in pairs(RenewableEnergyLoot.rollOnce(list, container)) do
+                            for fullType in pairs(RenewableEnergy.Loot.rollOnce(list, container)) do
                                 if missing[fullType] then
                                     missing[fullType] = nil
                                     remaining = remaining - 1
@@ -380,7 +380,7 @@ test("renewable_energy_loot_found_batteries_part_charged", {
             return
         end
         local range = RenewableEnergy.Specs.foundCharge
-        local container = RenewableEnergyLoot.newContainer(nil)
+        local container = RenewableEnergy.Loot.newContainer(nil)
         local bag = container:AddItem("Base.Bag_DuffelBag")
         local loose = container:AddItem("RenewableEnergy.DeepCycleBattery")
         local bagged = bag and bag:getInventory():AddItem("RenewableEnergy.L16Battery")
@@ -431,7 +431,7 @@ local function sampleSquares(wanted)
             end
         end
     end
-    local outside = RenewableEnergyLoot.squareOutsideRooms()
+    local outside = RenewableEnergy.Loot.squareOutsideRooms()
     if outside then
         table.insert(squares, outside)
     end

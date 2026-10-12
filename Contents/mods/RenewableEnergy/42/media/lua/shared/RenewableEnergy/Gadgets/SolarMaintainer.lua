@@ -1,8 +1,9 @@
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/Gadgets/VehicleBattery"
 
--- The Solar Battery Maintainer: a 10 W panel clipped to a vehicle that keeps its battery
+-- The Solar Battery Maintainer: a small panel clipped to a vehicle that keeps its battery
 -- topped up in daylight.
 --
 -- An attached maintainer is a mark in the modData of the vehicle's Battery part. That part
@@ -15,16 +16,16 @@ RenewableEnergy.SolarMaintainer = SolarMaintainer
 
 SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 
-local PART = "Battery"
-local KEY = "RenewableEnergy_SolarMaintainer"
+-- Battery part modData: { condition } of the attached maintainer.
+local ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"
 
 local function batteryPart(vehicle)
-    return vehicle and vehicle:getPartById(PART)
+    return vehicle and vehicle:getPartById(RenewableEnergy.VehicleBattery.PART)
 end
 
 function SolarMaintainer.isAttached(vehicle)
     local part = batteryPart(vehicle)
-    return part ~= nil and part:getModData()[KEY] ~= nil
+    return part ~= nil and part:getModData()[ATTACHED_KEY] ~= nil
 end
 
 function SolarMaintainer.canAttach(vehicle)
@@ -42,7 +43,7 @@ function SolarMaintainer.attach(character, vehicle, item)
         sendRemoveItemFromContainer(container, item)
     end
     local part = batteryPart(vehicle)
-    part:getModData()[KEY] = { condition = item:getCondition() }
+    part:getModData()[ATTACHED_KEY] = { condition = item:getCondition() }
     vehicle:transmitPartModData(part)
     return true
 end
@@ -54,8 +55,8 @@ function SolarMaintainer.detach(character, vehicle)
     end
     local part = batteryPart(vehicle)
     local item = instanceItem(SolarMaintainer.ITEM)
-    item:setCondition(part:getModData()[KEY].condition)
-    part:getModData()[KEY] = nil
+    item:setCondition(part:getModData()[ATTACHED_KEY].condition)
+    part:getModData()[ATTACHED_KEY] = nil
     vehicle:transmitPartModData(part)
     Actions.addOrDropItem(character, item)
     return true
@@ -76,7 +77,7 @@ function SolarMaintainer.charge(vehicle, hours)
     end
     local capacityWh = RenewableEnergy.Battery.nominalWh(battery)
     local wh = RenewableEnergy.Sun.panelWatts(RenewableEnergy.Specs.maintainerWatts, "flat") * hours
-    if not capacityWh or capacityWh <= 0 or wh <= 0 then
+    if capacityWh <= 0 or wh <= 0 then
         return 0
     end
     -- As vanilla's alternator charging does (Vehicles.Update.Battery): the server sends the

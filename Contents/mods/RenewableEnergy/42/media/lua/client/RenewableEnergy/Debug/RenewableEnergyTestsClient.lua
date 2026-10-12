@@ -9,9 +9,9 @@ require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/RenewableEnergyFormat"
-require "RenewableEnergy/UI/RenewableEnergyMenu"
-require "RenewableEnergy/UI/RenewableEnergyStatusWindow"
+require "RenewableEnergy/UI/Format"
+require "RenewableEnergy/UI/Menu"
+require "RenewableEnergy/UI/StatusWindow"
 
 -- Menus, timed actions and the status window. See RenewableEnergyTestLib.lua for how the runner
 -- works. Each test builds its own banks and panels next to the character and removes them

@@ -12,6 +12,7 @@
 if isClient() then return end
 
 require "Map/SGlobalObject"
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
@@ -20,11 +21,15 @@ require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
 
+RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local Battery, Wear, PowerBank = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
 
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
+RenewableEnergy.Bank = Bank
 
+-- The fields the Global Object System saves with the world; a field renamed here is lost from
+-- existing saves.
 Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
     "inverters", "chargers", "controllers", "sources", "loadW", "averageLoadW", "loadByKind", "chargeSource",
@@ -39,7 +44,7 @@ local INVERTER_EFFICIENCY = 0.9
 local BACKUP_REACH = 3
 -- Snow on panels, per hour: falling snow covers a panel at full intensity in about two
 -- hours; it melts above freezing and slides off in sun; a rack sheds it in about two hours
--- of sun or mild air (design §5.6).
+-- of sun or mild air.
 local SNOW_PER_HOUR = 0.5
 local SNOW_MELT_PER_HOUR = 0.1
 local SNOW_SUN_MELT_PER_HOUR = 0.05
@@ -158,6 +163,11 @@ function Bank:recount()
     self.charge = nominalWh > 0 and storedWh / nominalWh or 0
 end
 
+-- The BatteryWear sandbox option as a factor.
+local function wearScale()
+    return SandboxVars.RenewableEnergy.BatteryWear / 100
+end
+
 --- Put the bank's charge into every battery it holds: the batteries are wired in parallel,
 --- so they share one state of charge. Pending wear from days spent unloaded lands too.
 function Bank:writeBatteries(container, applyPending)
@@ -168,7 +178,7 @@ function Bank:writeBatteries(container, applyPending)
             Battery.setCharge(item, self.charge)
             if applyPending then
                 for _, depth in ipairs(self.pendingDepths) do
-                    changed = Battery.wear(item, Battery.cycleWear(spec, depth) * self:wearScale()) or changed
+                    changed = Battery.wear(item, Battery.cycleWear(spec, depth) * wearScale()) or changed
                 end
             end
             if changed then
@@ -181,15 +191,11 @@ function Bank:writeBatteries(container, applyPending)
     end
 end
 
-function Bank:wearScale()
-    return SandboxVars.RenewableEnergy.BatteryWear / 100
-end
-
 -- Wear every battery by a fraction of its life.
 function Bank:wearBatteries(container, fractionFor)
     eachItem(container, function(item)
         local spec = Battery.spec(item)
-        if spec and Battery.wear(item, fractionFor(spec) * self:wearScale()) then
+        if spec and Battery.wear(item, fractionFor(spec) * wearScale()) then
             sendItemStats(item)
         end
     end)
@@ -199,39 +205,29 @@ local function working(part)
     return part.condition > 0
 end
 
---- The watts the bank's working inverters carry together.
-function Bank:limitW()
-    local watts = 0
-    for _, inverter in ipairs(self.inverters) do
+-- The sum of Specs.inverters[type][field] over the bank's working inverters.
+local function sumInverters(bank, field)
+    local total = 0
+    for _, inverter in ipairs(bank.inverters) do
         if working(inverter) then
-            watts = watts + Specs.inverters[inverter.type].watts
+            total = total + Specs.inverters[inverter.type][field]
         end
     end
-    return watts
+    return total
 end
 
-function Bank:idleW()
-    local watts = 0
-    for _, inverter in ipairs(self.inverters) do
-        if working(inverter) then
-            watts = watts + Specs.inverters[inverter.type].idle
-        end
-    end
-    return watts
+--- The watts the bank's working inverters carry together.
+function Bank:limitW()
+    return sumInverters(self, "watts")
 end
 
 --- The watts the bank's working chargers, and the chargers built into its inverters, put in
 --- while grid or generator power reaches it.
 function Bank:chargerW()
-    local watts = 0
+    local watts = sumInverters(self, "chargerWatts")
     for _, charger in ipairs(self.chargers) do
         if working(charger) then
             watts = watts + Specs.chargerWatts
-        end
-    end
-    for _, inverter in ipairs(self.inverters) do
-        if working(inverter) then
-            watts = watts + Specs.inverters[inverter.type].chargerWatts
         end
     end
     return watts
@@ -294,24 +290,6 @@ local function conditionMax(fullType)
     return CONDITION_MAX[fullType]
 end
 
---- The modules a placed mount holds, from its modData; a mount without that record holds
---- whole factory modules.
-function Bank.modulesOf(isoObject, kind)
-    local modules = {}
-    local recorded = isoObject:getModData()[PowerBank.MODULES]
-    if type(recorded) == "table" then
-        for _, module in ipairs(recorded) do
-            table.insert(modules, { type = module.type, condition = module.condition })
-        end
-    end
-    if #modules == 0 then
-        for _ = 1, Specs.mounts[kind].modules do
-            table.insert(modules, { type = "RenewableEnergy.SolarModule", condition = 100 })
-        end
-    end
-    return modules
-end
-
 local function writeModules(isoObject, modules)
     local record = {}
     for i, module in ipairs(modules) do
@@ -348,7 +326,7 @@ function Bank:addSource(isoObject)
     table.insert(self.sources, {
         x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(),
         kind = kind, facing = facing, material = material, snow = 0, watts = 0,
-        modules = Bank.modulesOf(isoObject, kind),
+        modules = PowerBank.modulesOf(isoObject, kind),
     })
 end
 
@@ -359,17 +337,6 @@ function Bank:removeSource(x, y, z)
         return true
     end
     return false
-end
-
-local function sourceObjectAt(square)
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        local object = objects:get(i)
-        if PowerBank.sourceKind(object) then
-            return object
-        end
-    end
-    return nil
 end
 
 -- Snow cover after `hours` of the weather in `context`.
@@ -429,13 +396,19 @@ function Bank:clearSnow(source, object)
     end
 end
 
+--- How likely a storm is to crack a module of a mount, relative to Specs.storm.chancePerHour.
+local function stormFactor(mount, material)
+    local materialSpec = material and Specs.materials[material]
+    return Specs.mounts[mount].stormFactor * (materialSpec and materialSpec.stormFactor or 1)
+end
+
 --- A thunderstorm may crack one of a panel's modules. Returns whether it did.
 function Bank.stormCrack(source, stormHours)
     local options = SandboxVars.RenewableEnergy
     if not options.StormDamage or stormHours <= 0 then
         return false
     end
-    local perHour = Specs.storm.chancePerHour * PowerBank.stormFactor(source.kind, source.material) * options.StormDamageRate / 100
+    local perHour = Specs.storm.chancePerHour * stormFactor(source.kind, source.material) * options.StormDamageRate / 100
     local chance = 1 - (1 - math.min(1, perHour)) ^ stormHours
     local whole = {}
     for _, module in ipairs(source.modules) do
@@ -459,7 +432,7 @@ local function syncModules(source, object)
         writeModules(object, source.modules)
         source.modulesChanged = nil
     else
-        source.modules = Bank.modulesOf(object, source.kind)
+        source.modules = PowerBank.modulesOf(object, source.kind)
     end
 end
 
@@ -493,7 +466,7 @@ function Bank:updateSources(hours, context)
     for i = #self.sources, 1, -1 do
         local source = self.sources[i]
         local square = getSquare(source.x, source.y, source.z)
-        local object = square and sourceObjectAt(square)
+        local object = PowerBank.sourceOn(square)
         if square and not (object and square:isOutside() and PowerBank.isInReach(self, source.x, source.y, source.z)) then
             table.remove(self.sources, i)
         end
@@ -501,7 +474,7 @@ function Bank:updateSources(hours, context)
     local solarW, slots = 0, self:panelSlots()
     for i, source in ipairs(self.sources) do
         local square = getSquare(source.x, source.y, source.z)
-        local object = square and sourceObjectAt(square)
+        local object = PowerBank.sourceOn(square)
         if Bank.stormCrack(source, context.stormHours) then
             source.modulesChanged = true
         end
@@ -526,15 +499,9 @@ end
 
 -- Backup generator -----------------------------------------------------------------------
 
-local function hasFailsafe(square)
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        local sprite = objects:get(i):getSprite()
-        if sprite and Sprites.kindOf(sprite:getName()) == "failsafe" then
-            return true
-        end
-    end
-    return false
+local function isFailsafe(object)
+    local sprite = object:getSprite()
+    return sprite ~= nil and Sprites.kindOf(sprite:getName()) == "failsafe"
 end
 
 --- The nearest plugged-in generator, one with a failsafe on its square first.
@@ -545,7 +512,7 @@ function Bank:findGenerator()
             local square = getSquare(x, y, self.z)
             local generator = square and square:getGenerator()
             if generator and generator:isConnected() and not PowerBank.isBank(generator) then
-                local failsafe = hasFailsafe(square)
+                local failsafe = RenewableEnergy.findObjectOn(square, isFailsafe) ~= nil
                 local distance = IsoUtils.DistanceToSquared(x, y, self.x, self.y)
                 if not best or (failsafe and not bestFailsafe) or (failsafe == bestFailsafe and distance < bestDistance) then
                     best, bestFailsafe, bestDistance = generator, failsafe, distance
@@ -641,10 +608,14 @@ function Bank:chargeFrom(generators, hours)
     return watts
 end
 
---- Whether the bank would carry its load now: switched on, indoors, with a working inverter,
---- and neither the grid nor a backup generator doing it instead.
+-- Switched on, indoors, with a working inverter, and off the grid.
+local function canCarryLoad(bank)
+    return bank.on and bank.indoors and bank:limitW() > 0 and not bank.gridPowered
+end
+
+--- Whether the bank would carry its load now: it can, and no backup generator does it instead.
 function Bank:carriesLoad()
-    return self.on and self.indoors and self:limitW() > 0 and not self.gridPowered and not self:backupCarriesLoad()
+    return canCarryLoad(self) and not self:backupCarriesLoad()
 end
 
 --- Cut the power while the load is beyond the inverters, and bring it back once it fits.
@@ -661,8 +632,7 @@ end
 
 --- Whether the bank should power its squares now.
 function Bank:shouldPower()
-    return self.on and self.indoors and self:limitW() > 0 and not self.gridPowered
-        and not self.overloaded and not self.empty
+    return canCarryLoad(self) and not self.overloaded and not self.empty
 end
 
 --- Run the bank's generator, which is what powers the squares, while the bank should.
@@ -725,12 +695,17 @@ local function today()
     return time:getYear() * 1000 + Sun.dayOfYear(time:getMonth(), time:getDay())
 end
 
+-- The watts the inverters take from the batteries to carry the load and run themselves.
+local function inverterDrawW(bank)
+    return bank.averageLoadW / INVERTER_EFFICIENCY + sumInverters(bank, "idle")
+end
+
 --- The watts the batteries give the inverters now.
 function Bank:drawW()
     if not self:shouldPower() or self:backupCarriesLoad() then
         return 0
     end
-    return self.averageLoadW / INVERTER_EFFICIENCY + self:idleW()
+    return inverterDrawW(self)
 end
 
 --- One pass: `hours` of sun, load and charging up to now.
@@ -757,7 +732,7 @@ function Bank:update(hours, context)
     -- a bank that barely charges doesn't stop and start every pass.
     if drawW > 0 and stored <= 0 then
         self.empty = true
-    elseif self.empty and stored > 0 and stored >= (self.averageLoadW / INVERTER_EFFICIENCY + self:idleW()) * hours then
+    elseif self.empty and stored > 0 and stored >= inverterDrawW(self) * hours then
         self.empty = false
     end
     if self:shouldPower() then

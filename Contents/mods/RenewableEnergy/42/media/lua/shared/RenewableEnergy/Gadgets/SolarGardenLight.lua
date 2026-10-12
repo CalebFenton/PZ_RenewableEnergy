@@ -1,3 +1,4 @@
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
@@ -48,14 +49,7 @@ function SolarGardenLight.canPlaceOn(square)
 end
 
 function SolarGardenLight.findOn(square)
-    local objects = square and square:getObjects()
-    for i = 0, objects and objects:size() - 1 or -1 do
-        local object = objects:get(i)
-        if SolarGardenLight.isLight(object) then
-            return object
-        end
-    end
-    return nil
+    return RenewableEnergy.findObjectOn(square, SolarGardenLight.isLight)
 end
 
 function SolarGardenLight.getCharge(light)

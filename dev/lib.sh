@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced by the dev scripts. PZ_APP overrides the game's Contents folder, and CACHE the cache dir
 # that the calling script defaults to.
 
@@ -22,6 +23,19 @@ MOD_ERROR='\(MOD:Renewable Energy'
 # cache under macOS's /var (really /private/var), loses its tile depth maps. Hence a real copy, in
 # a cache dir under a path with no symlink in it.
 TMP_REAL="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
+
+# Compiles a dev Java file into a directory when the source is newer than its class. The game's
+# own Java has no compiler, so it needs a JDK's javac (or JAVAC); class files for Java 8 run on
+# the game's newer JVM, and any JDK from 8 on can write them.
+compile_java() {
+    local source=$1 dir=$2
+    local class
+    class="$dir/$(basename "$source" .java).class"
+    if [ "$source" -nt "$class" ]; then
+        mkdir -p "$dir"
+        "${JAVAC:-javac}" -nowarn -Xlint:-options -source 8 -target 8 -d "$dir" "$source"
+    fi
+}
 
 install_mod() {
     mkdir -p "$CACHE/mods"
@@ -66,4 +80,12 @@ release_game_lock() {
     if [ "$(cat "$GAME_LOCK/pid" 2>/dev/null)" = "$$" ]; then
         rm -rf "$GAME_LOCK"
     fi
+}
+
+# Background jobs of a script ignore Ctrl-C, so a game started in the background would outlive the
+# script. Stops the game with PID $1 when the script exits, and releases the lock only once the
+# game has exited.
+stop_game_on_exit() {
+    GAME_PID=$1
+    trap 'kill "$GAME_PID" 2>/dev/null || true; wait "$GAME_PID" 2>/dev/null || true; release_game_lock' EXIT
 }

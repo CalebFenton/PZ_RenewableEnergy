@@ -16,9 +16,7 @@ local ACCEPT_ITEM = "RenewableEnergy.PowerBank.acceptItem"
 
 local ClientBank = CGlobalObject:derive("RenewableEnergy_ClientBank")
 
-local BankSystem = CGlobalObjectSystem:derive("RenewableEnergy_BankSystem_Client")
-
-local listeners = {}
+local BankSystem = CGlobalObjectSystem:derive("RenewableEnergy_ClientBankSystem")
 
 function BankSystem:new()
     return CGlobalObjectSystem.new(self, PowerBank.SYSTEM_NAME)
@@ -45,22 +43,15 @@ local function adoptCopy(isoObject)
     end
 end
 
-local function notify(bank)
-    if isClient() then
-        adoptCopy(bank:getIsoObject())
-    end
-    for _, listener in ipairs(listeners) do
-        listener(bank.x, bank.y, bank.z, bank.status)
-    end
-end
-
 -- Only later updates come here: a new bank's first status is copied in by the engine
 -- without a call (CGlobalObjectSystem.receiveNewLuaObjectAt).
 function BankSystem:OnLuaObjectUpdated(bank)
-    notify(bank)
+    if isClient() then
+        adoptCopy(bank:getIsoObject())
+    end
 end
 
--- The server sends no system commands.
+-- The server sends no system commands, and vanilla's default raises an error for any command.
 function BankSystem:OnServerCommand(command, args)
 end
 
@@ -71,11 +62,6 @@ function PowerBank.command(player, name, args)
     if BankSystem.instance then
         BankSystem.instance:sendCommand(player, name, args)
     end
-end
-
---- Call `listener(x, y, z, status)` whenever a bank's status arrives.
-function PowerBank.addStatusListener(listener)
-    table.insert(listeners, listener)
 end
 
 if isClient() then

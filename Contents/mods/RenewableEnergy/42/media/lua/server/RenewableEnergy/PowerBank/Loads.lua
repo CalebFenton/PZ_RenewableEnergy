@@ -1,4 +1,4 @@
--- What a bank powers: every switched-on appliance in its reach, in watts (design §2.4), and
+-- What a bank powers: every switched-on appliance in its reach, in watts, and
 -- the running generators whose reach covers the bank.
 --
 -- The engine says whether an object draws power (getGeneratorPowerConsumption reads the
@@ -15,7 +15,9 @@ if isClient() then return end
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 
+RenewableEnergy = RenewableEnergy or {}
 local Loads = {}
+RenewableEnergy.Loads = Loads
 
 local LOADS = RenewableEnergy.Specs.loads
 local PowerBank = RenewableEnergy.PowerBank
@@ -25,35 +27,43 @@ local function isMiniFridge(object)
     return properties ~= nil and properties:get("GroupName") == "Mini"
 end
 
--- Specs.loads names of what an object draws now, called with each one.
-local function eachLoad(object, add)
+-- The Specs.loads kind of an object with a fridge or freezer container.
+local function fridgeKind(object)
+    if object:getContainerByType("fridge") then
+        if isMiniFridge(object) then
+            return "miniFridge"
+        elseif object:getContainerByType("freezer") then
+            return "fridgeFreezer"
+        end
+    end
+    return "fridge"
+end
+
+-- Adds to `load` each appliance `object` runs now.
+local function addAppliances(load, object)
     if instanceof(object, "IsoStove") then
-        add(object:isMicrowave() and "microwave" or "range")
+        Loads.add(load, object:isMicrowave() and "microwave" or "range")
     elseif instanceof(object, "IsoLightSwitch") then
-        add("light")
+        Loads.add(load, "light")
     elseif instanceof(object, "IsoTelevision") then
-        add("television")
+        Loads.add(load, "television")
     elseif instanceof(object, "IsoRadio") then
-        add("radio")
+        Loads.add(load, "radio")
     elseif instanceof(object, "IsoCarBatteryCharger") then
-        add("batteryCharger")
+        Loads.add(load, "batteryCharger")
     elseif instanceof(object, "IsoClothingWasher") then
-        add("washer")
+        Loads.add(load, "washer")
     elseif instanceof(object, "IsoClothingDryer") then
-        add("dryer")
+        Loads.add(load, "dryer")
     elseif instanceof(object, "IsoCombinationWasherDryer") then
-        add(object:isModeDryer() and "dryer" or "washer")
+        Loads.add(load, object:isModeDryer() and "dryer" or "washer")
     elseif instanceof(object, "IsoStackedWasherDryer") then
-        if object:isWasherActivated() then add("washer") end
-        if object:isDryerActivated() then add("dryer") end
-    elseif object:getPipedFuelAmount() <= 0 and object:getContainerByType("fridge") and isMiniFridge(object) then
-        add("miniFridge")
-    elseif object:getPipedFuelAmount() <= 0 and object:getContainerByType("fridge") and object:getContainerByType("freezer") then
-        add("fridgeFreezer")
+        if object:isWasherActivated() then Loads.add(load, "washer") end
+        if object:isDryerActivated() then Loads.add(load, "dryer") end
     elseif object:getPipedFuelAmount() <= 0 and object:getContainerByEitherType("fridge", "freezer") then
-        add("fridge")
+        Loads.add(load, fridgeKind(object))
     else
-        add("other", object:getGeneratorPowerConsumption() * LOADS.other.wattsPerConsumption)
+        Loads.add(load, "other", object:getGeneratorPowerConsumption() * LOADS.other.wattsPerConsumption)
     end
 end
 
@@ -107,9 +117,6 @@ function Loads.scan(square)
     local allowExterior = SandboxVars.AllowExteriorGenerator
     local cx, cy, cz = square:getX(), square:getY(), square:getZ()
     local cell = square:getCell()
-    local function add(name, watts)
-        Loads.add(load, name, watts)
-    end
     for z = math.max(-32, cz - levels), math.min(31, cz + levels) do
         for x = cx - radius, cx + radius do
             for y = cy - radius, cy + radius do
@@ -120,7 +127,7 @@ function Loads.scan(square)
                     for i = 0, objects:size() - 1 do
                         local object = objects:get(i)
                         if drawsFromGenerator(object, allowExterior) then
-                            eachLoad(object, add)
+                            addAppliances(load, object)
                         elseif isRunningGenerator(object) then
                             table.insert(load.generators, object)
                         end

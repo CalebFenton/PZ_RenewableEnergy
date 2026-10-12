@@ -20,8 +20,8 @@ module RenewableEnergy
     /**************************** Solar modules *****************************/
 
     /*
-        A 50 W 1993 module. Its condition is the share of its rating it makes, and a mount keeps
-        each module's condition (RecipeCode.lua). Research teaches the mounts it goes into.
+        A 1993 factory module. Its condition is the share of its rating it makes, and a mount keeps
+        each module's condition (Recipes.lua). Research teaches the mounts it goes into.
     */
     item SolarModule
     {
@@ -124,7 +124,7 @@ module RenewableEnergy
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
 
-    /**************************** Battery storage ***************************/
+    /**************************** Battery banks *****************************/
     /*
         Plain moveables, not base:generator: with that tag and a WorldObjectSprite, an item
         dropped on the floor turns into a bare IsoGenerator (IsoGridSquare.AddWorldInventoryItem).
@@ -216,7 +216,7 @@ module RenewableEnergy
 
     /**************************** Bank parts ********************************/
     /*
-        Research on found inverters teaches the storage they go into. Inverters and controllers
+        Research on found inverters teaches the banks they go into. Inverters and controllers
         wear while their bank runs, and Electronics Scrap repairs them (Lua: PowerBank).
     */
     item PlugInInverter

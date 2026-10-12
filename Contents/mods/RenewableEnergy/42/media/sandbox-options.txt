@@ -1,7 +1,7 @@
 VERSION = 1,
 /*
-    Sunlight multiplier: 1 is what 1993 modules really made in Kentucky; the default
-    of 3 lets a few modules carry a fridge in summer (design §2.3).
+    Sunlight multiplier: 1 is what 1993 modules really made in Kentucky; the default lets a few
+    modules carry a fridge in summer.
 */
 option RenewableEnergy.SunlightMultiplier {
 	page = RenewableEnergy, translation = RenewableEnergy_SunlightMultiplier,

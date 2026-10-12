@@ -1,3 +1,4 @@
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
@@ -16,7 +17,7 @@ RenewableEnergy.SolarCellCharger = SolarCellCharger
 SolarCellCharger.BATTERY = "Base.Battery"
 SolarCellCharger.SLOTS = 4
 -- Watt-hours that fill one Base.Battery. A game figure, not a cell's: it makes a set of four
--- take one to two sunny summer days at the default sunlight, which design §3 asks for.
+-- take one to two sunny summer days at the default sunlight.
 SolarCellCharger.BATTERY_WH = 25
 
 local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"
@@ -25,6 +26,7 @@ local STORED_KEY = "RenewableEnergy_storedWh"
 -- MapObjects keeps one function per sprite and priority.
 local LOAD_PRIORITY = 7
 
+-- Place key -> { x, y, z } of every charger the authority has seen.
 local places = {}
 
 local function placeKey(x, y, z)
@@ -40,14 +42,7 @@ function SolarCellCharger.acceptItem(container, item)
 end
 
 function SolarCellCharger.findOn(square)
-    local objects = square and square:getObjects()
-    for i = 0, objects and objects:size() - 1 or -1 do
-        local object = objects:get(i)
-        if SolarCellCharger.isCharger(object) then
-            return object
-        end
-    end
-    return nil
+    return RenewableEnergy.findObjectOn(square, SolarCellCharger.isCharger)
 end
 
 local function adopt(isoObject)

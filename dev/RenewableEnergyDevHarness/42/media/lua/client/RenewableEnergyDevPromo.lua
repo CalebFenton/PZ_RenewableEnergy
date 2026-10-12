@@ -8,6 +8,7 @@
 -- recipe and skill names in the game's language.
 -- Shots of anything but the world are taken twice, on black (promo_<shot>_k.png) and on white
 -- (promo_<shot>_w.png), so that art/promo/extract.py can recover how transparent each pixel is.
+
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
@@ -15,21 +16,16 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/UI/RenewableEnergyMenu"
-require "RenewableEnergy/UI/RenewableEnergyStatusWindow"
+require "RenewableEnergy/UI/StatusWindow"
+local Stage = require "RenewableEnergyDevStage"
 
-RenewableEnergyDevPromo = {}
+local Promo = {}
 
 local Sprites = RenewableEnergy.Sprites
+local PowerBank = RenewableEnergy.PowerBank
 
 -- The world shots are as wide as the README's images, in UI units.
 local WORLD_W = 1260
--- The character faces the camera last.
-local LOOK_AROUND = { IsoDirections.N, IsoDirections.E, IsoDirections.S, IsoDirections.W, IsoDirections.SE }
--- How far from each setup the trees go: near a building, a tree out of the character's sight
--- draws as a black silhouette full of holes (IsoTree.render).
-local TREE_RADIUS = 30
-local SEARCH_RADIUS = 40
 -- The banks charge through the morning, so the window shows a day's figures at noon.
 local MORNING, NOON = 8, 12
 -- Inputs that take any item with a tag show this one.
@@ -68,10 +64,10 @@ local HOMESTEAD = {
 -- hang on.
 local OPEN = { along = { -1, 4 }, out = { 1, 5 } }
 local AT_WALL = { 0, 2 }
--- The rack with a cracked module, wired in early so that its row shows in the status window.
+-- The rack with a cracked module, connected early so that its row shows in the status window.
 local CRACKED_RACK = 1
 local CRACKED_CONDITION = 30
-local MODULE = "RenewableEnergy.SolarModule"
+local MODULE = RenewableEnergy.Specs.factoryModule
 local HOMESTEAD_BANK = {
     "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery",
     "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery",
@@ -173,26 +169,6 @@ local function add(step)
     table.insert(steps, step)
 end
 
--- Runs each step on its own tick, then waits the number of ticks it returns.
-local function runSteps(onDone)
-    local index, wait = 1, 0
-    local function onTick()
-        if wait > 0 then
-            wait = wait - 1
-            return
-        end
-        local step = steps[index]
-        if not step then
-            Events.OnTick.Remove(onTick)
-            onDone()
-            return
-        end
-        index = index + 1
-        wait = step() or 0
-    end
-    Events.OnTick.Add(onTick)
-end
-
 local function region(name, x, y, w, h)
     return { name = name, x = math.floor(x), y = math.floor(y), w = math.floor(w), h = math.floor(h) }
 end
@@ -202,8 +178,7 @@ local function elementRegion(name, element)
 end
 
 local function screenshot(file)
-    getCore():TakeFullScreenshot(file .. ".png")
-    print("REPromo saved " .. file .. ".png")
+    Stage.screenshot("REPromo", file)
 end
 
 -- Every tinted element, the backdrop first, takes the backdrop colour.
@@ -396,7 +371,7 @@ end
 
 local function itemsList()
     local items = {}
-    for _, fullType in ipairs(RenewableEnergyDebug.ITEMS) do
+    for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
         -- The annotated maps are loot, not something to build with.
         if getScriptManager():getItem(fullType):getMapID() == nil then
             table.insert(items, itemEntry(fullType))
@@ -451,12 +426,8 @@ end
 
 -- World ------------------------------------------------------------------------------------------
 
-local function position(object)
-    return { x = object:getX(), y = object:getY(), z = object:getZ() }
-end
-
 local function perform(name, args)
-    local ok, reason = RenewableEnergy.PowerBank.perform(getPlayer(), name, args)
+    local ok, reason = PowerBank.perform(getPlayer(), name, args)
     if not ok then
         print("REPromo " .. name .. " failed: " .. tostring(reason))
     end
@@ -537,25 +508,8 @@ local function hasWindow(site, origin, along)
         and instanceof(square:getDoorOrWindow(site.wallNorth), "IsoWindow")
 end
 
-local function hasContainerOrGenerator(square)
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        local object = objects:get(i)
-        if object:getContainer() or instanceof(object, "IsoGenerator") or RenewableEnergy.PowerBank.sourceKind(object) then
-            return true
-        end
-    end
-    return false
-end
-
--- Indoors where a bank may stand, with nothing in the way, as the tests find one.
-local function isFreeIndoors(square)
-    return square ~= nil and RenewableEnergy.PowerBank.canPlaceBank(square) and square:isFree(false)
-        and square:getVehicleContainer() == nil and not hasContainerOrGenerator(square)
-end
-
 local function isFreeIndoorsAt(site, origin, position)
-    return isFreeIndoors(siteSquare(site, origin, position[1], position[2]))
+    return RenewableEnergy.Debug.isFreeSquare(siteSquare(site, origin, position[1], position[2]), true)
 end
 
 local function isOpenArea(site, origin, player, area)
@@ -589,28 +543,10 @@ local function fitsStage0(site, origin, player, needWindow)
         and isOpenArea(site, origin, player, STAGE0.open)
 end
 
--- The square closest to the character for which `accepts(origin)` holds, or nil.
-local function closest(player, accepts)
-    local here = player:getCurrentSquare()
-    local best, bestDistance
-    for dx = -SEARCH_RADIUS, SEARCH_RADIUS do
-        for dy = -SEARCH_RADIUS, SEARCH_RADIUS do
-            local distance = dx * dx + dy * dy
-            if not bestDistance or distance < bestDistance then
-                local origin = getCell():getGridSquare(here:getX() + dx, here:getY() + dy, here:getZ())
-                if origin and accepts(origin) then
-                    best, bestDistance = origin, distance
-                end
-            end
-        end
-    end
-    return best
-end
-
 -- The closest place to the character that takes the whole homestead, facing south if any does.
 local function findSite(player)
     for _, site in ipairs(SITES) do
-        local best = closest(player, function(origin)
+        local best = Stage.closestSquare(player, function(origin)
             return fits(site, origin, player)
         end)
         if best then
@@ -624,7 +560,7 @@ end
 local function findStage0(player, homestead)
     for _, needWindow in ipairs({ true, false }) do
         for _, site in ipairs(SITES) do
-            local best = closest(player, function(origin)
+            local best = Stage.closestSquare(player, function(origin)
                 local clear = math.abs(origin:getX() - homestead:getX()) >= STAGE0_DISTANCE
                     or math.abs(origin:getY() - homestead:getY()) >= STAGE0_DISTANCE
                 return clear and fitsStage0(site, origin, player, needWindow)
@@ -637,24 +573,12 @@ local function findStage0(player, homestead)
     return nil
 end
 
-local function removeTrees(center)
-    for dx = -TREE_RADIUS, TREE_RADIUS do
-        for dy = -TREE_RADIUS, TREE_RADIUS do
-            local square = getCell():getGridSquare(center:getX() + dx, center:getY() + dy, center:getZ())
-            local tree = square and square:getTree()
-            if tree then
-                square:RemoveTileObject(tree)
-            end
-        end
-    end
-end
-
 -- A placed tile, as the tests place one. A panel mount holds `modules` (a PowerBank.MODULES list),
 -- or without them whole factory modules.
 local function placeTile(square, spriteName, modules)
     local object = IsoObject.new(square, spriteName, spriteName)
     if modules then
-        object:getModData()[RenewableEnergy.PowerBank.MODULES] = modules
+        object:getModData()[PowerBank.MODULES] = modules
     end
     square:AddTileObject(object)
     square:RecalcAllWithNeighbours(true)
@@ -671,11 +595,11 @@ local function fillBank(bank, items, charge)
             RenewableEnergy.Battery.setCharge(item, charge)
         end
     end
-    perform("refresh", { bank = position(bank) })
+    perform("refresh", { bank = PowerBank.positionOf(bank) })
 end
 
 local function connect(bank, panel)
-    perform("connectSource", { bank = position(bank), source = position(panel) })
+    perform("connectSource", { bank = PowerBank.positionOf(bank), source = PowerBank.positionOf(panel) })
 end
 
 -- A clear, still day: no cloud, fog or rain however the weather turns while the shots run.
@@ -731,7 +655,7 @@ local function buildHomestead()
             clearGroundCover(at({ along, out }))
         end
     end
-    homesteadBank = RenewableEnergy.PowerBank.place(at(HOMESTEAD.bank), Sprites.batteryBankMetal, -1)
+    homesteadBank = PowerBank.place(at(HOMESTEAD.bank), Sprites.batteryBankMetal, -1)
     fillBank(homesteadBank, HOMESTEAD_BANK, MORNING_CHARGE)
     for _, spot in ipairs(HOMESTEAD.wallPanels) do
         connect(homesteadBank, placeTile(at(spot), Sprites.wall[spot[3]][site.facing]))
@@ -750,7 +674,7 @@ local function buildHomestead()
     generator:setConnected(true)
     generator:setFuel(generator:getMaxFuel() * 0.7)
     placeTile(generatorSquare, Sprites.failsafe)
-    perform("setBankOn", { bank = position(homesteadBank), on = true })
+    perform("setBankOn", { bank = PowerBank.positionOf(homesteadBank), on = true })
     switchOnLights(homesteadBank:getSquare())
 end
 
@@ -760,7 +684,7 @@ local function buildStage0()
             clearGroundCover(atStage0({ along, out }))
         end
     end
-    stage0Box = RenewableEnergy.PowerBank.place(atStage0(STAGE0.box), Sprites.batteryBoxWood, -1)
+    stage0Box = PowerBank.place(atStage0(STAGE0.box), Sprites.batteryBoxWood, -1)
     fillBank(stage0Box, STAGE0_BOX, MORNING_CHARGE)
     for _, spot in ipairs(STAGE0.flatPanels) do
         connect(stage0Box, placeTile(atStage0(spot), Sprites.flat))
@@ -776,13 +700,13 @@ local function buildStage0()
     -- Set out the way garden light spawns set one out, charged and unlit by day.
     RenewableEnergy.WorldSpawns.placeMoveable(atStage0(STAGE0.gardenLight), Sprites.gardenLight.off,
         { [RenewableEnergy.SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh })
-    perform("setBankOn", { bank = position(stage0Box), on = true })
+    perform("setBankOn", { bank = PowerBank.positionOf(stage0Box), on = true })
 end
 
 -- Bank passes hour by hour from the morning to noon, as the game's own passes would have run.
 local function chargeThroughMorning()
     local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
-    local system = RenewableEnergy.PowerBank.serverSystem
+    local system = PowerBank.serverSystem
     local banks = { system:getLuaObjectOnSquare(homesteadBank:getSquare()), system:getLuaObjectOnSquare(stage0Box:getSquare()) }
     -- The first pass only starts the clock of a bank that has never run one.
     for hour = MORNING, NOON do
@@ -875,26 +799,11 @@ end
 -- Has the character look around from each of `squares` and stay on the last, since squares they
 -- never saw are drawn dark, and sets the zoom `stepsOut` steps out from the closest.
 local function goTo(squares, stepsOut)
-    local player = getPlayer()
     for _, square in ipairs(squares) do
-        add(function()
-            player:teleportTo(square:getX() + 0.5, square:getY() + 0.5, square:getZ())
-            return 30
-        end)
-        for _, direction in ipairs(LOOK_AROUND) do
-            add(function()
-                player:faceDirection(direction)
-                return 40
-            end)
-        end
+        Stage.addLookAround(steps, getPlayer(), square)
     end
     add(function()
-        for _ = 1, 8 do
-            getCore():doZoomScroll(0, -1)
-        end
-        for _ = 1, stepsOut do
-            getCore():doZoomScroll(0, 1)
-        end
+        Stage.zoomOut(stepsOut)
         return 200
     end)
 end
@@ -909,8 +818,8 @@ local function addWorld()
         getWorld():setHydroPowerOn(false)
         clearWeather()
         getGameTime():setTimeOfDay(MORNING)
-        removeTrees(origin)
-        removeTrees(stage0Origin)
+        Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
+        Stage.removeTrees(stage0Origin:getX(), stage0Origin:getY(), stage0Origin:getZ())
         buildHomestead()
         buildStage0()
         chargeThroughMorning()
@@ -955,7 +864,7 @@ local function addStatus()
     local window
     add(function()
         newBackdrop()
-        window = RenewableEnergy.StatusWindow.open(0, RenewableEnergy.Menu.bankOnSquare(at(HOMESTEAD.bank)))
+        window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(at(HOMESTEAD.bank)))
         window:setX(100)
         window:setY(100)
         return 120
@@ -970,7 +879,7 @@ local function addStatus()
     removeBackdrop()
 end
 
-function RenewableEnergyDevPromo.capture(onDone)
+function Promo.capture(onDone)
     print("REPromo START")
     local player = getPlayer()
     local atWindow
@@ -980,7 +889,7 @@ function RenewableEnergyDevPromo.capture(onDone)
     end
     if not (site and stage0Site) then
         -- Without "REPromo DONE", run-debug-client.sh reports the run as failed.
-        print("REPromo FAIL: within " .. SEARCH_RADIUS .. " squares, no " .. (site
+        print("REPromo FAIL: within " .. Stage.SEARCH_RADIUS .. " squares, no " .. (site
             and "outside wall with free floor indoors behind it and open ground in front, for stage 0"
             or "plain building wall with free floor indoors behind it and open ground in front"))
         getCore():quitToDesktop()
@@ -991,7 +900,7 @@ function RenewableEnergyDevPromo.capture(onDone)
     -- Hides the HUD, the debug console and every other window; the shots add their own.
     ISUIHandler.setVisibleAllUI(false)
     local data = { items = itemsList(), recipes = {} }
-    for _, name in ipairs(RenewableEnergyDebug.recipeNames()) do
+    for _, name in ipairs(RenewableEnergy.Debug.recipeNames()) do
         table.insert(data.recipes, recipeEntry(name))
     end
     data.strings = {
@@ -1000,9 +909,9 @@ function RenewableEnergyDevPromo.capture(onDone)
     addWorld()
     addStatus()
     addIcons()
-    runSteps(function()
+    Stage.runSteps(steps, function()
         for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
-            local status = RenewableEnergy.PowerBank.getStatus(bank:getX(), bank:getY(), bank:getZ())
+            local status = PowerBank.statusOf(bank)
             local reasons, kinds = {}, {}
             for _, source in ipairs(status.sources) do
                 table.insert(reasons, tostring(source.reason))
@@ -1021,3 +930,5 @@ function RenewableEnergyDevPromo.capture(onDone)
         onDone()
     end)
 end
+
+return Promo

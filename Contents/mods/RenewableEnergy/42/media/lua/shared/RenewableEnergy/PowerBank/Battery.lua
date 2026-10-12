@@ -1,4 +1,4 @@
--- Batteries, the mod's and vanilla's car batteries: capacity, charge and wear (design §5.1).
+-- Batteries, the mod's and vanilla's car batteries: capacity, charge and wear.
 --
 -- A battery's charge is its drainable uses, 0 to 1, so that a battery carries its charge
 -- in and out of banks and the inventory shows it. Its condition is its health: capacity
@@ -7,6 +7,7 @@
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Wear"
 
+RenewableEnergy = RenewableEnergy or {}
 local Battery = {}
 RenewableEnergy.Battery = Battery
 

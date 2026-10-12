@@ -2,7 +2,8 @@ import java.lang.reflect.Field;
 
 /**
  * Starts the game client and presses "Click to start" whenever the loading screen shows it, so
- * dev/run-debug-client.sh --test runs without anyone at the computer.
+ * the harness runs of dev/run-debug-client.sh (--test, --art, --promo, --loot) need no one at the
+ * computer.
  *
  * GameLoadingState.update() continues only after a real left click, a joypad A press, or its
  * private forceDone flag, and Lua can reach none of them, so this sets forceDone. The game runs its

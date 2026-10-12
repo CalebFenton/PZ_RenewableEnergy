@@ -1,9 +1,9 @@
-require "ISUI/Maps/ISMapDefinitions"
-
 -- How the mod's own map items draw (LootMaps.callLua looks them up by stash name first, then by
 -- the item's Map id; the two are the same). Each shows only the few hundred squares around its
 -- stash house, in the style of vanilla's stash maps. Houses drawn on vanilla town maps keep the
 -- town map's own look, so they have no entry here.
+
+require "ISUI/Maps/ISMapDefinitions"
 
 -- Area of each map, in squares: west, north, east, south.
 local AREAS = {

@@ -5,9 +5,11 @@
 -- Timed Actions, a screenshot goes to <cachedir>/Screenshots, and "RETest DONE passed=<n>
 -- failed=<n>" goes to console.txt. With --promo, RenewableEnergyDevPromo saves the art for the README and
 -- prints "REPromo DONE". With --art, RenewableEnergyDevArt saves close-ups of every item and tile and
--- prints "REArt DONE". With --loot, RenewableEnergyLoot measures the loot and prints an "RELootReport"
+-- prints "REArt DONE". With --loot, RenewableEnergy.Loot measures the loot and prints an "RELootReport"
 -- line for each list, then the modules a thorough player finds in each town of
 -- RenewableEnergyDevTownCensus (dev/loot/census.py), then "RELootReport DONE". Then the game quits.
+-- run-debug-client.sh reads those lines from console.txt.
+
 require "RenewableEnergy/Debug/RenewableEnergyDebugScenario"
 require "RenewableEnergy/Debug/RenewableEnergyTests"
 require "RenewableEnergy/Debug/RenewableEnergyTestsPower"
@@ -17,12 +19,14 @@ require "RenewableEnergy/Debug/RenewableEnergyTestsLoot"
 require "RenewableEnergy/Debug/RenewableEnergyTestsGadgets"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 require "DebugUIs/DebugMenu/UnitTests/UnitTestsDebug"
-require "RenewableEnergyDevPromo"
-require "RenewableEnergyDevArt"
+local Promo = require "RenewableEnergyDevPromo"
+local Art = require "RenewableEnergyDevArt"
 
+-- Ticks after the scenario starts before a run begins, so the world around the character loads.
 local SETTLE_TICKS = 180
 -- Samples per list: enough to measure a 2% chance to within about ±0.3 percentage points (95%).
 local LOOT_SAMPLES = 10000
+local TEST_PREFIX = "renewable_energy_"
 
 local scenario = debugScenarios.RenewableEnergyScenario
 scenario.forceLaunch = true
@@ -31,12 +35,11 @@ scenario.forceLaunch = true
 -- would stop whenever someone switches to another window.
 getCore():setOptionPauseOnFocusloss(false)
 
-local names = {}
 -- Name prefixes from TESTS (see run-debug-client.sh); empty runs every test of this mod.
 local filters = {}
 
 local function selected(name)
-    if string.sub(name, 1, 17) ~= "renewable_energy_" then
+    if string.sub(name, 1, #TEST_PREFIX) ~= TEST_PREFIX then
         return false
     end
     if #filters == 0 then
@@ -61,49 +64,48 @@ local function testNames()
     return result
 end
 
-local function reportWhenDone()
+-- Once every test in `names` has a result label, takes a screenshot of the results, prints the
+-- counts and quits.
+local function reportWhenDone(names)
     local success, fail = getText("IGUI_UnitTests_Success"), getText("IGUI_UnitTests_Fail")
-    local passed, failed = 0, 0
-    for _, name in ipairs(names) do
-        local label = UnitTestsTimedActionsPanelTestResults[name].resultLabel.name
-        if string.sub(label, 1, #success) == success then
-            passed = passed + 1
-        elseif string.sub(label, 1, #fail) == fail then
-            failed = failed + 1
-        else
-            return
+    local function check()
+        local passed, failed = 0, 0
+        for _, name in ipairs(names) do
+            local label = UnitTestsTimedActionsPanelTestResults[name].resultLabel.name
+            if string.sub(label, 1, #success) == success then
+                passed = passed + 1
+            elseif string.sub(label, 1, #fail) == fail then
+                failed = failed + 1
+            else
+                return
+            end
         end
-    end
-    Events.OnTick.Remove(reportWhenDone)
-    local step = 0
-    local function screenshot()
-        step = step + 1
-        if step == 10 then
-            getCore():TakeFullScreenshot("renewable_energy_tests.png")
-        elseif step == 20 then
-            Events.OnTick.Remove(screenshot)
-            print("RETest DONE passed=" .. passed .. " failed=" .. failed)
-            getCore():quitToDesktop()
+        Events.OnTick.Remove(check)
+        local step = 0
+        local function screenshot()
+            step = step + 1
+            if step == 10 then
+                getCore():TakeFullScreenshot("renewable_energy_tests.png")
+            elseif step == 20 then
+                Events.OnTick.Remove(screenshot)
+                print("RETest DONE passed=" .. passed .. " failed=" .. failed)
+                getCore():quitToDesktop()
+            end
         end
+        Events.OnTick.Add(screenshot)
     end
-    Events.OnTick.Add(screenshot)
+    Events.OnTick.Add(check)
 end
 
-local ticks = 0
-local function startTests()
-    ticks = ticks + 1
-    if ticks < SETTLE_TICKS then
-        return
-    end
-    Events.OnTick.Remove(startTests)
+local function runTests()
     -- runOne fails on the panel's result labels unless the panel is open.
     UnitTestsDebug.OnOpenPanel()
-    names = testNames()
+    local names = testNames()
     print("RETest START " .. #names)
     for _, name in ipairs(names) do
         TimedActionTests.runOne(name)
     end
-    Events.OnTick.Add(reportWhenDone)
+    reportWhenDone(names)
 end
 
 -- run-debug-client.sh writes the mode to <cachedir>/Lua/RenewableEnergyDevHarness.txt, and the
@@ -128,12 +130,12 @@ end
 
 -- A module haul as "modules (watts as found / repaired)".
 local function hauled(haul)
-    local watts = RenewableEnergy.Specs.modules["RenewableEnergy.SolarModule"].watts / 100
+    local watts = RenewableEnergy.Specs.modules[RenewableEnergy.Specs.factoryModule].watts / 100
     return string.format("%.1f (%.0f / %.0f W)", haul.count, haul.condition * watts, haul.repaired * watts)
 end
 
 local function reportModules()
-    local report = RenewableEnergyLoot.moduleReport(require "RenewableEnergyDevTownCensus")
+    local report = RenewableEnergy.Loot.moduleReport(require "RenewableEnergyDevTownCensus")
     print("RELootReport modules a thorough player finds, as count (watts as found / after Repair Cracked Module)")
     for _, town in ipairs(report.towns) do
         print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, vehicles %s, sites %s; total %s",
@@ -148,28 +150,23 @@ local function reportModules()
 end
 
 local function reportLoot()
-    ticks = ticks + 1
-    if ticks < SETTLE_TICKS then
-        return
-    end
-    Events.OnTick.Remove(reportLoot)
     print("RELootReport START")
-    local report = RenewableEnergyLoot.report(LOOT_SAMPLES)
+    local report = RenewableEnergy.Loot.report(LOOT_SAMPLES)
     print(string.format("RELootReport settings: Other loot %.2f, Recipe Resources %.2f, loot rarity options 1, no zombie density bonus",
         report.settings.other, report.settings.recipeResource))
     for _, entry in ipairs(report) do
-        local names = {}
+        local fullTypes = {}
         for fullType in pairs(entry.expected) do
-            table.insert(names, fullType)
+            table.insert(fullTypes, fullType)
         end
         for fullType in pairs(entry.items) do
             if not entry.expected[fullType] then
-                table.insert(names, fullType)
+                table.insert(fullTypes, fullType)
             end
         end
-        table.sort(names)
+        table.sort(fullTypes)
         local parts = {}
-        for _, fullType in ipairs(names) do
+        for _, fullType in ipairs(fullTypes) do
             local measured = entry.items[fullType]
             local text = measured and share(measured.share) or "none"
             if measured and measured.perContainer >= 1.05 then
@@ -186,41 +183,35 @@ local function reportLoot()
     getCore():quitToDesktop()
 end
 
-local function capturePromo()
-    ticks = ticks + 1
-    if ticks < SETTLE_TICKS then
-        return
-    end
-    Events.OnTick.Remove(capturePromo)
-    RenewableEnergyDevPromo.capture(function()
-        print("REPromo DONE")
+local function quitWhenDone(mark)
+    return function()
+        print(mark .. " DONE")
         getCore():quitToDesktop()
-    end)
+    end
 end
 
-local function captureArt()
-    ticks = ticks + 1
-    if ticks < SETTLE_TICKS then
-        return
+local RUNS = {
+    test = runTests,
+    loot = reportLoot,
+    promo = function() Promo.capture(quitWhenDone("REPromo")) end,
+    art = function() Art.capture(quitWhenDone("REArt")) end,
+}
+
+-- Runs `run` once the scenario has had SETTLE_TICKS ticks.
+local function afterSettling(run)
+    local ticks = 0
+    local function onTick()
+        ticks = ticks + 1
+        if ticks >= SETTLE_TICKS then
+            Events.OnTick.Remove(onTick)
+            run()
+        end
     end
-    Events.OnTick.Remove(captureArt)
-    RenewableEnergyDevArt.capture(function()
-        print("REArt DONE")
-        getCore():quitToDesktop()
-    end)
+    Events.OnTick.Add(onTick)
 end
 
 local originalOnStart = scenario.onStart
 scenario.onStart = function()
     originalOnStart()
-    local mode = readMode()
-    if mode == "loot" then
-        Events.OnTick.Add(reportLoot)
-    elseif mode == "promo" then
-        Events.OnTick.Add(capturePromo)
-    elseif mode == "art" then
-        Events.OnTick.Add(captureArt)
-    else
-        Events.OnTick.Add(startTests)
-    end
+    afterSettling(RUNS[readMode()] or runTests)
 end

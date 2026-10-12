@@ -1,8 +1,5 @@
 require "TimedActions/ISBaseTimedAction"
 require "Util/BuildingHelper"
----@class RenewableEnergy
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 
@@ -14,6 +11,8 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 RenewableEnergyAction = ISBaseTimedAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
+local PowerBank = RenewableEnergy.PowerBank
+local positionOf, samePosition = PowerBank.positionOf, PowerBank.samePosition
 
 Action.CONNECT_SOURCE = "ConnectSource"
 Action.DISCONNECT_SOURCE = "DisconnectSource"
@@ -46,37 +45,27 @@ end
 -- an in-game minute is 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
 local UNITS_PER_SECOND = 48
 
-local function position(object)
-    return { x = object:getX(), y = object:getY(), z = object:getZ() }
-end
-
 local function onSquare(object)
     return object ~= nil and object:getObjectIndex() ~= -1
 end
 
-local function statusOf(bank)
-    return RenewableEnergy.PowerBank.getStatus(bank:getX(), bank:getY(), bank:getZ())
-end
-
 local function isBank(bank)
-    return onSquare(bank) and RenewableEnergy.PowerBank.isBank(bank)
+    return onSquare(bank) and PowerBank.isBank(bank)
 end
 
 local function isSource(object)
-    return onSquare(object) and RenewableEnergy.PowerBank.sourceKind(object) ~= nil
+    return onSquare(object) and PowerBank.sourceKind(object) ~= nil
 end
 
-local function samePosition(a, b)
-    return a ~= nil and b ~= nil and a.x == b.x and a.y == b.y and a.z == b.z
-end
-
+--- The bank the panel `source` is connected to, as { x, y, z }, or nil.
 function Action.connectedBank(source)
-    return RenewableEnergy.PowerBank.bankOfSource(source:getX(), source:getY(), source:getZ())
+    return PowerBank.bankOfSource(source:getX(), source:getY(), source:getZ())
 end
 
+--- Whether the panel `source` may be connected to `bank`.
 function Action.bankInReach(source, bank)
-    local here = position(bank)
-    for _, reachable in ipairs(RenewableEnergy.PowerBank.banksInReach(source:getX(), source:getY(), source:getZ())) do
+    local here = positionOf(bank)
+    for _, reachable in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ())) do
         if samePosition(reachable, here) then
             return true
         end
@@ -91,7 +80,7 @@ end
 -- The status of the action's bank, or nil when there is no bank or no status yet.
 local function bankStatus(self)
     if isBank(self.bank) then
-        return statusOf(self.bank)
+        return PowerBank.statusOf(self.bank)
     end
 end
 
@@ -110,13 +99,13 @@ end
 local CHECKS = {
     [Action.CONNECT_SOURCE] = function(self)
         return isSource(self.object) and isBank(self.bank) and Action.bankInReach(self.object, self.bank)
-            and not samePosition(Action.connectedBank(self.object), position(self.bank))
+            and not samePosition(Action.connectedBank(self.object), positionOf(self.bank))
     end,
     [Action.DISCONNECT_SOURCE] = function(self)
         return isSource(self.object) and Action.connectedBank(self.object) ~= nil
     end,
     [Action.CLEAR_SNOW] = function(self)
-        return isSource(self.object) and RenewableEnergy.PowerBank.sourceKind(self.object) == "flat"
+        return isSource(self.object) and PowerBank.sourceKind(self.object) == "flat"
             and Action.isSnowTool(self.item) and self.character:isPrimaryHandItem(self.item)
     end,
     [Action.TURN_ON] = function(self)
@@ -136,14 +125,14 @@ local CHECKS = {
     end,
     [Action.WIRE_IN] = function(self)
         return isBank(self.bank) and self.item ~= nil
-            and RenewableEnergy.PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil
+            and PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil
     end,
     [Action.UNWIRE] = function(self)
-        return self.item ~= nil and holdsItem(self) and RenewableEnergy.PowerBank.partKind(self.item:getFullType()) ~= nil
+        return self.item ~= nil and holdsItem(self) and PowerBank.partKind(self.item:getFullType()) ~= nil
             and not self.character:tooDarkToRead()
     end,
     [Action.REPAIR_PART] = function(self)
-        return self.item ~= nil and holdsItem(self) and RenewableEnergy.PowerBank.repairRefusal(self.character, self.item) == nil
+        return self.item ~= nil and holdsItem(self) and PowerBank.repairRefusal(self.character, self.item) == nil
     end,
     [Action.RENAME] = function(self)
         return isBank(self.bank) and type(self.bankName) == "string"
@@ -158,35 +147,35 @@ end
 -- The bank's command for each mode, run on the authority by PowerBank.perform.
 local COMMANDS = {
     [Action.CONNECT_SOURCE] = function(self)
-        return "connectSource", { bank = position(self.bank), source = position(self.object) }
+        return "connectSource", { bank = positionOf(self.bank), source = positionOf(self.object) }
     end,
     [Action.DISCONNECT_SOURCE] = function(self)
-        return "disconnectSource", { source = position(self.object) }
+        return "disconnectSource", { source = positionOf(self.object) }
     end,
     [Action.CLEAR_SNOW] = function(self)
-        return "clearSnow", { source = position(self.object) }
+        return "clearSnow", { source = positionOf(self.object) }
     end,
     [Action.TURN_ON] = function(self)
-        return "setBankOn", { bank = position(self.bank), on = true }
+        return "setBankOn", { bank = positionOf(self.bank), on = true }
     end,
     [Action.TURN_OFF] = function(self)
-        return "setBankOn", { bank = position(self.bank), on = false }
+        return "setBankOn", { bank = positionOf(self.bank), on = false }
     end,
     [Action.WIRE_IN] = function(self)
-        return "wireIn", { bank = position(self.bank), itemId = self.item:getID() }
+        return "wireIn", { bank = positionOf(self.bank), itemId = self.item:getID() }
     end,
     [Action.UNWIRE] = function(self)
-        return "unwire", { bank = position(self.bank), itemId = self.item:getID() }
+        return "unwire", { bank = positionOf(self.bank), itemId = self.item:getID() }
     end,
     [Action.REPAIR_PART] = function(self)
-        return "repairPart", { bank = position(self.bank), itemId = self.item:getID() }
+        return "repairPart", { bank = positionOf(self.bank), itemId = self.item:getID() }
     end,
     [Action.RENAME] = function(self)
-        return "rename", { bank = position(self.bank), name = self.bankName }
+        return "rename", { bank = positionOf(self.bank), name = self.bankName }
     end,
 }
 
--- In-game minutes per job at Electricity 3; wiring goes faster with skill, the rest does not.
+-- In-game minutes of the jobs that skill doesn't speed up.
 local MINUTES = {
     [Action.CLEAR_SNOW] = 5,
     [Action.TURN_ON] = 0.5,
@@ -204,7 +193,7 @@ end
 -- Wiring a part in takes PowerBank.wiringFor's seconds at Electricity 0, less with skill;
 -- unwiring takes half that. A part that is gone takes no time, and complete() refuses it.
 local function wiringUnits(self)
-    local wiring = self.item and RenewableEnergy.PowerBank.wiringFor(self.item:getFullType())
+    local wiring = self.item and PowerBank.wiringFor(self.item:getFullType())
     if not wiring then
         return 1
     end
@@ -322,7 +311,7 @@ function Action:complete()
         return RenewableEnergy.SolarMaintainer.detach(self.character, self.vehicle)
     end
     local command, args = COMMANDS[self.mode](self)
-    local ok = RenewableEnergy.PowerBank.perform(self.character, command, args)
+    local ok = PowerBank.perform(self.character, command, args)
     return ok == true
 end
 

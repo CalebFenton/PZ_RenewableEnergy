@@ -13,9 +13,11 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 
+RenewableEnergy = RenewableEnergy or {}
 local Specs, Sun, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sun, RenewableEnergy.PowerBank
 
 local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
+RenewableEnergy.BankSystem = BankSystem
 
 -- Values of the ChargeFreq sandbox option.
 local EVERY_TEN_MINUTES = 1
@@ -25,6 +27,10 @@ local SUN_STEP = 1 / 6
 -- Longer gaps than this between passes (a save loaded after the clock jumped) count as
 -- this long, so one pass never swings the charge by days of sun.
 local LONGEST_PASS = 24
+-- The bank container's filter, by the dotted path the game resolves.
+local ACCEPT_FUNCTION = "RenewableEnergy.PowerBank.acceptItem"
+-- MapObjects keeps one function per sprite and priority.
+local LOAD_PRIORITY = 6
 
 function BankSystem:new()
     return SGlobalObjectSystem.new(self, PowerBank.SYSTEM_NAME)
@@ -82,7 +88,7 @@ local function makeBank(square, spriteName, index, from)
     if container then
         container:setExplored(true)
         -- Neither saved nor sent, so every side sets it on its own copy.
-        container:setAcceptItemFunction("RenewableEnergy.PowerBank.acceptItem")
+        container:setAcceptItemFunction(ACCEPT_FUNCTION)
     end
     generator:transmitCompleteItemToClients()
     -- On a server each of these syncs the generator, which names it by its index on the
@@ -158,12 +164,12 @@ local function loadBank(isoObject)
         makeBank(isoObject:getSquare(), isoObject:getSprite():getName(), isoObject:getObjectIndex(), isoObject)
         return
     end
-    isoObject:getContainer():setAcceptItemFunction("RenewableEnergy.PowerBank.acceptItem")
+    isoObject:getContainer():setAcceptItemFunction(ACCEPT_FUNCTION)
     BankSystem.instance:loadIsoObject(isoObject)
 end
 
 for _, name in ipairs(PowerBank.bankSprites()) do
-    MapObjects.OnLoadWithSprite(name, loadBank, 6)
+    MapObjects.OnLoadWithSprite(name, loadBank, LOAD_PRIORITY)
 end
 
 -- The charge pass ------------------------------------------------------------------------
@@ -205,10 +211,15 @@ function BankSystem.passContext(hours)
     }
 end
 
+-- Game hours since the bank's last pass, at most LONGEST_PASS, and the pass's end time.
+local function passHours(bank)
+    local now = getGameTime():getWorldAgeHours()
+    return math.min(LONGEST_PASS, now - (bank.lastHour or now)), now
+end
+
 --- Bring one bank up to now.
 function BankSystem.updateBank(bank)
-    local now = getGameTime():getWorldAgeHours()
-    local hours = math.min(LONGEST_PASS, now - (bank.lastHour or now))
+    local hours, now = passHours(bank)
     bank.lastHour = now
     if hours > 0 then
         bank:update(hours, BankSystem.passContext(hours))
@@ -217,11 +228,10 @@ end
 
 function BankSystem.updateAll()
     local self = BankSystem.instance
-    local now = getGameTime():getWorldAgeHours()
     local contexts = {}
     for i = 1, self:getLuaObjectCount() do
         local bank = self:getLuaObjectByIndex(i)
-        local hours = math.min(LONGEST_PASS, now - (bank.lastHour or now))
+        local hours, now = passHours(bank)
         bank.lastHour = now
         if hours > 0 then
             -- Banks placed at different times run different spans; each span's light is

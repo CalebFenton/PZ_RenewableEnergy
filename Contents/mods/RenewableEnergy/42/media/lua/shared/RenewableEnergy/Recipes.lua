@@ -14,13 +14,10 @@ RenewableEnergy = RenewableEnergy or {}
 local Recipes = {}
 RenewableEnergy.Recipes = Recipes
 
-local Battery, Wear = RenewableEnergy.Battery, RenewableEnergy.Wear
--- A mount item's modData, like its placed object's: its modules' types and conditions.
-local MODULES = RenewableEnergy.PowerBank.MODULES
+local Specs, Battery, Wear, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
 -- Case modData: the car battery type it came out of, of the three vanilla car batteries.
 local CASE_BATTERY_KEY = "RenewableEnergy_batteryType"
-
-local FACTORY_MODULE = "RenewableEnergy.SolarModule"
+-- What Rebuild Car Battery makes from a case that doesn't say.
 local CAR_BATTERY = "Base.CarBattery1"
 
 -- Mount item types by their Specs.mounts kind.
@@ -35,26 +32,27 @@ local MOUNT_KINDS = {
 -- Repair Cracked Module: condition it adds, and the most it brings each module type to. A
 -- factory module's cells stay cracked under the new glass; a homemade one is at its
 -- ConditionMax.
-local MODULE_REPAIR = 30
-local MODULE_REPAIR_CAP = {
+Recipes.MODULE_REPAIR = 30
+Recipes.MODULE_REPAIR_CAP = {
     ["RenewableEnergy.SolarModule"] = 80,
     ["RenewableEnergy.HomemadeSolarModule"] = 60,
 }
 
 -- Service Battery adds a little to a tired battery; Recondition sets a better one.
-local SERVICE_REPAIR = 10
-local SERVICE_CAP = 60
-local RECONDITION_CONDITION = 85
+Recipes.SERVICE_REPAIR = 10
+Recipes.SERVICE_CAP = 60
+Recipes.RECONDITION_CONDITION = 85
 
 local function isModule(item)
-    return RenewableEnergy.Specs.modules[item:getFullType()] ~= nil
+    return Specs.modules[item:getFullType()] ~= nil
 end
 
 local function firstInput(craftRecipeData, matches)
     local items = craftRecipeData:getAllInputItems()
     for i = 0, items:size() - 1 do
-        if matches(items:get(i)) then
-            return items:get(i)
+        local item = items:get(i)
+        if matches(item) then
+            return item
         end
     end
     return nil
@@ -76,24 +74,7 @@ end
 
 -- Panel mounts -----------------------------------------------------------------------------------
 
---- The modules a mount item holds, as written under PowerBank.MODULES. A mount that never had them
---- written, such as one spawned by debug, holds factory modules in full condition.
----@param mount InventoryItem
----@return table[] { { type, condition }, ... }
-function Recipes.modulesOf(mount)
-    local modules = mount:getModData()[MODULES]
-    if modules then
-        return modules
-    end
-    local list = {}
-    local kind = MOUNT_KINDS[mount:getFullType()]
-    for i = 1, kind and RenewableEnergy.Specs.mounts[kind].modules or 0 do
-        list[i] = { type = FACTORY_MODULE, condition = 100 }
-    end
-    return list
-end
-
--- OnCreate of the mount recipes: the mount remembers its modules.
+-- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will.
 function Recipes.mountModules(craftRecipeData, character)
     local modules = {}
     local items = craftRecipeData:getAllInputItems()
@@ -104,16 +85,21 @@ function Recipes.mountModules(craftRecipeData, character)
         end
     end
     local mount = craftRecipeData:getFirstCreatedItem()
-    mount:getModData()[MODULES] = modules
+    mount:getModData()[PowerBank.MODULES] = modules
     sendModData(character, mount)
+end
+
+local function isMount(item)
+    return MOUNT_KINDS[item:getFullType()] ~= nil
 end
 
 -- OnCreate of the Unmount recipes: the modules come back as they went in.
 function Recipes.unmountModules(craftRecipeData, character)
-    local mount = firstInput(craftRecipeData, function(item)
-        return MOUNT_KINDS[item:getFullType()] ~= nil
-    end)
-    for _, module in ipairs(mount and Recipes.modulesOf(mount) or {}) do
+    local mount = firstInput(craftRecipeData, isMount)
+    if not mount then
+        return
+    end
+    for _, module in ipairs(PowerBank.modulesOf(mount, MOUNT_KINDS[mount:getFullType()])) do
         local item = instanceItem(module.type)
         Wear.setCondition(item, module.condition)
         addToInventory(character, item)
@@ -124,22 +110,22 @@ end
 
 -- OnTest of Repair Cracked Module: the module must be below what the repair brings it to.
 function Recipes.isModuleBelowRepairCap(item, character)
-    local cap = MODULE_REPAIR_CAP[item:getFullType()]
+    local cap = Recipes.MODULE_REPAIR_CAP[item:getFullType()]
     return cap == nil or item:getCondition() < cap
 end
 
 function Recipes.repairModule(craftRecipeData, character)
     local module = firstInput(craftRecipeData, function(item)
-        return MODULE_REPAIR_CAP[item:getFullType()] ~= nil
+        return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
     end)
-    local cap = MODULE_REPAIR_CAP[module:getFullType()]
-    Wear.setCondition(module, math.min(cap, module:getCondition() + MODULE_REPAIR))
+    local cap = Recipes.MODULE_REPAIR_CAP[module:getFullType()]
+    Wear.setCondition(module, math.min(cap, module:getCondition() + Recipes.MODULE_REPAIR))
     sendItemStats(module)
 end
 
 -- OnTest of Take Apart Shattered Module: a module that still makes power stays whole.
 function Recipes.isShatteredModule(item, character)
-    return item:getFullType() ~= FACTORY_MODULE or item:getCondition() <= 0
+    return item:getFullType() ~= Specs.factoryModule or item:getCondition() <= 0
 end
 
 -- Batteries --------------------------------------------------------------------------------------
@@ -150,23 +136,23 @@ end
 
 -- OnTest of Service Battery.
 function Recipes.canServiceBattery(item, character)
-    return not Battery.isBattery(item) or item:getCondition() < SERVICE_CAP
+    return not Battery.isBattery(item) or item:getCondition() < Recipes.SERVICE_CAP
 end
 
 function Recipes.serviceBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, math.min(SERVICE_CAP, battery:getCondition() + SERVICE_REPAIR))
+    Wear.setCondition(battery, math.min(Recipes.SERVICE_CAP, battery:getCondition() + Recipes.SERVICE_REPAIR))
     sendItemStats(battery)
 end
 
 -- OnTest of Recondition Battery.
 function Recipes.canReconditionBattery(item, character)
-    return not Battery.isBattery(item) or item:getCondition() < RECONDITION_CONDITION
+    return not Battery.isBattery(item) or item:getCondition() < Recipes.RECONDITION_CONDITION
 end
 
 function Recipes.reconditionBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, RECONDITION_CONDITION)
+    Wear.setCondition(battery, Recipes.RECONDITION_CONDITION)
     Battery.setCharge(battery, 0)
     sendItemStats(battery)
 end

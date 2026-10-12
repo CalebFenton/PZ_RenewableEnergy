@@ -38,7 +38,7 @@ local MAGAZINES = { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.Homes
 test("renewable_energy_items_have_icons", {
     validate = function()
         local question = getTexture("media/inventory/Question_On.png")
-        for _, fullType in ipairs(RenewableEnergyDebug.ITEMS) do
+        for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
             local script = getScriptManager():getItem(fullType)
             local texture = script and script:getNormalTexture()
             expect(texture ~= nil and texture ~= question, fullType .. " has no icon")
@@ -50,7 +50,7 @@ test("renewable_energy_items_have_icons", {
 -- so to the full type (Translator.getItemNameFromFullType, Item.getDisplayName).
 test("renewable_energy_items_have_names", {
     validate = function()
-        for _, fullType in ipairs(RenewableEnergyDebug.ITEMS) do
+        for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
             local item = instanceItem(fullType)
             expect(item ~= nil and item:getDisplayName() ~= fullType, fullType .. " has no name")
         end
@@ -81,8 +81,8 @@ test("renewable_energy_recipes_resolve_in_base", {
                 expect(recipe:getModule():getName() == "Base", name .. " is in module " .. recipe:getModule():getName())
             end
         end
-        expect(#RenewableEnergyDebug.recipeNames() == #RECIPES,
-            #RenewableEnergyDebug.recipeNames() .. " RenewableEnergy_ recipes loaded, expected " .. #RECIPES)
+        expect(#RenewableEnergy.Debug.recipeNames() == #RECIPES,
+            #RenewableEnergy.Debug.recipeNames() .. " RenewableEnergy_ recipes loaded, expected " .. #RECIPES)
     end,
 })
 
@@ -150,7 +150,7 @@ for _, magazine in ipairs(MAGAZINES) do
     test("renewable_energy_read_" .. string.lower(string.match(magazine, "%.(.+)")), {
         run = function()
             local p = player()
-            RenewableEnergyDebug.forgetRecipes(p)
+            RenewableEnergy.Debug.forgetRecipes(p)
             ISTimedActionQueue.add(ISReadABook:new(p, p:getInventory():AddItem(magazine)))
         end,
         validate = function()
@@ -160,7 +160,7 @@ for _, magazine in ipairs(MAGAZINES) do
             end
         end,
         cleanup = function()
-            RenewableEnergyDebug.learnRecipes(player())
+            RenewableEnergy.Debug.learnRecipes(player())
         end,
     })
 end
@@ -189,7 +189,7 @@ for fullType, recipes in pairs(RESEARCH) do
     test("renewable_energy_research_" .. string.lower(string.match(fullType, "%.(.+)")), {
         run = function()
             local p = player()
-            RenewableEnergyDebug.forgetRecipes(p)
+            RenewableEnergy.Debug.forgetRecipes(p)
             skilled(p)
             ISTimedActionQueue.add(ISResearchRecipe:new(p, p:getInventory():AddItem(fullType)))
         end,
@@ -199,7 +199,7 @@ for fullType, recipes in pairs(RESEARCH) do
             end
         end,
         cleanup = function()
-            RenewableEnergyDebug.learnRecipes(player())
+            RenewableEnergy.Debug.learnRecipes(player())
         end,
     })
 end
@@ -551,7 +551,7 @@ for _, chain in ipairs(REBUILDS) do
     test("renewable_energy_craft_rebuild_" .. string.lower(string.match(chain.battery, "%.(.+)")), {
         run = function(self)
             local p = player()
-            RenewableEnergyDebug.setupPlayer(p)
+            RenewableEnergy.Debug.setupPlayer(p)
             skilled(p)
             local inventory = p:getInventory()
             inventory:AddItem("Base.Wrench")

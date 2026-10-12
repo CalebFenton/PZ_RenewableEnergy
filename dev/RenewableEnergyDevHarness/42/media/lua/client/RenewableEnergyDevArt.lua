@@ -6,14 +6,16 @@
 --   art_overlays.png  snow on every panel tile that takes it, and the crate's contents and lid
 --   art_items.png     every item of the mod on the ground, a car battery first for scale
 --   art_icons.png     every item's icon at twice its size, as the crafting window draws it
---   art_fill.png      every battery storage tile with every battery overlay it has, and every
+--   art_fill.png      every bank tile, of every tier, with every battery overlay it has, and every
 --                     level of its charge meter
 --   art_trailer.png   the arrow board trailer hitched to a car, its battery box open and holding
 --                     a battery; "REArt trailer" in console.txt says whether both worked
+
 require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
+local Stage = require "RenewableEnergyDevStage"
 
-RenewableEnergyDevArt = {}
+local Art = {}
 
 local Sprites = RenewableEnergy.Sprites
 
@@ -66,7 +68,7 @@ local METER_CHARGES = { 0.05, 0.2, 0.5, 0.8, 1 }
 local FILL_TIERS = { "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood",
     "batteryBankMetal" }
 
--- Every battery storage tile with 1 to all of its batteries, its meter cycling through every
+-- Every bank tile, of every tier, with 1 to all of its batteries, its meter cycling through every
 -- level; one with fewer batteries than meter levels repeats its full count. Low tiers come first,
 -- at the back, so the tall banks in front hide none of them.
 local function fillTiles()
@@ -94,9 +96,6 @@ local SHOTS = {
     fill = { name = "art_fill", x = 6, y = 12, zoomSteps = 3 },
     trailer = { name = "art_trailer", x = 8, y = 7, zoomSteps = 2 },
 }
-local SEARCH_RADIUS = 40
-local TREE_RADIUS = 30
-local LOOK_AROUND = { IsoDirections.N, IsoDirections.E, IsoDirections.S, IsoDirections.W, IsoDirections.SE }
 
 local function isOpen(square)
     return square ~= nil and square:isOutside() and square:isSolidFloor() and square:getObjects():size() == 1
@@ -117,17 +116,10 @@ end
 
 -- The north-west corner of the closest open lot that takes the whole stage.
 local function findLot(player)
-    local here = player:getCurrentSquare()
-    local best, bestDistance
-    for dx = -SEARCH_RADIUS, SEARCH_RADIUS do
-        for dy = -SEARCH_RADIUS, SEARCH_RADIUS do
-            local distance = dx * dx + dy * dy
-            if (not bestDistance or distance < bestDistance) and lotFits(here:getX() + dx, here:getY() + dy, here:getZ()) then
-                best, bestDistance = { x = here:getX() + dx, y = here:getY() + dy, z = here:getZ() }, distance
-            end
-        end
-    end
-    return best
+    local corner = Stage.closestSquare(player, function(square)
+        return lotFits(square:getX(), square:getY(), square:getZ())
+    end)
+    return corner and { x = corner:getX(), y = corner:getY(), z = corner:getZ() }
 end
 
 local function lotSquare(lot, x, y)
@@ -139,18 +131,6 @@ local function placeTile(square, spriteName, overlays)
     square:AddTileObject(object)
     for _, overlay in ipairs(overlays or {}) do
         object:addAttachedAnimSpriteByName(overlay)
-    end
-end
-
-local function removeTrees(lot)
-    for dx = -TREE_RADIUS, TREE_RADIUS do
-        for dy = -TREE_RADIUS, TREE_RADIUS do
-            local square = getCell():getGridSquare(lot.x + dx, lot.y + dy, lot.z)
-            local tree = square and square:getTree()
-            if tree then
-                square:RemoveTileObject(tree)
-            end
-        end
     end
 end
 
@@ -274,60 +254,24 @@ local function hitchTrailer(stage, player)
         tostring(lid ~= nil), tostring(container ~= nil), container and container:getItems():size() or 0))
 end
 
--- Runs each step on its own tick, then waits as many ticks as the step returns.
-local function runSteps(steps, onDone)
-    local index, wait = 1, 0
-    local function onTick()
-        if wait > 0 then
-            wait = wait - 1
-            return
-        end
-        local step = steps[index]
-        if not step then
-            Events.OnTick.Remove(onTick)
-            onDone()
-            return
-        end
-        index = index + 1
-        wait = step() or 0
-    end
-    Events.OnTick.Add(onTick)
-end
-
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
 local function addShot(steps, player, lot, shot)
+    Stage.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
     table.insert(steps, function()
-        player:teleportTo(lot.x + shot.x + 0.5, lot.y + shot.y + 0.5, lot.z)
-        return 30
-    end)
-    -- Squares the character never saw are drawn dark, so it looks around first.
-    for _, direction in ipairs(LOOK_AROUND) do
-        table.insert(steps, function()
-            player:faceDirection(direction)
-            return 30
-        end)
-    end
-    table.insert(steps, function()
-        for _ = 1, 8 do
-            getCore():doZoomScroll(0, -1)
-        end
-        for _ = 1, shot.zoomSteps do
-            getCore():doZoomScroll(0, 1)
-        end
+        Stage.zoomOut(shot.zoomSteps)
         return 240
     end)
     table.insert(steps, function()
-        getCore():TakeFullScreenshot(shot.name .. ".png")
-        print("REArt saved " .. shot.name .. ".png")
+        Stage.screenshot("REArt", shot.name)
         return 10
     end)
 end
 
-function RenewableEnergyDevArt.capture(onDone)
+function Art.capture(onDone)
     local player = getPlayer()
     local lot = findLot(player)
     if not lot then
-        print("REArt found no open lot within " .. SEARCH_RADIUS .. " squares")
+        print("REArt found no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
         onDone()
         return
     end
@@ -338,7 +282,7 @@ function RenewableEnergyDevArt.capture(onDone)
     table.insert(steps, function()
         getClimateManager():stopWeatherAndThunder()
         getGameTime():setTimeOfDay(12)
-        removeTrees(lot)
+        Stage.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
         return 30
     end)
@@ -355,8 +299,7 @@ function RenewableEnergyDevArt.capture(onDone)
         return 20
     end)
     table.insert(steps, function()
-        getCore():TakeFullScreenshot("art_icons.png")
-        print("REArt saved art_icons.png")
+        Stage.screenshot("REArt", "art_icons")
         return 10
     end)
     table.insert(steps, function()
@@ -380,5 +323,7 @@ function RenewableEnergyDevArt.capture(onDone)
         return 60
     end)
     addShot(steps, player, lot, SHOTS.trailer)
-    runSteps(steps, onDone)
+    Stage.runSteps(steps, onDone)
 end
+
+return Art

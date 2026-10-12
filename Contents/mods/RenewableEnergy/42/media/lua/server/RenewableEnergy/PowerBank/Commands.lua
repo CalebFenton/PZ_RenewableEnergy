@@ -10,36 +10,36 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/BankSystem"
 
+RenewableEnergy = RenewableEnergy or {}
 local Specs, PowerBank, Wear = RenewableEnergy.Specs, RenewableEnergy.PowerBank, RenewableEnergy.Wear
 
 local Commands = {}
+RenewableEnergy.Commands = Commands
 
 -- Longest name a bank takes.
 local NAME_LENGTH = 32
 
+-- Whether a command argument is a { x, y, z } place.
+local function isPosition(position)
+    return type(position) == "table" and type(position.x) == "number" and type(position.y) == "number"
+        and type(position.z) == "number"
+end
+
 local function bankAt(position)
     local system = PowerBank.serverSystem
-    if not (system and type(position) == "table" and position.x and position.y and position.z) then
+    if not (system and isPosition(position)) then
         return nil
     end
     return system:getLuaObjectAt(position.x, position.y, position.z)
 end
 
 local function sourceAt(position)
-    local square = type(position) == "table" and position.x and getSquare(position.x, position.y, position.z)
-    local objects = square and square:getObjects()
-    for i = 0, (objects and objects:size() or 0) - 1 do
-        local object = objects:get(i)
-        if PowerBank.sourceKind(object) then
-            return object
-        end
-    end
-    return nil
+    return isPosition(position) and PowerBank.sourceOn(getSquare(position.x, position.y, position.z)) or nil
 end
 
 local function bankOfSource(position)
-    local found = PowerBank.bankOfSource(position.x, position.y, position.z)
-    return found and bankAt(found)
+    local found = isPosition(position) and PowerBank.bankOfSource(position.x, position.y, position.z)
+    return found and bankAt(found) or nil
 end
 
 -- The bank's container, if its chunk is loaded.
@@ -102,7 +102,7 @@ function Commands.connectSource(player, args)
 end
 
 function Commands.disconnectSource(player, args)
-    local bank = type(args.source) == "table" and bankOfSource(args.source)
+    local bank = bankOfSource(args.source)
     if not (bank and bank:removeSource(args.source.x, args.source.y, args.source.z)) then
         return false, "not connected"
     end
@@ -111,7 +111,7 @@ function Commands.disconnectSource(player, args)
 end
 
 function Commands.clearSnow(player, args)
-    local bank = type(args.source) == "table" and bankOfSource(args.source)
+    local bank = bankOfSource(args.source)
     local source = bank and bank:findSource(args.source.x, args.source.y, args.source.z)
     if not source then return false, "not connected" end
     bank:clearSnow(source, sourceAt(args.source))

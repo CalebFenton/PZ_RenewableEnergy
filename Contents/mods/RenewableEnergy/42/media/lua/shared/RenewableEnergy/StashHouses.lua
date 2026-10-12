@@ -1,14 +1,16 @@
-require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 
 -- Stash houses: buildings of the Muldraugh, KY map that the game's StashSystem stocks with a crate
 -- of solar gear, once someone reads an annotated map leading there or, for some, from the first
--- day. The Stash Houses option chooses: 1 none, 2 maps only, 3 maps and houses stocked from the
--- start, 4 houses stocked from the start only. StashSystem reads StashDescriptions on the server
--- and in single player; Distributions.lua puts the mod's own map items into corpse loot.
+-- day, as the Stash Houses option chooses. StashSystem reads StashDescriptions on the server and
+-- in single player; Distributions.lua puts the mod's own map items into corpse loot.
 
+RenewableEnergy = RenewableEnergy or {}
 local Stash = {}
 RenewableEnergy.Stash = Stash
+
+-- Values of the StashMode sandbox option.
+local StashMode = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }
 
 -- Description (the table StashSystem reads) -> what only the mod uses: knownOnStart, the percent
 -- chance that the house is stocked from the start; rarity, the map item's weight in the corpse
@@ -172,7 +174,7 @@ end
 --- Whether the Stash Houses option puts the maps into corpse loot.
 function Stash.mapsInLoot()
     local mode = SandboxVars.RenewableEnergy.StashMode
-    return mode == 2 or mode == 3
+    return mode == StashMode.MAPS or mode == StashMode.MAPS_AND_STOCKED
 end
 
 --- Stocks each house that rolls its knownOnStart chance. StashSystem.prepareBuildingStash also
@@ -217,7 +219,7 @@ end
 --- Adds the houses to StashDescriptions, once however often it is called, unless the Stash Houses
 --- option leaves them out. Returns whether the option uses them.
 function Stash.register()
-    if SandboxVars.RenewableEnergy.StashMode == 1 then
+    if SandboxVars.RenewableEnergy.StashMode == StashMode.NONE then
         return false
     end
     StashDescriptions = StashDescriptions or {}
@@ -254,7 +256,7 @@ local function onInitGlobalModData(isNewGame)
         return
     end
     Events.OnLoadedMapZones.Add(onLoadedMapZones)
-    if isNewGame and not isClient() and SandboxVars.RenewableEnergy.StashMode ~= 2 then
+    if isNewGame and not isClient() and SandboxVars.RenewableEnergy.StashMode ~= StashMode.MAPS then
         Events.OnTick.Add(stockOnFirstTick)
     end
 end

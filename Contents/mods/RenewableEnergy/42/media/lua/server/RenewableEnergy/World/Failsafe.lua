@@ -12,6 +12,8 @@ require "RenewableEnergy/Sprites"
 -- failsafe, so their handlers must leave it alone.
 
 local FAILSAFE = RenewableEnergy.Sprites.failsafe
+-- MapObjects keeps one function per sprite and priority.
+local LOAD_PRIORITY = 6
 
 local function moveToTop(failsafe)
     local square = failsafe:getSquare()
@@ -32,5 +34,5 @@ local function onObjectAdded(isoObject)
     end
 end
 
-MapObjects.OnLoadWithSprite(FAILSAFE, moveToTop, 6)
+MapObjects.OnLoadWithSprite(FAILSAFE, moveToTop, LOAD_PRIORITY)
 Events.OnObjectAdded.Add(onObjectAdded)

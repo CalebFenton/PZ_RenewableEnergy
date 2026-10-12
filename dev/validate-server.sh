@@ -3,7 +3,8 @@
 # waits for it to finish loading, stops it, and fails if the mod logged a problem. The server
 # loads the tiles, scripts, sandbox options, shared and server Lua, and the loot tables.
 #
-# CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-server).
+# CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-server), and TIMEOUT the
+# seconds the server may take to start (default 900).
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -46,10 +47,10 @@ cd "$PZ/Java"
     -cachedir="$CACHE" -servername "$NAME" -adminpassword admin -nosteam -debuglog=Mod,Lua \
     < "$FIFO" > "$CACHE/stdout.txt" 2>&1 &
 SERVER=$!
-# Background jobs of a script ignore Ctrl-C, so the server would outlive the script. The lock goes
-# only once the server has exited.
-trap 'kill "$SERVER" 2>/dev/null || true; wait "$SERVER" 2>/dev/null || true; rm -f "$FIFO"; release_game_lock' EXIT
+stop_game_on_exit "$SERVER"
+# Opening the FIFO waits for the server's end to open too; once both are open it can go.
 exec 3>"$FIFO"
+rm -f "$FIFO"
 
 started=0
 for _ in $(seq "$TIMEOUT"); do

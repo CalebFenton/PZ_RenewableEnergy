@@ -1,16 +1,20 @@
-require "RenewableEnergy/Utilities"
-
 -- Measures how often the mod's items spawn, with the game's own loot rolls on scratch containers
 -- that never enter the world, and how world banks and crates are stocked. For tuning
 -- Distributions.lua and WorldSpawns.lua, for the numbers in the README, and for the loot tests.
--- dev/run-debug-client.sh --loot prints RenewableEnergyLoot.report(). Debug mode only.
+-- dev/run-debug-client.sh --loot prints Loot.report() and Loot.moduleReport(). Debug mode only.
 --
 -- The report rolls copies of the lists that hold only the mod's items. Each entry rolls on its
 -- own, so that gives the same chances without creating the vanilla items, and rolling the whole
--- lists thousands of times ran the client out of memory. What it leaves out: a container that
+-- lists thousands of times runs the client out of memory. What it leaves out: a container that
 -- the vanilla items have already filled stops rolling, which makes the real chances a little
 -- lower in lists of heavy items.
-RenewableEnergyLoot = {}
+
+require "RenewableEnergy/Specs"
+require "RenewableEnergy/Recipes"
+
+RenewableEnergy = RenewableEnergy or {}
+local Loot = {}
+RenewableEnergy.Loot = Loot
 
 -- ItemPickerJava.getItemContainer reaches a parsed table only through a room, and vehicle lists
 -- not at all, so withLoot files the tables it measures under this made-up room.
@@ -144,11 +148,28 @@ local MEASURE_OPTIONS = {
 }
 local LRM_OPTIONS = { "LRMSolarPanels", "LRMBatteries", "LRMMisc" }
 
+-- Runs fn() with the mod's loot rarity options at `lrm` and the mod's loot applied for them, then
+-- restores the options and applies the loot again. ItemPickerJava.Parse is left to the caller.
+local function withLootRarity(lrm, fn)
+    local saved = {}
+    for _, option in ipairs(LRM_OPTIONS) do
+        saved[option] = SandboxVars.RenewableEnergy[option]
+        SandboxVars.RenewableEnergy[option] = lrm
+    end
+    RenewableEnergy.Distributions.apply()
+    local result = fn()
+    for option, value in pairs(saved) do
+        SandboxVars.RenewableEnergy[option] = value
+    end
+    RenewableEnergy.Distributions.apply()
+    return result
+end
+
 --- The loot table a reference from RenewableEnergy.Distributions.items names. A junk list is
 --- rolled with the list it belongs to, so "proc:X.junk" gives the table of X.
 ---@param reference string
 ---@return table?
-function RenewableEnergyLoot.lootTable(reference)
+function Loot.lootTable(reference)
     local kind, name = string.match(reference, "^(%a+):(.+)$")
     local list
     if kind == "proc" then
@@ -166,7 +187,7 @@ end
 
 --- The references in RenewableEnergy.Distributions.items with junk lists folded into their own,
 --- each with the set of item types it lists: { { reference = ..., items = { [fullType] = true } } }.
-function RenewableEnergyLoot.targets()
+function Loot.targets()
     local byReference, targets = {}, {}
     for _, spec in ipairs(RenewableEnergy.Distributions.items) do
         for _, entry in ipairs(spec.entries) do
@@ -187,7 +208,7 @@ local function isModItem(fullType)
     return string.sub(fullType, 1, #MOD_PREFIX) == MOD_PREFIX
 end
 
---- A copy of a loot table with only the mod's items, junk included.
+-- A copy of a loot table with only the mod's items, junk included.
 local function modItemsOnly(lootTable)
     local items = {}
     for i = 1, #lootTable.items - 1, 2 do
@@ -210,44 +231,37 @@ end
 --- procedural containers to pick. parsed[key] is the game's copy of the container to pass to
 --- ItemPickerJava.rollItem, or nil if the game didn't take it. Afterwards restores the options and
 --- parses the loot as it was.
-function RenewableEnergyLoot.withLoot(lrm, build, fn)
-    local saved = {}
-    for _, option in ipairs(LRM_OPTIONS) do
-        saved[option] = SandboxVars.RenewableEnergy[option]
-        SandboxVars.RenewableEnergy[option] = lrm
-    end
-    RenewableEnergy.Distributions.apply()
-    local containers, lists = build()
-    lists = lists or {}
-    for name, list in pairs(lists) do
-        ProceduralDistributions.list[name] = list
-    end
-    SuburbsDistributions[PROBE_ROOM] = containers
-    ItemPickerJava.Parse()
-    local parsed = {}
-    for key, containerTable in pairs(containers) do
-        -- For a procedural container, a list name no entry has returns the container itself.
-        parsed[key] = ItemPickerJava.getItemContainer(PROBE_ROOM, key, containerTable.procedural and "" or nil, false)
-    end
-    local result = fn(parsed)
-    SuburbsDistributions[PROBE_ROOM] = nil
-    for name in pairs(lists) do
-        ProceduralDistributions.list[name] = nil
-    end
-    for option, value in pairs(saved) do
-        SandboxVars.RenewableEnergy[option] = value
-    end
-    RenewableEnergy.Distributions.apply()
+function Loot.withLoot(lrm, build, fn)
+    local result = withLootRarity(lrm, function()
+        local containers, lists = build()
+        lists = lists or {}
+        for name, list in pairs(lists) do
+            ProceduralDistributions.list[name] = list
+        end
+        SuburbsDistributions[PROBE_ROOM] = containers
+        ItemPickerJava.Parse()
+        local parsed = {}
+        for key, containerTable in pairs(containers) do
+            -- For a procedural container, a list name no entry has returns the container itself.
+            parsed[key] = ItemPickerJava.getItemContainer(PROBE_ROOM, key, containerTable.procedural and "" or nil, false)
+        end
+        local measured = fn(parsed)
+        SuburbsDistributions[PROBE_ROOM] = nil
+        for name in pairs(lists) do
+            ProceduralDistributions.list[name] = nil
+        end
+        return measured
+    end)
     ItemPickerJava.Parse()
     return result
 end
 
---- One table per target of RenewableEnergyLoot.targets(), keyed "t<index>": the list itself, or
+--- One table per target of Loot.targets(), keyed "t<index>": the list itself, or
 --- with `modOnly` a copy of it with only the mod's items.
-function RenewableEnergyLoot.tablesFor(targets, modOnly)
+function Loot.tablesFor(targets, modOnly)
     local tables = {}
     for i, target in ipairs(targets) do
-        local lootTable = RenewableEnergyLoot.lootTable(target.reference)
+        local lootTable = Loot.lootTable(target.reference)
         if lootTable and modOnly then
             lootTable = modItemsOnly(lootTable)
         end
@@ -256,8 +270,8 @@ function RenewableEnergyLoot.tablesFor(targets, modOnly)
     return tables
 end
 
---- The containers of ROOM_CONTAINERS keyed "r<index>", each picking from copies of its lists with
---- only the mod's items, and those copies.
+-- The containers of ROOM_CONTAINERS keyed "r<index>", each picking from copies of its lists with
+-- only the mod's items, and those copies.
 local function roomContainersModOnly()
     local containers, lists = {}, {}
     for i, spec in ipairs(ROOM_CONTAINERS) do
@@ -284,7 +298,7 @@ end
 --- Runs fn with MEASURE_OPTIONS and the General debug log off: in debug mode ItemPickInfo logs a
 --- line for every roll into a container that isn't on a square, which floods console.txt. The
 --- loot category multipliers are cached when a game loads, so they are reloaded around fn.
-function RenewableEnergyLoot.withMeasureOptions(fn)
+function Loot.withMeasureOptions(fn)
     local options = getSandboxOptions()
     local saved = {}
     for name, value in pairs(MEASURE_OPTIONS) do
@@ -322,7 +336,7 @@ end
 --- outside any room, because a container in a room counts toward the room's per-room list limits
 --- and gets its forced lists.
 ---@param square IsoGridSquare?
-function RenewableEnergyLoot.newContainer(square)
+function Loot.newContainer(square)
     return ItemContainer.new("crate", square, nil)
 end
 
@@ -343,7 +357,7 @@ end
 
 --- Calls fill(container) on an emptied `container` once and returns what it got: fullType ->
 --- count, of the mod's items, or of every item with `everything`.
-function RenewableEnergyLoot.fillOnce(fill, container, everything)
+function Loot.fillOnce(fill, container, everything)
     container:removeAllItems()
     fill(container)
     local counts = {}
@@ -361,12 +375,16 @@ function RenewableEnergyLoot.fillOnce(fill, container, everything)
     return counts
 end
 
+local function rollFill(list)
+    return function(container)
+        ItemPickerJava.rollItem(list, container, true, nil, nil)
+    end
+end
+
 --- Rolls `list` (a parsed table) into an emptied `container` once and returns the mod's items it
 --- got: fullType -> count.
-function RenewableEnergyLoot.rollOnce(list, container)
-    return RenewableEnergyLoot.fillOnce(function(target)
-        ItemPickerJava.rollItem(list, target, true, nil, nil)
-    end, container)
+function Loot.rollOnce(list, container)
+    return Loot.fillOnce(rollFill(list), container)
 end
 
 -- Fills `container` `samples` times. Returns fullType -> { share = fraction of samples holding
@@ -374,7 +392,7 @@ end
 local function sample(fill, samples, container, everything)
     local holding, total = {}, {}
     for _ = 1, samples do
-        for fullType, count in pairs(RenewableEnergyLoot.fillOnce(fill, container, everything)) do
+        for fullType, count in pairs(Loot.fillOnce(fill, container, everything)) do
             holding[fullType] = (holding[fullType] or 0) + 1
             total[fullType] = (total[fullType] or 0) + count
         end
@@ -386,14 +404,8 @@ local function sample(fill, samples, container, everything)
     return result
 end
 
-local function rollFill(list)
-    return function(container)
-        ItemPickerJava.rollItem(list, container, true, nil, nil)
-    end
-end
-
 -- An outdoor square near the player, for procedural rolls.
-function RenewableEnergyLoot.squareOutsideRooms()
+function Loot.squareOutsideRooms()
     local player = getPlayer()
     local cell = getCell()
     if not player or not cell then
@@ -445,18 +457,18 @@ end
 --- a list of { label, reference, samples, items = fullType -> { share, perContainer }, expected =
 --- { [fullType] = true } }, with the loot multipliers it measured at in `settings`: { other = ...,
 --- recipeResource = ... }. World stock counts vanilla items too.
-function RenewableEnergyLoot.report(samples)
-    return RenewableEnergyLoot.withMeasureOptions(function()
-        local targets = RenewableEnergyLoot.targets()
+function Loot.report(samples)
+    return Loot.withMeasureOptions(function()
+        local targets = Loot.targets()
         table.insert(targets, { reference = "sub:RenewableEnergyStashCache.RenewableEnergySolarBox", items = {} })
         local function build()
             local containers, lists = roomContainersModOnly()
-            for key, lootTable in pairs(RenewableEnergyLoot.tablesFor(targets, true)) do
+            for key, lootTable in pairs(Loot.tablesFor(targets, true)) do
                 containers[key] = lootTable
             end
             return containers, lists
         end
-        return RenewableEnergyLoot.withLoot(1, build, function(parsed)
+        return Loot.withLoot(1, build, function(parsed)
             local entries = {}
             local function add(label, reference, fill, container, expected, everything)
                 table.insert(entries, {
@@ -467,13 +479,13 @@ function RenewableEnergyLoot.report(samples)
                     expected = expected,
                 })
             end
-            local container = RenewableEnergyLoot.newContainer(nil)
+            local container = Loot.newContainer(nil)
             for i, target in ipairs(targets) do
                 local list = parsed["t" .. i]
                 add(labelFor(target.reference), target.reference, list and rollFill(list), container, target.items)
             end
-            local square = RenewableEnergyLoot.squareOutsideRooms()
-            local roomContainer = RenewableEnergyLoot.newContainer(square)
+            local square = Loot.squareOutsideRooms()
+            local roomContainer = Loot.newContainer(square)
             for i, spec in ipairs(ROOM_CONTAINERS) do
                 local list = square and parsed["r" .. i]
                 add(spec.label, spec.room .. "." .. spec.container, list and rollFill(list), roomContainer, {})
@@ -494,15 +506,13 @@ end
 -- How many solar modules, and how many watts of them, a thorough player finds in a town: every
 -- container of every room, the crates world spawns put in rooms, the vehicles its stalls hold
 -- and the solar sites in its bounds, from dev/loot/census.py's counts times each one's expected
--- modules. Expectations come from the loot tables' weights the way ItemPickerJava rolls them
--- (DEVELOPMENT.md, Loot), so the report is exact for the lists and approximate where the game
--- picks among them: a procedural container picks a list by weightChance, at most `max` per room,
--- and lists forced by zone, tile or room are left out. Watts weigh each module by its condition;
--- "repaired" is after one Repair Cracked Module on every module it helps.
+-- modules. Expectations come from the loot tables' weights the way the game rolls them
+-- (ItemPickerJava.getActualSpawnChance), so the report is exact for the lists and approximate
+-- where the game picks among them: a procedural container picks a list by weightChance, at most
+-- `max` per room, and lists forced by zone, tile or room are left out. Watts weigh each module by
+-- its condition; "repaired" is after one Repair Cracked Module on every module it helps.
 
-local MODULE = "RenewableEnergy.SolarModule"
--- Repair Cracked Module: condition added, and the most it brings a factory module to.
-local REPAIR = { add = 30, cap = 80 }
+local MODULE = RenewableEnergy.Specs.factoryModule
 
 -- A count of modules with their summed condition, as found and as repaired.
 local function haul(count, condition, repaired)
@@ -522,10 +532,12 @@ end
 
 -- One module whose condition is uniform over the range: { count = 1, condition, repaired }.
 local function moduleOver(range)
+    local Recipes = RenewableEnergy.Recipes
+    local cap = Recipes.MODULE_REPAIR_CAP[MODULE]
     local sum, repairedSum, n = 0, 0, 0
     for condition = range.min, range.max do
         sum = sum + condition
-        repairedSum = repairedSum + (condition < REPAIR.cap and math.min(REPAIR.cap, condition + REPAIR.add) or condition)
+        repairedSum = repairedSum + (condition < cap and math.min(cap, condition + Recipes.MODULE_REPAIR) or condition)
         n = n + 1
     end
     return haul(1, sum / n, repairedSum / n)
@@ -551,7 +563,8 @@ local function chancePerRoll(weight, multiplier)
     return math.min(1, math.ceil(weight * 100 * multiplier) / 10000)
 end
 
---- Expected count of `fullType` in one fill of a loot table, junk included.
+-- Expected count of `fullType` in one fill of a loot table, junk included. Junk rolls at a loot
+-- multiplier of 1 with its weights times 1.4 (ItemPickerJava.getBaseChanceMultiplier).
 local function expectedIn(lootTable, fullType)
     if type(lootTable) ~= "table" then
         return 0
@@ -577,8 +590,8 @@ local function isForced(pick)
     return pick.forceForZones or pick.forceForTiles or pick.forceForRooms or pick.forceForItems
 end
 
---- Expected modules in `count` containers of `containerType` spread over `rooms` rooms named
---- `roomName`.
+-- Expected modules in `count` containers of `containerType` spread over `rooms` rooms named
+-- `roomName`.
 local function expectedInContainers(roomName, containerType, count, rooms)
     local room = SuburbsDistributions[roomName]
     local entry = room and room[containerType] or SuburbsDistributions.all[containerType]
@@ -648,15 +661,21 @@ local function arrowBoardHaul(kinds)
     return total
 end
 
+-- The special loot chance of a vehicle script whose script sets none (BaseVehicle.randomizeContainers,
+-- which rolls Rand.Next(100) <= chance, so a chance of n is n + 1 in 100).
+local DEFAULT_SPECIAL_LOOT_CHANCE = 8
+
 -- Expected modules in one vehicle of a script: its Normal loot, or one of its Specific sets at
--- the vehicle's special loot chance (BaseVehicle.randomizeContainers: 8 in 100).
-local SPECIAL_LOOT_CHANCE = 0.08
+-- the vehicle's special loot chance.
 local function vehicleModules(script)
     local name = string.gsub(script, "^Base%.", "")
     local distribution = VehicleDistributions[1][name]
     if not distribution then
         return 0
     end
+    local vehicleScript = getScriptManager():getVehicle(script)
+    local chance = vehicleScript and vehicleScript:getSpecialLootChance() or 0
+    local specialShare = ((chance > 0 and chance or DEFAULT_SPECIAL_LOOT_CHANCE) + 1) / 100
     local function setModules(set)
         local total = 0
         for part, lootTable in pairs(set or {}) do
@@ -674,12 +693,12 @@ local function vehicleModules(script)
     for _, set in ipairs(specific) do
         specificTotal = specificTotal + setModules(set)
     end
-    return (1 - SPECIAL_LOOT_CHANCE) * setModules(distribution.Normal) + SPECIAL_LOOT_CHANCE * specificTotal / #specific
+    return (1 - specialShare) * setModules(distribution.Normal) + specialShare * specificTotal / #specific
 end
 
---- Vehicles that come with a zone's stalls, by script, each { share, perStall }: the chance a
---- stall holds one. As IsoChunk.AddVehicles_OnZone and VehicleType.getRandomVehicleType roll
---- them, leaving out the special vehicles a few stalls of an ordinary zone turn into.
+-- Vehicles that come with a zone's stalls, by script, each { share, perStall }: the chance a
+-- stall holds one. As IsoChunk.AddVehicles_OnZone and VehicleType.getRandomVehicleType roll
+-- them, leaving out the special vehicles a few stalls of an ordinary zone turn into.
 local function zoneVehicles(zoneName)
     local zone = VehicleZoneDistribution[zoneName]
     if not zone or not zone.vehicles then
@@ -732,7 +751,7 @@ local function siteSpot(site)
     return spot[1], spot[2]
 end
 
---- Expected modules of a site once placed.
+-- Expected modules of a site once placed.
 local function siteHaul(site, kinds)
     local SolarSites, WorldSpawns = RenewableEnergy.SolarSites, RenewableEnergy.WorldSpawns
     local kind = SolarSites.KINDS[site.kind]
@@ -761,54 +780,52 @@ local function inTown(town, x, y)
     return x >= town.x1 and x <= town.x2 and y >= town.y1 and y <= town.y2
 end
 
+local function buildModuleReport(census)
+    local kinds = moduleKinds()
+    local siteChance = SandboxVars.RenewableEnergy.SolarSites / 100
+    local report = { towns = {}, sites = {} }
+    for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
+        table.insert(report.sites, { name = site.name, kind = site.kind, haul = siteHaul(site, kinds), site = site })
+    end
+    for _, town in ipairs(census.towns) do
+        local row = roomsHaul(town, kinds)
+        row.name = town.name
+        row.vehicles = vehiclesHaul(town.vehicleStalls, kinds)
+        row.sites = emptyHaul()
+        for _, entry in ipairs(report.sites) do
+            if inTown(town, siteSpot(entry.site)) then
+                addHaul(row.sites, entry.haul, siteChance)
+            end
+        end
+        row.total = emptyHaul()
+        for _, part in ipairs({ row.listed, row.cracked, row.crates, row.vehicles, row.sites }) do
+            addHaul(row.total, part)
+        end
+        table.insert(report.towns, row)
+    end
+    local _, zoneBoards = vehiclesHaul(census.mapVehicleStalls, kinds)
+    local roadWorks = 0
+    for _, entry in ipairs(report.sites) do
+        if entry.site.arrowBoard then
+            roadWorks = roadWorks + siteChance
+        end
+    end
+    report.arrowBoards = { zones = zoneBoards, roadWorks = roadWorks }
+    report.siteChance = siteChance
+    return report
+end
+
 --- The module report: for each town of the census, { name, listed, cracked, crates, vehicles,
 --- sites, total } hauls ({ count, condition, repaired }, condition summed over the modules);
 --- `sites`, each { name, kind, haul } at its Solar Sites chance; `arrowBoards`, the expected
 --- number on the map, { zones, roadWorks }. At the default loot settings and loot rarity
 --- options 1.
-function RenewableEnergyLoot.moduleReport(census)
-    return RenewableEnergyLoot.withMeasureOptions(function()
-        local saved = {}
-        for _, option in ipairs(LRM_OPTIONS) do
-            saved[option] = SandboxVars.RenewableEnergy[option]
-            SandboxVars.RenewableEnergy[option] = 1
-        end
-        RenewableEnergy.Distributions.apply()
-        local kinds = moduleKinds()
-        local siteChance = SandboxVars.RenewableEnergy.SolarSites / 100
-        local report = { towns = {}, sites = {} }
-        for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
-            table.insert(report.sites, { name = site.name, kind = site.kind, haul = siteHaul(site, kinds), site = site })
-        end
-        for _, town in ipairs(census.towns) do
-            local row = roomsHaul(town, kinds)
-            row.name = town.name
-            row.vehicles = vehiclesHaul(town.vehicleStalls, kinds)
-            row.sites = emptyHaul()
-            for _, entry in ipairs(report.sites) do
-                if inTown(town, siteSpot(entry.site)) then
-                    addHaul(row.sites, entry.haul, siteChance)
-                end
-            end
-            row.total = emptyHaul()
-            for _, part in ipairs({ row.listed, row.cracked, row.crates, row.vehicles, row.sites }) do
-                addHaul(row.total, part)
-            end
-            table.insert(report.towns, row)
-        end
-        local _, zoneBoards = vehiclesHaul(census.mapVehicleStalls, kinds)
-        local roadWorks = 0
-        for _, entry in ipairs(report.sites) do
-            if entry.site.arrowBoard then
-                roadWorks = roadWorks + siteChance
-            end
-        end
-        report.arrowBoards = { zones = zoneBoards, roadWorks = roadWorks }
-        report.siteChance = siteChance
-        for option, value in pairs(saved) do
-            SandboxVars.RenewableEnergy[option] = value
-        end
-        RenewableEnergy.Distributions.apply()
-        return report
+function Loot.moduleReport(census)
+    return Loot.withMeasureOptions(function()
+        return withLootRarity(1, function()
+            return buildModuleReport(census)
+        end)
     end)
 end
+
+return Loot

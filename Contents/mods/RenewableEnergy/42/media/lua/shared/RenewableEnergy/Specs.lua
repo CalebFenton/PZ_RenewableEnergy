@@ -1,11 +1,9 @@
 -- What each piece of the mod's power hardware is rated for, in watts and watt-hours.
 --
 -- Code that needs a rating reads it here, so balancing changes only this file. The ratings
--- start from 1993 parts (.agent/design-ideas.md) and are tuned to the stages in
--- .agent/progression-spec.md.
+-- start from the specifications of 1993 parts.
 
 RenewableEnergy = RenewableEnergy or {}
-
 local Specs = {}
 RenewableEnergy.Specs = Specs
 
@@ -56,11 +54,14 @@ Specs.partWear = {
 Specs.partRepair = { condition = 10, skill = 2, xp = 5 }
 
 -- Solar modules by item type: rated watts at condition 100. A module makes its rating times its
--- condition / 100, so a homemade one (ConditionMax 60) tops out lower.
+-- condition / 100, so a homemade one, whose ConditionMax is lower, tops out lower.
 Specs.modules = {
     ["RenewableEnergy.SolarModule"] = { watts = 50 },
     ["RenewableEnergy.HomemadeSolarModule"] = { watts = 50 },
 }
+-- The factory-made module: what a panel holds when nothing recorded its modules, and what
+-- world spawns place.
+Specs.factoryModule = "RenewableEnergy.SolarModule"
 
 -- Panel mounts by kind (RenewableEnergy.Sprites.kindOf): modules held, tilt from flat, and how
 -- likely a storm is to crack one of its modules, before the material's own factor.
@@ -81,8 +82,8 @@ Specs.materials = {
 -- game year had 21 thunderstorms and about 150 hours of them at windMin or more.
 Specs.storm = { windMin = 45, chancePerHour = 0.0035, crack = 30 }
 
--- Battery storage by item type. sprite is the Sprites field of its placed tile; the rest is
--- how many of each part can be wired in.
+-- Banks by item type. sprite is the Sprites field of its placed tile; the rest is how many of
+-- each part can be wired in.
 Specs.banks = {
     ["RenewableEnergy.BatteryBoxWood"] = { sprite = "batteryBoxWood", maxBatteries = 2, maxInverters = 1, maxChargers = 1, maxControllers = 0 },
     ["RenewableEnergy.BatteryBoxMetal"] = { sprite = "batteryBoxMetal", maxBatteries = 2, maxInverters = 1, maxChargers = 1, maxControllers = 0 },
@@ -114,7 +115,7 @@ Specs.gardenLight = { watts = 1, wh = 3, nightWatts = 0.5, radius = 2 }
 -- Batteries found in the world hold this fraction of a charge.
 Specs.foundCharge = { min = 0.3, max = 0.8 }
 
--- How far a panel may be wired from its bank, in tiles and in floors.
+-- How far a panel may be from the bank it is connected to, in tiles and in floors.
 Specs.sourceReach = { tiles = 20, levels = 3 }
 
 -- What appliances draw while on, in watts. A compressor runs only part of the time: watts is

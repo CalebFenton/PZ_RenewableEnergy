@@ -1,21 +1,23 @@
 -- Sunlight on a solar panel: where the sun is, how much of it the weather lets through, and
--- what a panel on each mount makes of it (design §2.1, §2.2, §4).
+-- what a panel on each mount makes of it.
 --
 -- The pure functions take every input as an argument, so the tests can integrate a whole
--- year without moving the game clock. The `...Now` functions read the game's clock and
--- weather.
+-- year without moving the game clock. The functions under "Game clock and weather" read the
+-- game's clock and weather.
 
-local Specs = require "RenewableEnergy/Specs"
+require "RenewableEnergy/Specs"
 
+RenewableEnergy = RenewableEnergy or {}
 local Sun = {}
 RenewableEnergy.Sun = Sun
 
+local Specs = RenewableEnergy.Specs
 local rad, sin, cos, tan, acos, max, min = math.rad, math.sin, math.cos, math.tan, math.acos, math.max, math.min
 
--- Clear-sky light on a horizontal surface at a sun overhead, and how much it thins as the
--- sun drops (a fit to clear-sky models that stands in for air mass). Panels are rated at it.
-local CLEAR_SKY = 1000
-Sun.FULL_SUN = CLEAR_SKY
+-- Clear-sky light, in W/m², on a horizontal surface at a sun overhead, and how much it thins as
+-- the sun drops (a fit to clear-sky models that stands in for air mass). Panels are rated at it.
+Sun.FULL_SUN = 1000
+local FULL_SUN = Sun.FULL_SUN
 local AIR_MASS_EXPONENT = 1.15
 -- The share of clear-sky light that comes from the whole sky rather than the sun's disc.
 -- With the cloud weighting below it puts a year's flat and south-wall output against a
@@ -78,7 +80,7 @@ function Sun.planeIrradiance(sun, kind, facing, weather)
     if sun.up <= 0 then
         return 0
     end
-    local horizontal = CLEAR_SKY * sun.up ^ AIR_MASS_EXPONENT
+    local horizontal = FULL_SUN * sun.up ^ AIR_MASS_EXPONENT
     horizontal = horizontal * (1 - CLOUD_LOSS * weather.cloud) * (1 - FOG_LOSS * weather.fog) * (1 - RAIN_LOSS * weather.rain)
     if weather.snowing then
         horizontal = horizontal * SNOWFALL_FACTOR
@@ -96,7 +98,7 @@ end
 
 --- Watts a panel rated `ratedWatts` makes in `irradiance`, under `snow` cover from 0 to 1.
 function Sun.wattsFrom(ratedWatts, irradiance, snow)
-    local watts = ratedWatts * irradiance / CLEAR_SKY * SYSTEM_LOSSES
+    local watts = ratedWatts * irradiance / FULL_SUN * SYSTEM_LOSSES
         * SandboxVars.RenewableEnergy.SunlightMultiplier * (1 - (snow or 0))
     return max(0, watts)
 end

@@ -503,7 +503,7 @@ def items(mod, game, report):
         for value in block.all("Tags"):
             for tag in filter(None, (t.strip() for t in value.value.split(";"))):
                 if ":" not in tag:
-                    # Tags are resource locations now; a bare one matches no tags[] query.
+                    # Build 42 tags are resource locations; a bare one matches no tags[] query.
                     report.fail("item-tag", path, value.line, "tag %s has no namespace, so nothing finds it (base:%s?)"
                                 % (tag, tag.lower()))
 

@@ -23,8 +23,9 @@
 #                                    list (a few minutes)
 #
 # CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-client), JAVAC the compiler for
-# ClickToStart.java (default: javac from PATH; any JDK from 8 on works), and TESTS, a comma-separated
-# list of test name prefixes, limits --test to those tests (e.g. TESTS=renewable_energy_loot_).
+# ClickToStart.java (default: javac from PATH; any JDK from 8 on works), TIMEOUT the seconds a
+# harness run may take (default 1200), and TESTS, a comma-separated list of test name prefixes,
+# limits --test to those tests (e.g. TESTS=renewable_energy_loot_).
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -89,12 +90,8 @@ if [ -z "$MODE" ]; then
     exec "${GAME[@]}" -cp "$GAME_CLASSPATH" zombie.gameStates.MainScreenState "${GAME_ARGS[@]}"
 fi
 
-# The game's own Java has no compiler. Target 8 so that any JDK can build a class it can run.
 LAUNCHER="$CACHE/launcher"
-if [ "$REPO/dev/ClickToStart.java" -nt "$LAUNCHER/ClickToStart.class" ]; then
-    mkdir -p "$LAUNCHER"
-    "${JAVAC:-javac}" -source 8 -target 8 -Xlint:-options -d "$LAUNCHER" "$REPO/dev/ClickToStart.java"
-fi
+compile_java "$REPO/dev/ClickToStart.java" "$LAUNCHER"
 
 # GLFW finds no monitor while the display sleeps, and the game can't open its window. caffeinate -u
 # wakes the display, and -d -i keep it and the computer awake until this script exits.
@@ -110,9 +107,7 @@ rm -f "$LOG" "$CACHE/Screenshots/${MODE:-none}"_*.png
 cd "$PZ/Java"
 "${GAME[@]}" -cp "$LAUNCHER:$GAME_CLASSPATH" ClickToStart "${GAME_ARGS[@]}" > "$CACHE/stdout.txt" 2>&1 &
 PID=$!
-# Background jobs of a script ignore Ctrl-C, so the game would outlive the script. The lock goes
-# only once the game has exited.
-trap 'kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; release_game_lock' EXIT
+stop_game_on_exit "$PID"
 
 case "$MODE" in
     promo) MARK=REPromo ;;
@@ -126,7 +121,7 @@ esac
 lua_stopped() {
     [ -f "$LOG" ] || return 1
     # Stack trace frames are indented; a require warning names the mod on a WARN line instead.
-    grep -q -E '^[[:space:]]+Lua\(\(MOD:Renewable Energy' "$LOG" && return 0
+    grep -q -E "^[[:space:]]+Lua\\($MOD_ERROR" "$LOG" && return 0
     sed -n "/> $MARK /,\$p" "$LOG" | grep -q -E '^Lua fail|dumping Lua stack trace'
 }
 STOPPED=

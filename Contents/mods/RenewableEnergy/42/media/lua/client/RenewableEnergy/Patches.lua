@@ -1,13 +1,11 @@
-require "TimedActions/ISInventoryTransferAction"
----@class RenewableEnergy
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PowerBank/PowerBank"
-
 -- A bank's parts come out only by being unwired, which gives back the wire. The container's
 -- AcceptItemFunction governs only what goes in, and the engine asks nothing of Lua before an item
 -- leaves (IsoObject.isRemoveItemAllowedFromContainer is Java's alone), so the player's own
 -- transfers are refused here: dragging, Grab and Loot All all run ISInventoryTransferAction.
 -- World spawns and the server's wiring move items without it.
+
+require "TimedActions/ISInventoryTransferAction"
+require "RenewableEnergy/PowerBank/PowerBank"
 
 local PowerBank = RenewableEnergy.PowerBank
 

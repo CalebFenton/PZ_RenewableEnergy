@@ -5,7 +5,7 @@ require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/UI/RenewableEnergyVehicleBattery"
+require "RenewableEnergy/UI/VehicleBatteryMenu"
 -- RenewableEnergy.GadgetCharging is server Lua, which single player loads only once a game
 -- starts, so it is looked up when a test runs rather than required here.
 require "Moveables/ISMoveableSpriteProps"

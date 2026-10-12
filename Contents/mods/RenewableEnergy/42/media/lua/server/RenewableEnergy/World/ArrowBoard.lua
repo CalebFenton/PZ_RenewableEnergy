@@ -1,5 +1,6 @@
 require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
+require "RenewableEnergy/Specs"
 require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
@@ -21,8 +22,8 @@ ArrowBoard.BATTERY_BOX = "RenewableEnergyBatteryBox"
 -- The four traffic jam zones share one vehicle table. About 5 a map, with the road works.
 ArrowBoard.ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4, trades = 2 }
 
--- What its battery box holds: two modules, the second often cracked; deep cycle batteries,
--- a count from min to max, charged by Distributions.chargeFoundBatteries; a charge controller.
+-- What its battery box holds: the panels' modules, the second often cracked; deep cycle
+-- batteries, charged by Distributions.chargeFoundBatteries; a charge controller.
 ArrowBoard.STOCK = {
     modules = 2,
     secondCrackedChance = 0.6,
@@ -51,7 +52,7 @@ function ArrowBoard.stockBatteryBox(container)
         local cracked = i == 2 and ZombRandFloat(0, 1) < stock.secondCrackedChance
         WorldSpawns.addModule(container, cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
     end
-    local batteries = ZombRand(stock.batteries.min, stock.batteries.max + 1)
+    local batteries = WorldSpawns.rollBetween(stock.batteries)
     for _ = 1, WorldSpawns.scaled(batteries, options.LRMBatteries) do
         container:AddItem(stock.battery)
     end

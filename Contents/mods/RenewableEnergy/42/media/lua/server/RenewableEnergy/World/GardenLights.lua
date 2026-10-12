@@ -15,6 +15,7 @@ require "RenewableEnergy/World/WorldSpawns"
 -- A house is rolled once the squares around it are loaded, which the chunk that brought it in
 -- doesn't promise, so the houses its chunks bring in wait in `pending` until then.
 
+RenewableEnergy = RenewableEnergy or {}
 local GardenLights = {}
 RenewableEnergy.GardenLights = GardenLights
 
@@ -152,9 +153,10 @@ end
 
 -- Rolling ----------------------------------------------------------------------------------------
 
---- Places 2 to 6 charged lights along the house's front. Returns how many it placed.
+--- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
+--- Returns how many it placed.
 function GardenLights.place(def)
-    local count = ZombRand(GardenLights.COUNT.min, GardenLights.COUNT.max + 1)
+    local count = RenewableEnergy.WorldSpawns.rollBetween(GardenLights.COUNT)
     local charged = { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh }
     local squares = GardenLights.frontSquares(def, count)
     for _, square in ipairs(squares) do
@@ -179,9 +181,13 @@ function GardenLights.roll(def, always)
     return placed
 end
 
+-- Squares along a chunk's side (IsoChunkMap.CHUNK_SIZE_IN_SQUARES).
+local CHUNK_SIZE = 8
+
+-- Whether every chunk that the house's REACH touches is loaded: one square per chunk tells.
 local function surroundingsLoaded(def)
-    for x = def:getX() - REACH, def:getX2() + REACH, 8 do
-        for y = def:getY() - REACH, def:getY2() + REACH, 8 do
+    for x = def:getX() - REACH, def:getX2() + REACH, CHUNK_SIZE do
+        for y = def:getY() - REACH, def:getY2() + REACH, CHUNK_SIZE do
             if not getSquare(x, y, 0) then
                 return false
             end
@@ -199,8 +205,8 @@ function GardenLights.queue(def, always)
 end
 
 local function onLoadChunk(chunk)
-    for x = 0, 7 do
-        for y = 0, 7 do
+    for x = 0, CHUNK_SIZE - 1 do
+        for y = 0, CHUNK_SIZE - 1 do
             local square = chunk:getGridSquare(x, y, 0)
             local building = square and square:getBuilding()
             local def = building and building:getDef()
@@ -211,12 +217,17 @@ local function onLoadChunk(chunk)
     end
 end
 
+-- Rolling removes a house from `pending`, so the ready ones are collected first.
 local function rollLoaded()
-    local ready = {}
+    local ready
     for _, entry in pairs(pending) do
         if surroundingsLoaded(entry.def) then
+            ready = ready or {}
             table.insert(ready, entry)
         end
+    end
+    if not ready then
+        return
     end
     for _, entry in ipairs(ready) do
         GardenLights.roll(entry.def, entry.always)
@@ -226,3 +237,5 @@ end
 Events.LoadChunk.Add(onLoadChunk)
 -- A minute is soon enough: houses load at the edge of the loaded area, out of sight.
 Events.EveryOneMinute.Add(rollLoaded)
+
+return GardenLights

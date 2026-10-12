@@ -1,15 +1,17 @@
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
+require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/StashDescriptions"
+require "RenewableEnergy/StashHouses"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/ArrowBoard"
 
--- Where the mod's items spawn, 1993 style (design §7). Distributions.items lists every entry;
--- apply() puts them into the game's loot tables in OnInitGlobalModData, scaled by the save's loot
--- rarity options, and dev/run-debug-client.sh --loot measures what each list hands out.
+-- Where the mod's items spawn, 1993 style. Distributions.items lists every entry; apply() puts
+-- them into the game's loot tables in OnInitGlobalModData, scaled by the save's loot rarity
+-- options, and dev/run-debug-client.sh --loot measures what each list hands out.
 
+RenewableEnergy = RenewableEnergy or {}
 local Distributions = {}
 RenewableEnergy.Distributions = Distributions
 
@@ -60,7 +62,7 @@ for _, containerType in ipairs(OWN_CONTAINER_TYPES) do
     subDist.all[containerType] = { rolls = 0, items = {} }
 end
 
--- The spawn table of the mod's stash houses (StashDescriptions.lua). StashSystem.doBuildingStash
+-- The spawn table of the mod's stash houses (StashHouses.lua). StashSystem.doBuildingStash
 -- refills each container of the house whose type is a key here; the house's other containers keep
 -- the loot of their own rooms. The crate the stash places rolls the kit's lists, more times.
 subDist.RenewableEnergyStashCache = copyTable(subDist.electronicsstorage)
@@ -175,8 +177,9 @@ end
 --- Each entry is { weight, list } before the loot rarity option named by `option`. A list is
 --- "proc:<ProceduralDistributions list>", "proc:<list>.junk", "veh:<VehicleDistributions list>"
 --- or "sub:<SuburbsDistributions path>". A weight w spawns with ⌈w × 100 × the loot rarity of the
---- item's category⌉ in 10,000 per roll (junk: w × 140, whatever the rarity). Stage 0 gear is the
---- commonest and stage 2 the rarest; modules stay a reward, mostly from kits, caches and vans.
+--- item's category⌉ in 10,000 per roll (junk: w × 140, whatever the rarity). The scavenger's
+--- gear is the commonest and the homestead's the rarest; modules stay a reward, mostly from kits,
+--- caches and vans.
 
 -- Vanilla stash crates (spawnTable of most vanilla stash houses): a prepper's cache.
 local SURVIVOR_CRATES = {
@@ -210,7 +213,7 @@ local function with(weight, lists, entries)
 end
 
 Distributions.items = {
-    -- Stage 0 ---------------------------------------------------------------------------------
+    -- Scavenger: the first magazine, plug-in power and the solar gadgets --------------------
     {
         -- The magazine that starts the mod, so it turns up in ordinary homes too: a few in a
         -- town's worth of houses.
@@ -334,7 +337,7 @@ Distributions.items = {
             { 0.5, "proc:BarnTools" },
         },
     },
-    -- Stage 1 ---------------------------------------------------------------------------------
+    -- RV and cabin: the second magazine, modules, deep cycle batteries and their electronics -
     {
         -- Half as common as #1 wherever both are, homes included.
         fullType = "RenewableEnergy.HomesteadPowerMag2",
@@ -456,7 +459,7 @@ Distributions.items = {
             { 0.5, "proc:RenewableEnergySolarKit.junk" },
         },
     },
-    -- Stage 2 ---------------------------------------------------------------------------------
+    -- Homestead: the Inverter/Charger, L-16 batteries and battery acid ----------------------
     {
         fullType = "RenewableEnergy.InverterCharger",
         option = "LRMMisc",
@@ -642,8 +645,8 @@ end
 
 --- The chance that a container of this weight gets a cracked module, at the save's options.
 function Distributions.crackedModuleChance(weight)
-    local module = RenewableEnergy.WorldSpawns.MODULE
-    return weight * ItemPickerJava.getLootModifier(module) * SandboxVars.RenewableEnergy.LRMSolarPanels / 100
+    local multiplier = ItemPickerJava.getLootModifier(RenewableEnergy.Specs.factoryModule)
+    return weight * multiplier * SandboxVars.RenewableEnergy.LRMSolarPanels / 100
 end
 
 --- Maybe adds a cracked module to a freshly filled container, if its room or vehicle keeps them.

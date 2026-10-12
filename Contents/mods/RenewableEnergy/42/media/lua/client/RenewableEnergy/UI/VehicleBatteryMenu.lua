@@ -1,10 +1,12 @@
-require "Vehicles/ISUI/ISVehicleMechanics"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-
 -- Offers the deep cycle battery under Install in the vehicle mechanics window's menu for an empty
 -- battery slot, the way vanilla offers the car batteries the slot's script lists, which the deep
 -- cycle battery isn't among (see RenewableEnergy.VehicleBattery). Picking one runs vanilla's own
 -- install (ISVehiclePartMenu.onInstallPart), with the slot's tools, time and hood.
+
+require "Vehicles/ISUI/ISVehicleMechanics"
+require "RenewableEnergy/Gadgets/VehicleBattery"
+
+RenewableEnergy = RenewableEnergy or {}
 local VehicleBatteryMenu = {}
 RenewableEnergy.VehicleBatteryMenu = VehicleBatteryMenu
 
@@ -22,13 +24,13 @@ function VehicleBatteryMenu.addInstallOptions(mechanics, part)
     if not subMenu then
         return
     end
-    local playerObj = mechanics.chr
+    local character = mechanics.chr
     local fullType = VehicleBattery.ITEM
     local script = getItem(fullType)
-    local option = subMenu:addOption(getItemName(fullType), playerObj, nil)
+    local option = subMenu:addOption(getItemName(fullType), character, nil)
     option.iconTexture = script and script:getNormalTexture()
     mechanics:doMenuTooltip(part, option, "install", fullType)
-    local items = VehicleUtils.getItems(playerObj:getPlayerNum())[fullType]
+    local items = VehicleUtils.getItems(character:getPlayerNum())[fullType]
     if not items then
         option.notAvailable = true
         return
@@ -36,7 +38,7 @@ function VehicleBatteryMenu.addInstallOptions(mechanics, part)
     local itemMenu = ISContextMenu:getNew(subMenu)
     mechanics.context:addSubMenu(option, itemMenu)
     for _, item in ipairs(items) do
-        local itemOption = itemMenu:addOption(item:getDisplayName() .. " (" .. item:getCondition() .. "%)", playerObj,
+        local itemOption = itemMenu:addOption(item:getDisplayName() .. " (" .. item:getCondition() .. "%)", character,
             ISVehiclePartMenu.onInstallPart, part, item)
         itemOption.itemForTexture = item
         mechanics:doMenuTooltip(part, itemOption, "install", fullType)
@@ -53,3 +55,5 @@ function ISVehicleMechanics:doPartContextMenu(part, x, y)
         VehicleBatteryMenu.addInstallOptions(self, part)
     end
 end
+
+return VehicleBatteryMenu

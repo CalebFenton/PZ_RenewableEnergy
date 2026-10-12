@@ -12,17 +12,17 @@ require "RenewableEnergy/PowerBank/BankSystem"
 require "RenewableEnergy/PowerBank/Commands"
 
 -- Battery banks, crates of solar gear and panels that the mod places in the world: in sheds,
--- garages and storage rooms the first time someone sees them (design §7), and at the named
--- solar sites of SolarSites.lua. Each container is stocked once, when it appears, and is
--- explored, so neither the room's loot nor loot respawn ever fills it.
+-- garages and storage rooms the first time someone sees them, and at the named solar sites of
+-- SolarSites.lua. Each container is stocked once, when it appears, and is explored, so neither
+-- the room's loot nor loot respawn ever fills it.
 
+RenewableEnergy = RenewableEnergy or {}
 local WorldSpawns = {}
 RenewableEnergy.WorldSpawns = WorldSpawns
 
 local Sprites = RenewableEnergy.Sprites
 local Specs = RenewableEnergy.Specs
-
-WorldSpawns.MODULE = "RenewableEnergy.SolarModule"
+local MODULE = Specs.factoryModule
 
 -- Module conditions. A cracked module lies in a garage with a broken cover glass; a weathered
 -- one has stood on a roof since the late 1980s. Site panels and crates hold a mix of both.
@@ -132,7 +132,7 @@ WorldSpawns.BANK_STOCK = {
 WorldSpawns.CRATE_STOCK = {
     -- An RV or cabin solar kit someone put away in a garage or storage unit.
     kit = {
-        { WorldSpawns.MODULE, 1, 2, "LRMSolarPanels" },
+        { MODULE, 1, 2, "LRMSolarPanels" },
         { "RenewableEnergy.DeepCycleBattery", 1, 2, "LRMBatteries" },
         { "RenewableEnergy.ChargeController", 0, 1, "LRMMisc" },
         { "RenewableEnergy.PowerInverter", 0, 1, "LRMMisc" },
@@ -142,7 +142,7 @@ WorldSpawns.CRATE_STOCK = {
     },
     -- The power company's spares for its pilot solar installations.
     powerYard = {
-        { WorldSpawns.MODULE, 3, 5, "LRMSolarPanels" },
+        { MODULE, 3, 5, "LRMSolarPanels" },
         { "RenewableEnergy.HomesteadPowerMag2", 1, 1, "LRMMisc" },
         { "RenewableEnergy.BatteryElectrolyte", 1, 3, "LRMBatteries" },
         { "RenewableEnergy.ChargeController", 0, 1, "LRMMisc" },
@@ -152,16 +152,17 @@ WorldSpawns.CRATE_STOCK = {
 
 -- Module conditions ------------------------------------------------------------------------------
 
-local function rollBetween(range)
+--- A whole number from range.min to range.max, both included.
+function WorldSpawns.rollBetween(range)
     return ZombRand(range.min, range.max + 1)
 end
 
 function WorldSpawns.crackedCondition()
-    return rollBetween(WorldSpawns.CRACKED)
+    return WorldSpawns.rollBetween(WorldSpawns.CRACKED)
 end
 
 function WorldSpawns.weatheredCondition()
-    return rollBetween(WorldSpawns.WEATHERED)
+    return WorldSpawns.rollBetween(WorldSpawns.WEATHERED)
 end
 
 --- A site module's condition: cracked or weathered.
@@ -176,14 +177,14 @@ end
 function WorldSpawns.siteModules(count)
     local modules = {}
     for i = 1, count do
-        modules[i] = { type = WorldSpawns.MODULE, condition = WorldSpawns.siteModuleCondition() }
+        modules[i] = { type = MODULE, condition = WorldSpawns.siteModuleCondition() }
     end
     return modules
 end
 
 --- Adds a factory module at `condition` to the container.
 function WorldSpawns.addModule(container, condition)
-    local item = container:AddItem(WorldSpawns.MODULE)
+    local item = container:AddItem(MODULE)
     if item then
         RenewableEnergy.Wear.setCondition(item, condition)
     end
@@ -216,7 +217,7 @@ local function pickByWeight(types)
 end
 
 local function addFound(container, fullType)
-    if fullType == WorldSpawns.MODULE then
+    if fullType == MODULE then
         return WorldSpawns.addModule(container, WorldSpawns.siteModuleCondition())
     end
     local item = container:AddItem(fullType)
@@ -233,24 +234,15 @@ local function maybeAddPart(container, part, multiplier, slots)
     end
 end
 
-local function bankSpecFor(spriteKey)
-    for _, spec in pairs(Specs.banks) do
-        if spec.sprite == spriteKey then
-            return spec
-        end
-    end
-    return nil
-end
-
 --- Fills a bank's container as BANK_STOCK[stockName] says, scaled by the loot rarity options:
 --- batteries at a part charge, and maybe an inverter, a controller and a charger.
 ---@param container ItemContainer
 ---@param stockName string a BANK_STOCK key
 function WorldSpawns.stockBank(container, stockName)
     local stock = WorldSpawns.BANK_STOCK[stockName]
-    local spec = bankSpecFor(stock.sprite)
+    local spec = RenewableEnergy.PowerBank.bankOfSprite(Sprites[stock.sprite]).spec
     local options = SandboxVars.RenewableEnergy
-    local batteries = WorldSpawns.scaled(ZombRand(stock.batteries.min, stock.batteries.max + 1), options.LRMBatteries)
+    local batteries = WorldSpawns.scaled(WorldSpawns.rollBetween(stock.batteries), options.LRMBatteries)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
         addFound(container, pickByWeight(stock.batteries.types))
     end
@@ -288,14 +280,17 @@ function WorldSpawns.placeBank(square, stockName)
     end
     local bank = RenewableEnergy.PowerBank.place(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], -1)
     WorldSpawns.stockBank(bank:getContainer(), stockName)
-    RenewableEnergy.PowerBank.perform(nil, "refresh", { bank = { x = square:getX(), y = square:getY(), z = square:getZ() } })
+    RenewableEnergy.PowerBank.perform(nil, "refresh", { bank = RenewableEnergy.PowerBank.positionOf(bank) })
     return bank
 end
 
+-- The item count from which vanilla shows a filled container's "many items" overlay
+-- (ContainerOverlays.updateContainerOverlaySprite).
+local CRATE_FULL_ITEMS = 7
+
 --- Places a crate of solar gear stocked as CRATE_STOCK[stockName] says. It shows its lid overlay
---- as ItemPickerJava does for a filled container (ContainerOverlays.updateContainerOverlaySprite:
---- closed below 7 items), set here without a transmit, because the clients get the whole object
---- right after.
+--- as ItemPickerJava does for a filled container, set here without a transmit, because the
+--- clients get the whole object right after.
 ---@param square IsoGridSquare
 ---@param stockName string a CRATE_STOCK key
 ---@return IsoObject
@@ -308,7 +303,7 @@ function WorldSpawns.placeCrate(square, stockName)
     square:AddSpecialObject(crate)
     local itemCount = container:getItems():size()
     if itemCount > 0 then
-        crate:setOverlaySprite(itemCount < 7 and Sprites.crateOverlays.closed or Sprites.crateOverlays.full, false)
+        crate:setOverlaySprite(itemCount < CRATE_FULL_ITEMS and Sprites.crateOverlays.closed or Sprites.crateOverlays.full, false)
     end
     if isServer() then
         crate:transmitCompleteItemToClients()
@@ -338,8 +333,8 @@ end
 
 -- Rooms seen for the first time -------------------------------------------------------------------
 
-local function rolls(odds, rarity)
-    return ZombRand(odds * rarity) == 0
+local function oneIn(n)
+    return ZombRand(n) == 0
 end
 
 local INDOOR_TRIES = 10
@@ -362,14 +357,14 @@ local function onSeeNewRoom(room)
     end
     local name = room:getName()
     local bank = WorldSpawns.BANK_ROOMS[name]
-    if bank and rolls(bank.odds, rarity) then
+    if bank and oneIn(bank.odds * rarity) then
         local square = indoorSquare(room)
         if square then
             WorldSpawns.placeBank(square, bank.stock)
         end
     end
     local crateOdds = WorldSpawns.CRATE_ROOMS[name]
-    if crateOdds and rolls(crateOdds, rarity) then
+    if crateOdds and oneIn(crateOdds * rarity) then
         local square = room:getRandomFreeSquare()
         if square then
             WorldSpawns.placeCrate(square, "kit")

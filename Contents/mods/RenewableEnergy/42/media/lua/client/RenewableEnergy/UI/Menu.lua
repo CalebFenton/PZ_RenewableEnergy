@@ -1,23 +1,25 @@
+-- Right-click menus for battery banks, the panels connected to them and vehicles. Each option
+-- queues a RenewableEnergyAction, which walks the character over and does the job. Parts go into
+-- a bank and come out only through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
+
 require "ISUI/ISWorldObjectContextMenu"
 require "Vehicles/TimedActions/ISPathFindAction"
----@class RenewableEnergy
-require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/RenewableEnergyFormat"
-require "RenewableEnergy/UI/RenewableEnergyStatusWindow"
+require "RenewableEnergy/UI/Format"
+require "RenewableEnergy/UI/StatusWindow"
 
--- Right-click menus for battery banks, the panels wired to them and vehicles. Each option queues
--- a RenewableEnergyAction, which walks the character over and does the job. Parts go into a bank
--- and come out only through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
+RenewableEnergy = RenewableEnergy or {}
 local Menu = {}
+RenewableEnergy.Menu = Menu
 
 local Action = RenewableEnergyAction
 local PowerBank = RenewableEnergy.PowerBank
 local Format = RenewableEnergy.Format
+local StatusWindow = RenewableEnergy.StatusWindow
 
 -- The item each placed kind is, for its name in the menu.
 local ITEMS = {
@@ -35,18 +37,10 @@ function Menu.nameOf(isoObject)
     return getItemNameFromFullType(mount and ITEMS[kind] .. (material == "wood" and "Wood" or "Metal") or ITEMS[kind])
 end
 
-local function statusOf(bank)
-    return PowerBank.getStatus(bank:getX(), bank:getY(), bank:getZ())
-end
-
 --- A bank's name: the one a player gave it, else its tier's.
 function Menu.bankLabel(bank)
-    local status = statusOf(bank)
+    local status = PowerBank.statusOf(bank)
     return status and Format.bankName(status) or Menu.nameOf(bank)
-end
-
-local function position(object)
-    return { x = object:getX(), y = object:getY(), z = object:getZ() }
 end
 
 local function disable(option, description)
@@ -97,14 +91,6 @@ local function queueVehicle(playerNum, mode, vehicle, item)
     local battery = vehicle:getPartById("Battery")
     ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, battery:getArea()))
     ISTimedActionQueue.add(Action:new(character, mode, nil, nil, vehicle, item))
-end
-
-local function openStatus(playerNum, bank)
-    RenewableEnergy.StatusWindow.open(playerNum, bank)
-end
-
-local function askName(playerNum, bank)
-    RenewableEnergy.StatusWindow.askName(playerNum, bank)
 end
 
 -- A stand-in for each tool tag, to name in the tooltip.
@@ -245,20 +231,18 @@ local function forSquaresAround(center, radius, levels, fn)
     end
 end
 
---- Panels in the bank's reach that are not wired to it yet.
+--- Panels in the bank's reach that are not connected to it yet.
 function Menu.unconnectedSources(bank)
-    local here = position(bank)
+    local here = PowerBank.positionOf(bank)
     local reach = RenewableEnergy.Specs.sourceReach
     local found = {}
     forSquaresAround(here, reach.tiles, reach.levels, function(square)
         local objects = square:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)
-            if PowerBank.sourceKind(object) and Action.bankInReach(object, bank) then
-                local connected = Action.connectedBank(object)
-                if not (connected and connected.x == here.x and connected.y == here.y and connected.z == here.z) then
-                    table.insert(found, object)
-                end
+            if PowerBank.sourceKind(object) and Action.bankInReach(object, bank)
+                and not PowerBank.samePosition(Action.connectedBank(object), here) then
+                table.insert(found, object)
             end
         end
     end)
@@ -268,9 +252,9 @@ end
 function Menu.addBankOptions(playerNum, context, bank)
     local menu = context:getNew(context)
     context:addSubMenu(context:addOption(Menu.bankLabel(bank)), menu)
-    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, openStatus, bank)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, StatusWindow.open, bank)
 
-    local status = statusOf(bank)
+    local status = PowerBank.statusOf(bank)
     if not status then
         -- The server has not sent this bank's status yet; switching it needs to know its state.
         return menu
@@ -292,15 +276,16 @@ function Menu.addBankOptions(playerNum, context, bank)
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)
-    menu:addOption(getText("ContextMenu_RenewableEnergy_Rename"), playerNum, askName, bank)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Rename"), playerNum, StatusWindow.askName, bank)
     return menu
 end
 
--- Status entry of a wired source, from its bank's status.
+-- A connected source's entry in its bank's status.
 local function sourceStatus(bankPosition, source)
     local status = PowerBank.getStatus(bankPosition.x, bankPosition.y, bankPosition.z)
+    local here = PowerBank.positionOf(source)
     for _, entry in ipairs(status and status.sources or {}) do
-        if entry.x == source:getX() and entry.y == source:getY() and entry.z == source:getZ() then
+        if PowerBank.samePosition(entry, here) then
             return entry
         end
     end
@@ -312,7 +297,7 @@ local function bankNameAt(at)
 end
 
 local function addSnowOption(playerNum, menu, source, entry)
-    if RenewableEnergy.PowerBank.sourceKind(source) ~= "flat" or not entry or entry.snow <= 0 then
+    if PowerBank.sourceKind(source) ~= "flat" or not entry or entry.snow <= 0 then
         return
     end
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ClearSnow"), playerNum, queueClearSnow, source)
@@ -326,7 +311,7 @@ function Menu.addSourceOptions(playerNum, context, source)
     local menu = context:getNew(context)
     context:addSubMenu(context:addOption(Menu.nameOf(source)), menu)
 
-    local here = position(source)
+    local here = PowerBank.positionOf(source)
     local connected = Action.connectedBank(source)
     if connected then
         menu:addOption(getText("ContextMenu_RenewableEnergy_WiredTo", bankNameAt(connected), Format.away(here, connected)))
@@ -336,10 +321,8 @@ function Menu.addSourceOptions(playerNum, context, source)
 
     local offered = 0
     for _, bankPosition in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ())) do
-        local square = getSquare(bankPosition.x, bankPosition.y, bankPosition.z)
-        local bank = square and Menu.bankOnSquare(square)
-        local isConnected = connected and connected.x == bankPosition.x and connected.y == bankPosition.y and connected.z == bankPosition.z
-        if bank and not isConnected then
+        local bank = PowerBank.bankOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
+        if bank and not PowerBank.samePosition(connected, bankPosition) then
             menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectPanel", Menu.bankLabel(bank), Format.away(here, bankPosition)),
                 playerNum, queueSource, Action.CONNECT_SOURCE, source, bank)
             offered = offered + 1
@@ -366,15 +349,6 @@ function Menu.addVehicleOptions(playerNum, context, vehicle)
     end
 end
 
-function Menu.bankOnSquare(square)
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        if PowerBank.isBank(objects:get(i)) then
-            return objects:get(i)
-        end
-    end
-end
-
 -- The bank and the panel among the clicked objects and the squares they stand on.
 local function findTargets(worldobjects)
     local bank, source, seen = nil, nil, {}
@@ -396,12 +370,12 @@ local function findTargets(worldobjects)
     return bank, source
 end
 
---- The generator vanilla would have offered its menu on had the bank not been there.
----
---- fetchVars.generator is a single slot that the last IsoGenerator walked wins, and a bank is an
---- IsoGenerator. Clearing the slot would also hide the menu of a real generator next to the bank,
---- the very layout a backup generator needs. This walks the objects in the engine's order (each
---- entry, then its square once) so the generator handed back is the one vanilla would have picked.
+-- The generator vanilla would have offered its menu on had the bank not been there.
+--
+-- fetchVars.generator is a single slot that the last IsoGenerator walked wins, and a bank is an
+-- IsoGenerator. Clearing the slot would also hide the menu of a real generator next to the bank,
+-- the very layout a backup generator needs. This walks the objects in the engine's order (each
+-- entry, then its square once) so the generator handed back is the one vanilla would have picked.
 local function otherGenerator(worldobjects)
     local found, seen = nil, {}
     local function consider(object)
@@ -456,5 +430,4 @@ end
 Events.OnPreFillWorldObjectContextMenu.Add(Menu.onPreFill)
 Events.OnFillWorldObjectContextMenu.Add(Menu.onFill)
 
-RenewableEnergy.Menu = Menu
 return Menu

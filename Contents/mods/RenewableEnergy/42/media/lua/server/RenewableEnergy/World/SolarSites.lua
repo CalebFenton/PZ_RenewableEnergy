@@ -11,10 +11,11 @@ local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
 
 -- The named solar sites (SolarSiteLocations.lua). A new world rolls each site once against the
 -- Solar Sites option, picks which of its spots the site uses, and keeps each of them as a global
--- object, which the game saves and hands back when its chunk first loads (SGlobalObjects
--- .chunkLoaded). The object goes down then, stocked, and the spot is forgotten, so nothing is
--- ever placed twice.
+-- object, which the game saves and hands back when its chunk first loads
+-- (SGlobalObjects.chunkLoaded). The object goes down then, stocked, and the spot is forgotten,
+-- so nothing is ever placed twice.
 
+RenewableEnergy = RenewableEnergy or {}
 local SolarSites = {}
 RenewableEnergy.SolarSites = SolarSites
 
@@ -65,7 +66,7 @@ end
 local function moduleCount(kind, mount)
     local range = SolarSites.KINDS[kind].modules
     if range then
-        return ZombRand(range.min, range.max + 1)
+        return RenewableEnergy.WorldSpawns.rollBetween(range)
     end
     return RenewableEnergy.Specs.mounts[MOUNTS[mount].kind].modules
 end
@@ -128,7 +129,7 @@ end
 function SolarSites.addSite(site)
     local kind = SolarSites.KINDS[site.kind]
     if kind.panels then
-        local count = ZombRand(kind.panels.min, kind.panels.max + 1)
+        local count = RenewableEnergy.WorldSpawns.rollBetween(kind.panels)
         for _, panel in ipairs(pickSome(site.panels, count)) do
             addSpot(panel[1], panel[2], panel[3], { what = "panel", siteKind = site.kind, mount = panel[4], facing = panel[5] })
         end

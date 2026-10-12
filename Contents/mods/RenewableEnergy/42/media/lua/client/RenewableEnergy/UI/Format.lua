@@ -1,9 +1,9 @@
----@class RenewableEnergy
-require "RenewableEnergy/Utilities"
-
 -- Text for the status window, the menus and the battery tooltip. Unit symbols are SI and the
 -- same in every language, so they are not translated.
+
+RenewableEnergy = RenewableEnergy or {}
 local Format = {}
+RenewableEnergy.Format = Format
 
 -- Whole units below a thousand, then one decimal: "95 W", "1.5 kW". Real 1993 setups run from
 -- tens of watts to a few kilowatts, so both ends stay readable.
@@ -97,5 +97,4 @@ function Format.bankName(status)
     return status.name or getItemNameFromFullType(status.bankType)
 end
 
-RenewableEnergy.Format = Format
 return Format

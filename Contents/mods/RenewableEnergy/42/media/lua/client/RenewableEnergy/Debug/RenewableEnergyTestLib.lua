@@ -131,7 +131,7 @@ end
 
 -- Registers a test that crafts `spec.recipe` the way the right-click menu does, from the first
 -- `spec.from` item. The character is an electrician who knows every recipe and stands by a
--- table, carrying exactly the inputs of one craft (RenewableEnergyDebug.addRecipeInputs with `spec.prefer`)
+-- table, carrying exactly the inputs of one craft (RenewableEnergy.Debug.addRecipeInputs with `spec.prefer`)
 -- and whatever `spec.setup(self)` adds. validate() expects the inventory counts in
 -- `spec.counts`, then runs `spec.validate(self)`. A failing test also reports why the game
 -- refused the craft, since the menu refuses without a word.
@@ -140,13 +140,13 @@ function RenewableEnergyTest.craftTest(name, spec)
         sandbox = spec.sandbox,
         run = function(self)
             local p = RenewableEnergyTest.player()
-            RenewableEnergyDebug.setupPlayer(p)
+            RenewableEnergy.Debug.setupPlayer(p)
             local recipe = getScriptManager():getCraftRecipe(spec.recipe)
             if not recipe then
                 self.refusal = "no recipe " .. spec.recipe
                 return
             end
-            local unmatched = RenewableEnergyDebug.addRecipeInputs(p, recipe, spec.prefer)
+            local unmatched = RenewableEnergy.Debug.addRecipeInputs(p, recipe, spec.prefer)
             if #unmatched > 0 then
                 self.refusal = "no item fits " .. table.concat(unmatched, "; ")
                 return

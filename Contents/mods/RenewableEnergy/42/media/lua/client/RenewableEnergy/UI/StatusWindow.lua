@@ -1,19 +1,25 @@
-require "ISUI/ISCollapsableWindow"
-require "ISUI/ISButton"
-require "ISUI/ISTextBox"
----@class RenewableEnergy
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/RenewableEnergyFormat"
-
 -- The battery bank's status window: a few lines on what the bank is doing, then what comes in,
 -- what draws and the parts on the left, and the batteries and the panels on the right. It draws
 -- the status snapshot the server sends with the bank, so it reads the same in single player and
 -- multiplayer. Clicking a panel's row highlights that panel in the world.
+
+require "ISUI/ISCollapsableWindow"
+require "ISUI/ISButton"
+require "ISUI/ISTextBox"
+require "RenewableEnergy/Recipes"
+require "RenewableEnergy/Sun"
+require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+require "RenewableEnergy/UI/Format"
+
+RenewableEnergy = RenewableEnergy or {}
 local StatusWindow = ISCollapsableWindow:derive("RenewableEnergyStatusWindow")
+RenewableEnergy.StatusWindow = StatusWindow
 
 local Format = RenewableEnergy.Format
+local PowerBank = RenewableEnergy.PowerBank
+local Recipes = RenewableEnergy.Recipes
+local Sun = RenewableEnergy.Sun
 local Action = RenewableEnergyAction
 
 local PAD = 10
@@ -26,8 +32,6 @@ local BUTTON_GAP = 8
 local MORE_LINE = 1
 -- How long a clicked panel stays highlighted, in real milliseconds.
 local HIGHLIGHT_MS = 5000
--- Full sun on a flat panel, the irradiance at which panels are rated.
-local FULL_SUN = 1000
 
 -- One window per local player.
 StatusWindow.windows = {}
@@ -40,16 +44,19 @@ local COLORS = {
     highlight = { r = 0.9, g = 1, b = 0, a = 1 },
 }
 
-local function color(name)
-    if name == "good" then
-        local c = getCore():getGoodHighlitedColor()
-        return { r = c:getR(), g = c:getG(), b = c:getB() }
-    elseif name == "bad" then
-        local c = getCore():getBadHighlitedColor()
-        return { r = c:getR(), g = c:getG(), b = c:getB() }
+-- The red, green and blue of a color name. "good" and "bad" are the player's highlight color
+-- options, which can change while the window is open.
+local function rgb(name)
+    if name == "good" or name == "bad" then
+        local c = name == "good" and getCore():getGoodHighlitedColor() or getCore():getBadHighlitedColor()
+        return c:getR(), c:getG(), c:getB()
     end
-    return COLORS[name] or COLORS.text
+    local c = COLORS[name] or COLORS.text
+    return c.r, c.g, c.b
 end
+
+-- drawProgressBar takes its color as a table; this one is refilled on every draw.
+local barColor = { r = 0, g = 0, b = 0, a = 1 }
 
 -- Summary -------------------------------------------------------------------------------------
 -- The lines across the top, { text, color }: charging or draining, the load against the limit,
@@ -132,7 +139,7 @@ end
 local function powerRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Power")
     if status.sunElevation > 0 then
-        row(rows, getText("IGUI_RenewableEnergy_Sunlight"), Format.percent(status.irradiance / FULL_SUN))
+        row(rows, getText("IGUI_RenewableEnergy_Sunlight"), Format.percent(status.irradiance / Sun.FULL_SUN))
     else
         row(rows, getText("IGUI_RenewableEnergy_Sunlight"), getText("IGUI_RenewableEnergy_Night"), "dim")
     end
@@ -228,12 +235,11 @@ local function partRows(rows, status)
     end
 end
 
--- The cheapest repair that helps a battery of this condition (the recipes' limits), or nil
--- for one in perfect shape.
+-- The cheapest repair that helps a battery of this condition, or nil for one in perfect shape.
 local function batteryRepair(condition)
-    if condition < 60 then
+    if condition < Recipes.SERVICE_CAP then
         return "IGUI_RenewableEnergy_RepairService"
-    elseif condition < 85 then
+    elseif condition < Recipes.RECONDITION_CONDITION then
         return "IGUI_RenewableEnergy_RepairRecondition"
     elseif condition < 100 then
         return "IGUI_RenewableEnergy_RepairRebuild"
@@ -395,25 +401,21 @@ function StatusWindow:createChildren()
     self.renameButton = addButton(self, getText("ContextMenu_RenewableEnergy_Rename"), StatusWindow.onRename)
 end
 
-function StatusWindow:bankPosition()
-    return { x = self.bank:getX(), y = self.bank:getY(), z = self.bank:getZ() }
-end
-
-function StatusWindow:queue(mode, bankName)
-    local character = getSpecificPlayer(self.playerNum)
-    if luautils.walkAdj(character, self.bank:getSquare(), true) then
-        ISTimedActionQueue.add(Action:new(character, mode, nil, self.bank, nil, nil, bankName))
+local function queueAtBank(playerNum, bank, mode, bankName)
+    local character = getSpecificPlayer(playerNum)
+    if luautils.walkAdj(character, bank:getSquare(), true) then
+        ISTimedActionQueue.add(Action:new(character, mode, nil, bank, nil, nil, bankName))
     end
 end
 
 function StatusWindow:onSwitch()
-    self:queue(self.status and self.status.on and Action.TURN_OFF or Action.TURN_ON)
+    queueAtBank(self.playerNum, self.bank, self.status and self.status.on and Action.TURN_OFF or Action.TURN_ON)
 end
 
 --- Asks a local player for a new name for `bank` and queues the renaming. An empty name gives
 --- the bank back its tier's name.
 function StatusWindow.askName(playerNum, bank)
-    local status = RenewableEnergy.PowerBank.getStatus(bank:getX(), bank:getY(), bank:getZ())
+    local status = PowerBank.statusOf(bank)
     local modal = ISTextBox:new(0, 0, 280, 180, getText("IGUI_RenewableEnergy_NameThisBank"), status and status.name or "",
         nil, StatusWindow.onNameEntered, playerNum, playerNum, bank)
     modal:initialise()
@@ -425,12 +427,8 @@ function StatusWindow.askName(playerNum, bank)
 end
 
 function StatusWindow.onNameEntered(target, button, playerNum, bank)
-    if button.internal ~= "OK" then
-        return
-    end
-    local character = getSpecificPlayer(playerNum)
-    if luautils.walkAdj(character, bank:getSquare(), true) then
-        ISTimedActionQueue.add(Action:new(character, Action.RENAME, nil, bank, nil, nil, button.parent.entry:getText()))
+    if button.internal == "OK" then
+        queueAtBank(playerNum, bank, Action.RENAME, button.parent.entry:getText())
     end
 end
 
@@ -447,7 +445,7 @@ function StatusWindow:setStatus(status)
         self.left, self.right = { { label = getText("IGUI_RenewableEnergy_Waiting"), value = "", color = "dim" } }, {}
     else
         self.summaryLines = StatusWindow.summary(status)
-        self.left, self.right = StatusWindow.rows(status, self:bankPosition())
+        self.left, self.right = StatusWindow.rows(status, PowerBank.positionOf(self.bank))
     end
     self.title = status and Format.bankName(status) or getText("IGUI_RenewableEnergy_StatusTitle")
     local summary = measureSummary(self.summaryLines)
@@ -471,17 +469,6 @@ end
 
 -- Highlighting a panel --------------------------------------------------------------------------
 
-local function panelObjectAt(source)
-    local square = getSquare(source.x, source.y, source.z)
-    local objects = square and square:getObjects()
-    for i = 0, (objects and objects:size() or 0) - 1 do
-        local object = objects:get(i)
-        if RenewableEnergy.PowerBank.sourceKind(object) then
-            return object
-        end
-    end
-end
-
 function StatusWindow:clearHighlight()
     local highlight = self.highlight
     if highlight then
@@ -495,7 +482,7 @@ end
 --- square isn't loaded.
 function StatusWindow:highlightPanel(source)
     self:clearHighlight()
-    local object = panelObjectAt(source)
+    local object = PowerBank.sourceOn(getSquare(source.x, source.y, source.z))
     if not object then
         return nil
     end
@@ -536,7 +523,7 @@ function StatusWindow:prerender()
     if self.highlight and getTimestampMs() >= self.highlight.untilMs then
         self:clearHighlight()
     end
-    local status = RenewableEnergy.PowerBank.getStatus(self.bank:getX(), self.bank:getY(), self.bank:getZ())
+    local status = PowerBank.statusOf(self.bank)
     if status ~= self.status or (status and status.hour ~= self.statusHour) or not self.left then
         self:setStatus(status)
     end
@@ -544,9 +531,7 @@ function StatusWindow:prerender()
 end
 
 local function isHighlighted(self, r)
-    local highlight = self.highlight
-    return highlight ~= nil and r.source ~= nil and r.source.x == highlight.source.x and r.source.y == highlight.source.y
-        and r.source.z == highlight.source.z
+    return self.highlight ~= nil and PowerBank.samePosition(r.source, self.highlight.source)
 end
 
 function StatusWindow:drawRows(rows, layout, x, y)
@@ -559,16 +544,17 @@ function StatusWindow:drawRows(rows, layout, x, y)
             self:drawText(r.header, x, y + 2, c.r, c.g, c.b, 1, UIFont.Small)
             self:drawRect(x, y + rowHeight(r) - 2, width, 1, 0.4, c.r, c.g, c.b)
         elseif r.bar then
-            local c = color(r.bar < 0.25 and "bad" or "good")
-            self:drawProgressBar(x, y + 2, width, BAR_HEIGHT, r.bar, { r = c.r, g = c.g, b = c.b, a = 1 })
+            barColor.r, barColor.g, barColor.b = rgb(r.bar < 0.25 and "bad" or "good")
+            self:drawProgressBar(x, y + 2, width, BAR_HEIGHT, r.bar, barColor)
         elseif r.label then
             if isHighlighted(self, r) then
                 local c = COLORS.highlight
                 self:drawRect(x - 2, y, width + 4, rowHeight(r), 0.2, c.r, c.g, c.b)
             end
-            local label, value = COLORS.label, color(r.color)
+            local label = COLORS.label
             self:drawText(r.label, x, y, label.r, label.g, label.b, 1, UIFont.Small)
-            self:drawTextRight(r.value, x + width, y, value.r, value.g, value.b, 1, UIFont.Small)
+            local red, green, blue = rgb(r.color)
+            self:drawTextRight(r.value, x + width, y, red, green, blue, 1, UIFont.Small)
         end
         y = y + rowHeight(r)
     end
@@ -577,8 +563,8 @@ end
 function StatusWindow:drawSummary(x, y)
     local height = getTextManager():getFontHeight(UIFont.Medium)
     for _, line in ipairs(self.summaryLines) do
-        local c = color(line.color)
-        self:drawText(line.text, x, y, c.r, c.g, c.b, 1, UIFont.Medium)
+        local red, green, blue = rgb(line.color)
+        self:drawText(line.text, x, y, red, green, blue, 1, UIFont.Medium)
         y = y + height
     end
 end
@@ -633,12 +619,11 @@ function StatusWindow.open(playerNum, bank)
     window:initialise()
     window:addToUIManager()
     StatusWindow.windows[playerNum] = window
-    RenewableEnergy.PowerBank.command(getSpecificPlayer(playerNum), "refresh", { bank = window:bankPosition() })
+    PowerBank.command(getSpecificPlayer(playerNum), "refresh", { bank = PowerBank.positionOf(bank) })
     if JoypadState.players[playerNum + 1] then
         setJoypadFocus(playerNum, window)
     end
     return window
 end
 
-RenewableEnergy.StatusWindow = StatusWindow
 return StatusWindow

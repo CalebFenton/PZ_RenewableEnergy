@@ -43,7 +43,7 @@ Sprites.crate = tile(11)
 Sprites.crateOverlays = { full = tile(12), closed = tile(13) }
 Sprites.gardenLight = { off = tile(14), lit = tile(15) }
 
--- Battery storage, one tile per tier and material. Specs.banks[itemType].sprite names the field.
+-- Banks, one tile per tier and material. Specs.banks[itemType].sprite names the field.
 Sprites.batteryBoxWood = tile(8)
 Sprites.batteryBoxMetal = tile(23)
 Sprites.batteryRackWood = tile(32)

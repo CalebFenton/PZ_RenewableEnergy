@@ -12,11 +12,11 @@ in the macOS Steam folder, `CACHE` to move the cache (default `$TMPDIR/pz-renewa
 ## How it works
 
 - `GameProbe.java` runs on the game's own JVM with `projectzomboid.jar` on the class path. It
-  compiles every mod Lua file with the game's Kahlua compiler (`lua-syntax`), and, once per game
-  update, writes what Lua can reach: the classes `LuaManager$Exposer` hands to `setExposed`, with
-  their methods, static members and constructors; the `@LuaMethod(global = true)` functions; the
-  Kahlua standard library; and the string tables of `LuaEventManager`, `Translator`,
-  `SandboxOptions` and `Item`.
+  compiles every Lua file of the mod and the dev harness with the game's Kahlua compiler
+  (`lua-syntax`), and, once per game update, writes what Lua can reach: the classes
+  `LuaManager$Exposer` hands to `setExposed`, with their methods, static members and
+  constructors; the `@LuaMethod(global = true)` functions; the Kahlua standard library; and the
+  string tables of `LuaEventManager`, `Translator`, `SandboxOptions` and `Item`.
 - `gamedata.py` reads the rest from the game's files: what its Lua assigns, defines and requires,
   its items, tags, recipes and models, its English translations, packs and tile definitions. The
   result is cached next to the API file, keyed by the jar and the checker's source.
