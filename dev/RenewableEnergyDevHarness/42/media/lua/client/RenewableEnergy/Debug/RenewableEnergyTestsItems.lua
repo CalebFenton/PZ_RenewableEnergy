@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+require "RenewableEnergy/Debug/RenewableEnergyDebug"
 
 -- Item and recipe data as the game loaded it, and learning recipes from magazines and research.
 -- See RenewableEnergyTestLib.lua for the runner and the helpers.
@@ -108,7 +109,7 @@ test("renewable_energy_items_recipes_load", {
                 end
             end
         end
-        local loaded = #Debug.recipeNames()
+        local loaded = #T.recipeNames()
         expect(loaded == #RECIPES, loaded .. " RenewableEnergy_ recipes loaded, expected " .. #RECIPES)
     end,
 })
@@ -145,9 +146,14 @@ for magazine, recipes in pairs(MAGAZINES) do
         instant = true,
         run = function(self)
             local p = player()
-            Debug.forgetRecipes(p)
-            T.defer(self, function() Debug.learnRecipes(p) end)
-            ISTimedActionQueue.add(ISReadABook:new(p, p:getInventory():AddItem(magazine)))
+            T.forgetRecipes(p)
+            T.defer(self, function() T.learnRecipes(p) end)
+            local item = p:getInventory():AddItem(magazine)
+            -- onCreateRecipeMagazine gives every copy a literatureTitle, and a title read within
+            -- the literature cooldown teaches nothing (ISReadABook:complete), so a second run in
+            -- the same world would fail without forgetting it.
+            p:getReadLiterature():remove(item:getModData().literatureTitle)
+            ISTimedActionQueue.add(ISReadABook:new(p, item))
         end,
         validate = function()
             local expected, known = {}, player():getKnownRecipes()
@@ -157,7 +163,7 @@ for magazine, recipes in pairs(MAGAZINES) do
                 expect(recipe ~= nil and recipe:needToBeLearn(), magazine .. " teaches " .. name .. ", which needs no learning")
                 expect(known:contains(name), "reading " .. magazine .. " did not teach " .. name)
             end
-            for _, name in ipairs(Debug.recipeNames()) do
+            for _, name in ipairs(T.recipeNames()) do
                 expect(expected[name] or not known:contains(name), "reading " .. magazine .. " taught " .. name)
             end
         end,
@@ -184,8 +190,8 @@ for fullType, recipes in pairs(RESEARCH) do
         instant = true,
         run = function(self)
             local p = player()
-            Debug.forgetRecipes(p)
-            T.defer(self, function() Debug.learnRecipes(p) end)
+            T.forgetRecipes(p)
+            T.defer(self, function() T.learnRecipes(p) end)
             -- Research asks for two thirds of a recipe's highest level.
             for _, perk in ipairs({ Perks.Electricity, Perks.MetalWelding, Perks.Woodwork }) do
                 T.setPerk(self, perk, 10)

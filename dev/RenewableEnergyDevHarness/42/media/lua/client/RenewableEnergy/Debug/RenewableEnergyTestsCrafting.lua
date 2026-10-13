@@ -298,8 +298,8 @@ for _, chain in ipairs(REBUILDS) do
             local rebuild = T.need(self, manager:getCraftRecipe(chain.rebuild), "the recipe " .. chain.rebuild)
             if not (strip and rebuild) then return end
             local p = player()
-            RenewableEnergy.Debug.learnRecipes(p)
-            RenewableEnergy.Debug.placeWorkTable(p)
+            T.learnRecipes(p)
+            T.placeWorkTable(p)
             T.setPerk(self, Perks.Electricity, 5)
             local inventory = p:getInventory()
             inventory:AddItem("Base.Screwdriver")

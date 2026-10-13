@@ -10,7 +10,7 @@
 # Needs uv, pandoc and Google Chrome (CHROME overrides its path). Takes a few seconds; rerun it after
 # every README, layout or mod change. New captures need dev/run-debug-client.sh --promo first.
 set -euo pipefail
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/harness/lib/harness.sh"
 
 REVIEW_DIR="${REVIEW_DIR:-$HOME/Nextcloud}"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"

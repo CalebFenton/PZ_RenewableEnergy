@@ -1562,7 +1562,7 @@ function Promo.capture(selection, onDone)
     setMouseXY(0, 0)
     -- The names come with every run, since they cost no shot.
     local data = { items = itemsList(), recipes = {}, models = {}, groups = {} }
-    for _, name in ipairs(RenewableEnergy.Debug.recipeNames()) do
+    for _, name in ipairs(PZHarness.Test.recipeNames()) do
         table.insert(data.recipes, recipeEntry(name))
     end
     data.strings = {

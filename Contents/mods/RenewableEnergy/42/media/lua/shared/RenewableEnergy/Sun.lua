@@ -21,7 +21,7 @@ local FULL_SUN = Sun.FULL_SUN
 local AIR_MASS_EXPONENT = 1.15
 -- The share of clear-sky light that comes from the whole sky rather than the sun's disc.
 -- With the cloud weighting below it puts a year's flat and south-wall output against a
--- 38° rack where Louisville's measured insolation does (RenewableEnergyTestsPower checks).
+-- 38° rack where Louisville's measured insolation does (the dev mod's power tests check).
 local CLEAR_DIFFUSE = 0.15
 -- Overcast still lets about a quarter through, all of it diffuse.
 local CLOUD_LOSS = 0.75

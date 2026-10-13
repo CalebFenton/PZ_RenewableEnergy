@@ -1,9 +1,8 @@
 -- Helpers that several of the mod's modules share.
 --
--- RenewableEnergy is the mod's one global table. The only other globals are the timed action
--- class RenewableEnergyAction, which the game looks up by name, and the debug test runner's
--- RenewableEnergyTest. Every file that adds to the table creates it first if no file has yet, so
--- files may load in any order.
+-- RenewableEnergy is the mod's one global table. The only other global is the timed action class
+-- RenewableEnergyAction, which the game looks up by name. Every file that adds to the table
+-- creates it first if no file has yet, so files may load in any order.
 
 RenewableEnergy = RenewableEnergy or {}
 

@@ -12,7 +12,8 @@ in the macOS Steam folder, `CACHE` to move the cache (default `$TMPDIR/pz-renewa
 ## How it works
 
 - `GameProbe.java` runs on the game's own JVM with `projectzomboid.jar` on the class path. It
-  compiles every Lua file of the mod and the dev harness with the game's Kahlua compiler
+  compiles every Lua file of the mod, its dev mod (`dev/RenewableEnergyDevHarness`, where the
+  tests are) and the shared harness mod (`dev/harness/mod`) with the game's Kahlua compiler
   (`lua-syntax`), and, once per game update, writes what Lua can reach: the classes
   `LuaManager$Exposer` hands to `setExposed`, with their methods, static members and
   constructors; the `@LuaMethod(global = true)` functions; the Kahlua standard library; and the
