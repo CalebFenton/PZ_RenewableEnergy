@@ -69,11 +69,12 @@ function Stage.runSteps(steps, onDone, mark)
     Events.OnTick.Add(onTick)
 end
 
--- Which squares around the character it has seen and how lit they are, as one comparable value.
+-- How many squares around the character it has seen, and the sum of their light levels: together
+-- they change when a square is newly seen or its light changes.
 local function lightingState(player)
     local here = player:getCurrentSquare()
     if not here then
-        return nil
+        return nil, nil
     end
     local playerNum = player:getPlayerNum()
     local seen, light = 0, 0
@@ -86,20 +87,28 @@ local function lightingState(player)
             end
         end
     end
-    return seen .. "/" .. light
+    return seen, light
 end
 
 --- A runSteps wait until the lighting around the character has settled: no square newly seen and
 --- no light level changed for SETTLE_MS. With `change`, the lighting must change first, since a
 --- change of the clock or a new light source takes most of a second to show.
 function Stage.lightingSettled(player, change)
-    local last, since
+    -- The lighting changes only once per pass of its thread, and the runs draw hundreds of frames
+    -- a second, so the area is scanned once per pass rather than every frame.
+    local interval = 1000 / getPerformance():getLightingFPS()
+    local lastSeen, lastLight, since, sampled
     local changed = not change
     return function()
-        local state, now = lightingState(player), getTimestampMs()
-        if state ~= last or not since then
+        local now = getTimestampMs()
+        if sampled and now - sampled < interval then
+            return false
+        end
+        sampled = now
+        local seen, light = lightingState(player)
+        if seen ~= lastSeen or light ~= lastLight or not since then
             changed = changed or since ~= nil
-            last, since = state, now
+            lastSeen, lastLight, since = seen, light, now
             return false
         end
         return changed and now - since >= SETTLE_MS

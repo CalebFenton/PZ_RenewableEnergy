@@ -22,6 +22,9 @@ map. It reads the files IsoMetaGrid and IsoLot read:
 
 Vehicle stalls are counted as IsoChunk.AddVehicles_OnZone lays them out: a stall every 3 squares
 across and 5 along a zone facing north or south, 5 across and 3 along one facing east or west.
+Traffic jam zones (trafficjam<n|s|e|w>, and the rtrafficjam ones each chunk rolls for) are laid
+out by IsoChunk.AddVehicles_TrafficJam_*, closer together; their counts are the expected number
+of cars' slots, whether or not a car takes each.
 """
 import functools
 import os
@@ -206,6 +209,36 @@ def stalls_along(start, length, step):
     return count
 
 
+JAM = re.compile(r"^r?trafficjam([nsew])$")
+
+
+def jam_slots_along(start, length, first, step, jitter):
+    """Expected slots along one axis of a traffic jam zone, as each chunk lays them: from the
+    first slot of the zone's grid (start + first + step * k) inside the chunk, then every `step`
+    squares, or one less half the time when `jitter`, while still inside the chunk and the zone."""
+    end, count = start + length, 0.0
+    for chunk in range(start // CHUNK * CHUNK, end, CHUNK):
+        at = start + first
+        while at < chunk:
+            at += step
+        limit = min(chunk + CHUNK, end)
+        if at >= limit:
+            continue
+        count += 1
+        for next_at, chance in (((at + step - 1, 0.5), (at + step, 0.5)) if jitter else ((at + step, 1.0),)):
+            if next_at < limit:
+                count += chance
+    return count
+
+
+def jam_slots(facing, x, y, w, h):
+    """IsoChunk.AddVehicles_TrafficJam_*: rows 3 squares apart across the road, cars about 6
+    along it."""
+    if facing in ("n", "s"):
+        return jam_slots_along(x, w, 1, 3, False) * jam_slots_along(y, h, 3, 6, True)
+    return jam_slots_along(y, h, 1, 3, False) * jam_slots_along(x, w, 3, 6, False)
+
+
 def vehicle_stalls(folder, town):
     _name, x1, y1, x2, y2 = town
     stalls = {}
@@ -215,14 +248,20 @@ def vehicle_stalls(folder, town):
         name, x, y, w, h, direction = m.group(1), *map(int, m.groups()[1:5]), m.group(6)
         if not (x1 <= x + w / 2 <= x2 and y1 <= y + h / 2 <= y2):
             continue
-        # The engine's guess at the facing of a zone without a Direction (IsoChunk.AddVehicles_OnZone).
-        facing = "N"
-        if w in (4, 5, 6) and (h <= 3 or h >= 6):
-            facing = "W"
-        facing = direction or facing
-        across, along = (3, 5) if facing in ("N", "S") else (5, 3)
-        count = stalls_along(x, w, across) * stalls_along(y, h, along)
         key = (name or "parkingstall").lower()
+        jam = JAM.match(key)
+        if jam:
+            count = jam_slots(jam.group(1), x, y, w, h)
+        elif "trafficjam" in key:
+            continue  # A misspelt jam, which the engine neither jams nor parks.
+        else:
+            # The engine's guess at the facing of a zone without a Direction (IsoChunk.AddVehicles_OnZone).
+            facing = "N"
+            if w in (4, 5, 6) and (h <= 3 or h >= 6):
+                facing = "W"
+            facing = direction or facing
+            across, along = (3, 5) if facing in ("N", "S") else (5, 3)
+            count = stalls_along(x, w, across) * stalls_along(y, h, along)
         stalls[key] = stalls.get(key, 0) + count
     return stalls
 
@@ -235,7 +274,7 @@ def lua_table(counts, indent):
         if isinstance(value, dict):
             lines.append('%s["%s"] = { %s },' % (pad, key, ", ".join('["%s"] = %d' % (k, value[k]) for k in sorted(value))))
         else:
-            lines.append('%s["%s"] = %d,' % (pad, key, value))
+            lines.append('%s["%s"] = %g,' % (pad, key, round(value, 1)))
     return "\n".join(lines)
 
 

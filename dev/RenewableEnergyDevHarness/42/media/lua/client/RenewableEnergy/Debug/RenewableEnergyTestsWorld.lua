@@ -5,7 +5,7 @@ local Stash = require "RenewableEnergy/StashHouses"
 -- Stash house, world spawn, solar site, garden light and arrow board tests. See
 -- RenewableEnergyTestLib.lua for how the runner works. Stash houses, world spawns, sites, garden
 -- lights and the arrow board's panels, box and frame live on the authority, so the tests build and
--- read them through the handlers in RenewableEnergyTestServerWorld.lua, and check what players see
+-- read them through the handlers in RenewableEnergyTestServer*.lua, and check what players see
 -- on this client's copies. What players do (opening the battery box, the mechanics window, the
 -- repairs, washing, hitching and driving) goes through the vanilla actions and the mod's own.
 
@@ -145,6 +145,13 @@ local function inRange(value, range)
     return value >= range.min and value <= range.max
 end
 
+-- A tuned range read from the authority's WorldSpawns: the test checks spawns against it, so it
+-- must itself be one a player can meet, from `lowest` up to `highest`.
+local function expectSaneRange(range, what, lowest, highest)
+    expect(range.min >= lowest and range.min <= range.max and range.max <= highest,
+        what .. " runs from " .. range.min .. " to " .. range.max)
+end
+
 local function expectFoundCharges(charges, what)
     local range = RenewableEnergy.Specs.foundCharge
     for _, charge in ipairs(charges) do
@@ -205,6 +212,7 @@ test("renewable_energy_world_bank_spawns_stocked", {
             local count = #bank.stock.charges
             expect(bank.sprite == Sprites[stock.sprite], what .. " has the wrong tile")
             expect(bank.stock.explored, what .. " is not explored")
+            expectSaneRange(stock.batteries, "the battery count of " .. what, 1, math.huge)
             expect(inRange(count, stock.batteries),
                 count .. " batteries in " .. what .. ", expected " .. stock.batteries.min .. " to " .. stock.batteries.max)
             expectFoundCharges(bank.stock.charges, what)
@@ -234,7 +242,7 @@ local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
 -- comes with a charge controller.
 test("renewable_energy_world_bank_stock_rates", {
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
-    run = function(self) T.server(self, "bankStockRates", { samples = 400, boxTiles = BOX_TILES }) end,
+    run = function(self) T.server(self, "bankStockRates", { samples = 2000, boxTiles = BOX_TILES }) end,
     validate = function(self) T.expectNoFailures(self.server.bankStockRates) end,
 })
 
@@ -274,6 +282,8 @@ test("renewable_energy_world_crate_spawns_stocked", {
         expect(crate.stock.explored, "the crate is not explored")
         local conditions = crate.stock.modules
         expect(#conditions >= 1 and #conditions <= 2, #conditions .. " modules in the crate, expected 1 or 2")
+        expectSaneRange(ranges.cracked, "a cracked module's condition", 1, 100)
+        expectSaneRange(ranges.weathered, "a weathered module's condition", 1, 100)
         for _, condition in ipairs(conditions) do
             expect(inRange(condition, ranges.cracked) or inRange(condition, ranges.weathered), "a crate module is at condition " .. condition)
         end
@@ -289,7 +299,7 @@ test("renewable_energy_world_crate_spawns_stocked", {
 
 -- Cracked modules -------------------------------------------------------------------------------
 
--- Farm storage shelves get cracked modules, at condition 20 to 50, and a bedroom's furniture
+-- Farm storage shelves get cracked modules, at cracked conditions, and a bedroom's furniture
 -- none. At the highest option every farm storage shelf gets one, so that nothing is left to
 -- chance; at the default the chance is small but there.
 test("renewable_energy_world_cracked_modules", {
@@ -319,7 +329,7 @@ test("renewable_energy_world_site_placed_once", {
 
 -- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
 -- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
--- outdoors; and each site has the spots its kind uses.
+-- outdoors with a facing; each site has a unique name, a known kind, and the spots its kind uses.
 test("renewable_energy_world_sites_placed_sensibly", {
     run = function(self) T.server(self, "sitesPlacedSensibly") end,
     validate = function(self) T.expectNoFailures(self.server.sitesPlacedSensibly) end,
@@ -349,6 +359,8 @@ test("renewable_energy_world_garden_lights_once_per_house", {
     validate = function(self)
         local answer = self.server.gardenLightsOnce
         local count = answer.count
+        -- The tuned count comes from the authority; a house that is rolled lights must get some.
+        expect(count.min >= 1 and count.min <= count.max, "houses get " .. count.min .. " to " .. count.max .. " lights")
         expect(answer.first >= count.min and answer.first <= count.max, "the house got " .. answer.first .. " lights")
         expect(answer.rolled, "the house's roll was not kept")
         expect(answer.second == 0, "rolling the house again gave " .. answer.second .. " more lights")
@@ -387,69 +399,89 @@ local function loadedAround(x, y, z, radius)
     return getSquare(x + radius, y + radius, z) ~= nil
 end
 
+-- Lets the visits below move the character: a teleport from inside a timed action doesn't stick,
+-- so OnTick makes the move that self.teleportTo(x, y, z) asks for. Puts the character back at the
+-- start when the test ends, should a visit leave them elsewhere.
+local function startVisits(self)
+    local p = player()
+    local start = { x = p:getX(), y = p:getY(), z = p:getZ() }
+    T.defer(self, function()
+        if math.abs(p:getX() - start.x) > 1 or math.abs(p:getY() - start.y) > 1 then
+            p:teleportTo(start.x, start.y, start.z)
+        end
+    end)
+    local target
+    T.onTick(self, function()
+        if target then
+            p:teleportTo(target[1], target[2], target[3])
+            target = nil
+        end
+    end)
+    function self.teleportTo(x, y, z) target = { x, y, z } end
+    return start
+end
+
+-- Queues a visit to `place` ({ x, y }): the character goes there, this client loads it, and the
+-- authority is asked about the house nearest it until that house has been rolled for garden lights
+-- or ROLL_MS pass. Leaves loaded, house, rolled and found (the neighbourhood) in `place`, and calls
+-- done() from the queue when the visit is over, so that what comes next queues after it.
+local function visitPlace(self, place, done)
+    T.step(function() self.teleportTo(place[1] + 0.5, place[2] + 0.5, 0) end)
+    T.waitUntil(function() return getSquare(place[1], place[2], 0) ~= nil end, VISIT_FRAMES)
+    T.step(function()
+        place.loaded = getSquare(place[1], place[2], 0) ~= nil
+        local deadline = getTimestampMs() + ROLL_MS
+        local function ask()
+            T.server(self, "gardenLightsAt", { x = place[1], y = place[2], radius = 20 })
+            T.step(function()
+                local at = self.server.gardenLightsAt
+                place.house, place.rolled, place.found = at.house, at.rolled, at.neighbourhood
+                if not place.rolled and getTimestampMs() < deadline then
+                    local again = getTimestampMs() + ROLL_POLL_MS
+                    T.waitUntil(function() return getTimestampMs() >= again end, math.huge)
+                    T.step(ask)
+                else
+                    done()
+                end
+            end)
+        end
+        ask()
+    end)
+end
+
+-- Queues the character's way back to `start` ({ x, y, z }) and a wait for the squares around it
+-- to load again; leaves in self.homeLoaded whether they did and in self.home where the character
+-- ended up.
+local function returnHome(self, start)
+    local x, y = math.floor(start.x), math.floor(start.y)
+    T.step(function() self.teleportTo(start.x, start.y, start.z) end)
+    T.waitUntil(function() return loadedAround(x, y, start.z, HOME_RADIUS) end, VISIT_FRAMES)
+    T.step(function()
+        local p = player()
+        self.homeLoaded = loadedAround(x, y, start.z, HOME_RADIUS)
+        self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
+    end)
+end
+
 -- The neighbourhood sets the chance: a rich street (Riverside's Rich loot zone) most, a trailer
 -- park least, an ordinary street (the start, in Muldraugh) in between. A farmhouse counts as
 -- ordinary. And a house far from the start is rolled once the character has been there. The
 -- character visits each place in turn, staying until it has loaded and the authority has rolled
--- the house nearest it, and comes back once the start has loaded again. A teleport from inside a
--- timed action doesn't stick, so OnTick moves them.
+-- the house nearest it, and comes back once the start has loaded again.
 test("renewable_energy_world_garden_light_neighbourhoods", {
     run = function(self)
-        local p = player()
-        local homeX, homeY, homeZ = p:getX(), p:getY(), p:getZ()
-        self.start = { x = homeX, y = homeY, z = homeZ }
         self.places = {
             { 6680, 5320, "rich" }, { 5370, 5945, "poor" }, { 7340, 5993, "ordinary" }, { 10835, 10144, "ordinary" },
         }
         T.setMultiplier(self, VISIT_SPEED)
-        T.defer(self, function()
-            if math.abs(p:getX() - homeX) > 1 or math.abs(p:getY() - homeY) > 1 then
-                p:teleportTo(homeX, homeY, homeZ)
-            end
-        end)
-        local target
-        T.onTick(self, function()
-            if target then
-                p:teleportTo(target[1], target[2], target[3])
-                target = nil
-            end
-        end)
-        local function goHome()
-            T.step(function() target = { homeX, homeY, homeZ } end)
-            T.waitUntil(function() return loadedAround(math.floor(homeX), math.floor(homeY), homeZ, HOME_RADIUS) end, VISIT_FRAMES)
-            T.step(function()
-                self.homeLoaded = loadedAround(math.floor(homeX), math.floor(homeY), homeZ, HOME_RADIUS)
-                self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
-            end)
-        end
-        -- Visits place i, then the next, all queued from the last step of each visit.
+        self.start = startVisits(self)
+        -- Each visit queues the next from its last step.
         local function visit(i)
-            local place = self.places[i]
-            if not place then
-                goHome()
-                return
+            if self.places[i] then
+                visitPlace(self, self.places[i], function() visit(i + 1) end)
+            else
+                returnHome(self, self.start)
             end
-            T.step(function() target = { place[1] + 0.5, place[2] + 0.5, 0 } end)
-            T.waitUntil(function() return getSquare(place[1], place[2], 0) ~= nil end, VISIT_FRAMES)
-            T.step(function()
-                place.loaded = getSquare(place[1], place[2], 0) ~= nil
-                local deadline = getTimestampMs() + ROLL_MS
-                local function ask()
-                    T.server(self, "gardenLightsAt", { x = place[1], y = place[2], radius = 20 })
-                    T.step(function()
-                        local at = self.server.gardenLightsAt
-                        place.house, place.rolled, place.found = at.house, at.rolled, at.neighbourhood
-                        if not place.rolled and getTimestampMs() < deadline then
-                            local again = getTimestampMs() + ROLL_POLL_MS
-                            T.waitUntil(function() return getTimestampMs() >= again end, math.huge)
-                            T.step(ask)
-                        else
-                            visit(i + 1)
-                        end
-                    end)
-                end
-                ask()
-            end)
         end
         visit(1)
     end,
@@ -471,12 +503,17 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
     end,
 })
 
--- At 0 the Garden Lights option leaves every house without lights.
+-- At 0 the Garden Lights option leaves every house without lights: the house near the start, rolled
+-- again and again the way the world rolls it, never gets one. At the option's default an ordinary
+-- street's chance would almost surely have given it some over this many rolls.
 test("renewable_energy_world_garden_lights_option_zero", {
     sandbox = { GardenLights = 0 },
-    run = function(self) T.server(self, "gardenLightsChance") end,
+    run = function(self) T.server(self, "gardenLightsRolls", { rolls = 60 }) end,
     validate = function(self)
-        expect(self.server.gardenLightsChance.chance == 0, "houses get lights with the option at 0")
+        local answer = self.server.gardenLightsRolls
+        expect(answer.chance == 0, "houses get lights with chance " .. answer.chance .. " with the option at 0")
+        expect(answer.placed == 0 and #answer.lights == 0,
+            "with the option at 0 the rolls placed " .. answer.placed .. " lights, and " .. #answer.lights .. " stand around the house")
     end,
 })
 
@@ -492,22 +529,20 @@ end
 -- north of it to `behind` squares south, clear of the character: room for vehicles facing north.
 local function openStrip(ahead, behind)
     local here = player():getSquare()
+    local hx, hy, z = here:getX(), here:getY(), here:getZ()
     for radius = 1, 25 do
-        for dx = -radius, radius do
-            for dy = -radius, radius do
-                local onRing = math.max(math.abs(dx), math.abs(dy)) == radius
-                local coversCharacter = math.abs(dx) <= 1 and -dy >= -ahead and -dy <= behind
-                if onRing and not coversCharacter then
-                    local x, y, z = here:getX() + dx, here:getY() + dy, here:getZ()
-                    local open = true
-                    for sx = x - 1, x + 1 do
-                        for sy = y - ahead, y + behind do
-                            open = open and isOpenGround(sx, sy, z)
-                        end
+        for x, y in PZHarness.Fixtures.ring(hx, hy, radius) do
+            local dx, dy = x - hx, y - hy
+            local coversCharacter = math.abs(dx) <= 1 and -dy >= -ahead and -dy <= behind
+            if not coversCharacter then
+                local open = true
+                for sx = x - 1, x + 1 do
+                    for sy = y - ahead, y + behind do
+                        open = open and isOpenGround(sx, sy, z)
                     end
-                    if open then
-                        return getSquare(x, y, z)
-                    end
+                end
+                if open then
+                    return getSquare(x, y, z)
                 end
             end
         end
@@ -786,8 +821,8 @@ test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
 
 -- A padlocked battery box opens the way vanilla gets into a locked trunk without its key: the lid
 -- comes off in the mechanics window with a wrench and vanilla's trunk lid skill, without its Basic
--- Mechanics recipe, and then a player takes the batteries out. Instant in single player only, as
--- with the panels.
+-- Mechanics recipe, and then a player takes the batteries out. The lid goes back on without the
+-- recipe too, unlocked, so the box shuts again. Instant in single player only, as with the panels.
 test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
     instant = not isClient(),
     run = function(self)
@@ -803,6 +838,7 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
             self.knewRecipe = p:isRecipeActuallyKnown("Basic Mechanics")
             self.lockedAccess = vehicle:canAccessContainer(self.box:getIndex(), p)
             self.canTakeOff = vehicle:canUninstallPart(p, self.lid)
+            self.lidType = self.lid:getInventoryItem():getFullType()
             -- What the mechanics window does for Uninstall.
             ISVehiclePartMenu.onUninstallPart(p, self.lid)
         end)
@@ -818,6 +854,19 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
         end)
         T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
         T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil end)
+        T.step(function()
+            self.canPutBack = trailer.vehicle:canInstallPart(p, self.lid)
+            local lid = p:getInventory():getFirstTypeRecurse(self.lidType)
+            if lid then
+                ISVehiclePartMenu.onInstallPart(p, self.lid, lid)
+            end
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.installed end, SERVER_MS)
+        T.waitForCopy(function() return self.lid:getInventoryItem() ~= nil end)
+        T.step(function()
+            local door = self.lid:getDoor()
+            self.lidBack = { installed = self.lid:getInventoryItem() ~= nil, locked = door:isLocked(), open = door:isOpen() }
+        end)
     end,
     validate = function(self)
         if not expect(self.lid ~= nil and self.box ~= nil, "the trailer has no lid or no battery box") then
@@ -831,6 +880,11 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
         expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
         expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
             "the battery never reached the inventory")
+        expect(self.canPutBack, "the mechanics window won't put the lid back on")
+        local back = self.lidBack
+        expect(back and back.installed and not back.locked and not back.open,
+            "the lid put back is " .. (back and ((back.installed and "on" or "off") .. ", " .. (back.locked and "locked" or "unlocked")
+                .. " and " .. (back.open and "open" or "shut")) or "unknown") .. ", expected on, unlocked and shut")
     end,
 })
 
@@ -1076,22 +1130,19 @@ local function inCell(vehicle)
 end
 
 -- Queues a car and an arrow board on a strip of open ground, the trailer behind the car, both
--- whole, the trailer set up with `opts.trailer` (see the setTrailer handler); lines them up and
--- hitches the trailer the way a player does, with vanilla's action. With `opts.drive` the character
--- gets in at the wheel first, so the hitch is fresh when the test goes on; else they stand beside
--- the car's tow bar. Leaves the handles in self.car and self.trailer, and in self.hitchedAt a real
--- time just after the hitch was made; a hitch that never forms fails the test.
-local function towingPair(self, opts)
-    opts = opts or {}
+-- whole, the trailer set up with `trailerArgs` if given (see the setTrailer handler), and a wait
+-- until the game moves them. Leaves the handles in self.car and self.trailer and returns the strip
+-- the car stands on, or nil without one.
+local function createTowingPair(self, trailerArgs)
     local strip = T.need(self, openStrip(STRIP_AHEAD, STRIP_BEHIND), "open ground for a car and the arrow board")
-    if not strip then return end
+    if not strip then return nil end
     local x, y, z = strip:getX(), strip:getY(), strip:getZ()
     local car = T.placeVehicle(self, TOWING_CAR, { square = strip, args = { repair = true } })
     local trailer = T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT,
         { square = getSquare(x, y + 5, z), args = { repair = true } })
     self.car, self.trailer = car, trailer
-    if opts.trailer then
-        T.onVehicle(self, trailer, "setTrailer", opts.trailer)
+    if trailerArgs then
+        T.onVehicle(self, trailer, "setTrailer", trailerArgs)
     end
     -- The game moves, and checks the hitch of, only vehicles that have joined the cell. Single
     -- player then lets them settle where they dropped; a multiplayer client runs no physics for
@@ -1100,29 +1151,41 @@ local function towingPair(self, opts)
         return inCell(car.vehicle) and inCell(trailer.vehicle)
             and (isClient() or car.vehicle:isAtRest() and trailer.vehicle:isAtRest())
     end, VEHICLE_FRAMES)
-    local p = player()
-    if opts.drive then
-        T.step(function()
-            local outside = car.vehicle:getPassengerPosition(0, "outside")
-            local door = car.vehicle:getWorldPos(outside:getOffset(), Vector3f.new())
-            p:teleportTo(door:x(), door:y(), z)
-            ISTimedActionQueue.add(ISEnterVehicle:new(p, car.vehicle, 0))
-        end)
-        T.waitUntil(function() return car.vehicle:isDriver(p) end, VEHICLE_FRAMES)
-    end
-    -- As a player lines them up: tow points within a square and the pair parallel. After the
-    -- driver gets in, since from then on the driver's client moves the car and the server's place
-    -- for it no longer counts.
+    return strip
+end
+
+-- Queues the character getting in at the wheel of self.car through the driver's door, and a wait
+-- until they sit there.
+local function enterDriver(self)
+    local p, car = player(), self.car
+    T.step(function()
+        local outside = car.vehicle:getPassengerPosition(0, "outside")
+        local door = car.vehicle:getWorldPos(outside:getOffset(), Vector3f.new())
+        p:teleportTo(door:x(), door:y(), p:getZ())
+        ISTimedActionQueue.add(ISEnterVehicle:new(p, car.vehicle, 0))
+    end)
+    T.waitUntil(function() return car.vehicle:isDriver(p) end, VEHICLE_FRAMES)
+end
+
+-- Queues lining up self.car and self.trailer as a player does: tow points within a square and the
+-- pair parallel, facing north. Do it after a driver gets in, since from then on the driver's client
+-- moves the car and the server's place for it no longer counts.
+local function alignTowPoints(self)
+    local car, trailer = self.car, self.trailer
     T.server(self, "lineUpTrailer", function()
         return { car = T.vehicleArgs(car), trailer = T.vehicleArgs(trailer), facing = "N" }
     end)
     -- And this client's copies, which take the server's places only when it next sends them.
     T.step(function() T.lineUpTrailer(car.vehicle, trailer.vehicle, "N") end)
     T.waitUntil(function() return hitchGap(car.vehicle, trailer.vehicle) < 1 end, VEHICLE_FRAMES)
-    if not opts.drive then
-        -- Beside the car's tow bar, out of the trailer's way; the runner puts the character back.
-        T.step(function() p:teleportTo(x + 2.5, y + 3.5, z) end)
-    end
+end
+
+-- Queues hitching self.trailer to self.car the way a player does, with vanilla's action, and a
+-- wait until the hitch has pulled the trailer in and the pair has settled. Leaves in
+-- self.hitchedAt a real time just after the hitch was made; a hitch that never forms fails the
+-- test.
+local function attachTrailer(self)
+    local p, car, trailer = player(), self.car, self.trailer
     T.step(function()
         ISTimedActionQueue.add(ISAttachTrailerToVehicle:new(p, car.vehicle, trailer.vehicle, "trailer", "trailer"))
     end)
@@ -1140,6 +1203,24 @@ local function towingPair(self, opts)
         T.need(self, hitched, string.format("the trailer hitched to the car (driving %s, tow points %.2f apart)",
             tostring(car.vehicle:isDriver(p)), hitchGap(car.vehicle, trailer.vehicle)))
     end)
+end
+
+-- Queues a hitched car and arrow board (createTowingPair, with `opts.trailer`). With `opts.drive`
+-- the character gets in at the wheel first, so the hitch is fresh when the test goes on; else they
+-- stand beside the car's tow bar. Leaves self.car, self.trailer and self.hitchedAt.
+local function towingPair(self, opts)
+    opts = opts or {}
+    local strip = createTowingPair(self, opts.trailer)
+    if not strip then return end
+    if opts.drive then
+        enterDriver(self)
+    end
+    alignTowPoints(self)
+    if not opts.drive then
+        -- Beside the car's tow bar, out of the trailer's way; the runner puts the character back.
+        T.step(function() player():teleportTo(strip:getX() + 2.5, strip:getY() + 3.5, strip:getZ()) end)
+    end
+    attachTrailer(self)
 end
 
 -- A push each frame, small enough that a frame adds only a few km/h, and the speeds a crash's jolt

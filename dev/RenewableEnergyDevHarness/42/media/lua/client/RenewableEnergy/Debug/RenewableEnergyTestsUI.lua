@@ -179,9 +179,7 @@ test("renewable_energy_ui_menu_panel_wired_to", {
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
         if not self.panel then return end
-        T.step(function()
-            PowerBank.command(player(), "rename", { bank = self.bank.position, name = "Shed Bank" })
-        end)
+        T.perform(self, "rename", { bank = self.bank.position, name = "Shed Bank" })
         T.waitForCopy(function()
             local status = T.clientStatus(self.bank)
             return status ~= nil and status.name == "Shed Bank"
@@ -255,8 +253,8 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
         T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Wrench" }, { type = PowerBank.WIRE } })
         T.makeDark(self)
         if not isClient() then
-            T.server(self, "perform", function()
-                return { command = "wireIn", args = { bank = self.bank.position, itemId = self.items.parts[1]:getID() } }
+            T.perform(self, "wireIn", function()
+                return { bank = self.bank.position, itemId = self.items.parts[1]:getID() }
             end)
         end
     end,
@@ -371,6 +369,9 @@ test("renewable_energy_ui_connect_panel", {
                     self.ended = worldMinutes()
                 end
             end)
+            -- A player walks over first, as the menu does, and a multiplayer server refuses the job
+            -- from afar.
+            if not T.need(self, luautils.walkAdj(p, self.panel.square, true), "a walk to the panel") then return end
             ISTimedActionQueue.add(action)
             T.waitForCopy(function()
                 return PowerBank.samePosition(Action.connectedBank(self.panel.object), self.bank.position)
@@ -398,6 +399,7 @@ test("renewable_energy_ui_disconnect_panel", {
         self.panel = self.bank and T.panel(self, Sprites.wall.wood.S, { near = self.bank, connect = true })
         if not self.panel then return end
         T.step(function()
+            if not T.need(self, luautils.walkAdj(player(), self.panel.square, true), "a walk to the panel") then return end
             ISTimedActionQueue.add(Action:new(player(), Action.DISCONNECT_SOURCE, self.panel.object))
             T.waitForCopy(function() return Action.connectedBank(self.panel.object) == nil end)
             T.bankState(self, self.bank)
@@ -504,14 +506,15 @@ test("renewable_energy_ui_wire_in_and_unwire", {
 })
 
 -- Renaming goes through the bank, shows in its menu and window, and an empty name gives the
--- tier's name back.
+-- tier's name back. The bank stands on open ground, which the walk to it always reaches.
 test("renewable_energy_ui_rename_bank", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryRackMetal", {})
+        local bank = T.bank(self, "batteryRackMetal", {}, { outdoors = true })
         if not bank then return end
         self.bank = bank
         T.step(function()
+            if not T.need(self, luautils.walkAdj(player(), bank.square, true), "a walk to the bank") then return end
             ISTimedActionQueue.add(Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "  Cellar  "))
             T.waitForCopy(function() return Menu.bankLabel(bank.object) == "Cellar" end)
             T.step(function()

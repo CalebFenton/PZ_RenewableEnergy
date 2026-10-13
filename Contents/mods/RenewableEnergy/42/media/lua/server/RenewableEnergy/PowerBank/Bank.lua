@@ -291,14 +291,11 @@ local function conditionMax(fullType)
 end
 
 --- The watts a panel's modules are rated for as they are now, and at their best.
-local function moduleWatts(source)
+local function sourceWatts(source)
     local now, best = 0, 0
     for _, module in ipairs(source.modules) do
-        local spec = Specs.modules[module.type]
-        if spec then
-            now = now + spec.watts * module.condition / 100
-            best = best + spec.watts * conditionMax(module.type) / 100
-        end
+        now = now + PowerBank.moduleWatts(module.type, module.condition)
+        best = best + PowerBank.moduleWatts(module.type, conditionMax(module.type))
     end
     return now, best
 end
@@ -463,36 +460,36 @@ end
 --- there and outdoors; one that is gone is dropped. Panels past the bank's slots stay wired
 --- and make nothing.
 function Bank:updateSources(hours, context)
-    for i = #self.sources, 1, -1 do
+    local solarW, slots = 0, self:panelSlots()
+    -- A dropped panel gives its place in the list, and so its slot, to the next one.
+    local i = 1
+    while i <= #self.sources do
         local source = self.sources[i]
         local square = getSquare(source.x, source.y, source.z)
         local object = PowerBank.sourceOn(square)
         if square and not (object and square:isOutside() and PowerBank.isInReach(self, source.x, source.y, source.z)) then
             table.remove(self.sources, i)
+        else
+            if Bank.stormCrack(source, context.stormHours) then
+                source.modulesChanged = true
+            end
+            if object then
+                syncModules(source, object)
+            end
+            updateSnow(source, hours, context)
+            if object then
+                showSnow(object, source)
+            end
+            local light = context.irradiance(source.kind, source.facing)
+            local clearLight = context.clearIrradiance(source.kind, source.facing)
+            local now, best = sourceWatts(source)
+            local inSlot = i <= slots
+            source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
+            source.fullSunPct = math.floor(100 * light * (1 - source.snow) / Sun.FULL_SUN + 0.5)
+            source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
+            solarW = solarW + source.watts
+            i = i + 1
         end
-    end
-    local solarW, slots = 0, self:panelSlots()
-    for i, source in ipairs(self.sources) do
-        local square = getSquare(source.x, source.y, source.z)
-        local object = PowerBank.sourceOn(square)
-        if Bank.stormCrack(source, context.stormHours) then
-            source.modulesChanged = true
-        end
-        if object then
-            syncModules(source, object)
-        end
-        updateSnow(source, hours, context)
-        if object then
-            showSnow(object, source)
-        end
-        local light = context.irradiance(source.kind, source.facing)
-        local clearLight = context.clearIrradiance(source.kind, source.facing)
-        local now, best = moduleWatts(source)
-        local inSlot = i <= slots
-        source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
-        source.fullSunPct = math.floor(100 * light * (1 - source.snow) / Sun.FULL_SUN + 0.5)
-        source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
-        solarW = solarW + source.watts
     end
     return solarW
 end
@@ -589,21 +586,27 @@ end
 
 --- What the chargers charge from: "grid", "generator" (a running generator other than a bank
 --- whose reach covers the bank, which burns fuel for them), or false. Returns the watts they
---- put in. Unloaded, only the grid carries on: the generator and its fuel are out of reach.
-function Bank:chargeFrom(generators, hours)
-    local watts = self:chargerW()
+--- put in over the pass's `hours`: no more than `roomWh`, what the batteries can still take
+--- after the sun and the load, and from a generator no more than its fuel pays for, which is
+--- all the fuel it burns. Unloaded, only the grid carries on: the generator and its fuel are
+--- out of reach.
+function Bank:chargeFrom(generators, hours, roomWh)
+    local generator
     if self:getSquare() then
-        local generator = not self.gridPowered and fueled(generators)
+        generator = not self.gridPowered and fueled(generators)
         self.chargeSource = (self.gridPowered and "grid") or (generator and "generator") or false
-        if watts > 0 and generator and self.charge < 1 then
-            local fuel = watts / WATTS_PER_FUEL_UNIT * SandboxVars.GeneratorFuelConsumption * hours
-            generator:setFuel(math.max(0, generator:getFuel() - fuel))
-        end
     elseif self.chargeSource == "generator" then
         self.chargeSource = false
     end
-    if not self.chargeSource or self.charge >= 1 then
+    if not self.chargeSource or hours <= 0 or roomWh <= 0 then
         return 0
+    end
+    local watts = math.min(self:chargerW(), roomWh / hours)
+    local fuelPerWh = SandboxVars.GeneratorFuelConsumption / WATTS_PER_FUEL_UNIT
+    if generator and fuelPerWh > 0 then
+        local fuel = generator:getFuel()
+        watts = math.min(watts, fuel / fuelPerWh / hours)
+        generator:setFuel(math.max(0, fuel - watts * hours * fuelPerWh))
     end
     return watts
 end
@@ -718,15 +721,18 @@ function Bank:update(hours, context)
     local solarW = self:updateSources(hours, context)
     self:updateGenerator()
     local generators = self:measure()
-    local chargerW = self:chargeFrom(generators, hours)
-    local inW = solarW + chargerW
     if self:checkOverload() then
         self:addPartWear(container, 0, 1)
     end
 
     local drawW = self:drawW()
     local capacity = self.nominalWh
-    local stored = math.max(0, math.min(capacity, self.charge * capacity + (inW - drawW) * hours))
+    local before = self.charge * capacity
+    -- The chargers fill what the sun and the load leave; with no batteries there is nothing to fill.
+    local roomWh = capacity > 0 and capacity - before - (solarW - drawW) * hours or 0
+    local chargerW = self:chargeFrom(generators, hours, roomWh)
+    local inW = solarW + chargerW
+    local stored = math.max(0, math.min(capacity, before + (inW - drawW) * hours))
     self.charge = capacity > 0 and stored / capacity or 0
     -- An empty bank's inverters cut out, and come back once a pass of load is stored, so
     -- a bank that barely charges doesn't stop and start every pass.

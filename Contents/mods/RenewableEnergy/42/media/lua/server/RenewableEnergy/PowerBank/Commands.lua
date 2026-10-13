@@ -1,7 +1,7 @@
--- What players do to banks, run on the authority: from a timed action's complete(), or from
--- a client's PowerBank.command. Every command checks the world again, since a client's view
--- can be stale or forged. Each returns whether it did anything and, if not, why (a
--- translation key where the player is told).
+-- What players do to banks, run on the authority: from a timed action's complete(), or the status
+-- refresh a client asks for (BankSystem:OnClientCommand). Every command checks the world again,
+-- since a client's view can be stale or forged. Each returns whether it did anything and, if not,
+-- why (a translation key where the player is told).
 
 if isClient() then return end
 

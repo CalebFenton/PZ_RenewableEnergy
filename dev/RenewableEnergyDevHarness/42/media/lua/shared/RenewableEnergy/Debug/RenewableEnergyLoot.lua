@@ -13,6 +13,7 @@
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
+require "PZHarness/Fixtures"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loot = {}
@@ -415,12 +416,10 @@ function Loot.squareOutsideRooms(character)
     end
     local px, py = math.floor(character:getX()), math.floor(character:getY())
     for radius = 0, 40 do
-        for dx = -radius, radius do
-            for _, dy in ipairs({ -radius, radius }) do
-                local square = cell:getGridSquare(px + dx, py + dy, 0)
-                if square and square:getRoom() == nil then
-                    return square
-                end
+        for x, y in PZHarness.Fixtures.ring(px, py, radius) do
+            local square = cell:getGridSquare(x, y, 0)
+            if square and square:getRoom() == nil then
+                return square
             end
         end
     end
@@ -698,15 +697,30 @@ local function vehicleModules(script)
     return (1 - specialShare) * setModules(distribution.Normal) + specialShare * specificTotal / #specific
 end
 
+-- The chance a traffic jam's slot takes a car (Rand.Next(100) <= 80), and that a chunk of an
+-- rtrafficjam zone jams at all (IsoChunk.AddVehicles).
+local JAM_SLOT_TAKEN, RANDOM_JAM_CHUNK = 0.81, 0.1
+
 -- Vehicles that come with a zone's stalls, by script, each { share, perStall }: the chance a
 -- stall holds one. As IsoChunk.AddVehicles_OnZone and VehicleType.getRandomVehicleType roll
--- them, leaving out the special vehicles a few stalls of an ordinary zone turn into.
+-- them, leaving out the special vehicles a few stalls of an ordinary zone turn into. A traffic
+-- jam's slots, which census.py counts as IsoChunk.AddVehicles_TrafficJam_* lays them out, take
+-- a car far more often than a stall does.
 local function zoneVehicles(zoneName)
-    local zone = VehicleZoneDistribution[zoneName]
+    local randomJam = zoneName:match("^r(trafficjam%a)$")
+    local zone = VehicleZoneDistribution[randomJam or zoneName]
     if not zone or not zone.vehicles then
         return {}
     end
-    local spawn = math.min(1, ((zone.spawnRate or 16) + 1) / 100) * (1 - (zone.chanceToSpawnBurnt or 0) / 100)
+    local spawn
+    if randomJam then
+        spawn = JAM_SLOT_TAKEN * RANDOM_JAM_CHUNK
+    elseif zoneName:match("^trafficjam%a$") then
+        spawn = JAM_SLOT_TAKEN
+    else
+        spawn = math.min(1, ((zone.spawnRate or 16) + 1) / 100)
+    end
+    spawn = spawn * (1 - (zone.chanceToSpawnBurnt or 0) / 100)
     local result = {}
     local function addFrom(vehicles, share)
         local total = 0
@@ -787,7 +801,8 @@ local function buildModuleReport(census)
     local siteChance = SandboxVars.RenewableEnergy.SolarSites / 100
     local report = { towns = {}, sites = {} }
     for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
-        table.insert(report.sites, { name = site.name, kind = site.kind, haul = siteHaul(site, kinds), site = site })
+        table.insert(report.sites, { name = site.name, kind = site.kind, haul = siteHaul(site, kinds), site = site,
+            chance = site.always and 1 or siteChance })
     end
     for _, town in ipairs(census.towns) do
         local row = roomsHaul(town, kinds)
@@ -796,7 +811,7 @@ local function buildModuleReport(census)
         row.sites = emptyHaul()
         for _, entry in ipairs(report.sites) do
             if inTown(town, siteSpot(entry.site)) then
-                addHaul(row.sites, entry.haul, siteChance)
+                addHaul(row.sites, entry.haul, entry.chance)
             end
         end
         row.total = emptyHaul()
@@ -806,21 +821,20 @@ local function buildModuleReport(census)
         table.insert(report.towns, row)
     end
     local _, zoneBoards = vehiclesHaul(census.mapVehicleStalls, kinds)
-    local roadWorks = 0
+    local siteBoards = 0
     for _, entry in ipairs(report.sites) do
         if entry.site.arrowBoard then
-            roadWorks = roadWorks + siteChance
+            siteBoards = siteBoards + entry.chance
         end
     end
-    report.arrowBoards = { zones = zoneBoards, roadWorks = roadWorks }
-    report.siteChance = siteChance
+    report.arrowBoards = { zones = zoneBoards, sites = siteBoards }
     return report
 end
 
 --- The module report: for each town of the census, { name, listed, cracked, crates, vehicles,
 --- sites, total } hauls ({ count, condition, repaired }, condition summed over the modules);
---- `sites`, each { name, kind, haul } at its Solar Sites chance; `arrowBoards`, the expected
---- number on the map, { zones, roadWorks }. At the default loot settings and loot rarity
+--- `sites`, each { name, kind, haul, chance }, the haul once placed; `arrowBoards`, the expected
+--- number on the map, { zones, sites }. At the default loot settings and loot rarity
 --- options 1.
 function Loot.moduleReport(census)
     return Loot.withMeasureOptions(function()

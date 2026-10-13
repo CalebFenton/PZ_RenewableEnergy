@@ -455,18 +455,9 @@ local function addCrackedShot(steps, player, lot)
     addShot(steps, player, lot, CRACKED_SHOT)
 end
 
-function Art.capture(onDone)
-    local player = getPlayer()
-    local lot = findLot(player)
-    if not lot then
-        print("REArt found no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
-        onDone()
-        return
-    end
-    print(string.format("REArt stage at %d,%d", lot.x, lot.y))
-    local trailer
+-- The tile, overlay, item, icon and fill shots, each on the lot cleared of the one before.
+local function addTileAndItemShots(steps, player, lot)
     local iconSheet = IconSheet:new()
-    local steps = {}
     table.insert(steps, function()
         getGameTime():setTimeOfDay(12)
         Stage.removeTrees(lot.x, lot.y, lot.z)
@@ -501,34 +492,60 @@ function Art.capture(onDone)
         return 30
     end)
     addShot(steps, player, lot, SHOTS.fill)
+end
+
+-- The trailer hitched to its car, then the rear in each of its states. `art.trailer` holds the
+-- pair the steps spawn.
+local function addHitchedTrailerShots(steps, player, lot, art)
     table.insert(steps, function()
         clearLot(lot)
         clearVehicles(lot)
-        trailer = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
+        art.trailer = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
         -- A vehicle joins the cell's list, and gets its physics, only on a later update.
         return 30
     end)
     table.insert(steps, function()
-        Stage.hitchTrailer(trailer, player, "REArt")
-        return trailerSettled(trailer.trailer)
+        Stage.hitchTrailer(art.trailer, player, "REArt")
+        return trailerSettled(art.trailer.trailer)
     end)
     addShot(steps, player, lot, SHOTS.trailer)
-    local function currentPair()
-        return trailer
-    end
-    addStates(steps, currentPair, HITCHED_STATES)
+    addStates(steps, art.currentPair, HITCHED_STATES)
+end
+
+-- A second trailer alone, facing the other way, in each of its states, then the cracked panels.
+local function addLoneAndCrackedShots(steps, player, lot, art)
     table.insert(steps, function()
         clearVehicles(lot)
-        trailer = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")
+        art.trailer = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")
         -- From the camera's side a car facing this way would hide its trailer.
-        trailer.car:permanentlyRemove()
-        trailer.car = nil
-        setBlood(trailer.trailer, BLOOD_SIDES)
+        art.trailer.car:permanentlyRemove()
+        art.trailer.car = nil
+        setBlood(art.trailer.trailer, BLOOD_SIDES)
         return 30
     end)
     addShot(steps, player, lot, SHOTS.trailerFront)
-    addStates(steps, currentPair, LONE_STATES)
+    addStates(steps, art.currentPair, LONE_STATES)
     addCrackedShot(steps, player, lot)
+end
+
+function Art.capture(onDone)
+    local player = getPlayer()
+    local lot = findLot(player)
+    if not lot then
+        -- Without "REArt DONE", run-debug-client.sh reports the run as failed.
+        print("REArt FAIL: no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
+        getCore():quitToDesktop()
+        return
+    end
+    print(string.format("REArt stage at %d,%d", lot.x, lot.y))
+    local art = {}
+    function art.currentPair()
+        return art.trailer
+    end
+    local steps = {}
+    addTileAndItemShots(steps, player, lot)
+    addHitchedTrailerShots(steps, player, lot, art)
+    addLoneAndCrackedShots(steps, player, lot, art)
     Stage.runSteps(steps, onDone, "REArt")
 end
 

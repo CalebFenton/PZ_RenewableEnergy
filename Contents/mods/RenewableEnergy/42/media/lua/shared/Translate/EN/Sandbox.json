@@ -9,7 +9,7 @@
     "Sandbox_RenewableEnergy_FailsafeStopCharge": "Failsafe Stop Charge",
     "Sandbox_RenewableEnergy_FailsafeStopCharge_tooltip": "A failsafe stops its backup generator when the battery bank's charge reaches this percent.",
     "Sandbox_RenewableEnergy_SolarSites": "Solar Sites",
-    "Sandbox_RenewableEnergy_SolarSites_tooltip": "Percent chance that each of the map's solar sites (farms, campers, relay sheds, ranger stations and the power yard) gets its panels and batteries, rolled once when the world is created.",
+    "Sandbox_RenewableEnergy_SolarSites_tooltip": "Percent chance that each of the map's solar sites (farms, campers, relay sheds, ranger stations, the power yard, road works and army checkpoints) is set up, rolled once when the world is created.<br>The road works north of Muldraugh and the checkpoint on the highway south of Louisville are always there unless this is 0.",
     "Sandbox_RenewableEnergy_GardenLights": "Garden Lights",
     "Sandbox_RenewableEnergy_GardenLights_tooltip": "Percent of the usual chance that a house has solar garden lights along its front, rolled once per house the first time someone sees it.<br>0 turns them off.",
     "Sandbox_RenewableEnergy_LRMSolarPanels": "Loot Rarity Multiplier - Solar modules",

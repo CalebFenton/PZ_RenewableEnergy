@@ -38,6 +38,7 @@ function SolarMaintainer.attach(character, vehicle, item)
         return false
     end
     local container = item:getContainer()
+    character:removeFromHands(item)
     if container then
         container:Remove(item)
         sendRemoveItemFromContainer(container, item)

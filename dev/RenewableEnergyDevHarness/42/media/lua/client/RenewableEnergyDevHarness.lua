@@ -41,10 +41,11 @@ local function reportModules()
             hauled(town.sites), hauled(town.total)))
     end
     for _, site in ipairs(report.sites) do
-        print(string.format("RELootReport modules at site %s (%s): %s when placed", site.name, site.kind, hauled(site.haul)))
+        print(string.format("RELootReport modules at site %s (%s): %s when placed, %.0f%% of worlds", site.name, site.kind,
+            hauled(site.haul), site.chance * 100))
     end
-    print(string.format("RELootReport modules: sites are placed at %.0f%%; arrow boards per map: %.1f from vehicle zones, %.1f at road works",
-        report.siteChance * 100, report.arrowBoards.zones, report.arrowBoards.roadWorks))
+    print(string.format("RELootReport modules: arrow boards per map: %.1f from vehicle zones, %.1f at sites",
+        report.arrowBoards.zones, report.arrowBoards.sites))
 end
 
 local function reportLoot(_, done)

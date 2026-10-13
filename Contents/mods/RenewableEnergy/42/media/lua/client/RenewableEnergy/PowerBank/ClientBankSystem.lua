@@ -58,10 +58,11 @@ end
 
 CGlobalObjectSystem.RegisterSystemClass(BankSystem)
 
---- Send command `name` to the server (single player too). See Commands.lua.
-function PowerBank.command(player, name, args)
+--- Ask the server for a fresh status of `bank` (single player too). Jobs that change a bank go
+--- through RenewableEnergyAction instead; the server takes no other command from a client.
+function PowerBank.requestStatus(player, bank)
     if BankSystem.instance then
-        BankSystem.instance:sendCommand(player, name, args)
+        BankSystem.instance:sendCommand(player, "refresh", { bank = PowerBank.positionOf(bank) })
     end
 end
 

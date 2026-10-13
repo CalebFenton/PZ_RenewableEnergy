@@ -335,9 +335,29 @@ function Action:perform()
     ISBaseTimedAction.perform(self)
 end
 
--- The server never calls isValid(), so this checks the action again.
+-- How far from the middle of the target's square, on each axis in squares, a multiplayer server
+-- lets a character finish a job on a bank, a panel or a garden light: what luautils.walkAdj counts
+-- as already there, the square getCorrectSquareForWall moves a wall's target to, and a couple more
+-- for the character's drift and the client's lag.
+local REACH = 4.6
+
+-- Whether the character stands where the menu would have walked them for the job. Vehicle jobs walk
+-- to an area of the vehicle instead (ISPathFindAction.pathToVehicleArea).
+local function withinReach(character, target)
+    local square = target:getSquare()
+    return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= REACH
+        and math.abs(character:getY() - (square:getY() + 0.5)) <= REACH
+        and math.abs(character:getZ() - square:getZ()) < 1
+end
+
+-- The server never calls isValid(), so this checks the action again. NetTimedAction checks no
+-- distance, so the server also makes sure the character is at the job, which a modified client
+-- could otherwise send for any bank in the world.
 function Action:complete()
     if not self:canPerform() then
+        return false
+    end
+    if isServer() and not self.vehicle and not withinReach(self.character, self:target()) then
         return false
     end
     if self.mode == Action.ATTACH_MAINTAINER then

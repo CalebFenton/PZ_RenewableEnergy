@@ -217,7 +217,7 @@ for magazine, recipes in pairs(MAGAZINES) do
     })
 end
 
--- Researching found hardware teaches what to build from it: the item's own recipe
+-- Researching found hardware teaches exactly what to build from it: the item's own recipe
 -- (OutputMapper) and its ResearchableRecipes.
 local RESEARCH = {
     ["RenewableEnergy.SolarModule"] = {
@@ -249,12 +249,6 @@ for fullType, recipes in pairs(RESEARCH) do
             end)
             awaitKnown(self, recipes)
         end,
-        validate = function(self)
-            for side, known in pairs(self.known) do
-                for _, recipe in ipairs(recipes) do
-                    expect(known[recipe], "researching " .. fullType .. " did not teach " .. recipe .. " on the " .. side)
-                end
-            end
-        end,
+        validate = function(self) expectTaught(self, "researching " .. fullType, recipes) end,
     })
 end

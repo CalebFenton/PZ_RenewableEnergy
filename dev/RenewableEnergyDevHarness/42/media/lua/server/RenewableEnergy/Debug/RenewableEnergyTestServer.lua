@@ -7,8 +7,10 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
+local overlaysOf = Helpers.overlaysOf
 
 local function mod()
     return RenewableEnergy.PowerBank, RenewableEnergy.Battery, RenewableEnergy.Wear
@@ -26,16 +28,6 @@ end
 
 local function firstOfType(container, fullType)
     return container and container:getFirstType(fullType)
-end
-
--- The names of the overlays an object's tile shows, in order.
-local function overlaysOf(object)
-    local names = {}
-    local attached = object and object:getAttachedAnimSprite()
-    for i = 0, (attached and attached:size() or 0) - 1 do
-        table.insert(names, attached:get(i):getName())
-    end
-    return names
 end
 
 -- What the tests read of a bank on the authority: its record, its tile and the parts in it.
@@ -293,6 +285,15 @@ handler("perform", function(player, args)
     return { ok = ok == true, reason = reason, xpBefore = xp, xpAfter = player:getXp():getXP(Perks.Electricity) }
 end)
 
+-- Finishes a Rename action on the bank at `args.bank` as the server's character, the way the server
+-- finishes a client's timed action (ActionManager.update calls complete()). Answers whether it did.
+handler("completeRename", function(player, args)
+    local _, bank, missing = needRecord(args.bank)
+    if not bank then return nil, missing end
+    local Action = RenewableEnergyAction
+    return { done = Action:new(player, Action.RENAME, nil, bank, nil, nil, args.name):complete() == true }
+end)
+
 -- The bank part's wear over `args.hours` hours on and `args.overloads` overloads, from the
 -- conditions in `args.conditions` (full type to condition): the condition each type lost.
 handler("wearParts", function(_, args)
@@ -446,7 +447,8 @@ end)
 -- `args.uses`, sent to the clients, and charges it for `args.hours` at the sun of the moment, then,
 -- if `args.pass`, runs the pass over every charger for as long again. An empty battery leaves its
 -- container on its next update (DrainableComboItem.update), so filling and charging happen in one
--- call. Answers the uses added and the charges after each.
+-- call. Answers the uses added, the charges after each, and flatWh: what an hour of the sun it
+-- charged in gives a flat panel per rated watt, since the live weather sets it.
 handler("cellCharge", function(_, args)
     local SolarCellCharger = RenewableEnergy.SolarCellCharger
     local charger = SolarCellCharger.findOn(squareAt(args))
@@ -459,7 +461,8 @@ handler("cellCharge", function(_, args)
         battery:setCurrentUsesFloat(args.uses)
         sendAddItemToContainer(container, battery)
     end
-    local reply = { added = SolarCellCharger.charge(charger, args.hours), after = usesOf(container) }
+    local reply = { added = SolarCellCharger.charge(charger, args.hours), after = usesOf(container),
+        flatWh = RenewableEnergy.Sun.panelWatts(1, "flat") }
     if args.pass then
         SolarCellCharger.chargeAll(args.hours)
         reply.afterPass = usesOf(container)
@@ -526,8 +529,8 @@ local function vehicleState(vehicle)
     }
 end
 
--- Named apart from the world tests' "vehicleState" (RenewableEnergyTestServerWorld.lua): one
--- registry holds every handler, and the file loaded later wins.
+-- Named apart from the arrow board tests' "vehicleState" (RenewableEnergyTestServerTrailer.lua):
+-- one registry holds every handler, and the file loaded later wins.
 handler("carState", function(_, args)
     local vehicle, missing = needVehicle(args)
     if not vehicle then return nil, missing end
@@ -556,14 +559,16 @@ handler("vehicleBattery", function(_, args)
 end)
 
 -- An hour's worth, `args.hours`, of the maintainer on the vehicle at the sun of the moment, from a
--- battery at `args.uses`: the Wh it added and the charge after.
+-- battery at `args.uses`: the Wh it added, the charge after, the battery's capacity in Wh, and
+-- flatWh as cellCharge answers it.
 handler("maintainerCharge", function(_, args)
     local vehicle, missing = needVehicle(args.vehicle)
     if not vehicle then return nil, missing end
     local _, battery = batteryOf(vehicle)
     battery:setCurrentUsesFloat(args.uses)
     local wh = RenewableEnergy.SolarMaintainer.charge(vehicle, args.hours)
-    return { wh = wh, after = battery:getCurrentUsesFloat() }
+    return { wh = wh, after = battery:getCurrentUsesFloat(), capacityWh = RenewableEnergy.Battery.nominalWh(battery),
+        flatWh = RenewableEnergy.Sun.panelWatts(1, "flat") }
 end)
 
 -- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
@@ -626,12 +631,12 @@ local function batteryBoxOf(trailer)
     return part and part:getItemContainer()
 end
 
--- What the clock test's fixtures hold, on the squares and vehicles `args` names: the bank's Wh and
--- the hour of its status, the car battery's charge, the solar battery charger's Wh in its cells
--- and toward the next use, the garden light's Wh, and the charge of the battery in the trailer's
--- box.
+-- What the clock test's fixtures hold, on the squares and vehicles `args` names, in Wh: the bank's,
+-- the car battery's, the solar battery charger's in its cells and toward the next use, the garden
+-- light's, and the trailer box battery's (-1 for none). Also the hour of the bank's status, the
+-- world age of the bank's last pass and of now, and the watts the trailer's panels make in full sun.
 local function gadgetCharges(args)
-    local SolarCellCharger = RenewableEnergy.SolarCellCharger
+    local SolarCellCharger, Battery = RenewableEnergy.SolarCellCharger, RenewableEnergy.Battery
     local record = recordAt(args.bank)
     local car, trailer = needVehicle(args.car), needVehicle(args.trailer)
     local charger = SolarCellCharger.findOn(squareAt(args.charger))
@@ -643,20 +648,27 @@ local function gadgetCharges(args)
     for _, uses in ipairs(usesOf(charger:getContainer())) do
         cellWh = cellWh + uses * SolarCellCharger.BATTERY_WH
     end
+    local function whIn(battery)
+        return Battery.getCharge(battery) * Battery.nominalWh(battery)
+    end
     local _, carBattery = batteryOf(car)
     local boxed = batteryBoxOf(trailer):getItems()
     return {
         bank = record.charge * record.nominalWh, hour = record.status and record.status.hour or 0,
-        car = carBattery:getCurrentUsesFloat(), charger = cellWh,
+        bankPassAge = record.lastHour, age = getGameTime():getWorldAgeHours(),
+        car = whIn(carBattery), charger = cellWh,
         light = RenewableEnergy.SolarGardenLight.getCharge(light),
-        trailer = boxed:size() > 0 and boxed:get(0):getCurrentUsesFloat() or -1,
+        trailer = boxed:size() > 0 and whIn(boxed:get(0)) or -1,
+        trailerWatts = RenewableEnergy.ArrowBoard.panelWatts(trailer),
     }
 end
 
 -- Readies the clock test's gadgets, half charged: a maintainer on the car, one deep cycle battery
 -- in the trailer's box, which may have spawned stocked, four cells in the solar battery charger,
--- and the garden light empty. Answers their charges (gadgetCharges).
+-- and the garden light empty. Answers their charges (gadgetCharges). The gadget pass runs first,
+-- so that the clock's passes from here on cover no more than the time the clock moves.
 handler("stockGadgets", function(player, args)
+    RenewableEnergy.GadgetCharging.update()
     local SolarCellCharger = RenewableEnergy.SolarCellCharger
     local car, trailer = needVehicle(args.car), needVehicle(args.trailer)
     local charger = SolarCellCharger.findOn(squareAt(args.charger))

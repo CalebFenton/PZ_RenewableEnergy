@@ -4,7 +4,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 -- Crafting tests: every recipe crafted the way a player starts it, instantly, with the inputs the
 -- authority gave, which also makes the outputs (T.craftTest). What a test then reads of the
 -- items it reads from the authority's copies, through the carried handler of
--- RenewableEnergyTestServerWorld.lua. See RenewableEnergyTestLib.lua for the runner and the
+-- RenewableEnergyTestServerCharacter.lua. See RenewableEnergyTestLib.lua for the runner and the
 -- helpers.
 
 local T = RenewableEnergyTest
@@ -514,4 +514,7 @@ craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "refuses_two_worn"), 
         T.server(self, "takeItems", { ids = { inputsOf(self, WORN)[3]:getID() } })
     end,
     counts = { [WORN] = 2, [PLATES] = 0 },
+    validate = function(self)
+        expect(self.refusal ~= nil, "the game would recast two worn sets of plates")
+    end,
 })

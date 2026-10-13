@@ -32,6 +32,7 @@ SolarSites.KINDS = {
     powerYard = { panels = { min = 2, max = 2 }, bank = "powerYard", crate = "powerYard" },
     ranger = { panels = { min = 2, max = 4 }, bank = "ranger" },
     roadWorks = {},
+    checkpoint = {},
 }
 
 -- A mount of SolarSiteLocations to its tile, its kind and its material.
@@ -91,14 +92,15 @@ local PLACERS = {
         end
     end,
     arrowBoard = function(square, spot)
-        RenewableEnergy.ArrowBoard.spawn(square, spot.facing)
+        return RenewableEnergy.ArrowBoard.spawn(square, spot.facing) ~= nil
     end,
 }
 
 --- Puts down what a site spot holds (its global object's modData: what, siteKind, mount,
---- facing, stock) on its square.
+--- facing, stock) on its square. Returns false when the game refused an arrow board, so its spot
+--- can stay for another try.
 function SolarSites.place(square, spot)
-    PLACERS[spot.what](square, spot)
+    return PLACERS[spot.what](square, spot) ~= false
 end
 
 -- Rolling ------------------------------------------------------------------------------------------
@@ -152,14 +154,15 @@ end
 local function rollSites()
     local chance = SandboxVars.RenewableEnergy.SolarSites
     for _, site in ipairs(SolarSites.sites()) do
-        if ZombRand(100) < chance then
+        if chance > 0 and (site.always or ZombRand(100) < chance) then
             SolarSites.addSite(site)
         end
     end
 end
 
 -- Vehicles can't safely join the world while their chunk is still loading, so arrow boards wait
--- for the next minute, their spots kept until then.
+-- for the next minute, their spots kept until then. One the game refuses, with another vehicle in
+-- the way, keeps its spot and tries once more each time its chunk loads.
 local waitingArrowBoards = {}
 
 local function placeWaitingArrowBoards()
@@ -167,9 +170,8 @@ local function placeWaitingArrowBoards()
         local entry = table.remove(waitingArrowBoards, i)
         local object = system:getObjectAt(entry.x, entry.y, entry.z)
         local square = getSquare(entry.x, entry.y, entry.z)
-        if object and square then
+        if object and square and SolarSites.place(square, entry.spot) then
             system:removeObject(object)
-            SolarSites.place(square, entry.spot)
         end
     end
 end

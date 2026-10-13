@@ -1,5 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Sun"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
@@ -18,7 +19,7 @@ require "TimedActions/ISInventoryTransferAction"
 
 local T = RenewableEnergyTest
 local test, expect, expectNear = T.test, T.expect, T.expectNear
-local Sprites, Specs = RenewableEnergy.Sprites, RenewableEnergy.Specs
+local Sprites, Specs, Sun = RenewableEnergy.Sprites, RenewableEnergy.Specs, RenewableEnergy.Sun
 local SolarMaintainer, SolarCellCharger = RenewableEnergy.SolarMaintainer, RenewableEnergy.SolarCellCharger
 local SolarGardenLight, VehicleBattery = RenewableEnergy.SolarGardenLight, RenewableEnergy.VehicleBattery
 
@@ -29,6 +30,14 @@ local LIGHT_FRAMES = 600
 
 local function outdoorSquare(self)
     return T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
+end
+
+-- Expects `flatWh`, what an hour of the sun a gadget charged in gave a flat panel per rated watt
+-- (as the server's gadget handlers answer it), to be noon's: some light, and no more than full sun.
+local function expectNoonSun(flatWh)
+    local full = Sun.wattsFrom(1, Sun.FULL_SUN, 0)
+    return expect(type(flatWh) == "number" and flatWh > 0 and flatWh <= full, "an hour of noon sun gave a flat panel "
+        .. tostring(flatWh) .. " Wh per rated watt, expected more than 0 and at most " .. full)
 end
 
 -- Queues reading the server's copy of the vehicle of `car` (a handle) into self[key]: its battery
@@ -93,12 +102,14 @@ test("renewable_energy_gadgets_maintainer_attach_detach", {
 })
 
 -- An hour on a half charged car battery, in order on one car. Charging reads the live weather, so
--- noon sun can only be expected to add something.
+-- the expected charge comes from the light the server says the hour had.
 local MAINTAINER_HOURS = {
     { what = "noon without a maintainer", hour = NOON, maintainer = false, charges = false },
     { what = "midnight with a maintainer", hour = MIDNIGHT, maintainer = true, charges = false },
     { what = "noon with a maintainer", hour = NOON, maintainer = true, charges = true },
 }
+-- How long each row charges, and the charge it starts from.
+local ROW_HOURS, ROW_START = 1, 0.5
 
 -- Charges in the noon sun only with a maintainer attached, and through the pass that finds every
 -- loaded vehicle.
@@ -119,7 +130,7 @@ test("renewable_energy_gadgets_maintainer_charge", {
                 T.waitForCopy(function() return SolarMaintainer.isAttached(car.vehicle) end)
             end
             T.step(function() T.setTime(self, row.hour) end)
-            T.server(self, "maintainerCharge", function() return { vehicle = T.vehicleArgs(car), hours = 1, uses = 0.5 } end)
+            T.server(self, "maintainerCharge", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS, uses = ROW_START } end)
             T.step(function() table.insert(self.rows, { row = row, reply = self.server.maintainerCharge }) end)
         end
         T.server(self, "chargeVehicles", function() return { vehicle = T.vehicleArgs(car), hours = 1 } end)
@@ -130,9 +141,16 @@ test("renewable_energy_gadgets_maintainer_charge", {
         for _, r in ipairs(self.rows) do
             local wh, after = r.reply.wh, r.reply.after
             if r.row.charges then
-                expect(wh > 0 and after > 0.5, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
+                local ratedWh, capacityWh = Specs.maintainerWatts * ROW_HOURS, r.reply.capacityWh
+                -- A thousandth of the rated hour covers the battery's float charge.
+                local tolerance = ratedWh / 1000
+                local expectedWh = math.min(ratedWh * r.reply.flatWh, (1 - ROW_START) * capacityWh)
+                expectNoonSun(r.reply.flatWh)
+                expect(wh > 0 and after > ROW_START, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
+                expectNear("Wh an hour at " .. r.row.what .. " added", wh, expectedWh, tolerance)
+                expectNear("charge after an hour at " .. r.row.what, after, ROW_START + expectedWh / capacityWh, tolerance / capacityWh)
             else
-                expect(wh == 0 and math.abs(after - 0.5) < 0.001, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
+                expect(wh == 0 and math.abs(after - ROW_START) < 0.001, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
             end
         end
         local pass = self.server.chargeVehicles
@@ -179,9 +197,13 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
     end,
 })
 
+-- How long each solar battery charger charges.
+local CELL_HOURS = 2
+
 -- Two hours on a full set of empty batteries at noon and at midnight, a charger each. Charging
--- reads the live weather, so noon sun can only be expected to add something, evenly; a set fills
--- in one to two sunny days, so two noon hours stay well short of half.
+-- reads the live weather, so each cell's expected share comes from the light the server says the
+-- hours had, and the charger pass run as long again doubles it; a set fills in one to two sunny
+-- days, so two noon hours stay well short of half.
 test("renewable_energy_gadgets_solar_battery_charger_charges", {
     instant = true,
     run = function(self)
@@ -191,14 +213,25 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
             if not charger then return end
             T.step(function() T.setTime(self, hour) end)
             T.server(self, "cellCharge", { x = charger.x, y = charger.y, z = charger.z,
-                count = SolarCellCharger.SLOTS, uses = 0, hours = 2, pass = hour == NOON })
+                count = SolarCellCharger.SLOTS, uses = 0, hours = CELL_HOURS, pass = hour == NOON })
             T.step(function() table.insert(self.rows, self.server.cellCharge) end)
         end
     end,
     validate = function(self)
         local noon, midnight = self.rows[1], self.rows[2]
         if not expect(noon and midnight, "the chargers never both charged") then return end
+        expectNoonSun(noon.flatWh)
         expect(noon.added > 0, "two hours of noon sun charged nothing")
+        -- Whole uses go one at a time to the emptiest cell, so each is within a use of an even share.
+        local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
+        local function expectShares(label, charges, hours)
+            local share = Specs.cellChargerWatts * noon.flatWh * hours / SolarCellCharger.BATTERY_WH / SolarCellCharger.SLOTS
+            for i, charge in ipairs(charges) do
+                expectNear(label .. ", cell " .. i, charge, share, useDelta)
+            end
+        end
+        expectShares("charge after two hours of noon sun", noon.after, CELL_HOURS)
+        expectShares("charge after the charger pass as long again", noon.afterPass, 2 * CELL_HOURS)
         local low, high = math.min(unpack(noon.after)), math.max(unpack(noon.after))
         expect(high - low <= 0.01, "the batteries charged unevenly, from " .. low .. " to " .. high)
         expect(high < 0.5, "two hours of noon sun filled the batteries to " .. high)

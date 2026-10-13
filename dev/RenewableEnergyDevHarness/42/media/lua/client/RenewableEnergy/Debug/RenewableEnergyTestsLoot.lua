@@ -3,7 +3,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 -- Loot tests. See RenewableEnergyTestLib.lua for how the runner works. Distributions.lua puts the
 -- loot in at OnInitGlobalModData where loot is rolled: in single player, or on a multiplayer
 -- server, whose tables alone hold the mod's entries. So the checks run there, in the handlers of
--- RenewableEnergyTestServerWorld.lua, and answer what they found wrong.
+-- RenewableEnergyTestServerLoot.lua, and answer what they found wrong.
 
 local T = RenewableEnergyTest
 local test = T.test
@@ -57,9 +57,17 @@ serverCheck("renewable_energy_loot_rarity_options_scale_weights", "lootRarityOpt
 
 -- Found batteries -------------------------------------------------------------------------------
 
--- Batteries that rooms, vehicles and corpses hand out hold a part charge, once: a refill of the
--- container by loot respawn leaves a battery already there alone.
-serverCheck("renewable_energy_loot_found_batteries_part_charged", "lootFoundBatteries")
+-- Batteries that rooms and corpses hand out hold a part charge, once: a refill of the container by
+-- loot respawn leaves a battery already there alone. The server fills crates on a free outdoor
+-- square the way the game fills them.
+test("renewable_energy_loot_found_batteries_part_charged", {
+    run = function(self)
+        local square = (T.need(self, T.squares(self, 1), "a free outdoor square") or {})[1]
+        if not square then return end
+        T.server(self, "lootFoundBatteries", { x = square:getX(), y = square:getY(), z = square:getZ() })
+    end,
+    validate = function(self) T.expectNoFailures(self.server.lootFoundBatteries) end,
+})
 
 -- Containers the player owns -----------------------------------------------------------------------
 

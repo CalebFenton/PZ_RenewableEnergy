@@ -226,7 +226,8 @@ test("renewable_energy_tiles_place_and_pick_up", {
 })
 
 -- A mount keeps each module's condition and whether it was mounted or connected before, and a
--- garden light its charge and bulb, from item to placed object and back.
+-- garden light its charge, from item to placed object and back. The gadget tests follow its bulb
+-- (renewable_energy_gadgets_garden_light_pick_up_keeps_bulb).
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
     { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
@@ -235,7 +236,6 @@ local CARRIED = {
     { Sprites.rack.wood.S, "RenewableEnergy.SolarRackWood", RenewableEnergy.PowerBank.MODULES, MODULES },
     { Sprites.flat, "RenewableEnergy.SolarFlat", RenewableEnergy.PowerBank.MODULES, { MODULES[1] } },
     { Sprites.gardenLight.off, RenewableEnergy.SolarGardenLight.ITEM, RenewableEnergy.SolarGardenLight.CHARGE_KEY, 2.5 },
-    { Sprites.gardenLight.off, RenewableEnergy.SolarGardenLight.ITEM, RenewableEnergy.SolarGardenLight.BULB_KEY, "Base.LightBulbBlue" },
 }
 
 local function describe(value)
@@ -281,16 +281,6 @@ test("renewable_energy_tiles_pick_up_keeps_mod_data", {
     end,
 })
 
--- The overlays attached to an object, in drawing order, as one string.
-local function attachedNames(object)
-    local names = {}
-    local attached = object and object:getAttachedAnimSprite()
-    for i = 0, (attached and attached:size() or 0) - 1 do
-        table.insert(names, attached:get(i):getName())
-    end
-    return table.concat(names, ",")
-end
-
 local function modulesAt(...)
     local modules = {}
     for i, condition in ipairs({ ... }) do
@@ -330,12 +320,12 @@ test("renewable_energy_tiles_cracked_modules_show", {
             local at = panel.position
             T.server(self, "panelCracks", { x = at.x, y = at.y, z = at.z, sprite = case.sprite, change = case.change })
             T.waitForCopy(function()
-                return attachedNames(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
+                return T.overlays(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
             end)
             T.step(function()
                 self.shown[case.name] = {
                     server = table.concat(self.server.panelCracks.overlays, ","),
-                    client = attachedNames(T.objectWithSprite(panel.square, case.sprite)),
+                    client = T.overlays(T.objectWithSprite(panel.square, case.sprite)),
                 }
             end)
         end
@@ -346,37 +336,5 @@ test("renewable_energy_tiles_cracked_modules_show", {
             expect(shown.server == case.shows, case.what .. " shows '" .. tostring(shown.server) .. "'")
             expect(shown.client == shown.server, "this client's copy of " .. case.what .. " shows '" .. tostring(shown.client) .. "'")
         end
-    end,
-})
-
--- A storm that cracks a wired panel's module below the threshold puts cracks on its tile in the
--- same bank pass, and players see them.
-test("renewable_energy_tiles_storm_crack_shows_cracks", {
-    sandbox = { StormDamage = true, StormDamageRate = 1000 },
-    run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
-        if not bank then return end
-        local panel = T.panel(self, Sprites.flat, { near = bank, modules = modulesAt(80), connect = true })
-        if not panel then return end
-        T.step(function()
-            T.need(self, panel.connected, "a panel connected to the bank")
-            self.before = attachedNames(panel.object)
-        end)
-        -- A thousand hours of storm at ten times the rate makes the crack certain.
-        T.bankPass(self, bank, 1000, { stormHours = 1000 })
-        T.server(self, "panelState", function() return panel.position end)
-        T.waitForCopy(function() return attachedNames(panel.object) == table.concat(self.server.panelState.overlays, ",") end)
-        T.step(function()
-            local modules = self.server.panelState.modules
-            self.condition = modules and modules[1] and modules[1].condition
-            self.after = table.concat(self.server.panelState.overlays, ",")
-            self.copy = attachedNames(panel.object)
-        end)
-    end,
-    validate = function(self)
-        expect(self.before == "", "the whole panel showed '" .. tostring(self.before) .. "' before the storm")
-        expect(self.condition == 50, "the storm left the module at " .. tostring(self.condition) .. ", expected 50")
-        expect(self.after == "renewable_energy_01_115", "the storm-cracked panel shows '" .. tostring(self.after) .. "'")
-        expect(self.copy == self.after, "this client's copy of the storm-cracked panel shows '" .. tostring(self.copy) .. "'")
     end,
 })

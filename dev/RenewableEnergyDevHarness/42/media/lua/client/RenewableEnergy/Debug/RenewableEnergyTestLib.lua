@@ -186,12 +186,20 @@ function T.clientStatus(bank)
     return bank.object and PowerBank.statusOf(bank.object)
 end
 
---- Queues switching `bank` on the way a client does, with the bank system's command, and a wait
---- until this client's copy of its status says it is on, whatever the bank then does.
-function T.switchOn(self, bank)
-    T.step(function()
-        PowerBank.command(T.player(), "setBankOn", { bank = bank.position, on = true })
+--- Queues the bank system's command `command` with `args` (a table, or a function the queue calls
+--- for one) on the authority as the server's character, the way a timed action's complete() runs
+--- it: the server takes no such command from a client. Its answer, { ok, reason, xpBefore,
+--- xpAfter }, lands in self.server.perform.
+function T.perform(self, command, args)
+    T.server(self, "perform", function()
+        return { command = command, args = type(args) == "function" and args() or args }
     end)
+end
+
+--- Queues switching `bank` on with the bank system's command, and a wait until this client's copy
+--- of its status says it is on, whatever the bank then does.
+function T.switchOn(self, bank)
+    T.perform(self, "setBankOn", { bank = bank.position, on = true })
     T.waitUntil(function()
         local status = T.clientStatus(bank)
         return status ~= nil and status.on == true
@@ -204,14 +212,12 @@ function T.waitForCopy(condition)
 end
 
 --- The overlays `object` shows, as their sprite names joined by commas, in order; a server's
---- answer lists them the same way (`overlays` in a bank state), joined with table.concat.
+--- answer lists them the same way (`overlays` in a bank state), joined with table.concat. Both
+--- read them with the server handlers' helper, which loads after client Lua, so it is required
+--- when a test runs.
 function T.overlays(object)
-    local names = {}
-    local attached = object and object:getAttachedAnimSprite()
-    for i = 0, (attached and attached:size() or 0) - 1 do
-        table.insert(names, attached:get(i):getName())
-    end
-    return table.concat(names, ",")
+    local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+    return table.concat(Helpers.overlaysOf(object), ",")
 end
 
 -- Data -----------------------------------------------------------------------------------------

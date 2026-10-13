@@ -1,7 +1,8 @@
 -- The named solar sites of SolarSites.lua, by the map they are on. Places where someone in 1993
 -- would have had solar: stock tank pumps out in the pastures, farms off the grid, campers,
 -- telephone relay sheds on the hills, the power company's yard, ranger stations, and arrow
--- boards at road works. Each was read off the map's lotheader and lotpack files of build 42.21.
+-- boards at road works and at the army's checkpoints on the roads into Louisville. Each was read
+-- off the map's lotheader and lotpack files of build 42.21.
 --
 -- A site lists the spots its kind (SolarSites.KINDS) may use:
 --   panels: { x, y, z, mount, facing }, mount "flat", "wallMetal", "rackMetal" or "rackWood";
@@ -9,6 +10,8 @@
 --   bank and crate: { x, y, z }, an empty floor square of a room;
 --   house: { x, y }, a square of the building that gets garden lights along its front;
 --   arrowBoard: { x, y, z, facing }, the middle of a road lane, facing along the road.
+-- A site with `always` skips the Solar Sites roll, so that every world has a few things a
+-- player can count on finding; the option at 0 still leaves it out.
 return {
     ["Muldraugh, KY"] = {
         -- Stock tank pumps: a pole mount by the big metal water tank of a pasture.
@@ -98,9 +101,15 @@ return {
             },
             bank = { 6998, 6025, 0 },
         },
-        -- Road works with a solar arrow board.
-        { kind = "roadWorks", name = "Road works north of Muldraugh", arrowBoard = { 10598, 9128, 0, "N" } },
+        -- Road works with a solar arrow board. The one on the highway to Louisville is always there.
+        { kind = "roadWorks", name = "Road works north of Muldraugh", arrowBoard = { 10598, 9128, 0, "N" }, always = true },
         { kind = "roadWorks", name = "Road works east of Riverside", arrowBoard = { 7053, 5467, 0, "E" } },
         { kind = "roadWorks", name = "Road works in Rosewood", arrowBoard = { 8200, 11507, 0, "N" } },
+        -- The army's checkpoints at the Louisville fence, an arrow board a little short of the
+        -- barrier: on the highway at the back of the queue of cars that never got through, the
+        -- camp beyond it; and on two country roads east of it.
+        { kind = "checkpoint", name = "Checkpoint on the highway south of Louisville", arrowBoard = { 12519, 4628, 0, "N" }, always = true },
+        { kind = "checkpoint", name = "Checkpoint on the road south-east of Louisville", arrowBoard = { 13425, 4117, 0, "N" } },
+        { kind = "checkpoint", name = "Checkpoint on the road east of Louisville", arrowBoard = { 14534, 4068, 0, "N" } },
     },
 }

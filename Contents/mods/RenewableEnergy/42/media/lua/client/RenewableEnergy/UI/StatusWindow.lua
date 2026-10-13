@@ -619,7 +619,7 @@ function StatusWindow.open(playerNum, bank)
     window:initialise()
     window:addToUIManager()
     StatusWindow.windows[playerNum] = window
-    PowerBank.command(getSpecificPlayer(playerNum), "refresh", { bank = PowerBank.positionOf(bank) })
+    PowerBank.requestStatus(getSpecificPlayer(playerNum), bank)
     if JoypadState.players[playerNum + 1] then
         setJoypadFocus(playerNum, window)
     end

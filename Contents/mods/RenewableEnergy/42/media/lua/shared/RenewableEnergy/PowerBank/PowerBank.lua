@@ -129,6 +129,13 @@ function PowerBank.moduleRecord(item)
         mounted = data[PowerBank.MOUNTED_ONCE] == true, connected = data[PowerBank.CONNECTED_ONCE] == true }
 end
 
+--- The watts a module of `fullType` makes in full sun at `condition`, on a mount or a trailer
+--- alike; 0 for a type that is no module.
+function PowerBank.moduleWatts(fullType, condition)
+    local spec = Specs.modules[fullType]
+    return spec and spec.watts * condition / 100 or 0
+end
+
 --- Marks a solar module item with its record's flags, as it comes off a mount.
 function PowerBank.markModule(item, module)
     local data = item:getModData()

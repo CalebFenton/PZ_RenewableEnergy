@@ -64,9 +64,11 @@ ArrowBoard.STOCK = {
 -- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` milliseconds of real
 -- time. A car stopping dead against a wall from that speed does it; braking hard sheds about 3 km/h
 -- in that time and running over a zombie or a kerb a few, so minor bumps never crack a panel.
--- `quietMs` keeps one crash, which the physics spreads over several frames, from counting twice.
+-- One crash is often several jolts: the physics spreads each over several frames, and a trailer
+-- thrown forward rolls on until the hitch brings it up short, a second jolt half a second or more
+-- later. So a jolt is a new crash only after `quietMs` without one.
 -- `unhitchedMs` and `unhitchedSquares` cover a crash that snaps the hitch (Crashes, below).
-ArrowBoard.CRASH = { kmh = 20, ms = 250, quietMs = 1000, unhitchedMs = 1000, unhitchedSquares = 8 }
+ArrowBoard.CRASH = { kmh = 20, ms = 250, quietMs = 2000, unhitchedMs = 1000, unhitchedSquares = 8 }
 
 -- Vehicle modData: its panels have been put on, at spawn or, for a trailer from a save made
 -- before they were parts, on its first load since.
@@ -115,10 +117,14 @@ function ArrowBoard.stockIfBatteryBox(roomName, container)
 end
 
 --- Spawns an arrow board on the square, its tongue pointing `facing` ("N", "E", "S" or "W").
---- Its panels go on and its battery box is stocked as it enters the world. Authority only.
+--- Its panels go on and its battery box is stocked as it enters the world. Returns it, or nil
+--- when the game kept it out of the world. Authority only.
 ---@return BaseVehicle?
 function ArrowBoard.spawn(square, facing)
-    return addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
+    local vehicle = addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
+    -- addVehicleDebug returns a vehicle even where it would hit another vehicle or stand indoors
+    -- outside a vehicle zone, but leaves it without a square (IsoChunk.doSpawnedVehiclesInInvalidPosition).
+    return vehicle and vehicle:getSquare() and vehicle or nil
 end
 
 -- Lid ------------------------------------------------------------------------------------------
@@ -128,8 +134,9 @@ end
 -- or by taking the lid off in the mechanics window once the key isn't needed for it
 -- (VehicleUtils.RequiredKeyNotFound). Nobody sits in the trailer and it has no windows, but its lid
 -- never needs the key to come off, so a padlocked box opens when someone unbolts the lid, with the
--- wrench, time and Mechanics odds vanilla asks for a trunk lid, though not its mechanic's recipe.
--- Put back, the lid is unlocked (Vehicles.InstallComplete.Door).
+-- wrench, time and Mechanics odds vanilla asks for a trunk lid, though not its mechanic's recipe,
+-- which putting it back doesn't ask for either. Put back, the lid is unlocked
+-- (Vehicles.InstallComplete.Door).
 
 --- Part `create` of the lid: runs once, when the trailer first enters the world. Shut, and
 --- padlocked by STOCK.lockedChance unless the save's Easy Use option leaves every vehicle
@@ -366,14 +373,18 @@ end
 -- the server takes the crash from the car's driver while the trailer is within
 -- ArrowBoard.CRASH.unhitchedSquares of the car's tow bar.
 
--- Loaded trailers by vehicle: their recent velocities, { ms, x, y } oldest first, the time of
--- their last crash, and on a multiplayer client the car of this game's player that last towed
--- them and until when that car's crashes still count.
+-- Loaded trailers by vehicle: their recent velocities, oldest first, in the lists ms, x and y,
+-- used as a ring of SAMPLE_SLOTS from `head`, `count` long, so that watching allocates nothing
+-- each frame; the time of their last crash's latest jolt; and on a multiplayer client the car of
+-- this game's player that last towed them and until when that car's crashes still count.
 local tracked = {}
+-- Enough for ArrowBoard.CRASH.ms at a thousand frames a second; at a higher rate the oldest
+-- samples go early, which still leaves a crash's jolt well inside the window.
+local SAMPLE_SLOTS = 256
 
 function ArrowBoard.track(vehicle)
     if not tracked[vehicle] and not isServer() then
-        tracked[vehicle] = { samples = {}, crashedAt = -math.huge }
+        tracked[vehicle] = { ms = {}, x = {}, y = {}, head = 1, count = 0, joltedAt = -math.huge }
     end
 end
 
@@ -399,28 +410,38 @@ end
 
 local velocity = Vector3f.new()
 
---- Records the trailer's velocity now and returns whether it changed by a crash's worth within
---- ArrowBoard.CRASH.ms.
-function ArrowBoard.sampleCrash(vehicle, entry, now)
+-- Records the trailer's velocity now and returns whether a new crash began: the velocity changed
+-- by a crash's worth within ArrowBoard.CRASH.ms, ArrowBoard.CRASH.quietMs after the last jolt.
+local function sampleCrash(vehicle, entry, now)
     vehicle:getLinearVelocity(velocity)
     local x, y = velocity:x(), velocity:z()
-    local samples = entry.samples
-    while samples[1] and now - samples[1].ms > ArrowBoard.CRASH.ms do
-        table.remove(samples, 1)
+    local ms, xs, ys = entry.ms, entry.x, entry.y
+    while entry.count > 0 and now - ms[entry.head] > ArrowBoard.CRASH.ms do
+        entry.head = entry.head % SAMPLE_SLOTS + 1
+        entry.count = entry.count - 1
     end
     local limit = ArrowBoard.CRASH.kmh / 3.6
-    local crashed = false
-    for _, sample in ipairs(samples) do
-        if (x - sample.x) ^ 2 + (y - sample.y) ^ 2 >= limit * limit then
-            crashed = true
+    local jolted, slot = false, entry.head
+    for _ = 1, entry.count do
+        if (x - xs[slot]) ^ 2 + (y - ys[slot]) ^ 2 >= limit * limit then
+            jolted = true
+            break
         end
+        slot = slot % SAMPLE_SLOTS + 1
     end
-    table.insert(samples, { ms = now, x = x, y = y })
-    if crashed and now - entry.crashedAt >= ArrowBoard.CRASH.quietMs then
-        entry.crashedAt = now
-        return true
+    slot = (entry.head + entry.count - 1) % SAMPLE_SLOTS + 1
+    if entry.count == SAMPLE_SLOTS then
+        entry.head = entry.head % SAMPLE_SLOTS + 1
+    else
+        entry.count = entry.count + 1
     end
-    return false
+    ms[slot], xs[slot], ys[slot] = now, x, y
+    if not jolted then
+        return false
+    end
+    local newCrash = now - entry.joltedAt >= ArrowBoard.CRASH.quietMs
+    entry.joltedAt = now
+    return newCrash
 end
 
 local cell
@@ -436,7 +457,7 @@ function ArrowBoard.watchCrashes()
             end
         else
             local runs = runsPhysics(vehicle, entry, now)
-            if runs and ArrowBoard.sampleCrash(vehicle, entry, now) then
+            if runs and sampleCrash(vehicle, entry, now) then
                 if isClient() then
                     sendClientCommand(getPlayer(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId(), car = runs:getId() })
                 else
@@ -458,16 +479,25 @@ local function justUnhitched(vehicle, car)
     return hitch ~= nil and coupler ~= nil and (hitch:x() - coupler:x()) ^ 2 + (hitch:y() - coupler:y()) ^ 2 <= squares * squares
 end
 
+-- When the server last took a crash for each trailer, by vehicle id: a client's own gate is all
+-- that keeps one crash from cracking the panels twice, so the server keeps it too.
+local crashTakenAt = {}
+
 -- The server takes a crash only from the driver of the car towing the trailer, or towing it until
--- a moment ago.
+-- a moment ago, and only one within ArrowBoard.CRASH.quietMs.
 local function onClientCommand(module, command, player, args)
     if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number"
         or type(args.car) ~= "number" then
         return
     end
     local vehicle, car = getVehicleById(args.vehicle), getVehicleById(args.car)
-    if ArrowBoard.isTrailer(vehicle) and car and car:isDriver(player)
-        and (vehicle:getVehicleTowedBy() == car or justUnhitched(vehicle, car)) then
+    if not (ArrowBoard.isTrailer(vehicle) and car and car:isDriver(player)
+        and (vehicle:getVehicleTowedBy() == car or justUnhitched(vehicle, car))) then
+        return
+    end
+    local now = getTimestampMs()
+    if now - (crashTakenAt[args.vehicle] or -math.huge) >= ArrowBoard.CRASH.quietMs then
+        crashTakenAt[args.vehicle] = now
         ArrowBoard.crashCrack(vehicle)
     end
 end
@@ -510,13 +540,12 @@ end
 
 -- Charging -------------------------------------------------------------------------------------
 
---- The watts its panels would make in full sun: each installed module's rating times its
---- condition / 100, as a module on a mount makes.
+--- The watts its panels would make in full sun, as the same modules on a mount make.
 function ArrowBoard.panelWatts(vehicle)
+    local moduleWatts = RenewableEnergy.PowerBank.moduleWatts
     local watts = 0
     for _, part in ipairs(installedPanels(vehicle)) do
-        local module = Specs.modules[part:getInventoryItem():getFullType()]
-        watts = watts + (module and module.watts or 0) * part:getCondition() / 100
+        watts = watts + moduleWatts(part:getInventoryItem():getFullType(), part:getCondition())
     end
     return watts
 end

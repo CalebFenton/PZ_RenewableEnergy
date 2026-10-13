@@ -362,17 +362,6 @@ local function itemEntry(fullType, count)
     return { icon = key, name = icons[key].name, fullType = fullType, count = count }
 end
 
-local function pickInputItem(possible)
-    for _, wanted in ipairs(PREFER) do
-        for j = 0, possible:size() - 1 do
-            if possible:get(j):getFullName() == wanted then
-                return wanted
-            end
-        end
-    end
-    return possible:get(0):getFullName()
-end
-
 -- The fluid of a recipe line's fluid part and the litres it takes or gives: { name, litres }, and
 -- the fluid's type.
 local function fluidEntry(fluid, litres)
@@ -409,7 +398,7 @@ local function inputEntry(input)
         end
     end
     if #names == 0 then
-        names = { FLUID_CONTAINERS[fluidType] or pickInputItem(input:getPossibleInputItems()) }
+        names = { FLUID_CONTAINERS[fluidType] or PZHarness.Test.inputItem(input, PREFER):getFullName() }
         counts = { entry.count }
     end
     local first = getScriptManager():getItem(names[1])
@@ -693,12 +682,12 @@ local function isApart(square, others)
     return true
 end
 
--- The closest place for stage 0 clear of the homestead: at a window if any, facing south first.
-local function findStage0(player, homestead)
+-- The closest place for stage 0 clear of `others`: at a window if any, facing south first.
+local function findStage0(player, others)
     for _, needWindow in ipairs({ true, false }) do
         for _, site in ipairs(SITES) do
             local best = Stage.closestSquare(player, function(origin)
-                return isApart(origin, { homestead }) and fitsStage0(site, origin, player, needWindow)
+                return isApart(origin, others) and fitsStage0(site, origin, player, needWindow)
             end)
             if best then
                 return site, best, needWindow
@@ -1113,9 +1102,9 @@ local function goTo(squares, stepsOut)
     end)
 end
 
--- What every group's shots share: noon without grid power, and no radio captions. The harness
--- clears the weather.
-local function addWorldSettings()
+-- What every group's shots share: noon without grid power, and no radio captions around the
+-- `places` the run uses. The harness clears the weather.
+local function addWorldSettings(places)
     add(function()
         -- The grid would power the squares and leave the bank nothing to run.
         local option = getSandboxOptions():getOptionByName("ElecShutModifier")
@@ -1124,7 +1113,7 @@ local function addWorldSettings()
         end
         getWorld():setHydroPowerOn(false)
         getGameTime():setTimeOfDay(NOON)
-        silenceRadios({ origin, stage0Origin, roadCar, studio, walkOrigin })
+        silenceRadios(places)
     end)
 end
 
@@ -1469,45 +1458,72 @@ local function addGardenLights()
     end)
 end
 
--- Finds every setup's place, each clear of the ones before it, or names the first it can't find.
-local function findPlaces(player)
-    local atWindow
-    site, origin = findSite(player)
-    if not site then
-        return "plain building wall with free floor indoors behind it and open ground in front"
+-- Finds the places in `needs`, each clear of those found before it, and returns them, or nil and
+-- the first it can't find. A run of every group looks for all of them.
+local function findPlaces(player, needs)
+    local found, logged = {}, {}
+    if needs.homestead then
+        site, origin = findSite(player)
+        if not site then
+            return nil, "plain building wall with free floor indoors behind it and open ground in front"
+        end
+        table.insert(found, origin)
+        table.insert(logged, string.format("homestead %d,%d facing %s", origin:getX(), origin:getY(), site.facing))
     end
-    stage0Site, stage0Origin, atWindow = findStage0(player, origin)
-    if not stage0Site then
-        return "outside wall with free floor indoors behind it and open ground in front, for stage 0"
+    if needs.stage0 then
+        local atWindow
+        stage0Site, stage0Origin, atWindow = findStage0(player, found)
+        if not stage0Site then
+            return nil, "outside wall with free floor indoors behind it and open ground in front, for stage 0"
+        end
+        table.insert(found, stage0Origin)
+        table.insert(logged, string.format("stage 0 %d,%d facing %s, %s", stage0Origin:getX(), stage0Origin:getY(),
+            stage0Site.facing, atWindow and "at a window" or "at a wall"))
     end
-    roadHeading, roadCar = findRoad(player, { origin, stage0Origin })
-    if not roadHeading then
-        return "stretch of open road for the trailer"
+    if needs.road then
+        roadHeading, roadCar = findRoad(player, found)
+        if not roadHeading then
+            return nil, "stretch of open road for the trailer"
+        end
+        table.insert(found, roadCar)
+        table.insert(logged, string.format("trailer %d,%d facing %s", roadCar:getX(), roadCar:getY(), roadHeading.facing))
     end
-    studio = findStudio(player, { origin, stage0Origin, roadCar })
-    if not studio then
-        return "open ground for the item shots' floor"
+    if needs.studio then
+        studio = findStudio(player, found)
+        if not studio then
+            return nil, "open ground for the item shots' floor"
+        end
+        table.insert(found, studio)
+        table.insert(logged, string.format("items %d,%d", studio:getX(), studio:getY()))
     end
-    walkSite, walkOrigin = findWalk(player, { origin, stage0Origin, roadCar, studio })
-    if not walkSite then
-        return "door with open ground in front, for the garden lights"
+    if needs.walk then
+        walkSite, walkOrigin = findWalk(player, found)
+        if not walkSite then
+            return nil, "door with open ground in front, for the garden lights"
+        end
+        table.insert(found, walkOrigin)
+        table.insert(logged, string.format("garden lights %d,%d facing %s", walkOrigin:getX(), walkOrigin:getY(),
+            walkSite.facing))
     end
-    print(string.format("REPromo homestead %d,%d facing %s; stage 0 %d,%d facing %s, %s; trailer %d,%d facing %s;"
-        .. " items %d,%d; garden lights %d,%d facing %s", origin:getX(), origin:getY(), site.facing,
-        stage0Origin:getX(), stage0Origin:getY(), stage0Site.facing, atWindow and "at a window" or "at a wall",
-        roadCar:getX(), roadCar:getY(), roadHeading.facing, studio:getX(), studio:getY(), walkOrigin:getX(),
-        walkOrigin:getY(), walkSite.facing))
+    if #logged > 0 then
+        print("REPromo " .. table.concat(logged, "; "))
+    end
+    return found
 end
 
--- The groups of GROUP_NAMES: whether they need both setups built, and what adds their steps.
+-- The groups of GROUP_NAMES: the places of findPlaces their steps use, whether they need both
+-- setups built, and what adds their steps. A run looks only for its groups' places, so that one
+-- group can't fail for want of a place another needs.
 local GROUPS = {
-    world = { setups = true, add = addWorld },
-    status = { setups = true, add = addStatus },
-    menu = { setups = true, add = addMenu },
-    icons = { add = addIcons },
-    models = { add = function(data) addModels(data.items, data.models) end },
-    trailer = { add = addTrailer },
-    gardenlights = { add = addGardenLights },
+    world = { places = { "homestead", "stage0" }, setups = true, add = addWorld },
+    status = { places = { "homestead", "stage0" }, setups = true, add = addStatus },
+    menu = { places = { "homestead", "stage0" }, setups = true, add = addMenu },
+    icons = { places = {}, add = addIcons },
+    -- The item floor is the road's asphalt.
+    models = { places = { "road", "studio" }, add = function(data) addModels(data.items, data.models) end },
+    -- The character looks around from the item floor first, as a full run's has by then.
+    trailer = { places = { "road", "studio" }, add = addTrailer },
+    gardenlights = { places = { "walk" }, add = addGardenLights },
 }
 
 -- Adds a step that starts a clock, and returns a function that adds a step logging, under
@@ -1538,9 +1554,17 @@ function Promo.capture(selection, onDone)
         end
         selected[name], any = true, true
     end
-    local player = getPlayer()
-    local missing = findPlaces(player)
-    if missing then
+    local chosen, needs = {}, {}
+    for _, name in ipairs(GROUP_NAMES) do
+        if selected[name] or not any then
+            table.insert(chosen, name)
+            for _, place in ipairs(GROUPS[name].places) do
+                needs[place] = true
+            end
+        end
+    end
+    local places, missing = findPlaces(getPlayer(), needs)
+    if not places then
         -- Without "REPromo DONE", run-debug-client.sh reports the run as failed.
         print("REPromo FAIL: within " .. Stage.SEARCH_RADIUS .. " squares, no " .. missing)
         getCore():quitToDesktop()
@@ -1560,21 +1584,19 @@ function Promo.capture(selection, onDone)
         modName = getText("Sandbox_RenewableEnergy"),
     }
     local endTotal = addTimer("total")
-    addWorldSettings()
+    addWorldSettings(places)
     local setupsBuilt = false
-    for _, name in ipairs(GROUP_NAMES) do
+    for _, name in ipairs(chosen) do
         local group = GROUPS[name]
-        if selected[name] or not any then
-            table.insert(data.groups, name)
-            currentGroup = name
-            local endGroup = addTimer(name)
-            if group.setups and not setupsBuilt then
-                addSetups()
-                setupsBuilt = true
-            end
-            group.add(data)
-            endGroup()
+        table.insert(data.groups, name)
+        currentGroup = name
+        local endGroup = addTimer(name)
+        if group.setups and not setupsBuilt then
+            addSetups()
+            setupsBuilt = true
         end
+        group.add(data)
+        endGroup()
     end
     endTotal()
     Stage.runSteps(steps, function()

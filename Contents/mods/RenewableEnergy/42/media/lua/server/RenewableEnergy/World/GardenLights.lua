@@ -184,23 +184,29 @@ end
 -- Squares along a chunk's side (IsoChunkMap.CHUNK_SIZE_IN_SQUARES).
 local CHUNK_SIZE = 8
 
--- Whether every chunk that the house's REACH touches is loaded: one square per chunk tells.
+-- Whether every chunk that the house's REACH touches is loaded: one square per chunk tells. The
+-- loaded area around several players needn't be a rectangle, so each chunk is checked.
 local function surroundingsLoaded(def)
-    for x = def:getX() - REACH, def:getX2() + REACH, CHUNK_SIZE do
-        for y = def:getY() - REACH, def:getY2() + REACH, CHUNK_SIZE do
-            if not getSquare(x, y, 0) then
+    local fromX, toX = math.floor((def:getX() - REACH) / CHUNK_SIZE), math.floor((def:getX2() + REACH) / CHUNK_SIZE)
+    local fromY, toY = math.floor((def:getY() - REACH) / CHUNK_SIZE), math.floor((def:getY2() + REACH) / CHUNK_SIZE)
+    for cx = fromX, toX do
+        for cy = fromY, toY do
+            if not getSquare(cx * CHUNK_SIZE, cy * CHUNK_SIZE, 0) then
                 return false
             end
         end
     end
-    return getSquare(def:getX2() + REACH, def:getY2() + REACH, 0) ~= nil
+    return true
 end
 
---- Rolls the house once its surroundings load, for certain when `always`.
-function GardenLights.queue(def, always)
+--- Rolls the house once its surroundings load, for certain when `always`. `x`, `y` is a square of
+--- the house in the chunk that brought it in: once that chunk unloads, the house leaves the queue
+--- until the chunk loads again and brings it back. A house that is certain stays, since nothing
+--- would bring back its certainty; there are only as many as there are solar sites.
+function GardenLights.queue(def, always, x, y)
     local key = GardenLights.buildingKey(def)
     if store()[key] == nil then
-        pending[key] = { def = def, always = always }
+        pending[key] = { def = def, always = always, x = not always and x or nil, y = y }
     end
 end
 
@@ -211,26 +217,34 @@ local function onLoadChunk(chunk)
             local building = square and square:getBuilding()
             local def = building and building:getDef()
             if def and def:isResidential() and not pending[GardenLights.buildingKey(def)] then
-                GardenLights.queue(def, false)
+                GardenLights.queue(def, false, square:getX(), square:getY())
             end
         end
     end
 end
 
--- Rolling removes a house from `pending`, so the ready ones are collected first.
+-- Rolling a house and its chunk unloading both remove it from `pending`, so the houses are
+-- collected first.
 local function rollLoaded()
-    local ready
-    for _, entry in pairs(pending) do
-        if surroundingsLoaded(entry.def) then
+    local ready, gone
+    for key, entry in pairs(pending) do
+        if entry.x and not getSquare(entry.x, entry.y, 0) then
+            gone = gone or {}
+            table.insert(gone, key)
+        elseif surroundingsLoaded(entry.def) then
             ready = ready or {}
             table.insert(ready, entry)
         end
     end
-    if not ready then
-        return
+    if gone then
+        for _, key in ipairs(gone) do
+            pending[key] = nil
+        end
     end
-    for _, entry in ipairs(ready) do
-        GardenLights.roll(entry.def, entry.always)
+    if ready then
+        for _, entry in ipairs(ready) do
+            GardenLights.roll(entry.def, entry.always)
+        end
     end
 end
 

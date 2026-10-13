@@ -15,7 +15,7 @@
 #                                    files, instead of starting the game again. A change outside the
 #                                    test files (Debug/RenewableEnergyTest*.lua in the dev mod)
 #                                    restarts the game. While it waits it shows and logs "RETest
-#                                    IDLE"; it quits after 10 minutes without a run, or when
+#                                    IDLE"; it quits after 30 minutes without a run, or when
 #                                    another run needs the game.
 #   dev/run-debug-client.sh --test --mp [--stay]
 #                                    the same tests in multiplayer: a dedicated server and a client

@@ -155,8 +155,13 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
     end
 end
 
+-- Clients ask only for a fresh status, which the status window may do from any distance. Every
+-- job that changes a bank comes as a RenewableEnergyAction, whose complete() checks the character
+-- is at it, so a forged command packet can't reach a bank from afar.
 function BankSystem:OnClientCommand(command, player, args)
-    PowerBank.perform(player, command, args)
+    if command == "refresh" then
+        PowerBank.perform(player, command, args)
+    end
 end
 
 -- Map loading ----------------------------------------------------------------------------

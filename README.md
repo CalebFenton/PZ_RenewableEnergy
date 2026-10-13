@@ -200,7 +200,7 @@ A solar kit is the stock of an RV or cabin setup: modules, deep cycle batteries,
 
 ### Solar sites
 
-Some places come already set up, though not every site is there in every world. Their banks are switched off and their panels not yet connected:
+Some places come already set up. Most aren't there in every world, but the road works north of Muldraugh and the army checkpoint on the highway south of Louisville always are. Their banks are switched off and their panels not yet connected:
 
 | Site | Where | What's there |
 |---|---|---|
@@ -211,6 +211,7 @@ Some places come already set up, though not every site is there in every world. 
 | Deer Valley Power yard | The substation west of Muldraugh, the best haul on the map | Ground racks, a bank of L-16s with an Inverter/Charger, and a crate of modules |
 | Ranger stations | Deerhead Lake and Doe Valley | Wall panels or racks, a battery box with deep cycle batteries |
 | Road works | North of Muldraugh, east of Riverside, in Rosewood | A solar arrow board |
+| Army checkpoints | The roads into Louisville: the highway, behind the queue of cars that never got through, and two country roads east of it | A solar arrow board |
 
 Solar arrow boards are the orange trailers road crews park at work zones, with a flashing arrow and two panels on top:
 

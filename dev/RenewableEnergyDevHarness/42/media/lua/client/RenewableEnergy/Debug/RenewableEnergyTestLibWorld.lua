@@ -2,14 +2,14 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
 -- Fixtures of the world, trailer, tile and loot tests, added to RenewableEnergyTest. What they build
 -- and read lives on the authority, so they go through the dev mod's server handlers in
--- server/RenewableEnergy/Debug/RenewableEnergyTestServerWorld.lua, which single player runs in this
--- game. That file loads after client Lua, on a multiplayer client as well, so its helpers are
--- required when a test runs.
+-- server/RenewableEnergy/Debug/RenewableEnergyTestServer*.lua, which single player runs in this
+-- game. Those files load after client Lua, on a multiplayer client as well, so the trailer
+-- readers are required when a test runs.
 
 local T = RenewableEnergyTest
 
-local function world()
-    return require "RenewableEnergy/Debug/RenewableEnergyTestServerWorld"
+local function trailer()
+    return require "RenewableEnergy/Debug/RenewableEnergyTestServerTrailer"
 end
 
 --- Expects a server check's answer ({ failures = { message, ... } }) to have found nothing wrong.
@@ -26,7 +26,8 @@ end
 
 --- Queues the server handler `name` on the vehicle with `args` (a table, or a function returning
 --- one when the call goes out) and leaves its answer in vehicle.answer and, if it holds one, the
---- server's state of the vehicle (see World.vehicleState in the server file) in vehicle.state.
+--- server's state of the vehicle (see Trailer.vehicleState in RenewableEnergyTestServerTrailer.lua)
+--- in vehicle.state.
 function T.onVehicle(self, vehicle, name, args)
     T.server(self, name, function()
         local all = T.vehicleArgs(vehicle)
@@ -55,9 +56,9 @@ function T.awaitVehicleState(self, vehicle, done, ms)
     T.step(function() vehicle.state = self.server.vehicleState.state end)
 end
 
---- This side's state of its copy of the vehicle, as World.vehicleState reads it.
+--- This side's state of its copy of the vehicle, as Trailer.vehicleState reads it.
 function T.copyState(vehicle)
-    return world().vehicleState(vehicle.vehicle)
+    return trailer().vehicleState(vehicle.vehicle)
 end
 
 --- Queues a wait, as long as a fixture's, until this side's copy of the vehicle matches
