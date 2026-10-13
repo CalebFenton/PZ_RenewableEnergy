@@ -76,6 +76,31 @@ function Trailer.shownModels(vehicle, partId)
     return table.concat(shown, ",")
 end
 
+--- How the lid's model stands in this game, read from its animation track, or nil while the lid
+--- shows no model: `clip`, the clip the track plays (nil before the game gives it one), `playing`,
+--- whether it is swinging, and `open`, how far open it stands, from 0 shut to 1 open. The clip runs
+--- from open to shut, and a reversed track plays it from its end (AnimationTrack.getCurrentTrackTime).
+--- A dedicated server draws nothing, so only a client or single player has a track.
+function Trailer.lidPose(vehicle)
+    local part = vehicle:getPartById(RenewableEnergy.ArrowBoard.LID)
+    local models = fieldValue(vehicle, "models")
+    for i = 0, models:size() - 1 do
+        local info = models:get(i)
+        if fieldValue(info, "part") == part then
+            local track = fieldValue(info, "track")
+            local clip = track and fieldValue(track, "currentClip")
+            if not clip then
+                return {}
+            end
+            local duration, time = fieldValue(clip, "duration"), fieldValue(track, "currentTimeValue")
+            local at = fieldValue(track, "reverse") and duration - time or time
+            return { clip = fieldValue(clip, "name"), playing = fieldValue(track, "isPlaying"),
+                open = duration > 0 and 1 - math.min(math.max(at / duration, 0), 1) or nil }
+        end
+    end
+    return nil
+end
+
 -- A part's installed item and its condition, or none.
 local function partState(vehicle, partId)
     local part = vehicle:getPartById(partId)
@@ -119,10 +144,11 @@ function Trailer.vehicleState(vehicle)
                 charge = RenewableEnergy.Battery.isBattery(item) and RenewableEnergy.Battery.getCharge(item) or nil })
         end
     end
-    local lid = vehicle:getPartById("TrunkDoor")
+    local lid = vehicle:getPartById(ArrowBoard.LID)
     local door = lid and lid:getDoor()
     if door then
-        state.lid = { open = door:isOpen(), locked = door:isLocked(), installed = lid:getInventoryItem() ~= nil }
+        state.lid = { open = door:isOpen(), locked = door:isLocked(), installed = lid:getInventoryItem() ~= nil,
+            shown = Trailer.shownModels(vehicle, ArrowBoard.LID) }
     end
     return state
 end

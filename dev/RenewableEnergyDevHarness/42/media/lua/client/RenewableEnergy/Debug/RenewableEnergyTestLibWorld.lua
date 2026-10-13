@@ -61,6 +61,11 @@ function T.copyState(vehicle)
     return trailer().vehicleState(vehicle.vehicle)
 end
 
+--- How this game draws the lid of its copy of the trailer, as Trailer.lidPose reads it.
+function T.lidPose(vehicle)
+    return trailer().lidPose(vehicle.vehicle)
+end
+
 --- Queues a wait, as long as a fixture's, until this side's copy of the vehicle matches
 --- `matches(state)`, its state as T.copyState reads it.
 function T.waitForVehicleCopy(vehicle, matches)

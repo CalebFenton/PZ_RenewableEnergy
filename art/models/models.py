@@ -9,19 +9,22 @@ game draws a world item or a vehicle body with a single texture. An item's mesh 
 models_X/WorldItems and its texture to textures/WorldItems, both RenewableEnergy_<Item>, and
 Models.txt gets a model <Item>_Ground in module RenewableEnergy for the item's WorldStaticModel. A
 vehicle's mesh goes to models_X/vehicles, cut into the body and the part models items.VEHICLES
-names, and its texture, with the mask, lights, rust, damage and blood textures of its shader, to
-textures/Vehicles; scripts/RenewableEnergy/Vehicles.txt names them.
+names, a hinged one skinned to a bone with the clip that swings it, and its texture, with the mask,
+lights, rust, damage and blood textures of its shader, to textures/Vehicles;
+scripts/RenewableEnergy/Vehicles.txt names them.
 
 An item's exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the
 vertices (like HearingAid's ground model): the game draws a dropped item that way.
 """
+import math
 import os
 import sys
 
 import bmesh
 import bpy
 import numpy as np
-from mathutils import Vector
+from bpy_extras.io_utils import axis_conversion
+from mathutils import Quaternion, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -171,7 +174,8 @@ def save_texture(path, pixels, alpha=False):
 
 
 def export(obj, name, image, path):
-    """Swaps the baked texture in as the only material and writes the FBX."""
+    """Swaps the baked texture in as the only material and writes the FBX, with the armature `rig`
+    gave it, if any, and its clip."""
     obj.data.materials.clear()
     mat = bpy.data.materials.new(PREFIX + name)
     if not mat.node_tree:
@@ -183,9 +187,16 @@ def export(obj, name, image, path):
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={"MESH"}, bake_space_transform=True,
-                             apply_scale_options="FBX_SCALE_ALL", add_leaf_bones=False, path_mode="STRIP",
-                             mesh_smooth_type="FACE")
+    options = dict(filepath=path, use_selection=True, apply_scale_options="FBX_SCALE_ALL", add_leaf_bones=False,
+                   path_mode="STRIP", mesh_smooth_type="FACE")
+    if obj.parent is None:
+        bpy.ops.export_scene.fbx(object_types={"MESH"}, bake_space_transform=True, **options)
+        return
+    # Baking the turn into the data breaks armatures; rig turned the data itself instead.
+    obj.parent.select_set(True)
+    bpy.ops.export_scene.fbx(object_types={"ARMATURE", "MESH"}, bake_space_transform=False, bake_anim=True,
+                             bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False,
+                             bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0, **options)
 
 
 def build_baked(stage, builder, name, size, to_ground):
@@ -556,6 +567,55 @@ def cut_piece(low, solid, prefixes, offset, keep):
     return piece
 
 
+# A hinged piece is skinned whole to one bone on its hinge. A part model that isn't static gets an
+# animation player of its own (BaseVehicle.ModelInfo), and playPartAnim plays the clip its part's
+# anim block names. The armature takes the name of vanilla's vehicle skeletons, VehicleSkeleton,
+# where the game looks for the bones (ImportedSkeleton). The game moves the bones by the clip, the
+# armature's own key included, and then draws the mesh through the mesh's own transform as well,
+# so in the file the armature and the mesh must stand without a transform, or the game turns the
+# mesh twice. The export turns the armature into the game's axes, so the armature starts turned
+# back by as much, and the piece's data is turned instead, as the static pieces' export turns
+# theirs; shut, it draws where a static one would. Vanilla's door and trunk clips run half a
+# second at 30 frames a second, which the anim block's rate scales.
+HINGE_FPS = 30
+HINGE_FRAMES = 15
+# From Blender's axes to the game's: what the FBX export's default axes do.
+GAME_AXES = axis_conversion(to_forward="-Z", to_up="Y").to_4x4()
+
+
+def rig(piece, hinge, bone_name):
+    """Gives `piece` an armature with one bone on `hinge` (an items.VEHICLES "hinged" entry) and the
+    clip that swings it from open to shut, both turned for the game's axes."""
+    scene = bpy.context.scene
+    scene.render.fps = HINGE_FPS
+    scene.frame_start, scene.frame_end = 1, 1 + HINGE_FRAMES
+    piece.data.transform(GAME_AXES)
+    armature = bpy.data.objects.new("VehicleSkeleton", bpy.data.armatures.new("VehicleSkeleton"))
+    armature.matrix_world = GAME_AXES.inverted()
+    scene.collection.objects.link(armature)
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.mode_set(mode="EDIT")
+    bone = armature.data.edit_bones.new(bone_name)
+    pivot = GAME_AXES @ Vector(hinge["pivot"])
+    axis = (GAME_AXES.to_3x3() @ Vector(hinge["axis"])).normalized()
+    # A bone's own Y runs from its head to its tail, so along the hinge.
+    bone.head, bone.tail = pivot, pivot + axis * 0.1
+    bpy.ops.object.mode_set(mode="OBJECT")
+    piece.parent = armature
+    piece.vertex_groups.new(name=bone_name).add(range(len(piece.data.vertices)), 1.0, "REPLACE")
+    piece.modifiers.new("Armature", "ARMATURE").object = armature
+    pose = armature.pose.bones[bone_name]
+    pose.rotation_mode = "QUATERNION"
+    armature.animation_data_create().action = bpy.data.actions.new(hinge["clip"])
+    for frame, degrees in ((1, hinge["open"]), (1 + HINGE_FRAMES, 0)):
+        pose.rotation_quaternion = Quaternion((0, 1, 0), math.radians(degrees))
+        pose.keyframe_insert("rotation_quaternion", frame=frame)
+    # The FBX writes each bone as it stands on the current frame; shut, it matches the bind.
+    scene.frame_set(1 + HINGE_FRAMES)
+    return armature
+
+
 def build_vehicles(stage):
     for name, spec in items.VEHICLES.items():
         low, colour, solid = build_baked(stage, spec["build"], name, VEHICLE_TEXTURE_SIZE, to_ground=False)
@@ -569,12 +629,17 @@ def build_vehicles(stage):
         for suffix, (prefixes, offset) in spec["pieces"].items():
             pieces[suffix] = cut_piece(low, solid, prefixes, offset, keep=True)
         bpy.data.objects.remove(low)
+        for suffix, hinge in spec.get("hinged", {}).items():
+            rig(pieces[suffix], hinge, suffix.strip("_") + "_bone")
         for suffix, piece in pieces.items():
             # Exported like the ground models: the game reads a mesh's vertices with Y up and -Z
             # forward (it flips Z, to left-handed coordinates), so the body's +Y, the hitch, leads.
             export(piece, name + suffix, image, os.path.join(VEHICLE_MESH_DIR, PREFIX + name + suffix + ".fbx"))
             print("vehicle %s%s: %d faces" % (name, suffix, len(piece.data.polygons)))
+            armature = piece.parent
             bpy.data.objects.remove(piece)
+            if armature:
+                bpy.data.objects.remove(armature)
 
 
 main()

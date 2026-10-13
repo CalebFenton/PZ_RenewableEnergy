@@ -137,6 +137,15 @@ end
 -- wrench, time and Mechanics odds vanilla asks for a trunk lid, though not its mechanic's recipe,
 -- which putting it back doesn't ask for either. Put back, the lid is unlocked
 -- (Vehicles.InstallComplete.Door).
+--
+-- The lid swings open and shut on its hinge. Vanilla plays a door's swing only in the game of the
+-- player who opens it, as the action starts (ISOpenVehicleDoor:start), before the server has
+-- said whether it opened, and everyone else's copy keeps the pose it held
+-- (BaseVehicle.updateAnimationPlayer replaces a held pose only once it ends, and it never ends).
+-- So every game that draws the trailer swings the lid itself once it sees the door's state
+-- change, the opener's included (swingLids, below).
+
+ArrowBoard.LID = "TrunkDoor"
 
 --- Part `create` of the lid: runs once, when the trailer first enters the world. Shut, and
 --- padlocked by STOCK.lockedChance unless the save's Easy Use option leaves every vehicle
@@ -147,6 +156,11 @@ function ArrowBoard.createLid(vehicle, part)
     door:setOpen(false)
     door:setLocked(not SandboxVars.VehicleEasyUse and ZombRandFloat(0, 1) < ArrowBoard.STOCK.lockedChance)
     door:setLockBroken(false)
+end
+
+--- Part `init` of the lid: runs on every side each time the trailer loads.
+function ArrowBoard.initLid(vehicle, part)
+    ArrowBoard.track(vehicle)
 end
 
 -- Panels ---------------------------------------------------------------------------------------
@@ -375,8 +389,9 @@ end
 
 -- Loaded trailers by vehicle: their recent velocities, oldest first, in the lists ms, x and y,
 -- used as a ring of SAMPLE_SLOTS from `head`, `count` long, so that watching allocates nothing
--- each frame; the time of their last crash's latest jolt; and on a multiplayer client the car of
--- this game's player that last towed them and until when that car's crashes still count.
+-- each frame; the time of their last crash's latest jolt; on a multiplayer client the car of
+-- this game's player that last towed them and until when that car's crashes still count; and
+-- whether this game last saw the lid open (lidOpen, nil until it first looks).
 local tracked = {}
 -- Enough for ArrowBoard.CRASH.ms at a thousand frames a second; at a higher rate the oldest
 -- samples go early, which still leaves a crash's jolt well inside the window.
@@ -468,6 +483,24 @@ function ArrowBoard.watchCrashes()
     end
 end
 
+--- Swings the lid of each loaded trailer whose door this game has seen open or shut since it last
+--- looked (Lid, above). A trailer it sees for the first time shows its lid as it is, because the
+--- game holds the Opened or Closed pose by the door's state when no swing plays. playPartAnim does
+--- nothing while the lid's model isn't loaded or the lid is off.
+function ArrowBoard.swingLids()
+    for vehicle, entry in pairs(tracked) do
+        local lid = vehicle:getPartById(ArrowBoard.LID)
+        local door = lid and lid:getDoor()
+        if door then
+            local open = door:isOpen()
+            if entry.lidOpen ~= nil and open ~= entry.lidOpen then
+                vehicle:playPartAnim(lid, open and "SwingOpen" or "SwingClose")
+            end
+            entry.lidOpen = open
+        end
+    end
+end
+
 -- Whether the trailer, no longer towed, is still close behind the car.
 local function justUnhitched(vehicle, car)
     if vehicle:getVehicleTowedBy() then
@@ -504,6 +537,7 @@ end
 
 if not isServer() then
     Events.OnTick.Add(ArrowBoard.watchCrashes)
+    Events.OnTick.Add(ArrowBoard.swingLids)
 end
 if not isClient() then
     Events.OnClientCommand.Add(onClientCommand)

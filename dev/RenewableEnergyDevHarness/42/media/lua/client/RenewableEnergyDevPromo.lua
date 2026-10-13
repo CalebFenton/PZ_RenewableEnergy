@@ -3,8 +3,9 @@
 -- indoors against an outside wall, wall panels on that wall, racks, flat panels and a backup
 -- generator in the yard) and a stage-0 wooden battery box indoors by a window with its panels
 -- outside. Around them it lays a plain floor where every item is shot alone, hitches the arrow
--- board trailer to a car at road works, and at night lines a house's front walk with lit garden
--- lights. It saves the raw art that art/promo/compose.py lays out for the README and the
+-- board trailer to a car at road works, at night lines a house's front walk with lit garden
+-- lights, and later that night lights up a house its own panels run, for the poster, among dark
+-- neighbours. It saves the raw art that art/promo/compose.py lays out for the README and the
 -- Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
 -- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
 -- recipe and skill names in the game's language.
@@ -35,10 +36,10 @@ local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
 
 -- The groups of shots, in the order a run takes them: the status window first, so that it reads
--- the same noon figures whatever else the run shoots, and the garden lights last, since they are
--- at night. run-debug-client.sh reads this line to refuse an unknown PROMO name before the game
--- starts.
-local GROUP_NAMES = { "status", "menu", "world", "icons", "models", "trailer", "gardenlights" }
+-- the same noon figures whatever else the run shoots, then the garden lights and the poster,
+-- which are at night, the poster last since it moves the clock on to the next day.
+-- run-debug-client.sh reads this line to refuse an unknown PROMO name before the game starts.
+local GROUP_NAMES = { "status", "menu", "world", "icons", "models", "trailer", "gardenlights", "poster" }
 local DRAW_FRAMES = Stage.DRAW_FRAMES
 
 -- The world shots are as wide as the README's images, in UI units.
@@ -176,6 +177,30 @@ local WALK = {
     scout = { 0, 4 },
     -- Late enough for the sky to be dark in any season.
     hour = 23,
+}
+-- The poster and the Workshop preview, after dark: a house with every light on, run by a bank
+-- indoors behind a window and fed by racks and flat panels in its yard, while the neighbours'
+-- houses, with the grid gone, stand dark. Positions are (along, out) from the square outside the
+-- window, as the homestead's.
+local POSTER = {
+    -- Lit windows sell it, so the wall the camera sees needs several, and the house some rooms.
+    windows = { along = { -4, 4 }, count = 2 },
+    rooms = 3,
+    bank = { 0, -1 },
+    open = { along = { -1, 2 }, out = { 1, 3 } },
+    racks = { { -1, 2, "metal" }, { 0, 2, "metal" }, { 1, 2, "metal" }, { 2, 2, "metal" } },
+    flatPanels = { { -1, 3 }, { 0, 3 }, { 1, 3 } },
+    player = { 2, 3 },
+    -- Where the character looks around first, by day, so that the house, its rooms behind the
+    -- windows and its neighbours are drawn rather than left black as unseen: indoors where the
+    -- floor is free, then outdoors.
+    indoors = { { -3, -2 }, { 0, -2 }, { 3, -2 } },
+    scouts = { { -4, 4 }, { 0, 8 }, { 6, 4 }, { 6, 0 } },
+    -- One in the morning, the next day (past 24 the clock rolls over): darker than the garden
+    -- lights' hour, so the lit house stands out of the street.
+    hour = 25,
+    -- Out far enough for the whole house and the dark around it.
+    zoomOut = 3,
 }
 -- How far around each setup radios and televisions are switched off, since their captions
 -- float over the shots.
@@ -787,6 +812,33 @@ local function findWalk(player, others)
     return nil
 end
 
+-- The closest window clear of `others` into a house (a building with a bedroom and POSTER.rooms
+-- rooms), on a wall with POSTER.windows.count windows near it, with free floor for the bank behind
+-- it and open ground for the panels in front, facing south first.
+local function findPoster(player, others)
+    for _, site in ipairs(SITES) do
+        local best = Stage.closestSquare(player, function(origin)
+            if not (isApart(origin, others) and hasWindow(site, origin, 0)
+                and isFreeIndoorsAt(site, origin, POSTER.bank) and isOpenArea(site, origin, player, POSTER.open)) then
+                return false
+            end
+            local building = siteSquare(site, origin, 0, -1):getBuilding()
+            if not (building and building:isResidential() and building:getDef():getRooms():size() >= POSTER.rooms) then
+                return false
+            end
+            local windows = 0
+            for along = POSTER.windows.along[1], POSTER.windows.along[2] do
+                windows = windows + (hasWindow(site, origin, along) and 1 or 0)
+            end
+            return windows >= POSTER.windows.count
+        end)
+        if best then
+            return site, best
+        end
+    end
+    return nil
+end
+
 -- A placed tile, as the tests place one. A panel mount holds `modules` (a PowerBank.MODULES list),
 -- or without them whole factory modules.
 local function placeTile(square, spriteName, modules)
@@ -909,8 +961,8 @@ local function switchOnLights(square, otherBank)
 end
 
 local site, origin, stage0Site, stage0Origin
-local studio, roadHeading, roadCar, walkSite, walkOrigin
-local homesteadBank, stage0Box
+local studio, roadHeading, roadCar, walkSite, walkOrigin, posterSite, posterOrigin
+local homesteadBank, stage0Box, posterBank
 
 local function at(position)
     return siteSquare(site, origin, position[1], position[2])
@@ -926,6 +978,10 @@ end
 
 local function atWalk(position)
     return siteSquare(walkSite, walkOrigin, position[1], position[2])
+end
+
+local function atPoster(position)
+    return siteSquare(posterSite, posterOrigin, position[1], position[2])
 end
 
 local function buildHomestead()
@@ -1458,6 +1514,100 @@ local function addGardenLights()
     end)
 end
 
+-- The poster's setup, built after dark so that the bank's first pass starts its clock there rather
+-- than running the house's lights through the evening. Every light in the house that the bank
+-- reaches goes on, upstairs too, and every other light in its reach off; the other setups' banks
+-- go off, so that this is the one lit house.
+local function buildPoster()
+    for along = POSTER.open.along[1], POSTER.open.along[2] do
+        for out = 0, POSTER.open.out[2] do
+            clearGroundCover(atPoster({ along, out }))
+        end
+    end
+    posterBank = PowerBank.place(atPoster(POSTER.bank), Sprites.batteryBankMetal, -1)
+    fillBank(posterBank, HOMESTEAD_BANK, 1)
+    for _, spot in ipairs(POSTER.racks) do
+        connect(posterBank, placeTile(atPoster(spot), Sprites.rack[spot[3]][posterSite.facing]))
+    end
+    for _, spot in ipairs(POSTER.flatPanels) do
+        connect(posterBank, placeTile(atPoster(spot), Sprites.flat))
+    end
+    for _, bank in ipairs({ homesteadBank, stage0Box }) do
+        perform("setBankOn", { bank = PowerBank.positionOf(bank), on = false })
+    end
+    perform("setBankOn", { bank = PowerBank.positionOf(posterBank), on = true })
+    local bankSquare = posterBank:getSquare()
+    local building = bankSquare:getBuilding()
+    local lit, unlit = 0, 0
+    forSquaresInReach(bankSquare, function(square)
+        local inHouse = square:getBuilding() == building
+        local objects = square:getObjects()
+        for i = 0, objects:size() - 1 do
+            local object = objects:get(i)
+            if instanceof(object, "IsoLightSwitch") then
+                if inHouse and not object:isActivated() and object:setActive(true, false, true) then
+                    lit = lit + 1
+                elseif not inHouse and object:isActivated() then
+                    object:setActive(false, false, true)
+                    unlit = unlit + 1
+                end
+            end
+        end
+    end)
+    print(string.format("REPromo poster: switched on %d lights in the house and off %d around it", lit, unlit))
+end
+
+-- A square as tall as the screen, centred across on the house and the panels.
+local function posterRegion()
+    local def = posterBank:getSquare():getBuilding():getDef()
+    local squares = { atPoster(POSTER.player) }
+    for _, corner in ipairs({ { def:getX(), def:getY() }, { def:getX2() - 1, def:getY() },
+        { def:getX(), def:getY2() - 1 }, { def:getX2() - 1, def:getY2() - 1 } }) do
+        local square = getCell():getGridSquare(corner[1], corner[2], posterOrigin:getZ())
+        if square then
+            table.insert(squares, square)
+        end
+    end
+    for _, list in ipairs({ POSTER.racks, POSTER.flatPanels }) do
+        for _, spot in ipairs(list) do
+            table.insert(squares, atPoster(spot))
+        end
+    end
+    local box = screenBox(squares)
+    local size = getCore():getScreenHeight()
+    local left = math.max(0, math.min(getCore():getScreenWidth() - size, (box.left + box.right - size) / 2))
+    return region("poster", left, 0, size, size)
+end
+
+local function addPoster()
+    add(function()
+        Stage.removeTrees(posterOrigin:getX(), posterOrigin:getY(), posterOrigin:getZ())
+    end)
+    local scouts = {}
+    for _, spot in ipairs(POSTER.indoors) do
+        local square = atPoster(spot)
+        if RenewableEnergy.Debug.isFreeSquare(square, true) then
+            table.insert(scouts, square)
+        end
+    end
+    for _, spot in ipairs(POSTER.scouts) do
+        local square = atPoster(spot)
+        if square then
+            table.insert(scouts, square)
+        end
+    end
+    table.insert(scouts, atPoster(POSTER.player))
+    goTo(scouts, POSTER.zoomOut)
+    add(function()
+        getGameTime():setTimeOfDay(POSTER.hour)
+        buildPoster()
+        return Stage.lightingSettled(getPlayer(), true)
+    end)
+    addOpaque("poster", function()
+        return { posterRegion() }
+    end)
+end
+
 -- Finds the places in `needs`, each clear of those found before it, and returns them, or nil and
 -- the first it can't find. A run of every group looks for all of them.
 local function findPlaces(player, needs)
@@ -1505,6 +1655,15 @@ local function findPlaces(player, needs)
         table.insert(logged, string.format("garden lights %d,%d facing %s", walkOrigin:getX(), walkOrigin:getY(),
             walkSite.facing))
     end
+    if needs.poster then
+        posterSite, posterOrigin = findPoster(player, found)
+        if not posterSite then
+            return nil, "wall with " .. POSTER.windows.count .. " windows and open ground in front, for the poster"
+        end
+        table.insert(found, posterOrigin)
+        table.insert(logged, string.format("poster %d,%d facing %s", posterOrigin:getX(), posterOrigin:getY(),
+            posterSite.facing))
+    end
     if #logged > 0 then
         print("REPromo " .. table.concat(logged, "; "))
     end
@@ -1524,6 +1683,7 @@ local GROUPS = {
     -- The character looks around from the item floor first, as a full run's has by then.
     trailer = { places = { "road", "studio" }, add = addTrailer },
     gardenlights = { places = { "walk" }, add = addGardenLights },
+    poster = { places = { "poster" }, add = addPoster },
 }
 
 -- Adds a step that starts a clock, and returns a function that adds a step logging, under

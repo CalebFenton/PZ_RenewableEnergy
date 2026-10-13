@@ -2781,10 +2781,10 @@
       "id": "RenewableEnergy_RecastBatteryPlates",
       "inputs": [
         {
-          "count": 1,
+          "count": 2,
           "items": [
             {
-              "count": 1,
+              "count": 2,
               "fullType": "RenewableEnergy.WornBatteryPlates",
               "icon": "icon_RenewableEnergy_WornBatteryPlates",
               "name": "Worn Battery Plates"
@@ -2795,10 +2795,30 @@
           "uses": false
         },
         {
-          "count": 4,
+          "count": 1,
           "items": [
             {
-              "count": 4,
+              "count": 1,
+              "fullType": "RenewableEnergy.WornBatteryPlates",
+              "icon": "icon_RenewableEnergy_WornBatteryPlates",
+              "name": "Worn Battery Plates"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.LeadPipe",
+              "icon": "icon_Base_LeadPipe",
+              "name": "Lead Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 8,
+          "items": [
+            {
+              "count": 8,
               "fullType": "Base.Charcoal",
               "icon": "icon_Base_Charcoal",
               "name": "Charcoal"
@@ -2841,7 +2861,7 @@
       "name": "Recast Battery Plates",
       "outputs": [
         {
-          "count": 1,
+          "count": 2,
           "fullType": "RenewableEnergy.BatteryPlates",
           "icon": "icon_RenewableEnergy_BatteryPlates",
           "name": "Battery Plates"
@@ -4400,6 +4420,9 @@
       "model_RenewableEnergy_SolarWallWood",
       "model_RenewableEnergy_WoodenBatteryPlatePattern",
       "model_RenewableEnergy_WornBatteryPlates"
+    ],
+    "poster": [
+      "poster"
     ],
     "status": [
       "status"

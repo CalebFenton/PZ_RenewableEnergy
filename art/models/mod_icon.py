@@ -1,200 +1,103 @@
-"""Renders the mod list icon, 42/icon.png, and from the same picture at full size the mod's poster,
-42/poster.png, and the Workshop preview, preview.png: a solar rack and a deep-cycle battery in
-afternoon sun, on a sky tile with the sun in its corner.
+"""Draws the mod list icon, 42/renewable_energy_icon.png: a solar panel seen straight on, its cells
+in a 3 x 2 grid, with the sun breaking its top right corner.
 
-    blender -b --factory-startup -P art/models/mod_icon.py
+    python3 art/models/mod_icon.py
 
-The mod list draws the icon about 28 to 40 pixels square (ModListBox, ModOrderListBox), so it is
-shipped at 64 pixels, the size the game scales down cleanly at every font size, and drawn bold:
-two objects, big, with a dark outline, nothing thinner than a couple of pixels at that size.
+The mod list draws the icon at the height of a line of small text plus a little, about 22 pixels,
+and the load order list at about 28, with linear filtering and no mipmaps (getTexture loads it
+without them). So it is drawn pixel by pixel at 32, like the mod's item icons (one object, a dark
+one-pixel outline, no background), and shipped doubled with hard edges: shrunk from 64, each
+screen pixel blends at most two of the drawing's pixels across, and the grid lines stay crisp,
+where shrunk from 32 they smear into the cells. Larger fonts draw it larger, which 64 also covers.
+
+It is drawn from the shapes below rather than kept as an edited image, so a rerun writes the same
+file. Needs Pillow.
 """
-import math
 import os
-import sys
-import tempfile
 
-import bpy
-import numpy as np
-from mathutils import Vector
+from PIL import Image
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-import items  # noqa: E402
-import kit  # noqa: E402
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ICON = os.path.join(REPO, "Contents/mods/RenewableEnergy/42/renewable_energy_icon.png")
+SIZE = 32
+SCALE = 2
 
-REPO = os.path.dirname(os.path.dirname(HERE))
-ICON = os.path.join(REPO, "Contents/mods/RenewableEnergy/42/icon.png")
-# The Workshop takes a square preview of 256 or 512 pixels, at most 1 MB; the mod list's poster
-# panel draws about that size too.
-FULL_SIZE = [os.path.join(REPO, "Contents/mods/RenewableEnergy/42/poster.png"), os.path.join(REPO, "preview.png")]
-SCRATCH = os.path.join(tempfile.gettempdir(), "renewable-energy-render")
-SIZE = 64
-RENDER = 512  # rendered larger, then averaged down for the icon
+# Darker than the item icons' outline, which sits on the lighter inventory: the mod list is dark.
+OUTLINE = (22, 24, 28)
+FRAME = (206, 214, 226)
+FRAME_SHADE = (150, 160, 178)
+CELL_TOP, CELL_BOTTOM = (64, 98, 184), (30, 52, 122)
+GLINT = (112, 146, 220)
+SUN = (255, 204, 48)
+SUN_LIGHT = (255, 238, 140)
+SUN_RIM = (232, 140, 24)
 
-SKY_TOP, SKY_BOTTOM = (0.20, 0.48, 0.82), (0.62, 0.82, 0.96)
-SUN = (1.0, 0.84, 0.25)
-BORDER = (0.10, 0.16, 0.26)
-
-
-def setup():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    scene = bpy.context.scene
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = 128
-    scene.render.film_transparent = True
-    scene.render.image_settings.file_format = "PNG"
-    scene.render.image_settings.color_mode = "RGBA"
-    scene.render.resolution_x = scene.render.resolution_y = RENDER
-    scene.render.resolution_percentage = 100
-    scene.view_settings.view_transform = "Standard"
-    world = bpy.data.worlds.new("Sky")
-    world.use_nodes = True
-    world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.6, 0.7, 0.85, 1)
-    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.9
-    scene.world = world
-    # Low sun from behind the camera's left shoulder, so the glass of the modules catches it.
-    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
-    sun.data.energy = 4.5
-    sun.data.angle = math.radians(6)
-    sun.rotation_euler = Vector((0.4, -0.9, 0.75)).to_track_quat("Z", "Y").to_euler()
-    scene.collection.objects.link(sun)
-    camera = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera"))
-    camera.data.type = "ORTHO"
-    scene.collection.objects.link(camera)
-    scene.camera = camera
-    stage = bpy.data.collections.new("Stage")
-    scene.collection.children.link(stage)
-    return camera, stage
+# The panel's outline box, inclusive, then its cells: each is as wide and tall as the frame leaves
+# for it between one-pixel bars.
+PANEL = (1, 12, 27, 30)
+COLUMNS, ROWS = 3, 2
+# The sun's centre and radius in pixels, its outline included.
+SUN_CENTRE, SUN_RADIUS = (25.0, 9.0), 7.6
 
 
-def build(stage):
-    """The rack faces the camera; the battery stands in front of its right leg."""
-    items.solar_rack(stage)
-    before = set(stage.objects)
-    items.deep_cycle_battery(stage)
-    battery = [obj for obj in stage.objects if obj not in before and obj.parent is None]
-    # Half again its real size: at the true scale it is a few pixels next to the rack.
-    kit.group(stage, "Battery", battery, at=(0.42, -0.66, 0), rotate=(0, 0, 18)).scale = (1.5, 1.5, 1.5)
-    bpy.context.view_layer.update()
+def mix(a, b, t):
+    return tuple(round(x + (y - x) * t) for x, y in zip(a, b))
 
 
-def aim(camera, stage):
-    """From the south-east, a little above, framing everything with a margin."""
-    direction = Vector((-0.45, 0.85, -0.38)).normalized()
-    rotation = direction.to_track_quat("-Z", "Y")
-    right, up = rotation @ Vector((1, 0, 0)), rotation @ Vector((0, 1, 0))
-    points = [obj.matrix_world @ v.co for obj in stage.objects if obj.type == "MESH" for v in obj.data.vertices]
-    across = [p.dot(right) for p in points]
-    along = [p.dot(up) for p in points]
-    size = max(max(across) - min(across), max(along) - min(along))
-    centre = right * (max(across) + min(across)) / 2 + up * (max(along) + min(along)) / 2
-    camera.rotation_euler = rotation.to_euler()
-    camera.location = centre - direction * 20
-    # The objects fill the lower right of the tile, leaving the top left to the sun.
-    camera.data.ortho_scale = size * 1.3
-    camera.location += -right * size * 0.1 + up * size * 0.04
-    bpy.context.view_layer.update()
+def panel(pixels):
+    left, top, right, bottom = PANEL
+    for y in range(top, bottom + 1):
+        for x in range(left, right + 1):
+            edge = x in (left, right) or y in (top, bottom)
+            pixels[x, y] = OUTLINE + (255,) if edge else FRAME + (255,)
+    # The frame's lower and right bars in shade, so the panel has a little depth.
+    for x in range(left + 1, right):
+        pixels[x, bottom - 1] = FRAME_SHADE + (255,)
+    for y in range(top + 1, bottom):
+        pixels[right - 1, y] = FRAME_SHADE + (255,)
+    inner_w, inner_h = right - left - 1, bottom - top - 1
+    cell_w, cell_h = (inner_w - COLUMNS - 1) // COLUMNS, (inner_h - ROWS - 1) // ROWS
+    assert (cell_w + 1) * COLUMNS + 1 == inner_w and (cell_h + 1) * ROWS + 1 == inner_h, "cells don't fit the frame"
+    for row in range(ROWS):
+        for column in range(COLUMNS):
+            x0 = left + 2 + column * (cell_w + 1)
+            y0 = top + 2 + row * (cell_h + 1)
+            for dy in range(cell_h):
+                colour = mix(CELL_TOP, CELL_BOTTOM, dy / (cell_h - 1))
+                for dx in range(cell_w):
+                    pixels[x0 + dx, y0 + dy] = colour + (255,)
+            # A glint across the glass's top left corner.
+            for dx, dy in [(1, 1), (2, 1), (1, 2)]:
+                pixels[x0 + dx, y0 + dy] = GLINT + (255,)
 
 
-def load_pixels(path):
-    image = bpy.data.images.load(path)
-    width, height = image.size
-    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(height, width, 4)[::-1]
-    bpy.data.images.remove(image)
-    return pixels
-
-
-def save_pixels(path, pixels):
-    height, width, _ = pixels.shape
-    image = bpy.data.images.new("out", width, height, alpha=True)
-    image.colorspace_settings.name = "Non-Color"
-    image.pixels[:] = np.clip(pixels[::-1], 0, 1).ravel()
-    image.filepath_raw = path
-    image.file_format = "PNG"
-    image.save()
-    bpy.data.images.remove(image)
-
-
-def rounded_square(n, radius):
-    """Coverage of a square tile with rounded corners, sampled at pixel centres."""
-    c = (np.arange(n) + 0.5) / n
-    x, y = np.meshgrid(c, c)
-    dx = np.maximum(np.abs(x - 0.5) - (0.5 - radius), 0)
-    dy = np.maximum(np.abs(y - 0.5) - (0.5 - radius), 0)
-    return (np.hypot(dx, dy) <= radius).astype(np.float32)
-
-
-def background(n):
-    """The sky tile: a gradient, a sun disc with a soft glow in the top left, a dark rim."""
-    rows = np.linspace(0, 1, n)[:, None, None]
-    sky = np.array(SKY_TOP) * (1 - rows) + np.array(SKY_BOTTOM) * rows
-    sky = np.broadcast_to(sky, (n, n, 3)).copy()
-    c = (np.arange(n) + 0.5) / n
-    x, y = np.meshgrid(c, c)
-    distance = np.hypot(x - 0.24, y - 0.22)
-    glow = np.clip(1 - distance / 0.32, 0, 1) ** 2 * 0.55
-    sky = sky * (1 - glow[..., None]) + np.array(SUN) * glow[..., None]
-    disc = distance < 0.11
-    sky[disc] = SUN
-    tile = rounded_square(n, 0.14)
-    inner = rounded_square(n, 0.14)
-    shrink = int(n * 0.035)
-    inner[:] = 0
-    inner[shrink:n - shrink, shrink:n - shrink] = rounded_square(n - 2 * shrink, 0.13)
-    out = np.zeros((n, n, 4), dtype=np.float32)
-    out[..., :3] = np.where(inner[..., None] > 0, sky, np.array(BORDER))
-    out[..., 3] = tile
-    return out
-
-
-def outline(fg, width):
-    """A dark rim around the objects, so they stand off the sky at small sizes."""
-    alpha = fg[..., 3]
-    grown = alpha.copy()
-    for dy in range(-width, width + 1):
-        for dx in range(-width, width + 1):
-            if dx * dx + dy * dy <= width * width:
-                grown = np.maximum(grown, np.roll(np.roll(alpha, dy, 0), dx, 1))
-    return grown
-
-
-def compose(fg):
-    n = fg.shape[0]
-    out = background(n)
-    rim = outline(fg, max(2, n // 90))
-    out[..., :3] = out[..., :3] * (1 - rim[..., None]) + np.array(BORDER) * rim[..., None]
-    a = fg[..., 3:4]
-    out[..., :3] = out[..., :3] * (1 - a) + fg[..., :3] * a
-    # Clip the objects to the tile, so nothing pokes past the rounded rim.
-    out[..., 3] = background(n)[..., 3]
-    return out
-
-
-def downsample(pixels, size):
-    factor = pixels.shape[0] // size
-    alpha = pixels[..., 3:4]
-    colour = (pixels[..., :3] * alpha).reshape(size, factor, size, factor, 3).mean(axis=(1, 3))
-    coverage = alpha.reshape(size, factor, size, factor).mean(axis=(1, 3))
-    out = np.zeros((size, size, 4), dtype=np.float32)
-    out[..., :3] = colour / np.maximum(coverage, 1e-4)[..., None]
-    out[..., 3] = coverage
-    return out
+def sun(pixels):
+    cx, cy = SUN_CENTRE
+    for y in range(SIZE):
+        for x in range(SIZE):
+            # Distance from the pixel's centre; the light comes from the top left.
+            d = ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) ** 0.5
+            if d > SUN_RADIUS:
+                continue
+            if d > SUN_RADIUS - 1.2:
+                colour = OUTLINE
+            elif d > SUN_RADIUS - 2.2:
+                colour = SUN_RIM
+            elif (x + 0.5 - cx) + (y + 0.5 - cy) < -4.5:
+                colour = SUN_LIGHT
+            else:
+                colour = SUN
+            pixels[x, y] = colour + (255,)
 
 
 def main():
-    camera, stage = setup()
-    build(stage)
-    aim(camera, stage)
-    os.makedirs(SCRATCH, exist_ok=True)
-    raw = os.path.join(SCRATCH, "mod_icon.png")
-    bpy.context.scene.render.filepath = raw
-    bpy.ops.render.render(write_still=True)
-    full = compose(load_pixels(raw))
-    save_pixels(ICON, downsample(full, SIZE))
-    for path in FULL_SIZE:
-        save_pixels(path, full)
-    print("mod icon, poster and preview written")
+    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    pixels = image.load()
+    panel(pixels)
+    sun(pixels)
+    image.resize((SIZE * SCALE, SIZE * SCALE), Image.NEAREST).save(ICON, optimize=True)
+    print(f"mod icon written: {os.path.relpath(ICON, REPO)}")
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -962,7 +962,7 @@ def arrow_board_trailer(col):
     box(col, "Trailer_Deck", M("rawsteel"), (width, length, 0.012))
     tube(col, "Trailer_Axle", M("darkgrey"), [(-0.62, axle_y, axle_z), (0.62, axle_y, axle_z)], 0.035, 8)
     _trailer_tongue(col, front)
-    _trailer_battery_box(col, front)
+    _trailer_battery_box(col)
     _arrow_board(col, rear)
     _trailer_modules(col, front)
 
@@ -982,16 +982,25 @@ def _trailer_tongue(col, front):
          0.008)
 
 
-def _trailer_battery_box(col, front):
+TRAILER_BOX = (0.72, 0.42, 0.34)  # width, depth and height of the battery box
+TRAILER_BOX_AT = (TRAILER_DECK_Y + TRAILER_DECK[1] / 2 + 0.3, -0.05)  # y and z of its bottom centre
+# The lid's hinge pins run along X at the back of the box's top, and the lid turns about them. Open
+# this far, it clears the panels' undersides by a centimetre and a half; much further and it meets
+# them.
+TRAILER_LID_HINGE = (0, TRAILER_BOX_AT[0] - TRAILER_BOX[1] / 2 - 0.01, TRAILER_BOX_AT[1] + TRAILER_BOX[2])
+TRAILER_LID_OPEN = 70
+
+
+def _trailer_battery_box(col):
     """The battery box bolted across the tongue: steel with a lid over its rim, a hasp and a
     padlock, stencilled on the side that faces the towing car."""
-    width, depth, height = 0.72, 0.42, 0.34
-    y, z = front + 0.3, -0.05
+    width, depth, height = TRAILER_BOX
+    y, z = TRAILER_BOX_AT
     face = y + depth / 2
     box(col, "Trailer_BatteryBox", M("safety"), (width, depth, height), at=(0, y, z), bevel=0.01)
     box(col, "Trailer_BatteryLid", M("safety"), (width + 0.03, depth + 0.03, 0.035), at=(0, y, z + height), bevel=0.008)
     for x in (-0.22, 0.22):
-        cylinder(col, "Trailer_BatteryHinge", M("darkgrey"), 0.012, 0.08, at=(x - 0.04, y - depth / 2 - 0.01, z + height),
+        cylinder(col, "Trailer_BatteryHinge", M("darkgrey"), 0.012, 0.08, at=(x - 0.04, TRAILER_LID_HINGE[1], TRAILER_LID_HINGE[2]),
                  rotate=(0, 90, 0), segments=8)
     box(col, "Trailer_Hasp", M("rawsteel"), (0.04, 0.012, 0.09), at=(0, face + 0.02, z + height - 0.05))
     box(col, "Trailer_Padlock", M("yellow"), (0.05, 0.025, 0.05), at=(0, face + 0.035, z + height - 0.12), bevel=0.006)
@@ -1110,7 +1119,9 @@ ITEMS = {
 
 # Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes
 # of the parts it takes, and how far they were built from where they belong). Every piece shares
-# the body's texture and mask, and the body keeps whatever no piece takes.
+# the body's texture and mask, and the body keeps whatever no piece takes. A piece in "hinged" turns
+# about a hinge in the game: it gets a bone there and one clip, named for the vehicle script's anim
+# blocks, that swings it from open, `open` degrees about `axis` by the right-hand rule, to shut.
 VEHICLES = {
     "ArrowBoardTrailer": {
         "build": arrow_board_trailer,
@@ -1120,6 +1131,9 @@ VEHICLES = {
             "_PanelRight": (("Trailer1_",), (0, 0, 0)),
             "_PanelLeftCracked": (("TrailerCracked0_",), TRAILER_CRACKED_OFFSET),
             "_PanelRightCracked": (("TrailerCracked1_",), TRAILER_CRACKED_OFFSET),
+        },
+        "hinged": {
+            "_Lid": {"pivot": TRAILER_LID_HINGE, "axis": (1, 0, 0), "open": TRAILER_LID_OPEN, "clip": "Lid_closing"},
         },
     },
 }

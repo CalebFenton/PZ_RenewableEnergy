@@ -8,11 +8,13 @@ editing a layout; recapture only when the game's look or the mod's names change:
 
     art/promo/compose.py
 
-Writes images/{banner,setup,bank,items,recipes,trailer,gardenlights}.png. Every image is 1260 pixels
-wide, which the Workshop page shows at 630, so it stays sharp on high-density screens. Icons are
-scaled by whole numbers with nearest-neighbour sampling, so their pixels stay crisp. The item models
-are framed from the box extract.py found around each. Item, recipe and skill names come from
-captures/promo.json, which the game wrote in its own words; the setup captions are the README's.
+Writes images/{banner,setup,bank,items,recipes,trailer,gardenlights}.png, and the mod's poster,
+Contents/mods/RenewableEnergy/42/poster.png, with the Workshop preview, preview.png. Every image is
+1260 pixels wide, which the Workshop page shows at 630, so it stays sharp on high-density screens;
+the poster and preview are 512 square. Icons are scaled by whole numbers with nearest-neighbour
+sampling, so their pixels stay crisp. The item models are framed from the box extract.py found
+around each. Item, recipe and skill names come from captures/promo.json, which the game wrote in
+its own words; the setup captions are the README's.
 """
 import json
 import math
@@ -22,8 +24,15 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
 CAPTURES = HERE / "captures"
 OUT = HERE / "images"
+# The same picture serves as the mod list's poster and the Workshop preview.
+POSTER_FILES = [REPO / "Contents/mods/RenewableEnergy/42/poster.png", REPO / "preview.png"]
+# The Workshop takes a square preview of 256 or 512 pixels, at most this many bytes
+# (SteamWorkshopItem.validatePreviewImage).
+POSTER_SIZE = 512
+PREVIEW_BYTES = 1_024_000
 FONT = HERE / "fonts" / "NotoSans.ttf"
 PROMO = json.loads((CAPTURES / "promo.json").read_text())
 
@@ -385,6 +394,27 @@ def gardenlights():
     return full_width("gardenlights")
 
 
+def poster():
+    """The lit house at night under the mod's name, in the banner's type. The name is set large
+    enough to read where Steam shows the preview smallest, about 196 pixels across."""
+    image = capture("poster").resize((POSTER_SIZE, POSTER_SIZE), Image.LANCZOS)
+    # Dark from the house's yard down, behind the title; the night above stays as it was shot.
+    shade = Image.linear_gradient("L").resize(image.size)
+    shade = shade.point(lambda v: round(210 * min(1, max(0, (v / 255 - 0.55) / 0.45)) ** 0.8))
+    image.paste(Image.new("RGBA", image.size, (12, 13, 16, 255)), (0, 0), shade)
+    title = "\n".join(PROMO["strings"]["modName"].split())
+    ImageDraw.Draw(image).multiline_text((30, POSTER_SIZE - 30), title, font=font(68, "Bold"), fill=TEXT,
+                                         anchor="ld", spacing=4)
+    return image
+
+
+def save_poster(image):
+    for path in POSTER_FILES:
+        image.convert("RGB").save(path, optimize=True)
+        assert path.stat().st_size <= PREVIEW_BYTES, f"{path.name} is over the Workshop's {PREVIEW_BYTES} bytes"
+        print(f"compose: {path.relative_to(REPO)} {image.width}x{image.height}")
+
+
 # Recipe cards: the recipe's name, skills, how it's learned and its tools in a column on the left,
 # then a slot per input, an arrow and a slot per result. Cards share a row wherever they fit, and
 # each row is as tall as its tallest card's contents.
@@ -589,6 +619,7 @@ def main():
     for name, make in [("banner", banner), ("setup", setup), ("bank", bank), ("items", items),
                        ("recipes", recipes), ("trailer", trailer), ("gardenlights", gardenlights)]:
         save(make(), name)
+    save_poster(poster())
 
 
 if __name__ == "__main__":

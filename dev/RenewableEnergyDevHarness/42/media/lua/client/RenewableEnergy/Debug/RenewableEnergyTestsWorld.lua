@@ -778,6 +778,77 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
     end,
 })
 
+-- Whether this game draws the trailer's lid held still, open or shut, as T.lidPose reads it.
+local function lidHeld(pose, open)
+    return pose ~= nil and pose.clip ~= nil and not pose.playing and pose.open == (open and 1 or 0)
+end
+
+local function describeLid(pose)
+    if not pose then
+        return "no lid model"
+    end
+    return string.format("clip %s, %s, %s open", tostring(pose.clip), pose.playing and "swinging" or "still", tostring(pose.open))
+end
+
+-- The battery box lid swings open on its hinge when a player opens it and stays open, and swings
+-- shut when they close it; it swings the same way in this game when someone else opens and closes
+-- it, which vanilla shows only to the player who did (RenewableEnergy.ArrowBoard.swingLids). Each
+-- swing passes the poses between shut and open, and the batteries come out only while it is open.
+test("renewable_energy_world_arrow_board_lid_swings", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        local LID = RenewableEnergy.ArrowBoard.LID
+        T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
+        T.waitForCopy(function()
+            local door = trailer.vehicle:getPartById(LID):getDoor()
+            return not door:isLocked() and not door:isOpen() and lidHeld(T.lidPose(trailer), false)
+        end)
+        T.step(function()
+            self.shut = T.lidPose(trailer)
+            standIn(trailer.vehicle, BATTERY_BOX)
+        end)
+        self.swings = {}
+        -- Queues `act` and a wait until the lid stands held `open`, noting what it passed on the way.
+        local function swing(name, open, act)
+            local seen = { name = name, open = open }
+            table.insert(self.swings, seen)
+            T.step(act)
+            T.waitForCopy(function()
+                seen.pose = T.lidPose(trailer)
+                if seen.pose and seen.pose.playing and seen.pose.open and seen.pose.open > 0.1 and seen.pose.open < 0.9 then
+                    seen.between = true
+                end
+                return trailer.vehicle:getPartById(LID):getDoor():isOpen() == open and lidHeld(seen.pose, open)
+            end)
+            T.step(function()
+                local vehicle = trailer.vehicle
+                seen.access = vehicle:canAccessContainer(vehicle:getPartById(BATTERY_BOX):getIndex(), p)
+            end)
+        end
+        -- What the trailer's menu does for Open Trunk and Close Trunk.
+        swing("opening it", true, function() ISVehicleMenu.onOpenDoor(p, trailer.vehicle:getPartById(LID)) end)
+        swing("closing it", false, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
+        swing("someone else opening it", true, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
+        swing("someone else closing it", false, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
+    end,
+    validate = function(self)
+        if not expect(lidHeld(self.shut, false), "the shut lid shows " .. describeLid(self.shut)) then
+            return
+        end
+        expect(self.shut.clip == "Lid_closing", "the lid plays " .. tostring(self.shut.clip))
+        for _, seen in ipairs(self.swings) do
+            local ends = seen.open and "open" or "shut"
+            expect(seen.between, seen.name .. " never swung the lid between shut and open")
+            expect(lidHeld(seen.pose, seen.open), seen.name .. " left the lid showing " .. describeLid(seen.pose) .. ", not held " .. ends)
+            expect(seen.access == seen.open, seen.name .. " left the batteries " .. (seen.access and "reachable" or "out of reach")
+                .. " with the lid " .. ends)
+        end
+    end,
+})
+
 -- Queues putting the battery box's padlock on and its lid down, with what the box holds, and a
 -- wait until this client's copy shows the lid locked; leaves the lid and the box in self.
 local function padlockBox(self, trailer, box)
@@ -821,10 +892,10 @@ test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
 
 -- A padlocked battery box opens the way vanilla gets into a locked trunk without its key: the lid
 -- comes off in the mechanics window with a wrench and vanilla's trunk lid skill, without its Basic
--- Mechanics recipe, and then a player takes the batteries out. The lid goes back on without the
--- recipe too, unlocked, so the box shuts again. The test reads canUninstallPart and
--- canInstallPart itself, so in multiplayer the mechanics cheat can shorten the actions, as with the
--- panels.
+-- Mechanics recipe, and then a player takes the batteries out. Off, the lid shows no model. The
+-- lid goes back on without the recipe too, unlocked and drawn shut, so the box shuts again. The
+-- test reads canUninstallPart and canInstallPart itself, so in multiplayer the mechanics cheat can
+-- shorten the actions, as with the panels.
 test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
     instant = true,
     run = function(self)
@@ -848,9 +919,10 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
             ISVehiclePartMenu.onUninstallPart(p, self.lid)
         end)
         T.awaitVehicleState(self, trailer, function(state) return state.lid and not state.lid.installed end, SERVER_MS)
-        T.waitForCopy(function() return self.lid and self.lid:getInventoryItem() == nil end)
+        T.waitForCopy(function() return self.lid and self.lid:getInventoryItem() == nil and T.copyState(trailer).lid.shown == "" end)
         T.step(function()
             self.lidOff = trailer.state
+            self.lidOffCopy = { shown = T.copyState(trailer).lid.shown, pose = T.lidPose(trailer) }
             self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
             local battery = self.box:getItemContainer():getFirstType("RenewableEnergy.DeepCycleBattery")
             if battery then
@@ -867,10 +939,11 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
             end
         end)
         T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.installed end, SERVER_MS)
-        T.waitForCopy(function() return self.lid:getInventoryItem() ~= nil end)
+        T.waitForCopy(function() return self.lid:getInventoryItem() ~= nil and lidHeld(T.lidPose(trailer), false) end)
         T.step(function()
             local door = self.lid:getDoor()
-            self.lidBack = { installed = self.lid:getInventoryItem() ~= nil, locked = door:isLocked(), open = door:isOpen() }
+            self.lidBack = { installed = self.lid:getInventoryItem() ~= nil, locked = door:isLocked(), open = door:isOpen(),
+                shown = T.copyState(trailer).lid.shown, pose = T.lidPose(trailer) }
         end)
     end,
     validate = function(self)
@@ -882,6 +955,9 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
         expect(self.canTakeOff, "the mechanics window won't take the padlocked lid off")
         expect(self.lidOff and not self.lidOff.lid.installed, "the lid is still on the server's trailer")
         expect(self.openAccess, "the box doesn't open with its lid off")
+        local off = self.lidOffCopy
+        expect(off and off.shown == "" and off.pose == nil, "the lid taken off still shows '" .. tostring(off and off.shown)
+            .. "', " .. describeLid(off and off.pose))
         expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
         expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
             "the battery never reached the inventory")
@@ -890,6 +966,8 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
         expect(back and back.installed and not back.locked and not back.open,
             "the lid put back is " .. (back and ((back.installed and "on" or "off") .. ", " .. (back.locked and "locked" or "unlocked")
                 .. " and " .. (back.open and "open" or "shut")) or "unknown") .. ", expected on, unlocked and shut")
+        expect(back and back.shown == "Default" and lidHeld(back.pose, false), "the lid put back shows '"
+            .. tostring(back and back.shown) .. "', " .. describeLid(back and back.pose) .. ", expected Default held shut")
     end,
 })
 

@@ -27,6 +27,8 @@
 --     art_trailer_damage2.png   at stage 2
 --     art_trailer_lid_removed.png   the battery box lid taken off
 --     art_trailer_washed.png    blood on all four sides, then washed off by vanilla's wash action
+--     art_trailer_lid_open.png  the battery box lid swung open, then
+--     art_trailer_lid_shut.png  swung shut again
 --   art_cracked.png   cracked glass on a flat panel, wooden and metal wall panels and racks (one
 --                     module of each rack cracked), placed the way players place them, so the
 --                     mod's own code adds the overlays, and east of them an arrow board trailer
@@ -145,8 +147,20 @@ local function wash(vehicle)
     end
 end
 
+-- The lid swings in real time, about a third of a second at normal speed, whatever the frame rate
+-- (BaseVehicle.updateAnimationPlayer); this leaves it time to come to rest.
+local LID_SWING_MS = 1000
+
+--- Sets the lid open or shut on the lone trailer and returns a runSteps wait for its swing.
+local function swingLid(pair, open)
+    pair.trailer:getPartById("TrunkDoor"):getDoor():setOpen(open)
+    local start = getTimestampMs()
+    return function() return getTimestampMs() - start >= LID_SWING_MS end
+end
+
 -- The trailer's states, each set on a repaired trailer and shot from where the shot before stands.
 -- The hitched trailer shows its rear; the lone one, facing the other way, its front and the lid.
+-- A state's `set` may return how to wait before the shot, as a runSteps step does.
 local HITCHED_STATES = {
     { name = "art_trailer_rust", set = function(pair) pair.trailer:setRust(1) end },
     { name = "art_trailer_blood_right", set = function(pair) setBlood(pair.trailer, { "Right" }) end },
@@ -190,6 +204,8 @@ local LONE_STATES = {
             wash(pair.trailer)
         end,
     },
+    { name = "art_trailer_lid_open", set = function(pair) return swingLid(pair, true) end },
+    { name = "art_trailer_lid_shut", set = function(pair) return swingLid(pair, false) end },
 }
 
 -- `pair` returns the current pair, which the steps only know once they run.
@@ -202,9 +218,8 @@ local function addStates(steps, pair, states)
             if pair().car then
                 pair().car:setStoplightsOn(false)
             end
-            state.set(pair())
             -- A part's new condition reaches the overlay on the vehicle's next update.
-            return 30
+            return state.set(pair()) or 30
         end)
         table.insert(steps, function()
             Stage.screenshot("REArt", state.name)

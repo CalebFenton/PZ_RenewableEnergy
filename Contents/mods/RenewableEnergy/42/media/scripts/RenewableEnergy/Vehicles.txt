@@ -21,11 +21,14 @@ module Base
 
     /* Part models cut from the same bake as the body, in the body's frame, so they sit in place at
        a part offset of zero and draw with the body's skin, mask, rust, damage and blood. The lid
-       keeps the Boot zone that shows its damage. */
+       keeps the Boot zone that shows its damage. It is skinned to a bone on its hinge, with the
+       clip that swings it (art/models/models.py), and only a model that isn't static gets an
+       animation player to play that clip (BaseVehicle.ModelInfo). */
     model RenewableEnergyArrowBoardTrailerLid
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_Lid,
         shader = vehicle_multiuv_noreflect,
+        static = false,
         invertX = false,
         scale = 1.0,
     }
@@ -229,6 +232,34 @@ module Base
             {
                 file = RenewableEnergyArrowBoardTrailerLid,
             }
+            /* The clip runs from open to shut, as vanilla's door clips do. Opened and Closed hold
+               it at one end: the game shows them by the door's state whenever no swing is playing
+               (BaseVehicle.updateAnimationPlayer). RenewableEnergy.ArrowBoard plays the swings,
+               in every game that draws the trailer, when it sees the door change; anim blocks add
+               to the template's, so Open and Close keep only their trunk sounds, which the player
+               opening or shutting the lid hears. */
+            anim Opened
+            {
+                anim = Lid_closing,
+                animate = false,
+            }
+            anim Closed
+            {
+                anim = Lid_closing,
+                reverse = true,
+                animate = false,
+            }
+            anim SwingOpen
+            {
+                anim = Lid_closing,
+                reverse = true,
+                rate = 2.0,
+            }
+            anim SwingClose
+            {
+                anim = Lid_closing,
+                rate = 2.5,
+            }
             /* Getting into a padlocked box, or shutting it again, shouldn't wait on a car
                mechanic's know-how, so the lid comes off and goes back on without the template's
                Basic Mechanics. A table block adds to the template's, and an empty value takes a
@@ -244,7 +275,7 @@ module Base
             lua
             {
                 create = RenewableEnergy.ArrowBoard.createLid,
-                init = Vehicles.Init.Door,
+                init = RenewableEnergy.ArrowBoard.initLid,
                 update = Vehicles.Update.TrunkDoor,
                 use = Vehicles.Use.TrunkDoor,
             }

@@ -130,7 +130,12 @@ def model_sheet():
             imported += list(bpy.context.selected_objects)
         texture_folder = "Vehicles" if folder == "vehicles" else folder
         texture = bpy.data.images.load(os.path.join(MEDIA, "textures/%s/RenewableEnergy_%s.png" % (texture_folder, texture_name)))
+        # A hinged piece comes with its armature, which shows it shut at rest.
         for obj in imported:
+            if obj.type == "ARMATURE":
+                obj.data.pose_position = "REST"
+        meshes = [obj for obj in imported if obj.type == "MESH"]
+        for obj in meshes:
             for mat in obj.data.materials:
                 nodes = [n for n in mat.node_tree.nodes if n.type == "TEX_IMAGE"]
                 if not nodes:
@@ -139,7 +144,7 @@ def model_sheet():
                                             mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
                 for node in nodes:
                     node.image = texture
-        points = [obj.matrix_world @ v.co for obj in imported for v in obj.data.vertices]
+        points = [obj.matrix_world @ v.co for obj in meshes for v in obj.data.vertices]
         centre = sum(points, Vector()) / len(points)
         size = max((p - centre).length for p in points) * 2.1
         for direction in ((-1, 1, -0.8), (1, -1, -0.8)):
