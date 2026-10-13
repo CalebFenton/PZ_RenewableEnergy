@@ -19,8 +19,8 @@
 #                                    another run needs the game.
 #   dev/run-debug-client.sh --test --mp [--stay]
 #                                    the same tests in multiplayer: a dedicated server and a client
-#                                    that joins it as the admin (dev/harness/README.md,
-#                                    Multiplayer); with --stay both stay open, and the next
+#                                    that joins it as the admin (dev/harness/docs/multiplayer.md);
+#                                    with --stay both stay open, and the next
 #                                    --test --mp --stay reruns the tests in about a second
 #   dev/run-debug-client.sh --promo  the same as --test, but instead of the tests the harness builds a
 #                                    working array and captures the art for the README and the
