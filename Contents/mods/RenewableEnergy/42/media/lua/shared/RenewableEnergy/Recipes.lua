@@ -30,6 +30,17 @@ local MOUNT_KINDS = {
     ["RenewableEnergy.SolarRackMetal"] = "rack",
 }
 
+-- What each mount recipe teaches when every module in it is new to mounting, by perk name. A
+-- module teaches its share only the first time it is ever mounted (PowerBank.MOUNTED_ONCE), so
+-- unmounting and mounting the same modules again teaches nothing.
+Recipes.MOUNT_XP = {
+    ["RenewableEnergy.SolarFlat"] = { Electricity = 10 },
+    ["RenewableEnergy.SolarWallWood"] = { Electricity = 15, Woodwork = 5 },
+    ["RenewableEnergy.SolarWallMetal"] = { Electricity = 15, MetalWelding = 5 },
+    ["RenewableEnergy.SolarRackWood"] = { Electricity = 20, Woodwork = 10 },
+    ["RenewableEnergy.SolarRackMetal"] = { Electricity = 20, MetalWelding = 10 },
+}
+
 -- Repair Cracked Module: condition it adds, and the most it brings each module type to. A
 -- factory module's cells stay cracked under the new glass; a homemade one is at its
 -- ConditionMax.
@@ -75,19 +86,30 @@ end
 
 -- Panel mounts -----------------------------------------------------------------------------------
 
--- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will.
+-- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will, and
+-- the modules new to mounting teach their share of the recipe's XP.
 function Recipes.mountModules(craftRecipeData, character)
-    local modules = {}
+    local modules, new = {}, 0
     local items = craftRecipeData:getAllInputItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if isModule(item) then
-            table.insert(modules, { type = item:getFullType(), condition = item:getCondition() })
+            local module = PowerBank.moduleRecord(item)
+            if not module.mounted then
+                module.mounted = true
+                new = new + 1
+            end
+            table.insert(modules, module)
         end
     end
     local mount = craftRecipeData:getFirstCreatedItem()
     mount:getModData()[PowerBank.MODULES] = modules
     sendModData(character, mount)
+    if new > 0 then
+        for perk, xp in pairs(Recipes.MOUNT_XP[mount:getFullType()]) do
+            addXp(character, Perks[perk], xp * new / #modules)
+        end
+    end
 end
 
 local function isMount(item)
@@ -103,6 +125,7 @@ function Recipes.unmountModules(craftRecipeData, character)
     for _, module in ipairs(PowerBank.modulesOf(mount, MOUNT_KINDS[mount:getFullType()])) do
         local item = instanceItem(module.type)
         Wear.setCondition(item, module.condition)
+        PowerBank.markModule(item, module)
         addToInventory(character, item)
     end
 end

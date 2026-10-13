@@ -9,11 +9,14 @@ require "RenewableEnergy/PowerBank/Bank"
 require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
--- trailer with a lamp board and two panels, its batteries in a lockable box on the tongue. It
--- turns up among junkyard and traffic jam wrecks and with tradesmen's vans, and at the road
--- works of SolarSites.lua. Its battery box is stocked the first time the trailer spawns, from
--- Distributions' OnFillContainer. Its panels charge the batteries in the box in daylight, wherever
--- it stands or is towed (GadgetCharging runs it).
+-- trailer with a lamp board and two panels, its batteries in a padlocked box on the tongue. It
+-- turns up among junkyard and traffic jam wrecks, and at the road works of SolarSites.lua. Its
+-- battery box is stocked the first time the trailer spawns, from Distributions' OnFillContainer.
+-- Its panels charge the batteries in the box in daylight, wherever it stands or is towed
+-- (GadgetCharging runs it).
+--
+-- No key to the box's padlock ever spawns, so a locked box opens the way vanilla gets into a
+-- locked trunk without its key: the lid comes off in the mechanics window (Lid, below).
 --
 -- Each panel is a vehicle part holding a Solar Module, whose condition is the part's: storms and
 -- hard crashes crack it, Repair Cracked Panel mends it on the trailer, and the mechanics window
@@ -38,17 +41,24 @@ ArrowBoard.BATTERY_BOX = "RenewableEnergyBatteryBox"
 ArrowBoard.PANELS = { "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight" }
 
 -- Its spawn weight among each vehicle zone's vehicles (VehicleZoneDistribution spawnChance).
--- The four traffic jam zones share one vehicle table. About 5 a map, with the road works.
-ArrowBoard.ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4, trades = 2 }
+-- The four traffic jam zones share one vehicle table. A traffic jam rolls a vehicle in most of its
+-- slots (IsoChunk.AddVehicles_TrafficJam_*) and a junkyard in a quarter of its stalls, so most of
+-- a map's arrow boards stand in the pileups.
+ArrowBoard.ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4 }
 
 -- What it comes with: modules on its panels, the second often cracked; in its battery box deep
--- cycle batteries, charged by Distributions.chargeFoundBatteries, and a charge controller.
+-- cycle batteries, worn by years on the road and charged by Distributions.chargeFoundBatteries,
+-- and often a charge controller. Crews padlock these boxes because batteries are what thieves
+-- take from a work zone, so most are locked, more often than vanilla locks a trunk (half the time
+-- at the default Locked Vehicle Frequency); some were left open in the rush to evacuate.
 ArrowBoard.STOCK = {
     modules = 2,
     secondCrackedChance = 0.6,
     batteries = { min = 4, max = 6 },
     battery = "RenewableEnergy.DeepCycleBattery",
-    controllerChance = 1,
+    batteryCondition = { min = 0, max = 80 },
+    controllerChance = 0.75,
+    lockedChance = 0.75,
 }
 
 -- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` milliseconds of real
@@ -86,7 +96,10 @@ function ArrowBoard.stockBatteryBox(container)
     local stock = ArrowBoard.STOCK
     local batteries = WorldSpawns.rollBetween(stock.batteries)
     for _ = 1, WorldSpawns.scaled(batteries, options.LRMBatteries) do
-        container:AddItem(stock.battery)
+        local battery = container:AddItem(stock.battery)
+        if battery then
+            RenewableEnergy.Wear.setCondition(battery, WorldSpawns.rollBetween(stock.batteryCondition))
+        end
     end
     if ZombRandFloat(0, 1) < stock.controllerChance * options.LRMMisc then
         container:AddItem(Specs.controller)
@@ -106,6 +119,27 @@ end
 ---@return BaseVehicle?
 function ArrowBoard.spawn(square, facing)
     return addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
+end
+
+-- Lid ------------------------------------------------------------------------------------------
+--
+-- The box's lid is a trunk lid under vanilla's TrunkDoor id (scripts/RenewableEnergy/Vehicles.txt).
+-- Without the key, vanilla gets into a locked trunk from a seat, through an open or broken window,
+-- or by taking the lid off in the mechanics window once the key isn't needed for it
+-- (VehicleUtils.RequiredKeyNotFound). Nobody sits in the trailer and it has no windows, but its lid
+-- never needs the key to come off, so a padlocked box opens when someone unbolts the lid, with the
+-- wrench, time and Mechanics odds vanilla asks for a trunk lid, though not its mechanic's recipe.
+-- Put back, the lid is unlocked (Vehicles.InstallComplete.Door).
+
+--- Part `create` of the lid: runs once, when the trailer first enters the world. Shut, and
+--- padlocked by STOCK.lockedChance unless the save's Easy Use option leaves every vehicle
+--- unlocked, as it does vanilla's trunks.
+function ArrowBoard.createLid(vehicle, part)
+    VehicleUtils.createPartInventoryItem(part)
+    local door = part:getDoor()
+    door:setOpen(false)
+    door:setLocked(not SandboxVars.VehicleEasyUse and ZombRandFloat(0, 1) < ArrowBoard.STOCK.lockedChance)
+    door:setLockBroken(false)
 end
 
 -- Panels ---------------------------------------------------------------------------------------
@@ -222,6 +256,23 @@ end
 --- Install and uninstall `complete` of the panels, on the authority.
 function ArrowBoard.panelChanged(vehicle, part)
     ArrowBoard.showPanel(part)
+end
+
+-- Vanilla only lowers the odds of a part going on or coming off when a skill is below the part's
+-- (VehicleUtils.calculateInstallationSuccess). A panel is wired as well as bolted, so it asks for
+-- every skill its table lists, through vanilla's own check that its tests leave unused.
+local function hasPanelSkills(part, chr, tableName)
+    return ISVehicleMechanics.cheat or VehicleUtils.testPerks(chr, part:getTable(tableName).skills)
+end
+
+--- Install `test` of the panels: vanilla's, and the skills.
+function ArrowBoard.panelInstallTest(vehicle, part, chr)
+    return Vehicles.InstallTest.Default(vehicle, part, chr) and hasPanelSkills(part, chr, "install")
+end
+
+--- Uninstall `test` of the panels: vanilla's, and the skills.
+function ArrowBoard.panelUninstallTest(vehicle, part, chr)
+    return Vehicles.UninstallTest.Default(vehicle, part, chr) and hasPanelSkills(part, chr, "uninstall")
 end
 
 --- Cracks the panel's module as a storm cracks a module: by Specs.storm.crack. Authority only.

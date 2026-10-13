@@ -96,6 +96,20 @@ function Commands.connectSource(player, args)
         previous:removeSource(x, y, z)
         previous:sendStatus()
     end
+    -- Each module teaches a little the first time it is ever connected, and the record keeps
+    -- that, through moves between banks and with the module when it comes off its mount.
+    local modules = PowerBank.modulesOf(source, PowerBank.sourceKind(source))
+    local learned = 0
+    for _, module in ipairs(modules) do
+        if not module.connected then
+            module.connected = true
+            learned = learned + 1
+        end
+    end
+    if learned > 0 then
+        PowerBank.writeModules(source, modules)
+        addXp(player, Perks.Electricity, Specs.connectXp * learned)
+    end
     bank:addSource(source)
     bank:sendStatus()
     return true

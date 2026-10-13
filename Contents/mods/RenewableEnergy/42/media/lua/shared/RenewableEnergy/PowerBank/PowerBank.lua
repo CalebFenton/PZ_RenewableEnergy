@@ -21,8 +21,13 @@ PowerBank.WIRE = "Base.ElectricWire"
 PowerBank.SCRAP = "Base.ElectronicsScrap"
 -- Item modData: the item was wired into a bank once, which taught its Electricity XP.
 PowerBank.WIRED_ONCE = "RenewableEnergy_wiredOnce"
--- Item and placed-object modData: the modules a panel mount holds, { { type, condition }, ... }.
+-- Item and placed-object modData: the modules a panel mount holds, { { type, condition, mounted,
+-- connected }, ... }. mounted and connected say the module already taught the XP of its first
+-- mounting and its first connection to a bank, so moving modules around teaches nothing new.
 PowerBank.MODULES = "RenewableEnergy_modules"
+-- Solar module item modData: the same two flags, while the module is off its mount.
+PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
+PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
 
 local SOURCE_KINDS = { flat = true, wall = true, rack = true }
 
@@ -84,15 +89,19 @@ function PowerBank.sourceOn(square)
     return RenewableEnergy.findObjectOn(square, isSource)
 end
 
---- The modules a panel holds, as a fresh list of { type, condition }: what the item or placed
---- object `holder` recorded under MODULES or, without a record (a mount spawned by debug), the
---- `mount` kind's full load of factory modules at full condition.
+local function copyModule(module)
+    return { type = module.type, condition = module.condition, mounted = module.mounted, connected = module.connected }
+end
+
+--- The modules a panel holds, as a fresh list of module records: what the item or placed object
+--- `holder` recorded under MODULES or, without a record (a mount spawned by debug), the `mount`
+--- kind's full load of factory modules at full condition.
 function PowerBank.modulesOf(holder, mount)
     local modules = {}
     local recorded = holder:getModData()[PowerBank.MODULES]
     if type(recorded) == "table" then
         for _, module in ipairs(recorded) do
-            table.insert(modules, { type = module.type, condition = module.condition })
+            table.insert(modules, copyModule(module))
         end
     end
     if #modules == 0 then
@@ -101,6 +110,30 @@ function PowerBank.modulesOf(holder, mount)
         end
     end
     return modules
+end
+
+--- Records `modules` on a placed panel and sends the record to clients.
+function PowerBank.writeModules(isoObject, modules)
+    local record = {}
+    for i, module in ipairs(modules) do
+        record[i] = copyModule(module)
+    end
+    isoObject:getModData()[PowerBank.MODULES] = record
+    isoObject:transmitModData()
+end
+
+--- The module record of a solar module item.
+function PowerBank.moduleRecord(item)
+    local data = item:getModData()
+    return { type = item:getFullType(), condition = item:getCondition(),
+        mounted = data[PowerBank.MOUNTED_ONCE] == true, connected = data[PowerBank.CONNECTED_ONCE] == true }
+end
+
+--- Marks a solar module item with its record's flags, as it comes off a mount.
+function PowerBank.markModule(item, module)
+    local data = item:getModData()
+    data[PowerBank.MOUNTED_ONCE] = module.mounted or nil
+    data[PowerBank.CONNECTED_ONCE] = module.connected or nil
 end
 
 --- Shows a cracked glass over each of a placed panel's modules below Specs.crackedBelow and over
@@ -199,8 +232,8 @@ local function countParts(container, kind)
     return count
 end
 
---- What wiring `fullType` into a bank takes (Specs.wiring), with the Electricity level filled
---- in, or nil if it is no part.
+--- What wiring `fullType` into a bank takes (Specs.wiring), with the Electricity level and XP
+--- filled in, or nil if it is no part.
 function PowerBank.wiringFor(fullType)
     local kind = PowerBank.partKind(fullType)
     if not kind then
@@ -212,6 +245,7 @@ function PowerBank.wiringFor(fullType)
     end
     if kind == "inverter" then
         wiring.skill = Specs.inverters[fullType].wireSkill
+        wiring.xp = Specs.inverters[fullType].wireXp
     end
     return wiring
 end

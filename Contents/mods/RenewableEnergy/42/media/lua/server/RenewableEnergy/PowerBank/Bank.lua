@@ -290,15 +290,6 @@ local function conditionMax(fullType)
     return CONDITION_MAX[fullType]
 end
 
-local function writeModules(isoObject, modules)
-    local record = {}
-    for i, module in ipairs(modules) do
-        record[i] = { type = module.type, condition = module.condition }
-    end
-    isoObject:getModData()[PowerBank.MODULES] = record
-    isoObject:transmitModData()
-end
-
 --- The watts a panel's modules are rated for as they are now, and at their best.
 local function moduleWatts(source)
     local now, best = 0, 0
@@ -437,7 +428,7 @@ end
 -- is the truth. Either way the tile shows the cracks the record now holds.
 local function syncModules(source, object)
     if source.modulesChanged then
-        writeModules(object, source.modules)
+        PowerBank.writeModules(object, source.modules)
         source.modulesChanged = nil
     else
         source.modules = PowerBank.modulesOf(object, source.kind)

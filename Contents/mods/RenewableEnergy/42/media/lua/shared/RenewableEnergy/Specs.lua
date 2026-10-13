@@ -19,12 +19,13 @@ Specs.batteries = {
 
 -- Inverters by item type: the watts it carries (a bank's limit is the sum over its working
 -- inverters), the watts it draws itself while on, the watts its built-in charger puts into the
--- bank from grid or generator power (0 for none), and the Electricity level wiring it in needs.
+-- bank from grid or generator power (0 for none), the Electricity level wiring it in needs, and
+-- the Electricity XP of the first time one is ever wired in.
 -- The Plug-in Inverter carries a TV and one lamp, or a mini fridge, but not a full fridge.
 Specs.inverters = {
-    ["RenewableEnergy.PlugInInverter"] = { watts = 150, idle = 4, chargerWatts = 0, wireSkill = 0 },
-    ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wireSkill = 2 },
-    ["RenewableEnergy.InverterCharger"] = { watts = 2500, idle = 15, chargerWatts = 1500, wireSkill = 4 },
+    ["RenewableEnergy.PlugInInverter"] = { watts = 150, idle = 4, chargerWatts = 0, wireSkill = 0, wireXp = 10 },
+    ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wireSkill = 2, wireXp = 15 },
+    ["RenewableEnergy.InverterCharger"] = { watts = 2500, idle = 15, chargerWatts = 1500, wireSkill = 4, wireXp = 25 },
 }
 
 -- The bank parts besides batteries and inverters: the charge controller, and vanilla's car
@@ -99,14 +100,17 @@ Specs.banks = {
 
 -- What wiring each kind of part into a bank takes: game seconds at Electricity 0, Electric Wire
 -- (Unwire gives it back), Electronics Scrap (kept by the part), the tool (an ItemTag field) and
--- the Electricity level. Inverters take their own wireSkill. xp is the Electricity XP of the
--- first time an item is ever wired in.
+-- the Electricity level. xp is the Electricity XP of the first time an item is ever wired in.
+-- Inverters take their own wireSkill and wireXp.
 Specs.wiring = {
-    battery = { seconds = 30, wire = 1, scrap = 0, tool = "WRENCH", skill = 0, xp = 2 },
-    inverter = { seconds = 60, wire = 2, scrap = 0, tool = "SCREWDRIVER", xp = 5 },
-    charger = { seconds = 30, wire = 1, scrap = 0, tool = "SCREWDRIVER", skill = 0, xp = 2 },
-    controller = { seconds = 60, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 3, xp = 5 },
+    battery = { seconds = 30, wire = 1, scrap = 0, tool = "WRENCH", skill = 0, xp = 5 },
+    inverter = { seconds = 60, wire = 2, scrap = 0, tool = "SCREWDRIVER" },
+    charger = { seconds = 30, wire = 1, scrap = 0, tool = "SCREWDRIVER", skill = 0, xp = 5 },
+    controller = { seconds = 60, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 3, xp = 15 },
 }
+
+-- Electricity XP for each module of a panel the first time it is ever connected to a bank.
+Specs.connectXp = 5
 
 -- Rated watts of the gadgets' cells.
 Specs.cellChargerWatts = 5

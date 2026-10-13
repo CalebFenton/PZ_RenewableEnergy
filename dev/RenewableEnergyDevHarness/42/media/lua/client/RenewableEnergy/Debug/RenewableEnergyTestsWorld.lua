@@ -583,8 +583,8 @@ end
 
 -- A spawned arrow board has a module on each panel, the first weathered and the second weathered
 -- or cracked, each showing the model its condition calls for, to players too; its battery box
--- holds no modules, deep cycle batteries at a part charge, and a charge controller; and the
--- trailer turns up among junkyard, traffic jam and tradesmen's vehicles.
+-- holds no modules, worn deep cycle batteries at a part charge, and at most one charge
+-- controller; and the trailer turns up among junkyard and traffic jam vehicles.
 test("renewable_energy_world_arrow_board_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -595,7 +595,7 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
     end,
     validate = function(self)
         local ArrowBoard = RenewableEnergy.ArrowBoard
-        for _, zone in ipairs({ "junkyard", "trafficjamn", "trafficjams", "trades" }) do
+        for _, zone in ipairs({ "junkyard", "trafficjamn", "trafficjams" }) do
             expect(VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] ~= nil, "no arrow boards in " .. zone)
         end
         local state = self.trailer.state
@@ -616,12 +616,15 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
             if item.charge then
                 batteries = batteries + 1
                 table.insert(charges, item.charge)
+                -- Worn, but never better than a battery that has seen years of road work.
+                expect(item.condition >= 0 and item.condition <= 80, "a battery in the box is at " .. item.condition .. "%")
             end
         end
         expect(batteries >= 4 and batteries <= 6, batteries .. " batteries in the battery box")
         expect(#boxItems(state, "RenewableEnergy.DeepCycleBattery") == batteries, "the battery box holds other batteries")
         expectFoundCharges(charges, "the battery box")
-        expect(#boxItems(state, "RenewableEnergy.ChargeController") == 1, "the battery box has no charge controller")
+        local controllers = #boxItems(state, "RenewableEnergy.ChargeController")
+        expect(controllers <= 1, "the battery box has " .. controllers .. " charge controllers")
     end,
 })
 
@@ -690,8 +693,8 @@ local function standIn(vehicle, area)
     p:setY(spot:getY())
 end
 
--- Its battery box opens only with its lid open, from beside it, and takes a battery a player puts
--- in.
+-- Its battery box, unlocked, opens only with its lid open, from beside it, and takes a battery a
+-- player puts in.
 test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
     instant = true,
     run = function(self)
@@ -699,7 +702,9 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
         self.trailer = spawnTrailer(self, { repair = true })
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
-        T.vehicleState(self, trailer)
+        -- Most trailers spawn with the box padlocked.
+        T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
+        T.waitForCopy(function() return not trailer.vehicle:getPartById("TrunkDoor"):getDoor():isLocked() end)
         T.give(self, "battery", { { type = "RenewableEnergy.DeepCycleBattery" } })
         T.step(function()
             -- A spawned trailer may come stocked, so count from what it already holds.
@@ -709,9 +714,9 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
             self.lid, self.box = lid, box
             if not (lid and lid:getDoor() and box and box:getItemContainer()) then return end
             standIn(vehicle, BATTERY_BOX)
-            self.lockedAtStart = lid:getDoor():isLocked()
             self.shutAccess = vehicle:canAccessContainer(box:getIndex(), p)
-            ISTimedActionQueue.add(ISOpenVehicleDoor:new(p, vehicle, lid))
+            -- What the trailer's menu does for Open Trunk.
+            ISVehicleMenu.onOpenDoor(p, lid)
         end)
         T.waitForCopy(function() return self.lid and self.lid:getDoor() and self.lid:getDoor():isOpen() end)
         T.step(function()
@@ -729,12 +734,103 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
                 and expect(self.box ~= nil and self.box:getItemContainer() ~= nil, "the battery box holds nothing")) then
             return
         end
-        expect(not self.lockedAtStart, "the battery box starts locked")
+        expect(self.trailer.state.lid ~= nil and not self.trailer.state.lid.locked, "the battery box stayed locked")
         expect(not self.shutAccess, "the battery box opens with its lid shut")
         expect(self.trailer.state.lid.open, "opening the lid left it shut")
         expect(self.openAccess, "the battery box doesn't open beside it with its lid open")
         local after = #boxItems(self.trailer.state, "RenewableEnergy.DeepCycleBattery")
         expect(after == self.before + 1, "the battery box holds " .. after .. " deep cycles after one was put in, " .. self.before .. " before")
+    end,
+})
+
+-- Queues putting the battery box's padlock on and its lid down, with what the box holds, and a
+-- wait until this client's copy shows the lid locked; leaves the lid and the box in self.
+local function padlockBox(self, trailer, box)
+    T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = true, box = box })
+    T.waitForCopy(function()
+        local lid = trailer.vehicle:getPartById("TrunkDoor")
+        return lid and lid:getDoor() and lid:getDoor():isLocked() and not lid:getDoor():isOpen()
+    end)
+    T.step(function()
+        self.lid, self.box = trailer.vehicle:getPartById("TrunkDoor"), trailer.vehicle:getPartById(BATTERY_BOX)
+        standIn(trailer.vehicle, BATTERY_BOX)
+    end)
+end
+
+-- A padlocked battery box stays shut when a player opens it as they would an unlocked one: the
+-- trailer's Open Trunk tries the lock first, and nobody has the key. The refused unlock empties
+-- the action queue (ISBaseTimedAction.stop), so it comes last and the checks read the copy here.
+test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        padlockBox(self, trailer)
+        T.step(function()
+            self.canUnlock = trailer.vehicle:canUnlockDoor(self.lid, p)
+            ISVehicleMenu.onOpenDoor(p, self.lid)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.lid ~= nil and self.box ~= nil, "the trailer has no lid or no battery box") then
+            return
+        end
+        local door = self.lid:getDoor()
+        expect(not self.canUnlock, "a character without a key can unlock the battery box")
+        expect(door:isLocked() and not door:isOpen(), "opening the padlocked box left it "
+            .. (door:isLocked() and "locked" or "unlocked") .. " and " .. (door:isOpen() and "open" or "shut"))
+        expect(not self.trailer.vehicle:canAccessContainer(self.box:getIndex(), player()), "the padlocked box opens")
+    end,
+})
+
+-- A padlocked battery box opens the way vanilla gets into a locked trunk without its key: the lid
+-- comes off in the mechanics window with a wrench and vanilla's trunk lid skill, without its Basic
+-- Mechanics recipe, and then a player takes the batteries out. Instant in single player only, as
+-- with the panels.
+test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
+    instant = not isClient(),
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        T.setPerk(self, Perks.Mechanics, 3)
+        T.give(self, "wrench", { { type = "Base.Wrench" } })
+        padlockBox(self, trailer, { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.5 } })
+        T.waitForCopy(function() return self.box and self.box:getItemContainer():getItems():size() == 1 end)
+        T.step(function()
+            local vehicle = trailer.vehicle
+            self.knewRecipe = p:isRecipeActuallyKnown("Basic Mechanics")
+            self.lockedAccess = vehicle:canAccessContainer(self.box:getIndex(), p)
+            self.canTakeOff = vehicle:canUninstallPart(p, self.lid)
+            -- What the mechanics window does for Uninstall.
+            ISVehiclePartMenu.onUninstallPart(p, self.lid)
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return state.lid and not state.lid.installed end, SERVER_MS)
+        T.waitForCopy(function() return self.lid and self.lid:getInventoryItem() == nil end)
+        T.step(function()
+            self.lidOff = trailer.state
+            self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
+            local battery = self.box:getItemContainer():getFirstType("RenewableEnergy.DeepCycleBattery")
+            if battery then
+                ISTimedActionQueue.add(ISInventoryTransferAction:new(p, battery, self.box:getItemContainer(), p:getInventory()))
+            end
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
+        T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil end)
+    end,
+    validate = function(self)
+        if not expect(self.lid ~= nil and self.box ~= nil, "the trailer has no lid or no battery box") then
+            return
+        end
+        expect(not self.knewRecipe, "the character knows Basic Mechanics, so the lid coming off proves nothing")
+        expect(not self.lockedAccess, "the padlocked box opens with its lid on")
+        expect(self.canTakeOff, "the mechanics window won't take the padlocked lid off")
+        expect(self.lidOff and not self.lidOff.lid.installed, "the lid is still on the server's trailer")
+        expect(self.openAccess, "the box doesn't open with its lid off")
+        expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
+        expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
+            "the battery never reached the inventory")
     end,
 })
 
@@ -821,6 +917,7 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
         T.setPerk(self, Perks.Mechanics, 2)
+        T.setPerk(self, Perks.Electricity, 1)
         T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 35 } } })
         waitForPanelsCopy(trailer)
         T.give(self, "wrench", { { type = "Base.Wrench", equip = "primary" } })
@@ -857,6 +954,36 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
         expect(panelCondition(state, LEFT) == 90, "the module went on at " .. tostring(panelCondition(state, LEFT)))
         expect(panelShown(state, LEFT) == "Whole", "a panel at 90 shows " .. panelShown(state, LEFT))
         expectPanelsCopy(self.trailer)
+    end,
+})
+
+-- A panel is wired as well as bolted, so without Electrical 1 the mechanics window neither takes
+-- one off nor puts one on, even with Mechanics 2 and a wrench, and a queued removal does nothing.
+-- The refused removal empties the action queue, so it comes last and the checks read the copy.
+test("renewable_energy_world_arrow_board_panels_need_electrical", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self)
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.setPerk(self, Perks.Electricity, 0)
+        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = {} } })
+        waitForPanelsCopy(trailer)
+        T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
+        T.step(function()
+            local vehicle = trailer.vehicle
+            self.canTakeOff = vehicle:canUninstallPart(p, vehicle:getPartById(LEFT))
+            self.canPutOn = vehicle:canInstallPart(p, vehicle:getPartById(RIGHT))
+            ISTimedActionQueue.add(ISUninstallVehiclePart:new(p, vehicle:getPartById(LEFT), 200))
+        end)
+    end,
+    validate = function(self)
+        expect(not self.canTakeOff, "a panel comes off without Electrical")
+        expect(not self.canPutOn, "a panel goes on without Electrical")
+        local left = self.trailer.vehicle and self.trailer.vehicle:getPartById(LEFT)
+        expect(left and left:getInventoryItem() ~= nil, "the panel came off without Electrical")
+        expect(player():getInventory():getCountTypeRecurse(MODULE) == 1, "a module came off into the inventory")
     end,
 })
 
@@ -1112,7 +1239,7 @@ test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
 })
 
 -- Repair Cracked Panel takes Repair Cracked Module's screwdriver (kept), glass pane, epoxy and
--- electric wire, needs its Electricity 3 and gives its 15 XP, and adds 30 to the panel's module up
+-- electric wire, needs its Electricity 3 and gives its XP, and adds 30 to the panel's module up
 -- to the factory module's 80.
 local function repairTest(name, from, to)
     test(name, {
@@ -1139,9 +1266,9 @@ local function repairTest(name, from, to)
             T.count(self, "left", { "Base.Screwdriver", "Base.GlassPanel", "Base.ElectricWire", "Base.Epoxy" })
             T.server(self, "electricityAward", { xp = 0 })
             T.step(function() self.gainedXp = self.server.electricityAward.xp - self.xp end)
-            -- What the game gives this character for an award of 15, the recipe's xpAward, through
-            -- the call CraftRecipe.addXP makes.
-            T.server(self, "electricityAward", { xp = 15 })
+            -- What the game gives this character for the recipe's xpAward, through the call
+            -- CraftRecipe.addXP makes.
+            T.server(self, "electricityAward", { xp = RenewableEnergy.Recipes.moduleRepairRecipe():getXPAward(0):getAmount() })
             waitForPanelsCopy(trailer)
         end,
         validate = function(self)

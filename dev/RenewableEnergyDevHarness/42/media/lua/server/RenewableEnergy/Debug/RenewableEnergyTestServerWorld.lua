@@ -797,7 +797,7 @@ function World.vehicleState(vehicle)
     local lid = vehicle:getPartById("TrunkDoor")
     local door = lid and lid:getDoor()
     if door then
-        state.lid = { open = door:isOpen(), locked = door:isLocked() }
+        state.lid = { open = door:isOpen(), locked = door:isLocked(), installed = lid:getInventoryItem() ~= nil }
     end
     return state
 end
@@ -851,7 +851,8 @@ end
 -- panel of `args.panels` ({ [partId] = { type, condition } }, an empty table taking the module
 -- off); each frame part of `args.frame` ({ [partId] = condition }); the battery box emptied and
 -- filled with `args.box` ({ { type, charge } }) if given; the blood of `args.blood` ({ [side] =
--- intensity }); the lid open or shut if `args.lidOpen` is set. Answers its state.
+-- intensity }); the lid open or shut if `args.lidOpen` is set, and locked or not if
+-- `args.lidLocked` is. Answers its state.
 handler("setTrailer", function(_, args)
     local vehicle, missing = vehicleArg(args)
     if not vehicle then
@@ -888,9 +889,14 @@ handler("setTrailer", function(_, args)
     for side, intensity in pairs(args.blood or {}) do
         vehicle:setBloodIntensity(side, intensity)
     end
+    local lid = vehicle:getPartById("TrunkDoor")
     if args.lidOpen ~= nil then
-        local lid = vehicle:getPartById("TrunkDoor")
         lid:getDoor():setOpen(args.lidOpen)
+    end
+    if args.lidLocked ~= nil then
+        lid:getDoor():setLocked(args.lidLocked)
+    end
+    if args.lidOpen ~= nil or args.lidLocked ~= nil then
         vehicle:transmitPartDoor(lid)
     end
     return { state = World.vehicleState(vehicle) }

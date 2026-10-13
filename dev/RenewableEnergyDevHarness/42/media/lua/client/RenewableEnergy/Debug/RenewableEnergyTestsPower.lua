@@ -689,6 +689,39 @@ test("renewable_energy_power_wiring_parts", {
     end,
 })
 
+-- Connecting a panel gives Electricity XP once per module, the first time that module is ever
+-- connected: a rack holding one module connected before gives the other one's share and marks
+-- both, and connecting it again after disconnecting gives nothing.
+test("renewable_energy_power_connect_xp_once_per_module", {
+    run = function(self)
+        T.setPerk(self, Perks.Electricity, 3)
+        local module = Specs.factoryModule
+        local bank = T.bank(self, "batteryBoxWood", {})
+        local panel = bank and T.panel(self, Sprites.rack.wood.S, { near = bank,
+            modules = { { type = module, condition = 90, connected = true }, { type = module, condition = 90 } } })
+        if not panel then return end
+        local args = { bank = bank.position, source = panel.position }
+        perform(self, "connected", "connectSource", args)
+        perform(self, "disconnected", "disconnectSource", args)
+        perform(self, "reconnected", "connectSource", args)
+        T.server(self, "panelState", panel.position)
+        -- What the game gives this character for one module's award, through the call
+        -- CraftRecipe.addXP makes.
+        T.server(self, "electricityAward", { xp = Specs.connectXp })
+    end,
+    validate = function(self)
+        if not expect(self.connected and self.connected.ok, "connecting the rack failed") then return end
+        expectNear("Electricity XP from connecting a rack with one new module", self.connected.xpAfter - self.connected.xpBefore,
+            self.server.electricityAward.gained, 0.01)
+        expect(self.disconnected.ok, "disconnecting the rack failed (" .. tostring(self.disconnected.reason) .. ")")
+        expect(self.reconnected.ok, "connecting the rack again failed (" .. tostring(self.reconnected.reason) .. ")")
+        expectNear("Electricity XP from connecting the rack again", self.reconnected.xpAfter - self.reconnected.xpBefore, 0, 0)
+        local modules = self.server.panelState.modules or {}
+        expect(#modules == 2 and modules[1].connected == true and modules[2].connected == true,
+            "the rack's record doesn't mark both modules connected")
+    end,
+})
+
 -- Queues repairing the first Inverter/Charger in `bank` as the server's character, leaving the
 -- answer in self[key].
 local function repair(self, key, bank)

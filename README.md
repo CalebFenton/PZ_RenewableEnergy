@@ -117,7 +117,7 @@ The batteries in a bank share one charge, and each day's drain wears them with t
 
 ### Keeping it running
 
-Three repairs bring a worn battery back. **Service Battery**, with water and a rag or baking soda, gives back some condition. **Recondition Battery**, with more of both, gives back a lot but leaves it flat. A **rebuild** makes it like new, and it's a project: strip the battery and save its acid, recast the worn plates at a furnace in a clay mold you fired yourself, and put it back together. Only charcoal and water get used up, so a battery you look after lasts as long as you play. Spill the acid and you'll need Battery Electrolyte.
+Three repairs bring a worn battery back. **Service Battery**, with water and a rag or baking soda, gives back some condition. **Recondition Battery**, with more of both, gives back a lot but leaves it flat. A **rebuild** makes it like new, and it's a project: strip the battery and save its acid, recast the worn plates at a furnace in a clay mold you fired yourself, and put it back together. Recasting loses lead, as it does at a real smelter: three worn sets cast two new ones, or two and a Lead Pipe. Keeping a bank alive means feeding it old batteries or pipe. Spill the acid and you'll need Battery Electrolyte.
 
 Inverters and charge controllers wear while they run, and an inverter more each time you overload it. Fix them with **Repair with Scrap** in the bank's menu, the way you'd fix a generator. Worn out, they stop until you do.
 
@@ -216,7 +216,7 @@ Solar arrow boards are the orange trailers road crews park at work zones, with a
 
 <p align="center"><img src="art/promo/images/trailer.png" alt="The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a red car on a road." width="100%"></p>
 
-They also turn up in junkyards, highway pileups and with tradesmen's vans. The battery box on the tongue holds deep cycle batteries and a charge controller, and one module is often cracked. Strip it where it stands, or tow it home, where its panels keep charging its batteries. Storms and crashes crack the panels and crashes dent the frame; right-click the trailer to repair either.
+You'll also find them in junkyards and, most often, in highway pileups. The battery box on the tongue holds well-used deep cycle batteries, usually a charge controller, and it's usually padlocked: with no key anywhere, you unbolt the lid with a wrench. Taking a panel off takes a wrench, Mechanics 2 and Electrical 1, and one module is often cracked. Strip it where it stands, or tow it home, where its panels keep charging its batteries. Storms and crashes crack the panels and crashes dent the frame; right-click the trailer to repair either.
 
 ### Stash houses
 

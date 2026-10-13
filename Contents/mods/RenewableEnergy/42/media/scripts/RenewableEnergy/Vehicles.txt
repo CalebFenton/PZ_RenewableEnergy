@@ -215,9 +215,12 @@ module Base
             }
         }
         /* The battery box's lid. Vehicles.ContainerAccess.TruckBed opens a container only while
-           the part named TrunkDoor is open, so the lid takes that name, and its lock is the box's
-           lock. It starts closed and unlocked. A lua block replaces the template's whole list. Its
-           model shows only while a lid is installed. */
+           the part named TrunkDoor is open or gone, so the lid takes that name, and its lock is
+           the box's padlock. It starts closed and often locked (RenewableEnergy.ArrowBoard). No
+           key spawns for it, and the lid needs none to come off, so the mechanics window unbolts a
+           locked one as the template's trunk lid, with its wrench, time and Mechanics odds. A lua
+           block replaces the template's whole list. Its model shows only while a lid is
+           installed. */
         part TrunkDoor
         {
             area = RenewableEnergyBatteryBox,
@@ -226,9 +229,16 @@ module Base
             {
                 file = RenewableEnergyArrowBoardTrailerLid,
             }
+            /* Getting into a padlocked box shouldn't wait on a car mechanic's know-how, so the lid
+               comes off without the template's Basic Mechanics. A table block adds to the
+               template's, and an empty value takes a key out (VehicleScript.LoadTable). */
+            table uninstall
+            {
+                recipes = ,
+            }
             lua
             {
-                create = Vehicles.Create.TrunkDoorOpen,
+                create = RenewableEnergy.ArrowBoard.createLid,
                 init = Vehicles.Init.Door,
                 update = Vehicles.Update.TrunkDoor,
                 use = Vehicles.Use.TrunkDoor,
@@ -315,8 +325,8 @@ module Base
                     }
                 }
                 time = 200,
-                skills = Mechanics:2,
-                test = Vehicles.InstallTest.Default,
+                skills = Mechanics:2;Electricity:1,
+                test = RenewableEnergy.ArrowBoard.panelInstallTest,
                 complete = RenewableEnergy.ArrowBoard.panelChanged,
             }
             table uninstall
@@ -332,8 +342,8 @@ module Base
                     }
                 }
                 time = 200,
-                skills = Mechanics:2,
-                test = Vehicles.UninstallTest.Default,
+                skills = Mechanics:2;Electricity:1,
+                test = RenewableEnergy.ArrowBoard.panelUninstallTest,
                 complete = RenewableEnergy.ArrowBoard.panelChanged,
             }
             lua

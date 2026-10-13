@@ -225,11 +225,11 @@ test("renewable_energy_tiles_place_and_pick_up", {
     end,
 })
 
--- A mount keeps each module's condition, and a garden light its charge and bulb, from item to
--- placed object and back.
+-- A mount keeps each module's condition and whether it was mounted or connected before, and a
+-- garden light its charge and bulb, from item to placed object and back.
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
-    { type = "RenewableEnergy.SolarModule", condition = 72 },
+    { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
 }
 local CARRIED = {
     { Sprites.rack.wood.S, "RenewableEnergy.SolarRackWood", RenewableEnergy.PowerBank.MODULES, MODULES },
@@ -244,7 +244,8 @@ local function describe(value)
     end
     local parts = {}
     for _, module in ipairs(value) do
-        table.insert(parts, tostring(module.type) .. "@" .. tostring(module.condition))
+        table.insert(parts, tostring(module.type) .. "@" .. tostring(module.condition)
+            .. (module.mounted and " mounted" or "") .. (module.connected and " connected" or ""))
     end
     return "{" .. table.concat(parts, ", ") .. "}"
 end

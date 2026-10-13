@@ -9,7 +9,8 @@ require "RenewableEnergy/PowerBank/PowerBank"
 
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, player = T.test, T.craftTest, T.expect, T.expectNear, T.player
-local MODULES_KEY = RenewableEnergy.PowerBank.MODULES
+local PowerBank = RenewableEnergy.PowerBank
+local MODULES_KEY = PowerBank.MODULES
 
 -- The test name for `recipe`: "RenewableEnergy_TakeApartSolarCellCharger", "returns_x" ->
 -- "renewable_energy_craft_take_apart_solar_cell_charger_returns_x".
@@ -128,7 +129,8 @@ for _, entry in ipairs(MOUNTS) do
     })
 end
 
--- Unmounting gives back each module as the type and at the condition it went in.
+-- Unmounting gives back each module as the type and at the condition it went in, still marked as
+-- mounted and connected before if it was.
 local UNMOUNTS = {
     { "RenewableEnergy_UnmountSolarFlat", "RenewableEnergy.SolarFlat" },
     { "RenewableEnergy_UnmountSolarWallWood", "RenewableEnergy.SolarWallWood" },
@@ -143,7 +145,7 @@ for _, entry in ipairs(UNMOUNTS) do
         recipe = recipe,
         from = mount,
         setup = function(self)
-            local modules = { { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 } }
+            local modules = { { type = "RenewableEnergy.HomemadeSolarModule", condition = 41, mounted = true, connected = true } }
             if rack then
                 table.insert(modules, { type = "RenewableEnergy.SolarModule", condition = 12 })
             end
@@ -161,6 +163,9 @@ for _, entry in ipairs(UNMOUNTS) do
             local homemade = carriedFirst(self, "RenewableEnergy.HomemadeSolarModule")
             expect(homemade == nil or homemade.condition == 41,
                 "the homemade module came back at " .. tostring(homemade and homemade.condition))
+            local data = homemade and homemade.modData or {}
+            expect(homemade == nil or (data[PowerBank.MOUNTED_ONCE] == true and data[PowerBank.CONNECTED_ONCE] == true),
+                "the homemade module came back without its mounted and connected marks")
             local factory = carriedFirst(self, "RenewableEnergy.SolarModule")
             expect(factory == nil or factory.condition == 12,
                 "the factory module came back at " .. tostring(factory and factory.condition))
@@ -173,6 +178,91 @@ craftTest(craftName("RenewableEnergy_UnmountSolarRackMetal", "without_record_ret
     recipe = "RenewableEnergy_UnmountSolarRackMetal",
     from = "RenewableEnergy.SolarRackMetal",
     counts = { ["RenewableEnergy.SolarRackMetal"] = 0, ["RenewableEnergy.SolarModule"] = 2, ["Base.MetalPipe"] = 4 },
+})
+
+-- Mounting teaches only modules never mounted before: a module mounted, unmounted and mounted
+-- again teaches nothing the second time, and a rack of that module and a new one teaches the new
+-- one's share. The XP is the authority's character's, read before and after each craft.
+test("renewable_energy_craft_mount_xp_only_for_new_modules", {
+    instant = true,
+    run = function(self)
+        local manager = getScriptManager()
+        local recipes = {}
+        for key, name in pairs({ flat = "RenewableEnergy_MakeSolarFlat", unmount = "RenewableEnergy_UnmountSolarFlat",
+            rack = "RenewableEnergy_MakeSolarRackWood" }) do
+            recipes[key] = T.need(self, manager:getCraftRecipe(name), "the recipe " .. name)
+            if not recipes[key] then return end
+        end
+        local p = player()
+        local module, flat = "RenewableEnergy.SolarModule", "RenewableEnergy.SolarFlat"
+        T.learnRecipes(p)
+        T.placeWorkTable(p)
+        T.setPerk(self, Perks.Electricity, 3)
+        T.setPerk(self, Perks.Woodwork, 4)
+        self.xp = {}
+        local function readXp(key)
+            T.server(self, "electricityAward", { xp = 0 })
+            T.step(function() self.xp[key] = self.server.electricityAward.xp end)
+        end
+        local function craft(recipe, fullType)
+            T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse(fullType) ~= nil end)
+            T.step(function()
+                local from = p:getInventory():getFirstTypeRecurse(fullType)
+                if from then
+                    T.startCraft(self, recipe, from)
+                end
+            end)
+        end
+        -- The flat mount's wire and screws, for each time it is made.
+        local fixings = {}
+        for _, input in ipairs(T.recipeInputs(recipes.flat, { module })) do
+            if input.type ~= module and input.type ~= "Base.Screwdriver" then
+                table.insert(fixings, input)
+            end
+        end
+        T.give(self, "flat", T.recipeInputs(recipes.flat, { module }))
+        readXp("start")
+        craft(recipes.flat, module)
+        readXp("mounted")
+        craft(recipes.unmount, flat)
+        T.give(self, "again", fixings)
+        readXp("unmounted")
+        craft(recipes.flat, module)
+        readXp("remounted")
+        craft(recipes.unmount, flat)
+        -- The rack's inputs with one new module, beside the one mounted twice.
+        local rack = {}
+        for _, input in ipairs(T.recipeInputs(recipes.rack, { module })) do
+            if input.type == module then
+                input.count = input.count - 1
+            end
+            table.insert(rack, input)
+        end
+        T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse(module) ~= nil end)
+        T.give(self, "rack", rack)
+        readXp("unmountedAgain")
+        craft(recipes.rack, module)
+        readXp("rack")
+        T.count(self, "made", { flat, "RenewableEnergy.SolarRackWood", module })
+        -- What the game gives this character for each award, through the call CraftRecipe.addXP
+        -- makes.
+        local mountXp = RenewableEnergy.Recipes.MOUNT_XP
+        T.server(self, "electricityAward", { xp = mountXp[flat].Electricity })
+        T.step(function() self.flatAward = self.server.electricityAward.gained end)
+        T.server(self, "electricityAward", { xp = mountXp["RenewableEnergy.SolarRackWood"].Electricity / 2 })
+        T.step(function() self.rackShareAward = self.server.electricityAward.gained end)
+    end,
+    validate = function(self)
+        local refusal = self.refusal and "; the game refused: " .. self.refusal or ""
+        local xp, made = self.xp, self.counts.made or {}
+        if not expect(xp.rack ~= nil and made["RenewableEnergy.SolarRackWood"] == 1,
+            "the crafts never got to the rack" .. refusal) then return end
+        expect(xp.mounted > xp.start, "mounting a new module gave no Electricity XP")
+        expectNear("Electricity XP from mounting a new module", xp.mounted - xp.start, self.flatAward, 0.01)
+        expectNear("Electricity XP from unmounting", xp.unmounted - xp.mounted, 0, 0)
+        expectNear("Electricity XP from mounting the same module again", xp.remounted - xp.unmounted, 0, 0)
+        expectNear("Electricity XP from a rack of a used and a new module", xp.rack - xp.unmountedAgain, self.rackShareAward, 0.01)
+    end,
 })
 
 -- Solar modules --------------------------------------------------------------------------------
@@ -371,7 +461,8 @@ end
 
 -- The plate mold the way vanilla makes its ingot mold: a wooden pattern at a table, pressed into
 -- clay at a hand press and fired in a kiln; the pattern and the mold last. Lead plates are
--- recast in a primitive furnace burning charcoal.
+-- recast in a primitive furnace burning charcoal, and lose lead doing it: three worn sets make
+-- two new ones, or two and a lead pipe do, and two worn sets alone make nothing.
 craftTest(craftName("RenewableEnergy_MakeBatteryPlatePattern"), {
     recipe = "RenewableEnergy_MakeBatteryPlatePattern",
     from = "Base.Plank",
@@ -395,13 +486,32 @@ craftTest(craftName("RenewableEnergy_FireBatteryPlateMold"), {
     counts = { ["RenewableEnergy.BatteryPlateMoldUnfired"] = 0, ["Base.Log"] = 0, ["RenewableEnergy.BatteryPlateMold"] = 1 },
 })
 
-craftTest(craftName("RenewableEnergy_RecastBatteryPlates"), {
+local WORN, PLATES = "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates"
+local FURNACE = { "Base.Primitive_Furnace", "crafted_01_112" }
+
+craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "three_worn_make_two"), {
     recipe = "RenewableEnergy_RecastBatteryPlates",
-    bench = { "Base.Primitive_Furnace", "crafted_01_112" },
-    from = "RenewableEnergy.WornBatteryPlates",
+    bench = FURNACE,
+    from = WORN,
     prefer = { "Base.Charcoal" },
-    counts = {
-        ["RenewableEnergy.WornBatteryPlates"] = 0, ["Base.Charcoal"] = 0,
-        ["RenewableEnergy.BatteryPlateMold"] = 1, ["RenewableEnergy.BatteryPlates"] = 1,
-    },
+    counts = { [WORN] = 0, ["Base.Charcoal"] = 0, ["RenewableEnergy.BatteryPlateMold"] = 1, [PLATES] = 2 },
+})
+
+craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "lead_pipe_makes_up_the_loss"), {
+    recipe = "RenewableEnergy_RecastBatteryPlates",
+    bench = FURNACE,
+    from = WORN,
+    prefer = { "Base.LeadPipe", "Base.Charcoal" },
+    counts = { [WORN] = 0, ["Base.LeadPipe"] = 0, ["Base.Charcoal"] = 0, [PLATES] = 2 },
+})
+
+craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "refuses_two_worn"), {
+    recipe = "RenewableEnergy_RecastBatteryPlates",
+    bench = FURNACE,
+    from = WORN,
+    prefer = { "Base.Charcoal" },
+    setup = function(self)
+        T.server(self, "takeItems", { ids = { inputsOf(self, WORN)[3]:getID() } })
+    end,
+    counts = { [WORN] = 2, [PLATES] = 0 },
 })
