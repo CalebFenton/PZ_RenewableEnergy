@@ -8,7 +8,7 @@ without its batteries and an overlay just the batteries.
 import math
 import random
 
-from kit import beam, box, cylinder, glow, group, material, prism, sphere, text, tube
+from kit import beam, box, cylinder, group, material, prism, text, tube
 
 # Palette ------------------------------------------------------------------------------------------
 
@@ -63,7 +63,6 @@ def M(name):
         "copper": lambda: material("RE_Copper", "#c27a3e", roughness=0.35, metallic=0.85, grime=0.1),
         "lens": lambda: material("RE_Lens", "#e6e2d4", roughness=0.25, grime=0.05),
         "lenslit": lambda: material("RE_LensLit", "#ffd28a", roughness=0.25, grime=0.0, emission="#ffc46a"),
-        "warmglow": lambda: glow("RE_WarmGlow", "#ffb24d", strength=1.5, alpha=0.35),
         "clay": lambda: material("RE_Clay", "#8e8172", roughness=0.9, grime=0.2, scale=16),
         "terracotta": lambda: material("RE_Terracotta", "#b2603b", roughness=0.85, grime=0.25, scale=16),
         "hdpe": lambda: material("RE_Hdpe", "#e8e4d8", roughness=0.5, grime=0.1),
@@ -791,8 +790,9 @@ def solar_cells(col):
 
 def solar_garden_light(col, lit=False, stake=True):
     """A solar path light: a frosted lens under a black cap with a little mono cell on top, on a
-    black post. `lit` makes the lens glow warm, in a soft halo. `stake` adds the spike that a
-    placed light has in the ground."""
+    black post. `lit` makes the lens glow warm; the light it casts on the ground is the game's,
+    from the lamp SolarGardenLight lights on its square. `stake` adds the spike that a placed
+    light has in the ground."""
     base = 0.1 if stake else 0.0
     post = 0.32
     if stake:
@@ -803,8 +803,6 @@ def solar_garden_light(col, lit=False, stake=True):
     top = base + post + 0.087
     cylinder(col, "Garden_Cap", M("black"), 0.068, 0.026, at=(0, 0, top), radius_top=0.06, segments=16)
     box(col, "Garden_Cell", M("mono"), (0.06, 0.06, 0.002), at=(0, 0, top + 0.026))
-    if lit:
-        sphere(col, "Garden_Glow", M("warmglow"), 0.14, at=(0, 0, base + post + 0.05))
 
 
 def lying(builder, **options):

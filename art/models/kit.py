@@ -98,27 +98,6 @@ def holdout():
     return mat
 
 
-def glow(name, color, strength=1.0, alpha=0.3):
-    """A halo of light: emits `color` and lets the rest through, so a lamp's tile carries a soft
-    glow in its partly transparent pixels."""
-    if name in _MATERIALS:
-        return _MATERIALS[name]
-    mat = bpy.data.materials.new(name)
-    nodes, bsdf = _principled(mat)
-    links = mat.node_tree.links
-    emission = nodes.new("ShaderNodeEmission")
-    emission.inputs["Color"].default_value = (*hex_rgb(color), 1.0)
-    emission.inputs["Strength"].default_value = strength
-    clear = nodes.new("ShaderNodeBsdfTransparent")
-    mix = nodes.new("ShaderNodeMixShader")
-    mix.inputs["Fac"].default_value = alpha
-    links.new(clear.outputs[0], mix.inputs[1])
-    links.new(emission.outputs[0], mix.inputs[2])
-    links.new(mix.outputs[0], nodes.get("Material Output").inputs["Surface"])
-    _MATERIALS[name] = mat
-    return mat
-
-
 # Meshes -------------------------------------------------------------------------------------------
 
 
@@ -158,15 +137,6 @@ def beam(collection, name, mat, start, end, section, bevel=0.0):
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(run)
     obj.location = start
-    return obj
-
-
-def sphere(collection, name, mat, radius, at=(0, 0, 0), segments=16, rings=8):
-    """A ball centred at `at`."""
-    bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=segments, v_segments=rings, radius=radius)
-    obj = _object(name, bm, mat, collection)
-    place(obj, at)
     return obj
 
 
