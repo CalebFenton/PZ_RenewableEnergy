@@ -24,8 +24,6 @@ local SETTLE_MS = 300
 local SETTLE_RADIUS = 15
 -- How long a step's wait may poll before the run logs it and goes on.
 local WAIT_MAX_MS = 10000
--- The highest uiRenderFPS the option takes (Core.optionUiRenderFps).
-local MAX_UI_FPS = 120
 -- Steps to scroll in to reach the closest zoom.
 local STEPS_TO_CLOSEST = 8
 local TRAILER = "Base.RenewableEnergyArrowBoardTrailer"
@@ -38,12 +36,8 @@ local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
 --- Runs each step on its own tick, then waits before the next: as many ticks as the step returns,
 --- or, if it returns a function, until that function returns true. A function polled for longer
 --- than WAIT_MAX_MS is logged under `mark` and given up. Then calls onDone.
---- Meanwhile the UI draws as often as the option allows, since UI steps wait for its drawings;
---- the player's rate comes back before onDone, so no saved options keep it.
 function Stage.runSteps(steps, onDone, mark)
     local index, wait, poll, pollStart = 1, 0, nil, 0
-    local uiFps = getCore():getOptionUIRenderFPS()
-    getCore():setOptionUIRenderFPS(MAX_UI_FPS)
     local function onTick()
         if poll then
             if poll() then
@@ -61,7 +55,6 @@ function Stage.runSteps(steps, onDone, mark)
         local step = steps[index]
         if not step then
             Events.OnTick.Remove(onTick)
-            getCore():setOptionUIRenderFPS(uiFps)
             onDone()
             return
         end
@@ -141,19 +134,6 @@ function Stage.closestSquare(player, accepts)
         end
     end
     return best
-end
-
---- A clear, still day at once: no cloud, fog or rain however the weather turns while the shots
---- run. Stopping the weather alone leaves its fog to fade out over seconds.
-function Stage.clearWeather()
-    local climate = getClimateManager()
-    climate:stopWeatherAndThunder()
-    for _, id in ipairs({ ClimateManager.FLOAT_CLOUD_INTENSITY, ClimateManager.FLOAT_FOG_INTENSITY,
-        ClimateManager.FLOAT_PRECIPITATION_INTENSITY }) do
-        local float = climate:getClimateFloat(id)
-        float:setEnableAdmin(true)
-        float:setAdminValue(0)
-    end
 end
 
 --- Removes every tree around x, y on level z.

@@ -84,9 +84,9 @@ PZHarness.register({
     prefix = "renewable_energy_",
     modes = {
         -- Both wait on the lighting, the zoom, the UI and the vehicles rather than on frame
-        -- counts, so they draw uncapped.
-        promo = { uncapped = true, run = Promo.capture },
-        art = { uncapped = true, run = function(_, done) Art.capture(done) end },
+        -- counts, so they draw uncapped, and they shoot a clear day.
+        promo = { uncapped = true, clearWeather = true, fastUI = true, run = Promo.capture },
+        art = { uncapped = true, clearWeather = true, fastUI = true, run = function(_, done) Art.capture(done) end },
         loot = { run = reportLoot },
     },
     onStart = function(mode)

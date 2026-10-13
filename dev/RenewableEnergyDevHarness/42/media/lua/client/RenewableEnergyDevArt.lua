@@ -468,7 +468,6 @@ function Art.capture(onDone)
     local iconSheet = IconSheet:new()
     local steps = {}
     table.insert(steps, function()
-        Stage.clearWeather()
         getGameTime():setTimeOfDay(12)
         Stage.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)

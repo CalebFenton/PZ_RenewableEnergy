@@ -1109,7 +1109,8 @@ local function goTo(squares, stepsOut)
     end)
 end
 
--- What every group's shots share: a clear noon without grid power, and no radio captions.
+-- What every group's shots share: noon without grid power, and no radio captions. The harness
+-- clears the weather.
 local function addWorldSettings()
     add(function()
         -- The grid would power the squares and leave the bank nothing to run.
@@ -1118,7 +1119,6 @@ local function addWorldSettings()
             option:setValue(-1)
         end
         getWorld():setHydroPowerOn(false)
-        Stage.clearWeather()
         getGameTime():setTimeOfDay(NOON)
         silenceRadios({ origin, stage0Origin, roadCar, studio, walkOrigin })
     end)
