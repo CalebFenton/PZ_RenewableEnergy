@@ -822,14 +822,19 @@ test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
 -- A padlocked battery box opens the way vanilla gets into a locked trunk without its key: the lid
 -- comes off in the mechanics window with a wrench and vanilla's trunk lid skill, without its Basic
 -- Mechanics recipe, and then a player takes the batteries out. The lid goes back on without the
--- recipe too, unlocked, so the box shuts again. Instant in single player only, as with the panels.
+-- recipe too, unlocked, so the box shuts again. The test reads canUninstallPart and
+-- canInstallPart itself, so in multiplayer the mechanics cheat can shorten the actions, as with the
+-- panels.
 test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
-    instant = not isClient(),
+    instant = true,
     run = function(self)
         self.trailer = spawnTrailer(self, { repair = true })
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
         T.setPerk(self, Perks.Mechanics, 3)
+        if isClient() then
+            T.setMechanicsCheat(self, true)
+        end
         T.give(self, "wrench", { { type = "Base.Wrench" } })
         padlockBox(self, trailer, { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.5 } })
         T.waitForCopy(function() return self.box and self.box:getItemContainer():getItems():size() == 1 end)
@@ -961,17 +966,19 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
 
 -- Taking a cracked panel off in the mechanics way gives the module at the panel's condition and
 -- leaves no panel showing; putting another module on shows it, whole or cracked by its condition,
--- to players too. Instant in single player only: vanilla's install action stops checking near its
--- end (ISInstallVehiclePart.isValid), but an instant one on a multiplayer client checks again after
--- the server has taken the module, stops, and empties the queue, so there it runs at full length.
+-- to players too. A multiplayer server times both actions in real time, so there the mechanics
+-- cheat shortens them (T.setMechanicsCheat).
 test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
-    instant = not isClient(),
+    instant = true,
     run = function(self)
         self.trailer = spawnTrailer(self)
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
         T.setPerk(self, Perks.Mechanics, 2)
         T.setPerk(self, Perks.Electricity, 1)
+        if isClient() then
+            T.setMechanicsCheat(self, true)
+        end
         T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 35 } } })
         waitForPanelsCopy(trailer)
         T.give(self, "wrench", { { type = "Base.Wrench", equip = "primary" } })

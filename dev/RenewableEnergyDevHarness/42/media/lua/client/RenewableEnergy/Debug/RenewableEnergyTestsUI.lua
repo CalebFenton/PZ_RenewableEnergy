@@ -329,9 +329,10 @@ test("renewable_energy_ui_repair_part", {
 
 -- Actions -------------------------------------------------------------------------------------
 
--- Two in-game minutes: a multiplayer server times the action in real time at normal speed (see
--- connectSpeed), 2.5 seconds a minute, and 5% of two minutes still dwarfs a network round trip.
-local CONNECT_MINUTES = 2
+-- One in-game minute, the option's least: a multiplayer server times the action in real time at
+-- normal speed (see connectSpeed), and 5% of a minute still dwarfs a round trip to a server on the
+-- same machine.
+local CONNECT_MINUTES = 1
 -- Game speed while connecting: in single player an action and the clock speed up alike, so the
 -- in-game minutes stay what they measure, and a tick stays a small part of a minute. A
 -- multiplayer server times an action in real milliseconds whatever the game speed
@@ -370,7 +371,8 @@ test("renewable_energy_ui_connect_panel", {
                 end
             end)
             -- A player walks over first, as the menu does, and a multiplayer server refuses the job
-            -- from afar.
+            -- from afar; standing next to the panel leaves that walk no way to go.
+            T.standNextTo(self.panel.square)
             if not T.need(self, luautils.walkAdj(p, self.panel.square, true), "a walk to the panel") then return end
             ISTimedActionQueue.add(action)
             T.waitForCopy(function()
@@ -399,6 +401,7 @@ test("renewable_energy_ui_disconnect_panel", {
         self.panel = self.bank and T.panel(self, Sprites.wall.wood.S, { near = self.bank, connect = true })
         if not self.panel then return end
         T.step(function()
+            T.standNextTo(self.panel.square)
             if not T.need(self, luautils.walkAdj(player(), self.panel.square, true), "a walk to the panel") then return end
             ISTimedActionQueue.add(Action:new(player(), Action.DISCONNECT_SOURCE, self.panel.object))
             T.waitForCopy(function() return Action.connectedBank(self.panel.object) == nil end)
@@ -528,6 +531,7 @@ test("renewable_energy_ui_rename_bank", {
         if not bank then return end
         self.bank = bank
         T.step(function()
+            T.standNextTo(bank.square)
             if not T.need(self, luautils.walkAdj(player(), bank.square, true), "a walk to the bank") then return end
             ISTimedActionQueue.add(Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "  Cellar  "))
             T.waitForCopy(function() return Menu.bankLabel(bank.object) == "Cellar" end)

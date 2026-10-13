@@ -439,19 +439,28 @@ end
 
 -- Queues running the garden light `light` (a handle) on the server for `hours`, from `charge` Wh
 -- if given, and a wait until this client shows what the server answered: the light's tile, and
--- its lamp if it is lit. A multiplayer client catches its lamps up with the tiles once a game
--- minute (SolarGardenLight's EveryOneMinute), 2.5 real seconds, so the clock then moves to the end
--- of its minute, on both sides, and that catch-up runs on the next tick.
+-- its lamp if it is lit.
 local function runLight(self, light, charge, hours)
     T.server(self, "gardenLightUpdate", { x = light.x, y = light.y, z = light.z,
         charge = charge, hours = hours })
-    T.step(function()
-        local minutes = getGameTime():getTimeOfDay() * 60
-        T.setTime(self, (math.floor(minutes) + 0.999) / 60)
-    end)
     T.waitForCopy(function()
         local reply = self.server.gardenLightUpdate
         return light.object:getTextureName() == reply.sprite and lampOn(light.square) == reply.lit
+    end)
+end
+
+-- The game minute on this client's clock.
+local function gameMinute()
+    return math.floor(getGameTime():getWorldAgeHours() * 60)
+end
+
+-- Queues moving the clock back to the start of its minute and leaves that minute in self.minute.
+-- A multiplayer client also redraws its lamps from its copies at every game minute, so a lamp
+-- that changes within the minute changed because the server said so.
+local function startOfMinute(self)
+    T.step(function()
+        T.setTime(self, (math.floor(getGameTime():getTimeOfDay() * 60) + 0.05) / 60)
+        T.step(function() self.minute = gameMinute() end)
     end)
 end
 
@@ -546,6 +555,7 @@ local function chooseBulbOption(self, light, bulbType, key)
         if not T.need(self, self[key], "the garden light's " .. (bulbType and "Add Light Bulb " .. bulbType or "Remove Light Bulb") .. " option") then
             return
         end
+        T.standNextTo(light.square)
         option.onSelect(option.target, option.param1, option.param2, option.param3)
     end)
 end
@@ -557,9 +567,9 @@ local function waitForDark(light)
     end)
 end
 
--- Taking the bulb out of a lit light puts the light out and gives the character the bulb. The
--- light then stays dark at night without drawing on its battery, and its menu offers to put a
--- bulb back.
+-- Taking the bulb out of a lit light puts the light out and gives the character the bulb, and
+-- this client's lamp goes out at once rather than at its next game minute. The light then stays
+-- dark at night without drawing on its battery, and its menu offers to put a bulb back.
 test("renewable_energy_gadgets_garden_light_remove_bulb", {
     hour = MIDNIGHT,
     instant = true,
@@ -569,8 +579,10 @@ test("renewable_energy_gadgets_garden_light_remove_bulb", {
         self.light = light
         runLight(self, light, 2, 0.5)
         T.step(function() self.litBefore = lampOn(light.square) end)
+        startOfMinute(self)
         chooseBulbOption(self, light, nil, "removeOffered")
         waitForDark(light)
+        T.step(function() self.darkMinute = gameMinute() end)
         T.count(self, "removed", { SolarGardenLight.PLAIN_BULB })
         T.step(function() self.copyDark = not lampOn(light.square) end)
         runLight(self, light, 2, 1)
@@ -583,6 +595,7 @@ test("renewable_energy_gadgets_garden_light_remove_bulb", {
         if not expect(self.litBefore, "the light never lit") then return end
         expect(self.removeOffered, "the lit light's menu doesn't offer Remove Light Bulb")
         expect(self.copyDark, "this client still draws the light's lamp after its bulb came out")
+        expect(self.darkMinute == self.minute, "this client's lamp went out only at a later game minute")
         expect(self.counts.removed[SolarGardenLight.PLAIN_BULB] == 1, "taking the bulb out gave "
             .. tostring(self.counts.removed[SolarGardenLight.PLAIN_BULB]) .. " light bulbs, expected 1")
         expect(self.night and not self.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")

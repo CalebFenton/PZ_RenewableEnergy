@@ -9,7 +9,7 @@ require "RenewableEnergy/Sun"
 -- The authority (single player or the server) keeps each light's charge and bulb in its modData
 -- and swaps its tile between unlit and lit. Light sources exist only where the game draws, so
 -- every client, and single player, gives each lit tile it sees a lamp of its own, in its bulb's
--- colour.
+-- colour. A server tells its clients when a light's lamp changes, so they draw it at once.
 RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
 RenewableEnergy.SolarGardenLight = SolarGardenLight
@@ -39,6 +39,9 @@ end
 local LAMP_COLOR = { r = 1.0, g = 0.8, b = 0.55 }
 -- MapObjects keeps one function per sprite and priority.
 local LOAD_PRIORITY = 7
+-- The server's word to its clients that a light's lamp changed: the tile and the bulb's modData
+-- reach them on their own, and a client would otherwise only catch up at its next game minute.
+local COMMAND_MODULE, LAMP_COMMAND = "RenewableEnergyGardenLight", "lamp"
 
 -- The places of the lights this side has seen: the authority charges them, the drawing side
 -- lights them.
@@ -107,17 +110,10 @@ local function removeLamp(key)
     end
 end
 
---- Gives a lit light a lamp in its bulb's colour and takes an unlit one's away. Not on a
---- dedicated server, which draws nothing.
-function SolarGardenLight.syncLamp(light)
-    if isServer() then
-        return
-    end
-    local x, y, z = light:getX(), light:getY(), light:getZ()
+-- Gives the place x, y, z a lamp in the colour of `bulb`, or none if `bulb` is nil.
+local function drawLamp(x, y, z, bulb)
     local key = placeKey(x, y, z)
-    local bulb = SolarGardenLight.getBulb(light)
-    -- A client can get the bulb's removal before the unlit tile that follows it.
-    if not (SolarGardenLight.isLit(light) and bulb) then
+    if not bulb then
         removeLamp(key)
         return
     end
@@ -140,6 +136,22 @@ function SolarGardenLight.syncLamp(light)
     lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, RenewableEnergy.Specs.gardenLight.radius), bulb = bulb }
 end
 
+-- The bulb a light's lamp shines with, or nil if it has no lamp.
+local function lampBulb(light)
+    return SolarGardenLight.isLit(light) and SolarGardenLight.getBulb(light) or nil
+end
+
+--- Gives a lit light a lamp in its bulb's colour and takes an unlit one's away. Not on a
+--- dedicated server, which draws nothing.
+function SolarGardenLight.syncLamp(light)
+    if isServer() then
+        return
+    end
+    -- A client can get the bulb's removal before the unlit tile that follows it, hence the bulb
+    -- and the tile both.
+    drawLamp(light:getX(), light:getY(), light:getZ(), lampBulb(light))
+end
+
 -- Calls `fn` with every light this side has seen. A light whose square is unloaded, or that is
 -- gone, is dropped with its lamp; MapObjects reports it again when its chunk loads.
 local function forEachLight(fn)
@@ -156,8 +168,11 @@ end
 
 -- Authority --------------------------------------------------------------------------------------
 
-local function setLit(light, lit)
-    if SolarGardenLight.isLit(light) ~= lit then
+-- Swaps the tile to lit or unlit and gives the light the lamp that goes with it here and, on a
+-- server, on every client, when the tile or the bulb (`bulbChanged`) changed.
+local function setLit(light, lit, bulbChanged)
+    local changed = SolarGardenLight.isLit(light) ~= lit
+    if changed then
         -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
         light:setSprite(getSprite(lit and Sprites.gardenLight.lit or Sprites.gardenLight.off))
         if isServer() then
@@ -166,12 +181,17 @@ local function setLit(light, lit)
     end
     -- Also when the tile stays lit, since its bulb may have changed.
     SolarGardenLight.syncLamp(light)
+    if isServer() and (changed or bulbChanged) then
+        sendServerCommand(COMMAND_MODULE, LAMP_COMMAND,
+            { x = light:getX(), y = light:getY(), z = light:getZ(), bulb = lampBulb(light) })
+    end
 end
 
 --- Runs a light for `hours` at the sun of the moment: by day its cell charges the battery, and
 --- after sunset its bulb draws on it until it is empty. A light without a bulb draws nothing.
---- Authority only. Returns whether the light is lit.
-function SolarGardenLight.update(light, hours)
+--- `bulbChanged` says its bulb has just changed, so that its lamp's colour reaches the clients
+--- even if it stays lit. Authority only. Returns whether the light is lit.
+function SolarGardenLight.update(light, hours, bulbChanged)
     local spec = RenewableEnergy.Specs.gardenLight
     local night = RenewableEnergy.Sun.elevation() <= 0
     local bulb = SolarGardenLight.getBulb(light) ~= nil
@@ -183,7 +203,7 @@ function SolarGardenLight.update(light, hours)
     end
     light:getModData()[SolarGardenLight.CHARGE_KEY] = charge
     local lit = night and bulb and charge > 0
-    setLit(light, lit)
+    setLit(light, lit, bulbChanged)
     return lit
 end
 
@@ -191,7 +211,7 @@ end
 local function setBulb(light, bulb)
     light:getModData()[SolarGardenLight.BULB_KEY] = bulb or SolarGardenLight.NO_BULB
     light:transmitModData()
-    SolarGardenLight.update(light, 0)
+    SolarGardenLight.update(light, 0, true)
 end
 
 --- Takes the bulb out of `light` and gives it to `character`. Authority only, from a timed
@@ -251,9 +271,21 @@ Events.OnObjectAboutToBeRemoved.Add(function(isoObject)
 end)
 
 -- The authority swaps the tile; the drawing side catches up with it, and with lights that went.
+-- A multiplayer client also draws what its server says a lamp became, at once, before the tile
+-- and the bulb's modData may have reached its copy of the light.
 if not isServer() then
     Events.EveryOneMinute.Add(function()
         forEachLight(SolarGardenLight.syncLamp)
+    end)
+    Events.OnServerCommand.Add(function(module, command, args)
+        if module ~= COMMAND_MODULE or command ~= LAMP_COMMAND then
+            return
+        end
+        local square = getCell():getGridSquare(args.x, args.y, args.z)
+        if SolarGardenLight.findOn(square) then
+            places[placeKey(args.x, args.y, args.z)] = { x = args.x, y = args.y, z = args.z }
+            drawLamp(args.x, args.y, args.z, args.bulb)
+        end
     end)
 end
 
