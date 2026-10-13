@@ -1,7 +1,7 @@
 {
     "Sandbox_RenewableEnergy": "Renewable Energy",
     "Sandbox_RenewableEnergy_SunlightMultiplier": "Sunlight Multiplier",
-    "Sandbox_RenewableEnergy_SunlightMultiplier_tooltip": "Multiplies what solar panels make.<br>1 is what 1993 panels really made in Kentucky: about 185 Wh a day per 50 W module on a tilted rack in summer, under half that in December.<br>3 (the default) lets a few modules run a fridge in summer.",
+    "Sandbox_RenewableEnergy_SunlightMultiplier_tooltip": "Multiplies what solar panels make.<br>1 is what 1993 panels really made in Kentucky: about 190 Wh a day per 50 W module on a tilted rack in an average July and 120 in December, against the 2 kWh a day a fridge-freezer uses.<br>Raise it if you'd rather not spend the game chasing panels.",
     "Sandbox_RenewableEnergy_BatteryWear": "Battery Wear",
     "Sandbox_RenewableEnergy_BatteryWear_tooltip": "Percent of the wear batteries take from deep discharges.<br>0 turns wear off.",
     "Sandbox_RenewableEnergy_FailsafeStartCharge": "Failsafe Start Charge",

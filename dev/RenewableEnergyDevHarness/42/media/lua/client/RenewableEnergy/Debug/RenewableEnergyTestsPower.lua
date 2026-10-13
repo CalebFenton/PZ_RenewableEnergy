@@ -267,8 +267,8 @@ test("renewable_energy_power_panel_charges_bank", {
         if not expect(self.panel.connected, "connecting the panel failed (" .. tostring(self.panel.reason) .. ")") then return end
         local after = self.bank.state
         local status, here = after.status, self.panel.position
-        -- One whole 50 W module at x3 (the default) in full sun, less 20% system losses.
-        expectNear("solar watts", status.solarW, 120, 0.5)
+        -- One whole 50 W module at x2.5 (the default) in full sun, less 20% system losses.
+        expectNear("solar watts", status.solarW, 100, 0.5)
         expectNear("Wh gained in an hour", after.storedWh - self.before.storedWh, status.solarW, 0.5)
         expectNear("percent of full sun", status.sources[1] and status.sources[1].fullSunPct, 100, 0)
         expectNear("the battery's charge", stateItem(after, "Base.CarBattery1").uses, after.charge, 0.001)
@@ -310,10 +310,10 @@ test("renewable_energy_power_module_condition_sets_watts", {
         local sources = self.bank.state.status.sources
         local cracked, homemade, rack = sources[1], sources[2], sources[3]
         if not expect(cracked and homemade and rack, "the status lists fewer than three panels") then return end
-        -- 50 W modules at x3 less 20% system losses: 120 W at condition 100.
-        expectNear("a module at condition 50", cracked.watts, 60, 0.5)
-        expectNear("a homemade module at 60", homemade.watts, 72, 0.5)
-        expectNear("a rack with a whole and a shattered module", rack.watts, 120, 0.5)
+        -- 50 W modules at x2.5 less 20% system losses: 100 W at condition 100.
+        expectNear("a module at condition 50", cracked.watts, 50, 0.5)
+        expectNear("a homemade module at 60", homemade.watts, 60, 0.5)
+        expectNear("a rack with a whole and a shattered module", rack.watts, 100, 0.5)
         expect(cracked.reason == "cracked", "the half-cracked panel's reason is " .. tostring(cracked.reason))
         expect(cracked.modules[1] and cracked.modules[1].condition == 50, "the status lost the module's condition")
     end,

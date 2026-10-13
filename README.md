@@ -25,9 +25,9 @@ You'll go through roughly these stages:
 | When | What you're after | What it takes |
 |---|---|---|
 | Before the grid goes | Stocking up | Car batteries filled on a Car Battery Charger, or a battery box filling from the grid |
-| The first weeks | The TV, a lamp, a mini fridge | A battery box, two car batteries, a Plug-in Inverter, and a panel or two or a couple of hours of generator a day |
-| Weeks 3 to 6 | The kitchen fridge | A battery rack of deep cycle batteries, a Power Inverter, a charge controller and 4 to 6 panels |
-| Months 2 and 3 | Fridge and freezer all year, the washer, the microwave | A battery bank of L-16s, an Inverter/Charger, two charge controllers, a failsafe on the generator, 10 to 14 panels |
+| The first weeks | The TV, a lamp, a mini fridge | A battery box, two car batteries, a Plug-in Inverter, two panels, and a couple of hours of generator on grey days |
+| Weeks 3 to 6 | The kitchen fridge | A battery rack of deep cycle batteries, a Power Inverter, a charge controller and 5 to 7 modules |
+| Months 2 and 3 | Fridge and freezer all year, the washer, the microwave | A battery bank of L-16s, an Inverter/Charger, two charge controllers, a failsafe on the generator, and 16 or more modules, most on ground racks |
 | After that | The electric range and the dryer | A metal bank with two Inverter/Chargers, four charge controllers and 20 to 30 panels |
 
 Panels are what you'll spend the game chasing: you find a few, fix the cracked ones, and eventually build your own out of whatever has solar cells in it.
@@ -40,7 +40,7 @@ The sun moves the way it does over Knox County, worked out from the in-game date
 
 Some of it isn't realistic, on purpose:
 
-- Out of the box, panels make three times what they would have. Set **Sunlight Multiplier** to 1 for true 1993 output, when it took a yard full of panels to run one fridge.
+- Out of the box, panels make two and a half times what they would have. Set **Sunlight Multiplier** to 1 for true 1993 output, when it took a yard full of panels to run one fridge.
 - An inverter is just a number of watts: go over it and the bank shuts off. No startup surge, no voltages.
 - Sixteen calculators make a solar module, about a thousand times what their cells really give. It's meant to be a chore, so you'll go looking for garden lights instead.
 - You can melt a worn battery's plates down at a furnace and cast new ones. Battery recyclers really do that, just not in somebody's backyard.
@@ -137,11 +137,11 @@ On a clear day at the default sunlight, one module makes:
 
 | Module on | Noon, July | Whole day, July | Whole day, December |
 |---|---|---|---|
-| A ground rack, facing south | 110 W | 0.85 kWh | 0.6 kWh |
-| A flat panel | 115 W | 1 kWh | 0.3 kWh |
-| A south wall | 50 W | 0.3 kWh | 0.65 kWh |
+| A ground rack, facing south | 90 W | 0.7 kWh | 0.5 kWh |
+| A flat panel | 95 W | 0.8 kWh | 0.25 kWh |
+| A south wall | 40 W | 0.27 kWh | 0.55 kWh |
 
-For scale, a fridge-freezer uses about 1.9 kWh a day, and a cloudy day makes a fraction of that table. Racks make the most over a year, flat panels are best in summer, and wall panels in winter.
+For scale, a fridge-freezer uses about 2 kWh a day, and a cloudy day makes a fraction of that table. Racks make the most over a year, flat panels are best in summer, and wall panels in winter.
 
 Thunderstorms with strong wind crack modules now and then: never on walls, less on metal mounts, most on wooden ones. A cracked module makes power in proportion to its condition and shows its broken glass from across the yard. **Repair Cracked Module** patches it with glass, epoxy or glue, and wire, but never back to new.
 
