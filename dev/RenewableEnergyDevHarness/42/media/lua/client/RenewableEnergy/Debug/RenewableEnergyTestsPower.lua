@@ -6,23 +6,20 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 
 -- Power tests: the sun model against measured insolation, and banks charging, powering,
 -- cutting out, wiring parts in and wearing, and the game's clock driving banks and gadgets.
--- Single player runs the server's bank system in the same Lua state, so the tests drive banks
--- through the same perform() and OnClientCommand a server runs, and check what reaches the
--- client's copy. Server Lua (RenewableEnergy.Loads, RenewableEnergy.Bank) loads after client
--- Lua, so tests look it up when they run. See RenewableEnergyTestLib.lua for the runner and the
--- helpers.
+-- Banks live on the authority: the fixtures build them there and the bank helpers drive and read
+-- the server's record through T.server (RenewableEnergyTestServer.lua), in this game in single
+-- player and on the server in multiplayer. What a client does goes through the bank system's
+-- commands, and what players see is checked on this client's copies. See
+-- RenewableEnergyTestLib.lua for the runner and the helpers.
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, player = T.test, T.expect, T.expectNear, T.player
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local Battery, Wear, PowerBank = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
-local SolarMaintainer, SolarCellCharger = RenewableEnergy.SolarMaintainer, RenewableEnergy.SolarCellCharger
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 
 local FRIDGE = "appliances_refrigeration_01_0"
@@ -160,49 +157,62 @@ test("renewable_energy_power_battery_wear", {
 
 -- Banks in the world ---------------------------------------------------------------------
 
-local function switchOn(bank)
-    return PowerBank.perform(player(), "setBankOn", { bank = PowerBank.positionOf(bank), on = true })
+local INVERTER = "RenewableEnergy.InverterCharger"
+
+--- Queues the bank system's command `command` with `args` (or `args()` when the call goes out)
+--- as the server's character, the way a timed action's complete() runs it, and leaves its answer
+--- ({ ok, reason, xpBefore, xpAfter }) in self[key].
+local function perform(self, key, command, args)
+    T.server(self, "perform", function()
+        return { command = command, args = type(args) == "function" and args() or args }
+    end)
+    T.step(function() self[key] = self.server.perform end)
 end
 
--- Wh stored in the bank.
-local function storedWh(record)
-    return record.charge * record.nominalWh
+-- The charge of the first `fullType` in this client's copy of the bank, or -1.
+local function copyUses(bank, fullType)
+    local item = bank.object:getContainer():getFirstType(fullType)
+    return item and item:getCurrentUsesFloat() or -1
 end
 
-local function loadOf(names)
-    local Loads = RenewableEnergy.Loads
-    local load = Loads.new()
-    for _, name in ipairs(names) do
-        Loads.add(load, name)
+-- The server's entry for the first `fullType` in a bank state's items.
+local function stateItem(state, fullType)
+    for _, item in ipairs(state and state.items or {}) do
+        if item.type == fullType then
+            return item
+        end
     end
-    return load
 end
 
 -- A placed bank is a registered generator, off until switched on, whose container refuses every
 -- transfer in and out: parts go in and come out only by being wired. Other transfers still work.
+-- The filter must hold on this client's copy, where the player drags.
 test("renewable_energy_power_bank_container_refuses_transfers", {
     instant = true,
     run = function(self)
-        local p = player()
         self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
         if not self.bank then return end
-        local container = self.bank:getContainer()
-        self.allowsBattery = container:isItemAllowed(instanceItem("Base.CarBattery2"))
-        self.battery = container:getFirstType("Base.CarBattery1")
-        local dragOut = ISInventoryTransferAction:new(p, self.battery, container, p:getInventory())
-        self.dragValid = dragOut:isValid()
-        ISTimedActionQueue.add(dragOut)
+        T.give(self, "carried", { { type = "Base.Bag_Schoolbag" }, { type = "Base.Hammer" } })
+        T.bankState(self, self.bank)
+        -- Last: the queue drops everything after an action that turns out invalid when it starts.
+        T.step(function()
+            local p, container = player(), self.bank.object:getContainer()
+            self.allowsBattery = container:isItemAllowed(instanceItem("Base.CarBattery2"))
+            self.battery = container:getFirstType("Base.CarBattery1")
+            local dragOut = ISInventoryTransferAction:new(p, self.battery, container, p:getInventory())
+            self.dragValid = dragOut:isValid()
+            ISTimedActionQueue.add(dragOut)
+        end)
     end,
     validate = function(self)
-        local p = player()
-        expect(PowerBank.isBank(self.bank), "the placed bank is not a bank")
-        expect(not self.bank:isActivated(), "a bank that was never switched on powers its area")
+        local p, bank, state = player(), self.bank.object, self.bank.state
+        expect(PowerBank.isBank(bank), "the placed bank is not a bank")
+        expect(not bank:isActivated() and not state.activated, "a bank that was never switched on powers its area")
         expect(not self.allowsBattery, "a battery can be dropped into a bank without wiring it in")
         expect(not self.dragValid, "moving a wired battery out of the bank is a valid transfer")
-        expect(self.bank:getContainer():contains(self.battery) and not p:getInventory():contains(self.battery),
-            "a wired battery was dragged out of the bank")
-        local bag = p:getInventory():AddItem("Base.Bag_Schoolbag")
-        local hammer = p:getInventory():AddItem("Base.Hammer")
+        expect(stateItem(state, "Base.CarBattery1") ~= nil and bank:getContainer():contains(self.battery)
+            and not p:getInventory():contains(self.battery), "a wired battery was dragged out of the bank")
+        local bag, hammer = self.items.carried[1], self.items.carried[2]
         expect(ISInventoryTransferAction:new(p, hammer, p:getInventory(), bag:getInventory()):isValid(),
             "moving a hammer into a bag is refused too")
     end,
@@ -218,48 +228,58 @@ test("renewable_energy_power_bank_refused_outdoors", {
         if not (indoor and outdoor) then return end
         self.indoorOk = PowerBank.canPlaceBank(indoor[1])
         self.outdoorOk, self.reason = PowerBank.canPlaceBank(outdoor[1])
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" },
+        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" },
             { square = outdoor[1] })
-        if not bank then return end
-        switchOn(bank)
-        self.outdoorPowered = bank:isActivated()
-        self.state = record.status.state
+        if not self.bank then return end
+        T.switchOn(self, self.bank)
+        T.bankState(self, self.bank)
     end,
     validate = function(self)
+        local state, status = self.bank.state, T.clientStatus(self.bank)
         expect(self.indoorOk, "a bank is refused inside a building")
         expect(not self.outdoorOk and self.reason == "Tooltip_RenewableEnergy_BankIndoorsOnly",
             "a bank may stand outdoors (reason " .. tostring(self.reason) .. ")")
-        expect(not self.outdoorPowered and self.state == "outdoors", "a bank outdoors switched on (state " .. tostring(self.state) .. ")")
+        expect(not state.activated and state.status.state == "outdoors",
+            "a bank outdoors switched on (state " .. tostring(state.status.state) .. ")")
+        expect(status and status.state == "outdoors", "this client's status of the bank reads " .. tostring(status and status.state))
     end,
 })
 
--- Noon on a connected panel charges the bank by what the panel makes, and the batteries carry
--- the charge.
+-- Noon on a connected panel charges the bank by what the panel makes, the batteries carry the
+-- charge, and the charge, the status and the tile's battery overlays reach this client's copies.
 test("renewable_energy_power_panel_charges_bank", {
     run = function(self)
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
-        if not bank then return end
-        local panel
-        panel, self.connected = T.panel(self, Sprites.flat, { near = bank, connect = true })
-        if not panel then return end
-        local before = storedWh(record)
-        record:update(1, T.passContext(1000))
-        self.gained = storedWh(record) - before
-        self.solarW = record.status.solarW
-        self.fullSun = record.status.sources[1] and record.status.sources[1].fullSunPct
-        local battery = bank:getContainer():getFirstType("Base.CarBattery1")
-        self.batteryCharge = battery and Battery.getCharge(battery)
-        self.bankCharge = record.charge
-        self.source = PowerBank.bankOfSource(panel:getX(), panel:getY(), panel:getZ())
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not self.panel then return end
+        self.bank = bank
+        T.bankState(self, bank)
+        T.step(function() self.before = bank.state end)
+        T.bankPass(self, bank, 1000)
+        T.waitForCopy(function()
+            local status = T.clientStatus(bank)
+            return math.abs(copyUses(bank, "Base.CarBattery1") - bank.state.charge) < 0.001
+                and status ~= nil and status.solarW == bank.state.status.solarW
+                and T.overlays(bank.object) == table.concat(bank.state.overlays, ",")
+        end)
     end,
     validate = function(self)
-        if not expect(self.connected, "connecting the panel failed") then return end
+        if not expect(self.panel.connected, "connecting the panel failed (" .. tostring(self.panel.reason) .. ")") then return end
+        local after = self.bank.state
+        local status, here = after.status, self.panel.position
         -- One whole 50 W module at x3 (the default) in full sun, less 20% system losses.
-        expectNear("solar watts", self.solarW, 120, 0.5)
-        expectNear("Wh gained in an hour", self.gained, self.solarW, 0.5)
-        expectNear("percent of full sun", self.fullSun, 100, 0)
-        expectNear("the battery's charge", self.batteryCharge, self.bankCharge, 0.001)
-        expect(self.source ~= nil, "bankOfSource doesn't know the panel")
+        expectNear("solar watts", status.solarW, 120, 0.5)
+        expectNear("Wh gained in an hour", after.storedWh - self.before.storedWh, status.solarW, 0.5)
+        expectNear("percent of full sun", status.sources[1] and status.sources[1].fullSunPct, 100, 0)
+        expectNear("the battery's charge", stateItem(after, "Base.CarBattery1").uses, after.charge, 0.001)
+        expectNear("this client's copy of the battery's charge", copyUses(self.bank, "Base.CarBattery1"), after.charge, 0.001)
+        local copy = T.clientStatus(self.bank)
+        expectNear("solar watts in this client's status", copy and copy.solarW, status.solarW, 0)
+        expect(PowerBank.bankOfSource(here.x, here.y, here.z) ~= nil, "bankOfSource doesn't know the panel")
+        local overlays = table.concat(after.overlays, ",")
+        expect(overlays ~= "", "the charged bank's tile shows no batteries")
+        expect(T.overlays(self.bank.object) == overlays, "this client's copy of the bank shows " .. T.overlays(self.bank.object)
+            .. ", the server's " .. overlays)
     end,
 })
 
@@ -267,33 +287,35 @@ test("renewable_energy_power_panel_charges_bank", {
 -- best 60%, a rack the sum of its two. The cracked panel says why it is low.
 test("renewable_energy_power_module_condition_sets_watts", {
     run = function(self)
-        local bank, record = T.bank(self, "batteryRackMetal", { "Base.CarBattery1", "RenewableEnergy.ChargeController" }, { charge = 0.1 })
+        local bank = T.bank(self, "batteryRackMetal", { "Base.CarBattery1", "RenewableEnergy.ChargeController" }, { charge = 0.1 })
         if not bank then return end
+        self.bank = bank
         local modules = {
             { { type = "RenewableEnergy.SolarModule", condition = 50 } },
             { { type = "RenewableEnergy.HomemadeSolarModule", condition = 60 } },
             { { type = "RenewableEnergy.SolarModule", condition = 100 }, { type = "RenewableEnergy.SolarModule", condition = 0 } },
         }
         local sprites = { Sprites.flat, Sprites.flat, Sprites.rack.metal.S }
-        self.connected = true
+        self.panels = {}
         for i, sprite in ipairs(sprites) do
-            local panel, connected = T.panel(self, sprite, { near = bank, modules = modules[i], connect = true })
-            if not panel then return end
-            self.connected = self.connected and connected
+            self.panels[i] = T.panel(self, sprite, { near = bank, modules = modules[i], connect = true })
+            if not self.panels[i] then return end
         end
-        record:update(1, T.passContext(1000))
-        local sources = record.status.sources
-        self.cracked, self.homemade, self.rack = sources[1], sources[2], sources[3]
+        T.bankPass(self, bank, 1000)
     end,
     validate = function(self)
-        if not expect(self.connected, "connecting the panels failed") then return end
-        if not expect(self.cracked and self.homemade and self.rack, "the status lists fewer than three panels") then return end
+        for _, panel in ipairs(self.panels) do
+            if not expect(panel.connected, "connecting a panel failed (" .. tostring(panel.reason) .. ")") then return end
+        end
+        local sources = self.bank.state.status.sources
+        local cracked, homemade, rack = sources[1], sources[2], sources[3]
+        if not expect(cracked and homemade and rack, "the status lists fewer than three panels") then return end
         -- 50 W modules at x3 less 20% system losses: 120 W at condition 100.
-        expectNear("a module at condition 50", self.cracked.watts, 60, 0.5)
-        expectNear("a homemade module at 60", self.homemade.watts, 72, 0.5)
-        expectNear("a rack with a whole and a shattered module", self.rack.watts, 120, 0.5)
-        expect(self.cracked.reason == "cracked", "the half-cracked panel's reason is " .. tostring(self.cracked.reason))
-        expect(self.cracked.modules[1] and self.cracked.modules[1].condition == 50, "the status lost the module's condition")
+        expectNear("a module at condition 50", cracked.watts, 60, 0.5)
+        expectNear("a homemade module at 60", homemade.watts, 72, 0.5)
+        expectNear("a rack with a whole and a shattered module", rack.watts, 120, 0.5)
+        expect(cracked.reason == "cracked", "the half-cracked panel's reason is " .. tostring(cracked.reason))
+        expect(cracked.modules[1] and cracked.modules[1].condition == 50, "the status lost the module's condition")
     end,
 })
 
@@ -302,97 +324,102 @@ test("renewable_energy_power_module_condition_sets_watts", {
 test("renewable_energy_power_panel_slots", {
     run = function(self)
         local box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.1 })
-        local batteryRack, record = T.bank(self, "batteryRackWood", { "Base.CarBattery1", "RenewableEnergy.ChargeController" },
-            { charge = 0.1 })
-        if not (box and batteryRack) then return end
-        self.box = {}
+        local batteryRack = box and T.bank(self, "batteryRackWood", { "Base.CarBattery1", Specs.controller }, { charge = 0.1 })
+        if not batteryRack then return end
+        self.rack = batteryRack
+        self.boxPanels, self.rackPanels = {}, {}
         for i = 1, 3 do
-            local panel, connected, reason = T.panel(self, Sprites.flat, { near = box, connect = true })
-            if not panel then return end
-            self.box[i], self.boxReason = connected, reason
+            self.boxPanels[i] = T.panel(self, Sprites.flat, { near = box, connect = true })
+            if not self.boxPanels[i] then return end
         end
-        local connected = 0
-        for _ = 1, 3 do
-            local panel, ok = T.panel(self, Sprites.flat, { near = batteryRack, connect = true })
-            if not panel then return end
-            connected = connected + (ok and 1 or 0)
+        for i = 1, 3 do
+            self.rackPanels[i] = T.panel(self, Sprites.flat, { near = batteryRack, connect = true })
+            if not self.rackPanels[i] then return end
         end
-        self.rackConnected = connected
-        local container = batteryRack:getContainer()
-        container:Remove(container:getFirstType(Specs.controller))
-        record:update(1, T.passContext(1000))
-        local sources = record.status.sources
-        self.slots = record.status.panelSlots
-        self.third = sources[3]
-        self.second = sources[2]
+        T.server(self, "removePart", { bank = batteryRack.position, type = Specs.controller })
+        T.bankPass(self, batteryRack, 1000)
     end,
     validate = function(self)
-        expect(self.box[1] and self.box[2], "a battery box refused its first two panels")
-        expect(not self.box[3] and self.boxReason == "Tooltip_RenewableEnergy_NoPanelSlot",
-            "a battery box took a third panel without a controller (" .. tostring(self.boxReason) .. ")")
-        expectNear("panels a battery rack with a controller took", self.rackConnected, 3, 0)
-        if not expect(self.third ~= nil, "the third panel was disconnected when the controller left") then return end
-        expect(self.slots.used == 3 and self.slots.total == 2, "panel slots read " .. self.slots.used .. " of " .. self.slots.total)
-        expect(self.third.watts == 0 and self.third.reason == "noController",
-            "a panel past the slots makes " .. self.third.watts .. " W, reason " .. tostring(self.third.reason))
-        expect(self.second.watts > 0, "a panel within the free slots stopped making power")
+        local box = self.boxPanels
+        expect(box[1].connected and box[2].connected, "a battery box refused its first two panels")
+        expect(not box[3].connected and box[3].reason == "Tooltip_RenewableEnergy_NoPanelSlot",
+            "a battery box took a third panel without a controller (" .. tostring(box[3].reason) .. ")")
+        local connected = 0
+        for _, panel in ipairs(self.rackPanels) do
+            connected = connected + (panel.connected and 1 or 0)
+        end
+        expectNear("panels a battery rack with a controller took", connected, 3, 0)
+        local status = self.rack.state.status
+        local slots, second, third = status.panelSlots, status.sources[2], status.sources[3]
+        if not expect(third ~= nil, "the third panel was disconnected when the controller left") then return end
+        expect(slots.used == 3 and slots.total == 2, "panel slots read " .. slots.used .. " of " .. slots.total)
+        expect(third.watts == 0 and third.reason == "noController",
+            "a panel past the slots makes " .. third.watts .. " W, reason " .. tostring(third.reason))
+        expect(second.watts > 0, "a panel within the free slots stopped making power")
     end,
 })
 
 -- The bank's limit is its working inverters' ratings together. A Plug-in Inverter runs a TV and
--- a lamp, or a mini fridge, but not a full fridge.
+-- a lamp, or a mini fridge, but not a full fridge. A broken inverter's loss shows in this client's
+-- status.
 test("renewable_energy_power_inverter_limits", {
     run = function(self)
-        local _, box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
-        local bank, record = T.bank(self, "batteryBankWood",
+        self.box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
+        self.bank = self.box and T.bank(self, "batteryBankWood",
             { "Base.CarBattery1", "RenewableEnergy.PowerInverter", "RenewableEnergy.PowerInverter" })
-        if not (box and bank) then return end
-        local limit = box:limitW()
-        local function fits(names)
-            return loadOf(names).watts <= limit
-        end
-        self.tvAndLamp = fits({ "television", "light" })
-        self.miniFridge = fits({ "miniFridge" })
-        self.fridge = fits({ "fridge" })
-        self.fridgeFreezer = fits({ "fridgeFreezer" })
-        self.twoInverters = record:limitW()
-        Wear.setCondition(bank:getContainer():getFirstType("RenewableEnergy.PowerInverter"), 0)
-        record:recount()
-        self.oneWorking = record:limitW()
+        if not self.bank then return end
+        T.server(self, "loadWatts", { sets = { { "television", "light" }, { "miniFridge" }, { "fridge" }, { "fridgeFreezer" } } })
+        T.bankState(self, self.box)
+        T.bankState(self, self.bank)
+        T.step(function() self.twoInverters = self.bank.state.limitW end)
+        T.setPartCondition(self, self.bank, "RenewableEnergy.PowerInverter", 0, true)
+        T.waitForCopy(function()
+            local status = T.clientStatus(self.bank)
+            return status ~= nil and status.limitW == self.bank.state.limitW
+        end)
     end,
     validate = function(self)
-        expect(self.tvAndLamp, "a Plug-in Inverter can't run a TV and a lamp")
-        expect(self.miniFridge, "a Plug-in Inverter can't run a mini fridge")
-        expect(not self.fridge and not self.fridgeFreezer, "a Plug-in Inverter runs a full fridge")
+        local limit, watts = self.box.state.limitW, self.server.loadWatts.watts
+        expect(watts[1] <= limit, "a Plug-in Inverter can't run a TV and a lamp")
+        expect(watts[2] <= limit, "a Plug-in Inverter can't run a mini fridge")
+        expect(watts[3] > limit and watts[4] > limit, "a Plug-in Inverter runs a full fridge")
         expectNear("limit of two 600 W inverters", self.twoInverters, 1200, 0)
-        expectNear("limit with one of them broken", self.oneWorking, 600, 0)
+        expectNear("limit with one of them broken", self.bank.state.limitW, 600, 0)
+        local status = T.clientStatus(self.bank)
+        expectNear("limit in this client's status", status and status.limitW, 600, 0)
     end,
 })
 
--- A load beyond the inverters cuts the bank's power, and the power comes back by itself once
--- the load fits again.
+-- A load beyond the inverters cuts the bank's power, which this client's status shows, and the
+-- power comes back by itself once the load fits again.
 test("renewable_energy_power_overload_cuts_and_returns", {
     run = function(self)
         T.setGrid(self, false)
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
         if not bank then return end
-        switchOn(bank)
-        T.applyLoad(record, { "television", "light" })
-        self.fitting = bank:isActivated()
-        T.applyLoad(record, { "television", "light", "fridge" })
-        self.cut = not bank:isActivated()
-        self.status = record.status
-        T.applyLoad(record, { "television" })
-        self.back = bank:isActivated() and not record.overloaded
+        self.bank = bank
+        T.switchOn(self, bank)
+        T.applyLoad(self, bank, { "television", "light" })
+        T.step(function() self.fitting = bank.state.activated end)
+        T.applyLoad(self, bank, { "television", "light", "fridge" })
+        T.step(function() self.cut = not bank.state.activated and bank.state.status end)
+        T.waitForCopy(function()
+            local status = T.clientStatus(bank)
+            return status ~= nil and status.overloaded == true
+        end)
+        T.step(function() self.copyCut = T.clientStatus(bank).state end)
+        T.applyLoad(self, bank, { "television" })
     end,
     validate = function(self)
         expect(self.fitting, "a TV and a lamp didn't run on a charged bank with a Plug-in Inverter")
-        expect(self.cut, "a fridge on top of them didn't cut the power")
-        local status = self.status
+        if not expect(self.cut, "a fridge on top of them didn't cut the power") then return end
+        local status = self.cut
         expect(status.overloaded and status.state == "overloaded", "the status doesn't read overloaded (state " .. tostring(status.state) .. ")")
         expectNear("load in the status", status.loadW, Specs.loads.television.watts + Specs.loads.light.watts + Specs.loads.fridge.watts, 0)
         expectNear("limit in the status", status.limitW, Specs.inverters["RenewableEnergy.PlugInInverter"].watts, 0)
-        expect(self.back, "the power didn't come back once the load fit")
+        expect(self.copyCut == "overloaded", "this client's status of the cut bank reads " .. tostring(self.copyCut))
+        local state = self.bank.state
+        expect(state.activated and not state.overloaded, "the power didn't come back once the load fit")
     end,
 })
 
@@ -403,29 +430,33 @@ test("renewable_energy_power_scan_sees_load_while_cut", {
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
         if not bank then return end
-        local Loads = RenewableEnergy.Loads
-        self.without = Loads.scan(bank:getSquare())
-        local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank }), "two free indoor squares for fridges")
+        self.bank = bank
+        local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
         if not squares then return end
-        T.tile(self, squares[1], FRIDGE)
-        T.tile(self, squares[2], MINI_FRIDGE)
-        self.unpowered = not bank:isActivated()
-        self.with = Loads.scan(bank:getSquare())
+        T.server(self, "scanLoad", bank.position)
+        T.step(function()
+            self.without = self.server.scanLoad
+            T.placeTile(self, squares[1], FRIDGE)
+            T.placeTile(self, squares[2], MINI_FRIDGE)
+            T.bankState(self, bank)
+            T.server(self, "scanLoad", bank.position)
+        end)
     end,
     validate = function(self)
-        expect(self.unpowered, "the bank was on while scanning")
+        local with, without = self.server.scanLoad, self.without
+        expect(not self.bank.state.activated, "the bank was on while scanning")
         local function count(load, kind)
-            return load.kinds[kind] and load.kinds[kind].count or 0
+            return load.counts[kind] or 0
         end
-        expectNear("fridge-freezers found", count(self.with, "fridgeFreezer") - count(self.without, "fridgeFreezer"), 1, 0)
-        expectNear("mini fridges found", count(self.with, "miniFridge") - count(self.without, "miniFridge"), 1, 0)
-        expectNear("watts added", self.with.watts - self.without.watts, Specs.loads.fridgeFreezer.watts + Specs.loads.miniFridge.watts, 0)
+        expectNear("fridge-freezers found", count(with, "fridgeFreezer") - count(without, "fridgeFreezer"), 1, 0)
+        expectNear("mini fridges found", count(with, "miniFridge") - count(without, "miniFridge"), 1, 0)
+        expectNear("watts added", with.watts - without.watts, Specs.loads.fridgeFreezer.watts + Specs.loads.miniFridge.watts, 0)
     end,
 })
 
---- A fuelled backup generator within `reach` tiles of `near`, outdoors if it can be, since a
---- running one makes a building toxic, with a failsafe beside it if asked.
-local function newBackup(self, near, running, failsafe, reach)
+--- A free square within `reach` tiles of `near` for a backup generator: outdoors if there is one,
+--- since a running generator makes a building toxic.
+local function backupSquare(self, near, reach)
     local square
     for _, indoors in ipairs({ false, true }) do
         local candidate = not square and (T.squares(self, 1, { indoors = indoors, near = near }) or {})[1]
@@ -433,18 +464,13 @@ local function newBackup(self, near, running, failsafe, reach)
             square = candidate
         end
     end
-    if not T.need(self, square, "a free square for a generator within " .. reach .. " tiles of the bank") then return nil end
-    local backup = T.track(self, IsoGenerator.new(instanceItem("Base.Generator"), square:getCell(), square))
-    backup:setConnected(true)
-    backup:setFuel(10)
-    backup:setCondition(100)
-    if failsafe then
-        T.tile(self, square, Sprites.failsafe)
-    end
-    if running then
-        backup:setActivated(true)
-    end
-    return backup
+    return T.need(self, square, "a free square for a generator within " .. reach .. " tiles of the bank")
+end
+
+-- Queues reading the backup generator on `square` into self[key]: { running, fuel }.
+local function generatorState(self, square, key)
+    T.server(self, "generatorState", { x = square:getX(), y = square:getY(), z = square:getZ() })
+    T.step(function() self[key] = self.server.generatorState end)
 end
 
 -- Chargers charge only from the grid or a running generator other than a bank, which burns fuel
@@ -453,28 +479,27 @@ test("renewable_energy_power_charger_sources", {
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)
         T.setGrid(self, false)
-        local bank, record = T.bank(self, "batteryRackWood",
-            { "Base.CarBattery1", "Base.CarBattery2", Specs.charger, Specs.charger, "RenewableEnergy.InverterCharger" },
-            { charge = 0.2 })
-        if not bank then return end
-        switchOn(bank)
-        record:update(1, T.passContext(0))
-        self.alone = record.status.chargerW
-        self.ownPower = bank:isActivated()
-        local backup = newBackup(self, bank:getSquare(), true, false, SandboxVars.GeneratorTileRange - 1)
+        local bank = T.bank(self, "batteryRackWood",
+            { "Base.CarBattery1", "Base.CarBattery2", Specs.charger, Specs.charger, INVERTER }, { charge = 0.2 })
+        local backup = bank and backupSquare(self, bank.square, SandboxVars.GeneratorTileRange - 1)
         if not backup then return end
-        local fuel = backup:getFuel()
-        record.charge = 0.2
-        record:update(1, T.passContext(0))
-        self.fromGenerator = record.status.chargerW
-        self.generatorSource = record.status.chargers[1] and record.status.chargers[1].charging
-        self.fuelUsed = fuel - backup:getFuel()
-        T.setGrid(self, true)
-        fuel = backup:getFuel()
-        record:update(1, T.passContext(0))
-        self.fromGrid = record.status.chargeSource
-        self.gridFuel = fuel - backup:getFuel()
-        self.gridPowered = bank:isActivated()
+        T.switchOn(self, bank)
+        T.bankPass(self, bank, 0)
+        T.step(function() self.alone, self.ownPower = bank.state.status.chargerW, bank.state.activated end)
+        T.server(self, "placeGenerator", { x = backup:getX(), y = backup:getY(), z = backup:getZ(), running = true })
+        generatorState(self, backup, "fuelBefore")
+        T.bankSet(self, bank, { charge = 0.2 })
+        T.bankPass(self, bank, 0)
+        T.step(function()
+            local status = bank.state.status
+            self.fromGenerator = status.chargerW
+            self.generatorSource = status.chargers[1] and status.chargers[1].charging
+        end)
+        generatorState(self, backup, "fuelAfter")
+        T.step(function() T.setGrid(self, true) end)
+        T.bankPass(self, bank, 0)
+        T.step(function() self.fromGrid, self.gridPowered = bank.state.status.chargeSource, bank.state.activated end)
+        generatorState(self, backup, "fuelOnGrid")
     end,
     validate = function(self)
         expectNear("charger watts with no grid or generator" .. (self.ownPower and " while the bank powers itself" or ""), self.alone, 0, 0)
@@ -483,105 +508,121 @@ test("renewable_energy_power_charger_sources", {
         expect(self.generatorSource == "generator", "a charger says it charges from " .. tostring(self.generatorSource))
         -- Vanilla bills a generator 1 unit of fuel per hour for 600 W of appliances, times the fuel
         -- consumption option: 2000 W at 0.1 burns a third of a unit an hour.
-        expectNear("fuel the chargers burned in an hour", self.fuelUsed, 1 / 3, 0.001)
+        expectNear("fuel the chargers burned in an hour", self.fuelBefore.fuel - self.fuelAfter.fuel, 1 / 3, 0.001)
         expect(self.fromGrid == "grid", "with the grid on the chargers charge from " .. tostring(self.fromGrid))
-        expectNear("fuel the chargers burned on grid power", self.gridFuel, 0, 0)
+        expectNear("fuel the chargers burned on grid power", self.fuelAfter.fuel - self.fuelOnGrid.fuel, 0, 0)
         expect(not self.gridPowered, "the bank ran its own generator while the grid powered its square")
     end,
 })
 
--- At night a bank that is on powers its squares and pays its load through the inverter and the
--- inverter's own idle draw, and its status says it is draining.
+-- At night a bank that is on powers its squares, on this client too, and pays its load through
+-- the inverter and the inverter's own idle draw, and its status says it is draining.
 test("renewable_energy_power_bank_powers_at_night", {
     run = function(self)
         T.setGrid(self, false)
-        local bank, record = T.bank(self, "batteryRackWood",
-            { "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", "RenewableEnergy.InverterCharger" })
+        local bank = T.bank(self, "batteryRackWood", { "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", INVERTER })
         if not bank then return end
-        switchOn(bank)
-        self.powered = bank:isActivated() and bank:getSquare():haveElectricity()
-        T.applyLoad(record, { "fridge", "television", "light" })
-        self.drawW = record:drawW()
-        local before = storedWh(record)
+        self.bank = bank
+        T.switchOn(self, bank)
+        T.bankState(self, bank)
+        T.waitForCopy(function() return bank.square:haveElectricity() end)
+        T.step(function()
+            self.powered = bank.state.activated and bank.state.powered
+            self.copyPowered = bank.square:haveElectricity()
+        end)
+        T.applyLoad(self, bank, { "fridge", "television", "light" })
+        T.step(function() self.drawW, self.before = bank.state.drawW, bank.state.storedWh end)
         -- The pass measures the house's real load again.
-        record:update(1, T.passContext(0))
-        self.passDrawW = record.status.drawW
-        self.used = before - storedWh(record)
-        self.charging = record.status.charging
+        T.bankPass(self, bank, 0)
     end,
     validate = function(self)
+        local after = self.bank.state
         expect(self.powered, "switching on a charged bank with an inverter did not power its square")
+        expect(self.copyPowered, "the powered square has no power on this client")
         -- A fridge's 160 W compressor runs 40% of the time (64 W), a TV takes 65 W and a lamp 60 W:
         -- 189 W through a 90% efficient inverter is 210 W, plus the Inverter/Charger's 15 W idle.
         expectNear("draw of a fridge, a TV and a lamp", self.drawW, 225, 0.01)
-        expect(self.passDrawW > 0, "the night's pass drew nothing from a bank that is on")
-        expectNear("Wh used in an hour", self.used, self.passDrawW, 0.5)
-        expect(self.charging.watts < 0 and self.charging.hours ~= nil, "the status doesn't say the bank is draining")
+        expect(after.status.drawW > 0, "the night's pass drew nothing from a bank that is on")
+        expectNear("Wh used in an hour", self.before - after.storedWh, after.status.drawW, 0.5)
+        local charging = after.status.charging
+        expect(charging.watts < 0 and charging.hours ~= nil, "the status doesn't say the bank is draining")
     end,
 })
 
--- A day's deepest discharge wears the batteries when the day turns.
+-- A day's deepest discharge wears the batteries when the day turns, on this client's copies too.
 test("renewable_energy_power_depth_of_discharge_wears_batteries", {
     sandbox = { BatteryWear = 100 },
     run = function(self)
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
-        if not bank then return end
-        record.cycleHigh = 1
-        record.charge = 0.5
-        record:trackCycle()
-        self.depth = record.cycleDepth
-        record.day = record.day and record.day - 1 or 0
-        record:newDay(bank:getContainer(), record.day + 1)
-        local battery = bank:getContainer():getFirstType("Base.CarBattery1")
-        self.condition = battery and battery:getCondition()
-        self.depthAfter = record.cycleDepth
+        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
+        if not self.bank then return end
+        T.server(self, "cycleDay", { bank = self.bank.position, high = 1, charge = 0.5 })
+        T.waitForCopy(function()
+            local battery = self.bank.object:getContainer():getFirstType("Base.CarBattery1")
+            return battery ~= nil and battery:getCondition() == stateItem(self.server.cycleDay, "Base.CarBattery1").condition
+        end)
     end,
     validate = function(self)
-        expectNear("cycle depth", self.depth, 0.5, 0.0001)
-        expectNear("car battery condition after a 50% day", self.condition, 99, 0)
-        expectNear("cycle depth on the new day", self.depthAfter, 0, 0)
+        local day = self.server.cycleDay
+        local battery = stateItem(day, "Base.CarBattery1")
+        local copy = self.bank.object:getContainer():getFirstType("Base.CarBattery1")
+        expectNear("cycle depth", day.depthBefore, 0.5, 0.0001)
+        expectNear("car battery condition after a 50% day", battery and battery.condition, 99, 0)
+        expectNear("this client's copy of the car battery's condition", copy and copy:getCondition(), 99, 0)
+        expectNear("cycle depth on the new day", day.cycleDepth, 0, 0)
     end,
 })
 
+local function freshModule(condition)
+    return { { type = "RenewableEnergy.SolarModule", condition = condition } }
+end
+
+-- The condition the panel object `panel` records for its first module, or nil.
+local function recordedCondition(panel)
+    local modules = panel and panel:getModData()[PowerBank.MODULES]
+    return modules and modules[1] and modules[1].condition
+end
+
 -- Storms crack modules by mount: wall panels never, wooden racks most, metal racks least. A
--- crack takes 30 condition, never below 0, and reaches the panel's own record.
+-- crack takes 30 condition, never below 0, and reaches the panel's own record, on this client too.
 test("renewable_energy_power_storms_crack_by_mount", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        local Bank = RenewableEnergy.Bank
+        local names = { "flat", "wall", "woodRack", "metalRack" }
         local mounts = {
             flat = { kind = "flat" }, wall = { kind = "wall", material = "wood" },
             woodRack = { kind = "rack", material = "wood" }, metalRack = { kind = "rack", material = "metal" },
         }
-        self.cracks = {}
-        for name, mount in pairs(mounts) do
-            local count = 0
-            for _ = 1, 2000 do
-                local source = { kind = mount.kind, material = mount.material,
-                    modules = { { type = "RenewableEnergy.SolarModule", condition = 100 } } }
-                if Bank.stormCrack(source, 20) then
-                    count = count + 1
-                end
-            end
-            self.cracks[name] = count
+        local trials = {}
+        for i, name in ipairs(names) do
+            local mount = mounts[name]
+            trials[i] = { source = { kind = mount.kind, material = mount.material, modules = freshModule(100) }, hours = 20, runs = 2000 }
         end
-        local nearlyGone = { kind = "flat", modules = { { type = "RenewableEnergy.SolarModule", condition = 10 } } }
-        T.setSandbox(self, "StormDamageRate", 1000)
-        Bank.stormCrack(nearlyGone, 1000)
-        self.floor = nearlyGone.modules[1].condition
-        T.setSandbox(self, "StormDamage", false)
-        local sheltered = { kind = "flat", modules = { { type = "RenewableEnergy.SolarModule", condition = 100 } } }
-        self.disabled = Bank.stormCrack(sheltered, 1000)
-        T.setSandbox(self, "StormDamage", true)
+        T.server(self, "stormCrack", { trials = trials })
+        T.step(function()
+            self.cracks = {}
+            for i, name in ipairs(names) do
+                self.cracks[name] = self.server.stormCrack.results[i].cracks
+            end
+            T.setSandbox(self, "StormDamageRate", 1000)
+        end)
+        T.server(self, "stormCrack", { trials = { { source = { kind = "flat", modules = freshModule(10) }, hours = 1000 } } })
+        T.step(function()
+            self.floor = self.server.stormCrack.results[1].modules[1].condition
+            T.setSandbox(self, "StormDamage", false)
+        end)
+        T.server(self, "stormCrack", { trials = { { source = { kind = "flat", modules = freshModule(100) }, hours = 1000 } } })
+        T.step(function()
+            self.disabled = self.server.stormCrack.results[1].cracks > 0
+            T.setSandbox(self, "StormDamage", true)
+        end)
 
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
-        if not bank then return end
-        local panel, connected = T.panel(self, Sprites.flat,
-            { near = bank, modules = { { type = "RenewableEnergy.SolarModule", condition = 100 } }, connect = true })
-        if not T.need(self, connected, "a panel connected to the bank") then return end
-        record:update(1, T.passContext(1000, 1000))
-        local modules = panel:getModData()[PowerBank.MODULES]
-        self.recorded = modules and modules[1] and modules[1].condition
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100), connect = true })
+        if not panel then return end
+        self.panel = panel
+        T.bankPass(self, bank, 1000, { stormHours = 1000 })
+        T.server(self, "panelState", panel.position)
+        T.waitForCopy(function() return recordedCondition(panel.object) == 70 end)
     end,
     validate = function(self)
         local cracks = self.cracks
@@ -591,7 +632,10 @@ test("renewable_energy_power_storms_crack_by_mount", {
                 cracks.woodRack, cracks.flat, cracks.metalRack))
         expectNear("a module at 10 after a crack", self.floor, 0, 0)
         expect(not self.disabled, "a storm cracked a module with Storm Damage off")
-        expectNear("the panel's recorded condition after a sure crack", self.recorded, 70, 0)
+        if not expect(self.panel.connected, "connecting the panel failed (" .. tostring(self.panel.reason) .. ")") then return end
+        local modules = self.server.panelState.modules
+        expectNear("the panel's recorded condition after a sure crack", modules and modules[1] and modules[1].condition, 70, 0)
+        expectNear("this client's copy of the panel's recorded condition", recordedCondition(self.panel.object), 70, 0)
     end,
 })
 
@@ -599,113 +643,112 @@ test("renewable_energy_power_storms_crack_by_mount", {
 -- the first time an item is ever wired in; unwiring gives back the part and the wire.
 test("renewable_energy_power_wiring_parts", {
     run = function(self)
-        local p = player()
         T.setPerk(self, Perks.Electricity, 2)
-        local bank, record = T.bank(self, "batteryBoxWood", {})
+        local bank = T.bank(self, "batteryBoxWood", {})
         if not bank then return end
-        local bankPosition = PowerBank.positionOf(bank)
-        local inventory = p:getInventory()
-        local function wire(item)
-            return PowerBank.perform(p, "wireIn", { bank = bankPosition, itemId = item:getID() })
+        self.bank = bank
+        local function wire(key, list, index)
+            perform(self, key, "wireIn", function() return { bank = bank.position, itemId = self.items[list][index]:getID() } end)
         end
-        local battery = inventory:AddItem("Base.CarBattery1")
-        local hammer = inventory:AddItem("Base.Hammer")
-        self.hammer = select(2, wire(hammer))
-        self.noTool = select(2, wire(battery))
-        inventory:AddItem("Base.Wrench")
-        self.noWire = select(2, wire(battery))
-        inventory:AddItem(PowerBank.WIRE)
-        local xp = p:getXp():getXP(Perks.Electricity)
-        self.wired = wire(battery)
-        self.firstXp = p:getXp():getXP(Perks.Electricity) - xp
-        self.wireLeft = inventory:getCountTypeRecurse(PowerBank.WIRE)
-        self.unwired = PowerBank.perform(p, "unwire", { bank = bankPosition, itemId = battery:getID() })
-        self.batteryBack = inventory:contains(battery)
-        self.wireBack = inventory:getCountTypeRecurse(PowerBank.WIRE)
-        xp = p:getXp():getXP(Perks.Electricity)
-        self.rewired = wire(battery)
-        self.secondXp = p:getXp():getXP(Perks.Electricity) - xp
-        inventory:AddItem("Base.Screwdriver")
-        inventory:AddItems(PowerBank.WIRE, 2)
-        self.skill = select(2, wire(inventory:AddItem("RenewableEnergy.InverterCharger")))
-        inventory:AddItem(PowerBank.WIRE)
-        self.full = select(2, wire(inventory:AddItem("Base.CarBattery2"))) == nil
-            and select(2, wire(inventory:AddItem("Base.CarBattery3")))
-        self.batteries = #record.batteries
+        T.give(self, "first", { { type = "Base.CarBattery1" }, { type = "Base.Hammer" } })
+        wire("hammer", "first", 2)
+        wire("noTool", "first", 1)
+        T.give(self, "wrench", { { type = "Base.Wrench" } })
+        wire("noWire", "first", 1)
+        T.give(self, "wire", { { type = PowerBank.WIRE } })
+        wire("wired", "first", 1)
+        T.count(self, "wired", { PowerBank.WIRE })
+        perform(self, "unwired", "unwire", function() return { bank = bank.position, itemId = self.items.first[1]:getID() } end)
+        T.count(self, "unwired", { PowerBank.WIRE, "Base.CarBattery1" })
+        wire("rewired", "first", 1)
+        T.give(self, "inverter", { { type = "Base.Screwdriver" }, { type = PowerBank.WIRE, count = 2 }, { type = INVERTER } })
+        wire("skill", "inverter", 4)
+        T.give(self, "batteries", { { type = PowerBank.WIRE }, { type = "Base.CarBattery2" }, { type = "Base.CarBattery3" } })
+        wire("second", "batteries", 2)
+        wire("full", "batteries", 3)
+        T.bankState(self, bank)
     end,
     validate = function(self)
-        expect(self.hammer == "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in (" .. tostring(self.hammer) .. ")")
-        expect(self.noTool == "Tooltip_RenewableEnergy_NeedTool", "a battery was wired in without a wrench (" .. tostring(self.noTool) .. ")")
-        expect(self.noWire == "Tooltip_RenewableEnergy_NeedWire", "a battery was wired in without wire (" .. tostring(self.noWire) .. ")")
-        expect(self.wired, "wiring a battery in with a wrench and wire failed")
-        expect(self.firstXp > 0, "the first wiring gave no Electricity XP")
-        expectNear("wire left after wiring a battery in", self.wireLeft, 0, 0)
-        expect(self.unwired and self.batteryBack, "unwiring didn't give the battery back")
-        expectNear("wire back after unwiring", self.wireBack, 1, 0)
-        expect(self.rewired, "wiring the battery in again failed")
-        expectNear("XP for wiring the same battery again", self.secondXp, 0, 0)
-        expect(self.skill == "Tooltip_RenewableEnergy_NeedSkill", "an Inverter/Charger was wired in at Electricity 2 (" .. tostring(self.skill) .. ")")
-        expect(self.full == "Tooltip_RenewableEnergy_NoSlot", "a battery box took a third battery (" .. tostring(self.full) .. ")")
-        expectNear("batteries in the box", self.batteries, 2, 0)
+        local function reason(key)
+            return tostring(self[key].reason)
+        end
+        expect(reason("hammer") == "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in (" .. reason("hammer") .. ")")
+        expect(reason("noTool") == "Tooltip_RenewableEnergy_NeedTool", "a battery was wired in without a wrench (" .. reason("noTool") .. ")")
+        expect(reason("noWire") == "Tooltip_RenewableEnergy_NeedWire", "a battery was wired in without wire (" .. reason("noWire") .. ")")
+        expect(self.wired.ok, "wiring a battery in with a wrench and wire failed (" .. reason("wired") .. ")")
+        expect(self.wired.xpAfter > self.wired.xpBefore, "the first wiring gave no Electricity XP")
+        expectNear("wire left after wiring a battery in", self.counts.wired[PowerBank.WIRE], 0, 0)
+        expect(self.unwired.ok and self.counts.unwired["Base.CarBattery1"] == 1, "unwiring didn't give the battery back")
+        expectNear("wire back after unwiring", self.counts.unwired[PowerBank.WIRE], 1, 0)
+        expect(self.rewired.ok, "wiring the battery in again failed (" .. reason("rewired") .. ")")
+        expectNear("XP for wiring the same battery again", self.rewired.xpAfter - self.rewired.xpBefore, 0, 0)
+        expect(reason("skill") == "Tooltip_RenewableEnergy_NeedSkill", "an Inverter/Charger was wired in at Electricity 2 (" .. reason("skill") .. ")")
+        expect(self.second.ok, "a battery box refused its second battery (" .. reason("second") .. ")")
+        expect(reason("full") == "Tooltip_RenewableEnergy_NoSlot", "a battery box took a third battery (" .. reason("full") .. ")")
+        expectNear("batteries in the box", self.bank.state.batteries, 2, 0)
     end,
 })
+
+-- Queues repairing the first Inverter/Charger in `bank` as the server's character, leaving the
+-- answer in self[key].
+local function repair(self, key, bank)
+    perform(self, key, "repairPart", function()
+        local inverter = stateItem(bank.state, INVERTER)
+        return { bank = bank.position, itemId = inverter and inverter.id or -1 }
+    end)
+end
 
 -- Inverters and controllers wear while the bank runs, an overload costs extra, a part at 0
 -- does nothing, and Electronics Scrap repairs 10 points at Electricity 2.
 test("renewable_energy_power_part_wear_and_repair", {
     run = function(self)
         T.setGrid(self, false)
-        local p = player()
-        local bank, record = T.bank(self, "batteryRackWood",
-            { "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", "RenewableEnergy.InverterCharger", Specs.controller })
-        if not bank then return end
-        local container = bank:getContainer()
-        local inverter = container:getFirstType("RenewableEnergy.InverterCharger")
-        local controller = container:getFirstType(Specs.controller)
-        Wear.setCondition(inverter, 80)
-        Wear.setCondition(controller, 80)
-        switchOn(bank)
-        record.overloaded = false
-        record:wearParts(container, 100, 0)
-        self.inverterWorn = 80 - inverter:getCondition()
-        self.controllerWorn = 80 - controller:getCondition()
-        Wear.setCondition(inverter, 80)
-        record:wearParts(container, 0, 1)
-        self.overloadWorn = 80 - inverter:getCondition()
-
-        local bankPosition = PowerBank.positionOf(bank)
-        local function repair(item)
-            return select(2, PowerBank.perform(p, "repairPart", { bank = bankPosition, itemId = item:getID() }))
-        end
-        Wear.setCondition(inverter, 50)
-        p:getInventory():AddItem(PowerBank.SCRAP)
         T.setPerk(self, Perks.Electricity, 1)
-        self.unskilled = repair(inverter)
-        T.setPerk(self, Perks.Electricity, 2)
-        self.repaired = repair(inverter) == nil and inverter:getCondition()
-        self.scrapLeft = p:getInventory():getCountTypeRecurse(PowerBank.SCRAP)
-        self.noScrap = repair(inverter)
-        Wear.setCondition(inverter, inverter:getConditionMax())
-        p:getInventory():AddItem(PowerBank.SCRAP)
-        self.whole = repair(inverter)
+        local bank = T.bank(self, "batteryRackWood",
+            { "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", INVERTER, Specs.controller })
+        if not bank then return end
+        self.bank = bank
+        T.switchOn(self, bank)
+        T.bankSet(self, bank, { overloaded = false })
+        T.server(self, "wearParts", { bank = bank.position, hours = 100, conditions = { [INVERTER] = 80, [Specs.controller] = 80 } })
+        T.step(function() self.worn = self.server.wearParts.lost end)
+        T.server(self, "wearParts", { bank = bank.position, overloads = 1, conditions = { [INVERTER] = 80 } })
+        T.step(function() self.overloadWorn = self.server.wearParts.lost[INVERTER] end)
 
-        Wear.setCondition(inverter, 0)
-        PowerBank.perform(p, "refresh", { bank = bankPosition })
-        record:powerUp()
-        self.brokenLimit = record:limitW()
-        self.brokenPowered = bank:isActivated()
+        T.setPartCondition(self, bank, INVERTER, 50)
+        T.give(self, "scrap", { { type = PowerBank.SCRAP } })
+        repair(self, "unskilled", bank)
+        T.step(function() T.setPerk(self, Perks.Electricity, 2) end)
+        repair(self, "repaired", bank)
+        T.bankState(self, bank)
+        T.count(self, "scrap", { PowerBank.SCRAP })
+        T.step(function() self.repairedCondition = stateItem(bank.state, INVERTER).condition end)
+        repair(self, "noScrap", bank)
+        -- Past ConditionMax, which the setter keeps it to.
+        T.setPartCondition(self, bank, INVERTER, 1000)
+        T.give(self, "moreScrap", { { type = PowerBank.SCRAP } })
+        repair(self, "whole", bank)
+
+        T.setPartCondition(self, bank, INVERTER, 0)
+        perform(self, "refreshed", "refresh", { bank = bank.position })
+        T.server(self, "powerUp", { bank = bank.position })
+        T.step(function() self.broken = self.server.powerUp end)
     end,
     validate = function(self)
-        expectNear("inverter condition lost in 100 hours on", self.inverterWorn, math.floor(Specs.partWear.inverterPerHour * 100), 0)
-        expectNear("controller condition lost in 100 hours on", self.controllerWorn, math.floor(Specs.partWear.controllerPerHour * 100), 0)
+        local function reason(key)
+            return tostring(self[key].reason)
+        end
+        expectNear("inverter condition lost in 100 hours on", self.worn[INVERTER], math.floor(Specs.partWear.inverterPerHour * 100), 0)
+        expectNear("controller condition lost in 100 hours on", self.worn[Specs.controller], math.floor(Specs.partWear.controllerPerHour * 100), 0)
         expectNear("inverter condition lost to one overload", self.overloadWorn, Specs.partWear.overload, 0)
-        expect(self.unskilled == "Tooltip_RenewableEnergy_NeedSkill", "a part was repaired at Electricity 1 (" .. tostring(self.unskilled) .. ")")
-        expectNear("condition after one scrap", self.repaired, 60, 0)
-        expectNear("scrap left", self.scrapLeft, 0, 0)
-        expect(self.noScrap == "Tooltip_RenewableEnergy_NeedScrap", "a part was repaired without scrap (" .. tostring(self.noScrap) .. ")")
-        expect(self.whole == "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair (" .. tostring(self.whole) .. ")")
-        expectNear("limit with the only inverter at 0", self.brokenLimit, 0, 0)
-        expect(not self.brokenPowered, "a bank whose only inverter is broken powers its area")
+        expect(reason("unskilled") == "Tooltip_RenewableEnergy_NeedSkill", "a part was repaired at Electricity 1 (" .. reason("unskilled") .. ")")
+        expect(self.repaired.ok, "repairing a worn inverter with scrap failed (" .. reason("repaired") .. ")")
+        expectNear("condition after one scrap", self.repairedCondition, 60, 0)
+        expectNear("scrap left", self.counts.scrap[PowerBank.SCRAP], 0, 0)
+        expect(reason("noScrap") == "Tooltip_RenewableEnergy_NeedScrap", "a part was repaired without scrap (" .. reason("noScrap") .. ")")
+        expect(reason("whole") == "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair (" .. reason("whole") .. ")")
+        expectNear("limit with the only inverter at 0", self.broken.limitW, 0, 0)
+        expect(not self.broken.activated, "a bank whose only inverter is broken powers its area")
     end,
 })
 
@@ -714,207 +757,153 @@ test("renewable_energy_power_failsafe_starts_generator", {
     sandbox = { FailsafeStartCharge = 20, FailsafeStopCharge = 80 },
     run = function(self)
         T.setGrid(self, false)
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" }, { charge = 0.1 })
-        if not bank then return end
-        local backup = newBackup(self, bank:getSquare(), false, true, 3)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" }, { charge = 0.1 })
+        local backup = bank and backupSquare(self, bank.square, 3)
         if not backup then return end
-        record.on = true
-        record:update(0.01, T.passContext(0))
-        self.started = backup:isActivated()
-        self.failsafe = record.status.generator and record.status.generator.failsafe
-        record.charge = 0.9
-        record:writeBatteries(bank:getContainer(), false)
-        record:update(0.01, T.passContext(0))
-        self.stopped = not backup:isActivated()
+        T.server(self, "placeGenerator", { x = backup:getX(), y = backup:getY(), z = backup:getZ(), failsafe = true })
+        T.bankSet(self, bank, { on = true })
+        T.bankPass(self, bank, 0, { hours = 0.01 })
+        T.step(function() self.failsafe = bank.state.status.generator and bank.state.status.generator.failsafe end)
+        generatorState(self, backup, "low")
+        T.bankSet(self, bank, { charge = 0.9 }, true)
+        T.bankPass(self, bank, 0, { hours = 0.01 })
+        generatorState(self, backup, "charged")
     end,
     validate = function(self)
         expect(self.failsafe, "the bank didn't find the failsafe generator")
-        expect(self.started, "the failsafe didn't start the generator at 10% charge")
-        expect(self.stopped, "the failsafe didn't stop the generator at 90% charge")
+        expect(self.low.running, "the failsafe didn't start the generator at 10% charge")
+        expect(not self.charged.running, "the failsafe didn't stop the generator at 90% charge")
     end,
 })
 
--- Clients send commands through OnClientCommand, which must survive bad arguments and refuse
--- what the world doesn't allow; the status it sends reaches the client's copy of the bank.
+-- Clients send commands through the bank system (a client command packet in multiplayer), which
+-- must survive forged arguments and refuse what the world doesn't allow; the server's record
+-- changes, and the status it sends reaches this client's copy.
 test("renewable_energy_power_commands_from_clients", {
     run = function(self)
-        local p = player()
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
-        if not bank then return end
-        local panel = T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
+        local panel = bank and T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
         if not panel then return end
-        local system = PowerBank.serverSystem
-        self.position = PowerBank.positionOf(bank)
-        system:OnClientCommand("noSuchCommand", p, { bank = self.position })
-        system:OnClientCommand("setBankOn", p, { bank = "nonsense" })
-        system:OnClientCommand("wireIn", p, { bank = self.position, itemId = "nonsense" })
-        system:OnClientCommand("rename", p, { bank = self.position, name = 7 })
-        self.badSource = PowerBank.perform(p, "connectSource", { bank = self.position, source = self.position })
-        self.noArgs = PowerBank.perform(p, "connectSource", nil)
-        local source = record:findSource(panel:getX(), panel:getY(), panel:getZ())
-        if source then source.snow = 0.8 end
-        self.cleared = PowerBank.perform(p, "clearSnow", { source = PowerBank.positionOf(panel) })
-        self.snow = source and source.snow
-        self.disconnected = PowerBank.perform(p, "disconnectSource", { source = PowerBank.positionOf(panel) })
-        self.sourcesLeft = #record.sources
-        system:OnClientCommand("rename", p, { bank = self.position, name = "  Shed bank  " })
-        system:OnClientCommand("setBankOn", p, { bank = self.position, on = true })
-        self.serverOn = record.on
-    end,
-    validate = function(self)
-        expect(not self.badSource, "a bank was connected to itself as a panel")
-        expect(not self.noArgs, "a command without arguments succeeded")
-        expect(self.cleared and self.snow == 0, "clearing snow left " .. tostring(self.snow))
-        expect(self.disconnected and self.sourcesLeft == 0, "disconnecting the panel left " .. tostring(self.sourcesLeft) .. " panels")
-        expect(self.serverOn, "setBankOn through OnClientCommand didn't switch the bank on")
-        local client = PowerBank.clientSystem
-        local copy = client and client.system:getObjectAt(self.position.x, self.position.y, self.position.z)
-        local status = copy and copy:getModData().status
-        expect(status and status.on == true and status.kind == "batteryBoxWood", "the client's copy of the status doesn't show the bank on")
-        expect(status and status.name == "Shed bank", "the client's copy names the bank " .. tostring(status and status.name))
-    end,
-})
-
--- The status of the bank at `position` on the client's copy, which the Global Object System syncs.
-local function clientStatus(position)
-    local client = PowerBank.clientSystem
-    local copy = client and position and client.system:getObjectAt(position.x, position.y, position.z)
-    return copy and copy:getModData().status
-end
-
--- A client renames and switches on a bank the server holds the way the bank window does, through
--- the bank system's commands (a client command packet in multiplayer), after a forged one the
--- server must shrug off. The server's record changes, and its status reaches the client's copy.
-test("renewable_energy_power_commands_reach_the_server", {
-    run = function(self)
-        local square = (T.squares(self, 1, { indoors = true }) or {})[1]
-        if not T.need(self, square, "a free indoor square for a bank") then return end
-        T.server(self, "placeBank", { x = square:getX(), y = square:getY(), z = square:getZ(),
-            kind = "batteryBoxWood", items = { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" } })
+        self.bank, self.panel = bank, panel
+        local function sourceSnow()
+            local status = T.clientStatus(bank)
+            return status and status.sources[1] and status.sources[1].snow
+        end
+        T.server(self, "setSnow", { bank = bank.position, source = panel.position, snow = 0.8 })
+        T.waitForCopy(function() return sourceSnow() == 0.8 end)
         T.step(function()
-            self.position = self.server.placeBank
-            PowerBank.command(player(), "setBankOn", { bank = "nonsense" })
-            PowerBank.command(player(), "rename", { bank = self.position, name = "  Network bank  " })
-            PowerBank.command(player(), "setBankOn", { bank = self.position, on = true })
+            local p = player()
+            self.snowBefore = sourceSnow()
+            PowerBank.command(p, "noSuchCommand", { bank = bank.position })
+            PowerBank.command(p, "setBankOn", { bank = "nonsense" })
+            PowerBank.command(p, "wireIn", { bank = bank.position, itemId = "nonsense" })
+            PowerBank.command(p, "rename", { bank = bank.position, name = 7 })
+            PowerBank.command(p, "connectSource", { bank = bank.position, source = bank.position })
+            PowerBank.command(p, "connectSource", nil)
+            PowerBank.command(p, "clearSnow", { source = panel.position })
         end)
-        T.waitUntil(function()
-            local status = clientStatus(self.position)
-            return status ~= nil and status.on == true and status.name == "Network bank"
-        end, 3000)
-        T.server(self, "bankState", function() return self.position end)
+        T.waitForCopy(function() return sourceSnow() == 0 end)
+        T.bankState(self, bank)
+        T.step(function()
+            local p = player()
+            self.afterForged = bank.state
+            self.snowAfter = sourceSnow()
+            PowerBank.command(p, "disconnectSource", { source = panel.position })
+            PowerBank.command(p, "rename", { bank = bank.position, name = "  Shed bank  " })
+            PowerBank.command(p, "setBankOn", { bank = bank.position, on = true })
+        end)
+        T.waitForCopy(function()
+            local status = T.clientStatus(bank)
+            return status ~= nil and status.on == true and status.name == "Shed bank" and #status.sources == 0
+        end)
+        T.bankState(self, bank)
     end,
     validate = function(self)
-        local state, status = self.server.bankState, clientStatus(self.position)
-        expect(state.found, "the server has no bank record at the place")
-        expect(state.on, "the server's bank isn't on")
-        expect(state.name == "Network bank", "the server names the bank " .. tostring(state.name))
-        expect(status and status.on == true and status.kind == "batteryBoxWood", "the client's copy doesn't show the bank on")
-        expect(status and status.name == "Network bank", "the client's copy names the bank " .. tostring(status and status.name))
+        local forged, state, status = self.afterForged, self.bank.state, T.clientStatus(self.bank)
+        expect(forged.sources == 1 and forged.batteries == 1 and forged.name == "" and not forged.on,
+            string.format("forged commands changed the bank: %d panels, %d batteries, name %q, on %s",
+                forged.sources, forged.batteries, forged.name, tostring(forged.on)))
+        expect(self.snowBefore == 0.8 and self.snowAfter == 0, "clearing snow went from " .. tostring(self.snowBefore)
+            .. " to " .. tostring(self.snowAfter))
+        expect(state.sources == 0, "disconnecting the panel left " .. state.sources .. " panels")
+        expect(state.on, "setBankOn didn't switch the server's bank on")
+        expect(state.name == "Shed bank", "the server names the bank " .. tostring(state.name))
+        expect(status and status.on == true and status.kind == "batteryBoxWood", "this client's copy of the status doesn't show the bank on")
+        expect(status and status.name == "Shed bank", "this client's copy names the bank " .. tostring(status and status.name))
     end,
 })
 
--- A removed running bank leaves nothing powered and is forgotten.
+-- A removed running bank leaves nothing powered, on this client too, and is forgotten.
 test("renewable_energy_power_removed_bank_leaves_no_power", {
     run = function(self)
         T.setGrid(self, false)
-        local bank = T.bank(self, "batteryRackWood", { "RenewableEnergy.L16Battery", "RenewableEnergy.InverterCharger" })
+        local bank = T.bank(self, "batteryRackWood", { "RenewableEnergy.L16Battery", INVERTER })
         if not bank then return end
-        local square = bank:getSquare()
-        switchOn(bank)
-        self.wasPowered = square:haveElectricity()
-        PowerBank.remove(bank)
-        self.powered = square:haveElectricity()
-        self.registered = PowerBank.serverSystem:getLuaObjectOnSquare(square) ~= nil
+        self.bank = bank
+        T.switchOn(self, bank)
+        T.bankState(self, bank)
+        T.waitForCopy(function() return bank.square:haveElectricity() end)
+        T.step(function() self.copyWasPowered = bank.square:haveElectricity() end)
+        T.server(self, "removeBank", { bank = bank.position })
+        T.waitForCopy(function() return not bank.square:haveElectricity() and PowerBank.bankOn(bank.square) == nil end)
     end,
     validate = function(self)
-        expect(self.wasPowered, "the switched-on bank didn't power its square")
-        expect(not self.powered, "the removed bank's square still has power")
-        expect(not self.registered, "the removed bank is still registered")
+        local removed, square = self.server.removeBank, self.bank.square
+        expect(self.bank.state.powered, "the switched-on bank didn't power its square")
+        expect(self.copyWasPowered, "the switched-on bank's square has no power on this client")
+        expect(not removed.powered, "the removed bank's square still has power")
+        expect(not square:haveElectricity(), "the removed bank's square still has power on this client")
+        expect(not removed.registered, "the removed bank is still registered")
+        expect(PowerBank.bankOn(square) == nil and PowerBank.statusOf(square) == nil, "this client still has the removed bank")
     end,
 })
 
 -- The clock ------------------------------------------------------------------------------
 
--- The solar battery charger's watt-hours not yet a whole use of a battery (its modData key).
-local CELL_CHARGER_STORED_KEY = "RenewableEnergy_storedWh"
 -- How far the clock jumps. EveryTenMinutes fires on the next tick when the minute of the hour
 -- lands in another ten (GameTime.update), which a jump of more than ten minutes past whole hours
 -- always does; the gadget pass makes up for at most an hour.
 local CLOCK_JUMP_HOURS = 1.25
--- The longest the test waits for the passes the jump sets off.
-local PASS_FRAMES = 10
 
--- What each fixture holds: the bank's Wh, the car battery's charge, the solar battery charger's
--- Wh in its cells and toward the next use, the garden light's Wh, and the charge of the battery
--- in the arrow board's box.
-local function charges(self)
-    local cellWh = self.charger:getModData()[CELL_CHARGER_STORED_KEY] or 0
-    for _, cell in ipairs(self.cells) do
-        cellWh = cellWh + cell:getCurrentUsesFloat() * SolarCellCharger.BATTERY_WH
-    end
-    return {
-        bank = storedWh(self.record),
-        car = self.carBattery:getCurrentUsesFloat(),
-        charger = cellWh,
-        light = SolarGardenLight.getCharge(self.light),
-        trailer = self.trailerBattery:getCurrentUsesFloat(),
-    }
-end
-
-local function allCharged(self)
-    if not self.before then return false end
-    local now = charges(self)
-    for name, before in pairs(self.before) do
-        if now[name] <= before then return false end
-    end
-    return true
-end
-
--- The game's clock runs the banks and the gadgets: once it moves on at noon, a bank with a
--- connected panel, a car with a maintainer, a solar battery charger holding cells, a garden
--- light and an arrow board's battery box have all charged. The live weather sets how much, so
--- this checks only that they did.
+-- The game's clock runs the banks and the gadgets on the authority: once it moves on at noon, a
+-- bank with a connected panel, a car with a maintainer, a solar battery charger holding cells, a
+-- garden light and an arrow board's battery box have all charged. The live weather sets how much,
+-- so this checks only that they did.
 test("renewable_energy_power_clock_drives_banks_and_gadgets", {
     hour = 12,
+    instant = true,
     run = function(self)
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
-        if not bank then return end
-        local panel, connected = T.panel(self, Sprites.flat, { near = bank, connect = true })
-        local car, carBattery = T.vehicle(self, "Base.CarNormal", { battery = "Base.CarBattery1", charge = 0.5 })
-        local trailer = car and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         local squares = T.need(self, T.squares(self, 2, { bare = true }), "two bare outdoor squares for the gadgets")
-        if not (panel and T.need(self, connected, "a panel connected to the bank") and trailer and squares) then return end
-        -- It may have spawned stocked; one battery, half charged, shows the panels charging.
-        local box = trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX):getItemContainer()
-        box:removeAllItems()
-        self.trailerBattery = box:AddItem("RenewableEnergy.DeepCycleBattery")
-        self.trailerBattery:setCurrentUsesFloat(0.5)
-        local maintainer = player():getInventory():AddItem(SolarMaintainer.ITEM)
-        if not T.need(self, SolarMaintainer.attach(player(), car, maintainer), "a maintainer on the car") then return end
-        local charger = T.placeMoveable(self, squares[1], "RenewableEnergy.SolarCellCharger", Sprites.cellCharger)
-        local light = T.placeMoveable(self, squares[2], SolarGardenLight.ITEM, Sprites.gardenLight.off,
-            { [SolarGardenLight.CHARGE_KEY] = 0 })
-        if not (charger and light) then return end
-        -- An empty battery is used up and leaves its container on its next update
-        -- (DrainableComboItem.update), so the cells start half charged.
-        self.cells = {}
-        for _ = 1, SolarCellCharger.SLOTS do
-            local cell = charger:getContainer():AddItem(SolarCellCharger.BATTERY)
-            cell:setCurrentUsesFloat(0.5)
-            table.insert(self.cells, cell)
+        if not (panel and squares) then return end
+        self.bank = bank
+        local car = T.placeVehicle(self, "Base.CarNormal", { battery = "Base.CarBattery1", charge = 0.5 })
+        local trailer = T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT)
+        local charger = T.placeAsPlayer(self, squares[1], "RenewableEnergy.SolarCellCharger", Sprites.cellCharger)
+        local light = T.placeAsPlayer(self, squares[2], SolarGardenLight.ITEM, Sprites.gardenLight.off)
+        local function fixtures()
+            return { bank = bank.position, car = T.vehicleArgs(car), trailer = T.vehicleArgs(trailer),
+                charger = { x = charger.x, y = charger.y, z = charger.z },
+                light = { x = light.x, y = light.y, z = light.z } }
         end
-        self.record, self.carBattery, self.charger, self.light = record, carBattery, charger, light
-        -- Setting the test's hour already set off a pass for the next tick, and the car joins the
-        -- cell's vehicles on the next cell update, so the clock moves on once both are done.
-        T.wait(2)
+        T.server(self, "stockGadgets", fixtures)
         T.step(function()
-            self.before = charges(self)
+            if not T.need(self, panel.connected, "a panel connected to the bank") then return end
+            self.before = self.server.stockGadgets
             T.setTime(self, getGameTime():getTimeOfDay() + CLOCK_JUMP_HOURS)
         end)
-        T.waitUntil(function() return allCharged(self) end, PASS_FRAMES)
+        -- The bank's pass and the gadgets' run on the same tick; the bank's status coming back with
+        -- a later hour says both have.
+        T.waitForCopy(function()
+            local status = T.clientStatus(bank)
+            return status ~= nil and status.hour >= self.before.hour + 1
+        end)
+        T.server(self, "gadgetCharges", fixtures)
     end,
     validate = function(self)
-        local before, after = self.before, charges(self)
+        local before, after = self.before, self.server.gadgetCharges
+        if not expect(before and after, "the clock test's gadgets were never read before and after") then return end
         local function charged(name, what)
             expect(after[name] > before[name], string.format("%s didn't charge as the clock moved on (%.4f to %.4f)",
                 what, before[name], after[name]))

@@ -169,38 +169,58 @@ test("renewable_energy_tiles_bank_scrap_definitions", {
     end,
 })
 
--- Each tile placed from its item is picked up as that item and nothing else, the tile's
--- CustomItem deciding it (without one the game hands back a generic Moveable); containers are
--- only on the tiles that hold items.
+-- The tiles' PickUpTool and PlaceTool, Electrician, are a screwdriver and some Electricity.
+local function electrician(self)
+    T.setPerk(self, Perks.Electricity, 10)
+    T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
+end
+
+-- Every placed tile's CustomItem names its item, so picking it up gives that item and nothing
+-- else (without one the game hands back a generic Moveable). And each item's own tile, placed and
+-- picked up the way a player does, comes back as the item, with a container only on the tiles that
+-- hold items. Wall panels need a wall to hang on, and the other facings are the same item's
+-- (renewable_energy_tiles_mounts_rotate turns them), so only the tile an item places is placed.
 test("renewable_energy_tiles_place_and_pick_up", {
+    instant = true,
     run = function(self)
         local square = T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
         if not square then return end
-        local inventory = T.player():getInventory()
+        electrician(self)
         self.results = {}
         for _, placed in ipairs(PLACED) do
-            -- The lit garden light is the unlit one switched on; its item places the unlit one.
-            if placed.sprite ~= Sprites.gardenLight.lit then
-                inventory:clear()
-                local object = T.placeMoveable(self, square, placed.item, placed.sprite)
-                ISMoveableSpriteProps.new(placed.sprite):pickUpMoveable(T.player(), square, true, true)
-                table.insert(self.results, {
-                    placed = placed,
-                    container = object and object:getContainer() ~= nil,
-                    removed = T.objectWithSprite(square, placed.sprite) == nil,
-                    returned = inventory:getCountTypeRecurse(placed.item),
-                    items = inventory:getItems():size(),
-                })
+            local script = getScriptManager():getItem(placed.item)
+            -- Banks stand only indoors, and placing them by hand is the power tests' business.
+            if placed.kind ~= "wall" and not RenewableEnergy.PowerBank.bankOfSprite(placed.sprite)
+                and script and script:getWorldObjectSprite() == placed.sprite then
+                local result = { placed = placed }
+                table.insert(self.results, result)
+                local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite)
+                T.step(function() result.container = handle.object ~= nil and handle.object:getContainer() ~= nil end)
+                T.pickUpAsPlayer(self, handle, placed.sprite)
+                T.server(self, "carried", { types = { placed.item } })
+                T.step(function()
+                    local carried = self.server.carried
+                    result.removed = T.objectWithSprite(square, placed.sprite) == nil
+                    result.returned, result.items = #carried.items[placed.item], carried.total
+                end)
+                T.server(self, "takeItems", { type = placed.item })
             end
         end
     end,
     validate = function(self)
+        for _, placed in ipairs(PLACED) do
+            local props = properties(placed.sprite)
+            local customItem = props and props:get("CustomItem")
+            expect(customItem == placed.item, placed.sprite .. " gives " .. tostring(customItem) .. ", expected " .. placed.item)
+        end
+        expect(#self.results > 0, "no item places one of the tiles")
         for _, r in ipairs(self.results) do
             local what = r.placed.sprite .. " (" .. r.placed.item .. ")"
             expect(r.container == (r.placed.container == true), what .. (r.placed.container and " has no container" or " has a container"))
             expect(r.removed, what .. " was not picked up")
-            expect(r.returned == 1 and r.items == 1,
-                what .. " gave back " .. r.items .. " items, " .. r.returned .. " of them " .. r.placed.item)
+            -- The screwdriver stays.
+            expect(r.returned == 1 and r.items == 2,
+                what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them " .. r.placed.item)
         end
     end,
 })
@@ -229,30 +249,32 @@ local function describe(value)
 end
 
 test("renewable_energy_tiles_pick_up_keeps_mod_data", {
+    instant = true,
     run = function(self)
         local square = T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
         if not square then return end
-        local inventory = T.player():getInventory()
+        electrician(self)
         self.results = {}
         for _, entry in ipairs(CARRIED) do
             local sprite, fullType, key, value = entry[1], entry[2], entry[3], entry[4]
-            inventory:clear()
-            local object = T.placeMoveable(self, square, fullType, sprite, { [key] = value })
-            local placed = describe(object and object:getModData()[key])
-            ISMoveableSpriteProps.new(sprite):pickUpMoveable(T.player(), square, true, true)
-            local item = inventory:getFirstTypeRecurse(fullType)
-            table.insert(self.results, {
-                what = fullType,
-                expected = describe(value),
-                placed = placed,
-                pickedUp = describe(item and item:getModData()[key]),
-            })
+            local result = { what = fullType, expected = describe(value) }
+            table.insert(self.results, result)
+            local handle = T.placeAsPlayer(self, square, fullType, sprite, { [key] = value })
+            T.server(self, "objectModData", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = sprite, key = key })
+            T.step(function() result.placed = describe(self.server.objectModData.value) end)
+            T.pickUpAsPlayer(self, handle, sprite)
+            T.server(self, "carried", { types = { fullType } })
+            T.step(function()
+                local item = self.server.carried.items[fullType][1]
+                result.pickedUp = describe(item and item.modData[key])
+            end)
+            T.server(self, "takeItems", { type = fullType })
         end
     end,
     validate = function(self)
         for _, r in ipairs(self.results) do
-            expect(r.placed == r.expected, "placed " .. r.what .. " holds " .. r.placed .. ", expected " .. r.expected)
-            expect(r.pickedUp == r.expected, "picked-up " .. r.what .. " holds " .. r.pickedUp .. ", expected " .. r.expected)
+            expect(r.placed == r.expected, "placed " .. r.what .. " holds " .. tostring(r.placed) .. ", expected " .. r.expected)
+            expect(r.pickedUp == r.expected, "picked-up " .. r.what .. " holds " .. tostring(r.pickedUp) .. ", expected " .. r.expected)
         end
     end,
 })
@@ -277,70 +299,82 @@ end
 
 -- A module below Specs.crackedBelow (60) shows cracked glass on the mount placed with it, a rack
 -- only over the cracked module's slot; one at 60 shows whole. Repairing the module takes the
--- cracks off, and snow already lying on a panel stays drawn over cracks added under it.
+-- cracks off, and snow already lying on a panel stays drawn over cracks added under it. The
+-- panels are placed and changed on the authority (panelCracks); what is checked is what this
+-- client shows, the same as the authority's.
+local CRACKED = {
+    { name = "flat59", sprite = Sprites.flat, modules = modulesAt(59), shows = "renewable_energy_01_115",
+        what = "a flat panel at 59" },
+    { name = "flat60", sprite = Sprites.flat, modules = modulesAt(60), shows = "", what = "a flat panel at 60" },
+    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = modulesAt(100, 59), shows = "renewable_energy_01_127",
+        what = "a metal rack facing west with its upper module at 59" },
+    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = modulesAt(0, 59),
+        shows = "renewable_energy_01_130,renewable_energy_01_131", what = "a wooden rack facing east with both modules cracked" },
+    -- A wall panel needs a wall to be placed against, so this one is a bare tile.
+    { name = "wall", sprite = Sprites.wall.wood.E, modules = modulesAt(59), shows = "renewable_energy_01_119",
+        what = "a wooden wall panel facing east at 59" },
+    { name = "repaired", sprite = Sprites.flat, modules = modulesAt(59), change = { modules = modulesAt(85) }, shows = "",
+        what = "a flat panel repaired to 85" },
+    { name = "snowed", sprite = Sprites.flat, modules = modulesAt(100), change = { modules = modulesAt(30), snow = true },
+        shows = "renewable_energy_01_115,renewable_energy_01_16", what = "a snowed-on flat panel at 30" },
+}
+
 test("renewable_energy_tiles_cracked_modules_show", {
     run = function(self)
-        local squares = T.need(self, T.squares(self, 6, { bare = true }), "six free outdoor squares")
-        if not squares then return end
-        local PowerBank = RenewableEnergy.PowerBank
-        local function place(i, item, sprite, modules)
-            return T.placeMoveable(self, squares[i], item, sprite, { [PowerBank.MODULES] = modules })
+        self.shown = {}
+        for _, case in ipairs(CRACKED) do
+            local panel = T.panel(self, case.sprite, { modules = case.modules })
+            if not panel then return end
+            local at = panel.position
+            T.server(self, "panelCracks", { x = at.x, y = at.y, z = at.z, sprite = case.sprite, change = case.change })
+            T.waitForCopy(function()
+                return attachedNames(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
+            end)
+            T.step(function()
+                self.shown[case.name] = {
+                    server = table.concat(self.server.panelCracks.overlays, ","),
+                    client = attachedNames(T.objectWithSprite(panel.square, case.sprite)),
+                }
+            end)
         end
-        local flat59 = place(1, "RenewableEnergy.SolarFlat", Sprites.flat, modulesAt(59))
-        local flat60 = place(2, "RenewableEnergy.SolarFlat", Sprites.flat, modulesAt(60))
-        local rackUpper = place(3, "RenewableEnergy.SolarRackMetal", Sprites.rack.metal.W, modulesAt(100, 59))
-        local rackBoth = place(4, "RenewableEnergy.SolarRackWood", Sprites.rack.wood.E, modulesAt(0, 59))
-        self.flat59 = attachedNames(flat59)
-        self.flat60 = attachedNames(flat60)
-        self.rackUpper = attachedNames(rackUpper)
-        self.rackBoth = attachedNames(rackBoth)
-        -- A wall panel needs a wall to be placed against, so this one is a bare tile.
-        local wall = T.tile(self, squares[5], Sprites.wall.wood.E, { [PowerBank.MODULES] = modulesAt(59) })
-        PowerBank.showCracks(wall)
-        self.wall = attachedNames(wall)
-        if flat59 then
-            flat59:getModData()[PowerBank.MODULES] = modulesAt(85)
-            PowerBank.showCracks(flat59)
-            self.repaired = attachedNames(flat59)
-        end
-        local snowed = T.tile(self, squares[6], Sprites.flat, { [PowerBank.MODULES] = modulesAt(30) })
-        snowed:addAttachedAnimSpriteByName(Sprites.snow.flat)
-        PowerBank.showCracks(snowed)
-        self.snowed = attachedNames(snowed)
     end,
     validate = function(self)
-        expect(self.flat59 == "renewable_energy_01_115", "a flat panel at 59 shows '" .. tostring(self.flat59) .. "'")
-        expect(self.flat60 == "", "a flat panel at 60 shows '" .. tostring(self.flat60) .. "'")
-        expect(self.rackUpper == "renewable_energy_01_127",
-            "a metal rack facing west with its upper module at 59 shows '" .. tostring(self.rackUpper) .. "'")
-        expect(self.rackBoth == "renewable_energy_01_130,renewable_energy_01_131",
-            "a wooden rack facing east with both modules cracked shows '" .. tostring(self.rackBoth) .. "'")
-        expect(self.wall == "renewable_energy_01_119", "a wooden wall panel facing east at 59 shows '" .. tostring(self.wall) .. "'")
-        expect(self.repaired == "", "a flat panel repaired to 85 shows '" .. tostring(self.repaired) .. "'")
-        expect(self.snowed == "renewable_energy_01_115,renewable_energy_01_16",
-            "a snowed-on flat panel at 30 shows '" .. tostring(self.snowed) .. "'")
+        for _, case in ipairs(CRACKED) do
+            local shown = self.shown[case.name] or {}
+            expect(shown.server == case.shows, case.what .. " shows '" .. tostring(shown.server) .. "'")
+            expect(shown.client == shown.server, "this client's copy of " .. case.what .. " shows '" .. tostring(shown.client) .. "'")
+        end
     end,
 })
 
 -- A storm that cracks a wired panel's module below the threshold puts cracks on its tile in the
--- same bank pass.
+-- same bank pass, and players see them.
 test("renewable_energy_tiles_storm_crack_shows_cracks", {
     sandbox = { StormDamage = true, StormDamageRate = 1000 },
     run = function(self)
-        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
         if not bank then return end
-        local panel, connected = T.panel(self, Sprites.flat, { near = bank, modules = modulesAt(80), connect = true })
-        if not T.need(self, connected, "a panel connected to the bank") then return end
-        self.before = attachedNames(panel)
+        local panel = T.panel(self, Sprites.flat, { near = bank, modules = modulesAt(80), connect = true })
+        if not panel then return end
+        T.step(function()
+            T.need(self, panel.connected, "a panel connected to the bank")
+            self.before = attachedNames(panel.object)
+        end)
         -- A thousand hours of storm at ten times the rate makes the crack certain.
-        record:update(1, T.passContext(1000, 1000))
-        local modules = panel:getModData()[RenewableEnergy.PowerBank.MODULES]
-        self.condition = modules and modules[1] and modules[1].condition
-        self.after = attachedNames(panel)
+        T.bankPass(self, bank, 1000, { stormHours = 1000 })
+        T.server(self, "panelState", function() return panel.position end)
+        T.waitForCopy(function() return attachedNames(panel.object) == table.concat(self.server.panelState.overlays, ",") end)
+        T.step(function()
+            local modules = self.server.panelState.modules
+            self.condition = modules and modules[1] and modules[1].condition
+            self.after = table.concat(self.server.panelState.overlays, ",")
+            self.copy = attachedNames(panel.object)
+        end)
     end,
     validate = function(self)
         expect(self.before == "", "the whole panel showed '" .. tostring(self.before) .. "' before the storm")
         expect(self.condition == 50, "the storm left the module at " .. tostring(self.condition) .. ", expected 50")
         expect(self.after == "renewable_energy_01_115", "the storm-cracked panel shows '" .. tostring(self.after) .. "'")
+        expect(self.copy == self.after, "this client's copy of the storm-cracked panel shows '" .. tostring(self.copy) .. "'")
     end,
 })

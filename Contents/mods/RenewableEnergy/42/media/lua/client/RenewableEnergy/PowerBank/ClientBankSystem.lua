@@ -3,8 +3,9 @@
 --
 -- Bank generators and containers come to a multiplayer client as plain copies, so this
 -- side does on its copy what the server does on its own: keep the generator out of the
--- cell's update, which would run a gas generator's engine sound, and give the container
--- its filter, which is neither saved nor sent.
+-- cell's update, which would run a gas generator's engine sound, give the container its
+-- filter, which is neither saved nor sent, and let go of the squares a running bank powered
+-- when it is taken away.
 
 require "Map/CGlobalObjectSystem"
 require "Map/CGlobalObject"
@@ -64,10 +65,36 @@ function PowerBank.command(player, name, args)
     end
 end
 
+-- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos), 8
+-- squares a side.
+local CHUNK_SQUARES = 8
+
+-- A server sends an object's removal before it removes its own copy (GameServer.RemoveItemFromMap),
+-- so the bank system there switches a running bank off only after this client has lost its copy,
+-- and the switch-off, which names the bank by its place on the square, finds nothing here. The
+-- copy of a running bank leaving this client's square lets go of the squares it powers itself,
+-- as a generator switching off does (IsoGenerator.setSurroundingElectricity); otherwise they stay
+-- powered here until their chunks reload.
+local function releasePower(isoObject)
+    if not (PowerBank.isBank(isoObject) and isoObject:isActivated()) then return end
+    local x, y, z = isoObject:getX(), isoObject:getY(), isoObject:getZ()
+    local radius = SandboxVars.GeneratorTileRange
+    local cell = getCell()
+    for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
+        for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do
+            local chunk = cell:getChunk(wx, wy)
+            if chunk then
+                chunk:removeGeneratorPos(x, y, z)
+            end
+        end
+    end
+end
+
 if isClient() then
     for _, name in ipairs(PowerBank.bankSprites()) do
         MapObjects.OnLoadWithSprite(name, adoptCopy, 6)
     end
+    Events.OnObjectAboutToBeRemoved.Add(releasePower)
 end
 
 -- A container opened in the loot window gets its filter before anything is dropped in it.

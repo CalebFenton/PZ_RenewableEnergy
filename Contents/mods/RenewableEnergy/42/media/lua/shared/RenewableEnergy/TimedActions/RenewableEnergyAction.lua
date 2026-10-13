@@ -240,6 +240,13 @@ function Action:target()
 end
 
 function Action:isValid()
+    -- In multiplayer the server's complete() moves the item (into the bank, out of it, onto the
+    -- vehicle) while this client's action is still finishing; failing then would stop the action
+    -- and empty the player's queue (ISBaseTimedAction.stop). Vanilla stops checking there too
+    -- (ISInstallVehiclePart.isValid).
+    if self.action and self.action:getJobDelta() >= 0.9 then
+        return true
+    end
     if self.item and not holdsItem(self) then
         return false
     end

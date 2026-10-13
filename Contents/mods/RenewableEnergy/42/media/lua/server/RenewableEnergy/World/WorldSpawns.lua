@@ -279,7 +279,13 @@ function WorldSpawns.placeBank(square, stockName)
         return nil
     end
     local bank = RenewableEnergy.PowerBank.place(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], -1)
-    WorldSpawns.stockBank(bank:getContainer(), stockName)
+    local container = bank:getContainer()
+    WorldSpawns.stockBank(container, stockName)
+    -- PowerBank.place sent the bank to the clients while it was empty.
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        sendAddItemToContainer(container, items:get(i))
+    end
     RenewableEnergy.PowerBank.perform(nil, "refresh", { bank = RenewableEnergy.PowerBank.positionOf(bank) })
     return bank
 end

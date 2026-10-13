@@ -1,6 +1,8 @@
 -- Measures how often the mod's items spawn, with the game's own loot rolls on scratch containers
 -- that never enter the world, and how world banks and crates are stocked. For tuning
--- Distributions.lua and WorldSpawns.lua, for the numbers in the README, and for the loot tests.
+-- Distributions.lua and WorldSpawns.lua, for the numbers in the README, and for the loot tests,
+-- which measure where the loot is rolled: in single player, or on a multiplayer server, whose
+-- loot tables alone hold the mod's entries. Shared Lua, so that the server has it.
 -- dev/run-debug-client.sh --loot prints Loot.report() and Loot.moduleReport(). Debug mode only.
 --
 -- The report rolls copies of the lists that hold only the mod's items. Each entry rolls on its
@@ -404,14 +406,14 @@ local function sample(fill, samples, container, everything)
     return result
 end
 
--- An outdoor square near the player, for procedural rolls.
-function Loot.squareOutsideRooms()
-    local player = getPlayer()
+-- An outdoor square near `character` (this game's player by default), for procedural rolls.
+function Loot.squareOutsideRooms(character)
+    character = character or getPlayer()
     local cell = getCell()
-    if not player or not cell then
+    if not character or not cell then
         return nil
     end
-    local px, py = math.floor(player:getX()), math.floor(player:getY())
+    local px, py = math.floor(character:getX()), math.floor(character:getY())
     for radius = 0, 40 do
         for dx = -radius, radius do
             for _, dy in ipairs({ -radius, radius }) do

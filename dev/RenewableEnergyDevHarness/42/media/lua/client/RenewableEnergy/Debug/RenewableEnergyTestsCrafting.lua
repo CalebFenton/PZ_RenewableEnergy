@@ -1,8 +1,11 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/PowerBank/PowerBank"
 
--- Crafting tests: every recipe crafted the way a player starts it, instantly. See
--- RenewableEnergyTestLib.lua for the runner and the helpers.
+-- Crafting tests: every recipe crafted the way a player starts it, instantly, with the inputs the
+-- authority gave, which also makes the outputs (T.craftTest). What a test then reads of the
+-- items it reads from the authority's copies, through the carried handler of
+-- RenewableEnergyTestServerWorld.lua. See RenewableEnergyTestLib.lua for the runner and the
+-- helpers.
 
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, player = T.test, T.craftTest, T.expect, T.expectNear, T.player
@@ -15,34 +18,35 @@ local function craftName(recipe, behavior)
     return "renewable_energy_craft_" .. string.lower(name) .. (behavior and "_" .. behavior or "")
 end
 
-local function first(fullType)
-    return player():getInventory():getFirstTypeRecurse(fullType)
-end
-
--- Every container the craft would take fluid from or pour into, emptied and filled with
--- `liters` of `fluid` (nil leaves them empty).
-local function refill(fullType, fluid, liters)
-    local items = player():getInventory():getAllTypeRecurse(fullType)
-    for i = 0, items:size() - 1 do
-        local container = items:get(i):getFluidContainer()
-        container:Empty()
-        if fluid then
-            container:addFluid(fluid, liters)
+-- The given inputs (this client's copies, T.craftTest's self.items.inputs) of `fullType`.
+local function inputsOf(self, fullType)
+    local found = {}
+    for _, item in ipairs(self.items.inputs or {}) do
+        if item:getFullType() == fullType then
+            table.insert(found, item)
         end
     end
+    return found
 end
 
--- Litres of `fluid` in all the character's containers.
-local function fluidCarried(fluid)
-    local liters = 0
-    local items = player():getInventory():getItems()
-    for i = 0, items:size() - 1 do
-        local container = items:get(i):getFluidContainer()
-        if container then
-            liters = liters + container:getSpecificFluidAmount(fluid)
-        end
+-- Queues reading the authority's copies of `types` and its litres of `fluids` into
+-- self.server.carried (see the carried handler).
+local function readCarried(self, types, fluids)
+    T.server(self, "carried", { types = types, fluids = fluids })
+end
+
+-- The authority's first item of `fullType` from the last readCarried, or nil.
+local function carriedFirst(self, fullType)
+    local items = self.server.carried and self.server.carried.items[fullType]
+    return items and items[1]
+end
+
+-- Queues filling every given input of `fullType` with `liters` of `fluid` (nil leaves it empty),
+-- on the authority, which sends it here.
+local function refill(self, fullType, fluid, liters)
+    for _, item in ipairs(inputsOf(self, fullType)) do
+        T.server(self, "refillFluid", { id = item:getID(), fluid = fluid, liters = liters })
     end
-    return liters
 end
 
 -- Bank tiers and parts -------------------------------------------------------------------------
@@ -73,10 +77,14 @@ end
 
 -- Mounts remember each module's type and condition.
 local function expectModules(mount, expected)
-    local modules = mount and mount:getModData()[MODULES_KEY]
+    local modules = mount and mount.modData[MODULES_KEY]
     if not expect(modules ~= nil and #modules == #expected,
         "the mount holds " .. tostring(modules and #modules) .. " modules, expected " .. #expected) then
         return
+    end
+    -- Which input the craft lists first is its own business.
+    if #modules == 2 and modules[1].type ~= expected[1].type then
+        expected = { expected[2], expected[1] }
     end
     for i, want in ipairs(expected) do
         local got = modules[i]
@@ -99,27 +107,24 @@ for _, entry in ipairs(MOUNTS) do
         recipe = recipe,
         from = "RenewableEnergy.SolarModule",
         prefer = { "RenewableEnergy.SolarModule" },
-        setup = function()
-            first("RenewableEnergy.SolarModule"):setCondition(72)
+        setup = function(self)
+            local modules = inputsOf(self, "RenewableEnergy.SolarModule")
+            T.changeItem(self, modules[1], { condition = 72 })
             if count == 2 then
-                local inventory = player():getInventory()
-                inventory:Remove(inventory:getAllTypeRecurse("RenewableEnergy.SolarModule"):get(1))
-                inventory:AddItem("RenewableEnergy.HomemadeSolarModule"):setCondition(41)
+                -- One of the two a homemade module instead.
+                T.server(self, "takeItems", { ids = { modules[2]:getID() } })
+                T.give(self, "homemade", { { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 } })
             end
         end,
         counts = { ["RenewableEnergy.SolarModule"] = 0, ["RenewableEnergy.HomemadeSolarModule"] = 0, [mount] = 1 },
-        validate = function()
+        validate = function(self)
             local expected = { { type = "RenewableEnergy.SolarModule", condition = 72 } }
             if count == 2 then
                 table.insert(expected, { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 })
             end
-            local modules = first(mount) and first(mount):getModData()[MODULES_KEY]
-            -- Which input the craft lists first is its own business.
-            if modules and #modules == 2 and modules[1].type ~= expected[1].type then
-                expected[1], expected[2] = expected[2], expected[1]
-            end
-            expectModules(first(mount), expected)
+            expectModules(carriedFirst(self, mount), expected)
         end,
+        after = function(self) readCarried(self, { mount }) end,
     })
 end
 
@@ -137,25 +142,28 @@ for _, entry in ipairs(UNMOUNTS) do
     craftTest(craftName(recipe, "returns_modules"), {
         recipe = recipe,
         from = mount,
-        setup = function()
+        setup = function(self)
             local modules = { { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 } }
             if rack then
                 table.insert(modules, { type = "RenewableEnergy.SolarModule", condition = 12 })
             end
-            first(mount):getModData()[MODULES_KEY] = modules
+            T.changeItem(self, inputsOf(self, mount)[1], { modData = { [MODULES_KEY] = modules } })
         end,
         counts = {
             [mount] = 0,
             ["RenewableEnergy.HomemadeSolarModule"] = 1,
             ["RenewableEnergy.SolarModule"] = rack and 1 or 0,
         },
-        validate = function()
-            local homemade = first("RenewableEnergy.HomemadeSolarModule")
-            expect(homemade == nil or homemade:getCondition() == 41,
-                "the homemade module came back at " .. tostring(homemade and homemade:getCondition()))
-            local factory = first("RenewableEnergy.SolarModule")
-            expect(factory == nil or factory:getCondition() == 12,
-                "the factory module came back at " .. tostring(factory and factory:getCondition()))
+        after = function(self)
+            readCarried(self, { "RenewableEnergy.HomemadeSolarModule", "RenewableEnergy.SolarModule" })
+        end,
+        validate = function(self)
+            local homemade = carriedFirst(self, "RenewableEnergy.HomemadeSolarModule")
+            expect(homemade == nil or homemade.condition == 41,
+                "the homemade module came back at " .. tostring(homemade and homemade.condition))
+            local factory = carriedFirst(self, "RenewableEnergy.SolarModule")
+            expect(factory == nil or factory.condition == 12,
+                "the factory module came back at " .. tostring(factory and factory.condition))
         end,
     })
 end
@@ -184,14 +192,15 @@ for _, entry in ipairs(MODULE_REPAIRS) do
         recipe = "RenewableEnergy_RepairCrackedModule",
         from = module,
         prefer = { module },
-        setup = function()
-            first(module):setCondition(before)
+        setup = function(self)
+            T.changeItem(self, inputsOf(self, module)[1], { condition = before })
         end,
         counts = { [module] = 1, ["Base.GlassPanel"] = refused and 1 or 0 },
+        after = function(self) readCarried(self, { module }) end,
         validate = function(self)
-            local item = first(module)
-            expect(item and item:getCondition() == after,
-                "the module is at " .. tostring(item and item:getCondition()) .. ", expected " .. after)
+            local item = carriedFirst(self, module)
+            expect(item and item.condition == after,
+                "the module is at " .. tostring(item and item.condition) .. ", expected " .. after)
             if refused then
                 expect(self.refusal ~= nil, "the game would start the repair")
             end
@@ -224,8 +233,8 @@ end
 craftTest(craftName("RenewableEnergy_TakeApartShatteredModule"), {
     recipe = "RenewableEnergy_TakeApartShatteredModule",
     from = "RenewableEnergy.SolarModule",
-    setup = function()
-        first("RenewableEnergy.SolarModule"):setCondition(0)
+    setup = function(self)
+        T.changeItem(self, inputsOf(self, "RenewableEnergy.SolarModule")[1], { condition = 0 })
     end,
     counts = { ["RenewableEnergy.SolarModule"] = 0, ["RenewableEnergy.SolarCells"] = 12 },
 })
@@ -234,8 +243,8 @@ craftTest(craftName("RenewableEnergy_TakeApartShatteredModule"), {
 craftTest(craftName("RenewableEnergy_TakeApartShatteredModule", "refuses_working_module"), {
     recipe = "RenewableEnergy_TakeApartShatteredModule",
     from = "RenewableEnergy.SolarModule",
-    setup = function()
-        first("RenewableEnergy.SolarModule"):setCondition(20)
+    setup = function(self)
+        T.changeItem(self, inputsOf(self, "RenewableEnergy.SolarModule")[1], { condition = 20 })
     end,
     counts = { ["RenewableEnergy.SolarModule"] = 1, ["RenewableEnergy.SolarCells"] = 0 },
     validate = function(self)
@@ -260,18 +269,17 @@ for _, entry in ipairs(BATTERY_REPAIRS) do
         recipe = recipe,
         from = CAR_BATTERY,
         prefer = { CAR_BATTERY, "RenewableEnergy.BatteryElectrolyte" },
-        setup = function()
-            local battery = first(CAR_BATTERY)
-            battery:setCondition(before)
-            battery:setCurrentUsesFloat(0.7)
-            refill("RenewableEnergy.BatteryElectrolyte", "Water", 1)
+        setup = function(self)
+            T.changeItem(self, inputsOf(self, CAR_BATTERY)[1], { condition = before, uses = 0.7 })
+            refill(self, "RenewableEnergy.BatteryElectrolyte", "Water", 1)
         end,
         counts = { [CAR_BATTERY] = 1 },
+        after = function(self) readCarried(self, { CAR_BATTERY }) end,
         validate = function(self)
-            local battery = first(CAR_BATTERY)
+            local battery = carriedFirst(self, CAR_BATTERY)
             if not expect(battery ~= nil, "the battery is gone") then return end
-            expect(battery:getCondition() == after, "the battery is at " .. battery:getCondition() .. ", expected " .. after)
-            expectNear("the battery's charge", battery:getCurrentUsesFloat(), charge, 0.001)
+            expect(battery.condition == after, "the battery is at " .. battery.condition .. ", expected " .. after)
+            expectNear("the battery's charge", battery.uses, charge, 0.001)
             if refused then
                 expect(self.refusal ~= nil, "the game would start the repair")
             end
@@ -290,6 +298,7 @@ local REBUILDS = {
       strip = "RenewableEnergy_StripL16Battery", rebuild = "RenewableEnergy_RebuildL16Battery" },
 }
 for _, chain in ipairs(REBUILDS) do
+    local counted = { chain.case, "RenewableEnergy.WornBatteryPlates", chain.battery, "RenewableEnergy.BatteryPlates" }
     test(craftName(chain.rebuild, "from_its_stripped_case"), {
         instant = true,
         run = function(self)
@@ -301,33 +310,41 @@ for _, chain in ipairs(REBUILDS) do
             T.learnRecipes(p)
             T.placeWorkTable(p)
             T.setPerk(self, Perks.Electricity, 5)
-            local inventory = p:getInventory()
-            inventory:AddItem("Base.Screwdriver")
-            inventory:AddItem("Base.Wrench")
-            inventory:AddItem("Base.Gloves_Dish")
-            local battery = inventory:AddItem(chain.battery)
-            battery:setCondition(20)
-            battery:setCurrentUsesFloat(0.6)
-            -- One empty litre bottle per litre of acid, and one with the water.
+            -- One empty litre bottle per litre of acid.
+            local given = { { type = "Base.Screwdriver" }, { type = "Base.Wrench" }, { type = "Base.Gloves_Dish" },
+                { type = chain.battery, condition = 20, uses = 0.6 } }
             for _ = 1, chain.plates do
-                inventory:AddItem("RenewableEnergy.BatteryElectrolyte"):getFluidContainer():Empty()
+                table.insert(given, { type = "RenewableEnergy.BatteryElectrolyte" })
             end
-            T.startCraft(self, strip, battery)
+            T.give(self, "inputs", given)
             T.step(function()
-                self.stripped = {
-                    case = inventory:getCountTypeRecurse(chain.case),
-                    worn = inventory:getCountTypeRecurse("RenewableEnergy.WornBatteryPlates"),
-                    acid = fluidCarried(Fluid.Acid),
-                    batteries = inventory:getCountTypeRecurse(chain.battery),
-                }
-                inventory:RemoveAll("RenewableEnergy.WornBatteryPlates")
-                inventory:AddItems("RenewableEnergy.BatteryPlates", chain.plates)
-                inventory:AddItem("Base.WaterBottle"):getFluidContainer():Empty()
-                refill("Base.WaterBottle", "Water", 1)
-                local case = first(chain.case)
-                if case then
-                    T.startCraft(self, rebuild, case)
-                end
+                refill(self, "RenewableEnergy.BatteryElectrolyte", nil)
+                T.step(function()
+                    T.startCraft(self, strip, inputsOf(self, chain.battery)[1])
+                    readCarried(self, counted, { "Acid" })
+                    T.step(function()
+                        local carried = self.server.carried
+                        self.stripped = {
+                            case = #carried.items[chain.case], worn = #carried.items["RenewableEnergy.WornBatteryPlates"],
+                            acid = carried.fluids.Acid, batteries = #carried.items[chain.battery],
+                        }
+                        -- New plates in place of the worn, and a litre of water to top up.
+                        T.server(self, "takeItems", { type = "RenewableEnergy.WornBatteryPlates" })
+                        T.give(self, "rebuild", { { type = "RenewableEnergy.BatteryPlates", count = chain.plates },
+                            { type = "Base.WaterBottle" } })
+                        T.server(self, "refillFluid", function()
+                            return { id = self.items.rebuild[#self.items.rebuild]:getID(), fluid = "Water", liters = 1 }
+                        end)
+                        T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse(chain.case) ~= nil end)
+                        T.step(function()
+                            local case = p:getInventory():getFirstTypeRecurse(chain.case)
+                            if case then
+                                T.startCraft(self, rebuild, case)
+                            end
+                            readCarried(self, counted, { "Acid" })
+                        end)
+                    end)
+                end)
             end)
         end,
         validate = function(self)
@@ -337,15 +354,15 @@ for _, chain in ipairs(REBUILDS) do
             expect(s.batteries == 0 and s.case == 1 and s.worn == chain.plates,
                 "stripping left " .. s.batteries .. " batteries, " .. s.case .. " cases, " .. s.worn .. " worn plates" .. refusal)
             expectNear("acid poured out by stripping", s.acid, chain.plates, 0.01)
-            local inventory = player():getInventory()
-            local battery = first(chain.battery)
+            local carried = self.server.carried
+            local battery = carriedFirst(self, chain.battery)
             if expect(battery ~= nil, "no " .. chain.battery .. " was rebuilt" .. refusal) then
-                expect(battery:getCondition() == 100, "the rebuilt battery is at " .. battery:getCondition())
-                expectNear("the rebuilt battery's charge", battery:getCurrentUsesFloat(), 0, 0.001)
+                expect(battery.condition == 100, "the rebuilt battery is at " .. battery.condition)
+                expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
             end
-            expect(inventory:getCountTypeRecurse(chain.case) == 0, "the case is still there")
-            expect(inventory:getCountTypeRecurse("RenewableEnergy.BatteryPlates") == 0, "plates are left over")
-            expectNear("acid left after rebuilding", fluidCarried(Fluid.Acid), 0, 0.01)
+            expect(#carried.items[chain.case] == 0, "the case is still there")
+            expect(#carried.items["RenewableEnergy.BatteryPlates"] == 0, "plates are left over")
+            expectNear("acid left after rebuilding", carried.fluids.Acid, 0, 0.01)
         end,
     })
 end

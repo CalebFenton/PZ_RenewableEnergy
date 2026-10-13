@@ -148,6 +148,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 
 - Server Lua loads after client Lua, so client Lua can't `require` a server file at load time. It has to require it at runtime, when `require` hands back the loaded file's table.
 - `getVehicleById` returns nil in single player, because vehicles are registered with `VehicleManager` only on a server (`BaseVehicle.createPhysics`). Find a vehicle through the squares it stands on instead.
+- The game's Lua has no `next`: a call fails with "tried to call nil". Count a table with `#` or a loop over `pairs` instead.
 
 ### State and syncing
 
@@ -157,6 +158,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - The Global Object System (`zombie/globalObjects`) saves each object's modData keys with the world even while its chunk is unloaded, and `setObjectSyncKeys` sends those keys to every client, in single player too.
 - A system registered with `SGlobalObjects.registerSystem` must put a `getInitialStateForClient` function in its modData, or the game throws when a client connects (`SGlobalObjectSystem.getInitialStateForClient`). `SGlobalObjectSystem.lua` defines one for the systems derived from it.
 - A container's `AcceptItemFunction` filter is not saved with the container. Set it again whenever the object loads (`MapObjects.OnLoadWithSprite`) and whenever it is placed (`OnObjectAdded`), on every side.
+- On a server the global `sendItemStats(item)` sends the item to the clients near its container's square, object or player, and to every client when the container has none, which throws while it writes the container's place (`GameServer.sendItemStats`). Only scratch containers that never enter the world, as tests and loot measurements make, have none.
 
 ### Timed actions in multiplayer
 
@@ -164,6 +166,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - The server rebuilds the action by calling `<Class>:new()` with the values of the fields named like `new()`'s parameters, in parameter order (`NetTimedAction`). Parameter names must equal field names, and every argument must be serializable. Items are sent as container plus id, so they must be in a container. An unsupported argument type is dropped and shifts the arguments after it.
 - The server never calls `isValid()`, `update()`, or `perform()`, so check the action again in `complete()`; returning `false` rejects it.
 - On the client, fetch items again by id in `start()`, as vanilla does, because server syncs can replace the item objects.
+- Until the server's answer that the action is done arrives, the client checks `isValid()` every tick, and the item syncs `complete()` sends (`sendRemoveItemFromContainer`, a used fixer) can arrive first. An `isValid()` that checks for an item the action used then fails, so the client calls `stop()` instead of `perform()`, and `ISBaseTimedAction.stop` empties the whole queue; what the server did stands. Vanilla's `ISInstallVehiclePart` stops checking once its job delta reaches 0.9, which an instant action never does, and `ISFixVehiclePartAction` always checks, so welding with the last sheet metal ends that way.
 
 ### Events
 
@@ -208,6 +211,9 @@ A battery bank is an `IsoGenerator`, so everything a generator does applies to i
 - Crashes and character hits damage a part only while it holds an item, and a part's condition shows on the mask only for vanilla's ids: `EngineDoor` on Head and the front guards, `TruckBed` on Tail and the rear guards, `TrunkDoor` on Boot, doors and windows on theirs (`BaseVehicle.doDamageOverlay`). Only Hood, Boot, doors, windows and, under a `TrunkDoor` with `hasLightsRear`, the tail lamps turn dark grey when their part is empty. A part's `itemType` gets the vehicle's `mechanicType` appended (`Base.EngineDoor` becomes `Base.EngineDoor1`) unless the part sets `specificItem = false`, and `category = nodisplay` keeps it out of the mechanics window (`ISVehicleMechanics`), which otherwise names parts by id alone (`IGUI_VehiclePart<Id>`) whatever the vehicle.
 - A vehicle with an `EngineDoor` part sends a character opening the mechanics window to that part's area first, and opens the hood only if the part has a door (`ISVehicleMenu.onMechanic`). Washing blood off offers each side whose area the script has, by name: Front `Engine`, Rear `TruckBed`, Left `SeatLeft` or `SeatFrontLeft`, Right `SeatRight` or `SeatFrontRight` (`ISWashVehicle`); a seat area seats no one unless a `passenger` names it.
 - A vehicle's colour is rolled once, when it spawns, and `forcedColor = hue saturation value` in its script only applies then (`BaseVehicle.doVehicleColor`); `setColorHSV` changes it later.
+- A dedicated server never creates `WorldSimulation`, so it runs no vehicle physics (`BaseVehicle.createPhysics`). A vehicle nobody drives moves only on a client that has taken `LocalCollide` authority over it; hitching through the server's `addPointConstraint` with a player gives it to that player's client, for car and trailer both. A trailer left alone on a server never settles.
+- `addVehicleDebug` and the world's vehicle stories (`RandomizedWorldBase.addVehicle`, which falls back to the `junkyard` zone's vehicles) set every part's condition after the parts were made and their `create` Lua ran (`BaseVehicle.setGeneralPartCondition`), and the admin `/addvehicle` repairs the vehicle then (`AddVehicleCommand`), so a condition `create` gives a part doesn't survive them; zone spawns (`IsoChunk`) keep it.
+- A hitch that snaps (see [Writing tests](#writing-tests)) breaks in the physics step that jolts it, and a multiplayer client has the server break it too (`BaseVehicle.breakConstraintOnServer`), so by the time Lua looks at the jolted trailer it is no longer towed.
 
 ## Art
 

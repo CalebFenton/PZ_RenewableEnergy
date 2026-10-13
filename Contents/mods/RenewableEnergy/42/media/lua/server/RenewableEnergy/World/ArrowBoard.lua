@@ -55,7 +55,8 @@ ArrowBoard.STOCK = {
 -- time. A car stopping dead against a wall from that speed does it; braking hard sheds about 3 km/h
 -- in that time and running over a zombie or a kerb a few, so minor bumps never crack a panel.
 -- `quietMs` keeps one crash, which the physics spreads over several frames, from counting twice.
-ArrowBoard.CRASH = { kmh = 20, ms = 250, quietMs = 1000 }
+-- `unhitchedMs` and `unhitchedSquares` cover a crash that snaps the hitch (Crashes, below).
+ArrowBoard.CRASH = { kmh = 20, ms = 250, quietMs = 1000, unhitchedMs = 1000, unhitchedSquares = 8 }
 
 -- Vehicle modData: its panels have been put on, at spawn or, for a trailer from a save made
 -- before they were parts, on its first load since.
@@ -104,11 +105,7 @@ end
 --- Its panels go on and its battery box is stocked as it enters the world. Authority only.
 ---@return BaseVehicle?
 function ArrowBoard.spawn(square, facing)
-    local vehicle = addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
-    if vehicle then
-        ArrowBoard.restockPanels(vehicle)
-    end
-    return vehicle
+    return addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
 end
 
 -- Panels ---------------------------------------------------------------------------------------
@@ -142,6 +139,12 @@ function ArrowBoard.showPanels(vehicle)
     end
 end
 
+-- The trailers stocked this tick, each { vehicle, panels = { { part, item, condition } } }: the
+-- modules on their panels and the conditions they got. addVehicleDebug and the world's vehicle
+-- stories set every part's condition after the parts were made (BaseVehicle.setGeneralPartCondition,
+-- RandomizedWorldBase.addVehicle), over the stock ones, so the next tick puts them back.
+local justStocked = {}
+
 -- Puts modules on its panels as the box once held them: the first weathered, the second weathered
 -- or cracked, as many as the panel rarity option gives. Once per trailer. Authority only.
 local function stockPanels(vehicle)
@@ -153,6 +156,7 @@ local function stockPanels(vehicle)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local stock = ArrowBoard.STOCK
     local count = WorldSpawns.scaled(stock.modules, SandboxVars.RenewableEnergy.LRMSolarPanels)
+    local panels = {}
     for i, id in ipairs(ArrowBoard.PANELS) do
         local part = vehicle:getPartById(id)
         if part and i <= count and not part:getInventoryItem() then
@@ -161,23 +165,42 @@ local function stockPanels(vehicle)
             RenewableEnergy.Wear.setCondition(item, cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
             part:setInventoryItem(item)
             vehicle:transmitPartItem(part)
+            table.insert(panels, { part = part, item = item, condition = item:getCondition() })
         end
+    end
+    if #panels > 0 then
+        table.insert(justStocked, { vehicle = vehicle, panels = panels })
     end
 end
 
---- Puts fresh stock modules on its panels. addVehicleDebug sets every part's condition after the
---- parts were made (BaseVehicle.setGeneralPartCondition), over the panels' stock ones, so what it
---- spawns gets its panels again. Authority only.
-function ArrowBoard.restockPanels(vehicle)
-    for _, id in ipairs(ArrowBoard.PANELS) do
-        local part = vehicle:getPartById(id)
-        if part and part:getInventoryItem() then
-            part:setInventoryItem(nil)
+-- Sets a panel's condition, which is its module's, everywhere, and shows it. Authority only.
+local function setPanelCondition(vehicle, part, condition)
+    part:setCondition(condition)
+    vehicle:transmitPartCondition(part)
+    ArrowBoard.showPanel(part)
+end
+
+--- OnTick: gives the modules stocked last tick their stock conditions back where something has
+--- set them since. Authority only.
+function ArrowBoard.keepStockConditions()
+    if #justStocked == 0 then
+        return
+    end
+    local trailers = justStocked
+    justStocked = {}
+    for _, trailer in ipairs(trailers) do
+        for _, panel in ipairs(trailer.panels) do
+            local part = panel.part
+            if part:getInventoryItem() == panel.item and part:getCondition() ~= panel.condition then
+                -- A client may have got the trailer already and shown the panel by the condition
+                -- it had then, and the server sends a part's models only when they change
+                -- (BaseVehicle.setModelVisible), so they change twice.
+                part:setModelVisible("Whole", false)
+                part:setModelVisible("Cracked", false)
+                setPanelCondition(trailer.vehicle, part, panel.condition)
+            end
         end
     end
-    vehicle:getModData()[PANELS_STOCKED] = nil
-    stockPanels(vehicle)
-    ArrowBoard.showPanels(vehicle)
 end
 
 --- Part `create` of the panels: runs once for each when the trailer first enters the world.
@@ -198,13 +221,6 @@ end
 
 --- Install and uninstall `complete` of the panels, on the authority.
 function ArrowBoard.panelChanged(vehicle, part)
-    ArrowBoard.showPanel(part)
-end
-
--- Sets a panel's condition, which is its module's, everywhere, and shows it. Authority only.
-local function setPanelCondition(vehicle, part, condition)
-    part:setCondition(condition)
-    vehicle:transmitPartCondition(part)
     ArrowBoard.showPanel(part)
 end
 
@@ -293,10 +309,15 @@ end
 -- addDamageFront/Rear), which the panels aren't, and the trailer's own crash durability isn't
 -- readable from Lua. So the side running the trailer's physics watches its velocity: single player
 -- every loaded trailer, a multiplayer client the trailer behind the car it drives, which then asks
--- the server to crack the panels, as vanilla's own crash command does.
+-- the server to crack the panels, as vanilla's own crash command does. A crash hard enough can
+-- snap the hitch in the physics step that jolts the trailer (Bullet.onVehicleConstraintImpulse),
+-- so that client goes on watching a trailer its car towed for ArrowBoard.CRASH.unhitchedMs, and
+-- the server takes the crash from the car's driver while the trailer is within
+-- ArrowBoard.CRASH.unhitchedSquares of the car's tow bar.
 
--- Loaded trailers by vehicle: their recent velocities, { ms, x, y } oldest first, and the time
--- of their last crash.
+-- Loaded trailers by vehicle: their recent velocities, { ms, x, y } oldest first, the time of
+-- their last crash, and on a multiplayer client the car of this game's player that last towed
+-- them and until when that car's crashes still count.
 local tracked = {}
 
 function ArrowBoard.track(vehicle)
@@ -305,15 +326,24 @@ function ArrowBoard.track(vehicle)
     end
 end
 
+local function drivenHere(car)
+    local driver = car:getDriver()
+    return driver ~= nil and instanceof(driver, "IsoPlayer") and driver:isLocalPlayer()
+end
+
 -- Whether this game runs the trailer's physics: single player, or the client whose player drives
--- the car towing it.
-local function runsPhysics(vehicle)
+-- the car towing it or towed it a moment ago. Returns true, or that car.
+local function runsPhysics(vehicle, entry, now)
     if not isClient() then
         return true
     end
     local tow = vehicle:getVehicleTowedBy()
-    local driver = tow and tow:getDriver()
-    return driver ~= nil and instanceof(driver, "IsoPlayer") and driver:isLocalPlayer()
+    if tow and drivenHere(tow) then
+        entry.car, entry.carUntil = tow, now + ArrowBoard.CRASH.unhitchedMs
+    elseif entry.car and (now > entry.carUntil or tow or not drivenHere(entry.car)) then
+        entry.car = nil
+    end
+    return entry.car
 end
 
 local velocity = Vector3f.new()
@@ -353,24 +383,40 @@ function ArrowBoard.watchCrashes()
             if vehicle:isRemovedFromWorld() then
                 tracked[vehicle] = nil
             end
-        elseif runsPhysics(vehicle) and ArrowBoard.sampleCrash(vehicle, entry, now) then
-            if isClient() then
-                sendClientCommand(getPlayer(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId() })
-            else
-                ArrowBoard.crashCrack(vehicle)
+        else
+            local runs = runsPhysics(vehicle, entry, now)
+            if runs and ArrowBoard.sampleCrash(vehicle, entry, now) then
+                if isClient() then
+                    sendClientCommand(getPlayer(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId(), car = runs:getId() })
+                else
+                    ArrowBoard.crashCrack(vehicle)
+                end
             end
         end
     end
 end
 
--- The server takes a crash only from the driver of the car towing the trailer.
+-- Whether the trailer, no longer towed, is still close behind the car.
+local function justUnhitched(vehicle, car)
+    if vehicle:getVehicleTowedBy() then
+        return false
+    end
+    local hitch = car:getTowingWorldPos("trailer", Vector3f.new())
+    local coupler = vehicle:getTowedByWorldPos("trailer", Vector3f.new())
+    local squares = ArrowBoard.CRASH.unhitchedSquares
+    return hitch ~= nil and coupler ~= nil and (hitch:x() - coupler:x()) ^ 2 + (hitch:y() - coupler:y()) ^ 2 <= squares * squares
+end
+
+-- The server takes a crash only from the driver of the car towing the trailer, or towing it until
+-- a moment ago.
 local function onClientCommand(module, command, player, args)
-    if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number" then
+    if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number"
+        or type(args.car) ~= "number" then
         return
     end
-    local vehicle = getVehicleById(args.vehicle)
-    local tow = ArrowBoard.isTrailer(vehicle) and vehicle:getVehicleTowedBy()
-    if tow and tow:isDriver(player) then
+    local vehicle, car = getVehicleById(args.vehicle), getVehicleById(args.car)
+    if ArrowBoard.isTrailer(vehicle) and car and car:isDriver(player)
+        and (vehicle:getVehicleTowedBy() == car or justUnhitched(vehicle, car)) then
         ArrowBoard.crashCrack(vehicle)
     end
 end
@@ -380,6 +426,7 @@ if not isServer() then
 end
 if not isClient() then
     Events.OnClientCommand.Add(onClientCommand)
+    Events.OnTick.Add(ArrowBoard.keepStockConditions)
 end
 
 -- Repair on the trailer ------------------------------------------------------------------------

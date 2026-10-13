@@ -1,8 +1,9 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 
--- Item and recipe data as the game loaded it, and learning recipes from magazines and research.
--- See RenewableEnergyTestLib.lua for the runner and the helpers.
+-- Item and recipe data as the game loaded it, and learning recipes from magazines and research,
+-- through the vanilla actions, which teach on the authority. See RenewableEnergyTestLib.lua for
+-- the runner and the helpers.
 
 local T = RenewableEnergyTest
 local test, expect, player = T.test, T.expect, T.player
@@ -139,6 +140,52 @@ local MAGAZINES = {
     },
 }
 
+-- Which of the mod's recipes this client's character has learned; the knownRecipes handler reads
+-- the authority's list. A multiplayer server teaches and sends what it taught.
+local function knownHere()
+    local known, list = {}, player():getKnownRecipes()
+    for _, name in ipairs(T.recipeNames()) do
+        if list:contains(name) then
+            known[name] = true
+        end
+    end
+    return known
+end
+
+-- Queues a wait until the authority and this client both know `recipes`, as far as a fixture's
+-- wait goes, and leaves what each knows in self.known.
+local function awaitKnown(self, recipes)
+    local function knowsAll(known)
+        for _, name in ipairs(recipes) do
+            if not known[name] then
+                return false
+            end
+        end
+        return true
+    end
+    T.serverUntil(self, "knownRecipes", { prefix = "RenewableEnergy_" }, function(reply) return knowsAll(reply.known) end)
+    T.waitForCopy(function() return knowsAll(knownHere()) end)
+    T.step(function()
+        self.known = { server = self.server.knownRecipes.known, client = knownHere() }
+    end)
+end
+
+-- Expects `what` to have taught exactly `recipes` of the mod's, on both sides.
+local function expectTaught(self, what, recipes)
+    local expected = {}
+    for _, name in ipairs(recipes) do
+        expected[name] = true
+    end
+    for side, known in pairs(self.known) do
+        for _, name in ipairs(recipes) do
+            expect(known[name], what .. " did not teach " .. name .. " on the " .. side)
+        end
+        for _, name in ipairs(T.recipeNames()) do
+            expect(expected[name] or not known[name], what .. " taught " .. name .. " on the " .. side)
+        end
+    end
+end
+
 -- Reading a magazine through the vanilla action teaches exactly its recipes, each one a recipe
 -- that has to be learned.
 for magazine, recipes in pairs(MAGAZINES) do
@@ -148,24 +195,24 @@ for magazine, recipes in pairs(MAGAZINES) do
             local p = player()
             T.forgetRecipes(p)
             T.defer(self, function() T.learnRecipes(p) end)
-            local item = p:getInventory():AddItem(magazine)
+            T.give(self, "magazine", { { type = magazine } })
             -- onCreateRecipeMagazine gives every copy a literatureTitle, and a title read within
             -- the literature cooldown teaches nothing (ISReadABook:complete), so a second run in
-            -- the same world would fail without forgetting it.
-            p:getReadLiterature():remove(item:getModData().literatureTitle)
-            ISTimedActionQueue.add(ISReadABook:new(p, item))
+            -- the same world would fail without forgetting it, where the reading counts too.
+            T.server(self, "forgetLiterature", function() return { title = self.items.magazine[1]:getModData().literatureTitle } end)
+            T.step(function()
+                local item = self.items.magazine[1]
+                p:getReadLiterature():remove(item:getModData().literatureTitle)
+                ISTimedActionQueue.add(ISReadABook:new(p, item))
+            end)
+            awaitKnown(self, recipes)
         end,
-        validate = function()
-            local expected, known = {}, player():getKnownRecipes()
+        validate = function(self)
             for _, name in ipairs(recipes) do
-                expected[name] = true
                 local recipe = getScriptManager():getCraftRecipe(name)
                 expect(recipe ~= nil and recipe:needToBeLearn(), magazine .. " teaches " .. name .. ", which needs no learning")
-                expect(known:contains(name), "reading " .. magazine .. " did not teach " .. name)
             end
-            for _, name in ipairs(T.recipeNames()) do
-                expect(expected[name] or not known:contains(name), "reading " .. magazine .. " taught " .. name)
-            end
+            expectTaught(self, "reading " .. magazine, recipes)
         end,
     })
 end
@@ -196,11 +243,17 @@ for fullType, recipes in pairs(RESEARCH) do
             for _, perk in ipairs({ Perks.Electricity, Perks.MetalWelding, Perks.Woodwork }) do
                 T.setPerk(self, perk, 10)
             end
-            ISTimedActionQueue.add(ISResearchRecipe:new(p, p:getInventory():AddItem(fullType)))
+            T.give(self, "hardware", { { type = fullType } })
+            T.step(function()
+                ISTimedActionQueue.add(ISResearchRecipe:new(p, self.items.hardware[1]))
+            end)
+            awaitKnown(self, recipes)
         end,
-        validate = function()
-            for _, recipe in ipairs(recipes) do
-                expect(player():isRecipeActuallyKnown(recipe), "researching " .. fullType .. " did not teach " .. recipe)
+        validate = function(self)
+            for side, known in pairs(self.known) do
+                for _, recipe in ipairs(recipes) do
+                    expect(known[recipe], "researching " .. fullType .. " did not teach " .. recipe .. " on the " .. side)
+                end
             end
         end,
     })
