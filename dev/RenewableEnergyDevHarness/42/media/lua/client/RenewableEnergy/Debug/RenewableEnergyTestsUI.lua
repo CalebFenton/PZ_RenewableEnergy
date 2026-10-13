@@ -429,7 +429,21 @@ test("renewable_energy_ui_clear_snow_requirements", {
         p:setPrimaryHandItem(broom)
         expect(canClear(self.flat, broom), "a broom in hand can't clear a flat panel")
         expect(not canClear(self.wall, broom), "a wall panel, which holds no snow, can be cleared")
+        -- Where the game breaks items (single player; a multiplayer client leaves it to the server),
+        -- a broom that breaks in hand splinters as one broken in a fight does (OnBreak.LongStick),
+        -- dropping splinters at the character's feet, which go again.
+        local feet = p:getSquare()
+        local lying, dropped = {}, feet:getWorldObjects()
+        for i = 0, dropped:size() - 1 do
+            lying[dropped:get(i)] = true
+        end
         broom:setCondition(0)
+        for i = dropped:size() - 1, 0, -1 do
+            local object = dropped:get(i)
+            if not lying[object] then
+                feet:removeWorldObject(object)
+            end
+        end
         expect(not canClear(self.flat, broom), "a broken broom can clear snow")
         p:setPrimaryHandItem(shovel)
         expect(canClear(self.flat, shovel), "a snow shovel in hand can't clear a flat panel")

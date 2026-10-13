@@ -21,6 +21,11 @@ local LOOT_SAMPLES = 10000
 -- stocked bank (WorldSpawns' OnSeeNewRoom), and one near the start puts a bank in reach of the
 -- panels and banks the tests build. The spawn tests place their banks with WorldSpawns.placeBank.
 local NO_ROOM_BANKS = 1
+-- Garden Lights at 0. A house is rolled for lights on the game minute after its surroundings load
+-- (GardenLights.rollLoaded), so one at the edge of the area the tests use can grow lights during a
+-- test; at 0 it is still rolled, without lights. The garden light tests roll with `always` or set
+-- the option themselves.
+local NO_HOUSE_LIGHTS = 0
 
 local function share(fraction)
     return string.format("%.2f%% (1 in %.0f)", fraction * 100, 1 / fraction)
@@ -94,6 +99,7 @@ PZHarness.register({
     onStart = function(mode)
         if mode == "test" then
             SandboxVars.RenewableEnergy.BatteryBankSpawn = NO_ROOM_BANKS
+            SandboxVars.RenewableEnergy.GardenLights = NO_HOUSE_LIGHTS
         end
     end,
     tests = {
