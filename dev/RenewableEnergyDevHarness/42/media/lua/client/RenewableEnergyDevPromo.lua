@@ -39,8 +39,7 @@ local PowerBank = RenewableEnergy.PowerBank
 -- at night. run-debug-client.sh reads this line to refuse an unknown PROMO name before the game
 -- starts.
 local GROUP_NAMES = { "status", "menu", "world", "icons", "models", "trailer", "gardenlights" }
--- Frames for a change to reach the screen, where the screenshot reads it.
-local DRAW_FRAMES = 10
+local DRAW_FRAMES = Stage.DRAW_FRAMES
 
 -- The world shots are as wide as the README's images, in UI units.
 local WORLD_W = 1260
@@ -824,18 +823,6 @@ local function connect(bank, panel)
     perform("connectSource", { bank = PowerBank.positionOf(bank), source = PowerBank.positionOf(panel) })
 end
 
--- A clear, still day: no cloud, fog or rain however the weather turns while the shots run.
-local function clearWeather()
-    local climate = getClimateManager()
-    climate:stopWeatherAndThunder()
-    for _, id in ipairs({ ClimateManager.FLOAT_CLOUD_INTENSITY, ClimateManager.FLOAT_FOG_INTENSITY,
-        ClimateManager.FLOAT_PRECIPITATION_INTENSITY }) do
-        local float = climate:getClimateFloat(id)
-        float:setEnableAdmin(true)
-        float:setAdminValue(0)
-    end
-end
-
 -- Whether `square` is in reach of a bank on `bankSquare`, as RenewableEnergy.Loads measures it.
 local function isInReach(bankSquare, square)
     local radius = SandboxVars.GeneratorTileRange
@@ -1131,7 +1118,7 @@ local function addWorldSettings()
             option:setValue(-1)
         end
         getWorld():setHydroPowerOn(false)
-        clearWeather()
+        Stage.clearWeather()
         getGameTime():setTimeOfDay(NOON)
         silenceRadios({ origin, stage0Origin, roadCar, studio, walkOrigin })
     end)

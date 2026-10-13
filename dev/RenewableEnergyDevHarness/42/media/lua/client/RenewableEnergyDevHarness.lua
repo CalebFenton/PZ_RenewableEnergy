@@ -83,11 +83,10 @@ PZHarness.register({
     scenario = "RenewableEnergyScenario",
     prefix = "renewable_energy_",
     modes = {
-        -- The promo waits on the lighting, the zoom and the vehicles rather than on frame counts;
-        -- --art keeps 60 frames a second, because its captures wait fixed tick counts for walking
-        -- and lighting.
+        -- Both wait on the lighting, the zoom, the UI and the vehicles rather than on frame
+        -- counts, so they draw uncapped.
         promo = { uncapped = true, run = Promo.capture },
-        art = { run = function(_, done) Art.capture(done) end },
+        art = { uncapped = true, run = function(_, done) Art.capture(done) end },
         loot = { run = reportLoot },
     },
     onStart = function(mode)

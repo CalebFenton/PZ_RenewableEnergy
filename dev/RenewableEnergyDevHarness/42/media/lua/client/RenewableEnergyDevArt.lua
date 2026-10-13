@@ -356,6 +356,8 @@ local IconSheet = ISPanel:derive("RenewableEnergyDevArtIcons")
 local ICON_SIZE, CELL_W, CELL_H, ICON_COLUMNS = 64, 190, 96, 10
 
 function IconSheet:render()
+    -- Counted for the shot's wait: the UI draws at its own rate, not every frame.
+    self.drawn = (self.drawn or 0) + 1
     ISPanel.render(self)
     for i, script in ipairs(self.scripts) do
         local column, row = (i - 1) % ICON_COLUMNS, math.floor((i - 1) / ICON_COLUMNS)
@@ -385,7 +387,10 @@ local function addShot(steps, player, lot, shot)
     Stage.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
     table.insert(steps, function()
         Stage.zoomOut(shot.zoomSteps)
-        return 240
+        return Stage.zoomSettled()
+    end)
+    table.insert(steps, function()
+        return Stage.DRAW_FRAMES
     end)
     table.insert(steps, function()
         Stage.screenshot("REArt", shot.name)
@@ -463,7 +468,7 @@ function Art.capture(onDone)
     local iconSheet = IconSheet:new()
     local steps = {}
     table.insert(steps, function()
-        getClimateManager():stopWeatherAndThunder()
+        Stage.clearWeather()
         getGameTime():setTimeOfDay(12)
         Stage.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
@@ -479,7 +484,9 @@ function Art.capture(onDone)
     addShot(steps, player, lot, SHOTS.items)
     table.insert(steps, function()
         iconSheet:addToUIManager()
-        return 20
+        return function()
+            return (iconSheet.drawn or 0) >= Stage.DRAW_FRAMES
+        end
     end)
     table.insert(steps, function()
         Stage.screenshot("REArt", "art_icons")
