@@ -58,7 +58,8 @@ test("renewable_energy_items_have_icons_names_and_ground_models", {
                 expect(instance ~= nil and instance:getDisplayName() ~= fullType, fullType .. " has no name")
             end
         end
-        expect(checked == #Debug.ITEMS, checked .. " RenewableEnergy items loaded, expected " .. #Debug.ITEMS)
+        local expected = #Debug.ITEMS + #Debug.PART_ITEMS
+        expect(checked == expected, checked .. " RenewableEnergy items loaded, expected " .. expected)
     end,
 })
 

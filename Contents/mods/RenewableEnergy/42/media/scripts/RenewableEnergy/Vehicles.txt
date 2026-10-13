@@ -3,11 +3,18 @@ module Base
     /* In module Base, as vanilla's vehicles are: templates and model files are looked up by bare
        name there. art/models/models.py writes the mesh and its textures; the body is built in the
        frame of vanilla's Trailer, so the numbers below are that trailer's, multiplied out by its
-       model scale of 1.82, and read in metres. */
+       model scale of 1.82, and read in metres.
+
+       vehicle_multiuv_noreflect rather than its norandom twin: the damage shells take their hue
+       from the paint, and their saturation and value as offsets from it, outside the Head, Tail,
+       window and lamp zones (vehicle_common.frag addDamage). Norandom's paint is the skin texel,
+       so on the orange paint every dent stays orange; this one's is the vehicle's colour, whose
+       forcedColor below cancels the offsets, so the shells draw their own grey. The skin is
+       opaque, so that colour never repaints it. */
     model RenewableEnergyArrowBoardTrailer
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer,
-        shader = vehicle_norandom_multiuv_noreflect,
+        shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
     }
@@ -18,35 +25,35 @@ module Base
     model RenewableEnergyArrowBoardTrailerLid
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_Lid,
-        shader = vehicle_norandom_multiuv_noreflect,
+        shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelLeft
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeft,
-        shader = vehicle_norandom_multiuv_noreflect,
+        shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelLeftCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeftCracked,
-        shader = vehicle_norandom_multiuv_noreflect,
+        shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelRight
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRight,
-        shader = vehicle_norandom_multiuv_noreflect,
+        shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelRightCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRightCracked,
-        shader = vehicle_norandom_multiuv_noreflect,
+        shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
     }
@@ -68,6 +75,9 @@ module Base
         {
             texture = Vehicles/RenewableEnergy_ArrowBoardTrailer,
         }
+        /* Hue, saturation, value. Half saturation and value add nothing to the damage shells', so
+           they keep their grey; ArrowBoard.initFrame sets it again on trailers spawned before. */
+        forcedColor = 0.0 0.5 0.5,
         textureMask = Vehicles/RenewableEnergy_ArrowBoardTrailer_Mask,
         textureLights = Vehicles/RenewableEnergy_ArrowBoardTrailer_Lights,
         /* The multi-UV shader draws blood from the overlays: where it grows first, then its colour. */
@@ -162,6 +172,27 @@ module Base
         {
             xywh = -0.97 0.45 0.8 1.0,
         }
+        /* Where a character stands to wash each side's blood off, as ISWashVehicle finds them by
+           these names (Front, Rear, Left, Right), and to weld the front and the back of the frame:
+           around the coupler, so the sides of the tongue stay reachable with a car on the hitch;
+           behind the deck; beside each side. No passenger names the seat areas, so they seat no
+           one. */
+        area Engine
+        {
+            xywh = 0.0 1.6 2.0 0.8,
+        }
+        area TruckBed
+        {
+            xywh = 0.0 -1.55 2.0 0.7,
+        }
+        area SeatLeft
+        {
+            xywh = 0.97 -0.3 0.8 1.8,
+        }
+        area SeatRight
+        {
+            xywh = -0.97 -0.3 0.8 1.8,
+        }
         template = Tire/part/TireFrontLeft,
         template = Tire/part/TireFrontRight,
         template = Suspension/part/SuspensionFrontLeft,
@@ -203,6 +234,37 @@ module Base
                 use = Vehicles.Use.TrunkDoor,
             }
         }
+        /* The frame, front and back, under the ids whose condition the game shows on the mask's
+           zones (BaseVehicle.doDamageOverlay): the front on Head, the back on Tail and the side
+           guards. Crashes and road kills damage them (addDamageFront/Rear, addDamage*HitAChr),
+           but only while they hold an item. Hidden from the mechanics window, which would call
+           them Hood and Truck Bed; Repair Frame welds them from the trailer's menu instead. With
+           no door and no container they open nothing. specificItem = false keeps the item's name
+           as written, without the mechanicType that VehicleScript otherwise appends. */
+        part EngineDoor
+        {
+            area = Engine,
+            category = nodisplay,
+            itemType = RenewableEnergy.TrailerFrame,
+            specificItem = false,
+            lua
+            {
+                create = Vehicles.Create.Default,
+                init = RenewableEnergy.ArrowBoard.initFrame,
+            }
+        }
+        part TruckBed
+        {
+            area = TruckBed,
+            category = nodisplay,
+            itemType = RenewableEnergy.TrailerFrame,
+            specificItem = false,
+            lua
+            {
+                create = Vehicles.Create.Default,
+                init = RenewableEnergy.ArrowBoard.initFrame,
+            }
+        }
         part RenewableEnergyPanelLeft
         {
             area = RenewableEnergyPanelLeft,
@@ -231,12 +293,14 @@ module Base
         }
         /* The two panels hold a Solar Module each; the part's condition is the module's. Lua shows
            the Whole or the Cracked model by that condition (RenewableEnergy.ArrowBoard), so the
-           game mustn't show both whenever a module is installed. A pattern only reaches parts
-           already declared, so this comes after them. */
+           game mustn't show both whenever a module is installed. specificItem = false keeps the
+           module types as written (see the frame). A pattern only reaches parts already declared,
+           so this comes after them. */
         part RenewableEnergyPanel*
         {
             category = bodywork,
             itemType = RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule,
+            specificItem = false,
             setAllModelsVisible = false,
             table install
             {
@@ -296,5 +360,15 @@ module Base
             canAttach = trailer,
             updateconstraint = false,
         }
+    }
+
+    /* Repair Frame: welding, as vanilla's Fix Trailer Welding welds its trailers' bodies. */
+    fixing Fix Trailer Frame Welding
+    {
+        Require = RenewableEnergy.TrailerFrame,
+        GlobalItem = Base.BlowTorch=2,
+        ConditionModifier = 1.2,
+        Fixer = Base.SheetMetal; MetalWelding=3;Mechanics=2,
+        Fixer = Base.SmallSheetMetal=2; MetalWelding=3;Mechanics=2,
     }
 }

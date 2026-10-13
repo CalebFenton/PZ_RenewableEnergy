@@ -236,15 +236,16 @@ def clear_stale(folders):
 
 # Vehicle overlays -----------------------------------------------------------------------------------
 #
-# The vehicle shader vehicle_norandom_multiuv_noreflect finds a body's zones from the colour of its
+# The vehicle shader vehicle_multiuv_noreflect finds a body's zones from the colour of its
 # mask texture (UV1), and draws rust, damage and blood from textures it samples with UV2. The body
 # carries UV2 as a copy of UV1, so every overlay is baked here in the skin's own UV space. Zones
 # match within 0.01, so the mask holds flat colours. Its texels are filtered linearly, so the
 # check in `mask_zones` refuses two neighbouring zones whose blend passes through a third.
 
 # The multi-UV shaders' zone colours (vehicle_common.frag.h); the single-UV shaders swap the
-# guards. Head takes Front blood, Tail and Boot Rear blood, the guards Left and Right blood, and
-# Boot shows the TrunkDoor part's damage (BaseVehicle.doDamageOverlay, doBloodOverlay*).
+# guards. Head takes Front blood, Tail and Boot Rear blood, the guards Left and Right blood. Head
+# shows the EngineDoor part's damage (the frame's front), Tail and the guards TruckBed's (its
+# back) and Boot TrunkDoor's (the battery box lid) (BaseVehicle.doDamageOverlay, doBloodOverlay*).
 HEAD, TAIL, BOOT = (255, 0, 0), (0, 255, 0), (0, 255, 127)
 GUARD_LEFT, GUARD_RIGHT = (0, 0, 191), (191, 191, 0)
 STOPLIGHT_LEFT, STOPLIGHT_RIGHT = (127, 191, 0), (127, 64, 0)
@@ -482,21 +483,24 @@ def vehicle_overlays(low, solid):
     rust[..., 2] = 0.07 + 0.03 * grain
     rust[..., 3] = smoothstep(0.0, 0.18, amount + 0.15 * (grain - 0.5)) * rust_ok
 
-    # Damage shells take their hue from the paint and their value and saturation as an offset from
-    # it (vehicle_common.frag addDamage): grey above middle lightens the paint, below darkens it.
+    # Damage shells in grey: the vehicle's forced colour (Vehicles.txt) has the shader draw a shell's
+    # own saturation and value, under the paint's hue, outside Head, Tail and the lamps, which draw
+    # its colour as is (vehicle_common.frag addDamage), so grey stays grey on every zone. Scratches
+    # and dents scrape the paint to bare steel, and a dark crease rings each dent.
     lines = np.maximum(1 - np.abs(2 * noise(point, (5, 5, 60), 21) - 1),
                        1 - np.abs(2 * noise(point, (60, 6, 6), 22) - 1))
     scratches = smoothstep(0.9, 0.97, lines) * smoothstep(0.35, 0.6, fractal(point, (6, 6, 6), 23, 3))
     damage1 = np.zeros(shape + (4,))
-    damage1[..., :3] = 0.85
+    damage1[..., :3] = 0.7
     damage1[..., 3] = scratches
     dents = fractal(point, (8, 8, 8), 31)
-    dent = smoothstep(0.54, 0.64, dents)
-    rim = smoothstep(0.5, 0.54, dents) * (1 - dent)
+    bare = smoothstep(0.6, 0.66, dents)
+    crease = smoothstep(0.56, 0.59, dents) * (1 - smoothstep(0.6, 0.63, dents))
+    steel = (0.5 + 0.15 * grain)[..., None]
     damage2 = np.zeros(shape + (4,))
-    damage2[..., :3] = np.where(dent[..., None] > rim[..., None], 0.0, 0.7)
-    damage2[..., :3] = np.where(scratches[..., None] > np.maximum(dent, rim)[..., None], 0.9, damage2[..., :3])
-    damage2[..., 3] = np.clip(np.maximum.reduce((dent, rim * 0.4, scratches)), 0, 1)
+    damage2[..., :3] = np.where(crease[..., None] > bare[..., None], 0.08, steel)
+    damage2[..., :3] = np.where(scratches[..., None] > np.maximum(bare, crease)[..., None], 0.85, damage2[..., :3])
+    damage2[..., 3] = np.clip(np.maximum.reduce((bare * 0.9, crease, scratches)), 0, 1)
 
     # Blood: the shader shows a texel once growth × splatter, each alpha cubed first, passes 1 minus
     # the side's intensity (vehicle_common.frag addBlood). Smears are stretched upright into runs.

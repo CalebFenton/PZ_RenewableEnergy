@@ -17,11 +17,16 @@
 --     art_trailer_brake.png     the brake lights, lit while the towing car brakes
 --     art_trailer_panel_cracked.png   its right panel's module cracked, the left one whole
 --     art_trailer_panel_removed.png   its left panel taken off
+--     art_trailer_rear_damage1.png    the back of its frame (TruckBed: tail and sides) at damage
+--                                     stage 1, then
+--     art_trailer_rear_damage2.png    at stage 2
 --   art_trailer_front.png   a second trailer, alone and facing the other way, blood on all four
 --                     sides, for the front and left side; the same view then shows it clean with
---     art_trailer_damage1.png   the battery box lid (TrunkDoor) at damage stage 1, then
+--     art_trailer_damage1.png   its whole frame (EngineDoor and TruckBed) and the battery box lid
+--                               (TrunkDoor) at damage stage 1, then
 --     art_trailer_damage2.png   at stage 2
 --     art_trailer_lid_removed.png   the battery box lid taken off
+--     art_trailer_washed.png    blood on all four sides, then washed off by vanilla's wash action
 --   art_cracked.png   cracked glass on a flat panel, wooden and metal wall panels and racks (one
 --                     module of each rack cracked), placed the way players place them, so the
 --                     mod's own code adds the overlays, and east of them an arrow board trailer
@@ -113,7 +118,9 @@ local SHOTS = {
 }
 
 -- Damage stage 1 is a condition from 40 to 59, stage 2 below 40 (BaseVehicle.doDamageOverlay).
-local LID_STAGE_1, LID_STAGE_2 = 50, 20
+local STAGE_1, STAGE_2 = 50, 20
+-- The frame's front and back, and the battery box lid.
+local BODY_PARTS = { "EngineDoor", "TruckBed", "TrunkDoor" }
 local BLOOD_SIDES = { "Front", "Rear", "Left", "Right" }
 
 local function setBlood(vehicle, sides)
@@ -122,6 +129,19 @@ local function setBlood(vehicle, sides)
     end
     for _, side in ipairs(sides) do
         vehicle:setBloodIntensity(side, 1)
+    end
+end
+
+local function setCondition(vehicle, partIds, condition)
+    for _, id in ipairs(partIds) do
+        vehicle:getPartById(id):setCondition(condition)
+    end
+end
+
+-- ISWashVehicle's own removal, side by side, without the walk to each side's area.
+local function wash(vehicle)
+    for _, side in ipairs(BLOOD_SIDES) do
+        ISWashVehicle:new(getPlayer(), vehicle, side, nil):removeBlood(100, 0)
     end
 end
 
@@ -156,11 +176,20 @@ local HITCHED_STATES = {
             RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
         end,
     },
+    { name = "art_trailer_rear_damage1", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_1) end },
+    { name = "art_trailer_rear_damage2", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_2) end },
 }
 local LONE_STATES = {
-    { name = "art_trailer_damage1", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setCondition(LID_STAGE_1) end },
-    { name = "art_trailer_damage2", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setCondition(LID_STAGE_2) end },
+    { name = "art_trailer_damage1", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_1) end },
+    { name = "art_trailer_damage2", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_2) end },
     { name = "art_trailer_lid_removed", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setInventoryItem(nil) end },
+    {
+        name = "art_trailer_washed",
+        set = function(pair)
+            setBlood(pair.trailer, BLOOD_SIDES)
+            wash(pair.trailer)
+        end,
+    },
 }
 
 -- `pair` returns the current pair, which the steps only know once they run.

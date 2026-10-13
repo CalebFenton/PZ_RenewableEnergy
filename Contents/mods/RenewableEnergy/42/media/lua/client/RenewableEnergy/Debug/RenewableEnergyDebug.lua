@@ -7,7 +7,7 @@ RenewableEnergy = RenewableEnergy or {}
 local Debug = {}
 RenewableEnergy.Debug = Debug
 
--- Every item this mod defines, in the order the README shows them.
+-- Every item this mod defines that a player can hold, in the order the README shows them.
 Debug.ITEMS = {
     "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule", "RenewableEnergy.SolarCells",
     "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWallWood", "RenewableEnergy.SolarWallMetal",
@@ -25,6 +25,8 @@ Debug.ITEMS = {
     "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
 }
+-- Items that only ever sit in a vehicle part.
+Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
 
 local RECIPE_PREFIX = "RenewableEnergy_"
 

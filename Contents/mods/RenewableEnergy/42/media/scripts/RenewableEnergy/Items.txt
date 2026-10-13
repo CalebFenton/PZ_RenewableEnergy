@@ -530,4 +530,21 @@ module RenewableEnergy
         WorldStaticModel = Map,
         Tags = base:ignorezombiedensity,
     }
+
+    /**************************** Vehicle parts *****************************/
+    /*
+        What the arrow board trailer's two frame parts hold, as a hood holds a hood: its
+        condition is the frame's. The parts have no uninstall, so it never leaves the trailer but
+        through debug tools, and borrows the icon and ground model of vanilla's hood.
+    */
+    item TrailerFrame
+    {
+        DisplayCategory = VehicleMaintenance,
+        ItemType = base:normal,
+        Weight = 40.0,
+        Icon = EngineDoor,
+        ConditionMax = 100,
+        MechanicsItem = true,
+        WorldStaticModel = CarHood,
+    }
 }

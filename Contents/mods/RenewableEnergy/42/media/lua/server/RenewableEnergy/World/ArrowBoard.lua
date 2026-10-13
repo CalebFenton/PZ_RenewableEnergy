@@ -21,6 +21,8 @@ require "RenewableEnergy/World/WorldSpawns"
 -- condition. Nothing in the game reports a part's condition changing, so every change this file
 -- makes shows it at once, and each charge pass shows every loaded trailer's panels again for the
 -- changes it didn't make (a failed uninstall, a debug tool).
+--
+-- Its frame dents in crashes as a car's body does, and Repair Frame welds it (Frame, below).
 
 RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
@@ -244,6 +246,45 @@ function ArrowBoard.crashCrack(vehicle)
             ArrowBoard.crackPanel(vehicle, part)
         end
     end
+end
+
+-- Frame ----------------------------------------------------------------------------------------
+--
+-- The frame's front and back are parts under vanilla's EngineDoor and TruckBed ids, the only ids
+-- whose condition the game shows as dents on the body (scripts/RenewableEnergy/Vehicles.txt), so
+-- crashes and road kills dent them with no help from here. Repair Frame welds them through
+-- vanilla's fixing, from the trailer's menu, since the mechanics window doesn't show them.
+
+-- Each frame part and the name the repair menu gives it.
+ArrowBoard.FRAME = {
+    { id = "EngineDoor", name = "IGUI_RenewableEnergy_FrameFront" },
+    { id = "TruckBed", name = "IGUI_RenewableEnergy_FrameBack" },
+}
+
+--- Part `init` of the frame parts: runs on every side each time the trailer loads.
+function ArrowBoard.initFrame(vehicle, part)
+    -- A part added to the script after a trailer spawned is never created on it, so a trailer
+    -- from an older save gets its frame here.
+    if not isClient() and not part:getInventoryItem() then
+        VehicleUtils.createPartInventoryItem(part)
+        vehicle:transmitPartItem(part)
+    end
+    -- The colour is rolled at spawn, so a trailer spawned before the script forced it keeps a
+    -- random one, which would tint its dents.
+    local script = vehicle:getScript()
+    vehicle:setColorHSV(script:getForcedHue(), script:getForcedSat(), script:getForcedVal())
+end
+
+--- The trailer's frame parts that are dented: { part, name } for each, front first.
+function ArrowBoard.damagedFrame(vehicle)
+    local damaged = {}
+    for _, frame in ipairs(ArrowBoard.isTrailer(vehicle) and ArrowBoard.FRAME or {}) do
+        local part = vehicle:getPartById(frame.id)
+        if part and part:getInventoryItem() and part:getCondition() < 100 then
+            table.insert(damaged, { part = part, name = frame.name })
+        end
+    end
+    return damaged
 end
 
 -- Crashes --------------------------------------------------------------------------------------

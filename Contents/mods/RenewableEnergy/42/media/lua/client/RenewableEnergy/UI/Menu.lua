@@ -1,8 +1,10 @@
 -- Right-click menus for battery banks, the panels connected to them and vehicles. Each option
--- queues a RenewableEnergyAction, which walks the character over and does the job. Parts go into
--- a bank and come out only through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
+-- queues a RenewableEnergyAction, which walks the character over and does the job, except Repair
+-- Frame, which walks over and queues vanilla's fixing. Parts go into a bank and come out only
+-- through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
 
 require "ISUI/ISWorldObjectContextMenu"
+require "ISUI/ISInventoryPaneContextMenu"
 require "Vehicles/TimedActions/ISPathFindAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
@@ -360,8 +362,37 @@ function Menu.addPanelRepairOptions(playerNum, context, vehicle)
     end
 end
 
+-- Walks to the frame part's end of the trailer, then fixes it as the mechanics window's Repair
+-- menu does (ISInventoryPaneContextMenu.onFix), which walks nowhere.
+local function queueFixFrame(item, playerNum, fixingNum, fixerNum, part)
+    local character = getSpecificPlayer(playerNum)
+    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, part:getVehicle(), part:getArea()))
+    ISInventoryPaneContextMenu.onFix(item, playerNum, fixingNum, fixerNum, part)
+end
+
+--- Repair Frame for each dented end of an arrow board trailer's frame: vanilla's fixing menu for
+--- the part, the one the mechanics window gives a car's body.
+function Menu.addFrameRepairOptions(playerNum, context, vehicle)
+    for _, frame in ipairs(RenewableEnergy.ArrowBoard.damagedFrame(vehicle)) do
+        local part = frame.part
+        local item = part:getInventoryItem()
+        local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairFrame", getText(frame.name),
+            part:getCondition()))
+        local submenu = context:getNew(context)
+        context:addSubMenu(option, submenu)
+        local fixes = FixingManager.getFixes(item)
+        for i = 0, fixes:size() - 1 do
+            ISInventoryPaneContextMenu.buildFixingMenu(item, playerNum, fixes:get(i), i, option, submenu, part)
+        end
+        for _, fix in ipairs(submenu.options) do
+            fix.onSelect = queueFixFrame
+        end
+    end
+end
+
 function Menu.addVehicleOptions(playerNum, context, vehicle)
     Menu.addPanelRepairOptions(playerNum, context, vehicle)
+    Menu.addFrameRepairOptions(playerNum, context, vehicle)
     local SolarMaintainer = RenewableEnergy.SolarMaintainer
     if SolarMaintainer.isAttached(vehicle) then
         return context:addOption(getText("ContextMenu_RenewableEnergy_DetachMaintainer"), playerNum, queueVehicle,

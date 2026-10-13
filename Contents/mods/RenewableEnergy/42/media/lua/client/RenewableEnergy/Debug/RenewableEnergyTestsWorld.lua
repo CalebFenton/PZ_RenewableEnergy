@@ -1133,6 +1133,33 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
     end,
 })
 
+-- The mechanics window offers to install an inventory item whose full type is in the part's item
+-- types (ISVehicleMechanics, VehicleUtils.getItems), so each panel lists both modules as they are
+-- named, without the mechanicType the game appends to a specific item; and repair() puts a module
+-- back on an empty panel, where an appended name found no item.
+test("renewable_energy_world_arrow_board_panels_take_real_modules", {
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+    end,
+    validate = function(self)
+        for _, id in ipairs({ LEFT, RIGHT }) do
+            local types = self.trailer:getPartById(id):getItemType()
+            local listed = {}
+            for i = 0, types:size() - 1 do
+                table.insert(listed, types:get(i))
+            end
+            expect(types:contains(MODULE) and types:contains(HOMEMADE),
+                id .. " takes " .. table.concat(listed, ", "))
+        end
+        putPanel(self.trailer, LEFT, nil)
+        self.trailer:repair()
+        local item = self.trailer:getPartById(LEFT):getInventoryItem()
+        expect(item ~= nil and (item:getFullType() == MODULE or item:getFullType() == HOMEMADE),
+            "repair() put " .. (item and item:getFullType() or "nothing") .. " on the empty panel")
+    end,
+})
+
 -- A crack, from a storm or a crash, takes 30 from a panel's module, as a storm takes from a module
 -- on a mount, and shows it cracked; a storm cracks a trailer's panels as it would flat panels.
 test("renewable_energy_world_arrow_board_panels_crack", {
@@ -1363,5 +1390,181 @@ test("renewable_energy_world_arrow_board_stands_alone", {
         expect(self.trailer:isAtRest(), "it never came to rest")
         local up = self.trailer:getUpVectorDot()
         expect(up > 0.98, string.format("it came to rest tipped over (up vector dot %.3f)", up))
+    end,
+})
+
+local FRAME_FRONT, FRAME_BACK = "EngineDoor", "TruckBed"
+
+local function frameCondition(vehicle, partId)
+    local part = vehicle:getPartById(partId)
+    return part and part:getInventoryItem() and part:getCondition()
+end
+
+-- Puts the character at the middle of one of the trailer's areas: teleportTo rounds down to the
+-- square's corner, which can fall outside a narrow area.
+local function standIn(vehicle, area)
+    local spot = vehicle:getAreaCenter(area)
+    local p = player()
+    p:teleportTo(spot:getX(), spot:getY(), vehicle:getZ())
+    p:setX(spot:getX())
+    p:setY(spot:getY())
+end
+
+-- The game's own crash damage, which a car's crash passes on to the trailer it tows
+-- (BaseVehicle.crash), dents the front of the frame in a front crash and the back in a rear one;
+-- the mechanics window lists neither part.
+test("renewable_energy_world_arrow_board_frame_dents_in_crashes", {
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+        if self.trailer then
+            self.trailer:repair()
+        end
+    end,
+    validate = function(self)
+        local trailer = self.trailer
+        for _, id in ipairs({ FRAME_FRONT, FRAME_BACK }) do
+            local part = trailer:getPartById(id)
+            expect(part ~= nil and part:getCategory() == "nodisplay", id .. " shows in the mechanics window")
+        end
+        trailer:crash(40, true)
+        local front, back = frameCondition(trailer, FRAME_FRONT), frameCondition(trailer, FRAME_BACK)
+        expect(front and front < 100, "a front crash left the front of the frame at " .. tostring(front))
+        expect(back == 100, "a front crash took the back of the frame to " .. tostring(back))
+        trailer:crash(40, false)
+        back = frameCondition(trailer, FRAME_BACK)
+        expect(back and back < 100, "a rear crash left the back of the frame at " .. tostring(back))
+    end,
+})
+
+-- A trailer from a save made before its frame was parts loads with them empty and the random
+-- colour it spawned with, and gets a frame and the script's colour on that load.
+test("renewable_energy_world_arrow_board_old_trailer_gets_frame", {
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+    end,
+    validate = function(self)
+        local trailer = self.trailer
+        trailer:setColorHSV(0.3, 0.9, 0.8)
+        for _, id in ipairs({ FRAME_FRONT, FRAME_BACK }) do
+            local part = trailer:getPartById(id)
+            part:setInventoryItem(nil)
+            RenewableEnergy.ArrowBoard.initFrame(trailer, part)
+            expect(frameCondition(trailer, id) ~= nil, "the old trailer's " .. id .. " loaded empty")
+        end
+        local script = trailer:getScript()
+        expect(trailer:getColorSaturation() == script:getForcedSat() and trailer:getColorValue() == script:getForcedVal(),
+            string.format("the old trailer kept its colour, saturation %.2f and value %.2f",
+                trailer:getColorSaturation(), trailer:getColorValue()))
+    end,
+})
+
+-- Vanilla's wash action offers each side of the trailer and washes its blood off from the side's
+-- area: Front by the coupler, Rear behind the deck, Left and Right beside it.
+local WASH_AREAS = { { side = "Front", area = "Engine" }, { side = "Rear", area = "TruckBed" },
+    { side = "Left", area = "SeatLeft" }, { side = "Right", area = "SeatRight" } }
+local WASH_BLOOD = 0.2
+
+test("renewable_energy_world_arrow_board_washes", {
+    instant = true,
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        local bucket = p:getInventory():AddItem("Base.Bucket")
+        self.offered, self.left = {}, {}
+        -- Each side's wash is queued once the one before has finished, behind it.
+        local function washSide(i)
+            local wash = WASH_AREAS[i]
+            for _, other in ipairs(WASH_AREAS) do
+                trailer:setBloodIntensity(other.side, 0)
+            end
+            trailer:setBloodIntensity(wash.side, WASH_BLOOD)
+            bucket:getFluidContainer():addFluid(Fluid.Water, 10)
+            local area = ISWashVehicle.hasBlood(trailer) and ISWashVehicle.chooseArea(p, trailer)
+            self.offered[wash.side] = area and area.id .. " at " .. area.area or "nothing"
+            standIn(trailer, wash.area)
+            ISTimedActionQueue.add(ISWashVehicle:new(p, trailer, wash.side, wash.area))
+            T.waitUntil(function() return trailer:getBloodIntensity(wash.side) <= 0 end, 600)
+            T.step(function()
+                self.left[wash.side] = trailer:getBloodIntensity(wash.side)
+                if WASH_AREAS[i + 1] then
+                    washSide(i + 1)
+                end
+            end)
+        end
+        washSide(1)
+    end,
+    validate = function(self)
+        for _, wash in ipairs(WASH_AREAS) do
+            local expected = wash.side .. " at " .. wash.area
+            expect(self.offered[wash.side] == expected, "blood on " .. wash.side .. " offered " .. tostring(self.offered[wash.side]))
+            expect(self.left[wash.side] == 0, "washing " .. wash.side .. " left " .. tostring(self.left[wash.side]))
+        end
+    end,
+})
+
+-- Repair Frame offers each dented end of the frame, and the sheet metal fix it offers, vanilla's
+-- welding, walks there and welds it whole at high skill; a whole frame offers nothing.
+test("renewable_energy_world_arrow_board_frame_welds", {
+    instant = true,
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+        if not self.trailer then return end
+        local trailer, inventory = self.trailer, player():getInventory()
+        trailer:repair()
+        T.setPerk(self, Perks.MetalWelding, 10)
+        T.setPerk(self, Perks.Mechanics, 10)
+        trailer:getPartById(FRAME_FRONT):setCondition(20)
+        trailer:getPartById(FRAME_BACK):setCondition(45)
+        inventory:AddItem("Base.BlowTorch")
+        inventory:AddItem("Base.SheetMetal")
+        inventory:AddItem("Base.SheetMetal")
+        self.labels = {}
+        -- The frame's options, and under each the first fix: one sheet metal.
+        local function frameOptions()
+            local context = ISContextMenu.get(0, 0, 0)
+            RenewableEnergy.Menu.addFrameRepairOptions(0, context, trailer)
+            local found = {}
+            for _, option in ipairs(context.options) do
+                local submenu = option.subOption and context:getSubMenu(option.subOption)
+                table.insert(found, { name = option.name, fix = submenu and submenu.options[1] })
+            end
+            return found
+        end
+        local function weld(option, area)
+            standIn(trailer, area)
+            local fix = option.fix
+            fix.onSelect(fix.target, fix.param1, fix.param2, fix.param3, fix.param4)
+        end
+        local offered = frameOptions()
+        for _, option in ipairs(offered) do
+            table.insert(self.labels, option.name)
+        end
+        if not T.need(self, #offered == 2 and offered[1].fix and offered[2].fix or nil, "a fix under each frame option") then
+            return
+        end
+        weld(offered[1], "Engine")
+        T.waitUntil(function() return frameCondition(trailer, FRAME_FRONT) == 100 end, VEHICLE_FRAMES)
+        T.step(function()
+            weld(frameOptions()[1], "TruckBed")
+            T.waitUntil(function() return frameCondition(trailer, FRAME_BACK) == 100 end, VEHICLE_FRAMES)
+            T.step(function()
+                self.afterRepair = #frameOptions()
+            end)
+        end)
+    end,
+    validate = function(self)
+        local front = getText("ContextMenu_RenewableEnergy_RepairFrame", getText("IGUI_RenewableEnergy_FrameFront"), 20)
+        local back = getText("ContextMenu_RenewableEnergy_RepairFrame", getText("IGUI_RenewableEnergy_FrameBack"), 45)
+        expect(self.labels[1] == front and self.labels[2] == back, "the menu offered " .. table.concat(self.labels, ", "))
+        expect(frameCondition(self.trailer, FRAME_FRONT) == 100 and frameCondition(self.trailer, FRAME_BACK) == 100,
+            "welding left the frame at " .. tostring(frameCondition(self.trailer, FRAME_FRONT)) .. " and "
+            .. tostring(frameCondition(self.trailer, FRAME_BACK)))
+        expect(player():getInventory():getCountTypeRecurse("Base.SheetMetal") == 0, "welding left sheet metal")
+        expect(self.afterRepair == 0, "a whole frame offers " .. tostring(self.afterRepair) .. " repairs")
     end,
 })
