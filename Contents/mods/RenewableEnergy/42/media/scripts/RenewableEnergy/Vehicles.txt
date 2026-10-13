@@ -166,7 +166,9 @@ module Base
         template = Tire/part/TireFrontRight,
         template = Suspension/part/SuspensionFrontLeft,
         template = Suspension/part/SuspensionFrontRight,
-        template = TrunkDoor,
+        /* Only the part: a whole-vehicle template line also replaces the vehicle's physics shapes
+           and useChassisPhysicsCollision with the template's (VehicleScript.copyPhysicsFrom). */
+        template = TrunkDoor/part/TrunkDoor,
         part TireFrontLeft
         {
             table install

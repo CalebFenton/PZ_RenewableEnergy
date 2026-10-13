@@ -1341,3 +1341,27 @@ test("renewable_energy_world_arrow_board_towed_by_car", {
         expect(gap < ON_HITCH, string.format("the trailer's coupler is %.2f squares off the car's hitch", gap))
     end,
 })
+
+-- How long a freshly spawned vehicle is given to fall onto its wheels before it counts as at rest:
+-- it can read as at rest before its physics has run.
+local SETTLE_MS = 1000
+
+-- Unhitched and left on its own, it comes to rest on its wheels and coupler, as vanilla's Trailer
+-- does (up vector dot 0.989, about 8.5 degrees nose down). Without its physics shapes it rests on
+-- the chassis box's front edge at 0.897.
+test("renewable_energy_world_arrow_board_stands_alone", {
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+        if not self.trailer then return end
+        local spawnedMs = getTimestampMs()
+        T.waitUntil(function()
+            return getTimestampMs() - spawnedMs > SETTLE_MS and inCell(self.trailer) and self.trailer:isAtRest()
+        end, VEHICLE_FRAMES)
+    end,
+    validate = function(self)
+        expect(self.trailer:isAtRest(), "it never came to rest")
+        local up = self.trailer:getUpVectorDot()
+        expect(up > 0.98, string.format("it came to rest tipped over (up vector dot %.3f)", up))
+    end,
+})
