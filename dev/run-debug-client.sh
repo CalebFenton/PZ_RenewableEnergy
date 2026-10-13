@@ -17,6 +17,11 @@
 #                                    restarts the game. While it waits it shows and logs "RETest
 #                                    IDLE"; it quits after 10 minutes without a run, or when
 #                                    another run needs the game.
+#   dev/run-debug-client.sh --test --mp [--stay]
+#                                    the same tests in multiplayer: a dedicated server and a client
+#                                    that joins it as the admin (dev/harness/README.md,
+#                                    Multiplayer); with --stay both stay open, and the next
+#                                    --test --mp --stay reruns the tests in about a second
 #   dev/run-debug-client.sh --promo  the same as --test, but instead of the tests the harness builds a
 #                                    working array and captures the art for the README and the
 #                                    Workshop page, and art/promo/extract.py crops it into

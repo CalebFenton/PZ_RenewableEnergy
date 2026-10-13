@@ -4,6 +4,7 @@
 
 - After every change: `dev/static-check.sh` (seconds; compiles every Lua file with the game's compiler and cross-checks scripts, translations, textures and API names) and `dev/validate-server.sh` (boots a headless dedicated server and fails on any error the mod logs).
 - Before finishing: `dev/run-debug-client.sh --test`. It runs every in-game test unattended and needs a JDK's `javac` on `PATH` (or `JAVAC` set); `TESTS=<prefix>,...` runs only the tests whose names start with one of them. The dev scripts take a lock, so a run waits while another one's game is up; just run them.
+- Multiplayer: `dev/run-debug-client.sh --test --mp` runs the same tests with a dedicated server and a client that joins it (about 44 seconds); add `--stay` while you iterate, so the next such run reruns them in about a second. What only the server can do goes through `RenewableEnergyTest.server` and the dev mod's server handlers; `dev/harness/README.md` (Multiplayer) explains it.
 - README and Workshop art: `PROMO=<group> dev/run-debug-client.sh --promo` reshoots one group of screenshots, such as `PROMO=trailer` or `PROMO=models`, in about half a minute and replaces only that group's captures (a wrong name lists the groups); `art/promo/compose.py` then lays out the images in seconds. Iterate on the one group you are changing, and never rerun every group to check one shot. A layout change needs only `compose.py`.
 
 ## Rules

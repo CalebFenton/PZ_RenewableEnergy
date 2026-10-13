@@ -775,6 +775,44 @@ test("renewable_energy_power_commands_from_clients", {
     end,
 })
 
+-- The status of the bank at `position` on the client's copy, which the Global Object System syncs.
+local function clientStatus(position)
+    local client = PowerBank.clientSystem
+    local copy = client and position and client.system:getObjectAt(position.x, position.y, position.z)
+    return copy and copy:getModData().status
+end
+
+-- A client renames and switches on a bank the server holds the way the bank window does, through
+-- the bank system's commands (a client command packet in multiplayer), after a forged one the
+-- server must shrug off. The server's record changes, and its status reaches the client's copy.
+test("renewable_energy_power_commands_reach_the_server", {
+    run = function(self)
+        local square = (T.squares(self, 1, { indoors = true }) or {})[1]
+        if not T.need(self, square, "a free indoor square for a bank") then return end
+        T.server(self, "placeBank", { x = square:getX(), y = square:getY(), z = square:getZ(),
+            kind = "batteryBoxWood", items = { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" } })
+        T.step(function()
+            self.position = self.server.placeBank
+            PowerBank.command(player(), "setBankOn", { bank = "nonsense" })
+            PowerBank.command(player(), "rename", { bank = self.position, name = "  Network bank  " })
+            PowerBank.command(player(), "setBankOn", { bank = self.position, on = true })
+        end)
+        T.waitUntil(function()
+            local status = clientStatus(self.position)
+            return status ~= nil and status.on == true and status.name == "Network bank"
+        end, 3000)
+        T.server(self, "bankState", function() return self.position end)
+    end,
+    validate = function(self)
+        local state, status = self.server.bankState, clientStatus(self.position)
+        expect(state.found, "the server has no bank record at the place")
+        expect(state.on, "the server's bank isn't on")
+        expect(state.name == "Network bank", "the server names the bank " .. tostring(state.name))
+        expect(status and status.on == true and status.kind == "batteryBoxWood", "the client's copy doesn't show the bank on")
+        expect(status and status.name == "Network bank", "the client's copy names the bank " .. tostring(status and status.name))
+    end,
+})
+
 -- A removed running bank leaves nothing powered and is forgotten.
 test("renewable_energy_power_removed_bank_leaves_no_power", {
     run = function(self)

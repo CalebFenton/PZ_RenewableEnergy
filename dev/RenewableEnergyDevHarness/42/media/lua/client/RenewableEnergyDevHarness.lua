@@ -1,12 +1,13 @@
 -- Development only, not published; dev/run-debug-client.sh loads it with the shared harness mod
 -- (dev/harness), which runs the modes it registers here. Every mode starts the Renewable Energy
 -- debug scenario. With --test the harness runs every renewable_energy_* test and prints
--- "RETest DONE passed=<n> failed=<n>". With --promo, RenewableEnergyDevPromo saves the art for the
--- README and prints "REPromo DONE". With --art, RenewableEnergyDevArt saves close-ups of every
--- item and tile and prints "REArt DONE". With --loot, RenewableEnergy.Loot measures the loot and
--- prints an "RELootReport" line for each list, then the modules a thorough player finds in each
--- town of RenewableEnergyDevTownCensus (dev/loot/census.py), then "RELootReport DONE". Then the
--- game quits. run-debug-client.sh reads those lines from console.txt.
+-- "RETest DONE passed=<n> failed=<n> skipped=<n>"; with --test --mp it runs them on a client
+-- joined to a dedicated server. With --promo, RenewableEnergyDevPromo saves the art for the README
+-- and prints "REPromo DONE". With --art, RenewableEnergyDevArt saves close-ups of every item and
+-- tile and prints "REArt DONE". With --loot, RenewableEnergy.Loot measures the loot and prints an
+-- "RELootReport" line for each list, then the modules a thorough player finds in each town of
+-- RenewableEnergyDevTownCensus (dev/loot/census.py), then "RELootReport DONE". Then the game
+-- quits. run-debug-client.sh reads those lines from console.txt.
 
 require "PZHarness/Runner"
 require "RenewableEnergy/Debug/RenewableEnergyDebugScenario"
