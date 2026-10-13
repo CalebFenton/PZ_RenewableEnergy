@@ -838,7 +838,10 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
         end)
         T.give(self, "module", { { type = MODULE, condition = 90 } })
         T.step(function()
-            ISTimedActionQueue.add(ISInstallVehiclePart:new(p, trailer.vehicle:getPartById(LEFT), self.items.module[1], 200))
+            -- Vanilla's install takes the time it is given even when actions are instant
+            -- (ISInstallVehiclePart.new never asks getDuration), so the instant time is given.
+            local time = p:isTimedActionInstant() and 1 or 200
+            ISTimedActionQueue.add(ISInstallVehiclePart:new(p, trailer.vehicle:getPartById(LEFT), self.items.module[1], time))
         end)
         T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= nil end, SERVER_MS)
         waitForPanelsCopy(trailer)
@@ -949,8 +952,8 @@ end
 -- whole, the trailer set up with `opts.trailer` (see the setTrailer handler); lines them up and
 -- hitches the trailer the way a player does, with vanilla's action. With `opts.drive` the character
 -- gets in at the wheel first, so the hitch is fresh when the test goes on; else they stand beside
--- the car's tow bar. Leaves the handles in self.car and self.trailer; a hitch that never forms
--- fails the test.
+-- the car's tow bar. Leaves the handles in self.car and self.trailer, and in self.hitchedAt a real
+-- time just after the hitch was made; a hitch that never forms fails the test.
 local function towingPair(self, opts)
     opts = opts or {}
     local strip = T.need(self, openStrip(STRIP_AHEAD, STRIP_BEHIND), "open ground for a car and the arrow board")
@@ -996,6 +999,10 @@ local function towingPair(self, opts)
     T.step(function()
         ISTimedActionQueue.add(ISAttachTrailerToVehicle:new(p, car.vehicle, trailer.vehicle, "trailer", "trailer"))
     end)
+    -- The action hitches as it starts, so the hitch is older than its time since this. A test that
+    -- tows runs instantly: at its real length the action would take two seconds, as long as the
+    -- game spares a fresh hitch from snapping.
+    T.step(function() self.hitchedAt = getTimestampMs() end)
     -- The hitch pulls the trailer in over the next physics steps.
     T.waitUntil(function()
         return trailer.vehicle:getVehicleTowedBy() == car.vehicle and hitchGap(car.vehicle, trailer.vehicle) < ON_HITCH
@@ -1025,9 +1032,11 @@ local FRESH_HITCH_MS, SNAP_PUSH = 2000, 5000
 -- player driving the car that tows it, and asks the server to crack them (in single player it
 -- cracks them itself). The jolt is a push on the trailer while it is hitched to the character's
 -- car, soon enough after hitching that the hitch holds, or with `snap` late enough that the jolt
--- snaps the hitch.
+-- snaps the hitch, which the watcher then follows for a moment longer: two cases, each a jolt of
+-- its own.
 local function crashTest(name, targetKmh, expected, snap)
     test(name, {
+        instant = true,
         run = function(self)
             towingPair(self, { drive = true, trailer = {
                 box = {}, panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = { type = MODULE, condition = 90 } },
@@ -1035,10 +1044,12 @@ local function crashTest(name, targetKmh, expected, snap)
             if not self.trailer then return end
             local trailer = self.trailer
             if snap then
-                T.step(function() self.hitchedAt = getTimestampMs() end)
                 T.waitUntil(function() return getTimestampMs() - self.hitchedAt > FRESH_HITCH_MS end, VEHICLE_FRAMES)
             end
             self.peak = 0
+            -- Until the car has stopped, so that the next test doesn't begin with the character at
+            -- the wheel of a moving car, and the trailer too while hitched, so that a crack a bump
+            -- caused would show; a trailer the jolt set loose coasts on for a while.
             T.waitUntil(function()
                 local vehicle = trailer.vehicle
                 local speed = math.abs(vehicle:getCurrentSpeedKmHour())
@@ -1052,17 +1063,20 @@ local function crashTest(name, targetKmh, expected, snap)
                 self.peak = math.max(self.peak, speed)
                 if not self.snapSpeed and vehicle:getVehicleTowedBy() == nil then
                     self.snapSpeed = speed
+                    self.hitchAgeMs = getTimestampMs() - self.hitchedAt
                 end
-                return self.pushed and vehicle:isAtRest()
+                return self.pushed and self.car.vehicle:isAtRest() and (self.snapSpeed ~= nil or vehicle:isAtRest())
             end, 6000)
-            T.step(function() self.snapped = self.snapSpeed ~= nil end)
             T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= 90 end,
                 expected == 90 and 0 or SERVER_MS)
         end,
         validate = function(self)
             local state = self.trailer.state
             if snap then
-                expect(self.snapped, string.format("the jolt to %.1f km/h left the trailer hitched", self.peak))
+                expect(self.snapSpeed ~= nil, string.format("the jolt to %.1f km/h left the trailer hitched", self.peak))
+            else
+                expect(self.snapSpeed == nil, string.format("the jolt snapped a hitch over %s ms old at %s km/h",
+                    tostring(self.hitchAgeMs), tostring(self.snapSpeed)))
             end
             expect(panelCondition(state, LEFT) == expected and panelCondition(state, RIGHT) == expected,
                 string.format("a jolt to %.1f km/h%s left the panels at %s and %s", self.peak,
@@ -1080,6 +1094,7 @@ crashTest("renewable_energy_world_arrow_board_crash_snapping_the_hitch_cracks_pa
 -- nothing.
 test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
     mpOnly = "single player cracks the panels where it watches the trailer; only a multiplayer client sends the crash command",
+    instant = true,
     run = function(self)
         towingPair(self, { trailer = { panels = { [LEFT] = { type = MODULE, condition = 90 } } } })
         if not self.trailer then return end
@@ -1161,6 +1176,7 @@ local PUSH_IMPULSE = 6000
 -- It spawns, a vanilla car hitches it with the game's own action, and when the car is pushed north
 -- the trailer follows, still on the hitch, on the server too.
 test("renewable_energy_world_arrow_board_towed_by_car", {
+    instant = true,
     run = function(self)
         towingPair(self)
         if not self.trailer then return end
