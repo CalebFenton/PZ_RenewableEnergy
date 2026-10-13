@@ -119,13 +119,13 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_DeepCycleBattery,
         texture = WorldItems/RenewableEnergy_DeepCycleBattery,
-        scale = 1,
+        scale = 0.75,
     }
     model L16Battery_Ground
     {
         mesh = WorldItems/RenewableEnergy_L16Battery,
         texture = WorldItems/RenewableEnergy_L16Battery,
-        scale = 1,
+        scale = 0.75,
     }
     model SolarMaintainer_Ground
     {
@@ -149,49 +149,49 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_CarBatteryCase,
         texture = WorldItems/RenewableEnergy_CarBatteryCase,
-        scale = 1,
+        scale = 0.75,
     }
     model DeepCycleBatteryCase_Ground
     {
         mesh = WorldItems/RenewableEnergy_DeepCycleBatteryCase,
         texture = WorldItems/RenewableEnergy_DeepCycleBatteryCase,
-        scale = 1,
+        scale = 0.75,
     }
     model L16BatteryCase_Ground
     {
         mesh = WorldItems/RenewableEnergy_L16BatteryCase,
         texture = WorldItems/RenewableEnergy_L16BatteryCase,
-        scale = 1,
+        scale = 0.75,
     }
     model WornBatteryPlates_Ground
     {
         mesh = WorldItems/RenewableEnergy_WornBatteryPlates,
         texture = WorldItems/RenewableEnergy_WornBatteryPlates,
-        scale = 1,
+        scale = 0.75,
     }
     model BatteryPlates_Ground
     {
         mesh = WorldItems/RenewableEnergy_BatteryPlates,
         texture = WorldItems/RenewableEnergy_BatteryPlates,
-        scale = 1,
+        scale = 0.75,
     }
     model WoodenBatteryPlatePattern_Ground
     {
         mesh = WorldItems/RenewableEnergy_WoodenBatteryPlatePattern,
         texture = WorldItems/RenewableEnergy_WoodenBatteryPlatePattern,
-        scale = 1,
+        scale = 0.75,
     }
     model BatteryPlateMoldUnfired_Ground
     {
         mesh = WorldItems/RenewableEnergy_BatteryPlateMoldUnfired,
         texture = WorldItems/RenewableEnergy_BatteryPlateMoldUnfired,
-        scale = 1,
+        scale = 0.75,
     }
     model BatteryPlateMold_Ground
     {
         mesh = WorldItems/RenewableEnergy_BatteryPlateMold,
         texture = WorldItems/RenewableEnergy_BatteryPlateMold,
-        scale = 1,
+        scale = 0.75,
     }
     model BatteryElectrolyte_Ground
     {

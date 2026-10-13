@@ -12,5 +12,6 @@
     "ContextMenu_RenewableEnergy_PartCondition": "%1 (%2)",
     "ContextMenu_RenewableEnergy_Rename": "Rename",
     "ContextMenu_RenewableEnergy_AttachMaintainer": "Attach Solar Maintainer",
-    "ContextMenu_RenewableEnergy_DetachMaintainer": "Detach Solar Maintainer"
+    "ContextMenu_RenewableEnergy_DetachMaintainer": "Detach Solar Maintainer",
+    "ContextMenu_RenewableEnergy_RepairPanel": "Repair Cracked Panel: %1 (%2%%)"
 }

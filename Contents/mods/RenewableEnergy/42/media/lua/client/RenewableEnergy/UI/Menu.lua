@@ -336,7 +336,32 @@ function Menu.addSourceOptions(playerNum, context, source)
     return menu
 end
 
+-- Walks to the panel's side of the trailer and mends it there.
+local function queueRepairPanel(playerNum, vehicle, partId)
+    local character = getSpecificPlayer(playerNum)
+    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, vehicle:getPartById(partId):getArea()))
+    ISTimedActionQueue.add(Action:new(character, Action.REPAIR_PANEL, nil, nil, vehicle, nil, nil, partId))
+end
+
+--- Repair Cracked Panel for each cracked panel of an arrow board trailer that the repair can
+--- mend, greyed out with the reason when the character can't do it.
+function Menu.addPanelRepairOptions(playerNum, context, vehicle)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local key, args = RenewableEnergy.Recipes.panelRepairRefusal(getSpecificPlayer(playerNum))
+    for _, partId in ipairs(ArrowBoard.isTrailer(vehicle) and ArrowBoard.PANELS or {}) do
+        local part = ArrowBoard.repairablePanel(vehicle, partId)
+        if part then
+            local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairPanel",
+                getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueRepairPanel, vehicle, partId)
+            if key then
+                disable(option, getText(key, unpack(args)))
+            end
+        end
+    end
+end
+
 function Menu.addVehicleOptions(playerNum, context, vehicle)
+    Menu.addPanelRepairOptions(playerNum, context, vehicle)
     local SolarMaintainer = RenewableEnergy.SolarMaintainer
     if SolarMaintainer.isAttached(vehicle) then
         return context:addOption(getText("ContextMenu_RenewableEnergy_DetachMaintainer"), playerNum, queueVehicle,

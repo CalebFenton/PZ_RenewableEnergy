@@ -666,13 +666,6 @@ local function houseNearCharacter()
     return houseNear(here:getX(), here:getY(), 60)
 end
 
--- The runner teleports the character back to the start before each test, and after a test that
--- went far away the start's chunks load again over the next frames.
-local HOUSE_LOAD_FRAMES = 3000
-local function waitForHouseNearCharacter()
-    T.waitUntil(function() return houseNearCharacter() ~= nil end, HOUSE_LOAD_FRAMES)
-end
-
 -- The garden lights around a house, by square key.
 local function lightsAround(def)
     local found = {}
@@ -701,26 +694,23 @@ end
 -- start was already rolled when its chunk loaded, so the test forgets that roll first.
 test("renewable_energy_world_garden_lights_once_per_house", {
     run = function(self)
-        waitForHouseNearCharacter()
-        T.step(function()
-            local GardenLights = RenewableEnergy.GardenLights
-            local def = T.need(self, houseNearCharacter(), "a house near the character")
-            if not def then return end
-            local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), GardenLights.buildingKey(def)
-            local roll = store[key]
-            T.defer(self, function() store[key] = roll end)
-            self.before = lightsAround(def)
-            store[key] = nil
-            self.first = GardenLights.roll(def, true)
-            self.rolled = GardenLights.isRolled(def)
-            self.second = GardenLights.roll(def, true)
-            self.after = lightsAround(def)
-            for squareKey, light in pairs(self.after) do
-                if not self.before[squareKey] then
-                    T.track(self, light)
-                end
+        local GardenLights = RenewableEnergy.GardenLights
+        local def = T.need(self, houseNearCharacter(), "a house near the character")
+        if not def then return end
+        local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), GardenLights.buildingKey(def)
+        local roll = store[key]
+        T.defer(self, function() store[key] = roll end)
+        self.before = lightsAround(def)
+        store[key] = nil
+        self.first = GardenLights.roll(def, true)
+        self.rolled = GardenLights.isRolled(def)
+        self.second = GardenLights.roll(def, true)
+        self.after = lightsAround(def)
+        for squareKey, light in pairs(self.after) do
+            if not self.before[squareKey] then
+                T.track(self, light)
             end
-        end)
+        end
     end,
     validate = function(self)
         local count = RenewableEnergy.GardenLights.COUNT
@@ -773,6 +763,7 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
         local GardenLights = RenewableEnergy.GardenLights
         local p = player()
         local homeX, homeY, homeZ = p:getX(), p:getY(), p:getZ()
+        self.start = { x = homeX, y = homeY, z = homeZ }
         self.places = {
             { 6680, 5320, "rich" }, { 5370, 5945, "poor" }, { 7340, 5993, "ordinary" }, { 10835, 10144, "ordinary" },
         }
@@ -808,6 +799,7 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
                 end
             else
                 self.homeLoaded = loadedAround(math.floor(homeX), math.floor(homeY), homeZ, HOME_RADIUS)
+                self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
                 self.done = self.homeLoaded or frames >= VISIT_FRAMES
             end
         end)
@@ -825,13 +817,16 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
             end
         end
         expect(self.homeLoaded, "the start never loaded again")
+        local home, start = self.home or {}, self.start
+        expect(home.z == start.z and math.abs(home.x - start.x) <= 1 and math.abs(home.y - start.y) <= 1,
+            string.format("the character ended at %s,%s,%s, not back at the start", tostring(home.x), tostring(home.y),
+                tostring(home.z)))
     end,
 })
 
 -- At 0 the Garden Lights option leaves every house without lights.
 test("renewable_energy_world_garden_lights_option_zero", {
     sandbox = { GardenLights = 0 },
-    run = waitForHouseNearCharacter,
     validate = function()
         local def = houseNearCharacter()
         if expect(def ~= nil, "no house near the character") then
@@ -878,9 +873,42 @@ end
 -- The squares an arrow board takes north and south of its centre.
 local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
--- A spawned arrow board's battery box holds its panels' modules, the first weathered and the
--- second weathered or cracked, deep cycle batteries at a part charge, and a charge controller;
--- and the trailer turns up among junkyard, traffic jam and tradesmen's vehicles.
+-- What each panel part shows: the ids of its part models in the vehicle's model list. Read by
+-- reflection (debug only), since nothing exposes the list to Lua.
+local function fieldValue(object, name)
+    for i = 0, getNumClassFields(object) - 1 do
+        local field = getClassField(object, i)
+        if tostring(field):match("%." .. name .. "$") then
+            return getClassFieldVal(object, field)
+        end
+    end
+    return nil
+end
+
+local function shownModels(vehicle, partId)
+    local part, shown = vehicle:getPartById(partId), {}
+    local models = fieldValue(vehicle, "models")
+    for i = 0, models:size() - 1 do
+        local info = models:get(i)
+        if fieldValue(info, "part") == part then
+            table.insert(shown, fieldValue(info, "scriptModel"):getId())
+        end
+    end
+    table.sort(shown)
+    return table.concat(shown, ",")
+end
+
+local LEFT, RIGHT = "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight"
+
+local function panelCondition(vehicle, partId)
+    local part = vehicle:getPartById(partId)
+    return part and part:getInventoryItem() and part:getCondition()
+end
+
+-- A spawned arrow board has a module on each panel, the first weathered and the second weathered
+-- or cracked, each showing the model its condition calls for; its battery box holds no modules,
+-- deep cycle batteries at a part charge, and a charge controller; and the trailer turns up among
+-- junkyard, traffic jam and tradesmen's vehicles.
 test("renewable_energy_world_arrow_board_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -891,24 +919,64 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
         self.trailer = T.need(self, trailer and trailer:getId() ~= -1 and T.track(self, trailer), "room to spawn the arrow board")
     end,
     validate = function(self)
-        local ArrowBoard, WorldSpawns = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns
+        local ArrowBoard = RenewableEnergy.ArrowBoard
         for _, zone in ipairs({ "junkyard", "trafficjamn", "trafficjams", "trades" }) do
             expect(VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] ~= nil, "no arrow boards in " .. zone)
         end
+        local left, right = panelCondition(self.trailer, LEFT), panelCondition(self.trailer, RIGHT)
+        expect(left and left >= 60 and left <= 100, "its left panel's module is at " .. tostring(left))
+        expect(right and (right >= 20 and right <= 50 or right >= 60 and right <= 100),
+            "its right panel's module is at " .. tostring(right))
+        expect(shownModels(self.trailer, LEFT) == "Whole", "its weathered left panel shows " .. shownModels(self.trailer, LEFT))
+        local rightModel = right and right < 60 and "Cracked" or "Whole"
+        expect(shownModels(self.trailer, RIGHT) == rightModel, "its right panel at " .. tostring(right) .. " shows "
+            .. shownModels(self.trailer, RIGHT))
         local part = self.trailer:getPartById(ArrowBoard.BATTERY_BOX)
         local container = part and part:getItemContainer()
         if not expect(container ~= nil, "the arrow board has no battery box") then
             return
         end
-        local conditions = moduleConditions(container)
-        expect(#conditions == ArrowBoard.STOCK.modules, #conditions .. " modules in the battery box")
-        expect(conditions[1] == nil or inRange(conditions[1], WorldSpawns.WEATHERED), "its first module is at " .. tostring(conditions[1]))
-        expect(conditions[2] == nil or isSiteCondition(conditions[2]), "its second module is at " .. tostring(conditions[2]))
+        expect(#moduleConditions(container) == 0, #moduleConditions(container) .. " modules in the battery box")
         local count, charges = countBatteries(container)
-        expect(inRange(count, ArrowBoard.STOCK.batteries), count .. " batteries in the battery box")
-        expect(container:getCountType(ArrowBoard.STOCK.battery) == count, "the battery box holds other batteries")
+        expect(count >= 4 and count <= 6, count .. " batteries in the battery box")
+        expect(container:getCountType("RenewableEnergy.DeepCycleBattery") == count, "the battery box holds other batteries")
         expectFoundCharges(charges, "the battery box")
-        expect(container:getCountType(RenewableEnergy.Specs.controller) == 1, "the battery box has no charge controller")
+        expect(container:getCountType("RenewableEnergy.ChargeController") == 1, "the battery box has no charge controller")
+    end,
+})
+
+-- A trailer from a save made before its panels were parts loads with them empty, and they get
+-- their modules on that first load, once: panels taken off later stay off.
+test("renewable_energy_world_arrow_board_old_trailer_gets_panels_once", {
+    sandbox = { LRMSolarPanels = 1 },
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+    end,
+    validate = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local function load()
+            for _, id in ipairs({ LEFT, RIGHT }) do
+                ArrowBoard.initPanel(self.trailer, self.trailer:getPartById(id))
+            end
+        end
+        local function empty()
+            for _, id in ipairs({ LEFT, RIGHT }) do
+                self.trailer:getPartById(id):setInventoryItem(nil)
+            end
+        end
+        empty()
+        self.trailer:getModData().RenewableEnergy_panelsStocked = nil
+        load()
+        local left, right = panelCondition(self.trailer, LEFT), panelCondition(self.trailer, RIGHT)
+        expect(left and left >= 60, "the old trailer's left panel loaded with " .. tostring(left))
+        expect(right ~= nil, "the old trailer's right panel loaded empty")
+        empty()
+        load()
+        expect(panelCondition(self.trailer, LEFT) == nil and panelCondition(self.trailer, RIGHT) == nil,
+            "panels taken off came back on the next load")
+        expect(shownModels(self.trailer, LEFT) == "" and shownModels(self.trailer, RIGHT) == "",
+            "empty panels show " .. shownModels(self.trailer, LEFT) .. " and " .. shownModels(self.trailer, RIGHT))
     end,
 })
 
@@ -948,6 +1016,21 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
     end,
 })
 
+-- Puts a module of `fullType` at `condition` on the panel, or takes it off when `fullType` is nil,
+-- as the mechanics window's install does, and shows it.
+local function putPanel(vehicle, partId, fullType, condition)
+    local part = vehicle:getPartById(partId)
+    local item = fullType and instanceItem(fullType)
+    part:setInventoryItem(item or nil)
+    if item then
+        part:setCondition(condition)
+    end
+    RenewableEnergy.ArrowBoard.showPanel(part)
+    return part
+end
+
+local HOMEMADE = "RenewableEnergy.HomemadeSolarModule"
+
 -- Its two 50 W panels charge the batteries in its box, the emptiest first: all of a pass goes to
 -- the emptier battery while it has room, and once batteries fill, the rest goes unstored.
 test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
@@ -958,6 +1041,8 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
     end,
     validate = function(self)
         local ArrowBoard = RenewableEnergy.ArrowBoard
+        putPanel(self.trailer, LEFT, MODULE, 100)
+        putPanel(self.trailer, RIGHT, MODULE, 100)
         local box = self.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
         box:removeAllItems()
         local deepCycle = box:AddItem("RenewableEnergy.DeepCycleBattery")
@@ -982,6 +1067,191 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
             "the batteries aren't full: " .. l16:getCurrentUsesFloat() .. ", " .. deepCycle:getCurrentUsesFloat())
     end,
 })
+
+-- Each installed panel makes its module's 50 W rating times its condition / 100: a whole module
+-- and a half-cracked one make 75 W, a homemade module at 60 makes 30 W, and with no panels the
+-- trailer stores nothing.
+test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
+    hour = 12,
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+    end,
+    validate = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local box = self.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
+        box:removeAllItems()
+        box:AddItem("RenewableEnergy.L16Battery"):setCurrentUsesFloat(0)
+        local flatWh = RenewableEnergy.Sun.panelWatts(1, "flat")
+        if not expect(flatWh > 0, "no sun at noon") then return end
+        putPanel(self.trailer, LEFT, MODULE, 100)
+        putPanel(self.trailer, RIGHT, MODULE, 50)
+        expectNear("watts of a whole and a half-cracked panel", ArrowBoard.panelWatts(self.trailer), 75)
+        expectNear("watt-hours they store in an hour", ArrowBoard.charge(self.trailer, 1), 75 * flatWh, 0.001)
+        putPanel(self.trailer, RIGHT, nil)
+        expectNear("watts of the whole panel alone", ArrowBoard.panelWatts(self.trailer), 50)
+        putPanel(self.trailer, LEFT, HOMEMADE, 60)
+        expectNear("watts of a homemade module at 60", ArrowBoard.panelWatts(self.trailer), 30)
+        putPanel(self.trailer, LEFT, nil)
+        expectNear("watts with no panels", ArrowBoard.panelWatts(self.trailer), 0)
+        expectNear("watt-hours stored with no panels", ArrowBoard.charge(self.trailer, 1), 0)
+    end,
+})
+
+-- Taking a cracked panel off in the mechanics way gives the module at the panel's condition and
+-- leaves no panel showing; putting another module on shows it, whole or cracked by its condition.
+test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
+    instant = true,
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+        if not self.trailer then return end
+        local p = player()
+        T.setPerk(self, Perks.Mechanics, 2)
+        local part = putPanel(self.trailer, LEFT, MODULE, 35)
+        self.crackedShown = shownModels(self.trailer, LEFT)
+        p:setPrimaryHandItem(p:getInventory():AddItem("Base.Wrench"))
+        ISTimedActionQueue.add(ISUninstallVehiclePart:new(p, part, 200))
+        T.step(function()
+            self.removed = p:getInventory():getFirstTypeRecurse(MODULE)
+            self.emptyShown = shownModels(self.trailer, LEFT)
+            self.whole = p:getInventory():AddItem(MODULE)
+            self.whole:setCondition(90)
+            -- Queued here, the install runs after this step, before validate.
+            ISTimedActionQueue.add(ISInstallVehiclePart:new(p, part, self.whole, 200))
+        end)
+    end,
+    validate = function(self)
+        self.wholeShown = shownModels(self.trailer, LEFT)
+        self.wholeCondition = panelCondition(self.trailer, LEFT)
+        expect(self.crackedShown == "Cracked", "a panel at 35 shows " .. self.crackedShown)
+        expect(self.removed ~= nil and self.removed:getCondition() == 35,
+            "the panel came off as " .. (self.removed and self.removed:getCondition() .. "%" or "nothing"))
+        expect(self.emptyShown == "", "the empty panel shows " .. self.emptyShown)
+        expect(self.wholeCondition == 90, "the module went on at " .. tostring(self.wholeCondition))
+        expect(self.wholeShown == "Whole", "a panel at 90 shows " .. self.wholeShown)
+    end,
+})
+
+-- A crack, from a storm or a crash, takes 30 from a panel's module, as a storm takes from a module
+-- on a mount, and shows it cracked; a storm cracks a trailer's panels as it would flat panels.
+test("renewable_energy_world_arrow_board_panels_crack", {
+    sandbox = { StormDamage = true, StormDamageRate = 1000 },
+    run = function(self)
+        local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+        self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+    end,
+    validate = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local part = putPanel(self.trailer, LEFT, MODULE, 80)
+        ArrowBoard.crackPanel(self.trailer, part)
+        expect(panelCondition(self.trailer, LEFT) == 50, "a crack left the panel at " .. tostring(panelCondition(self.trailer, LEFT)))
+        expect(shownModels(self.trailer, LEFT) == "Cracked", "the cracked panel shows " .. shownModels(self.trailer, LEFT))
+        putPanel(self.trailer, LEFT, MODULE, 100)
+        putPanel(self.trailer, RIGHT, MODULE, 100)
+        -- A thousand hours at ten times the rate makes a crack all but certain.
+        expect(ArrowBoard.stormCrack(self.trailer, 1000) == 2, "a long storm didn't crack both panels")
+        expect(panelCondition(self.trailer, LEFT) == 70 and panelCondition(self.trailer, RIGHT) == 70,
+            "the storm left the panels at " .. tostring(panelCondition(self.trailer, LEFT)) .. " and "
+            .. tostring(panelCondition(self.trailer, RIGHT)))
+        T.setSandbox(self, "StormDamage", false)
+        expect(ArrowBoard.stormCrack(self.trailer, 1000) == 0, "a storm cracked panels with storm damage off")
+    end,
+})
+
+-- A push each frame, small enough that a frame adds only a few km/h, and the speeds a crash's jolt
+-- and a bump's stop pushing at. The game applies a push for the frame's length of physics time
+-- (BaseVehicle.applyAccumulatedImpulsesFromHitObjectsToPhysics), so one push gives a different
+-- speed at each frame rate; pushing up to a measured speed doesn't. Even at 60 frames a second
+-- the crash's push takes well under the watcher's quarter second.
+local PUSH, CRASH_KMH, BUMP_KMH = 1000, 35, 6
+
+-- Watching the trailer's velocity, the game cracks its panels when it is jolted as hard as a crash
+-- and leaves them be after a bump.
+local function crashTest(name, targetKmh, expected)
+    test(name, {
+        run = function(self)
+            local square = T.need(self, openStrip(7, 7), "open ground for the arrow board")
+            self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+            if not self.trailer then return end
+            local trailer = self.trailer
+            trailer:repair()
+            trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX):getItemContainer():removeAllItems()
+            putPanel(trailer, LEFT, MODULE, 90)
+            putPanel(trailer, RIGHT, MODULE, 90)
+            self.peak = 0
+            T.waitUntil(function()
+                return getCell():getVehicles():contains(trailer) and trailer:isAtRest()
+            end, 3000)
+            T.waitUntil(function()
+                local speed = math.abs(trailer:getCurrentSpeedKmHour())
+                if not self.pushed then
+                    if speed >= targetKmh then
+                        self.pushed = true
+                    else
+                        trailer:applyImpulseGeneric(trailer:getX(), trailer:getY(), trailer:getZ(), 0, -1, 0, PUSH)
+                    end
+                end
+                self.peak = math.max(self.peak, speed)
+                return panelCondition(trailer, LEFT) ~= 90 or self.pushed and trailer:isAtRest()
+            end, 6000)
+        end,
+        validate = function(self)
+            expect(panelCondition(self.trailer, LEFT) == expected and panelCondition(self.trailer, RIGHT) == expected,
+                string.format("a jolt to %.1f km/h left the panels at %s and %s", self.peak,
+                    tostring(panelCondition(self.trailer, LEFT)), tostring(panelCondition(self.trailer, RIGHT))))
+        end,
+    })
+end
+crashTest("renewable_energy_world_arrow_board_crash_cracks_panels", CRASH_KMH, 60)
+crashTest("renewable_energy_world_arrow_board_bump_leaves_panels", BUMP_KMH, 90)
+
+-- Repair Cracked Panel takes Repair Cracked Module's screwdriver (kept), glass pane, epoxy and
+-- electric wire, needs its Electricity 3 and gives its 15 XP, and adds 30 to the panel's module up
+-- to the factory module's 80.
+local function repairTest(name, from, to)
+    test(name, {
+        instant = true,
+        run = function(self)
+            local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+            self.trailer = square and T.vehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square })
+            if not self.trailer then return end
+            local p, inventory = player(), player():getInventory()
+            T.setPerk(self, Perks.Electricity, 3)
+            putPanel(self.trailer, LEFT, MODULE, from)
+            self.screwdriver = inventory:AddItem("Base.Screwdriver")
+            inventory:AddItem("Base.GlassPanel")
+            self.epoxy = inventory:AddItem("Base.Epoxy")
+            self.epoxyUses = self.epoxy:getCurrentUses()
+            inventory:AddItem("Base.ElectricWire")
+            self.xp = p:getXp():getXP(Perks.Electricity)
+            ISTimedActionQueue.add(RenewableEnergyAction:new(p, RenewableEnergyAction.REPAIR_PANEL, nil, nil, self.trailer,
+                nil, nil, LEFT))
+            T.step(function()
+                self.gainedXp = p:getXp():getXP(Perks.Electricity) - self.xp
+                -- What the game gives this character for an award of 15, the recipe's xpAward,
+                -- through the call CraftRecipe.addXP makes in single player.
+                local before = p:getXp():getXP(Perks.Electricity)
+                p:getXp():AddXP(Perks.Electricity, 15, true, true, false, false)
+                self.awardXp = p:getXp():getXP(Perks.Electricity) - before
+            end)
+        end,
+        validate = function(self)
+            local inventory = player():getInventory()
+            expect(panelCondition(self.trailer, LEFT) == to,
+                "the repair took the panel from " .. from .. " to " .. tostring(panelCondition(self.trailer, LEFT)))
+            expect(inventory:contains(self.screwdriver), "the repair used up the screwdriver")
+            expect(inventory:getCountTypeRecurse("Base.GlassPanel") == 0, "the repair left the glass pane")
+            expect(inventory:getCountTypeRecurse("Base.ElectricWire") == 0, "the repair left the wire")
+            local epoxyLeft = inventory:contains(self.epoxy) and self.epoxy:getCurrentUses() or 0
+            expect(epoxyLeft == self.epoxyUses - 1, "the epoxy went from " .. self.epoxyUses .. " uses to " .. epoxyLeft)
+            expect(self.gainedXp > 0, "the repair gave no Electricity XP")
+            expectNear("Electricity XP from the repair", self.gainedXp, self.awardXp, 0.01)
+        end,
+    })
+end
+repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 35, 65)
+repairTest("renewable_energy_world_arrow_board_repair_stops_at_80", 55, 80)
 
 local TOWING_CAR = "Base.OffRoad"
 -- How far ahead of the car, and behind the trailer, the strip they stand on runs, in squares:
@@ -1040,6 +1310,8 @@ test("renewable_energy_world_arrow_board_towed_by_car", {
         end, VEHICLE_FRAMES)
         T.step(function()
             local p = player()
+            -- As a player hitches: tow points within a square and the pair parallel.
+            T.lineUpTrailer(car, trailer, "N")
             car:addPointConstraint(p, trailer, "trailer", "trailer")
             -- Out of the car's way; the runner puts the character back.
             p:teleportTo(x + 3.5, y + 2.5, z)

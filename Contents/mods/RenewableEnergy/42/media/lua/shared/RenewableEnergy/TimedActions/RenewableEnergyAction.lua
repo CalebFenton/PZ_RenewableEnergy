@@ -1,6 +1,7 @@
 require "TimedActions/ISBaseTimedAction"
 require "Util/BuildingHelper"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 
 -- Every hands-on job at a battery bank, a panel or a vehicle. In multiplayer the client runs
@@ -25,9 +26,10 @@ Action.WIRE_IN = "WireIn"
 Action.UNWIRE = "Unwire"
 Action.REPAIR_PART = "RepairPart"
 Action.RENAME = "Rename"
+Action.REPAIR_PANEL = "RepairPanel"
 
--- Jobs on the bank's wiring, which need light to see the terminals by.
-local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true }
+-- Jobs on the bank's wiring or a cracked panel, which need light to see by.
+local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true }
 -- Jobs on a part already in the bank's container rather than in the character's inventory.
 local PART_IN_BANK = { [Action.UNWIRE] = true, [Action.REPAIR_PART] = true }
 
@@ -137,6 +139,11 @@ local CHECKS = {
     [Action.RENAME] = function(self)
         return isBank(self.bank) and type(self.bankName) == "string"
     end,
+    [Action.REPAIR_PANEL] = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        return ArrowBoard ~= nil and ArrowBoard.repairablePanel(self.vehicle, self.partId) ~= nil
+            and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
+    end,
 }
 
 function Action:canPerform()
@@ -221,6 +228,9 @@ function Action:getDuration()
     elseif self.mode == Action.REPAIR_PART then
         -- As vanilla's ISFixGenerator.
         return 150 - level * 3
+    elseif self.mode == Action.REPAIR_PANEL then
+        -- As the crafting window times Repair Cracked Module (ISHandcraftAction).
+        return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5
     end
     return MINUTES[self.mode] * Action.unitsPerMinute()
 end
@@ -277,7 +287,7 @@ function Action:start()
     if self.mode == Action.CONNECT_SOURCE or self.mode == Action.ATTACH_MAINTAINER
         or self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE then
         self.sound = self.character:playSound("GeneratorConnect")
-    elseif self.mode == Action.REPAIR_PART then
+    elseif self.mode == Action.REPAIR_PART or self.mode == Action.REPAIR_PANEL then
         self.sound = self.character:playSound("GeneratorRepair")
     end
 end
@@ -309,6 +319,8 @@ function Action:complete()
         return RenewableEnergy.SolarMaintainer.attach(self.character, self.vehicle, self.item)
     elseif self.mode == Action.DETACH_MAINTAINER then
         return RenewableEnergy.SolarMaintainer.detach(self.character, self.vehicle)
+    elseif self.mode == Action.REPAIR_PANEL then
+        return RenewableEnergy.ArrowBoard.repairPanel(self.character, self.vehicle, self.partId)
     end
     local command, args = COMMANDS[self.mode](self)
     local ok = PowerBank.perform(self.character, command, args)
@@ -318,9 +330,9 @@ end
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
 -- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel, `bank`
 -- the bank's IsoGenerator, `item` the snow tool, the maintainer or the bank part, `bankName` the
--- bank's new name; unused ones are nil. The name can't be a field called `name`, which
--- NetTimedAction reads as the action's own name.
-function Action:new(character, mode, object, bank, vehicle, item, bankName)
+-- bank's new name, `partId` the vehicle part worked on; unused ones are nil. The name can't be a
+-- field called `name`, which NetTimedAction reads as the action's own name.
+function Action:new(character, mode, object, bank, vehicle, item, bankName, partId)
     local o = ISBaseTimedAction.new(self, character)
     o.mode = mode
     o.object = object
@@ -328,6 +340,7 @@ function Action:new(character, mode, object, bank, vehicle, item, bankName)
     o.vehicle = vehicle
     o.item = item
     o.bankName = bankName
+    o.partId = partId
     o.stopOnWalk = true
     o.stopOnRun = true
     o.maxTime = o:getDuration()

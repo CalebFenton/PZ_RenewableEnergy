@@ -22,17 +22,24 @@ FACING_TURN = {"S": 0, "E": 90, "N": 180, "W": -90}
 WALL_PANEL_HEIGHT = 1.1
 
 
-def _wall(material, facing):
-    """On the square's north edge facing south, or on its west edge facing east."""
+def _wall(material, facing, cracks=False):
+    """On the square's north edge facing south, or on its west edge facing east. `cracks` makes the
+    overlay of the cracks in its glass."""
     at = (0, 0.5, WALL_PANEL_HEIGHT) if facing == "S" else (-0.5, 0, WALL_PANEL_HEIGHT)
-    return [layer(items.solar_wall, material=material, at=at, turn=FACING_TURN[facing])]
-
-
-def _rack(material, facing, snow=False):
     turn = FACING_TURN[facing]
-    if snow:
+    if cracks:
+        return [layer(items.solar_wall, holdout=True, material=material, at=at, turn=turn),
+                layer(items.solar_wall, material=material, cracks=True, at=at, turn=turn)]
+    return [layer(items.solar_wall, material=material, at=at, turn=turn)]
+
+
+def _rack(material, facing, snow=False, cracks=None):
+    """`snow` makes the overlay of the snow on it, `cracks` (a module slot) that of the cracks in
+    one module's glass."""
+    turn = FACING_TURN[facing]
+    if snow or cracks:
         return [layer(items.solar_rack, holdout=True, material=material, turn=turn),
-                layer(items.solar_rack, material=material, snow=True, turn=turn)]
+                layer(items.solar_rack, material=material, snow=snow, cracks=cracks, turn=turn)]
     return [layer(items.solar_rack, material=material, turn=turn)]
 
 
@@ -52,6 +59,7 @@ TILES = {
     14: [layer(items.solar_garden_light, stake=False)],
     15: [layer(items.solar_garden_light, stake=False, lit=True)],
     16: [layer(items.solar_flat, holdout=True), layer(items.solar_flat, snow=True)],
+    115: [layer(items.solar_flat, holdout=True), layer(items.solar_flat, cracks=True)],
 }
 for material, first_wall, first_rack, first_snow in (("metal", 1, 3, 17), ("wood", 21, 24, 28)):
     for offset, facing in enumerate("SE"):
@@ -59,6 +67,13 @@ for material, first_wall, first_rack, first_snow in (("metal", 1, 3, 17), ("wood
     for offset, facing in enumerate("SENW"):
         TILES[first_rack + offset] = _rack(material, facing)
         TILES[first_snow + offset] = _rack(material, facing, snow=True)
+# Cracked glass: a wall panel's per facing, and a rack's per facing and module slot, slot 1 first.
+for material, first_wall, first_rack in (("metal", 116, 120), ("wood", 118, 128)):
+    for offset, facing in enumerate("SE"):
+        TILES[first_wall + offset] = _wall(material, facing, cracks=True)
+    for offset, facing in enumerate("SENW"):
+        for slot in (1, 2):
+            TILES[first_rack + 2 * offset + slot - 1] = _rack(material, facing, cracks=slot)
 
 # Battery storage: the item type, its tile, its first battery overlay and its first meter
 # overlay. Overlay n of the batteries shows n of them, overlay n of the meter n LEDs lit.

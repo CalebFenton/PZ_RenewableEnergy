@@ -86,7 +86,8 @@ def tile_sheet():
         if layers[0]["holdout"]:
             base = next(i for i, other in tiles.TILES.items()
                         if len(other) == 1 and other[0]["build"] is layers[0]["build"]
-                        and other[0]["turn"] == layers[0]["turn"] and other[0]["at"] == layers[0]["at"])
+                        and other[0]["turn"] == layers[0]["turn"] and other[0]["at"] == layers[0]["at"]
+                        and other[0]["options"] == layers[0]["options"])
             over(cell, load(path % base), 0, 0)
         over(cell, load(path % index), 0, 0)
         cells.append(enlarge(cell, 2))
@@ -112,12 +113,23 @@ def model_sheet():
     scene.collection.objects.link(camera)
     scene.camera = camera
     cells = []
-    models = [("WorldItems", name) for name in items.ITEMS] + [("vehicles", name) for name in items.VEHICLES]
-    for folder, name in models:
-        bpy.ops.import_scene.fbx(filepath=os.path.join(MEDIA, "models_X/%s/RenewableEnergy_%s.fbx" % (folder, name)))
-        imported = list(bpy.context.selected_objects)
+    # A vehicle shows as its body with its part models, once whole and once with every cracked
+    # variant in place of the part it replaces.
+    models = [("WorldItems", name, name, [name]) for name in items.ITEMS]
+    for name, spec in items.VEHICLES.items():
+        whole = [s for s in spec["pieces"] if not s.endswith("Cracked")]
+        cracked = [s + "Cracked" if s + "Cracked" in spec["pieces"] else s for s in whole]
+        models.append(("vehicles", name, name, [name + s for s in [""] + whole]))
+        if cracked != whole:
+            models.append(("vehicles", name + "Cracked", name, [name + s for s in [""] + cracked]))
+    for folder, name, texture_name, files in models:
+        bpy.ops.object.select_all(action="DESELECT")
+        imported = []
+        for file in files:
+            bpy.ops.import_scene.fbx(filepath=os.path.join(MEDIA, "models_X/%s/RenewableEnergy_%s.fbx" % (folder, file)))
+            imported += list(bpy.context.selected_objects)
         texture_folder = "Vehicles" if folder == "vehicles" else folder
-        texture = bpy.data.images.load(os.path.join(MEDIA, "textures/%s/RenewableEnergy_%s.png" % (texture_folder, name)))
+        texture = bpy.data.images.load(os.path.join(MEDIA, "textures/%s/RenewableEnergy_%s.png" % (texture_folder, texture_name)))
         for obj in imported:
             for mat in obj.data.materials:
                 nodes = [n for n in mat.node_tree.nodes if n.type == "TEX_IMAGE"]

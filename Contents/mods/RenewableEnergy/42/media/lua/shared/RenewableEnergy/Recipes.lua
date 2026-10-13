@@ -114,13 +114,114 @@ function Recipes.isModuleBelowRepairCap(item, character)
     return cap == nil or item:getCondition() < cap
 end
 
+--- What Repair Cracked Module brings the module's condition to.
+function Recipes.repairedCondition(module)
+    return math.min(Recipes.MODULE_REPAIR_CAP[module:getFullType()], module:getCondition() + Recipes.MODULE_REPAIR)
+end
+
 function Recipes.repairModule(craftRecipeData, character)
     local module = firstInput(craftRecipeData, function(item)
         return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
     end)
-    local cap = Recipes.MODULE_REPAIR_CAP[module:getFullType()]
-    Wear.setCondition(module, math.min(cap, module:getCondition() + Recipes.MODULE_REPAIR))
+    Wear.setCondition(module, Recipes.repairedCondition(module))
     sendItemStats(module)
+end
+
+-- Repair Cracked Panel mends a module still on the arrow board trailer the way Repair Cracked
+-- Module mends one in hand. It reads the recipe's inputs, skill, time and XP from the recipe
+-- itself, so the two can't drift apart; the module input is the panel.
+Recipes.MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
+
+function Recipes.moduleRepairRecipe()
+    return getScriptManager():getCraftRecipe(Recipes.MODULE_REPAIR_RECIPE)
+end
+
+-- As CraftRecipeData.processKeepInputItem wears kept tools: the factor for each MayDegrade flag.
+local function wearOf(input)
+    if input:mayDegradeHeavy() then return 1 end
+    if input:mayDegrade() then return 2 end
+    if input:mayDegradeLight() then return 3 end
+    if input:mayDegradeVeryLight() then return 6 end
+    return nil
+end
+
+local function isModuleInput(input)
+    return input:containsItem(getScriptManager():getItem(Specs.factoryModule))
+end
+
+--- The inventory items, bags included, that pay for a Repair Cracked Panel: for each of the
+--- recipe's inputs but the module, { item, uses, keep, wear }, `uses` being the drainable uses it takes
+--- (nil for a whole item), and `wear` the factor a kept tool's MayDegrade flag gives damageCheck.
+--- Returns nil, and the first input nothing pays for, when one is missing.
+function Recipes.panelRepairInputs(character)
+    local inventory = character:getInventory()
+    local inputs = Recipes.moduleRepairRecipe():getInputs()
+    local picks, taken = {}, {}
+    for i = 0, inputs:size() - 1 do
+        local input = inputs:get(i)
+        if not isModuleInput(input) then
+            local needed = input:getIntAmount()
+            local candidates = inventory:getAllEvalRecurse(function(item)
+                return not taken[item] and not item:isBroken() and input:containsItem(item:getScriptItem())
+            end)
+            for j = 0, candidates:size() - 1 do
+                if needed <= 0 then break end
+                local item = candidates:get(j)
+                if instanceof(item, "DrainableComboItem") then
+                    -- A line such as [Base.Epoxy;2:Base.Glue] takes more uses of some items.
+                    local uses = math.ceil(needed * input:getRelativeScale(item:getFullType()))
+                    if item:getCurrentUses() >= uses then
+                        table.insert(picks, { item = item, uses = uses, keep = input:isKeep() })
+                        taken[item], needed = true, 0
+                    end
+                else
+                    table.insert(picks, { item = item, keep = input:isKeep(), wear = wearOf(input) })
+                    taken[item], needed = true, needed - 1
+                end
+            end
+            if needed > 0 then
+                return nil, input
+            end
+        end
+    end
+    return picks
+end
+
+--- Why the character can't do Repair Cracked Panel, as a translation key and its arguments,
+--- or nil when they can: the recipe unknown, the skill short, or an input missing.
+function Recipes.panelRepairRefusal(character)
+    local recipe = Recipes.moduleRepairRecipe()
+    if not character:isRecipeKnown(recipe) then
+        return "Tooltip_RenewableEnergy_NeedRecipe", { recipe:getTranslationName() }
+    end
+    for i = 0, recipe:getRequiredSkillCount() - 1 do
+        local skill = recipe:getRequiredSkill(i)
+        if character:getPerkLevel(skill:getPerk()) < skill:getLevel() then
+            return "Tooltip_RenewableEnergy_NeedSkill", { skill:getPerk():getName(), skill:getLevel() }
+        end
+    end
+    local picks, missing = Recipes.panelRepairInputs(character)
+    if not picks then
+        return "Tooltip_RenewableEnergy_NeedItem", { missing:getPossibleInputItems():get(0):getDisplayName() }
+    end
+    return nil
+end
+
+--- Uses up what Recipes.panelRepairInputs picked; tools are kept and may wear as the recipe's
+--- craft wears them. Authority only.
+function Recipes.useInputs(picks, character)
+    local recipe = Recipes.moduleRepairRecipe()
+    for _, pick in ipairs(picks) do
+        if pick.keep and pick.wear then
+            local skill = recipe:getHighestRelevantSkillLevel(character) + pick.item:getMaintenanceMod(character)
+            pick.item:damageCheck(skill, pick.wear, false)
+            pick.item:syncItemFields()
+        elseif not pick.keep then
+            for _ = 1, pick.uses or 1 do
+                pick.item:UseAndSync()
+            end
+        end
+    end
 end
 
 -- OnTest of Take Apart Shattered Module: a module that still makes power stays whole.

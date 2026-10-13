@@ -12,6 +12,45 @@ module Base
         scale = 1.0,
     }
 
+    /* Part models cut from the same bake as the body, in the body's frame, so they sit in place at
+       a part offset of zero and draw with the body's skin, mask, rust, damage and blood. The lid
+       keeps the Boot zone that shows its damage. */
+    model RenewableEnergyArrowBoardTrailerLid
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_Lid,
+        shader = vehicle_norandom_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+    model RenewableEnergyArrowBoardTrailerPanelLeft
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeft,
+        shader = vehicle_norandom_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+    model RenewableEnergyArrowBoardTrailerPanelLeftCracked
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeftCracked,
+        shader = vehicle_norandom_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+    model RenewableEnergyArrowBoardTrailerPanelRight
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRight,
+        shader = vehicle_norandom_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+    model RenewableEnergyArrowBoardTrailerPanelRightCracked
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRightCracked,
+        shader = vehicle_norandom_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+
     vehicle RenewableEnergyArrowBoardTrailer
     {
         neverSpawnKey = true,
@@ -114,6 +153,15 @@ module Base
         {
             xywh = -0.97 -0.31 0.8 0.86,
         }
+        /* Where a character stands to take a panel off or put one on: beside its half of the frame. */
+        area RenewableEnergyPanelLeft
+        {
+            xywh = 0.97 0.45 0.8 1.0,
+        }
+        area RenewableEnergyPanelRight
+        {
+            xywh = -0.97 0.45 0.8 1.0,
+        }
         template = Tire/part/TireFrontLeft,
         template = Tire/part/TireFrontRight,
         template = Suspension/part/SuspensionFrontLeft,
@@ -135,17 +183,97 @@ module Base
         }
         /* The battery box's lid. Vehicles.ContainerAccess.TruckBed opens a container only while
            the part named TrunkDoor is open, so the lid takes that name, and its lock is the box's
-           lock. It starts closed and unlocked. A lua block replaces the template's whole list. */
+           lock. It starts closed and unlocked. A lua block replaces the template's whole list. Its
+           model shows only while a lid is installed. */
         part TrunkDoor
         {
             area = RenewableEnergyBatteryBox,
             mechanicRequireKey = false,
+            model Default
+            {
+                file = RenewableEnergyArrowBoardTrailerLid,
+            }
             lua
             {
                 create = Vehicles.Create.TrunkDoorOpen,
                 init = Vehicles.Init.Door,
                 update = Vehicles.Update.TrunkDoor,
                 use = Vehicles.Use.TrunkDoor,
+            }
+        }
+        part RenewableEnergyPanelLeft
+        {
+            area = RenewableEnergyPanelLeft,
+            mechanicArea = Left,
+            model Whole
+            {
+                file = RenewableEnergyArrowBoardTrailerPanelLeft,
+            }
+            model Cracked
+            {
+                file = RenewableEnergyArrowBoardTrailerPanelLeftCracked,
+            }
+        }
+        part RenewableEnergyPanelRight
+        {
+            area = RenewableEnergyPanelRight,
+            mechanicArea = Right,
+            model Whole
+            {
+                file = RenewableEnergyArrowBoardTrailerPanelRight,
+            }
+            model Cracked
+            {
+                file = RenewableEnergyArrowBoardTrailerPanelRightCracked,
+            }
+        }
+        /* The two panels hold a Solar Module each; the part's condition is the module's. Lua shows
+           the Whole or the Cracked model by that condition (RenewableEnergy.ArrowBoard), so the
+           game mustn't show both whenever a module is installed. A pattern only reaches parts
+           already declared, so this comes after them. */
+        part RenewableEnergyPanel*
+        {
+            category = bodywork,
+            itemType = RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule,
+            setAllModelsVisible = false,
+            table install
+            {
+                items
+                {
+                    1
+                    {
+                        tags = base:wrench,
+                        count = 1,
+                        keep = true,
+                        equip = primary,
+                    }
+                }
+                time = 200,
+                skills = Mechanics:2,
+                test = Vehicles.InstallTest.Default,
+                complete = RenewableEnergy.ArrowBoard.panelChanged,
+            }
+            table uninstall
+            {
+                items
+                {
+                    1
+                    {
+                        tags = base:wrench,
+                        count = 1,
+                        keep = true,
+                        equip = primary,
+                    }
+                }
+                time = 200,
+                skills = Mechanics:2,
+                test = Vehicles.UninstallTest.Default,
+                complete = RenewableEnergy.ArrowBoard.panelChanged,
+            }
+            lua
+            {
+                create = RenewableEnergy.ArrowBoard.createPanel,
+                init = RenewableEnergy.ArrowBoard.initPanel,
             }
         }
         part RenewableEnergyBatteryBox

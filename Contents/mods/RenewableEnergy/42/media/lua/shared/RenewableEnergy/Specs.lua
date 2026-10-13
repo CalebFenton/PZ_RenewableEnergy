@@ -81,6 +81,10 @@ Specs.materials = {
 -- condition. Aimed at one cracked module every 2-3 months on ten flat panels: a fast-forwarded
 -- game year had 21 thunderstorms and about 150 hours of them at windMin or more.
 Specs.storm = { windMin = 45, chancePerHour = 0.0035, crack = 30 }
+-- A module below this condition shows a cracked cover glass, on a mount and on the arrow board
+-- trailer: every cracked module found in the world, and any storm crack on a module that wasn't
+-- far above it, while weathered finds and repaired modules (Repair Cracked Module's caps) show whole.
+Specs.crackedBelow = 60
 
 -- Banks by item type. sprite is the Sprites field of its placed tile; the rest is how many of
 -- each part can be wired in.
@@ -107,8 +111,6 @@ Specs.wiring = {
 -- Rated watts of the gadgets' cells.
 Specs.cellChargerWatts = 5
 Specs.maintainerWatts = 10
--- The arrow board trailer's two built-in panels, a module's rating each.
-Specs.arrowBoardWatts = 2 * Specs.modules["RenewableEnergy.SolarModule"].watts
 
 -- A solar garden light: its cell's rated watts, the watt-hours its battery holds, what its lamp
 -- draws at night, and the radius it lights.

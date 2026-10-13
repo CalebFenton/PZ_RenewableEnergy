@@ -2,7 +2,10 @@ require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
+require "RenewableEnergy/Recipes"
 require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/PowerBank/Wear"
+require "RenewableEnergy/PowerBank/Bank"
 require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
@@ -11,22 +14,33 @@ require "RenewableEnergy/World/WorldSpawns"
 -- works of SolarSites.lua. Its battery box is stocked the first time the trailer spawns, from
 -- Distributions' OnFillContainer. Its panels charge the batteries in the box in daylight, wherever
 -- it stands or is towed (GadgetCharging runs it).
+--
+-- Each panel is a vehicle part holding a Solar Module, whose condition is the part's: storms and
+-- hard crashes crack it, Repair Cracked Panel mends it on the trailer, and the mechanics window
+-- takes it off and puts any module on. The part shows its Whole or its Cracked model by that
+-- condition. Nothing in the game reports a part's condition changing, so every change this file
+-- makes shows it at once, and each charge pass shows every loaded trailer's panels again for the
+-- changes it didn't make (a failed uninstall, a debug tool).
 
 RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
 RenewableEnergy.ArrowBoard = ArrowBoard
 
+local Specs = RenewableEnergy.Specs
+
 -- Script name without its module, as VehicleDistributions and OnFillContainer name it.
 ArrowBoard.VEHICLE = "RenewableEnergyArrowBoardTrailer"
 ArrowBoard.SCRIPT = "Base." .. ArrowBoard.VEHICLE
 ArrowBoard.BATTERY_BOX = "RenewableEnergyBatteryBox"
+-- The panel parts, left then right.
+ArrowBoard.PANELS = { "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight" }
 
 -- Its spawn weight among each vehicle zone's vehicles (VehicleZoneDistribution spawnChance).
 -- The four traffic jam zones share one vehicle table. About 5 a map, with the road works.
 ArrowBoard.ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4, trades = 2 }
 
--- What its battery box holds: the panels' modules, the second often cracked; deep cycle
--- batteries, charged by Distributions.chargeFoundBatteries; a charge controller.
+-- What it comes with: modules on its panels, the second often cracked; in its battery box deep
+-- cycle batteries, charged by Distributions.chargeFoundBatteries, and a charge controller.
 ArrowBoard.STOCK = {
     modules = 2,
     secondCrackedChance = 0.6,
@@ -34,6 +48,18 @@ ArrowBoard.STOCK = {
     battery = "RenewableEnergy.DeepCycleBattery",
     controllerChance = 1,
 }
+
+-- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` milliseconds of real
+-- time. A car stopping dead against a wall from that speed does it; braking hard sheds about 3 km/h
+-- in that time and running over a zombie or a kerb a few, so minor bumps never crack a panel.
+-- `quietMs` keeps one crash, which the physics spreads over several frames, from counting twice.
+ArrowBoard.CRASH = { kmh = 20, ms = 250, quietMs = 1000 }
+
+-- Vehicle modData: its panels have been put on, at spawn or, for a trailer from a save made
+-- before they were parts, on its first load since.
+local PANELS_STOCKED = "RenewableEnergy_panelsStocked"
+-- The client command a driver sends when the trailer they tow crashes.
+local COMMAND_MODULE, CRASH_COMMAND = "RenewableEnergyArrowBoard", "crashed"
 
 for zone, weight in pairs(ArrowBoard.ZONE_WEIGHTS) do
     VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] = { index = -1, spawnChance = weight }
@@ -44,6 +70,10 @@ VehicleDistributions[1][ArrowBoard.VEHICLE] = {
     Normal = { [ArrowBoard.BATTERY_BOX] = { rolls = 0, items = {} } },
 }
 
+function ArrowBoard.isTrailer(vehicle)
+    return vehicle ~= nil and vehicle:getScriptName() == ArrowBoard.SCRIPT
+end
+
 --- Stocks the battery box of a freshly spawned arrow board, scaled by the loot rarity options.
 --- Authority only.
 ---@param container ItemContainer
@@ -51,16 +81,12 @@ function ArrowBoard.stockBatteryBox(container)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local options = SandboxVars.RenewableEnergy
     local stock = ArrowBoard.STOCK
-    for i = 1, WorldSpawns.scaled(stock.modules, options.LRMSolarPanels) do
-        local cracked = i == 2 and ZombRandFloat(0, 1) < stock.secondCrackedChance
-        WorldSpawns.addModule(container, cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
-    end
     local batteries = WorldSpawns.rollBetween(stock.batteries)
     for _ = 1, WorldSpawns.scaled(batteries, options.LRMBatteries) do
         container:AddItem(stock.battery)
     end
     if ZombRandFloat(0, 1) < stock.controllerChance * options.LRMMisc then
-        container:AddItem(RenewableEnergy.Specs.controller)
+        container:AddItem(Specs.controller)
     end
 end
 
@@ -73,10 +99,287 @@ function ArrowBoard.stockIfBatteryBox(roomName, container)
 end
 
 --- Spawns an arrow board on the square, its tongue pointing `facing` ("N", "E", "S" or "W").
---- Its battery box is stocked as it enters the world. Authority only.
+--- Its panels go on and its battery box is stocked as it enters the world. Authority only.
 ---@return BaseVehicle?
 function ArrowBoard.spawn(square, facing)
-    return addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
+    local vehicle = addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections[facing], nil, square)
+    if vehicle then
+        ArrowBoard.restockPanels(vehicle)
+    end
+    return vehicle
+end
+
+-- Panels ---------------------------------------------------------------------------------------
+
+function ArrowBoard.isPanel(part)
+    local id = part and part:getId()
+    return id == ArrowBoard.PANELS[1] or id == ArrowBoard.PANELS[2]
+end
+
+--- Whether a module at this condition has a cracked cover glass.
+function ArrowBoard.isCracked(condition)
+    return condition < Specs.crackedBelow
+end
+
+--- Shows the panel's Whole or Cracked model by its module's condition, or neither without one.
+--- Showing a model that already shows costs nothing, so callers needn't know what changed. On
+--- the server the game sends the models to every client (VehiclePartModels).
+function ArrowBoard.showPanel(part)
+    local installed = part:getInventoryItem() ~= nil
+    local cracked = installed and ArrowBoard.isCracked(part:getCondition())
+    part:setModelVisible("Whole", installed and not cracked)
+    part:setModelVisible("Cracked", cracked)
+end
+
+function ArrowBoard.showPanels(vehicle)
+    for _, id in ipairs(ArrowBoard.PANELS) do
+        local part = vehicle:getPartById(id)
+        if part then
+            ArrowBoard.showPanel(part)
+        end
+    end
+end
+
+-- Puts modules on its panels as the box once held them: the first weathered, the second weathered
+-- or cracked, as many as the panel rarity option gives. Once per trailer. Authority only.
+local function stockPanels(vehicle)
+    local modData = vehicle:getModData()
+    if modData[PANELS_STOCKED] then
+        return
+    end
+    modData[PANELS_STOCKED] = true
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local stock = ArrowBoard.STOCK
+    local count = WorldSpawns.scaled(stock.modules, SandboxVars.RenewableEnergy.LRMSolarPanels)
+    for i, id in ipairs(ArrowBoard.PANELS) do
+        local part = vehicle:getPartById(id)
+        if part and i <= count and not part:getInventoryItem() then
+            local cracked = i == 2 and ZombRandFloat(0, 1) < stock.secondCrackedChance
+            local item = instanceItem(Specs.factoryModule)
+            RenewableEnergy.Wear.setCondition(item, cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
+            part:setInventoryItem(item)
+            vehicle:transmitPartItem(part)
+        end
+    end
+end
+
+--- Puts fresh stock modules on its panels. addVehicleDebug sets every part's condition after the
+--- parts were made (BaseVehicle.setGeneralPartCondition), over the panels' stock ones, so what it
+--- spawns gets its panels again. Authority only.
+function ArrowBoard.restockPanels(vehicle)
+    for _, id in ipairs(ArrowBoard.PANELS) do
+        local part = vehicle:getPartById(id)
+        if part and part:getInventoryItem() then
+            part:setInventoryItem(nil)
+        end
+    end
+    vehicle:getModData()[PANELS_STOCKED] = nil
+    stockPanels(vehicle)
+    ArrowBoard.showPanels(vehicle)
+end
+
+--- Part `create` of the panels: runs once for each when the trailer first enters the world.
+function ArrowBoard.createPanel(vehicle, part)
+    if not isClient() then
+        stockPanels(vehicle)
+    end
+end
+
+--- Part `init` of the panels: runs on every side each time the trailer loads.
+function ArrowBoard.initPanel(vehicle, part)
+    if not isClient() then
+        stockPanels(vehicle)
+    end
+    ArrowBoard.showPanel(part)
+    ArrowBoard.track(vehicle)
+end
+
+--- Install and uninstall `complete` of the panels, on the authority.
+function ArrowBoard.panelChanged(vehicle, part)
+    ArrowBoard.showPanel(part)
+end
+
+-- Sets a panel's condition, which is its module's, everywhere, and shows it. Authority only.
+local function setPanelCondition(vehicle, part, condition)
+    part:setCondition(condition)
+    vehicle:transmitPartCondition(part)
+    ArrowBoard.showPanel(part)
+end
+
+--- Cracks the panel's module as a storm cracks a module: by Specs.storm.crack. Authority only.
+function ArrowBoard.crackPanel(vehicle, part)
+    setPanelCondition(vehicle, part, math.max(0, part:getCondition() - Specs.storm.crack))
+end
+
+-- The installed panels.
+local function installedPanels(vehicle)
+    local panels = {}
+    for _, id in ipairs(ArrowBoard.PANELS) do
+        local part = vehicle:getPartById(id)
+        if part and part:getInventoryItem() then
+            table.insert(panels, part)
+        end
+    end
+    return panels
+end
+
+--- A thunderstorm may crack each panel as it would a flat panel's module (Bank.stormCrack), over
+--- `stormHours` of storm. Authority only. Returns how many cracked.
+function ArrowBoard.stormCrack(vehicle, stormHours)
+    local cracked = 0
+    for _, part in ipairs(installedPanels(vehicle)) do
+        local source = { kind = "flat", modules = { { condition = part:getCondition() } } }
+        if RenewableEnergy.Bank.stormCrack(source, stormHours) then
+            setPanelCondition(vehicle, part, source.modules[1].condition)
+            cracked = cracked + 1
+        end
+    end
+    return cracked
+end
+
+--- A hard crash cracks every panel with any glass left. Authority only.
+function ArrowBoard.crashCrack(vehicle)
+    for _, part in ipairs(installedPanels(vehicle)) do
+        if part:getCondition() > 0 then
+            ArrowBoard.crackPanel(vehicle, part)
+        end
+    end
+end
+
+-- Crashes --------------------------------------------------------------------------------------
+--
+-- A crash reaches a towed trailer only as damage to vanilla's part ids (BaseVehicle.crash and
+-- addDamageFront/Rear), which the panels aren't, and the trailer's own crash durability isn't
+-- readable from Lua. So the side running the trailer's physics watches its velocity: single player
+-- every loaded trailer, a multiplayer client the trailer behind the car it drives, which then asks
+-- the server to crack the panels, as vanilla's own crash command does.
+
+-- Loaded trailers by vehicle: their recent velocities, { ms, x, y } oldest first, and the time
+-- of their last crash.
+local tracked = {}
+
+function ArrowBoard.track(vehicle)
+    if not tracked[vehicle] and not isServer() then
+        tracked[vehicle] = { samples = {}, crashedAt = -math.huge }
+    end
+end
+
+-- Whether this game runs the trailer's physics: single player, or the client whose player drives
+-- the car towing it.
+local function runsPhysics(vehicle)
+    if not isClient() then
+        return true
+    end
+    local tow = vehicle:getVehicleTowedBy()
+    local driver = tow and tow:getDriver()
+    return driver ~= nil and instanceof(driver, "IsoPlayer") and driver:isLocalPlayer()
+end
+
+local velocity = Vector3f.new()
+
+--- Records the trailer's velocity now and returns whether it changed by a crash's worth within
+--- ArrowBoard.CRASH.ms.
+function ArrowBoard.sampleCrash(vehicle, entry, now)
+    vehicle:getLinearVelocity(velocity)
+    local x, y = velocity:x(), velocity:z()
+    local samples = entry.samples
+    while samples[1] and now - samples[1].ms > ArrowBoard.CRASH.ms do
+        table.remove(samples, 1)
+    end
+    local limit = ArrowBoard.CRASH.kmh / 3.6
+    local crashed = false
+    for _, sample in ipairs(samples) do
+        if (x - sample.x) ^ 2 + (y - sample.y) ^ 2 >= limit * limit then
+            crashed = true
+        end
+    end
+    table.insert(samples, { ms = now, x = x, y = y })
+    if crashed and now - entry.crashedAt >= ArrowBoard.CRASH.quietMs then
+        entry.crashedAt = now
+        return true
+    end
+    return false
+end
+
+local cell
+function ArrowBoard.watchCrashes()
+    local now = getTimestampMs()
+    cell = cell or getCell()
+    for vehicle, entry in pairs(tracked) do
+        if not cell:getVehicles():contains(vehicle) then
+            -- Left the cell or the world; a vehicle joins the cell a frame after it spawns, so one
+            -- not yet in it waits.
+            if vehicle:isRemovedFromWorld() then
+                tracked[vehicle] = nil
+            end
+        elseif runsPhysics(vehicle) and ArrowBoard.sampleCrash(vehicle, entry, now) then
+            if isClient() then
+                sendClientCommand(getPlayer(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId() })
+            else
+                ArrowBoard.crashCrack(vehicle)
+            end
+        end
+    end
+end
+
+-- The server takes a crash only from the driver of the car towing the trailer.
+local function onClientCommand(module, command, player, args)
+    if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number" then
+        return
+    end
+    local vehicle = getVehicleById(args.vehicle)
+    local tow = ArrowBoard.isTrailer(vehicle) and vehicle:getVehicleTowedBy()
+    if tow and tow:isDriver(player) then
+        ArrowBoard.crashCrack(vehicle)
+    end
+end
+
+if not isServer() then
+    Events.OnTick.Add(ArrowBoard.watchCrashes)
+end
+if not isClient() then
+    Events.OnClientCommand.Add(onClientCommand)
+end
+
+-- Repair on the trailer ------------------------------------------------------------------------
+
+--- The trailer's panel `partId` if it holds a module that Repair Cracked Panel can mend, else nil.
+function ArrowBoard.repairablePanel(vehicle, partId)
+    local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
+    local item = part and ArrowBoard.isPanel(part) and part:getInventoryItem()
+    if item and ArrowBoard.isCracked(part:getCondition()) and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
+        return part
+    end
+    return nil
+end
+
+--- Repair Cracked Panel: Repair Cracked Module's inputs, skill, XP and effect on a module still
+--- on the trailer. Authority only; returns whether it repaired.
+function ArrowBoard.repairPanel(character, vehicle, partId)
+    local Recipes = RenewableEnergy.Recipes
+    local part = ArrowBoard.repairablePanel(vehicle, partId)
+    local inputs = part and Recipes.panelRepairRefusal(character) == nil and Recipes.panelRepairInputs(character)
+    if not inputs then
+        return false
+    end
+    Recipes.useInputs(inputs, character)
+    local item = part:getInventoryItem()
+    setPanelCondition(vehicle, part, Recipes.repairedCondition(item))
+    Recipes.moduleRepairRecipe():addXP(character)
+    return true
+end
+
+-- Charging -------------------------------------------------------------------------------------
+
+--- The watts its panels would make in full sun: each installed module's rating times its
+--- condition / 100, as a module on a mount makes.
+function ArrowBoard.panelWatts(vehicle)
+    local watts = 0
+    for _, part in ipairs(installedPanels(vehicle)) do
+        local module = Specs.modules[part:getInventoryItem():getFullType()]
+        watts = watts + (module and module.watts or 0) * part:getCondition() / 100
+    end
+    return watts
 end
 
 -- The battery in the box with the lowest charge that isn't full, or nil.
@@ -99,7 +402,7 @@ end
 --- any way, and make nothing under a roof. Authority only. Returns the watt-hours stored.
 ---@param vehicle BaseVehicle
 function ArrowBoard.charge(vehicle, hours)
-    if vehicle:getScriptName() ~= ArrowBoard.SCRIPT then
+    if not ArrowBoard.isTrailer(vehicle) then
         return 0
     end
     local square = vehicle:getSquare()
@@ -109,7 +412,7 @@ function ArrowBoard.charge(vehicle, hours)
         return 0
     end
     local Battery = RenewableEnergy.Battery
-    local wh = RenewableEnergy.Sun.panelWatts(RenewableEnergy.Specs.arrowBoardWatts, "flat") * hours
+    local wh = RenewableEnergy.Sun.panelWatts(ArrowBoard.panelWatts(vehicle), "flat") * hours
     local stored = 0
     local battery = wh > 0 and emptiestBattery(container)
     while battery do
@@ -126,6 +429,17 @@ function ArrowBoard.charge(vehicle, hours)
         battery = wh > 0 and emptiestBattery(container)
     end
     return stored
+end
+
+--- The charge pass for one loaded vehicle: if it is an arrow board, storms may crack its panels,
+--- its panels show what they hold, and they charge its box. Authority only.
+function ArrowBoard.update(vehicle, hours)
+    if not ArrowBoard.isTrailer(vehicle) then
+        return 0
+    end
+    ArrowBoard.stormCrack(vehicle, RenewableEnergy.Bank.stormHours(hours))
+    ArrowBoard.showPanels(vehicle)
+    return ArrowBoard.charge(vehicle, hours)
 end
 
 return ArrowBoard

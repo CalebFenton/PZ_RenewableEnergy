@@ -185,16 +185,16 @@
     {
       "name": "model_RenewableEnergy_SolarModule",
       "box": [
-        67,
+        66,
         133,
-        447,
+        446,
         230
       ]
     },
     {
       "name": "model_RenewableEnergy_HomemadeSolarModule",
       "box": [
-        61,
+        60,
         137,
         452,
         233
@@ -205,51 +205,51 @@
       "box": [
         33,
         33,
-        127,
-        76
+        128,
+        75
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarFlat",
       "box": [
-        67,
+        66,
         133,
-        447,
-        234
+        446,
+        235
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarWallWood",
       "box": [
-        54,
+        53,
         142,
         459,
-        286
+        287
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarWallMetal",
       "box": [
-        67,
+        66,
         133,
-        447,
+        446,
         260
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarRackWood",
       "box": [
-        50,
+        49,
         111,
-        333,
+        332,
         427
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarRackMetal",
       "box": [
-        50,
-        111,
+        49,
+        112,
         332,
         430
       ]
@@ -257,10 +257,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBoxWood",
       "box": [
-        106,
-        106,
+        105,
+        105,
         364,
-        406
+        407
       ]
     },
     {
@@ -268,7 +268,7 @@
       "box": [
         105,
         105,
-        360,
+        361,
         407
       ]
     },
@@ -284,7 +284,7 @@
     {
       "name": "model_RenewableEnergy_BatteryRackMetal",
       "box": [
-        68,
+        67,
         107,
         373,
         405
@@ -293,7 +293,7 @@
     {
       "name": "model_RenewableEnergy_BatteryBankWood",
       "box": [
-        58,
+        57,
         25,
         321,
         404
@@ -302,10 +302,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        58,
-        22,
+        57,
+        23,
         321,
-        398
+        399
       ]
     },
     {
@@ -313,8 +313,8 @@
       "box": [
         48,
         48,
-        186,
-        94
+        185,
+        93
       ]
     },
     {
@@ -322,8 +322,8 @@
       "box": [
         57,
         57,
-        220,
-        138
+        221,
+        137
       ]
     },
     {
@@ -340,8 +340,8 @@
       "box": [
         36,
         36,
-        139,
-        100
+        138,
+        101
       ]
     },
     {
@@ -356,100 +356,100 @@
     {
       "name": "model_RenewableEnergy_DeepCycleBattery",
       "box": [
-        62,
-        62,
-        238,
-        222
+        46,
+        46,
+        178,
+        167
       ]
     },
     {
       "name": "model_RenewableEnergy_L16Battery",
       "box": [
-        87,
-        87,
-        289,
-        335
+        66,
+        66,
+        216,
+        254
       ]
     },
     {
       "name": "model_RenewableEnergy_CarBatteryCase",
       "box": [
-        49,
-        49,
-        190,
-        188
+        37,
+        37,
+        143,
+        144
       ]
     },
     {
       "name": "model_RenewableEnergy_DeepCycleBatteryCase",
       "box": [
-        61,
-        61,
-        234,
-        215
+        46,
+        46,
+        178,
+        162
       ]
     },
     {
       "name": "model_RenewableEnergy_L16BatteryCase",
       "box": [
-        88,
-        88,
-        290,
-        338
+        66,
+        66,
+        216,
+        254
       ]
     },
     {
       "name": "model_RenewableEnergy_WornBatteryPlates",
       "box": [
-        31,
-        31,
-        102,
-        121
+        23,
+        23,
+        77,
+        90
       ]
     },
     {
       "name": "model_RenewableEnergy_BatteryPlates",
       "box": [
-        32,
-        32,
-        103,
-        124
+        23,
+        23,
+        77,
+        90
       ]
     },
     {
       "name": "model_RenewableEnergy_WoodenBatteryPlatePattern",
       "box": [
-        24,
-        24,
-        94,
-        69
+        19,
+        19,
+        73,
+        53
       ]
     },
     {
       "name": "model_RenewableEnergy_BatteryPlateMoldUnfired",
       "box": [
-        36,
-        36,
-        138,
-        116
+        27,
+        27,
+        104,
+        86
       ]
     },
     {
       "name": "model_RenewableEnergy_BatteryPlateMold",
       "box": [
-        36,
-        36,
-        138,
-        116
+        27,
+        27,
+        105,
+        87
       ]
     },
     {
       "name": "model_RenewableEnergy_BatteryElectrolyte",
       "box": [
-        45,
-        45,
-        90,
-        174
+        46,
+        46,
+        91,
+        176
       ]
     },
     {
@@ -458,7 +458,7 @@
         93,
         93,
         359,
-        235
+        236
       ]
     },
     {
@@ -466,17 +466,17 @@
       "box": [
         35,
         35,
-        134,
+        135,
         79
       ]
     },
     {
       "name": "model_RenewableEnergy_SolarGardenLight",
       "box": [
-        101,
-        101,
-        390,
-        174
+        102,
+        102,
+        392,
+        176
       ]
     },
     {
@@ -485,7 +485,7 @@
         39,
         39,
         151,
-        114
+        115
       ]
     },
     {
@@ -494,7 +494,7 @@
         39,
         39,
         151,
-        114
+        115
       ]
     },
     {
@@ -502,8 +502,8 @@
       "box": [
         43,
         43,
-        120,
-        167
+        121,
+        166
       ]
     }
   ],

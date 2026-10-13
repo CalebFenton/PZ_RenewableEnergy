@@ -25,7 +25,7 @@ function GadgetCharging.chargeVehicles(hours)
     while vehicles:hasNext() do
         local vehicle = vehicles:next()
         RenewableEnergy.SolarMaintainer.charge(vehicle, hours)
-        RenewableEnergy.ArrowBoard.charge(vehicle, hours)
+        RenewableEnergy.ArrowBoard.update(vehicle, hours)
     end
 end
 

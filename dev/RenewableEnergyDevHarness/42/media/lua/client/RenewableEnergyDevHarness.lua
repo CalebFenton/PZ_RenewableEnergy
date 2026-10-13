@@ -96,7 +96,15 @@ local function runTests(onDone)
     local passed, failed, index, ticks = 0, 0, 0, 0
     local startedMs = getTimestampMs()
     local doneMs = startedMs
-    local current, player, square, wasCheat
+    -- Where the current test started, as numbers: the square object itself goes back to the pool
+    -- when a test takes the character far enough for its chunk to unload, and comes back as some
+    -- other square (IsoGridSquare.discard, getNew), so teleporting to its coordinates then lands
+    -- somewhere else entirely.
+    local current, player, start, wasCheat
+    local function atStart()
+        local here = player:getCurrentSquare()
+        return here ~= nil and here:getX() == start.x and here:getY() == start.y and here:getZ() == start.z
+    end
     local function onTick()
         ticks = ticks + 1
         if current then
@@ -111,9 +119,8 @@ local function runTests(onDone)
             current = nil
             doneMs = getTimestampMs()
             ISBuildMenu.cheat = wasCheat
-            if square and player:getCurrentSquare() ~= square then
-                player:teleportTo(square:getX() + 0.5, square:getY() + 0.5, square:getZ())
-                player:setCurrent(square)
+            if not atStart() then
+                player:teleportTo(start.x + 0.5, start.y + 0.5, start.z)
             end
             return
         end
@@ -133,7 +140,8 @@ local function runTests(onDone)
         end
         current = tests[name]
         print("TEST: " .. name)
-        square = player:getCurrentSquare()
+        local here = player:getCurrentSquare()
+        start = { x = here:getX(), y = here:getY(), z = here:getZ() }
         player:getBodyDamage():RestoreToFullHealth()
         player:getInventory():removeAllItems()
         player:clearWornItems()
@@ -371,9 +379,17 @@ if mode == "test" or mode == "promo" then
     getPerformance():setFramerateUncapped(true)
 end
 
+-- Battery Bank Spawn's "None". At its default a room seen for the first time now and then gets a
+-- stocked bank (WorldSpawns' OnSeeNewRoom), and one near the start puts a bank in reach of the
+-- panels and banks the tests build. The spawn tests place their banks with WorldSpawns.placeBank.
+local NO_ROOM_BANKS = 1
+
 local originalOnStart = scenario.onStart
 scenario.onStart = function()
     originalOnStart()
+    if mode == "test" then
+        SandboxVars.RenewableEnergy.BatteryBankSpawn = NO_ROOM_BANKS
+    end
     local run = RUNS[mode] or RUNS.test
     afterSettling(function() run(selection, stay) end)
 end

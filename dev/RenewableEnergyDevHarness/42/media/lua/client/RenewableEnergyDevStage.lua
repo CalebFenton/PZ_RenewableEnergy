@@ -1,3 +1,4 @@
+require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 -- Development only. What the --art and --promo captures share: finding a place near the
 -- character, clearing its trees, the steps that walk the character to a shot and frame it, and
 -- the arrow board trailer hitched to a car.
@@ -206,29 +207,11 @@ function Stage.spawnTrailer(square, facing)
     return pair
 end
 
--- Turns both of `pair` square to its facing and moves the trailer so its coupler sits on the car's
--- tow bar. addVehicleDebug skews each vehicle's heading at random, and a hitch left to pull the
--- trailer in from where it spawned yanks it hard enough to jackknife it.
-local function lineUpTrailer(pair)
-    local car, trailer = pair.car, pair.trailer
-    -- The rotation addVehicleDebug gives a heading, before its random skew.
-    local yaw = ((IsoDirections[pair.facing]:toAngle() + math.pi) * 180 / math.pi) % 360
-    car:setAngles(0, yaw, 0)
-    trailer:setAngles(0, yaw, 0)
-    local towing = car:getTowingWorldPos("trailer", Vector3f.new())
-    local towed = trailer:getTowedByWorldPos("trailer", Vector3f.new())
-    local transform = trailer:getWorldTransform(Transform.new())
-    local origin = transform:getOrigin()
-    -- The transform's x and z are the world's x and y.
-    origin:set(origin:x() + towing:x() - towed:x(), origin:y(), origin:z() + towing:y() - towed:y())
-    trailer:setWorldTransform(transform)
-end
-
 --- Lines up and hitches the trailer of Stage.spawnTrailer's `pair`, opens its battery box and puts
 --- a battery in it, and logs under `mark` whether both worked.
 function Stage.hitchTrailer(pair, player, mark)
     local car, trailer = pair.car, pair.trailer
-    lineUpTrailer(pair)
+    RenewableEnergyTest.lineUpTrailer(car, trailer, pair.facing)
     car:addPointConstraint(player, trailer, "trailer", "trailer")
     local lid = trailer:getPartById("TrunkDoor")
     local box = trailer:getPartById("RenewableEnergyBatteryBox")

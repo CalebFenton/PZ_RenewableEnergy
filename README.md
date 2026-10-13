@@ -187,7 +187,7 @@ Wall panels and racks come in wood or metal, and both make the same power. The d
 
 ### Storms, cracks and repairs
 
-A thunderstorm with a strong wind can crack a module, taking 30 points off its condition. Wall panels never crack, metal mounts hold up better than flat panels, and wooden mounts crack twice as often. At the default setting, ten flat panels get about one cracked module every two or three months.
+A thunderstorm with a strong wind can crack a module, taking 30 points off its condition. Wall panels never crack, metal mounts hold up better than flat panels, and wooden mounts crack twice as often. At the default setting, ten flat panels get about one cracked module every two or three months. A module below 60% shows its cracked glass wherever it's mounted, so you can spot the ones that need fixing from across the yard.
 
 A module makes power in proportion to its condition, so a cracked one at 40% makes 20 W. **Repair Cracked Module** (Electrical 3) takes a glass pane, epoxy or two glue, and a piece of wire, and gives back 30 points, up to 80%. You can make glass panes yourself once you've learned glassmaking.
 
@@ -381,7 +381,9 @@ Solar arrow boards are the orange trailers road crews park at work zones, with a
 
 <p align="center"><img src="art/promo/images/trailer.png" alt="The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a white car on a road by traffic cones" width="100%"></p>
 
-Besides the road works, they turn up in junkyards, in highway pileups and parked with tradesmen's vans. The battery box on the tongue holds two spare modules, often one of them cracked, 4 to 6 deep cycle batteries and a charge controller. Strip it where it stands or hitch it to a car and tow it home. Its own two panels are built in and lie flat, so wherever it stands in the open they charge whatever car, deep cycle or L-16 batteries are in the box, the emptiest first. On a clear day at the default multiplier that's about 230 W at noon and 2 kWh a day in July, a deep cycle battery and a half, and 0.6 kWh a day in December. It shows dents on its battery box lid, rust and blood the way cars do, and its tail lamps light up when the car towing it brakes.
+Besides the road works, they turn up in junkyards, in highway pileups and parked with tradesmen's vans. Each comes with a module on both panels, the second one often cracked, and the battery box on the tongue holds 4 to 6 deep cycle batteries and a charge controller. Strip it where it stands or hitch it to a car and tow it home. The panels lie flat, so wherever it stands in the open they charge whatever car, deep cycle or L-16 batteries are in the box, the emptiest first, each making its module's watts times its condition like any other panel. With two whole modules on a clear day at the default multiplier that's about 230 W at noon and 2 kWh a day in July, a deep cycle battery and a half, and 0.6 kWh a day in December.
+
+The panels come off. Take one off or put any solar module on in the mechanics window with a wrench (Mechanics 2), and a cracked panel comes off as a cracked module. Storms crack them as they crack flat panels, and so does a hard crash (a change of speed of 20 km/h or more in an instant: running into a wall, not a kerb or a zombie). A cracked panel shows its broken glass. Right-click the trailer and choose **Repair Cracked Panel** to fix it in place, with the same tools, skill and parts as **Repair Cracked Module**. It shows dents on its battery box lid, which you can take off too, rust and blood the way cars do, and its tail lamps light up when the car towing it brakes.
 
 ### Stash houses
 

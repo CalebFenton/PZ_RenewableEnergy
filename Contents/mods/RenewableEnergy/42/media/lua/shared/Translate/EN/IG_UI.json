@@ -9,6 +9,8 @@
     "IGUI_ContainerTitle_RenewableEnergyCellCharger": "Solar Battery Charger",
     "IGUI_VehicleNameRenewableEnergyArrowBoardTrailer": "Solar Arrow Board Trailer",
     "IGUI_VehiclePartRenewableEnergyBatteryBox": "Battery Box",
+    "IGUI_VehiclePartRenewableEnergyPanelLeft": "Left Solar Panel",
+    "IGUI_VehiclePartRenewableEnergyPanelRight": "Right Solar Panel",
     "IGUI_RenewableEnergy_StatusTitle": "Battery Bank",
     "IGUI_RenewableEnergy_Waiting": "Waiting for the bank's status...",
     "IGUI_RenewableEnergy_NameThisBank": "Name this battery bank:",

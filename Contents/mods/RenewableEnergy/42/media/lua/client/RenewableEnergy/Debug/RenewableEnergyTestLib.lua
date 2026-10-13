@@ -443,6 +443,25 @@ function T.vehicle(self, script, opts)
     return nil
 end
 
+--- Turns `car` and `trailer` square to `facing` ("N", "E", "S" or "W") and moves the trailer so its
+--- coupler sits on the car's tow bar, as a player lines them up to hitch: vanilla hitches a trailer
+--- only with the two points within a square and the vehicles near parallel
+--- (BaseVehicle.canAttachTrailer). addVehicleDebug skews each heading by up to about 11 degrees at
+--- random, and a hitch left to pull a trailer in from farther off can fail to or jackknife it.
+function T.lineUpTrailer(car, trailer, facing)
+    -- The rotation addVehicleDebug gives a heading, before its random skew.
+    local yaw = ((IsoDirections[facing]:toAngle() + math.pi) * 180 / math.pi) % 360
+    car:setAngles(0, yaw, 0)
+    trailer:setAngles(0, yaw, 0)
+    local towing = car:getTowingWorldPos("trailer", Vector3f.new())
+    local towed = trailer:getTowedByWorldPos("trailer", Vector3f.new())
+    local transform = trailer:getWorldTransform(Transform.new())
+    local origin = transform:getOrigin()
+    -- The transform's x and z are the world's x and y.
+    origin:set(origin:x() + towing:x() - towed:x(), origin:y(), origin:z() + towing:y() - towed:y())
+    trailer:setWorldTransform(transform)
+end
+
 -- Banks ----------------------------------------------------------------------------------------
 
 --- A bank pass's context with the weather fixed: `light` W/m² on every mount, clear, 25 °C, no

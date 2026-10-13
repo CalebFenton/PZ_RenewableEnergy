@@ -4,7 +4,10 @@
 -- item icons and ground models, and tools/make_tiles.py gives each placed tile its properties.
 -- Lua names tiles only through this file, so a new layout changes nothing else.
 
+require "RenewableEnergy/Specs"
+
 RenewableEnergy = RenewableEnergy or {}
+local Specs = RenewableEnergy.Specs
 
 local Sprites = {}
 RenewableEnergy.Sprites = Sprites
@@ -60,6 +63,20 @@ Sprites.snow = {
     },
 }
 
+-- A cracked module's glass, drawn over its mount's tile. A rack has one per module slot, slot 1
+-- the lower module, so it shows only the modules that are cracked.
+Sprites.cracks = {
+    flat = tile(115),
+    wall = {
+        wood = { S = tile(118), E = tile(119) },
+        metal = { S = tile(116), E = tile(117) },
+    },
+    rack = {
+        wood = { S = tiles(128, 2), E = tiles(130, 2), N = tiles(132, 2), W = tiles(134, 2) },
+        metal = { S = tiles(120, 2), E = tiles(122, 2), N = tiles(124, 2), W = tiles(126, 2) },
+    },
+}
+
 -- Each bank tile's overlays: `batteries[n]` shows n batteries in it, `meter[level]` its charge
 -- meter lit from 1 (empty) to 5 (full).
 Sprites.bankFill = {
@@ -104,6 +121,30 @@ addOverlays({ Sprites.snow.flat })
 for _, facings in pairs(Sprites.snow.rack) do
     addOverlays(facings)
 end
+-- Snow lies on the glass, so it is drawn over the cracks.
+local SNOW, CRACKS = {}, {}
+SNOW[Sprites.snow.flat] = true
+for _, facings in pairs(Sprites.snow.rack) do
+    for _, name in pairs(facings) do
+        SNOW[name] = true
+    end
+end
+CRACKS[Sprites.cracks.flat] = true
+for _, facings in pairs(Sprites.cracks.wall) do
+    for _, name in pairs(facings) do
+        CRACKS[name] = true
+    end
+end
+for _, facings in pairs(Sprites.cracks.rack) do
+    for _, slots in pairs(facings) do
+        for _, name in ipairs(slots) do
+            CRACKS[name] = true
+        end
+    end
+end
+for name in pairs(CRACKS) do
+    OVERLAYS[name] = true
+end
 for _, fill in pairs(Sprites.bankFill) do
     addOverlays(fill.batteries)
     addOverlays(fill.meter)
@@ -125,6 +166,46 @@ end
 --- Whether a sprite is one of the overlays above, which are never placed on their own.
 function Sprites.isOverlay(spriteName)
     return spriteName ~= nil and OVERLAYS[spriteName] == true
+end
+
+--- Whether a sprite is a crack overlay of Sprites.cracks.
+function Sprites.isCrack(spriteName)
+    return spriteName ~= nil and CRACKS[spriteName] == true
+end
+
+--- Whether a sprite is a snow overlay of Sprites.snow.
+function Sprites.isSnow(spriteName)
+    return spriteName ~= nil and SNOW[spriteName] == true
+end
+
+-- A mount's crack overlays by module slot.
+local function crackSlots(kind, facing, material)
+    if kind == "flat" then
+        return { Sprites.cracks.flat }
+    end
+    local mount = Sprites.cracks[kind] and Sprites.cracks[kind][material]
+    local slots = mount and mount[facing]
+    if type(slots) == "string" then
+        return { slots }
+    end
+    return slots or {}
+end
+
+--- The crack overlays a mount's tile shows: one for each module below Specs.crackedBelow, by slot.
+---@param kind string "flat", "wall" or "rack" (see kindOf)
+---@param facing string? the mount's facing, for walls and racks
+---@param material string? "wood" or "metal", for walls and racks
+---@param modules table[] the mount's { type, condition } modules in slot order
+---@return string[]
+function Sprites.crackOverlays(kind, facing, material, modules)
+    local shown = {}
+    for slot, name in ipairs(crackSlots(kind, facing, material)) do
+        local module = modules[slot]
+        if module and module.condition < Specs.crackedBelow then
+            table.insert(shown, name)
+        end
+    end
+    return shown
 end
 
 --- The meter level, 1 to 5, that shows a charge fraction.

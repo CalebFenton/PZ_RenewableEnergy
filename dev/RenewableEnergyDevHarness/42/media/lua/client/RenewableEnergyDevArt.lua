@@ -15,10 +15,17 @@
 --     art_trailer_blood_right.png   blood on the right side only, which settles which side is which
 --     art_trailer_blood.png     blood on all four sides
 --     art_trailer_brake.png     the brake lights, lit while the towing car brakes
+--     art_trailer_panel_cracked.png   its right panel's module cracked, the left one whole
+--     art_trailer_panel_removed.png   its left panel taken off
 --   art_trailer_front.png   a second trailer, alone and facing the other way, blood on all four
 --                     sides, for the front and left side; the same view then shows it clean with
 --     art_trailer_damage1.png   the battery box lid (TrunkDoor) at damage stage 1, then
 --     art_trailer_damage2.png   at stage 2
+--     art_trailer_lid_removed.png   the battery box lid taken off
+--   art_cracked.png   cracked glass on a flat panel, wooden and metal wall panels and racks (one
+--                     module of each rack cracked), placed the way players place them, so the
+--                     mod's own code adds the overlays, and east of them an arrow board trailer
+--                     with its left panel cracked and its right one whole, to compare the look
 
 require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
@@ -135,10 +142,25 @@ local HITCHED_STATES = {
             pair.car:setStoplightsOn(true)
         end,
     },
+    {
+        name = "art_trailer_panel_cracked",
+        set = function(pair)
+            pair.trailer:getPartById("RenewableEnergyPanelRight"):setCondition(30)
+            RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
+        end,
+    },
+    {
+        name = "art_trailer_panel_removed",
+        set = function(pair)
+            pair.trailer:getPartById("RenewableEnergyPanelLeft"):setInventoryItem(nil)
+            RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
+        end,
+    },
 }
 local LONE_STATES = {
     { name = "art_trailer_damage1", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setCondition(LID_STAGE_1) end },
     { name = "art_trailer_damage2", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setCondition(LID_STAGE_2) end },
+    { name = "art_trailer_lid_removed", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setInventoryItem(nil) end },
 }
 
 -- `pair` returns the current pair, which the steps only know once they run.
@@ -146,6 +168,8 @@ local function addStates(steps, pair, states)
     for _, state in ipairs(states) do
         table.insert(steps, function()
             pair().trailer:repair()
+            -- repair() mends the panels without anything showing their models again.
+            RenewableEnergy.ArrowBoard.showPanels(pair().trailer)
             if pair().car then
                 pair().car:setStoplightsOn(false)
             end
@@ -340,6 +364,63 @@ local function addShot(steps, player, lot, shot)
     end)
 end
 
+-- Cracked mounts, by lot square, and their modules' conditions in slot order. Each rack has one
+-- cracked module, the wooden one its lower and the metal one its upper.
+local CRACKED_WALLS = {
+    { x = 1, y = 1, sprite = WALL_NORTH }, { x = 2, y = 1, sprite = WALL_NORTH },
+    { x = 0, y = 2, sprite = WALL_WEST }, { x = 0, y = 3, sprite = WALL_WEST },
+}
+local CRACKED_PANELS = {
+    { x = 1, y = 1, sprite = Sprites.wall.metal.S, conditions = { 40 } },
+    { x = 2, y = 1, sprite = Sprites.wall.wood.S, conditions = { 40 } },
+    { x = 0, y = 2, sprite = Sprites.wall.metal.E, conditions = { 40 } },
+    { x = 0, y = 3, sprite = Sprites.wall.wood.E, conditions = { 40 } },
+    { x = 2, y = 3, sprite = Sprites.flat, conditions = { 30 } },
+    { x = 1, y = 5, sprite = Sprites.rack.wood.S, conditions = { 30, 100 } },
+    { x = 3, y = 5, sprite = Sprites.rack.metal.S, conditions = { 100, 45 } },
+}
+-- Lot squares x 5 to 8, y 1 to 3 stay open, east of the mounts, for a trailer with a cracked panel.
+-- The character stands south-east of the mounts and south-west of the open ground, hiding neither.
+local CRACKED_SHOT = { name = "art_cracked", x = 7, y = 7, zoomSteps = 2 }
+
+-- The lot's north-west square while the cracked stage stands, else nil.
+local crackedLot
+
+--- The north-west square of the art_cracked stage's lot while it stands, else nil. The mounts
+--- stand at x 0 to 3, y 1 to 5 from it; x 5 to 8, y 1 to 3 is open ground.
+function Art.crackedOrigin()
+    return crackedLot and lotSquare(crackedLot, 0, 0)
+end
+
+local function addCrackedShot(steps, player, lot)
+    table.insert(steps, function()
+        clearLot(lot)
+        clearVehicles(lot)
+        placeTiles(lot, CRACKED_WALLS)
+        for _, panel in ipairs(CRACKED_PANELS) do
+            local modules = {}
+            for slot, condition in ipairs(panel.conditions) do
+                modules[slot] = { type = "RenewableEnergy.SolarModule", condition = condition }
+            end
+            RenewableEnergy.WorldSpawns.placePanel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
+        end
+        recalcLot(lot)
+        crackedLot = lot
+        return 30
+    end)
+    -- A trailer beside them with one panel cracked as theirs are and one whole, to compare the look.
+    table.insert(steps, function()
+        -- Row 4 keeps all of it on the cleared lot.
+        local trailer = addVehicleDebug(RenewableEnergy.ArrowBoard.SCRIPT, IsoDirections.N, 0, lotSquare(lot, 6, 4))
+        trailer:repair()
+        trailer:getPartById("RenewableEnergyPanelLeft"):setCondition(30)
+        trailer:getPartById("RenewableEnergyPanelRight"):setCondition(100)
+        RenewableEnergy.ArrowBoard.showPanels(trailer)
+        return 30
+    end)
+    addShot(steps, player, lot, CRACKED_SHOT)
+end
+
 function Art.capture(onDone)
     local player = getPlayer()
     local lot = findLot(player)
@@ -412,6 +493,7 @@ function Art.capture(onDone)
     end)
     addShot(steps, player, lot, SHOTS.trailerFront)
     addStates(steps, currentPair, LONE_STATES)
+    addCrackedShot(steps, player, lot)
     Stage.runSteps(steps, onDone, "REArt")
 end
 

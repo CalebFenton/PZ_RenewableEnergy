@@ -21,7 +21,7 @@ local MATERIALS = { wood = "Wood", metal = "Metal" }
 local PLACED = RenewableEnergyTest.PLACED_TILES
 
 local function overlays()
-    local all = { Sprites.crateOverlays.full, Sprites.crateOverlays.closed, Sprites.snow.flat }
+    local all = { Sprites.crateOverlays.full, Sprites.crateOverlays.closed, Sprites.snow.flat, Sprites.cracks.flat }
     local function add(list)
         for _, name in pairs(list) do
             table.insert(all, name)
@@ -29,6 +29,14 @@ local function overlays()
     end
     for _, facings in pairs(Sprites.snow.rack) do
         add(facings)
+    end
+    for _, facings in pairs(Sprites.cracks.wall) do
+        add(facings)
+    end
+    for _, facings in pairs(Sprites.cracks.rack) do
+        for _, slots in pairs(facings) do
+            add(slots)
+        end
     end
     for _, fill in pairs(Sprites.bankFill) do
         add(fill.batteries)
@@ -246,5 +254,93 @@ test("renewable_energy_tiles_pick_up_keeps_mod_data", {
             expect(r.placed == r.expected, "placed " .. r.what .. " holds " .. r.placed .. ", expected " .. r.expected)
             expect(r.pickedUp == r.expected, "picked-up " .. r.what .. " holds " .. r.pickedUp .. ", expected " .. r.expected)
         end
+    end,
+})
+
+-- The overlays attached to an object, in drawing order, as one string.
+local function attachedNames(object)
+    local names = {}
+    local attached = object and object:getAttachedAnimSprite()
+    for i = 0, (attached and attached:size() or 0) - 1 do
+        table.insert(names, attached:get(i):getName())
+    end
+    return table.concat(names, ",")
+end
+
+local function modulesAt(...)
+    local modules = {}
+    for i, condition in ipairs({ ... }) do
+        modules[i] = { type = "RenewableEnergy.SolarModule", condition = condition }
+    end
+    return modules
+end
+
+-- A module below Specs.crackedBelow (60) shows cracked glass on the mount placed with it, a rack
+-- only over the cracked module's slot; one at 60 shows whole. Repairing the module takes the
+-- cracks off, and snow already lying on a panel stays drawn over cracks added under it.
+test("renewable_energy_tiles_cracked_modules_show", {
+    run = function(self)
+        local squares = T.need(self, T.squares(self, 6, { bare = true }), "six free outdoor squares")
+        if not squares then return end
+        local PowerBank = RenewableEnergy.PowerBank
+        local function place(i, item, sprite, modules)
+            return T.placeMoveable(self, squares[i], item, sprite, { [PowerBank.MODULES] = modules })
+        end
+        local flat59 = place(1, "RenewableEnergy.SolarFlat", Sprites.flat, modulesAt(59))
+        local flat60 = place(2, "RenewableEnergy.SolarFlat", Sprites.flat, modulesAt(60))
+        local rackUpper = place(3, "RenewableEnergy.SolarRackMetal", Sprites.rack.metal.W, modulesAt(100, 59))
+        local rackBoth = place(4, "RenewableEnergy.SolarRackWood", Sprites.rack.wood.E, modulesAt(0, 59))
+        self.flat59 = attachedNames(flat59)
+        self.flat60 = attachedNames(flat60)
+        self.rackUpper = attachedNames(rackUpper)
+        self.rackBoth = attachedNames(rackBoth)
+        -- A wall panel needs a wall to be placed against, so this one is a bare tile.
+        local wall = T.tile(self, squares[5], Sprites.wall.wood.E, { [PowerBank.MODULES] = modulesAt(59) })
+        PowerBank.showCracks(wall)
+        self.wall = attachedNames(wall)
+        if flat59 then
+            flat59:getModData()[PowerBank.MODULES] = modulesAt(85)
+            PowerBank.showCracks(flat59)
+            self.repaired = attachedNames(flat59)
+        end
+        local snowed = T.tile(self, squares[6], Sprites.flat, { [PowerBank.MODULES] = modulesAt(30) })
+        snowed:addAttachedAnimSpriteByName(Sprites.snow.flat)
+        PowerBank.showCracks(snowed)
+        self.snowed = attachedNames(snowed)
+    end,
+    validate = function(self)
+        expect(self.flat59 == "renewable_energy_01_115", "a flat panel at 59 shows '" .. tostring(self.flat59) .. "'")
+        expect(self.flat60 == "", "a flat panel at 60 shows '" .. tostring(self.flat60) .. "'")
+        expect(self.rackUpper == "renewable_energy_01_127",
+            "a metal rack facing west with its upper module at 59 shows '" .. tostring(self.rackUpper) .. "'")
+        expect(self.rackBoth == "renewable_energy_01_130,renewable_energy_01_131",
+            "a wooden rack facing east with both modules cracked shows '" .. tostring(self.rackBoth) .. "'")
+        expect(self.wall == "renewable_energy_01_119", "a wooden wall panel facing east at 59 shows '" .. tostring(self.wall) .. "'")
+        expect(self.repaired == "", "a flat panel repaired to 85 shows '" .. tostring(self.repaired) .. "'")
+        expect(self.snowed == "renewable_energy_01_115,renewable_energy_01_16",
+            "a snowed-on flat panel at 30 shows '" .. tostring(self.snowed) .. "'")
+    end,
+})
+
+-- A storm that cracks a wired panel's module below the threshold puts cracks on its tile in the
+-- same bank pass.
+test("renewable_energy_tiles_storm_crack_shows_cracks", {
+    sandbox = { StormDamage = true, StormDamageRate = 1000 },
+    run = function(self)
+        local bank, record = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        if not bank then return end
+        local panel, connected = T.panel(self, Sprites.flat, { near = bank, modules = modulesAt(80), connect = true })
+        if not T.need(self, connected, "a panel connected to the bank") then return end
+        self.before = attachedNames(panel)
+        -- A thousand hours of storm at ten times the rate makes the crack certain.
+        record:update(1, T.passContext(1000, 1000))
+        local modules = panel:getModData()[RenewableEnergy.PowerBank.MODULES]
+        self.condition = modules and modules[1] and modules[1].condition
+        self.after = attachedNames(panel)
+    end,
+    validate = function(self)
+        expect(self.before == "", "the whole panel showed '" .. tostring(self.before) .. "' before the storm")
+        expect(self.condition == 50, "the storm left the module at " .. tostring(self.condition) .. ", expected 50")
+        expect(self.after == "renewable_energy_01_115", "the storm-cracked panel shows '" .. tostring(self.after) .. "'")
     end,
 })

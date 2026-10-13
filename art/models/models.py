@@ -8,8 +8,9 @@ Each model's parts are merged into one mesh, unwrapped, and their materials bake
 game draws a world item or a vehicle body with a single texture. An item's mesh goes to
 models_X/WorldItems and its texture to textures/WorldItems, both RenewableEnergy_<Item>, and
 Models.txt gets a model <Item>_Ground in module RenewableEnergy for the item's WorldStaticModel. A
-vehicle's mesh goes to models_X/vehicles and its texture, with the mask, lights, rust, damage and
-blood textures of its shader, to textures/Vehicles; scripts/RenewableEnergy/Vehicles.txt names them.
+vehicle's mesh goes to models_X/vehicles, cut into the body and the part models items.VEHICLES
+names, and its texture, with the mask, lights, rust, damage and blood textures of its shader, to
+textures/Vehicles; scripts/RenewableEnergy/Vehicles.txt names them.
 
 An item's exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the
 vertices (like HearingAid's ground model): the game draws a dropped item that way.
@@ -41,7 +42,8 @@ TEXTURE_SIZE = {name: 512 for name in ("SolarModule", "HomemadeSolarModule", "So
                                        "SolarRackWood", "SolarRackMetal", "BatteryRackWood", "BatteryRackMetal",
                                        "BatteryBankWood", "BatteryBankMetal")}
 DEFAULT_TEXTURE_SIZE = 256
-# Real size reads well on the ground next to the game's own items, which are drawn about life size.
+# Real size reads well on the ground next to most of the game's own items; an item's
+# "ground_scale" in items.ITEMS overrides it where the game draws its kind smaller (batteries).
 WORLD_SCALE = 1.0
 
 
@@ -210,14 +212,14 @@ def build_baked(stage, builder, name, size, to_ground):
     return low, colour, solid
 
 
-def models_txt(names):
+def models_txt(specs):
     lines = ["module RenewableEnergy", "{",
              "    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel. */"]
-    for name in names:
+    for name, spec in specs.items():
         lines += ["    model %s_Ground" % name, "    {",
                   "        mesh = WorldItems/%s%s," % (PREFIX, name),
                   "        texture = WorldItems/%s%s," % (PREFIX, name),
-                  "        scale = %g," % WORLD_SCALE,
+                  "        scale = %g," % spec.get("ground_scale", WORLD_SCALE),
                   "    }"]
     lines.append("}")
     with open(MODELS_TXT, "w") as f:
@@ -270,7 +272,7 @@ TRAILER_ZONES = {
 }
 # Rust stays off glass, lamps and the board's face. Module parts are named after their module.
 RUST_FREE = ("Board_Back", "Board_Lamp", "Board_Visor", "Trailer_TailLight", "Trailer_Reflector", "Trailer_Panel",
-             "Trailer0_", "Trailer1_")
+             "Trailer0_", "Trailer1_", "TrailerCracked")
 # Printed on the battery box: kept clean of blood and rust so it stays legible.
 TRAILER_STENCIL = "Trailer_Stencil"
 MASK_SIZE = 1024
@@ -530,19 +532,45 @@ def main():
     build_vehicles(stage)
 
 
+def cut_piece(low, solid, prefixes, offset, keep):
+    """A copy of the baked mesh `low` holding only the faces of parts named with one of
+    `prefixes` (`keep`), or only the others, moved back by `offset`. It keeps the shared UVs."""
+    names = [part_name(obj) for obj in solid]
+    parts = np.zeros(len(low.data.polygons), dtype=np.int64)
+    low.data.attributes["part"].data.foreach_get("value", parts)
+    piece = low.copy()
+    piece.data = low.data.copy()
+    bpy.context.scene.collection.objects.link(piece)
+    bm = bmesh.new()
+    bm.from_mesh(piece.data)
+    bm.faces.ensure_lookup_table()
+    drop = [face for face in bm.faces if names[parts[face.index]].startswith(prefixes) != keep]
+    bmesh.ops.delete(bm, geom=drop, context="FACES")
+    bmesh.ops.translate(bm, vec=-Vector(offset), verts=bm.verts)
+    bm.to_mesh(piece.data)
+    bm.free()
+    return piece
+
+
 def build_vehicles(stage):
-    for name, builder in items.VEHICLES.items():
-        low, colour, solid = build_baked(stage, builder, name, VEHICLE_TEXTURE_SIZE, to_ground=False)
+    for name, spec in items.VEHICLES.items():
+        low, colour, solid = build_baked(stage, spec["build"], name, VEHICLE_TEXTURE_SIZE, to_ground=False)
         image = save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + ".png"), colour)
         for suffix, (pixels, alpha) in vehicle_overlays(low, solid).items():
             save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + suffix + ".png"), pixels, alpha)
         # The multi-UV shader reads rust, damage and blood through UV2; new() copies the active UV1.
         low.data.uv_layers.new(name="UVMap2")
-        # Exported like the ground models: the game reads a mesh's vertices with Y up and -Z
-        # forward (it flips Z, to left-handed coordinates), so the body's +Y, the hitch, leads.
-        export(low, name, image, os.path.join(VEHICLE_MESH_DIR, PREFIX + name + ".fbx"))
-        print("vehicle %s: %d faces" % (name, len(low.data.polygons)))
+        taken = tuple(prefix for prefixes, _ in spec["pieces"].values() for prefix in prefixes)
+        pieces = {"": cut_piece(low, solid, taken, (0, 0, 0), keep=False)}
+        for suffix, (prefixes, offset) in spec["pieces"].items():
+            pieces[suffix] = cut_piece(low, solid, prefixes, offset, keep=True)
         bpy.data.objects.remove(low)
+        for suffix, piece in pieces.items():
+            # Exported like the ground models: the game reads a mesh's vertices with Y up and -Z
+            # forward (it flips Z, to left-handed coordinates), so the body's +Y, the hitch, leads.
+            export(piece, name + suffix, image, os.path.join(VEHICLE_MESH_DIR, PREFIX + name + suffix + ".fbx"))
+            print("vehicle %s%s: %d faces" % (name, suffix, len(piece.data.polygons)))
+            bpy.data.objects.remove(piece)
 
 
 main()

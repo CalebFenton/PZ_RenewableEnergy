@@ -4,8 +4,8 @@ tileGeometry.txt.
     python3 tools/make_tiles.py
 
 Tile numbers match art/models/tiles.py, which renders them, and
-media/lua/shared/RenewableEnergy/Sprites.lua, which names them for Lua. Overlay tiles (snow,
-batteries, the charge meter, the crate's contents and lid) are only ever attached to another tile,
+media/lua/shared/RenewableEnergy/Sprites.lua, which names them for Lua. Overlay tiles (snow, cracked
+glass, batteries, the charge meter, the crate's contents and lid) are only ever attached to another tile,
 so they have no properties. Property names and values follow the vanilla tile definitions
 (newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:
 
@@ -34,7 +34,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 15
+COLUMNS, ROWS = 8, 17
 
 
 def moveable(item, level=None, tool="Electrician", **props):

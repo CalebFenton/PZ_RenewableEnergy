@@ -103,6 +103,57 @@ function PowerBank.modulesOf(holder, mount)
     return modules
 end
 
+--- Shows a cracked glass over each of a placed panel's modules below Specs.crackedBelow and over
+--- none of the others, then sends the overlays to clients if they changed. Authority only: a
+--- client's own overlays would be overwritten by the server's next sprite update.
+function PowerBank.showCracks(isoObject)
+    local kind, facing, material = PowerBank.sourceKind(isoObject)
+    if not kind then return end
+    local list = Sprites.crackOverlays(kind, facing, material, PowerBank.modulesOf(isoObject, kind))
+    local wanted = {}
+    for _, name in ipairs(list) do
+        wanted[name] = true
+    end
+    local shown, changed = {}, false
+    local attached = isoObject:getAttachedAnimSprite()
+    for i = (attached and attached:size() or 0) - 1, 0, -1 do
+        local name = attached:get(i):getName()
+        if Sprites.isCrack(name) then
+            if wanted[name] and not shown[name] then
+                shown[name] = true
+            else
+                isoObject:RemoveAttachedAnim(i)
+                changed = true
+            end
+        end
+    end
+    local added = false
+    for _, name in ipairs(list) do
+        if not shown[name] then
+            isoObject:addAttachedAnimSpriteByName(name)
+            added = true
+        end
+    end
+    if added then
+        -- Snow lies on the glass, so it goes back on top of the cracks just added.
+        local snow = {}
+        attached = isoObject:getAttachedAnimSprite()
+        for i = attached:size() - 1, 0, -1 do
+            local name = attached:get(i):getName()
+            if Sprites.isSnow(name) then
+                table.insert(snow, 1, name)
+                isoObject:RemoveAttachedAnim(i)
+            end
+        end
+        for _, name in ipairs(snow) do
+            isoObject:addAttachedAnimSpriteByName(name)
+        end
+    end
+    if changed or added then
+        isoObject:transmitUpdatedSpriteToClients()
+    end
+end
+
 --- Where a bank may stand: inside a building, out of the weather. Returns true, or false and
 --- the translation key of the reason.
 function PowerBank.canPlaceBank(square)

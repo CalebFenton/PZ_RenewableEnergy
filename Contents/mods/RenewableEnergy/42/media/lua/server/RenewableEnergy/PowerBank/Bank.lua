@@ -402,6 +402,14 @@ local function stormFactor(mount, material)
     return Specs.mounts[mount].stormFactor * (materialSpec and materialSpec.stormFactor or 1)
 end
 
+--- The hours of a pass of `hours`, ending now, in which a thunderstorm can crack modules: all
+--- of them while one blows hard enough, else none.
+function Bank.stormHours(hours)
+    local climate = getClimateManager()
+    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.windMin
+    return storming and hours or 0
+end
+
 --- A thunderstorm may crack one of a panel's modules. Returns whether it did.
 function Bank.stormCrack(source, stormHours)
     local options = SandboxVars.RenewableEnergy
@@ -426,7 +434,7 @@ end
 
 -- Keep a panel's module record and the bank's copy the same: a crack while the panel's square
 -- was unloaded goes to the object, otherwise the object (which unmounting and repairs change)
--- is the truth.
+-- is the truth. Either way the tile shows the cracks the record now holds.
 local function syncModules(source, object)
     if source.modulesChanged then
         writeModules(object, source.modules)
@@ -434,6 +442,7 @@ local function syncModules(source, object)
     else
         source.modules = PowerBank.modulesOf(object, source.kind)
     end
+    PowerBank.showCracks(object)
 end
 
 -- Why a panel makes less than it would at its best in clear full sun: the biggest loss, if it

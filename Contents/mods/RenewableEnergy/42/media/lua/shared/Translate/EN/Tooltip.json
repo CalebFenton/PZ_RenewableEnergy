@@ -42,6 +42,8 @@
     "Tooltip_RenewableEnergy_NeedTool": "Needs a %1.",
     "Tooltip_RenewableEnergy_NeedWire": "Needs %1 %2.",
     "Tooltip_RenewableEnergy_NeedScrap": "Needs %1 %2.",
+    "Tooltip_RenewableEnergy_NeedRecipe": "Needs the %1 recipe.",
+    "Tooltip_RenewableEnergy_NeedItem": "Needs %1.",
     "Tooltip_RenewableEnergy_NotRepairable": "It can't be repaired.",
     "Tooltip_RenewableEnergy_NoRepairNeeded": "Already in good condition.",
     "Tooltip_RenewableEnergy_NoPanelSlot": "No free panel slot: wire in a charge controller.",

@@ -24,6 +24,8 @@ def M(name):
         "busbar": lambda: material("RE_Busbar", "#cfd2d6", roughness=0.3, metallic=0.9, grime=0.0),
         "amorphous": lambda: material("RE_Amorphous", "#2c3a78", roughness=0.2, metallic=0.25, grime=0.05),
         "mono": lambda: material("RE_MonoCells", "#17191f", roughness=0.25, metallic=0.3, grime=0.04),
+        # Broken cover glass: the fractures catch the light and read pale over the cells.
+        "crack": lambda: material("RE_Crack", "#dfe7ee", roughness=0.3, grime=0.0),
         "black": lambda: material("RE_BlackPlastic", "#1f2022", roughness=0.55, grime=0.15),
         "darkgrey": lambda: material("RE_DarkGrey", "#3a3c3f", roughness=0.5, grime=0.15),
         "grey": lambda: material("RE_GreyPaint", "#8b9089", roughness=0.55, grime=0.2),
@@ -81,8 +83,53 @@ MODULE = (0.986, 0.446, 0.036)
 FRAME = 0.028
 
 
-def solar_module(col, name="Module", snow=False):
-    """A module lying glass up. `snow` adds only the snow lying on it."""
+# A module whose condition is below Specs.crackedBelow has a cracked cover glass, drawn by
+# module_cracks everywhere it shows: on the mounts' crack overlay tiles and on the arrow board
+# trailer's cracked panels. Lines wide enough to read at a tile's scale, about a centimetre a pixel.
+CRACK_WIDTH = 0.01
+
+
+def module_cracks(col, name):
+    """The cracks of a broken cover glass, lying on a module built by solar_module: lines
+    radiating from where something struck it, and a broken ring round the strike."""
+    width, depth, height = MODULE
+    inner_w, inner_d = width / 2 - FRAME - 0.01, depth / 2 - FRAME - 0.01
+    rng = random.Random(42)
+    strike = (0.14, -0.03)
+    z = height - 0.0018
+    parts = []
+
+    def segment(a, b):
+        length = math.hypot(b[0] - a[0], b[1] - a[1])
+        angle = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+        parts.append(box(col, name + "_Crack", M("crack"), (length + CRACK_WIDTH * 0.5, CRACK_WIDTH, 0.0008),
+                         at=((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z), rotate=(0, 0, angle)))
+
+    for i in range(9):
+        heading = 2 * math.pi * i / 9 + rng.uniform(-0.3, 0.3)
+        reach = rng.uniform(0.18, 0.5)
+        point = strike
+        for _ in range(3):
+            heading += rng.uniform(-0.35, 0.35)
+            x = max(-inner_w, min(inner_w, point[0] + reach / 3 * math.cos(heading)))
+            y = max(-inner_d, min(inner_d, point[1] + reach / 3 * math.sin(heading)))
+            segment(point, (x, y))
+            point = (x, y)
+    ring = 0.07
+    for i in range(8):
+        if i % 3 == 2:
+            continue
+        a0, a1 = 2 * math.pi * i / 8, 2 * math.pi * (i + 1) / 8
+        segment((strike[0] + ring * math.cos(a0), strike[1] + ring * math.sin(a0)),
+                (strike[0] + ring * math.cos(a1), strike[1] + ring * math.sin(a1)))
+    return parts
+
+
+def solar_module(col, name="Module", snow=False, cracked=False, cracks=False):
+    """A module lying glass up. `snow` adds only the snow lying on it and `cracks` only the cracks
+    of a broken glass, for overlay tiles; `cracked` draws the whole module with those cracks."""
+    if cracks:
+        return module_cracks(col, name)
     width, depth, height = MODULE
     parts = []
     if snow:
@@ -107,6 +154,8 @@ def solar_module(col, name="Module", snow=False):
             parts.append(box(col, name + "_Busbar", M("busbar"), (inner_w - 0.02, 0.0025, 0.0006),
                              at=(0, y + offset, height - 0.0025)))
     parts.append(box(col, name + "_JunctionBox", M("black"), (0.11, 0.08, 0.02), at=(0, 0.06, 0.004), bevel=0.004))
+    if cracked:
+        parts += module_cracks(col, name)
     return parts
 
 
@@ -125,13 +174,14 @@ def amorphous_panel(col, name, size, stripes):
     return parts
 
 
-def solar_flat(col, snow=False):
-    """One module on two low rails, for a roof or the ground at 0 degrees."""
-    module = solar_module(col, "Flat", snow=snow)
+def solar_flat(col, snow=False, cracks=False):
+    """One module on two low rails, for a roof or the ground at 0 degrees. `snow` and `cracks` give
+    only the snow on it or the cracks in its glass, for overlay tiles."""
+    module = solar_module(col, "Flat", snow=snow, cracks=cracks)
     lift = 0.045
     for obj in module:
         obj.location.z += lift
-    if snow:
+    if snow or cracks:
         return
     for sign in (-1, 1):
         box(col, "Flat_Rail", M("aluminium"), (MODULE[0] - 0.12, 0.03, lift), at=(0, sign * 0.13, 0), bevel=0.002)
@@ -142,14 +192,16 @@ def solar_flat(col, snow=False):
 WALL_STANDOFF = 0.05
 
 
-def solar_wall(col, material="metal", lying=False):
+def solar_wall(col, material="metal", lying=False, cracks=False):
     """One module upright, its back WALL_STANDOFF in front of y = 0 (the wall), its bottom edge at
     z = 0: on two galvanised channel brackets lagged to the wall, or on two pine battens with a
     ledger board under it and cleats nailed over its top edge. `lying` lays it glass up on its
-    brackets, as it lies on the ground."""
+    brackets, as it lies on the ground. `cracks` gives only the cracks in its glass."""
     # Turning +90 degrees about X takes glass up to glass to the front (-Y).
-    module = group(col, "Wall_Module", solar_module(col, "Wall"), at=(0, -WALL_STANDOFF, MODULE[1] / 2),
+    module = group(col, "Wall_Module", solar_module(col, "Wall", cracks=cracks), at=(0, -WALL_STANDOFF, MODULE[1] / 2),
                    rotate=(90, 0, 0))
+    if cracks:
+        return
     parts = [module]
     if material == "metal":
         for x in (-0.33, 0.33):
@@ -176,18 +228,22 @@ RACK_TILT = 38
 RACK_FRONT = 0.25  # height of the lower edge
 
 
-def solar_rack(col, material="metal", snow=False):
+def solar_rack(col, material="metal", snow=False, cracks=None):
     """Two modules, one above the other, tilted RACK_TILT degrees to the front on a galvanised pipe
     frame or a frame of pine 2 x 4s on skids. Both hold the modules in the same place, so the
-    snow on them is the same."""
+    snow on them is the same. `cracks`, a module slot (1 the lower module, 2 the upper), gives only
+    the cracks in that module's glass."""
     tilt = math.radians(RACK_TILT)
     gap = 0.01
     span = 2 * MODULE[1] + gap
     panels = []
     for i, offset in enumerate((-(MODULE[1] + gap) / 2, (MODULE[1] + gap) / 2)):
-        panels.append(group(col, "Rack_Module%d" % i, solar_module(col, "Rack%d" % i, snow=snow), at=(0, offset, 0)))
+        if cracks and cracks != i + 1:
+            continue
+        module = solar_module(col, "Rack%d" % i, snow=snow, cracks=bool(cracks))
+        panels.append(group(col, "Rack_Module%d" % i, module, at=(0, offset, 0)))
     group(col, "Rack_Panels", panels, at=(0, 0, RACK_FRONT + span / 2 * math.sin(tilt)), rotate=(RACK_TILT, 0, 0))
-    if snow:
+    if snow or cracks:
         return
     front_y, back_y = -span / 2 * math.cos(tilt), span / 2 * math.cos(tilt)
     top = RACK_FRONT + span * math.sin(tilt)
@@ -973,14 +1029,25 @@ def _arrow_board(col, rear):
         box(col, "Board_Visor", M("black"), (0.1, 0.012, 0.05), at=(x, centre_y + y + 0.052, top))
 
 
+# The trailer's panels are vehicle parts the player can take off, each shown whole or cracked by
+# its module's condition, so each is a model of its own: TrailerN_ the whole module N (0 on the
+# left, at -X), TrailerCrackedN_ the cracked one. The cracked pair is built this far off and moved
+# back after baking, because the bake takes each surface's colour from the nearest detail and the
+# two pairs would otherwise lie in one place.
+TRAILER_CRACKED_OFFSET = (0.0, 0.0, 4.0)
+
+
 def _trailer_modules(col, front):
     """Two modules side by side, long sides front to back, on rails over the front of the deck and
     the battery box, raised a little at the front, on posts from the deck."""
     tilt, centre_y, height = 10, 0.2, 0.72
-    modules = [group(col, "Trailer_Module", solar_module(col, "Trailer%d" % i), at=(x, 0, 0), rotate=(0, 0, 90))
-               for i, x in enumerate((-0.235, 0.235))]
+    for prefix, cracked, offset in (("Trailer", False, (0, 0, 0)), ("TrailerCracked", True, TRAILER_CRACKED_OFFSET)):
+        modules = [group(col, "Trailer_Module", solar_module(col, "%s%d" % (prefix, i), cracked=cracked), at=(x, 0, 0),
+                         rotate=(0, 0, 90))
+                   for i, x in enumerate((-0.235, 0.235))]
+        group(col, "Trailer_Panels", modules, at=(offset[0], centre_y + offset[1], height + offset[2]), rotate=(tilt, 0, 0))
     rails = [box(col, "Trailer_PanelRail", M("galvanised"), (0.04, MODULE[0] + 0.04, 0.04), at=(x, 0, -0.04)) for x in (-0.4, 0.4)]
-    group(col, "Trailer_Panels", modules + rails, at=(0, centre_y, height), rotate=(tilt, 0, 0))
+    group(col, "Trailer_Rails", rails, at=(0, centre_y, height), rotate=(tilt, 0, 0))
     rise = math.sin(math.radians(tilt))
     for x in (-0.4, 0.4):
         for y in (-0.25, front - 0.04):
@@ -989,8 +1056,15 @@ def _trailer_modules(col, front):
 
 # Inventory items ----------------------------------------------------------------------------------
 
-# Item type -> builder of its ground model, of its icon when that shows more, and the icon's
-# camera elevation in degrees when the 30 of a tile would show a flat thing edge on.
+# Item type -> builder of its ground model, of its icon when that shows more, the icon's camera
+# elevation in degrees when the 30 of a tile would show a flat thing edge on, and the ground
+# model's scale in Models.txt when it isn't models.WORLD_SCALE.
+#
+# The game draws its car battery at 0.19 x 0.13 x 0.14 m, about three quarters of a real one's
+# 0.26 x 0.17 x 0.20, so a battery built true to life lies on the ground half again as big as the
+# car battery beside it. The batteries, their cases and the plates and molds sized to fit them
+# shrink by as much; the parts stay real size for the icons and the battery storage tiles.
+BATTERY_GROUND_SCALE = 0.75
 ITEMS = {
     "SolarModule": {"model": solar_module, "icon_elevation": 55},
     "HomemadeSolarModule": {"model": homemade_module, "icon_elevation": 55},
@@ -1017,25 +1091,37 @@ ITEMS = {
     "InverterCharger": {"model": inverter_charger},
     "ChargeController": {"model": charge_controller},
     "SolarFailsafe": {"model": solar_failsafe, "icon": lambda col: solar_failsafe(col, cable=False)},
-    "DeepCycleBattery": {"model": deep_cycle_battery},
-    "L16Battery": {"model": l16_battery},
+    "DeepCycleBattery": {"model": deep_cycle_battery, "ground_scale": BATTERY_GROUND_SCALE},
+    "L16Battery": {"model": l16_battery, "ground_scale": BATTERY_GROUND_SCALE},
     "SolarMaintainer": {"model": solar_maintainer, "icon_elevation": 40},
     "SolarCellCharger": {"model": solar_cell_charger, "icon_elevation": 45},
     "SolarGardenLight": {"model": lying(solar_garden_light), "icon": solar_garden_light},
-    "CarBatteryCase": {"model": car_battery_case, "icon_elevation": 40},
-    "DeepCycleBatteryCase": {"model": deep_cycle_battery_case, "icon_elevation": 40},
-    "L16BatteryCase": {"model": l16_battery_case, "icon_elevation": 40},
-    "WornBatteryPlates": {"model": lambda col: battery_plates(col, worn=True)},
-    "BatteryPlates": {"model": battery_plates},
-    "WoodenBatteryPlatePattern": {"model": plate_pattern, "icon_elevation": 55},
-    "BatteryPlateMoldUnfired": {"model": plate_mold, "icon_elevation": 50},
-    "BatteryPlateMold": {"model": lambda col: plate_mold(col, fired=True), "icon_elevation": 50},
+    "CarBatteryCase": {"model": car_battery_case, "icon_elevation": 40, "ground_scale": BATTERY_GROUND_SCALE},
+    "DeepCycleBatteryCase": {"model": deep_cycle_battery_case, "icon_elevation": 40, "ground_scale": BATTERY_GROUND_SCALE},
+    "L16BatteryCase": {"model": l16_battery_case, "icon_elevation": 40, "ground_scale": BATTERY_GROUND_SCALE},
+    "WornBatteryPlates": {"model": lambda col: battery_plates(col, worn=True), "ground_scale": BATTERY_GROUND_SCALE},
+    "BatteryPlates": {"model": battery_plates, "ground_scale": BATTERY_GROUND_SCALE},
+    "WoodenBatteryPlatePattern": {"model": plate_pattern, "icon_elevation": 55, "ground_scale": BATTERY_GROUND_SCALE},
+    "BatteryPlateMoldUnfired": {"model": plate_mold, "icon_elevation": 50, "ground_scale": BATTERY_GROUND_SCALE},
+    "BatteryPlateMold": {"model": lambda col: plate_mold(col, fired=True), "icon_elevation": 50,
+                         "ground_scale": BATTERY_GROUND_SCALE},
     "BatteryElectrolyte": {"model": battery_electrolyte},
     "HomesteadPowerMag1": {"model": magazine_1, "icon_elevation": 70},
     "HomesteadPowerMag2": {"model": magazine_2, "icon_elevation": 70},
 }
 
-# Vehicle -> builder of its body.
+# Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes
+# of the parts it takes, and how far they were built from where they belong). Every piece shares
+# the body's texture and mask, and the body keeps whatever no piece takes.
 VEHICLES = {
-    "ArrowBoardTrailer": arrow_board_trailer,
+    "ArrowBoardTrailer": {
+        "build": arrow_board_trailer,
+        "pieces": {
+            "_Lid": (("Trailer_BatteryLid",), (0, 0, 0)),
+            "_PanelLeft": (("Trailer0_",), (0, 0, 0)),
+            "_PanelRight": (("Trailer1_",), (0, 0, 0)),
+            "_PanelLeftCracked": (("TrailerCracked0_",), TRAILER_CRACKED_OFFSET),
+            "_PanelRightCracked": (("TrailerCracked1_",), TRAILER_CRACKED_OFFSET),
+        },
+    },
 }
