@@ -8,15 +8,15 @@ editing a layout; recapture only when the game's look or the mod's names change:
 
     art/promo/compose.py
 
-Writes images/{banner,setup,status,menu,items,models,recipes,trailer,gardenlights}.png. Every image is
-1260 pixels wide, which the Workshop page shows at 630, so it stays sharp on high-density screens.
-Icons are scaled by whole numbers with nearest-neighbour sampling, so their pixels stay crisp. The
-item models are framed from the box extract.py found around each. Item, recipe and skill names
-come from captures/promo.json, which the game wrote in its own words; the stage captions are the
-README's.
+Writes images/{banner,setup,bank,items,recipes,trailer,gardenlights}.png. Every image is 1260 pixels
+wide, which the Workshop page shows at 630, so it stays sharp on high-density screens. Icons are
+scaled by whole numbers with nearest-neighbour sampling, so their pixels stay crisp. The item models
+are framed from the box extract.py found around each. Item, recipe and skill names come from
+captures/promo.json, which the game wrote in its own words; the setup captions are the README's.
 """
 import json
 import math
+import re
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -33,9 +33,17 @@ PANEL = (36, 39, 46)
 TEXT = (232, 234, 238)
 MUTED = (160, 166, 176)
 SOLAR = (86, 140, 214)
-STAGE0 = "Stage 0 · Scavenger"
-STAGES12 = "Stages 1 and 2 · RV / Cabin and Homestead"
-BANK_INSET = "The bank, indoors"
+FIRST_BOX = "A first battery box"
+HOMESTEAD = "A homestead"
+# Where each world shot is cropped, in capture pixels, around what the promo run built in it; a
+# reshoot that frames a shot differently needs its box moved. The setup shots share a shape so
+# that they line up side by side.
+SETUP_CROPS = {"stage0": (330, 50, 1230, 812), "homestead": (260, 0, 1160, 762)}
+BANK_CROP = (0, 180, 464, 592)
+MENU_CROP = (206, 105, 726, 385)
+TRAILER_CROP = (0, 140, 1260, 660)
+# bank.png: the status window's size against its capture, as large as leaves room for the menu.
+STATUS_SCALE = 1.25
 # items.png: one row per kind of thing, with its caption, wrapped at ITEM_COLUMNS.
 ITEM_ROWS = [
     ("Panels and mounts", ["RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule",
@@ -58,24 +66,26 @@ ITEM_ROWS = [
                                       "RenewableEnergy.SolarGardenLight", "RenewableEnergy.SolarCells",
                                       "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2"]),
 ]
-ITEM_COLUMNS = 7
+ITEM_COLUMNS = 6
 # recipes.png: the recipes by what they're for.
 RECIPE_SECTIONS = [
     ("Battery storage", ["RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
                          "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal",
                          "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal"]),
-    ("Panel mounts", ["RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood",
-                      "RenewableEnergy_MakeSolarWallMetal", "RenewableEnergy_MakeSolarRackWood",
-                      "RenewableEnergy_MakeSolarRackMetal"]),
-    ("Moving modules to another mount", ["RenewableEnergy_UnmountSolarFlat", "RenewableEnergy_UnmountSolarWallWood",
-                                         "RenewableEnergy_UnmountSolarWallMetal", "RenewableEnergy_UnmountSolarRackWood",
-                                         "RenewableEnergy_UnmountSolarRackMetal"]),
-    ("Module repair and homemade modules", ["RenewableEnergy_RepairCrackedModule",
-                                            "RenewableEnergy_MakeHomemadeSolarModule"]),
-    ("Taking apart for solar cells", ["RenewableEnergy_TakeApartCalculator", "RenewableEnergy_TakeApartSolarGardenLight",
-                                      "RenewableEnergy_TakeApartSolarCellCharger",
-                                      "RenewableEnergy_TakeApartSolarMaintainer",
-                                      "RenewableEnergy_TakeApartShatteredModule"]),
+    ("Panel mounts, and taking them down", ["RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood",
+                                            "RenewableEnergy_MakeSolarWallMetal", "RenewableEnergy_MakeSolarRackWood",
+                                            "RenewableEnergy_MakeSolarRackMetal", "RenewableEnergy_UnmountSolarFlat",
+                                            "RenewableEnergy_UnmountSolarWallWood",
+                                            "RenewableEnergy_UnmountSolarWallMetal",
+                                            "RenewableEnergy_UnmountSolarRackWood",
+                                            "RenewableEnergy_UnmountSolarRackMetal"]),
+    ("Modules: repair, homemade, and solar cells", ["RenewableEnergy_RepairCrackedModule",
+                                                    "RenewableEnergy_MakeHomemadeSolarModule",
+                                                    "RenewableEnergy_TakeApartCalculator",
+                                                    "RenewableEnergy_TakeApartSolarGardenLight",
+                                                    "RenewableEnergy_TakeApartSolarCellCharger",
+                                                    "RenewableEnergy_TakeApartSolarMaintainer",
+                                                    "RenewableEnergy_TakeApartShatteredModule"]),
     ("Battery care and rebuilding", ["RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery",
                                      "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery",
                                      "RenewableEnergy_StripL16Battery", "RenewableEnergy_MakeBatteryPlatePattern",
@@ -141,14 +151,20 @@ def paste(base, image, centre, shadow=True):
     base.alpha_composite(image, (x, y))
 
 
-def wrap(string, face, width):
-    """Splits string into lines no wider than width, breaking at spaces."""
+def wrap(string, face, width, split_words=False):
+    """Splits string into lines no wider than width, breaking at spaces, and with split_words also
+    after the hyphens and slashes of a word too wide for a line of its own."""
     lines = []
     for word in string.split():
-        if lines and face.getlength(lines[-1] + " " + word) <= width:
-            lines[-1] += " " + word
-        else:
-            lines.append(word)
+        parts = [word]
+        if split_words and face.getlength(word) > width:
+            parts = [part for part in re.split(r"(?<=[-/])", word) if part]
+        for i, part in enumerate(parts):
+            joined = lines[-1] + ("" if i else " ") + part if lines else None
+            if joined and face.getlength(joined) <= width:
+                lines[-1] = joined
+            else:
+                lines.append(part)
     return "\n".join(lines)
 
 
@@ -220,119 +236,149 @@ def banner():
     return image
 
 
+def scaled(image, factor):
+    """image scaled by factor, through a whole-number nearest-neighbour enlargement first when it
+    grows, which keeps captured UI text sharper than scaling straight to it."""
+    if factor > 1:
+        image = pixels(image, math.ceil(factor * 2))
+        factor /= math.ceil(factor * 2)
+    return image.resize((round(image.width * factor), round(image.height * factor)), Image.LANCZOS)
+
+
 def setup():
-    """Stage 0 above the homestead, each under its caption, with the homestead's bank, which
-    stands indoors behind the wall panels, inset under the homestead's caption."""
-    stage0, homestead = full_width("stage0"), full_width("homestead")
+    """The first battery box and the homestead side by side, each under its caption. Each shot is
+    cropped to SETUP_CROPS around what was built, then both are scaled to share the width."""
     gap = 12
-    image = canvas(stage0.height + gap + homestead.height)
-    image.alpha_composite(stage0, (0, 0))
-    image.alpha_composite(homestead, (0, stage0.height + gap))
-    caption(image, (24, 24), STAGE0)
-    caption(image, (24, stage0.height + gap + 24), STAGES12)
-    bank = capture("bank")
-    top = stage0.height + gap + 24 + 44 + 16
-    width = min(round(WIDTH * 0.3), round(bank.width * (image.height - top - 24) / bank.height))
-    bank = bank.resize((width, round(bank.height * width / bank.width)), Image.LANCZOS)
-    framed = Image.new("RGBA", (bank.width + 8, bank.height + 8), TEXT + (255,))
-    framed.alpha_composite(bank, (4, 4))
-    paste(image, framed, (24 + framed.width / 2, top + framed.height / 2))
-    caption(image, (36, top + framed.height - 56), BANK_INSET)
+    width = (WIDTH - gap) // 2
+    shots = []
+    for name, label in [("stage0", FIRST_BOX), ("homestead", HOMESTEAD)]:
+        crop = capture(name).crop(SETUP_CROPS[name])
+        shots.append((scaled(crop, width / crop.width), label))
+    image = canvas(max(shot.height for shot, _ in shots))
+    for i, (shot, label) in enumerate(shots):
+        left = i * (width + gap)
+        image.alpha_composite(shot, (left, 0))
+        caption(image, (left + 16, 16), label)
     return image
 
 
-def window_card(name):
-    """A captured window or menu at one and a half times its size if that fits: three times with
-    nearest-neighbour sampling, then halved, which keeps the text sharper than scaling straight
-    to it."""
-    window = capture(name)
-    margin = 40
-    if window.width * 3 // 2 <= WIDTH - 2 * margin:
-        window = pixels(window, 3)
-        window = window.resize((window.width // 2, window.height // 2), Image.LANCZOS)
-    image = canvas(window.height + 2 * margin)
-    paste(image, window, (WIDTH / 2, image.height / 2))
+def bank():
+    """The homestead's bank indoors over its right-click menu, beside its status window. The
+    menu's text is drawn larger than the status window's, so it is scaled down to about the same
+    size, and cropped to the bank's own submenu and Wire In."""
+    margin, gap = 20, 16
+    status = scaled(capture("status"), STATUS_SCALE)
+    column = WIDTH - 2 * margin - gap - status.width
+    menu = capture("menu").crop(MENU_CROP)
+    menu = scaled(menu, column / menu.width)
+    room = capture("bank").crop(BANK_CROP).convert("RGBA")
+    room = scaled(room, column / room.width)
+    height = max(status.height, room.height + gap + menu.height)
+    image = canvas(height + 2 * margin)
+    paste(image, room, (margin + column / 2, margin + room.height / 2))
+    paste(image, menu, (margin + column / 2, margin + room.height + gap + menu.height / 2))
+    paste(image, status, (WIDTH - margin - status.width / 2, margin + height / 2))
     return image
 
 
-def item_sheet(row, card):
-    """Every item in ITEM_ROWS, each kind under its caption, on a card `row` pixels tall that
-    card(image, full_type, name, box) fills."""
-    names = {item["fullType"]: item["name"] for item in PROMO["items"]}
-    missing = set(names) - {full_type for _, full_types in ITEM_ROWS for full_type in full_types}
-    assert not missing, f"the item sheets have no place for {sorted(missing)}"
-    column = (WIDTH - 20) // ITEM_COLUMNS
-    heading = 44
-    lines = sum(math.ceil(len(full_types) / ITEM_COLUMNS) for _, full_types in ITEM_ROWS)
-    image = canvas(20 + heading * len(ITEM_ROWS) + row * lines)
-    top = 20
-    for title, full_types in ITEM_ROWS:
-        text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
-        top += heading
-        for start in range(0, len(full_types), ITEM_COLUMNS):
-            line = full_types[start:start + ITEM_COLUMNS]
-            left0 = (WIDTH - column * len(line)) / 2
-            for c, full_type in enumerate(line):
-                left = left0 + c * column
-                box = (left + 6, top, left + column - 6, top + row - 12)
-                panel(image, box)
-                card(image, full_type, names[full_type], box)
-            top += row
-    return image
-
-
-def card_name(image, name, x, top, box):
-    """The item's name centred on x from top down, which must end inside its card's box."""
-    bottom = text(image, (x, top), name, 17, "SemiBold", anchor="ma", width=box[2] - box[0] - 16)[3]
-    assert bottom <= box[3] - 12, f"{name} runs past its card"
-
-
-def items():
-    def card(image, full_type, name, box):
-        x = (box[0] + box[2]) / 2
-        paste(image, icon(icon_key(full_type), 96), (x, box[1] + 70))
-        card_name(image, name, x, box[1] + 132, box)
-    return item_sheet(248, card)
-
-
-# models.png: how much room each model gets around it, as a share of its size, and how tall its
-# picture is on the card.
+# items.png: each card is the item's model as it lies on the ground, with MODEL_PADDING of its size
+# around it and no taller than MODEL_H, over its inventory icon and its name side by side.
 MODEL_PADDING = 0.12
-MODEL_H = 140
+MODEL_H = 120
+ITEM_PAD = 8
+ICON = 64
+NAME_SIZE = 16
+
+
+def on_floor(image, item_box, margin):
+    """image on a canvas margin wider on every side, the extra laid with tiles of the bare floor
+    above the item, so that a frame can run past the capture's edges."""
+    tile = image.crop((0, 0, image.width, item_box[1]))
+    floor = Image.new("RGB", (image.width + 2 * margin, image.height + 2 * margin))
+    for y in range(0, floor.height, tile.height):
+        for x in range(0, floor.width, tile.width):
+            floor.paste(tile, (x, y))
+    floor.paste(image, (margin, margin))
+    return floor
 
 
 def framed_model(key, item_box, size):
-    """A model capture cropped around the item's box, with MODEL_PADDING, to the shape of size and
-    scaled to it. A crop that would run past the capture shrinks to fit it."""
+    """The model capture around the item's box, with MODEL_PADDING on every side, scaled to fit
+    inside size and centred in it."""
     image = capture(key).convert("RGB")
     left, top, right, bottom = item_box
-    w = (right - left) * (1 + 2 * MODEL_PADDING)
-    h = (bottom - top) * (1 + 2 * MODEL_PADDING)
-    aspect = size[0] / size[1]
-    w, h = max(w, h * aspect), max(h, w / aspect)
-    fit = min(1, image.width / w, image.height / h)
-    w, h = w * fit, h * fit
-    x = min(max(0, (left + right - w) / 2), image.width - w)
-    y = min(max(0, (top + bottom - h) / 2), image.height - h)
-    return image.resize(size, Image.LANCZOS, box=(x, y, x + w, y + h))
+    scale = min(size[0] / ((right - left) * (1 + 2 * MODEL_PADDING)),
+                size[1] / ((bottom - top) * (1 + 2 * MODEL_PADDING)))
+    w, h = size[0] / scale, size[1] / scale
+    x, y = (left + right - w) / 2, (top + bottom - h) / 2
+    margin = math.ceil(max(0, -x, -y, x + w - image.width, y + h - image.height))
+    if margin:
+        image = on_floor(image, item_box, margin)
+    return image.resize(size, Image.LANCZOS, box=(x + margin, y + margin, x + margin + w, y + margin + h))
 
 
-def models():
+def name_block(name, width):
+    """The item's name wrapped to width, and how tall it stands."""
+    face = font(NAME_SIZE, "SemiBold")
+    wrapped = wrap(name, face, width, split_words=True)
+    box = ImageDraw.Draw(Image.new("L", (1, 1))).multiline_textbbox((0, 0), wrapped, font=face, spacing=3)
+    assert box[2] <= width, f"{name} is too wide for its card"
+    return wrapped, box[3]
+
+
+def item_card(image, full_type, name, box, boxes):
+    """The item's model over its icon and its name, name being name_block's."""
+    left, top = round(box[0]) + ITEM_PAD, box[1] + ITEM_PAD
+    size = (round(box[2]) - ITEM_PAD - left, MODEL_H)
+    key = "model_" + full_type.replace(".", "_")
+    picture = framed_model(key, boxes[key], size).convert("RGBA")
+    corners = Image.new("L", size, 0)
+    ImageDraw.Draw(corners).rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), 12, fill=255)
+    image.paste(picture, (left, top), corners)
+    row = top + MODEL_H + ITEM_PAD
+    paste(image, icon(icon_key(full_type), ICON), (left + ICON / 2, row + ICON / 2), shadow=False)
+    wrapped, height = name
+    text(image, (left + ICON + ITEM_PAD, row + max(0, (ICON - height) / 2)), wrapped, NAME_SIZE, "SemiBold")
+
+
+def items():
+    """Every item in ITEM_ROWS, each kind under its caption, each line of cards as tall as its
+    longest name needs."""
+    names = {item["fullType"]: item["name"] for item in PROMO["items"]}
+    missing = set(names) - {full_type for _, full_types in ITEM_ROWS for full_type in full_types}
+    assert not missing, f"items.png has no place for {sorted(missing)}"
     boxes = {model["name"]: model["box"] for model in PROMO["models"]}
-
-    def card(image, full_type, name, box):
-        size = (round(box[2] - box[0] - 16), MODEL_H)
-        key = "model_" + full_type.replace(".", "_")
-        picture = framed_model(key, boxes[key], size).convert("RGBA")
-        corners = Image.new("L", size, 0)
-        ImageDraw.Draw(corners).rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), 12, fill=255)
-        image.paste(picture, (round(box[0] + 8), box[1] + 8), corners)
-        card_name(image, name, (box[0] + box[2]) / 2, box[1] + 8 + MODEL_H + 10, box)
-    return item_sheet(276, card)
+    column = (WIDTH - 20) // ITEM_COLUMNS
+    name_width = column - 12 - 3 * ITEM_PAD - ICON
+    heading, gap = 44, 12
+    sections = []
+    for title, full_types in ITEM_ROWS:
+        lines = []
+        for start in range(0, len(full_types), ITEM_COLUMNS):
+            cards = [(full_type, name_block(names[full_type], name_width))
+                     for full_type in full_types[start:start + ITEM_COLUMNS]]
+            height = 3 * ITEM_PAD + MODEL_H + max(ICON, *(name[1] for _, name in cards))
+            lines.append((cards, height))
+        sections.append((title, lines))
+    image = canvas(20 + heading * len(sections) + sum(h + gap for _, lines in sections for _, h in lines))
+    top = 20
+    for title, lines in sections:
+        text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
+        top += heading
+        for cards, height in lines:
+            left0 = (WIDTH - column * len(cards)) / 2
+            for c, (full_type, name) in enumerate(cards):
+                left = left0 + c * column
+                box = (left + 6, top, left + column - 6, top + height)
+                panel(image, box)
+                item_card(image, full_type, name, box, boxes)
+            top += height + gap
+    return image
 
 
 def trailer():
-    return full_width("trailer")
+    """The arrow board trailer and the car towing it, cropped to a strip."""
+    return full_width("trailer").crop(TRAILER_CROP)
 
 
 def gardenlights():
@@ -340,8 +386,8 @@ def gardenlights():
 
 
 # Recipe cards: the recipe's name, skills, how it's learned and its tools in a column on the left,
-# then a slot per input, an arrow and a slot per result. Cards share a row wherever they fit.
-CARD_H = 220
+# then a slot per input, an arrow and a slot per result. Cards share a row wherever they fit, and
+# each row is as tall as its tallest card's contents.
 CARD_GAP = 12
 CARD_PAD = 16
 NAME_W = 168
@@ -455,6 +501,7 @@ def learn_line(recipe):
 
 
 def recipe_card(base, recipe, parts, box):
+    """Draws the card into box and returns how far down its contents reach."""
     left, top, right, bottom = box
     panel(base, box, SOLAR)
     tools, inputs, results = parts
@@ -476,21 +523,36 @@ def recipe_card(base, recipe, parts, box):
         x += SLOT
     assert lowest <= bottom - 10, f"{recipe['id']} runs past the bottom of its card"
     assert x - SLOT / 2 <= right - CARD_PAD + 1, f"{recipe['id']} is too wide for its card"
+    return lowest
 
 
-def card_rows(cards):
-    """Packs (recipe, parts, width) cards into rows as wide as the image allows, each into the
-    first row with room for it."""
+def card_height(recipe, parts, width):
+    """How tall the card must be to hold its contents, found by drawing it on a scratch image."""
+    scratch = Image.new("RGBA", (width, 1000))
+    return round(recipe_card(scratch, recipe, parts, (0, 0, width, 1000))) + CARD_PAD
+
+
+def first_fit(cards):
+    """Packs (order, (recipe, parts, width)) pairs into rows as wide as the image allows, each into
+    the first row with room for it, and returns the rows and the cards in each in their order."""
     rows = []
-    for card in cards:
+    for order, card in cards:
         assert card[2] <= ROW_W, f"{card[0]['id']} is too wide for the image"
         row = next((row for row in rows if row[1] + CARD_GAP + card[2] <= ROW_W), None)
         if row:
-            row[0].append(card)
+            row[0].append((order, card))
             row[1] += CARD_GAP + card[2]
         else:
-            rows.append([[card], card[2]])
-    return [row for row, _ in rows]
+            rows.append([[(order, card)], card[2]])
+    return [[card for _, card in sorted(row)] for row, _ in sorted(rows, key=lambda row: min(row[0]))]
+
+
+def card_rows(cards):
+    """The section's cards in rows, in the section's order unless packing the widest first takes
+    fewer rows."""
+    in_order = first_fit(list(enumerate(cards)))
+    widest_first = first_fit(sorted(enumerate(cards), key=lambda pair: -pair[1][2]))
+    return widest_first if len(widest_first) < len(in_order) else in_order
 
 
 def recipes():
@@ -506,26 +568,25 @@ def recipes():
             cards.append((by_id[i], parts, card_width(parts)))
         sections.append((title, card_rows(cards)))
     heading = 52
-    rows = sum(len(section_rows) for _, section_rows in sections)
-    image = canvas(20 + len(sections) * heading + rows * (CARD_H + CARD_GAP))
+    heights = [[max(card_height(*card) for card in row) for row in section_rows] for _, section_rows in sections]
+    image = canvas(20 + len(sections) * heading + sum(h + CARD_GAP for hs in heights for h in hs))
     top = 20
-    for title, section_rows in sections:
+    for (title, section_rows), row_heights in zip(sections, heights):
         text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
         top += heading
-        for row in section_rows:
+        for row, height in zip(section_rows, row_heights):
             # The row's spare width goes to its cards evenly, so every row spans the image.
             spare = (ROW_W - sum(card[2] for card in row) - CARD_GAP * (len(row) - 1)) / len(row)
             left = 20
             for recipe, parts, width in row:
-                recipe_card(image, recipe, parts, (left, top, left + width + spare, top + CARD_H))
+                recipe_card(image, recipe, parts, (left, top, left + width + spare, top + height))
                 left += width + spare + CARD_GAP
-            top += CARD_H + CARD_GAP
+            top += height + CARD_GAP
     return image
 
 
 def main():
-    for name, make in [("banner", banner), ("setup", setup), ("status", lambda: window_card("status")),
-                       ("menu", lambda: window_card("menu")), ("items", items), ("models", models),
+    for name, make in [("banner", banner), ("setup", setup), ("bank", bank), ("items", items),
                        ("recipes", recipes), ("trailer", trailer), ("gardenlights", gardenlights)]:
         save(make(), name)
 

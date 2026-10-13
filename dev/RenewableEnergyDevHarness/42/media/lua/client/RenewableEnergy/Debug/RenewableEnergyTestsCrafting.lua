@@ -214,10 +214,10 @@ craftTest(craftName("RenewableEnergy_MakeHomemadeSolarModule"), {
     counts = { ["RenewableEnergy.SolarCells"] = 0, ["RenewableEnergy.HomemadeSolarModule"] = 1 },
 })
 
--- Taking things apart for their cells.
+-- Taking things apart for their cells. A garden light gives back the plain bulb it comes with.
 local TAKE_APART = {
     { "RenewableEnergy_TakeApartCalculator", "Base.Calculator", 1, { ["Base.ElectronicsScrap"] = 1 } },
-    { "RenewableEnergy_TakeApartSolarGardenLight", "RenewableEnergy.SolarGardenLight", 2 },
+    { "RenewableEnergy_TakeApartSolarGardenLight", "RenewableEnergy.SolarGardenLight", 2, { ["Base.LightBulb"] = 1 } },
     { "RenewableEnergy_TakeApartSolarCellCharger", "RenewableEnergy.SolarCellCharger", 4 },
     { "RenewableEnergy_TakeApartSolarMaintainer", "RenewableEnergy.SolarMaintainer", 6 },
 }

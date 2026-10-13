@@ -1,5 +1,5 @@
 version=1
-# No images yet: the repository isn't public, so the art in art/promo/images has no URL to link. Once it is, add [img]<raw URL of banner.png, setup.png, menu.png, status.png, gardenlights.png, items.png, models.png, recipes.png, trailer.png>[/img] above the matching sections (SteamWorkshopItem.readWorkshopTxt skips lines starting with #).
+# No images yet: the repository isn't public, so the art in art/promo/images has no URL to link. Once it is, add [img]<raw URL of banner.png, setup.png, bank.png, gardenlights.png, items.png, recipes.png, trailer.png>[/img] above the matching sections (SteamWorkshopItem.readWorkshopTxt skips lines starting with #).
 title=Renewable Energy
 description=Sooner or later the grid goes down, and sooner or later the gas runs out too. A generator buys you time, but it's loud, it fumes up the house, and it eats scrap electronics to keep going.
 description=
@@ -30,9 +30,6 @@ description=Service a worn battery with water and baking soda, recondition it, o
 description=
 description=[h2]Finding it[/h2]
 description=Look where people had this stuff in 1993: campers, auto parts stores, farms, electricians' vans, the phone and power companies, and preppers' caches. Some storage rooms hold a whole RV solar kit, and cracked modules turn up in garages, sheds and junkyards. There are solar sites to raid: stock tank pumps in the pastures, farmhouses, campers, the phone company's relay sheds, ranger stations, the Deer Valley Power yard, and solar arrow board trailers at road works and in highway pileups. Some houses have solar garden lights out front that still work.
-description=
-description=[h2]What's next[/h2]
-description=Biogas. Ferment kitchen scraps and manure into methane for cooking, light, and a generator that charges the bank at night.
 description=
 description=[h2]Credits[/h2]
 description=By Caleb Fenton. Inspired by Immersive Solar Arrays by RadX5 and Poltergeist. Apache License 2.0.

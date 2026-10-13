@@ -2,6 +2,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Wear"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 
 -- Callbacks of the craftRecipes in media/scripts/RenewableEnergy/Recipes.txt. Shared, since
 -- OnTest runs wherever the craft is checked. OnCreate runs once, on the authority (single
@@ -288,6 +289,20 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
     local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or CAR_BATTERY)
     setRebuilt(battery)
     addToInventory(character, battery)
+end
+
+-- Gadgets ----------------------------------------------------------------------------------------
+
+-- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
+function Recipes.takeApartGardenLight(craftRecipeData, character)
+    local SolarGardenLight = RenewableEnergy.SolarGardenLight
+    local light = firstInput(craftRecipeData, function(item)
+        return item:getFullType() == SolarGardenLight.ITEM
+    end)
+    local bulb = light and SolarGardenLight.getBulb(light)
+    if bulb then
+        addToInventory(character, instanceItem(bulb))
+    end
 end
 
 return Recipes

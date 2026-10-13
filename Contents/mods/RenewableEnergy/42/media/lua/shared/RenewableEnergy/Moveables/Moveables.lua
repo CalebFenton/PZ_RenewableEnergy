@@ -86,9 +86,9 @@ end
 -- Picking up --------------------------------------------------------------------------------------
 -- Placing copies an item's modData onto the object, but picking up copies an object's back only
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
--- conditions and a garden light its charge.
+-- conditions and a garden light its charge and bulb.
 
-local CARRIED_KEYS = { RenewableEnergy.PowerBank.MODULES, SolarGardenLight.CHARGE_KEY }
+local CARRIED_KEYS = { RenewableEnergy.PowerBank.MODULES, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
 
 -- The object being picked up, while vanilla makes its item.
 local pickingUp

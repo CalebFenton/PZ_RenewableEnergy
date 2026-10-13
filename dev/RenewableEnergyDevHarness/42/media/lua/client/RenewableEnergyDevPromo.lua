@@ -167,7 +167,11 @@ local WALK = {
     -- The door stands on the square at out 0, so the open ground starts past it. It reaches a
     -- square past the lights, so that no fence stands between them and the camera.
     open = { along = { -1, 1 }, out = { 1, 4 } },
-    lights = { { -1, 1 }, { 1, 1 }, { -1, 3 }, { 1, 3 } },
+    -- Each with its own bulb, to show the colours a light takes.
+    lights = {
+        { -1, 1, bulb = "Base.LightBulb" }, { 1, 1, bulb = "Base.LightBulbBlue" },
+        { -1, 3, bulb = "Base.LightBulbRed" }, { 1, 3, bulb = "Base.LightBulbGreen" },
+    },
     player = { 0, 0 },
     scout = { 0, 4 },
     -- Late enough for the sky to be dark in any season.
@@ -1443,7 +1447,7 @@ local function addGardenLights()
         end
         for _, spot in ipairs(WALK.lights) do
             RenewableEnergy.WorldSpawns.placeMoveable(atWalk(spot), Sprites.gardenLight.off,
-                { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh })
+                { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh, [SolarGardenLight.BULB_KEY] = spot.bulb })
         end
         getGameTime():setTimeOfDay(WALK.hour)
         -- The lighting takes most of a second to follow the clock.

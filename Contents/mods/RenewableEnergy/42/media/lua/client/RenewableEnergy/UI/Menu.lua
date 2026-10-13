@@ -1,7 +1,7 @@
--- Right-click menus for battery banks, the panels connected to them and vehicles. Each option
--- queues a RenewableEnergyAction, which walks the character over and does the job, except Repair
--- Frame, which walks over and queues vanilla's fixing. Parts go into a bank and come out only
--- through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
+-- Right-click menus for battery banks, the panels connected to them, garden lights and vehicles.
+-- Each option queues a RenewableEnergyAction, which walks the character over and does the job,
+-- except Repair Frame, which walks over and queues vanilla's fixing. Parts go into a bank and come
+-- out only through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
 
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
@@ -10,6 +10,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/StatusWindow"
@@ -20,6 +21,7 @@ RenewableEnergy.Menu = Menu
 
 local Action = RenewableEnergyAction
 local PowerBank = RenewableEnergy.PowerBank
+local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Format = RenewableEnergy.Format
 local StatusWindow = RenewableEnergy.StatusWindow
 
@@ -28,6 +30,7 @@ local ITEMS = {
     flat = "RenewableEnergy.SolarFlat",
     wall = "RenewableEnergy.SolarWall",
     rack = "RenewableEnergy.SolarRack",
+    gardenLight = SolarGardenLight.ITEM,
 }
 for fullType, bank in pairs(RenewableEnergy.Specs.banks) do
     ITEMS[bank.sprite] = fullType
@@ -132,20 +135,23 @@ local function wiredParts(bank)
     return parts
 end
 
--- One item of each part type the character carries, bags included, in inventory order.
-local function carriedParts(character)
-    local parts, seen = {}, {}
-    local items = character:getInventory():getAllEvalRecurse(function(item)
-        return PowerBank.partKind(item:getFullType()) ~= nil
-    end)
+-- One item of each type the character carries for which `matches(item)` holds, bags included, in
+-- inventory order.
+local function oneOfEachType(character, matches)
+    local found, seen = {}, {}
+    local items = character:getInventory():getAllEvalRecurse(matches)
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if not seen[item:getFullType()] then
             seen[item:getFullType()] = true
-            table.insert(parts, item)
+            table.insert(found, item)
         end
     end
-    return parts
+    return found
+end
+
+local function isPart(item)
+    return PowerBank.partKind(item:getFullType()) ~= nil
 end
 
 local function addSubMenu(context, name)
@@ -159,7 +165,7 @@ end
 --- character carries no part.
 function Menu.addWireInOptions(playerNum, menu, bank)
     local character = getSpecificPlayer(playerNum)
-    local parts = carriedParts(character)
+    local parts = oneOfEachType(character, isPart)
     if #parts == 0 then
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireIn"))
         disable(option, getText("Tooltip_RenewableEnergy_NothingToWire"))
@@ -338,6 +344,40 @@ function Menu.addSourceOptions(playerNum, context, source)
     return menu
 end
 
+local function queueBulb(playerNum, mode, light, bulb)
+    local character = getSpecificPlayer(playerNum)
+    if not luautils.walkAdj(character, light:getSquare(), true) then
+        return
+    end
+    if bulb then
+        ISInventoryPaneContextMenu.transferIfNeeded(character, bulb)
+    end
+    ISTimedActionQueue.add(Action:new(character, mode, light, nil, nil, bulb))
+end
+
+--- Remove Light Bulb for a light that has one, else Add Light Bulb with one option for each type
+--- of bulb the character carries, shown in its colour as vanilla shows a lamp's. Returns the
+--- light's submenu.
+function Menu.addGardenLightOptions(playerNum, context, light)
+    local menu = addSubMenu(context, Menu.nameOf(light))
+    if SolarGardenLight.getBulb(light) then
+        menu:addOption(getText("ContextMenu_RemoveLightbulb"), playerNum, queueBulb, Action.REMOVE_BULB, light)
+        return menu
+    end
+    local bulbs = oneOfEachType(getSpecificPlayer(playerNum), SolarGardenLight.isBulb)
+    if #bulbs == 0 then
+        disable(menu:addOption(getText("ContextMenu_AddLightbulb")), getText("ContextMenu_AddLightbulb_RequiresBulb"))
+        return menu
+    end
+    local submenu = addSubMenu(menu, getText("ContextMenu_AddLightbulb"))
+    for _, bulb in ipairs(bulbs) do
+        local option = submenu:addOption(bulb:getDisplayName(), playerNum, queueBulb, Action.ADD_BULB, light, bulb)
+        option.iconTexture = bulb:getTex()
+        option.color = { r = bulb:getColorRed(), g = bulb:getColorGreen(), b = bulb:getColorBlue() }
+    end
+    return menu
+end
+
 -- Walks to the panel's side of the trailer and mends it there.
 local function queueRepairPanel(playerNum, vehicle, partId)
     local character = getSpecificPlayer(playerNum)
@@ -405,9 +445,10 @@ function Menu.addVehicleOptions(playerNum, context, vehicle)
     end
 end
 
--- The bank and the panel among the clicked objects and the squares they stand on.
+-- The bank, the panel and the garden light among the clicked objects and the squares they stand
+-- on.
 local function findTargets(worldobjects)
-    local bank, source, seen = nil, nil, {}
+    local bank, source, light, seen = nil, nil, nil, {}
     for _, clicked in ipairs(worldobjects) do
         local square = clicked:getSquare()
         if square and not seen[square] then
@@ -419,11 +460,13 @@ local function findTargets(worldobjects)
                     bank = object
                 elseif not source and PowerBank.sourceKind(object) then
                     source = object
+                elseif not light and SolarGardenLight.isLight(object) then
+                    light = object
                 end
             end
         end
     end
-    return bank, source
+    return bank, source, light
 end
 
 -- The generator vanilla would have offered its menu on had the bank not been there.
@@ -463,10 +506,10 @@ function Menu.onPreFill(playerNum, context, worldobjects, test)
 end
 
 function Menu.onFill(playerNum, context, worldobjects, test)
-    local bank, source = findTargets(worldobjects)
+    local bank, source, light = findTargets(worldobjects)
     local character = getSpecificPlayer(playerNum)
     local vehicle = not character:getVehicle() and IsoObjectPicker.Instance:PickVehicle(getMouseXScaled(), getMouseYScaled())
-    if not (bank or source or vehicle) then
+    if not (bank or source or light or vehicle) then
         return
     end
     if test then
@@ -477,6 +520,9 @@ function Menu.onFill(playerNum, context, worldobjects, test)
     end
     if source then
         Menu.addSourceOptions(playerNum, context, source)
+    end
+    if light then
+        Menu.addGardenLightOptions(playerNum, context, light)
     end
     if vehicle then
         Menu.addVehicleOptions(playerNum, context, vehicle)

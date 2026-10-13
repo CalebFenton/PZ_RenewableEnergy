@@ -3,12 +3,13 @@ require "Util/BuildingHelper"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 
--- Every hands-on job at a battery bank, a panel or a vehicle. In multiplayer the client runs
--- start() and perform(), and the server rebuilds the action from new()'s parameters and runs
--- complete(), which makes the change; single player runs both. The server finds the class by its
--- Type with a plain global lookup (NetTimedAction.parse), which is why this one class is a global
--- outside the RenewableEnergy table.
+-- Every hands-on job at a battery bank, a panel, a garden light or a vehicle. In multiplayer the
+-- client runs start() and perform(), and the server rebuilds the action from new()'s parameters
+-- and runs complete(), which makes the change; single player runs both. The server finds the
+-- class by its Type with a plain global lookup (NetTimedAction.parse), which is why this one class
+-- is a global outside the RenewableEnergy table.
 RenewableEnergyAction = ISBaseTimedAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
@@ -27,6 +28,8 @@ Action.UNWIRE = "Unwire"
 Action.REPAIR_PART = "RepairPart"
 Action.RENAME = "Rename"
 Action.REPAIR_PANEL = "RepairPanel"
+Action.REMOVE_BULB = "RemoveBulb"
+Action.ADD_BULB = "AddBulb"
 
 -- Jobs on the bank's wiring or a cracked panel, which need light to see by.
 local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true }
@@ -57,6 +60,10 @@ end
 
 local function isSource(object)
     return onSquare(object) and PowerBank.sourceKind(object) ~= nil
+end
+
+local function isGardenLight(object)
+    return onSquare(object) and RenewableEnergy.SolarGardenLight.isLight(object)
 end
 
 --- The bank the panel `source` is connected to, as { x, y, z }, or nil.
@@ -144,6 +151,14 @@ local CHECKS = {
         return ArrowBoard ~= nil and ArrowBoard.repairablePanel(self.vehicle, self.partId) ~= nil
             and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
     end,
+    [Action.REMOVE_BULB] = function(self)
+        return isGardenLight(self.object) and RenewableEnergy.SolarGardenLight.getBulb(self.object) ~= nil
+    end,
+    [Action.ADD_BULB] = function(self)
+        local SolarGardenLight = RenewableEnergy.SolarGardenLight
+        return isGardenLight(self.object) and SolarGardenLight.getBulb(self.object) == nil
+            and SolarGardenLight.isBulb(self.item) and self.character:getInventory():containsRecursive(self.item)
+    end,
 }
 
 function Action:canPerform()
@@ -190,6 +205,9 @@ local MINUTES = {
     [Action.ATTACH_MAINTAINER] = 1,
     [Action.DETACH_MAINTAINER] = 1,
     [Action.RENAME] = 0.5,
+    -- As long as vanilla's for a lamp's bulb at the default day length (ISLightActions).
+    [Action.REMOVE_BULB] = 1,
+    [Action.ADD_BULB] = 1,
 }
 
 -- Full time at Electricity 3, about a third of it at 10, about a quarter longer at 0.
@@ -328,6 +346,10 @@ function Action:complete()
         return RenewableEnergy.SolarMaintainer.detach(self.character, self.vehicle)
     elseif self.mode == Action.REPAIR_PANEL then
         return RenewableEnergy.ArrowBoard.repairPanel(self.character, self.vehicle, self.partId)
+    elseif self.mode == Action.REMOVE_BULB then
+        return RenewableEnergy.SolarGardenLight.removeBulb(self.character, self.object)
+    elseif self.mode == Action.ADD_BULB then
+        return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item)
     end
     local command, args = COMMANDS[self.mode](self)
     local ok = PowerBank.perform(self.character, command, args)
@@ -335,10 +357,11 @@ function Action:complete()
 end
 
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
--- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel, `bank`
--- the bank's IsoGenerator, `item` the snow tool, the maintainer or the bank part, `bankName` the
--- bank's new name, `partId` the vehicle part worked on; unused ones are nil. The name can't be a
--- field called `name`, which NetTimedAction reads as the action's own name.
+-- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel or the
+-- garden light, `bank` the bank's IsoGenerator, `item` the snow tool, the maintainer, the bank
+-- part or the light bulb, `bankName` the bank's new name, `partId` the vehicle part worked on;
+-- unused ones are nil. The name can't be a field called `name`, which NetTimedAction reads as the
+-- action's own name.
 function Action:new(character, mode, object, bank, vehicle, item, bankName, partId)
     local o = ISBaseTimedAction.new(self, character)
     o.mode = mode

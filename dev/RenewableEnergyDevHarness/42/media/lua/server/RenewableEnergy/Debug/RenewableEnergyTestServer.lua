@@ -483,6 +483,22 @@ handler("gardenLightUpdate", function(_, args)
     return { lit = lit, sprite = light:getTextureName(), charge = SolarGardenLight.getCharge(light) }
 end)
 
+-- Swaps the bulb of the garden light on the square at `args` for a new `args.bulb` in one go, so
+-- that a multiplayer client gets the new bulb while its lamp is still lit, which no pair of timed
+-- actions does reliably. The old bulb goes to the character. Answers whether the light is lit and
+-- the bulb it holds.
+handler("gardenLightSwapBulb", function(player, args)
+    local SolarGardenLight = RenewableEnergy.SolarGardenLight
+    local light = SolarGardenLight.findOn(squareAt(args))
+    if not light then
+        return nil, "the garden light on the server"
+    end
+    if not (SolarGardenLight.removeBulb(player, light) and SolarGardenLight.addBulb(player, light, instanceItem(args.bulb))) then
+        return nil, "a bulb swap in the garden light on the server"
+    end
+    return { lit = SolarGardenLight.isLit(light), bulb = SolarGardenLight.getBulb(light) }
+end)
+
 -- Vehicles ----------------------------------------------------------------------------------------
 
 local function batteryOf(vehicle)

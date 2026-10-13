@@ -225,8 +225,8 @@ test("renewable_energy_tiles_place_and_pick_up", {
     end,
 })
 
--- A mount keeps each module's condition, and a garden light its charge, from item to placed
--- object and back.
+-- A mount keeps each module's condition, and a garden light its charge and bulb, from item to
+-- placed object and back.
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
     { type = "RenewableEnergy.SolarModule", condition = 72 },
@@ -235,6 +235,7 @@ local CARRIED = {
     { Sprites.rack.wood.S, "RenewableEnergy.SolarRackWood", RenewableEnergy.PowerBank.MODULES, MODULES },
     { Sprites.flat, "RenewableEnergy.SolarFlat", RenewableEnergy.PowerBank.MODULES, { MODULES[1] } },
     { Sprites.gardenLight.off, RenewableEnergy.SolarGardenLight.ITEM, RenewableEnergy.SolarGardenLight.CHARGE_KEY, 2.5 },
+    { Sprites.gardenLight.off, RenewableEnergy.SolarGardenLight.ITEM, RenewableEnergy.SolarGardenLight.BULB_KEY, "Base.LightBulbBlue" },
 }
 
 local function describe(value)

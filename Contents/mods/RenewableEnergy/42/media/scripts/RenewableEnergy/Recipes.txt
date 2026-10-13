@@ -491,6 +491,7 @@ module Base
         }
     }
 
+    /* The light's bulb, if it has one, comes back through OnCreate. */
     craftRecipe RenewableEnergy_TakeApartSolarGardenLight
     {
         timedAction = DismantleElectrical,
@@ -499,6 +500,8 @@ module Base
         category = Electrical,
         SkillRequired = Electricity:1,
         xpAward = Electricity:2,
+        Tooltip = Tooltip_RenewableEnergy_TakeApartGivesBulb,
+        OnCreate = RenewableEnergy.Recipes.takeApartGardenLight,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
