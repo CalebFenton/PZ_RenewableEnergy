@@ -30,14 +30,15 @@ def M(name):
         "darkgrey": lambda: material("RE_DarkGrey", "#3a3c3f", roughness=0.5, grime=0.15),
         "grey": lambda: material("RE_GreyPaint", "#8b9089", roughness=0.55, grime=0.2),
         "battery": lambda: material("RE_BatteryCase", "#29292b", roughness=0.6, grime=0.15),
-        # The game's own car battery's grey and label, so the case stripped from one reads as it.
-        "carbattery": lambda: material("RE_CarBattery", "#3f3f3f", roughness=0.6, grime=0.15),
+        # A shade lighter than the game's own car battery's grey, which it draws nearly black on a
+        # face as big as an open case's, with the same label, so the case stripped from one reads as it.
+        "carbattery": lambda: material("RE_CarBattery", "#585858", roughness=0.6, grime=0.15),
         "carlabel": lambda: material("RE_CarLabel", "#698a5f", roughness=0.6, grime=0.1),
         "bolt": lambda: material("RE_Bolt", "#e9e147", roughness=0.5, grime=0.0),
         # The grey paste and sulphate a battery's plates leave smeared on the inside of its case.
         "leadstain": lambda: material("RE_LeadStain", "#99958a", roughness=0.9, grime=0.4, scale=30),
         "marine": lambda: material("RE_MarineBlue", "#2155a8", roughness=0.45, grime=0.12),
-        "maroon": lambda: material("RE_Maroon", "#6e2024", roughness=0.5, grime=0.15),
+        "maroon": lambda: material("RE_Maroon", "#8c2a2f", roughness=0.5, grime=0.15),
         "cream": lambda: material("RE_Cream", "#e6dfc8", roughness=0.6, grime=0.1),
         "white": lambda: material("RE_White", "#ecebe6", roughness=0.6, grime=0.08),
         "yellow": lambda: material("RE_Yellow", "#dcb22b", roughness=0.5, grime=0.1),
@@ -832,7 +833,9 @@ def lying(builder, **options):
 
 def battery_case(col, name, size, colour, cells, label, words=None, bolt=False, handles=False):
     """A stripped battery: the case with its lid cut off and its plates pulled, grey inside with the
-    paste they left, a ledge moulded along its foot and a torn scrap of its label on the front.
+    paste they left, moulded with a lip round its top, ribs up its ends and a ledge along its foot,
+    each catching the light so its big faces don't read as one flat patch, and a torn scrap of its
+    label on the front.
     `cells` is how many cells it holds: six for 12 V, three for 6 V. `label` is the scrap's material,
     `words` what is left of its lettering, and `bolt` puts the game's car battery's lightning bolt on it."""
     width, depth, height = size
@@ -848,6 +851,11 @@ def battery_case(col, name, size, colour, cells, label, words=None, bolt=False, 
         box(col, name + "_EndStain", M("leadstain"), (width - 2 * wall - 2 * stain, stain, inside),
             at=(0, sign * (depth / 2 - wall - stain / 2), wall))
         box(col, name + "_Ledge", M(colour), (width - 0.004, 0.008, 0.016), at=(0, sign * (depth / 2 + 0.004), 0), bevel=0.002)
+        box(col, name + "_Lip", M(colour), (width + 0.006, 0.006, 0.014), at=(0, sign * depth / 2, height - 0.016), bevel=0.002)
+        box(col, name + "_Lip", M(colour), (0.006, depth - 0.006, 0.014), at=(sign * width / 2, 0, height - 0.016), bevel=0.002)
+        for rib in (-1, 1):
+            box(col, name + "_Rib", M(colour), (0.006, 0.01, height - 0.034), at=(sign * (width / 2 + 0.001), rib * depth * 0.38, 0.012),
+                bevel=0.002)
     for i in range(1, cells):
         box(col, name + "_CellWall", M("leadstain"), (0.004, depth - 2 * (wall + stain), height - 0.025),
             at=(-width / 2 + i * width / cells, 0, wall))

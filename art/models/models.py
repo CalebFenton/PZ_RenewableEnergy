@@ -4,8 +4,9 @@ items.VEHICLES, and writes Models.txt.
     PYTHONHASHSEED=0 blender -b --factory-startup --python-use-system-env -P art/models/models.py
 
 Each model's parts are merged into one mesh, unwrapped, and their materials baked into one texture
-(colour, darkened by ambient occlusion so creases read without the renderer's light), because the
-game draws a world item or a vehicle body with a single texture. An item's mesh goes to
+(colour, darkened by ambient occlusion so creases read without the renderer's light; a world item's
+gets the light painted in as well, `paint_light` says why), because the game draws a world item or
+a vehicle body with a single texture. An item's mesh goes to
 models_X/WorldItems and its texture to textures/WorldItems, both RenewableEnergy_<Item>, and
 Models.txt gets a model <Item>_Ground in module RenewableEnergy for the item's WorldStaticModel. A
 vehicle's mesh goes to models_X/vehicles, cut into the body and the part models items.VEHICLES
@@ -167,6 +168,84 @@ def bake(obj, kind, size, colorspace, source=None):
     return pixels
 
 
+def bake_emit(obj, size, shader):
+    """Bakes what `shader(nodes, links)` returns, a vector socket, into a float image over every face
+    of `obj`, and returns its pixels."""
+    image = bpy.data.images.new("bake_emit", size, size, alpha=False, float_buffer=True)
+    image.colorspace_settings.name = "Non-Color"
+    mat = bpy.data.materials.new("BakeEmit")
+    mat.use_nodes = True
+    nodes, links = mat.node_tree.nodes, mat.node_tree.links
+    nodes.clear()
+    emission = nodes.new("ShaderNodeEmission")
+    links.new(shader(nodes, links), emission.inputs["Color"])
+    links.new(emission.outputs[0], nodes.new("ShaderNodeOutputMaterial").inputs["Surface"])
+    target = nodes.new("ShaderNodeTexImage")
+    target.image = image
+    nodes.active = target
+    kept = list(obj.data.materials)
+    for i in range(len(kept)):
+        obj.data.materials[i] = mat
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.bake(type="EMIT", margin=4)
+    for i, original in enumerate(kept):
+        obj.data.materials[i] = original
+    bpy.data.materials.remove(mat)
+    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(size, size, 4)[..., :3]
+    bpy.data.images.remove(image)
+    return pixels
+
+
+def baked_normal(obj, size, bevel=None):
+    """Each texel's normal, rounded over `bevel` metres at the edges if given."""
+    def shader(nodes, links):
+        if bevel:
+            source = nodes.new("ShaderNodeBevel")
+            source.inputs["Radius"].default_value = bevel
+            source.samples = 16
+            normal = source.outputs["Normal"]
+        else:
+            normal = nodes.new("ShaderNodeNewGeometry").outputs["Normal"]
+        encode = nodes.new("ShaderNodeVectorMath")
+        encode.operation = "MULTIPLY_ADD"
+        encode.inputs[1].default_value = (0.5, 0.5, 0.5)
+        encode.inputs[2].default_value = (0.5, 0.5, 0.5)
+        links.new(normal, encode.inputs[0])
+        return encode.outputs[0]
+    normal = bake_emit(obj, size, shader) * 2 - 1
+    return normal / np.maximum(np.linalg.norm(normal, axis=-1, keepdims=True), 1e-6)
+
+
+# The game lights a world item evenly, so faces of one colour draw as one flat patch and the
+# item's shape is lost. Like a hand-painted game texture, the bake paints the light in, as the
+# tiles are lit (render.py: from the west, a little south): tops lightest, the south side the
+# camera sees on the left a shade darker, the east side on the right darker again, every edge
+# rounded off so it catches a highlight, and each side darkening towards the ground. The faces the
+# camera sees head-on keep about their own colour, as the game crushes dark ones towards black:
+# upward faces come out about 1.3 times their colour, the south side 0.97, the east side 0.85.
+SKY, SKY_TILT = 0.85, 0.15  # sky light on a side face, and how much more (less) facing up (down)
+SUN, SUN_TOWARD = 0.45, Vector((-0.85, -0.35, 1.0)).normalized()
+EDGE_RADIUS, EDGE_GLINT = 0.008, 0.6
+GROUND_SHADE = 0.2  # how much darker the foot of the item than its top
+
+
+def paint_light(obj, size, occlusion):
+    """The light painted onto each texel of the world item `obj`, given its ambient occlusion."""
+    flat = baked_normal(obj, size)
+    rounded = baked_normal(obj, size, EDGE_RADIUS)
+    height = bake_emit(obj, size, lambda nodes, links: nodes.new("ShaderNodeNewGeometry").outputs["Position"])[..., 2:3]
+    up = rounded[..., 2:3]
+    sun = np.maximum(rounded @ np.array(SUN_TOWARD, dtype=np.float32), 0)[..., None]
+    # How far the rounding turns the normal, 1 on the edge itself; only where the edge stands out
+    # into the open, not in the crease of an inside corner.
+    edge = np.clip((1 - np.sum(flat * rounded, axis=-1, keepdims=True)) / (1 - math.cos(math.pi / 4)), 0, 1)
+    glint = EDGE_GLINT * edge * occlusion ** 2
+    ground = 1 - GROUND_SHADE * (1 - np.clip(height / max(float(height.max()), 0.01), 0, 1))
+    return (SKY + SKY_TILT * up + SUN * sun + glint) * ground
+
+
 def save_texture(path, pixels, alpha=False):
     size = pixels.shape[0]
     image = bpy.data.images.new("texture", size, size, alpha=alpha)
@@ -201,8 +280,9 @@ def export(obj, name, path):
 
 def build_baked(stage, builder, name, size, to_ground):
     """Builds one model's parts as a single mesh, unwrapped, and bakes its texture: colour
-    darkened by ambient occlusion. `to_ground` centres it standing on the ground; otherwise it
-    keeps the builder's origin. Returns the mesh object, the texture's pixels and the parts the
+    darkened by ambient occlusion. `to_ground` centres it standing on the ground and paints the
+    light in, as for a world item; otherwise it keeps the builder's origin and the light is the
+    game's, as for a vehicle. Returns the mesh object, the texture's pixels and the parts the
     mesh's "part" attribute indexes; the parts stay on `stage` until the next build."""
     kit.clear(stage)
     builder(stage)
@@ -218,6 +298,8 @@ def build_baked(stage, builder, name, size, to_ground):
     high.hide_render = True
     occlusion = bake(low, "AO", size, "Non-Color")[..., :1]
     colour[..., :3] *= 0.55 + 0.45 * occlusion
+    if to_ground:
+        colour[..., :3] *= paint_light(low, size, occlusion)
     bpy.data.objects.remove(high)
     stage.hide_render = False
     return low, colour, solid
