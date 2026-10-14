@@ -20,6 +20,9 @@
 --     art_trailer_rear_damage1.png    the back of its frame (TruckBed: tail and sides) at damage
 --                                     stage 1, then
 --     art_trailer_rear_damage2.png    at stage 2
+--     art_trailer_lit.png       its arrow lit by day, from a charged battery, mid-flash
+--     art_trailer_dark.png      switched on but dark, with no battery in its box
+--     art_trailer_lit_night.png its arrow lit at night, dimmed, lighting the ground around it
 --   art_trailer_front.png   a second trailer, alone and facing the other way, blood on all four
 --                     sides, for the front and left side; the same view then shows it clean with
 --     art_trailer_damage1.png   its whole frame (EngineDoor and TruckBed) and the battery box lid
@@ -174,6 +177,38 @@ local function lockLid(pair, locked)
     door:setLocked(locked)
 end
 
+-- How far into a flash a lit shot waits, so the frame it copies has drawn the lamps lit.
+local FLASH_SETTLE_MS = 150
+-- The last moment into a flash a lit shot may start, leaving the rest of the flash for the shot.
+local FLASH_SHOT_MS = 500
+
+-- The trailer switched on with a charged battery in its box, or none if not `lit`, its lamps set
+-- as the clock's pass sets them, dimmed for the night if `night`, the clock set to midnight then.
+-- Returns a runSteps wait: at night until the lighting has settled on the dark and the board's
+-- lamppost, and for lit lamps until they are a little way into a flash.
+local function setLamps(pair, lit, night)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local container = pair.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
+    container:removeAllItems()
+    if lit then
+        RenewableEnergy.Battery.setCharge(container:AddItem("RenewableEnergy.DeepCycleBattery"), 0.8)
+    end
+    if night then
+        getGameTime():setTimeOfDay(0)
+    end
+    ArrowBoard.setSwitch(pair.trailer, true)
+    ArrowBoard.runLamps(pair.trailer, 0, night)
+    local settled = night and Stage.lightingSettled(getPlayer(), true)
+    return function()
+        if settled and not settled() then
+            return false
+        end
+        settled = nil
+        local flashLit, ms = ArrowBoard.flashPhase(getTimestampMs())
+        return not lit or flashLit and ms >= FLASH_SETTLE_MS and ms <= FLASH_SHOT_MS
+    end
+end
+
 -- The trailer's states, each set on a repaired trailer and shot from where the shot before stands.
 -- The hitched trailer shows its rear; the lone one, facing the other way, its front and the lid.
 -- A state's `set` may return how to wait before the shot, as a runSteps step does.
@@ -208,6 +243,10 @@ local HITCHED_STATES = {
     },
     { name = "art_trailer_rear_damage1", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_1) end },
     { name = "art_trailer_rear_damage2", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_2) end },
+    { name = "art_trailer_lit", set = function(pair) return setLamps(pair, true, false) end },
+    { name = "art_trailer_dark", set = function(pair) return setLamps(pair, false, false) end },
+    -- The last of them: the lone trailer's shots put the clock back to noon.
+    { name = "art_trailer_lit_night", set = function(pair) return setLamps(pair, true, true) end },
 }
 local LONE_STATES = {
     { name = "art_trailer_damage1", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_1) end },
@@ -454,6 +493,8 @@ local function addCrackedShot(steps, player, lot)
         trailer:getPartById("RenewableEnergyPanelLeft"):setCondition(30)
         trailer:getPartById("RenewableEnergyPanelRight"):setCondition(100)
         RenewableEnergy.ArrowBoard.showPanels(trailer)
+        -- Dark, as Stage.spawnTrailer leaves its trailers.
+        RenewableEnergy.ArrowBoard.setSwitch(trailer, false)
         return Stage.vehiclesAtRest({ trailer = trailer }, false)
     end)
     addShot(steps, player, lot, CRACKED_SHOT)
@@ -511,6 +552,11 @@ end
 
 -- A second trailer alone, facing the other way, in each of its states, then the cracked panels.
 local function addLoneAndCrackedShots(steps, player, lot, art)
+    -- Back to noon after the hitched trailer's night shot.
+    table.insert(steps, function()
+        getGameTime():setTimeOfDay(12)
+        return Stage.lightingSettled(player, true)
+    end)
     table.insert(steps, function()
         clearVehicles(lot)
         art.trailer = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")

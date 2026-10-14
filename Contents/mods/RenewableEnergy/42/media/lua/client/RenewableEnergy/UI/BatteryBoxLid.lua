@@ -1,8 +1,9 @@
 -- The arrow board's battery box lid is a trunk lid to vanilla (scripts/RenewableEnergy/Vehicles.txt
 -- says why), so vanilla's radial menu, joypad prompt, loot window and mechanics window would call it
 -- a trunk. These hooks give it the box's words on the trailer only, tell a player who tries the
--- padlocked box how to get in, offer Cut Padlock at the padlock, and show the box in the loot
--- window when the lid opens, wherever vanilla shows a trunk's container.
+-- padlocked box how to get in, offer Cut Padlock at the padlock and the lamps' switch inside the
+-- box, and show the box in the loot window when the lid opens, wherever vanilla shows a trunk's
+-- container.
 
 require "ISUI/ISButtonPrompt"
 require "ISUI/ISWorldObjectContextMenu"
@@ -68,16 +69,45 @@ function BatteryBoxLid.cutPadlock(character, lid, cutters)
     ISTimedActionQueue.add(Action:new(character, Action.CUT_PADLOCK, nil, nil, vehicle, cutters))
 end
 
+-- Switch -------------------------------------------------------------------------------------------
+
+--- Walks to the box and flips the lamps' switch inside it to `on`.
+function BatteryBoxLid.flipSwitch(character, vehicle, on)
+    local box = vehicle:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
+    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, box:getArea()))
+    ISTimedActionQueue.add(Action:new(character, on and Action.BOARD_ON or Action.BOARD_OFF, nil, nil, vehicle))
+end
+
+-- Adds the switch's slice for a character standing at an arrow board's battery box: Switch Lamps
+-- On or Off, with vanilla's headlight icons, where the switch can be reached, else one that says
+-- why not and does nothing, as vanilla's radial does for what it can't do (ISVehicleMenu).
+local function addSwitchSlice(menu, character)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local vehicle = ISVehicleMenu.getVehicleToInteractWith(character)
+    local box = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(ArrowBoard.BATTERY_BOX)
+    if not (box and vehicle:isInArea(box:getArea(), character)) then
+        return
+    end
+    local on = ArrowBoard.isSwitchedOn(vehicle)
+    local texture = getTexture(on and "media/ui/vehicles/vehicle_lightsOFF.png" or "media/ui/vehicles/vehicle_lightsON.png")
+    if ArrowBoard.switchReachable(vehicle) then
+        menu:addSlice(getText(on and "IGUI_RenewableEnergy_LampsOff" or "IGUI_RenewableEnergy_LampsOn"), texture,
+            BatteryBoxLid.flipSwitch, character, vehicle, not on)
+    else
+        menu:addSlice(getText("IGUI_RenewableEnergy_LampsSwitchShut"), texture, nil)
+    end
+end
+
 -- Radial menu --------------------------------------------------------------------------------------
 
 local vanillaShowRadialMenuOutside = ISVehicleMenu.showRadialMenuOutside
 
--- Renames the lid's Open and Close and adds Cut Padlock beside them at a padlock that holds: one
--- that cuts it for a player carrying bolt cutters, else one that only says what cutting takes and
--- does nothing, as vanilla's radial says what hotwiring takes (ISVehicleMenu.showRadialMenu). The
--- menu joins the UI only on the next UI update (UIManager.AddUI), so whether vanilla built it here
--- shows only in what it was before: shown, which the call hides, or the character in a vehicle,
--- which builds nothing.
+-- Renames the lid's Open and Close, adds the lamps' switch, and adds Cut Padlock beside them at a
+-- padlock that holds: one that cuts it for a player carrying bolt cutters, else one that only says
+-- what cutting takes and does nothing, as vanilla's radial says what hotwiring takes
+-- (ISVehicleMenu.showRadialMenu). The menu joins the UI only on the next UI update
+-- (UIManager.AddUI), so whether vanilla built it here shows only in what it was before: shown,
+-- which the call hides, or the character in a vehicle, which builds nothing.
 function ISVehicleMenu.showRadialMenuOutside(playerObj)
     local menu = getPlayerRadialMenu(playerObj:getPlayerNum())
     local wasShown = menu:isReallyVisible()
@@ -93,6 +123,7 @@ function ISVehicleMenu.showRadialMenuOutside(playerObj)
             menu:setSliceText(i, BatteryBoxLid.text(part, command == ISVehicleMenu.onOpenDoor and "IGUI_OpenTrunk" or "IGUI_CloseTrunk"))
         end
     end
+    addSwitchSlice(menu, playerObj)
     if not (lid and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
         return
     end

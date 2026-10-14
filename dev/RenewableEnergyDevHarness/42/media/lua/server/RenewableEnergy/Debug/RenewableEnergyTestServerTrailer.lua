@@ -117,8 +117,9 @@ local function partState(vehicle, partId)
 end
 
 --- What the tests read of a vehicle on either side: each panel's module, condition and shown
---- models, the frame's parts, what the battery box holds, the lid, the towing car's id and where
---- the vehicle is.
+--- models, the frame's parts and the lamp board, what the battery box holds, the lid, the switch,
+--- the lamps and whether this side's copy shows them lit this moment (windowLights), the towing
+--- car's id and where the vehicle is.
 function Trailer.vehicleState(vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local state = {
@@ -159,6 +160,9 @@ function Trailer.vehicleState(vehicle)
             installed = lid:getInventoryItem() ~= nil,
             shown = Trailer.shownModels(vehicle, ArrowBoard.LID) }
     end
+    state.switchOn = ArrowBoard.isSwitchedOn(vehicle)
+    state.lamps = ArrowBoard.lamps(vehicle)
+    state.windowLights = vehicle:getWindowLightsOn()
     return state
 end
 
@@ -199,11 +203,12 @@ end
 
 -- Sets up the trailer `args.id` on the authority, in this order: whole if `args.repair`; each
 -- panel of `args.panels` ({ [partId] = { type, condition } }, an empty table taking the module
--- off); each frame part of `args.frame` ({ [partId] = condition }); the battery box emptied and
--- filled with `args.box` ({ { type, charge } }) if given; the blood of `args.blood` ({ [side] =
--- intensity }); the lid taken off or a new one put on if `args.lidInstalled` is set, open or shut
--- if `args.lidOpen` is, locked or not if `args.lidLocked` is, and its lock cut or whole if
--- `args.lidLockBroken` is. Answers its state.
+-- off); each frame part and the lamp board of `args.frame` ({ [partId] = condition }); the battery
+-- box emptied and filled with `args.box` ({ { type, charge } }) if given; the blood of
+-- `args.blood` ({ [side] = intensity }); the lid taken off or a new one put on if
+-- `args.lidInstalled` is set, open or shut if `args.lidOpen` is, locked or not if `args.lidLocked`
+-- is, and its lock cut or whole if `args.lidLockBroken` is; the switch on or off if
+-- `args.switchOn` is set, as the switch action does. Answers its state.
 handler("setTrailer", function(_, args)
     local vehicle, missing = vehicleAt(args)
     if not vehicle then
@@ -260,7 +265,66 @@ handler("setTrailer", function(_, args)
     if args.lidOpen ~= nil or args.lidLocked ~= nil or args.lidLockBroken ~= nil then
         vehicle:transmitPartDoor(lid)
     end
+    if args.switchOn ~= nil then
+        ArrowBoard.setSwitch(vehicle, args.switchOn)
+    end
     return { state = Trailer.vehicleState(vehicle) }
+end)
+
+-- `args.hours` of the trailer's lamps as they were lit, then the lamps set again with the
+-- photocell seeing dark if `args.night` (ArrowBoard.runLamps). Answers the watt-hours they drew
+-- and the trailer's state.
+handler("arrowBoardLamps", function(_, args)
+    local vehicle, missing = vehicleAt(args)
+    if not vehicle then
+        return nil, missing
+    end
+    local drawn = RenewableEnergy.ArrowBoard.runLamps(vehicle, args.hours, args.night == true)
+    return { drawn = drawn, state = Trailer.vehicleState(vehicle) }
+end)
+
+-- The trailer's whole charge pass of `args.hours` at the sun of the moment, as the clock runs it
+-- (ArrowBoard.update). Answers the watt-hours its panels stored and its state.
+handler("arrowBoardUpdate", function(_, args)
+    local vehicle, missing = vehicleAt(args)
+    if not vehicle then
+        return nil, missing
+    end
+    local stored = RenewableEnergy.ArrowBoard.update(vehicle, args.hours)
+    return { stored = stored, state = Trailer.vehicleState(vehicle) }
+end)
+
+-- Whether the switch could be set to `args.on` on the authority, which the switch action asks
+-- before it flips it. Answers that and the trailer's state.
+handler("arrowBoardCanSwitch", function(_, args)
+    local vehicle, missing = vehicleAt(args)
+    if not vehicle then
+        return nil, missing
+    end
+    return { can = RenewableEnergy.ArrowBoard.canSwitch(vehicle, args.on), state = Trailer.vehicleState(vehicle) }
+end)
+
+-- Rolls the trailer's switch as stocking does `args.rolls` times, from no switch each time, then
+-- puts its own back. Answers how many rolls came out on.
+handler("arrowBoardSwitchRolls", function(_, args)
+    local vehicle, missing = vehicleAt(args)
+    if not vehicle then
+        return nil, missing
+    end
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
+    local modData = box:getModData()
+    local own, on = modData.RenewableEnergy_switchOn, 0
+    for _ = 1, args.rolls do
+        modData.RenewableEnergy_switchOn = nil
+        ArrowBoard.rollSwitch(vehicle)
+        if ArrowBoard.isSwitchedOn(vehicle) then
+            on = on + 1
+        end
+    end
+    modData.RenewableEnergy_switchOn = own
+    vehicle:transmitPartModData(box)
+    return { on = on }
 end)
 
 -- `args.hours` of the trailer's panels charging its box at the sun of the moment. Answers the

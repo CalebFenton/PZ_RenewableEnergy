@@ -86,6 +86,11 @@ function Battery.cycleWear(spec, depth)
     return (depth / 0.5) ^ 2 / spec.cyclesAt50
 end
 
+--- The Battery Wear sandbox option as a factor on the wear of every discharge.
+function Battery.wearScale()
+    return SandboxVars.RenewableEnergy.BatteryWear / 100
+end
+
 --- Take `fraction` of a full life off a battery's condition. Returns whether the condition
 --- changed, so the caller knows to sync the item.
 function Battery.wear(item, fraction)

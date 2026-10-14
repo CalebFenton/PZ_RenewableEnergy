@@ -1270,6 +1270,8 @@ local function addTrailer()
     end)
     add(function()
         Stage.hitchTrailer(pair, getPlayer(), "REPromo")
+        -- Its arrow lit, as work zones leave them.
+        Stage.holdLampsLit(pair.trailer)
         return Stage.vehiclesAtRest(pair, true)
     end)
     -- From the item floor first, as a full run's character has by now: the hedges and fences along

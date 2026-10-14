@@ -327,6 +327,24 @@ module Base
                 init = RenewableEnergy.ArrowBoard.initFrame,
             }
         }
+        /* The lamp board, under the rear windshield's id: the game lights the mask zone of that
+           id from the lamps texture while windowLightsOn is set and the part holds an item, with no
+           battery part to ask (BaseVehicle.updateLights), so RenewableEnergy.ArrowBoard flashes the
+           lamps by that flag alone. The id also shows the part's condition on that zone and takes
+           rear crashes (doDamageOverlay, addDamageRear); a board beaten to nothing stays dark until
+           Repair Frame welds it, so it holds the frame's item, whose welding that is. */
+        part WindshieldRear
+        {
+            area = TruckBed,
+            category = nodisplay,
+            itemType = RenewableEnergy.TrailerFrame,
+            specificItem = false,
+            lua
+            {
+                create = Vehicles.Create.Default,
+                init = RenewableEnergy.ArrowBoard.initBoard,
+            }
+        }
         part RenewableEnergyPanelLeft
         {
             area = RenewableEnergyPanelLeft,
@@ -378,7 +396,7 @@ module Base
                 }
                 time = 200,
                 skills = Mechanics:2;Electricity:1,
-                test = RenewableEnergy.ArrowBoard.panelInstallTest,
+                test = Vehicles.InstallTest.Default,
                 complete = RenewableEnergy.ArrowBoard.panelChanged,
             }
             table uninstall
@@ -395,7 +413,7 @@ module Base
                 }
                 time = 200,
                 skills = Mechanics:2;Electricity:1,
-                test = RenewableEnergy.ArrowBoard.panelUninstallTest,
+                test = Vehicles.UninstallTest.Default,
                 complete = RenewableEnergy.ArrowBoard.panelChanged,
             }
             lua

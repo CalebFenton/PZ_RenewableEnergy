@@ -677,9 +677,10 @@ local function gadgetCharges(args)
 end
 
 -- Readies the clock test's gadgets, half charged: a maintainer on the car, one deep cycle battery
--- in the trailer's box, which may have spawned stocked, four cells in the solar battery charger,
--- and the garden light empty. Answers their charges (gadgetCharges). The gadget pass runs first,
--- so that the clock's passes from here on cover no more than the time the clock moves.
+-- in the trailer's box, which may have spawned stocked, with its lamps switched off, since they
+-- would draw what the panels make, four cells in the solar battery charger, and the garden light
+-- empty. Answers their charges (gadgetCharges). The gadget pass runs first, so that the clock's
+-- passes from here on cover no more than the time the clock moves.
 handler("stockGadgets", function(player, args)
     RenewableEnergy.GadgetCharging.update()
     local SolarCellCharger = RenewableEnergy.SolarCellCharger
@@ -695,6 +696,7 @@ handler("stockGadgets", function(player, args)
     local box = batteryBoxOf(trailer)
     box:removeAllItems()
     box:AddItem("RenewableEnergy.DeepCycleBattery"):setCurrentUsesFloat(0.5)
+    RenewableEnergy.ArrowBoard.setSwitch(trailer, false)
     -- An empty cell is used up and leaves its container on its next update
     -- (DrainableComboItem.update), so the cells start half charged.
     local cells = charger:getContainer()

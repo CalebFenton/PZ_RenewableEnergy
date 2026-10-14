@@ -123,6 +123,20 @@ Specs.maintainerWatts = 10
 -- draws at night, and the radius it lights.
 Specs.gardenLight = { watts = 1, wh = 3, nightWatts = 0.5, radius = 2 }
 
+-- The arrow board trailer's 15-lamp board and its controller, as Solar Technology's Silent
+-- Sentinel manual measures them at 12.5 V (P/N 550-025-100, Power Consumption and Battery Level):
+-- a single arrow draws dayWatts while lit by day (1.25 A) and nightWatts once the photocell dims
+-- it after dark (0.5 A), the controller offWatts between flashes (0.05 A). The MUTCD (2009,
+-- 6F.61) asks 25 to 40 flashes a minute, each lit at least half the time. The controller shuts
+-- the lamps off below 10.7 V, which a lead-acid battery under that load reaches nearly flat:
+-- below `cutoff` of a full charge in every battery. It lights them again once a battery is back
+-- at `reconnect`, about the 12 V rested where its battery level reads Normal again. At night the
+-- lit board lights the ground `radius` squares around it.
+Specs.arrowBoard = {
+    dayWatts = 15.6, nightWatts = 6.25, offWatts = 0.625, flashesPerMinute = 30, onShare = 0.5,
+    cutoff = 0.1, reconnect = 0.25, radius = 3,
+}
+
 -- Batteries found in the world hold this fraction of a charge.
 Specs.foundCharge = { min = 0.3, max = 0.8 }
 

@@ -260,6 +260,9 @@ def clear_stale(folders):
 HEAD, TAIL, BOOT = (255, 0, 0), (0, 255, 0), (0, 255, 127)
 GUARD_LEFT, GUARD_RIGHT = (0, 0, 191), (191, 191, 0)
 STOPLIGHT_LEFT, STOPLIGHT_RIGHT = (127, 191, 0), (127, 64, 0)
+# The rear windshield's zone, the lamp board's: lit from the lights texture while the vehicle's
+# windowLightsOn is set, dented by the WindshieldRear part, bloodied from the rear.
+LAMP_BOARD = (0, 127, 0)
 # Matches no zone: no blood or damage, never dark when a part is missing.
 CLEAN = (255, 255, 255)
 ZONE_COLOURS = [(255, 0, 0), (0, 255, 0), (0, 255, 255), (255, 255, 0), (255, 0, 255), (0, 0, 255), (0, 127, 127),
@@ -280,8 +283,13 @@ TRAILER_ZONES = {
     "Trailer_Rail": SIDE, "Trailer_Spring": SIDE, "Trailer_Fender": SIDE, "Trailer_FenderSkirt": SIDE,
     "Trailer_Reflector": SIDE,
     "Trailer_Mast": TAIL, "Trailer_MastPivot": TAIL, "Trailer_Cradle": TAIL,
+    "Board_Back": LAMP_BOARD, "Board_FrameLong": LAMP_BOARD, "Board_FrameShort": LAMP_BOARD,
+    "Board_Lamp": LAMP_BOARD, "Board_Visor": LAMP_BOARD,
     "Trailer_Deck": FACING, "Trailer_CrossMember": FACING,
 }
+# Parts drawn lit from the lights texture when their zone is lit, in that colour: the arrow's
+# lamps, a bright amber against their dark lenses. The tail lights glow by their zone (STOPLIGHT).
+GLOWING = {"Board_Lamp": (1.0, 0.86, 0.38)}
 # Rust stays off glass, lamps and the board's face. Module parts are named after their module.
 RUST_FREE = ("Board_Back", "Board_Lamp", "Board_Visor", "Trailer_TailLight", "Trailer_Reflector", "Trailer_Panel",
              "Trailer0_", "Trailer1_", "TrailerCracked")
@@ -410,7 +418,8 @@ def smoothstep(low, high, x):
 
 def surface(low, solid, size):
     """Per texel of a `size` texture: zone colour (0..1), surface point, normal, whether rust may
-    show, and how deep into its island it lies. Covers the islands padded a few texels."""
+    show, how deep into its island it lies, whether it is covered and the colour it glows (GLOWING,
+    alpha 0 where it doesn't). Covers the islands padded a few texels."""
     face, point = rasterize(low, size)
     depth = depth_in_island(face, 4)
     source = pad(face, max(2, size // 256)).ravel()
@@ -427,10 +436,13 @@ def surface(low, solid, size):
     names = [part_name(obj) for obj in solid]
     zones = np.array([face_zone(names[parts[i]], centres[i], normals[i]) for i in range(len(polygons))]) / 255.0
     rusts = np.array([not names[parts[i]].startswith(RUST_FREE) for i in range(len(polygons))])
+    glows = np.array([GLOWING[names[parts[i]]] + (1.0,) if names[parts[i]] in GLOWING else (0.0, 0.0, 0.0, 0.0)
+                      for i in range(len(polygons))])
     flat_face = face.ravel()[np.where(covered, source, 0)]
     zone = np.where(covered[:, None], zones[flat_face], 1.0)
     rust = covered & rusts[flat_face]
     normal = np.where(covered[:, None], normals[flat_face], 0.0)
+    glow = np.where(covered[:, None], glows[flat_face], 0.0)
     point = np.where(covered[:, None], point.reshape(-1, 3)[np.where(covered, source, 0)], 0.0)
     depth = depth.ravel()[np.where(covered, source, 0)]
     stencil = [obj for obj in bpy.data.objects if part_name(obj) == TRAILER_STENCIL]
@@ -442,7 +454,7 @@ def surface(low, solid, size):
         rust &= ~inside
     shape = (size, size)
     return (zone.reshape(*shape, 3), point.reshape(*shape, 3), normal.reshape(*shape, 3), rust.reshape(shape),
-            depth.reshape(shape), covered.reshape(shape))
+            depth.reshape(shape), covered.reshape(shape), glow.reshape(*shape, 4))
 
 
 def check_mask(mask):
@@ -468,16 +480,17 @@ def check_mask(mask):
 
 def vehicle_overlays(low, solid):
     """The mask, lights, rust, damage shells and blood textures of a vehicle body, by file suffix."""
-    zone, point, normal, rust_ok, depth, covered = surface(low, solid, MASK_SIZE)
+    zone, point, normal, rust_ok, depth, covered, glow = surface(low, solid, MASK_SIZE)
     mask = np.concatenate((zone, np.ones(zone.shape[:2] + (1,))), axis=-1)
     check_mask(mask)
     stop = np.isin(np.round(zone * 255).astype(int) @ np.array([65536, 256, 1]),
                    [(r << 16) | (g << 8) | b for r, g, b in (STOPLIGHT_LEFT, STOPLIGHT_RIGHT)])
-    # Drawn over the lit lamps after the scene's lighting, so they glow at night too.
-    lights = np.zeros(zone.shape[:2] + (4,))
+    # Drawn over the lit lamps after the scene's lighting, so they glow at night too: the tail
+    # lights by their zone, the arrow's lamps by their part.
+    lights = glow.copy()
     lights[stop] = (1.0, 0.08, 0.03, 1.0)
 
-    zone, point, normal, rust_ok, depth, covered = surface(low, solid, OVERLAY_SIZE)
+    zone, point, normal, rust_ok, depth, covered, _ = surface(low, solid, OVERLAY_SIZE)
     shape = zone.shape[:2]
     z = point[..., 2]
     low_down = 1 - smoothstep(-0.35, 0.55, z)

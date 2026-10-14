@@ -170,10 +170,7 @@ function Bank:recount()
     self.charge = nominalWh > 0 and storedWh / nominalWh or 0
 end
 
--- The BatteryWear sandbox option as a factor.
-local function wearScale()
-    return SandboxVars.RenewableEnergy.BatteryWear / 100
-end
+local wearScale = Battery.wearScale
 
 --- Put the bank's charge into every battery it holds: the batteries are wired in parallel,
 --- so they share one state of charge. Pending wear from days spent unloaded lands too.

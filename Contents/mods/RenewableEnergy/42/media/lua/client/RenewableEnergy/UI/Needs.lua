@@ -1,8 +1,8 @@
--- Tooltip text listing what a job takes the way vanilla's mechanics window lists what taking
--- engine parts takes (ISVehicleMechanics.doMenuTooltip): "Needs" over a line per need, "<what>
--- <have>/<need>" in vanilla's good colour when the character has enough and its bad colour when
--- short, then anything else that stands in the way in the bad colour. The needs are the lists the
--- refusals read (RenewableEnergy.firstUnmet), so the colours agree with what the job allows.
+-- Tooltip text listing what a job takes the way vanilla lists what fixing an item takes
+-- (ISInventoryPaneContextMenu, "Needs" over a line per need) and the mechanics window colours it
+-- (ISVehicleMechanics.doMenuTooltip): "<what> <have>/<need>" in the good colour when the character
+-- has enough and the bad colour when short. The needs are the lists the refusals read
+-- (RenewableEnergy.firstUnmet), so the colours agree with what the job allows.
 
 require "Vehicles/ISUI/ISVehicleMechanics"
 
@@ -24,49 +24,20 @@ local function nameOf(need)
     return need.input:getPossibleInputItems():get(0):getDisplayName()
 end
 
---- Whether the character has enough of `need`, which picks its line's colour.
-function Needs.met(need)
-    return need.have >= need.need
-end
-
---- One need's line; a recipe gets vanilla's recipe line, which has no count.
-function Needs.line(need)
-    local colour = Needs.met(need) and ISVehicleMechanics.ghs or ISVehicleMechanics.bhs
+-- One need's line; a recipe gets vanilla's recipe line, which has no count.
+local function line(need)
+    local colour = need.have >= need.need and ISVehicleMechanics.ghs or ISVehicleMechanics.bhs
     if need.recipe then
         return " " .. colour .. " " .. getText("Tooltip_vehicle_requireRecipe", need.recipe:getTranslationName()) .. " <LINE>"
     end
     return " " .. colour .. nameOf(need) .. " " .. need.have .. "/" .. need.need .. " <LINE>"
 end
 
---- A line for each of `needs`.
-function Needs.lines(needs)
-    local text = ""
+--- The tooltip text: "Needs" over a line for each of `needs`.
+function Needs.describe(needs)
+    local text = getText("Tooltip_craft_Needs") .. " : <LINE>"
     for _, need in ipairs(needs) do
-        text = text .. Needs.line(need)
-    end
-    return text
-end
-
---- Vanilla's "One of:" over a line for each of `needs`, any one of which will do.
-function Needs.oneOf(needs)
-    local text = " " .. getText("IGUI_CraftUI_OneOf") .. " <LINE> "
-    for _, need in ipairs(needs) do
-        text = text .. " <INDENT:20> " .. Needs.line(need) .. " <INDENT:0> "
-    end
-    return text
-end
-
---- A line in the bad colour, for what stops the job however much the character has.
-function Needs.warning(text)
-    return " " .. ISVehicleMechanics.bhs .. " " .. text .. " <LINE>"
-end
-
---- The tooltip text: "Needs" over `lines` (from Needs.lines or Needs.oneOf), then the
---- translation key `blocker`, if any, as a warning.
-function Needs.describe(lines, blocker)
-    local text = getText("Tooltip_craft_Needs") .. " : <LINE>" .. lines
-    if blocker then
-        text = text .. Needs.warning(getText(blocker))
+        text = text .. line(need)
     end
     return text
 end

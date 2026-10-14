@@ -1068,22 +1068,49 @@ local function standAtBox(vehicle)
     standIn(vehicle, boxOf(vehicle):getArea(), 0.7)
 end
 
--- What the trailer's radial menu, opened where the character stands, shows of Cut Padlock:
--- "offered" when a slice cuts the padlock, "unavailable" when a slice only says what cutting takes
--- (it has no command), "none" without either. The menu goes away again before it is drawn.
-local function cutPadlockSlice()
+-- The slices of the trailer's radial menu, opened where the character stands. The menu goes away
+-- again before it is drawn.
+local function radialSlices()
     local p = player()
     local menu = getPlayerRadialMenu(p:getPlayerNum())
     ISVehicleMenu.showRadialMenuOutside(p)
-    local shown = "none"
+    local slices = {}
     for _, slice in ipairs(menu.slices) do
+        table.insert(slices, slice)
+    end
+    menu:undisplay()
+    return slices
+end
+
+-- What the trailer's radial menu shows of Cut Padlock: "offered" when a slice cuts the padlock,
+-- "unavailable" when a slice only says what cutting takes (it has no command), "none" without
+-- either.
+local function cutPadlockSlice()
+    local needs = getText("IGUI_RenewableEnergy_CutPadlockNeeds",
+        getScriptManager():FindItem(RenewableEnergy.BatteryBoxLid.CUTTERS):getDisplayName())
+    local shown = "none"
+    for _, slice in ipairs(radialSlices()) do
         if slice.command[1] == RenewableEnergy.BatteryBoxLid.cutPadlock then
             shown = "offered"
-        elseif slice.command[1] == nil then
+        elseif slice.command[1] == nil and slice.text == needs then
             shown = "unavailable"
         end
     end
-    menu:undisplay()
+    return shown
+end
+
+-- What the trailer's radial menu shows of the lamps' switch: "on" or "off" for a slice that turns
+-- the arrow board on or off, "shut" for the one that says the switch is in the shut box and has
+-- no command, "none" without any.
+local function switchSlice()
+    local shown = "none"
+    for _, slice in ipairs(radialSlices()) do
+        if slice.command[1] == RenewableEnergy.BatteryBoxLid.flipSwitch then
+            shown = slice.command[4] and "on" or "off"
+        elseif slice.command[1] == nil and slice.text == getText("IGUI_RenewableEnergy_LampsSwitchShut") then
+            shown = "shut"
+        end
+    end
     return shown
 end
 
@@ -1314,6 +1341,291 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
     end,
 })
 
+-- Lamps -----------------------------------------------------------------------------------------
+
+local DEEP_CYCLE = "RenewableEnergy.DeepCycleBattery"
+
+-- The arrow board's lamps light only while its switch is on, a battery in its box holds more than
+-- the controller's cutoff and its lamp board isn't wrecked: switching off, wrecking the board or
+-- flattening the battery darkens it, and putting each back lights it again. The photocell dims
+-- them after dark.
+test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, board = self.trailer, RenewableEnergy.ArrowBoard.BOARD
+        self.stages = {}
+        local function stage(name, args, night, want)
+            T.onVehicle(self, trailer, "setTrailer", args)
+            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = night })
+            T.step(function() table.insert(self.stages, { name = name, want = want, lamps = trailer.answer.state.lamps }) end)
+        end
+        -- In a step, once the trailer is placed, so its calls go out as plain tables, together.
+        T.step(function()
+            T.batch(function()
+                stage("switched on with a charged battery", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.6 } } },
+                    false, "day")
+                stage("after dark", {}, true, "night")
+                stage("switched off", { switchOn = false }, false, nil)
+                stage("on with its lamp board wrecked", { switchOn = true, frame = { [board] = 0 } }, false, nil)
+                stage("on with its lamp board welded", { frame = { [board] = 100 } }, false, "day")
+                stage("on with a flat battery", { box = { { type = DEEP_CYCLE, charge = 0.05 } } }, false, nil)
+                stage("on with a charged battery again", { box = { { type = DEEP_CYCLE, charge = 0.6 } } }, false, "day")
+            end)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.stages ~= nil and #self.stages == 7, "the lamps were never read") then return end
+        for _, stage in ipairs(self.stages) do
+            expect(stage.lamps == stage.want, "the lamps " .. stage.name .. " are " .. tostring(stage.lamps or "dark")
+                .. ", expected " .. tostring(stage.want or "dark"))
+        end
+    end,
+})
+
+-- Its panels only charge its batteries: switched on in the noon sun with no battery in its box,
+-- only a charge controller, the clock's pass leaves it dark and stores nothing.
+test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
+    hour = 12,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer = self.trailer
+        T.step(function()
+            T.batch(function()
+                T.onVehicle(self, trailer, "setTrailer", {
+                    switchOn = true, box = { { type = "RenewableEnergy.ChargeController" } },
+                    panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
+                })
+                T.onVehicle(self, trailer, "arrowBoardUpdate", { hours = 1 })
+            end)
+        end)
+    end,
+    validate = function(self)
+        local answer = self.trailer.answer
+        if not expect(answer ~= nil and answer.state ~= nil, "the pass never ran") then return end
+        expect(answer.state.switchOn, "the switch isn't on")
+        expect(answer.state.lamps == nil, "the lamps are " .. tostring(answer.state.lamps) .. " with no battery in the box")
+        expectNear("watt-hours stored with no battery", answer.stored, 0)
+    end,
+})
+
+-- Lit, the lamps draw their flashing average from the box's battery for the time they run: by day
+-- at full brightness, and less once the photocell dims them for the night.
+test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer = self.trailer
+        local function lamps(hours, night, key)
+            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = hours, night = night })
+            if key then
+                T.step(function() self[key] = trailer.answer end)
+            end
+        end
+        T.step(function()
+            T.batch(function()
+                T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.8 } } })
+                lamps(0, false)
+                lamps(2, false, "day")
+                lamps(0, true)
+                lamps(2, true, "night")
+            end)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.day and self.night, "the lamps never ran") then return end
+        local ArrowBoard, wh = RenewableEnergy.ArrowBoard, RenewableEnergy.Specs.batteries[DEEP_CYCLE].wh
+        local dayWh, nightWh = 2 * ArrowBoard.lampWatts(false), 2 * ArrowBoard.lampWatts(true)
+        expectNear("watt-hours two hours of lamps draw by day", self.day.drawn, dayWh, 1e-6)
+        expectNear("watt-hours two hours of dimmed lamps draw at night", self.night.drawn, nightWh, 1e-6)
+        expect(nightWh < dayWh / 2, string.format("the dimmed lamps draw %.2f Wh against %.2f by day", nightWh, dayWh))
+        local battery = boxItems(self.night.state, DEEP_CYCLE)[1]
+        -- A battery's charge is kept in whole uses of its UseDelta, which each pass rounds to.
+        expectNear("the battery's charge after both", battery and battery.charge or -1, 0.8 - (dayWh + nightWh) / wh, 3e-5)
+    end,
+})
+
+-- The controller cuts the lamps off once every battery is down to its cutoff, taking none below
+-- it, and lights them only once a battery is back up at the reconnect level: a battery between the
+-- two leaves them dark, and the panels charging it past the reconnect level light them again.
+test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
+    hour = 12,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, spec = self.trailer, RenewableEnergy.Specs.arrowBoard
+        -- Just under the reconnect level, so even an overcast noon charges it past.
+        local between = spec.reconnect - 0.01
+        self.betweenCharge = between
+        local function keep(key)
+            T.step(function() self[key] = trailer.answer end)
+        end
+        T.step(function()
+            T.batch(function()
+                T.onVehicle(self, trailer, "setTrailer", {
+                    switchOn = true, panels = { [LEFT] = {}, [RIGHT] = {} },
+                    box = { { type = DEEP_CYCLE, charge = spec.cutoff + 0.01 } },
+                })
+                T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
+                keep("lit")
+                T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 2, night = false })
+                keep("cut")
+                T.onVehicle(self, trailer, "setTrailer", { box = { { type = DEEP_CYCLE, charge = between } } })
+                T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
+                keep("between")
+                -- Three hours of noon sun on two whole panels put it back over the reconnect level.
+                T.onVehicle(self, trailer, "setTrailer", {
+                    panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
+                })
+                T.onVehicle(self, trailer, "arrowBoardUpdate", { hours = 3 })
+                keep("charged")
+            end)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.charged ~= nil, "the lamps never ran") then return end
+        local spec, wh = RenewableEnergy.Specs.arrowBoard, RenewableEnergy.Specs.batteries[DEEP_CYCLE].wh
+        expect(self.lit.state.lamps == "day", "the lamps are " .. tostring(self.lit.state.lamps) .. " above the cutoff")
+        -- A battery's charge is kept in whole uses and read back as a 32-bit float.
+        expectNear("watt-hours drawn down to the cutoff", self.cut.drawn, 0.01 * wh, 1e-3)
+        local battery = boxItems(self.cut.state, DEEP_CYCLE)[1]
+        expectNear("the battery's charge once cut off", battery and battery.charge or -1, spec.cutoff, 1e-6)
+        expect(self.cut.state.lamps == nil, "the lamps are " .. tostring(self.cut.state.lamps) .. " at the cutoff")
+        expect(self.between.state.lamps == nil, "the lamps came back on at " .. self.betweenCharge .. ", below the reconnect level")
+        local charged = boxItems(self.charged.state, DEEP_CYCLE)[1]
+        if not expect(charged and charged.charge >= spec.reconnect, "the panels left the battery at "
+            .. tostring(charged and charged.charge) .. ", too little sun to show the lamps coming back") then
+            return
+        end
+        expect(self.charged.state.lamps == "day", "the lamps are " .. tostring(self.charged.state.lamps)
+            .. " with the battery charged back to " .. charged.charge)
+    end,
+})
+
+-- The trailer's menu at its battery box offers the arrow board's switch only while the box is open
+-- or its lid off: at a shut box, padlocked or not, a slice says the switch is inside and does
+-- nothing, and the authority refuses the switch too. Opened, the switch turns the lamps off and on
+-- again through the switch action, on the server and in this game.
+test("renewable_energy_world_arrow_board_switch_works_only_in_the_open_box", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        self.seen, self.refused = {}, {}
+        local function look(name, want)
+            T.step(function()
+                standAtBox(trailer.vehicle)
+                table.insert(self.seen, { name = name, want = want, shown = switchSlice() })
+            end)
+        end
+        local function refused(name)
+            T.onVehicle(self, trailer, "arrowBoardCanSwitch", { on = false })
+            T.step(function() table.insert(self.refused, { name = name, can = trailer.answer.can }) end)
+        end
+        local function flip(on)
+            T.step(function() RenewableEnergy.BatteryBoxLid.flipSwitch(p, trailer.vehicle, on) end)
+            T.awaitVehicleState(self, trailer, function(state) return state.switchOn == on end, SERVER_MS)
+            T.waitForVehicleCopy(trailer, function(copy) return copy.switchOn == on end)
+            T.step(function()
+                self[on and "onAgain" or "off"] = { server = trailer.state, copy = T.copyState(trailer) }
+            end)
+        end
+        T.onVehicle(self, trailer, "setTrailer", {
+            lidOpen = false, lidLocked = true, lidLockBroken = false, switchOn = true,
+            box = { { type = DEEP_CYCLE, charge = 0.8 } },
+        })
+        T.waitForVehicleCopy(trailer, function(copy) return copy.switchOn and copy.lid and copy.lid.locked end)
+        look("at a padlocked box", "shut")
+        refused("padlocked")
+        T.onVehicle(self, trailer, "setTrailer", { lidLocked = false })
+        T.waitForVehicleCopy(trailer, function(copy) return copy.lid and not copy.lid.locked end)
+        look("at a shut box", "shut")
+        refused("shut")
+        T.onVehicle(self, trailer, "setTrailer", { lidOpen = true })
+        T.waitForVehicleCopy(trailer, function(copy) return copy.lid and copy.lid.open end)
+        look("at the open box, switched on", "off")
+        flip(false)
+        look("at the open box, switched off", "on")
+        flip(true)
+        T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false })
+        T.waitForVehicleCopy(trailer, function(copy) return copy.lid and not copy.lid.installed end)
+        look("at the box without its lid", "off")
+    end,
+    validate = function(self)
+        if not expect(self.seen ~= nil and #self.seen == 5, "the trailer's menu wasn't seen at every stage") then return end
+        for _, seen in ipairs(self.seen) do
+            expect(seen.shown == seen.want, "the menu " .. seen.name .. " shows the switch " .. seen.shown .. " rather than " .. seen.want)
+        end
+        for _, refused in ipairs(self.refused) do
+            expect(refused.can == false, "the server lets the switch be flipped through the " .. refused.name .. " lid")
+        end
+        local off, on = self.off, self.onAgain
+        if not expect(off and on, "the switch was never flipped off and on") then return end
+        expect(off.server.lamps == nil and off.copy.lamps == nil, "switched off, the lamps are "
+            .. tostring(off.server.lamps) .. " on the server and " .. tostring(off.copy.lamps) .. " here")
+        expect(on.server.lamps ~= nil and on.copy.lamps == on.server.lamps, "switched on again, the lamps are "
+            .. tostring(on.server.lamps) .. " on the server and " .. tostring(on.copy.lamps) .. " here")
+    end,
+})
+
+-- The real seconds the flash test watches the lamps for: a few of the lamps' flashes.
+local FLASH_WATCH_MS = 5000
+-- The frames that watch may take at most: far more than it needs at any frame rate.
+local FLASH_WATCH_FRAMES = 100000
+
+-- This game draws the lamps the server lights: while they are lit the board flashes, lit and dark
+-- by turns, and once the server switches them off it stays dark.
+test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer = self.trailer
+        local function watch(key)
+            T.step(function()
+                local seen = { lit = 0, dark = 0, start = getTimestampMs() }
+                self[key] = seen
+                T.waitUntil(function()
+                    local lit = trailer.vehicle:getWindowLightsOn()
+                    seen.lit, seen.dark = seen.lit + (lit and 1 or 0), seen.dark + (lit and 0 or 1)
+                    return getTimestampMs() - seen.start >= FLASH_WATCH_MS
+                end, FLASH_WATCH_FRAMES, "the lamps' flashes")
+            end)
+        end
+        T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.8 } } })
+        T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
+        T.waitForVehicleCopy(trailer, function(copy) return copy.lamps == "day" end)
+        watch("lit")
+        T.onVehicle(self, trailer, "setTrailer", { switchOn = false })
+        T.waitForVehicleCopy(trailer, function(copy) return copy.lamps == nil end)
+        watch("dark")
+    end,
+    validate = function(self)
+        local lit, dark = self.lit, self.dark
+        if not expect(lit and dark, "the lamps were never watched") then return end
+        expect(lit.lit > 0 and lit.dark > 0, string.format("lit, the board showed lit %d and dark %d frames", lit.lit, lit.dark))
+        expect(dark.lit == 0, string.format("switched off, the board showed lit %d of %d frames", dark.lit, dark.lit + dark.dark))
+    end,
+})
+
+-- Found trailers have their switch on by STOCK.switchedOnChance: thousands of rolls land within
+-- a few points of it, about ten standard deviations, so the test doesn't fail by chance.
+test("renewable_energy_world_arrow_board_found_switched_on_mostly", {
+    run = function(self)
+        self.trailer = spawnTrailer(self)
+        if not self.trailer then return end
+        T.onVehicle(self, self.trailer, "arrowBoardSwitchRolls", { rolls = 4000 })
+    end,
+    validate = function(self)
+        local answer = self.trailer.answer
+        if not expect(answer ~= nil and answer.on ~= nil, "the switch was never rolled") then return end
+        local share, chance = answer.on / 4000, RenewableEnergy.ArrowBoard.STOCK.switchedOnChance
+        expect(math.abs(share - chance) <= 0.045, string.format("%.3f of found trailers are switched on, expected about %.2f",
+            share, chance))
+    end,
+})
+
 -- Taking a cracked panel off in the mechanics way gives the module at the panel's condition and
 -- leaves no panel showing; putting another module on shows it, whole or cracked by its condition,
 -- to players too. A multiplayer server times both actions in real time, so there the mechanics
@@ -1378,11 +1690,11 @@ local function mechanicsMenu(vehicle, part)
     return window.context
 end
 
--- A panel is wired as well as bolted, so it takes every skill its table lists: short of either, a
--- panel neither comes off nor goes on, even with a wrench, the mechanics window greys out its
--- Uninstall, and a queued removal does nothing. The refused removal empties the action queue, so
--- it comes last and the checks read the copy.
-local function panelSkillTest(mechanics, electricity, short)
+-- A panel's skills are vanilla's recommendations, as for any part: short of one, the panel still
+-- comes off and goes on, the mechanics window offers Uninstall, and only the odds fall, by
+-- vanilla's 20 plus 15 for each missing level (VehicleUtils.calculateInstallationSuccess), which
+-- its tooltip shows. With every skill met the job can't fail.
+local function panelSkillTest(mechanics, electricity, success)
     return {
         instant = true,
         run = function(self)
@@ -1396,32 +1708,40 @@ local function panelSkillTest(mechanics, electricity, short)
             T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
             T.step(function()
                 local vehicle = trailer.vehicle
-                local left = vehicle:getPartById(LEFT)
+                local left, right = vehicle:getPartById(LEFT), vehicle:getPartById(RIGHT)
                 self.canTakeOff = vehicle:canUninstallPart(p, left)
-                self.canPutOn = vehicle:canInstallPart(p, vehicle:getPartById(RIGHT))
+                self.canPutOn = vehicle:canInstallPart(p, right)
+                self.takeOffOdds = VehicleUtils.calculateInstallationSuccess(left:getTable("uninstall").skills, p)
+                self.putOnOdds = VehicleUtils.calculateInstallationSuccess(right:getTable("install").skills, p)
                 local context = mechanicsMenu(vehicle, left)
                 local uninstall = context and context:getOptionFromName(getText("IGUI_Uninstall"))
                 self.uninstallOption = uninstall and (uninstall.notAvailable and "greyed out" or "offered") or "missing"
+                local tooltip = uninstall and uninstall.toolTip and uninstall.toolTip.description or ""
+                self.showsOdds = tooltip:find(getText("Tooltip_chanceSuccess") .. " " .. self.takeOffOdds .. "%", 1, true) ~= nil
                 if context then
                     context:closeAll()
                 end
-                ISTimedActionQueue.add(ISUninstallVehiclePart:new(p, left, 200))
             end)
         end,
         validate = function(self)
-            expect(not self.canTakeOff, "a panel comes off without " .. short)
-            expect(not self.canPutOn, "a panel goes on without " .. short)
-            expect(self.uninstallOption == "greyed out", "without " .. short .. " the mechanics window's Uninstall is "
-                .. tostring(self.uninstallOption))
-            local left = self.trailer.vehicle and self.trailer.vehicle:getPartById(LEFT)
-            expect(left and left:getInventoryItem() ~= nil, "the panel came off without " .. short)
-            expect(player():getInventory():getCountTypeRecurse(MODULE) == 1, "a module came off into the inventory")
+            local skills = "Mechanics " .. mechanics .. ", Electrical " .. electricity
+            expect(self.canTakeOff, "a panel can't come off at " .. skills)
+            expect(self.canPutOn, "a panel can't go on at " .. skills)
+            expect(self.uninstallOption == "offered", "the mechanics window's Uninstall is " .. tostring(self.uninstallOption))
+            expectNear("odds of taking a panel off", self.takeOffOdds, success, 0)
+            expectNear("odds of putting a panel on", self.putOnOdds, success, 0)
+            -- Vanilla shows the odds only when the job can fail.
+            expect(self.showsOdds == (success < 100), "the Uninstall tooltip " .. (self.showsOdds and "shows" or "doesn't show")
+                .. " vanilla's odds of success at " .. skills)
         end,
     }
 end
 
-test("renewable_energy_world_arrow_board_panels_need_mechanics", panelSkillTest(1, 1, "Mechanics 2"))
-test("renewable_energy_world_arrow_board_panels_need_electrical", panelSkillTest(2, 0, "Electrical 1"))
+-- One level short of either skill costs vanilla's 20 plus 15.
+local ONE_SHORT = 100 - (20 + 15)
+test("renewable_energy_world_arrow_board_panels_recommend_mechanics", panelSkillTest(1, 1, ONE_SHORT))
+test("renewable_energy_world_arrow_board_panels_recommend_electrical", panelSkillTest(2, 0, ONE_SHORT))
+test("renewable_energy_world_arrow_board_panels_skilled", panelSkillTest(2, 1, 100))
 
 -- The mechanics window offers to install an inventory item whose full type is in the part's item
 -- types (ISVehicleMechanics, VehicleUtils.getItems), so each panel lists both modules as they are

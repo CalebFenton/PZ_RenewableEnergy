@@ -2,7 +2,8 @@ require "PZHarness/Fixtures"
 -- Development only. What the --art and --promo captures share besides the harness's
 -- PZHarness/Capture.lua, which runs their steps: finding a place near the character, clearing its
 -- trees, the steps that walk the character to a shot and frame it, the arrow board trailer hitched
--- to a car and the waits for it to settle. The lid test waits on lightingSettled too.
+-- to a car, dark or its arrow held lit, and the waits for it to settle. The lid test waits on
+-- lightingSettled too.
 
 local Stage = {}
 
@@ -161,8 +162,9 @@ function Stage.iconTexture(fullType)
 end
 
 --- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer
---- behind it, both repaired: { car, trailer, facing }. A vehicle joins the cell's list, and gets
---- its physics, only on a later update, so wait with vehiclesAtRest before hitching them.
+--- behind it, both repaired, the trailer's lamps switched off: { car, trailer, facing }. A vehicle
+--- joins the cell's list, and gets its physics, only on a later update, so wait with
+--- vehiclesAtRest before hitching them.
 function Stage.spawnTrailer(square, facing)
     local behind = BEHIND[facing]
     local trailerSquare = getCell():getGridSquare(square:getX() + behind[1] * TRAILER_GAP,
@@ -175,6 +177,9 @@ function Stage.spawnTrailer(square, facing)
         facing = facing,
     }
     pair.car:repair()
+    -- Most trailers are found switched on, and a shot of a flashing board would show it lit or dark
+    -- by the moment it was taken; a shot of the lamps lights them itself.
+    RenewableEnergy.ArrowBoard.setSwitch(pair.trailer, false)
     return pair
 end
 
@@ -232,6 +237,33 @@ function Stage.vehiclesAtRest(pair, hitch)
         since = since or getTimestampMs()
         return getTimestampMs() - since >= STILL_MS
     end
+end
+
+-- Trailers whose lamps Stage.holdLampsLit holds lit, by vehicle.
+local heldLit
+
+--- Switches the trailer on with a charged battery in its box, and holds its lamps lit through
+--- their flashes, for a shot that can't time its frame to a flash. The holding runs after
+--- ArrowBoard's flashing in each tick, since it is added later, once a shot first asks for it.
+function Stage.holdLampsLit(trailer)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local container = trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
+    RenewableEnergy.Battery.setCharge(container:AddItem("RenewableEnergy.DeepCycleBattery"), 1)
+    ArrowBoard.setSwitch(trailer, true)
+    ArrowBoard.runLamps(trailer, 0, false)
+    if not heldLit then
+        heldLit = {}
+        Events.OnTick.Add(function()
+            for vehicle in pairs(heldLit) do
+                if vehicle:isRemovedFromWorld() then
+                    heldLit[vehicle] = nil
+                else
+                    vehicle:setWindowLightsOn(true)
+                end
+            end
+        end)
+    end
+    heldLit[trailer] = true
 end
 
 return Stage

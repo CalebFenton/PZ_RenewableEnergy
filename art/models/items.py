@@ -68,9 +68,11 @@ def M(name):
         "hdpe": lambda: material("RE_Hdpe", "#e8e4d8", roughness=0.5, grime=0.1),
         "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
         "plate": lambda: material("RE_Plate", "#6a6e72", roughness=0.6, metallic=0.5, grime=0.2),
-        # Highway work-zone orange, and the amber of its lamps and reflectors.
+        # Highway work-zone orange, the amber of its reflectors, and the board's lamps while they're
+        # dark: lit, the vehicle's lights texture draws them bright (models.GLOWING).
         "safety": lambda: material("RE_SafetyOrange", "#e0661a", roughness=0.5, grime=0.25),
         "amberlamp": lambda: material("RE_AmberLamp", "#f5a623", roughness=0.3, grime=0.05),
+        "amberlampdark": lambda: material("RE_AmberLampDark", "#6e4510", roughness=0.3, grime=0.05),
     }[name]()
 
 
@@ -1036,7 +1038,7 @@ def _arrow_board(col, rear):
         box(col, "Board_FrameShort", M("safety"), (0.04, depth - 0.08, thick + 0.01), at=(sign * (width - 0.04) / 2, centre_y, bottom),
             bevel=0.005)
     for x, y in ARROW_LAMPS:
-        cylinder(col, "Board_Lamp", M("amberlamp"), 0.045, 0.015, at=(x, centre_y + y, top), segments=12)
+        cylinder(col, "Board_Lamp", M("amberlampdark"), 0.045, 0.015, at=(x, centre_y + y, top), segments=12)
         box(col, "Board_Visor", M("black"), (0.1, 0.012, 0.05), at=(x, centre_y + y + 0.052, top))
 
 

@@ -215,9 +215,11 @@ Some places come already set up. Most aren't there in every world, but the road 
 
 Solar arrow boards are the orange trailers road crews park at work zones, with a flashing arrow and two panels on top:
 
-<p align="center"><img src="art/promo/images/trailer.png" alt="The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a red car on a road." width="100%"></p>
+<p align="center"><img src="art/promo/images/trailer.png" alt="The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a car on a road." width="100%"></p>
 
-You'll also find them in junkyards and, most often, in highway pileups. The battery box on the tongue holds well-used deep cycle batteries, usually a charge controller, and it's usually padlocked: with no key anywhere, cut the padlock with bolt cutters or unbolt the lid with a wrench. Taking a panel off takes a wrench, Mechanics 2 and Electrical 1, and one module is often cracked. Strip it where it stands, or tow it home, where its panels keep charging its batteries. Storms and crashes crack the panels and crashes dent the frame; right-click the trailer to repair either.
+You'll also find them in junkyards and, most often, in highway pileups. The battery box on the tongue holds well-used deep cycle batteries, usually a charge controller, and it's usually padlocked: with no key anywhere, cut the padlock with bolt cutters or unbolt the lid with a wrench. Taking a panel off takes a wrench, and below Mechanics 2 and Electrical 1 it can fail and damage the module, as with any car part. One module is often cracked. Strip it where it stands, or tow it home, where its panels keep charging its batteries. Storms and crashes crack the panels and crashes dent the frame; right-click the trailer to repair either.
+
+Most boards you find are still running, as the crews left them: the arrow flashes day and night from the batteries in the box, dims after dark, and lights the road around it a little. The switch is inside the box, so open it, or take its lid off, and use the trailer's radial menu at the box to **Turn Arrow Board on** or **off**. The panels only charge the batteries, so a board goes dark when it's switched off, when its box holds no batteries, when they've run down to the controller's low-battery cutoff, where it stays dark until the panels charge them back up a little, or when crashes have wrecked the lamp board; Repair Frame welds it whole. The lamps draw about 8 W by day and 3 W at night, so a box of batteries lasts weeks without sun. Like its charging, a board runs only while someone is nearby.
 
 ### Stash houses
 

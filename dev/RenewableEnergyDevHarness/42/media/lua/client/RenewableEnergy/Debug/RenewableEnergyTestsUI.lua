@@ -8,7 +8,6 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
-require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/StatusWindow"
 
 -- The right-click menus, the actions they start and the status window. The wiring and repair
@@ -26,7 +25,6 @@ local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
 local Format = RenewableEnergy.Format
 local Menu = RenewableEnergy.Menu
-local Needs = RenewableEnergy.Needs
 local StatusWindow = RenewableEnergy.StatusWindow
 
 local POWER_INVERTER = "RenewableEnergy.PowerInverter"
@@ -185,18 +183,15 @@ test("renewable_energy_ui_menu_panel_wired_to", {
     end,
 })
 
--- Whether the tooltip's list of `needs` marks the need of `kind` as short (Needs.met).
-local function marksShort(needs, kind)
-    for _, need in ipairs(needs) do
-        if need.kind == kind and not Needs.met(need) then
-            return true
-        end
-    end
-    return false
+-- Whether the option's tooltip lists the item `fullType` in the colour for what the character is
+-- short of.
+local function marksShort(option, fullType)
+    local text = tooltipOf(option) or ""
+    return text:find(ISVehicleMechanics.bhs .. getItemNameFromFullType(fullType), 1, true) ~= nil
 end
 
--- Wire In offers each carried part type once, greys out one that can't go in and marks what it
--- lacks as short, and offers it once it can.
+-- Wire In offers each carried part type once, greys out one that can't go in listing everything
+-- it lacks, and offers it once it can.
 test("renewable_energy_ui_menu_wire_in_options", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {})
@@ -213,7 +208,7 @@ test("renewable_energy_ui_menu_wire_in_options", {
             end
             local plugIn = optionFor(menu, self.items.parts[3])
             self.withoutTools = { unavailable = plugIn ~= nil and plugIn.notAvailable, reason = tooltipOf(plugIn),
-                toolShort = marksShort(PowerBank.wiringNeeds(player(), "RenewableEnergy.PlugInInverter"), "tool") }
+                screwdriverShort = marksShort(plugIn, "Base.Screwdriver"), wireShort = marksShort(plugIn, PowerBank.WIRE) }
             context:hideAndChildren()
         end)
         local wire = PowerBank.wiringFor("RenewableEnergy.PlugInInverter").wire
@@ -227,8 +222,9 @@ test("renewable_energy_ui_menu_wire_in_options", {
     end,
     validate = function(self)
         expectNear("Wire In options for two batteries of one type", self.batteries, 1, 0)
-        expect(self.withoutTools.unavailable and self.withoutTools.toolShort,
-            "Wire In doesn't grey out an inverter and mark the screwdriver short (" .. tostring(self.withoutTools.reason) .. ")")
+        expect(self.withoutTools.unavailable and self.withoutTools.screwdriverShort and self.withoutTools.wireShort,
+            "Wire In doesn't grey out an inverter marking both the screwdriver and the wire short ("
+            .. tostring(self.withoutTools.reason) .. ")")
         expect(self.withTools.available, "with a screwdriver and wire, the inverter can't be wired in ("
             .. tostring(self.withTools.reason) .. ")")
     end,
@@ -257,8 +253,8 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
         local context = newContext()
         local wireIn = optionFor(Menu.addWireInOptions(0, context, bank), battery)
         local dark = getText("Tooltip_RenewableEnergy_TooDark")
-        expect(wireIn ~= nil and wireIn.notAvailable and PowerBank.wiringBlocker(p, bank, battery) == "Tooltip_RenewableEnergy_TooDark",
-            "Wire In isn't greyed out for the dark (" .. tostring(tooltipOf(wireIn)) .. ")")
+        expect(wireIn ~= nil and wireIn.notAvailable and tooltipOf(wireIn) == dark,
+            "Wire In isn't greyed out saying it's too dark (" .. tostring(tooltipOf(wireIn)) .. ")")
         local unwire = Menu.addUnwireOptions(0, context, bank)
         local allDark = unwire ~= nil and #unwire.options > 0
         for _, option in ipairs(unwire and unwire.options or {}) do
@@ -275,7 +271,7 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
     end,
 })
 
--- Repair offers each inverter, greyed out and marking the scrap short while there is none, and
+-- Repair offers each inverter, greyed out with the scrap marked short while there is none, and
 -- once there is, walks over and mends the inverter in place with one scrap, on the server and this
 -- client's copy.
 local WORN = 50
@@ -292,7 +288,7 @@ test("renewable_energy_ui_repair_part", {
             local context = newContext()
             local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
             self.withoutScrap = { unavailable = option ~= nil and option.notAvailable, reason = tooltipOf(option),
-                scrapShort = marksShort(PowerBank.repairNeeds(player()), "scrap") }
+                scrapShort = marksShort(option, PowerBank.SCRAP) }
             context:hideAndChildren()
         end)
         T.give(self, "scrap", { { type = PowerBank.SCRAP } })

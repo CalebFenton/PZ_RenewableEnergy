@@ -40,6 +40,7 @@
     "Tooltip_RenewableEnergy_NothingToWire": "Carry a battery, an inverter, a car battery charger or a charge controller to wire it in.",
     "Tooltip_RenewableEnergy_NoSlot": "The bank has no room for another one of these.",
     "Tooltip_RenewableEnergy_TooDark": "It's too dark to see the wiring.",
+    "Tooltip_RenewableEnergy_NeedSnowTool": "Needs a broom or a snow shovel.",
     "Tooltip_RenewableEnergy_NotRepairable": "It can't be repaired.",
     "Tooltip_RenewableEnergy_NoRepairNeeded": "Already in good condition.",
     "Tooltip_RenewableEnergy_NoPanelSlot": "No free panel slot: wire in a charge controller.",

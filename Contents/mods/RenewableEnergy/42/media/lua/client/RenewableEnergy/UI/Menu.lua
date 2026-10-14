@@ -44,12 +44,18 @@ local function disable(option, description)
     option.toolTip.description = description
 end
 
--- Lists what the job takes (Needs.describe) on the option, available or not, as vanilla's
--- mechanics window does; greyed out while `refused`.
-local function showNeeds(option, lines, blocker, refused)
-    option.notAvailable = refused
+-- An option whose job takes several things (skill, tools, materials) lists them all with have and
+-- need, as vanilla's item repair and build menu do, so the character sees everything they lack at
+-- once; greyed out while any is short. A `blocker` (a translation key) that no amount of carrying
+-- fixes replaces the list with its plain sentence, as vanilla's generator options do.
+local function showNeeds(option, needs, blocker)
+    if blocker then
+        disable(option, getText(blocker))
+        return
+    end
+    option.notAvailable = RenewableEnergy.firstUnmet(needs) ~= nil
     option.toolTip = ISWorldObjectContextMenu.addToolTip()
-    option.toolTip.description = Needs.describe(lines, blocker)
+    option.toolTip.description = Needs.describe(needs)
 end
 
 local function queueAt(playerNum, square, mode, object, bank, vehicle, item)
@@ -154,8 +160,7 @@ function Menu.addWireInOptions(playerNum, menu, bank)
     local submenu = addSubMenu(menu, getText("ContextMenu_RenewableEnergy_WireIn"))
     for _, item in ipairs(parts) do
         local option = submenu:addOption(item:getDisplayName(), playerNum, queuePart, Action.WIRE_IN, bank, item)
-        showNeeds(option, Needs.lines(PowerBank.wiringNeeds(character, item:getFullType())),
-            PowerBank.wiringBlocker(character, bank, item), PowerBank.wiringRefusal(character, bank, item) ~= nil)
+        showNeeds(option, PowerBank.wiringNeeds(character, item:getFullType()), PowerBank.wiringBlocker(character, bank, item))
     end
     return submenu
 end
@@ -191,11 +196,11 @@ function Menu.addRepairOptions(playerNum, menu, bank)
         return nil
     end
     local character = getSpecificPlayer(playerNum)
-    local needs = Needs.lines(PowerBank.repairNeeds(character))
+    local needs = PowerBank.repairNeeds(character)
     local submenu = addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Repair"))
     for _, item in ipairs(parts) do
         local option = submenu:addOption(partLabel(item), playerNum, queuePart, Action.REPAIR_PART, bank, item)
-        showNeeds(option, needs, PowerBank.repairBlocker(character, item), PowerBank.repairRefusal(character, item) ~= nil)
+        showNeeds(option, needs, PowerBank.repairBlocker(character, item))
     end
     return submenu
 end
@@ -291,16 +296,9 @@ local function addSnowOption(playerNum, menu, source, entry)
         return
     end
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ClearSnow"), playerNum, queueClearSnow, source)
-    local inventory = getSpecificPlayer(playerNum):getInventory()
-    local tools = {}
-    for fullType in pairs(Action.SNOW_TOOLS) do
-        local carried = inventory:containsEvalRecurse(function(item)
-            return item:getFullType() == fullType and Action.isSnowTool(item)
-        end)
-        table.insert(tools, { item = fullType, have = carried and 1 or 0, need = 1 })
+    if not getSpecificPlayer(playerNum):getInventory():containsEvalRecurse(Action.isSnowTool) then
+        disable(option, getText("Tooltip_RenewableEnergy_NeedSnowTool"))
     end
-    table.sort(tools, function(a, b) return a.item < b.item end)
-    showNeeds(option, Needs.oneOf(tools), nil, not inventory:containsEvalRecurse(Action.isSnowTool))
 end
 
 function Menu.addSourceOptions(playerNum, context, source)
@@ -381,13 +379,12 @@ function Menu.addPanelRepairOptions(playerNum, context, vehicle)
         return
     end
     local needs = RenewableEnergy.Recipes.panelRepairNeeds(getSpecificPlayer(playerNum))
-    local refused = RenewableEnergy.firstUnmet(needs) ~= nil
     for _, partId in ipairs(ArrowBoard.PANELS) do
         local part = ArrowBoard.repairablePanel(vehicle, partId)
         if part then
             local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairPanel",
                 getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueRepairPanel, vehicle, partId)
-            showNeeds(option, Needs.lines(needs), nil, refused)
+            showNeeds(option, needs)
         end
     end
 end

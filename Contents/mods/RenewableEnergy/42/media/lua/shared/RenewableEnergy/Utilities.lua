@@ -32,8 +32,8 @@ end
 -- A job's needs are a list of what it takes of the character, each { kind, have, need } with
 -- what it names: `perk` for a skill, `tool` (an ItemTag field) for a tool, `item` (a full type)
 -- for an item counted by type, `input` (an InputScript) for a recipe's input, `recipe` for a
--- recipe to know (have 1 when known). The same list refuses the job and draws the menu's
--- tooltip (UI/Needs.lua), so the two can't disagree.
+-- recipe to know (have 1 when known). The same list refuses the job and tells the menu what it
+-- lacks, so the two can't disagree.
 
 --- The first of `needs` the character is short of, or nil when they have them all.
 function RenewableEnergy.firstUnmet(needs)

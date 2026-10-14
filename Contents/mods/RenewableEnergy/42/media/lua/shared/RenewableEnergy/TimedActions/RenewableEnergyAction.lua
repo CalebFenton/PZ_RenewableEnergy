@@ -31,6 +31,8 @@ Action.REPAIR_PANEL = "RepairPanel"
 Action.REMOVE_BULB = "RemoveBulb"
 Action.ADD_BULB = "AddBulb"
 Action.CUT_PADLOCK = "CutPadlock"
+Action.BOARD_ON = "BoardOn"
+Action.BOARD_OFF = "BoardOff"
 
 -- Jobs on the bank's wiring or a cracked panel, which need light to see by.
 local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true }
@@ -165,6 +167,12 @@ local KEEPS = {
     [Action.CUT_PADLOCK] = function(self)
         return inWorld(self.vehicle) and Action.isBoltCutters(self.item) and self.character:isPrimaryHandItem(self.item)
     end,
+    [Action.BOARD_ON] = function(self)
+        return inWorld(self.vehicle)
+    end,
+    [Action.BOARD_OFF] = function(self)
+        return inWorld(self.vehicle)
+    end,
 }
 
 -- The rest of each job's rules: the state of its target and its bank, which a multiplayer
@@ -214,6 +222,14 @@ local CHECKS = {
         local ArrowBoard = RenewableEnergy.ArrowBoard
         local lid = ArrowBoard ~= nil and ArrowBoard.isTrailer(self.vehicle) and self.vehicle:getPartById(ArrowBoard.LID)
         return lid and ArrowBoard.isPadlocked(lid) or false
+    end,
+    [Action.BOARD_ON] = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        return ArrowBoard ~= nil and ArrowBoard.canSwitch(self.vehicle, true)
+    end,
+    [Action.BOARD_OFF] = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        return ArrowBoard ~= nil and ArrowBoard.canSwitch(self.vehicle, false)
     end,
 }
 
@@ -280,6 +296,8 @@ local MINUTES = {
     [Action.CLEAR_SNOW] = 5,
     [Action.TURN_ON] = 0.5,
     [Action.TURN_OFF] = 0.5,
+    [Action.BOARD_ON] = 0.5,
+    [Action.BOARD_OFF] = 0.5,
     [Action.ATTACH_MAINTAINER] = 1,
     [Action.DETACH_MAINTAINER] = 1,
     [Action.RENAME] = 0.5,
@@ -426,7 +444,8 @@ function Action:perform()
     if self.sound then
         self.character:stopOrTriggerSound(self.sound)
     end
-    if self.mode == Action.TURN_ON or self.mode == Action.TURN_OFF then
+    if self.mode == Action.TURN_ON or self.mode == Action.TURN_OFF or self.mode == Action.BOARD_ON
+        or self.mode == Action.BOARD_OFF then
         self.character:playSound("LightSwitch")
     end
     if self.mode == Action.CUT_PADLOCK then
@@ -477,6 +496,8 @@ function Action:complete()
         return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item)
     elseif self.mode == Action.CUT_PADLOCK then
         return cutPadlock(self)
+    elseif self.mode == Action.BOARD_ON or self.mode == Action.BOARD_OFF then
+        return RenewableEnergy.ArrowBoard.setSwitch(self.vehicle, self.mode == Action.BOARD_ON)
     end
     local command, args = COMMANDS[self.mode](self)
     local ok = PowerBank.perform(self.character, command, args)
