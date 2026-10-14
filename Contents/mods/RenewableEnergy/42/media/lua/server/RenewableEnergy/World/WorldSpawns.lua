@@ -286,7 +286,7 @@ function WorldSpawns.placeBank(square, stockName)
     for i = 0, items:size() - 1 do
         sendAddItemToContainer(container, items:get(i))
     end
-    RenewableEnergy.PowerBank.perform(nil, "refresh", { bank = RenewableEnergy.PowerBank.positionOf(bank) })
+    RenewableEnergy.BankSystem.instance:getLuaObjectOnSquare(square):refresh()
     return bank
 end
 

@@ -1,7 +1,8 @@
 require "RenewableEnergy/Sprites"
 
--- The crate shows its modules while it holds 7 items or more and its closed lid below that, in any
--- room ("other"); ContainerOverlays reads tiles as { many items, few items }.
+-- The crate shows its modules while it holds enough items for vanilla's "many items" overlay
+-- (ContainerOverlays.updateContainerOverlaySprite) and its closed lid below that, in any room
+-- ("other"); ContainerOverlays reads tiles as { many items, few items }.
 local Sprites = RenewableEnergy.Sprites
 
 local overlayMap = { VERSION = 1 }

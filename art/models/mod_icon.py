@@ -1,7 +1,12 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pillow==12.3.0"]
+# ///
 """Draws the mod list icon, 42/renewable_energy_icon.png: a solar panel seen straight on, its cells
 in a 3 x 2 grid, with the sun breaking its top right corner.
 
-    python3 art/models/mod_icon.py
+    art/models/mod_icon.py
 
 The mod list draws the icon at the height of a line of small text plus a little, about 22 pixels,
 and the load order list at about 28, with linear filtering and no mipmaps (getTexture loads it
@@ -11,7 +16,7 @@ screen pixel blends at most two of the drawing's pixels across, and the grid lin
 where shrunk from 32 they smear into the cells. Larger fonts draw it larger, which 64 also covers.
 
 It is drawn from the shapes below rather than kept as an edited image, so a rerun writes the same
-file. Needs Pillow.
+file. It needs uv (https://docs.astral.sh/uv/), which brings Pillow.
 """
 import os
 

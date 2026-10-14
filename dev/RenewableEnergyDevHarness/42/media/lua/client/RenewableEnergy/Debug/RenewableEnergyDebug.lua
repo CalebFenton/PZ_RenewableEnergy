@@ -1,7 +1,9 @@
--- Setup helpers for the debug scenario, the tests and the dev harness. Debug mode only.
+-- Setup helpers for the debug scenario, the tests and the dev harness, and a count of the frames
+-- each status window drew. Debug mode only.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/UI/StatusWindow"
 require "PZHarness/TestLib"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -51,6 +53,17 @@ function Debug.setupPlayer(player)
     PZHarness.Test.learnRecipes(player)
     player:getInventory():AddItem("Base.Screwdriver")
     PZHarness.Test.placeWorkTable(player)
+end
+
+-- The tests and the promo shots wait on `renderedFrames`, the frames a status window drew its rows
+-- in, so that they read and shoot a window that has drawn.
+local StatusWindow = RenewableEnergy.StatusWindow
+local render = StatusWindow.render
+function StatusWindow:render()
+    render(self)
+    if not self.isCollapsed and self.left then
+        self.renderedFrames = (self.renderedFrames or 0) + 1
+    end
 end
 
 return Debug

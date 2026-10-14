@@ -28,6 +28,9 @@ Specs.inverters = {
     ["RenewableEnergy.InverterCharger"] = { watts = 2500, idle = 15, chargerWatts = 1500, wireSkill = 4, wireXp = 25 },
 }
 
+-- A 1993 modified-sine inverter turns about this much of the battery's power into AC.
+Specs.inverterEfficiency = 0.9
+
 -- The bank parts besides batteries and inverters: the charge controller, and vanilla's car
 -- battery charger, which a bank wires in as its charger.
 Specs.controller = "RenewableEnergy.ChargeController"

@@ -37,8 +37,6 @@ Bank.SAVED_FIELDS = {
     "solarWhToday", "loadWhToday", "empty", "status",
 }
 
--- A 1993 modified-sine inverter turns about this much of the battery's power into AC.
-local INVERTER_EFFICIENCY = 0.9
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
 -- bank's floor.
 local BACKUP_REACH = 3
@@ -94,7 +92,7 @@ end
 --- global objects were lost.
 function Bank:stateFromIsoObject(isoObject)
     self:initNew()
-    self.bankType = PowerBank.bankOfSprite(isoObject:getSprite():getName()).fullType
+    self.bankType = PowerBank.bankOfSprite(Sprites.nameOf(isoObject)).fullType
     self:loaded(isoObject)
 end
 
@@ -114,6 +112,15 @@ function Bank:loaded(isoObject)
     self.indoors = PowerBank.canPlaceBank(isoObject:getSquare())
     self:recount()
     self:switchGenerator()
+    self:sendStatus()
+end
+
+--- Look at the container again, whatever filled or emptied it: the parts it holds, whether the
+--- bank runs, the batteries on its tile and the status the clients see.
+function Bank:refresh()
+    self:recount()
+    self:switchGenerator()
+    self:showBatteries()
     self:sendStatus()
 end
 
@@ -174,7 +181,9 @@ function Bank:writeBatteries(container, applyPending)
     eachItem(container, function(item)
         local spec = Battery.spec(item)
         if spec and item:getCondition() > 0 then
-            local changed = math.abs(Battery.getCharge(item) - self.charge) >= 0.001
+            -- As the arrow board and the maintainer do: clients hear of the charge once it shows
+            -- at two decimals.
+            local changed = VehicleUtils.compareFloats(Battery.getCharge(item), self.charge, 2)
             Battery.setCharge(item, self.charge)
             if applyPending then
                 for _, depth in ipairs(self.pendingDepths) do
@@ -497,8 +506,7 @@ end
 -- Backup generator -----------------------------------------------------------------------
 
 local function isFailsafe(object)
-    local sprite = object:getSprite()
-    return sprite ~= nil and Sprites.kindOf(sprite:getName()) == "failsafe"
+    return Sprites.kindOf(Sprites.nameOf(object)) == "failsafe"
 end
 
 --- The nearest plugged-in generator, one with a failsafe on its square first.
@@ -700,7 +708,7 @@ end
 
 -- The watts the inverters take from the batteries to carry the load and run themselves.
 local function inverterDrawW(bank)
-    return bank.averageLoadW / INVERTER_EFFICIENCY + sumInverters(bank, "idle")
+    return bank.averageLoadW / Specs.inverterEfficiency + sumInverters(bank, "idle")
 end
 
 --- The watts the batteries give the inverters now.

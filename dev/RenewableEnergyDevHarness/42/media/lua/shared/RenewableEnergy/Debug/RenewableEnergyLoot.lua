@@ -620,6 +620,17 @@ local function expectedInContainers(roomName, containerType, count, rooms)
     return total
 end
 
+-- Expected modules in a world crate stocked from WorldSpawns.CRATE_STOCK[name].
+local function crateModules(name)
+    local modules = 0
+    for _, line in ipairs(RenewableEnergy.WorldSpawns.CRATE_STOCK[name]) do
+        if line[1] == MODULE then
+            modules = modules + (line[2] + line[3]) / 2 * SandboxVars.RenewableEnergy[line[4]]
+        end
+    end
+    return modules
+end
+
 -- What the rooms of a town hold: list modules (whole), cracked modules and world crates.
 local function roomsHaul(town, kinds)
     local Distributions, WorldSpawns = RenewableEnergy.Distributions, RenewableEnergy.WorldSpawns
@@ -635,15 +646,10 @@ local function roomsHaul(town, kinds)
         end
     end
     local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
-    local crateModules = 0
-    for _, line in ipairs(WorldSpawns.CRATE_STOCK.kit) do
-        if line[1] == MODULE then
-            crateModules = (line[2] + line[3]) / 2 * SandboxVars.RenewableEnergy[line[4]]
-        end
-    end
+    local kitModules = crateModules("kit")
     for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
         if rarity then
-            crates = crates + (town.rooms[roomName] or 0) / (odds * rarity) * crateModules
+            crates = crates + (town.rooms[roomName] or 0) / (odds * rarity) * kitModules
         end
     end
     return {
@@ -769,7 +775,7 @@ end
 
 -- Expected modules of a site once placed.
 local function siteHaul(site, kinds)
-    local SolarSites, WorldSpawns = RenewableEnergy.SolarSites, RenewableEnergy.WorldSpawns
+    local SolarSites = RenewableEnergy.SolarSites
     local kind = SolarSites.KINDS[site.kind]
     local total = emptyHaul()
     if kind.panels then
@@ -781,10 +787,8 @@ local function siteHaul(site, kinds)
         end
         addHaul(total, kinds.site, panels * perPanel / #site.panels)
     end
-    for _, line in ipairs(kind.crate and WorldSpawns.CRATE_STOCK[kind.crate] or {}) do
-        if line[1] == MODULE then
-            addHaul(total, kinds.site, (line[2] + line[3]) / 2 * SandboxVars.RenewableEnergy[line[4]])
-        end
+    if kind.crate then
+        addHaul(total, kinds.site, crateModules(kind.crate))
     end
     if site.arrowBoard then
         addHaul(total, arrowBoardHaul(kinds))

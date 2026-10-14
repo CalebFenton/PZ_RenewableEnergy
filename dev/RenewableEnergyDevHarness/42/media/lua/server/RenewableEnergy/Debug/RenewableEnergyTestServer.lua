@@ -6,18 +6,13 @@
 -- handlers, so a --stay rerun loads it again (RELOAD_FILES).
 
 require "PZHarness/ServerHandlers"
-require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local overlaysOf = Helpers.overlaysOf
+local overlaysOf, squareAt, vehicleAt = Helpers.overlaysOf, Helpers.squareAt, Helpers.vehicleAt
 
 local function mod()
     return RenewableEnergy.PowerBank, RenewableEnergy.Battery, RenewableEnergy.Wear
-end
-
-local function squareAt(position)
-    return position and getSquare(position.x, position.y, position.z)
 end
 
 -- The server's record of the bank at `position`, and its tile.
@@ -346,6 +341,28 @@ handler("removeBank", function(_, args)
         registered = RenewableEnergy.PowerBank.serverSystem:getLuaObjectOnSquare(square) ~= nil }
 end)
 
+-- Takes the containers off the bank at `args.bank`, as a bank tile a map or a placement that failed
+-- halfway leaves, then loads its square the way its chunk loading does, which rebuilds it. Answers
+-- the rebuilt bank's state. placeBank's cleanup removes only the tile it placed, so the rebuilt one
+-- is removed when the test ends.
+handler("rebuildBank", function(_, args, defer)
+    local _, bank, missing = needRecord(args.bank)
+    if not bank then return nil, missing end
+    bank:removeAllContainers()
+    local square = squareAt(args.bank)
+    MapObjects.loadGridSquare(square)
+    local rebuilt = RenewableEnergy.PowerBank.bankOn(square)
+    if not (rebuilt and rebuilt ~= bank and rebuilt:getContainer()) then
+        return nil, "a rebuilt bank with a container on the server"
+    end
+    defer(function()
+        if rebuilt:getObjectIndex() ~= -1 then
+            RenewableEnergy.PowerBank.remove(rebuilt)
+        end
+    end)
+    return stateAt(args.bank)
+end)
+
 -- Loads -------------------------------------------------------------------------------------------
 
 -- The watts each list of Specs.loads kinds in `args.sets` takes.
@@ -509,15 +526,6 @@ local function batteryOf(vehicle)
     return part, part and part:getInventoryItem()
 end
 
--- The server's copy of the vehicle `args` names ({ id, x, y, z }, from T.vehicleArgs).
-local function needVehicle(args)
-    local vehicle = args and PZHarness.Fixtures.vehicleById(args.id, args)
-    if not vehicle then
-        return nil, "the vehicle on the server"
-    end
-    return vehicle
-end
-
 -- What the tests read of a vehicle: its battery, whether a maintainer is attached, whether its
 -- engine runs.
 local function vehicleState(vehicle)
@@ -532,7 +540,7 @@ end
 -- Named apart from the arrow board tests' "vehicleState" (RenewableEnergyTestServerTrailer.lua):
 -- one registry holds every handler, and the file loaded later wins.
 handler("carState", function(_, args)
-    local vehicle, missing = needVehicle(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then return nil, missing end
     return vehicleState(vehicle)
 end)
@@ -540,7 +548,7 @@ end)
 -- Puts a new `args.type` in the vehicle's battery slot if given, empties it if `args.empty`, and
 -- charges its battery to `args.uses` if given, sent to the clients.
 handler("vehicleBattery", function(_, args)
-    local vehicle, missing = needVehicle(args.vehicle)
+    local vehicle, missing = vehicleAt(args.vehicle)
     if not vehicle then return nil, missing end
     local part = batteryOf(vehicle)
     if not part then
@@ -562,7 +570,7 @@ end)
 -- battery at `args.uses`: the Wh it added, the charge after, the battery's capacity in Wh, and
 -- flatWh as cellCharge answers it.
 handler("maintainerCharge", function(_, args)
-    local vehicle, missing = needVehicle(args.vehicle)
+    local vehicle, missing = vehicleAt(args.vehicle)
     if not vehicle then return nil, missing end
     local _, battery = batteryOf(vehicle)
     battery:setCurrentUsesFloat(args.uses)
@@ -574,7 +582,7 @@ end)
 -- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
 -- vehicle's battery charge before and after.
 handler("chargeVehicles", function(_, args)
-    local vehicle, missing = needVehicle(args.vehicle)
+    local vehicle, missing = vehicleAt(args.vehicle)
     if not vehicle then return nil, missing end
     local _, battery = batteryOf(vehicle)
     local before = battery:getCurrentUsesFloat()
@@ -585,7 +593,7 @@ end)
 -- Vanilla's headlight update (Vehicles.Update.Headlight) for `args.minutes` with the engine off,
 -- from a battery at `args.uses`: the share of a full charge it took.
 handler("headlightDrain", function(_, args)
-    local vehicle, missing = needVehicle(args.vehicle)
+    local vehicle, missing = vehicleAt(args.vehicle)
     if not vehicle then return nil, missing end
     local headlight = vehicle:getPartById("HeadlightLeft")
     if not (headlight and headlight:getInventoryItem()) then
@@ -604,7 +612,7 @@ end)
 -- repaired and fuelled first, since it shuts down without fuel and stalls at random below half
 -- condition, and switched off after.
 handler("alternatorCharge", function(_, args)
-    local vehicle, missing = needVehicle(args.vehicle)
+    local vehicle, missing = vehicleAt(args.vehicle)
     if not vehicle then return nil, missing end
     vehicle:repair()
     local tank = vehicle:getPartById("GasTank")
@@ -638,7 +646,7 @@ end
 local function gadgetCharges(args)
     local SolarCellCharger, Battery = RenewableEnergy.SolarCellCharger, RenewableEnergy.Battery
     local record = recordAt(args.bank)
-    local car, trailer = needVehicle(args.car), needVehicle(args.trailer)
+    local car, trailer = vehicleAt(args.car), vehicleAt(args.trailer)
     local charger = SolarCellCharger.findOn(squareAt(args.charger))
     local light = RenewableEnergy.SolarGardenLight.findOn(squareAt(args.light))
     if not (record and car and trailer and charger and light) then
@@ -670,7 +678,7 @@ end
 handler("stockGadgets", function(player, args)
     RenewableEnergy.GadgetCharging.update()
     local SolarCellCharger = RenewableEnergy.SolarCellCharger
-    local car, trailer = needVehicle(args.car), needVehicle(args.trailer)
+    local car, trailer = vehicleAt(args.car), vehicleAt(args.trailer)
     local charger = SolarCellCharger.findOn(squareAt(args.charger))
     local light = RenewableEnergy.SolarGardenLight.findOn(squareAt(args.light))
     if not (car and trailer and charger and light) then

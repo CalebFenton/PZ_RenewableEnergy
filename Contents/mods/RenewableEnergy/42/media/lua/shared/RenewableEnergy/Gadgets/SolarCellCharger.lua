@@ -2,6 +2,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
+require "RenewableEnergy/PowerBank/Battery"
 
 -- The Solar Battery Charger: a small panel over a tray of four vanilla batteries (Base.Battery),
 -- the only cell that lamps, radios and flashlights take. Placed outdoors, it charges them in
@@ -34,7 +35,7 @@ local function placeKey(x, y, z)
 end
 
 function SolarCellCharger.isCharger(isoObject)
-    return isoObject ~= nil and RenewableEnergy.Sprites.kindOf(isoObject:getTextureName()) == "cellCharger"
+    return isoObject ~= nil and RenewableEnergy.Sprites.kindOf(RenewableEnergy.Sprites.nameOf(isoObject)) == "cellCharger"
 end
 
 function SolarCellCharger.acceptItem(container, item)
@@ -64,32 +65,24 @@ Events.OnObjectAdded.Add(function(isoObject)
     end
 end)
 
-local function emptiestBattery(container)
-    local emptiest
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:getFullType() == SolarCellCharger.BATTERY and item:getCurrentUsesFloat() < 1
-            and (not emptiest or item:getCurrentUsesFloat() < emptiest:getCurrentUsesFloat()) then
-            emptiest = item
-        end
-    end
-    return emptiest
+local function isCell(item)
+    return item:getFullType() == SolarCellCharger.BATTERY
 end
 
--- Adds `hours` of the panel's current output to the batteries in `charger`, one use at a
--- time to the emptiest, so a set fills evenly. Authority only. Returns the uses it added.
-function SolarCellCharger.charge(charger, hours)
+-- Adds `hours` of the panel's output under `sky` (Sun.skyNow, now if nil) to the batteries in
+-- `charger`, one use at a time to the emptiest, so a set fills evenly. Authority only. Returns
+-- the uses it added.
+function SolarCellCharger.charge(charger, hours, sky)
     local container = charger:getContainer()
-    local square = charger:getSquare()
-    if not (container and square and square:isOutside()) then
+    if not container then
         return 0
     end
+    local Battery = RenewableEnergy.Battery
     local data = charger:getModData()
     local stored = (data[STORED_KEY] or 0)
-        + RenewableEnergy.Sun.panelWatts(RenewableEnergy.Specs.cellChargerWatts, "flat") * hours
+        + RenewableEnergy.Sun.squareWatts(charger:getSquare(), RenewableEnergy.Specs.cellChargerWatts, sky) * hours
     local added = 0
-    local battery = emptiestBattery(container)
+    local battery = Battery.emptiestIn(container, isCell)
     while battery do
         local useWh = battery:getUseDelta() * SolarCellCharger.BATTERY_WH
         if stored < useWh then
@@ -100,7 +93,7 @@ function SolarCellCharger.charge(charger, hours)
         sendItemStats(battery)
         stored = stored - useWh
         added = added + 1
-        battery = emptiestBattery(container)
+        battery = Battery.emptiestIn(container, isCell)
     end
     -- Full batteries take nothing, and a panel stores nothing for later.
     data[STORED_KEY] = battery and stored or 0
@@ -110,15 +103,14 @@ end
 -- Charges every charger the authority has seen whose square is loaded. One whose square is
 -- unloaded is dropped; MapObjects reports it again when its chunk loads.
 function SolarCellCharger.chargeAll(hours)
+    local sky = RenewableEnergy.Sun.skyNow()
     for key, place in pairs(places) do
         local square = getCell():getGridSquare(place.x, place.y, place.z)
         local charger = SolarCellCharger.findOn(square)
         if charger then
-            SolarCellCharger.charge(charger, hours)
+            SolarCellCharger.charge(charger, hours, sky)
         else
             places[key] = nil
         end
     end
 end
-
-return SolarCellCharger

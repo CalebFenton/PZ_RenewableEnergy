@@ -186,6 +186,20 @@ function T.clientStatus(bank)
     return bank.object and PowerBank.statusOf(bank.object)
 end
 
+--- The server's entry for the first `fullType` in a bank state's items, or nil.
+function T.stateItem(state, fullType)
+    for _, item in ipairs(state and state.items or {}) do
+        if item.type == fullType then
+            return item
+        end
+    end
+end
+
+--- The first `fullType` in this client's copy of `bank` (a handle), or nil.
+function T.copyItem(bank, fullType)
+    return bank.object:getContainer():getFirstType(fullType)
+end
+
 --- Queues the bank system's command `command` with `args` (a table, or a function the queue calls
 --- for one) on the authority as the server's character, the way a timed action's complete() runs
 --- it: the server takes no such command from a client. Its answer, { ok, reason, xpBefore,
@@ -220,7 +234,17 @@ function T.overlays(object)
     return table.concat(Helpers.overlaysOf(object), ",")
 end
 
+--- Chooses a context menu option the way a click does.
+function T.choose(option)
+    option.onSelect(option.target, option.param1, option.param2, option.param3, option.param4)
+end
+
 -- Data -----------------------------------------------------------------------------------------
+
+--- `name` in snake case, for test names: "HomesteadPowerMag1" -> "homestead_power_mag1".
+function T.snake(name)
+    return string.lower((name:gsub("(%l)(%u)", "%1_%2"):gsub("(%d)(%u)", "%1_%2")))
+end
 
 -- Every placed tile: the item picking it up gives, what Sprites.kindOf reports (kind, facing,
 -- material), and whether it holds items.

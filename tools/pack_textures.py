@@ -1,11 +1,17 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pillow==12.3.0"]
+# ///
 """Builds the mod's texture pack, common/media/texturepacks/renewable_energy.pack, and reads .pack
 files for dev/check.
 
-    python3 tools/pack_textures.py
+    tools/pack_textures.py
 
 art/models/make.sh runs it after rendering. It packs every PNG in tools/tiles (the tile sprites)
 and tools/textures (the item icons) onto one fresh atlas page, so a deleted source leaves no stale
-sprite behind. Needs Pillow; reading a pack does not.
+sprite behind. Building needs uv (https://docs.astral.sh/uv/), which brings Pillow; reading a pack
+needs neither.
 
 The game knows a packed sprite by its bare name, globally: Texture.getSharedTexture drops the
 directory and the .png from whatever it is asked for and tries the packs first. So a sprite named

@@ -11,7 +11,7 @@ local Stage = require "RenewableEnergyDevStage"
 -- repairs, washing, hitching and driving) goes through the vanilla actions and the mod's own.
 
 local T = RenewableEnergyTest
-local test, expect, expectNear, player = T.test, T.expect, T.expectNear, T.player
+local test, expect, expectNear, player, serverCheck = T.test, T.expect, T.expectNear, T.player, T.serverCheck
 
 local Sprites = RenewableEnergy.Sprites
 
@@ -20,10 +20,7 @@ local Sprites = RenewableEnergy.Sprites
 -- StashSystem gives up without an error when the stash building isn't a building, prepares only a
 -- building whose bounds strictly contain the building square (doBuildingStash), and stocks the
 -- crate only if its square is in a room of that building, so a wrong coordinate is an empty house.
-test("renewable_energy_world_stash_houses_resolve", {
-    run = function(self) T.server(self, "stashHousesResolve") end,
-    validate = function(self) T.expectNoFailures(self.server.stashHousesResolve) end,
-})
+serverCheck("renewable_energy_world_stash_houses_resolve", "stashHousesResolve")
 
 -- Unless Stash Houses is at 1 (none), the stashes join the list StashSystem reads, once however
 -- often the game loads.
@@ -101,10 +98,7 @@ test("renewable_energy_world_known_on_start_stocks_and_stays_hidden", {
 
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
 -- and every corpse list a map names exists.
-test("renewable_energy_world_prepper_map_targets", {
-    run = function(self) T.server(self, "prepperMapTargets") end,
-    validate = function(self) T.expectNoFailures(self.server.prepperMapTargets) end,
-})
+serverCheck("renewable_energy_world_prepper_map_targets", "prepperMapTargets")
 
 -- A map item of the mod's own shows the area of its stash house, found or not: its Map id is the
 -- stash name, which UI/MapDefinitions.lua draws. Vanilla town maps keep their own look.
@@ -241,11 +235,8 @@ local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
 
 -- Over many banks, each part turns up about as often as BANK_STOCK says, and a battery box never
 -- comes with a charge controller.
-test("renewable_energy_world_bank_stock_rates", {
-    sandbox = { LRMBatteries = 1, LRMMisc = 1 },
-    run = function(self) T.server(self, "bankStockRates", { samples = 2000, boxTiles = BOX_TILES }) end,
-    validate = function(self) T.expectNoFailures(self.server.bankStockRates) end,
-})
+serverCheck("renewable_energy_world_bank_stock_rates", "bankStockRates", { samples = 2000, boxTiles = BOX_TILES },
+    { LRMBatteries = 1, LRMMisc = 1 })
 
 -- At 0 the battery option leaves world banks empty of batteries.
 test("renewable_energy_world_bank_stock_option_zero", {
@@ -303,11 +294,7 @@ test("renewable_energy_world_crate_spawns_stocked", {
 -- Farm storage shelves get cracked modules, at cracked conditions, and a bedroom's furniture
 -- none. At the highest option every farm storage shelf gets one, so that nothing is left to
 -- chance; at the default the chance is small but there.
-test("renewable_energy_world_cracked_modules", {
-    sandbox = { LRMSolarPanels = 100 },
-    run = function(self) T.server(self, "crackedModules", { samples = 200 }) end,
-    validate = function(self) T.expectNoFailures(self.server.crackedModules) end,
-})
+serverCheck("renewable_energy_world_cracked_modules", "crackedModules", { samples = 200 }, { LRMSolarPanels = 100 })
 
 -- Solar sites -----------------------------------------------------------------------------------
 
@@ -331,10 +318,7 @@ test("renewable_energy_world_site_placed_once", {
 -- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
 -- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
 -- outdoors with a facing; each site has a unique name, a known kind, and the spots its kind uses.
-test("renewable_energy_world_sites_placed_sensibly", {
-    run = function(self) T.server(self, "sitesPlacedSensibly") end,
-    validate = function(self) T.expectNoFailures(self.server.sitesPlacedSensibly) end,
-})
+serverCheck("renewable_energy_world_sites_placed_sensibly", "sitesPlacedSensibly")
 
 -- Garden lights ---------------------------------------------------------------------------------
 
@@ -556,9 +540,18 @@ local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
 local LEFT, RIGHT = "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight"
 local HOMEMADE = "RenewableEnergy.HomemadeSolarModule"
-local BATTERY_BOX = "RenewableEnergyBatteryBox"
 -- How long the server is given to show a change a client asked for.
 local SERVER_MS = 15000
+
+-- The trailer's battery box lid and the box. ArrowBoard.lua is a server file, which loads after
+-- this one, so the part ids are read when a test runs.
+local function lidOf(vehicle)
+    return vehicle:getPartById(RenewableEnergy.ArrowBoard.LID)
+end
+
+local function boxOf(vehicle)
+    return vehicle:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
+end
 
 -- Queues an arrow board on open ground near the character, spawned by the authority with `args`
 -- (see RenewableEnergyTestLibWorld.lua) and facing `facing` (north unless given), and returns its
@@ -720,14 +713,24 @@ test("renewable_energy_world_arrow_board_old_trailer_gets_panels_once", {
     end,
 })
 
--- Puts the character at the middle of one of the vehicle's areas: teleportTo rounds down to the
--- square's corner, which can fall outside a narrow area.
-local function standIn(vehicle, area)
+-- Puts the character at the middle of one of the vehicle's areas, or `toSide` squares from there
+-- towards the vehicle's side and facing it: teleportTo rounds down to the square's corner, which
+-- can fall outside a narrow area.
+local function standIn(vehicle, area, toSide)
     local spot = vehicle:getAreaCenter(area)
+    local x, y = spot:getX(), spot:getY()
+    if toSide then
+        local origin = vehicle:getWorldPos(0, 0, 0, Vector3f.new())
+        local side = vehicle:getWorldPos(1, 0, 0, Vector3f.new())
+        x, y = x + (side:x() - origin:x()) * toSide, y + (side:y() - origin:y()) * toSide
+    end
     local p = player()
-    p:teleportTo(spot:getX(), spot:getY(), vehicle:getZ())
-    p:setX(spot:getX())
-    p:setY(spot:getY())
+    p:teleportTo(x, y, vehicle:getZ())
+    p:setX(x)
+    p:setY(y)
+    if toSide then
+        p:setTargetAndCurrentDirection(vehicle:getX() - x, vehicle:getY() - y)
+    end
 end
 
 -- Its battery box, unlocked, opens only with its lid open, from beside it, and takes a battery a
@@ -741,16 +744,16 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
         local trailer, p = self.trailer, player()
         -- Most trailers spawn with the box padlocked.
         T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
-        T.waitForCopy(function() return not trailer.vehicle:getPartById("TrunkDoor"):getDoor():isLocked() end)
+        T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
         T.give(self, "battery", { { type = "RenewableEnergy.DeepCycleBattery" } })
         T.step(function()
             -- A spawned trailer may come stocked, so count from what it already holds.
             self.before = #boxItems(trailer.state, "RenewableEnergy.DeepCycleBattery")
             local vehicle = trailer.vehicle
-            local lid, box = vehicle:getPartById("TrunkDoor"), vehicle:getPartById(BATTERY_BOX)
+            local lid, box = lidOf(vehicle), boxOf(vehicle)
             self.lid, self.box = lid, box
             if not (lid and lid:getDoor() and box and box:getItemContainer()) then return end
-            standIn(vehicle, BATTERY_BOX)
+            standIn(vehicle, box:getArea())
             self.shutAccess = vehicle:canAccessContainer(box:getIndex(), p)
             -- What the trailer's menu does for Open Trunk.
             ISVehicleMenu.onOpenDoor(p, lid)
@@ -800,87 +803,84 @@ local function lidShot(name, vehicle)
     local file = "test_lid_" .. name .. ".png"
     getCore():TakeFullScreenshot(file)
     local x, y, z = vehicle:getX(), vehicle:getY(), vehicle:getZ()
-    local box = vehicle:getAreaCenter(BATTERY_BOX)
+    local box = vehicle:getAreaCenter(boxOf(vehicle):getArea())
     print(string.format("RELidShot %s %.1f %.1f %.1f %.1f %.3f %d", file, isoToScreenX(0, x, y, z), isoToScreenY(0, x, y, z),
         isoToScreenX(0, box:getX(), box:getY(), z), isoToScreenY(0, box:getX(), box:getY(), z),
         getCore():getZoom(0), getCore():getScreenWidth()))
 end
 
+local LID_SWINGS = "renewable_energy_world_arrow_board_lid_swings"
+
 -- The battery box lid swings open on its hinge when a player opens it and stays open, and swings
 -- shut when they close it; it swings the same way in this game when someone else opens and closes
 -- it, which vanilla shows only to the player who did (RenewableEnergy.ArrowBoard.watchLids). Each
 -- swing passes the poses between shut and open, and the batteries come out only while it is open.
--- The screenshots (test_lid_*.png, one held and one mid-swing per swing, then the shut lid
--- padlocked and unlocked by the server) show what this game drew; dev/lid-shots.py lays them out.
-test("renewable_energy_world_arrow_board_lid_swings", {
+-- A run that selects this test alone by its name, as dev/lid-shots.py's command does, also saves
+-- what this game drew (test_lid_*.png: the lid held shut, then one held and one mid-swing per
+-- swing) for dev/lid-shots.py to lay out; other runs skip the shots, which cost the waits for the
+-- screen and the lighting.
+test(LID_SWINGS, {
     instant = true,
     run = function(self)
+        local shooting = PZHarness.run.selection == LID_SWINGS
         -- Facing south, its box is on the side the camera sees.
         self.trailer = spawnTrailer(self, { repair = true }, "S")
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
-        local LID = RenewableEnergy.ArrowBoard.LID
         T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
         T.waitForCopy(function()
-            local door = trailer.vehicle:getPartById(LID):getDoor()
+            local door = lidOf(trailer.vehicle):getDoor()
             return not door:isLocked() and not door:isOpen() and lidHeld(T.lidPose(trailer), false)
         end)
-        -- Frames for the held pose to reach the screen before a shot.
-        local SHOWN_FRAMES = 3
-        -- The box's area lies over the box, so for a shot the character steps beside it: south-west
-        -- of it stands level with it on the screen, hiding neither the box nor the trailer.
-        local function stepAside()
-            local spot = trailer.vehicle:getAreaCenter(BATTERY_BOX)
-            p:teleportTo(spot:getX() - 2, spot:getY() + 2, trailer.vehicle:getZ())
+        T.step(function() self.shut = T.lidPose(trailer) end)
+        -- Queues a shot of the held pose from beside the box: the box's area lies over the box, so
+        -- the character steps south-west of it, level with it on the screen, hiding neither the
+        -- box nor the trailer, and the pose gets a few frames to reach the screen.
+        local function shotFromAside(label)
+            if not shooting then return end
+            T.step(function()
+                local spot = trailer.vehicle:getAreaCenter(boxOf(trailer.vehicle):getArea())
+                p:teleportTo(spot:getX() - 2, spot:getY() + 2, trailer.vehicle:getZ())
+            end)
+            -- The squares around the new spot stay dark until the lighting has seen them.
+            T.waitForCopy(Stage.lightingSettled(p))
+            T.wait(3)
+            T.step(function() lidShot(label, trailer.vehicle) end)
         end
-        T.step(function()
-            self.shut = T.lidPose(trailer)
-            stepAside()
-        end)
-        -- The squares around the new spot stay dark until the lighting has seen them.
-        T.waitForCopy(Stage.lightingSettled(p))
-        T.step(function() lidShot("0_shut", trailer.vehicle) end)
+        shotFromAside("0_shut")
         self.swings = {}
         -- Queues `act` from the box's area and a wait until the lid stands held `open`, noting what
-        -- it passed on the way, with a shot of the first pose between and one of the held pose from
-        -- beside the box, numbered `shot`.
+        -- it passed on the way and whether the box then opens from there, with shots numbered
+        -- `shot`: the first pose between, and the held pose.
         local function swing(name, open, shot, act)
             local seen = { name = name, open = open }
             table.insert(self.swings, seen)
             local label = shot .. "_" .. (name:gsub(" ", "_"))
             T.step(function()
-                standIn(trailer.vehicle, BATTERY_BOX)
+                standIn(trailer.vehicle, boxOf(trailer.vehicle):getArea())
                 act()
             end)
             T.waitForCopy(function()
                 seen.pose = T.lidPose(trailer)
                 if seen.pose and seen.pose.playing and seen.pose.open and seen.pose.open > 0.1 and seen.pose.open < 0.9 then
-                    if not seen.between then
+                    if shooting and not seen.between then
                         lidShot(label .. "_swinging", trailer.vehicle)
                     end
                     seen.between = true
                 end
-                return trailer.vehicle:getPartById(LID):getDoor():isOpen() == open and lidHeld(seen.pose, open)
+                return lidOf(trailer.vehicle):getDoor():isOpen() == open and lidHeld(seen.pose, open)
             end)
             T.step(function()
                 local vehicle = trailer.vehicle
-                seen.access = vehicle:canAccessContainer(vehicle:getPartById(BATTERY_BOX):getIndex(), p)
-                stepAside()
+                seen.access = vehicle:canAccessContainer(boxOf(vehicle):getIndex(), p)
             end)
-            T.wait(SHOWN_FRAMES)
-            T.step(function() lidShot(label, trailer.vehicle) end)
+            shotFromAside(label)
         end
         -- What the trailer's menu does for Open Trunk and Close Trunk.
-        swing("opening it", true, 1, function() ISVehicleMenu.onOpenDoor(p, trailer.vehicle:getPartById(LID)) end)
-        swing("closing it", false, 2, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
+        swing("opening it", true, 1, function() ISVehicleMenu.onOpenDoor(p, lidOf(trailer.vehicle)) end)
+        swing("closing it", false, 2, function() ISVehicleMenu.onCloseDoor(p, lidOf(trailer.vehicle)) end)
         swing("someone else opening it", true, 3, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
         swing("someone else closing it", false, 4, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
-        for shot, locked in ipairs({ true, false }) do
-            T.onVehicle(self, trailer, "setTrailer", { lidLocked = locked })
-            T.waitForVehicleCopy(trailer, function(copy) return copy.lid.shown == (locked and "Default,Padlock" or "Default") end)
-            T.wait(SHOWN_FRAMES)
-            T.step(function() lidShot((shot + 4) .. (locked and "_padlocked" or "_unlocked") .. "_by_the_server", trailer.vehicle) end)
-        end
     end,
     validate = function(self)
         if not expect(lidHeld(self.shut, false), "the shut lid shows " .. describeLid(self.shut)) then
@@ -902,12 +902,12 @@ test("renewable_energy_world_arrow_board_lid_swings", {
 local function padlockBox(self, trailer, box)
     T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = true, box = box })
     T.waitForCopy(function()
-        local lid = trailer.vehicle:getPartById("TrunkDoor")
+        local lid = lidOf(trailer.vehicle)
         return lid and lid:getDoor() and lid:getDoor():isLocked() and not lid:getDoor():isOpen()
     end)
     T.step(function()
-        self.lid, self.box = trailer.vehicle:getPartById("TrunkDoor"), trailer.vehicle:getPartById(BATTERY_BOX)
-        standIn(trailer.vehicle, BATTERY_BOX)
+        self.lid, self.box = lidOf(trailer.vehicle), boxOf(trailer.vehicle)
+        standIn(trailer.vehicle, self.box:getArea())
     end)
 end
 
@@ -1065,16 +1065,7 @@ test("renewable_energy_world_arrow_board_padlock_shows_while_locked", {
 -- a player opens the box from, so that the trailer's menu offers the lid (BaseVehicle.getUseablePart
 -- wants the character in the area and facing the box, which from the area's middle they can't).
 local function standAtBox(vehicle)
-    local centre = vehicle:getAreaCenter(BATTERY_BOX)
-    local origin = vehicle:getWorldPos(0, 0, 0, Vector3f.new())
-    local side = vehicle:getWorldPos(1, 0, 0, Vector3f.new())
-    local x = centre:getX() + (side:x() - origin:x()) * 0.7
-    local y = centre:getY() + (side:y() - origin:y()) * 0.7
-    local p = player()
-    p:teleportTo(x, y, vehicle:getZ())
-    p:setX(x)
-    p:setY(y)
-    p:setTargetAndCurrentDirection(vehicle:getX() - x, vehicle:getY() - y)
+    standIn(vehicle, boxOf(vehicle):getArea(), 0.7)
 end
 
 -- Whether the trailer's radial menu, opened where the character stands, offers Cut Padlock. The
@@ -1181,11 +1172,11 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
         T.give(self, "cutters", { { type = "Base.BoltCutters" } })
         look("at a padlocked box with bolt cutters", true)
         T.onVehicle(self, trailer, "setTrailer", { lidLocked = false })
-        T.waitForCopy(function() return not trailer.vehicle:getPartById("TrunkDoor"):getDoor():isLocked() end)
+        T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
         look("at an unlocked box", false)
         T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false, lidLocked = true })
         T.waitForCopy(function()
-            local lid = trailer.vehicle:getPartById("TrunkDoor")
+            local lid = lidOf(trailer.vehicle)
             return lid:getInventoryItem() == nil and lid:getDoor():isLocked()
         end)
         look("at a locked box without its lid", false)
@@ -1211,9 +1202,9 @@ test("renewable_energy_world_arrow_board_box_shows_in_the_loot_window", {
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
         T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
-        T.waitForCopy(function() return not trailer.vehicle:getPartById("TrunkDoor"):getDoor():isLocked() end)
+        T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
         T.step(function()
-            self.lid, self.box = trailer.vehicle:getPartById("TrunkDoor"), trailer.vehicle:getPartById(BATTERY_BOX)
+            self.lid, self.box = lidOf(trailer.vehicle), boxOf(trailer.vehicle)
             standAtBox(trailer.vehicle)
             getPlayerLoot(p:getPlayerNum()).forceSelectedContainer = nil
             ISVehicleMenu.onOpenDoor(p, self.lid)
@@ -1607,7 +1598,8 @@ local function crashTest(name, targetKmh, expected, snap)
             self.peak = 0
             -- Until the car has stopped, so that the next test doesn't begin with the character at
             -- the wheel of a moving car, and the trailer too while hitched, so that a crack a bump
-            -- caused would show; a trailer the jolt set loose coasts on for a while.
+            -- caused would show; a trailer the jolt set loose coasts on for a while. A pair rolling
+            -- at a crash's speed takes longer to stop than one settling on its hitch.
             T.waitUntil(function()
                 local vehicle = trailer.vehicle
                 local speed = math.abs(vehicle:getCurrentSpeedKmHour())
@@ -1624,12 +1616,15 @@ local function crashTest(name, targetKmh, expected, snap)
                     self.hitchAgeMs = getTimestampMs() - self.hitchedAt
                 end
                 return self.pushed and self.car.vehicle:isAtRest() and (self.snapSpeed ~= nil or vehicle:isAtRest())
-            end, 6000)
+            end, 2 * VEHICLE_FRAMES)
             T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= 90 end,
                 expected == 90 and 0 or SERVER_MS)
         end,
         validate = function(self)
             local state = self.trailer.state
+            if not expect(self.pushed, string.format("the push never got the trailer to %d km/h, only %.1f", targetKmh, self.peak)) then
+                return
+            end
             if snap then
                 expect(self.snapSpeed ~= nil, string.format("the jolt to %.1f km/h left the trailer hitched", self.peak))
             else
@@ -1939,8 +1934,7 @@ test("renewable_energy_world_arrow_board_frame_welds", {
         end
         local function weld(option, area)
             standIn(trailer.vehicle, area)
-            local fix = option.fix
-            fix.onSelect(fix.target, fix.param1, fix.param2, fix.param3, fix.param4)
+            T.choose(option.fix)
         end
         T.step(function()
             local offered = frameOptions()

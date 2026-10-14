@@ -90,7 +90,8 @@ end
 
 local CARRIED_KEYS = { RenewableEnergy.PowerBank.MODULES, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
 
--- The object being picked up, while vanilla makes its item.
+-- The object being picked up, until vanilla makes its item. Each pick-up makes one item, which
+-- takes it, so an error in vanilla's pick-up can't leave it for an unrelated item later.
 local pickingUp
 
 local vanillaPickUp = ISMoveableSpriteProps.pickUpMoveableInternal
@@ -104,11 +105,13 @@ end
 -- Copies the keys before vanilla adds the item to the inventory and sends it to the client.
 local vanillaInstanceItem = ISMoveableSpriteProps.instanceItem
 function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
+    local from = pickingUp
+    pickingUp = nil
     local item = vanillaInstanceItem(self, spriteNameOverride)
-    if item and pickingUp and pickingUp:hasModData() then
-        local from, to = pickingUp:getModData(), item:getModData()
+    if item and from and from:hasModData() then
+        local fromData, to = from:getModData(), item:getModData()
         for _, key in ipairs(CARRIED_KEYS) do
-            to[key] = from[key]
+            to[key] = fromData[key]
         end
     end
     return item

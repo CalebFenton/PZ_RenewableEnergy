@@ -25,21 +25,9 @@ local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Format = RenewableEnergy.Format
 local StatusWindow = RenewableEnergy.StatusWindow
 
--- The item each placed kind is, for its name in the menu.
-local ITEMS = {
-    flat = "RenewableEnergy.SolarFlat",
-    wall = "RenewableEnergy.SolarWall",
-    rack = "RenewableEnergy.SolarRack",
-    gardenLight = SolarGardenLight.ITEM,
-}
-for fullType, bank in pairs(RenewableEnergy.Specs.banks) do
-    ITEMS[bank.sprite] = fullType
-end
-
+--- The name of the item a placed tile is: its CustomItem, which picking it up gives back.
 function Menu.nameOf(isoObject)
-    local kind, _, material = RenewableEnergy.Sprites.kindOf(isoObject:getSprite():getName())
-    local mount = ITEMS[kind] and (kind == "wall" or kind == "rack") and material
-    return getItemNameFromFullType(mount and ITEMS[kind] .. (material == "wood" and "Wood" or "Metal") or ITEMS[kind])
+    return getItemNameFromFullType(isoObject:getProperties():get("CustomItem"))
 end
 
 --- A bank's name: the one a player gave it, else its tier's.
@@ -239,17 +227,24 @@ local function forSquaresAround(center, radius, levels, fn)
     end
 end
 
---- Panels in the bank's reach that are not connected to it yet.
+--- Panels in the bank's reach that are not connected to it yet. This bank's status says which
+--- are, rather than asking every bank about every panel found.
 function Menu.unconnectedSources(bank)
     local here = PowerBank.positionOf(bank)
     local reach = RenewableEnergy.Specs.sourceReach
+    local status = PowerBank.statusOf(bank)
+    local connected = {}
+    for _, source in ipairs(status and status.sources or {}) do
+        connected[source.x .. "," .. source.y .. "," .. source.z] = true
+    end
     local found = {}
     forSquaresAround(here, reach.tiles, reach.levels, function(square)
         local objects = square:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)
-            if PowerBank.sourceKind(object) and Action.bankInReach(object, bank)
-                and not PowerBank.samePosition(Action.connectedBank(object), here) then
+            if PowerBank.sourceKind(object) and square:isOutside()
+                and PowerBank.isInReach(here, square:getX(), square:getY(), square:getZ())
+                and not connected[square:getX() .. "," .. square:getY() .. "," .. square:getZ()] then
                 table.insert(found, object)
             end
         end

@@ -585,24 +585,18 @@ end
 
 -- Found batteries ---------------------------------------------------------------------------------
 
--- Item modData key: the battery already got its found charge, so a refill of its container (loot
--- respawn) leaves a stored battery's charge alone.
-local FOUND = "RenewableEnergy_found"
-
---- Gives the mod's batteries in a freshly filled container, bags included, a part charge.
+--- Gives the mod's batteries in a freshly filled container, bags included, a part charge. A
+--- battery that already has a charge of its own is one a refill (loot respawn) found there.
 ---@param container ItemContainer
 function Distributions.chargeFoundBatteries(container)
+    local Battery = RenewableEnergy.Battery
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item:IsInventoryContainer() then
             Distributions.chargeFoundBatteries(item:getInventory())
-        elseif string.find(item:getFullType(), "^RenewableEnergy%.") and RenewableEnergy.Battery.isBattery(item) then
-            local modData = item:getModData()
-            if not modData[FOUND] then
-                modData[FOUND] = true
-                RenewableEnergy.Battery.setFoundCharge(item)
-            end
+        elseif string.find(item:getFullType(), "^RenewableEnergy%.") and Battery.isBattery(item) and not Battery.hasCharge(item) then
+            Battery.setFoundCharge(item)
         end
     end
 end

@@ -5,7 +5,7 @@ whole map's vehicle stalls. Writes them to
 dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevTownCensus.lua, which the
 --loot report multiplies by each container's, room's and vehicle's expected modules.
 
-    python3 dev/loot/census.py [PZ media folder]
+    dev/loot/census.py [PZ media folder]
 
 The media folder defaults to the macOS Steam install. Rerun it after a game update changes the
 map. It reads the files IsoMetaGrid and IsoLot read:
@@ -239,13 +239,17 @@ def jam_slots(facing, x, y, w, h):
     return jam_slots_along(y, h, 1, 3, False) * jam_slots_along(x, w, 3, 6, False)
 
 
-def vehicle_stalls(folder, town):
-    _name, x1, y1, x2, y2 = town
-    stalls = {}
+def parking_zones(folder):
+    """The map's ParkingStall zones as (name, x, y, w, h, direction)."""
     with open(os.path.join(folder, "objects.lua"), encoding="latin-1") as f:
         text = f.read()
-    for m in ZONE.finditer(text):
-        name, x, y, w, h, direction = m.group(1), *map(int, m.groups()[1:5]), m.group(6)
+    return [(m.group(1), *map(int, m.groups()[1:5]), m.group(6)) for m in ZONE.finditer(text)]
+
+
+def vehicle_stalls(zones, town):
+    _name, x1, y1, x2, y2 = town
+    stalls = {}
+    for name, x, y, w, h, direction in zones:
         if not (x1 <= x + w / 2 <= x2 and y1 <= y + h / 2 <= y2):
             continue
         key = (name or "parkingstall").lower()
@@ -282,6 +286,7 @@ def main():
     media = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MEDIA
     folder = os.path.join(media, "maps", MAP)
     types = container_types(media)
+    zones = parking_zones(folder)
     out = ["-- Written by dev/loot/census.py from the game's map; rerun it rather than edit this file.",
            "-- towns: each town's bounds, its rooms by name, its container tiles by room name and",
            "-- container type, and its vehicle stalls by vehicle zone. mapVehicleStalls: the whole map's.",
@@ -293,14 +298,14 @@ def main():
         out.append('        { name = "%s", x1 = %d, y1 = %d, x2 = %d, y2 = %d,' % (name, x1, y1, x2, y2))
         for field, counts in (("rooms", count_rooms(folder, town)),
                               ("containers", count_containers(folder, types, town)),
-                              ("vehicleStalls", vehicle_stalls(folder, town))):
+                              ("vehicleStalls", vehicle_stalls(zones, town))):
             out.append("            %s = {" % field)
             out.append(lua_table(counts, 16))
             out.append("            },")
         out.append("        },")
     out.append("    },")
     out.append("    mapVehicleStalls = {")
-    out.append(lua_table(vehicle_stalls(folder, ("map", 0, 0, 1 << 20, 1 << 20)), 8))
+    out.append(lua_table(vehicle_stalls(zones, ("map", 0, 0, 1 << 20, 1 << 20)), 8))
     out.append("    },")
     out.append("}")
     with open(OUT, "w") as f:

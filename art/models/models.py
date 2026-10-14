@@ -1,7 +1,7 @@
 """Bakes and exports the ground model of every item in items.ITEMS and the body of every vehicle in
 items.VEHICLES, and writes Models.txt.
 
-    blender -b --factory-startup -P art/models/models.py
+    PYTHONHASHSEED=0 blender -b --factory-startup --python-use-system-env -P art/models/models.py
 
 Each model's parts are merged into one mesh, unwrapped, and their materials baked into one texture
 (colour, darkened by ambient occlusion so creases read without the renderer's light), because the
@@ -15,7 +15,11 @@ scripts/RenewableEnergy/Vehicles.txt names them.
 
 An item's exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the
 vertices (like HearingAid's ground model): the game draws a dropped item that way.
+
+The FBX files come out the same, byte for byte, from the same parts (make.sh says why).
 """
+import datetime
+import functools
 import math
 import os
 import sys
@@ -24,11 +28,19 @@ import bmesh
 import bpy
 import numpy as np
 from bpy_extras.io_utils import axis_conversion
+from io_scene_fbx import export_fbx_bin
 from mathutils import Quaternion, Vector
+
+if sys.flags.hash_randomization:
+    sys.exit("models.py: set PYTHONHASHSEED and pass --python-use-system-env, or every FBX object id changes")
+# The exporter's own hook for the creation time; it takes the time of writing without one.
+export_fbx_bin.fbx_header_elements = functools.partial(export_fbx_bin.fbx_header_elements,
+                                                       time=datetime.datetime(2000, 1, 1))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import items  # noqa: E402
+import kit  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(HERE))
 MOD = os.path.join(REPO, "Contents/mods/RenewableEnergy")
@@ -64,14 +76,6 @@ def setup():
     stage = bpy.data.collections.new("Stage")
     scene.collection.children.link(stage)
     return stage
-
-
-def clear(stage):
-    for obj in list(stage.objects):
-        bpy.data.objects.remove(obj)
-    for mesh in list(bpy.data.meshes):
-        if mesh.users == 0:
-            bpy.data.meshes.remove(mesh)
 
 
 # Thinner than this, a part is printed on the surface below it rather than modelled: labels,
@@ -170,25 +174,21 @@ def save_texture(path, pixels, alpha=False):
     image.filepath_raw = path
     image.file_format = "PNG"
     image.save()
-    return image
+    bpy.data.images.remove(image)
 
 
-def export(obj, name, image, path):
-    """Swaps the baked texture in as the only material and writes the FBX, with the armature `rig`
-    gave it, if any, and its clip."""
+def export(obj, name, path):
+    """Swaps one material in for the parts' and writes the FBX, with the armature `rig` gave it, if
+    any, and its clip. The material holds no texture: the game drops a model's materials
+    (JAssImpImporter.takeOutTheTrash) and takes its texture from the model script, and the exporter
+    would write the texture's absolute path, so each checkout would write different files."""
     obj.data.materials.clear()
-    mat = bpy.data.materials.new(PREFIX + name)
-    if not mat.node_tree:
-        mat.use_nodes = True
-    node = mat.node_tree.nodes.new("ShaderNodeTexImage")
-    node.image = image
-    mat.node_tree.links.new(node.outputs["Color"], mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
-    obj.data.materials.append(mat)
+    obj.data.materials.append(bpy.data.materials.new(PREFIX + name))
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     options = dict(filepath=path, use_selection=True, apply_scale_options="FBX_SCALE_ALL", add_leaf_bones=False,
-                   path_mode="STRIP", mesh_smooth_type="FACE")
+                   mesh_smooth_type="FACE")
     if obj.parent is None:
         bpy.ops.export_scene.fbx(object_types={"MESH"}, bake_space_transform=True, **options)
         return
@@ -204,7 +204,7 @@ def build_baked(stage, builder, name, size, to_ground):
     darkened by ambient occlusion. `to_ground` centres it standing on the ground; otherwise it
     keeps the builder's origin. Returns the mesh object, the texture's pixels and the parts the
     mesh's "part" attribute indexes; the parts stay on `stage` until the next build."""
-    clear(stage)
+    kit.clear(stage)
     builder(stage)
     bpy.context.view_layer.update()
     parts = [obj for obj in stage.objects if obj.type == "MESH"]
@@ -539,8 +539,8 @@ def main():
     for name, spec in items.ITEMS.items():
         size = TEXTURE_SIZE.get(name, DEFAULT_TEXTURE_SIZE)
         low, colour, _ = build_baked(stage, spec["model"], name, size, to_ground=True)
-        image = save_texture(os.path.join(TEXTURE_DIR, PREFIX + name + ".png"), colour)
-        export(low, name, image, os.path.join(MESH_DIR, PREFIX + name + ".fbx"))
+        save_texture(os.path.join(TEXTURE_DIR, PREFIX + name + ".png"), colour)
+        export(low, name, os.path.join(MESH_DIR, PREFIX + name + ".fbx"))
         print("model %s: %d faces, %d px texture" % (name, len(low.data.polygons), size))
         bpy.data.objects.remove(low)
     models_txt(items.ITEMS)
@@ -619,7 +619,7 @@ def rig(piece, hinge, bone_name):
 def build_vehicles(stage):
     for name, spec in items.VEHICLES.items():
         low, colour, solid = build_baked(stage, spec["build"], name, VEHICLE_TEXTURE_SIZE, to_ground=False)
-        image = save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + ".png"), colour)
+        save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + ".png"), colour)
         for suffix, (pixels, alpha) in vehicle_overlays(low, solid).items():
             save_texture(os.path.join(VEHICLE_TEXTURE_DIR, PREFIX + name + suffix + ".png"), pixels, alpha)
         # The multi-UV shader reads rust, damage and blood through UV2; new() copies the active UV1.
@@ -634,7 +634,7 @@ def build_vehicles(stage):
         for suffix, piece in pieces.items():
             # Exported like the ground models: the game reads a mesh's vertices with Y up and -Z
             # forward (it flips Z, to left-handed coordinates), so the body's +Y, the hitch, leads.
-            export(piece, name + suffix, image, os.path.join(VEHICLE_MESH_DIR, PREFIX + name + suffix + ".fbx"))
+            export(piece, name + suffix, os.path.join(VEHICLE_MESH_DIR, PREFIX + name + suffix + ".fbx"))
             print("vehicle %s%s: %d faces" % (name, suffix, len(piece.data.polygons)))
             armature = piece.parent
             bpy.data.objects.remove(piece)

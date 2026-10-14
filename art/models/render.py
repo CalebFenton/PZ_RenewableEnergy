@@ -88,14 +88,6 @@ def setup():
     return camera, stage
 
 
-def clear(stage):
-    for obj in list(stage.objects):
-        bpy.data.objects.remove(obj)
-    for mesh in list(bpy.data.meshes):
-        if mesh.users == 0:
-            bpy.data.meshes.remove(mesh)
-
-
 def build(stage, layers):
     for spec in layers:
         before = set(stage.objects)
@@ -124,27 +116,6 @@ def render(path, width, height):
     scene.render.resolution_x, scene.render.resolution_y = width, height
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
-
-
-def load_pixels(path):
-    """An image file as a float array of rows from the top, RGBA."""
-    image = bpy.data.images.load(path)
-    width, height = image.size
-    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(height, width, 4)[::-1]
-    bpy.data.images.remove(image)
-    return pixels
-
-
-def save_pixels(path, pixels):
-    height, width, _ = pixels.shape
-    image = bpy.data.images.new("out", width, height, alpha=True)
-    image.colorspace_settings.name = "Non-Color"
-    image.pixels[:] = np.clip(pixels[::-1], 0, 1).ravel()
-    image.filepath_raw = path
-    image.file_format = "PNG"
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    image.save()
-    bpy.data.images.remove(image)
 
 
 # Tiles --------------------------------------------------------------------------------------------
@@ -205,19 +176,21 @@ def render_tiles(camera, stage):
     atlas = np.zeros((rows * TILE_H, COLUMNS * TILE_W, 4), dtype=np.float32)
     tile_camera(camera)
     for index, layers in sorted(tiles.TILES.items()):
-        clear(stage)
+        kit.clear(stage)
         build(stage, layers)
-        path = os.path.join(TILE_DIR, "%s_%d.png" % (TILESET, index))
-        render(path, TILE_W, TILE_H)
-        alpha = load_pixels(path)[..., 3]
-        depth = depth_map(camera, alpha)
+        # Saved from the pixels: the render's own file carries the date and its timings.
+        raw = os.path.join(SCRATCH, "tile.png")
+        render(raw, TILE_W, TILE_H)
+        pixels = kit.load_pixels(raw)
+        kit.save_pixels(os.path.join(TILE_DIR, "%s_%d.png" % (TILESET, index)), pixels)
+        depth = depth_map(camera, pixels[..., 3])
         cell = atlas[index // COLUMNS * TILE_H:(index // COLUMNS + 1) * TILE_H,
                      index % COLUMNS * TILE_W:(index % COLUMNS + 1) * TILE_W]
         covered = depth >= 0
         cell[covered, :3] = np.maximum(depth[covered], 1 / 255)[:, None]
         cell[covered, 3] = 1
         print("tile %d: %d layers, %d pixels" % (index, len(layers), int(covered.sum())))
-    save_pixels(DEPTH_FILE, atlas)
+    kit.save_pixels(DEPTH_FILE, atlas)
 
 
 # Icons --------------------------------------------------------------------------------------------
@@ -263,12 +236,12 @@ def render_icons(camera, stage):
         if stale.startswith("Item_RenewableEnergy_"):
             os.remove(os.path.join(ICON_DIR, stale))
     for name, spec in items.ITEMS.items():
-        clear(stage)
+        kit.clear(stage)
         build(stage, [tiles.layer(spec.get("icon", spec["model"]))])
         icon_camera(camera, stage, spec.get("icon_elevation", 30))
         raw = os.path.join(SCRATCH, "icon_%s.png" % name)
         render(raw, ICON_RENDER, ICON_RENDER)
-        save_pixels(os.path.join(ICON_DIR, "Item_RenewableEnergy_%s.png" % name), pixel_icon(load_pixels(raw)))
+        kit.save_pixels(os.path.join(ICON_DIR, "Item_RenewableEnergy_%s.png" % name), pixel_icon(kit.load_pixels(raw)))
         print("icon %s" % name)
 
 

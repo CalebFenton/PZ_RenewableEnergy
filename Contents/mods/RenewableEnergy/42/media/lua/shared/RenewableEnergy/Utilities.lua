@@ -18,4 +18,15 @@ function RenewableEnergy.findObjectOn(square, matches)
     return nil
 end
 
+--- Takes `item` from `character`: out of their hands and out of the container that holds it, and
+--- tells the clients. Authority only.
+function RenewableEnergy.takeItem(character, item)
+    character:removeFromHands(item)
+    local container = item:getContainer()
+    if container then
+        container:Remove(item)
+        sendRemoveItemFromContainer(container, item)
+    end
+end
+
 return RenewableEnergy

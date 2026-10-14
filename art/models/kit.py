@@ -1,13 +1,16 @@
-"""Geometry and material helpers shared by the item builders in items.py.
+"""Geometry and material helpers shared by the item builders in items.py, and the stage and pixel
+helpers that models.py, render.py and preview.py share.
 
 Units are metres and the scene is Blender's: +Z up. An item is built standing on z = 0, centred on
 the origin, with its front facing -Y. In a tile, -Y is south and +X east (Blender's +Y is the
 game's north, because the game's y axis points south).
 """
 import math
+import os
 
 import bmesh
 import bpy
+import numpy as np
 from mathutils import Vector
 
 # Materials ----------------------------------------------------------------------------------------
@@ -170,25 +173,6 @@ def tube(collection, name, mat, points, radius, sides=6):
     return _object(name, bm, mat, collection)
 
 
-def torus(collection, name, mat, major, minor, at=(0, 0, 0), rotate=None, segments=16, sides=6):
-    """A ring lying in the XY plane, such as a coil of cable."""
-    bm = bmesh.new()
-    rings = []
-    for i in range(segments):
-        a = 2 * math.pi * i / segments
-        centre = Vector((math.cos(a) * major, math.sin(a) * major, 0))
-        out = Vector((math.cos(a), math.sin(a), 0))
-        rings.append([bm.verts.new(centre + (out * math.cos(b) + Vector((0, 0, 1)) * math.sin(b)) * minor)
-                      for b in (2 * math.pi * k / sides for k in range(sides))])
-    for i in range(segments):
-        a, b = rings[i], rings[(i + 1) % segments]
-        for k in range(sides):
-            bm.faces.new((a[k], b[k], b[(k + 1) % sides], a[(k + 1) % sides]))
-    obj = _object(name, bm, mat, collection)
-    place(obj, at, rotate)
-    return obj
-
-
 def prism(collection, name, mat, outline, depth, at=(0, 0, 0), rotate=None):
     """A flat shape extruded along +Y: `outline` is a list of (x, z) points, counter-clockwise when
     seen from the front. Used for brackets, triangles and cut sheet."""
@@ -244,3 +228,37 @@ def group(collection, name, objects, at=(0, 0, 0), rotate=None):
         obj.parent = empty
     place(empty, at, rotate)
     return empty
+
+
+# Stage and pixels ---------------------------------------------------------------------------------
+
+
+def clear(stage):
+    """Takes every object off the stage, and the meshes nothing uses any more."""
+    for obj in list(stage.objects):
+        bpy.data.objects.remove(obj)
+    for mesh in list(bpy.data.meshes):
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
+
+
+def load_pixels(path):
+    """An image file as a float array of rows from the top, RGBA."""
+    image = bpy.data.images.load(path)
+    width, height = image.size
+    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(height, width, 4)[::-1]
+    bpy.data.images.remove(image)
+    return pixels
+
+
+def save_pixels(path, pixels):
+    """Writes a load_pixels array as a PNG, its values as they are, without a colour transform."""
+    height, width, _ = pixels.shape
+    image = bpy.data.images.new("out", width, height, alpha=True)
+    image.colorspace_settings.name = "Non-Color"
+    image.pixels[:] = np.clip(pixels[::-1], 0, 1).ravel()
+    image.filepath_raw = path
+    image.file_format = "PNG"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    image.save()
+    bpy.data.images.remove(image)

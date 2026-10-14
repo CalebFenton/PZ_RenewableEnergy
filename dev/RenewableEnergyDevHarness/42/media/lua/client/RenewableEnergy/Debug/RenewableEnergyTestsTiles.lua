@@ -113,26 +113,38 @@ test("renewable_energy_tiles_mounts_rotate", {
     end,
 })
 
--- Every battery a bank can hold shows, and the meter reads its charge.
+-- Every battery a bank can hold shows, and the meter reads its charge: it climbs with the charge,
+-- through every level, from its lowest empty to its highest full.
 test("renewable_energy_tiles_bank_overlays", {
     validate = function()
+        local levels
         for itemType, bank in pairs(Specs.banks) do
             local fill = Sprites.bankFill[bank.sprite]
             if expect(fill ~= nil, itemType .. " has no battery overlays") then
+                levels = #fill.meter
                 expect(#fill.batteries == bank.maxBatteries, string.format("%s shows up to %d batteries but holds %d",
                     itemType, #fill.batteries, bank.maxBatteries))
                 local full = Sprites.bankOverlays(bank.sprite, bank.maxBatteries, 1)
-                expect(full[1] == fill.batteries[bank.maxBatteries] and full[2] == fill.meter[5],
+                expect(full[1] == fill.batteries[bank.maxBatteries] and full[2] == fill.meter[levels],
                     "a full " .. itemType .. " shows " .. table.concat(full, ", "))
-                local one = Sprites.bankOverlays(bank.sprite, 1, 0.05)
+                local one = Sprites.bankOverlays(bank.sprite, 1, 0)
                 expect(one[1] == fill.batteries[1] and one[2] == fill.meter[1],
-                    "one battery at 5% in " .. itemType .. " shows " .. table.concat(one, ", "))
+                    "one empty battery in " .. itemType .. " shows " .. table.concat(one, ", "))
                 expect(#Sprites.bankOverlays(bank.sprite, 0, 1) == 0, "an empty " .. itemType .. " shows overlays")
             end
         end
-        for fraction, level in pairs({ [0] = 1, [0.2] = 2, [0.5] = 3, [0.8] = 4, [0.96] = 5, [1] = 5 }) do
-            expect(Sprites.meterLevel(fraction) == level,
-                "charge " .. fraction .. " shows meter level " .. Sprites.meterLevel(fraction) .. ", expected " .. level)
+        if not levels then return end
+        local seen, last, falls = {}, Sprites.meterLevel(0), nil
+        expect(last == 1, "no charge shows meter level " .. last)
+        for percent = 0, 100 do
+            local level = Sprites.meterLevel(percent / 100)
+            falls = falls or (level < last and percent)
+            seen[level], last = true, level
+        end
+        expect(not falls, "the meter drops a level at " .. tostring(falls) .. "% charge")
+        expect(last == levels, "a full charge shows meter level " .. last .. " of " .. levels)
+        for level = 1, levels do
+            expect(seen[level], "no charge shows meter level " .. level)
         end
     end,
 })
@@ -175,67 +187,17 @@ local function electrician(self)
     T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
 end
 
--- Every placed tile's CustomItem names its item, so picking it up gives that item and nothing
--- else (without one the game hands back a generic Moveable). And each item's own tile, placed and
--- picked up the way a player does, comes back as the item, with a container only on the tiles that
--- hold items. Wall panels need a wall to hang on, and the other facings are the same item's
--- (renewable_energy_tiles_mounts_rotate turns them), so only the tile an item places is placed.
-test("renewable_energy_tiles_place_and_pick_up", {
-    instant = true,
-    run = function(self)
-        local square = T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
-        if not square then return end
-        electrician(self)
-        self.results = {}
-        for _, placed in ipairs(PLACED) do
-            local script = getScriptManager():getItem(placed.item)
-            -- Banks stand only indoors, and placing them by hand is the power tests' business.
-            if placed.kind ~= "wall" and not RenewableEnergy.PowerBank.bankOfSprite(placed.sprite)
-                and script and script:getWorldObjectSprite() == placed.sprite then
-                local result = { placed = placed }
-                table.insert(self.results, result)
-                local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite)
-                T.step(function() result.container = handle.object ~= nil and handle.object:getContainer() ~= nil end)
-                T.pickUpAsPlayer(self, handle, placed.sprite)
-                T.server(self, "carried", { types = { placed.item } })
-                T.step(function()
-                    local carried = self.server.carried
-                    result.removed = T.objectWithSprite(square, placed.sprite) == nil
-                    result.returned, result.items = #carried.items[placed.item], carried.total
-                end)
-                T.server(self, "takeItems", { type = placed.item })
-            end
-        end
-    end,
-    validate = function(self)
-        for _, placed in ipairs(PLACED) do
-            local props = properties(placed.sprite)
-            local customItem = props and props:get("CustomItem")
-            expect(customItem == placed.item, placed.sprite .. " gives " .. tostring(customItem) .. ", expected " .. placed.item)
-        end
-        expect(#self.results > 0, "no item places one of the tiles")
-        for _, r in ipairs(self.results) do
-            local what = r.placed.sprite .. " (" .. r.placed.item .. ")"
-            expect(r.container == (r.placed.container == true), what .. (r.placed.container and " has no container" or " has a container"))
-            expect(r.removed, what .. " was not picked up")
-            -- The screwdriver stays.
-            expect(r.returned == 1 and r.items == 2,
-                what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them " .. r.placed.item)
-        end
-    end,
-})
-
--- A mount keeps each module's condition and whether it was mounted or connected before, and a
--- garden light its charge, from item to placed object and back. The gadget tests follow its bulb
--- (renewable_energy_gadgets_garden_light_pick_up_keeps_bulb).
+-- What a kind keeps in its modData from item to placed object and back: a mount each module's
+-- condition and whether it was mounted or connected before, and a garden light its charge. The
+-- gadget tests follow the light's bulb (renewable_energy_gadgets_garden_light_pick_up_keeps_bulb).
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
     { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
 }
 local CARRIED = {
-    { Sprites.rack.wood.S, "RenewableEnergy.SolarRackWood", RenewableEnergy.PowerBank.MODULES, MODULES },
-    { Sprites.flat, "RenewableEnergy.SolarFlat", RenewableEnergy.PowerBank.MODULES, { MODULES[1] } },
-    { Sprites.gardenLight.off, RenewableEnergy.SolarGardenLight.ITEM, RenewableEnergy.SolarGardenLight.CHARGE_KEY, 2.5 },
+    ["RenewableEnergy.SolarRackWood"] = { key = RenewableEnergy.PowerBank.MODULES, value = MODULES },
+    ["RenewableEnergy.SolarFlat"] = { key = RenewableEnergy.PowerBank.MODULES, value = { MODULES[1] } },
+    [RenewableEnergy.SolarGardenLight.ITEM] = { key = RenewableEnergy.SolarGardenLight.CHARGE_KEY, value = 2.5 },
 }
 
 local function describe(value)
@@ -250,33 +212,70 @@ local function describe(value)
     return "{" .. table.concat(parts, ", ") .. "}"
 end
 
-test("renewable_energy_tiles_pick_up_keeps_mod_data", {
+-- Every placed tile's CustomItem names its item, so picking it up gives that item and nothing
+-- else (without one the game hands back a generic Moveable). And each item's own tile, placed and
+-- picked up the way a player does, comes back as the item, with a container only on the tiles that
+-- hold items, and with what CARRIED says it keeps. Wall panels need a wall to hang on, and the
+-- other facings are the same item's (renewable_energy_tiles_mounts_rotate turns them), so only the
+-- tile an item places is placed.
+test("renewable_energy_tiles_place_and_pick_up", {
     instant = true,
     run = function(self)
         local square = T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
         if not square then return end
         electrician(self)
         self.results = {}
-        for _, entry in ipairs(CARRIED) do
-            local sprite, fullType, key, value = entry[1], entry[2], entry[3], entry[4]
-            local result = { what = fullType, expected = describe(value) }
-            table.insert(self.results, result)
-            local handle = T.placeAsPlayer(self, square, fullType, sprite, { [key] = value })
-            T.server(self, "objectModData", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = sprite, key = key })
-            T.step(function() result.placed = describe(self.server.objectModData.value) end)
-            T.pickUpAsPlayer(self, handle, sprite)
-            T.server(self, "carried", { types = { fullType } })
-            T.step(function()
-                local item = self.server.carried.items[fullType][1]
-                result.pickedUp = describe(item and item.modData[key])
-            end)
-            T.server(self, "takeItems", { type = fullType })
+        for _, placed in ipairs(PLACED) do
+            local script = getScriptManager():getItem(placed.item)
+            -- Banks stand only indoors, and placing them by hand is the power tests' business.
+            if placed.kind ~= "wall" and not RenewableEnergy.PowerBank.bankOfSprite(placed.sprite)
+                and script and script:getWorldObjectSprite() == placed.sprite then
+                local carried = CARRIED[placed.item]
+                local result = { placed = placed, expected = carried and describe(carried.value) }
+                table.insert(self.results, result)
+                local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite, carried and { [carried.key] = carried.value })
+                T.step(function() result.container = handle.object ~= nil and handle.object:getContainer() ~= nil end)
+                if carried then
+                    T.server(self, "objectModData", { x = square:getX(), y = square:getY(), z = square:getZ(),
+                        sprite = placed.sprite, key = carried.key })
+                    T.step(function() result.placedData = describe(self.server.objectModData.value) end)
+                end
+                T.pickUpAsPlayer(self, handle, placed.sprite)
+                T.server(self, "carried", { types = { placed.item } })
+                T.step(function()
+                    local items = self.server.carried.items[placed.item]
+                    result.removed = T.objectWithSprite(square, placed.sprite) == nil
+                    result.returned, result.items = #items, self.server.carried.total
+                    result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
+                end)
+                T.server(self, "takeItems", { type = placed.item })
+            end
         end
     end,
     validate = function(self)
+        for _, placed in ipairs(PLACED) do
+            local props = properties(placed.sprite)
+            local customItem = props and props:get("CustomItem")
+            expect(customItem == placed.item, placed.sprite .. " gives " .. tostring(customItem) .. ", expected " .. placed.item)
+        end
+        expect(#self.results > 0, "no item places one of the tiles")
+        local kept = {}
         for _, r in ipairs(self.results) do
-            expect(r.placed == r.expected, "placed " .. r.what .. " holds " .. tostring(r.placed) .. ", expected " .. r.expected)
-            expect(r.pickedUp == r.expected, "picked-up " .. r.what .. " holds " .. tostring(r.pickedUp) .. ", expected " .. r.expected)
+            local what = r.placed.sprite .. " (" .. r.placed.item .. ")"
+            expect(r.container == (r.placed.container == true), what .. (r.placed.container and " has no container" or " has a container"))
+            expect(r.removed, what .. " was not picked up")
+            -- The screwdriver stays.
+            expect(r.returned == 1 and r.items == 2,
+                what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them " .. r.placed.item)
+            if r.expected then
+                kept[r.placed.item] = true
+                expect(r.placedData == r.expected, "placed " .. what .. " holds " .. tostring(r.placedData) .. ", expected " .. r.expected)
+                expect(r.pickedUpData == r.expected, "picked-up " .. what .. " holds " .. tostring(r.pickedUpData)
+                    .. ", expected " .. r.expected)
+            end
+        end
+        for fullType in pairs(CARRIED) do
+            expect(kept[fullType], fullType .. " places no tile of its own, so nothing checked what it keeps")
         end
     end,
 })
@@ -289,24 +288,25 @@ local function modulesAt(...)
     return modules
 end
 
--- A module below Specs.crackedBelow (60) shows cracked glass on the mount placed with it, a rack
--- only over the cracked module's slot; one at 60 shows whole. Repairing the module takes the
--- cracks off, and snow already lying on a panel stays drawn over cracks added under it. The
--- panels are placed and changed on the authority (panelCracks); what is checked is what this
--- client shows, the same as the authority's.
+-- A module below Specs.crackedBelow shows cracked glass on the mount placed with it, a rack only
+-- over the cracked module's slot; one at it shows whole. Repairing the module takes the cracks
+-- off, and snow already lying on a panel stays drawn over cracks added under it. The panels are
+-- placed and changed on the authority (panelCracks); what is checked is what this client shows,
+-- the same as the authority's.
+local CRACKED_AT, WHOLE_AT = Specs.crackedBelow - 1, Specs.crackedBelow
 local CRACKED = {
-    { name = "flat59", sprite = Sprites.flat, modules = modulesAt(59), shows = "renewable_energy_01_115",
-        what = "a flat panel at 59" },
-    { name = "flat60", sprite = Sprites.flat, modules = modulesAt(60), shows = "", what = "a flat panel at 60" },
-    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = modulesAt(100, 59), shows = "renewable_energy_01_127",
-        what = "a metal rack facing west with its upper module at 59" },
-    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = modulesAt(0, 59),
+    { name = "flatCracked", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), shows = "renewable_energy_01_115",
+        what = "a flat panel just below the crack" },
+    { name = "flatWhole", sprite = Sprites.flat, modules = modulesAt(WHOLE_AT), shows = "", what = "a flat panel at the crack" },
+    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = modulesAt(100, CRACKED_AT), shows = "renewable_energy_01_127",
+        what = "a metal rack facing west with its upper module cracked" },
+    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = modulesAt(0, CRACKED_AT),
         shows = "renewable_energy_01_130,renewable_energy_01_131", what = "a wooden rack facing east with both modules cracked" },
     -- A wall panel needs a wall to be placed against, so this one is a bare tile.
-    { name = "wall", sprite = Sprites.wall.wood.E, modules = modulesAt(59), shows = "renewable_energy_01_119",
-        what = "a wooden wall panel facing east at 59" },
-    { name = "repaired", sprite = Sprites.flat, modules = modulesAt(59), change = { modules = modulesAt(85) }, shows = "",
-        what = "a flat panel repaired to 85" },
+    { name = "wall", sprite = Sprites.wall.wood.E, modules = modulesAt(CRACKED_AT), shows = "renewable_energy_01_119",
+        what = "a cracked wooden wall panel facing east" },
+    { name = "repaired", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), change = { modules = modulesAt(85) }, shows = "",
+        what = "a cracked flat panel repaired to 85" },
     { name = "snowed", sprite = Sprites.flat, modules = modulesAt(100), change = { modules = modulesAt(30), snow = true },
         shows = "renewable_energy_01_115,renewable_energy_01_16", what = "a snowed-on flat panel at 30" },
 }

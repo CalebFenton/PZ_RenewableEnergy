@@ -44,14 +44,17 @@ local COLORS = {
     highlight = { r = 0.9, g = 1, b = 0, a = 1 },
 }
 
--- The red, green and blue of a color name. "good" and "bad" are the player's highlight color
--- options, which can change while the window is open.
+-- The player's good and bad highlight color options, which can change while the window is open,
+-- read once a frame (StatusWindow:render).
+local highlights = {}
+
+-- The red, green and blue of a color name, "good" and "bad" among them.
 local function rgb(name)
-    if name == "good" or name == "bad" then
-        local c = name == "good" and getCore():getGoodHighlitedColor() or getCore():getBadHighlitedColor()
+    local c = name and highlights[name]
+    if c then
         return c:getR(), c:getG(), c:getB()
     end
-    local c = COLORS[name] or COLORS.text
+    c = COLORS[name] or COLORS.text
     return c.r, c.g, c.b
 end
 
@@ -345,7 +348,8 @@ local function measure(rows)
             labelWidth = math.max(labelWidth, textManager:MeasureStringX(UIFont.Small, r.label))
             valueWidth = math.max(valueWidth, textManager:MeasureStringX(UIFont.Small, r.value))
         end
-        height = height + rowHeight(r)
+        r.height = rowHeight(r)
+        height = height + r.height
     end
     local width = math.max(MIN_COLUMN_WIDTH, headerWidth, labelWidth + LABEL_GAP + valueWidth)
     return { width = width, height = height, labelWidth = labelWidth }
@@ -356,7 +360,8 @@ local function measureSummary(lines)
     for _, line in ipairs(lines) do
         width = math.max(width, getTextManager():MeasureStringX(UIFont.Medium, line.text))
     end
-    return { width = width, height = #lines * getTextManager():getFontHeight(UIFont.Medium) }
+    local fontHeight = getTextManager():getFontHeight(UIFont.Medium)
+    return { width = width, height = #lines * fontHeight, lineHeight = fontHeight }
 end
 
 -- Keeps as many right-column rows as fit beside the left column, then one "and N more" line
@@ -500,7 +505,7 @@ function StatusWindow:panelRowAt(x, y)
         return nil
     end
     for _, r in ipairs(self.right or {}) do
-        if r.source and r.top and y >= r.top and y < r.top + rowHeight(r) then
+        if r.source and r.top and y >= r.top and y < r.top + r.height then
             return r
         end
     end
@@ -542,26 +547,26 @@ function StatusWindow:drawRows(rows, layout, x, y)
         if r.header then
             local c = COLORS.header
             self:drawText(r.header, x, y + 2, c.r, c.g, c.b, 1, UIFont.Small)
-            self:drawRect(x, y + rowHeight(r) - 2, width, 1, 0.4, c.r, c.g, c.b)
+            self:drawRect(x, y + r.height - 2, width, 1, 0.4, c.r, c.g, c.b)
         elseif r.bar then
             barColor.r, barColor.g, barColor.b = rgb(r.bar < 0.25 and "bad" or "good")
             self:drawProgressBar(x, y + 2, width, BAR_HEIGHT, r.bar, barColor)
         elseif r.label then
             if isHighlighted(self, r) then
                 local c = COLORS.highlight
-                self:drawRect(x - 2, y, width + 4, rowHeight(r), 0.2, c.r, c.g, c.b)
+                self:drawRect(x - 2, y, width + 4, r.height, 0.2, c.r, c.g, c.b)
             end
             local label = COLORS.label
             self:drawText(r.label, x, y, label.r, label.g, label.b, 1, UIFont.Small)
             local red, green, blue = rgb(r.color)
             self:drawTextRight(r.value, x + width, y, red, green, blue, 1, UIFont.Small)
         end
-        y = y + rowHeight(r)
+        y = y + r.height
     end
 end
 
 function StatusWindow:drawSummary(x, y)
-    local height = getTextManager():getFontHeight(UIFont.Medium)
+    local height = self.summaryLayout.lineHeight
     for _, line in ipairs(self.summaryLines) do
         local red, green, blue = rgb(line.color)
         self:drawText(line.text, x, y, red, green, blue, 1, UIFont.Medium)
@@ -571,10 +576,11 @@ end
 
 function StatusWindow:render()
     if not self.isCollapsed and self.left then
+        local core = getCore()
+        highlights.good, highlights.bad = core:getGoodHighlitedColor(), core:getBadHighlitedColor()
         self:drawSummary(PAD, self:titleBarHeight() + PAD)
         self:drawRows(self.left, self.leftLayout, PAD, self.columnsTop)
         self:drawRows(self.right, self.rightLayout, PAD + self.leftLayout.width + COLUMN_GAP, self.columnsTop)
-        self.renderedFrames = (self.renderedFrames or 0) + 1
     end
     ISCollapsableWindow.render(self)
 end

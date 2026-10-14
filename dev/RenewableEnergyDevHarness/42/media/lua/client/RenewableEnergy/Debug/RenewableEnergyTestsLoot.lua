@@ -6,16 +6,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 -- RenewableEnergyTestServerLoot.lua, and answer what they found wrong.
 
 local T = RenewableEnergyTest
-local test = T.test
-
--- Registers a test that runs the server check `name` with `args` and expects it to find nothing
--- wrong.
-local function serverCheck(testName, name, args)
-    test(testName, {
-        run = function(self) T.server(self, name, args) end,
-        validate = function(self) T.expectNoFailures(self.server[name]) end,
-    })
-end
+local test, serverCheck = T.test, T.serverCheck
 
 -- Lists ----------------------------------------------------------------------------------------
 

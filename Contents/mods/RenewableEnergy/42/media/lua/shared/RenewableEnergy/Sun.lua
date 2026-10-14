@@ -154,17 +154,21 @@ function Sun.panelWatts(ratedWatts, kind, facing, snow)
     return Sun.wattsFrom(ratedWatts, Sun.irradiance(kind, facing), snow)
 end
 
---- Light on a flat surface on `square` now, in W/m²: 0 under a roof or for no square.
-function Sun.squareIrradiance(square)
+--- The sun now as a flat cell sees it, { up, flat }: the sun's `up` as Sun.position gives it,
+--- below 0 at night, and `flat`, the light on open flat ground in W/m², weather included. A pass
+--- over many gadgets works it out once.
+function Sun.skyNow()
+    local sun = Sun.positionNow()
+    return { up = sun.up, flat = Sun.planeIrradiance(sun, "flat", nil, Sun.weatherNow()) }
+end
+
+--- Watts a flat cell rated `ratedWatts` lying on `square` makes under `sky` (Sun.skyNow, now
+--- if nil): none under a roof or for no square.
+function Sun.squareWatts(square, ratedWatts, sky)
     if not (square and square:isOutside()) then
         return 0
     end
-    return Sun.irradiance("flat")
-end
-
---- Watts a flat cell rated `ratedWatts` lying on `square` makes now.
-function Sun.squareWatts(square, ratedWatts)
-    return Sun.wattsFrom(ratedWatts, Sun.squareIrradiance(square), 0)
+    return Sun.wattsFrom(ratedWatts, (sky or Sun.skyNow()).flat, 0)
 end
 
 return Sun

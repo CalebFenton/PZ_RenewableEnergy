@@ -27,8 +27,6 @@ local SUN_STEP = 1 / 6
 -- Longer gaps than this between passes (a save loaded after the clock jumped) count as
 -- this long, so one pass never swings the charge by days of sun.
 local LONGEST_PASS = 24
--- The bank container's filter, by the dotted path the game resolves.
-local ACCEPT_FUNCTION = "RenewableEnergy.PowerBank.acceptItem"
 -- MapObjects keeps one function per sprite and priority.
 local LOAD_PRIORITY = 6
 
@@ -57,6 +55,10 @@ end
 
 -- Placing and removing -------------------------------------------------------------------
 
+-- Set while makeBank takes away a working bank to rebuild it: the bank's state on the global
+-- object (charge, panels, name, wear still owed) stays for the rebuilt bank to load.
+local rebuilding = false
+
 --- Make a bank tile into a working bank: an IsoGenerator, the only thing that powers the
 --- squares around it, with the tile's container for its batteries. `from`, a placed bank
 --- tile that isn't a generator yet, hands over its container and modData.
@@ -67,7 +69,9 @@ local function makeBank(square, spriteName, index, from)
         for key, value in pairs(from:getModData()) do
             modData[key] = value
         end
+        rebuilding = true
         square:transmitRemoveItemFromSquare(from)
+        rebuilding = false
     end
 
     local generator = IsoGenerator.new(square:getCell())
@@ -87,8 +91,7 @@ local function makeBank(square, spriteName, index, from)
     container = generator:getContainer()
     if container then
         container:setExplored(true)
-        -- Neither saved nor sent, so every side sets it on its own copy.
-        container:setAcceptItemFunction(ACCEPT_FUNCTION)
+        PowerBank.adoptContainer(container)
     end
     generator:transmitCompleteItemToClients()
     -- On a server each of these syncs the generator, which names it by its index on the
@@ -116,7 +119,7 @@ function PowerBank.remove(isoObject)
 end
 
 function BankSystem:OnObjectAdded(isoObject)
-    local name = isoObject:getSprite() and isoObject:getSprite():getName()
+    local name = RenewableEnergy.Sprites.nameOf(isoObject)
     if PowerBank.bankOfSprite(name) and not PowerBank.isBank(isoObject) then
         -- A bank tile placed as a moveable is a plain IsoObject.
         makeBank(isoObject:getSquare(), name, isoObject:getObjectIndex(), isoObject)
@@ -140,26 +143,58 @@ end
 function BankSystem:OnObjectAboutToBeRemoved(isoObject)
     if PowerBank.isBank(isoObject) then
         unpower(isoObject)
-        local bank = self:getLuaObjectOnSquare(isoObject:getSquare())
+        local bank = not rebuilding and self:getLuaObjectOnSquare(isoObject:getSquare())
         if bank then
             self:removeLuaObject(bank)
         end
     elseif PowerBank.sourceKind(isoObject) then
         local x, y, z = isoObject:getX(), isoObject:getY(), isoObject:getZ()
-        for i = 1, self:getLuaObjectCount() do
-            local bank = self:getLuaObjectByIndex(i)
-            if bank:removeSource(x, y, z) then
-                bank:sendStatus()
-            end
+        local found = PowerBank.bankOfSource(x, y, z)
+        local bank = found and self:getLuaObjectAt(found.x, found.y, found.z)
+        if bank and bank:removeSource(x, y, z) then
+            bank:sendStatus()
         end
     end
 end
 
--- Clients ask only for a fresh status, which the status window may do from any distance. Every
--- job that changes a bank comes as a RenewableEnergyAction, whose complete() checks the character
--- is at it, so a forged command packet can't reach a bank from afar.
+-- Clients ask only for a fresh status, which the status window does when it opens. Every job
+-- that changes a bank comes as a RenewableEnergyAction, whose complete() checks the character is
+-- at it, so a forged command packet can't reach a bank from afar.
+
+-- A client loads at most this many squares each way around its player (the widest chunk grid a
+-- server lets a client connect with, GameServer.receivePlayerConnect), so a bank farther away
+-- can't be in its view.
+local REFRESH_REACH = 80
+-- Real milliseconds a player waits between refreshes of one bank, since each refresh sends the
+-- bank's status to every client.
+local REFRESH_MS = 1000
+
+local function mayRefresh(player, args)
+    local at = type(args) == "table" and args.bank
+    if not (player and type(at) == "table" and type(at.x) == "number" and type(at.y) == "number" and type(at.z) == "number") then
+        return false
+    end
+    if math.abs(player:getX() - at.x) > REFRESH_REACH or math.abs(player:getY() - at.y) > REFRESH_REACH then
+        return false
+    end
+    local bank = BankSystem.instance:getLuaObjectAt(at.x, at.y, at.z)
+    if not bank then
+        return false
+    end
+    -- Each player's last refresh, by name, kept unsaved on the bank's record: it goes when the bank
+    -- goes, and a bank built in its place starts afresh.
+    bank.refreshedAt = bank.refreshedAt or {}
+    local now, name = getTimestampMs(), player:getUsername()
+    local last = bank.refreshedAt[name]
+    if last and now - last < REFRESH_MS then
+        return false
+    end
+    bank.refreshedAt[name] = now
+    return true
+end
+
 function BankSystem:OnClientCommand(command, player, args)
-    if command == "refresh" then
+    if command == "refresh" and mayRefresh(player, args) then
         PowerBank.perform(player, command, args)
     end
 end
@@ -170,10 +205,10 @@ end
 -- failed halfway, a map or stash placing the bare tile) so a reload repairs it.
 local function loadBank(isoObject)
     if not PowerBank.isBank(isoObject) or not isoObject:getContainer() then
-        makeBank(isoObject:getSquare(), isoObject:getSprite():getName(), isoObject:getObjectIndex(), isoObject)
+        makeBank(isoObject:getSquare(), RenewableEnergy.Sprites.nameOf(isoObject), isoObject:getObjectIndex(), isoObject)
         return
     end
-    isoObject:getContainer():setAcceptItemFunction(ACCEPT_FUNCTION)
+    PowerBank.adoptContainer(isoObject:getContainer())
     BankSystem.instance:loadIsoObject(isoObject)
 end
 
@@ -237,12 +272,18 @@ local function passHours(bank)
     return math.min(LONGEST_PASS, now - (bank.lastHour or now)), now
 end
 
---- Bring one bank up to now.
-function BankSystem.updateBank(bank)
+--- Bring one bank up to now. `contexts`, optional, keeps each span's pass context for the
+--- next bank.
+function BankSystem.updateBank(bank, contexts)
+    contexts = contexts or {}
     local hours, now = passHours(bank)
     bank.lastHour = now
     if hours > 0 then
-        bank:update(hours, BankSystem.passContext(hours))
+        -- Banks placed at different times run different spans; each span's light is worked
+        -- out once.
+        local key = string.format("%.4f", hours)
+        contexts[key] = contexts[key] or BankSystem.passContext(hours)
+        bank:update(hours, contexts[key])
     end
 end
 
@@ -250,16 +291,7 @@ function BankSystem.updateAll()
     local self = BankSystem.instance
     local contexts = {}
     for i = 1, self:getLuaObjectCount() do
-        local bank = self:getLuaObjectByIndex(i)
-        local hours, now = passHours(bank)
-        bank.lastHour = now
-        if hours > 0 then
-            -- Banks placed at different times run different spans; each span's light is
-            -- worked out once.
-            local key = string.format("%.4f", hours)
-            contexts[key] = contexts[key] or BankSystem.passContext(hours)
-            bank:update(hours, contexts[key])
-        end
+        BankSystem.updateBank(self:getLuaObjectByIndex(i), contexts)
     end
 end
 

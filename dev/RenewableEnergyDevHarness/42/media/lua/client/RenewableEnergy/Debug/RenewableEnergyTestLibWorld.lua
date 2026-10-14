@@ -19,6 +19,16 @@ function T.expectNoFailures(answer)
     end
 end
 
+--- Registers a test that runs the server check `name` with `args`, under the sandbox options
+--- `sandbox` if given, and expects it to find nothing wrong.
+function T.serverCheck(testName, name, args, sandbox)
+    T.test(testName, {
+        sandbox = sandbox,
+        run = function(self) T.server(self, name, args) end,
+        validate = function(self) T.expectNoFailures(self.server[name]) end,
+    })
+end
+
 -- Vehicles ----------------------------------------------------------------------------------------
 -- A vehicle is a T.placeVehicle handle, spawned by the authority, which the server file's
 -- serverSettings.spawnVehicle spawns as the world does when `args.stocked`, and whole when

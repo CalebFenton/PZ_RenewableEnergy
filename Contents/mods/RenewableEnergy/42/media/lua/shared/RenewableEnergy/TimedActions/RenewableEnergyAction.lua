@@ -143,7 +143,6 @@ local CHECKS = {
     end,
     [Action.UNWIRE] = function(self)
         return self.item ~= nil and holdsItem(self) and PowerBank.partKind(self.item:getFullType()) ~= nil
-            and not self.character:tooDarkToRead()
     end,
     [Action.REPAIR_PART] = function(self)
         return self.item ~= nil and holdsItem(self) and PowerBank.repairRefusal(self.character, self.item) == nil
@@ -307,9 +306,13 @@ end
 
 function Action:start()
     if isClient() and self.item then
-        -- Server syncs can replace the item objects while the action waits in the queue.
-        local container = PART_IN_BANK[self.mode] and self.bank:getContainer() or self.character:getInventory()
-        self.item = container:getItemWithIDRecursiv(self.item:getID())
+        -- Server syncs can replace the item objects while the action waits in the queue. A bank
+        -- gone meanwhile leaves no item, which the server refuses.
+        local container = self.character:getInventory()
+        if PART_IN_BANK[self.mode] then
+            container = isBank(self.bank) and self.bank:getContainer()
+        end
+        self.item = container and container:getItemWithIDRecursiv(self.item:getID()) or nil
     end
     if self.mode == Action.CLEAR_SNOW then
         if self.item and self.item:getType() == "SnowShovel" then
@@ -379,12 +382,18 @@ end
 -- How far from the middle of the target's square, on each axis in squares, a multiplayer server
 -- lets a character finish a job on a bank, a panel or a garden light: what luautils.walkAdj counts
 -- as already there, the square getCorrectSquareForWall moves a wall's target to, and a couple more
--- for the character's drift and the client's lag.
+-- for the character's drift and the client's lag. A vehicle job gets as much past the vehicle's
+-- body, whose areas the menu walks the character to (ISPathFindAction.pathToVehicleArea).
 local REACH = 4.6
 
--- Whether the character stands where the menu would have walked them for the job. Vehicle jobs walk
--- to an area of the vehicle instead (ISPathFindAction.pathToVehicleArea).
+-- Whether the character stands where the menu would have walked them for the job.
 local function withinReach(character, target)
+    if instanceof(target, "BaseVehicle") then
+        local extents = target:getScript():getExtents()
+        local reach = math.max(extents:x(), extents:z()) / 2 + REACH
+        return IsoUtils.DistanceTo(character:getX(), character:getY(), target:getX(), target:getY()) <= reach
+            and math.abs(character:getZ() - target:getZ()) < 1
+    end
     local square = target:getSquare()
     return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= REACH
         and math.abs(character:getY() - (square:getY() + 0.5)) <= REACH
@@ -393,12 +402,12 @@ end
 
 -- The server never calls isValid(), so this checks the action again. NetTimedAction checks no
 -- distance, so the server also makes sure the character is at the job, which a modified client
--- could otherwise send for any bank in the world.
+-- could otherwise send for any bank or vehicle in the world.
 function Action:complete()
     if not self:canPerform() then
         return false
     end
-    if isServer() and not self.vehicle and not withinReach(self.character, self:target()) then
+    if isServer() and not withinReach(self.character, self:target()) then
         return false
     end
     if self.mode == Action.ATTACH_MAINTAINER then

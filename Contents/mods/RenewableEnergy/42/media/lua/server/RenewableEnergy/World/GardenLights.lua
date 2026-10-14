@@ -82,8 +82,7 @@ end
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
 local function isStreet(square)
-    local floor = square:getFloor()
-    local name = floor and floor:getTextureName() or ""
+    local name = RenewableEnergy.Sprites.nameOf(square:getFloor()) or ""
     return string.find(name, "^floors_exterior_street") ~= nil or string.find(name, "^blends_street") ~= nil
 end
 
@@ -211,13 +210,18 @@ function GardenLights.queue(def, always, x, y)
 end
 
 local function onLoadChunk(chunk)
+    -- A house covers many of the chunk's squares; each is looked at once.
+    local seen = {}
     for x = 0, CHUNK_SIZE - 1 do
         for y = 0, CHUNK_SIZE - 1 do
             local square = chunk:getGridSquare(x, y, 0)
             local building = square and square:getBuilding()
             local def = building and building:getDef()
-            if def and def:isResidential() and not pending[GardenLights.buildingKey(def)] then
-                GardenLights.queue(def, false, square:getX(), square:getY())
+            if def and not seen[def] then
+                seen[def] = true
+                if def:isResidential() and not pending[GardenLights.buildingKey(def)] then
+                    GardenLights.queue(def, false, square:getX(), square:getY())
+                end
             end
         end
     end

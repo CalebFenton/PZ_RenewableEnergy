@@ -38,6 +38,7 @@
 
 require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 
 local Art = {}
@@ -233,12 +234,11 @@ local function addStates(steps, pair, states)
             if pair().car then
                 pair().car:setStoplightsOn(false)
             end
-            -- A part's new condition reaches the overlay on the vehicle's next update.
-            return state.set(pair()) or 30
+            -- A part's new condition reaches the overlay on the vehicle's next update, once a frame.
+            return state.set(pair()) or Stage.DRAW_FRAMES
         end)
         table.insert(steps, function()
             Stage.screenshot("REArt", state.name)
-            return 10
         end)
     end
 end
@@ -326,22 +326,6 @@ local function clearVehicles(lot)
     end
 end
 
--- How long the trailer must stay put to count as pulled up to its hitch.
-local TRAILER_STILL_MS = 1000
-
---- A runSteps wait until the hitch has pulled `trailer` up to its car and it has stopped.
-local function trailerSettled(trailer)
-    local x, y, since
-    return function()
-        local now = getTimestampMs()
-        if not since or math.abs(trailer:getX() - x) + math.abs(trailer:getY() - y) > 0.01 then
-            x, y, since = trailer:getX(), trailer:getY(), now
-            return false
-        end
-        return now - since >= TRAILER_STILL_MS
-    end
-end
-
 local function placeTiles(lot, list)
     for _, tile in ipairs(list) do
         placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite, tile.overlays)
@@ -354,18 +338,15 @@ local function buildTileStage(lot)
     placeTiles(lot, TILES)
 end
 
--- The mod's items in name order, after a vanilla car battery for scale.
+-- The mod's items in the README's order, then those that only sit in a vehicle part, after a
+-- vanilla car battery for scale.
 local function itemTypes()
-    local names = {}
-    local scripts = getScriptManager():getAllItems()
-    for i = 0, scripts:size() - 1 do
-        local script = scripts:get(i)
-        if script:getModuleName() == "RenewableEnergy" then
-            table.insert(names, script:getFullName())
+    local names = { SCALE_ITEM }
+    for _, list in ipairs({ RenewableEnergy.Debug.ITEMS, RenewableEnergy.Debug.PART_ITEMS }) do
+        for _, fullType in ipairs(list) do
+            table.insert(names, fullType)
         end
     end
-    table.sort(names)
-    table.insert(names, 1, SCALE_ITEM)
     return names
 end
 
@@ -389,25 +370,24 @@ function IconSheet:render()
     -- Counted for the shot's wait: the UI draws at its own rate, not every frame.
     self.drawn = (self.drawn or 0) + 1
     ISPanel.render(self)
-    for i, script in ipairs(self.scripts) do
+    for i, icon in ipairs(self.icons) do
         local column, row = (i - 1) % ICON_COLUMNS, math.floor((i - 1) / ICON_COLUMNS)
         local x, y = column * CELL_W, row * CELL_H + 6
-        local texture = getTexture("Item_" .. tostring(script:getIcon()))
-        if texture then
-            self:drawTextureScaled(texture, x + (CELL_W - ICON_SIZE) / 2, y, ICON_SIZE, ICON_SIZE, 1, 1, 1, 1)
+        if icon.texture then
+            self:drawTextureScaled(icon.texture, x + (CELL_W - ICON_SIZE) / 2, y, ICON_SIZE, ICON_SIZE, 1, 1, 1, 1)
         end
-        self:drawTextCentre(script:getName(), x + CELL_W / 2, y + ICON_SIZE + 2, 1, 1, 1, 1, UIFont.Small)
+        self:drawTextCentre(icon.name, x + CELL_W / 2, y + ICON_SIZE + 2, 1, 1, 1, 1, UIFont.Small)
     end
 end
 
 function IconSheet:new()
-    local scripts = {}
+    local icons = {}
     for _, fullType in ipairs(itemTypes()) do
-        table.insert(scripts, getScriptManager():getItem(fullType))
+        table.insert(icons, { texture = Stage.iconTexture(fullType), name = getScriptManager():getItem(fullType):getName() })
     end
-    local rows = math.ceil(#scripts / ICON_COLUMNS)
+    local rows = math.ceil(#icons / ICON_COLUMNS)
     local o = ISPanel.new(self, 60, 160, ICON_COLUMNS * CELL_W, rows * CELL_H + 8)
-    o.scripts = scripts
+    o.icons = icons
     o.backgroundColor = { r = 0.25, g = 0.25, b = 0.25, a = 1 }
     return o
 end
@@ -424,7 +404,6 @@ local function addShot(steps, player, lot, shot)
     end)
     table.insert(steps, function()
         Stage.screenshot("REArt", shot.name)
-        return 10
     end)
 end
 
@@ -447,15 +426,6 @@ local CRACKED_PANELS = {
 -- The character stands south-east of the mounts and south-west of the open ground, hiding neither.
 local CRACKED_SHOT = { name = "art_cracked", x = 7, y = 7, zoomSteps = 2 }
 
--- The lot's north-west square while the cracked stage stands, else nil.
-local crackedLot
-
---- The north-west square of the art_cracked stage's lot while it stands, else nil. The mounts
---- stand at x 0 to 3, y 1 to 5 from it; x 5 to 8, y 1 to 3 is open ground.
-function Art.crackedOrigin()
-    return crackedLot and lotSquare(crackedLot, 0, 0)
-end
-
 local function addCrackedShot(steps, player, lot)
     table.insert(steps, function()
         clearLot(lot)
@@ -469,18 +439,22 @@ local function addCrackedShot(steps, player, lot)
             RenewableEnergy.WorldSpawns.placePanel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
         end
         recalcLot(lot)
-        crackedLot = lot
-        return 30
     end)
     -- A trailer beside them with one panel cracked as theirs are and one whole, to compare the look.
+    -- The tick after stocking puts the stock conditions back over any set in the same tick
+    -- (ArrowBoard.keepStockConditions), so they're set a step later.
+    local trailer
     table.insert(steps, function()
         -- Row 4 keeps all of it on the cleared lot.
-        local trailer = addVehicleDebug(RenewableEnergy.ArrowBoard.SCRIPT, IsoDirections.N, 0, lotSquare(lot, 6, 4))
+        trailer = addVehicleDebug(RenewableEnergy.ArrowBoard.SCRIPT, IsoDirections.N, 0, lotSquare(lot, 6, 4))
+        return 1
+    end)
+    table.insert(steps, function()
         trailer:repair()
         trailer:getPartById("RenewableEnergyPanelLeft"):setCondition(30)
         trailer:getPartById("RenewableEnergyPanelRight"):setCondition(100)
         RenewableEnergy.ArrowBoard.showPanels(trailer)
-        return 30
+        return Stage.vehiclesAtRest({ trailer = trailer }, false)
     end)
     addShot(steps, player, lot, CRACKED_SHOT)
 end
@@ -492,14 +466,12 @@ local function addTileAndItemShots(steps, player, lot)
         getGameTime():setTimeOfDay(12)
         Stage.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
-        return 30
     end)
     addShot(steps, player, lot, SHOTS.tiles)
     addShot(steps, player, lot, SHOTS.overlays)
     table.insert(steps, function()
         clearLot(lot)
         dropItems(lot)
-        return 30
     end)
     addShot(steps, player, lot, SHOTS.items)
     table.insert(steps, function()
@@ -510,7 +482,6 @@ local function addTileAndItemShots(steps, player, lot)
     end)
     table.insert(steps, function()
         Stage.screenshot("REArt", "art_icons")
-        return 10
     end)
     table.insert(steps, function()
         iconSheet:removeFromUIManager()
@@ -519,7 +490,6 @@ local function addTileAndItemShots(steps, player, lot)
     table.insert(steps, function()
         clearLot(lot)
         placeTiles(lot, fillTiles())
-        return 30
     end)
     addShot(steps, player, lot, SHOTS.fill)
 end
@@ -531,12 +501,11 @@ local function addHitchedTrailerShots(steps, player, lot, art)
         clearLot(lot)
         clearVehicles(lot)
         art.trailer = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
-        -- A vehicle joins the cell's list, and gets its physics, only on a later update.
-        return 30
+        return Stage.vehiclesAtRest(art.trailer, false)
     end)
     table.insert(steps, function()
         Stage.hitchTrailer(art.trailer, player, "REArt")
-        return trailerSettled(art.trailer.trailer)
+        return Stage.vehiclesAtRest(art.trailer, true)
     end)
     addShot(steps, player, lot, SHOTS.trailer)
     addStates(steps, art.currentPair, HITCHED_STATES)
@@ -551,7 +520,7 @@ local function addLoneAndCrackedShots(steps, player, lot, art)
         art.trailer.car:permanentlyRemove()
         art.trailer.car = nil
         setBlood(art.trailer.trailer, BLOOD_SIDES)
-        return 30
+        return Stage.vehiclesAtRest(art.trailer, false)
     end)
     addShot(steps, player, lot, SHOTS.trailerFront)
     addStates(steps, art.currentPair, LONE_STATES)
@@ -576,7 +545,15 @@ function Art.capture(onDone)
     addTileAndItemShots(steps, player, lot)
     addHitchedTrailerShots(steps, player, lot, art)
     addLoneAndCrackedShots(steps, player, lot, art)
-    Stage.runSteps(steps, onDone, "REArt")
+    Stage.runSteps(steps, function(gaveUp)
+        if gaveUp > 0 then
+            -- Without "REArt DONE", run-debug-client.sh reports the run as failed.
+            print("REArt FAIL: " .. gaveUp .. " waits gave up")
+            getCore():quitToDesktop()
+            return
+        end
+        onDone()
+    end, "REArt")
 end
 
 return Art

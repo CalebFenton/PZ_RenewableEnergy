@@ -54,11 +54,11 @@ local function placeKey(x, y, z)
 end
 
 function SolarGardenLight.isLight(isoObject)
-    return isoObject ~= nil and Sprites.kindOf(isoObject:getTextureName()) == "gardenLight"
+    return Sprites.kindOf(Sprites.nameOf(isoObject)) == "gardenLight"
 end
 
 function SolarGardenLight.isLit(isoObject)
-    return isoObject:getTextureName() == Sprites.gardenLight.lit
+    return Sprites.nameOf(isoObject) == Sprites.gardenLight.lit
 end
 
 --- Where a light may stand: on the ground outdoors, where the sun reaches it.
@@ -190,14 +190,17 @@ end
 --- Runs a light for `hours` at the sun of the moment: by day its cell charges the battery, and
 --- after sunset its bulb draws on it until it is empty. A light without a bulb draws nothing.
 --- `bulbChanged` says its bulb has just changed, so that its lamp's colour reaches the clients
---- even if it stays lit. Authority only. Returns whether the light is lit.
-function SolarGardenLight.update(light, hours, bulbChanged)
+--- even if it stays lit. `sky` is Sun.skyNow(), worked out here if nil. Authority only. Returns
+--- whether the light is lit.
+function SolarGardenLight.update(light, hours, bulbChanged, sky)
+    local Sun = RenewableEnergy.Sun
     local spec = RenewableEnergy.Specs.gardenLight
-    local night = RenewableEnergy.Sun.elevation() <= 0
+    sky = sky or Sun.skyNow()
+    local night = sky.up <= 0
     local bulb = SolarGardenLight.getBulb(light) ~= nil
     local charge = SolarGardenLight.getCharge(light)
     if not night then
-        charge = math.min(spec.wh, charge + RenewableEnergy.Sun.squareWatts(light:getSquare(), spec.watts) * hours)
+        charge = math.min(spec.wh, charge + Sun.squareWatts(light:getSquare(), spec.watts, sky) * hours)
     elseif bulb then
         charge = math.max(0, charge - spec.nightWatts * hours)
     end
@@ -232,20 +235,16 @@ function SolarGardenLight.addBulb(character, light, item)
     if SolarGardenLight.getBulb(light) or not SolarGardenLight.isBulb(item) then
         return false
     end
-    character:removeFromHands(item)
-    local container = item:getContainer()
-    if container then
-        container:Remove(item)
-        sendRemoveItemFromContainer(container, item)
-    end
+    RenewableEnergy.takeItem(character, item)
     setBulb(light, item:getFullType())
     return true
 end
 
 --- Runs every loaded light the authority has seen.
 function SolarGardenLight.updateAll(hours)
+    local sky = RenewableEnergy.Sun.skyNow()
     forEachLight(function(light)
-        SolarGardenLight.update(light, hours)
+        SolarGardenLight.update(light, hours, false, sky)
     end)
 end
 

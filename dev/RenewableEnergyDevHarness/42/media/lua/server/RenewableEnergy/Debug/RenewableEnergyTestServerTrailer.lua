@@ -11,15 +11,28 @@ local handler = PZHarness.serverHandler
 
 local Trailer = {}
 
-local vehicleById = PZHarness.Fixtures.vehicleById
+local vehicleAt = require("RenewableEnergy/Debug/RenewableEnergyTestHelpers").vehicleAt
 
 -- The conditions the panels of trailers spawned with `args.recordStock` got as they were stocked,
 -- by vehicle id: { [partId] = condition }.
 local stockedPanels = {}
 
+-- Spawns `script` with the harness's plain addVehicleDebug, an arrow board's stocked panels
+-- getting the condition `roll(stockRoll)` returns for each, stockRoll being the roll stocking makes.
+-- Stocking rolls the left panel first.
+local function spawnStocking(script, square, facing, roll)
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local weathered, cracked = WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition
+    WorldSpawns.weatheredCondition = function() return roll(weathered) end
+    WorldSpawns.crackedCondition = function() return roll(cracked) end
+    local vehicle = addVehicleDebug(script, IsoDirections[facing], nil, square)
+    WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition = weathered, cracked
+    return vehicle
+end
+
 -- T.placeVehicle's spawn: an arrow board through ArrowBoard.spawn when `args.stocked`, as the world
--- spawns one; with `args.recordStock` the harness's plain addVehicleDebug, recording its panels'
--- stock conditions (arrowBoardStock); else the harness's spawn; whole when `args.repair`.
+-- spawns one; with `args.recordStock` a plain spawn recording its panels' stock conditions
+-- (arrowBoardStock); else the harness's spawn; whole when `args.repair`.
 PZHarness.serverSettings = PZHarness.serverSettings or {}
 function PZHarness.serverSettings.spawnVehicle(script, square, facing, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
@@ -27,22 +40,17 @@ function PZHarness.serverSettings.spawnVehicle(script, square, facing, args)
     if args and args.stocked then
         vehicle = ArrowBoard.spawn(square, facing)
     elseif args and args.recordStock then
-        -- Stocking rolls a condition for each panel in turn, left first.
-        local WorldSpawns, rolled = RenewableEnergy.WorldSpawns, {}
-        local weathered, cracked = WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition
-        local function recording(roll)
-            return function()
-                local condition = roll()
-                table.insert(rolled, condition)
-                return condition
-            end
-        end
-        WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition = recording(weathered), recording(cracked)
-        vehicle = addVehicleDebug(script, IsoDirections[facing], nil, square)
-        WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition = weathered, cracked
+        local rolled = {}
+        vehicle = spawnStocking(script, square, facing, function(stockRoll)
+            local condition = stockRoll()
+            table.insert(rolled, condition)
+            return condition
+        end)
         stockedPanels[vehicle:getId()] = { [ArrowBoard.PANELS[1]] = rolled[1], [ArrowBoard.PANELS[2]] = rolled[2] }
     elseif args and args.repair then
-        vehicle = addVehicleDebug(script, IsoDirections[facing], nil, square)
+        -- The tick after stocking puts the stock conditions back over a repair in the same tick
+        -- (ArrowBoard.keepStockConditions), so a whole trailer is stocked whole.
+        vehicle = spawnStocking(script, square, facing, function() return 100 end)
     end
     if vehicle and args.repair then
         vehicle:repair()
@@ -154,18 +162,8 @@ function Trailer.vehicleState(vehicle)
     return state
 end
 
--- The vehicle of `args` ({ id, x, y, z }: RenewableEnergyTest.vehicleArgs; single player finds it
--- by the squares around x, y, z), or nil and what is missing.
-local function vehicleArg(args)
-    local vehicle = vehicleById(args.id, args)
-    if not vehicle or vehicle:isRemovedFromWorld() then
-        return nil, "vehicle " .. tostring(args.id) .. " on the server"
-    end
-    return vehicle
-end
-
 handler("vehicleState", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -174,7 +172,7 @@ end)
 
 -- The stock conditions of the panels of a trailer spawned with `args.recordStock`, and its state.
 handler("arrowBoardStock", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -207,7 +205,7 @@ end
 -- if `args.lidOpen` is, locked or not if `args.lidLocked` is, and its lock cut or whole if
 -- `args.lidLockBroken` is. Answers its state.
 handler("setTrailer", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -242,7 +240,7 @@ handler("setTrailer", function(_, args)
     for side, intensity in pairs(args.blood or {}) do
         vehicle:setBloodIntensity(side, intensity)
     end
-    local lid = vehicle:getPartById("TrunkDoor")
+    local lid = vehicle:getPartById(ArrowBoard.LID)
     if args.lidInstalled == false then
         lid:setInventoryItem(nil)
         vehicle:transmitPartItem(lid)
@@ -269,7 +267,7 @@ end)
 -- watt-hours stored, the panels' rating, what a flat watt of panel makes in an hour now, and the
 -- trailer's state.
 handler("arrowBoardCharge", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -282,7 +280,7 @@ end)
 
 -- A crack on the panel `args.part`. Answers the trailer's state.
 handler("arrowBoardCrack", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -293,7 +291,7 @@ end)
 -- `args.hours` of thunderstorm over the trailer at the save's storm options. Answers how many
 -- panels cracked and the trailer's state.
 handler("arrowBoardStorm", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -305,7 +303,7 @@ end)
 -- record of stocking them, then the panels' init. Then its panels are taken off and it loads
 -- again. Answers its state after each load.
 handler("arrowBoardOldPanels", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -333,7 +331,7 @@ end)
 -- random colour of `args.hsv`, then the frame's init. Answers its state and its script's forced
 -- colour.
 handler("arrowBoardOldFrame", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -350,7 +348,7 @@ end)
 -- The game's own crash damage on the vehicle: `args.amount`, to the front if `args.front`.
 -- Answers its state.
 handler("vehicleCrash", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -361,7 +359,7 @@ end)
 -- The item types each panel takes, then the left panel emptied and the trailer repaired. Answers
 -- the types and the trailer's state.
 handler("arrowBoardRepairAll", function(_, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end
@@ -382,7 +380,7 @@ end)
 -- `args.facing` and puts the trailer's coupler on the car's tow bar
 -- (PZHarness.Fixtures.lineUpTrailer), on the authority, which sends the clients their new places.
 handler("lineUpTrailer", function(_, args)
-    local car, trailer = vehicleArg(args.car), vehicleArg(args.trailer)
+    local car, trailer = vehicleAt(args.car), vehicleAt(args.trailer)
     if not (car and trailer) then
         return nil, "the car and the trailer on the server"
     end
@@ -393,7 +391,7 @@ end)
 -- Gives the character a key to the vehicle `args`, which no arrow board ever spawns with, so a
 -- test can show what a key holder could do to its lid.
 handler("arrowBoardKey", function(player, args)
-    local vehicle, missing = vehicleArg(args)
+    local vehicle, missing = vehicleAt(args)
     if not vehicle then
         return nil, missing
     end

@@ -33,12 +33,24 @@ function Battery.nominalWh(item)
     return spec and spec.wh * health(item) or 0
 end
 
+-- Item modData key: the battery has a charge of its own (found, crafted, or charged and drained
+-- in a bank), so a refill of its container, as loot respawn does, must leave it alone. The key
+-- keeps its old name so that batteries in existing saves stay marked.
+local HAS_CHARGE = "RenewableEnergy_found"
+
 function Battery.getCharge(item)
     return item:getCurrentUsesFloat()
 end
 
 function Battery.setCharge(item, charge)
     item:setCurrentUsesFloat(math.max(0, math.min(1, charge)))
+    item:getModData()[HAS_CHARGE] = true
+end
+
+--- Whether the battery's charge was ever set (Battery.setCharge), rather than being what the
+--- item spawned with.
+function Battery.hasCharge(item)
+    return item:getModData()[HAS_CHARGE] == true
 end
 
 --- Give a battery found in the world a random part charge, and send it to the clients that
@@ -47,6 +59,23 @@ function Battery.setFoundCharge(item)
     local range = RenewableEnergy.Specs.foundCharge
     Battery.setCharge(item, range.min + (range.max - range.min) * ZombRandFloat(0, 1))
     sendItemStats(item)
+end
+
+--- The item in `container` with the lowest charge that isn't full, of those `accepts(item)`
+--- takes, or nil. Any drainable item will do, a vanilla cell as well as a bank battery.
+function Battery.emptiestIn(container, accepts)
+    local emptiest, lowest
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if accepts(item) then
+            local charge = Battery.getCharge(item)
+            if charge < 1 and (not emptiest or charge < lowest) then
+                emptiest, lowest = item, charge
+            end
+        end
+    end
+    return emptiest
 end
 
 --- Fraction of its life a battery loses to one discharge `depth` deep (0 to 1).

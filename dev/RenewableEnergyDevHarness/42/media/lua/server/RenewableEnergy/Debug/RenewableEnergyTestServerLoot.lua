@@ -350,11 +350,12 @@ local function worldCrate(square, containerType, defer)
 end
 
 -- Batteries that loot hands out hold a part charge, once: a refill of the container, as loot
--- respawn does, leaves a battery already there alone. Each container is filled the way the game
--- fills it (ItemPickerJava.fillContainer): one outside any room rolls the "all" table of its type,
--- here one that rolls the mod's batteries, and one of a corpse's type rolls the corpse lists; a
--- bag in each holds a battery, as a looted bag can. The arrow board tests cover vehicle fills,
--- which stock the trailer's battery box. `args` is a free outdoor square.
+-- respawn does, leaves a battery already there alone, as it does one whose charge came from
+-- anywhere else. Each container is filled the way the game fills it (ItemPickerJava.fillContainer):
+-- one outside any room rolls the "all" table of its type, here one that rolls the mod's batteries,
+-- and one of a corpse's type rolls the corpse lists; a bag in each holds a battery, as a looted bag
+-- can. The arrow board tests cover vehicle fills, which stock the trailer's battery box. `args` is
+-- a free outdoor square.
 handler("lootFoundBatteries", function(_, args, defer)
     local expect, expectNear, failures = newCheck()
     if not distributions(expect) then
@@ -387,12 +388,20 @@ handler("lootFoundBatteries", function(_, args, defer)
             expect(charge >= range.min and charge <= range.max,
                 battery:getFullType() .. " in " .. fill.what .. " holds " .. charge .. ", expected " .. range.min .. " to " .. range.max)
         end
+        -- Emptied, as unwiring it from a drained bank or rebuilding it leaves a battery.
+        local own = container:AddItem("RenewableEnergy.L16Battery")
+        Battery.setCharge(own, 0)
         local stored = batteries[1]
         if stored then
-            Battery.setCharge(stored, 1)
-            ItemPickerJava.fillContainer(container, nil)
+            -- Charged past the found range, and not through Battery.setCharge, so only what the fill
+            -- marked on it keeps a refill off it.
+            stored:setCurrentUsesFloat(1)
+        end
+        ItemPickerJava.fillContainer(container, nil)
+        if stored then
             expectNear("a stored battery's charge in " .. fill.what .. " after a refill", Battery.getCharge(stored), 1)
         end
+        expectNear("an emptied battery's charge in " .. fill.what .. " after a refill", Battery.getCharge(own), 0)
     end
     return { failures = failures }
 end)

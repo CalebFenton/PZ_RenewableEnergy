@@ -13,7 +13,8 @@ require "RenewableEnergy/PowerBank/PowerBank"
 
 local PowerBank = RenewableEnergy.PowerBank
 
-local ACCEPT_ITEM = "RenewableEnergy.PowerBank.acceptItem"
+-- MapObjects keeps one function per sprite and priority.
+local LOAD_PRIORITY = 6
 
 local ClientBank = CGlobalObject:derive("RenewableEnergy_ClientBank")
 
@@ -38,10 +39,7 @@ end
 local function adoptCopy(isoObject)
     if not PowerBank.isBank(isoObject) then return end
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
-    local container = isoObject:getContainer()
-    if container and container:getAcceptItemFunction() == nil then
-        container:setAcceptItemFunction(ACCEPT_ITEM)
-    end
+    PowerBank.adoptContainer(isoObject:getContainer())
 end
 
 -- Only later updates come here: a new bank's first status is copied in by the engine
@@ -93,7 +91,7 @@ end
 
 if isClient() then
     for _, name in ipairs(PowerBank.bankSprites()) do
-        MapObjects.OnLoadWithSprite(name, adoptCopy, 6)
+        MapObjects.OnLoadWithSprite(name, adoptCopy, LOAD_PRIORITY)
     end
     Events.OnObjectAboutToBeRemoved.Add(releasePower)
 end
@@ -104,8 +102,8 @@ Events.OnRefreshInventoryWindowContainers.Add(function(page, state)
     for _, button in ipairs(page.backpacks or {}) do
         local container = button.inventory
         local parent = container and container:getParent()
-        if parent and PowerBank.isBank(parent) and container:getAcceptItemFunction() == nil then
-            container:setAcceptItemFunction(ACCEPT_ITEM)
+        if parent and PowerBank.isBank(parent) then
+            PowerBank.adoptContainer(container)
         end
     end
 end)

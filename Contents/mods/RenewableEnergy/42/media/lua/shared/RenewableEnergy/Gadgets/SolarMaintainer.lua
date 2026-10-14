@@ -1,3 +1,4 @@
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
@@ -37,12 +38,7 @@ function SolarMaintainer.attach(character, vehicle, item)
     if not (item and item:getFullType() == SolarMaintainer.ITEM and SolarMaintainer.canAttach(vehicle)) then
         return false
     end
-    local container = item:getContainer()
-    character:removeFromHands(item)
-    if container then
-        container:Remove(item)
-        sendRemoveItemFromContainer(container, item)
-    end
+    RenewableEnergy.takeItem(character, item)
     local part = batteryPart(vehicle)
     part:getModData()[ATTACHED_KEY] = { condition = item:getCondition() }
     vehicle:transmitPartModData(part)

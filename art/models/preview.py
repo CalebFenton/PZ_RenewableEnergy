@@ -20,30 +20,13 @@ from mathutils import Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import items  # noqa: E402
+import kit  # noqa: E402
 import tiles  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(HERE))
 MEDIA = os.path.join(REPO, "Contents/mods/RenewableEnergy/common/media")
 OUT = os.environ.get("PREVIEWS", os.path.join(tempfile.gettempdir(), "renewable-energy-previews"))
 BACKGROUND = np.array([0.3, 0.3, 0.3, 1.0], dtype=np.float32)
-
-
-def load(path):
-    image = bpy.data.images.load(path)
-    width, height = image.size
-    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(height, width, 4)[::-1].copy()
-    bpy.data.images.remove(image)
-    return pixels
-
-
-def save(path, pixels):
-    height, width, _ = pixels.shape
-    image = bpy.data.images.new("sheet", width, height, alpha=True)
-    image.pixels[:] = np.clip(pixels[::-1], 0, 1).ravel()
-    image.filepath_raw = path
-    image.file_format = "PNG"
-    image.save()
-    bpy.data.images.remove(image)
 
 
 def over(sheet, pixels, x, y):
@@ -88,16 +71,16 @@ def tile_sheet():
                         if len(other) == 1 and other[0]["build"] is layers[0]["build"]
                         and other[0]["turn"] == layers[0]["turn"] and other[0]["at"] == layers[0]["at"]
                         and other[0]["options"] == layers[0]["options"])
-            over(cell, load(path % base), 0, 0)
-        over(cell, load(path % index), 0, 0)
+            over(cell, kit.load_pixels(path % base), 0, 0)
+        over(cell, kit.load_pixels(path % index), 0, 0)
         cells.append(enlarge(cell, 2))
-    save(os.path.join(OUT, "tiles.png"), grid(cells, 8, 256, 512))
+    kit.save_pixels(os.path.join(OUT, "tiles.png"), grid(cells, 8, 256, 512))
 
 
 def icon_sheet():
-    cells = [enlarge(load(os.path.join(REPO, "tools/textures/Item_RenewableEnergy_%s.png" % name)), 4)
+    cells = [enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/Item_RenewableEnergy_%s.png" % name)), 4)
              for name in items.ITEMS]
-    save(os.path.join(OUT, "icons.png"), grid(cells, 8, 136, 136))
+    kit.save_pixels(os.path.join(OUT, "icons.png"), grid(cells, 8, 136, 136))
 
 
 def model_sheet():
@@ -136,14 +119,11 @@ def model_sheet():
                 obj.data.pose_position = "REST"
         meshes = [obj for obj in imported if obj.type == "MESH"]
         for obj in meshes:
+            # The files carry no texture (models.py export says why): it goes on here.
             for mat in obj.data.materials:
-                nodes = [n for n in mat.node_tree.nodes if n.type == "TEX_IMAGE"]
-                if not nodes:
-                    nodes = [mat.node_tree.nodes.new("ShaderNodeTexImage")]
-                    mat.node_tree.links.new(nodes[0].outputs["Color"],
-                                            mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
-                for node in nodes:
-                    node.image = texture
+                node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+                node.image = texture
+                mat.node_tree.links.new(node.outputs["Color"], mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
         points = [obj.matrix_world @ v.co for obj in meshes for v in obj.data.vertices]
         centre = sum(points, Vector()) / len(points)
         size = max((p - centre).length for p in points) * 2.1
@@ -155,12 +135,12 @@ def model_sheet():
             path = os.path.join(OUT, "model_%s_%d.png" % (name, direction.x > 0))
             scene.render.filepath = path
             bpy.ops.render.render(write_still=True)
-            cells.append(load(path))
+            cells.append(kit.load_pixels(path))
             os.remove(path)
         for obj in imported:
             bpy.data.objects.remove(obj)
         print("previewed %s" % name)
-    save(os.path.join(OUT, "models.png"), grid(cells, 8, 256, 256))
+    kit.save_pixels(os.path.join(OUT, "models.png"), grid(cells, 8, 256, 256))
 
 
 def main():

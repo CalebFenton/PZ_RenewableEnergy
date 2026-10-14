@@ -1,15 +1,10 @@
 -- How the mod's own map items draw (LootMaps.callLua looks them up by stash name first, then by
--- the item's Map id; the two are the same). Each shows only the few hundred squares around its
--- stash house, in the style of vanilla's stash maps. Houses drawn on vanilla town maps keep the
--- town map's own look, so they have no entry here.
+-- the item's Map id; the two are the same). Each shows only its stash house's mapArea
+-- (StashHouses.lua), in the style of vanilla's stash maps. Houses drawn on vanilla town maps have
+-- no mapArea and keep the town map's own look.
 
 require "ISUI/Maps/ISMapDefinitions"
-
--- Area of each map, in squares: west, north, east, south.
-local AREAS = {
-    RenewableEnergy_CrowcallRoad = { 7860, 12250, 8099, 12449 },
-    RenewableEnergy_DixieTrailerPark = { 11560, 8730, 11799, 8929 },
-}
+require "RenewableEnergy/StashHouses"
 
 local function drawArea(area)
     return function(mapUI)
@@ -21,6 +16,6 @@ local function drawArea(area)
     end
 end
 
-for mapId, area in pairs(AREAS) do
+for mapId, area in pairs(RenewableEnergy.Stash.mapAreas) do
     LootMaps.Init[mapId] = drawArea(area)
 end

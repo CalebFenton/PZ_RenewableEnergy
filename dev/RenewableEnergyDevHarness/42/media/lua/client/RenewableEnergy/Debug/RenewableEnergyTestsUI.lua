@@ -17,7 +17,7 @@ require "RenewableEnergy/UI/StatusWindow"
 -- back. See RenewableEnergyTestLib.lua for the runner and the helpers.
 
 local T = RenewableEnergyTest
-local test, expect, expectNear, player = T.test, T.expect, T.expectNear, T.player
+local test, expect, expectNear, player, stateItem, copyItem = T.test, T.expect, T.expectNear, T.player, T.stateItem, T.copyItem
 
 local Action = RenewableEnergyAction
 local Specs = RenewableEnergy.Specs
@@ -58,27 +58,8 @@ local function optionFor(menu, item)
     end
 end
 
--- Chooses an option the way a click does.
-local function choose(option)
-    option.onSelect(option.target, option.param1, option.param2, option.param3, option.param4)
-end
-
 local function newContext()
     return ISContextMenu.get(0, 0, 0)
-end
-
--- The first `fullType` in this client's copy of `bank`.
-local function copyPart(bank, fullType)
-    return bank.object:getContainer():getFirstType(fullType)
-end
-
--- The server's entry for the first `fullType` in a bank state's items.
-local function stateItem(state, fullType)
-    for _, item in ipairs(state and state.items or {}) do
-        if item.type == fullType then
-            return item
-        end
-    end
 end
 
 -- Menus ---------------------------------------------------------------------------------------
@@ -285,29 +266,31 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
 
 -- Repair offers each inverter, says what a repair lacks, and once it has it, walks over and
 -- mends the inverter in place with one scrap, on the server and this client's copy.
+local WORN = 50
+local REPAIRED = WORN + Specs.partRepair.condition
 test("renewable_energy_ui_repair_part", {
     instant = true,
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { POWER_INVERTER }, { outdoors = true })
         if not bank then return end
         self.bank = bank
-        T.setPartCondition(self, bank, POWER_INVERTER, 50)
-        T.waitForCopy(function() return copyPart(bank, POWER_INVERTER):getCondition() == 50 end)
+        T.setPartCondition(self, bank, POWER_INVERTER, WORN)
+        T.waitForCopy(function() return copyItem(bank, POWER_INVERTER):getCondition() == WORN end)
         T.step(function()
             local context = newContext()
-            local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyPart(bank, POWER_INVERTER))
+            local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
             self.withoutScrap = { unavailable = option ~= nil and option.notAvailable, reason = tooltipOf(option) }
             context:hideAndChildren()
         end)
         T.give(self, "scrap", { { type = PowerBank.SCRAP } })
         T.step(function()
             local context = newContext()
-            local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyPart(bank, POWER_INVERTER))
+            local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
             context:hideAndChildren()
             self.offered = option ~= nil and not option.notAvailable
             if not self.offered then return end
-            choose(option)
-            T.waitForCopy(function() return copyPart(bank, POWER_INVERTER):getCondition() == 60 end)
+            T.choose(option)
+            T.waitForCopy(function() return copyItem(bank, POWER_INVERTER):getCondition() == REPAIRED end)
             T.bankState(self, bank)
             T.count(self, "scrap", { PowerBank.SCRAP })
         end)
@@ -317,11 +300,10 @@ test("renewable_energy_ui_repair_part", {
         expect(self.withoutScrap.unavailable and self.withoutScrap.reason == needScrap,
             "Repair doesn't say it needs scrap (" .. tostring(self.withoutScrap.reason) .. ")")
         if not expect(self.offered, "with scrap in hand, Repair isn't offered for a worn inverter") then return end
-        -- A repair mends 10 points.
         local inverter = stateItem(self.bank.state, POWER_INVERTER)
         if not expect(inverter ~= nil, "repairing took the inverter out of the bank") then return end
-        expectNear("inverter condition after the repair", inverter.condition, 60, 0)
-        expectNear("this client's copy of the inverter's condition", copyPart(self.bank, POWER_INVERTER):getCondition(), 60, 0)
+        expectNear("inverter condition after the repair", inverter.condition, REPAIRED, 0)
+        expectNear("this client's copy of the inverter's condition", copyItem(self.bank, POWER_INVERTER):getCondition(), REPAIRED, 0)
         expectNear("scrap left", self.counts.scrap[PowerBank.SCRAP], 0, 0)
         expectNear("scrap left on this client", player():getInventory():getCountTypeRecurse(PowerBank.SCRAP), 0, 0)
     end,
@@ -488,7 +470,7 @@ test("renewable_energy_ui_wire_in_and_unwire", {
                 self.refused = tostring(tooltipOf(option))
                 return
             end
-            choose(option)
+            T.choose(option)
             local queue = ISTimedActionQueue.getTimedActionQueue(p).queue
             self.action = queue[#queue]
             T.waitForCopy(function()
@@ -618,15 +600,16 @@ local function rowLabelled(rows, label)
 end
 
 -- Opens the window of this client's copy of the bank, closed again when the test ends, and queues
--- a wait until it has drawn its rows `frames` times.
-local function openWindow(self, frames)
+-- a wait until it has drawn its rows.
+local function openWindow(self)
     local window = StatusWindow.open(0, self.bank.object)
     self.window = window
     T.defer(self, function() window:close() end)
-    T.waitUntil(function() return (window.renderedFrames or 0) >= (frames or 1) end, DRAW_FRAMES)
+    T.waitUntil(function() return (window.renderedFrames or 0) > 0 end, DRAW_FRAMES)
 end
 
--- A bank with nothing in it still draws every section, and says it has no batteries.
+-- A bank with nothing in it says it has no batteries, no inverter and no parts, and that it must
+-- go inside.
 test("renewable_energy_ui_window_empty_bank", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
@@ -636,11 +619,6 @@ test("renewable_energy_ui_window_empty_bank", {
         local window = self.window
         expect((window.renderedFrames or 0) > 0, "the window never drew its rows")
         expect(window.status ~= nil, "the window shows no status")
-        local found = headers(window.left)
-        for _, key in ipairs({ "IGUI_RenewableEnergy_Power", "IGUI_RenewableEnergy_Drawing", "IGUI_RenewableEnergy_Storage",
-            "IGUI_RenewableEnergy_Parts" }) do
-            expect(found[getText(key)], "the window has no " .. key .. " section")
-        end
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_NoBatteries")), "an empty bank does not say it has no batteries")
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_NoWorkingInverter")), "an empty bank does not say it has no inverter")
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_StateOutdoors")), "a bank outdoors doesn't say it must go inside")
@@ -764,12 +742,9 @@ local FULL_BANK_SOURCES = {
     { sprite = Sprites.rack.wood.S, modules = { { type = MODULE, condition = 100 }, { type = MODULE, condition = 20 } } },
     { sprite = Sprites.rack.metal.E, modules = { { type = MODULE, condition = 90 }, { type = MODULE, condition = 90 } } },
 }
--- Frames the window draws before the screenshot, so the shot shows it settled.
-local SCREENSHOT_FRAMES = 5
 
 -- A working bank with batteries, inverters, controllers, a charger and panels lists every one
--- of them, and the screenshot (renewable_energy_status_window.png in the cache's Screenshots)
--- shows the layout.
+-- of them, and offers its switch.
 test("renewable_energy_ui_window_full_bank", {
     run = function(self)
         T.setGrid(self, false)
@@ -784,12 +759,7 @@ test("renewable_energy_ui_window_full_bank", {
         T.bankPass(self, bank, 650)
         T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
         waitForLoad(bank)
-        T.step(function()
-            openWindow(self, SCREENSHOT_FRAMES)
-            T.step(function() getCore():TakeFullScreenshot("renewable_energy_status_window.png") end)
-            -- The shot is taken when the next frame is drawn.
-            T.wait(2)
-        end)
+        T.step(function() openWindow(self) end)
     end,
     validate = function(self)
         local window = self.window
@@ -805,6 +775,5 @@ test("renewable_energy_ui_window_full_bank", {
             expect(rowLabelled(window.left, getItemNameFromFullType(fullType)) ~= nil, "the window does not list the " .. fullType)
         end
         expect(window.switchButton.enable, "the switch is disabled on a bank with an inverter")
-        expect(window.renameButton.enable, "the rename button is disabled")
     end,
 })

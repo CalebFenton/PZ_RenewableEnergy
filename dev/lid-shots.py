@@ -9,14 +9,16 @@ sheet, to see what a game drew while the battery box lid swung:
     TESTS=renewable_energy_world_arrow_board_lid_swings dev/run-debug-client.sh --test --mp
     dev/lid-shots.py            # the --mp client's cache; give a cache dir for another run
 
-The top row holds the lid held shut, open after this client opened it, shut again, and open after
-the server opened it as another player would; the row under it the first frame between shut and
-open of each swing; the last row the shut lid padlocked by the server, then unlocked. Writes <cache>/Screenshots/test_lid_sheet.png, which the next --test run
+The test takes the shots only when TESTS names it exactly, not by a prefix. The top row holds the
+lid held shut, open after this client opened it, shut again, open after the server opened it as
+another player would, and shut again by the server; the row under it the first frame between shut
+and open of each swing. Writes <cache>/Screenshots/test_lid_sheet.png, which the next --test run
 clears with the shots.
 
-It also fails when the box looks the same open as shut. Grass, leaves and fog move between shots,
-so around the box each open shot must differ from the first shut one by well more than the second
-shut one does.
+It also fails when the box looks the same open as shut, or open after the server shut it. Grass,
+leaves and fog move between shots, so around the box each open shot must differ from the first
+shut one by well more than the second shut one does, and the one the server shut by well less than
+either open one.
 """
 
 import os
@@ -37,6 +39,7 @@ HELD = [
     ("1_opening_it", "opened here"),
     ("2_closing_it", "shut here"),
     ("3_someone_else_opening_it", "opened by the server"),
+    ("4_someone_else_closing_it", "shut by the server"),
 ]
 SWINGING = [
     ("1_opening_it_swinging", "opening here"),
@@ -44,11 +47,7 @@ SWINGING = [
     ("3_someone_else_opening_it_swinging", "opening, server"),
     ("4_someone_else_closing_it_swinging", "shutting, server"),
 ]
-LOCKS = [
-    ("5_padlocked_by_the_server", "padlocked, server"),
-    ("6_unlocked_by_the_server", "unlocked, server"),
-]
-# How much more an open box must differ from the first shut one than the second shut one does.
+# How much more an open box must differ from the first shut one than a shut one does.
 OPEN_MARGIN = 3.0
 LABEL_H = 24
 
@@ -93,12 +92,18 @@ def difference(a, b):
     return sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
 
 
+def default_cache():
+    """The --mp client's cache, which the harness names after harness.conf's CACHE_NAME."""
+    conf = (Path(__file__).parent / "harness.conf").read_text()
+    name = re.search(r"^CACHE_NAME=(\S+)$", conf, re.MULTILINE).group(1)
+    return Path(os.path.realpath(os.environ.get("TMPDIR", "/tmp"))) / f"{name}-mpclient"
+
+
 def main():
-    default = Path(os.path.realpath(os.environ.get("TMPDIR", "/tmp"))) / "pz-renewable-energy-mpclient"
-    cache = Path(sys.argv[1]) if len(sys.argv) > 1 else default
+    cache = Path(sys.argv[1]) if len(sys.argv) > 1 else default_cache()
     screenshots = cache / "Screenshots"
     places = shot_places(cache / "console.txt")
-    rows = [[(load(screenshots, places, name), label) for name, label in row] for row in (HELD, SWINGING, LOCKS)]
+    rows = [[(load(screenshots, places, name), label) for name, label in row] for row in (HELD, SWINGING)]
     held = [shot for shot, _ in rows[0]]
     missing = [name for (name, _), shot in zip(HELD, held) if shot is None]
     if missing:
@@ -116,16 +121,28 @@ def main():
     sheet.save(out)
     print(out)
 
-    shut, opened_here, shut_again, opened_by_server = held
+    shut, opened_here, shut_again, opened_by_server, shut_by_server = held
     shut_box = shut.crop(shut.box, BOX)
-    still = difference(shut_box, shut_again.crop(shut_again.box, BOX))
+
+    def moved(shot):
+        return difference(shut_box, shot.crop(shot.box, BOX))
+
+    still = moved(shut_again)
     failed = False
+    opened = []
     for name, shot in (("opened here", opened_here), ("opened by the server", opened_by_server)):
-        moved = difference(shut_box, shot.crop(shot.box, BOX))
-        print(f"box {name}: differs from shut by {moved:.2f}; shut again, by {still:.2f}")
-        if moved < OPEN_MARGIN * still:
+        opened.append(moved(shot))
+        print(f"box {name}: differs from shut by {opened[-1]:.2f}; shut again, by {still:.2f}")
+        if opened[-1] < OPEN_MARGIN * still:
             print(f"FAIL: the box {name} looks as it does shut")
             failed = True
+    # The mirror of the open check: the sync bug this sheet exists for draws a lid the server shut
+    # still open on this client.
+    closed = moved(shut_by_server)
+    print(f"box shut by the server: differs from shut by {closed:.2f}")
+    if closed * OPEN_MARGIN > min(opened):
+        print("FAIL: the box shut by the server looks as it does open")
+        failed = True
     sys.exit(1 if failed else 0)
 
 

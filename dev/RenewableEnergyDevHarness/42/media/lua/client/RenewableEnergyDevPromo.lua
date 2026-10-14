@@ -18,6 +18,7 @@
 -- The run draws as many frames a second as it can, so its steps wait for what they need, such as
 -- the lighting settling, and count frames only for drawing.
 
+require "PZHarness/TestLib"
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 require "RenewableEnergy/Specs"
@@ -208,15 +209,14 @@ local QUIET_RADIUS = 25
 
 -- JSON -------------------------------------------------------------------------------------------
 
--- Kahlua has no next(), so an empty table is the one whose pairs() yields nothing.
+-- A table is an array when its keys are exactly 1 to #value; Kahlua has no next(), so the keys
+-- are counted with pairs(). An empty table is an array.
 local function isArray(value)
-    if value[1] ~= nil then
-        return true
-    end
+    local count = 0
     for _ in pairs(value) do
-        return false
+        count = count + 1
     end
-    return true
+    return count == #value
 end
 
 local function encode(value, out)
@@ -234,15 +234,15 @@ local function encode(value, out)
         else
             local keys = {}
             for key in pairs(value) do
-                table.insert(keys, tostring(key))
+                table.insert(keys, key)
             end
-            table.sort(keys)
+            table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
             table.insert(out, "{")
             for i, key in ipairs(keys) do
                 if i > 1 then
                     table.insert(out, ",")
                 end
-                encode(key, out)
+                encode(tostring(key), out)
                 table.insert(out, ":")
                 encode(value[key], out)
             end
@@ -253,7 +253,13 @@ local function encode(value, out)
             return string.format("\\u%04x", string.byte(c))
         end)
         table.insert(out, '"' .. escaped .. '"')
-    elseif kind == "number" or kind == "boolean" then
+    elseif kind == "number" then
+        -- JSON has no NaN or infinity, so a figure that came out as one has to be fixed at its source.
+        if value ~= value or value == math.huge or value == -math.huge then
+            error("REPromo: non-finite number in the JSON")
+        end
+        table.insert(out, tostring(value))
+    elseif kind == "boolean" then
         table.insert(out, tostring(value))
     else
         table.insert(out, "null")
@@ -364,19 +370,12 @@ end
 local icons = {}
 local iconOrder = {}
 
--- The icon the crafting window draws: the script's, which for a moveable is not the tile the
--- inventory shows.
-local function iconTexture(fullType, item)
-    local icon = getScriptManager():getItem(fullType):getIcon()
-    return icon and getTexture("Item_" .. icon) or item:getTex()
-end
-
 -- Registers an item for the icon sheet and returns its key in captures/.
 local function iconFor(fullType)
     local key = "icon_" .. string.gsub(fullType, "%.", "_")
     if not icons[key] then
         local item = instanceItem(fullType)
-        icons[key] = { fullType = fullType, name = item:getDisplayName(), texture = iconTexture(fullType, item) }
+        icons[key] = { fullType = fullType, name = item:getDisplayName(), texture = Stage.iconTexture(fullType) }
         table.insert(iconOrder, key)
     end
     return key
@@ -553,7 +552,6 @@ local function addIcons()
             rowHeight = math.max(rowHeight, h)
         end
         backdrop:addChild(sheet)
-        return 10
     end)
     addMatted("icons", function()
         local regions = {}
@@ -1298,7 +1296,6 @@ local function addMenu()
         end
         -- The world menu was made when the game started, under the backdrop.
         context:bringToTop()
-        return 30
     end)
     addMatted("menu", function()
         local left, top, right, bottom = math.huge, math.huge, 0, 0
@@ -1355,7 +1352,6 @@ local function addModels(items, models)
         for _, item in ipairs(items) do
             studio:AddWorldInventoryItem(instanceItem(item.fullType), 0.5, 0.5, 0)
         end
-        return 30
     end)
     goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]) }, 0)
     local floor = "promo_models_floor"
@@ -1385,7 +1381,6 @@ local function addModels(items, models)
         getCore():setOptionZoomLevels1x(zoomLevels[1])
         getCore():setOptionZoomLevels2x(zoomLevels[2])
         getCore():zoomLevelsChanged()
-        return 30
     end)
 end
 
@@ -1396,41 +1391,6 @@ local function roadSquares()
         table.insert(squares, atRoad(spot))
     end
     return squares
-end
-
--- Physics runs in real time, so the trailer steps wait for the vehicles to stand still: spawned,
--- they settle onto their wheels, and a trailer hitched before then swings round as the hitch pulls
--- it up to the car's tow bar. Vehicles at rest report a creep of about a tenth of a metre a second
--- until their physics sleeps, seconds later.
-local STILL_MS = 250
-local STILL_SPEED = 0.2
-local HITCH_GAP = 0.1
-
--- A runSteps wait until both of Stage.spawnTrailer's `pair` stand still on their squares, and with
--- `hitch`, with the trailer's tow point at the car's.
-local function atRest(pair, hitch)
-    local velocity, towing, towed = Vector3f.new(), Vector3f.new(), Vector3f.new()
-    local since
-    return function()
-        local still = true
-        for _, vehicle in ipairs({ pair.car, pair.trailer }) do
-            local square = vehicle:getSquare()
-            still = still and square ~= nil and square:getVehicleContainer() == vehicle
-                and vehicle:getLinearVelocity(velocity):length() < STILL_SPEED
-        end
-        if still and hitch then
-            local a = pair.car:getTowingWorldPos("trailer", towing)
-            local b = pair.trailer:getTowedByWorldPos("trailer", towed)
-            still = a ~= nil and b ~= nil and pair.trailer:getVehicleTowedBy() == pair.car
-                and IsoUtils.DistanceToSquared(a:x(), a:y(), b:x(), b:y()) < HITCH_GAP * HITCH_GAP
-        end
-        if not still then
-            since = nil
-            return false
-        end
-        since = since or getTimestampMs()
-        return getTimestampMs() - since >= STILL_MS
-    end
 end
 
 -- The arrow board trailer hitched to a car on the road, cones behind it, a step out from the
@@ -1458,11 +1418,11 @@ local function addTrailer()
             placeTile(atRoad(spot), ROAD.cone)
         end
         pair = Stage.spawnTrailer(roadCar, roadHeading.facing)
-        return atRest(pair, false)
+        return Stage.vehiclesAtRest(pair, false)
     end)
     add(function()
         Stage.hitchTrailer(pair, getPlayer(), "REPromo")
-        return atRest(pair, true)
+        return Stage.vehiclesAtRest(pair, true)
     end)
     -- From the item floor first, as a full run's character has by now: the hedges and fences along
     -- a road hide what lies past them from the road itself.
@@ -1700,11 +1660,34 @@ local function addTimer(label)
     end
 end
 
+-- A group in only one of GROUP_NAMES and GROUPS, or nil: one missing from GROUP_NAMES is never
+-- shot and run-debug-client.sh refuses its name, and one missing from GROUPS has no steps.
+local function unlistedGroup()
+    local listed = {}
+    for _, name in ipairs(GROUP_NAMES) do
+        if not GROUPS[name] then
+            return name .. " is in GROUP_NAMES but not GROUPS"
+        end
+        listed[name] = true
+    end
+    for name in pairs(GROUPS) do
+        if not listed[name] then
+            return name .. " is in GROUPS but not GROUP_NAMES"
+        end
+    end
+end
+
 --- Shoots the groups named in `selection`, comma-separated, or every group if it is empty, and
 --- calls onDone.
 function Promo.capture(selection, onDone)
     selection = selection or ""
     print("REPromo START " .. (selection ~= "" and selection or "all"))
+    local unlisted = unlistedGroup()
+    if unlisted then
+        print("REPromo FAIL: group " .. unlisted)
+        getCore():quitToDesktop()
+        return
+    end
     local selected, any = {}, false
     for name in string.gmatch(selection, "[^,%s]+") do
         if not GROUPS[name] then
@@ -1759,7 +1742,14 @@ function Promo.capture(selection, onDone)
         endGroup()
     end
     endTotal()
-    Stage.runSteps(steps, function()
+    Stage.runSteps(steps, function(gaveUp)
+        if gaveUp > 0 then
+            -- Without "REPromo DONE" the run fails, so extract.py keeps the committed captures
+            -- rather than replacing them with shots of a scene that never settled.
+            print("REPromo FAIL: " .. gaveUp .. " waits gave up")
+            getCore():quitToDesktop()
+            return
+        end
         data.screen = { w = getCore():getScreenWidth(), h = getCore():getScreenHeight() }
         data.shots = shots
         writeJson("REPromo.json", data)

@@ -42,7 +42,7 @@ end
 
 -- Queues reading the server's copy of the vehicle of `car` (a handle) into self[key]: its battery
 -- ({ type, uses }), whether a maintainer is attached and whether its engine runs.
-local function vehicleState(self, car, key)
+local function carState(self, car, key)
     T.server(self, "carState", function() return T.vehicleArgs(car) end)
     T.step(function() self[key] = self.server.carState end)
 end
@@ -77,14 +77,14 @@ test("renewable_energy_gadgets_maintainer_attach_detach", {
         T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })
         T.step(function() self.canAttach = SolarMaintainer.canAttach(car.vehicle) end)
         chooseMaintainerOption(self, car, true, "attachOffered")
-        vehicleState(self, car, "attached")
+        carState(self, car, "attached")
         T.count(self, "attached", { SolarMaintainer.ITEM })
         T.step(function()
             self.copyAttached = SolarMaintainer.isAttached(car.vehicle)
             self.canAttachTwice = SolarMaintainer.canAttach(car.vehicle)
         end)
         chooseMaintainerOption(self, car, false, "detachOffered")
-        vehicleState(self, car, "detached")
+        carState(self, car, "detached")
         T.count(self, "detached", { SolarMaintainer.ITEM })
     end,
     validate = function(self)
@@ -240,8 +240,10 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
     end,
 })
 
--- Works on vehicles as ISVehicleMechanics.cheat does, so that installing needs no key, hood or
--- walk, which the debug car may not allow.
+-- Works on vehicles as the mechanics window's ISVehicleMechanics.cheat does, so that its menu
+-- installs without a key, hood or walk, which the debug car may not allow. Only that Lua flag: the
+-- character's own mechanics cheat (T.setMechanicsCheat) would also make the install instant and
+-- skip its isValid, which this test means to run as players get it.
 local function mechanicsCheat(self)
     local saved = ISVehicleMechanics.cheat
     T.defer(self, function() ISVehicleMechanics.cheat = saved end)
@@ -299,9 +301,9 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
                     or "it is listed but not available (" .. tostring(VehicleUtils.getItems(0)[VehicleBattery.ITEM] ~= nil) .. " in reach)"
                 return
             end
-            pick.onSelect(pick.target, pick.param1, pick.param2)
+            T.choose(pick)
             T.waitForCopy(function() return carBattery(car) ~= nil end)
-            vehicleState(self, car, "installed")
+            carState(self, car, "installed")
             T.count(self, "installed", { VehicleBattery.ITEM })
             T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), uses = 0.5 } end)
             T.waitForCopy(function()
@@ -312,7 +314,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
             T.waitForCopy(function()
                 return carBattery(car) == nil and T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM) ~= nil
             end)
-            vehicleState(self, car, "uninstalled")
+            carState(self, car, "uninstalled")
             T.count(self, "uninstalled", { VehicleBattery.ITEM })
         end)
     end,
@@ -467,7 +469,7 @@ end
 -- A placed light run for `hours` at `hour` from `charge` Wh: whether it is lit afterwards (its
 -- sprite and, on this client, its lamp), and its charge in Wh, or for the noon row a range. It
 -- goes out once the night has drawn its battery empty, and by day its cell charges the battery,
--- never past full.
+-- never past full. One light runs every row in turn, each from its own charge.
 local GARDEN_LIGHT_HOURS = {
     { what = "charged at midnight", hour = MIDNIGHT, charge = 2, hours = 0.5, lit = true,
         after = 2 - Specs.gardenLight.nightWatts * 0.5 },
@@ -480,9 +482,9 @@ test("renewable_energy_gadgets_garden_light_update", {
     instant = true,
     run = function(self)
         self.rows = {}
+        local light = placeGardenLight(self, GARDEN_LIGHT_HOURS[1].charge)
+        if not light then return end
         for _, row in ipairs(GARDEN_LIGHT_HOURS) do
-            local light = placeGardenLight(self, row.charge)
-            if not light then return end
             T.step(function() T.setTime(self, row.hour) end)
             runLight(self, light, row.charge, row.hours)
             T.step(function()
@@ -556,7 +558,7 @@ local function chooseBulbOption(self, light, bulbType, key)
             return
         end
         T.standNextTo(light.square)
-        option.onSelect(option.target, option.param1, option.param2, option.param3)
+        T.choose(option)
     end)
 end
 

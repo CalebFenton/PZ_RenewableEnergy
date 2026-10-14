@@ -10,11 +10,24 @@
 -- Named to sort before the handler files, so that a --stay rerun loads it again (RELOAD_FILES)
 -- before the files that require it.
 
+require "PZHarness/Fixtures"
+
 local Helpers = {}
 
 --- The square at `args` ({ x, y, z }), or nil when there is none or it isn't loaded here.
 function Helpers.squareAt(args)
     return args and args.x and getSquare(args.x, args.y, args.z)
+end
+
+--- The vehicle `args` names ({ id, x, y, z }: RenewableEnergyTest.vehicleArgs; single player
+--- finds it by the squares around x, y, z), or nil and what is missing when there is none or it
+--- has been taken out of the world.
+function Helpers.vehicleAt(args)
+    local vehicle = args and PZHarness.Fixtures.vehicleById(args.id, args)
+    if not vehicle or vehicle:isRemovedFromWorld() then
+        return nil, "vehicle " .. tostring(args and args.id) .. " on the server"
+    end
+    return vehicle
 end
 
 --- Removes a tile object the way the game does, so the mod's removal handlers run.

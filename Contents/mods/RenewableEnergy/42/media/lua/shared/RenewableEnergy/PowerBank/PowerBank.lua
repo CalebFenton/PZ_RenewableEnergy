@@ -1,8 +1,8 @@
 -- Battery banks and the panels connected to them, as both sides see them: what an object is,
 -- what a bank holds and what it may take, and the bank's status as the server last reported it.
 --
--- The server runs the banks (server/RenewableEnergy/PowerBank) and adds perform() and
--- place() to this table; the client adds command() (client/RenewableEnergy/PowerBank/
+-- The server runs the banks (server/RenewableEnergy/PowerBank) and adds perform(), place() and
+-- remove() to this table; the client adds requestStatus() (client/RenewableEnergy/PowerBank/
 -- ClientBankSystem.lua). Both register a Global Object System under SYSTEM_NAME, which keeps
 -- each bank's state while its chunk is unloaded and copies the `status` field to every client.
 
@@ -46,14 +46,6 @@ function PowerBank.bankSprites()
     return names
 end
 
-local function spriteName(isoObject)
-    if not instanceof(isoObject, "IsoObject") then
-        return nil
-    end
-    local sprite = isoObject:getSprite()
-    return sprite and sprite:getName()
-end
-
 --- The bank a placed sprite is: { fullType, spec }, or nil.
 function PowerBank.bankOfSprite(name)
     return name and BANKS_BY_SPRITE[name]
@@ -62,7 +54,7 @@ end
 --- Whether an object is a working bank: a bank tile turned into the generator that powers
 --- the squares around it.
 function PowerBank.isBank(isoObject)
-    return instanceof(isoObject, "IsoGenerator") and PowerBank.bankOfSprite(spriteName(isoObject)) ~= nil
+    return instanceof(isoObject, "IsoGenerator") and PowerBank.bankOfSprite(Sprites.nameOf(isoObject)) ~= nil
 end
 
 --- The working bank on a square, or nil.
@@ -73,7 +65,7 @@ end
 --- The mount of a placed panel, "flat", "wall" or "rack", the way it faces and what it is made
 --- of; nil for anything else.
 function PowerBank.sourceKind(isoObject)
-    local kind, facing, material = Sprites.kindOf(spriteName(isoObject))
+    local kind, facing, material = Sprites.kindOf(Sprites.nameOf(isoObject))
     if SOURCE_KINDS[kind] then
         return kind, facing, material
     end
@@ -272,10 +264,18 @@ function PowerBank.acceptItem(container, item)
     return false
 end
 
+--- Gives a bank's container its filter, acceptItem by the dotted path the game resolves. The
+--- filter is neither saved nor sent, so every side sets it on its own copy.
+function PowerBank.adoptContainer(container)
+    if container and container:getAcceptItemFunction() == nil then
+        container:setAcceptItemFunction("RenewableEnergy.PowerBank.acceptItem")
+    end
+end
+
 --- Why `character` can't wire `item` into the bank `bankObject` now, as a translation key, or
 --- nil if they can.
 function PowerBank.wiringRefusal(character, bankObject, item)
-    local bank = PowerBank.bankOfSprite(spriteName(bankObject))
+    local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
     local container = bank and bankObject:getContainer()
     local wiring = instanceof(item, "InventoryItem") and PowerBank.wiringFor(item:getFullType())
     if not (container and wiring) then
@@ -385,11 +385,14 @@ function PowerBank.banksInReach(x, y, z)
     return found
 end
 
---- The bank the panel on this square is connected to, as { x, y, z }, or nil.
+--- The bank the panel on this square is connected to, as { x, y, z }, or nil. The authority
+--- reads the bank's own list of panels; a client has only the status the server last sent.
 function PowerBank.bankOfSource(x, y, z)
     local found
+    local authority = PowerBank.serverSystem ~= nil
     eachBank(function(bank)
-        for _, source in ipairs(bank.status and bank.status.sources or {}) do
+        local sources = authority and bank.sources or (bank.status and bank.status.sources)
+        for _, source in ipairs(sources or {}) do
             if source.x == x and source.y == y and source.z == z then
                 found = { x = bank.x, y = bank.y, z = bank.z }
                 return true

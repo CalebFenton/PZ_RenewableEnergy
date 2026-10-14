@@ -70,14 +70,6 @@ local function firstInput(craftRecipeData, matches)
     return nil
 end
 
-local function addToInventory(character, item)
-    local inventory = character:getInventory()
-    inventory:AddItem(item)
-    if isServer() then
-        sendAddItemToContainer(inventory, item)
-    end
-end
-
 local function sendModData(character, item)
     if isServer() then
         syncItemModData(character, item)
@@ -126,7 +118,7 @@ function Recipes.unmountModules(craftRecipeData, character)
         local item = instanceItem(module.type)
         Wear.setCondition(item, module.condition)
         PowerBank.markModule(item, module)
-        addToInventory(character, item)
+        Actions.addOrDropItem(character, item)
     end
 end
 
@@ -311,7 +303,7 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
     end)
     local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or CAR_BATTERY)
     setRebuilt(battery)
-    addToInventory(character, battery)
+    Actions.addOrDropItem(character, battery)
 end
 
 -- Gadgets ----------------------------------------------------------------------------------------
@@ -324,7 +316,7 @@ function Recipes.takeApartGardenLight(craftRecipeData, character)
     end)
     local bulb = light and SolarGardenLight.getBulb(light)
     if bulb then
-        addToInventory(character, instanceItem(bulb))
+        Actions.addOrDropItem(character, instanceItem(bulb))
     end
 end
 

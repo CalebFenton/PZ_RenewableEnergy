@@ -1,4 +1,4 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
+require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/PowerBank/PowerBank"
 
 -- Crafting tests: every recipe crafted the way a player starts it, instantly, with the inputs the
@@ -15,8 +15,7 @@ local MODULES_KEY = PowerBank.MODULES
 -- The test name for `recipe`: "RenewableEnergy_TakeApartSolarCellCharger", "returns_x" ->
 -- "renewable_energy_craft_take_apart_solar_cell_charger_returns_x".
 local function craftName(recipe, behavior)
-    local name = recipe:gsub("^RenewableEnergy_", ""):gsub("(%l)(%u)", "%1_%2"):gsub("(%d)(%u)", "%1_%2")
-    return "renewable_energy_craft_" .. string.lower(name) .. (behavior and "_" .. behavior or "")
+    return "renewable_energy_craft_" .. T.snake((recipe:gsub("^RenewableEnergy_", ""))) .. (behavior and "_" .. behavior or "")
 end
 
 -- The given inputs (this client's copies, T.craftTest's self.items.inputs) of `fullType`.
@@ -52,26 +51,50 @@ end
 
 -- Bank tiers and parts -------------------------------------------------------------------------
 
--- Each recipe makes one item and uses up its materials.
+-- Each recipe makes one item and uses up what its script takes, but the tools it keeps. A craft
+-- starts from the material a player right-clicks.
 local MAKES = {
-    { "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy.BatteryBoxWood", { "Base.Plank", "Base.Nails" } },
-    { "RenewableEnergy_MakeBatteryBoxMetal", "RenewableEnergy.BatteryBoxMetal", { "Base.SmallSheetMetal" } },
-    { "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy.BatteryRackWood", { "Base.Plank", "Base.Nails" } },
-    { "RenewableEnergy_BuildBatteryRackMetal", "RenewableEnergy.BatteryRackMetal", { "Base.SmallSheetMetal", "Base.MetalBar" } },
-    { "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy.BatteryBankWood", { "Base.Plank", "Base.Nails" } },
-    { "RenewableEnergy_BuildBatteryBankMetal", "RenewableEnergy.BatteryBankMetal", { "Base.SheetMetal", "Base.MetalBar" } },
-    { "RenewableEnergy_MakeChargeController", "RenewableEnergy.ChargeController",
-        { "Base.ElectronicsScrap", "Base.ElectricWire", "Base.SmallSheetMetal", "Base.Amplifier" } },
-    { "RenewableEnergy_MakeSolarFailsafe", "RenewableEnergy.SolarFailsafe",
-        { "Base.RemoteCraftedV3", "Base.ElectronicsScrap", "Base.ElectricWire" } },
+    { "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy.BatteryBoxWood", "Base.Plank" },
+    { "RenewableEnergy_MakeBatteryBoxMetal", "RenewableEnergy.BatteryBoxMetal", "Base.SmallSheetMetal" },
+    { "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy.BatteryRackWood", "Base.Plank" },
+    { "RenewableEnergy_BuildBatteryRackMetal", "RenewableEnergy.BatteryRackMetal", "Base.SmallSheetMetal" },
+    { "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy.BatteryBankWood", "Base.Plank" },
+    { "RenewableEnergy_BuildBatteryBankMetal", "RenewableEnergy.BatteryBankMetal", "Base.SheetMetal" },
+    { "RenewableEnergy_MakeChargeController", "RenewableEnergy.ChargeController", "Base.ElectronicsScrap" },
+    { "RenewableEnergy_MakeSolarFailsafe", "RenewableEnergy.SolarFailsafe", "Base.RemoteCraftedV3" },
 }
-for _, entry in ipairs(MAKES) do
-    local recipe, result, materials = entry[1], entry[2], entry[3]
-    local counts = { [result] = 1 }
-    for _, material in ipairs(materials) do
-        counts[material] = 0
+
+-- The items one craft of `recipe` uses up: those T.recipeInputs gives for the inputs it neither
+-- keeps nor takes only some uses of, as a blowtorch's.
+local function usedUp(recipe)
+    local types = {}
+    local inputs = recipe:getInputs()
+    for i = 0, inputs:size() - 1 do
+        local input = inputs:get(i)
+        local item = not input:isKeep() and T.inputItem(input)
+        if item and (input:isItemCount() or not item:isItemType(ItemType.DRAINABLE)) then
+            table.insert(types, item:getFullName())
+        end
     end
-    craftTest(craftName(recipe), { recipe = recipe, from = materials[1], counts = counts })
+    return types
+end
+
+for _, entry in ipairs(MAKES) do
+    local recipe, result, from = entry[1], entry[2], entry[3]
+    craftTest(craftName(recipe), {
+        recipe = recipe,
+        from = from,
+        counts = { [result] = 1 },
+        after = function(self) T.count(self, "usedUp", usedUp(getScriptManager():getCraftRecipe(recipe))) end,
+        validate = function(self)
+            local checked = 0
+            for fullType, count in pairs(self.counts.usedUp or {}) do
+                checked = checked + 1
+                expect(count == 0, count .. " " .. fullType .. " left after the craft, which uses it up")
+            end
+            expect(checked > 0, "the craft uses up nothing")
+        end,
+    })
 end
 
 -- Panel mounts ---------------------------------------------------------------------------------

@@ -8,11 +8,6 @@ debugScenarios = debugScenarios or {}
 debugScenarios.RenewableEnergyScenario = {
     name = "Renewable Energy",
     startLoc = { x = 10835, y = 10144, z = 0 }, -- Muldraugh; DebugScenarios requires a start location
-    setSandbox = function()
-        -- DebugScenarios doesn't record the active mods for the new save (see MainScreen.resetLuaIfNeeded).
-        ActiveMods.getById("currentGame"):copyFrom(ActiveMods.getById("default"))
-        SandboxVars.Zombies = 6 -- none
-    end,
     onStart = function()
         -- Crafting needs light, and the panels need sun.
         getGameTime():setTimeOfDay(10)

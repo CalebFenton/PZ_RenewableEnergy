@@ -1,4 +1,4 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
+require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 
 -- Item and recipe data as the game loaded it, and learning recipes from magazines and research,
@@ -33,8 +33,7 @@ local RECIPES = {
 
 -- "RenewableEnergy.HomesteadPowerMag1" -> "homestead_power_mag1".
 local function snakeName(fullType)
-    local name = string.match(fullType, "%.(.+)") or fullType
-    return string.lower((name:gsub("(%l)(%u)", "%1_%2"):gsub("(%d)(%u)", "%1_%2")))
+    return T.snake(string.match(fullType, "%.(.+)") or fullType)
 end
 
 -- Items -----------------------------------------------------------------------------------------
@@ -65,15 +64,19 @@ test("renewable_energy_items_have_icons_names_and_ground_models", {
     end,
 })
 
--- A homemade module comes out of the box at its cap, 60, and the electrolyte bottle full of acid.
+-- A homemade module comes out of the box at its cap, below a factory module's, and the
+-- electrolyte bottle full of acid.
 test("renewable_energy_items_new_start_right", {
     validate = function()
         local module = instanceItem("RenewableEnergy.HomemadeSolarModule")
-        expect(module:getCondition() == 60 and module:getConditionMax() == 60,
-            "a new homemade module is at " .. module:getCondition() .. " of " .. module:getConditionMax())
+        local factoryCap = instanceItem("RenewableEnergy.SolarModule"):getConditionMax()
+        expect(module:getCondition() == module:getConditionMax() and module:getConditionMax() < factoryCap,
+            "a new homemade module is at " .. module:getCondition() .. " of " .. module:getConditionMax()
+            .. ", a factory module's cap being " .. factoryCap)
         local bottle = instanceItem("RenewableEnergy.BatteryElectrolyte"):getFluidContainer()
-        expect(bottle ~= nil and math.abs(bottle:getSpecificFluidAmount(Fluid.Acid) - 1) < 0.01,
-            "a new electrolyte bottle holds " .. tostring(bottle and bottle:getSpecificFluidAmount(Fluid.Acid)) .. " L of acid")
+        expect(bottle ~= nil and math.abs(bottle:getSpecificFluidAmount(Fluid.Acid) - bottle:getCapacity()) < 0.01,
+            "a new electrolyte bottle holds " .. tostring(bottle and bottle:getSpecificFluidAmount(Fluid.Acid)) .. " L of acid, of "
+            .. tostring(bottle and bottle:getCapacity()))
     end,
 })
 

@@ -37,11 +37,14 @@
 #   dev/run-debug-client.sh --loot   the same, but instead of the tests the harness measures how
 #                                    often each of the mod's items spawns in each loot list and
 #                                    room container it is in, and the script prints one line per
-#                                    list (a few minutes)
+#                                    list, then the modules and watts a thorough player finds per
+#                                    town and per solar site, and the arrow boards per map (a few
+#                                    minutes)
 #
 # CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-client), JAVAC the compiler for
 # ClickToStart.java (default: javac from PATH; any JDK from 8 on works), TIMEOUT the seconds a
-# harness run may take (default 1200), TESTS, a comma-separated list of test name prefixes,
-# limits --test to those tests (e.g. TESTS=renewable_energy_loot_), and PROMO, a comma-separated
-# list of groups, limits --promo to those groups.
+# harness run may take (default 300 per round for --test, 1200 for the other modes), TESTS, a
+# comma-separated list of test name prefixes, limits --test to those tests (e.g.
+# TESTS=renewable_energy_loot_), and PROMO, a comma-separated list of groups, limits --promo to
+# those groups.
 . "$(dirname "$0")/harness/bin/run-client.sh"

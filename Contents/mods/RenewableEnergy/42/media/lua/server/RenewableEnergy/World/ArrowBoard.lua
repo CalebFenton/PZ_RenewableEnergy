@@ -158,7 +158,8 @@ ArrowBoard.LID = "TrunkDoor"
 ArrowBoard.PADLOCK = "Padlock"
 
 -- The lids each game watches, by vehicle: the lid's item, lock and broken lock it last showed the
--- padlock for, and whether it last saw the lid open (open, nil until it first looks).
+-- padlock for, whether it last saw the lid open (open, nil until it first looks), and on a
+-- server when it last took a crash for the trailer (crashTakenAt).
 local lids = {}
 
 --- Whether the lid's padlock holds: the lid is on, locked, and its lock isn't cut.
@@ -416,8 +417,9 @@ end
 
 -- Loaded trailers by vehicle: their recent velocities, oldest first, in the lists ms, x and y,
 -- used as a ring of SAMPLE_SLOTS from `head`, `count` long, so that watching allocates nothing
--- each frame; the time of their last crash's latest jolt; on a multiplayer client the car of
--- this game's player that last towed them and until when that car's crashes still count.
+-- each frame; the time of their last crash's latest jolt; whether they have joined the cell; on
+-- a multiplayer client the car of this game's player that last towed them and until when that
+-- car's crashes still count.
 local tracked = {}
 -- Enough for ArrowBoard.CRASH.ms at a thousand frames a second; at a higher rate the oldest
 -- samples go early, which still leaves a crash's jolt well inside the window.
@@ -489,14 +491,13 @@ local cell
 function ArrowBoard.watchCrashes()
     local now = getTimestampMs()
     cell = cell or getCell()
+    -- A vehicle joins the cell a frame after it enters the world, so one not yet in it waits. Once
+    -- in, it stays until it leaves the world, so the cell's list is searched only until then.
     for vehicle, entry in pairs(tracked) do
-        if not cell:getVehicles():contains(vehicle) then
-            -- Left the cell or the world; a vehicle joins the cell a frame after it spawns, so one
-            -- not yet in it waits.
-            if vehicle:isRemovedFromWorld() then
-                tracked[vehicle] = nil
-            end
-        else
+        if vehicle:isRemovedFromWorld() then
+            tracked[vehicle] = nil
+        elseif entry.inCell or cell:getVehicles():contains(vehicle) then
+            entry.inCell = true
             local runs = runsPhysics(vehicle, entry, now)
             if runs and sampleCrash(vehicle, entry, now) then
                 if isClient() then
@@ -547,12 +548,9 @@ local function justUnhitched(vehicle, car)
     return hitch ~= nil and coupler ~= nil and (hitch:x() - coupler:x()) ^ 2 + (hitch:y() - coupler:y()) ^ 2 <= squares * squares
 end
 
--- When the server last took a crash for each trailer, by vehicle id: a client's own gate is all
--- that keeps one crash from cracking the panels twice, so the server keeps it too.
-local crashTakenAt = {}
-
 -- The server takes a crash only from the driver of the car towing the trailer, or towing it until
--- a moment ago, and only one within ArrowBoard.CRASH.quietMs.
+-- a moment ago, and only one within ArrowBoard.CRASH.quietMs: a client's own gate is all that
+-- keeps one crash from cracking the panels twice, so the server keeps it too, on the lid's entry.
 local function onClientCommand(module, command, player, args)
     if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number"
         or type(args.car) ~= "number" then
@@ -564,8 +562,10 @@ local function onClientCommand(module, command, player, args)
         return
     end
     local now = getTimestampMs()
-    if now - (crashTakenAt[args.vehicle] or -math.huge) >= ArrowBoard.CRASH.quietMs then
-        crashTakenAt[args.vehicle] = now
+    local entry = lids[vehicle] or {}
+    lids[vehicle] = entry
+    if now - (entry.crashTakenAt or -math.huge) >= ArrowBoard.CRASH.quietMs then
+        entry.crashTakenAt = now
         ArrowBoard.crashCrack(vehicle)
     end
 end
@@ -619,19 +619,9 @@ function ArrowBoard.panelWatts(vehicle)
     return watts
 end
 
--- The battery in the box with the lowest charge that isn't full, or nil.
-local function emptiestBattery(container)
-    local Battery = RenewableEnergy.Battery
-    local emptiest
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if Battery.nominalWh(item) > 0 and Battery.getCharge(item) < 1
-            and (not emptiest or Battery.getCharge(item) < Battery.getCharge(emptiest)) then
-            emptiest = item
-        end
-    end
-    return emptiest
+-- A battery in the box that can still hold a charge.
+local function holdsCharge(item)
+    return RenewableEnergy.Battery.nominalWh(item) > 0
 end
 
 --- Adds `hours` of its panels' current output to the batteries in its battery box, the emptiest
@@ -651,7 +641,7 @@ function ArrowBoard.charge(vehicle, hours)
     local Battery = RenewableEnergy.Battery
     local wh = RenewableEnergy.Sun.panelWatts(ArrowBoard.panelWatts(vehicle), "flat") * hours
     local stored = 0
-    local battery = wh > 0 and emptiestBattery(container)
+    local battery = wh > 0 and Battery.emptiestIn(container, holdsCharge)
     while battery do
         local before = Battery.getCharge(battery)
         local room = (1 - before) * Battery.nominalWh(battery)
@@ -663,7 +653,7 @@ function ArrowBoard.charge(vehicle, hours)
             sendItemStats(battery)
         end
         wh, stored = wh - added, stored + added
-        battery = wh > 0 and emptiestBattery(container)
+        battery = wh > 0 and Battery.emptiestIn(container, holdsCharge)
     end
     return stored
 end

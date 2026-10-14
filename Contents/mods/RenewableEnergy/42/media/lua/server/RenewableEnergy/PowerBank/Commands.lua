@@ -53,11 +53,7 @@ local function consume(character, fullType, count)
     if count <= 0 then return end
     local items = character:getInventory():getSomeTypeRecurse(fullType, count)
     for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        local container = item:getContainer()
-        character:removeFromHands(item)
-        container:Remove(item)
-        sendRemoveItemFromContainer(container, item)
+        RenewableEnergy.takeItem(character, items:get(i))
     end
 end
 
@@ -85,13 +81,17 @@ function Commands.connectSource(player, args)
     if not (source:getSquare():isOutside() and PowerBank.isInReach(bank, x, y, z)) then
         return false, "out of reach"
     end
+    -- A panel feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
+    -- snow and all.
+    local previous = bankOfSource(args.source)
+    if previous == bank then
+        return false, "already connected"
+    end
     -- The container is the truth about the controllers, whatever filled it since the last pass.
     bank:recount()
     if #bank.sources >= bank:panelSlots() then
         return false, "Tooltip_RenewableEnergy_NoPanelSlot"
     end
-    -- A panel feeds one bank.
-    local previous = bankOfSource(args.source)
     if previous then
         previous:removeSource(x, y, z)
         previous:sendStatus()
@@ -145,10 +145,7 @@ function Commands.wireIn(player, args)
     local wiring = PowerBank.wiringFor(item:getFullType())
     consume(player, PowerBank.WIRE, wiring.wire)
     consume(player, PowerBank.SCRAP, wiring.scrap)
-    local from = item:getContainer()
-    player:removeFromHands(item)
-    from:Remove(item)
-    sendRemoveItemFromContainer(from, item)
+    RenewableEnergy.takeItem(player, item)
     container:AddItem(item)
     sendAddItemToContainer(container, item)
     local data = item:getModData()
@@ -210,10 +207,7 @@ end
 function Commands.refresh(player, args)
     local bank = bankAt(args.bank)
     if not bank then return false, "no bank" end
-    bank:recount()
-    bank:switchGenerator()
-    bank:showBatteries()
-    bank:sendStatus()
+    bank:refresh()
     return true
 end
 

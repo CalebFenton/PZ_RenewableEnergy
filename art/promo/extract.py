@@ -144,4 +144,5 @@ def main():
         print(f"extract: no capture {name}.png; run dev/run-debug-client.sh --promo with PROMO={group}")
 
 
-main()
+if __name__ == "__main__":
+    main()

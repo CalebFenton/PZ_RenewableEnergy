@@ -40,9 +40,9 @@ local SURVIVALISTS_AND_BANDITS = {
 -- building through it, and doBuildingStash only matches a building whose bounds strictly contain
 -- it. crateX, crateY, crateZ: an empty floor square in one of the house's rooms, since only
 -- containers in its rooms are stocked. map: the item that leads there; a mod item is a map of just
--- that area, which corpses in `mapCorpses` carry at `mapWeight`, a vanilla town map is found
--- wherever vanilla puts it. Marks are drawn on the map: a symbol of MapSymbolDefinitions, or note
--- n, whose text is the translation Stash_<name>_<n>.
+-- mapArea, the squares west, north, east and south it shows, which corpses in `mapCorpses` carry at
+-- `mapWeight`, a vanilla town map is found wherever vanilla puts it. Marks are drawn on the map: a
+-- symbol of MapSymbolDefinitions, or note n, whose text is the translation Stash_<name>_<n>.
 local HOUSES = {
     -- A prepper's farmhouse off Crowcall Road, south of Rosewood, with a bunker under its shed.
     -- Only survivalists and bandits carry its map and it is never stocked from the start: the
@@ -50,6 +50,7 @@ local HOUSES = {
     {
         name = "RenewableEnergy_CrowcallRoad",
         map = "RenewableEnergy.CrowcallRoadMap",
+        mapArea = { 7860, 12250, 8099, 12449 },
         buildingX = 7984, buildingY = 12342,
         crateX = 7985, crateY = 12341, crateZ = 0,
         barricades = 90,
@@ -70,6 +71,7 @@ local HOUSES = {
     {
         name = "RenewableEnergy_DixieTrailerPark",
         map = "RenewableEnergy.DixieTrailerParkMap",
+        mapArea = { 11560, 8730, 11799, 8929 },
         buildingX = 11713, buildingY = 8794,
         crateX = 11714, crateY = 8789, crateZ = 0,
         zombies = 3,
@@ -163,12 +165,16 @@ local function describe(house)
     return description
 end
 
+-- Stash name -> the mapArea of its mod map item, for the map's drawing (MapDefinitions.lua).
+Stash.mapAreas = {}
+
 for _, house in ipairs(HOUSES) do
     Stash.descriptions[describe(house)] = {
         knownOnStart = house.knownOnStart,
         rarity = house.mapWeight,
         targets = house.mapCorpses,
     }
+    Stash.mapAreas[house.name] = house.mapArea
 end
 
 --- Whether the Stash Houses option puts the maps into corpse loot.

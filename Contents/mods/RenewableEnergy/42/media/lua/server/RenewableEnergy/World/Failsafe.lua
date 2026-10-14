@@ -29,7 +29,7 @@ local function moveToTop(failsafe)
 end
 
 local function onObjectAdded(isoObject)
-    if isoObject and isoObject:getTextureName() == FAILSAFE then
+    if RenewableEnergy.Sprites.kindOf(RenewableEnergy.Sprites.nameOf(isoObject)) == "failsafe" then
         moveToTop(isoObject)
     end
 end

@@ -163,6 +163,15 @@ function Sprites.kindOf(spriteName)
     return entry[1], entry[2], entry[3]
 end
 
+--- The sprite name of a placed object, or nil for anything else or an object without a sprite.
+function Sprites.nameOf(isoObject)
+    if not instanceof(isoObject, "IsoObject") then
+        return nil
+    end
+    local sprite = isoObject:getSprite()
+    return sprite and sprite:getName()
+end
+
 --- Whether a sprite is one of the overlays above, which are never placed on their own.
 function Sprites.isOverlay(spriteName)
     return spriteName ~= nil and OVERLAYS[spriteName] == true

@@ -1,7 +1,8 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+require "PZHarness/Fixtures"
 -- Development only. What the --art and --promo captures share: finding a place near the
--- character, clearing its trees, the steps that walk the character to a shot and frame it, and
--- the arrow board trailer hitched to a car.
+-- character, clearing its trees, the steps that walk the character to a shot and frame it, the
+-- arrow board trailer hitched to a car and the waits for it to settle. The lid test waits on
+-- lightingSettled too.
 
 local Stage = {}
 
@@ -22,11 +23,10 @@ local LOOK_PASSES = 3
 local SETTLE_MS = 300
 -- How far around the character the lighting has to settle, in squares.
 local SETTLE_RADIUS = 15
--- How long a step's wait may poll before the run logs it and goes on.
+-- How long a step's wait may poll before the run logs it and goes on; onDone counts these.
 local WAIT_MAX_MS = 10000
 -- Steps to scroll in to reach the closest zoom.
 local STEPS_TO_CLOSEST = 8
-local TRAILER = "Base.RenewableEnergyArrowBoardTrailer"
 local TOWING_CAR = "Base.OffRoad"
 -- How far behind its car a trailer spawns, clear of it while both settle onto their wheels; the
 -- hitch then moves it up to the tow bar.
@@ -35,9 +35,10 @@ local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
 
 --- Runs each step on its own tick, then waits before the next: as many ticks as the step returns,
 --- or, if it returns a function, until that function returns true. A function polled for longer
---- than WAIT_MAX_MS is logged under `mark` and given up. Then calls onDone.
+--- than WAIT_MAX_MS is logged under `mark` and given up. Then calls onDone with how many waits
+--- gave up, since a shot after one shows a scene that never settled.
 function Stage.runSteps(steps, onDone, mark)
-    local index, wait, poll, pollStart = 1, 0, nil, 0
+    local index, wait, poll, pollStart, gaveUp = 1, 0, nil, 0, 0
     local function onTick()
         if poll then
             if poll() then
@@ -45,6 +46,7 @@ function Stage.runSteps(steps, onDone, mark)
             elseif getTimestampMs() - pollStart > WAIT_MAX_MS then
                 print(string.format("%s WAIT gave up on step %d after %d ms", mark or "Stage", index - 1, WAIT_MAX_MS))
                 poll = nil
+                gaveUp = gaveUp + 1
             end
             return
         end
@@ -55,7 +57,7 @@ function Stage.runSteps(steps, onDone, mark)
         local step = steps[index]
         if not step then
             Events.OnTick.Remove(onTick)
-            onDone()
+            onDone(gaveUp)
             return
         end
         index = index + 1
@@ -127,17 +129,24 @@ function Stage.zoomSettled()
 end
 
 --- The loaded square closest to the character, within SEARCH_RADIUS on its level, for which
---- `accepts(square)` holds, or nil.
+--- `accepts(square)` holds, or nil. Of squares as close, the one furthest west, then north.
 function Stage.closestSquare(player, accepts)
     local here = player:getCurrentSquare()
-    local best, bestDistance
-    for dx = -Stage.SEARCH_RADIUS, Stage.SEARCH_RADIUS do
-        for dy = -Stage.SEARCH_RADIUS, Stage.SEARCH_RADIUS do
+    local x, y, z = here:getX(), here:getY(), here:getZ()
+    local best, bestDistance, bestDx, bestDy
+    -- Ring by ring outwards, until no square of the next ring can be as close as the best.
+    for radius = 0, Stage.SEARCH_RADIUS do
+        if bestDistance and radius * radius > bestDistance then
+            break
+        end
+        for sx, sy in PZHarness.Fixtures.ring(x, y, radius) do
+            local dx, dy = sx - x, sy - y
             local distance = dx * dx + dy * dy
-            if not bestDistance or distance < bestDistance then
-                local square = getCell():getGridSquare(here:getX() + dx, here:getY() + dy, here:getZ())
+            if not bestDistance or distance < bestDistance
+                or (distance == bestDistance and (dx < bestDx or (dx == bestDx and dy < bestDy))) then
+                local square = getCell():getGridSquare(sx, sy, z)
                 if square and accepts(square) then
-                    best, bestDistance = square, distance
+                    best, bestDistance, bestDx, bestDy = square, distance, dx, dy
                 end
             end
         end
@@ -203,20 +212,28 @@ function Stage.screenshot(mark, file)
     print(mark .. " saved " .. file .. ".png")
 end
 
+--- The icon the crafting window draws for `fullType`: the script's, which for a moveable is not
+--- the tile the inventory shows, or else the item's own.
+function Stage.iconTexture(fullType)
+    local icon = getScriptManager():getItem(fullType):getIcon()
+    return icon and getTexture("Item_" .. icon) or instanceItem(fullType):getTex()
+end
+
 --- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer
 --- behind it, both repaired: { car, trailer, facing }. A vehicle joins the cell's list, and gets
---- its physics, only on a later update, so hitch them some ticks later.
+--- its physics, only on a later update, so wait with vehiclesAtRest before hitching them.
 function Stage.spawnTrailer(square, facing)
     local behind = BEHIND[facing]
     local trailerSquare = getCell():getGridSquare(square:getX() + behind[1] * TRAILER_GAP,
         square:getY() + behind[2] * TRAILER_GAP, square:getZ())
     local pair = {
         car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
-        trailer = addVehicleDebug(TRAILER, IsoDirections[facing], 0, trailerSquare),
+        -- The tests' spawn, which keeps a whole trailer's panels whole past stocking.
+        trailer = PZHarness.serverSettings.spawnVehicle(RenewableEnergy.ArrowBoard.SCRIPT, trailerSquare, facing,
+            { repair = true }),
         facing = facing,
     }
     pair.car:repair()
-    pair.trailer:repair()
     return pair
 end
 
@@ -224,7 +241,7 @@ end
 --- a battery in it, and logs under `mark` whether both worked.
 function Stage.hitchTrailer(pair, player, mark)
     local car, trailer = pair.car, pair.trailer
-    RenewableEnergyTest.lineUpTrailer(car, trailer, pair.facing)
+    PZHarness.Fixtures.lineUpTrailer(car, trailer, pair.facing)
     car:addPointConstraint(player, trailer, "trailer", "trailer")
     local lid = trailer:getPartById("TrunkDoor")
     local box = trailer:getPartById("RenewableEnergyBatteryBox")
@@ -238,6 +255,42 @@ function Stage.hitchTrailer(pair, player, mark)
     print(string.format("%s trailer towedBy=%s lid=%s container=%s items=%d", mark,
         tostring(trailer:getVehicleTowedBy() == car), tostring(lid ~= nil), tostring(container ~= nil),
         container and container:getItems():size() or 0))
+end
+
+-- Physics runs in real time, so the trailer steps wait for the vehicles to stand still: spawned,
+-- they settle onto their wheels, and a trailer hitched before then swings round as the hitch pulls
+-- it up to the car's tow bar. Vehicles at rest report a creep of about a tenth of a metre a second
+-- until their physics sleeps, seconds later.
+local STILL_MS = 250
+local STILL_SPEED = 0.2
+local HITCH_GAP = 0.1
+
+--- A runSteps wait until the vehicles of Stage.spawnTrailer's `pair` (the trailer alone once its
+--- car is gone) stand still on their squares, and with `hitch`, with the trailer's tow point at
+--- the car's.
+function Stage.vehiclesAtRest(pair, hitch)
+    local velocity, towing, towed = Vector3f.new(), Vector3f.new(), Vector3f.new()
+    local since
+    return function()
+        local still = true
+        for _, vehicle in ipairs({ pair.trailer, pair.car }) do
+            local square = vehicle:getSquare()
+            still = still and square ~= nil and square:getVehicleContainer() == vehicle
+                and vehicle:getLinearVelocity(velocity):length() < STILL_SPEED
+        end
+        if still and hitch then
+            local a = pair.car:getTowingWorldPos("trailer", towing)
+            local b = pair.trailer:getTowedByWorldPos("trailer", towed)
+            still = a ~= nil and b ~= nil and pair.trailer:getVehicleTowedBy() == pair.car
+                and IsoUtils.DistanceToSquared(a:x(), a:y(), b:x(), b:y()) < HITCH_GAP * HITCH_GAP
+        end
+        if not still then
+            since = nil
+            return false
+        end
+        since = since or getTimestampMs()
+        return getTimestampMs() - since >= STILL_MS
+    end
 end
 
 return Stage
