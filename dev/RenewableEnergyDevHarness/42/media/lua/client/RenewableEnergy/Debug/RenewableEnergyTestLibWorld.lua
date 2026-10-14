@@ -39,13 +39,15 @@ end
 --- server's state of the vehicle (see Trailer.vehicleState in RenewableEnergyTestServerTrailer.lua)
 --- in vehicle.state.
 function T.onVehicle(self, vehicle, name, args)
-    T.server(self, name, function()
+    local function allArgs()
         local all = T.vehicleArgs(vehicle)
         for key, value in pairs(type(args) == "function" and args() or args or {}) do
             all[key] = value
         end
         return all
-    end)
+    end
+    -- Queued once the vehicle is placed, the call can go out ahead of its turn (T.server, T.batch).
+    T.server(self, name, (vehicle.id and type(args) ~= "function") and allArgs() or allArgs)
     T.step(function()
         vehicle.answer = self.server[name]
         vehicle.state = vehicle.answer.state or vehicle.state

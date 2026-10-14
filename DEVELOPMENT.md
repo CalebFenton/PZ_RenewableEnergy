@@ -182,7 +182,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 | `OnLoadedMapZones` | Every side, after `StashSystem.load` (`IsoWorld.init`). |
 | `OnGameStart` | Only where `IngameState.enter()` runs, which a dedicated server never calls, so never on a dedicated server. |
 | `OnObjectAboutToBeRemoved` | Whenever `IsoGridSquare.RemoveTileObject` runs: picking an object up, destroying it, and lifting it to reorder a square. |
-| `OnServerCommand` | Multiplayer clients, for `sendServerCommand()` from the server. |
+| `OnServerCommand` | Multiplayer clients, for `sendServerCommand()` from the server. Commands both ways are reliable but unordered (`PacketTypes.ClientCommand`, reliability 2), and two sent in the same tick can arrive swapped, so a command that must follow another waits for its effect or carries a sequence number. |
 | `OnFillContainer` | Room containers, corpses, zombies and vehicle containers (`BaseVehicle.randomizeContainer`), but not `ItemPickerJava.fillContainerType` fills such as stashes and `RBSafehouse`. Two callers pass a bag's loot table instead of a container (`ItemPickerJava.fillContainerInternal` and `doRollItemInternal`). |
 
 ### Generators

@@ -662,20 +662,24 @@ test("renewable_energy_ui_window_reflects_status", {
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
-        T.setPartCondition(self, bank, "Base.CarBatteryCharger", 0)
-        T.setPartCondition(self, bank, "Base.CarBattery1", 70)
-        for _ = 1, 3 do
-            if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
-        end
+        T.batch(function()
+            T.setPartCondition(self, bank, "Base.CarBatteryCharger", 0)
+            T.setPartCondition(self, bank, "Base.CarBattery1", 70)
+            for _ = 1, 3 do
+                if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
+            end
+        end)
         T.waitForCopy(function()
             local status = T.clientStatus(bank)
             return status ~= nil and #status.sources == 3
         end)
         T.step(function() self.withControllerSummary = StatusWindow.summary(T.clientStatus(bank)) end)
-        T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
-        T.bankSet(self, bank, { on = true })
-        T.bankPass(self, bank, 1000)
-        T.applyLoad(self, bank, { "television", "light", "light", "fridge" })
+        T.batch(function()
+            T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
+            T.bankSet(self, bank, { on = true })
+            T.bankPass(self, bank, 1000)
+            T.applyLoad(self, bank, { "television", "light", "light", "fridge" })
+        end)
         waitForLoad(bank)
     end,
     validate = function(self)
@@ -770,13 +774,15 @@ test("renewable_energy_ui_window_full_bank", {
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
-        T.setPartCondition(self, bank, "RenewableEnergy.L16Battery", 45)
-        for _, source in ipairs(FULL_BANK_SOURCES) do
-            if not T.panel(self, source.sprite, { near = bank, modules = source.modules, connect = true }) then return end
-        end
-        T.bankSet(self, bank, { on = true })
-        T.bankPass(self, bank, 650)
-        T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
+        T.batch(function()
+            T.setPartCondition(self, bank, "RenewableEnergy.L16Battery", 45)
+            for _, source in ipairs(FULL_BANK_SOURCES) do
+                if not T.panel(self, source.sprite, { near = bank, modules = source.modules, connect = true }) then return end
+            end
+            T.bankSet(self, bank, { on = true })
+            T.bankPass(self, bank, 650)
+            T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
+        end)
         waitForLoad(bank)
         T.step(function() openWindow(self) end)
     end,

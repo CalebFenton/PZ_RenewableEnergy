@@ -225,32 +225,36 @@ test("renewable_energy_tiles_place_and_pick_up", {
         if not square then return end
         electrician(self)
         self.results = {}
-        for _, placed in ipairs(PLACED) do
-            local script = getScriptManager():getItem(placed.item)
-            -- Banks stand only indoors, and placing them by hand is the power tests' business.
-            if placed.kind ~= "wall" and not RenewableEnergy.PowerBank.bankOfSprite(placed.sprite)
-                and script and script:getWorldObjectSprite() == placed.sprite then
-                local carried = CARRIED[placed.item]
-                local result = { placed = placed, expected = carried and describe(carried.value) }
-                table.insert(self.results, result)
-                local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite, carried and { [carried.key] = carried.value })
-                T.step(function() result.container = handle.object ~= nil and handle.object:getContainer() ~= nil end)
-                if carried then
-                    T.server(self, "objectModData", { x = square:getX(), y = square:getY(), z = square:getZ(),
-                        sprite = placed.sprite, key = carried.key })
-                    T.step(function() result.placedData = describe(self.server.objectModData.value) end)
+        -- Placing and picking up hold back the calls after them, so what goes out early is the
+        -- clear-out after each count and the next item's give, which the square's checks don't see.
+        T.batch(function()
+            for _, placed in ipairs(PLACED) do
+                local script = getScriptManager():getItem(placed.item)
+                -- Banks stand only indoors, and placing them by hand is the power tests' business.
+                if placed.kind ~= "wall" and not RenewableEnergy.PowerBank.bankOfSprite(placed.sprite)
+                    and script and script:getWorldObjectSprite() == placed.sprite then
+                    local carried = CARRIED[placed.item]
+                    local result = { placed = placed, expected = carried and describe(carried.value) }
+                    table.insert(self.results, result)
+                    local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite, carried and { [carried.key] = carried.value })
+                    T.step(function() result.container = handle.object ~= nil and handle.object:getContainer() ~= nil end)
+                    if carried then
+                        T.server(self, "objectModData", { x = square:getX(), y = square:getY(), z = square:getZ(),
+                            sprite = placed.sprite, key = carried.key })
+                        T.step(function() result.placedData = describe(self.server.objectModData.value) end)
+                    end
+                    T.pickUpAsPlayer(self, handle, placed.sprite)
+                    T.server(self, "carried", { types = { placed.item } })
+                    T.step(function()
+                        local items = self.server.carried.items[placed.item]
+                        result.removed = T.objectWithSprite(square, placed.sprite) == nil
+                        result.returned, result.items = #items, self.server.carried.total
+                        result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
+                    end)
+                    T.server(self, "takeItems", { type = placed.item })
                 end
-                T.pickUpAsPlayer(self, handle, placed.sprite)
-                T.server(self, "carried", { types = { placed.item } })
-                T.step(function()
-                    local items = self.server.carried.items[placed.item]
-                    result.removed = T.objectWithSprite(square, placed.sprite) == nil
-                    result.returned, result.items = #items, self.server.carried.total
-                    result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
-                end)
-                T.server(self, "takeItems", { type = placed.item })
             end
-        end
+        end)
     end,
     validate = function(self)
         for _, placed in ipairs(PLACED) do
@@ -314,21 +318,24 @@ local CRACKED = {
 test("renewable_energy_tiles_cracked_modules_show", {
     run = function(self)
         self.shown = {}
-        for _, case in ipairs(CRACKED) do
-            local panel = T.panel(self, case.sprite, { modules = case.modules })
-            if not panel then return end
-            local at = panel.position
-            T.server(self, "panelCracks", { x = at.x, y = at.y, z = at.z, sprite = case.sprite, change = case.change })
-            T.waitForCopy(function()
-                return T.overlays(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
-            end)
-            T.step(function()
-                self.shown[case.name] = {
-                    server = table.concat(self.server.panelCracks.overlays, ","),
-                    client = T.overlays(T.objectWithSprite(panel.square, case.sprite)),
-                }
-            end)
-        end
+        -- Every case has a panel of its own, which the other cases' calls leave alone.
+        T.batch(function()
+            for _, case in ipairs(CRACKED) do
+                local panel = T.panel(self, case.sprite, { modules = case.modules })
+                if not panel then return end
+                local at = panel.position
+                T.server(self, "panelCracks", { x = at.x, y = at.y, z = at.z, sprite = case.sprite, change = case.change })
+                T.waitForCopy(function()
+                    return T.overlays(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
+                end)
+                T.step(function()
+                    self.shown[case.name] = {
+                        server = table.concat(self.server.panelCracks.overlays, ","),
+                        client = T.overlays(T.objectWithSprite(panel.square, case.sprite)),
+                    }
+                end)
+            end
+        end)
     end,
     validate = function(self)
         for _, case in ipairs(CRACKED) do

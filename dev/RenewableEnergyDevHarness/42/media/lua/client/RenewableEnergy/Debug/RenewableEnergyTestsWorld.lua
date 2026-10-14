@@ -1241,18 +1241,23 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
         self.trailer = spawnTrailer(self)
         if not self.trailer then return end
         local trailer = self.trailer
-        T.onVehicle(self, trailer, "setTrailer", {
-            panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
-            box = { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.6 }, { type = "RenewableEnergy.L16Battery", charge = 0.2 } },
-        })
-        T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
-        T.step(function() self.first = trailer.answer end)
-        -- 21 Wh of room in the L-16 and 12.6 in the deep cycle: both fill, the rest is lost.
-        T.onVehicle(self, trailer, "setTrailer", {
-            box = { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.99 }, { type = "RenewableEnergy.L16Battery", charge = 0.99 } },
-        })
-        T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
-        T.step(function() self.second = trailer.answer end)
+        -- In a step, once the trailer is placed, so its calls go out as plain tables, together.
+        T.step(function()
+            T.batch(function()
+                T.onVehicle(self, trailer, "setTrailer", {
+                    panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
+                    box = { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.6 }, { type = "RenewableEnergy.L16Battery", charge = 0.2 } },
+                })
+                T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
+                T.step(function() self.first = trailer.answer end)
+                -- 21 Wh of room in the L-16 and 12.6 in the deep cycle: both fill, the rest is lost.
+                T.onVehicle(self, trailer, "setTrailer", {
+                    box = { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.99 }, { type = "RenewableEnergy.L16Battery", charge = 0.99 } },
+                })
+                T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
+                T.step(function() self.second = trailer.answer end)
+            end)
+        end)
     end,
     validate = function(self)
         -- The panels lie flat whichever way the trailer faces, so they see what a flat panel does.
@@ -1285,11 +1290,16 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
             T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
             T.step(function() table.insert(self.passes, trailer.answer) end)
         end
-        pass({ [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 50 } },
-            { { type = "RenewableEnergy.L16Battery", charge = 0 } })
-        pass({ [RIGHT] = {} })
-        pass({ [LEFT] = { type = HOMEMADE, condition = 60 } })
-        pass({ [LEFT] = {} })
+        -- In a step, once the trailer is placed, so its calls go out as plain tables, together.
+        T.step(function()
+            T.batch(function()
+                pass({ [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 50 } },
+                    { { type = "RenewableEnergy.L16Battery", charge = 0 } })
+                pass({ [RIGHT] = {} })
+                pass({ [LEFT] = { type = HOMEMADE, condition = 60 } })
+                pass({ [LEFT] = {} })
+            end)
+        end)
     end,
     validate = function(self)
         local p = self.passes

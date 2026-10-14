@@ -300,11 +300,13 @@ test("renewable_energy_power_module_condition_sets_watts", {
         }
         local sprites = { Sprites.flat, Sprites.flat, Sprites.rack.metal.S }
         self.panels = {}
-        for i, sprite in ipairs(sprites) do
-            self.panels[i] = T.panel(self, sprite, { near = bank, modules = modules[i], connect = true })
-            if not self.panels[i] then return end
-        end
-        T.bankPass(self, bank, 1000)
+        T.batch(function()
+            for i, sprite in ipairs(sprites) do
+                self.panels[i] = T.panel(self, sprite, { near = bank, modules = modules[i], connect = true })
+                if not self.panels[i] then return end
+            end
+            T.bankPass(self, bank, 1000)
+        end)
     end,
     validate = function(self)
         for _, panel in ipairs(self.panels) do
@@ -333,16 +335,19 @@ test("renewable_energy_power_panel_slots", {
         if not batteryRack then return end
         self.rack = batteryRack
         self.boxPanels, self.rackPanels = {}, {}
-        for i = 1, 3 do
-            self.boxPanels[i] = T.panel(self, Sprites.flat, { near = box, connect = true })
-            if not self.boxPanels[i] then return end
-        end
-        for i = 1, 3 do
-            self.rackPanels[i] = T.panel(self, Sprites.flat, { near = batteryRack, connect = true })
-            if not self.rackPanels[i] then return end
-        end
-        T.server(self, "removePart", { bank = batteryRack.position, type = Specs.controller })
-        T.bankPass(self, batteryRack, 1000)
+        -- The banks stay out: the rack's copy waits for both its parts, and the controller leaves.
+        T.batch(function()
+            for i = 1, 3 do
+                self.boxPanels[i] = T.panel(self, Sprites.flat, { near = box, connect = true })
+                if not self.boxPanels[i] then return end
+            end
+            for i = 1, 3 do
+                self.rackPanels[i] = T.panel(self, Sprites.flat, { near = batteryRack, connect = true })
+                if not self.rackPanels[i] then return end
+            end
+            T.server(self, "removePart", { bank = batteryRack.position, type = Specs.controller })
+            T.bankPass(self, batteryRack, 1000)
+        end)
     end,
     validate = function(self)
         local box = self.boxPanels
@@ -373,11 +378,13 @@ test("renewable_energy_power_inverter_limits", {
         self.bank = self.box and T.bank(self, "batteryBankWood",
             { "Base.CarBattery1", "RenewableEnergy.PowerInverter", "RenewableEnergy.PowerInverter" })
         if not self.bank then return end
-        T.server(self, "loadWatts", { sets = { { "television", "light" }, { "miniFridge" }, { "fridge" }, { "fridgeFreezer" } } })
-        T.bankState(self, self.box)
-        T.bankState(self, self.bank)
-        T.step(function() self.twoInverters = self.bank.state.limitW end)
-        T.setPartCondition(self, self.bank, "RenewableEnergy.PowerInverter", 0, true)
+        T.batch(function()
+            T.server(self, "loadWatts", { sets = { { "television", "light" }, { "miniFridge" }, { "fridge" }, { "fridgeFreezer" } } })
+            T.bankState(self, self.box)
+            T.bankState(self, self.bank)
+            T.step(function() self.twoInverters = self.bank.state.limitW end)
+            T.setPartCondition(self, self.bank, "RenewableEnergy.PowerInverter", 0, true)
+        end)
         T.waitForCopy(function()
             local summary = T.clientSummary(self.bank)
             return summary ~= nil and summary.limitW == self.bank.state.limitW
@@ -529,21 +536,25 @@ test("renewable_energy_power_charger_sources", {
         local roomWh = (1 - charge) * 2 * Specs.batteries[battery].wh
         self.hours = roomWh / 2 / self.chargersW
         T.switchOn(self, bank)
-        T.bankPass(self, bank, 0)
-        T.step(function() self.alone, self.ownPower = bank.state.status.chargerW, bank.state.activated end)
-        placeGenerator(self, backup, { running = true })
-        T.bankSet(self, bank, { charge = charge })
-        T.bankPass(self, bank, 0, { hours = self.hours })
-        T.step(function()
-            local status = bank.state.status
-            self.fromGenerator = status.chargerW
-            self.generatorSource = status.chargers[1] and status.chargers[1].charging
+        T.batch(function()
+            T.bankPass(self, bank, 0)
+            T.step(function() self.alone, self.ownPower = bank.state.status.chargerW, bank.state.activated end)
+            placeGenerator(self, backup, { running = true })
+            T.bankSet(self, bank, { charge = charge })
+            T.bankPass(self, bank, 0, { hours = self.hours })
+            T.step(function()
+                local status = bank.state.status
+                self.fromGenerator = status.chargerW
+                self.generatorSource = status.chargers[1] and status.chargers[1].charging
+            end)
+            generatorState(self, backup, "fuelAfter")
         end)
-        generatorState(self, backup, "fuelAfter")
         T.step(function() T.setGrid(self, true) end)
-        T.bankPass(self, bank, 0)
-        T.step(function() self.fromGrid, self.gridPowered = bank.state.status.chargeSource, bank.state.activated end)
-        generatorState(self, backup, "fuelOnGrid")
+        T.batch(function()
+            T.bankPass(self, bank, 0)
+            T.step(function() self.fromGrid, self.gridPowered = bank.state.status.chargeSource, bank.state.activated end)
+            generatorState(self, backup, "fuelOnGrid")
+        end)
     end,
     validate = function(self)
         expectNear("charger watts with no grid or generator" .. (self.ownPower and " while the bank powers itself" or ""), self.alone, 0, 0)
@@ -571,10 +582,12 @@ test("renewable_energy_power_bank_powers_at_night", {
             self.powered = bank.state.activated and bank.state.powered
             self.copyPowered = bank.square:haveElectricity()
         end)
-        T.applyLoad(self, bank, { "fridge", "television", "light" })
-        T.step(function() self.drawW, self.before = bank.state.drawW, bank.state.storedWh end)
-        -- The pass measures the house's real load again.
-        T.bankPass(self, bank, 0)
+        T.batch(function()
+            T.applyLoad(self, bank, { "fridge", "television", "light" })
+            T.step(function() self.drawW, self.before = bank.state.drawW, bank.state.storedWh end)
+            -- The pass measures the house's real load again.
+            T.bankPass(self, bank, 0)
+        end)
     end,
     validate = function(self)
         local after = self.bank.state
@@ -761,13 +774,15 @@ test("renewable_energy_power_connect_xp_once_per_module", {
             modules = { { type = module, condition = 90, connected = true }, { type = module, condition = 90 } } })
         if not panel then return end
         local args = { bank = bank.position, source = panel.position }
-        perform(self, "connected", "connectSource", args)
-        perform(self, "disconnected", "disconnectSource", args)
-        perform(self, "reconnected", "connectSource", args)
-        T.server(self, "panelState", panel.position)
-        -- What the game gives this character for one module's award, through the call
-        -- CraftRecipe.addXP makes.
-        T.server(self, "electricityAward", { xp = Specs.connectXp })
+        T.batch(function()
+            perform(self, "connected", "connectSource", args)
+            perform(self, "disconnected", "disconnectSource", args)
+            perform(self, "reconnected", "connectSource", args)
+            T.server(self, "panelState", panel.position)
+            -- What the game gives this character for one module's award, through the call
+            -- CraftRecipe.addXP makes.
+            T.server(self, "electricityAward", { xp = Specs.connectXp })
+        end)
     end,
     validate = function(self)
         if not expect(self.connected and self.connected.ok, "connecting the rack failed") then return end
@@ -808,30 +823,39 @@ test("renewable_energy_power_part_wear_and_repair", {
         if not bank then return end
         self.bank = bank
         T.switchOn(self, bank)
-        T.bankSet(self, bank, { overloaded = false })
-        T.server(self, "wearParts", { bank = bank.position, hours = 100, conditions = { [INVERTER] = WORN_FROM, [Specs.controller] = WORN_FROM } })
-        T.step(function() self.worn = self.server.wearParts.lost end)
-        T.server(self, "wearParts", { bank = bank.position, overloads = 1, conditions = { [INVERTER] = WORN_FROM } })
-        T.step(function() self.overloadWorn = self.server.wearParts.lost[INVERTER] end)
+        -- Each repair reads the inverter's id from the bank state before it, so it goes in its turn.
+        T.batch(function()
+            T.bankSet(self, bank, { overloaded = false })
+            T.server(self, "wearParts", { bank = bank.position, hours = 100, conditions = { [INVERTER] = WORN_FROM, [Specs.controller] = WORN_FROM } })
+            T.step(function() self.worn = self.server.wearParts.lost end)
+            T.server(self, "wearParts", { bank = bank.position, overloads = 1, conditions = { [INVERTER] = WORN_FROM } })
+            T.step(function() self.overloadWorn = self.server.wearParts.lost[INVERTER] end)
 
-        T.setPartCondition(self, bank, INVERTER, 50)
-        T.give(self, "scrap", { { type = PowerBank.SCRAP } })
+            T.setPartCondition(self, bank, INVERTER, 50)
+            T.give(self, "scrap", { { type = PowerBank.SCRAP } })
+        end)
         repair(self, "unskilled", bank)
         T.step(function() T.setPerk(self, Perks.Electricity, 2) end)
         repair(self, "repaired", bank)
-        T.bankState(self, bank)
-        T.count(self, "scrap", { PowerBank.SCRAP })
-        T.step(function() self.repairedCondition = stateItem(bank.state, INVERTER).condition end)
+        T.batch(function()
+            T.bankState(self, bank)
+            T.count(self, "scrap", { PowerBank.SCRAP })
+            T.step(function() self.repairedCondition = stateItem(bank.state, INVERTER).condition end)
+        end)
         repair(self, "noScrap", bank)
-        -- Past ConditionMax, which the setter keeps it to.
-        T.setPartCondition(self, bank, INVERTER, 1000)
-        T.give(self, "moreScrap", { { type = PowerBank.SCRAP } })
+        T.batch(function()
+            -- Past ConditionMax, which the setter keeps it to.
+            T.setPartCondition(self, bank, INVERTER, 1000)
+            T.give(self, "moreScrap", { { type = PowerBank.SCRAP } })
+        end)
         repair(self, "whole", bank)
 
-        T.setPartCondition(self, bank, INVERTER, 0)
-        perform(self, "refreshed", "refresh", { bank = bank.position })
-        T.server(self, "powerUp", { bank = bank.position })
-        T.step(function() self.broken = self.server.powerUp end)
+        T.batch(function()
+            T.setPartCondition(self, bank, INVERTER, 0)
+            perform(self, "refreshed", "refresh", { bank = bank.position })
+            T.server(self, "powerUp", { bank = bank.position })
+            T.step(function() self.broken = self.server.powerUp end)
+        end)
     end,
     validate = function(self)
         local function reason(key)
@@ -867,14 +891,16 @@ test("renewable_energy_power_failsafe_starts_generator", {
         local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" }, { charge = 0.1 })
         local backup = bank and backupSquare(self, bank.square, 3)
         if not backup then return end
-        placeGenerator(self, backup, { failsafe = true })
-        T.bankSet(self, bank, { on = true })
-        T.bankPass(self, bank, 0, { hours = 0.01 })
-        T.step(function() self.failsafe = bank.state.status.generator and bank.state.status.generator.failsafe end)
-        generatorState(self, backup, "low")
-        T.bankSet(self, bank, { charge = 0.9 }, true)
-        T.bankPass(self, bank, 0, { hours = 0.01 })
-        generatorState(self, backup, "charged")
+        T.batch(function()
+            placeGenerator(self, backup, { failsafe = true })
+            T.bankSet(self, bank, { on = true })
+            T.bankPass(self, bank, 0, { hours = 0.01 })
+            T.step(function() self.failsafe = bank.state.status.generator and bank.state.status.generator.failsafe end)
+            generatorState(self, backup, "low")
+            T.bankSet(self, bank, { charge = 0.9 }, true)
+            T.bankPass(self, bank, 0, { hours = 0.01 })
+            generatorState(self, backup, "charged")
+        end)
     end,
     validate = function(self)
         expect(self.failsafe, "the bank didn't find the failsafe generator")
@@ -908,24 +934,29 @@ test("renewable_energy_power_commands_from_clients", {
             { "connectSource" },
         }
         self.accepted = {}
-        for _, call in ipairs(forged) do
-            T.perform(self, call[1], call[2])
-            T.step(function()
-                if self.server.perform.ok then
-                    table.insert(self.accepted, call[1])
-                end
-            end)
-        end
-        T.perform(self, "clearSnow", { source = panel.position })
+        -- The forged commands change nothing this client sees, so they and the clear go together.
+        T.batch(function()
+            for _, call in ipairs(forged) do
+                T.perform(self, call[1], call[2])
+                T.step(function()
+                    if self.server.perform.ok then
+                        table.insert(self.accepted, call[1])
+                    end
+                end)
+            end
+            T.perform(self, "clearSnow", { source = panel.position })
+        end)
         T.waitForCopy(function() return not sourceSnowy() end)
         T.bankState(self, bank)
         T.step(function()
             self.afterForged = bank.state
             self.snowyAfter = sourceSnowy()
         end)
-        T.perform(self, "disconnectSource", { source = panel.position })
-        T.perform(self, "rename", { bank = bank.position, name = "  Shed bank  " })
-        T.perform(self, "setBankOn", { bank = bank.position, on = true })
+        T.batch(function()
+            T.perform(self, "disconnectSource", { source = panel.position })
+            T.perform(self, "rename", { bank = bank.position, name = "  Shed bank  " })
+            T.perform(self, "setBankOn", { bank = bank.position, on = true })
+        end)
         T.waitForCopy(function()
             local summary = T.clientSummary(bank)
             return summary ~= nil and summary.on == true and summary.name == "Shed bank" and #summary.sources == 0
@@ -1139,11 +1170,13 @@ test("renewable_energy_power_far_action_refused", {
         self.far = far and T.bank(self, "batteryBoxWood", {}, { square = far[1], outdoors = true })
         self.near = self.far and T.bank(self, "batteryBoxWood", {}, { outdoors = true })
         if not self.near then return end
-        for _, bank in ipairs({ self.far, self.near }) do
-            T.server(self, "completeRename", { bank = bank.position, name = bank == self.far and "Far" or "Near" })
-            T.step(function() bank.done = self.server.completeRename and self.server.completeRename.done end)
-            T.bankState(self, bank)
-        end
+        T.batch(function()
+            for _, bank in ipairs({ self.far, self.near }) do
+                T.server(self, "completeRename", { bank = bank.position, name = bank == self.far and "Far" or "Near" })
+                T.step(function() bank.done = self.server.completeRename and self.server.completeRename.done end)
+                T.bankState(self, bank)
+            end
+        end)
     end,
     validate = function(self)
         local far, near = self.far and self.far.state, self.near and self.near.state
@@ -1173,19 +1206,22 @@ test("renewable_energy_power_generator_fuel_follows_battery_room", {
         self.bank = bank
         self.chargersW = 2 * Specs.chargerWatts + Specs.inverters[INVERTER].chargerWatts
         self.low = 0.2
-        placeGenerator(self, backup, { running = true })
         local function pass(key)
             generatorState(self, backup, key .. "Before")
             T.bankPass(self, bank, 0)
             T.step(function() self[key] = bank.state end)
             generatorState(self, backup, key .. "After")
         end
-        pass("full")
-        T.bankSet(self, bank, { charge = self.low }, true)
-        pass("room")
-        T.server(self, "removePart", { bank = bank.position, type = battery })
-        T.server(self, "removePart", { bank = bank.position, type = battery })
-        pass("empty")
+        -- The bank stays out: its copy waits for every part, and the batteries leave.
+        T.batch(function()
+            placeGenerator(self, backup, { running = true })
+            pass("full")
+            T.bankSet(self, bank, { charge = self.low }, true)
+            pass("room")
+            T.server(self, "removePart", { bank = bank.position, type = battery })
+            T.server(self, "removePart", { bank = bank.position, type = battery })
+            pass("empty")
+        end)
     end,
     validate = function(self)
         local function burned(key)
@@ -1223,8 +1259,10 @@ test("renewable_energy_power_rebuilt_bank_keeps_its_record", {
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not panel then return end
         self.bank, self.panel = bank, panel
-        T.perform(self, "rename", { bank = bank.position, name = "Cellar" })
-        T.server(self, "rebuildBank", { bank = bank.position })
+        T.batch(function()
+            T.perform(self, "rename", { bank = bank.position, name = "Cellar" })
+            T.server(self, "rebuildBank", { bank = bank.position })
+        end)
         T.waitForCopy(function()
             local rebuilt, summary = PowerBank.bankOn(bank.square), PowerBank.summaryOf(bank.square)
             return rebuilt ~= nil and rebuilt ~= bank.object and summary ~= nil and summary.name == "Cellar"
@@ -1266,11 +1304,13 @@ test("renewable_energy_power_reconnecting_a_panel_keeps_it", {
             T.bankState(self, bank)
             T.step(function() self[key].state = bank.state end)
         end
-        T.server(self, "setSnow", { bank = bank.position, source = panel.position, snow = 0.8 })
-        tryAgain("again")
-        self.second = T.panel(self, Sprites.flat, { near = bank, connect = true })
-        if not self.second then return end
-        tryAgain("full")
+        T.batch(function()
+            T.server(self, "setSnow", { bank = bank.position, source = panel.position, snow = 0.8 })
+            tryAgain("again")
+            self.second = T.panel(self, Sprites.flat, { near = bank, connect = true })
+            if not self.second then return end
+            tryAgain("full")
+        end)
     end,
     validate = function(self)
         if not expect(self.panel.connected and self.second.connected, "connecting the panels failed ("

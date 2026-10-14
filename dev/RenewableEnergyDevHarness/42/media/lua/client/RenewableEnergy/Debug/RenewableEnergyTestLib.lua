@@ -222,9 +222,12 @@ end
 --- it: the server takes no such command from a client. Its answer, { ok, reason, xpBefore,
 --- xpAfter }, lands in self.server.perform.
 function T.perform(self, command, args)
-    T.server(self, "perform", function()
-        return { command = command, args = type(args) == "function" and args() or args }
-    end)
+    if type(args) == "function" then
+        T.server(self, "perform", function() return { command = command, args = args() } end)
+    else
+        -- A table goes out ahead of its turn where it can (T.server).
+        T.server(self, "perform", { command = command, args = args })
+    end
 end
 
 --- Queues switching `bank` on with the bank system's command, and a wait until this client's copy

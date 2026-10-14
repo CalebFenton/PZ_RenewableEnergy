@@ -265,15 +265,17 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
         T.give(self, "rack", rack)
         readXp("unmountedAgain")
         craft(recipes.rack, module)
-        readXp("rack")
-        T.count(self, "made", { flat, "RenewableEnergy.SolarRackWood", module })
-        -- What the game gives this character for each award, through the call CraftRecipe.addXP
-        -- makes.
-        local mountXp = RenewableEnergy.Recipes.MOUNT_XP
-        T.server(self, "electricityAward", { xp = mountXp[flat].Electricity })
-        T.step(function() self.flatAward = self.server.electricityAward.gained end)
-        T.server(self, "electricityAward", { xp = mountXp["RenewableEnergy.SolarRackWood"].Electricity / 2 })
-        T.step(function() self.rackShareAward = self.server.electricityAward.gained end)
+        T.batch(function()
+            readXp("rack")
+            T.count(self, "made", { flat, "RenewableEnergy.SolarRackWood", module })
+            -- What the game gives this character for each award, through the call CraftRecipe.addXP
+            -- makes.
+            local mountXp = RenewableEnergy.Recipes.MOUNT_XP
+            T.server(self, "electricityAward", { xp = mountXp[flat].Electricity })
+            T.step(function() self.flatAward = self.server.electricityAward.gained end)
+            T.server(self, "electricityAward", { xp = mountXp["RenewableEnergy.SolarRackWood"].Electricity / 2 })
+            T.step(function() self.rackShareAward = self.server.electricityAward.gained end)
+        end)
     end,
     validate = function(self)
         local refusal = self.refusal and "; the game refused: " .. self.refusal or ""
