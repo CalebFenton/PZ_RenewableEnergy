@@ -23,13 +23,15 @@ def M(name):
         "backsheet": lambda: material("RE_Backsheet", "#e9e8df", roughness=0.5, grime=0.05),
         "busbar": lambda: material("RE_Busbar", "#cfd2d6", roughness=0.3, metallic=0.9, grime=0.0),
         "amorphous": lambda: material("RE_Amorphous", "#2c3a78", roughness=0.2, metallic=0.25, grime=0.05),
-        "mono": lambda: material("RE_MonoCells", "#17191f", roughness=0.25, metallic=0.3, grime=0.04),
+        "mono": lambda: material("RE_MonoCells", "#222838", roughness=0.25, metallic=0.3, grime=0.04),
         # Broken cover glass: the fractures catch the light and read pale over the cells.
         "crack": lambda: material("RE_Crack", "#dfe7ee", roughness=0.3, grime=0.0),
-        "black": lambda: material("RE_BlackPlastic", "#1f2022", roughness=0.55, grime=0.15),
-        "darkgrey": lambda: material("RE_DarkGrey", "#3a3c3f", roughness=0.5, grime=0.15),
+        # Black and dark grey plastic as light as the game's own black radios and speakers, which it
+        # still draws as black: darker, and a shaded face loses all its detail.
+        "black": lambda: material("RE_BlackPlastic", "#393a3d", roughness=0.55, grime=0.15),
+        "darkgrey": lambda: material("RE_DarkGrey", "#4e5156", roughness=0.5, grime=0.15),
         "grey": lambda: material("RE_GreyPaint", "#8b9089", roughness=0.55, grime=0.2),
-        "battery": lambda: material("RE_BatteryCase", "#29292b", roughness=0.6, grime=0.15),
+        "battery": lambda: material("RE_BatteryCase", "#3a3a3d", roughness=0.6, grime=0.15),
         # A shade lighter than the game's own car battery's grey, which it draws nearly black on a
         # face as big as an open case's, with the same label, so the case stripped from one reads as it.
         "carbattery": lambda: material("RE_CarBattery", "#585858", roughness=0.6, grime=0.15),
@@ -42,11 +44,12 @@ def M(name):
         "cream": lambda: material("RE_Cream", "#e6dfc8", roughness=0.6, grime=0.1),
         "white": lambda: material("RE_White", "#ecebe6", roughness=0.6, grime=0.08),
         "yellow": lambda: material("RE_Yellow", "#dcb22b", roughness=0.5, grime=0.1),
-        "lead": lambda: material("RE_Lead", "#a8aaa6", roughness=0.45, metallic=0.8, grime=0.15),
+        "lead": lambda: material("RE_Lead", "#bbbdb9", roughness=0.45, metallic=0.8, grime=0.15),
         "red": lambda: material("RE_Red", "#b8231f", roughness=0.5, grime=0.1),
         "plywood": lambda: material("RE_Plywood", "#b48d5c", roughness=0.8, grime=0.25, scale=12, grain="veneer"),
         "wood": lambda: material("RE_Wood", "#94693f", roughness=0.8, grime=0.3, scale=10, grain="board"),
         "navy": lambda: material("RE_Navy", "#2c416d", roughness=0.4, metallic=0.4, grime=0.1),
+        # The inverter/charger's cabinet, and the factory paint on a battery bank's steel.
         "bluegrey": lambda: material("RE_BlueGrey", "#5e7189", roughness=0.45, metallic=0.3, grime=0.15),
         "cardboard": lambda: material("RE_Cardboard", "#bb9061", roughness=0.85, grime=0.2, scale=14),
         "tape": lambda: material("RE_Tape", "#c9b27c", roughness=0.4, grime=0.05),
@@ -65,8 +68,12 @@ def M(name):
         "pine": lambda: material("RE_Pine", "#c39b62", roughness=0.8, grime=0.2, scale=9, grain="board"),
         "pinedark": lambda: material("RE_PineDark", "#9a7041", roughness=0.8, grime=0.2, scale=9, grain="board"),
         # Bare mild steel, as pale as the game's own sheet metal, with darker weld beads at its joints.
+        # Rusty steel, flecked brown, is scrap welded up at home.
         "rawsteel": lambda: material("RE_RawSteel", "#a9afb3", roughness=0.5, metallic=0.6, grime=0.35),
+        "rustysteel": lambda: material("RE_RustySteel", "#a9afb3", roughness=0.6, metallic=0.5, grime=0.35, scale=6,
+                                       speckle=("#93602f", 0.45)),
         "weld": lambda: material("RE_Weld", "#3f3c39", roughness=0.75, metallic=0.5, grime=0.3),
+        "rust": lambda: material("RE_Rust", "#7b4a2c", roughness=0.9, grime=0.3, scale=30),
         "copper": lambda: material("RE_Copper", "#c27a3e", roughness=0.35, metallic=0.85, grime=0.1),
         "lens": lambda: material("RE_Lens", "#e6e2d4", roughness=0.25, grime=0.05),
         "lenslit": lambda: material("RE_LensLit", "#ffd28a", roughness=0.25, grime=0.0, emission="#ffc46a"),
@@ -74,10 +81,12 @@ def M(name):
         "terracotta": lambda: material("RE_Terracotta", "#b2603b", roughness=0.85, grime=0.25, scale=16),
         "hdpe": lambda: material("RE_Hdpe", "#e8e4d8", roughness=0.5, grime=0.1),
         "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
-        # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is
-        # blackened, crusted white with sulphate and blue-green where the acid ate at it.
-        "plate": lambda: material("RE_Plate", "#858a90", roughness=0.8, grime=0.2),
-        "plateworn": lambda: material("RE_PlateWorn", "#3e3f41", roughness=0.85, grime=0.35, scale=30),
+        # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is black
+        # with dirt but for patches of bare grey, crusted white with sulphate and blue-green where
+        # the acid ate at it. The game draws a side face much darker than its colour (a mid grey at
+        # about a third of its brightness), so the greys are pale to read as lead.
+        "plate": lambda: material("RE_Plate", "#9a9fa4", roughness=0.8, grime=0.2),
+        "plateworn": lambda: material("RE_PlateWorn", "#4a4b4e", roughness=0.85, grime=0.4, scale=30),
         "corrosion": lambda: material("RE_Corrosion", "#7fc0ae", roughness=0.95, grime=0.2, scale=60),
         # Highway work-zone orange, the amber of its reflectors, and the board's lamps while they're
         # dark: lit, the vehicle's lights texture draws them bright (models.GLOWING).
@@ -491,25 +500,29 @@ SHELVING = (0.92, 0.44)
 SLOTS_4 = tuple(-0.315 + 0.21 * i for i in range(4))
 SLOTS_3 = (-0.28, 0.0, 0.28)
 
-# Shelving tiers: overall height, the top of each shelf a row of batteries stands on, and the
-# battery positions across a shelf. Steel shelves are thinner, so a metal tier fits a shelf
-# or a battery more in the same space.
-RACK_WOOD = {"height": 0.76, "shelves": (0.07, 0.43), "slots": SLOTS_3}
-RACK_METAL = {"height": 0.76, "shelves": (0.05, 0.41), "slots": SLOTS_4}
-BANK_WOOD = {"height": 1.24, "shelves": (0.07, 0.47, 0.87), "slots": SLOTS_4}
-BANK_METAL = {"height": 1.24, "shelves": (0.05, 0.35, 0.65, 0.95), "slots": SLOTS_4}
+# Shelving tiers: overall height, the top of each shelf a row of batteries stands on, the
+# battery positions across a shelf, and whether it is built neat. Steel shelves are thinner, so
+# a metal tier fits a shelf or a battery more in the same space. A rack is knocked up at home from
+# what was to hand; the bank, the tier above it, is built neat and finished.
+RACK_WOOD = {"height": 0.76, "shelves": (0.07, 0.43), "slots": SLOTS_3, "neat": False}
+RACK_METAL = {"height": 0.76, "shelves": (0.05, 0.41), "slots": SLOTS_4, "neat": False}
+BANK_WOOD = {"height": 1.24, "shelves": (0.07, 0.47, 0.87), "slots": SLOTS_4, "neat": True}
+BANK_METAL = {"height": 1.24, "shelves": (0.05, 0.35, 0.65, 0.95), "slots": SLOTS_4, "neat": True}
 
 
 def battery_shelving(col, tier, material, frame=True, batteries=0, meter_level=0):
     """A battery rack or bank: shelves of batteries in pine or angle iron, a fused disconnect and
-    a charge meter on top."""
+    a charge meter on top. A neat one has a no-smoking sign on the front of its top, as battery
+    rooms do."""
     width, depth = SHELVING
-    height = tier["height"]
+    height, neat = tier["height"], tier["neat"]
     if frame:
         if material == "wood":
-            _pine_shelving(col, height, tier["shelves"])
+            _pine_shelving(col, height, tier["shelves"], neat)
+            front = -depth / 2 - 0.02
         else:
-            _steel_shelving(col, height, tier["shelves"])
+            _steel_shelving(col, height, tier["shelves"], neat)
+            front = -depth / 2
         # Fused disconnect on the right, its cables down the back to the bottom shelf.
         box(col, "Shelving_Disconnect", M("grey"), (0.14, 0.1, 0.22), at=(width / 2 - 0.12, -depth / 2 + 0.06, height), bevel=0.01)
         box(col, "Shelving_Handle", M("red"), (0.03, 0.05, 0.08), at=(width / 2 - 0.12, -depth / 2, height + 0.08), bevel=0.006)
@@ -517,58 +530,78 @@ def battery_shelving(col, tier, material, frame=True, batteries=0, meter_level=0
             x = width / 2 - 0.05 - 0.03 * i
             tube(col, "Shelving_MainCable", M(colour), [(x, -depth / 2 + 0.1, height + 0.05), (x + 0.02, depth / 2 - 0.06, height + 0.02),
                                                          (x + 0.02, depth / 2 - 0.06, 0.1)], 0.012)
+        if neat:
+            box(col, "Shelving_Sign", M("yellow"), (0.13, 0.002, 0.028), at=(0.1, front - 0.001, height - 0.032))
+            text(col, "Shelving_SignText", M("ink"), "NO SMOKING", 0.012, at=(0.1, front - 0.0025, height - 0.0225))
     charge_meter(col, (-0.18, -depth / 2 + 0.08, height), frame, meter_level)
     slots = [(x, z) for z in tier["shelves"] for x in tier["slots"]]
     bank_batteries(col, "Shelving", slots, batteries)
 
 
-def _pine_shelving(col, height, shelves):
+def _pine_shelving(col, height, shelves, neat):
     """2 x 4 corner posts, each shelf three boards with an apron board nailed along its front and
-    back, a top of boards, and a diagonal brace across the back."""
+    back, a top of boards, and a diagonal brace across the back. Neat, it is all matched boards
+    stained dark; rough, it is odd boards and a plywood offcut cut and laid by eye, its posts left
+    standing proud of the top at whatever length they were."""
     width, depth = SHELVING
+    rng = random.Random(len(shelves))
+    frame = M("wood" if neat else "pinedark")
     for x in (-width / 2 + 0.019, width / 2 - 0.019):
         for y in (-depth / 2 + 0.045, depth / 2 - 0.045):
-            box(col, "Shelving_Post", M("pinedark"), (0.038, 0.089, height), at=(x, y, 0), bevel=0.004)
+            box(col, "Shelving_Post", frame, (0.038, 0.089, height + (0 if neat else rng.uniform(0.02, 0.06))), at=(x, y, 0),
+                bevel=0.004)
     boards = 3
     board_depth = depth / boards
     for z in shelves + (height,):
         for i in range(boards):
-            box(col, "Shelving_Board", M("pine" if i % 2 == 0 else "pinedark"), (width, board_depth - 0.006, 0.02),
-                at=(0, -depth / 2 + board_depth * (i + 0.5), z - 0.02), bevel=0.003)
+            if neat:
+                shade, short, shift, turn = "wood", 0.0, 0.0, 0.0
+            else:
+                shade = rng.choice(("pine", "pinedark", "wood", "plywood"))
+                short, shift, turn = rng.uniform(0.0, 0.03), rng.uniform(-0.015, 0.015), rng.uniform(-1.2, 1.2)
+            box(col, "Shelving_Board", M(shade), (width - short, board_depth - 0.006, 0.02),
+                at=(shift, -depth / 2 + board_depth * (i + 0.5), z - 0.02), rotate=(0, 0, turn), bevel=0.003)
         apron_bottom = max(0.0, z - 0.09)
         for sign in (-1, 1):
-            box(col, "Shelving_Apron", M("pine"), (width, 0.02, z - apron_bottom), at=(0, sign * (depth / 2 + 0.01), apron_bottom),
-                bevel=0.003)
+            box(col, "Shelving_Apron", M("wood" if neat else rng.choice(("pine", "pinedark"))), (width, 0.02, z - apron_bottom),
+                at=(0 if neat else rng.uniform(-0.012, 0.012), sign * (depth / 2 + 0.01), apron_bottom), bevel=0.003)
         for x in (-width / 2 + 0.019, width / 2 - 0.019):
             for dz in (0.025, 0.06):
                 if z - dz > apron_bottom:
                     cylinder(col, "Shelving_Nail", M("lead"), 0.005, 0.003, at=(x, -depth / 2 - 0.02, z - dz),
                              rotate=(90, 0, 0), segments=8)
-    beam(col, "Shelving_Brace", M("pinedark"), (-width / 2 + 0.05, depth / 2 + 0.03, 0.1),
+    beam(col, "Shelving_Brace", frame, (-width / 2 + 0.05, depth / 2 + 0.03, 0.1),
          (width / 2 - 0.05, depth / 2 + 0.03, height - 0.1), (0.07, 0.02), bevel=0.003)
 
 
-def _steel_shelving(col, height, shelves):
+def _steel_shelving(col, height, shelves, neat):
     """Angle-iron uprights, each shelf a steel sheet on angle-iron rails welded between them, a
-    sheet on top, and flat bars crossed on the back."""
+    sheet on top, and flat bars crossed on the back. Neat, it is painted, the welds under the paint,
+    and stands on rubber feet; rough, it is scrap steel flecked with rust, rust at its welds."""
     width, depth = SHELVING
     angle, thick = 0.04, SHEET
+    steel = M("bluegrey" if neat else "rustysteel")
     for sx in (-1, 1):
         for sy in (-1, 1):
-            box(col, "Shelving_Angle", M("rawsteel"), (angle, thick, height), at=(sx * (width - angle) / 2, sy * (depth - thick) / 2, 0))
-            box(col, "Shelving_Angle", M("rawsteel"), (thick, angle, height), at=(sx * (width - thick) / 2, sy * (depth - angle) / 2, 0))
-            box(col, "Shelving_Foot", M("rawsteel"), (0.06, 0.06, 0.005), at=(sx * (width / 2 - 0.03), sy * (depth / 2 - 0.03), 0))
+            box(col, "Shelving_Angle", steel, (angle, thick, height), at=(sx * (width - angle) / 2, sy * (depth - thick) / 2, 0))
+            box(col, "Shelving_Angle", steel, (thick, angle, height), at=(sx * (width - thick) / 2, sy * (depth - angle) / 2, 0))
+            if neat:
+                cylinder(col, "Shelving_Foot", M("black"), 0.022, 0.012, at=(sx * (width / 2 - 0.022), sy * (depth / 2 - 0.022), 0),
+                         segments=12)
+            else:
+                box(col, "Shelving_Foot", steel, (0.06, 0.06, 0.005), at=(sx * (width / 2 - 0.03), sy * (depth / 2 - 0.03), 0))
     rail = width - 2 * angle
     for z in shelves + (height,):
-        box(col, "Shelving_Sheet", M("rawsteel"), (width - 2 * thick, depth - 2 * thick, thick), at=(0, 0, z - thick))
+        box(col, "Shelving_Sheet", steel, (width - 2 * thick, depth - 2 * thick, thick), at=(0, 0, z - thick))
         for sy in (-1, 1):
-            box(col, "Shelving_Rail", M("rawsteel"), (rail, thick, 0.035), at=(0, sy * (depth / 2 - thick / 2), max(0.0, z - 0.035)))
-            for sx in (-1, 1):
-                box(col, "Shelving_Weld", M("weld"), (0.012, 0.008, 0.035),
-                    at=(sx * rail / 2, sy * (depth / 2 + 0.002), max(0.0, z - 0.035)))
+            box(col, "Shelving_Rail", steel, (rail, thick, 0.035), at=(0, sy * (depth / 2 - thick / 2), max(0.0, z - 0.035)))
+            if not neat:
+                for sx in (-1, 1):
+                    box(col, "Shelving_Weld", M("rust"), (0.012, 0.008, 0.035),
+                        at=(sx * rail / 2, sy * (depth / 2 + 0.002), max(0.0, z - 0.035)))
     back = depth / 2 + 0.004
     for sx in (-1, 1):
-        beam(col, "Shelving_Brace", M("rawsteel"), (sx * (width / 2 - 0.03), back, 0.06), (-sx * (width / 2 - 0.03), back, height - 0.06),
+        beam(col, "Shelving_Brace", steel, (sx * (width / 2 - 0.03), back, 0.06), (-sx * (width / 2 - 0.03), back, height - 0.06),
              (0.03, 0.005))
 
 
@@ -618,16 +651,17 @@ def plug_in_inverter(col):
 
 
 def power_inverter(col):
-    """A 600 W inverter: black steel case, louvred top, two outlets and a switch on the front."""
+    """A 600 W inverter: a charcoal steel case with black louvres on top, and on a brushed
+    aluminium faceplate two outlets, a switch and a light."""
     width, depth, height = 0.3, 0.18, 0.075
-    box(col, "Inv600_Case", M("black"), (width, depth, height), bevel=0.006)
-    fins(col, "Inv600_Louvre", M("darkgrey"), width * 0.6, depth * 0.6, height, 9, height=0.002)
-    box(col, "Inv600_Panel", M("darkgrey"), (width - 0.02, 0.003, height - 0.015), at=(0, -depth / 2 - 0.001, 0.007))
+    box(col, "Inv600_Case", M("darkgrey"), (width, depth, height), bevel=0.006)
+    fins(col, "Inv600_Louvre", M("black"), width * 0.6, depth * 0.6, height, 9, height=0.002)
+    box(col, "Inv600_Panel", M("aluminium"), (width - 0.02, 0.003, height - 0.015), at=(0, -depth / 2 - 0.001, 0.007))
     outlet(col, "Inv600_OutletA", (-0.09, -depth / 2 - 0.003, 0.016))
     outlet(col, "Inv600_OutletB", (-0.04, -depth / 2 - 0.003, 0.016))
     box(col, "Inv600_Switch", M("red"), (0.02, 0.008, 0.025), at=(0.05, -depth / 2 - 0.004, 0.025), bevel=0.003)
     box(col, "Inv600_Led", M("ledgreen"), (0.008, 0.004, 0.008), at=(0.09, -depth / 2 - 0.003, 0.04))
-    text(col, "Inv600_Text", M("white"), "600W", 0.02, at=(0.09, -depth / 2 - 0.004, 0.015))
+    text(col, "Inv600_Text", M("ink"), "600W", 0.02, at=(0.09, -depth / 2 - 0.004, 0.015))
     for sign, colour in ((1, "red"), (-1, "black")):
         cylinder(col, "Inv600_Terminal", M(colour), 0.012, 0.02, at=(sign * 0.05, depth / 2 + 0.01, 0.025),
                  rotate=(90, 0, 0), segments=10)
@@ -686,9 +720,9 @@ def solar_cell_charger(col):
     box(col, "CellChg_Panel", M("black"), (0.1, depth - 0.02, 0.003), at=(-0.03, 0, height), bevel=0.001)
     for i in range(4):
         for j in range(2):
-            box(col, "CellChg_Cell", M("mono"), (0.04, 0.035, 0.002), at=(-0.06 + i * 0.024 - 0.0, -0.02 + j * 0.04, height + 0.002))
+            box(col, "CellChg_Cell", M("mono"), (0.021, 0.035, 0.002), at=(-0.066 + i * 0.024, -0.02 + j * 0.04, height + 0.002))
     for i in range(4):
-        box(col, "CellChg_Bay", M("black"), (0.012, 0.06, 0.004), at=(0.035 + i * 0.016, 0, height - 0.002))
+        box(col, "CellChg_Bay", M("darkgrey"), (0.012, 0.06, 0.004), at=(0.035 + i * 0.016, 0, height - 0.002))
     box(col, "CellChg_Led", M("ledgreen"), (0.008, 0.008, 0.004), at=(0.075, 0.042, height))
 
 
@@ -926,12 +960,13 @@ PLATE = (0.13, 0.12)  # a plate's width and height, without its lug
 
 def battery_plates(col, worn=False):
     """A cell's plates: grey pasted lead in a cast grid, standing in a row, the positive and negative
-    ones joined by a strap and lug each. Worn plates are blackened and buckled, crusted white with
-    sulphate, and blue-green where the acid ate at them and their straps."""
+    ones joined by a strap and lug each. Worn plates are buckled and black with dirt, grid and all,
+    bare lead showing through in patches, crusted white with sulphate, and blue-green where the
+    acid ate at them and their straps."""
     width, height = PLATE
     count, pitch = 7, 0.014
     rng = random.Random(3)
-    grid = M("plate" if worn else "lead")
+    grid = M("plateworn" if worn else "lead")
     for i in range(count):
         plate = [box(col, "Plates_Plate", M("plateworn" if worn else "plate"), (width, 0.005, height))]
         for k in range(1, 4):
@@ -939,6 +974,10 @@ def battery_plates(col, worn=False):
         for k in range(1, 5):
             plate.append(box(col, "Plates_Rib", grid, (0.004, 0.002, height - 0.01), at=(-width / 2 + k * width / 5, -0.0035, 0.005)))
         if worn:
+            # About a fifth of its face, under the grid.
+            for _ in range(3):
+                plate.append(box(col, "Plates_Bare", M("lead"), (rng.uniform(0.03, 0.05), 0.001, rng.uniform(0.02, 0.04)),
+                                 at=(rng.uniform(-0.04, 0.04), -0.003, rng.uniform(0.005, 0.08))))
             for crust in ("sulphate", "sulphate", "corrosion", "corrosion"):
                 plate.append(box(col, "Plates_Crust", M(crust), (rng.uniform(0.02, 0.05), 0.008, rng.uniform(0.015, 0.035)),
                                  at=(rng.uniform(-0.045, 0.045), 0, rng.uniform(0.01, 0.08)), bevel=0.003))

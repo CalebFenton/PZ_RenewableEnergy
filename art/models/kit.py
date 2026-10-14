@@ -44,9 +44,11 @@ GRAIN_LINE, GRAIN_EARLY = 0.5, 1.1  # a grain line's shade, and the pale wood be
 
 def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None):
     """A painted, plastic or metal surface. `grime` darkens it in blotches, so flat colours don't
-    look like a render. `speckle` = (colour, amount) scatters fine flakes of a second colour, the
-    way multicrystalline cells sparkle. `emission` makes it glow, for lit LEDs. `grain`, a kind in
-    GRAIN, draws dark grain lines along each part's longest side, as `_object` laid them out."""
+    look like a render. `speckle` = (colour, amount) mottles it with a second colour in a web of
+    flakes, the base colour left at each flake's centre and less of it the higher `amount`: the way
+    multicrystalline cells sparkle, or rust on scrap steel. `emission` makes it glow, for lit LEDs.
+    `grain`, a kind in GRAIN, draws dark grain lines along each part's longest side, as `_object`
+    laid them out."""
     key = name
     if key in _MATERIALS:
         return _MATERIALS[key]
