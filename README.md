@@ -44,9 +44,9 @@ If what's switched on draws more than the inverters carry, the power cuts out un
 
 ## Crafting
 
-[![Every recipe's inputs and result, with the skills it needs and how it's learned](art/promo/images/recipes.png)](art/promo/images/recipes.png)
-
 Most recipes need a table and enough light, and a battery rebuild a furnace, a hand press and a kiln too. You learn them from two Homestead Power magazines, by levelling Electrical, or by researching a part you found. The inverters, the maintainer and the battery charger can't be crafted: you'll have to find them.
+
+Every recipe's inputs, skills and tools are in the gallery, and on [one sheet](art/promo/images/recipes.png).
 
 ## Where to look
 

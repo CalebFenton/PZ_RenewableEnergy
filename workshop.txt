@@ -42,9 +42,9 @@ description=
 description=If what's switched on draws more than the inverters carry, the power cuts out until you switch something off. The bank powers everything a generator in its spot would, the neighbours' fridges and lights included, so switch those off or set up away from town.
 description=
 description=[h2]Crafting[/h2]
-description=[url=https://raw.githubusercontent.com/CalebFenton/PZ_RenewableEnergy/master/art/promo/images/recipes.png][img]https://raw.githubusercontent.com/CalebFenton/PZ_RenewableEnergy/master/art/promo/images/recipes.png[/img][/url]
-description=
 description=Most recipes need a table and enough light, and a battery rebuild a furnace, a hand press and a kiln too. You learn them from two Homestead Power magazines, by levelling Electrical, or by researching a part you found. The inverters, the maintainer and the battery charger can't be crafted: you'll have to find them.
+description=
+description=Every recipe's inputs, skills and tools are in the gallery, and on [url=https://raw.githubusercontent.com/CalebFenton/PZ_RenewableEnergy/master/art/promo/images/recipes.png]one sheet[/url].
 description=
 description=[h2]Where to look[/h2]
 description=Think about who had this stuff in 1993: people with campers and boats, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common and good ones aren't; the biggest batteries and inverters are rare. Some places come already set up, from a stock tank pump in a pasture to a power company yard, though not every world has every one.

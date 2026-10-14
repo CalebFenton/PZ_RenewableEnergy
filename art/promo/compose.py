@@ -15,6 +15,7 @@ the poster and preview are 512 square. Icons are scaled by whole numbers with ne
 sampling, so their pixels stay crisp. The item models are framed from the box extract.py found
 around each. Item, recipe and skill names come from captures/promo.json, which the game wrote in
 its own words; the setup captions are the README's.
+Also writes gallery/NN-<name>.jpg, the Workshop's 1920x1080 screenshot gallery, in upload order.
 """
 import json
 import math
@@ -107,6 +108,44 @@ RECIPE_SECTIONS = [
 # improves an item it keeps shows that item.
 RECIPE_RESULTS = {"RenewableEnergy_RebuildCarBattery": "Base.CarBattery1"}
 
+GALLERY = HERE / "gallery"
+# The Workshop's screenshot gallery shows pictures at 16:9 and enlarges one to its own size; each file
+# must stay under a megabyte (ISteamUGC::AddItemPreviewFile).
+GALLERY_SIZE = (1920, 1080)
+GALLERY_BYTES = 1_000_000
+# Every picture's caption sits centred in a band across its top, the same on every mod's gallery;
+# PAGE is what's left below it.
+CAPTION_BAND = 150
+CAPTION_SIZE = 60
+PAGE = (GALLERY_SIZE[0], GALLERY_SIZE[1] - CAPTION_BAND)
+# The world shots go in at their captured size, which keeps their pixels; the trailer's crop is the
+# garden lights' height, around the trailer and the cones behind it.
+GALLERY_TRAILER_CROP = (0, 32, 1260, 944)
+# The bank's status window, as large as leaves the room and its menu as tall beside it.
+GALLERY_STATUS_SCALE = 1.94
+# The item and recipe sheets drawn this many times the README's size: as large as the fullest page
+# allows, which keeps their smallest text at 18 and 16 pixels.
+ITEM_K = 1.1
+RECIPE_K = 1.33
+# The item sheet over two pictures, with how many cards to a line on each.
+GALLERY_ITEMS = [
+    ("items-power", "Panels to mount, banks to fill, parts to wire in", ITEM_ROWS[:3], 7),
+    ("items-batteries", "Batteries to rebuild, gadgets to take apart", ITEM_ROWS[3:], 6),
+]
+# The recipe sheet over as few pictures as its cards fit at RECIPE_K: for each picture, the
+# sections it shows by title, and which of each section's recipes.
+MOUNTS, CARE = "Panel mounts, and taking them down", "Battery care and rebuilding"
+GALLERY_RECIPES = [
+    ("recipes-storage", "Recipes: battery boxes, racks and banks", [("Battery storage", slice(None))]),
+    ("recipes-mounts", "Recipes: building panel mounts", [(MOUNTS, slice(0, 5))]),
+    ("recipes-unmounting-electronics", "Recipes: taking panels down, and electronics",
+     [(MOUNTS, slice(5, None)), ("Electronics", slice(None))]),
+    ("recipes-modules", "Recipes: modules and solar cells", [("Modules: repair, homemade, and solar cells",
+                                                              slice(None))]),
+    ("recipes-battery-care", "Recipes: servicing and stripping batteries", [(CARE, slice(0, 5))]),
+    ("recipes-rebuilding", "Recipes: casting plates, rebuilding batteries", [(CARE, slice(5, None))]),
+]
+
 
 def font(size, weight="Regular"):
     face = ImageFont.truetype(str(FONT), size)
@@ -140,12 +179,17 @@ def icon(key, size):
     return pixels(image, max(1, size // max(image.size)))
 
 
-def canvas(height):
+def canvas(height, width=WIDTH):
     """A dark card with a faint vertical gradient."""
-    image = Image.new("RGBA", (WIDTH, height), BACKGROUND + (255,))
-    shade = Image.linear_gradient("L").resize((WIDTH, height)).point(lambda v: v * 0.35)
-    image.paste(Image.new("RGBA", (WIDTH, height), (12, 13, 16, 255)), (0, 0), shade)
+    image = Image.new("RGBA", (width, height), BACKGROUND + (255,))
+    shade = Image.linear_gradient("L").resize((width, height)).point(lambda v: v * 0.35)
+    image.paste(Image.new("RGBA", (width, height), (12, 13, 16, 255)), (0, 0), shade)
     return image
+
+
+def sized(n, k):
+    """n pixels of a README layout drawn k times its size, for the gallery's larger pages."""
+    return round(n * k)
 
 
 def paste(base, image, centre, shadow=True):
@@ -186,20 +230,22 @@ def text(base, xy, string, size, weight="Regular", fill=TEXT, anchor="la", width
     return ImageDraw.Draw(base).multiline_textbbox(xy, string, font=face, anchor=anchor, spacing=3)
 
 
-def panel(base, box, accent=None):
+def panel(base, box, accent=None, k=1):
     draw = ImageDraw.Draw(base)
-    draw.rounded_rectangle(box, 18, fill=PANEL + (255,))
+    draw.rounded_rectangle(box, sized(18, k), fill=PANEL + (255,))
     if accent:
-        draw.rectangle((box[0] + 28, box[1], box[2] - 28, box[1] + 5), fill=accent + (255,))
+        draw.rectangle((box[0] + sized(28, k), box[1], box[2] - sized(28, k), box[1] + sized(5, k)),
+                       fill=accent + (255,))
 
 
-def badge(base, xy, string):
+def badge(base, xy, string, k=1):
     """A small pill with string in it, its top right corner at xy."""
-    face = font(16, "Bold")
-    w = face.getlength(string) + 14
-    box = (xy[0] - w, xy[1], xy[0], xy[1] + 22)
-    ImageDraw.Draw(base).rounded_rectangle(box, 11, fill=(14, 15, 18, 235))
-    ImageDraw.Draw(base).text(((box[0] + box[2]) / 2, box[1] + 11), string, font=face, fill=TEXT, anchor="mm")
+    face = font(sized(16, k), "Bold")
+    w = face.getlength(string) + sized(14, k)
+    box = (xy[0] - w, xy[1], xy[0], xy[1] + sized(22, k))
+    ImageDraw.Draw(base).rounded_rectangle(box, sized(11, k), fill=(14, 15, 18, 235))
+    ImageDraw.Draw(base).text(((box[0] + box[2]) / 2, box[1] + sized(11, k)), string, font=face, fill=TEXT,
+                              anchor="mm")
 
 
 def caption(base, xy, string):
@@ -213,11 +259,12 @@ def caption(base, xy, string):
     ImageDraw.Draw(base).text((box[0] + 18, box[1] + 22), string, font=face, fill=TEXT, anchor="lm")
 
 
-def arrow(base, centre, colour=MUTED):
+def arrow(base, centre, colour=MUTED, k=1):
     x, y = centre
     draw = ImageDraw.Draw(base)
-    draw.rectangle((x - 22, y - 4, x + 6, y + 4), fill=colour)
-    draw.polygon([(x + 4, y - 14), (x + 22, y), (x + 4, y + 14)], fill=colour)
+    draw.rectangle((x - sized(22, k), y - sized(4, k), x + sized(6, k), y + sized(4, k)), fill=colour)
+    draw.polygon([(x + sized(4, k), y - sized(14, k)), (x + sized(22, k), y), (x + sized(4, k), y + sized(14, k))],
+                 fill=colour)
 
 
 def save(image, name):
@@ -229,18 +276,23 @@ def save(image, name):
 # Images ------------------------------------------------------------------------------------------
 
 
-def banner():
-    """The mod's name over the homestead, which the world capture holds against its right edge."""
-    image = full_width("world")
-    # Dark behind the title on the left, clear by the middle, where the homestead starts.
+def mod_title(image, size):
+    """The mod's name over the world capture's left side, darkened behind it and clear by the
+    middle, where the homestead starts. Returns the name's box."""
     shade = Image.linear_gradient("L").rotate(90, expand=True).resize(image.size)
     shade = shade.point(lambda v: max(0, min(235, round((140 - v) * 3.3))))
     image.paste(Image.new("RGBA", image.size, (12, 13, 16, 255)), (0, 0), shade)
     title = "\n".join(PROMO["strings"]["modName"].split())
-    box = ImageDraw.Draw(image).multiline_textbbox((60, image.height / 2 - 20), title, font=font(84, "Bold"),
-                                                   anchor="lm", spacing=6)
-    ImageDraw.Draw(image).multiline_text((60, image.height / 2 - 20), title, font=font(84, "Bold"), fill=TEXT,
-                                         anchor="lm", spacing=6)
+    xy = (round(size * 5 / 7), image.height / 2 - round(size * 5 / 21))
+    face = font(size, "Bold")
+    ImageDraw.Draw(image).multiline_text(xy, title, font=face, fill=TEXT, anchor="lm", spacing=round(size / 14))
+    return ImageDraw.Draw(image).multiline_textbbox(xy, title, font=face, anchor="lm", spacing=round(size / 14))
+
+
+def banner():
+    """The mod's name over the homestead, which the world capture holds against its right edge."""
+    image = full_width("world")
+    box = mod_title(image, 84)
     text(image, (64, box[3] + 22), "Off-grid power, 1993", 30, "Medium", MUTED)
     return image
 
@@ -271,22 +323,24 @@ def setup():
     return image
 
 
-def bank():
-    """The homestead's bank indoors over its right-click menu, beside its status window. The
-    menu's text is drawn larger than the status window's, so it is scaled down to about the same
-    size, and cropped to the bank's own submenu and Wire In."""
+def bank(width=WIDTH, status_scale=STATUS_SCALE, height=None):
+    """The homestead's bank indoors over its right-click menu, beside its status window, centred
+    in height if given. The menu's text is drawn larger than the status window's, so it is scaled
+    down to about the same size, and cropped to the bank's own submenu and Wire In."""
     margin, gap = 20, 16
-    status = scaled(capture("status"), STATUS_SCALE)
-    column = WIDTH - 2 * margin - gap - status.width
+    status = scaled(capture("status"), status_scale)
+    column = width - 2 * margin - gap - status.width
     menu = capture("menu").crop(MENU_CROP)
     menu = scaled(menu, column / menu.width)
     room = capture("bank").crop(BANK_CROP).convert("RGBA")
     room = scaled(room, column / room.width)
-    height = max(status.height, room.height + gap + menu.height)
-    image = canvas(height + 2 * margin)
-    paste(image, room, (margin + column / 2, margin + room.height / 2))
-    paste(image, menu, (margin + column / 2, margin + room.height + gap + menu.height / 2))
-    paste(image, status, (WIDTH - margin - status.width / 2, margin + height / 2))
+    inner = max(status.height, room.height + gap + menu.height)
+    image = canvas(height or inner + 2 * margin, width)
+    top = (image.height - inner) // 2
+    assert top >= margin, "the bank's status window and menu are too tall for the page"
+    paste(image, room, (margin + column / 2, top + room.height / 2))
+    paste(image, menu, (margin + column / 2, top + room.height + gap + menu.height / 2))
+    paste(image, status, (width - margin - status.width / 2, top + inner / 2))
     return image
 
 
@@ -326,62 +380,72 @@ def framed_model(key, item_box, size):
     return image.resize(size, Image.LANCZOS, box=(x + margin, y + margin, x + margin + w, y + margin + h))
 
 
-def name_block(name, width):
+def name_block(name, width, k=1):
     """The item's name wrapped to width, and how tall it stands."""
-    face = font(NAME_SIZE, "SemiBold")
+    face = font(sized(NAME_SIZE, k), "SemiBold")
     wrapped = wrap(name, face, width, split_words=True)
     box = ImageDraw.Draw(Image.new("L", (1, 1))).multiline_textbbox((0, 0), wrapped, font=face, spacing=3)
     assert box[2] <= width, f"{name} is too wide for its card"
     return wrapped, box[3]
 
 
-def item_card(image, full_type, name, box, boxes):
+def item_card(image, full_type, name, box, boxes, k=1):
     """The item's model over its icon and its name, name being name_block's."""
-    left, top = round(box[0]) + ITEM_PAD, box[1] + ITEM_PAD
-    size = (round(box[2]) - ITEM_PAD - left, MODEL_H)
+    pad, icon_size, model_h = sized(ITEM_PAD, k), sized(ICON, k), sized(MODEL_H, k)
+    left, top = round(box[0]) + pad, box[1] + pad
+    size = (round(box[2]) - pad - left, model_h)
     key = "model_" + full_type.replace(".", "_")
     picture = framed_model(key, boxes[key], size).convert("RGBA")
     corners = Image.new("L", size, 0)
-    ImageDraw.Draw(corners).rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), 12, fill=255)
+    ImageDraw.Draw(corners).rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), sized(12, k), fill=255)
     image.paste(picture, (left, top), corners)
-    row = top + MODEL_H + ITEM_PAD
-    paste(image, icon(icon_key(full_type), ICON), (left + ICON / 2, row + ICON / 2), shadow=False)
+    row = top + model_h + pad
+    paste(image, icon(icon_key(full_type), icon_size), (left + icon_size / 2, row + icon_size / 2), shadow=False)
     wrapped, height = name
-    text(image, (left + ICON + ITEM_PAD, row + max(0, (ICON - height) / 2)), wrapped, NAME_SIZE, "SemiBold")
+    text(image, (left + icon_size + pad, row + max(0, (icon_size - height) / 2)), wrapped, sized(NAME_SIZE, k),
+         "SemiBold")
 
 
 def items():
-    """Every item in ITEM_ROWS, each kind under its caption, each line of cards as tall as its
-    longest name needs."""
-    names = {item["fullType"]: item["name"] for item in PROMO["items"]}
-    missing = set(names) - {full_type for _, full_types in ITEM_ROWS for full_type in full_types}
+    names = {item["fullType"] for item in PROMO["items"]}
+    missing = names - {full_type for _, full_types in ITEM_ROWS for full_type in full_types}
     assert not missing, f"items.png has no place for {sorted(missing)}"
+    return item_sheet(ITEM_ROWS)
+
+
+def item_sheet(rows, width=WIDTH, columns=ITEM_COLUMNS, k=1, height=None):
+    """Every item in rows, each kind under its caption, each line of cards as tall as its longest
+    name needs, drawn k times the README's size and centred in height if given."""
+    names = {item["fullType"]: item["name"] for item in PROMO["items"]}
     boxes = {model["name"]: model["box"] for model in PROMO["models"]}
-    column = (WIDTH - 20) // ITEM_COLUMNS
-    name_width = column - 12 - 3 * ITEM_PAD - ICON
-    heading, gap = 44, 12
+    pad, icon_size, inset = sized(ITEM_PAD, k), sized(ICON, k), sized(6, k)
+    column = (width - 20) // columns
+    name_width = column - 2 * inset - 3 * pad - icon_size
+    heading, gap = sized(44, k), sized(12, k)
     sections = []
-    for title, full_types in ITEM_ROWS:
+    for title, full_types in rows:
         lines = []
-        for start in range(0, len(full_types), ITEM_COLUMNS):
-            cards = [(full_type, name_block(names[full_type], name_width))
-                     for full_type in full_types[start:start + ITEM_COLUMNS]]
-            height = 3 * ITEM_PAD + MODEL_H + max(ICON, *(name[1] for _, name in cards))
-            lines.append((cards, height))
+        for start in range(0, len(full_types), columns):
+            cards = [(full_type, name_block(names[full_type], name_width, k))
+                     for full_type in full_types[start:start + columns]]
+            line_height = 3 * pad + sized(MODEL_H, k) + max(icon_size, *(name[1] for _, name in cards))
+            lines.append((cards, line_height))
         sections.append((title, lines))
-    image = canvas(20 + heading * len(sections) + sum(h + gap for _, lines in sections for _, h in lines))
-    top = 20
+    needed = 20 + heading * len(sections) + sum(h + gap for _, lines in sections for _, h in lines)
+    image = canvas(height or needed, width)
+    assert needed <= image.height, f"{rows[0][0]} and the rest are too tall for the page"
+    top = 20 + (image.height - needed) // 2
     for title, lines in sections:
-        text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
+        text(image, (30, top + heading / 2), title, sized(22, k), "SemiBold", MUTED, "lm")
         top += heading
-        for cards, height in lines:
-            left0 = (WIDTH - column * len(cards)) / 2
+        for cards, line_height in lines:
+            left0 = (width - column * len(cards)) / 2
             for c, (full_type, name) in enumerate(cards):
                 left = left0 + c * column
-                box = (left + 6, top, left + column - 6, top + height)
-                panel(image, box)
-                item_card(image, full_type, name, box, boxes)
-            top += height + gap
+                box = (left + inset, top, left + column - inset, top + line_height)
+                panel(image, box, k=k)
+                item_card(image, full_type, name, box, boxes, k)
+            top += line_height + gap
     return image
 
 
@@ -423,7 +487,6 @@ CARD_PAD = 16
 NAME_W = 168
 SLOT = 72
 ARROW_W = 30
-ROW_W = WIDTH - 40
 
 
 def unique_names(items):
@@ -491,23 +554,27 @@ def slot_caption(slot):
     return ", ".join(words)
 
 
-def draw_slot(base, slot, x, top):
+def draw_slot(base, slot, x, top, k=1):
     """A slot's icon centred on x with its name below, a badge with how many whole items, and a
     caption. Returns the bottom of what it drew."""
     item, count = slot["item"], slot.get("count")
-    paste(base, icon(item["icon"], 64), (x, top + 46), shadow=False)
+    slot_w = sized(SLOT, k)
+    paste(base, icon(item["icon"], sized(64, k)), (x, top + sized(46, k)), shadow=False)
     if count and count > 1 and not slot.get("uses"):
-        badge(base, (x + 38, top + 10), f"×{count}")
-    box = text(base, (x, top + 84), item["name"], 13, "Medium", TEXT, "ma", width=SLOT - 6)
+        badge(base, (x + sized(38, k), top + sized(10, k)), f"×{count}", k)
+    box = text(base, (x, top + sized(84, k)), item["name"], sized(13, k), "Medium", TEXT, "ma",
+               width=slot_w - sized(6, k))
     caption_text = slot_caption(slot)
     if caption_text:
-        box = text(base, (x, box[3] + 3), caption_text, 12, "Medium", MUTED, "ma", width=SLOT - 4)
+        box = text(base, (x, box[3] + sized(3, k)), caption_text, sized(12, k), "Medium", MUTED, "ma",
+                   width=slot_w - sized(4, k))
     return box[3]
 
 
-def card_width(parts):
+def card_width(parts, k=1):
     _, inputs, results = parts
-    return CARD_PAD + NAME_W + 14 + (len(inputs) + len(results)) * SLOT + ARROW_W + CARD_PAD
+    return (2 * sized(CARD_PAD, k) + sized(NAME_W, k) + sized(14, k) + (len(inputs) + len(results)) * sized(SLOT, k)
+            + sized(ARROW_W, k))
 
 
 def learn_line(recipe):
@@ -530,89 +597,194 @@ def learn_line(recipe):
     return "Learn " + ", or ".join(ways)
 
 
-def recipe_card(base, recipe, parts, box):
+def recipe_card(base, recipe, parts, box, k=1):
     """Draws the card into box and returns how far down its contents reach."""
     left, top, right, bottom = box
-    panel(base, box, SOLAR)
+    panel(base, box, SOLAR, k)
     tools, inputs, results = parts
-    x = left + CARD_PAD
-    lines = text(base, (x, top + 16), recipe["name"], 17, "Bold", width=NAME_W)
+    pad, name_w, slot_w, arrow_w = sized(CARD_PAD, k), sized(NAME_W, k), sized(SLOT, k), sized(ARROW_W, k)
+    x = left + pad
+    lines = text(base, (x, top + sized(16, k)), recipe["name"], sized(17, k), "Bold", width=name_w)
     skills = "  ·  ".join(f"{s['name']} {s['level']}" for s in recipe["skills"])
     for line, size in [(skills, 13), (learn_line(recipe), 12), ("Tools: " + ", ".join(tools) if tools else "", 12)]:
         if line:
-            lines = text(base, (x, lines[3] + 6), line, size, "Medium", MUTED, width=NAME_W)
+            lines = text(base, (x, lines[3] + sized(6, k)), line, sized(size, k), "Medium", MUTED, width=name_w)
     lowest = lines[3]
-    x = left + CARD_PAD + NAME_W + 14 + SLOT / 2
+    x = left + pad + name_w + sized(14, k) + slot_w / 2
     for slot in inputs:
-        lowest = max(lowest, draw_slot(base, slot, x, top))
-        x += SLOT
-    arrow(base, (x - SLOT / 2 + ARROW_W / 2, top + 46))
-    x += ARROW_W
+        lowest = max(lowest, draw_slot(base, slot, x, top, k))
+        x += slot_w
+    arrow(base, (x - slot_w / 2 + arrow_w / 2, top + sized(46, k)), k=k)
+    x += arrow_w
     for slot in results:
-        lowest = max(lowest, draw_slot(base, slot, x, top))
-        x += SLOT
-    assert lowest <= bottom - 10, f"{recipe['id']} runs past the bottom of its card"
-    assert x - SLOT / 2 <= right - CARD_PAD + 1, f"{recipe['id']} is too wide for its card"
+        lowest = max(lowest, draw_slot(base, slot, x, top, k))
+        x += slot_w
+    assert lowest <= bottom - sized(10, k), f"{recipe['id']} runs past the bottom of its card"
+    assert x - slot_w / 2 <= right - pad + 1, f"{recipe['id']} is too wide for its card"
     return lowest
 
 
-def card_height(recipe, parts, width):
+def card_height(recipe, parts, width, k=1):
     """How tall the card must be to hold its contents, found by drawing it on a scratch image."""
-    scratch = Image.new("RGBA", (width, 1000))
-    return round(recipe_card(scratch, recipe, parts, (0, 0, width, 1000))) + CARD_PAD
+    scratch = Image.new("RGBA", (width, sized(1000, k)))
+    return round(recipe_card(scratch, recipe, parts, (0, 0, width, sized(1000, k)), k)) + sized(CARD_PAD, k)
 
 
-def first_fit(cards):
-    """Packs (order, (recipe, parts, width)) pairs into rows as wide as the image allows, each into
-    the first row with room for it, and returns the rows and the cards in each in their order."""
+def first_fit(cards, row_w, gap):
+    """Packs (order, (recipe, parts, width)) pairs into rows as wide as row_w, each into the first
+    row with room for it, and returns the rows and the cards in each in their order."""
     rows = []
     for order, card in cards:
-        assert card[2] <= ROW_W, f"{card[0]['id']} is too wide for the image"
-        row = next((row for row in rows if row[1] + CARD_GAP + card[2] <= ROW_W), None)
+        assert card[2] <= row_w, f"{card[0]['id']} is too wide for the image"
+        row = next((row for row in rows if row[1] + gap + card[2] <= row_w), None)
         if row:
             row[0].append((order, card))
-            row[1] += CARD_GAP + card[2]
+            row[1] += gap + card[2]
         else:
             rows.append([[(order, card)], card[2]])
     return [[card for _, card in sorted(row)] for row, _ in sorted(rows, key=lambda row: min(row[0]))]
 
 
-def card_rows(cards):
+def card_rows(cards, row_w, gap):
     """The section's cards in rows, in the section's order unless packing the widest first takes
     fewer rows."""
-    in_order = first_fit(list(enumerate(cards)))
-    widest_first = first_fit(sorted(enumerate(cards), key=lambda pair: -pair[1][2]))
+    in_order = first_fit(list(enumerate(cards)), row_w, gap)
+    widest_first = first_fit(sorted(enumerate(cards), key=lambda pair: -pair[1][2]), row_w, gap)
     return widest_first if len(widest_first) < len(in_order) else in_order
 
 
 def recipes():
+    placed = [i for _, ids in RECIPE_SECTIONS for i in ids]
+    game = [r["id"] for r in PROMO["recipes"]]
+    assert sorted(placed) == sorted(game), f"recipes.png places {sorted(placed)}, the game has {sorted(game)}"
+    return recipe_sheet(RECIPE_SECTIONS)
+
+
+def recipe_sheet(sections, width=WIDTH, k=1, height=None):
+    """The sections' recipe cards, each section under its title unless that is None, drawn k times
+    the README's size and centred in height if given."""
     by_id = {r["id"]: r for r in PROMO["recipes"]}
     items_by_type = {item["fullType"]: item for item in PROMO["items"]}
-    placed = [i for _, ids in RECIPE_SECTIONS for i in ids]
-    assert sorted(placed) == sorted(by_id), f"recipes.png places {sorted(placed)}, the game has {sorted(by_id)}"
-    sections = []
-    for title, ids in RECIPE_SECTIONS:
+    row_w, gap = width - 40, sized(CARD_GAP, k)
+    laid = []
+    for title, ids in sections:
         cards = []
         for i in ids:
             parts = recipe_parts(by_id[i], items_by_type)
-            cards.append((by_id[i], parts, card_width(parts)))
-        sections.append((title, card_rows(cards)))
-    heading = 52
-    heights = [[max(card_height(*card) for card in row) for row in section_rows] for _, section_rows in sections]
-    image = canvas(20 + len(sections) * heading + sum(h + CARD_GAP for hs in heights for h in hs))
-    top = 20
-    for (title, section_rows), row_heights in zip(sections, heights):
-        text(image, (30, top + heading / 2), title, 22, "SemiBold", MUTED, "lm")
-        top += heading
-        for row, height in zip(section_rows, row_heights):
+            cards.append((by_id[i], parts, card_width(parts, k)))
+        laid.append((title, card_rows(cards, row_w, gap)))
+    heading = sized(52, k)
+    heights = [[max(card_height(*card, k) for card in row) for row in rows] for _, rows in laid]
+    needed = 20 + sum(heading for title, _ in laid if title) + sum(h + gap for hs in heights for h in hs)
+    image = canvas(height or needed, width)
+    assert needed <= image.height, f"the recipes from {sections[0][1][0]} on are too tall for the page"
+    top = 20 + (image.height - needed) // 2
+    for (title, rows), row_heights in zip(laid, heights):
+        if title:
+            text(image, (30, top + heading / 2), title, sized(22, k), "SemiBold", MUTED, "lm")
+            top += heading
+        for row, row_height in zip(rows, row_heights):
             # The row's spare width goes to its cards evenly, so every row spans the image.
-            spare = (ROW_W - sum(card[2] for card in row) - CARD_GAP * (len(row) - 1)) / len(row)
+            spare = (row_w - sum(card[2] for card in row) - gap * (len(row) - 1)) / len(row)
             left = 20
-            for recipe, parts, width in row:
-                recipe_card(image, recipe, parts, (left, top, left + width + spare, top + height))
-                left += width + spare + CARD_GAP
-            top += height + CARD_GAP
+            for recipe, parts, card_w in row:
+                recipe_card(image, recipe, parts, (left, top, left + card_w + spare, top + row_height), k)
+                left += card_w + spare + gap
+            top += row_height + gap
     return image
+
+
+# Gallery -----------------------------------------------------------------------------------------
+
+
+def page(caption_text, content):
+    """A gallery picture: its caption in the band across the top, over content the size of PAGE."""
+    assert content.size == PAGE, f"{caption_text!r} has a page of {content.size}"
+    image = Image.new("RGBA", GALLERY_SIZE, BACKGROUND + (255,))
+    image.alpha_composite(content, (0, CAPTION_BAND))
+    face = font(CAPTION_SIZE, "Bold")
+    assert face.getlength(caption_text) <= GALLERY_SIZE[0] - 120, f"{caption_text!r} is too wide for the band"
+    ImageDraw.Draw(image).text((GALLERY_SIZE[0] / 2, CAPTION_BAND / 2), caption_text, font=face, fill=TEXT,
+                               anchor="mm")
+    return image
+
+
+def hero():
+    """The banner at 16:9: the world capture across the page's width, standing on its foot, under the
+    mod's name."""
+    shot = capture("world")
+    shot = scaled(shot, PAGE[0] / shot.width)
+    mod_title(shot, 132)
+    image = canvas(PAGE[1], PAGE[0])
+    image.alpha_composite(shot, (0, PAGE[1] - shot.height))
+    return image
+
+
+def progression():
+    """The setup's two shots at their captured size, an arrow leading from the first battery box to
+    the homestead."""
+    image = canvas(PAGE[1], PAGE[0])
+    shots = [(capture(name).crop(SETUP_CROPS[name]), label) for name, label in [("stage0", FIRST_BOX),
+                                                                                ("homestead", HOMESTEAD)]]
+    gap = 72
+    left = (PAGE[0] - sum(shot.width for shot, _ in shots) - gap) // 2
+    for i, (shot, label) in enumerate(shots):
+        top = (PAGE[1] - shot.height) // 2
+        if i:
+            arrow(image, (left - gap / 2, PAGE[1] / 2), k=1.5)
+        paste(image, shot, (left + shot.width / 2, top + shot.height / 2))
+        caption(image, (left + 16, top + 16), label)
+        left += shot.width + gap
+    return image
+
+
+def shot_page(shot):
+    """A world capture at its captured size, centred on the page."""
+    assert shot.height <= PAGE[1] and shot.width <= PAGE[0], "the shot is larger than the page"
+    image = canvas(PAGE[1], PAGE[0])
+    paste(image, shot, (PAGE[0] / 2, PAGE[1] / 2))
+    return image
+
+
+def gallery():
+    """The gallery's pictures in upload order, the hero first, each with its file's name."""
+    by_title = dict(RECIPE_SECTIONS)
+    recipe_pages = [(name, caption_text, [(None, by_title[title][part]) for title, part in parts])
+                    for name, caption_text, parts in GALLERY_RECIPES]
+    shown = sorted(i for _, _, sections in recipe_pages for _, ids in sections for i in ids)
+    assert shown == sorted(i for _, ids in RECIPE_SECTIONS for i in ids), "the gallery must show every recipe once"
+    assert [row for _, _, rows, _ in GALLERY_ITEMS for row in rows] == ITEM_ROWS, "the gallery must show every item"
+    pictures = [
+        ("hero", page("Off-grid power, 1993", hero())),
+        ("progression", page("Start with a car battery in a box. End with a homestead.", progression())),
+        ("bank", page("Every bank tells you what it's doing, panel by panel",
+                      bank(PAGE[0], GALLERY_STATUS_SCALE, PAGE[1]))),
+        ("gardenlights", page("Garden lights charge by day and glow after dark", shot_page(capture("gardenlights")))),
+        ("trailer", page("Road crews left their solar arrow boards running",
+                         shot_page(capture("trailer").crop(GALLERY_TRAILER_CROP)))),
+    ]
+    pictures += [(name, page(caption_text, item_sheet(rows, PAGE[0], columns, ITEM_K, PAGE[1])))
+                 for name, caption_text, rows, columns in GALLERY_ITEMS]
+    pictures += [(name, page(caption_text, recipe_sheet(sections, PAGE[0], RECIPE_K, PAGE[1])))
+                 for name, caption_text, sections in recipe_pages]
+    return pictures
+
+
+def save_gallery(pictures):
+    """Writes the pictures as NN-<name>.jpg, numbered in upload order, and deletes anything else in
+    the folder, since the whole folder is uploaded."""
+    GALLERY.mkdir(exist_ok=True)
+    written = set()
+    for number, (name, picture) in enumerate(pictures, 1):
+        path = GALLERY / f"{number:02d}-{name}.jpg"
+        # Full-resolution colour keeps the captions' and icons' edges clean.
+        picture.convert("RGB").save(path, quality=90, subsampling=0, optimize=True)
+        assert path.stat().st_size < GALLERY_BYTES, f"{path.name} is over the Workshop's {GALLERY_BYTES} bytes"
+        written.add(path)
+        print(f"compose: gallery/{path.name} {picture.width}x{picture.height} {path.stat().st_size} bytes")
+    for path in GALLERY.iterdir():
+        if path not in written:
+            path.unlink()
 
 
 def main():
@@ -620,6 +792,7 @@ def main():
                        ("recipes", recipes), ("trailer", trailer), ("gardenlights", gardenlights)]:
         save(make(), name)
     save_poster(poster())
+    save_gallery(gallery())
 
 
 if __name__ == "__main__":

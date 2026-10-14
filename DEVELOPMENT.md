@@ -19,10 +19,11 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 - `tools/pack_textures.py`: rebuilds `renewable_energy.pack`; `make.sh` runs it. `python3 dev/harness/check/tiledefs.py <file.tiles> all` prints every tile's properties.
 - `dev/run-debug-client.sh --art`: renders every tile, overlay, item and trailer state to `<cache>/Screenshots` for review; `RenewableEnergyDevArt.lua` in the dev mod lists the shots.
 - `TESTS=renewable_energy_world_arrow_board_lid_swings dev/run-debug-client.sh --test --mp`, then `dev/lid-shots.py`: shows what a multiplayer client draws of the battery box lid as it swings, which `--art` can't, since it runs single player only. Only a run whose `TESTS` is exactly that name takes the shots; the script's header says what the sheet shows.
-- `dev/run-debug-client.sh --promo`, then `art/promo/compose.py`: shoots the README and Workshop art into `art/promo/captures`, then lays it out into `art/promo/images`, `42/poster.png` and `preview.png`. `RenewableEnergyDevPromo.lua` in the dev mod lists the setups and shots. Commit the captures, so a layout change needs only `compose.py`.
+- `dev/run-debug-client.sh --promo`, then `art/promo/compose.py`: shoots the README and Workshop art into `art/promo/captures`, then lays it out into `art/promo/images`, the Workshop gallery in `art/promo/gallery`, `42/poster.png` and `preview.png`. `RenewableEnergyDevPromo.lua` in the dev mod lists the setups and shots. Commit the captures, so a layout change needs only `compose.py`.
 - `PROMO=<group>,... dev/run-debug-client.sh --promo`: reshoots only those groups (`MODE_GROUPS_promo` in `dev/harness.conf`) and replaces only their captures. Reshoot the group you are changing, then check `git status art/promo/captures`. There is no `--promo --stay`: a second run in the same world would find its places taken by what the first one built.
 - `dev/review.sh`: lays out the images, renders the README to HTML and PDF, and zips the mod as players install it, without starting the game. Its header says what it needs and where the files go.
 - `dev/workshop-txt.sh`: writes `workshop.txt`'s description from `README.md`, leaving out the sections `WORKSHOP_SKIP` in `dev/harness.conf` names; the static check fails while the two differ.
+- `dev/workshop-gallery.sh`: lists the Workshop item's gallery; `--upload` replaces its images with `art/promo/gallery`'s. Needs Steam running and the item published.
 
 `README.md` is the Workshop page, and `dev/harness/docs/workshop-page.md` says what goes on it. It links the images by relative path, and `workshop.txt` by raw URL, which shows nothing until the repository is public; a renamed image breaks the Workshop page.
 
@@ -281,4 +282,4 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 1. `dev/static-check.sh`, `dev/validate-server.sh` and `dev/run-debug-client.sh --test` must pass.
 2. Bump `modversion` in `42/mod.info`. Raise `versionMin` when the mod starts depending on a newer game version.
 3. Update `README.md`, then run `dev/workshop-txt.sh`, `dev/run-debug-client.sh --promo` if the look or the names changed, and `dev/review.sh` to read the result.
-4. Upload from the in-game Workshop screen.
+4. Upload from the in-game Workshop screen, then `dev/workshop-gallery.sh --upload` if the gallery changed.
