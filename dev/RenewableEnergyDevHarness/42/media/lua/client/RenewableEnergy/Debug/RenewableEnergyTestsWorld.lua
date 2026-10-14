@@ -1,6 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Sprites"
 local Stash = require "RenewableEnergy/StashHouses"
+local Stage = require "RenewableEnergyDevStage"
 
 -- Stash house, world spawn, solar site, garden light and arrow board tests. See
 -- RenewableEnergyTestLib.lua for how the runner works. Stash houses, world spawns, sites, garden
@@ -560,10 +561,11 @@ local BATTERY_BOX = "RenewableEnergyBatteryBox"
 local SERVER_MS = 15000
 
 -- Queues an arrow board on open ground near the character, spawned by the authority with `args`
--- (see RenewableEnergyTestLibWorld.lua), and returns its T.placeVehicle handle.
-local function spawnTrailer(self, args)
+-- (see RenewableEnergyTestLibWorld.lua) and facing `facing` (north unless given), and returns its
+-- T.placeVehicle handle.
+local function spawnTrailer(self, args, facing)
     local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
-    return square and T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square, args = args })
+    return square and T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square, args = args, facing = facing })
 end
 
 local function panelCondition(state, partId)
@@ -790,14 +792,31 @@ local function describeLid(pose)
     return string.format("clip %s, %s, %s open", tostring(pose.clip), pose.playing and "swinging" or "still", tostring(pose.open))
 end
 
+-- Saves a full screenshot as test_lid_<name>.png in the cache's Screenshots, which every --test
+-- run clears first. The game copies the frame last shown (Core.TakeFullScreenshot). The console
+-- line gives dev/lid-shots.py where the trailer's centre and its box's area are on the screen, in
+-- UI units, and the zoom and the screen's width in UI units, to crop by.
+local function lidShot(name, vehicle)
+    local file = "test_lid_" .. name .. ".png"
+    getCore():TakeFullScreenshot(file)
+    local x, y, z = vehicle:getX(), vehicle:getY(), vehicle:getZ()
+    local box = vehicle:getAreaCenter(BATTERY_BOX)
+    print(string.format("RELidShot %s %.1f %.1f %.1f %.1f %.3f %d", file, isoToScreenX(0, x, y, z), isoToScreenY(0, x, y, z),
+        isoToScreenX(0, box:getX(), box:getY(), z), isoToScreenY(0, box:getX(), box:getY(), z),
+        getCore():getZoom(0), getCore():getScreenWidth()))
+end
+
 -- The battery box lid swings open on its hinge when a player opens it and stays open, and swings
 -- shut when they close it; it swings the same way in this game when someone else opens and closes
 -- it, which vanilla shows only to the player who did (RenewableEnergy.ArrowBoard.swingLids). Each
 -- swing passes the poses between shut and open, and the batteries come out only while it is open.
+-- The screenshots (test_lid_*.png, one held and one mid-swing per swing) show what this game
+-- drew; dev/lid-shots.py lays them out.
 test("renewable_energy_world_arrow_board_lid_swings", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
+        -- Facing south, its box is on the side the camera sees.
+        self.trailer = spawnTrailer(self, { repair = true }, "S")
         if not self.trailer then return end
         local trailer, p = self.trailer, player()
         local LID = RenewableEnergy.ArrowBoard.LID
@@ -806,19 +825,39 @@ test("renewable_energy_world_arrow_board_lid_swings", {
             local door = trailer.vehicle:getPartById(LID):getDoor()
             return not door:isLocked() and not door:isOpen() and lidHeld(T.lidPose(trailer), false)
         end)
+        -- Frames for the held pose to reach the screen before a shot.
+        local SHOWN_FRAMES = 3
+        -- The box's area lies over the box, so for a shot the character steps beside it: south-west
+        -- of it stands level with it on the screen, hiding neither the box nor the trailer.
+        local function stepAside()
+            local spot = trailer.vehicle:getAreaCenter(BATTERY_BOX)
+            p:teleportTo(spot:getX() - 2, spot:getY() + 2, trailer.vehicle:getZ())
+        end
         T.step(function()
             self.shut = T.lidPose(trailer)
-            standIn(trailer.vehicle, BATTERY_BOX)
+            stepAside()
         end)
+        -- The squares around the new spot stay dark until the lighting has seen them.
+        T.waitForCopy(Stage.lightingSettled(p))
+        T.step(function() lidShot("0_shut", trailer.vehicle) end)
         self.swings = {}
-        -- Queues `act` and a wait until the lid stands held `open`, noting what it passed on the way.
-        local function swing(name, open, act)
+        -- Queues `act` from the box's area and a wait until the lid stands held `open`, noting what
+        -- it passed on the way, with a shot of the first pose between and one of the held pose from
+        -- beside the box, numbered `shot`.
+        local function swing(name, open, shot, act)
             local seen = { name = name, open = open }
             table.insert(self.swings, seen)
-            T.step(act)
+            local label = shot .. "_" .. (name:gsub(" ", "_"))
+            T.step(function()
+                standIn(trailer.vehicle, BATTERY_BOX)
+                act()
+            end)
             T.waitForCopy(function()
                 seen.pose = T.lidPose(trailer)
                 if seen.pose and seen.pose.playing and seen.pose.open and seen.pose.open > 0.1 and seen.pose.open < 0.9 then
+                    if not seen.between then
+                        lidShot(label .. "_swinging", trailer.vehicle)
+                    end
                     seen.between = true
                 end
                 return trailer.vehicle:getPartById(LID):getDoor():isOpen() == open and lidHeld(seen.pose, open)
@@ -826,13 +865,16 @@ test("renewable_energy_world_arrow_board_lid_swings", {
             T.step(function()
                 local vehicle = trailer.vehicle
                 seen.access = vehicle:canAccessContainer(vehicle:getPartById(BATTERY_BOX):getIndex(), p)
+                stepAside()
             end)
+            T.wait(SHOWN_FRAMES)
+            T.step(function() lidShot(label, trailer.vehicle) end)
         end
         -- What the trailer's menu does for Open Trunk and Close Trunk.
-        swing("opening it", true, function() ISVehicleMenu.onOpenDoor(p, trailer.vehicle:getPartById(LID)) end)
-        swing("closing it", false, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
-        swing("someone else opening it", true, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
-        swing("someone else closing it", false, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
+        swing("opening it", true, 1, function() ISVehicleMenu.onOpenDoor(p, trailer.vehicle:getPartById(LID)) end)
+        swing("closing it", false, 2, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
+        swing("someone else opening it", true, 3, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
+        swing("someone else closing it", false, 4, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
     end,
     validate = function(self)
         if not expect(lidHeld(self.shut, false), "the shut lid shows " .. describeLid(self.shut)) then
