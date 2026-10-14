@@ -1,43 +1,6 @@
 -- Development only; dev/run-debug-client.sh --art runs it instead of the tests. It checks the art
--- from art/models in the world and saves screenshots to <cachedir>/Screenshots, building one
--- stage after another on the same open lot:
---   art_tiles.png     every placed tile, the wall panels on walls it builds, the character
---                     standing in front of a wall panel (the depth map must draw them in front)
---   art_overlays.png  snow on every panel tile that takes it, and the crate's contents and lid
---   art_items.png     every item of the mod on the ground, a car battery first for scale
---   art_icons.png     every item's icon at twice its size, as the crafting window draws it
---   art_fill.png      every bank tile, of every tier, with every battery overlay it has, and every
---                     level of its charge meter
---   art_trailer.png   the arrow board trailer hitched to a car, its battery box open and holding
---                     a battery; "REArt trailer" in console.txt says whether both worked. The
---                     same view then shows its rear in each of these states:
---     art_trailer_rust.png      rust at its full amount
---     art_trailer_blood_right.png   blood on the right side only, which settles which side is which
---     art_trailer_blood.png     blood on all four sides
---     art_trailer_brake.png     the brake lights, lit while the towing car brakes
---     art_trailer_panel_cracked.png   its right panel's module cracked, the left one whole
---     art_trailer_panel_removed.png   its left panel taken off
---     art_trailer_rear_damage1.png    the back of its frame (TruckBed: tail and sides) at damage
---                                     stage 1, then
---     art_trailer_rear_damage2.png    at stage 2
---     art_trailer_lit.png       its arrow lit by day, from a charged battery, mid-flash
---     art_trailer_dark.png      switched on but dark, with no battery in its box
---     art_trailer_lit_night.png its arrow lit at night, dimmed, lighting the ground around it
---   art_trailer_front.png   a second trailer, alone and facing the other way, blood on all four
---                     sides, for the front and left side; the same view then shows it clean with
---     art_trailer_damage1.png   its whole frame (EngineDoor and TruckBed) and the battery box lid
---                               (TrunkDoor) at damage stage 1, then
---     art_trailer_damage2.png   at stage 2
---     art_trailer_lid_removed.png   the battery box lid taken off
---     art_trailer_washed.png    blood on all four sides, then washed off by vanilla's wash action
---     art_trailer_lid_open.png  the battery box lid swung open, then
---     art_trailer_lid_shut.png  swung shut again
---     art_trailer_lid_locked.png    the shut lid padlocked, then
---     art_trailer_lid_unlocked.png  unlocked, the padlock gone
---   art_cracked.png   cracked glass on a flat panel, wooden and metal wall panels and racks (one
---                     module of each rack cracked), placed the way players place them, so the
---                     mod's own code adds the overlays, and east of them an arrow board trailer
---                     with its left panel cracked and its right one whole, to compare the look
+-- from art/models in the world: it builds one stage after another on the same open lot and saves
+-- each shot to <cachedir>/Screenshots as <name>.png.
 
 require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
@@ -117,7 +80,8 @@ local function fillTiles()
     return fill
 end
 
--- Where the character stands for each shot, and how far it zooms out from the closest zoom.
+-- Where the character stands for each shot, and how far it zooms out from the closest zoom. For
+-- the tiles it stands in front of a wall panel, which the depth map must draw behind it.
 local SHOTS = {
     tiles = { name = "art_tiles", x = 2, y = 1, zoomSteps = 3 },
     overlays = { name = "art_overlays", x = 4, y = 10, zoomSteps = 2 },
@@ -161,7 +125,7 @@ local LID_SWING_MS = 1000
 
 --- Sets the lid open or shut on the lone trailer and returns a runSteps wait for its swing.
 local function swingLid(pair, open)
-    local door = pair.trailer:getPartById("TrunkDoor"):getDoor()
+    local door = pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):getDoor()
     -- Spawned trailers are often locked, and a locked lid wouldn't open in play.
     door:setLocked(false)
     door:setOpen(open)
@@ -171,7 +135,7 @@ end
 
 -- The lid shut and padlocked or not; ArrowBoard's lid watcher shows the padlock by the next frame.
 local function lockLid(pair, locked)
-    local door = pair.trailer:getPartById("TrunkDoor"):getDoor()
+    local door = pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):getDoor()
     door:setOpen(false)
     door:setLockBroken(false)
     door:setLocked(locked)
@@ -214,6 +178,7 @@ end
 -- A state's `set` may return how to wait before the shot, as a runSteps step does.
 local HITCHED_STATES = {
     { name = "art_trailer_rust", set = function(pair) pair.trailer:setRust(1) end },
+    -- One side alone settles which side is which.
     { name = "art_trailer_blood_right", set = function(pair) setBlood(pair.trailer, { "Right" }) end },
     { name = "art_trailer_blood", set = function(pair) setBlood(pair.trailer, BLOOD_SIDES) end },
     {
@@ -251,7 +216,10 @@ local HITCHED_STATES = {
 local LONE_STATES = {
     { name = "art_trailer_damage1", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_1) end },
     { name = "art_trailer_damage2", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_2) end },
-    { name = "art_trailer_lid_removed", set = function(pair) pair.trailer:getPartById("TrunkDoor"):setInventoryItem(nil) end },
+    {
+        name = "art_trailer_lid_removed",
+        set = function(pair) pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):setInventoryItem(nil) end,
+    },
     {
         name = "art_trailer_washed",
         set = function(pair)
@@ -291,9 +259,10 @@ local function isOpen(square)
 end
 
 local function lotFits(cornerX, cornerY, z)
+    local cell = getCell()
     for x = cornerX, cornerX + AREA.w - 1 do
         for y = cornerY, cornerY + AREA.h - 1 do
-            if not isOpen(getCell():getGridSquare(x, y, z)) then
+            if not isOpen(cell:getGridSquare(x, y, z)) then
                 return false
             end
         end
@@ -352,19 +321,8 @@ end
 local VEHICLE_MARGIN = 4
 
 local function clearVehicles(lot)
-    local found = {}
-    for x = -VEHICLE_MARGIN, AREA.w + VEHICLE_MARGIN - 1 do
-        for y = -VEHICLE_MARGIN, AREA.h + VEHICLE_MARGIN - 1 do
-            local square = lotSquare(lot, x, y)
-            local vehicle = square and square:getVehicleContainer()
-            if vehicle then
-                found[vehicle] = true
-            end
-        end
-    end
-    for vehicle in pairs(found) do
-        vehicle:permanentlyRemove()
-    end
+    Stage.removeVehicles(lot.x - VEHICLE_MARGIN, lot.y - VEHICLE_MARGIN, lot.x + AREA.w + VEHICLE_MARGIN - 1,
+        lot.y + AREA.h + VEHICLE_MARGIN - 1, lot.z)
 end
 
 local function placeTiles(lot, list)
@@ -398,7 +356,7 @@ local function dropItems(lot)
             local column, row = (i - 1) % ITEMS_PER_ROW, math.floor((i - 1) / ITEMS_PER_ROW)
             lotSquare(lot, column, 1 + row * 2):AddWorldInventoryItem(item, 0.5, 0.5, 0)
         else
-            print("REArt missing item " .. fullType)
+            print(MARK .. " missing item " .. fullType)
         end
     end
 end
@@ -481,7 +439,7 @@ local function addCrackedShot(steps, player, lot)
     end)
     -- A trailer beside them with one panel cracked as theirs are and one whole, to compare the look.
     -- The tick after stocking puts the stock conditions back over any set in the same tick
-    -- (ArrowBoard.keepStockConditions), so they're set a step later.
+    -- (ArrowBoard.lua's keepStockConditions), so they're set a step later.
     local trailer
     table.insert(steps, function()
         -- Row 4 keeps all of it on the cleared lot.
@@ -533,18 +491,18 @@ local function addTileAndItemShots(steps, player, lot)
     addShot(steps, player, lot, SHOTS.fill)
 end
 
--- The trailer hitched to its car, then the rear in each of its states. `art.trailer` holds the
--- pair the steps spawn.
+-- The trailer hitched to its car, then the rear in each of its states. `art.pair` holds the pair
+-- the steps spawn.
 local function addHitchedTrailerShots(steps, player, lot, art)
     table.insert(steps, function()
         clearLot(lot)
         clearVehicles(lot)
-        art.trailer = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
-        return Stage.vehiclesAtRest(art.trailer, false)
+        art.pair = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
+        return Stage.vehiclesAtRest(art.pair, false)
     end)
     table.insert(steps, function()
-        Stage.hitchTrailer(art.trailer, player, "REArt")
-        return Stage.vehiclesAtRest(art.trailer, true)
+        Stage.hitchTrailer(art.pair, player, MARK)
+        return Stage.vehiclesAtRest(art.pair, true)
     end)
     addShot(steps, player, lot, SHOTS.trailer)
     addStates(steps, art.currentPair, HITCHED_STATES)
@@ -559,12 +517,12 @@ local function addLoneAndCrackedShots(steps, player, lot, art)
     end)
     table.insert(steps, function()
         clearVehicles(lot)
-        art.trailer = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")
+        art.pair = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")
         -- From the camera's side a car facing this way would hide its trailer.
-        art.trailer.car:permanentlyRemove()
-        art.trailer.car = nil
-        setBlood(art.trailer.trailer, BLOOD_SIDES)
-        return Stage.vehiclesAtRest(art.trailer, false)
+        art.pair.car:permanentlyRemove()
+        art.pair.car = nil
+        setBlood(art.pair.trailer, BLOOD_SIDES)
+        return Stage.vehiclesAtRest(art.pair, false)
     end)
     addShot(steps, player, lot, SHOTS.trailerFront)
     addStates(steps, art.currentPair, LONE_STATES)
@@ -582,7 +540,7 @@ function Art.capture(onDone)
     print(string.format("REArt stage at %d,%d", lot.x, lot.y))
     local art = {}
     function art.currentPair()
-        return art.trailer
+        return art.pair
     end
     addTileAndItemShots(run.steps, player, lot)
     addHitchedTrailerShots(run.steps, player, lot, art)

@@ -2,15 +2,12 @@
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
-require "PZHarness/ServerHandlers"
-require "PZHarness/Checks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
-local newCheck, countPairs = PZHarness.Checks.new, PZHarness.Fixtures.countPairs
+local check, saveOptions, countPairs = Helpers.check, Helpers.saveOptions, PZHarness.Fixtures.countPairs
 local squareAt, removeObject = Helpers.squareAt, Helpers.removeObject
 local Sprites = RenewableEnergy.Sprites
 
@@ -105,11 +102,10 @@ end
 -- Every entry names an item that exists, since the game drops an unknown item silently, and sits
 -- once in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
 -- table or a corpse's outfit list.
-handler("lootListsInUse", function()
-    local expect, _, failures = newCheck()
+check("lootListsInUse", function(expect)
     local D = distributions(expect)
     if not D then
-        return { failures = failures }
+        return
     end
     local procUsers = procListUsers()
     local vehicleTables = vehicleTablesInUse()
@@ -141,15 +137,13 @@ handler("lootListsInUse", function()
             end
         end
     end
-    return { failures = failures }
 end)
 
 -- Every list actually hands out every item it lists, through the game's own rolls. The loot
 -- rarity options are at their maximum, so a few rolls are enough even for the rarest entries.
-handler("lootItemsSpawn", function()
-    local expect, _, failures = newCheck()
+check("lootItemsSpawn", function(expect)
     if not distributions(expect) then
-        return { failures = failures }
+        return
     end
     local Loot = RenewableEnergy.Loot
     local targets = Loot.targets()
@@ -185,7 +179,6 @@ handler("lootItemsSpawn", function()
             end
         end)
     end)
-    return { failures = failures }
 end)
 
 -- Sum of an item's weights in vanilla lists: the mod's own kit and stock lists don't count,
@@ -205,11 +198,10 @@ local function vanillaWeight(D, fullType)
 end
 
 -- Each ladder of `args.ladders` turns up less often at each step.
-handler("lootLaterStagesRarer", function(_, args)
-    local expect, _, failures = newCheck()
+check("lootLaterStagesRarer", function(expect, _, _, args)
     local D = distributions(expect)
     if not D then
-        return { failures = failures }
+        return
     end
     for _, ladder in ipairs(args.ladders) do
         for i = 2, #ladder do
@@ -217,7 +209,6 @@ handler("lootLaterStagesRarer", function(_, args)
             expect(earlier > later, ladder[i] .. " (" .. later .. ") is not rarer than " .. ladder[i - 1] .. " (" .. earlier .. ")")
         end
     end
-    return { failures = failures }
 end)
 
 -- Whether `list` has every vanilla item of `vanilla`; the mod's own entries differ between them.
@@ -233,8 +224,7 @@ end
 
 -- The utility vans keep every vanilla builder's item and get the mod's own truck bed; trailers
 -- can roll a camper's.
-handler("lootVehicleTables", function()
-    local expect, _, failures = newCheck()
+check("lootVehicleTables", function(expect)
     local byVehicle = VehicleDistributions[1]
     local vanillaBed = VehicleDistributions.ConstructionWorkerTruckBed
     for vehicle, listName in pairs({ VanKnoxCom = "RenewableEnergyTelecomTruckBed", VanDeerValley = "RenewableEnergyUtilityTruckBed" }) do
@@ -256,7 +246,6 @@ handler("lootVehicleTables", function()
     end
     expect(trailerTrunk ~= nil and listsContainAll(trailerTrunk, VehicleDistributions.CamperTruckBed),
         "the camper trailer lacks the camper's vanilla items")
-    return { failures = failures }
 end)
 
 -- Each loot rarity option scales the weights of its items in every list, the mod's own lists
@@ -264,17 +253,16 @@ end)
 -- leaving them at weight 0, because ItemPickerJava adds the zombie density bonus to every weight,
 -- so they would still spawn in towns; the other options' items stay. Applying the options again,
 -- as a second load does, replaces the entries instead of adding more.
-handler("lootRarityOptions", function(_, args)
-    local expect, expectNear, failures = newCheck()
+check("lootRarityOptions", function(expect, expectNear, _, args, defer)
     local D = distributions(expect)
     if not D then
-        return { failures = failures }
+        return
     end
-    local options = SandboxVars.RenewableEnergy
-    local saved = {}
+    local options, names = SandboxVars.RenewableEnergy, {}
     for option in pairs(args.rows[1]) do
-        saved[option] = options[option]
+        table.insert(names, option)
     end
+    local restoreOptions = saveOptions(defer, names, D.apply)
     for _, row in ipairs(args.rows) do
         local label = string.format("at %s/%s/%s", row.LRMSolarPanels, row.LRMBatteries, row.LRMMisc)
         for option, value in pairs(row) do
@@ -309,11 +297,7 @@ handler("lootRarityOptions", function(_, args)
             end
         end)
     end
-    for option, value in pairs(saved) do
-        options[option] = value
-    end
-    D.apply()
-    return { failures = failures }
+    restoreOptions()
 end)
 
 -- A container type that "all" rolls the mod's batteries into for certain: a weight this high is
@@ -356,14 +340,13 @@ end
 -- and one of a corpse's type rolls the corpse lists; a bag in each holds a battery, as a looted bag
 -- can. The arrow board tests cover vehicle fills, which stock the trailer's battery box. `args` is
 -- a free outdoor square.
-handler("lootFoundBatteries", function(_, args, defer)
-    local expect, expectNear, failures = newCheck()
+check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
     if not distributions(expect) then
-        return { failures = failures }
+        return
     end
     local square = squareAt(args)
     if not square or square:getRoom() then
-        return nil, "an outdoor square loaded on the server"
+        return "an outdoor square loaded on the server"
     end
     local Battery = RenewableEnergy.Battery
     local range = RenewableEnergy.Specs.foundCharge
@@ -403,7 +386,6 @@ handler("lootFoundBatteries", function(_, args, defer)
         end
         expectNear("an emptied battery's charge in " .. fill.what .. " after a refill", Battery.getCharge(own), 0)
     end
-    return { failures = failures }
 end)
 
 -- Up to `wanted` loaded squares near the character in rooms that have a loot distribution, one per
@@ -436,11 +418,10 @@ end
 -- battery out of would refill with free batteries every respawn. The objects of `args.containers`
 -- ({ { sprite, type } }) are built from the tiles, as placing them does, but never added to the
 -- square.
-handler("lootPlayerContainers", function(player, args)
-    local expect, _, failures = newCheck()
+check("lootPlayerContainers", function(expect, _, player, args)
     local squares = sampleSquares(player, 4)
     if not expect(#squares >= 2, "no loaded room near the character") then
-        return { failures = failures }
+        return
     end
     for _, square in ipairs(squares) do
         local room = square:getRoom()
@@ -462,5 +443,4 @@ handler("lootPlayerContainers", function(player, args)
             end
         end
     end
-    return { failures = failures }
 end)

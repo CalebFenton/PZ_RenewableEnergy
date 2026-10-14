@@ -108,13 +108,17 @@ local function partLabel(item)
         Format.percent(item:getCondition() / item:getConditionMax()))
 end
 
+local function isPart(item)
+    return PowerBank.partKind(item:getFullType()) ~= nil
+end
+
 -- The parts in the bank's container, in its order.
 local function wiredParts(bank)
     local parts = {}
     local items = bank:getContainer():getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        if PowerBank.partKind(item:getFullType()) then
+        if isPart(item) then
             table.insert(parts, item)
         end
     end
@@ -128,16 +132,13 @@ local function oneOfEachType(character, matches)
     local items = character:getInventory():getAllEvalRecurse(matches)
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        if not seen[item:getFullType()] then
-            seen[item:getFullType()] = true
+        local fullType = item:getFullType()
+        if not seen[fullType] then
+            seen[fullType] = true
             table.insert(found, item)
         end
     end
     return found
-end
-
-local function isPart(item)
-    return PowerBank.partKind(item:getFullType()) ~= nil
 end
 
 local function addSubMenu(context, name)
@@ -245,8 +246,7 @@ function Menu.unconnectedSources(bank)
 end
 
 function Menu.addBankOptions(playerNum, context, bank)
-    local menu = context:getNew(context)
-    context:addSubMenu(context:addOption(Menu.bankLabel(bank)), menu)
+    local menu = addSubMenu(context, Menu.bankLabel(bank))
     menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, StatusWindow.open, bank)
 
     local summary = PowerBank.summaryOf(bank)
@@ -302,8 +302,7 @@ local function addSnowOption(playerNum, menu, source, entry)
 end
 
 function Menu.addSourceOptions(playerNum, context, source)
-    local menu = context:getNew(context)
-    context:addSubMenu(context:addOption(Menu.nameOf(source)), menu)
+    local menu = addSubMenu(context, Menu.nameOf(source))
 
     local here = PowerBank.positionOf(source)
     local connected = Action.connectedBank(source)
@@ -458,10 +457,10 @@ end
 
 -- The generator vanilla would have offered its menu on had the bank not been there.
 --
--- fetchVars.generator is a single slot that the last IsoGenerator walked wins, and a bank is an
--- IsoGenerator. Clearing the slot would also hide the menu of a real generator next to the bank,
--- the very layout a backup generator needs. This walks the objects in the engine's order (each
--- entry, then its square once) so the generator handed back is the one vanilla would have picked.
+-- fetchVars.generator holds only the last IsoGenerator the fetch walked, and a bank is one.
+-- Clearing the slot would also hide the menu of a real generator beside the bank, where a backup
+-- generator stands. This walks the objects in the fetch's order (each entry, then its square once;
+-- ISWorldObjectContextMenuLogic.fetch) so the generator handed back is the one vanilla would pick.
 local function otherGenerator(worldobjects)
     local found, seen = nil, {}
     local function consider(object)

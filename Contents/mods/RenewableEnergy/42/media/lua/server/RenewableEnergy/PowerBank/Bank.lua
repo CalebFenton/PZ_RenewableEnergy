@@ -40,9 +40,8 @@ Bank.SAVED_FIELDS = {
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
 -- bank's floor.
 local BACKUP_REACH = 3
--- Snow on panels, per hour: falling snow covers a panel at full intensity in about two
--- hours; it melts above freezing and slides off in sun; a rack sheds it in about two hours
--- of sun or mild air.
+-- Snow cover on a panel, as a share of the panel per hour: falling snow adds it, mild air and
+-- sun melt it, and a rack sheds it in sun or mild air.
 local SNOW_PER_HOUR = 0.5
 local SNOW_MELT_PER_HOUR = 0.1
 local SNOW_SUN_MELT_PER_HOUR = 0.05
@@ -53,8 +52,7 @@ local SNOW_SHOWN = 0.5
 -- A panel making less than this share of what it would in clear full sun names the biggest
 -- reason in the status.
 local LOW_SHARE = 0.7
--- Vanilla bills generators in fuel per hour per unit of power; a unit is this many watts
--- (Specs.loads.other).
+-- Vanilla bills generators in fuel per hour per unit of power; a unit is this many watts.
 local WATTS_PER_FUEL_UNIT = Specs.loads.other.wattsPerConsumption
 
 function Bank:new(luaSystem, globalObject)
@@ -130,13 +128,6 @@ end
 
 -- Parts ----------------------------------------------------------------------------------
 
-local function eachItem(container, fn)
-    local items = container:getItems()
-    for i = items:size() - 1, 0, -1 do
-        fn(items:get(i))
-    end
-end
-
 local function partEntry(item)
     return { id = item:getID(), type = item:getFullType(), condition = item:getCondition() }
 end
@@ -149,7 +140,9 @@ function Bank:recount()
     if not container then return end
     local parts = { battery = {}, inverter = {}, charger = {}, controller = {} }
     local nominalWh, storedWh = 0, 0
-    eachItem(container, function(item)
+    local items = container:getItems()
+    for i = items:size() - 1, 0, -1 do
+        local item = items:get(i)
         local kind = PowerBank.partKind(item:getFullType())
         if kind == "battery" then
             local wh = Battery.nominalWh(item)
@@ -161,7 +154,7 @@ function Bank:recount()
         elseif kind then
             table.insert(parts[kind], partEntry(item))
         end
-    end)
+    end
     self.batteries = parts.battery
     self.inverters = parts.inverter
     self.chargers = parts.charger
@@ -170,12 +163,13 @@ function Bank:recount()
     self.charge = nominalWh > 0 and storedWh / nominalWh or 0
 end
 
-local wearScale = Battery.wearScale
-
 --- Put the bank's charge into every battery it holds: the batteries are wired in parallel,
 --- so they share one state of charge. Pending wear from days spent unloaded lands too.
 function Bank:writeBatteries(container, applyPending)
-    eachItem(container, function(item)
+    local scale = applyPending and Battery.wearScale()
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
         local spec = Battery.spec(item)
         if spec and item:getCondition() > 0 then
             -- As the arrow board and the maintainer do: clients hear of the charge once it shows
@@ -184,27 +178,30 @@ function Bank:writeBatteries(container, applyPending)
             Battery.setCharge(item, self.charge)
             if applyPending then
                 for _, depth in ipairs(self.pendingDepths) do
-                    changed = Battery.wear(item, Battery.cycleWear(spec, depth) * wearScale()) or changed
+                    changed = Battery.wear(item, Battery.cycleWear(spec, depth) * scale) or changed
                 end
             end
             if changed then
                 sendItemStats(item)
             end
         end
-    end)
+    end
     if applyPending then
         self.pendingDepths = {}
     end
 end
 
--- Wear every battery by a fraction of its life.
-function Bank:wearBatteries(container, fractionFor)
-    eachItem(container, function(item)
+-- Wear every battery by one discharge `depth` deep.
+function Bank:wearBatteries(container, depth)
+    local scale = Battery.wearScale()
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
         local spec = Battery.spec(item)
-        if spec and Battery.wear(item, fractionFor(spec) * wearScale()) then
+        if spec and Battery.wear(item, Battery.cycleWear(spec, depth) * scale) then
             sendItemStats(item)
         end
-    end)
+    end
 end
 
 local function working(part)
@@ -253,18 +250,17 @@ end
 -- Inverters and controllers wear while they work, and an overload strains the inverters.
 function Bank:wearParts(container, hours, overloads)
     local wear = Specs.partWear
-    eachItem(container, function(item)
+    local inverterPoints = wear.inverterPerHour * hours + wear.overload * overloads
+    local controllerPoints = wear.controllerPerHour * hours
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
         local kind = PowerBank.partKind(item:getFullType())
-        local points = 0
-        if kind == "inverter" then
-            points = wear.inverterPerHour * hours + wear.overload * overloads
-        elseif kind == "controller" then
-            points = wear.controllerPerHour * hours
-        end
+        local points = (kind == "inverter" and inverterPoints) or (kind == "controller" and controllerPoints) or 0
         if Wear.take(item, points) then
             sendItemStats(item)
         end
-    end)
+    end
 end
 
 -- Wear now if the parts are at hand, else when the chunk next loads.
@@ -686,7 +682,7 @@ function Bank:newDay(container, day)
     if self.day and self.day ~= day then
         local depth = self.cycleDepth
         if container then
-            self:wearBatteries(container, function(spec) return Battery.cycleWear(spec, depth) end)
+            self:wearBatteries(container, depth)
         elseif depth > 0 then
             table.insert(self.pendingDepths, depth)
         end
@@ -746,12 +742,13 @@ function Bank:update(hours, context)
     elseif self.empty and stored > 0 and stored >= inverterDrawW(self) * hours then
         self.empty = false
     end
-    if self:shouldPower() then
+    local powering = self:shouldPower()
+    if powering then
         self:addPartWear(container, hours, 0)
     end
 
     self.solarWhToday = self.solarWhToday + solarW * hours
-    self.loadWhToday = self.loadWhToday + (self:shouldPower() and self.averageLoadW or 0) * hours
+    self.loadWhToday = self.loadWhToday + (powering and self.averageLoadW or 0) * hours
     self:trackCycle()
     self:newDay(container, today())
     if container then
@@ -772,15 +769,17 @@ function Bank:showBatteries()
     if not isoObject then return end
     local wanted = Sprites.bankOverlays(self:spec().sprite, #self.batteries, self.charge)
     local attached = isoObject:getAttachedAnimSprite()
-    local shown = {}
-    for i = 0, (attached and attached:size() or 0) - 1 do
+    local count = attached and attached:size() or 0
+    local shown, matches = 0, true
+    for i = 0, count - 1 do
         local name = attached:get(i):getName()
         if Sprites.isOverlay(name) then
-            table.insert(shown, name)
+            shown = shown + 1
+            matches = matches and wanted[shown] == name
         end
     end
-    if table.concat(shown, ",") == table.concat(wanted, ",") then return end
-    for i = (attached and attached:size() or 0) - 1, 0, -1 do
+    if matches and shown == #wanted then return end
+    for i = count - 1, 0, -1 do
         if Sprites.isOverlay(attached:get(i):getName()) then
             isoObject:RemoveAttachedAnim(i)
         end
@@ -793,8 +792,7 @@ end
 
 -- Status ---------------------------------------------------------------------------------
 
---- What the bank is doing, for the status window: "outdoors", "noInverter", "off", "grid",
---- "overloaded", "empty" or "on".
+--- What the bank is doing, for the status window.
 function Bank:state()
     if not self.indoors then return "outdoors" end
     if self:limitW() <= 0 then return "noInverter" end

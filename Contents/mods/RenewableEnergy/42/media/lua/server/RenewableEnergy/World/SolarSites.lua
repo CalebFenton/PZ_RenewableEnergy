@@ -19,6 +19,8 @@ RenewableEnergy = RenewableEnergy or {}
 local SolarSites = {}
 RenewableEnergy.SolarSites = SolarSites
 
+local WorldSpawns = RenewableEnergy.WorldSpawns
+
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 
 -- What each kind of site puts at its spots: how many of its panel spots it uses, how many
@@ -67,7 +69,7 @@ end
 local function moduleCount(kind, mount)
     local range = SolarSites.KINDS[kind].modules
     if range then
-        return RenewableEnergy.WorldSpawns.rollBetween(range)
+        return WorldSpawns.rollBetween(range)
     end
     return RenewableEnergy.Specs.mounts[MOUNTS[mount].kind].modules
 end
@@ -76,14 +78,14 @@ end
 
 local PLACERS = {
     panel = function(square, spot)
-        local modules = RenewableEnergy.WorldSpawns.siteModules(moduleCount(spot.siteKind, spot.mount))
-        RenewableEnergy.WorldSpawns.placePanel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
+        local modules = WorldSpawns.siteModules(moduleCount(spot.siteKind, spot.mount))
+        WorldSpawns.placePanel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
     end,
     bank = function(square, spot)
-        RenewableEnergy.WorldSpawns.placeBank(square, spot.stock)
+        WorldSpawns.placeBank(square, spot.stock)
     end,
     crate = function(square, spot)
-        RenewableEnergy.WorldSpawns.placeCrate(square, spot.stock)
+        WorldSpawns.placeCrate(square, spot.stock)
     end,
     gardenLights = function(square)
         local building = square:getBuilding()
@@ -96,9 +98,8 @@ local PLACERS = {
     end,
 }
 
---- Puts down what a site spot holds (its global object's modData: what, siteKind, mount,
---- facing, stock) on its square. Returns false when the game refused an arrow board, so its spot
---- can stay for another try.
+--- Puts down what a site spot (its global object's modData) holds on its square. Returns false
+--- when the game refused an arrow board, so its spot can stay for another try.
 function SolarSites.place(square, spot)
     return PLACERS[spot.what](square, spot) ~= false
 end
@@ -131,7 +132,7 @@ end
 function SolarSites.addSite(site)
     local kind = SolarSites.KINDS[site.kind]
     if kind.panels then
-        local count = RenewableEnergy.WorldSpawns.rollBetween(kind.panels)
+        local count = WorldSpawns.rollBetween(kind.panels)
         for _, panel in ipairs(pickSome(site.panels, count)) do
             addSpot(panel[1], panel[2], panel[3], { what = "panel", siteKind = site.kind, mount = panel[4], facing = panel[5] })
         end
@@ -183,6 +184,8 @@ function SolarSites.placeChunk(wx, wy)
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
         local x, y, z = object:getX(), object:getY(), object:getZ()
+        -- A copy: removeObject, which comes before placing, wipes the object's modData
+        -- (GlobalObject.Reset).
         local spot = {}
         for key, value in pairs(object:getModData()) do
             spot[key] = value
@@ -211,7 +214,7 @@ local function onChunkLoaded(_self, wx, wy)
     SolarSites.placeChunk(wx, wy)
 end
 
--- The game asks every system for a table to send to clients; the spots concern only the server.
+-- SGlobalObjectSystem throws for a system without this; the spots concern only the server.
 local function getInitialStateForClient()
     return nil
 end

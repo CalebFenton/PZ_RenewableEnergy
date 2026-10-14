@@ -11,12 +11,14 @@ RenewableEnergy = RenewableEnergy or {}
 local Battery = {}
 RenewableEnergy.Battery = Battery
 
+local Specs, Wear = RenewableEnergy.Specs, RenewableEnergy.Wear
+
 --- The Specs.batteries row for an item, or nil if it is no battery.
 function Battery.spec(item)
     if not instanceof(item, "InventoryItem") then
         return nil
     end
-    return RenewableEnergy.Specs.batteries[item:getFullType()]
+    return Specs.batteries[item:getFullType()]
 end
 
 function Battery.isBattery(item)
@@ -56,7 +58,7 @@ end
 --- Give a battery found in the world a random part charge, and send it to the clients that
 --- see it. Authority only.
 function Battery.setFoundCharge(item)
-    local range = RenewableEnergy.Specs.foundCharge
+    local range = Specs.foundCharge
     Battery.setCharge(item, range.min + (range.max - range.min) * ZombRandFloat(0, 1))
     sendItemStats(item)
 end
@@ -78,10 +80,8 @@ function Battery.emptiestIn(container, accepts)
     return emptiest
 end
 
---- Fraction of its life a battery loses to one discharge `depth` deep (0 to 1).
----
---- Cycle life falls with the square of the depth (SAND2004-3149), anchored at the
---- type's cycles at 50%: a deep-cycle battery then lasts about 400 cycles at 80%.
+--- Fraction of its life a battery loses to one discharge `depth` deep (0 to 1). Cycle life
+--- falls with the square of the depth (SAND2004-3149), anchored at the type's cycles at 50%.
 function Battery.cycleWear(spec, depth)
     return (depth / 0.5) ^ 2 / spec.cyclesAt50
 end
@@ -94,7 +94,7 @@ end
 --- Take `fraction` of a full life off a battery's condition. Returns whether the condition
 --- changed, so the caller knows to sync the item.
 function Battery.wear(item, fraction)
-    return RenewableEnergy.Wear.take(item, fraction * item:getConditionMax())
+    return Wear.take(item, fraction * item:getConditionMax())
 end
 
 return Battery

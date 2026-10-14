@@ -8,6 +8,9 @@ require "ISUI/ISToolTipInv"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/UI/Format"
 
+local Battery = RenewableEnergy.Battery
+local Format = RenewableEnergy.Format
+
 local PAD = 5
 
 -- The strip of the battery last drawn, rebuilt only when the battery, its charge, its condition
@@ -19,8 +22,7 @@ local function stripFor(item, font)
     if strip.item == item and strip.uses == uses and strip.condition == condition and strip.font == font then
         return strip
     end
-    local Format = RenewableEnergy.Format
-    local wh = RenewableEnergy.Battery.nominalWh(item)
+    local wh = Battery.nominalWh(item)
     local lines = {
         { getText("IGUI_RenewableEnergy_Capacity") .. ":", Format.wattHours(wh) },
         { getText("IGUI_RenewableEnergy_Stored") .. ":", Format.wattHours(wh * uses) },
@@ -32,7 +34,7 @@ local function stripFor(item, font)
         valueWidth = math.max(valueWidth, textManager:MeasureStringX(font, line[2]))
     end
     strip = { item = item, uses = uses, condition = condition, font = font, lines = lines, labelWidth = labelWidth,
-        valueWidth = valueWidth }
+        valueWidth = valueWidth, lineHeight = textManager:getFontHeight(font) }
     return strip
 end
 
@@ -41,13 +43,12 @@ local vanillaRender = ISToolTipInv.render
 function ISToolTipInv:render()
     vanillaRender(self)
     -- Vanilla skips the tooltip while a context menu is open.
-    if not RenewableEnergy.Battery.isBattery(self.item) or (ISContextMenu.instance and ISContextMenu.instance.visibleCheck) then
+    if not Battery.isBattery(self.item) or (ISContextMenu.instance and ISContextMenu.instance.visibleCheck) then
         return
     end
 
-    local font = self.tooltip:getFont()
-    local lineHeight = getTextManager():getFontHeight(font)
-    local rows = stripFor(self.item, font)
+    local rows = stripFor(self.item, self.tooltip:getFont())
+    local font, lineHeight = rows.font, rows.lineHeight
     local width = math.max(self.width, PAD + rows.labelWidth + PAD + rows.valueWidth + PAD)
     local height = PAD + lineHeight * #rows.lines + PAD
     local top = self.height
@@ -55,8 +56,9 @@ function ISToolTipInv:render()
     if self:getAbsoluteY() + top + height > getCore():getScreenHeight() then
         top = -height
     end
-    self:drawRect(0, top, width, height, self.backgroundColor.a, self.backgroundColor.r, self.backgroundColor.g, self.backgroundColor.b)
-    self:drawRectBorder(0, top, width, height, self.borderColor.a, self.borderColor.r, self.borderColor.g, self.borderColor.b)
+    local background, border = self.backgroundColor, self.borderColor
+    self:drawRect(0, top, width, height, background.a, background.r, background.g, background.b)
+    self:drawRectBorder(0, top, width, height, border.a, border.r, border.g, border.b)
     local y = top + PAD
     for _, line in ipairs(rows.lines) do
         self:drawText(line[1], PAD, y, 1.0, 1.0, 0.8, 1.0, font)

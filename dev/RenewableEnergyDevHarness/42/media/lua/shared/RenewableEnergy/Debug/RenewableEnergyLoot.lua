@@ -1,15 +1,14 @@
 -- Measures how often the mod's items spawn, with the game's own loot rolls on scratch containers
--- that never enter the world, and how world banks and crates are stocked. For tuning
--- Distributions.lua and WorldSpawns.lua, for the numbers in the README, and for the loot tests,
--- which measure where the loot is rolled: in single player, or on a multiplayer server, whose
--- loot tables alone hold the mod's entries. Shared Lua, so that the server has it.
+-- that never enter the world, and how world banks and crates are stocked: for tuning
+-- Distributions.lua and WorldSpawns.lua, the README's numbers and the loot tests. Shared Lua so
+-- the loot tests can roll on a multiplayer server, whose loot tables alone hold the mod's entries.
 -- dev/run-debug-client.sh --loot prints Loot.report() and Loot.moduleReport(). Debug mode only.
 --
--- The report rolls copies of the lists that hold only the mod's items. Each entry rolls on its
--- own, so that gives the same chances without creating the vanilla items, and rolling the whole
--- lists thousands of times runs the client out of memory. What it leaves out: a container that
--- the vanilla items have already filled stops rolling, which makes the real chances a little
--- lower in lists of heavy items.
+-- The report rolls copies of the lists that hold only the mod's items: each entry rolls on its
+-- own, so the chances are the same without creating the vanilla items, and rolling the whole
+-- lists thousands of times runs the client out of memory. It leaves out that a container the
+-- vanilla items have already filled stops rolling, so the real chances are a little lower in
+-- lists of heavy items.
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
@@ -135,11 +134,11 @@ local ROOM_CONTAINERS = {
     { room = "RenewableEnergyStashCache", container = "metal_shelves", label = "Metal shelves in the mod's stash houses" },
 }
 
--- Sandbox options while measuring: the loot settings of a new game with the default preset,
--- without the zombie density bonus (of the mod's items only the magazines can get it, and that
--- preset turns it off anyway), and without annotated maps, each of which uses up a stash of the
--- world. DEFAULT stands for the option's default value, which the game takes from the Apocalypse
--- preset (SandboxOptions constructor).
+-- Sandbox options while measuring: a new default-preset game's loot settings, without the zombie
+-- density bonus (of the mod's items only the magazines can get it, and the preset turns it off
+-- anyway) and without annotated maps, each of which uses up a stash of the world. DEFAULT stands
+-- for the option's default value, which the game takes from the Apocalypse preset
+-- (SandboxOptions constructor).
 local DEFAULT = {}
 local MEASURE_OPTIONS = {
     OtherLootNew = DEFAULT,
@@ -407,7 +406,7 @@ local function sample(fill, samples, container, everything)
     return result
 end
 
--- An outdoor square near `character` (this game's player by default), for procedural rolls.
+--- An outdoor square near `character` (this game's player by default), for procedural rolls.
 function Loot.squareOutsideRooms(character)
     character = character or getPlayer()
     local cell = getCell()
@@ -426,6 +425,15 @@ function Loot.squareOutsideRooms(character)
     return nil
 end
 
+local function sortedKeys(t)
+    local keys = {}
+    for key in pairs(t) do
+        table.insert(keys, key)
+    end
+    table.sort(keys)
+    return keys
+end
+
 -- How WorldSpawns and the arrow board stock the containers they place, each into a scratch
 -- container.
 local function worldStock()
@@ -434,16 +442,11 @@ local function worldStock()
     local function add(label, reference, fill)
         table.insert(stocks, { label = label, reference = reference, fill = fill })
     end
-    local bankNames = {}
-    for name in pairs(WorldSpawns.BANK_STOCK) do
-        table.insert(bankNames, name)
-    end
-    table.sort(bankNames)
-    for _, name in ipairs(bankNames) do
+    for _, name in ipairs(sortedKeys(WorldSpawns.BANK_STOCK)) do
         add("World bank: " .. name .. " (" .. WorldSpawns.BANK_STOCK[name].sprite .. ")", "world:bank." .. name,
             function(container) WorldSpawns.stockBank(container, name) end)
     end
-    for _, name in ipairs({ "kit", "powerYard" }) do
+    for _, name in ipairs(sortedKeys(WorldSpawns.CRATE_STOCK)) do
         add("World crate: " .. name, "world:crate." .. name, function(container) WorldSpawns.stockCrate(container, name) end)
     end
     add("Arrow board battery box", "world:arrowBoard", function(container)
@@ -504,14 +507,14 @@ function Loot.report(samples)
 end
 
 -- Module-watts report ------------------------------------------------------------------------------
--- How many solar modules, and how many watts of them, a thorough player finds in a town: every
--- container of every room, the crates world spawns put in rooms, the vehicles its stalls hold
--- and the solar sites in its bounds, from dev/loot/census.py's counts times each one's expected
--- modules. Expectations come from the loot tables' weights the way the game rolls them
--- (ItemPickerJava.getActualSpawnChance), so the report is exact for the lists and approximate
--- where the game picks among them: a procedural container picks a list by weightChance, at most
--- `max` per room, and lists forced by zone, tile or room are left out. Watts weigh each module by
--- its condition; "repaired" is after one Repair Cracked Module on every module it helps.
+-- How many solar modules a thorough player finds in a town, with their summed condition, which
+-- --loot turns into watts: dev/loot/census.py's counts of the town's container tiles, rooms and
+-- vehicle stalls, each times its expected modules, plus the world crates of its rooms and the
+-- solar sites in its bounds. Expectations come from the loot tables' weights the way the game
+-- rolls them (ItemPickerJava.getActualSpawnChance), so the report is exact for the lists and
+-- approximate where the game picks among them: a procedural container picks a list by
+-- weightChance, at most `max` per room, and lists forced by zone, tile or room are left out.
+-- "Repaired" is after one Repair Cracked Module on every module it helps.
 
 local MODULE = RenewableEnergy.Specs.factoryModule
 
@@ -544,6 +547,7 @@ local function moduleOver(range)
     return haul(1, sum / n, repairedSum / n)
 end
 
+-- One module that is `a` with chance `share`, else `b`.
 local function mix(share, a, b)
     return haul(1, share * a.condition + (1 - share) * b.condition, share * a.repaired + (1 - share) * b.repaired)
 end
@@ -560,35 +564,46 @@ local function moduleKinds()
     }
 end
 
+-- ItemPickerJava.getBaseChanceMultiplier: a junk entry rolls at its weight times this.
+local JUNK_WEIGHT_MULTIPLIER = 1.4
+
+-- The chance one roll of an entry of `weight` hits: ItemPickerJava rolls Rand.Next(10000) below
+-- getActualSpawnChance, which is weight * 100 * the loot multiplier.
 local function chancePerRoll(weight, multiplier)
     return math.min(1, math.ceil(weight * 100 * multiplier) / 10000)
 end
 
+-- Expected count of `fullType` in one fill of `list`'s items, with each weight times `weightFactor`.
+local function expectedInItems(list, fullType, weightFactor, multiplier)
+    local total = 0
+    local items = list.items or {}
+    for i = 1, #items - 1, 2 do
+        if items[i] == fullType then
+            total = total + (list.rolls or 1) * chancePerRoll(items[i + 1] * weightFactor, multiplier)
+        end
+    end
+    return total
+end
+
 -- Expected count of `fullType` in one fill of a loot table, junk included. Junk rolls at a loot
--- multiplier of 1 with its weights times 1.4 (ItemPickerJava.getBaseChanceMultiplier).
+-- multiplier of 1 (ItemPickerJava.getLootModifier).
 local function expectedIn(lootTable, fullType)
     if type(lootTable) ~= "table" then
         return 0
     end
-    local total = 0
-    local multiplier = ItemPickerJava.getLootModifier(fullType)
-    local items = lootTable.items or {}
-    for i = 1, #items - 1, 2 do
-        if items[i] == fullType then
-            total = total + (lootTable.rolls or 1) * chancePerRoll(items[i + 1], multiplier)
-        end
-    end
-    local junk = lootTable.junk
-    for i = 1, #(junk and junk.items or {}) - 1, 2 do
-        if junk.items[i] == fullType then
-            total = total + (junk.rolls or 1) * chancePerRoll(junk.items[i + 1] * 1.4, 1)
-        end
+    local total = expectedInItems(lootTable, fullType, 1, ItemPickerJava.getLootModifier(fullType))
+    if lootTable.junk then
+        total = total + expectedInItems(lootTable.junk, fullType, JUNK_WEIGHT_MULTIPLIER, 1)
     end
     return total
 end
 
 local function isForced(pick)
     return pick.forceForZones or pick.forceForTiles or pick.forceForRooms or pick.forceForItems
+end
+
+local function pickWeight(pick)
+    return math.max(1, pick.weightChance or 1)
 end
 
 -- Expected modules in `count` containers of `containerType` spread over `rooms` rooms named
@@ -602,18 +617,19 @@ local function expectedInContainers(roomName, containerType, count, rooms)
     if not entry.procedural then
         return count * expectedIn(entry, MODULE)
     end
+    local procList = entry.procList or {}
     local totalWeight = 0
-    for _, pick in ipairs(entry.procList or {}) do
+    for _, pick in ipairs(procList) do
         if not isForced(pick) then
-            totalWeight = totalWeight + math.max(1, pick.weightChance or 1)
+            totalWeight = totalWeight + pickWeight(pick)
         end
     end
     local perRoom = count / rooms
     local total = 0
-    for _, pick in ipairs(entry.procList or {}) do
+    for _, pick in ipairs(procList) do
         local list = ProceduralDistributions.list[pick.name]
         if not isForced(pick) and list then
-            local picked = perRoom * math.max(1, pick.weightChance or 1) / totalWeight
+            local picked = perRoom * pickWeight(pick) / totalWeight
             total = total + rooms * math.min(picked, pick.max or picked) * expectedIn(list, MODULE)
         end
     end
@@ -646,9 +662,10 @@ local function roomsHaul(town, kinds)
         end
     end
     local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
-    local kitModules = crateModules("kit")
-    for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
-        if rarity then
+    if rarity then
+        -- WorldSpawns' OnSeeNewRoom stocks every crate it puts in a room as a kit.
+        local kitModules = crateModules("kit")
+        for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
             crates = crates + (town.rooms[roomName] or 0) / (odds * rarity) * kitModules
         end
     end
@@ -668,14 +685,15 @@ local function arrowBoardHaul(kinds)
     return total
 end
 
--- The special loot chance of a vehicle script whose script sets none (BaseVehicle.randomizeContainers,
--- which rolls Rand.Next(100) <= chance, so a chance of n is n + 1 in 100).
+-- BaseVehicle.randomizeContainers' special loot chance for a script whose own is 0 or less. It
+-- rolls Rand.Next(100) <= chance, so a chance of n is n + 1 in 100.
 local DEFAULT_SPECIAL_LOOT_CHANCE = 8
 
 -- Expected modules in one vehicle of a script: its Normal loot, or one of its Specific sets at
 -- the vehicle's special loot chance.
 local function vehicleModules(script)
     local name = string.gsub(script, "^Base%.", "")
+    -- Vanilla VehicleDistributions.lua inserts its table by vehicle script name at index 1.
     local distribution = VehicleDistributions[1][name]
     if not distribution then
         return 0
@@ -706,12 +724,14 @@ end
 -- The chance a traffic jam's slot takes a car (Rand.Next(100) <= 80), and that a chunk of an
 -- rtrafficjam zone jams at all (IsoChunk.AddVehicles).
 local JAM_SLOT_TAKEN, RANDOM_JAM_CHUNK = 0.81, 0.1
+-- VehicleType's spawnRate and chanceToSpawnNormal for a zone that sets none.
+local DEFAULT_SPAWN_RATE, DEFAULT_CHANCE_TO_SPAWN_NORMAL = 16, 80
 
--- Vehicles that come with a zone's stalls, by script, each { share, perStall }: the chance a
--- stall holds one. As IsoChunk.AddVehicles_OnZone and VehicleType.getRandomVehicleType roll
--- them, leaving out the special vehicles a few stalls of an ordinary zone turn into. A traffic
--- jam's slots, which census.py counts as IsoChunk.AddVehicles_TrafficJam_* lays them out, take
--- a car far more often than a stall does.
+-- The vehicles a stall of the zone holds, by script: the chance a stall holds one, as
+-- IsoChunk.AddVehicles_OnZone and VehicleType.getRandomVehicleType roll them, leaving out the
+-- special vehicles a few stalls of an ordinary zone turn into. A traffic jam's slots, which
+-- census.py counts as IsoChunk.AddVehicles_TrafficJam_* lays them out, take a car far more often
+-- than a stall does.
 local function zoneVehicles(zoneName)
     local randomJam = zoneName:match("^r(trafficjam%a)$")
     local zone = VehicleZoneDistribution[randomJam or zoneName]
@@ -724,7 +744,7 @@ local function zoneVehicles(zoneName)
     elseif zoneName:match("^trafficjam%a$") then
         spawn = JAM_SLOT_TAKEN
     else
-        spawn = math.min(1, ((zone.spawnRate or 16) + 1) / 100)
+        spawn = math.min(1, ((zone.spawnRate or DEFAULT_SPAWN_RATE) + 1) / 100)
     end
     spawn = spawn * (1 - (zone.chanceToSpawnBurnt or 0) / 100)
     local result = {}
@@ -737,7 +757,7 @@ local function zoneVehicles(zoneName)
             result[script] = (result[script] or 0) + share * entry.spawnChance / total
         end
     end
-    local normal = zone.specialCar and (zone.chanceToSpawnNormal or 80) / 100 or 0
+    local normal = zone.specialCar and (zone.chanceToSpawnNormal or DEFAULT_CHANCE_TO_SPAWN_NORMAL) / 100 or 0
     addFrom(zone.vehicles, spawn * (1 - normal))
     if normal > 0 then
         addFrom(VehicleZoneDistribution.parkingstall.vehicles, spawn * normal)
@@ -779,13 +799,13 @@ local function siteHaul(site, kinds)
     local kind = SolarSites.KINDS[site.kind]
     local total = emptyHaul()
     if kind.panels then
-        local panels = (kind.panels.min + math.min(kind.panels.max, #site.panels)) / 2
-        local perPanel = 0
+        local placedPanels = (kind.panels.min + math.min(kind.panels.max, #site.panels)) / 2
+        local moduleSum = 0
         for _, panel in ipairs(site.panels) do
             local mount = RenewableEnergy.Sprites.kindOf(SolarSites.mountSprite(panel[4], panel[5]))
-            perPanel = perPanel + (kind.modules and (kind.modules.min + kind.modules.max) / 2 or RenewableEnergy.Specs.mounts[mount].modules)
+            moduleSum = moduleSum + (kind.modules and (kind.modules.min + kind.modules.max) / 2 or RenewableEnergy.Specs.mounts[mount].modules)
         end
-        addHaul(total, kinds.site, panels * perPanel / #site.panels)
+        addHaul(total, kinds.site, placedPanels * moduleSum / #site.panels)
     end
     if kind.crate then
         addHaul(total, kinds.site, crateModules(kind.crate))

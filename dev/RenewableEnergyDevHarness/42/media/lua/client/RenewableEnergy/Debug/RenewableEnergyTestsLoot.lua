@@ -1,9 +1,8 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 
--- Loot tests. See RenewableEnergyTestLib.lua for how the runner works. Distributions.lua puts the
--- loot in at OnInitGlobalModData where loot is rolled: in single player, or on a multiplayer
--- server, whose tables alone hold the mod's entries. So the checks run there, in the handlers of
--- RenewableEnergyTestServerLoot.lua, and answer what they found wrong.
+-- Distributions.lua puts the loot in at OnInitGlobalModData where loot is rolled: in single player,
+-- or on a multiplayer server, whose tables alone hold the mod's entries. So the checks run there,
+-- in the handlers of RenewableEnergyTestServerLoot.lua, and answer what they found wrong.
 
 local T = RenewableEnergyTest
 local test, serverCheck = T.test, T.serverCheck
@@ -39,7 +38,7 @@ serverCheck("renewable_energy_loot_vehicle_tables", "lootVehicleTables")
 -- it takes its items out of every list rather than leaving them at weight 0, because
 -- ItemPickerJava adds the zombie density bonus to every weight, so they would still spawn in
 -- towns; the other options' items stay. Applying the options again, as a second load does,
--- replaces the entries instead of adding more. One row per case.
+-- replaces the entries instead of adding more.
 serverCheck("renewable_energy_loot_rarity_options_scale_weights", "lootRarityOptions", { rows = {
     { LRMSolarPanels = 0, LRMBatteries = 0, LRMMisc = 0 },
     { LRMSolarPanels = 0, LRMBatteries = 1, LRMMisc = 1 },

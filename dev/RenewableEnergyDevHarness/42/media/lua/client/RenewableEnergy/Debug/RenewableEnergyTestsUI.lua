@@ -60,6 +60,14 @@ local function newContext()
     return ISContextMenu.get(0, 0, 0)
 end
 
+-- Stands the character next to `square` so the walk vanilla's walkAdj queues first has no way to
+-- go (T.standNextTo), then makes that walk, as the menu does before an action: a multiplayer
+-- server refuses a job from afar. False, with the walk missing from the test, when it fails.
+local function walkTo(self, square, what)
+    T.standNextTo(square)
+    return T.need(self, luautils.walkAdj(player(), square, true), "a walk to " .. what)
+end
+
 -- Menus ---------------------------------------------------------------------------------------
 
 -- Right-clicking a bank in the world builds the bank's submenu through vanilla's own menu
@@ -320,8 +328,8 @@ test("renewable_energy_ui_repair_part", {
 -- Actions -------------------------------------------------------------------------------------
 
 -- One in-game minute, the option's least: a multiplayer server times the action in real time at
--- normal speed (see connectSpeed), and 5% of a minute still dwarfs a round trip to a server on the
--- same machine.
+-- normal speed (see connectSpeed), and the timing's tolerance still dwarfs a round trip to a
+-- server on the same machine.
 local CONNECT_MINUTES = 1
 -- Game speed while connecting: in single player an action and the clock speed up alike, so the
 -- in-game minutes stay what they measure, and a tick stays a small part of a minute. A
@@ -360,10 +368,7 @@ test("renewable_energy_ui_connect_panel", {
                     self.ended = worldMinutes()
                 end
             end)
-            -- A player walks over first, as the menu does, and a multiplayer server refuses the job
-            -- from afar; standing next to the panel leaves that walk no way to go.
-            T.standNextTo(self.panel.square)
-            if not T.need(self, luautils.walkAdj(p, self.panel.square, true), "a walk to the panel") then return end
+            if not walkTo(self, self.panel.square, "the panel") then return end
             ISTimedActionQueue.add(action)
             T.waitForCopy(function()
                 return PowerBank.samePosition(Action.connectedBank(self.panel.object), self.bank.position)
@@ -384,6 +389,8 @@ test("renewable_energy_ui_connect_panel", {
     end,
 })
 
+-- Disconnect, chosen from a connected panel's menu, takes the panel off the bank on the server and
+-- in this client's copy.
 test("renewable_energy_ui_disconnect_panel", {
     instant = true,
     run = function(self)
@@ -391,28 +398,58 @@ test("renewable_energy_ui_disconnect_panel", {
         self.panel = self.bank and T.panel(self, Sprites.wall.wood.S, { near = self.bank, connect = true })
         if not self.panel then return end
         T.step(function()
+            local context = newContext()
+            local option = optionNamed(Menu.addSourceOptions(0, context, self.panel.object),
+                getText("ContextMenu_RenewableEnergy_DisconnectPanel"))
+            context:hideAndChildren()
+            self.offered = option ~= nil and not option.notAvailable
+            if not self.offered then return end
             T.standNextTo(self.panel.square)
-            if not T.need(self, luautils.walkAdj(player(), self.panel.square, true), "a walk to the panel") then return end
-            ISTimedActionQueue.add(Action:new(player(), Action.DISCONNECT_SOURCE, self.panel.object))
+            T.choose(option)
             T.waitForCopy(function() return Action.connectedBank(self.panel.object) == nil end)
             T.bankState(self, self.bank)
         end)
     end,
     validate = function(self)
         expect(self.panel.connected, "the bank refused to connect a wall panel next to it (" .. tostring(self.panel.reason) .. ")")
+        if not expect(self.offered, "a connected panel's menu offers no Disconnect") then return end
         expect(self.bank.state.sources == 0, "the server's bank still lists the panel after disconnecting it")
         expect(Action.connectedBank(self.panel.object) == nil, "this client still sees the panel connected after disconnecting it")
     end,
 })
 
--- Clearing snow needs a broom or snow shovel in hand, and only flat panels hold snow.
+-- The Clear Snow option on `panel`'s menu: whether it shows, whether it is greyed out, and why.
+local function clearSnowOption(panel)
+    local context = newContext()
+    local option = optionNamed(Menu.addSourceOptions(0, context, panel.object), getText("ContextMenu_RenewableEnergy_ClearSnow"))
+    context:hideAndChildren()
+    return { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable, reason = tooltipOf(option) }
+end
+
+-- A snowy flat panel offers Clear Snow, greyed out saying why until the character carries a broom
+-- or snow shovel. The action then needs the tool in hand and unbroken, and only flat panels hold
+-- snow.
 test("renewable_energy_ui_clear_snow_requirements", {
     run = function(self)
-        self.flat = T.panel(self, Sprites.flat)
-        self.wall = T.panel(self, Sprites.wall.wood.E)
+        self.bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        self.flat = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
+        self.wall = self.flat and T.panel(self, Sprites.wall.wood.E)
+        if not self.wall then return end
+        T.server(self, "setSnow", { bank = self.bank.position, source = self.flat.position, snow = 0.8 })
+        T.waitForCopy(function()
+            local summary = T.clientSummary(self.bank)
+            return summary ~= nil and summary.sources[1] ~= nil and summary.sources[1].snowy == true
+        end)
+        T.step(function() self.withoutTool = clearSnowOption(self.flat) end)
         T.give(self, "tools", { { type = "Base.Broom" }, { type = "Base.SnowShovel" }, { type = "Base.Hammer" } })
+        T.step(function() self.withTool = clearSnowOption(self.flat) end)
     end,
     validate = function(self)
+        expect(self.withoutTool.unavailable and self.withoutTool.reason == getText("Tooltip_RenewableEnergy_NeedSnowTool"),
+            "with no broom or shovel, Clear Snow on a snowy panel isn't greyed out saying why ("
+            .. tostring(self.withoutTool.offered) .. ", " .. tostring(self.withoutTool.reason) .. ")")
+        expect(self.withTool.offered and not self.withTool.unavailable,
+            "carrying a broom, Clear Snow isn't offered on a snowy panel (" .. tostring(self.withTool.reason) .. ")")
         local p = player()
         local broom, shovel, hammer = self.items.tools[1], self.items.tools[2], self.items.tools[3]
         local function canClear(panel, tool)
@@ -447,9 +484,8 @@ test("renewable_energy_ui_clear_snow_requirements", {
 })
 
 -- Wire In from the menu walks over and wires the part into the bank, on the server and in this
--- client's copy, which then lists it and offers to unwire it. Wiring takes about a quarter of the
--- time at Electricity 10 as at 0. The bank stands on the open ground next to the character, which
--- a walk always reaches.
+-- client's copy, which then lists it and offers to unwire it; and Electricity shortens the wiring.
+-- The bank stands on open ground next to the character, which a walk always reaches.
 test("renewable_energy_ui_wire_in_and_unwire", {
     instant = true,
     run = function(self)
@@ -480,8 +516,6 @@ test("renewable_energy_ui_wire_in_and_unwire", {
                 return
             end
             T.choose(option)
-            local queue = ISTimedActionQueue.getTimedActionQueue(p).queue
-            self.action = queue[#queue]
             T.waitForCopy(function()
                 local status = T.clientStatus(bank)
                 return bank.object:getContainer():getItemWithID(self.batteryId) ~= nil and status ~= nil and #status.batteries == 1
@@ -493,7 +527,6 @@ test("renewable_energy_ui_wire_in_and_unwire", {
         expectNear("wiring time at Electricity 10 over the time at 0", self.skilled / self.unskilled, 0.25, 0.03)
         if not expect(self.refused == nil, "Wire In was refused: " .. tostring(self.refused)) then return end
         local bank = self.bank.object
-        expect(self.action ~= nil and self.action.mode == Action.WIRE_IN, "choosing Wire In queued no Wire In action")
         if not expect(self.bank.state ~= nil, "the queue stopped before the server's bank was read") then return end
         local held = {}
         for _, item in ipairs(self.bank.state.items) do
@@ -514,7 +547,7 @@ test("renewable_energy_ui_wire_in_and_unwire", {
 })
 
 -- Renaming goes through the bank, shows in its menu and window, and an empty name gives the
--- tier's name back. The bank stands on open ground, which the walk to it always reaches.
+-- tier's name back.
 test("renewable_energy_ui_rename_bank", {
     instant = true,
     run = function(self)
@@ -522,8 +555,7 @@ test("renewable_energy_ui_rename_bank", {
         if not bank then return end
         self.bank = bank
         T.step(function()
-            T.standNextTo(bank.square)
-            if not T.need(self, luautils.walkAdj(player(), bank.square, true), "a walk to the bank") then return end
+            if not walkTo(self, bank.square, "the bank") then return end
             ISTimedActionQueue.add(Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "  Cellar  "))
             T.waitForCopy(function() return Menu.bankLabel(bank.object) == "Cellar" end)
             T.step(function()
@@ -620,6 +652,10 @@ local function openWindow(self)
     T.waitForCopy(function() return (window.renderedFrames or 0) > 0 end)
 end
 
+local function expectDrawn(window)
+    return expect((window.renderedFrames or 0) > 0 and window.status ~= nil, "the window never drew a status")
+end
+
 -- A bank with nothing in it says it has no batteries, no inverter and no parts, and that it must
 -- go inside.
 test("renewable_energy_ui_window_empty_bank", {
@@ -629,8 +665,7 @@ test("renewable_energy_ui_window_empty_bank", {
     end,
     validate = function(self)
         local window = self.window
-        expect((window.renderedFrames or 0) > 0, "the window never drew its rows")
-        expect(window.status ~= nil, "the window shows no status")
+        if not expectDrawn(window) then return end
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_NoBatteries")), "an empty bank does not say it has no batteries")
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_NoWorkingInverter")), "an empty bank does not say it has no inverter")
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_StateOutdoors")), "a bank outdoors doesn't say it must go inside")
@@ -697,25 +732,19 @@ test("renewable_energy_ui_window_reflects_status", {
         local charger = rowLabelled(left, getItemNameFromFullType("Base.CarBatteryCharger"))
         expect(charger ~= nil and charger.color == "bad" and charger.value == getText("IGUI_RenewableEnergy_PartBroken", "0%"),
             "a broken charger doesn't read broken (" .. tostring(charger and charger.value) .. ")")
-        local repairs = {}
-        for _, r in ipairs(right) do
-            if r.label == getItemNameFromFullType("Base.CarBattery1") then
-                table.insert(repairs, r.value)
-            end
-        end
+        local batteryName = getItemNameFromFullType("Base.CarBattery1")
         local recondition = getText("IGUI_RenewableEnergy_BatteryValueRepair", Format.percent(status.charge), "70%",
             getText("IGUI_RenewableEnergy_RepairRecondition"))
-        local found = false
-        for _, value in ipairs(repairs) do
-            found = found or value == recondition
-        end
-        expect(found, "a battery at 70 condition doesn't suggest Recondition (" .. table.concat(repairs, "; ") .. ")")
-        local panels = {}
+        local repairs, found, panels = {}, false, {}
         for _, r in ipairs(right) do
-            if r.source then
+            if r.label == batteryName then
+                table.insert(repairs, r.value)
+                found = found or r.value == recondition
+            elseif r.source then
                 table.insert(panels, r)
             end
         end
+        expect(found, "a battery at 70 condition doesn't suggest Recondition (" .. table.concat(repairs, "; ") .. ")")
         if not expect(#panels == 3, #panels .. " panel rows, expected 3") then return end
         local noSlot = getText("IGUI_RenewableEnergy_ReasonNoController")
         expect(panels[3].value:find(noSlot, 1, true) ~= nil and panels[3].color == "bad",
@@ -784,14 +813,13 @@ test("renewable_energy_ui_window_full_bank", {
     end,
     validate = function(self)
         local window = self.window
+        if not expectDrawn(window) then return end
         local status = window.status
-        expect((window.renderedFrames or 0) > 0, "the window never drew its rows")
-        if not expect(status ~= nil, "the window shows no status") then return end
-        expect(#status.batteries == 5, #status.batteries .. " batteries in the status, expected 5")
-        expect(#status.sources == #FULL_BANK_SOURCES, #status.sources .. " panels in the status, expected " .. #FULL_BANK_SOURCES)
         local found = headers(window.right)
-        expect(found[getText("IGUI_RenewableEnergy_Batteries", 5)], "the window does not list the 5 batteries")
-        expect(found[getText("IGUI_RenewableEnergy_Panels", #FULL_BANK_SOURCES)], "the window does not list the panels")
+        expect(found[getText("IGUI_RenewableEnergy_Batteries", 5)],
+            "the window does not list 5 batteries; the status holds " .. #status.batteries)
+        expect(found[getText("IGUI_RenewableEnergy_Panels", #FULL_BANK_SOURCES)],
+            "the window does not list " .. #FULL_BANK_SOURCES .. " panels; the status holds " .. #status.sources)
         for _, fullType in ipairs({ "RenewableEnergy.InverterCharger", POWER_INVERTER, Specs.controller, "Base.CarBatteryCharger" }) do
             expect(rowLabelled(window.left, getItemNameFromFullType(fullType)) ~= nil, "the window does not list the " .. fullType)
         end

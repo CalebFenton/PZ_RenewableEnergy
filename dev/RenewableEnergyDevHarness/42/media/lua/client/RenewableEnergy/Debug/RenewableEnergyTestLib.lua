@@ -1,14 +1,12 @@
 require "PZHarness/TestLib"
-require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (dev/harness/mod/42/media/lua/client/PZHarness/TestLib.lua explains the runner and the rules
 -- every helper keeps), plus the fixtures that know this mod's objects, which push their undos the
--- same way. RenewableEnergyDevHarness.lua gives the library this mod's settings.
+-- same way. RenewableEnergyTestSettings.lua gives the library this mod's settings.
 --
 -- Banks and panels live on the authority, so their fixtures are built by the dev mod's server
 -- handlers (server/RenewableEnergy/Debug/RenewableEnergyTestServer.lua) through T.server, in this
@@ -115,7 +113,7 @@ end
 
 --- The battery in this client's copy of the vehicle of a T.placeVehicle handle, or nil.
 function T.vehicleBattery(vehicle)
-    local part = vehicle.vehicle and vehicle.vehicle:getPartById("Battery")
+    local part = vehicle.vehicle and vehicle.vehicle:getPartById(RenewableEnergy.VehicleBattery.PART)
     return part and part:getInventoryItem()
 end
 
@@ -155,8 +153,8 @@ function T.bankState(self, bank)
     T.step(function() bank.state = self.server.bankState end)
 end
 
---- Queues a pass of `opts.hours` (1 by default) of `bank` on the server, with the weather fixed:
---- `light` W/m² on every mount, clear, 25 °C, no snow, and `opts.stormHours` of storm.
+--- Queues a pass of `opts.hours` (1 by default) of `bank` on the server, with the weather fixed
+--- clear: `light` W/m² on every mount, no snow, and `opts.stormHours` of storm.
 function T.bankPass(self, bank, light, opts)
     opts = opts or {}
     onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours })

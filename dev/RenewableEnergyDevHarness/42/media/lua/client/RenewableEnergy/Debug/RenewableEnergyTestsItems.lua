@@ -120,9 +120,7 @@ test("renewable_energy_items_recipes_load", {
 
 -- Learning ------------------------------------------------------------------------------------
 
--- What each magazine teaches, as the README promises: #1 the boxes, racks, mounts and module
--- repair; #2 the banks, the charge controller, the failsafe, homemade modules, reconditioning
--- and rebuilding.
+-- What each magazine teaches, as the README promises.
 local MAGAZINES = {
     ["RenewableEnergy.HomesteadPowerMag1"] = {
         "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
@@ -200,8 +198,8 @@ for magazine, recipes in pairs(MAGAZINES) do
             T.defer(self, function() T.learnRecipes(p) end)
             T.give(self, "magazine", { { type = magazine } })
             -- onCreateRecipeMagazine gives every copy a literatureTitle, and a title read within
-            -- the literature cooldown teaches nothing (ISReadABook:complete), so a second run in
-            -- the same world would fail without forgetting it, where the reading counts too.
+            -- the literature cooldown teaches nothing (ISReadABook:complete), so the title is
+            -- forgotten on both sides first, or a second run in the same world would fail.
             T.server(self, "forgetLiterature", function() return { title = self.items.magazine[1]:getModData().literatureTitle } end)
             T.step(function()
                 local item = self.items.magazine[1]
@@ -242,7 +240,8 @@ for fullType, recipes in pairs(RESEARCH) do
             local p = player()
             T.forgetRecipes(p)
             T.defer(self, function() T.learnRecipes(p) end)
-            -- Research asks for two thirds of a recipe's highest level.
+            -- Research needs two thirds of a recipe's highest skill requirement
+            -- (CraftRecipe.getResearchSkillLevel); the top level meets any.
             for _, perk in ipairs({ Perks.Electricity, Perks.MetalWelding, Perks.Woodwork }) do
                 T.setPerk(self, perk, 10)
             end

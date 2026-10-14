@@ -306,7 +306,8 @@ local MINUTES = {
     [Action.ADD_BULB] = 1,
 }
 
--- Full time at Electricity 3, about a third of it at 10, about a quarter longer at 0.
+-- The share of its full time a job takes at an Electricity level: all of it at level 3, less
+-- above it and more below, in a straight line.
 local function skillFactor(level)
     return 1 - 0.095 * (level - 3)
 end
@@ -506,10 +507,9 @@ end
 
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
 -- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel or the
--- garden light, `bank` the bank's IsoGenerator, `item` the snow tool, the maintainer, the bank
--- part, the light bulb or the bolt cutters, `bankName` the bank's new name, `partId` the vehicle
--- part worked on; unused ones are nil. The name can't be a field called `name`, which
--- NetTimedAction reads as the action's own name.
+-- garden light, `bank` the bank's IsoGenerator, `item` the tool or part the job uses, `bankName`
+-- the bank's new name, `partId` the vehicle part worked on; unused ones are nil. The name can't
+-- be a field called `name`, which NetTimedAction reads as the action's own name.
 function Action:new(character, mode, object, bank, vehicle, item, bankName, partId)
     local o = ISBaseTimedAction.new(self, character)
     o.mode = mode

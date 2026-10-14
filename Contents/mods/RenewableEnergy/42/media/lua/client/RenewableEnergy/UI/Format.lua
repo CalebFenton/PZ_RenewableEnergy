@@ -55,8 +55,9 @@ local function amount(count, unit)
     return count .. " " .. getText(UNITS[unit][count == 1 and 1 or 2])
 end
 
--- "3 hours" or "45 minutes" for a duration in hours: the largest unit that is at least one,
--- since the rate it comes from changes from hour to hour anyway.
+-- "3 hours" or "45 minutes" for a duration in hours, in whole units of the largest unit that is at
+-- least one, except that hours run on through the second day. The rate the duration comes from
+-- changes from hour to hour, so finer detail would mislead.
 function Format.duration(hours)
     if hours >= 48 then
         return amount(math.floor(hours / 24), "day")

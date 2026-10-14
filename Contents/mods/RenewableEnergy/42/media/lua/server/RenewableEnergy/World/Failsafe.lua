@@ -11,7 +11,8 @@ require "RenewableEnergy/Sprites"
 -- goes through RemoveTileObject, which fires OnObjectAboutToBeRemoved and OnTileRemoved for the
 -- failsafe, so their handlers must leave it alone.
 
-local FAILSAFE = RenewableEnergy.Sprites.failsafe
+local Sprites = RenewableEnergy.Sprites
+local FAILSAFE = Sprites.failsafe
 -- MapObjects keeps one function per sprite and priority.
 local LOAD_PRIORITY = 6
 
@@ -29,7 +30,7 @@ local function moveToTop(failsafe)
 end
 
 local function onObjectAdded(isoObject)
-    if RenewableEnergy.Sprites.kindOf(RenewableEnergy.Sprites.nameOf(isoObject)) == "failsafe" then
+    if Sprites.kindOf(Sprites.nameOf(isoObject)) == "failsafe" then
         moveToTop(isoObject)
     end
 end

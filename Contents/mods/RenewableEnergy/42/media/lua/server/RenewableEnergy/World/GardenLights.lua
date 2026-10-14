@@ -19,6 +19,8 @@ RenewableEnergy = RenewableEnergy or {}
 local GardenLights = {}
 RenewableEnergy.GardenLights = GardenLights
 
+local Sprites = RenewableEnergy.Sprites
+local WorldSpawns = RenewableEnergy.WorldSpawns
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 
 -- Global ModData: the lights each rolled house got, by building key.
@@ -38,7 +40,7 @@ local REACH = 4
 -- How far down the path from a door the lights go.
 local PATH_LENGTH = 4
 
--- Building key -> BuildingDef of houses waiting for their surroundings to load.
+-- Building key -> the queue() entry of a house waiting for its surroundings to load.
 local pending = {}
 
 local function store()
@@ -82,7 +84,7 @@ end
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
 local function isStreet(square)
-    local name = RenewableEnergy.Sprites.nameOf(square:getFloor()) or ""
+    local name = Sprites.nameOf(square:getFloor()) or ""
     return string.find(name, "^floors_exterior_street") ~= nil or string.find(name, "^blends_street") ~= nil
 end
 
@@ -155,11 +157,11 @@ end
 --- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
 --- Returns how many it placed.
 function GardenLights.place(def)
-    local count = RenewableEnergy.WorldSpawns.rollBetween(GardenLights.COUNT)
+    local count = WorldSpawns.rollBetween(GardenLights.COUNT)
     local charged = { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh }
     local squares = GardenLights.frontSquares(def, count)
     for _, square in ipairs(squares) do
-        RenewableEnergy.WorldSpawns.placeMoveable(square, RenewableEnergy.Sprites.gardenLight.off, charged)
+        WorldSpawns.placeMoveable(square, Sprites.gardenLight.off, charged)
     end
     return #squares
 end
@@ -168,14 +170,15 @@ end
 --- how many it got; a house rolled before gets none.
 function GardenLights.roll(def, always)
     local key = GardenLights.buildingKey(def)
-    if store()[key] ~= nil then
+    local rolled = store()
+    if rolled[key] ~= nil then
         return 0
     end
     local placed = 0
     if always or ZombRandFloat(0, 1) < GardenLights.chanceFor(def) then
         placed = GardenLights.place(def)
     end
-    store()[key] = placed
+    rolled[key] = placed
     pending[key] = nil
     return placed
 end

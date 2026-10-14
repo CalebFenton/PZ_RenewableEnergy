@@ -13,13 +13,14 @@ require "Moveables/ISMoveableDefinitions"
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
 
-local Sprites = RenewableEnergy.Sprites
-local Specs = RenewableEnergy.Specs
+local Sprites, Specs = RenewableEnergy.Sprites, RenewableEnergy.Specs
+local PowerBank, SolarGardenLight = RenewableEnergy.PowerBank, RenewableEnergy.SolarGardenLight
 
-local MATERIALS = { wood = "Wood", metal = "Metal" }
+local MATERIALS = { "wood", "metal" }
 
-local PLACED = RenewableEnergyTest.PLACED_TILES
+local PLACED = T.PLACED_TILES
 
+-- Every overlay tile Sprites.lua names.
 local function overlays()
     local all = { Sprites.crateOverlays.full, Sprites.crateOverlays.closed, Sprites.snow.flat, Sprites.cracks.flat }
     local function add(list)
@@ -99,7 +100,7 @@ test("renewable_energy_tiles_kind_of_reads_every_placed_tile", {
 test("renewable_energy_tiles_mounts_rotate", {
     validate = function()
         for _, mount in ipairs({ "rack", "wall" }) do
-            for material in pairs(MATERIALS) do
+            for _, material in ipairs(MATERIALS) do
                 local set = Sprites[mount][material]
                 for facing, name in pairs(set) do
                     local faces = ISMoveableSpriteProps.new(name):getFaces()
@@ -195,9 +196,9 @@ local MODULES = {
     { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
 }
 local CARRIED = {
-    ["RenewableEnergy.SolarRackWood"] = { key = RenewableEnergy.PowerBank.MODULES, value = MODULES },
-    ["RenewableEnergy.SolarFlat"] = { key = RenewableEnergy.PowerBank.MODULES, value = { MODULES[1] } },
-    [RenewableEnergy.SolarGardenLight.ITEM] = { key = RenewableEnergy.SolarGardenLight.CHARGE_KEY, value = 2.5 },
+    ["RenewableEnergy.SolarRackWood"] = { key = PowerBank.MODULES, value = MODULES },
+    ["RenewableEnergy.SolarFlat"] = { key = PowerBank.MODULES, value = { MODULES[1] } },
+    [SolarGardenLight.ITEM] = { key = SolarGardenLight.CHARGE_KEY, value = 2.5 },
 }
 
 local function describe(value)
@@ -231,7 +232,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
             for _, placed in ipairs(PLACED) do
                 local script = getScriptManager():getItem(placed.item)
                 -- Banks stand only indoors, and placing them by hand is the power tests' business.
-                if placed.kind ~= "wall" and not RenewableEnergy.PowerBank.bankOfSprite(placed.sprite)
+                if placed.kind ~= "wall" and not PowerBank.bankOfSprite(placed.sprite)
                     and script and script:getWorldObjectSprite() == placed.sprite then
                     local carried = CARRIED[placed.item]
                     local result = { placed = placed, expected = carried and describe(carried.value) }

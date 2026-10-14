@@ -14,6 +14,8 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 RenewableEnergy = RenewableEnergy or {}
 local SolarMaintainer = {}
 RenewableEnergy.SolarMaintainer = SolarMaintainer
+local Battery, Specs, Sun, VehicleBattery = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun,
+    RenewableEnergy.VehicleBattery
 
 SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 
@@ -21,7 +23,7 @@ SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 local ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"
 
 local function batteryPart(vehicle)
-    return vehicle and vehicle:getPartById(RenewableEnergy.VehicleBattery.PART)
+    return vehicle and vehicle:getPartById(VehicleBattery.PART)
 end
 
 function SolarMaintainer.isAttached(vehicle)
@@ -59,21 +61,17 @@ function SolarMaintainer.detach(character, vehicle)
     return true
 end
 
--- Adds `hours` of the maintainer's current output to the vehicle's battery. The panel lies
--- flat on the dashboard or roof, and a vehicle under a roof gets no sun. Authority only.
--- Returns the watt-hours it added.
-function SolarMaintainer.charge(vehicle, hours)
-    if not SolarMaintainer.isAttached(vehicle) then
-        return 0
-    end
-    local square = vehicle:getSquare()
+-- Adds `hours` of the maintainer's output under `sky` (Sun.skyNow, now if nil) to the vehicle's
+-- battery. The panel lies flat on the dashboard or roof, so a vehicle under a roof gets no sun.
+-- Authority only. Returns the watt-hours it added.
+function SolarMaintainer.charge(vehicle, hours, sky)
     local part = batteryPart(vehicle)
-    local battery = part:getInventoryItem()
-    if not (square and square:isOutside() and battery) then
+    local battery = part and part:getModData()[ATTACHED_KEY] ~= nil and part:getInventoryItem()
+    if not battery then
         return 0
     end
-    local capacityWh = RenewableEnergy.Battery.nominalWh(battery)
-    local wh = RenewableEnergy.Sun.panelWatts(RenewableEnergy.Specs.maintainerWatts, "flat") * hours
+    local capacityWh = Battery.nominalWh(battery)
+    local wh = Sun.squareWatts(vehicle:getSquare(), Specs.maintainerWatts, sky) * hours
     if capacityWh <= 0 or wh <= 0 then
         return 0
     end

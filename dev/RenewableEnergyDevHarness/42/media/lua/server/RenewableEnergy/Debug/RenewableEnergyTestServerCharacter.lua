@@ -53,9 +53,10 @@ handler("takeItems", function(player, args)
     return { taken = #items }
 end)
 
--- What the character carries, bags included: for each type of `args.types` its items { id,
--- condition, uses (the fraction left), modData }, and in `fluids` the litres of each fluid of
--- `args.fluids` (Fluid field names) in all the character's fluid containers.
+-- What the character carries: for each type of `args.types` its items, bags included, { id,
+-- condition, uses (the fraction left), modData }; in `fluids` the litres of each fluid of
+-- `args.fluids` (Fluid field names) in the fluid containers of its main inventory; and in `total`
+-- how many items its main inventory holds.
 handler("carried", function(player, args)
     local inventory = player:getInventory()
     local items = {}
@@ -69,17 +70,17 @@ handler("carried", function(player, args)
         end
     end
     local fluids = {}
-    local all = inventory:getItems()
+    local carried = inventory:getItems()
     for _, name in ipairs(args.fluids or {}) do
         fluids[name] = 0
-        for i = 0, all:size() - 1 do
-            local container = all:get(i):getFluidContainer()
+        for i = 0, carried:size() - 1 do
+            local container = carried:get(i):getFluidContainer()
             if container then
                 fluids[name] = fluids[name] + container:getSpecificFluidAmount(Fluid[name])
             end
         end
     end
-    return { items = items, fluids = fluids, total = inventory:getItems():size() }
+    return { items = items, fluids = fluids, total = carried:size() }
 end)
 
 -- The recipes the character has learned whose names start with `args.prefix`, as a set.

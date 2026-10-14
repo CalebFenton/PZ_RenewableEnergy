@@ -21,11 +21,13 @@ local LONGEST_PASS = 1
 local lastHour
 
 function GadgetCharging.chargeVehicles(hours)
+    local sky = RenewableEnergy.Sun.skyNow()
+    -- IsoCell.getVehicles is a Set, which only an iterator walks.
     local vehicles = getCell():getVehicles():iterator()
     while vehicles:hasNext() do
         local vehicle = vehicles:next()
-        RenewableEnergy.SolarMaintainer.charge(vehicle, hours)
-        RenewableEnergy.ArrowBoard.update(vehicle, hours)
+        RenewableEnergy.SolarMaintainer.charge(vehicle, hours, sky)
+        RenewableEnergy.ArrowBoard.update(vehicle, hours, sky)
     end
 end
 

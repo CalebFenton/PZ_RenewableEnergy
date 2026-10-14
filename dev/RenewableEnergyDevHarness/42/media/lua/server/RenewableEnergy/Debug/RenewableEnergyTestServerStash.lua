@@ -4,15 +4,15 @@
 -- handlers work.
 
 require "PZHarness/ServerHandlers"
-require "PZHarness/Checks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
+local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
 local Stash = require "RenewableEnergy/StashHouses"
 
-local handler = PZHarness.serverHandler
-local newCheck, countPairs = PZHarness.Checks.new, PZHarness.Fixtures.countPairs
+local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
+local countPairs = PZHarness.Fixtures.countPairs
 local Sprites = RenewableEnergy.Sprites
 
 local function stashCount()
@@ -26,8 +26,7 @@ end
 -- StashSystem gives up without an error when the stash building isn't a building, prepares only a
 -- building whose bounds strictly contain the building square (doBuildingStash), and stocks the
 -- crate only if its square is in a room of that building, so a wrong coordinate is an empty house.
-handler("stashHousesResolve", function()
-    local expect, _, failures = newCheck()
+check("stashHousesResolve", function(expect)
     local metaGrid = getWorld():getMetaGrid()
     for stashMap in pairs(Stash.descriptions) do
         local x, y = stashMap.buildingX, stashMap.buildingY
@@ -49,7 +48,6 @@ handler("stashHousesResolve", function()
             stashMap.name .. ": its spawn table has no solar crate loot")
     end
     expect(stashCount() == 4, stashCount() .. " Renewable Energy stashes, expected 4")
-    return { failures = failures }
 end)
 
 -- Takes the mod's houses out of StashDescriptions.
@@ -63,9 +61,12 @@ end
 
 -- Registers the houses at each Stash Houses option, twice, and answers by option what register
 -- returned and how many of the mod's houses StashDescriptions then lists, with how many it has.
-handler("stashRegister", function()
+handler("stashRegister", function(_, _, defer)
     local options = SandboxVars.RenewableEnergy
-    local saved = options.StashMode
+    local restoreOptions = saveOptions(defer, { "StashMode" }, function()
+        unregister()
+        Stash.register()
+    end)
     local results = {}
     for _, mode in ipairs({ 1, 2, 3, 4 }) do
         unregister()
@@ -80,16 +81,13 @@ handler("stashRegister", function()
         end
         results[mode] = { registered = registered, count = count }
     end
-    options.StashMode = saved
-    unregister()
-    Stash.register()
+    restoreOptions()
     return { results = results, houses = stashCount() }
 end)
 
 -- The engine's own load and annotate path, which a found map takes, on a fresh copy of each stash
 -- so the world's stash state stays as it was.
-handler("stashMapsAnnotate", function()
-    local expect, _, failures = newCheck()
+check("stashMapsAnnotate", function(expect)
     for stashMap in pairs(Stash.descriptions) do
         local engineStash = EngineStash.new(stashMap.name)
         engineStash:load(stashMap)
@@ -101,7 +99,6 @@ handler("stashMapsAnnotate", function()
     end
     -- doStashItem takes the stash out of the possible list; this puts it back.
     Stash.relistUnfound()
-    return { failures = failures }
 end)
 
 local function isPossibleStash(name)
@@ -226,8 +223,7 @@ end)
 
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
 -- and every corpse list a map names exists.
-handler("prepperMapTargets", function()
-    local expect, _, failures = newCheck()
+check("prepperMapTargets", function(expect)
     local all = SuburbsDistributions.all
     for stashMap, added in pairs(Stash.descriptions) do
         for _, target in ipairs(added.targets or {}) do
@@ -236,7 +232,7 @@ handler("prepperMapTargets", function()
     end
     local _, prepper = descriptionNamed("RenewableEnergy_CrowcallRoad")
     if not expect(prepper ~= nil, "no Crowcall Road stash") then
-        return { failures = failures }
+        return
     end
     local targets = {}
     for _, target in ipairs(prepper.targets) do
@@ -247,15 +243,14 @@ handler("prepperMapTargets", function()
             expect(targets[key], "the Crowcall Road map does not drop from " .. key)
         end
     end
-    return { failures = failures }
 end)
 
 -- The corpse loot at each Stash Houses option: for every stash and outfit list, how often its map
 -- is listed and at what weight, against the stash's rarity.
-handler("stashMapsInCorpseLoot", function()
+handler("stashMapsInCorpseLoot", function(_, _, defer)
     local D = RenewableEnergy.Distributions
     local options = SandboxVars.RenewableEnergy
-    local saved = options.StashMode
+    local restoreOptions = saveOptions(defer, { "StashMode" }, D.apply)
     local found = {}
     for _, mode in ipairs({ 1, 2, 3, 4 }) do
         options.StashMode = mode
@@ -270,7 +265,6 @@ handler("stashMapsInCorpseLoot", function()
             end
         end
     end
-    options.StashMode = saved
-    D.apply()
+    restoreOptions()
     return { found = found }
 end)

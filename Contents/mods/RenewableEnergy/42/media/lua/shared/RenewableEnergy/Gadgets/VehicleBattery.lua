@@ -15,6 +15,7 @@ require "RenewableEnergy/Specs"
 RenewableEnergy = RenewableEnergy or {}
 local VehicleBattery = {}
 RenewableEnergy.VehicleBattery = VehicleBattery
+local Specs = RenewableEnergy.Specs
 
 -- The vehicle part id of the battery slot.
 VehicleBattery.PART = "Battery"
@@ -33,11 +34,11 @@ end
 --- makes in `item`: the car battery's capacity over the item's. 1 for anything the mod has no
 --- rating for, so other batteries charge and drain as vanilla has them.
 function VehicleBattery.chargeScale(item)
-    local spec = item and RenewableEnergy.Specs.batteries[item:getFullType()]
+    local spec = item and Specs.batteries[item:getFullType()]
     if not spec then
         return 1
     end
-    return RenewableEnergy.Specs.batteries[CAR_BATTERY].wh / spec.wh
+    return Specs.batteries[CAR_BATTERY].wh / spec.wh
 end
 
 return VehicleBattery

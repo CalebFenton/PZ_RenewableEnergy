@@ -1,9 +1,9 @@
-require "PZHarness/Fixtures"
 -- Development only. What the --art and --promo captures share besides the harness's
 -- PZHarness/Capture.lua, which runs their steps: finding a place near the character, clearing its
--- trees, the steps that walk the character to a shot and frame it, the arrow board trailer hitched
--- to a car, dark or its arrow held lit, and the waits for it to settle. The lid test waits on
--- lightingSettled too.
+-- trees and vehicles, the steps that walk the character to a shot and frame it, the arrow board
+-- trailer hitched to a car, dark or its arrow held lit, and the waits for it to settle.
+
+require "PZHarness/Fixtures"
 
 local Stage = {}
 
@@ -37,11 +37,12 @@ local function lightingState(player)
     if not here then
         return nil, nil
     end
+    local cell, x, y, z = getCell(), here:getX(), here:getY(), here:getZ()
     local playerNum = player:getPlayerNum()
     local seen, light = 0, 0
     for dx = -SETTLE_RADIUS, SETTLE_RADIUS do
         for dy = -SETTLE_RADIUS, SETTLE_RADIUS do
-            local square = getCell():getGridSquare(here:getX() + dx, here:getY() + dy, here:getZ())
+            local square = cell:getGridSquare(x + dx, y + dy, z)
             if square then
                 seen = seen + (square:isSeen(playerNum) and 1 or 0)
                 light = light + math.floor(square:getLightLevel(playerNum) * 100)
@@ -102,16 +103,35 @@ function Stage.closestSquare(player, accepts)
     return best
 end
 
---- Removes every tree around x, y on level z.
+--- Removes every tree within TREE_RADIUS of x, y on level z.
 function Stage.removeTrees(x, y, z)
+    local cell = getCell()
     for dx = -TREE_RADIUS, TREE_RADIUS do
         for dy = -TREE_RADIUS, TREE_RADIUS do
-            local square = getCell():getGridSquare(x + dx, y + dy, z)
+            local square = cell:getGridSquare(x + dx, y + dy, z)
             local tree = square and square:getTree()
             if tree then
                 square:RemoveTileObject(tree)
             end
         end
+    end
+end
+
+--- Removes every vehicle standing on a square from x1, y1 to x2, y2 on level z. Found through the
+--- squares, since the cell keeps its vehicles in a Java Set (IsoCell.getVehicles), which Lua can't walk.
+function Stage.removeVehicles(x1, y1, x2, y2, z)
+    local cell, found = getCell(), {}
+    for x = x1, x2 do
+        for y = y1, y2 do
+            local square = cell:getGridSquare(x, y, z)
+            local vehicle = square and square:getVehicleContainer()
+            if vehicle then
+                found[vehicle] = true
+            end
+        end
+    end
+    for vehicle in pairs(found) do
+        vehicle:permanentlyRemove()
     end
 end
 
@@ -189,8 +209,8 @@ function Stage.hitchTrailer(pair, player, mark)
     local car, trailer = pair.car, pair.trailer
     PZHarness.Fixtures.lineUpTrailer(car, trailer, pair.facing)
     car:addPointConstraint(player, trailer, "trailer", "trailer")
-    local lid = trailer:getPartById("TrunkDoor")
-    local box = trailer:getPartById("RenewableEnergyBatteryBox")
+    local lid = trailer:getPartById(RenewableEnergy.ArrowBoard.LID)
+    local box = trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
     local container = box and box:getItemContainer()
     if lid and lid:getDoor() then
         lid:getDoor():setOpen(true)
@@ -217,13 +237,13 @@ local HITCH_GAP = 0.1
 function Stage.vehiclesAtRest(pair, hitch)
     local velocity, towing, towed = Vector3f.new(), Vector3f.new(), Vector3f.new()
     local since
+    local function isStill(vehicle)
+        local square = vehicle:getSquare()
+        return square ~= nil and square:getVehicleContainer() == vehicle
+            and vehicle:getLinearVelocity(velocity):length() < STILL_SPEED
+    end
     return function()
-        local still = true
-        for _, vehicle in ipairs({ pair.trailer, pair.car }) do
-            local square = vehicle:getSquare()
-            still = still and square ~= nil and square:getVehicleContainer() == vehicle
-                and vehicle:getLinearVelocity(velocity):length() < STILL_SPEED
-        end
+        local still = isStill(pair.trailer) and (pair.car == nil or isStill(pair.car))
         if still and hitch then
             local a = pair.car:getTowingWorldPos("trailer", towing)
             local b = pair.trailer:getTowedByWorldPos("trailer", towed)

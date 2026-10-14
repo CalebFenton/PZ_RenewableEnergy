@@ -5,9 +5,8 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 
--- The Solar Battery Charger: a small panel over a tray of four vanilla batteries (Base.Battery),
--- the only cell that lamps, radios and flashlights take. Placed outdoors, it charges them in
--- daylight.
+-- The Solar Battery Charger: a small panel over a tray of vanilla batteries (Base.Battery), the
+-- only cell that lamps, radios and flashlights take. Placed outdoors, it charges them in daylight.
 --
 -- It is a placed tile with a container. The container's filter is not saved with it, so it is
 -- set again whenever the tile loads or is placed, on every side; the authority also keeps the
@@ -15,11 +14,12 @@ require "RenewableEnergy/PowerBank/Battery"
 RenewableEnergy = RenewableEnergy or {}
 local SolarCellCharger = {}
 RenewableEnergy.SolarCellCharger = SolarCellCharger
+local Battery, Specs, Sprites, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 
 SolarCellCharger.BATTERY = "Base.Battery"
 SolarCellCharger.SLOTS = 4
--- Watt-hours that fill one Base.Battery. A game figure, not a cell's: it makes a set of four
--- take one to two sunny summer days at the default sunlight.
+-- Watt-hours that fill one Base.Battery. A game figure, not a cell's: it makes a full tray take
+-- one to two sunny summer days at the default sunlight.
 SolarCellCharger.BATTERY_WH = 25
 
 local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"
@@ -27,7 +27,7 @@ local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"
 local STORED_KEY = "RenewableEnergy_storedWh"
 
 function SolarCellCharger.isCharger(isoObject)
-    return isoObject ~= nil and RenewableEnergy.Sprites.kindOf(RenewableEnergy.Sprites.nameOf(isoObject)) == "cellCharger"
+    return isoObject ~= nil and Sprites.kindOf(Sprites.nameOf(isoObject)) == "cellCharger"
 end
 
 function SolarCellCharger.acceptItem(container, item)
@@ -47,7 +47,7 @@ end
 
 -- Every side needs the filter, but only the authority charges.
 local chargers = RenewableEnergy.PlaceTracker.new({
-    sprites = { RenewableEnergy.Sprites.cellCharger },
+    sprites = { Sprites.cellCharger },
     matches = SolarCellCharger.isCharger,
     onFound = setFilter,
     keepPlaces = not isClient(),
@@ -65,10 +65,8 @@ function SolarCellCharger.charge(charger, hours, sky)
     if not container then
         return 0
     end
-    local Battery = RenewableEnergy.Battery
     local data = charger:getModData()
-    local stored = (data[STORED_KEY] or 0)
-        + RenewableEnergy.Sun.squareWatts(charger:getSquare(), RenewableEnergy.Specs.cellChargerWatts, sky) * hours
+    local stored = (data[STORED_KEY] or 0) + Sun.squareWatts(charger:getSquare(), Specs.cellChargerWatts, sky) * hours
     local added = 0
     local battery = Battery.emptiestIn(container, isCell)
     while battery do
@@ -90,7 +88,7 @@ end
 
 -- Charges every loaded charger the authority has seen.
 function SolarCellCharger.chargeAll(hours)
-    local sky = RenewableEnergy.Sun.skyNow()
+    local sky = Sun.skyNow()
     chargers:each(function(charger)
         SolarCellCharger.charge(charger, hours, sky)
     end)

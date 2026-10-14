@@ -8,13 +8,13 @@
 if isClient() then return end
 
 require "Map/SGlobalObjectSystem"
-require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 
 RenewableEnergy = RenewableEnergy or {}
-local Specs, Sun, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sun, RenewableEnergy.PowerBank
+local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
 
 local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
 RenewableEnergy.BankSystem = BankSystem
@@ -130,7 +130,7 @@ function PowerBank.remove(isoObject)
 end
 
 function BankSystem:OnObjectAdded(isoObject)
-    local name = RenewableEnergy.Sprites.nameOf(isoObject)
+    local name = Sprites.nameOf(isoObject)
     if PowerBank.bankOfSprite(name) and not PowerBank.isBank(isoObject) then
         -- A bank tile placed as a moveable is a plain IsoObject.
         makeBank(isoObject:getSquare(), name, isoObject:getObjectIndex(), isoObject)
@@ -220,7 +220,7 @@ end
 -- failed halfway, a map or stash placing the bare tile) so a reload repairs it.
 local function loadBank(isoObject)
     if not PowerBank.isBank(isoObject) or not isoObject:getContainer() then
-        makeBank(isoObject:getSquare(), RenewableEnergy.Sprites.nameOf(isoObject), isoObject:getObjectIndex(), isoObject)
+        makeBank(isoObject:getSquare(), Sprites.nameOf(isoObject), isoObject:getObjectIndex(), isoObject)
         return
     end
     PowerBank.adoptContainer(isoObject:getContainer())
@@ -233,9 +233,9 @@ end
 
 -- A panel's chunk loaded: its overlays were saved with it, but a save from before the mod drew
 -- cracks has none.
-local mountSprites = { RenewableEnergy.Sprites.flat }
+local mountSprites = { Sprites.flat }
 for _, mount in ipairs({ "wall", "rack" }) do
-    for _, facings in pairs(RenewableEnergy.Sprites[mount]) do
+    for _, facings in pairs(Sprites[mount]) do
         for _, name in pairs(facings) do
             table.insert(mountSprites, name)
         end
@@ -257,17 +257,25 @@ function BankSystem.passContext(hours)
         table.insert(suns, Sun.positionNow(hours * (i - 0.5) / steps))
     end
     local function averaged(skies)
+        -- By kind, then facing ("" for none), so a lookup builds no string.
         local cache = {}
         return function(kind, facing)
-            local key = kind .. (facing or "")
-            if not cache[key] then
+            local byFacing = cache[kind]
+            if not byFacing then
+                byFacing = {}
+                cache[kind] = byFacing
+            end
+            local key = facing or ""
+            local average = byFacing[key]
+            if not average then
                 local total = 0
                 for _, sun in ipairs(suns) do
                     total = total + Sun.planeIrradiance(sun, kind, facing, skies)
                 end
-                cache[key] = total / steps
+                average = total / steps
+                byFacing[key] = average
             end
-            return cache[key]
+            return average
         end
     end
     return {

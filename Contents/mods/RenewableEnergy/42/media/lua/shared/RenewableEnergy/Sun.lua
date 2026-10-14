@@ -2,8 +2,7 @@
 -- what a panel on each mount makes of it.
 --
 -- The pure functions take every input as an argument, so the tests can integrate a whole
--- year without moving the game clock. The functions under "Game clock and weather" read the
--- game's clock and weather.
+-- year without moving the game clock.
 
 require "RenewableEnergy/Specs"
 
@@ -21,9 +20,9 @@ local FULL_SUN = Sun.FULL_SUN
 local AIR_MASS_EXPONENT = 1.15
 -- The share of clear-sky light that comes from the whole sky rather than the sun's disc.
 -- With the cloud weighting below it puts a year's flat and south-wall output against a
--- 38° rack where Louisville's measured insolation does (the dev mod's power tests check).
+-- rack's where Louisville's measured insolation does (the dev mod's power tests check).
 local CLEAR_DIFFUSE = 0.15
--- Overcast still lets about a quarter through, all of it diffuse.
+-- The share of the light that full cloud, fog or rain stops. What gets through cloud is all diffuse.
 local CLOUD_LOSS = 0.75
 local FOG_LOSS = 0.3
 local RAIN_LOSS = 0.3
@@ -31,15 +30,22 @@ local SNOWFALL_FACTOR = 0.5
 -- Ground reflection: grass and soil, and fresh snow, which lifts a wall panel's winter output.
 local GROUND_ALBEDO = 0.2
 local SNOW_ALBEDO = 0.7
--- Wiring, dust, mismatch, controller and battery charging losses between the panel's
--- rating and what the bank stores.
-local SYSTEM_LOSSES = 0.8
+-- The share of a panel's rating the bank stores after wiring, dust, mismatch, controller and
+-- battery charging losses.
+local SYSTEM_EFFICIENCY = 0.8
 
 -- Weather without cloud, fog, rain or snow.
 Sun.CLEAR_WEATHER = { cloud = 0, fog = 0, rain = 0, snowing = false, groundSnow = 0 }
 
 -- Horizontal unit vectors (east, north) a panel facing each way leans towards.
 local FACINGS = { S = { 0, -1 }, N = { 0, 1 }, E = { 1, 0 }, W = { -1, 0 } }
+
+-- Each mount's tilt from flat as { sine, cosine }, which every irradiance sum needs.
+local TILTS = {}
+for kind, mount in pairs(Specs.mounts) do
+    local tilt = rad(mount.tilt)
+    TILTS[kind] = { sin(tilt), cos(tilt) }
+end
 
 local DAYS_BEFORE_MONTH = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 }
 
@@ -89,16 +95,17 @@ function Sun.planeIrradiance(sun, kind, facing, weather)
     local diffuse = horizontal * diffuseShare
     local direct = horizontal * (1 - diffuseShare) / sun.up
 
-    local tilt = rad(Specs.mounts[kind].tilt)
+    local tilt = TILTS[kind]
+    local sinTilt, cosTilt = tilt[1], tilt[2]
     local lean = FACINGS[facing] or FACINGS.S
-    local incidence = sun.east * sin(tilt) * lean[1] + sun.north * sin(tilt) * lean[2] + sun.up * cos(tilt)
+    local incidence = sun.east * sinTilt * lean[1] + sun.north * sinTilt * lean[2] + sun.up * cosTilt
     local albedo = GROUND_ALBEDO + (SNOW_ALBEDO - GROUND_ALBEDO) * weather.groundSnow
-    return direct * max(0, incidence) + diffuse * (1 + cos(tilt)) / 2 + horizontal * albedo * (1 - cos(tilt)) / 2
+    return direct * max(0, incidence) + diffuse * (1 + cosTilt) / 2 + horizontal * albedo * (1 - cosTilt) / 2
 end
 
 --- Watts a panel rated `ratedWatts` makes in `irradiance`, under `snow` cover from 0 to 1.
 function Sun.wattsFrom(ratedWatts, irradiance, snow)
-    local watts = ratedWatts * irradiance / FULL_SUN * SYSTEM_LOSSES
+    local watts = ratedWatts * irradiance / FULL_SUN * SYSTEM_EFFICIENCY
         * SandboxVars.RenewableEnergy.SunlightMultiplier * (1 - (snow or 0))
     return max(0, watts)
 end

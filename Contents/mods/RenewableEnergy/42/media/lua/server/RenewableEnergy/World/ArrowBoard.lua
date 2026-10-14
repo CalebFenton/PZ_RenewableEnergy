@@ -9,26 +9,15 @@ require "RenewableEnergy/PowerBank/Bank"
 require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
--- trailer with a lamp board and two panels, its batteries in a padlocked box on the tongue. It
--- turns up among junkyard and traffic jam wrecks, and at the road works of SolarSites.lua. Its
--- battery box is stocked the first time the trailer spawns, from Distributions' OnFillContainer.
--- Its panels charge the batteries in the box in daylight, wherever it stands or is towed
--- (GadgetCharging runs it), and its lamps flash an arrow from those batteries, day and night, while
--- the controller's switch in the box is on (Lamps, below).
+-- trailer whose panels charge the batteries in a padlocked box on its tongue, which light an
+-- arrow on its lamp board. It turns up among junkyard and traffic jam wrecks and at SolarSites'
+-- road works. Distributions' OnFillContainer stocks its box when it first spawns, and
+-- GadgetCharging's pass charges it and runs its lamps wherever it stands or is towed.
 --
--- No key to the box's padlock ever spawns, so a locked box opens only by force: bolt cutters cut
--- the padlock, or the lid comes off in the mechanics window the way vanilla gets into a locked
--- trunk without its key (Lid, below). The padlock shows on the lid while it holds.
---
--- Each panel is a vehicle part holding a Solar Module, whose condition is the part's: storms and
--- hard crashes crack it, Repair Cracked Panel mends it on the trailer, and the mechanics window
--- takes it off and puts any module on. The part shows its Whole or its Cracked model by that
--- condition. Nothing in the game reports a part's condition changing, so every change this file
--- makes shows it at once, and each charge pass shows every loaded trailer's panels again for the
--- changes it didn't make (a failed uninstall, a debug tool).
---
--- Its frame and its lamp board dent in crashes as a car's body does, and Repair Frame welds them
--- (Frame, below).
+-- Each panel is a vehicle part holding a Solar Module, whose condition is the part's, shown by
+-- its Whole or Cracked model. Nothing in the game reports a part's condition changing, so every
+-- change this file makes shows the model at once, and each charge pass shows every loaded
+-- trailer's panels again for the changes it didn't make (a failed uninstall, a debug tool).
 
 RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
@@ -37,27 +26,24 @@ RenewableEnergy.ArrowBoard = ArrowBoard
 local Specs = RenewableEnergy.Specs
 
 -- Script name without its module, as VehicleDistributions and OnFillContainer name it.
-ArrowBoard.VEHICLE = "RenewableEnergyArrowBoardTrailer"
-ArrowBoard.SCRIPT = "Base." .. ArrowBoard.VEHICLE
+local VEHICLE = "RenewableEnergyArrowBoardTrailer"
+ArrowBoard.SCRIPT = "Base." .. VEHICLE
 ArrowBoard.BATTERY_BOX = "RenewableEnergyBatteryBox"
--- The panel parts, left then right.
+-- In stocking order: the second is the one STOCK.secondCrackedChance may crack.
 ArrowBoard.PANELS = { "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight" }
 -- The lamp board, under vanilla's rear windshield id (scripts/RenewableEnergy/Vehicles.txt says why).
 ArrowBoard.BOARD = "WindshieldRear"
 
--- Its spawn weight among each vehicle zone's vehicles (VehicleZoneDistribution spawnChance).
--- The four traffic jam zones share one vehicle table. A traffic jam rolls a vehicle in most of its
--- slots (IsoChunk.AddVehicles_TrafficJam_*) and a junkyard in a quarter of its stalls, so most of
--- a map's arrow boards stand in the pileups.
-ArrowBoard.ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4 }
+-- Its spawnChance among each vehicle zone's vehicles (VehicleZoneDistribution). The traffic jam
+-- zones share one vehicle table. A traffic jam rolls a vehicle in most of its slots
+-- (IsoChunk.AddVehicles_TrafficJam_*) and a junkyard in far fewer of its stalls, so most of a
+-- map's arrow boards stand in the pileups.
+local ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4 }
 
--- What it comes with: modules on its panels, the second often cracked; in its battery box deep
--- cycle batteries, worn by years on the road and charged by Distributions.chargeFoundBatteries,
--- and often a charge controller. Crews padlock these boxes because batteries are what thieves
--- take from a work zone, so most are locked, more often than vanilla locks a trunk (half the time
--- at the default Locked Vehicle Frequency); some were left open in the rush to evacuate. Crews
--- left the boards running where they stood, so most still have their switch on; a few were
--- switched off to be towed or stored.
+-- What a found trailer comes with. Its batteries are worn by years on the road, and
+-- Distributions.chargeFoundBatteries charges them. Crews padlocked these boxes because batteries
+-- are what thieves take from a work zone, so more are locked than vanilla's trunks, and left the
+-- boards running where they stood, so most are switched on.
 ArrowBoard.STOCK = {
     modules = 2,
     secondCrackedChance = 0.6,
@@ -69,27 +55,42 @@ ArrowBoard.STOCK = {
     switchedOnChance = 0.9,
 }
 
--- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` milliseconds of real
--- time. A car stopping dead against a wall from that speed does it; braking hard sheds about 3 km/h
--- in that time and running over a zombie or a kerb a few, so minor bumps never crack a panel.
--- One crash is often several jolts: the physics spreads each over several frames, and a trailer
--- thrown forward rolls on until the hitch brings it up short, a second jolt half a second or more
--- later. So a jolt is a new crash only after `quietMs` without one.
+-- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` of real time, as a
+-- car stopping dead against a wall from that speed does. Hard braking sheds about 3 km/h in that
+-- time and running over a zombie or a kerb a few, so bumps never crack a panel. The physics spreads
+-- a crash over several frames, and a trailer thrown forward jolts again when the hitch brings it up
+-- short, half a second or more later, so a jolt is a new crash only after `quietMs` without one.
 -- `unhitchedMs` and `unhitchedSquares` cover a crash that snaps the hitch (Crashes, below).
-ArrowBoard.CRASH = { kmh = 20, ms = 250, quietMs = 2000, unhitchedMs = 1000, unhitchedSquares = 8 }
+local CRASH = { kmh = 20, ms = 250, quietMs = 2000, unhitchedMs = 1000, unhitchedSquares = 8 }
 
--- Vehicle modData: its panels have been put on, at spawn or, for a trailer from a save made
--- before they were parts, on its first load since.
+-- Loaded trailers by vehicle, for watchCrashes: their recent velocities, oldest first, in the
+-- lists ms, x and y, used as a ring of SAMPLE_SLOTS from `head`, `count` long, so that watching
+-- allocates nothing each frame; when they last jolted (joltedAt); whether they have joined the
+-- cell (inCell); on a multiplayer client the car of this game's player that last towed them and
+-- until when its crashes still count (car, carUntil).
+local tracked = {}
+-- Enough for CRASH.ms at a thousand frames a second; at a higher rate the oldest samples go
+-- early, which still leaves a crash's jolt well inside the window.
+local SAMPLE_SLOTS = 256
+
+local function track(vehicle)
+    if not tracked[vehicle] and not isServer() then
+        tracked[vehicle] = { ms = {}, x = {}, y = {}, head = 1, count = 0, joltedAt = -math.huge }
+    end
+end
+
+-- Vehicle modData: its panels have been stocked, at spawn or, on a trailer saved before the panels
+-- were parts, at its first load.
 local PANELS_STOCKED = "RenewableEnergy_panelsStocked"
 -- The client command a driver sends when the trailer they tow crashes.
 local COMMAND_MODULE, CRASH_COMMAND = "RenewableEnergyArrowBoard", "crashed"
 
-for zone, weight in pairs(ArrowBoard.ZONE_WEIGHTS) do
+for zone, weight in pairs(ZONE_WEIGHTS) do
     VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] = { index = -1, spawnChance = weight }
 end
 
 -- An empty table for the box, so that randomizeContainers fills it and fires OnFillContainer.
-VehicleDistributions[1][ArrowBoard.VEHICLE] = {
+VehicleDistributions[1][VEHICLE] = {
     Normal = { [ArrowBoard.BATTERY_BOX] = { rolls = 0, items = {} } },
 }
 
@@ -119,7 +120,7 @@ end
 --- OnFillContainer: stocks the container if it is an arrow board's battery box, and sets the
 --- switch in it.
 function ArrowBoard.stockIfBatteryBox(roomName, container)
-    local part = roomName == ArrowBoard.VEHICLE and container:getVehiclePart()
+    local part = roomName == VEHICLE and container:getVehiclePart()
     if part and part:getId() == ArrowBoard.BATTERY_BOX then
         ArrowBoard.stockBatteryBox(container)
         ArrowBoard.rollSwitch(part:getVehicle())
@@ -140,35 +141,30 @@ end
 -- Lid ------------------------------------------------------------------------------------------
 --
 -- The box's lid is a trunk lid under vanilla's TrunkDoor id (scripts/RenewableEnergy/Vehicles.txt).
--- Without the key, vanilla gets into a locked trunk from a seat, through an open or broken window,
--- or by taking the lid off in the mechanics window once the key isn't needed for it
--- (VehicleUtils.RequiredKeyNotFound). Nobody sits in the trailer and it has no windows, but its lid
--- never needs the key to come off, so a padlocked box opens when someone unbolts the lid, with the
--- wrench, time and Mechanics odds vanilla asks for a trunk lid, though not its mechanic's recipe,
--- which putting it back doesn't ask for either. Put back, the lid is unlocked
--- (Vehicles.InstallComplete.Door). Bolt cutters are quicker: Cut Padlock (RenewableEnergyAction,
--- offered by UI/BatteryBoxLid.lua) unlocks the lid and breaks its lock, which vanilla never locks
--- again (BaseVehicle.canLockDoor).
+-- Vanilla lets the mechanics window take a locked trunk's lid off when the key isn't needed for it
+-- (VehicleUtils.RequiredKeyNotFound), which this lid never is, so no key spawns and a padlocked
+-- box opens only by force: unbolting the lid, which goes back on unlocked
+-- (Vehicles.InstallComplete.Door), or Cut Padlock (RenewableEnergyAction, offered by
+-- UI/BatteryBoxLid.lua), which breaks the lock so vanilla never locks it again
+-- (BaseVehicle.canLockDoor).
 --
--- The lid swings open and shut on its hinge. Vanilla plays a door's swing only in the game of the
--- player who opens it, as the action starts (ISOpenVehicleDoor:start), before the server has
--- said whether it opened, and everyone else's copy keeps the pose it held
--- (BaseVehicle.updateAnimationPlayer replaces a held pose only once it ends, and it never ends).
--- So every game that draws the trailer swings the lid itself once it sees the door's state
--- change, the opener's included (watchLids, below).
+-- Vanilla swings a door only in the opener's game, as the action starts and before the server
+-- has said whether it opened (ISOpenVehicleDoor:start); everyone else's copy keeps its held pose,
+-- which BaseVehicle.updateAnimationPlayer replaces only once it ends, and it never ends. So every
+-- game that draws the trailer, the opener's included, swings the lid itself when it sees the
+-- door's state change (watchLids).
 --
--- The padlock is a model of its own on the lid, shown while the lid is on and locked with a lock
--- nobody cut. Nothing reports a door's lock changing, and installing the lid shows all its
--- models (VehiclePart.setInventoryItem), so every side watches the lid and shows the padlock
--- again whenever any of that changes. The server's models are what it sends its clients
--- (VehiclePartModels), so it watches too.
+-- Nothing reports a door's lock changing, and installing the lid shows all its models
+-- (VehiclePart.setInventoryItem), so every side watches the lid and shows the padlock again when
+-- any of that changes; the server too, since its models are what it sends its clients
+-- (VehiclePartModels).
 
 ArrowBoard.LID = "TrunkDoor"
-ArrowBoard.PADLOCK = "Padlock"
+local PADLOCK = "Padlock"
 
 -- The lids each game watches, by vehicle: the lid's item, lock and broken lock it last showed the
--- padlock for, whether it last saw the lid open (open, nil until it first looks), and on a
--- server when it last took a crash for the trailer (crashTakenAt).
+-- padlock for, whether it last saw the lid open (nil until it first looks), and on a server when
+-- it last took a crash for the trailer (crashTakenAt).
 local lids = {}
 
 --- Whether the lid's padlock holds: the lid is on, locked, and its lock isn't cut.
@@ -177,14 +173,14 @@ function ArrowBoard.isPadlocked(part)
     return part:getInventoryItem() ~= nil and door:isLocked() and not door:isLockBroken()
 end
 
---- Shows the lid's padlock if it holds. On the server the game sends the models to every client.
-function ArrowBoard.showPadlock(part)
-    part:setModelVisible(ArrowBoard.PADLOCK, ArrowBoard.isPadlocked(part))
+-- Shows the lid's padlock if it holds. On the server the game sends the models to every client.
+local function showPadlock(part)
+    part:setModelVisible(PADLOCK, ArrowBoard.isPadlocked(part))
 end
 
 --- Part `create` of the lid: runs once, when the trailer first enters the world. Shut, and
---- padlocked by STOCK.lockedChance unless the save's Easy Use option leaves every vehicle
---- unlocked, as it does vanilla's trunks.
+--- padlocked by STOCK.lockedChance unless the Easy Use option leaves vehicles unlocked, as it
+--- does vanilla's trunks.
 function ArrowBoard.createLid(vehicle, part)
     VehicleUtils.createPartInventoryItem(part)
     local door = part:getDoor()
@@ -195,14 +191,14 @@ end
 
 --- Part `init` of the lid: runs on every side each time the trailer loads.
 function ArrowBoard.initLid(vehicle, part)
-    ArrowBoard.showPadlock(part)
+    showPadlock(part)
     lids[vehicle] = lids[vehicle] or {}
-    ArrowBoard.track(vehicle)
+    track(vehicle)
 end
 
 -- Panels ---------------------------------------------------------------------------------------
 
-function ArrowBoard.isPanel(part)
+local function isPanel(part)
     local id = part and part:getId()
     return id == ArrowBoard.PANELS[1] or id == ArrowBoard.PANELS[2]
 end
@@ -237,8 +233,8 @@ end
 -- RandomizedWorldBase.addVehicle), over the stock ones, so the next tick puts them back.
 local justStocked = {}
 
--- Puts modules on its panels as the box once held them: the first weathered, the second weathered
--- or cracked, as many as the panel rarity option gives. Once per trailer. Authority only.
+-- Puts modules on its panels, as many as the panel rarity option gives, the second maybe cracked.
+-- Once per trailer. Authority only.
 local function stockPanels(vehicle)
     local modData = vehicle:getModData()
     if modData[PANELS_STOCKED] then
@@ -272,9 +268,9 @@ local function setPanelCondition(vehicle, part, condition)
     ArrowBoard.showPanel(part)
 end
 
---- OnTick: gives the modules stocked last tick their stock conditions back where something has
---- set them since. Authority only.
-function ArrowBoard.keepStockConditions()
+-- OnTick: gives the modules stocked last tick their stock conditions back where something has
+-- set them since. Authority only.
+local function keepStockConditions()
     if #justStocked == 0 then
         return
     end
@@ -308,7 +304,7 @@ function ArrowBoard.initPanel(vehicle, part)
         stockPanels(vehicle)
     end
     ArrowBoard.showPanel(part)
-    ArrowBoard.track(vehicle)
+    track(vehicle)
 end
 
 --- Install and uninstall `complete` of the panels, on the authority.
@@ -316,12 +312,11 @@ function ArrowBoard.panelChanged(vehicle, part)
     ArrowBoard.showPanel(part)
 end
 
---- Cracks the panel's module as a storm cracks a module: by Specs.storm.crack. Authority only.
+--- Cracks the panel's module as a storm cracks a module. Authority only.
 function ArrowBoard.crackPanel(vehicle, part)
     setPanelCondition(vehicle, part, math.max(0, part:getCondition() - Specs.storm.crack))
 end
 
--- The installed panels.
 local function installedPanels(vehicle)
     local panels = {}
     for _, id in ipairs(ArrowBoard.PANELS) do
@@ -347,8 +342,8 @@ function ArrowBoard.stormCrack(vehicle, stormHours)
     return cracked
 end
 
---- A hard crash cracks every panel with any glass left. Authority only.
-function ArrowBoard.crashCrack(vehicle)
+-- A hard crash cracks every panel with any glass left. Authority only.
+local function crashCrack(vehicle)
     for _, part in ipairs(installedPanels(vehicle)) do
         if part:getCondition() > 0 then
             ArrowBoard.crackPanel(vehicle, part)
@@ -400,46 +395,26 @@ end
 
 -- Crashes --------------------------------------------------------------------------------------
 --
--- A crash reaches a towed trailer only as damage to vanilla's part ids (BaseVehicle.crash and
--- addDamageFront/Rear), which the panels aren't, and the trailer's own crash durability isn't
--- readable from Lua. So the side running the trailer's physics watches its velocity: single player
--- every loaded trailer, a multiplayer client the trailer behind the car it drives, which then asks
--- the server to crack the panels, as vanilla's own crash command does. A crash hard enough can
--- snap the hitch in the physics step that jolts the trailer (Bullet.onVehicleConstraintImpulse),
--- so that client goes on watching a trailer its car towed for ArrowBoard.CRASH.unhitchedMs, and
--- the server takes the crash from the car's driver while the trailer is within
--- ArrowBoard.CRASH.unhitchedSquares of the car's tow bar.
-
--- Loaded trailers by vehicle: their recent velocities, oldest first, in the lists ms, x and y,
--- used as a ring of SAMPLE_SLOTS from `head`, `count` long, so that watching allocates nothing
--- each frame; the time of their last crash's latest jolt; whether they have joined the cell; on
--- a multiplayer client the car of this game's player that last towed them and until when that
--- car's crashes still count.
-local tracked = {}
--- Enough for ArrowBoard.CRASH.ms at a thousand frames a second; at a higher rate the oldest
--- samples go early, which still leaves a crash's jolt well inside the window.
-local SAMPLE_SLOTS = 256
-
-function ArrowBoard.track(vehicle)
-    if not tracked[vehicle] and not isServer() then
-        tracked[vehicle] = { ms = {}, x = {}, y = {}, head = 1, count = 0, joltedAt = -math.huge }
-    end
-end
+-- A crash reaches a towed trailer only as damage to vanilla's part ids (BaseVehicle.crash,
+-- addDamageFront/Rear), which the panels aren't, and Lua can't read the trailer's own crash
+-- durability. So the game running the trailer's physics watches its velocity: single player every
+-- loaded trailer; a multiplayer client the trailer behind the car it drives, asking the server to
+-- crack the panels as vanilla's own crash command does. A crash can snap the hitch in the physics
+-- step that jolts the trailer (Bullet.onVehicleConstraintImpulse), so that client goes on watching
+-- for CRASH.unhitchedMs, and the server takes the crash from the car's driver while the trailer is
+-- within CRASH.unhitchedSquares of the car's tow bar.
 
 local function drivenHere(car)
     local driver = car:getDriver()
     return driver ~= nil and instanceof(driver, "IsoPlayer") and driver:isLocalPlayer()
 end
 
--- Whether this game runs the trailer's physics: single player, or the client whose player drives
--- the car towing it or towed it a moment ago. Returns true, or that car.
-local function runsPhysics(vehicle, entry, now)
-    if not isClient() then
-        return true
-    end
+-- On a multiplayer client, the car this game's player drives that tows the trailer or towed it a
+-- moment ago, whose game runs the trailer's physics; nil if none.
+local function carTowingHere(vehicle, entry, now)
     local tow = vehicle:getVehicleTowedBy()
     if tow and drivenHere(tow) then
-        entry.car, entry.carUntil = tow, now + ArrowBoard.CRASH.unhitchedMs
+        entry.car, entry.carUntil = tow, now + CRASH.unhitchedMs
     elseif entry.car and (now > entry.carUntil or tow or not drivenHere(entry.car)) then
         entry.car = nil
     end
@@ -449,19 +424,21 @@ end
 local velocity = Vector3f.new()
 
 -- Records the trailer's velocity now and returns whether a new crash began: the velocity changed
--- by a crash's worth within ArrowBoard.CRASH.ms, ArrowBoard.CRASH.quietMs after the last jolt.
+-- by a crash's worth within CRASH.ms, CRASH.quietMs after the last jolt.
 local function sampleCrash(vehicle, entry, now)
     vehicle:getLinearVelocity(velocity)
     local x, y = velocity:x(), velocity:z()
     local ms, xs, ys = entry.ms, entry.x, entry.y
-    while entry.count > 0 and now - ms[entry.head] > ArrowBoard.CRASH.ms do
+    while entry.count > 0 and now - ms[entry.head] > CRASH.ms do
         entry.head = entry.head % SAMPLE_SLOTS + 1
         entry.count = entry.count - 1
     end
-    local limit = ArrowBoard.CRASH.kmh / 3.6
+    local limitMps = CRASH.kmh / 3.6
+    local limitSq = limitMps * limitMps
     local jolted, slot = false, entry.head
     for _ = 1, entry.count do
-        if (x - xs[slot]) ^ 2 + (y - ys[slot]) ^ 2 >= limit * limit then
+        local dx, dy = x - xs[slot], y - ys[slot]
+        if dx * dx + dy * dy >= limitSq then
             jolted = true
             break
         end
@@ -477,14 +454,15 @@ local function sampleCrash(vehicle, entry, now)
     if not jolted then
         return false
     end
-    local newCrash = now - entry.joltedAt >= ArrowBoard.CRASH.quietMs
+    local newCrash = now - entry.joltedAt >= CRASH.quietMs
     entry.joltedAt = now
     return newCrash
 end
 
 local cell
-function ArrowBoard.watchCrashes()
+local function watchCrashes()
     local now = getTimestampMs()
+    local client = isClient()
     cell = cell or getCell()
     -- A vehicle joins the cell a frame after it enters the world, so one not yet in it waits. Once
     -- in, it stays until it leaves the world, so the cell's list is searched only until then.
@@ -493,24 +471,24 @@ function ArrowBoard.watchCrashes()
             tracked[vehicle] = nil
         elseif entry.inCell or cell:getVehicles():contains(vehicle) then
             entry.inCell = true
-            local runs = runsPhysics(vehicle, entry, now)
-            if runs and sampleCrash(vehicle, entry, now) then
-                if isClient() then
-                    sendClientCommand(getPlayer(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId(), car = runs:getId() })
+            local car = client and carTowingHere(vehicle, entry, now)
+            if (car or not client) and sampleCrash(vehicle, entry, now) then
+                if client then
+                    sendClientCommand(getPlayer(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId(), car = car:getId() })
                 else
-                    ArrowBoard.crashCrack(vehicle)
+                    crashCrack(vehicle)
                 end
             end
         end
     end
 end
 
---- Shows the padlock of each loaded trailer whose lid has come off, gone on, been locked, unlocked
---- or cut since this game last looked, and, but on a dedicated server, swings the lid of each
---- whose door it has seen open or shut (Lid, above). A trailer it sees for the first time shows
---- its lid as it is, because the game holds the Opened or Closed pose by the door's state when no
---- swing plays. playPartAnim does nothing while the lid's model isn't loaded or the lid is off.
-function ArrowBoard.watchLids()
+-- OnTick: shows the padlock again on each loaded trailer whose lid has come off, gone on, been
+-- locked, unlocked or cut since this game last looked and, but on a dedicated server, swings each
+-- lid whose door it has seen open or shut (Lid, above). A lid seen for the first time isn't
+-- swung: with no swing playing, the game holds the Opened or Closed pose by the door's state.
+-- playPartAnim does nothing while the lid's model isn't loaded or the lid is off.
+local function watchLids()
     local server = isServer()
     for vehicle, entry in pairs(lids) do
         local lid = vehicle:getPartById(ArrowBoard.LID)
@@ -520,7 +498,7 @@ function ArrowBoard.watchLids()
         elseif door then
             local item, locked, broken = lid:getInventoryItem(), door:isLocked(), door:isLockBroken()
             if item ~= entry.item or locked ~= entry.locked or broken ~= entry.broken then
-                ArrowBoard.showPadlock(lid)
+                showPadlock(lid)
                 entry.item, entry.locked, entry.broken = item, locked, broken
             end
             local open = door:isOpen()
@@ -539,12 +517,12 @@ local function justUnhitched(vehicle, car)
     end
     local hitch = car:getTowingWorldPos("trailer", Vector3f.new())
     local coupler = vehicle:getTowedByWorldPos("trailer", Vector3f.new())
-    local squares = ArrowBoard.CRASH.unhitchedSquares
+    local squares = CRASH.unhitchedSquares
     return hitch ~= nil and coupler ~= nil and (hitch:x() - coupler:x()) ^ 2 + (hitch:y() - coupler:y()) ^ 2 <= squares * squares
 end
 
 -- The server takes a crash only from the driver of the car towing the trailer, or towing it until
--- a moment ago, and only one within ArrowBoard.CRASH.quietMs: a client's own gate is all that
+-- a moment ago, and only one within CRASH.quietMs: a client's own gate is all that
 -- keeps one crash from cracking the panels twice, so the server keeps it too, on the lid's entry.
 local function onClientCommand(module, command, player, args)
     if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number"
@@ -559,19 +537,19 @@ local function onClientCommand(module, command, player, args)
     local now = getTimestampMs()
     local entry = lids[vehicle] or {}
     lids[vehicle] = entry
-    if now - (entry.crashTakenAt or -math.huge) >= ArrowBoard.CRASH.quietMs then
+    if now - (entry.crashTakenAt or -math.huge) >= CRASH.quietMs then
         entry.crashTakenAt = now
-        ArrowBoard.crashCrack(vehicle)
+        crashCrack(vehicle)
     end
 end
 
 if not isServer() then
-    Events.OnTick.Add(ArrowBoard.watchCrashes)
+    Events.OnTick.Add(watchCrashes)
 end
-Events.OnTick.Add(ArrowBoard.watchLids)
+Events.OnTick.Add(watchLids)
 if not isClient() then
     Events.OnClientCommand.Add(onClientCommand)
-    Events.OnTick.Add(ArrowBoard.keepStockConditions)
+    Events.OnTick.Add(keepStockConditions)
 end
 
 -- Repair on the trailer ------------------------------------------------------------------------
@@ -579,7 +557,7 @@ end
 --- The trailer's panel `partId` if it holds a module that Repair Cracked Panel can mend, else nil.
 function ArrowBoard.repairablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
-    local item = part and ArrowBoard.isPanel(part) and part:getInventoryItem()
+    local item = part and isPanel(part) and part:getInventoryItem()
     if item and ArrowBoard.isCracked(part:getCondition()) and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
         return part
     end
@@ -619,11 +597,12 @@ local function holdsCharge(item)
     return RenewableEnergy.Battery.nominalWh(item) > 0
 end
 
---- Adds `hours` of its panels' current output to the batteries in its battery box, the emptiest
---- first, so that a mixed set fills evenly. The panels count as flat, since the trailer may face
---- any way, and make nothing under a roof. Authority only. Returns the watt-hours stored.
+--- Adds `hours` of its panels' output under `sky` (Sun.skyNow, now if nil) to the batteries in
+--- its battery box, the emptiest first, so that a mixed set fills evenly. The panels count as
+--- flat, since the trailer may face any way, and make nothing under a roof. Authority only.
+--- Returns the watt-hours stored.
 ---@param vehicle BaseVehicle
-function ArrowBoard.charge(vehicle, hours)
+function ArrowBoard.charge(vehicle, hours, sky)
     if not ArrowBoard.isTrailer(vehicle) then
         return 0
     end
@@ -634,7 +613,8 @@ function ArrowBoard.charge(vehicle, hours)
         return 0
     end
     local Battery = RenewableEnergy.Battery
-    local wh = RenewableEnergy.Sun.panelWatts(ArrowBoard.panelWatts(vehicle), "flat") * hours
+    local Sun = RenewableEnergy.Sun
+    local wh = Sun.wattsFrom(ArrowBoard.panelWatts(vehicle), (sky or Sun.skyNow()).flat, 0) * hours
     local stored = 0
     local battery = wh > 0 and Battery.emptiestIn(container, holdsCharge)
     while battery do
@@ -655,24 +635,18 @@ end
 
 -- Lamps ----------------------------------------------------------------------------------------
 --
--- The board's lamps run off the batteries in the box, through the controller in it: lit while
--- its switch is on, the lamp board isn't beaten to nothing and a battery holds more than the
--- controller's cutoff (Specs.arrowBoard), day and night, the photocell dimming them after dark.
--- The panels only charge the batteries, so a board without batteries stays dark in full sun.
--- Once every battery is down to the cutoff the lamps stay off until one is back up at the
--- reconnect level, so a board that barely charges doesn't flicker on and off from pass to pass.
+-- The lamps run off the box's batteries through the controller in it: lit day and night while
+-- its switch is on, the lamp board isn't beaten to nothing and a battery is above the controller's
+-- cutoff, dimmed by the photocell after dark. Once every battery is down to the cutoff they stay
+-- off until one is back up at the reconnect level, so a board that barely charges doesn't flicker
+-- from pass to pass.
 --
--- The authority decides, in the charge pass (and at once when the switch moves), and keeps the
--- switch and the lamps in the battery box part's modData, which the part saves and the server
--- sends its clients (transmitPartModData). Like the charging, a trailer whose chunk isn't loaded
--- stands still: its lamps draw nothing until it loads again, and a pass makes up for at most
--- GadgetCharging's longest stretch.
---
--- Every game that draws the trailer flashes the lamps itself, by the real clock, through the
--- vehicle's windowLightsOn flag, which nothing else sets or sends and which lights the board's
--- zone of the lamps texture each frame it is set (Vehicles.txt). After dark it also gives the
--- board a steady lamppost of its own, since moving a lamppost relights the cell, too dear to do
--- every flash.
+-- The authority sets them in the charge pass, and at once when the switch moves, in the battery
+-- box part's modData, which the part saves and the server sends its clients (transmitPartModData).
+-- Every game that draws the trailer flashes them itself, by the real clock, through the vehicle's
+-- windowLightsOn flag, which nothing else sets or sends and which lights the board's zone of the
+-- lamps texture each frame it is set (Vehicles.txt). After dark it also gives the board a steady
+-- lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
 -- Battery box part modData: the switch (true on), the lamps as the authority last set them
 -- (LAMPS_DAY or LAMPS_NIGHT, nil while dark), and whether the controller has cut them off for flat
@@ -680,7 +654,7 @@ end
 -- day, the highest charge that day and the deepest discharge from it.
 local SWITCH_KEY, LAMPS_KEY, CUT_OFF_KEY = "RenewableEnergy_switchOn", "RenewableEnergy_lamps", "RenewableEnergy_cutOff"
 local CYCLE_DAY, CYCLE_HIGH, CYCLE_DEPTH = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
-ArrowBoard.LAMPS_DAY, ArrowBoard.LAMPS_NIGHT = "day", "night"
+local LAMPS_DAY, LAMPS_NIGHT = "day", "night"
 
 -- The lamps' amber, halved, since the native lighting doubles a lamp's colour (SolarGardenLight).
 local GROUND_LIGHT = { r = 0.5, g = 0.35, b = 0.08 }
@@ -698,15 +672,14 @@ function ArrowBoard.isSwitchedOn(vehicle)
     return box ~= nil and box:getModData()[SWITCH_KEY] == true
 end
 
---- The lamps as the authority last set them: ArrowBoard.LAMPS_DAY, ArrowBoard.LAMPS_NIGHT
---- (dimmed), or nil while dark.
+--- The lamps as the authority last set them: "day", "night" (dimmed), or nil while dark.
 function ArrowBoard.lamps(vehicle)
     local box = boxOf(vehicle)
     return box and box:getModData()[LAMPS_KEY] or nil
 end
 
---- Whether the lamp board can light: on the trailer, and not beaten to nothing.
-function ArrowBoard.boardIntact(vehicle)
+-- Whether the lamp board can light: on the trailer, and not beaten to nothing.
+local function boardIntact(vehicle)
     local board = vehicle:getPartById(ArrowBoard.BOARD)
     return board ~= nil and board:getInventoryItem() ~= nil and board:getCondition() > 0
 end
@@ -778,9 +751,9 @@ function ArrowBoard.lampWatts(night)
     return (night and spec.nightWatts or spec.dayWatts) * spec.onShare + spec.offWatts * (1 - spec.onShare)
 end
 
---- Takes `wh` from the batteries in the box, the fullest first, so that a mixed set drains evenly,
---- none below the controller's cutoff. Authority only. Returns the watt-hours taken.
-function ArrowBoard.drain(container, wh)
+-- Takes `wh` from the batteries in the box, the fullest first, so that a mixed set drains evenly,
+-- none below the controller's cutoff. Authority only. Returns the watt-hours taken.
+local function drain(container, wh)
     local Battery = RenewableEnergy.Battery
     local cutoff = Specs.arrowBoard.cutoff
     local taken = 0
@@ -845,8 +818,8 @@ local function setLamps(vehicle, box, night)
     elseif fullest >= spec.reconnect then
         modData[CUT_OFF_KEY] = nil
     end
-    local lit = modData[SWITCH_KEY] == true and not modData[CUT_OFF_KEY] and ArrowBoard.boardIntact(vehicle)
-    local lamps = lit and (night and ArrowBoard.LAMPS_NIGHT or ArrowBoard.LAMPS_DAY) or nil
+    local lit = modData[SWITCH_KEY] == true and not modData[CUT_OFF_KEY] and boardIntact(vehicle)
+    local lamps = lit and (night and LAMPS_NIGHT or LAMPS_DAY) or nil
     if modData[LAMPS_KEY] ~= lamps then
         modData[LAMPS_KEY] = lamps
         vehicle:transmitPartModData(box)
@@ -868,7 +841,7 @@ function ArrowBoard.runLamps(vehicle, hours, night)
         return 0
     end
     local lamps = box:getModData()[LAMPS_KEY]
-    local drawn = lamps and ArrowBoard.drain(container, ArrowBoard.lampWatts(lamps == ArrowBoard.LAMPS_NIGHT) * hours) or 0
+    local drawn = lamps and drain(container, ArrowBoard.lampWatts(lamps == LAMPS_NIGHT) * hours) or 0
     trackCycle(box, container)
     if night == nil then
         night = isNight()
@@ -902,8 +875,8 @@ function ArrowBoard.flashPhase(ms)
     return false, into - litFor
 end
 
--- Drawing side: every loaded trailer this game draws, by vehicle: its battery box part, and while
--- it lights the ground the lamppost and the square it stands on.
+-- Every loaded trailer this game draws, by vehicle: its battery box part, and while it lights the
+-- ground its lamppost and that lamppost's square (x, y, z).
 local boards = {}
 
 local function removeGroundLight(entry)
@@ -920,14 +893,13 @@ local function placeGroundLight(entry, vehicle)
         return
     end
     removeGroundLight(entry)
-    local colour = GROUND_LIGHT
-    entry.light = getCell():addLamppost(x, y, z, colour.r, colour.g, colour.b, Specs.arrowBoard.radius)
+    entry.light = getCell():addLamppost(x, y, z, GROUND_LIGHT.r, GROUND_LIGHT.g, GROUND_LIGHT.b, Specs.arrowBoard.radius)
     entry.x, entry.y, entry.z = x, y, z
 end
 
---- OnTick, but on a dedicated server: flashes the lamps of every loaded trailer that is lit, and
---- lights the ground around those dimmed for the night. Allocates nothing unless a lamppost moves.
-function ArrowBoard.flashLamps()
+-- OnTick, but on a dedicated server: flashes the lamps of every loaded trailer that is lit, and
+-- lights the ground around those dimmed for the night. Allocates nothing unless a lamppost moves.
+local function flashLamps()
     local flashLit = ArrowBoard.flashPhase(getTimestampMs())
     for vehicle, entry in pairs(boards) do
         if vehicle:isRemovedFromWorld() then
@@ -940,7 +912,7 @@ function ArrowBoard.flashLamps()
             if vehicle:getWindowLightsOn() ~= show then
                 vehicle:setWindowLightsOn(show)
             end
-            if lamps == ArrowBoard.LAMPS_NIGHT then
+            if lamps == LAMPS_NIGHT then
                 placeGroundLight(entry, vehicle)
             else
                 removeGroundLight(entry)
@@ -949,8 +921,8 @@ function ArrowBoard.flashLamps()
     end
 end
 
---- Part `init` of the lamp board: runs on every side each time the trailer loads. A trailer from
---- a save made before the lamps worked gets its board and its switch here.
+--- Part `init` of the lamp board: runs on every side each time the trailer loads. A trailer saved
+--- before it had the board and the switch gets them here.
 function ArrowBoard.initBoard(vehicle, part)
     ArrowBoard.initFrame(vehicle, part)
     if not isClient() then
@@ -962,20 +934,21 @@ function ArrowBoard.initBoard(vehicle, part)
 end
 
 if not isServer() then
-    Events.OnTick.Add(ArrowBoard.flashLamps)
+    Events.OnTick.Add(flashLamps)
 end
 
---- The charge pass for one loaded vehicle: if it is an arrow board, storms may crack its panels,
---- its panels show what they hold, they charge its box and its lamps draw from it. Authority only.
---- Returns the watt-hours its panels stored.
-function ArrowBoard.update(vehicle, hours)
+--- The charge pass for one loaded vehicle under `sky` (Sun.skyNow, now if nil): if it is an
+--- arrow board, storms may crack its panels, its panels show what they hold, they charge its box
+--- and its lamps draw from it. Authority only. Returns the watt-hours its panels stored.
+function ArrowBoard.update(vehicle, hours, sky)
     if not ArrowBoard.isTrailer(vehicle) then
         return 0
     end
+    sky = sky or RenewableEnergy.Sun.skyNow()
     ArrowBoard.stormCrack(vehicle, RenewableEnergy.Bank.stormHours(hours))
     ArrowBoard.showPanels(vehicle)
-    local stored = ArrowBoard.charge(vehicle, hours)
-    ArrowBoard.runLamps(vehicle, hours)
+    local stored = ArrowBoard.charge(vehicle, hours, sky)
+    ArrowBoard.runLamps(vehicle, hours, sky.up <= 0)
     return stored
 end
 

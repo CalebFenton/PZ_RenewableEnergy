@@ -18,6 +18,10 @@ RenewableEnergy.Distributions = Distributions
 local subDist = SuburbsDistributions
 local procLists = ProceduralDistributions.list
 local vehDist = VehicleDistributions
+local Battery = RenewableEnergy.Battery
+local Stash = RenewableEnergy.Stash
+local WorldSpawns = RenewableEnergy.WorldSpawns
+local ArrowBoard = RenewableEnergy.ArrowBoard
 
 -- The mod's own lists ----------------------------------------------------------------------------
 
@@ -247,7 +251,6 @@ Distributions.items = {
             { 1, "veh:RenewableEnergyCamperTrailerTrunk" },
             { 1, "veh:SurvivalistTruckBed" },
             { 1, "sub:all.Outfit_Camper" },
-            -- About one kit in nine.
             { 8, "proc:RenewableEnergySolarKit.junk" },
         })))))),
     },
@@ -339,7 +342,7 @@ Distributions.items = {
     },
     -- RV and cabin: the second magazine, modules, deep cycle batteries and their electronics -
     {
-        -- Half as common as #1 wherever both are, homes included.
+        -- Half as common as the first magazine wherever both are, homes included.
         fullType = "RenewableEnergy.HomesteadPowerMag2",
         option = "LRMMisc",
         entries = with(1.5, SURVIVOR_CRATES, with(0.5, SURVIVALIST_CORPSES, with(0.3, HOME_SHELVES,
@@ -542,18 +545,18 @@ end
 -- Puts each stash's map item into the corpse loot its description targets, if the Stash Houses
 -- option drops maps.
 local function applyStashMaps()
-    local inLoot = RenewableEnergy.Stash.mapsInLoot()
-    for stashMap, added in pairs(RenewableEnergy.Stash.descriptions) do
-        for _, target in ipairs(added.targets or {}) do
+    local inLoot = Stash.mapsInLoot()
+    for description, extra in pairs(Stash.descriptions) do
+        for _, target in ipairs(extra.targets or {}) do
             local items = Distributions.resolveItemList("sub:all." .. target)
             if items then
-                removeItem(items, stashMap.item)
+                removeItem(items, description.item)
                 if inLoot then
-                    table.insert(items, stashMap.item)
-                    table.insert(items, added.rarity)
+                    table.insert(items, description.item)
+                    table.insert(items, extra.rarity)
                 end
             else
-                print("RenewableEnergy: no corpse loot " .. target .. " for " .. stashMap.item .. ", skipped")
+                print("RenewableEnergy: no corpse loot " .. target .. " for " .. description.item .. ", skipped")
             end
         end
     end
@@ -589,13 +592,12 @@ end
 --- battery that already has a charge of its own is one a refill (loot respawn) found there.
 ---@param container ItemContainer
 function Distributions.chargeFoundBatteries(container)
-    local Battery = RenewableEnergy.Battery
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item:IsInventoryContainer() then
             Distributions.chargeFoundBatteries(item:getInventory())
-        elseif string.find(item:getFullType(), "^RenewableEnergy%.") and Battery.isBattery(item) and not Battery.hasCharge(item) then
+        elseif item:getModule() == "RenewableEnergy" and Battery.isBattery(item) and not Battery.hasCharge(item) then
             Battery.setFoundCharge(item)
         end
     end
@@ -647,19 +649,19 @@ end
 function Distributions.addCrackedModules(roomName, containerType, container)
     local weight = crackedModuleWeight(roomName, containerType, container)
     if weight > 0 and ZombRandFloat(0, 1) < Distributions.crackedModuleChance(weight) then
-        local WorldSpawns = RenewableEnergy.WorldSpawns
         WorldSpawns.addModule(container, WorldSpawns.crackedCondition())
     end
 end
 
 -- Rooms, vehicles and corpses fire this after rolling their loot; vanilla's own drainable
--- randomizing (ItemPickerJava.rollItem) runs before it. Two callers pass a bag's loot table in
--- place of a container. Stash and safehouse fills (fillContainerType) don't fire it. The arrow
--- board's battery box is stocked here, so that its batteries get their charge with the rest.
+-- randomizing (ItemPickerJava.rollItem) runs before it. ItemPickerJava's bag fills pass the bag's
+-- loot table in place of a container. Stash and safehouse fills (fillContainerType) don't fire
+-- it. The arrow board's battery box is stocked here, so that its batteries get their charge with
+-- the rest.
 local function onFillContainer(roomName, containerType, container)
     if instanceof(container, "ItemContainer") then
         Distributions.addCrackedModules(roomName, containerType, container)
-        RenewableEnergy.ArrowBoard.stockIfBatteryBox(roomName, container)
+        ArrowBoard.stockIfBatteryBox(roomName, container)
         Distributions.chargeFoundBatteries(container)
     end
 end

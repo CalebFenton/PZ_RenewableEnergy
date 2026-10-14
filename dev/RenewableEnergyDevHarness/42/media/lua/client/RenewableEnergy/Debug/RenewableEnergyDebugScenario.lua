@@ -1,8 +1,9 @@
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 
 -- Listed in the SCENARIOS panel on the main menu when the game runs with -debug
--- (DebugScenarios.lua). Starts a zombie-free world in the morning with an electrician and
--- carpenter who knows every recipe, a screwdriver and a table to craft at.
+-- (DebugScenarios.lua), and started by every dev harness mode, whose world has no zombies
+-- (PZHarness Runner). Starts in the morning with an electrician and carpenter who knows every
+-- recipe, a screwdriver and a table to craft at.
 debugScenarios = debugScenarios or {}
 
 debugScenarios.RenewableEnergyScenario = {

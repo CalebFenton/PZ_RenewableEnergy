@@ -49,7 +49,7 @@ function Trailer.spawnVehicle(script, square, facing, args)
         stockedPanels[vehicle:getId()] = { [ArrowBoard.PANELS[1]] = rolled[1], [ArrowBoard.PANELS[2]] = rolled[2] }
     elseif args and args.repair then
         -- The tick after stocking puts the stock conditions back over a repair in the same tick
-        -- (ArrowBoard.keepStockConditions), so a whole trailer is stocked whole.
+        -- (ArrowBoard.lua's keepStockConditions), so a whole trailer is stocked whole.
         vehicle = spawnStocking(script, square, facing, function() return 100 end)
     end
     if vehicle and args.repair then
@@ -58,27 +58,37 @@ function Trailer.spawnVehicle(script, square, facing, args)
     return vehicle
 end
 
--- What each panel part shows: the ids of its part models in the vehicle's model list. Read by
--- reflection (debug only), since nothing exposes the list to Lua.
+-- The value of the Java field `name` of `object`, read by reflection (debug only), since nothing
+-- exposes a vehicle's model list (BaseVehicle.models) to Lua.
 local function fieldValue(object, name)
+    local suffix = "%." .. name .. "$"
     for i = 0, getNumClassFields(object) - 1 do
         local field = getClassField(object, i)
-        if tostring(field):match("%." .. name .. "$") then
+        if tostring(field):match(suffix) then
             return getClassFieldVal(object, field)
         end
     end
     return nil
 end
 
---- The models a part of `vehicle` shows, sorted and joined with commas.
-function Trailer.shownModels(vehicle, partId)
-    local part, shown = vehicle:getPartById(partId), {}
+-- The entries of the vehicle's model list that draw the part `partId`.
+local function partModels(vehicle, partId)
+    local part, found = vehicle:getPartById(partId), {}
     local models = fieldValue(vehicle, "models")
     for i = 0, models:size() - 1 do
         local info = models:get(i)
         if fieldValue(info, "part") == part then
-            table.insert(shown, fieldValue(info, "scriptModel"):getId())
+            table.insert(found, info)
         end
+    end
+    return found
+end
+
+--- The models a part of `vehicle` shows, sorted and joined with commas.
+function Trailer.shownModels(vehicle, partId)
+    local shown = {}
+    for _, info in ipairs(partModels(vehicle, partId)) do
+        table.insert(shown, fieldValue(info, "scriptModel"):getId())
     end
     table.sort(shown)
     return table.concat(shown, ",")
@@ -90,23 +100,19 @@ end
 --- from open to shut, and a reversed track plays it from its end (AnimationTrack.getCurrentTrackTime).
 --- A dedicated server draws nothing, so only a client or single player has a track.
 function Trailer.lidPose(vehicle)
-    local part = vehicle:getPartById(RenewableEnergy.ArrowBoard.LID)
-    local models = fieldValue(vehicle, "models")
-    for i = 0, models:size() - 1 do
-        local info = models:get(i)
-        if fieldValue(info, "part") == part then
-            local track = fieldValue(info, "track")
-            local clip = track and fieldValue(track, "currentClip")
-            if not clip then
-                return {}
-            end
-            local duration, time = fieldValue(clip, "duration"), fieldValue(track, "currentTimeValue")
-            local at = fieldValue(track, "reverse") and duration - time or time
-            return { clip = fieldValue(clip, "name"), playing = fieldValue(track, "isPlaying"),
-                open = duration > 0 and 1 - math.min(math.max(at / duration, 0), 1) or nil }
-        end
+    local info = partModels(vehicle, RenewableEnergy.ArrowBoard.LID)[1]
+    if not info then
+        return nil
     end
-    return nil
+    local track = fieldValue(info, "track")
+    local clip = track and fieldValue(track, "currentClip")
+    if not clip then
+        return {}
+    end
+    local duration, time = fieldValue(clip, "duration"), fieldValue(track, "currentTimeValue")
+    local at = fieldValue(track, "reverse") and duration - time or time
+    return { clip = fieldValue(clip, "name"), playing = fieldValue(track, "isPlaying"),
+        open = duration > 0 and 1 - math.min(math.max(at / duration, 0), 1) or nil }
 end
 
 -- A part's installed item and its condition, or none.
@@ -166,20 +172,24 @@ function Trailer.vehicleState(vehicle)
     return state
 end
 
-handler("vehicleState", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+-- Registers the handler `name` on the vehicle `args` names (RenewableEnergyTest.onVehicle):
+-- `fn(vehicle, args, player)` runs once it is found.
+local function onVehicle(name, fn)
+    handler(name, function(player, args)
+        local vehicle, missing = vehicleAt(args)
+        if not vehicle then
+            return nil, missing
+        end
+        return fn(vehicle, args, player)
+    end)
+end
+
+onVehicle("vehicleState", function(vehicle)
     return { state = Trailer.vehicleState(vehicle) }
 end)
 
 -- The stock conditions of the panels of a trailer spawned with `args.recordStock`, and its state.
-handler("arrowBoardStock", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardStock", function(vehicle, args)
     local stock = stockedPanels[vehicle:getId()]
     if not stock then
         return nil, "the stock conditions of vehicle " .. tostring(args.id)
@@ -209,11 +219,7 @@ end
 -- `args.lidInstalled` is set, open or shut if `args.lidOpen` is, locked or not if `args.lidLocked`
 -- is, and its lock cut or whole if `args.lidLockBroken` is; the switch on or off if
 -- `args.switchOn` is set, as the switch action does. Answers its state.
-handler("setTrailer", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("setTrailer", function(vehicle, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     if args.repair then
         vehicle:repair()
@@ -274,43 +280,27 @@ end)
 -- `args.hours` of the trailer's lamps as they were lit, then the lamps set again with the
 -- photocell seeing dark if `args.night` (ArrowBoard.runLamps). Answers the watt-hours they drew
 -- and the trailer's state.
-handler("arrowBoardLamps", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardLamps", function(vehicle, args)
     local drawn = RenewableEnergy.ArrowBoard.runLamps(vehicle, args.hours, args.night == true)
     return { drawn = drawn, state = Trailer.vehicleState(vehicle) }
 end)
 
 -- The trailer's whole charge pass of `args.hours` at the sun of the moment, as the clock runs it
 -- (ArrowBoard.update). Answers the watt-hours its panels stored and its state.
-handler("arrowBoardUpdate", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardUpdate", function(vehicle, args)
     local stored = RenewableEnergy.ArrowBoard.update(vehicle, args.hours)
     return { stored = stored, state = Trailer.vehicleState(vehicle) }
 end)
 
 -- Whether the switch could be set to `args.on` on the authority, which the switch action asks
 -- before it flips it. Answers that and the trailer's state.
-handler("arrowBoardCanSwitch", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardCanSwitch", function(vehicle, args)
     return { can = RenewableEnergy.ArrowBoard.canSwitch(vehicle, args.on), state = Trailer.vehicleState(vehicle) }
 end)
 
 -- Rolls the trailer's switch as stocking does `args.rolls` times, from no switch each time, then
 -- puts its own back. Answers how many rolls came out on.
-handler("arrowBoardSwitchRolls", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardSwitchRolls", function(vehicle, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local modData = box:getModData()
@@ -330,11 +320,7 @@ end)
 -- `args.hours` of the trailer's panels charging its box at the sun of the moment. Answers the
 -- watt-hours stored, the panels' rating, what a flat watt of panel makes in an hour now, and the
 -- trailer's state.
-handler("arrowBoardCharge", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardCharge", function(vehicle, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local watts = ArrowBoard.panelWatts(vehicle)
     local stored = ArrowBoard.charge(vehicle, args.hours)
@@ -343,22 +329,14 @@ handler("arrowBoardCharge", function(_, args)
 end)
 
 -- A crack on the panel `args.part`. Answers the trailer's state.
-handler("arrowBoardCrack", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardCrack", function(vehicle, args)
     RenewableEnergy.ArrowBoard.crackPanel(vehicle, vehicle:getPartById(args.part))
     return { state = Trailer.vehicleState(vehicle) }
 end)
 
 -- `args.hours` of thunderstorm over the trailer at the save's storm options. Answers how many
 -- panels cracked and the trailer's state.
-handler("arrowBoardStorm", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardStorm", function(vehicle, args)
     local cracked = RenewableEnergy.ArrowBoard.stormCrack(vehicle, args.hours)
     return { cracked = cracked, state = Trailer.vehicleState(vehicle) }
 end)
@@ -366,11 +344,7 @@ end)
 -- The trailer loads as one from a save made before its panels were parts: empty panels and no
 -- record of stocking them, then the panels' init. Then its panels are taken off and it loads
 -- again. Answers its state after each load.
-handler("arrowBoardOldPanels", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardOldPanels", function(vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local function load()
         for _, id in ipairs(ArrowBoard.PANELS) do
@@ -394,11 +368,7 @@ end)
 -- The trailer loads as one from a save made before its frame was parts: frame parts empty and the
 -- random colour of `args.hsv`, then the frame's init. Answers its state and its script's forced
 -- colour.
-handler("arrowBoardOldFrame", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardOldFrame", function(vehicle, args)
     vehicle:setColorHSV(args.hsv[1], args.hsv[2], args.hsv[3])
     for _, frame in ipairs(RenewableEnergy.ArrowBoard.FRAME) do
         local part = vehicle:getPartById(frame.id)
@@ -411,22 +381,14 @@ end)
 
 -- The game's own crash damage on the vehicle: `args.amount`, to the front if `args.front`.
 -- Answers its state.
-handler("vehicleCrash", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("vehicleCrash", function(vehicle, args)
     vehicle:crash(args.amount, args.front)
     return { state = Trailer.vehicleState(vehicle) }
 end)
 
 -- The item types each panel takes, then the left panel emptied and the trailer repaired. Answers
 -- the types and the trailer's state.
-handler("arrowBoardRepairAll", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardRepairAll", function(vehicle)
     local types = {}
     for _, id in ipairs(RenewableEnergy.ArrowBoard.PANELS) do
         local list = vehicle:getPartById(id):getItemType()
@@ -454,11 +416,7 @@ end)
 
 -- Gives the character a key to the vehicle `args`, which no arrow board ever spawns with, so a
 -- test can show what a key holder could do to its lid.
-handler("arrowBoardKey", function(player, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then
-        return nil, missing
-    end
+onVehicle("arrowBoardKey", function(vehicle, _, player)
     return { given = { PZHarness.giveItem(player, vehicle:createVehicleKey()) } }
 end)
 

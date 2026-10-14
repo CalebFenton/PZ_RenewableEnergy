@@ -1,12 +1,6 @@
--- Development only; dev/run-debug-client.sh --promo runs it instead of the tests. It builds two
--- working setups near the scenario start at a clear noon, a homestead (a metal battery bank
--- indoors against an outside wall, wall panels on that wall, racks, flat panels and a backup
--- generator in the yard) and a stage-0 wooden battery box indoors by a window with its panels
--- outside. Around them it lays a plain floor where every item is shot alone, hitches the arrow
--- board trailer to a car at road works, at night lines a house's front walk with lit garden
--- lights, and later that night lights up a house its own panels run, for the poster, among dark
--- neighbours. It saves the raw art that art/promo/compose.py lays out for the README and the
--- Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
+-- Development only; dev/run-debug-client.sh --promo runs it instead of the tests. It builds the
+-- setups near the scenario start and saves the raw art that art/promo/compose.py lays out for the
+-- README and the Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
 -- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
 -- recipe and skill names in the game's language.
 -- The shots come in groups (dev/harness.conf's MODE_GROUPS_promo), and PROMO=<group>,... shoots
@@ -208,10 +202,6 @@ local QUIET_RADIUS = 25
 local run
 local region, elementRegion = Capture.region, Capture.elementRegion
 
-local function add(step)
-    run:add(step)
-end
-
 -- Names ------------------------------------------------------------------------------------------
 
 local icons = {}
@@ -382,7 +372,7 @@ end
 
 local function addIcons()
     local sheet
-    add(function()
+    run:add(function()
         local backdrop = run:newBackdrop()
         sheet = IconSheet:new(100, 100, getCore():getScreenWidth() - 200, getCore():getScreenHeight() - 200)
         sheet:noBackground()
@@ -464,8 +454,11 @@ local WALL_FLAGS = { IsoFlagType.cutN, IsoFlagType.cutW, IsoFlagType.WallOverlay
 
 local function isOnWall(object)
     local props = object:getProperties()
+    if not props then
+        return false
+    end
     for _, flag in ipairs(WALL_FLAGS) do
-        if props and props:has(flag) then
+        if props:has(flag) then
             return true
         end
     end
@@ -588,10 +581,6 @@ local function findStudio(player, others)
     end)
 end
 
-local function startsWith(text, prefix)
-    return string.sub(text, 1, #prefix) == prefix
-end
-
 local function roadSquare(heading, car, position)
     local ahead, side = position[1], position[2]
     return getCell():getGridSquare(car:getX() + ahead * heading.ahead[1] + side * heading.side[1],
@@ -602,13 +591,13 @@ end
 local function isRoadPaint(object)
     local sprite = object:getSprite()
     local name = sprite and sprite:getName()
-    return name ~= nil and (startsWith(name, "floors_overlay") or startsWith(name, "blends_"))
+    return name ~= nil and (PZHarness.startsWith(name, "floors_overlay") or PZHarness.startsWith(name, "blends_"))
 end
 
 local function isOpenRoad(square, player)
     local floor = square and square:getFloor()
     local name = floor and floor:getSprite() and floor:getSprite():getName()
-    return name ~= nil and startsWith(name, "blends_street") and isClear(square, isRoadPaint)
+    return name ~= nil and PZHarness.startsWith(name, "blends_street") and isClear(square, isRoadPaint)
         and square ~= player:getCurrentSquare()
 end
 
@@ -786,18 +775,15 @@ local function switchOnLights(square, otherBank)
     local building = square:getBuilding()
     local switched = 0
     for radius = 0, LIGHT_SEARCH do
-        for dx = -radius, radius do
-            for dy = -radius, radius do
-                local near = math.max(math.abs(dx), math.abs(dy)) == radius
-                    and getCell():getGridSquare(square:getX() + dx, square:getY() + dy, square:getZ())
-                local objects = near and building and near:getBuilding() == building and not isInReach(otherBank, near)
-                    and near:getObjects()
-                for i = 0, (objects and objects:size() or 0) - 1 do
-                    local object = objects:get(i)
-                    if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and not object:isActivated()
-                        and object:setActive(true, false, true) then
-                        switched = switched + 1
-                    end
+        for x, y in PZHarness.Fixtures.ring(square:getX(), square:getY(), radius) do
+            local near = getCell():getGridSquare(x, y, square:getZ())
+            local objects = near and building and near:getBuilding() == building and not isInReach(otherBank, near)
+                and near:getObjects()
+            for i = 0, (objects and objects:size() or 0) - 1 do
+                local object = objects:get(i)
+                if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and not object:isActivated()
+                    and object:setActive(true, false, true) then
+                    switched = switched + 1
                 end
             end
         end
@@ -997,7 +983,7 @@ local function goTo(squares, stepsOut)
             lookedFrom[square] = true
         end
     end
-    add(function()
+    run:add(function()
         Stage.zoomOut(stepsOut)
         return Capture.zoomSettled()
     end)
@@ -1006,13 +992,9 @@ end
 -- What every group's shots share: noon without grid power, and no radio captions around the
 -- `places` the run uses. The harness clears the weather.
 local function addWorldSettings(places)
-    add(function()
+    run:add(function()
         -- The grid would power the squares and leave the bank nothing to run.
-        local option = getSandboxOptions():getOptionByName("ElecShutModifier")
-        if option then
-            option:setValue(-1)
-        end
-        getWorld():setHydroPowerOn(false)
+        PZHarness.Fixtures.setGrid(false)
         getGameTime():setTimeOfDay(NOON)
         silenceRadios(places)
     end)
@@ -1039,7 +1021,7 @@ end
 
 -- Both setups, charged through the morning; the world, status and menu shots need them.
 local function addSetups()
-    add(function()
+    run:add(function()
         getGameTime():setTimeOfDay(MORNING)
         Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
         Stage.removeTrees(stage0Origin:getX(), stage0Origin:getY(), stage0Origin:getZ())
@@ -1052,7 +1034,6 @@ local function addSetups()
 end
 
 local function addWorld()
-    -- A step out from the closest zoom, which leaves too little of the house around the panels.
     local scouts = {}
     for _, spot in ipairs(HOMESTEAD.scouts) do
         local square = at(spot)
@@ -1061,12 +1042,13 @@ local function addWorld()
         end
     end
     table.insert(scouts, at(HOMESTEAD.player))
+    -- A step out from the closest zoom, which leaves too little of the house around the panels.
     goTo(scouts, 1)
     run:addOpaque("homestead", function()
         return { centred("homestead", homesteadSquares()) }
     end)
     -- The banner shows the whole homestead a step further out.
-    add(function()
+    run:add(function()
         getCore():doZoomScroll(0, 1)
         return Capture.zoomSettled()
     end)
@@ -1089,7 +1071,7 @@ end
 -- The homestead bank's status window on a backdrop.
 local function addStatus()
     local window
-    add(function()
+    run:add(function()
         run:newBackdrop()
         window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(at(HOMESTEAD.bank)))
         window:setX(100)
@@ -1102,7 +1084,7 @@ local function addStatus()
     run:addMatted("status", function()
         return { elementRegion("status", window) }
     end)
-    add(function()
+    run:add(function()
         window:close()
     end)
     run:removeBackdrop()
@@ -1123,7 +1105,7 @@ end
 -- submenu open and the first part the bank takes highlighted.
 local function addMenu()
     local menus, carried = {}, {}
-    add(function()
+    run:add(function()
         run:newBackdrop()
         -- In debug mode vanilla adds its debug options to every world menu unless told not to.
         getDebugOptions():setBoolean("UI.HideDebugContextMenuOptions", true)
@@ -1154,7 +1136,7 @@ local function addMenu()
         end
         return { region("menu", left, top, right - left, bottom - top) }
     end)
-    add(function()
+    run:add(function()
         menus[1]:hideAndChildren()
         for _, item in ipairs(carried) do
             getPlayer():getInventory():Remove(item)
@@ -1179,7 +1161,7 @@ end
 local function addModels(items, models)
     local group = run.current
     local zoomLevels
-    add(function()
+    run:add(function()
         local asphalt = roadCar:getFloor():getSprite():getName()
         print("REPromo item floor " .. asphalt)
         for dx = -STUDIO.floorReach, STUDIO.floorReach do
@@ -1203,29 +1185,29 @@ local function addModels(items, models)
     end)
     goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]) }, 0)
     local floor = run.prefix .. "models_floor"
-    add(function()
+    run:add(function()
         studio:removeAllWorldObjects()
         return DRAW_FRAMES
     end)
-    add(function()
+    run:add(function()
         run:screenshot(floor)
     end)
     for _, item in ipairs(items) do
         local name = "model_" .. string.gsub(item.fullType, "%.", "_")
-        add(function()
+        run:add(function()
             local placed = instanceItem(item.fullType)
             placed:setWorldZRotation(STUDIO.rotation)
             studio:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
             return DRAW_FRAMES
         end)
-        add(function()
+        run:add(function()
             local file = run.prefix .. name
             run:screenshot(file)
             table.insert(models, { name = name, group = group, file = file, floor = floor, window = studioWindow(name) })
             studio:removeAllWorldObjects()
         end)
     end
-    add(function()
+    run:add(function()
         getCore():setOptionZoomLevels1x(zoomLevels[1])
         getCore():setOptionZoomLevels2x(zoomLevels[2])
         getCore():zoomLevelsChanged()
@@ -1245,30 +1227,17 @@ end
 -- closest zoom.
 local function addTrailer()
     local pair
-    add(function()
-        Stage.removeTrees(roadCar:getX(), roadCar:getY(), roadCar:getZ())
-        -- Found through the squares they stand on, since Lua can't walk the cell's set of them.
-        local parked, seen = {}, {}
-        for dx = -ROAD.clearRadius, ROAD.clearRadius do
-            for dy = -ROAD.clearRadius, ROAD.clearRadius do
-                local square = getCell():getGridSquare(roadCar:getX() + dx, roadCar:getY() + dy, roadCar:getZ())
-                local vehicle = square and square:getVehicleContainer()
-                if vehicle and not seen[vehicle] then
-                    seen[vehicle] = true
-                    table.insert(parked, vehicle)
-                end
-            end
-        end
-        for _, vehicle in ipairs(parked) do
-            vehicle:permanentlyRemove()
-        end
+    run:add(function()
+        local x, y, z, reach = roadCar:getX(), roadCar:getY(), roadCar:getZ(), ROAD.clearRadius
+        Stage.removeTrees(x, y, z)
+        Stage.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
         for _, spot in ipairs(ROAD.cones) do
             placeTile(atRoad(spot), ROAD.cone)
         end
         pair = Stage.spawnTrailer(roadCar, roadHeading.facing)
         return Stage.vehiclesAtRest(pair, false)
     end)
-    add(function()
+    run:add(function()
         Stage.hitchTrailer(pair, getPlayer(), "REPromo")
         -- Its arrow lit, as work zones leave them.
         Stage.holdLampsLit(pair.trailer)
@@ -1293,7 +1262,7 @@ end
 -- Garden lights along a house's front walk, charged and lit at night, at the closest zoom.
 local function addGardenLights()
     local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    add(function()
+    run:add(function()
         Stage.removeTrees(walkOrigin:getX(), walkOrigin:getY(), walkOrigin:getZ())
         for along = WALK.open.along[1], WALK.open.along[2] do
             for out = WALK.open.out[1], WALK.open.out[2] do
@@ -1308,7 +1277,7 @@ local function addGardenLights()
         -- The lighting takes most of a second to follow the clock.
         return Stage.lightingSettled(getPlayer(), true)
     end)
-    add(function()
+    run:add(function()
         -- Lit now, rather than at the next minute's pass. Their light shows while the character
         -- looks around.
         for _, spot in ipairs(WALK.lights) do
@@ -1390,7 +1359,7 @@ local function posterRegion()
 end
 
 local function addPoster()
-    add(function()
+    run:add(function()
         Stage.removeTrees(posterOrigin:getX(), posterOrigin:getY(), posterOrigin:getZ())
     end)
     local scouts = {}
@@ -1408,7 +1377,7 @@ local function addPoster()
     end
     table.insert(scouts, atPoster(POSTER.player))
     goTo(scouts, POSTER.zoomOut)
-    add(function()
+    run:add(function()
         getGameTime():setTimeOfDay(POSTER.hour)
         buildPoster()
         return Stage.lightingSettled(getPlayer(), true)
@@ -1500,11 +1469,11 @@ local GROUPS = {
 -- "REPromo TIME", how long the steps added in between took.
 local function addTimer(label)
     local started
-    add(function()
+    run:add(function()
         started = getTimestampMs()
     end)
     return function()
-        add(function()
+        run:add(function()
             print(string.format("REPromo TIME %s %.1f s", label, (getTimestampMs() - started) / 1000))
         end)
     end

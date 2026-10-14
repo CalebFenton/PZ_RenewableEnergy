@@ -15,15 +15,15 @@ RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
 RenewableEnergy.SolarGardenLight = SolarGardenLight
 
-local Sprites = RenewableEnergy.Sprites
+local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 
 SolarGardenLight.ITEM = "RenewableEnergy.SolarGardenLight"
 -- Object modData: watt-hours in the light's battery. Picking the light up carries it along
 -- (Moveables.lua).
 SolarGardenLight.CHARGE_KEY = "RenewableEnergy_chargeWh"
 -- Object and item modData: the full type of the bulb in the light. Unset means the plain bulb
--- every light comes with, so the lights in saves from before the mod had bulbs, and every one
--- spawned since, hold one without being touched. Picking the light up carries it along too.
+-- every light comes with, so a light saved or spawned without the key holds one. Picking the
+-- light up carries it along too.
 SolarGardenLight.BULB_KEY = "RenewableEnergy_bulb"
 SolarGardenLight.PLAIN_BULB = "Base.LightBulb"
 -- BULB_KEY of a light whose bulb was taken out.
@@ -125,7 +125,7 @@ local function drawLamp(x, y, z, bulb)
         return
     end
     local r, g, b = lampColor(bulb)
-    lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, RenewableEnergy.Specs.gardenLight.radius), bulb = bulb }
+    lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, Specs.gardenLight.radius), bulb = bulb }
 end
 
 -- The bulb a light's lamp shines with, or nil if it has no lamp.
@@ -180,8 +180,7 @@ end
 --- even if it stays lit. `sky` is Sun.skyNow(), worked out here if nil. Authority only. Returns
 --- whether the light is lit.
 function SolarGardenLight.update(light, hours, bulbChanged, sky)
-    local Sun = RenewableEnergy.Sun
-    local spec = RenewableEnergy.Specs.gardenLight
+    local spec = Specs.gardenLight
     sky = sky or Sun.skyNow()
     local night = sky.up <= 0
     local bulb = SolarGardenLight.getBulb(light) ~= nil
@@ -229,7 +228,7 @@ end
 
 --- Runs every loaded light the authority has seen.
 function SolarGardenLight.updateAll(hours)
-    local sky = RenewableEnergy.Sun.skyNow()
+    local sky = Sun.skyNow()
     lights:each(function(light)
         SolarGardenLight.update(light, hours, false, sky)
     end)

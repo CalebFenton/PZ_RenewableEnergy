@@ -22,6 +22,8 @@ RenewableEnergy.WorldSpawns = WorldSpawns
 
 local Sprites = RenewableEnergy.Sprites
 local Specs = RenewableEnergy.Specs
+local PowerBank = RenewableEnergy.PowerBank
+local Battery = RenewableEnergy.Battery
 local MODULE = Specs.factoryModule
 
 -- Module conditions. A cracked module lies in a garage with a broken cover glass; a weathered
@@ -221,8 +223,8 @@ local function addFound(container, fullType)
         return WorldSpawns.addModule(container, WorldSpawns.siteModuleCondition())
     end
     local item = container:AddItem(fullType)
-    if item and RenewableEnergy.Battery.isBattery(item) then
-        RenewableEnergy.Battery.setFoundCharge(item)
+    if item and Battery.isBattery(item) then
+        Battery.setFoundCharge(item)
     end
     return item
 end
@@ -240,7 +242,7 @@ end
 ---@param stockName string a BANK_STOCK key
 function WorldSpawns.stockBank(container, stockName)
     local stock = WorldSpawns.BANK_STOCK[stockName]
-    local spec = RenewableEnergy.PowerBank.bankOfSprite(Sprites[stock.sprite]).spec
+    local spec = PowerBank.bankOfSprite(Sprites[stock.sprite]).spec
     local options = SandboxVars.RenewableEnergy
     local batteries = WorldSpawns.scaled(WorldSpawns.rollBetween(stock.batteries), options.LRMBatteries)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
@@ -274,11 +276,11 @@ end
 ---@param stockName string a BANK_STOCK key
 ---@return IsoGenerator?
 function WorldSpawns.placeBank(square, stockName)
-    if not RenewableEnergy.PowerBank.canPlaceBank(square) then
+    if not PowerBank.canPlaceBank(square) then
         print("RenewableEnergy: no bank at " .. square:getX() .. "," .. square:getY() .. "," .. square:getZ() .. ", which is not indoors")
         return nil
     end
-    local bank = RenewableEnergy.PowerBank.place(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], -1)
+    local bank = PowerBank.place(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], -1)
     local container = bank:getContainer()
     WorldSpawns.stockBank(container, stockName)
     -- PowerBank.place sent the bank to the clients while it was empty.
@@ -314,6 +316,8 @@ function WorldSpawns.placeCrate(square, stockName)
     if isServer() then
         crate:transmitCompleteItemToClients()
     end
+    -- The game fires OnObjectAdded only for an object a client sends (AddItemToMapPacket), so an
+    -- object Lua places fires it itself, as vanilla's TrapBO does.
     triggerEvent("OnObjectAdded", crate)
     return crate
 end
@@ -334,7 +338,7 @@ end
 
 --- Places a panel mount holding `modules` (a PowerBank.MODULES list).
 function WorldSpawns.placePanel(square, spriteName, modules)
-    WorldSpawns.placeMoveable(square, spriteName, { [RenewableEnergy.PowerBank.MODULES] = modules })
+    WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES] = modules })
 end
 
 -- Rooms seen for the first time -------------------------------------------------------------------
@@ -349,7 +353,7 @@ local INDOOR_TRIES = 10
 local function indoorSquare(room)
     for _ = 1, INDOOR_TRIES do
         local square = room:getRandomFreeSquare()
-        if square and RenewableEnergy.PowerBank.canPlaceBank(square) then
+        if square and PowerBank.canPlaceBank(square) then
             return square
         end
     end

@@ -1,9 +1,7 @@
 -- The arrow board's battery box lid is a trunk lid to vanilla (scripts/RenewableEnergy/Vehicles.txt
--- says why), so vanilla's radial menu, joypad prompt, loot window and mechanics window would call it
--- a trunk. These hooks give it the box's words on the trailer only, tell a player who tries the
--- padlocked box how to get in, offer Cut Padlock at the padlock and the lamps' switch inside the
--- box, and show the box in the loot window when the lid opens, wherever vanilla shows a trunk's
--- container.
+-- says why), so vanilla's UI would call it a trunk and open no container for it. These hooks of
+-- vanilla's UI give it the box's words and container on the trailer only, tell a player who tries
+-- the padlocked box how to get in, and offer Cut Padlock and the lamps' switch.
 
 require "ISUI/ISButtonPrompt"
 require "ISUI/ISWorldObjectContextMenu"

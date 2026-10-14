@@ -1,8 +1,6 @@
--- The battery bank's status window: a few lines on what the bank is doing, then what comes in,
--- what draws and the parts on the left, and the batteries and the panels on the right. It draws
--- the status the server sends to the players watching the bank, which it does while it is open,
--- so it reads the same in single player and multiplayer. Clicking a panel's row highlights that
--- panel in the world.
+-- The battery bank's status window. It draws the status the server sends to the players watching
+-- the bank, which it does while the window is open, so it reads the same in single player and
+-- multiplayer. Clicking a panel's row highlights that panel in the world.
 
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
@@ -63,19 +61,19 @@ end
 local barColor = { r = 0, g = 0, b = 0, a = 1 }
 
 -- Summary -------------------------------------------------------------------------------------
--- The lines across the top, { text, color }: charging or draining, the load against the limit,
--- the panel slots, and what is wrong if the bank isn't running.
+-- The lines across the top, each { text = text, color = name }.
 
 local function chargingLine(status)
     if #status.batteries == 0 then
         return { text = getText("IGUI_RenewableEnergy_NoBatteries"), color = "bad" }
     end
     local watts, hours = status.charging.watts, status.charging.hours
-    if round(watts) > 0 then
+    local shownWatts = round(watts)
+    if shownWatts > 0 then
         local text = hours and getText("IGUI_RenewableEnergy_ChargingFullIn", Format.signedWatts(watts), Format.duration(hours))
             or getText("IGUI_RenewableEnergy_Charging", Format.signedWatts(watts))
         return { text = text, color = "good" }
-    elseif round(watts) < 0 then
+    elseif shownWatts < 0 then
         local text = hours and getText("IGUI_RenewableEnergy_DrainingEmptyIn", Format.signedWatts(watts), Format.duration(hours))
             or getText("IGUI_RenewableEnergy_Draining", Format.signedWatts(watts))
         return { text = text, color = hours and hours < 12 and "bad" or nil }
@@ -357,11 +355,12 @@ local function measure(rows)
 end
 
 local function measureSummary(lines)
+    local textManager = getTextManager()
     local width = 0
     for _, line in ipairs(lines) do
-        width = math.max(width, getTextManager():MeasureStringX(UIFont.Medium, line.text))
+        width = math.max(width, textManager:MeasureStringX(UIFont.Medium, line.text))
     end
-    local fontHeight = getTextManager():getFontHeight(UIFont.Medium)
+    local fontHeight = textManager:getFontHeight(UIFont.Medium)
     return { width = width, height = #lines * fontHeight, lineHeight = fontHeight }
 end
 
@@ -370,7 +369,8 @@ end
 local function fit(rows, height)
     local used, kept = 0, {}
     for i, r in ipairs(rows) do
-        if used + rowHeight(r) + MORE_LINE * lineHeight() > height and i < #rows then
+        local h = rowHeight(r)
+        if used + h + MORE_LINE * lineHeight() > height and i < #rows then
             local hidden = 0
             for j = i, #rows do
                 if rows[j].label then
@@ -381,7 +381,7 @@ local function fit(rows, height)
             return kept
         end
         table.insert(kept, r)
-        used = used + rowHeight(r)
+        used = used + h
     end
     return kept
 end
@@ -522,6 +522,7 @@ function StatusWindow:onMouseDown(x, y)
 end
 
 function StatusWindow:prerender()
+    -- -1: the bank is on no square any more (IsoObject.getObjectIndex), picked up or destroyed.
     if self.bank:getObjectIndex() == -1 then
         self:close()
         return
@@ -608,7 +609,7 @@ function StatusWindow:new(x, y, playerNum, bank)
     o.playerNum = playerNum
     o.bank = bank
     o.summaryLines = {}
-    -- Nearly opaque: the vanilla 0.8 lets the text of windows behind show through the rows.
+    -- Nearly opaque: vanilla's translucent window lets the text of windows behind show through the rows.
     o.backgroundColor = { r = 0, g = 0, b = 0, a = 0.95 }
     o:setResizable(false)
     return o

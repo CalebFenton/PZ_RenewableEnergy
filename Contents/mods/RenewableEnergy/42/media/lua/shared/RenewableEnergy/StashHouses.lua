@@ -39,10 +39,11 @@ local SURVIVALISTS_AND_BANDITS = {
 -- buildingX, buildingY: a ground floor square well inside the house; StashSystem finds the
 -- building through it, and doBuildingStash only matches a building whose bounds strictly contain
 -- it. crateX, crateY, crateZ: an empty floor square in one of the house's rooms, since only
--- containers in its rooms are stocked. map: the item that leads there; a mod item is a map of just
--- mapArea, the squares west, north, east and south it shows, which corpses in `mapCorpses` carry at
--- `mapWeight`, a vanilla town map is found wherever vanilla puts it. Marks are drawn on the map: a
--- symbol of MapSymbolDefinitions, or note n, whose text is the translation Stash_<name>_<n>.
+-- containers in its rooms are stocked. map: the item that leads there. A mod item is a map of
+-- just mapArea (its west, north, east and south edges) that the corpses of `mapCorpses` carry at
+-- weight `mapWeight`; a vanilla town map is found wherever vanilla puts it. Marks are drawn on
+-- the map: a symbol of MapSymbolDefinitions, or note n, whose text is the translation
+-- Stash_<name>_<n>.
 local HOUSES = {
     -- A prepper's farmhouse off Crowcall Road, south of Rosewood, with a bunker under its shed.
     -- Only survivalists and bandits carry its map and it is never stocked from the start: the
@@ -150,7 +151,8 @@ local function describe(house)
         spawnTable = SPAWN_TABLE,
         zombies = house.zombies,
         barricades = house.barricades,
-        -- StashSystem places max - min of them (doSpecificBuildingProperties).
+        -- "min-max", but StashSystem.doSpecificBuildingProperties places max - min traps, not a
+        -- count between them.
         traps = house.traps,
         containers = { {
             containerType = CRATE_TYPE,

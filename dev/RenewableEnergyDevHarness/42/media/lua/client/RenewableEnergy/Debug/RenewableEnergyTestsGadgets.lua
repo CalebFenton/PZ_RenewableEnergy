@@ -12,10 +12,10 @@ require "Moveables/ISMoveableSpriteProps"
 require "TimedActions/ISInventoryTransferAction"
 
 -- Gadget tests: the solar battery maintainer, the solar battery charger, the deep cycle battery in
--- a vehicle and the solar garden light. The gadgets run on the authority, so the tests place them
--- the way a player does and drive and read them through T.server (RenewableEnergyTestServer.lua),
--- in this game in single player and on the server in multiplayer, and check what players see on
--- this client's copies. See RenewableEnergyTestLib.lua for how the runner works.
+-- a vehicle and the solar garden light. The gadgets run on the authority (this game in single
+-- player, the server in multiplayer), so the tests place them the way a player does, drive and
+-- read them through T.server (RenewableEnergyTestServer.lua), and check what players see on this
+-- client's copies. See RenewableEnergyTestLib.lua for how the runner works.
 
 local T = RenewableEnergyTest
 local test, expect, expectNear = T.test, T.expect, T.expectNear
@@ -133,28 +133,34 @@ test("renewable_energy_gadgets_maintainer_charge", {
             T.server(self, "maintainerCharge", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS, uses = ROW_START } end)
             T.step(function() table.insert(self.rows, { row = row, reply = self.server.maintainerCharge }) end)
         end
-        T.server(self, "chargeVehicles", function() return { vehicle = T.vehicleArgs(car), hours = 1 } end)
+        T.server(self, "chargeVehicles", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS } end)
     end,
     validate = function(self)
         if not expect(#self.rows == #MAINTAINER_HOURS and self.server.chargeVehicles, "the hours on the car never all ran ("
             .. #self.rows .. " of " .. #MAINTAINER_HOURS .. ")") then return end
+        local charged
         for _, r in ipairs(self.rows) do
             local wh, after = r.reply.wh, r.reply.after
             if r.row.charges then
+                charged = r.reply
                 local ratedWh, capacityWh = Specs.maintainerWatts * ROW_HOURS, r.reply.capacityWh
                 -- A thousandth of the rated hour covers the battery's float charge.
                 local tolerance = ratedWh / 1000
                 local expectedWh = math.min(ratedWh * r.reply.flatWh, (1 - ROW_START) * capacityWh)
                 expectNoonSun(r.reply.flatWh)
-                expect(wh > 0 and after > ROW_START, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
                 expectNear("Wh an hour at " .. r.row.what .. " added", wh, expectedWh, tolerance)
                 expectNear("charge after an hour at " .. r.row.what, after, ROW_START + expectedWh / capacityWh, tolerance / capacityWh)
             else
                 expect(wh == 0 and math.abs(after - ROW_START) < 0.001, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
             end
         end
-        local pass = self.server.chargeVehicles
-        expect(pass.after > pass.before, "the vehicle pass did not charge the maintained car")
+        -- The pass runs the maintainer for as long as the last noon row, right after it, so it adds
+        -- what that hour added unless the battery fills first. The light can still move a little
+        -- between the two calls, hence a fiftieth of that hour's Wh.
+        local pass, capacityWh = self.server.chargeVehicles, charged.capacityWh
+        local expectedWh = math.min(charged.wh, (1 - pass.before) * capacityWh)
+        expectNear("charge after the vehicle pass over the maintained car", pass.after,
+            pass.before + expectedWh / capacityWh, charged.wh / 50 / capacityWh)
     end,
 })
 
@@ -264,11 +270,6 @@ local function subMenuOf(context, option)
     return option and option.subOption and context:getSubMenu(option.subOption)
 end
 
--- The battery in this client's copy of the car of the handle `car`, or nil.
-local function carBattery(car)
-    return car.vehicle:getPartById(VehicleBattery.PART):getInventoryItem()
-end
-
 -- The mechanics menu of an empty battery slot offers the deep cycle battery the character
 -- carries, and picking it installs it with vanilla's action, on the server and on this client's
 -- copy; uninstalling gives it back with its charge. The actions take their real time, cut to a
@@ -281,7 +282,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
         if not car then return end
         self.car = car
         T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), empty = true } end)
-        T.waitForCopy(function() return carBattery(car) == nil end)
+        T.waitForCopy(function() return T.vehicleBattery(car) == nil end)
         T.give(self, "battery", { { type = VehicleBattery.ITEM } })
         T.step(function()
             local part = car.vehicle:getPartById(VehicleBattery.PART)
@@ -302,17 +303,17 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
                 return
             end
             T.choose(pick)
-            T.waitForCopy(function() return carBattery(car) ~= nil end)
+            T.waitForCopy(function() return T.vehicleBattery(car) ~= nil end)
             carState(self, car, "installed")
             T.count(self, "installed", { VehicleBattery.ITEM })
             T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), uses = 0.5 } end)
             T.waitForCopy(function()
-                local battery = carBattery(car)
+                local battery = T.vehicleBattery(car)
                 return battery ~= nil and math.abs(battery:getCurrentUsesFloat() - 0.5) < 0.001
             end)
             T.step(function() ISVehiclePartMenu.onUninstallPart(T.player(), part) end)
             T.waitForCopy(function()
-                return carBattery(car) == nil and T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM) ~= nil
+                return T.vehicleBattery(car) == nil and T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM) ~= nil
             end)
             carState(self, car, "uninstalled")
             T.count(self, "uninstalled", { VehicleBattery.ITEM })
@@ -327,7 +328,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
             .. tostring(installed and installed.type))
         expect(self.counts.installed[VehicleBattery.ITEM] == 0, "the installed battery is still in the inventory")
         expect(self.uninstalled.battery == nil, "the server's battery slot still holds a battery after uninstalling")
-        expect(carBattery(self.car) == nil, "this client's battery slot still holds a battery after uninstalling")
+        expect(T.vehicleBattery(self.car) == nil, "this client's battery slot still holds a battery after uninstalling")
         expect(self.counts.uninstalled[VehicleBattery.ITEM] == 1, "uninstalling gave back "
             .. tostring(self.counts.uninstalled[VehicleBattery.ITEM]) .. " deep cycle batteries")
         local battery = T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM)
@@ -342,7 +343,7 @@ local function capacityRatio()
 end
 
 -- Queues the server handler `name` on a car each with a car battery and a deep cycle battery,
--- with `args` and the car's name, leaving the answers in self.answers in that order.
+-- with `args` plus the car's T.vehicleArgs, leaving the answers in self.answers in that order.
 local function onBothBatteries(self, name, args)
     self.answers = {}
     for _, batteryType in ipairs({ CAR_BATTERY, VehicleBattery.ITEM }) do
@@ -359,38 +360,32 @@ local function onBothBatteries(self, name, args)
     end
 end
 
--- Fraction of a full charge vanilla's headlight update takes from each car's battery in an hour
--- with the engine off. Both cars run the same light, and the deep cycle battery loses less of its
--- charge by its capacity over a car battery's.
-test("renewable_energy_gadgets_deep_cycle_battery_drains_slower", {
-    run = function(self)
-        onBothBatteries(self, "headlightDrain", { uses = 0.8, minutes = 60 })
-    end,
-    validate = function(self)
-        local car, deepCycle = self.answers[1], self.answers[2]
-        if not expect(deepCycle and deepCycle.type == VehicleBattery.ITEM, "the second car holds "
-            .. tostring(deepCycle and deepCycle.type)) then return end
-        if expect(car.drop > 0, "the headlight didn't drain the car battery") then
-            expectNear("deep cycle drain over car battery drain", deepCycle.drop / car.drop, capacityRatio(), 0.01)
-        end
-    end,
-})
-
--- A running engine charges both batteries by the same watt-hours, so the bigger one gains less
--- of its charge.
-test("renewable_energy_gadgets_deep_cycle_battery_charges_from_vehicle", {
-    run = function(self)
-        onBothBatteries(self, "alternatorCharge", { uses = 0.2, minutes = 60 })
-    end,
-    validate = function(self)
-        local car, deepCycle = self.answers[1], self.answers[2]
-        if not expect(deepCycle and deepCycle.type == VehicleBattery.ITEM, "the second car holds "
-            .. tostring(deepCycle and deepCycle.type)) then return end
-        if expect(car.gain > 0, "the alternator didn't charge the car battery") then
-            expectNear("deep cycle gain over car battery gain", deepCycle.gain / car.gain, capacityRatio(), 0.01)
-        end
-    end,
-})
+-- An hour of vanilla's headlight update with the engine off, and of a running engine, on each
+-- car: both move the same watt-hours through either battery, so the deep cycle battery's share of
+-- a full charge changes less, by its capacity over a car battery's. `change` is the field of the
+-- handler's answer that holds that share.
+local VEHICLE_HOURS = {
+    { behavior = "drains_slower", handler = "headlightDrain", uses = 0.8, change = "drop",
+        none = "the headlight didn't drain the car battery" },
+    { behavior = "charges_from_vehicle", handler = "alternatorCharge", uses = 0.2, change = "gain",
+        none = "the alternator didn't charge the car battery" },
+}
+for _, case in ipairs(VEHICLE_HOURS) do
+    test("renewable_energy_gadgets_deep_cycle_battery_" .. case.behavior, {
+        run = function(self)
+            onBothBatteries(self, case.handler, { uses = case.uses, minutes = 60 })
+        end,
+        validate = function(self)
+            local car, deepCycle = self.answers[1], self.answers[2]
+            if not expect(deepCycle and deepCycle.type == VehicleBattery.ITEM, "the second car holds "
+                .. tostring(deepCycle and deepCycle.type)) then return end
+            if expect(car[case.change] > 0, case.none) then
+                expectNear("deep cycle " .. case.change .. " over car battery " .. case.change,
+                    deepCycle[case.change] / car[case.change], capacityRatio(), 0.01)
+            end
+        end,
+    })
+end
 
 -- Solar garden light -----------------------------------------------------------------------------
 

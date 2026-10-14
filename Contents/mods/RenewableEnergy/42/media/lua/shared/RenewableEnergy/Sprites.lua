@@ -78,7 +78,7 @@ Sprites.cracks = {
 }
 
 -- Each bank tile's overlays: `batteries[n]` shows n batteries in it, `meter[level]` its charge
--- meter lit from 1 (empty) to 5 (full).
+-- meter lit from 1 (empty) to the last level (full).
 Sprites.bankFill = {
     batteryBoxWood = { batteries = tiles(36, 2), meter = tiles(48, 5) },
     batteryBoxMetal = { batteries = tiles(38, 2), meter = tiles(53, 5) },
@@ -110,44 +110,35 @@ for field in pairs(Sprites.bankFill) do
     KINDS[Sprites[field]] = { field, nil, field:find("Wood$") and "wood" or "metal" }
 end
 
-local OVERLAYS = {}
-local function addOverlays(list)
-    for _, name in pairs(list) do
-        OVERLAYS[name] = true
+local function addAll(set, names)
+    for _, name in pairs(names) do
+        set[name] = true
     end
 end
-addOverlays(Sprites.crateOverlays)
-addOverlays({ Sprites.snow.flat })
-for _, facings in pairs(Sprites.snow.rack) do
-    addOverlays(facings)
-end
--- Snow lies on the glass, so it is drawn over the cracks.
-local SNOW, CRACKS = {}, {}
+
+local SNOW, CRACKS, OVERLAYS = {}, {}, {}
 SNOW[Sprites.snow.flat] = true
 for _, facings in pairs(Sprites.snow.rack) do
-    for _, name in pairs(facings) do
-        SNOW[name] = true
-    end
+    addAll(SNOW, facings)
 end
 CRACKS[Sprites.cracks.flat] = true
 for _, facings in pairs(Sprites.cracks.wall) do
-    for _, name in pairs(facings) do
-        CRACKS[name] = true
-    end
+    addAll(CRACKS, facings)
 end
 for _, facings in pairs(Sprites.cracks.rack) do
     for _, slots in pairs(facings) do
-        for _, name in ipairs(slots) do
-            CRACKS[name] = true
-        end
+        addAll(CRACKS, slots)
     end
 end
-for name in pairs(CRACKS) do
-    OVERLAYS[name] = true
+for _, set in ipairs({ SNOW, CRACKS }) do
+    for name in pairs(set) do
+        OVERLAYS[name] = true
+    end
 end
+addAll(OVERLAYS, Sprites.crateOverlays)
 for _, fill in pairs(Sprites.bankFill) do
-    addOverlays(fill.batteries)
-    addOverlays(fill.meter)
+    addAll(OVERLAYS, fill.batteries)
+    addAll(OVERLAYS, fill.meter)
 end
 
 --- What a placed tile is.
@@ -217,7 +208,7 @@ function Sprites.crackOverlays(kind, facing, material, modules)
     return shown
 end
 
---- The meter level, 1 to 5, that shows a charge fraction.
+--- The meter level, from 1 (empty), that shows a charge fraction.
 function Sprites.meterLevel(chargeFraction)
     for level, limit in ipairs(METER_LIMITS) do
         if chargeFraction < limit then

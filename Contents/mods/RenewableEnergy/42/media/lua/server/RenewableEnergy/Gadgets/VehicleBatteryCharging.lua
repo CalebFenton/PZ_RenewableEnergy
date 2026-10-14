@@ -2,14 +2,14 @@ require "Vehicles/Vehicles"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- Scales vanilla's vehicle battery charging and draining by the installed battery's capacity
--- (RenewableEnergy.VehicleBattery.chargeScale), so a deep cycle battery's charge moves at half a
--- car battery's pace for the same watts: the lights and radio run twice as long with the engine
--- off, and the alternator takes twice as long to fill it.
+-- (RenewableEnergy.VehicleBattery.chargeScale), so a deep cycle battery's charge moves slower
+-- than a car battery's for the same watts: the lights and radio run longer with the engine off,
+-- and the alternator takes longer to fill it.
 --
--- Vanilla drains through VehicleUtils.chargeBattery (headlights, radio, lightbar, heater) and
--- charges from the alternator in Vehicles.Update.Battery; parts call their update functions by
--- name each time (VehiclePart.getLuaFunction), so the wrapped ones are the ones that run. The
--- 2.5% a start takes is Java's (BaseVehicle.tryStartEngine) and stays as it is.
+-- Vanilla drains through VehicleUtils.chargeBattery and charges from the alternator in
+-- Vehicles.Update.Battery; parts call their update functions by name each time
+-- (VehiclePart.getLuaFunction), so the wrapped ones are the ones that run. What a start takes is
+-- Java's (BaseVehicle.tryStartEngine) and stays unscaled.
 
 local VehicleBattery = RenewableEnergy.VehicleBattery
 
@@ -42,7 +42,7 @@ function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
         return
     end
     local scaled = before + (after - before) * scale
-    item:setUsedDelta(scaled)
+    item:setCurrentUsesFloat(scaled)
     -- Vanilla sent the unscaled charge to clients if it showed a change at two decimals.
     if VehicleUtils.compareFloats(after, scaled, 2) then
         vehicle:transmitPartUsedDelta(part)

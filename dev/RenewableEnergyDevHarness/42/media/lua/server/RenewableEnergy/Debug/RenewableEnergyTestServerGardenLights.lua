@@ -9,6 +9,10 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local handler = PZHarness.serverHandler
 local removeObject = Helpers.removeObject
 
+-- Squares out from a house's bounds searched for its lights: past GardenLights' local REACH, the
+-- farthest out a light may stand.
+local LIGHT_MARGIN = 5
+
 -- The house nearest the square within `radius`, or nil.
 local function houseNear(x, y, radius)
     for r = 0, radius do
@@ -31,8 +35,8 @@ end
 local function lightsAround(def)
     local found = {}
     local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    for x = def:getX() - 5, def:getX2() + 5 do
-        for y = def:getY() - 5, def:getY2() + 5 do
+    for x = def:getX() - LIGHT_MARGIN, def:getX2() + LIGHT_MARGIN do
+        for y = def:getY() - LIGHT_MARGIN, def:getY2() + LIGHT_MARGIN do
             local light = SolarGardenLight.findOn(getSquare(x, y, 0))
             if light then
                 found[x .. "," .. y] = light

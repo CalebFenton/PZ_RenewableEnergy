@@ -4,14 +4,13 @@
 -- handlers work.
 
 require "PZHarness/ServerHandlers"
-require "PZHarness/Checks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
-local newCheck, objectWithSprite = PZHarness.Checks.new, PZHarness.Fixtures.objectWithSprite
+local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
+local objectWithSprite = PZHarness.Fixtures.objectWithSprite
 local squareAt, removeObject = Helpers.squareAt, Helpers.removeObject
 local Sprites = RenewableEnergy.Sprites
 
@@ -31,8 +30,9 @@ local function batteryCharges(container)
     local charges = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
-        if RenewableEnergy.Battery.isBattery(items:get(i)) then
-            table.insert(charges, RenewableEnergy.Battery.getCharge(items:get(i)))
+        local item = items:get(i)
+        if RenewableEnergy.Battery.isBattery(item) then
+            table.insert(charges, RenewableEnergy.Battery.getCharge(item))
         end
     end
     return charges
@@ -42,8 +42,9 @@ local function moduleConditions(container)
     local conditions = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
-        if items:get(i):getFullType() == MODULE then
-            table.insert(conditions, items:get(i):getCondition())
+        local item = items:get(i)
+        if item:getFullType() == MODULE then
+            table.insert(conditions, item:getCondition())
         end
     end
     return conditions
@@ -89,15 +90,14 @@ local RATE_SIGMAS = 4
 
 -- Over many banks, each part turns up about as often as BANK_STOCK says, and a battery box never
 -- comes with a charge controller.
-handler("bankStockRates", function(_, args)
-    local expect, expectNear, failures = newCheck()
+check("bankStockRates", function(expect, expectNear, _, args, defer)
     local WorldSpawns, Loot = RenewableEnergy.WorldSpawns, RenewableEnergy.Loot
     local container = Loot.newContainer(nil)
     local samples = args.samples
     -- Found batteries are sent to the clients that see them, and a server can't send an item of a
     -- container that isn't in the world; the parts' rates don't depend on the batteries.
     local options = SandboxVars.RenewableEnergy
-    local batteries = options.LRMBatteries
+    local restoreOptions = saveOptions(defer, { "LRMBatteries" })
     options.LRMBatteries = 0
     local function partCounts(stockName)
         local found = { inverter = 0, controller = 0, charger = 0 }
@@ -134,8 +134,7 @@ handler("bankStockRates", function(_, args)
             end
         end
     end
-    options.LRMBatteries = batteries
-    return { failures = failures }
+    restoreOptions()
 end)
 
 -- How many items `args.times` electronics storage banks get at the save's options.
@@ -179,8 +178,7 @@ end
 -- Farm storage shelves get cracked modules, at cracked conditions, and a bedroom's furniture none,
 -- at the save's Solar Panels loot option; at the option's default a garage shelf's chance is the
 -- room's weight at the module's loot multiplier, small but there.
-handler("crackedModules", function(_, args)
-    local expect, expectNear, failures = newCheck()
+check("crackedModules", function(expect, expectNear, _, args, defer)
     local Distributions = RenewableEnergy.Distributions
     local container = ItemContainer.new("crate", nil, nil)
     for _ = 1, args.samples do
@@ -194,12 +192,11 @@ handler("crackedModules", function(_, args)
     end
     local elsewhere = container:getItems():size()
     container:removeAllItems()
-    local options = SandboxVars.RenewableEnergy
-    local saved = options.LRMSolarPanels
-    options.LRMSolarPanels = 1
+    local restoreOptions = saveOptions(defer, { "LRMSolarPanels" })
+    SandboxVars.RenewableEnergy.LRMSolarPanels = 1
     local garage = Distributions.CRACKED_MODULE_ROOMS.garage
     local defaultChance = Distributions.crackedModuleChance(garage)
-    options.LRMSolarPanels = saved
+    restoreOptions()
     expectConditionRanges(expect)
     expect(#conditions == args.samples, #conditions .. " cracked modules on " .. args.samples .. " farm storage shelves")
     for _, condition in ipairs(conditions) do
@@ -212,7 +209,6 @@ handler("crackedModules", function(_, args)
     local lootModifier = ItemPickerJava.getLootModifier(RenewableEnergy.Specs.factoryModule)
     expectNear("a garage shelf's chance of a cracked module", defaultChance, garage * lootModifier / 100, 1e-9)
     expect(defaultChance > 0 and defaultChance < 0.1, "a garage shelf holds a cracked module with chance " .. defaultChance)
-    return { failures = failures }
 end)
 
 -- What WorldSpawns stocks, which only the authority loads: for each BANK_STOCK name of
@@ -234,11 +230,10 @@ end)
 -- again places nothing. Its pump's pole mount holds 1 or 2 modules at site conditions. The site
 -- has one spot, a metal rack facing south on the square at `args`; the rack is removed when the
 -- test ends.
-handler("sitePlacedOnce", function(_, args, defer)
-    local expect, _, failures = newCheck()
+check("sitePlacedOnce", function(expect, _, _, args, defer)
     local square = squareAt(args)
     if not square then
-        return nil, "the site's square loaded on the server"
+        return "the site's square loaded on the server"
     end
     local SolarSites = RenewableEnergy.SolarSites
     local x, y, z = args.x, args.y, args.z
@@ -252,7 +247,7 @@ handler("sitePlacedOnce", function(_, args, defer)
     local addedAgain = square:getObjects():size() - objects
     local rack = objectWithSprite(square, Sprites.rack.metal.S)
     if not rack then
-        return nil, "the site's rack on its spot"
+        return "the site's rack on its spot"
     end
     defer(function() removeObject(rack) end)
     expect(waiting, "the site kept no spot to place")
@@ -266,7 +261,6 @@ handler("sitePlacedOnce", function(_, args, defer)
         expect(module.type == MODULE and isSiteCondition(module.condition),
             "the pump's mount holds " .. tostring(module.type) .. " at " .. tostring(module.condition))
     end
-    return { failures = failures }
 end)
 
 -- Site kinds that are an arrow board on the road and nothing else.
@@ -276,8 +270,7 @@ local ARROW_BOARD_KINDS = { roadWorks = true, checkpoint = true }
 -- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
 -- outdoors with a facing; each site has a unique name, a known kind, and the spots its
 -- kind uses, as many panel spots as the kind may place.
-handler("sitesPlacedSensibly", function()
-    local expect, _, failures = newCheck()
+check("sitesPlacedSensibly", function(expect)
     local SolarSites = RenewableEnergy.SolarSites
     local metaGrid = getWorld():getMetaGrid()
     local sites = SolarSites.sites()
@@ -326,5 +319,4 @@ handler("sitesPlacedSensibly", function()
             end
         end
     end
-    return { failures = failures }
 end)

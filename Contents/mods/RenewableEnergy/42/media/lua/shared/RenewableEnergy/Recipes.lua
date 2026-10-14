@@ -16,7 +16,8 @@ local Recipes = {}
 RenewableEnergy.Recipes = Recipes
 
 local Specs, Battery, Wear, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
--- Case modData: the car battery type it came out of, of the three vanilla car batteries.
+local SolarGardenLight = RenewableEnergy.SolarGardenLight
+-- Case modData: the full type of the vanilla car battery it came out of.
 local CASE_BATTERY_KEY = "RenewableEnergy_batteryType"
 -- What Rebuild Car Battery makes from a case that doesn't say.
 local CAR_BATTERY = "Base.CarBattery1"
@@ -135,6 +136,7 @@ function Recipes.repairedCondition(module)
     return math.min(Recipes.MODULE_REPAIR_CAP[module:getFullType()], module:getCondition() + Recipes.MODULE_REPAIR)
 end
 
+-- OnCreate of Repair Cracked Module.
 function Recipes.repairModule(craftRecipeData, character)
     local module = firstInput(craftRecipeData, function(item)
         return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
@@ -165,11 +167,11 @@ local function isModuleInput(input)
     return input:containsItem(getScriptManager():getItem(Specs.factoryModule))
 end
 
---- The inventory items, bags included, that pay for a Repair Cracked Panel: for each of the
---- recipe's inputs but the module, { item, uses, keep, wear }, `uses` being the drainable uses it takes
---- (nil for a whole item), and `wear` the factor a kept tool's MayDegrade flag gives damageCheck.
---- nil when an input is missing. Then, for every one of those inputs, the need it is
---- (RenewableEnergy.firstUnmet), `have` being how much of its amount the items found pay.
+--- The inventory items, bags included, that pay for a Repair Cracked Panel's inputs but the
+--- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
+--- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; nil when an
+--- input is missing. Second, each of those inputs as a need (RenewableEnergy.firstUnmet), `have`
+--- being how much of its amount the items found pay.
 function Recipes.panelRepairInputs(character)
     local inventory = character:getInventory()
     local inputs = Recipes.moduleRepairRecipe():getInputs()
@@ -177,7 +179,8 @@ function Recipes.panelRepairInputs(character)
     for i = 0, inputs:size() - 1 do
         local input = inputs:get(i)
         if not isModuleInput(input) then
-            local needed = input:getIntAmount()
+            local amount = input:getIntAmount()
+            local needed = amount
             local candidates = inventory:getAllEvalRecurse(function(item)
                 return not taken[item] and not item:isBroken() and input:containsItem(item:getScriptItem())
             end)
@@ -196,7 +199,7 @@ function Recipes.panelRepairInputs(character)
                     taken[item], needed = true, needed - 1
                 end
             end
-            table.insert(needs, { kind = "item", input = input, have = input:getIntAmount() - needed, need = input:getIntAmount() })
+            table.insert(needs, { kind = "item", input = input, have = amount - needed, need = amount })
             complete = complete and needed <= 0
         end
     end
@@ -259,6 +262,7 @@ function Recipes.canServiceBattery(item, character)
     return not Battery.isBattery(item) or item:getCondition() < Recipes.SERVICE_CAP
 end
 
+-- OnCreate of Service Battery.
 function Recipes.serviceBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
     Wear.setCondition(battery, math.min(Recipes.SERVICE_CAP, battery:getCondition() + Recipes.SERVICE_REPAIR))
@@ -270,6 +274,7 @@ function Recipes.canReconditionBattery(item, character)
     return not Battery.isBattery(item) or item:getCondition() < Recipes.RECONDITION_CONDITION
 end
 
+-- OnCreate of Recondition Battery.
 function Recipes.reconditionBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
     Wear.setCondition(battery, Recipes.RECONDITION_CONDITION)
@@ -277,7 +282,7 @@ function Recipes.reconditionBattery(craftRecipeData, character)
     sendItemStats(battery)
 end
 
--- OnCreate of Strip Car Battery: the case remembers which of the three car batteries it was,
+-- OnCreate of Strip Car Battery: the case remembers which vanilla car battery it was,
 -- since each fits different vehicles.
 function Recipes.stripCarBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
@@ -313,7 +318,6 @@ end
 
 -- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
 function Recipes.takeApartGardenLight(craftRecipeData, character)
-    local SolarGardenLight = RenewableEnergy.SolarGardenLight
     local light = firstInput(craftRecipeData, function(item)
         return item:getFullType() == SolarGardenLight.ITEM
     end)

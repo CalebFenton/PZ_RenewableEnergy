@@ -118,8 +118,8 @@ test("renewable_energy_world_stash_map_items_draw_their_area", {
     end,
 })
 
--- With Stash Houses at 2 or 3 every stash's map goes into its outfits' corpse loot, once; at 1 or
--- 4 none does.
+-- Under the Stash Houses settings that hand out maps from corpses, every stash's map goes into its
+-- outfits' corpse loot once, at its rarity; under the others none does.
 test("renewable_energy_world_stash_maps_in_corpse_loot", {
     run = function(self) T.server(self, "stashMapsInCorpseLoot") end,
     validate = function(self)
@@ -238,7 +238,7 @@ local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
 serverCheck("renewable_energy_world_bank_stock_rates", "bankStockRates", { samples = 2000, boxTiles = BOX_TILES },
     { LRMBatteries = 1, LRMMisc = 1 })
 
--- At 0 the battery option leaves world banks empty of batteries.
+-- With the battery and misc loot options at 0, world banks spawn empty.
 test("renewable_energy_world_bank_stock_option_zero", {
     sandbox = { LRMBatteries = 0, LRMMisc = 0 },
     run = function(self) T.server(self, "bankStockCount", { times = 20 }) end,
@@ -248,6 +248,8 @@ test("renewable_energy_world_bank_stock_option_zero", {
     end,
 })
 
+-- A crate appears stocked with modules at cracked or weathered conditions and batteries at a part
+-- charge, explored, showing full, and players see what it holds.
 test("renewable_energy_world_crate_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -539,7 +541,9 @@ end
 local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
 local LEFT, RIGHT = "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight"
+local PANELS = { LEFT, RIGHT }
 local HOMEMADE = "RenewableEnergy.HomemadeSolarModule"
+local DEEP_CYCLE, L16 = "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery"
 -- How long the server is given to show a change a client asked for.
 local SERVER_MS = 15000
 
@@ -554,11 +558,18 @@ local function boxOf(vehicle)
 end
 
 -- Queues an arrow board on open ground near the character, spawned by the authority with `args`
--- (see RenewableEnergyTestLibWorld.lua) and facing `facing` (north unless given), and returns its
--- T.placeVehicle handle.
+-- (see RenewableEnergyTestLibWorld.lua) and facing `facing` (north unless given). Leaves its
+-- T.placeVehicle handle in self.trailer and returns it, or nil without open ground.
 local function spawnTrailer(self, args, facing)
     local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
-    return square and T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square, args = args, facing = facing })
+    self.trailer = square and T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square, args = args, facing = facing })
+    return self.trailer
+end
+
+-- Queues what `fn` queues in one T.batch, from a step: by then the trailer is placed, so its calls
+-- go out as plain tables, together.
+local function batchOnTrailer(fn)
+    T.step(function() T.batch(fn) end)
 end
 
 local function panelCondition(state, partId)
@@ -573,7 +584,7 @@ end
 
 local function describePanels(state)
     local parts = {}
-    for _, id in ipairs({ LEFT, RIGHT }) do
+    for _, id in ipairs(PANELS) do
         table.insert(parts, string.format("%s at %s showing '%s'", id, tostring(panelCondition(state, id)), panelShown(state, id)))
     end
     return table.concat(parts, ", ")
@@ -581,7 +592,7 @@ end
 
 -- Whether two states of the trailer have the same panels: modules, conditions and shown models.
 local function samePanels(a, b)
-    for _, id in ipairs({ LEFT, RIGHT }) do
+    for _, id in ipairs(PANELS) do
         if panelCondition(a, id) ~= panelCondition(b, id) or panelShown(a, id) ~= panelShown(b, id) then
             return false
         end
@@ -611,6 +622,32 @@ local function boxItems(state, fullType)
     return items
 end
 
+-- setTrailer's `panels` with a factory module at `condition` on each panel.
+local function modulesOnBothPanels(condition)
+    return { [LEFT] = { type = MODULE, condition = condition }, [RIGHT] = { type = MODULE, condition = condition } }
+end
+
+-- The conditions a found trailer's modules come in (WorldSpawns.WEATHERED and CRACKED), written
+-- out so that the tests don't take them from the code they check.
+local WEATHERED, CRACKED = { min = 60, max = 100 }, { min = 20, max = 50 }
+
+-- Expects `state`'s panels stocked as a found trailer's: the first module weathered, the second
+-- weathered or cracked. Returns both conditions.
+local function expectStockConditions(state, what)
+    local left, right = panelCondition(state, LEFT), panelCondition(state, RIGHT)
+    expect(left and inRange(left, WEATHERED), what .. "'s left panel's module is at " .. tostring(left))
+    expect(right and (inRange(right, WEATHERED) or inRange(right, CRACKED)),
+        what .. "'s right panel's module is at " .. tostring(right))
+    return left, right
+end
+
+-- Queues the battery box's lid unpadlocked and down, as most trailers spawn with it padlocked,
+-- and a wait until this client's copy shows it unlocked.
+local function unlockBox(self, trailer)
+    T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
+    T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
+end
+
 -- A spawned arrow board has a module on each panel, the first weathered and the second weathered
 -- or cracked, each showing the model its condition calls for, to players too; its battery box
 -- holds no modules, worn deep cycle batteries at a part charge, and at most one charge
@@ -618,8 +655,7 @@ end
 test("renewable_energy_world_arrow_board_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
-        self.trailer = spawnTrailer(self, { stocked = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { stocked = true }) then return end
         T.vehicleState(self, self.trailer)
         waitForPanelsCopy(self.trailer)
     end,
@@ -629,12 +665,9 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
             expect(VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] ~= nil, "no arrow boards in " .. zone)
         end
         local state = self.trailer.state
-        local left, right = panelCondition(state, LEFT), panelCondition(state, RIGHT)
-        expect(left and left >= 60 and left <= 100, "its left panel's module is at " .. tostring(left))
-        expect(right and (right >= 20 and right <= 50 or right >= 60 and right <= 100),
-            "its right panel's module is at " .. tostring(right))
+        local _, right = expectStockConditions(state, "the found trailer")
         expect(panelShown(state, LEFT) == "Whole", "its weathered left panel shows " .. panelShown(state, LEFT))
-        local rightModel = right and right < 60 and "Cracked" or "Whole"
+        local rightModel = right and right < WEATHERED.min and "Cracked" or "Whole"
         expect(panelShown(state, RIGHT) == rightModel, "its right panel at " .. tostring(right) .. " shows " .. panelShown(state, RIGHT))
         expectPanelsCopy(self.trailer)
         if not expect(state.box ~= nil, "the arrow board has no battery box") then
@@ -651,7 +684,7 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
             end
         end
         expect(batteries >= 4 and batteries <= 6, batteries .. " batteries in the battery box")
-        expect(#boxItems(state, "RenewableEnergy.DeepCycleBattery") == batteries, "the battery box holds other batteries")
+        expect(#boxItems(state, DEEP_CYCLE) == batteries, "the battery box holds other batteries")
         expectFoundCharges(charges, "the battery box")
         local controllers = #boxItems(state, "RenewableEnergy.ChargeController")
         expect(controllers <= 1, "the battery box has " .. controllers .. " charge controllers")
@@ -664,8 +697,7 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
 test("renewable_energy_world_arrow_board_plain_spawn_keeps_stock", {
     sandbox = { LRMSolarPanels = 1 },
     run = function(self)
-        self.trailer = spawnTrailer(self, { recordStock = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { recordStock = true }) then return end
         local trailer = self.trailer
         T.serverUntil(self, "arrowBoardStock", function() return T.vehicleArgs(trailer) end, function(reply)
             return panelCondition(reply.state, LEFT) == reply.stock[LEFT] and panelCondition(reply.state, RIGHT) == reply.stock[RIGHT]
@@ -678,7 +710,7 @@ test("renewable_energy_world_arrow_board_plain_spawn_keeps_stock", {
     end,
     validate = function(self)
         local stock, state = self.trailer.answer.stock, self.trailer.state
-        for _, id in ipairs({ LEFT, RIGHT }) do
+        for _, id in ipairs(PANELS) do
             local condition = panelCondition(state, id)
             expect(stock[id] ~= nil and condition == stock[id],
                 id .. " was stocked at " .. tostring(stock[id]) .. " and is at " .. tostring(condition))
@@ -694,17 +726,14 @@ test("renewable_energy_world_arrow_board_plain_spawn_keeps_stock", {
 test("renewable_energy_world_arrow_board_old_trailer_gets_panels_once", {
     sandbox = { LRMSolarPanels = 1 },
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         T.onVehicle(self, self.trailer, "arrowBoardOldPanels")
         T.step(function() self.trailer.state = self.trailer.answer.second end)
         waitForPanelsCopy(self.trailer)
     end,
     validate = function(self)
         local first, second = self.trailer.answer.first, self.trailer.answer.second
-        local left, right = panelCondition(first, LEFT), panelCondition(first, RIGHT)
-        expect(left and left >= 60, "the old trailer's left panel loaded with " .. tostring(left))
-        expect(right ~= nil, "the old trailer's right panel loaded empty")
+        expectStockConditions(first, "the old trailer")
         expect(panelCondition(second, LEFT) == nil and panelCondition(second, RIGHT) == nil,
             "panels taken off came back on the next load")
         expect(panelShown(second, LEFT) == "" and panelShown(second, RIGHT) == "",
@@ -739,16 +768,13 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
     instant = true,
     run = function(self)
         -- A spawned vehicle may lack parts, and the box opens freely without its lid.
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
-        -- Most trailers spawn with the box padlocked.
-        T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
-        T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
-        T.give(self, "battery", { { type = "RenewableEnergy.DeepCycleBattery" } })
+        unlockBox(self, trailer)
+        T.give(self, "battery", { { type = DEEP_CYCLE } })
         T.step(function()
             -- A spawned trailer may come stocked, so count from what it already holds.
-            self.before = #boxItems(trailer.state, "RenewableEnergy.DeepCycleBattery")
+            self.before = #boxItems(trailer.state, DEEP_CYCLE)
             local vehicle = trailer.vehicle
             local lid, box = lidOf(vehicle), boxOf(vehicle)
             self.lid, self.box = lid, box
@@ -766,7 +792,7 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
                 self.box:getItemContainer()))
         end)
         T.awaitVehicleState(self, trailer, function(state)
-            return #boxItems(state, "RenewableEnergy.DeepCycleBattery") > self.before
+            return #boxItems(state, DEEP_CYCLE) > self.before
         end, SERVER_MS)
     end,
     validate = function(self)
@@ -778,7 +804,7 @@ test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
         expect(not self.shutAccess, "the battery box opens with its lid shut")
         expect(self.trailer.state.lid.open, "opening the lid left it shut")
         expect(self.openAccess, "the battery box doesn't open beside it with its lid open")
-        local after = #boxItems(self.trailer.state, "RenewableEnergy.DeepCycleBattery")
+        local after = #boxItems(self.trailer.state, DEEP_CYCLE)
         expect(after == self.before + 1, "the battery box holds " .. after .. " deep cycles after one was put in, " .. self.before .. " before")
     end,
 })
@@ -813,7 +839,7 @@ local LID_SWINGS = "renewable_energy_world_arrow_board_lid_swings"
 
 -- The battery box lid swings open on its hinge when a player opens it and stays open, and swings
 -- shut when they close it; it swings the same way in this game when someone else opens and closes
--- it, which vanilla shows only to the player who did (RenewableEnergy.ArrowBoard.watchLids). Each
+-- it, which vanilla shows only to the player who did (ArrowBoard.lua's watchLids). Each
 -- swing passes the poses between shut and open, and the batteries come out only while it is open.
 -- A run that selects this test alone by its name, as dev/lid-shots.py's command does, also saves
 -- what this game drew (test_lid_*.png: the lid held shut, then one held and one mid-swing per
@@ -824,8 +850,7 @@ test(LID_SWINGS, {
     run = function(self)
         local shooting = PZHarness.run.selection == LID_SWINGS
         -- Facing south, its box is on the side the camera sees.
-        self.trailer = spawnTrailer(self, { repair = true }, "S")
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }, "S") then return end
         local trailer, p = self.trailer, player()
         T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
         T.waitForCopy(function()
@@ -911,14 +936,32 @@ local function padlockBox(self, trailer, box)
     end)
 end
 
+-- Queues the character taking the deep cycle in self.box into their inventory, and a wait until
+-- the server's box is empty and this client holds the battery.
+local function takeBattery(self, trailer)
+    local p = player()
+    T.step(function()
+        local battery = self.box:getItemContainer():getFirstType(DEEP_CYCLE)
+        if battery then
+            ISTimedActionQueue.add(ISInventoryTransferAction:new(p, battery, self.box:getItemContainer(), p:getInventory()))
+        end
+    end)
+    T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
+    T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse(DEEP_CYCLE) ~= nil end)
+end
+
+local function expectBatteryTaken(self)
+    expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
+    expect(player():getInventory():getFirstTypeRecurse(DEEP_CYCLE) ~= nil, "the battery never reached the inventory")
+end
+
 -- A padlocked battery box stays shut when a player opens it as they would an unlocked one: the
 -- trailer's Open Trunk tries the lock first, and nobody has the key. The refused unlock empties
 -- the action queue (ISBaseTimedAction.stop), so it comes last and the checks read the copy here.
 test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
         padlockBox(self, trailer)
         T.step(function()
@@ -947,15 +990,14 @@ test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
 test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
         T.setPerk(self, Perks.Mechanics, 3)
         if isClient() then
             T.setMechanicsCheat(self, true)
         end
         T.give(self, "wrench", { { type = "Base.Wrench" } })
-        padlockBox(self, trailer, { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.5 } })
+        padlockBox(self, trailer, { { type = DEEP_CYCLE, charge = 0.5 } })
         T.waitForCopy(function() return self.box and self.box:getItemContainer():getItems():size() == 1 end)
         T.step(function()
             local vehicle = trailer.vehicle
@@ -972,13 +1014,8 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
             self.lidOff = trailer.state
             self.lidOffCopy = { shown = T.copyState(trailer).lid.shown, pose = T.lidPose(trailer) }
             self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
-            local battery = self.box:getItemContainer():getFirstType("RenewableEnergy.DeepCycleBattery")
-            if battery then
-                ISTimedActionQueue.add(ISInventoryTransferAction:new(p, battery, self.box:getItemContainer(), p:getInventory()))
-            end
         end)
-        T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
-        T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil end)
+        takeBattery(self, trailer)
         T.step(function()
             self.canPutBack = trailer.vehicle:canInstallPart(p, self.lid)
             local lid = p:getInventory():getFirstTypeRecurse(self.lidType)
@@ -1006,9 +1043,7 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
         local off = self.lidOffCopy
         expect(off and off.shown == "" and off.pose == nil, "the lid taken off still shows '" .. tostring(off and off.shown)
             .. "', " .. describeLid(off and off.pose))
-        expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
-        expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
-            "the battery never reached the inventory")
+        expectBatteryTaken(self)
         expect(self.canPutBack, "the mechanics window won't put the lid back on")
         local back = self.lidBack
         expect(back and back.installed and not back.locked and not back.open,
@@ -1026,8 +1061,7 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
 test("renewable_energy_world_arrow_board_padlock_shows_while_locked", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
         self.seen = {}
         local function stage(name, args, want)
@@ -1121,10 +1155,9 @@ end
 test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
-        padlockBox(self, trailer, { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.5 } })
+        padlockBox(self, trailer, { { type = DEEP_CYCLE, charge = 0.5 } })
         T.waitForCopy(function() return self.box and self.box:getItemContainer():getItems():size() == 1 end)
         T.give(self, "cutters", { { type = "Base.BoltCutters" } })
         T.server(self, "arrowBoardKey", function() return T.vehicleArgs(trailer) end)
@@ -1152,13 +1185,8 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         T.waitForCopy(function() return self.lid and self.lid:getDoor():isOpen() end)
         T.step(function()
             self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
-            local battery = self.box:getItemContainer():getFirstType("RenewableEnergy.DeepCycleBattery")
-            if battery then
-                ISTimedActionQueue.add(ISInventoryTransferAction:new(p, battery, self.box:getItemContainer(), p:getInventory()))
-            end
         end)
-        T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
-        T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil end)
+        takeBattery(self, trailer)
     end,
     validate = function(self)
         if not expect(self.lid ~= nil and self.box ~= nil, "the trailer has no lid or no battery box") then
@@ -1177,9 +1205,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         expect(not self.keyRelocks, "the cut padlock locks again with the trailer's key")
         expect(self.cutSlice == "none", "the menu shows Cut Padlock on a cut lock (" .. tostring(self.cutSlice) .. ")")
         expect(self.openAccess, "the box doesn't open once its padlock is cut")
-        expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
-        expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
-            "the battery never reached the inventory")
+        expectBatteryTaken(self)
         expect(player():getInventory():getFirstTypeRecurse("Base.BoltCutters") ~= nil, "cutting used up the bolt cutters")
     end,
 })
@@ -1190,8 +1216,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
 test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
         self.seen = {}
         local function look(name, want)
@@ -1231,11 +1256,9 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
 test("renewable_energy_world_arrow_board_box_shows_in_the_loot_window", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
-        T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
-        T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
+        unlockBox(self, trailer)
         T.step(function()
             self.lid, self.box = lidOf(trailer.vehicle), boxOf(trailer.vehicle)
             standAtBox(trailer.vehicle)
@@ -1260,30 +1283,24 @@ test("renewable_energy_world_arrow_board_box_shows_in_the_loot_window", {
     end,
 })
 
--- Its two 50 W panels charge the batteries in its box, the emptiest first: all of a pass goes to
--- the emptier battery while it has room, and once batteries fill, the rest goes unstored.
+-- Its panels charge the batteries in its box, the emptiest first: all of a pass goes to the
+-- emptier battery while it has room, and once batteries fill, the rest goes unstored.
 test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
     hour = 12,
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         local trailer = self.trailer
-        -- In a step, once the trailer is placed, so its calls go out as plain tables, together.
-        T.step(function()
-            T.batch(function()
-                T.onVehicle(self, trailer, "setTrailer", {
-                    panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
-                    box = { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.6 }, { type = "RenewableEnergy.L16Battery", charge = 0.2 } },
-                })
-                T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
-                T.step(function() self.first = trailer.answer end)
-                -- 21 Wh of room in the L-16 and 12.6 in the deep cycle: both fill, the rest is lost.
-                T.onVehicle(self, trailer, "setTrailer", {
-                    box = { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.99 }, { type = "RenewableEnergy.L16Battery", charge = 0.99 } },
-                })
-                T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
-                T.step(function() self.second = trailer.answer end)
-            end)
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "setTrailer", {
+                panels = modulesOnBothPanels(100),
+                box = { { type = DEEP_CYCLE, charge = 0.6 }, { type = L16, charge = 0.2 } },
+            })
+            T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
+            T.step(function() self.first = trailer.answer end)
+            -- 21 Wh of room in the L-16 and 12.6 in the deep cycle: both fill, the rest is lost.
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = DEEP_CYCLE, charge = 0.99 }, { type = L16, charge = 0.99 } } })
+            T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
+            T.step(function() self.second = trailer.answer end)
         end)
     end,
     validate = function(self)
@@ -1302,14 +1319,12 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
     end,
 })
 
--- Each installed panel makes its module's 50 W rating times its condition / 100: a whole module
--- and a half-cracked one make 75 W, a homemade module at 60 makes 30 W, and with no panels the
--- trailer stores nothing.
+-- Each installed panel makes its module's rating scaled by its condition, a homemade module's too,
+-- and with no panels the trailer stores nothing.
 test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
     hour = 12,
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         local trailer = self.trailer
         self.passes = {}
         local function pass(panels, box)
@@ -1317,15 +1332,12 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
             T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
             T.step(function() table.insert(self.passes, trailer.answer) end)
         end
-        -- In a step, once the trailer is placed, so its calls go out as plain tables, together.
-        T.step(function()
-            T.batch(function()
-                pass({ [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 50 } },
-                    { { type = "RenewableEnergy.L16Battery", charge = 0 } })
-                pass({ [RIGHT] = {} })
-                pass({ [LEFT] = { type = HOMEMADE, condition = 60 } })
-                pass({ [LEFT] = {} })
-            end)
+        batchOnTrailer(function()
+            pass({ [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 50 } },
+                { { type = L16, charge = 0 } })
+            pass({ [RIGHT] = {} })
+            pass({ [LEFT] = { type = HOMEMADE, condition = 60 } })
+            pass({ [LEFT] = {} })
         end)
     end,
     validate = function(self)
@@ -1343,16 +1355,13 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
 
 -- Lamps -----------------------------------------------------------------------------------------
 
-local DEEP_CYCLE = "RenewableEnergy.DeepCycleBattery"
-
 -- The arrow board's lamps light only while its switch is on, a battery in its box holds more than
 -- the controller's cutoff and its lamp board isn't wrecked: switching off, wrecking the board or
 -- flattening the battery darkens it, and putting each back lights it again. The photocell dims
 -- them after dark.
 test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, board = self.trailer, RenewableEnergy.ArrowBoard.BOARD
         self.stages = {}
         local function stage(name, args, night, want)
@@ -1360,18 +1369,15 @@ test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
             T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = night })
             T.step(function() table.insert(self.stages, { name = name, want = want, lamps = trailer.answer.state.lamps }) end)
         end
-        -- In a step, once the trailer is placed, so its calls go out as plain tables, together.
-        T.step(function()
-            T.batch(function()
-                stage("switched on with a charged battery", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.6 } } },
-                    false, "day")
-                stage("after dark", {}, true, "night")
-                stage("switched off", { switchOn = false }, false, nil)
-                stage("on with its lamp board wrecked", { switchOn = true, frame = { [board] = 0 } }, false, nil)
-                stage("on with its lamp board welded", { frame = { [board] = 100 } }, false, "day")
-                stage("on with a flat battery", { box = { { type = DEEP_CYCLE, charge = 0.05 } } }, false, nil)
-                stage("on with a charged battery again", { box = { { type = DEEP_CYCLE, charge = 0.6 } } }, false, "day")
-            end)
+        batchOnTrailer(function()
+            stage("switched on with a charged battery", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.6 } } },
+                false, "day")
+            stage("after dark", {}, true, "night")
+            stage("switched off", { switchOn = false }, false, nil)
+            stage("on with its lamp board wrecked", { switchOn = true, frame = { [board] = 0 } }, false, nil)
+            stage("on with its lamp board welded", { frame = { [board] = 100 } }, false, "day")
+            stage("on with a flat battery", { box = { { type = DEEP_CYCLE, charge = 0.05 } } }, false, nil)
+            stage("on with a charged battery again", { box = { { type = DEEP_CYCLE, charge = 0.6 } } }, false, "day")
         end)
     end,
     validate = function(self)
@@ -1388,17 +1394,13 @@ test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
 test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
     hour = 12,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
-        T.step(function()
-            T.batch(function()
-                T.onVehicle(self, trailer, "setTrailer", {
-                    switchOn = true, box = { { type = "RenewableEnergy.ChargeController" } },
-                    panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
-                })
-                T.onVehicle(self, trailer, "arrowBoardUpdate", { hours = 1 })
-            end)
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "setTrailer", {
+                switchOn = true, box = { { type = "RenewableEnergy.ChargeController" } }, panels = modulesOnBothPanels(100),
+            })
+            T.onVehicle(self, trailer, "arrowBoardUpdate", { hours = 1 })
         end)
     end,
     validate = function(self)
@@ -1414,8 +1416,7 @@ test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
 -- at full brightness, and less once the photocell dims them for the night.
 test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
         local function lamps(hours, night, key)
             T.onVehicle(self, trailer, "arrowBoardLamps", { hours = hours, night = night })
@@ -1423,14 +1424,14 @@ test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
                 T.step(function() self[key] = trailer.answer end)
             end
         end
-        T.step(function()
-            T.batch(function()
-                T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.8 } } })
-                lamps(0, false)
-                lamps(2, false, "day")
-                lamps(0, true)
-                lamps(2, true, "night")
-            end)
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.8 } } })
+            -- A pass draws at the lamps' current state and only then sets it for `night`
+            -- (ArrowBoard.runLamps), so a zero-hour pass sets the state the measured pass draws at.
+            lamps(0, false)
+            lamps(2, false, "day")
+            lamps(0, true)
+            lamps(2, true, "night")
         end)
     end,
     validate = function(self)
@@ -1452,8 +1453,7 @@ test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
 test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
     hour = 12,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, spec = self.trailer, RenewableEnergy.Specs.arrowBoard
         -- Just under the reconnect level, so even an overcast noon charges it past.
         local between = spec.reconnect - 0.01
@@ -1461,26 +1461,22 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
         local function keep(key)
             T.step(function() self[key] = trailer.answer end)
         end
-        T.step(function()
-            T.batch(function()
-                T.onVehicle(self, trailer, "setTrailer", {
-                    switchOn = true, panels = { [LEFT] = {}, [RIGHT] = {} },
-                    box = { { type = DEEP_CYCLE, charge = spec.cutoff + 0.01 } },
-                })
-                T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
-                keep("lit")
-                T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 2, night = false })
-                keep("cut")
-                T.onVehicle(self, trailer, "setTrailer", { box = { { type = DEEP_CYCLE, charge = between } } })
-                T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
-                keep("between")
-                -- Three hours of noon sun on two whole panels put it back over the reconnect level.
-                T.onVehicle(self, trailer, "setTrailer", {
-                    panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
-                })
-                T.onVehicle(self, trailer, "arrowBoardUpdate", { hours = 3 })
-                keep("charged")
-            end)
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "setTrailer", {
+                switchOn = true, panels = { [LEFT] = {}, [RIGHT] = {} },
+                box = { { type = DEEP_CYCLE, charge = spec.cutoff + 0.01 } },
+            })
+            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
+            keep("lit")
+            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 2, night = false })
+            keep("cut")
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = DEEP_CYCLE, charge = between } } })
+            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
+            keep("between")
+            -- A few hours of noon sun on two whole panels put it back over the reconnect level.
+            T.onVehicle(self, trailer, "setTrailer", { panels = modulesOnBothPanels(100) })
+            T.onVehicle(self, trailer, "arrowBoardUpdate", { hours = 3 })
+            keep("charged")
         end)
     end,
     validate = function(self)
@@ -1510,8 +1506,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
 test("renewable_energy_world_arrow_board_switch_works_only_in_the_open_box", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
         self.seen, self.refused = {}, {}
         local function look(name, want)
@@ -1579,8 +1574,7 @@ local FLASH_WATCH_FRAMES = 100000
 -- by turns, and once the server switches them off it stays dark.
 test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
         local function watch(key)
             T.step(function()
@@ -1609,19 +1603,20 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     end,
 })
 
--- Found trailers have their switch on by STOCK.switchedOnChance: thousands of rolls land within
--- a few points of it, about ten standard deviations, so the test doesn't fail by chance.
+-- Found trailers have their switch on by STOCK.switchedOnChance: over SWITCH_ROLLS rolls the share
+-- lands within SWITCH_TOLERANCE of it, about ten standard deviations, so the test doesn't fail by
+-- chance.
+local SWITCH_ROLLS, SWITCH_TOLERANCE = 4000, 0.045
 test("renewable_energy_world_arrow_board_found_switched_on_mostly", {
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
-        T.onVehicle(self, self.trailer, "arrowBoardSwitchRolls", { rolls = 4000 })
+        if not spawnTrailer(self) then return end
+        T.onVehicle(self, self.trailer, "arrowBoardSwitchRolls", { rolls = SWITCH_ROLLS })
     end,
     validate = function(self)
         local answer = self.trailer.answer
         if not expect(answer ~= nil and answer.on ~= nil, "the switch was never rolled") then return end
-        local share, chance = answer.on / 4000, RenewableEnergy.ArrowBoard.STOCK.switchedOnChance
-        expect(math.abs(share - chance) <= 0.045, string.format("%.3f of found trailers are switched on, expected about %.2f",
+        local share, chance = answer.on / SWITCH_ROLLS, RenewableEnergy.ArrowBoard.STOCK.switchedOnChance
+        expect(math.abs(share - chance) <= SWITCH_TOLERANCE, string.format("%.3f of found trailers are switched on, expected about %.2f",
             share, chance))
     end,
 })
@@ -1633,8 +1628,7 @@ test("renewable_energy_world_arrow_board_found_switched_on_mostly", {
 test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         local trailer, p = self.trailer, player()
         T.setPerk(self, Perks.Mechanics, 2)
         T.setPerk(self, Perks.Electricity, 1)
@@ -1698,8 +1692,7 @@ local function panelSkillTest(mechanics, electricity, success)
     return {
         instant = true,
         run = function(self)
-            self.trailer = spawnTrailer(self)
-            if not self.trailer then return end
+            if not spawnTrailer(self) then return end
             local trailer, p = self.trailer, player()
             T.setPerk(self, Perks.Mechanics, mechanics)
             T.setPerk(self, Perks.Electricity, electricity)
@@ -1737,7 +1730,6 @@ local function panelSkillTest(mechanics, electricity, success)
     }
 end
 
--- One level short of either skill costs vanilla's 20 plus 15.
 local ONE_SHORT = 100 - (20 + 15)
 test("renewable_energy_world_arrow_board_panels_recommend_mechanics", panelSkillTest(1, 1, ONE_SHORT))
 test("renewable_energy_world_arrow_board_panels_recommend_electrical", panelSkillTest(2, 0, ONE_SHORT))
@@ -1749,13 +1741,12 @@ test("renewable_energy_world_arrow_board_panels_skilled", panelSkillTest(2, 1, 1
 -- back on an empty panel, where an appended name found no item.
 test("renewable_energy_world_arrow_board_panels_take_real_modules", {
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         T.onVehicle(self, self.trailer, "arrowBoardRepairAll")
     end,
     validate = function(self)
         local answer = self.trailer.answer
-        for _, id in ipairs({ LEFT, RIGHT }) do
+        for _, id in ipairs(PANELS) do
             local listed, types = answer.types[id], {}
             for _, fullType in ipairs(listed) do
                 types[fullType] = true
@@ -1768,23 +1759,20 @@ test("renewable_energy_world_arrow_board_panels_take_real_modules", {
     end,
 })
 
--- A crack, from a storm or a crash, takes 30 from a panel's module, as a storm takes from a module
--- on a mount, and shows it cracked, to players too; a storm cracks a trailer's panels as it would
--- flat panels.
+-- A crack, from a storm or a crash, takes as much from a panel's module as a storm takes from a
+-- module on a mount, and shows it cracked, to players too; a storm cracks a trailer's panels as it
+-- would flat panels.
 test("renewable_energy_world_arrow_board_panels_crack", {
     sandbox = { StormDamage = true, StormDamageRate = 1000 },
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         local trailer = self.trailer
         T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 80 } } })
         T.onVehicle(self, trailer, "arrowBoardCrack", { part = LEFT })
         waitForPanelsCopy(trailer)
         T.step(function() self.crack = { state = trailer.state, copy = trailer.copy } end)
-        T.onVehicle(self, trailer, "setTrailer", {
-            panels = { [LEFT] = { type = MODULE, condition = 100 }, [RIGHT] = { type = MODULE, condition = 100 } },
-        })
-        -- A thousand hours at ten times the rate makes a crack all but certain.
+        T.onVehicle(self, trailer, "setTrailer", { panels = modulesOnBothPanels(100) })
+        -- This long a storm at the raised rate makes a crack all but certain.
         T.onVehicle(self, trailer, "arrowBoardStorm", { hours = 1000 })
         T.step(function()
             self.storm = trailer.answer
@@ -1948,9 +1936,7 @@ local function crashTest(name, targetKmh, expected, snap)
     test(name, {
         instant = true,
         run = function(self)
-            towingPair(self, { drive = true, trailer = {
-                box = {}, panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = { type = MODULE, condition = 90 } },
-            } })
+            towingPair(self, { drive = true, trailer = { box = {}, panels = modulesOnBothPanels(90) } })
             if not self.trailer then return end
             local trailer = self.trailer
             if snap then
@@ -2025,15 +2011,14 @@ test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
     end,
 })
 
--- Repair Cracked Panel takes Repair Cracked Module's screwdriver (kept), glass pane, epoxy and
--- electric wire, needs its Electricity 3 and gives its XP, and adds 30 to the panel's module up
--- to the factory module's 80.
+-- Repair Cracked Panel takes Repair Cracked Module's inputs, keeping the screwdriver, needs its
+-- Electricity level and gives its XP, and mends the panel's module by that recipe's step, no
+-- higher than its repair cap.
 local function repairTest(name, from, to)
     test(name, {
         instant = true,
         run = function(self)
-            self.trailer = spawnTrailer(self)
-            if not self.trailer then return end
+            if not spawnTrailer(self) then return end
             local trailer, p = self.trailer, player()
             T.setPerk(self, Perks.Electricity, 3)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = from } } })
@@ -2081,11 +2066,15 @@ repairTest("renewable_energy_world_arrow_board_repair_stops_at_80", 55, 80)
 
 -- The car is pushed whenever it rolls slower than this, in squares a second, until the trailer
 -- has followed it TOW_SQUARES. Pushed every frame, it would speed off the open strip, and a crash
--- snaps a hitch more than two seconds old (Bullet.onVehicleConstraintImpulse).
+-- snaps a hitch older than FRESH_HITCH_MS (Bullet.onVehicleConstraintImpulse).
 local PUSH_SPEED = 5
 local TOW_SQUARES = 2
 -- A car with nobody at the wheel holds its brakes, so each push has to beat them.
 local PUSH_IMPULSE = 6000
+
+local function distanceFrom(start, x, y)
+    return math.sqrt((x - start.x) ^ 2 + (y - start.y) ^ 2)
+end
 
 -- It spawns, a vanilla car hitches it with the game's own action, and when the car is pushed north
 -- the trailer follows, still on the hitch, on the server too.
@@ -2096,8 +2085,7 @@ test("renewable_energy_world_arrow_board_towed_by_car", {
         if not self.trailer then return end
         local car, trailer = self.car, self.trailer
         local function towed()
-            local vehicle = trailer.vehicle
-            return math.sqrt((vehicle:getX() - self.start.x) ^ 2 + (vehicle:getY() - self.start.y) ^ 2)
+            return distanceFrom(self.start, trailer.vehicle:getX(), trailer.vehicle:getY())
         end
         T.step(function()
             self.start = { x = trailer.vehicle:getX(), y = trailer.vehicle:getY() }
@@ -2118,7 +2106,7 @@ test("renewable_energy_world_arrow_board_towed_by_car", {
             self.towedBy = trailer.vehicle:getVehicleTowedBy() == car.vehicle
         end)
         T.awaitVehicleState(self, trailer, function(state)
-            return math.sqrt((state.x - self.start.x) ^ 2 + (state.y - self.start.y) ^ 2) >= TOW_SQUARES
+            return distanceFrom(self.start, state.x, state.y) >= TOW_SQUARES
         end, SERVER_MS)
     end,
     validate = function(self)
@@ -2130,7 +2118,7 @@ test("renewable_energy_world_arrow_board_towed_by_car", {
         expect(self.gap < ON_HITCH, string.format("the trailer's coupler is %.2f squares off the car's hitch", self.gap))
         local state = self.trailer.state
         expect(state.towedBy == self.car.id, "the server's trailer is towed by " .. tostring(state.towedBy) .. ", not the car")
-        local moved = math.sqrt((state.x - self.start.x) ^ 2 + (state.y - self.start.y) ^ 2)
+        local moved = distanceFrom(self.start, state.x, state.y)
         expect(moved >= TOW_SQUARES, string.format("the server's trailer moved %.2f squares", moved))
     end,
 })
@@ -2145,8 +2133,7 @@ local SETTLE_MS = 1000
 test("renewable_energy_world_arrow_board_stands_alone", {
     spOnly = "a dedicated server runs no vehicle physics and a client only those it drives, tows or bumps, so nothing settles a trailer left alone",
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         local spawnedMs
         T.step(function() spawnedMs = getTimestampMs() end)
         T.waitUntil(function()
@@ -2174,8 +2161,7 @@ end
 -- the mechanics window lists neither part.
 test("renewable_energy_world_arrow_board_frame_dents_in_crashes", {
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
         T.onVehicle(self, trailer, "vehicleCrash", { amount = 40, front = true })
         T.step(function() self.front = trailer.state end)
@@ -2198,8 +2184,7 @@ test("renewable_energy_world_arrow_board_frame_dents_in_crashes", {
 -- colour it spawned with, and gets a frame and the script's colour on that load.
 test("renewable_energy_world_arrow_board_old_trailer_gets_frame", {
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         T.onVehicle(self, self.trailer, "arrowBoardOldFrame", { hsv = { 0.3, 0.9, 0.8 } })
     end,
     validate = function(self)
@@ -2221,8 +2206,7 @@ local WASH_BLOOD = 0.2
 test("renewable_energy_world_arrow_board_washes", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
+        if not spawnTrailer(self) then return end
         local trailer, p = self.trailer, player()
         T.give(self, "bucket", { { type = "Base.Bucket" } })
         self.offered, self.left = {}, {}
@@ -2267,8 +2251,7 @@ test("renewable_energy_world_arrow_board_washes", {
 test("renewable_energy_world_arrow_board_frame_welds", {
     instant = true,
     run = function(self)
-        self.trailer = spawnTrailer(self, { repair = true })
-        if not self.trailer then return end
+        if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
         T.setPerk(self, Perks.MetalWelding, 10)
         T.setPerk(self, Perks.Mechanics, 10)

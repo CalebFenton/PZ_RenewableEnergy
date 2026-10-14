@@ -21,6 +21,8 @@ RenewableEnergy.Loads = Loads
 
 local LOADS = RenewableEnergy.Specs.loads
 local PowerBank = RenewableEnergy.PowerBank
+-- The map's lowest and highest levels (IsoChunk.getGridSquare).
+local LOWEST_LEVEL, HIGHEST_LEVEL = -32, 31
 
 local function isMiniFridge(object)
     local properties = object:getProperties()
@@ -85,13 +87,17 @@ function Loads.add(load, name, watts)
     load.kinds[name] = kind
 end
 
+local function byWattsDescending(a, b)
+    return a.watts > b.watts
+end
+
 --- The load by kind, biggest first: { { kind, count, watts }, ... }.
 function Loads.byKind(load)
     local list = {}
     for name, kind in pairs(load.kinds) do
         table.insert(list, { kind = name, count = kind.count, watts = kind.watts })
     end
-    table.sort(list, function(a, b) return a.watts > b.watts end)
+    table.sort(list, byWattsDescending)
     return list
 end
 
@@ -117,11 +123,14 @@ function Loads.scan(square)
     local allowExterior = SandboxVars.AllowExteriorGenerator
     local cx, cy, cz = square:getX(), square:getY(), square:getZ()
     local cell = square:getCell()
-    for z = math.max(-32, cz - levels), math.min(31, cz + levels) do
+    local radiusSquared = radius * radius
+    for z = math.max(LOWEST_LEVEL, cz - levels), math.min(HIGHEST_LEVEL, cz + levels) do
         for x = cx - radius, cx + radius do
+            local dxSquared = (x - cx) * (x - cx)
             for y = cy - radius, cy + radius do
-                local scanned = IsoUtils.DistanceToSquared(x + 0.5, y + 0.5, cx + 0.5, cy + 0.5) <= radius * radius
-                    and cell:getGridSquare(x, y, z)
+                -- The engine's reach test between square centres (IsoUtils.DistanceToSquared), in Lua
+                -- rather than a Java call per square.
+                local scanned = dxSquared + (y - cy) * (y - cy) <= radiusSquared and cell:getGridSquare(x, y, z)
                 if scanned then
                     local objects = scanned:getObjects()
                     for i = 0, objects:size() - 1 do
