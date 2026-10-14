@@ -808,10 +808,10 @@ end
 
 -- The battery box lid swings open on its hinge when a player opens it and stays open, and swings
 -- shut when they close it; it swings the same way in this game when someone else opens and closes
--- it, which vanilla shows only to the player who did (RenewableEnergy.ArrowBoard.swingLids). Each
+-- it, which vanilla shows only to the player who did (RenewableEnergy.ArrowBoard.watchLids). Each
 -- swing passes the poses between shut and open, and the batteries come out only while it is open.
--- The screenshots (test_lid_*.png, one held and one mid-swing per swing) show what this game
--- drew; dev/lid-shots.py lays them out.
+-- The screenshots (test_lid_*.png, one held and one mid-swing per swing, then the shut lid
+-- padlocked and unlocked by the server) show what this game drew; dev/lid-shots.py lays them out.
 test("renewable_energy_world_arrow_board_lid_swings", {
     instant = true,
     run = function(self)
@@ -875,6 +875,12 @@ test("renewable_energy_world_arrow_board_lid_swings", {
         swing("closing it", false, 2, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
         swing("someone else opening it", true, 3, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
         swing("someone else closing it", false, 4, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
+        for shot, locked in ipairs({ true, false }) do
+            T.onVehicle(self, trailer, "setTrailer", { lidLocked = locked })
+            T.waitForVehicleCopy(trailer, function(copy) return copy.lid.shown == (locked and "Default,Padlock" or "Default") end)
+            T.wait(SHOWN_FRAMES)
+            T.step(function() lidShot((shot + 4) .. (locked and "_padlocked" or "_unlocked") .. "_by_the_server", trailer.vehicle) end)
+        end
     end,
     validate = function(self)
         if not expect(lidHeld(self.shut, false), "the shut lid shows " .. describeLid(self.shut)) then
@@ -1010,6 +1016,223 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
                 .. " and " .. (back.open and "open" or "shut")) or "unknown") .. ", expected on, unlocked and shut")
         expect(back and back.shown == "Default" and lidHeld(back.pose, false), "the lid put back shows '"
             .. tostring(back and back.shown) .. "', " .. describeLid(back and back.pose) .. ", expected Default held shut")
+    end,
+})
+
+-- The lid shows its padlock only while it is on, locked, and its lock isn't cut, on the server and
+-- in this game, which follows the server's changes: unlocking, locking again, cutting the lock,
+-- taking the lid off, and putting a lid on unlocked, which shows all its models
+-- (VehiclePart.setInventoryItem) until the lid watcher hides the padlock.
+test("renewable_energy_world_arrow_board_padlock_shows_while_locked", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer = self.trailer
+        self.seen = {}
+        local function stage(name, args, want)
+            local seen = { name = name, want = want }
+            table.insert(self.seen, seen)
+            T.onVehicle(self, trailer, "setTrailer", args)
+            T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.shown == want end, SERVER_MS)
+            T.waitForVehicleCopy(trailer, function(copy) return copy.lid and copy.lid.shown == want end)
+            T.step(function()
+                seen.server = trailer.state.lid and trailer.state.lid.shown
+                seen.copy = T.copyState(trailer).lid and T.copyState(trailer).lid.shown
+            end)
+        end
+        stage("locked", { lidOpen = false, lidLocked = true, lidLockBroken = false }, "Default,Padlock")
+        stage("unlocked", { lidLocked = false }, "Default")
+        stage("locked again", { lidLocked = true }, "Default,Padlock")
+        stage("with its lock cut", { lidLockBroken = true }, "Default")
+        stage("taken off", { lidInstalled = false, lidLocked = false, lidLockBroken = false }, "")
+        stage("put back unlocked", { lidInstalled = true }, "Default")
+    end,
+    validate = function(self)
+        if not expect(self.seen ~= nil and #self.seen > 0, "the trailer never spawned") then
+            return
+        end
+        for _, seen in ipairs(self.seen) do
+            expect(seen.server == seen.want, "the lid " .. seen.name .. " shows '" .. tostring(seen.server)
+                .. "' on the server, expected '" .. seen.want .. "'")
+            expect(seen.copy == seen.want, "the lid " .. seen.name .. " shows '" .. tostring(seen.copy)
+                .. "' here, expected '" .. seen.want .. "'")
+        end
+    end,
+})
+
+-- Puts the character inside the box's area, most of the way to its side, facing the trailer: where
+-- a player opens the box from, so that the trailer's menu offers the lid (BaseVehicle.getUseablePart
+-- wants the character in the area and facing the box, which from the area's middle they can't).
+local function standAtBox(vehicle)
+    local centre = vehicle:getAreaCenter(BATTERY_BOX)
+    local origin = vehicle:getWorldPos(0, 0, 0, Vector3f.new())
+    local side = vehicle:getWorldPos(1, 0, 0, Vector3f.new())
+    local x = centre:getX() + (side:x() - origin:x()) * 0.7
+    local y = centre:getY() + (side:y() - origin:y()) * 0.7
+    local p = player()
+    p:teleportTo(x, y, vehicle:getZ())
+    p:setX(x)
+    p:setY(y)
+    p:setTargetAndCurrentDirection(vehicle:getX() - x, vehicle:getY() - y)
+end
+
+-- Whether the trailer's radial menu, opened where the character stands, offers Cut Padlock. The
+-- menu goes away again before it is drawn.
+local function offersCutPadlock()
+    local p = player()
+    local menu = getPlayerRadialMenu(p:getPlayerNum())
+    ISVehicleMenu.showRadialMenuOutside(p)
+    local offered = false
+    for _, slice in ipairs(menu.slices) do
+        offered = offered or slice.command[1] == RenewableEnergy.BatteryBoxLid.cutPadlock
+    end
+    menu:undisplay()
+    return offered
+end
+
+-- With bolt cutters a player cuts the battery box's padlock where the trailer's menu offers it: the
+-- lid comes unlocked with a broken lock, on the server and here, the box opens and gives up its
+-- battery, and the lock never closes again, even for someone holding the trailer's key, which no
+-- arrow board spawns with. Cut, the box offers no more cutting.
+test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        padlockBox(self, trailer, { { type = "RenewableEnergy.DeepCycleBattery", charge = 0.5 } })
+        T.waitForCopy(function() return self.box and self.box:getItemContainer():getItems():size() == 1 end)
+        T.give(self, "cutters", { { type = "Base.BoltCutters" } })
+        T.server(self, "arrowBoardKey", function() return T.vehicleArgs(trailer) end)
+        T.step(function()
+            local vehicle = trailer.vehicle
+            standAtBox(vehicle)
+            self.offered = offersCutPadlock()
+            self.keyUnlocks = vehicle:canUnlockDoor(self.lid, p)
+            local cutters = RenewableEnergy.BatteryBoxLid.padlockCutters(p, self.lid)
+            if cutters then
+                -- What the menu's Cut Padlock does.
+                RenewableEnergy.BatteryBoxLid.cutPadlock(p, self.lid, cutters)
+            end
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.lockBroken end, SERVER_MS)
+        T.waitForCopy(function() return self.lid and self.lid:getDoor():isLockBroken() and not self.lid:getDoor():isLocked() end)
+        T.step(function()
+            local vehicle, door = trailer.vehicle, self.lid:getDoor()
+            self.cut = { server = trailer.state.lid, locked = door:isLocked(), broken = door:isLockBroken() }
+            self.keyRelocks = vehicle:canLockDoor(self.lid, p)
+            standAtBox(vehicle)
+            self.offeredCut = offersCutPadlock()
+            ISVehicleMenu.onOpenDoor(p, self.lid)
+        end)
+        T.waitForCopy(function() return self.lid and self.lid:getDoor():isOpen() end)
+        T.step(function()
+            self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
+            local battery = self.box:getItemContainer():getFirstType("RenewableEnergy.DeepCycleBattery")
+            if battery then
+                ISTimedActionQueue.add(ISInventoryTransferAction:new(p, battery, self.box:getItemContainer(), p:getInventory()))
+            end
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
+        T.waitForCopy(function() return p:getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil end)
+    end,
+    validate = function(self)
+        if not expect(self.lid ~= nil and self.box ~= nil, "the trailer has no lid or no battery box") then
+            return
+        end
+        expect(self.offered, "the menu at the padlocked box doesn't offer Cut Padlock to a player with bolt cutters")
+        expect(self.keyUnlocks, "the trailer's key doesn't open its padlock, so it can't show the cut lock refusing it")
+        local cut = self.cut
+        if not expect(cut ~= nil, "the padlock was never cut") then
+            return
+        end
+        expect(cut.server and not cut.server.locked and cut.server.lockBroken, "the server's lid is "
+            .. tostring(cut.server and cut.server.locked and "locked" or "unlocked") .. " with its lock "
+            .. tostring(cut.server and cut.server.lockBroken and "broken" or "whole") .. " after the cut")
+        expect(not cut.locked and cut.broken, "this game's lid isn't unlocked with a broken lock after the cut")
+        expect(not self.keyRelocks, "the cut padlock locks again with the trailer's key")
+        expect(not self.offeredCut, "the menu offers Cut Padlock on a cut lock")
+        expect(self.openAccess, "the box doesn't open once its padlock is cut")
+        expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
+        expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
+            "the battery never reached the inventory")
+        expect(player():getInventory():getFirstTypeRecurse("Base.BoltCutters") ~= nil, "cutting used up the bolt cutters")
+    end,
+})
+
+-- The trailer's menu offers Cut Padlock only at a padlock that holds, to a player carrying bolt
+-- cutters: not without them, not on an unlocked box, and not with the lid off.
+test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer = self.trailer
+        self.seen = {}
+        local function look(name, want)
+            T.step(function()
+                standAtBox(trailer.vehicle)
+                table.insert(self.seen, { name = name, want = want, offered = offersCutPadlock() })
+            end)
+        end
+        padlockBox(self, trailer)
+        look("at a padlocked box without bolt cutters", false)
+        T.give(self, "cutters", { { type = "Base.BoltCutters" } })
+        look("at a padlocked box with bolt cutters", true)
+        T.onVehicle(self, trailer, "setTrailer", { lidLocked = false })
+        T.waitForCopy(function() return not trailer.vehicle:getPartById("TrunkDoor"):getDoor():isLocked() end)
+        look("at an unlocked box", false)
+        T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false, lidLocked = true })
+        T.waitForCopy(function()
+            local lid = trailer.vehicle:getPartById("TrunkDoor")
+            return lid:getInventoryItem() == nil and lid:getDoor():isLocked()
+        end)
+        look("at a locked box without its lid", false)
+    end,
+    validate = function(self)
+        if not expect(self.seen ~= nil and #self.seen == 4, "the trailer never spawned") then
+            return
+        end
+        for _, seen in ipairs(self.seen) do
+            expect(seen.offered == seen.want, "the menu " .. seen.name .. (seen.offered and " offers" or " doesn't offer")
+                .. " Cut Padlock")
+        end
+    end,
+})
+
+-- Opening the lid shows the battery box in the loot window as opening a trunk shows the trunk:
+-- in single player only, since vanilla picks the container in complete(), which a multiplayer
+-- client never runs (ISOpenVehicleDoor.selectContainerInLootWindow).
+test("renewable_energy_world_arrow_board_box_shows_in_the_loot_window", {
+    instant = true,
+    run = function(self)
+        self.trailer = spawnTrailer(self, { repair = true })
+        if not self.trailer then return end
+        local trailer, p = self.trailer, player()
+        T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
+        T.waitForCopy(function() return not trailer.vehicle:getPartById("TrunkDoor"):getDoor():isLocked() end)
+        T.step(function()
+            self.lid, self.box = trailer.vehicle:getPartById("TrunkDoor"), trailer.vehicle:getPartById(BATTERY_BOX)
+            standAtBox(trailer.vehicle)
+            getPlayerLoot(p:getPlayerNum()).forceSelectedContainer = nil
+            ISVehicleMenu.onOpenDoor(p, self.lid)
+        end)
+        T.waitForCopy(function()
+            if not self.lid:getDoor():isOpen() then
+                return false
+            end
+            self.selected = getPlayerLoot(p:getPlayerNum()).forceSelectedContainer
+            return true
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.box ~= nil and self.box:getItemContainer() ~= nil, "the trailer has no battery box") then
+            return
+        end
+        local picked = self.selected ~= nil and self.selected == self.box:getItemContainer()
+        expect(picked == not isClient(), "opening the lid " .. (picked and "picked" or "didn't pick") .. " the battery box in the loot window"
+            .. (isClient() and ", which vanilla never does for a trunk on a multiplayer client" or ""))
     end,
 })
 

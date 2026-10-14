@@ -992,8 +992,9 @@ TRAILER_LID_OPEN = 70
 
 
 def _trailer_battery_box(col):
-    """The battery box bolted across the tongue: steel with a lid over its rim, a hasp and a
-    padlock, stencilled on the side that faces the towing car."""
+    """The battery box bolted across the tongue: steel with a lid over its rim, a hasp with a
+    staple and a padlock, stencilled on the side that faces the towing car. The padlock hangs from
+    the staple, which stays on the box with the hasp, so the box looks right with the lock cut."""
     width, depth, height = TRAILER_BOX
     y, z = TRAILER_BOX_AT
     face = y + depth / 2
@@ -1003,9 +1004,12 @@ def _trailer_battery_box(col):
         cylinder(col, "Trailer_BatteryHinge", M("darkgrey"), 0.012, 0.08, at=(x - 0.04, TRAILER_LID_HINGE[1], TRAILER_LID_HINGE[2]),
                  rotate=(0, 90, 0), segments=8)
     box(col, "Trailer_Hasp", M("rawsteel"), (0.04, 0.012, 0.09), at=(0, face + 0.02, z + height - 0.05))
+    staple_y = (face + 0.026, face + 0.045)
+    tube(col, "Trailer_Staple", M("rawsteel"), [(0, staple_y[0], z + height - 0.032), (0, staple_y[1], z + height - 0.032),
+                                                (0, staple_y[1], z + height - 0.048), (0, staple_y[0], z + height - 0.048)], 0.003)
     box(col, "Trailer_Padlock", M("yellow"), (0.05, 0.025, 0.05), at=(0, face + 0.035, z + height - 0.12), bevel=0.006)
-    tube(col, "Trailer_Shackle", M("rawsteel"), [(-0.015, face + 0.035, z + height - 0.07), (-0.015, face + 0.035, z + height - 0.04),
-                                                 (0.015, face + 0.035, z + height - 0.04), (0.015, face + 0.035, z + height - 0.07)], 0.004)
+    tube(col, "Trailer_PadlockShackle", M("rawsteel"), [(-0.015, face + 0.035, z + height - 0.07), (-0.015, face + 0.035, z + height - 0.04),
+                                                        (0.015, face + 0.035, z + height - 0.04), (0.015, face + 0.035, z + height - 0.07)], 0.004)
     text(col, "Trailer_Stencil", M("ink"), "BATTERIES", 0.05, at=(0, face + 0.002, z + 0.1), rotate=(90, 0, 180))
 
 
@@ -1127,6 +1131,7 @@ VEHICLES = {
         "build": arrow_board_trailer,
         "pieces": {
             "_Lid": (("Trailer_BatteryLid",), (0, 0, 0)),
+            "_Padlock": (("Trailer_Padlock",), (0, 0, 0)),
             "_PanelLeft": (("Trailer0_",), (0, 0, 0)),
             "_PanelRight": (("Trailer1_",), (0, 0, 0)),
             "_PanelLeftCracked": (("TrailerCracked0_",), TRAILER_CRACKED_OFFSET),

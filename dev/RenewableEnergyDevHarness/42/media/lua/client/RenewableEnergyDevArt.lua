@@ -29,6 +29,8 @@
 --     art_trailer_washed.png    blood on all four sides, then washed off by vanilla's wash action
 --     art_trailer_lid_open.png  the battery box lid swung open, then
 --     art_trailer_lid_shut.png  swung shut again
+--     art_trailer_lid_locked.png    the shut lid padlocked, then
+--     art_trailer_lid_unlocked.png  unlocked, the padlock gone
 --   art_cracked.png   cracked glass on a flat panel, wooden and metal wall panels and racks (one
 --                     module of each rack cracked), placed the way players place them, so the
 --                     mod's own code adds the overlays, and east of them an arrow board trailer
@@ -153,9 +155,20 @@ local LID_SWING_MS = 1000
 
 --- Sets the lid open or shut on the lone trailer and returns a runSteps wait for its swing.
 local function swingLid(pair, open)
-    pair.trailer:getPartById("TrunkDoor"):getDoor():setOpen(open)
+    local door = pair.trailer:getPartById("TrunkDoor"):getDoor()
+    -- Spawned trailers are often locked, and a locked lid wouldn't open in play.
+    door:setLocked(false)
+    door:setOpen(open)
     local start = getTimestampMs()
     return function() return getTimestampMs() - start >= LID_SWING_MS end
+end
+
+-- The lid shut and padlocked or not; ArrowBoard's lid watcher shows the padlock by the next frame.
+local function lockLid(pair, locked)
+    local door = pair.trailer:getPartById("TrunkDoor"):getDoor()
+    door:setOpen(false)
+    door:setLockBroken(false)
+    door:setLocked(locked)
 end
 
 -- The trailer's states, each set on a repaired trailer and shot from where the shot before stands.
@@ -206,6 +219,8 @@ local LONE_STATES = {
     },
     { name = "art_trailer_lid_open", set = function(pair) return swingLid(pair, true) end },
     { name = "art_trailer_lid_shut", set = function(pair) return swingLid(pair, false) end },
+    { name = "art_trailer_lid_locked", set = function(pair) lockLid(pair, true) end },
+    { name = "art_trailer_lid_unlocked", set = function(pair) lockLid(pair, false) end },
 }
 
 -- `pair` returns the current pair, which the steps only know once they run.

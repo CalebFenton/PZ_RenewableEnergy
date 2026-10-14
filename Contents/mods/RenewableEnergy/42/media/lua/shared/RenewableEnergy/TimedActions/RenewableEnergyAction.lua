@@ -30,6 +30,7 @@ Action.RENAME = "Rename"
 Action.REPAIR_PANEL = "RepairPanel"
 Action.REMOVE_BULB = "RemoveBulb"
 Action.ADD_BULB = "AddBulb"
+Action.CUT_PADLOCK = "CutPadlock"
 
 -- Jobs on the bank's wiring or a cracked panel, which need light to see by.
 local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true }
@@ -84,6 +85,10 @@ end
 
 function Action.isSnowTool(item)
     return item ~= nil and Action.SNOW_TOOLS[item:getFullType()] == true and not item:isBroken()
+end
+
+function Action.isBoltCutters(item)
+    return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and not item:isBroken()
 end
 
 -- The status of the action's bank, or nil when there is no bank or no status yet.
@@ -158,6 +163,12 @@ local CHECKS = {
         local SolarGardenLight = RenewableEnergy.SolarGardenLight
         return isGardenLight(self.object) and SolarGardenLight.getBulb(self.object) == nil
             and SolarGardenLight.isBulb(self.item) and self.character:getInventory():containsRecursive(self.item)
+    end,
+    [Action.CUT_PADLOCK] = function(self)
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local lid = ArrowBoard ~= nil and ArrowBoard.isTrailer(self.vehicle) and self.vehicle:getPartById(ArrowBoard.LID)
+        return lid and ArrowBoard.isPadlocked(lid) and Action.isBoltCutters(self.item)
+            and self.character:isPrimaryHandItem(self.item) or false
     end,
 }
 
@@ -249,6 +260,9 @@ function Action:getDuration()
     elseif self.mode == Action.REPAIR_PANEL then
         -- As the crafting window times Repair Cracked Module (ISHandcraftAction).
         return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5
+    elseif self.mode == Action.CUT_PADLOCK then
+        -- A squeeze of the handles, far quicker than unbolting the lid.
+        return 100
     end
     return MINUTES[self.mode] * Action.unitsPerMinute()
 end
@@ -306,6 +320,11 @@ function Action:start()
         end
         return
     end
+    if self.mode == Action.CUT_PADLOCK then
+        -- As vanilla works on a vehicle part at waist height (ISUninstallVehiclePart).
+        self:setActionAnim("VehicleWorkOnMid")
+        return
+    end
     self:setActionAnim("Loot")
     self.character:SetVariable("LootPosition", self.vehicle and "Mid" or "Low")
     self.character:reportEvent("EventLootItem")
@@ -331,8 +350,30 @@ function Action:perform()
     if self.mode == Action.TURN_ON or self.mode == Action.TURN_OFF then
         self.character:playSound("LightSwitch")
     end
+    if self.mode == Action.CUT_PADLOCK then
+        -- The sound of a lock giving way, as when a character forces a locked window
+        -- (OpenWindowState).
+        self.character:playSound("BreakLockOnWindow")
+    end
     ISInventoryPage.renderDirty = true
     ISBaseTimedAction.perform(self)
+end
+
+-- Cut Padlock, on the authority: the lid unlocked, its lock broken. Vanilla saves and sends a
+-- broken lock with the door, never locks it again (BaseVehicle.canLockDoor), and keeps it on the
+-- lid's item while the lid is off (Vehicles.UninstallComplete.Door). The cutters wear as vanilla's
+-- cutting recipes wear them (MayDegradeLight in CutUpTire, CraftRecipeData.processKeepInputItem),
+-- and a pair that breaks leaves the hands as a broken weapon does (ISDestroyStuffAction).
+local function cutPadlock(self)
+    local lid = self.vehicle:getPartById(RenewableEnergy.ArrowBoard.LID)
+    local door = lid:getDoor()
+    door:setLocked(false)
+    door:setLockBroken(true)
+    self.vehicle:transmitPartDoor(lid)
+    if self.item:damageCheck(0, 3) then
+        ItemUtils.checkWeapon(self.character)
+    end
+    return true
 end
 
 -- How far from the middle of the target's square, on each axis in squares, a multiplayer server
@@ -370,6 +411,8 @@ function Action:complete()
         return RenewableEnergy.SolarGardenLight.removeBulb(self.character, self.object)
     elseif self.mode == Action.ADD_BULB then
         return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item)
+    elseif self.mode == Action.CUT_PADLOCK then
+        return cutPadlock(self)
     end
     local command, args = COMMANDS[self.mode](self)
     local ok = PowerBank.perform(self.character, command, args)
@@ -379,9 +422,9 @@ end
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
 -- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel or the
 -- garden light, `bank` the bank's IsoGenerator, `item` the snow tool, the maintainer, the bank
--- part or the light bulb, `bankName` the bank's new name, `partId` the vehicle part worked on;
--- unused ones are nil. The name can't be a field called `name`, which NetTimedAction reads as the
--- action's own name.
+-- part, the light bulb or the bolt cutters, `bankName` the bank's new name, `partId` the vehicle
+-- part worked on; unused ones are nil. The name can't be a field called `name`, which
+-- NetTimedAction reads as the action's own name.
 function Action:new(character, mode, object, bank, vehicle, item, bankName, partId)
     local o = ISBaseTimedAction.new(self, character)
     o.mode = mode

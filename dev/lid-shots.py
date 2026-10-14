@@ -11,7 +11,7 @@ sheet, to see what a game drew while the battery box lid swung:
 
 The top row holds the lid held shut, open after this client opened it, shut again, and open after
 the server opened it as another player would; the row under it the first frame between shut and
-open of each swing. Writes <cache>/Screenshots/test_lid_sheet.png, which the next --test run
+open of each swing; the last row the shut lid padlocked by the server, then unlocked. Writes <cache>/Screenshots/test_lid_sheet.png, which the next --test run
 clears with the shots.
 
 It also fails when the box looks the same open as shut. Grass, leaves and fog move between shots,
@@ -43,6 +43,10 @@ SWINGING = [
     ("2_closing_it_swinging", "shutting here"),
     ("3_someone_else_opening_it_swinging", "opening, server"),
     ("4_someone_else_closing_it_swinging", "shutting, server"),
+]
+LOCKS = [
+    ("5_padlocked_by_the_server", "padlocked, server"),
+    ("6_unlocked_by_the_server", "unlocked, server"),
 ]
 # How much more an open box must differ from the first shut one than the second shut one does.
 OPEN_MARGIN = 3.0
@@ -94,7 +98,7 @@ def main():
     cache = Path(sys.argv[1]) if len(sys.argv) > 1 else default
     screenshots = cache / "Screenshots"
     places = shot_places(cache / "console.txt")
-    rows = [[(load(screenshots, places, name), label) for name, label in row] for row in (HELD, SWINGING)]
+    rows = [[(load(screenshots, places, name), label) for name, label in row] for row in (HELD, SWINGING, LOCKS)]
     held = [shot for shot, _ in rows[0]]
     missing = [name for (name, _), shot in zip(HELD, held) if shot is None]
     if missing:

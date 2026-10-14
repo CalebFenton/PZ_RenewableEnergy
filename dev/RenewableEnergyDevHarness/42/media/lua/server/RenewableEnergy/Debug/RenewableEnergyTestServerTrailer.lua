@@ -147,7 +147,8 @@ function Trailer.vehicleState(vehicle)
     local lid = vehicle:getPartById(ArrowBoard.LID)
     local door = lid and lid:getDoor()
     if door then
-        state.lid = { open = door:isOpen(), locked = door:isLocked(), installed = lid:getInventoryItem() ~= nil,
+        state.lid = { open = door:isOpen(), locked = door:isLocked(), lockBroken = door:isLockBroken(),
+            installed = lid:getInventoryItem() ~= nil,
             shown = Trailer.shownModels(vehicle, ArrowBoard.LID) }
     end
     return state
@@ -202,8 +203,9 @@ end
 -- panel of `args.panels` ({ [partId] = { type, condition } }, an empty table taking the module
 -- off); each frame part of `args.frame` ({ [partId] = condition }); the battery box emptied and
 -- filled with `args.box` ({ { type, charge } }) if given; the blood of `args.blood` ({ [side] =
--- intensity }); the lid open or shut if `args.lidOpen` is set, and locked or not if
--- `args.lidLocked` is. Answers its state.
+-- intensity }); the lid taken off or a new one put on if `args.lidInstalled` is set, open or shut
+-- if `args.lidOpen` is, locked or not if `args.lidLocked` is, and its lock cut or whole if
+-- `args.lidLockBroken` is. Answers its state.
 handler("setTrailer", function(_, args)
     local vehicle, missing = vehicleArg(args)
     if not vehicle then
@@ -241,13 +243,23 @@ handler("setTrailer", function(_, args)
         vehicle:setBloodIntensity(side, intensity)
     end
     local lid = vehicle:getPartById("TrunkDoor")
+    if args.lidInstalled == false then
+        lid:setInventoryItem(nil)
+        vehicle:transmitPartItem(lid)
+    elseif args.lidInstalled then
+        VehicleUtils.createPartInventoryItem(lid)
+        vehicle:transmitPartItem(lid)
+    end
     if args.lidOpen ~= nil then
         lid:getDoor():setOpen(args.lidOpen)
     end
     if args.lidLocked ~= nil then
         lid:getDoor():setLocked(args.lidLocked)
     end
-    if args.lidOpen ~= nil or args.lidLocked ~= nil then
+    if args.lidLockBroken ~= nil then
+        lid:getDoor():setLockBroken(args.lidLockBroken)
+    end
+    if args.lidOpen ~= nil or args.lidLocked ~= nil or args.lidLockBroken ~= nil then
         vehicle:transmitPartDoor(lid)
     end
     return { state = Trailer.vehicleState(vehicle) }
@@ -376,6 +388,16 @@ handler("lineUpTrailer", function(_, args)
     end
     PZHarness.Fixtures.lineUpTrailer(car, trailer, args.facing)
     return {}
+end)
+
+-- Gives the character a key to the vehicle `args`, which no arrow board ever spawns with, so a
+-- test can show what a key holder could do to its lid.
+handler("arrowBoardKey", function(player, args)
+    local vehicle, missing = vehicleArg(args)
+    if not vehicle then
+        return nil, missing
+    end
+    return { given = { PZHarness.giveItem(player, vehicle:createVehicleKey()) } }
 end)
 
 return Trailer

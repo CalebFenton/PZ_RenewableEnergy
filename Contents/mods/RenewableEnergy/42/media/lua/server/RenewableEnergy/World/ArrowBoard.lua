@@ -15,8 +15,9 @@ require "RenewableEnergy/World/WorldSpawns"
 -- Its panels charge the batteries in the box in daylight, wherever it stands or is towed
 -- (GadgetCharging runs it).
 --
--- No key to the box's padlock ever spawns, so a locked box opens the way vanilla gets into a
--- locked trunk without its key: the lid comes off in the mechanics window (Lid, below).
+-- No key to the box's padlock ever spawns, so a locked box opens only by force: bolt cutters cut
+-- the padlock, or the lid comes off in the mechanics window the way vanilla gets into a locked
+-- trunk without its key (Lid, below). The padlock shows on the lid while it holds.
 --
 -- Each panel is a vehicle part holding a Solar Module, whose condition is the part's: storms and
 -- hard crashes crack it, Repair Cracked Panel mends it on the trailer, and the mechanics window
@@ -136,16 +137,40 @@ end
 -- never needs the key to come off, so a padlocked box opens when someone unbolts the lid, with the
 -- wrench, time and Mechanics odds vanilla asks for a trunk lid, though not its mechanic's recipe,
 -- which putting it back doesn't ask for either. Put back, the lid is unlocked
--- (Vehicles.InstallComplete.Door).
+-- (Vehicles.InstallComplete.Door). Bolt cutters are quicker: Cut Padlock (RenewableEnergyAction,
+-- offered by UI/BatteryBoxLid.lua) unlocks the lid and breaks its lock, which vanilla never locks
+-- again (BaseVehicle.canLockDoor).
 --
 -- The lid swings open and shut on its hinge. Vanilla plays a door's swing only in the game of the
 -- player who opens it, as the action starts (ISOpenVehicleDoor:start), before the server has
 -- said whether it opened, and everyone else's copy keeps the pose it held
 -- (BaseVehicle.updateAnimationPlayer replaces a held pose only once it ends, and it never ends).
 -- So every game that draws the trailer swings the lid itself once it sees the door's state
--- change, the opener's included (swingLids, below).
+-- change, the opener's included (watchLids, below).
+--
+-- The padlock is a model of its own on the lid, shown while the lid is on and locked with a lock
+-- nobody cut. Nothing reports a door's lock changing, and installing the lid shows all its
+-- models (VehiclePart.setInventoryItem), so every side watches the lid and shows the padlock
+-- again whenever any of that changes. The server's models are what it sends its clients
+-- (VehiclePartModels), so it watches too.
 
 ArrowBoard.LID = "TrunkDoor"
+ArrowBoard.PADLOCK = "Padlock"
+
+-- The lids each game watches, by vehicle: the lid's item, lock and broken lock it last showed the
+-- padlock for, and whether it last saw the lid open (open, nil until it first looks).
+local lids = {}
+
+--- Whether the lid's padlock holds: the lid is on, locked, and its lock isn't cut.
+function ArrowBoard.isPadlocked(part)
+    local door = part:getDoor()
+    return part:getInventoryItem() ~= nil and door:isLocked() and not door:isLockBroken()
+end
+
+--- Shows the lid's padlock if it holds. On the server the game sends the models to every client.
+function ArrowBoard.showPadlock(part)
+    part:setModelVisible(ArrowBoard.PADLOCK, ArrowBoard.isPadlocked(part))
+end
 
 --- Part `create` of the lid: runs once, when the trailer first enters the world. Shut, and
 --- padlocked by STOCK.lockedChance unless the save's Easy Use option leaves every vehicle
@@ -160,6 +185,8 @@ end
 
 --- Part `init` of the lid: runs on every side each time the trailer loads.
 function ArrowBoard.initLid(vehicle, part)
+    ArrowBoard.showPadlock(part)
+    lids[vehicle] = lids[vehicle] or {}
     ArrowBoard.track(vehicle)
 end
 
@@ -390,8 +417,7 @@ end
 -- Loaded trailers by vehicle: their recent velocities, oldest first, in the lists ms, x and y,
 -- used as a ring of SAMPLE_SLOTS from `head`, `count` long, so that watching allocates nothing
 -- each frame; the time of their last crash's latest jolt; on a multiplayer client the car of
--- this game's player that last towed them and until when that car's crashes still count; and
--- whether this game last saw the lid open (lidOpen, nil until it first looks).
+-- this game's player that last towed them and until when that car's crashes still count.
 local tracked = {}
 -- Enough for ArrowBoard.CRASH.ms at a thousand frames a second; at a higher rate the oldest
 -- samples go early, which still leaves a crash's jolt well inside the window.
@@ -483,20 +509,29 @@ function ArrowBoard.watchCrashes()
     end
 end
 
---- Swings the lid of each loaded trailer whose door this game has seen open or shut since it last
---- looked (Lid, above). A trailer it sees for the first time shows its lid as it is, because the
---- game holds the Opened or Closed pose by the door's state when no swing plays. playPartAnim does
---- nothing while the lid's model isn't loaded or the lid is off.
-function ArrowBoard.swingLids()
-    for vehicle, entry in pairs(tracked) do
+--- Shows the padlock of each loaded trailer whose lid has come off, gone on, been locked, unlocked
+--- or cut since this game last looked, and, but on a dedicated server, swings the lid of each
+--- whose door it has seen open or shut (Lid, above). A trailer it sees for the first time shows
+--- its lid as it is, because the game holds the Opened or Closed pose by the door's state when no
+--- swing plays. playPartAnim does nothing while the lid's model isn't loaded or the lid is off.
+function ArrowBoard.watchLids()
+    local server = isServer()
+    for vehicle, entry in pairs(lids) do
         local lid = vehicle:getPartById(ArrowBoard.LID)
         local door = lid and lid:getDoor()
-        if door then
+        if vehicle:isRemovedFromWorld() then
+            lids[vehicle] = nil
+        elseif door then
+            local item, locked, broken = lid:getInventoryItem(), door:isLocked(), door:isLockBroken()
+            if item ~= entry.item or locked ~= entry.locked or broken ~= entry.broken then
+                ArrowBoard.showPadlock(lid)
+                entry.item, entry.locked, entry.broken = item, locked, broken
+            end
             local open = door:isOpen()
-            if entry.lidOpen ~= nil and open ~= entry.lidOpen then
+            if not server and entry.open ~= nil and open ~= entry.open then
                 vehicle:playPartAnim(lid, open and "SwingOpen" or "SwingClose")
             end
-            entry.lidOpen = open
+            entry.open = open
         end
     end
 end
@@ -537,8 +572,8 @@ end
 
 if not isServer() then
     Events.OnTick.Add(ArrowBoard.watchCrashes)
-    Events.OnTick.Add(ArrowBoard.swingLids)
 end
+Events.OnTick.Add(ArrowBoard.watchLids)
 if not isClient() then
     Events.OnClientCommand.Add(onClientCommand)
     Events.OnTick.Add(ArrowBoard.keepStockConditions)

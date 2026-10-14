@@ -276,7 +276,7 @@ TRAILER_ZONES = {
     "Trailer_BatteryLid": BOOT, "Trailer_TailLight": STOPLIGHT,
     "Trailer_Tongue": HEAD, "Trailer_Coupler": HEAD, "Trailer_CouplerCap": HEAD, "Trailer_Jack": HEAD,
     "Trailer_JackFoot": HEAD, "Trailer_JackCrank": HEAD, "Trailer_BatteryBox": HEAD, "Trailer_BatteryHinge": HEAD,
-    "Trailer_Hasp": HEAD, "Trailer_Padlock": HEAD, "Trailer_Shackle": HEAD,
+    "Trailer_Hasp": HEAD, "Trailer_Staple": HEAD, "Trailer_Padlock": HEAD, "Trailer_PadlockShackle": HEAD,
     "Trailer_Rail": SIDE, "Trailer_Spring": SIDE, "Trailer_Fender": SIDE, "Trailer_FenderSkirt": SIDE,
     "Trailer_Reflector": SIDE,
     "Trailer_Mast": TAIL, "Trailer_MastPivot": TAIL, "Trailer_Cradle": TAIL,

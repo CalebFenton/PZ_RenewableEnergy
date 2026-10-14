@@ -32,6 +32,14 @@ module Base
         invertX = false,
         scale = 1.0,
     }
+    /* The padlock draws only on a shut lid, so it needs no bone and stays static. */
+    model RenewableEnergyArrowBoardTrailerPadlock
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_Padlock,
+        shader = vehicle_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
     model RenewableEnergyArrowBoardTrailerPanelLeft
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeft,
@@ -221,9 +229,13 @@ module Base
            the part named TrunkDoor is open or gone, so the lid takes that name, and its lock is
            the box's padlock. It starts closed and often locked (RenewableEnergy.ArrowBoard). No
            key spawns for it, and the lid needs none to come off, so the mechanics window unbolts a
-           locked one as the template's trunk lid, with its wrench, time and Mechanics odds. A lua
+           locked one as the template's trunk lid, with its wrench, time and Mechanics odds; bolt
+           cutters can cut the padlock instead (RenewableEnergyAction). A lua
            block replaces the template's whole list. Its model shows only while a lid is
-           installed. */
+           installed, and the padlock's only while that lid is locked with an uncut lock
+           (RenewableEnergy.ArrowBoard). The game swings whichever of a part's models it showed
+           first (BaseVehicle.getModelInfoForPart), so the padlock comes after Default, which
+           shows it first on install, and only the padlock is ever shown on its own. */
         part TrunkDoor
         {
             area = RenewableEnergyBatteryBox,
@@ -231,6 +243,10 @@ module Base
             model Default
             {
                 file = RenewableEnergyArrowBoardTrailerLid,
+            }
+            model Padlock
+            {
+                file = RenewableEnergyArrowBoardTrailerPadlock,
             }
             /* The clip runs from open to shut, as vanilla's door clips do. Opened and Closed hold
                it at one end: the game shows them by the door's state whenever no swing is playing

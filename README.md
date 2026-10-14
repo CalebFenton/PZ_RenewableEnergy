@@ -217,7 +217,7 @@ Solar arrow boards are the orange trailers road crews park at work zones, with a
 
 <p align="center"><img src="art/promo/images/trailer.png" alt="The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a red car on a road." width="100%"></p>
 
-You'll also find them in junkyards and, most often, in highway pileups. The battery box on the tongue holds well-used deep cycle batteries, usually a charge controller, and it's usually padlocked: with no key anywhere, you unbolt the lid with a wrench. Taking a panel off takes a wrench, Mechanics 2 and Electrical 1, and one module is often cracked. Strip it where it stands, or tow it home, where its panels keep charging its batteries. Storms and crashes crack the panels and crashes dent the frame; right-click the trailer to repair either.
+You'll also find them in junkyards and, most often, in highway pileups. The battery box on the tongue holds well-used deep cycle batteries, usually a charge controller, and it's usually padlocked: with no key anywhere, cut the padlock with bolt cutters or unbolt the lid with a wrench. Taking a panel off takes a wrench, Mechanics 2 and Electrical 1, and one module is often cracked. Strip it where it stands, or tow it home, where its panels keep charging its batteries. Storms and crashes crack the panels and crashes dent the frame; right-click the trailer to repair either.
 
 ### Stash houses
 
