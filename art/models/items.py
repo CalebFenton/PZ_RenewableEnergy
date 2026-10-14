@@ -17,7 +17,7 @@ def M(name):
     """The shared materials, made on first use."""
     return {
         "aluminium": lambda: material("RE_Aluminium", "#b9bdc1", roughness=0.35, metallic=0.8, grime=0.08),
-        "galvanised": lambda: material("RE_Galvanised", "#a3a9ab", roughness=0.5, metallic=0.7, grime=0.2),
+        "galvanised": lambda: material("RE_Galvanised", "#b4babc", roughness=0.5, metallic=0.7, grime=0.2),
         "cells": lambda: material("RE_PolyCells", "#1d3a7c", roughness=0.25, metallic=0.2, grime=0.05,
                                   speckle=("#4c78c8", 0.9)),
         "backsheet": lambda: material("RE_Backsheet", "#e9e8df", roughness=0.5, grime=0.05),
@@ -42,10 +42,10 @@ def M(name):
         "cream": lambda: material("RE_Cream", "#e6dfc8", roughness=0.6, grime=0.1),
         "white": lambda: material("RE_White", "#ecebe6", roughness=0.6, grime=0.08),
         "yellow": lambda: material("RE_Yellow", "#dcb22b", roughness=0.5, grime=0.1),
-        "lead": lambda: material("RE_Lead", "#8e8f8a", roughness=0.45, metallic=0.8, grime=0.15),
+        "lead": lambda: material("RE_Lead", "#a8aaa6", roughness=0.45, metallic=0.8, grime=0.15),
         "red": lambda: material("RE_Red", "#b8231f", roughness=0.5, grime=0.1),
-        "plywood": lambda: material("RE_Plywood", "#b48d5c", roughness=0.8, grime=0.25, scale=12),
-        "wood": lambda: material("RE_Wood", "#94693f", roughness=0.8, grime=0.3, scale=10),
+        "plywood": lambda: material("RE_Plywood", "#b48d5c", roughness=0.8, grime=0.25, scale=12, grain="veneer"),
+        "wood": lambda: material("RE_Wood", "#94693f", roughness=0.8, grime=0.3, scale=10, grain="board"),
         "navy": lambda: material("RE_Navy", "#2c416d", roughness=0.4, metallic=0.4, grime=0.1),
         "bluegrey": lambda: material("RE_BlueGrey", "#5e7189", roughness=0.45, metallic=0.3, grime=0.15),
         "cardboard": lambda: material("RE_Cardboard", "#bb9061", roughness=0.85, grime=0.2, scale=14),
@@ -62,10 +62,10 @@ def M(name):
         "sky": lambda: material("RE_Sky", "#8fc4e8", roughness=0.4, grime=0.05),
         "sun": lambda: material("RE_Sun", "#ffd640", roughness=0.4, grime=0.0),
         # Pine boards and 2 x 4s, two shades so neighbouring boards read apart.
-        "pine": lambda: material("RE_Pine", "#c39b62", roughness=0.8, grime=0.3, scale=9),
-        "pinedark": lambda: material("RE_PineDark", "#9a7041", roughness=0.8, grime=0.3, scale=9),
-        # Bare mild steel with darker weld beads at its joints.
-        "rawsteel": lambda: material("RE_RawSteel", "#8c9296", roughness=0.5, metallic=0.6, grime=0.35),
+        "pine": lambda: material("RE_Pine", "#c39b62", roughness=0.8, grime=0.2, scale=9, grain="board"),
+        "pinedark": lambda: material("RE_PineDark", "#9a7041", roughness=0.8, grime=0.2, scale=9, grain="board"),
+        # Bare mild steel, as pale as the game's own sheet metal, with darker weld beads at its joints.
+        "rawsteel": lambda: material("RE_RawSteel", "#a9afb3", roughness=0.5, metallic=0.6, grime=0.35),
         "weld": lambda: material("RE_Weld", "#3f3c39", roughness=0.75, metallic=0.5, grime=0.3),
         "copper": lambda: material("RE_Copper", "#c27a3e", roughness=0.35, metallic=0.85, grime=0.1),
         "lens": lambda: material("RE_Lens", "#e6e2d4", roughness=0.25, grime=0.05),
@@ -74,7 +74,11 @@ def M(name):
         "terracotta": lambda: material("RE_Terracotta", "#b2603b", roughness=0.85, grime=0.25, scale=16),
         "hdpe": lambda: material("RE_Hdpe", "#e8e4d8", roughness=0.5, grime=0.1),
         "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
-        "plate": lambda: material("RE_Plate", "#6a6e72", roughness=0.6, metallic=0.5, grime=0.2),
+        # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is
+        # blackened, crusted white with sulphate and blue-green where the acid ate at it.
+        "plate": lambda: material("RE_Plate", "#858a90", roughness=0.8, grime=0.2),
+        "plateworn": lambda: material("RE_PlateWorn", "#3e3f41", roughness=0.85, grime=0.35, scale=30),
+        "corrosion": lambda: material("RE_Corrosion", "#7fc0ae", roughness=0.95, grime=0.2, scale=60),
         # Highway work-zone orange, the amber of its reflectors, and the board's lamps while they're
         # dark: lit, the vehicle's lights texture draws them bright (models.GLOWING).
         "safety": lambda: material("RE_SafetyOrange", "#e0661a", roughness=0.5, grime=0.25),
@@ -402,19 +406,19 @@ def bank_batteries(col, name, slots, count):
 
 
 BOX = (0.5, 0.36, 0.22)
-PLY = 0.018
+BOARD = 0.019  # a pine 1 x 6's thickness
 SHEET = 0.004
 
 
 def battery_box(col, material, frame=True, batteries=0, meter_level=0):
     """The first bank: an open box for two batteries, its lid propped open against the back, a
-    terminal block and leads on its side and a small charge meter on its front. Plywood with
-    pine cleats, or steel sheet welded at the corners with an angle-iron rim and side handles."""
+    terminal block and leads on its side and a small charge meter on its front. Pine boards nailed
+    together, or steel sheet welded at the corners with an angle-iron rim and side handles."""
     width, depth, height = BOX
-    floor = PLY if material == "wood" else SHEET
+    floor = BOARD if material == "wood" else SHEET
     if frame:
         if material == "wood":
-            _plywood_box(col)
+            _plank_box(col)
         else:
             _steel_box(col)
         box(col, "Box_Terminal", M("black"), (0.02, 0.1, 0.06), at=(width / 2 + 0.012, -0.08, 0.06), bevel=0.004)
@@ -428,15 +432,36 @@ def battery_box(col, material, frame=True, batteries=0, meter_level=0):
     bank_batteries(col, "Box", [(-0.11, floor), (0.11, floor)], batteries)
 
 
-def _plywood_box(col):
+def _plank_box(col):
+    """Planks nailed at the corners, two boards high, in two shades so they read apart, a floor of
+    boards, cleats on the ends to lift it by, and a lid of boards on two battens."""
     width, depth, height = BOX
-    box(col, "Box_Floor", M("plywood"), (width, depth, PLY), bevel=0.003)
+    gap = 0.003
+    shades = ("pine", "pinedark")
+    board = (depth - 2 * gap) / 3
+    for i in range(3):
+        box(col, "Box_Floor", M(shades[i % 2]), (width, board, BOARD), at=(0, -depth / 2 + board / 2 + i * (board + gap), 0),
+            bevel=0.003)
+    rise = (height - gap) / 2
+    for row in range(2):
+        z = row * (rise + gap)
+        for sign in (-1, 1):
+            box(col, "Box_FrontBack", M(shades[row]), (width, BOARD, rise), at=(0, sign * (depth - BOARD) / 2, z), bevel=0.004)
+            box(col, "Box_Side", M(shades[(row + 1) % 2]), (BOARD, depth - 2 * BOARD, rise), at=(sign * (width - BOARD) / 2, 0, z),
+                bevel=0.004)
+            # Through the front board into the end of the side's.
+            for dz in (0.025, rise - 0.025):
+                cylinder(col, "Box_Nail", M("lead"), 0.004, 0.001, at=(sign * (width - BOARD) / 2, -depth / 2 - 0.0005, z + dz),
+                         rotate=(90, 0, 0), segments=8)
     for sign in (-1, 1):
-        box(col, "Box_Side", M("plywood"), (PLY, depth, height), at=(sign * (width - PLY) / 2, 0, 0), bevel=0.003)
-        box(col, "Box_FrontBack", M("plywood"), (width - 2 * PLY, PLY, height), at=(0, sign * (depth - PLY) / 2, 0), bevel=0.003)
         box(col, "Box_Cleat", M("wood"), (0.025, 0.12, 0.03), at=(sign * (width / 2 + 0.012), 0, height - 0.07), bevel=0.004)
-    box(col, "Box_Lid", M("plywood"), (width, PLY, depth), at=(0, depth / 2 + 0.03, height - 0.01),
-        rotate=(-12, 0, 0), bevel=0.003)
+    lid = []
+    for i in range(3):
+        lid.append(box(col, "Box_Lid", M(shades[i % 2]), (width, BOARD, board), at=(0, 0, i * (board + gap)), bevel=0.003))
+    for sign in (-1, 1):
+        lid.append(box(col, "Box_LidBatten", M("wood"), (0.05, BOARD, depth - 0.05), at=(sign * (width / 2 - 0.07), -BOARD, 0.025),
+                       bevel=0.003))
+    group(col, "Box_LidBoards", lid, at=(0, depth / 2 + 0.03, height - 0.01), rotate=(-12, 0, 0))
 
 
 def _steel_box(col):
@@ -562,9 +587,10 @@ STORAGE = {
 
 
 def fins(col, name, mat, width, depth, z, count, height=0.008):
-    """A row of `count` heat-sink fins or louvres across `width`, each running front to back."""
+    """A row of `count` heat-sink fins or louvres across `width`, each running front to back: 8 mm
+    thick, about a pixel at the game's closest zoom, as a thinner one comes and goes as it draws."""
     for i in range(count):
-        box(col, name, mat, (0.004, depth * 0.9, height), at=(-width / 2 + (i + 0.5) * width / count, 0, z))
+        box(col, name, mat, (0.008, depth * 0.9, height), at=(-width / 2 + (i + 0.5) * width / count, 0, z))
 
 
 def outlet(col, name, at, scale=1.0, turn=0):
@@ -856,9 +882,11 @@ def battery_case(col, name, size, colour, cells, label, words=None, bolt=False, 
         for rib in (-1, 1):
             box(col, name + "_Rib", M(colour), (0.006, 0.01, height - 0.034), at=(sign * (width / 2 + 0.001), rib * depth * 0.38, 0.012),
                 bevel=0.002)
+    # The walls between the cells, stained like the inside, their cut tops the case's own plastic.
     for i in range(1, cells):
-        box(col, name + "_CellWall", M("leadstain"), (0.004, depth - 2 * (wall + stain), height - 0.025),
-            at=(-width / 2 + i * width / cells, 0, wall))
+        x = -width / 2 + i * width / cells
+        box(col, name + "_CellWall", M("leadstain"), (0.006, depth - 2 * (wall + stain), inside), at=(x, 0, wall))
+        box(col, name + "_CellWallCut", M(colour), (0.006, depth - 2 * (wall + stain), 0.001), at=(x, 0, wall + inside))
     w, h = width * 0.6, height * 0.35
     x, z = -width * 0.08, height * 0.2
     torn = [(-0.5, 0), (0.2, 0), (0.32, 0.18), (0.22, 0.38), (0.42, 0.6), (0.3, 0.8), (0.5, 1.0), (-0.5, 1.0)]
@@ -897,25 +925,33 @@ PLATE = (0.13, 0.12)  # a plate's width and height, without its lug
 
 
 def battery_plates(col, worn=False):
-    """A cell's plates: lead grids standing in a row, the positive and negative ones joined by a
-    strap and lug each. Worn plates are buckled and crusted white with sulphate."""
+    """A cell's plates: grey pasted lead in a cast grid, standing in a row, the positive and negative
+    ones joined by a strap and lug each. Worn plates are blackened and buckled, crusted white with
+    sulphate, and blue-green where the acid ate at them and their straps."""
     width, height = PLATE
     count, pitch = 7, 0.014
     rng = random.Random(3)
+    grid = M("plate" if worn else "lead")
     for i in range(count):
-        plate = [box(col, "Plates_Plate", M("plate"), (width, 0.005, height))]
+        plate = [box(col, "Plates_Plate", M("plateworn" if worn else "plate"), (width, 0.005, height))]
         for k in range(1, 4):
-            plate.append(box(col, "Plates_Rib", M("lead"), (width - 0.01, 0.002, 0.004), at=(0, -0.0035, k * height / 4)))
+            plate.append(box(col, "Plates_Rib", grid, (width - 0.01, 0.002, 0.004), at=(0, -0.0035, k * height / 4)))
+        for k in range(1, 5):
+            plate.append(box(col, "Plates_Rib", grid, (0.004, 0.002, height - 0.01), at=(-width / 2 + k * width / 5, -0.0035, 0.005)))
         if worn:
-            for _ in range(3):
-                plate.append(box(col, "Plates_Crust", M("sulphate"), (rng.uniform(0.02, 0.06), 0.008, rng.uniform(0.015, 0.04)),
-                                 at=(rng.uniform(-0.04, 0.04), 0, rng.uniform(0.01, 0.07)), bevel=0.003))
+            for crust in ("sulphate", "sulphate", "corrosion", "corrosion"):
+                plate.append(box(col, "Plates_Crust", M(crust), (rng.uniform(0.02, 0.05), 0.008, rng.uniform(0.015, 0.035)),
+                                 at=(rng.uniform(-0.045, 0.045), 0, rng.uniform(0.01, 0.08)), bevel=0.003))
         group(col, "Plates_Set", plate, at=(0, (i - (count - 1) / 2) * pitch, 0),
               rotate=(rng.uniform(-7, 7) if worn else 0, 0, rng.uniform(-3, 3) if worn else 0))
     span = count * pitch
     for sign in (-1, 1):
         box(col, "Plates_Strap", M("lead"), (0.025, span, 0.012), at=(sign * 0.04, 0, height), bevel=0.003)
         box(col, "Plates_Lug", M("lead"), (0.018, 0.018, 0.03), at=(sign * 0.04, 0, height + 0.012), bevel=0.003)
+        if worn:
+            box(col, "Plates_StrapCrust", M("corrosion"), (0.03, span * 0.45, 0.006), at=(sign * 0.04, sign * span * 0.2, height + 0.009),
+                bevel=0.003)
+            box(col, "Plates_LugCrust", M("corrosion"), (0.022, 0.022, 0.012), at=(sign * 0.04, 0, height + 0.03), bevel=0.004)
 
 
 def plate_pattern(col):

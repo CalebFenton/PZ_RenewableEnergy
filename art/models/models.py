@@ -141,10 +141,19 @@ def unwrap(obj):
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
+# A bake takes each texel's colour from one point at its centre, so a line thinner than a texel,
+# like the gap between two solar cells, shows or vanishes by where it happens to fall. The colour
+# is baked this many times finer each way and averaged down, so every such line shows alike.
+SUPERSAMPLE = 4
+
+
 def bake(obj, kind, size, colorspace, source=None):
     """Bakes every material of `obj` into one new image and returns its pixels. With `source`, the
-    colour comes from the nearest surface of that more detailed copy, decals included."""
-    image = bpy.data.images.new("bake_" + kind, size, size, alpha=False)
+    colour comes from the nearest surface of that more detailed copy, decals included, as paint:
+    a metal's diffuse colour is its base colour less its metallic share, nearly black for bare
+    metal, and the game has no reflections to give the rest back."""
+    fine = size * SUPERSAMPLE if source else size
+    image = bpy.data.images.new("bake_" + kind, fine, fine, alpha=False)
     image.colorspace_settings.name = colorspace
     added = []
     for mat in obj.data.materials:
@@ -158,20 +167,34 @@ def bake(obj, kind, size, colorspace, source=None):
     if kind == "AO":
         bpy.ops.object.bake(type="AO", margin=4)
     else:
+        metallic = [mat.node_tree.nodes["Principled BSDF"].inputs["Metallic"] for mat in source.data.materials
+                    if "Principled BSDF" in mat.node_tree.nodes]
+        kept = [socket.default_value for socket in metallic]
+        for socket in metallic:
+            socket.default_value = 0.0
+        # A colour has no noise to average out: one sample a fine texel is enough.
+        samples = bpy.context.scene.cycles.samples
+        bpy.context.scene.cycles.samples = 1
         source.select_set(True)
-        bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, margin=4, use_selected_to_active=True,
+        bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, margin=4 * SUPERSAMPLE, use_selected_to_active=True,
                             cage_extrusion=0.004, max_ray_distance=0.01)
+        bpy.context.scene.cycles.samples = samples
+        for socket, value in zip(metallic, kept):
+            socket.default_value = value
     for mat, node in added:
         mat.node_tree.nodes.remove(node)
-    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(size, size, 4)
+    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(fine, fine, 4)
     bpy.data.images.remove(image)
-    return pixels
+    step = fine // size
+    return pixels.reshape(size, step, size, step, 4).mean(axis=(1, 3))
 
 
 def bake_emit(obj, size, shader):
     """Bakes what `shader(nodes, links)` returns, a vector socket, into a float image over every face
-    of `obj`, and returns its pixels."""
-    image = bpy.data.images.new("bake_emit", size, size, alpha=False, float_buffer=True)
+    of `obj`, and returns its pixels: supersampled like the colour, so thin parts such as fins catch
+    the light alike, the scene's samples shared among the fine texels."""
+    fine = size * SUPERSAMPLE
+    image = bpy.data.images.new("bake_emit", fine, fine, alpha=False, float_buffer=True)
     image.colorspace_settings.name = "Non-Color"
     mat = bpy.data.materials.new("BakeEmit")
     mat.use_nodes = True
@@ -189,13 +212,16 @@ def bake_emit(obj, size, shader):
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.bake(type="EMIT", margin=4)
+    samples = bpy.context.scene.cycles.samples
+    bpy.context.scene.cycles.samples = max(1, samples // SUPERSAMPLE ** 2)
+    bpy.ops.object.bake(type="EMIT", margin=4 * SUPERSAMPLE)
+    bpy.context.scene.cycles.samples = samples
     for i, original in enumerate(kept):
         obj.data.materials[i] = original
     bpy.data.materials.remove(mat)
-    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(size, size, 4)[..., :3]
+    pixels = np.array(image.pixels[:], dtype=np.float32).reshape(fine, fine, 4)[..., :3]
     bpy.data.images.remove(image)
-    return pixels
+    return pixels.reshape(size, SUPERSAMPLE, size, SUPERSAMPLE, 3).mean(axis=(1, 3))
 
 
 def baked_normal(obj, size, bevel=None):

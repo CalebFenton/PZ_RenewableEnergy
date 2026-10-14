@@ -7,6 +7,7 @@ game's north, because the game's y axis points south).
 """
 import math
 import os
+import random
 
 import bmesh
 import bpy
@@ -33,11 +34,19 @@ def _principled(material):
 
 _MATERIALS = {}
 
+# Wood grain, by kind: the size across the grain of the figure the grain lines follow (metres),
+# how many times longer it runs along the grain, and how many lines cross one figure. Boards are
+# sawn, so their grain runs in long straight streaks; plywood's face is a veneer peeled off the
+# log, its figure broad and wavy.
+GRAIN = {"board": (0.08, 12.0, 3.0), "veneer": (0.09, 4.0, 3.0)}
+GRAIN_LINE, GRAIN_EARLY = 0.5, 1.1  # a grain line's shade, and the pale wood between lines
 
-def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None):
+
+def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None):
     """A painted, plastic or metal surface. `grime` darkens it in blotches, so flat colours don't
     look like a render. `speckle` = (colour, amount) scatters fine flakes of a second colour, the
-    way multicrystalline cells sparkle. `emission` makes it glow, for lit LEDs."""
+    way multicrystalline cells sparkle. `emission` makes it glow, for lit LEDs. `grain`, a kind in
+    GRAIN, draws dark grain lines along each part's longest side, as `_object` laid them out."""
     key = name
     if key in _MATERIALS:
         return _MATERIALS[key]
@@ -79,6 +88,43 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         links.new(color_out, mix.inputs[6])
         mix.inputs[7].default_value = (*hex_rgb(speckle[0]), 1.0)
         color_out = mix.outputs[2]
+    if grain:
+        across, stretch, lines = GRAIN[grain]
+        attribute = nodes.new("ShaderNodeAttribute")
+        attribute.attribute_name = "grain"
+        along = nodes.new("ShaderNodeVectorMath")
+        along.operation = "MULTIPLY"
+        along.inputs[1].default_value = (1 / stretch, 1, 1)
+        links.new(attribute.outputs["Vector"], along.inputs[0])
+        figure = nodes.new("ShaderNodeTexNoise")
+        figure.inputs["Scale"].default_value = 1 / across
+        figure.inputs["Detail"].default_value = 2.0
+        links.new(along.outputs[0], figure.inputs["Vector"])
+        # The figure's contour lines: up and down `lines` times over its range, a dark line at each
+        # low.
+        count = nodes.new("ShaderNodeMath")
+        count.operation = "MULTIPLY"
+        count.inputs[1].default_value = lines * 2
+        links.new(figure.outputs["Fac"], count.inputs[0])
+        wave = nodes.new("ShaderNodeMath")
+        wave.operation = "PINGPONG"
+        wave.inputs[1].default_value = 1.0
+        links.new(count.outputs[0], wave.inputs[0])
+        shade = nodes.new("ShaderNodeValToRGB")
+        shade.color_ramp.elements[0].position = 0.0
+        shade.color_ramp.elements[0].color = (GRAIN_LINE, GRAIN_LINE, GRAIN_LINE, 1)
+        shade.color_ramp.elements[1].position = 0.3
+        shade.color_ramp.elements[1].color = (1, 1, 1, 1)
+        early = shade.color_ramp.elements.new(1.0)
+        early.color = (GRAIN_EARLY, GRAIN_EARLY, GRAIN_EARLY, 1)
+        links.new(wave.outputs[0], shade.inputs["Fac"])
+        streaked = nodes.new("ShaderNodeMix")
+        streaked.data_type = "RGBA"
+        streaked.blend_type = "MULTIPLY"
+        streaked.inputs["Factor"].default_value = 1.0
+        links.new(color_out, streaked.inputs[6])
+        links.new(shade.outputs["Color"], streaked.inputs[7])
+        color_out = streaked.outputs[2]
     links.new(color_out, bsdf.inputs["Base Color"])
     if emission:
         bsdf.inputs["Emission Color"].default_value = (*hex_rgb(emission), 1.0)
@@ -104,9 +150,22 @@ def holdout():
 # Meshes -------------------------------------------------------------------------------------------
 
 
+# Each mesh carries its own wood grain coordinates (attribute "grain"): its vertices' positions
+# turned so its longest side runs along X, where a grain material stretches its figure, and moved by
+# an offset of its own, so boards side by side don't match. They stay in the part's frame through
+# models.py's merge, so the grain follows each board however it is placed.
+_grain_offsets = random.Random(0)
+
+
 def _object(name, bm, mat, collection):
     mesh = bpy.data.meshes.new(name)
     bm.normal_update()
+    extent = [max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts) for i in range(3)]
+    axes = sorted(range(3), key=lambda i: -extent[i])
+    offset = Vector([_grain_offsets.uniform(-20, 20) for _ in range(3)])
+    layer = bm.verts.layers.float_vector.new("grain")
+    for v in bm.verts:
+        v[layer] = Vector([v.co[i] for i in axes]) + offset
     bm.to_mesh(mesh)
     bm.free()
     mesh.materials.append(mat)
@@ -234,7 +293,9 @@ def group(collection, name, objects, at=(0, 0, 0), rotate=None):
 
 
 def clear(stage):
-    """Takes every object off the stage, and the meshes nothing uses any more."""
+    """Takes every object off the stage, and the meshes nothing uses any more, and starts the grain
+    offsets over, so a build's parts get the same grain whatever was built before it."""
+    _grain_offsets.seed(0)
     for obj in list(stage.objects):
         bpy.data.objects.remove(obj)
     for mesh in list(bpy.data.meshes):
