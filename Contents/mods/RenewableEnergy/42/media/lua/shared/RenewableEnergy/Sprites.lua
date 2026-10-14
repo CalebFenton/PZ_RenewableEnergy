@@ -77,16 +77,26 @@ Sprites.cracks = {
     },
 }
 
--- Each bank tile's overlays: `batteries[n]` shows n batteries in it, `meter[level]` its charge
--- meter lit from 1 (empty) to the last level (full).
+-- Each bank tile's overlays: `batteries[look][n]` shows a battery of that look in slot n, linked
+-- to the one before it, and `meter[level]` its charge meter lit from 1 (empty) to the last level
+-- (full). A bank draws one battery overlay per battery it holds, in slot order, then its meter.
 Sprites.bankFill = {
-    batteryBoxWood = { batteries = tiles(36, 2), meter = tiles(48, 5) },
-    batteryBoxMetal = { batteries = tiles(38, 2), meter = tiles(53, 5) },
-    batteryRackWood = { batteries = tiles(73, 6), meter = tiles(58, 5) },
-    batteryRackMetal = { batteries = tiles(79, 8), meter = tiles(63, 5) },
-    batteryBankWood = { batteries = tiles(87, 12), meter = tiles(68, 5) },
-    batteryBankMetal = { batteries = tiles(99, 16), meter = tiles(40, 5) },
+    batteryBoxWood = { batteries = { car = tiles(36, 2), deepCycle = tiles(136, 2), l16 = tiles(182, 2) },
+        meter = tiles(48, 5) },
+    batteryBoxMetal = { batteries = { car = tiles(38, 2), deepCycle = tiles(138, 2), l16 = tiles(184, 2) },
+        meter = tiles(53, 5) },
+    batteryRackWood = { batteries = { car = tiles(73, 6), deepCycle = tiles(140, 6), l16 = tiles(186, 6) },
+        meter = tiles(58, 5) },
+    batteryRackMetal = { batteries = { car = tiles(79, 8), deepCycle = tiles(146, 8), l16 = tiles(192, 8) },
+        meter = tiles(63, 5) },
+    batteryBankWood = { batteries = { car = tiles(87, 12), deepCycle = tiles(154, 12), l16 = tiles(200, 12) },
+        meter = tiles(68, 5) },
+    batteryBankMetal = { batteries = { car = tiles(99, 16), deepCycle = tiles(166, 16), l16 = tiles(212, 16) },
+        meter = tiles(40, 5) },
 }
+-- The look a battery's overlay draws it with, by item type: any other battery is drawn as a car
+-- battery.
+local BATTERY_LOOKS = { ["RenewableEnergy.DeepCycleBattery"] = "deepCycle", ["RenewableEnergy.L16Battery"] = "l16" }
 -- The charge fraction each meter level starts below.
 local METER_LIMITS = { 0.10, 0.35, 0.65, 0.95 }
 
@@ -137,7 +147,9 @@ for _, set in ipairs({ SNOW, CRACKS }) do
 end
 addAll(OVERLAYS, Sprites.crateOverlays)
 for _, fill in pairs(Sprites.bankFill) do
-    addAll(OVERLAYS, fill.batteries)
+    for _, slots in pairs(fill.batteries) do
+        addAll(OVERLAYS, slots)
+    end
     addAll(OVERLAYS, fill.meter)
 end
 
@@ -218,21 +230,31 @@ function Sprites.meterLevel(chargeFraction)
     return #METER_LIMITS + 1
 end
 
---- The overlays a bank's tile shows for its batteries and charge, in drawing order. A bank
---- without batteries shows none: its meter has nothing to read.
+--- The look a battery's overlay draws it with: "car", "deepCycle" or "l16" (Sprites.bankFill).
+---@param fullType string the battery's item type
+---@return string
+function Sprites.batteryLook(fullType)
+    return BATTERY_LOOKS[fullType] or "car"
+end
+
+--- The overlays a bank's tile shows for its batteries and charge, in drawing order: each battery
+--- in its slot, as many as the tile has slots, then the meter. A bank without batteries shows
+--- none: its meter has nothing to read.
 ---@param bankSpriteField string the bank's Sprites field, such as "batteryRackWood"
----@param batteries integer how many batteries it holds
+---@param batteryTypes string[] the item types of the batteries it holds, in slot order
 ---@param chargeFraction number stored over capacity, 0 to 1
 ---@return string[]
-function Sprites.bankOverlays(bankSpriteField, batteries, chargeFraction)
+function Sprites.bankOverlays(bankSpriteField, batteryTypes, chargeFraction)
     local fill = Sprites.bankFill[bankSpriteField]
-    if not fill or batteries <= 0 then
+    if not fill or #batteryTypes == 0 then
         return {}
     end
-    return {
-        fill.batteries[math.min(batteries, #fill.batteries)],
-        fill.meter[Sprites.meterLevel(chargeFraction)],
-    }
+    local shown = {}
+    for slot = 1, math.min(#batteryTypes, #fill.batteries.car) do
+        shown[slot] = fill.batteries[Sprites.batteryLook(batteryTypes[slot])][slot]
+    end
+    table.insert(shown, fill.meter[Sprites.meterLevel(chargeFraction)])
+    return shown
 end
 
 return Sprites

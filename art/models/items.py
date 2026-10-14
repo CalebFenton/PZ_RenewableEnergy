@@ -68,10 +68,12 @@ def M(name):
         "pine": lambda: material("RE_Pine", "#c39b62", roughness=0.8, grime=0.2, scale=9, grain="board"),
         "pinedark": lambda: material("RE_PineDark", "#9a7041", roughness=0.8, grime=0.2, scale=9, grain="board"),
         # Bare mild steel, as pale as the game's own sheet metal, with darker weld beads at its joints.
-        # Rusty steel, flecked brown, is scrap welded up at home.
+        # Rusty steel, flecked brown, is scrap welded up at home. Worn steel is bare steel rubbed
+        # bright, or showing through chipped paint.
         "rawsteel": lambda: material("RE_RawSteel", "#a9afb3", roughness=0.5, metallic=0.6, grime=0.35),
         "rustysteel": lambda: material("RE_RustySteel", "#a9afb3", roughness=0.6, metallic=0.5, grime=0.35, scale=6,
                                        speckle=("#93602f", 0.45)),
+        "worn": lambda: material("RE_WornSteel", "#d3d7da", roughness=0.35, metallic=0.8, grime=0.05),
         "weld": lambda: material("RE_Weld", "#3f3c39", roughness=0.75, metallic=0.5, grime=0.3),
         "rust": lambda: material("RE_Rust", "#7b4a2c", roughness=0.9, grime=0.3, scale=30),
         "copper": lambda: material("RE_Copper", "#c27a3e", roughness=0.35, metallic=0.85, grime=0.1),
@@ -361,18 +363,32 @@ def l16_battery(col):
             label=("L-16", 0.05), handle="sides", post_height=0.035)
 
 
-def bank_battery(col, name):
-    """The generic flooded battery the bank and box tiles show, whatever type is inside."""
-    battery(col, name, (0.18, 0.30, 0.24), "battery", "darkgrey", caps=(-0.03, 0.03), cap_colour="cream",
-            handle=None, post_height=0.02)
+# How a battery in a bank or box tile looks by its type, at the one size every slot fits: case, lid,
+# vent caps and the label on its end. A car battery is grey all over with the game's own car
+# battery's green label, a deep-cycle marine blue with a white lid, an L-16 maroon with a black lid,
+# so even a box, which hides all but their tops, tells them apart.
+BANK_BATTERY_LOOKS = {
+    "car": ("carbattery", "carbattery", "cream", "carlabel"),
+    "deepCycle": ("marine", "white", "white", "label"),
+    "l16": ("maroon", "battery", "black", "label"),
+}
+
+
+def bank_battery(col, name, look="car"):
+    """A flooded battery as the bank and box tiles show it, whatever its size, coloured as its type."""
+    case, lid, caps, label = BANK_BATTERY_LOOKS[look]
+    width, depth, height = 0.18, 0.30, 0.24
+    battery(col, name, (width, depth, height), case, lid, caps=(-0.03, 0.03), cap_colour=caps, handle=None, post_height=0.02)
+    box(col, name + "_Label", M(label), (width * 0.75, 0.002, height * 0.35), at=(0, -depth / 2 - 0.001, height * 0.3))
 
 
 # Battery storage ----------------------------------------------------------------------------------
 #
 # Each tier comes in pine and in welded steel, the same size on the floor. Every builder takes
-# `frame` (the storage itself), `batteries` (how many stand in it, filled from the bottom left)
+# `frame` (the storage itself), `batteries` (how many car batteries stand in it, filled from the
+# bottom left), `slot` and `look` (only the battery in that slot, as that BANK_BATTERY_LOOKS look)
 # and `meter_level` (how many of its charge meter's five LEDs are lit), so a tile can draw the
-# frame alone and an overlay just the batteries or just the lit LEDs.
+# frame alone and an overlay just one battery or just the lit LEDs.
 
 METER_COLOURS = ("ledred", "ledyellow", "ledgreen", "ledgreen", "ledgreen")
 
@@ -395,15 +411,16 @@ def charge_meter(col, at, frame, level, scale=1.0):
             at=(x + (i - 2) * pitch, front - 0.007, z + 0.049 * scale))
 
 
-def bank_batteries(col, name, slots, count):
-    """`count` batteries standing in `slots` = [(x, z), ...] in order, each linked in series to the
-    one before it on the same shelf, from that one's + post to its - post."""
+def bank_batteries(col, name, slots, count, slot=None, look="car"):
+    """`count` car batteries standing in `slots` = [(x, z), ...] in order, each linked in series to
+    the one before it on the same shelf, from that one's + post to its - post; or with `slot`, only
+    the battery in that slot, as `look`, and its link."""
     post_x, post_y = 0.055, -0.12
-    for i in range(count):
+    for i in range(count) if slot is None else (slot,):
         x, z = slots[i]
         battery_name = "%sBattery%d" % (name, i)
         before = set(col.objects)
-        bank_battery(col, battery_name)
+        bank_battery(col, battery_name, look)
         for obj in set(col.objects) - before:
             obj.location.x += x
             obj.location.z += z
@@ -419,7 +436,7 @@ BOARD = 0.019  # a pine 1 x 6's thickness
 SHEET = 0.004
 
 
-def battery_box(col, material, frame=True, batteries=0, meter_level=0):
+def battery_box(col, material, frame=True, batteries=0, meter_level=0, slot=None, look="car"):
     """The first bank: an open box for two batteries, its lid propped open against the back, a
     terminal block and leads on its side and a small charge meter on its front. Pine boards nailed
     together, or steel sheet welded at the corners with an angle-iron rim and side handles."""
@@ -438,7 +455,7 @@ def battery_box(col, material, frame=True, batteries=0, meter_level=0):
         text(col, "Box_Stencil", M("ink" if material == "wood" else "white"), "12V", 0.06,
              at=(-0.12, -depth / 2 - 0.0015, 0.06))
     charge_meter(col, (0.11, -depth / 2 - 0.02, 0.11), frame, meter_level, scale=0.5)
-    bank_batteries(col, "Box", [(-0.11, floor), (0.11, floor)], batteries)
+    bank_batteries(col, "Box", [(-0.11, floor), (0.11, floor)], batteries, slot, look)
 
 
 def _plank_box(col):
@@ -494,6 +511,11 @@ def _steel_box(col):
                  segments=8)
     box(col, "Box_Lid", M("rawsteel"), (width + 2 * rim, SHEET, depth + rim), at=(0, depth / 2 + rim, height),
         rotate=(-12, 0, 0))
+    # Batteries go in and out over the front, so the rim is rubbed bright there, and the damp of
+    # the floor has rusted the foot of the front in patches.
+    box(col, "Box_Wear", M("worn"), (width * 0.55, rim * 0.8, 0.0008), at=(0, -(depth + rim) / 2, height))
+    for x, w, h in ((-0.17, 0.06, 0.02), (0.04, 0.09, 0.014), (0.19, 0.05, 0.025)):
+        box(col, "Box_Rust", M("rust"), (w, 0.0008, h), at=(x, -depth / 2 - 0.0004, 0))
 
 
 SHELVING = (0.92, 0.44)
@@ -510,7 +532,7 @@ BANK_WOOD = {"height": 1.24, "shelves": (0.07, 0.47, 0.87), "slots": SLOTS_4, "n
 BANK_METAL = {"height": 1.24, "shelves": (0.05, 0.35, 0.65, 0.95), "slots": SLOTS_4, "neat": True}
 
 
-def battery_shelving(col, tier, material, frame=True, batteries=0, meter_level=0):
+def battery_shelving(col, tier, material, frame=True, batteries=0, meter_level=0, slot=None, look="car"):
     """A battery rack or bank: shelves of batteries in pine or angle iron, a fused disconnect and
     a charge meter on top. A neat one has a no-smoking sign on the front of its top, as battery
     rooms do."""
@@ -535,7 +557,7 @@ def battery_shelving(col, tier, material, frame=True, batteries=0, meter_level=0
             text(col, "Shelving_SignText", M("ink"), "NO SMOKING", 0.012, at=(0.1, front - 0.0025, height - 0.0225))
     charge_meter(col, (-0.18, -depth / 2 + 0.08, height), frame, meter_level)
     slots = [(x, z) for z in tier["shelves"] for x in tier["slots"]]
-    bank_batteries(col, "Shelving", slots, batteries)
+    bank_batteries(col, "Shelving", slots, batteries, slot, look)
 
 
 def _pine_shelving(col, height, shelves, neat):
@@ -577,10 +599,14 @@ def _pine_shelving(col, height, shelves, neat):
 def _steel_shelving(col, height, shelves, neat):
     """Angle-iron uprights, each shelf a steel sheet on angle-iron rails welded between them, a
     sheet on top, and flat bars crossed on the back. Neat, it is painted, the welds under the paint,
-    and stands on rubber feet; rough, it is scrap steel flecked with rust, rust at its welds."""
+    and stands on rubber feet, its paint chipped to bare steel where batteries and boots knock it;
+    rough, it is scrap steel flecked with rust, rust at its welds, rubbed bright where batteries
+    slide on and off."""
     width, depth = SHELVING
     angle, thick = 0.04, SHEET
     steel = M("bluegrey" if neat else "rustysteel")
+    rng = random.Random(len(shelves))
+    front = -depth / 2 - 0.0004
     for sx in (-1, 1):
         for sy in (-1, 1):
             box(col, "Shelving_Angle", steel, (angle, thick, height), at=(sx * (width - angle) / 2, sy * (depth - thick) / 2, 0))
@@ -590,6 +616,8 @@ def _steel_shelving(col, height, shelves, neat):
                          segments=12)
             else:
                 box(col, "Shelving_Foot", steel, (0.06, 0.06, 0.005), at=(sx * (width / 2 - 0.03), sy * (depth / 2 - 0.03), 0))
+        if neat:
+            box(col, "Shelving_Chip", M("worn"), (0.03, 0.0008, 0.035), at=(sx * (width / 2 - 0.02), front, 0.015))
     rail = width - 2 * angle
     for z in shelves + (height,):
         box(col, "Shelving_Sheet", steel, (width - 2 * thick, depth - 2 * thick, thick), at=(0, 0, z - thick))
@@ -599,6 +627,12 @@ def _steel_shelving(col, height, shelves, neat):
                 for sx in (-1, 1):
                     box(col, "Shelving_Weld", M("rust"), (0.012, 0.008, 0.035),
                         at=(sx * rail / 2, sy * (depth / 2 + 0.002), max(0.0, z - 0.035)))
+        for _ in range(2):
+            if neat:
+                box(col, "Shelving_Chip", M("worn"), (rng.uniform(0.015, 0.035), 0.0008, rng.uniform(0.008, 0.016)),
+                    at=(rng.uniform(-0.38, 0.38), front, z - 0.018))
+            else:
+                box(col, "Shelving_Wear", M("worn"), (rng.uniform(0.08, 0.13), 0.0008, 0.008), at=(rng.uniform(-0.3, 0.3), front, z - 0.009))
     back = depth / 2 + 0.004
     for sx in (-1, 1):
         beam(col, "Shelving_Brace", steel, (sx * (width / 2 - 0.03), back, 0.06), (-sx * (width / 2 - 0.03), back, height - 0.06),
@@ -637,6 +671,16 @@ def outlet(col, name, at, scale=1.0, turn=0):
     return group(col, name, parts, at=at, rotate=(0, 0, turn))
 
 
+def sticker(col, name, band, size, at, rotate=None):
+    """A maker's rating sticker, as most of the game's own electronics carry: white with a coloured
+    band along its top edge. `size` = (width, height), standing and facing -Y before `rotate`, its
+    bottom centre at `at` on the face it is stuck to."""
+    width, height = size
+    parts = [box(col, name, M("label"), (width, 0.0008, height), at=(0, -0.0004, 0)),
+             box(col, name + "Band", M(band), (width, 0.0008, height * 0.3), at=(0, -0.0008, height * 0.7))]
+    return group(col, name + "_At", parts, at=at, rotate=rotate)
+
+
 def plug_in_inverter(col):
     """A 140 W inverter for a cigarette lighter socket: an aluminium extrusion, one outlet, a cord."""
     box(col, "PlugInv_Body", M("aluminium"), (0.14, 0.075, 0.045), bevel=0.006)
@@ -648,11 +692,12 @@ def plug_in_inverter(col):
                                            (0.12, 0.1, 0.005), (0.06, 0.09, 0.005)], 0.0035)
     cylinder(col, "PlugInv_Plug", M("black"), 0.011, 0.05, at=(0.06, 0.09, 0.011), rotate=(0, -90, 0), segments=10)
     box(col, "PlugInv_Led", M("ledgreen"), (0.006, 0.003, 0.006), at=(-0.04, -0.039, 0.02))
+    sticker(col, "PlugInv_Sticker", "red", (0.045, 0.022), (0.03, -0.0375, 0.012))
 
 
 def power_inverter(col):
-    """A 600 W inverter: a charcoal steel case with black louvres on top, and on a brushed
-    aluminium faceplate two outlets, a switch and a light."""
+    """A 600 W inverter: a charcoal steel case with black louvres and a rating sticker on top, and
+    on a brushed aluminium faceplate two outlets, a switch and a light."""
     width, depth, height = 0.3, 0.18, 0.075
     box(col, "Inv600_Case", M("darkgrey"), (width, depth, height), bevel=0.006)
     fins(col, "Inv600_Louvre", M("black"), width * 0.6, depth * 0.6, height, 9, height=0.002)
@@ -662,6 +707,7 @@ def power_inverter(col):
     box(col, "Inv600_Switch", M("red"), (0.02, 0.008, 0.025), at=(0.05, -depth / 2 - 0.004, 0.025), bevel=0.003)
     box(col, "Inv600_Led", M("ledgreen"), (0.008, 0.004, 0.008), at=(0.09, -depth / 2 - 0.003, 0.04))
     text(col, "Inv600_Text", M("ink"), "600W", 0.02, at=(0.09, -depth / 2 - 0.004, 0.015))
+    sticker(col, "Inv600_Sticker", "red", (0.045, 0.06), (0.12, -0.03, height), rotate=(-90, 0, 0))
     for sign, colour in ((1, "red"), (-1, "black")):
         cylinder(col, "Inv600_Terminal", M(colour), 0.012, 0.02, at=(sign * 0.05, depth / 2 + 0.01, 0.025),
                  rotate=(90, 0, 0), segments=10)
@@ -669,7 +715,7 @@ def power_inverter(col):
 
 def inverter_charger(col):
     """A 2,500 W inverter/charger: a heavy blue-grey cabinet with a black control panel, heat-sink
-    fins on top, carrying handles and big terminal covers."""
+    fins on top, carrying handles, big terminal covers and a rating sticker on its side."""
     width, depth, height = 0.52, 0.28, 0.22
     box(col, "InvChg_Case", M("bluegrey"), (width, depth, height), bevel=0.01)
     fins(col, "InvChg_Fin", M("aluminium"), width * 0.9, depth * 0.9, height, 16, height=0.025)
@@ -684,10 +730,12 @@ def inverter_charger(col):
                                                     (sign * (width / 2 + 0.035), 0.05, 0.16), (sign * (width / 2), 0.06, 0.16)], 0.008)
     for x, colour in ((0.12, "red"), (0.2, "black")):
         box(col, "InvChg_TermCover", M(colour), (0.06, 0.05, 0.05), at=(x, depth / 2 + 0.02, 0.02), bevel=0.01)
+    sticker(col, "InvChg_Sticker", "navy", (0.1, 0.06), (width / 2, 0.03, 0.04), rotate=(0, 0, 90))
 
 
 def charge_controller(col):
-    """A 30 A charge controller: a navy anodised box with fins, three LEDs and a terminal strip."""
+    """A 30 A charge controller: a navy anodised box with fins and a rating sticker on top, three
+    LEDs and a terminal strip."""
     width, depth, height = 0.19, 0.13, 0.055
     box(col, "Ctrl_Case", M("navy"), (width, depth, height), bevel=0.005)
     fins(col, "Ctrl_Fin", M("aluminium"), width * 0.55, depth, height, 6, height=0.012)
@@ -697,10 +745,12 @@ def charge_controller(col):
     for i in range(6):
         cylinder(col, "Ctrl_Screw", M("lead"), 0.005, 0.004, at=(-0.065 + i * 0.026, depth / 2 + 0.012, 0.02), segments=8)
     text(col, "Ctrl_Text", M("white"), "30A", 0.02, at=(0.05, -depth / 2 - 0.002, 0.018))
+    sticker(col, "Ctrl_Sticker", "red", (0.03, 0.07), (-0.074, -0.035, height), rotate=(-90, 0, 0))
 
 
 def solar_failsafe(col, cable=True):
-    """A generator auto-start relay box: grey enclosure, warning label, LED, a control cable."""
+    """A generator auto-start relay box: grey enclosure, its lid screwed down at the corners, a
+    warning label, LED, and a control cable out through a gland in its side."""
     width, depth, height = 0.18, 0.1, 0.14
     box(col, "Failsafe_Case", M("grey"), (width, depth, height), bevel=0.008)
     box(col, "Failsafe_Lid", M("darkgrey"), (width + 0.006, depth + 0.006, 0.012), at=(0, 0, height - 0.012), bevel=0.004)
@@ -708,8 +758,17 @@ def solar_failsafe(col, cable=True):
     text(col, "Failsafe_Text", M("ink"), "AUTO START", 0.0135, at=(0, -depth / 2 - 0.0025, 0.068))
     box(col, "Failsafe_Led", M("ledgreen"), (0.012, 0.004, 0.012), at=(0.06, -depth / 2 - 0.002, 0.1))
     box(col, "Failsafe_Switch", M("black"), (0.02, 0.006, 0.02), at=(-0.06, -depth / 2 - 0.002, 0.095))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            cylinder(col, "Failsafe_Screw", M("lead"), 0.005, 0.002, at=(sx * (width / 2 - 0.014), sy * (depth / 2 - 0.014), height),
+                     segments=8)
+    # The gland: a hex nut against the side and a domed cap the cable comes out of.
+    gland_y, gland_z = 0.02, 0.04
+    cylinder(col, "Failsafe_GlandNut", M("darkgrey"), 0.014, 0.006, at=(width / 2, gland_y, gland_z), rotate=(0, 90, 0), segments=6)
+    cylinder(col, "Failsafe_Gland", M("darkgrey"), 0.011, 0.016, at=(width / 2 + 0.006, gland_y, gland_z), rotate=(0, 90, 0),
+             segments=12, radius_top=0.008)
     if cable:
-        tube(col, "Failsafe_Cable", M("black"), [(width / 2, 0.02, 0.04), (width / 2 + 0.06, 0.03, 0.006),
+        tube(col, "Failsafe_Cable", M("black"), [(width / 2 + 0.02, gland_y, gland_z), (width / 2 + 0.06, 0.03, 0.006),
                                                  (width / 2 + 0.16, 0.1, 0.006), (width / 2 + 0.2, 0.22, 0.006)], 0.007)
 
 
@@ -1062,12 +1121,15 @@ TRAILER_HITCH_Y = 1.4
 def arrow_board_trailer(col):
     """A solar arrow board trailer of the late 1980s, set for the road: a steel deck on one axle in
     highway orange, the lamp board folded down flat over the back on its mast, two modules on a
-    frame over the front, and a padlocked battery box on the tongue."""
+    frame over the front, and a padlocked battery box on the tongue. Red and white reflective tape
+    runs along its sides and back, reflectors mark its corners, amber at the front and red at the
+    back, and it carries the county's name and a Kentucky plate."""
     width, length = TRAILER_DECK
     front, rear = TRAILER_DECK_Y + length / 2, TRAILER_DECK_Y - length / 2
     axle_y, axle_z = TRAILER_AXLE
     paint = M("safety")
     for sign in (-1, 1):
+        side = sign * (width / 2 + 0.0008)
         box(col, "Trailer_Rail", paint, (0.05, length, 0.13), at=(sign * (width / 2 - 0.025), TRAILER_DECK_Y, -0.13), bevel=0.005)
         box(col, "Trailer_Spring", M("darkgrey"), (0.05, 0.6, 0.04), at=(sign * (width / 2 - 0.025), axle_y, axle_z - 0.02))
         # A fender over each wheel, outside the rails.
@@ -1075,24 +1137,61 @@ def arrow_board_trailer(col):
         for y in (axle_y - 0.32, axle_y + 0.32):
             box(col, "Trailer_FenderSkirt", M("black"), (0.24, 0.025, 0.17), at=(sign * 0.69, y, -0.05))
         box(col, "Trailer_TailLight", M("red"), (0.1, 0.02, 0.05), at=(sign * (width / 2 - 0.08), rear - 0.01, -0.1), bevel=0.005)
-        box(col, "Trailer_Reflector", M("amberlamp"), (0.004, 0.06, 0.03), at=(sign * (width / 2 + 0.002), front - 0.1, -0.09))
+        for y, name, colour in ((front - 0.1, "Trailer_Reflector", "amberlamp"), (rear + 0.1, "Trailer_ReflectorRear", "red")):
+            box(col, name, M(colour), (0.004, 0.06, 0.03), at=(side + sign * 0.0012, y, -0.09))
+        # The tape in two runs, ahead of and behind the wheel.
+        for start, end in ((rear + 0.03, axle_y - 0.37), (axle_y + 0.37, front - 0.03)):
+            _tape(col, "Trailer_Tape", start, end, lambda at, w: ((0.0016, w, 0.022), (side, at, -0.122)))
+        text(col, "Trailer_Stencil", M("ink"), "KNOX CO", 0.045, at=(side + sign * 0.0006, (rear + axle_y - 0.37) / 2 + 0.05, -0.085),
+             rotate=(90, 0, 90 * sign))
+    _tape(col, "Trailer_TapeRear", -0.42, 0.42, lambda at, w: ((w, 0.0016, 0.02), (at, rear - 0.0008, -0.045)))
     for y in (rear + 0.025, axle_y, front - 0.025):
         box(col, "Trailer_CrossMember", paint, (width - 0.1, 0.05, 0.1), at=(0, y, -0.12))
-    box(col, "Trailer_Deck", M("rawsteel"), (width, length, 0.012))
+    box(col, "Trailer_Deck", M("rawsteel"), (width, length, 0.012), at=(0, TRAILER_DECK_Y, 0))
     tube(col, "Trailer_Axle", M("darkgrey"), [(-0.62, axle_y, axle_z), (0.62, axle_y, axle_z)], 0.035, 8)
+    _trailer_plate(col, rear)
     _trailer_tongue(col, front)
     _trailer_battery_box(col)
     _arrow_board(col, rear)
     _trailer_modules(col, front)
+    # The lamps' cable from the battery box, along the deck to the mast and up it.
+    mast_back = rear + 0.175
+    tube(col, "Trailer_Cable", M("black"), [(-0.3, TRAILER_BOX_AT[0] - TRAILER_BOX[1] / 2, TRAILER_BOX_AT[1] + 0.06),
+                                            (-0.3, front - 0.02, 0.02), (-0.3, mast_back + 0.1, 0.02), (-0.03, mast_back, 0.02),
+                                            (-0.03, mast_back, 0.4)], 0.008)
+
+
+def _tape(col, name, start, end, piece):
+    """Reflective tape from `start` to `end` in alternating red and white pieces about 10 cm long;
+    `piece(centre, length)` gives each piece's size and where it goes."""
+    count = max(1, round((end - start) / 0.1))
+    length = (end - start) / count
+    for i in range(count):
+        size, at = piece(start + (i + 0.5) * length, length)
+        box(col, name, M("red" if i % 2 == 0 else "white"), size, at=at)
+
+
+def _trailer_plate(col, rear):
+    """A Kentucky plate of the day, its county along the bottom, on a bracket under the back."""
+    width, height, z = 0.3, 0.15, -0.28
+    box(col, "Trailer_PlateBracket", M("darkgrey"), (0.05, 0.03, 0.17), at=(0, rear + 0.015, z + 0.02))
+    box(col, "Trailer_Plate", M("white"), (width, 0.004, height), at=(0, rear - 0.002, z), bevel=0.004)
+    face = rear - 0.0045
+    for body, size, dz in (("KENTUCKY", 0.022, 0.118), ("RD 4417", 0.055, 0.045), ("KNOX", 0.02, 0.012)):
+        text(col, "Trailer_Stencil", M("navy"), body, size, at=(0, face, z + dz))
 
 
 def _trailer_tongue(col, front):
-    """The A-frame tongue from the deck's front corners to the coupler, and the jack stand."""
+    """The A-frame tongue from the deck's front corners to the coupler, its safety chains slung
+    from it, and the jack stand."""
+    hitch = TRAILER_HITCH_Y
     for sign in (-1, 1):
-        beam(col, "Trailer_Tongue", M("safety"), (sign * 0.5, front - 0.05, -0.09), (sign * 0.03, TRAILER_HITCH_Y - 0.1, -0.12),
+        beam(col, "Trailer_Tongue", M("safety"), (sign * 0.5, front - 0.05, -0.09), (sign * 0.03, hitch - 0.1, -0.12),
              (0.06, 0.07), bevel=0.005)
-    box(col, "Trailer_Coupler", M("darkgrey"), (0.1, 0.22, 0.08), at=(0, TRAILER_HITCH_Y - 0.12, -0.16), bevel=0.01)
-    cylinder(col, "Trailer_CouplerCap", M("darkgrey"), 0.05, 0.08, at=(0, TRAILER_HITCH_Y - 0.02, -0.16), segments=12)
+        tube(col, "Trailer_Chain", M("galvanised"), [(sign * 0.14, hitch - 0.35, -0.15), (sign * 0.12, hitch - 0.24, -0.28),
+                                                     (sign * 0.07, hitch - 0.11, -0.24), (sign * 0.05, hitch - 0.07, -0.18)], 0.007)
+    box(col, "Trailer_Coupler", M("darkgrey"), (0.1, 0.22, 0.08), at=(0, hitch - 0.12, -0.16), bevel=0.01)
+    cylinder(col, "Trailer_CouplerCap", M("darkgrey"), 0.05, 0.08, at=(0, hitch - 0.02, -0.16), segments=12)
     jack_x, jack_y = 0.33, front + 0.45
     cylinder(col, "Trailer_Jack", M("darkgrey"), 0.03, 0.55, at=(jack_x, jack_y, TRAILER_GROUND), segments=10)
     box(col, "Trailer_JackFoot", M("darkgrey"), (0.12, 0.12, 0.01), at=(jack_x, jack_y, TRAILER_GROUND))
@@ -1133,9 +1232,12 @@ def _trailer_battery_box(col):
 
 
 ARROW_BOARD = (1.5, 0.85, 0.09)
-# The board's 15 lamps, (across, along) from its centre: a shaft and a head pointing left.
-ARROW_LAMPS = ([(x, 0.0) for x in (0.62, 0.47, 0.32, 0.17, 0.02, -0.13, -0.28, -0.43, -0.6)]
-               + [(x, sign * y) for x, y in ((-0.46, 0.12), (-0.32, 0.24), (-0.18, 0.34)) for sign in (-1, 1)])
+# The board's 15 lamps on one grid, (across, along) from its centre: a shaft of nine across the
+# board and a head of three each side pointing left, each head lamp in a shaft lamp's column. The
+# outer head lamps clear the frame by a couple of centimetres.
+LAMP_PITCH = (0.15, 0.105)
+ARROW_LAMPS = ([(LAMP_PITCH[0] * (4 - i), 0.0) for i in range(9)]
+               + [(LAMP_PITCH[0] * (i - 4), sign * LAMP_PITCH[1] * i) for i in (1, 2, 3) for sign in (-1, 1)])
 
 
 def _arrow_board(col, rear):
@@ -1154,9 +1256,11 @@ def _arrow_board(col, rear):
             bevel=0.005)
         box(col, "Board_FrameShort", M("safety"), (0.04, depth - 0.08, thick + 0.01), at=(sign * (width - 0.04) / 2, centre_y, bottom),
             bevel=0.005)
+    # Each lamp a lens in a grey bezel, standing just proud of the frame: a hood standing up beside
+    # it would hide the lamp behind it from some sides and not from others.
     for x, y in ARROW_LAMPS:
-        cylinder(col, "Board_Lamp", M("amberlampdark"), 0.045, 0.015, at=(x, centre_y + y, top), segments=12)
-        box(col, "Board_Visor", M("black"), (0.1, 0.012, 0.05), at=(x, centre_y + y + 0.052, top))
+        cylinder(col, "Board_Bezel", M("darkgrey"), 0.052, 0.012, at=(x, centre_y + y, top), segments=16)
+        cylinder(col, "Board_Lamp", M("amberlampdark"), 0.045, 0.006, at=(x, centre_y + y, top + 0.012), segments=16)
 
 
 # The trailer's panels are vehicle parts the player can take off, each shown whole or cracked by

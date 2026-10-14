@@ -43,8 +43,16 @@ def _rack(material, facing, snow=False, cracks=None):
     return [layer(items.solar_rack, material=material, turn=turn)]
 
 
-def _overlay(build, **options):
-    return [layer(build, holdout=True), layer(build, frame=False, **options)]
+def _overlay(build, at, **options):
+    return [layer(build, holdout=True, at=at), layer(build, frame=False, at=at, **options)]
+
+
+def _battery_overlay(build, at, slot, look):
+    """The battery in `slot` (from 0) as `look`, and its link to the one before. A bank draws its
+    batteries' overlays in slot order, so this one keeps out from behind the storage and the
+    batteries in the slots before it, and draws over any in front of it."""
+    return [layer(build, holdout=True, at=at), layer(build, holdout=True, frame=False, batteries=slot, at=at),
+            layer(build, frame=False, slot=slot, look=look, at=at)]
 
 
 TILES = {
@@ -75,22 +83,30 @@ for material, first_wall, first_rack in (("metal", 116, 120), ("wood", 118, 128)
         for slot in (1, 2):
             TILES[first_rack + 2 * offset + slot - 1] = _rack(material, facing, cracks=slot)
 
-# Battery storage: the item type, its tile, its first battery overlay and its first meter
-# overlay. Overlay n of the batteries shows n of them, overlay n of the meter n LEDs lit.
+# Battery storage: the item type, its tile, the first battery overlay of each look in
+# items.BANK_BATTERY_LOOKS' order, and its first meter overlay. Battery overlay n of a look shows a
+# battery of that look in slot n; meter overlay n shows n LEDs lit. The car batteries' overlays
+# are the tiles that once showed n batteries of any type, which a save may still have on a bank.
 STORAGE_TILES = (
-    ("BatteryBoxWood", 8, 36, 48),
-    ("BatteryBoxMetal", 23, 38, 53),
-    ("BatteryRackWood", 32, 73, 58),
-    ("BatteryRackMetal", 33, 79, 63),
-    ("BatteryBankWood", 34, 87, 68),
-    ("BatteryBankMetal", 9, 99, 40),
+    ("BatteryBoxWood", 8, (36, 136, 182), 48),
+    ("BatteryBoxMetal", 23, (38, 138, 184), 53),
+    ("BatteryRackWood", 32, (73, 140, 186), 58),
+    ("BatteryRackMetal", 33, (79, 146, 192), 63),
+    ("BatteryBankWood", 34, (87, 154, 200), 68),
+    ("BatteryBankMetal", 9, (99, 166, 212), 40),
 )
 STORAGE_CAPACITY = {"BatteryBoxWood": 2, "BatteryBoxMetal": 2, "BatteryRackWood": 6, "BatteryRackMetal": 8,
                     "BatteryBankWood": 12, "BatteryBankMetal": 16}
-for item, base, first_battery, first_meter in STORAGE_TILES:
-    build = items.STORAGE[item]
-    TILES[base] = [layer(build)]
-    for count in range(1, STORAGE_CAPACITY[item] + 1):
-        TILES[first_battery + count - 1] = _overlay(build, batteries=count)
+# Storage stands at the back of its square, as the game's own shelves and cabinets do, so that
+# against a wall on the square's north edge it stands against the wall: this far north of the
+# centre, which leaves a box's propped lid and a rack's back brace just short of the edge.
+STORAGE_NORTH = {"BatteryBoxWood": 0.18, "BatteryBoxMetal": 0.18, "BatteryRackWood": 0.22, "BatteryRackMetal": 0.22,
+                 "BatteryBankWood": 0.22, "BatteryBankMetal": 0.22}
+for item, base, first_batteries, first_meter in STORAGE_TILES:
+    build, at = items.STORAGE[item], (0, STORAGE_NORTH[item], 0)
+    TILES[base] = [layer(build, at=at)]
+    for look, first_battery in zip(items.BANK_BATTERY_LOOKS, first_batteries):
+        for slot in range(STORAGE_CAPACITY[item]):
+            TILES[first_battery + slot] = _battery_overlay(build, at, slot, look)
     for level in range(1, 6):
-        TILES[first_meter + level - 1] = _overlay(build, meter_level=level)
+        TILES[first_meter + level - 1] = _overlay(build, at, meter_level=level)

@@ -53,13 +53,13 @@ local SITES = {
     { wallNorth = true, along = { 1, 0 }, out = { 0, 1 }, facing = "S" },
     { wallNorth = false, along = { 0, 1 }, out = { 1, 0 }, facing = "E" },
 }
--- The homestead. Banks stand indoors, so the bank is behind the wall the wall panels hang on, out
--- of the yard shots; the character stands beside it for a shot of its own. Outdoors, the character
+-- The homestead. Banks stand indoors, so the bank is in the room behind the wall the wall panels
+-- hang on (`inside` is the square behind it), out of the yard shots, against the room's north wall
+-- with the character off to its side for a shot of its own (bankPlace). Outdoors, the character
 -- stands beside the last wall panel, where nothing is behind them, and the backup generator is
 -- within a failsafe's reach of the bank.
 local HOMESTEAD = {
-    bank = { 0, -1 },
-    indoors = { 1, -1 },
+    inside = { 0, -1 },
     generator = { -1, 1 },
     wallPanels = { { 0, 0, "wood" }, { 1, 0, "wood" }, { 2, 0, "metal" } },
     player = { 3, 1 },
@@ -163,7 +163,9 @@ local WALK = {
         { -1, 1, bulb = "Base.LightBulb" }, { 1, 1, bulb = "Base.LightBulbBlue" },
         { -1, 3, bulb = "Base.LightBulbRed" }, { 1, 3, bulb = "Base.LightBulbGreen" },
     },
-    player = { 0, 0 },
+    -- On the walk between the far pair of lights, clear of the door: a square nearer it would
+    -- stand straight in front of a near light.
+    player = { 0, 3 },
     scout = { 0, 4 },
     -- Late enough for the sky to be dark in any season.
     hour = 23,
@@ -491,6 +493,115 @@ local function isFreeIndoorsAt(site, origin, position)
     return RenewableEnergy.Debug.isFreeSquare(siteSquare(site, origin, position[1], position[2]), true)
 end
 
+-- North from `square` through its room to the room's north wall: a bank faces south, so it stands
+-- there with its back to the wall. Nil outside a room.
+local function againstNorthWall(square)
+    local room = square and square:getRoom()
+    while square and room and square:getRoom() == room do
+        if square:getWall(true) then
+            return square
+        end
+        square = getCell():getGridSquare(square:getX(), square:getY() - 1, square:getZ())
+    end
+    return nil
+end
+
+local function hasOpening(square)
+    return square:getDoorOrWindow(true) ~= nil or square:getDoorOrWindow(false) ~= nil
+end
+
+-- Where along the panels' wall the bank's column may be, nearest the panels first.
+local ALONG_PANELS = { 0, -1, 1, -2, 2 }
+-- The character's square from the bank's, (east, south), the first that fits: in front of it and
+-- far enough off to one side that the character hides none of it.
+local BESIDE_BANK = { { 0, 2 }, { -2, 1 }, { 2, 1 } }
+
+-- The squares of the bank shot: from the bank to the character and a square either side.
+local function eachShotSquare(bank, player, fn)
+    for y = bank:getY(), player:getY() + 1 do
+        for x = math.min(bank:getX(), player:getX()) - 1, math.max(bank:getX(), player:getX()) + 1 do
+            fn(getCell():getGridSquare(x, y, bank:getZ()))
+        end
+    end
+end
+
+-- Whether `square` is in `room` with more of it to the east: the game draws a room's east wall
+-- faded over whatever stands beside it rather than cutting it away.
+local function isClearOfEastWall(square, room)
+    local east = getCell():getGridSquare(square:getX() + 1, square:getY(), square:getZ())
+    return square:getRoom() == room and east ~= nil and east:getRoom() == room
+end
+
+-- Whether the character may stand there for the bank shot: in the bank's room with only the room
+-- between them, at no door or window, clear of the east wall.
+local function isBesideBank(bank, player)
+    local room = bank:getRoom()
+    if hasOpening(player) or not isClearOfEastWall(player, room) then
+        return false
+    end
+    for y = bank:getY(), player:getY() do
+        for x = math.min(bank:getX(), player:getX()), math.max(bank:getX(), player:getX()) do
+            local square = getCell():getGridSquare(x, y, bank:getZ())
+            if not (square and square:getRoom() == room) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- The homestead bank's square and the character's. The panels' wall faces south, so the bank
+-- stands across the room from it, against the north wall, facing it, at no door or window and clear
+-- of the east wall. Nil if the room has no such place.
+local function bankPlace(site, origin)
+    if site.facing ~= "S" then return nil end
+    for _, along in ipairs(ALONG_PANELS) do
+        local bank = againstNorthWall(siteSquare(site, origin, HOMESTEAD.inside[1] + along, HOMESTEAD.inside[2]))
+        if bank and RenewableEnergy.PowerBank.canPlaceBank(bank) and not hasOpening(bank)
+            and isClearOfEastWall(bank, bank:getRoom()) then
+            for _, offset in ipairs(BESIDE_BANK) do
+                local player = getCell():getGridSquare(bank:getX() + offset[1], bank:getY() + offset[2], bank:getZ())
+                if player and isBesideBank(bank, player) then
+                    return bank, player
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Sets the room in the bank shot: takes the furniture, and anything else standing on the floor,
+-- off it, so that nothing stands beside the bank or in front of it or the character. Walls, what
+-- hangs on them, light switches, doors and windows stay.
+local function clearBankShot(bank, player)
+    eachShotSquare(bank, player, function(square)
+        if not (square and square:getRoom() == bank:getRoom()) then return end
+        local floor, objects = square:getFloor(), square:getObjects()
+        for i = objects:size() - 1, 0, -1 do
+            local object = objects:get(i)
+            if object ~= floor and not isOnWall(object) and not instanceof(object, "IsoDoor")
+                and not instanceof(object, "IsoWindow") and not instanceof(object, "IsoLightSwitch") then
+                square:RemoveTileObject(object)
+            end
+        end
+    end)
+end
+
+-- Shuts the doors of the room in the bank shot, which the game draws faded when open, once the
+-- character has come in through one.
+local function shutBankShotDoors(bank, player)
+    eachShotSquare(bank, player, function(square)
+        if not (square and square:getRoom() == bank:getRoom()) then return end
+        local objects = square:getObjects()
+        for i = 0, objects:size() - 1 do
+            local object = objects:get(i)
+            if instanceof(object, "IsoDoor") and object:IsOpen() then
+                object:ToggleDoor(getPlayer())
+            end
+        end
+    end)
+end
+
 local function isOpenArea(site, origin, player, area)
     for along = area.along[1], area.along[2] do
         for out = area.out[1], area.out[2] do
@@ -508,8 +619,7 @@ local function fits(site, origin, player)
             return false
         end
     end
-    return isFreeIndoorsAt(site, origin, HOMESTEAD.bank) and isFreeIndoorsAt(site, origin, HOMESTEAD.indoors)
-        and isOpenArea(site, origin, player, OPEN)
+    return bankPlace(site, origin) ~= nil and isOpenArea(site, origin, player, OPEN)
 end
 
 -- At a window if `needWindow`, else at any outside wall.
@@ -791,7 +901,7 @@ local function switchOnLights(square, otherBank)
     print("REPromo switched on " .. switched .. " lights")
 end
 
-local site, origin, stage0Site, stage0Origin
+local site, origin, bankSquare, besideBank, stage0Site, stage0Origin
 local studio, roadHeading, roadCar, walkSite, walkOrigin, posterSite, posterOrigin
 local homesteadBank, stage0Box, posterBank
 
@@ -816,13 +926,14 @@ local function atPoster(position)
 end
 
 local function buildHomestead()
-    quietNeighbourhood(at(HOMESTEAD.bank), atStage0(STAGE0.box))
+    quietNeighbourhood(bankSquare, atStage0(STAGE0.box))
     for along = OPEN.along[1], OPEN.along[2] do
         for out = 0, OPEN.out[2] do
             clearGroundCover(at({ along, out }))
         end
     end
-    homesteadBank = PowerBank.place(at(HOMESTEAD.bank), Sprites.batteryBankMetal, -1)
+    clearBankShot(bankSquare, besideBank)
+    homesteadBank = PowerBank.place(bankSquare, Sprites.batteryBankMetal, -1)
     fillBank(homesteadBank, HOMESTEAD_BANK, MORNING_CHARGE)
     for _, spot in ipairs(HOMESTEAD.wallPanels) do
         connect(homesteadBank, placeTile(at(spot), Sprites.wall[spot[3]][site.facing]))
@@ -927,7 +1038,7 @@ local function homesteadSquares()
 end
 
 local function bankSquares()
-    return { at(HOMESTEAD.bank), at(HOMESTEAD.indoors) }
+    return { bankSquare, besideBank }
 end
 
 local function stage0Squares()
@@ -1056,7 +1167,11 @@ local function addWorld()
         return { rightAligned("world", homesteadSquares()) }
     end)
     -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
-    goTo({ at(HOMESTEAD.indoors) }, 0)
+    goTo({ besideBank }, 0)
+    run:add(function()
+        shutBankShotDoors(bankSquare, besideBank)
+        return DRAW_FRAMES
+    end)
     run:addOpaque("bank", function()
         return { cropped("bank", bankSquares()) }
     end)
@@ -1073,7 +1188,7 @@ local function addStatus()
     local window
     run:add(function()
         run:newBackdrop()
-        window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(at(HOMESTEAD.bank)))
+        window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(bankSquare))
         window:setX(100)
         window:setY(100)
         -- The window lays its rows out from the bank's status as it draws.
@@ -1114,6 +1229,13 @@ local function addMenu()
             table.insert(carried, inventory:AddItem(fullType))
         end
         local context = ISWorldObjectContextMenu.createMenu(0, { homesteadBank }, MENU_AT, MENU_AT)
+        -- A light switch on the bank's wall adds its own option above the bank's.
+        local switch = RenewableEnergy.findObjectOn(homesteadBank:getSquare(), function(object)
+            return instanceof(object, "IsoLightSwitch")
+        end)
+        if switch then
+            context:removeOptionByName(switch:getTileName())
+        end
         local bankMenu = openSubMenu(context, RenewableEnergy.Menu.bankLabel(homesteadBank))
         local wireIn = openSubMenu(bankMenu, getText("ContextMenu_RenewableEnergy_WireIn"))
         menus = { context, bankMenu, wireIn }
@@ -1394,8 +1516,9 @@ local function findPlaces(player, needs)
     if needs.homestead then
         site, origin = findSite(player)
         if not site then
-            return nil, "plain building wall with free floor indoors behind it and open ground in front"
+            return nil, "plain building wall with open ground in front and a room behind it with plain floor on its north wall"
         end
+        bankSquare, besideBank = bankPlace(site, origin)
         table.insert(found, origin)
         table.insert(logged, string.format("homestead %d,%d facing %s", origin:getX(), origin:getY(), site.facing))
     end

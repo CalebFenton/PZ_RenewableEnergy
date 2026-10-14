@@ -59,18 +59,24 @@ end
 local METER_CHARGES = { 0.05, 0.2, 0.5, 0.8, 1 }
 local FILL_TIERS = { "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood",
     "batteryBankMetal" }
+-- The batteries the fill tiles hold, in turn, so every look shows in every slot.
+local FILL_BATTERIES = { "Base.CarBattery1", "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery" }
 
 -- Every bank tile, of every tier, with 1 to all of its batteries, its meter cycling through every
--- level; one with fewer batteries than meter levels repeats its full count. Low tiers come first,
--- at the back, so the tall banks in front hide none of them.
+-- level; one with fewer batteries than meter levels repeats its full count. The batteries' types
+-- take turns, starting one further on each tile. Low tiers come first, at the back, so the tall
+-- banks in front hide none of them.
 local function fillTiles()
     local fill, x, y = {}, 0, 0
     for _, field in ipairs(FILL_TIERS) do
-        local capacity = #Sprites.bankFill[field].batteries
+        local capacity = #Sprites.bankFill[field].batteries.car
         for i = 1, math.max(capacity, #METER_CHARGES) do
             local charge = METER_CHARGES[(i - 1) % #METER_CHARGES + 1]
-            table.insert(fill, { x = x, y = y, sprite = Sprites[field],
-                overlays = Sprites.bankOverlays(field, math.min(i, capacity), charge) })
+            local types = {}
+            for slot = 1, math.min(i, capacity) do
+                types[slot] = FILL_BATTERIES[(i + slot - 2) % #FILL_BATTERIES + 1]
+            end
+            table.insert(fill, { x = x, y = y, sprite = Sprites[field], overlays = Sprites.bankOverlays(field, types, charge) })
             x = x + 1
             if x >= AREA.w then
                 x, y = 0, y + 2

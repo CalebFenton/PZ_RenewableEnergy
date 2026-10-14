@@ -759,11 +759,16 @@ function Bank:update(hours, context)
     self:sendStatus()
 end
 
--- The bank's tile shows its batteries and charge.
+-- The bank's tile shows its batteries, each as its type, and its charge.
 function Bank:showBatteries()
     local isoObject = self:getIsoObject()
     if not isoObject then return end
-    local wanted = Sprites.bankOverlays(self:spec().sprite, #self.batteries, self.charge)
+    -- recount reads the container from its last item, so this is the order they went in.
+    local types = {}
+    for i = #self.batteries, 1, -1 do
+        table.insert(types, self.batteries[i].type)
+    end
+    local wanted = Sprites.bankOverlays(self:spec().sprite, types, self.charge)
     local attached = isoObject:getAttachedAnimSprite()
     local count = attached and attached:size() or 0
     local shown, matches = 0, true

@@ -49,7 +49,7 @@ HOMESTEAD = "A homestead"
 # reshoot that frames a shot differently needs its box moved. The setup shots share a shape so
 # that they line up side by side.
 SETUP_CROPS = {"stage0": (330, 50, 1230, 812), "homestead": (260, 0, 1160, 762)}
-BANK_CROP = (0, 180, 464, 592)
+BANK_CROP = (100, 200, 592, 588)
 MENU_CROP = (206, 105, 726, 385)
 TRAILER_CROP = (0, 140, 1260, 660)
 # bank.png: the status window's size against its capture, as large as leaves room for the menu.

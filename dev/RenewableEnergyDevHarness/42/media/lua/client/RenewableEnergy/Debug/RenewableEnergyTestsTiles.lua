@@ -40,7 +40,9 @@ local function overlays()
         end
     end
     for _, fill in pairs(Sprites.bankFill) do
-        add(fill.batteries)
+        for _, slots in pairs(fill.batteries) do
+            add(slots)
+        end
         add(fill.meter)
     end
     return all
@@ -114,8 +116,8 @@ test("renewable_energy_tiles_mounts_rotate", {
     end,
 })
 
--- Every battery a bank can hold shows, and the meter reads its charge: it climbs with the charge,
--- through every level, from its lowest empty to its highest full.
+-- Every battery a bank can hold shows in its own slot, as its type, and the meter reads its
+-- charge: it climbs with the charge, through every level, from its lowest empty to its highest full.
 test("renewable_energy_tiles_bank_overlays", {
     validate = function()
         local levels
@@ -123,15 +125,21 @@ test("renewable_energy_tiles_bank_overlays", {
             local fill = Sprites.bankFill[bank.sprite]
             if expect(fill ~= nil, itemType .. " has no battery overlays") then
                 levels = #fill.meter
-                expect(#fill.batteries == bank.maxBatteries, string.format("%s shows up to %d batteries but holds %d",
-                    itemType, #fill.batteries, bank.maxBatteries))
-                local full = Sprites.bankOverlays(bank.sprite, bank.maxBatteries, 1)
-                expect(full[1] == fill.batteries[bank.maxBatteries] and full[2] == fill.meter[levels],
-                    "a full " .. itemType .. " shows " .. table.concat(full, ", "))
-                local one = Sprites.bankOverlays(bank.sprite, 1, 0)
-                expect(one[1] == fill.batteries[1] and one[2] == fill.meter[1],
-                    "one empty battery in " .. itemType .. " shows " .. table.concat(one, ", "))
-                expect(#Sprites.bankOverlays(bank.sprite, 0, 1) == 0, "an empty " .. itemType .. " shows overlays")
+                for look, slots in pairs(fill.batteries) do
+                    expect(#slots == bank.maxBatteries, string.format("%s shows up to %d %s batteries but holds %d",
+                        itemType, #slots, look, bank.maxBatteries))
+                end
+                local cars = {}
+                for i = 1, bank.maxBatteries + 1 do
+                    cars[i] = "Base.CarBattery1"
+                end
+                local full = Sprites.bankOverlays(bank.sprite, cars, 1)
+                expect(#full == bank.maxBatteries + 1 and full[bank.maxBatteries] == fill.batteries.car[bank.maxBatteries]
+                    and full[#full] == fill.meter[levels], "an overfull " .. itemType .. " shows " .. table.concat(full, ", "))
+                local mixed = Sprites.bankOverlays(bank.sprite, { "RenewableEnergy.L16Battery", "RenewableEnergy.DeepCycleBattery" }, 0)
+                expect(#mixed == 3 and mixed[1] == fill.batteries.l16[1] and mixed[2] == fill.batteries.deepCycle[2]
+                    and mixed[3] == fill.meter[1], "an empty L-16 and deep-cycle in " .. itemType .. " show " .. table.concat(mixed, ", "))
+                expect(#Sprites.bankOverlays(bank.sprite, {}, 1) == 0, "an empty " .. itemType .. " shows overlays")
             end
         end
         if not levels then return end

@@ -34,7 +34,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 17
+COLUMNS, ROWS = 8, 29
 
 
 def moveable(item, level=None, tool="Electrician", **props):

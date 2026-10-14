@@ -385,23 +385,26 @@ STOPLIGHT = "stoplight"
 # Part name -> zone, or how to pick one per face; parts not listed stay CLEAN.
 TRAILER_ZONES = {
     "Trailer_BatteryLid": BOOT, "Trailer_TailLight": STOPLIGHT,
-    "Trailer_Tongue": HEAD, "Trailer_Coupler": HEAD, "Trailer_CouplerCap": HEAD, "Trailer_Jack": HEAD,
+    "Trailer_Tongue": HEAD, "Trailer_Coupler": HEAD, "Trailer_CouplerCap": HEAD, "Trailer_Chain": HEAD, "Trailer_Jack": HEAD,
     "Trailer_JackFoot": HEAD, "Trailer_JackCrank": HEAD, "Trailer_BatteryBox": HEAD, "Trailer_BatteryHinge": HEAD,
     "Trailer_Hasp": HEAD, "Trailer_Staple": HEAD, "Trailer_Padlock": HEAD, "Trailer_PadlockShackle": HEAD,
     "Trailer_Rail": SIDE, "Trailer_Spring": SIDE, "Trailer_Fender": SIDE, "Trailer_FenderSkirt": SIDE,
-    "Trailer_Reflector": SIDE,
+    "Trailer_Reflector": SIDE, "Trailer_ReflectorRear": SIDE, "Trailer_Tape": SIDE,
+    "Trailer_TapeRear": TAIL, "Trailer_Plate": TAIL, "Trailer_PlateBracket": TAIL,
     "Trailer_Mast": TAIL, "Trailer_MastPivot": TAIL, "Trailer_Cradle": TAIL,
     "Board_Back": LAMP_BOARD, "Board_FrameLong": LAMP_BOARD, "Board_FrameShort": LAMP_BOARD,
-    "Board_Lamp": LAMP_BOARD, "Board_Visor": LAMP_BOARD,
+    "Board_Lamp": LAMP_BOARD, "Board_Bezel": LAMP_BOARD,
     "Trailer_Deck": FACING, "Trailer_CrossMember": FACING,
 }
 # Parts drawn lit from the lights texture when their zone is lit, in that colour: the arrow's
 # lamps, a bright amber against their dark lenses. The tail lights glow by their zone (STOPLIGHT).
 GLOWING = {"Board_Lamp": (1.0, 0.86, 0.38)}
-# Rust stays off glass, lamps and the board's face. Module parts are named after their module.
-RUST_FREE = ("Board_Back", "Board_Lamp", "Board_Visor", "Trailer_TailLight", "Trailer_Reflector", "Trailer_Panel",
-             "Trailer0_", "Trailer1_", "TrailerCracked")
-# Printed on the battery box: kept clean of blood and rust so it stays legible.
+# Rust stays off glass, lamps, reflective tape and the board's face. Module parts are named after
+# their module.
+RUST_FREE = ("Board_Back", "Board_Lamp", "Board_Bezel", "Trailer_TailLight", "Trailer_Reflector", "Trailer_Tape",
+             "Trailer_Panel", "Trailer0_", "Trailer1_", "TrailerCracked")
+# Printed on the battery box, the side rails and the plate: kept clean of blood and rust so it
+# stays legible.
 TRAILER_STENCIL = "Trailer_Stencil"
 MASK_SIZE = 1024
 OVERLAY_SIZE = 512
