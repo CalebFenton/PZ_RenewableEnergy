@@ -14,7 +14,7 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 - `dev/run-debug-client.sh --test`: runs every test unattended and exits nonzero on a failure or any Lua error. Needs a JDK's `javac`. Narrow it with `TESTS=<prefix>,...`, `--changed` (by `TEST_MAP` in `dev/harness.conf`) or `--failed`.
 - `dev/run-debug-client.sh --test --stay`: keeps the game open, and the next `--test --stay` reloads only the test files and reruns in it. Finish with a plain `--test`, since the kept world holds what earlier runs left.
 - `dev/run-debug-client.sh --test --mp`: the same tests against a dedicated server; add `--stay` to keep both open. `dev/harness/docs/multiplayer.md` explains the server channel.
-- `dev/run-debug-client.sh --loot`: measures how often each of the mod's items spawns in each loot list and room container, and the modules and watts a thorough player finds per town and solar site. Run it after changing loot and update the README's tables from it. `dev/loot/census.py` counts the towns it uses; rerun that only after the map changes.
+- `dev/run-debug-client.sh --loot`: measures how often each of the mod's items spawns in each loot list and room container, and the modules and watts a thorough player finds per town and solar site. Run it after changing loot, and check the README's hints on what's rare still hold. `dev/loot/census.py` counts the towns it uses; rerun that only after the map changes.
 - `art/models/make.sh`: rebuilds every model, texture, icon and tile from `art/models/items.py`, `art/models/tiles.py` and `tools/make_tiles.py`, and writes review sheets to `$TMPDIR/renewable-energy-previews`. Its header says what each step writes and needs.
 - `tools/pack_textures.py`: rebuilds `renewable_energy.pack`; `make.sh` runs it. `python3 dev/harness/check/tiledefs.py <file.tiles> all` prints every tile's properties.
 - `dev/run-debug-client.sh --art`: renders every tile, overlay, item and trailer state to `<cache>/Screenshots` for review; `RenewableEnergyDevArt.lua` in the dev mod lists the shots.
@@ -22,8 +22,9 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 - `dev/run-debug-client.sh --promo`, then `art/promo/compose.py`: shoots the README and Workshop art into `art/promo/captures`, then lays it out into `art/promo/images`, `42/poster.png` and `preview.png`. `RenewableEnergyDevPromo.lua` in the dev mod lists the setups and shots. Commit the captures, so a layout change needs only `compose.py`.
 - `PROMO=<group>,... dev/run-debug-client.sh --promo`: reshoots only those groups (`MODE_GROUPS_promo` in `dev/harness.conf`) and replaces only their captures. Reshoot the group you are changing, then check `git status art/promo/captures`. There is no `--promo --stay`: a second run in the same world would find its places taken by what the first one built.
 - `dev/review.sh`: lays out the images, renders the README to HTML and PDF, and zips the mod as players install it, without starting the game. Its header says what it needs and where the files go.
+- `dev/workshop-txt.sh`: writes `workshop.txt`'s description from `README.md`, leaving out the sections `WORKSHOP_SKIP` in `dev/harness.conf` names; the static check fails while the two differ.
 
-The README links the images by relative path. `workshop.txt` has no images until the repository is public; then link them by raw URL, and a renamed image breaks the Workshop page.
+`README.md` is the Workshop page, and `dev/harness/docs/workshop-page.md` says what goes on it. It links the images by relative path, and `workshop.txt` by raw URL, which shows nothing until the repository is public; a renamed image breaks the Workshop page.
 
 ## Debugging by hand
 
@@ -272,13 +273,12 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 
 ## Workshop page
 
-- The description is limited to 8000 bytes, BBCode included. `[table]` renders there.
-- The in-game Workshop screen uploads `Contents/` and `preview.png`, which must be a square PNG of 256 or 512 pixels and at most 1 MB. The other files at the repository root aren't uploaded. Tags must come from the game's `media/WorkshopTags.txt`.
+- The in-game Workshop screen uploads `Contents/` and `preview.png`; the other files at the repository root aren't uploaded. `dev/harness/docs/workshop-page.md` has the Workshop's limits.
 - Steam shows the preview as small as about 196 pixels. In the game's mod list, `mod.info`'s `icon=` is drawn about 22 pixels square (the small font's height plus a little; `ModListBox`) and 28 in the load order, through `getTexture`, which loads it with linear filtering and no mipmaps, so a picture larger than about twice that size is sampled past its thin lines. `mod.info` takes one `category=`, which the mod list's filter matches exactly; the first `poster=` is the main poster.
 
 ## Release checklist
 
 1. `dev/static-check.sh`, `dev/validate-server.sh` and `dev/run-debug-client.sh --test` must pass.
 2. Bump `modversion` in `42/mod.info`. Raise `versionMin` when the mod starts depending on a newer game version.
-3. Update `workshop.txt` and `README.md`, and run `dev/run-debug-client.sh --promo` if the look or the names changed, then `dev/review.sh` to read the result.
+3. Update `README.md`, then run `dev/workshop-txt.sh`, `dev/run-debug-client.sh --promo` if the look or the names changed, and `dev/review.sh` to read the result.
 4. Upload from the in-game Workshop screen.

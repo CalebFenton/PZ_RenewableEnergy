@@ -1,6 +1,6 @@
 -- Measures how often the mod's items spawn, with the game's own loot rolls on scratch containers
 -- that never enter the world, and how world banks and crates are stocked: for tuning
--- Distributions.lua and WorldSpawns.lua, the README's numbers and the loot tests. Shared Lua so
+-- Distributions.lua and WorldSpawns.lua, the README's hints and the loot tests. Shared Lua so
 -- the loot tests can roll on a multiplayer server, whose loot tables alone hold the mod's entries.
 -- dev/run-debug-client.sh --loot prints Loot.report() and Loot.moduleReport(). Debug mode only.
 --

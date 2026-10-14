@@ -120,7 +120,7 @@ test("renewable_energy_items_recipes_load", {
 
 -- Learning ------------------------------------------------------------------------------------
 
--- What each magazine teaches, as the README promises.
+-- What each magazine teaches.
 local MAGAZINES = {
     ["RenewableEnergy.HomesteadPowerMag1"] = {
         "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
