@@ -410,6 +410,12 @@ function PowerBank.samePosition(a, b)
     return a ~= nil and b ~= nil and a.x == b.x and a.y == b.y and a.z == b.z
 end
 
+--- Whether `position` is a { x, y, z } place, as a command argument from a client must be.
+function PowerBank.isPosition(position)
+    return type(position) == "table" and type(position.x) == "number" and type(position.y) == "number"
+        and type(position.z) == "number"
+end
+
 --- Whether a panel at x, y, z is within Specs.sourceReach of `bank`, anything with x, y and z.
 function PowerBank.isInReach(bank, x, y, z)
     local reach = Specs.sourceReach

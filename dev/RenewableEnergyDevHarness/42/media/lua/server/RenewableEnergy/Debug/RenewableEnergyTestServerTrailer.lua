@@ -11,7 +11,8 @@ local handler = PZHarness.serverHandler
 
 local Trailer = {}
 
-local vehicleAt = require("RenewableEnergy/Debug/RenewableEnergyTestHelpers").vehicleAt
+local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local vehicleAt, deferOnce = Helpers.vehicleAt, Helpers.deferOnce
 
 -- The conditions the panels of trailers spawned with `args.recordStock` got as they were stocked,
 -- by vehicle id: { [partId] = condition }.
@@ -19,14 +20,18 @@ local stockedPanels = {}
 
 -- Spawns `script` with the harness's plain addVehicleDebug, an arrow board's stocked panels
 -- getting the condition `roll(stockRoll)` returns for each, stockRoll being the roll stocking makes.
--- Stocking rolls the left panel first.
+-- Stocking rolls the left panel first. No caller hands it a defer, so a pcall puts the conditions
+-- back before an error goes on.
 local function spawnStocking(script, square, facing, roll)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local weathered, cracked = WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition
     WorldSpawns.weatheredCondition = function() return roll(weathered) end
     WorldSpawns.crackedCondition = function() return roll(cracked) end
-    local vehicle = addVehicleDebug(script, IsoDirections[facing], nil, square)
+    local ok, vehicle = pcall(addVehicleDebug, script, IsoDirections[facing], nil, square)
     WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition = weathered, cracked
+    if not ok then
+        error(vehicle)
+    end
     return vehicle
 end
 
@@ -173,14 +178,14 @@ function Trailer.vehicleState(vehicle)
 end
 
 -- Registers the handler `name` on the vehicle `args` names (RenewableEnergyTest.onVehicle):
--- `fn(vehicle, args, player)` runs once it is found.
+-- `fn(vehicle, args, player, defer)` runs once it is found.
 local function onVehicle(name, fn)
-    handler(name, function(player, args)
+    handler(name, function(player, args, defer)
         local vehicle, missing = vehicleAt(args)
         if not vehicle then
             return nil, missing
         end
-        return fn(vehicle, args, player)
+        return fn(vehicle, args, player, defer)
     end)
 end
 
@@ -300,11 +305,15 @@ end)
 
 -- Rolls the trailer's switch as stocking does `args.rolls` times, from no switch each time, then
 -- puts its own back. Answers how many rolls came out on.
-onVehicle("arrowBoardSwitchRolls", function(vehicle, args)
+onVehicle("arrowBoardSwitchRolls", function(vehicle, args, _, defer)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local modData = box:getModData()
     local own, on = modData.RenewableEnergy_switchOn, 0
+    local restore = deferOnce(defer, function()
+        modData.RenewableEnergy_switchOn = own
+        vehicle:transmitPartModData(box)
+    end)
     for _ = 1, args.rolls do
         modData.RenewableEnergy_switchOn = nil
         ArrowBoard.rollSwitch(vehicle)
@@ -312,8 +321,7 @@ onVehicle("arrowBoardSwitchRolls", function(vehicle, args)
             on = on + 1
         end
     end
-    modData.RenewableEnergy_switchOn = own
-    vehicle:transmitPartModData(box)
+    restore()
     return { on = on }
 end)
 

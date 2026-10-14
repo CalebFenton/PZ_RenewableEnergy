@@ -2064,6 +2064,38 @@ end
 repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 35, 65)
 repairTest("renewable_energy_world_arrow_board_repair_stops_at_80", 55, 80)
 
+-- Part-used glue adds up, as in vanilla crafting: two tubes with one use left each pay the glue
+-- the repair takes, and both are used up.
+test("renewable_energy_world_arrow_board_repair_adds_up_part_used_glue", {
+    instant = true,
+    run = function(self)
+        if not spawnTrailer(self) then return end
+        local trailer = self.trailer
+        T.setPerk(self, Perks.Electricity, 3)
+        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 35 } } })
+        waitForPanelsCopy(trailer)
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.ElectricWire" },
+            { type = "Base.Glue" }, { type = "Base.Glue" } })
+        T.step(function()
+            for i = 4, 5 do
+                local glue = self.items.inputs[i]
+                T.changeItem(self, glue, { uses = 1 / glue:getMaxUses() })
+            end
+        end)
+        T.step(function()
+            ISTimedActionQueue.add(RenewableEnergyAction:new(player(), RenewableEnergyAction.REPAIR_PANEL, nil, nil, trailer.vehicle,
+                nil, nil, LEFT))
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= 35 end, SERVER_MS)
+        T.count(self, "left", { "Base.Glue" })
+    end,
+    validate = function(self)
+        expect(panelCondition(self.trailer.state, LEFT) == 65, "two part-used tubes of glue didn't pay for the repair")
+        local glue = self.counts.left and self.counts.left["Base.Glue"]
+        expect(glue == 0, tostring(glue) .. " tubes of glue left, expected both used up")
+    end,
+})
+
 -- The car is pushed whenever it rolls slower than this, in squares a second, until the trailer
 -- has followed it TOW_SQUARES. Pushed every frame, it would speed off the open strip, and a crash
 -- snaps a hitch older than FRESH_HITCH_MS (Bullet.onVehicleConstraintImpulse).

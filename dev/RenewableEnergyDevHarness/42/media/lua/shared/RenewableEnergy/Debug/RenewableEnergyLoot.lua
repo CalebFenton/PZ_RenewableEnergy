@@ -150,6 +150,17 @@ local MEASURE_OPTIONS = {
 }
 local LRM_OPTIONS = { "LRMSolarPanels", "LRMBatteries", "LRMMisc" }
 
+-- Returns fn()'s result, calling restore() after fn whether or not it throws; a throw goes on
+-- after restore, so a failed measurement still leaves the game's loot and options as they were.
+local function restoring(fn, restore)
+    local ok, result = pcall(fn)
+    restore()
+    if not ok then
+        error(result)
+    end
+    return result
+end
+
 -- Runs fn() with the mod's loot rarity options at `lrm` and the mod's loot applied for them, then
 -- restores the options and applies the loot again. ItemPickerJava.Parse is left to the caller.
 local function withLootRarity(lrm, fn)
@@ -158,13 +169,15 @@ local function withLootRarity(lrm, fn)
         saved[option] = SandboxVars.RenewableEnergy[option]
         SandboxVars.RenewableEnergy[option] = lrm
     end
-    RenewableEnergy.Distributions.apply()
-    local result = fn()
-    for option, value in pairs(saved) do
-        SandboxVars.RenewableEnergy[option] = value
-    end
-    RenewableEnergy.Distributions.apply()
-    return result
+    return restoring(function()
+        RenewableEnergy.Distributions.apply()
+        return fn()
+    end, function()
+        for option, value in pairs(saved) do
+            SandboxVars.RenewableEnergy[option] = value
+        end
+        RenewableEnergy.Distributions.apply()
+    end)
 end
 
 --- The loot table a reference from RenewableEnergy.Distributions.items names. A junk list is
@@ -234,28 +247,30 @@ end
 --- ItemPickerJava.rollItem, or nil if the game didn't take it. Afterwards restores the options and
 --- parses the loot as it was.
 function Loot.withLoot(lrm, build, fn)
-    local result = withLootRarity(lrm, function()
-        local containers, lists = build()
-        lists = lists or {}
-        for name, list in pairs(lists) do
-            ProceduralDistributions.list[name] = list
-        end
-        SuburbsDistributions[PROBE_ROOM] = containers
-        ItemPickerJava.Parse()
-        local parsed = {}
-        for key, containerTable in pairs(containers) do
-            -- For a procedural container, a list name no entry has returns the container itself.
-            parsed[key] = ItemPickerJava.getItemContainer(PROBE_ROOM, key, containerTable.procedural and "" or nil, false)
-        end
-        local measured = fn(parsed)
-        SuburbsDistributions[PROBE_ROOM] = nil
-        for name in pairs(lists) do
-            ProceduralDistributions.list[name] = nil
-        end
-        return measured
-    end)
-    ItemPickerJava.Parse()
-    return result
+    return restoring(function()
+        return withLootRarity(lrm, function()
+            local containers, lists = build()
+            lists = lists or {}
+            return restoring(function()
+                for name, list in pairs(lists) do
+                    ProceduralDistributions.list[name] = list
+                end
+                SuburbsDistributions[PROBE_ROOM] = containers
+                ItemPickerJava.Parse()
+                local parsed = {}
+                for key, containerTable in pairs(containers) do
+                    -- For a procedural container, a list name no entry has returns the container itself.
+                    parsed[key] = ItemPickerJava.getItemContainer(PROBE_ROOM, key, containerTable.procedural and "" or nil, false)
+                end
+                return fn(parsed)
+            end, function()
+                SuburbsDistributions[PROBE_ROOM] = nil
+                for name in pairs(lists) do
+                    ProceduralDistributions.list[name] = nil
+                end
+            end)
+        end)
+    end, function() ItemPickerJava.Parse() end)
 end
 
 --- One table per target of Loot.targets(), keyed "t<index>": the list itself, or
@@ -303,33 +318,37 @@ end
 function Loot.withMeasureOptions(fn)
     local options = getSandboxOptions()
     local saved = {}
-    for name, value in pairs(MEASURE_OPTIONS) do
-        local option = options:getOptionByName(name)
-        saved[name] = option:getValue()
-        option:setValue(value == DEFAULT and option:getDefaultValue() or value)
-    end
-    ItemPickerJava.InitSandboxLootSettings()
     local generalLog = DebugType.General:getLogSeverity()
-    DebugType.General:setLogSeverity(LogSeverity.Off)
-    local result = fn()
-    DebugType.General:setLogSeverity(generalLog)
-    for name, value in pairs(saved) do
-        options:getOptionByName(name):setValue(value)
-    end
-    ItemPickerJava.InitSandboxLootSettings()
-    return result
+    return restoring(function()
+        for name, value in pairs(MEASURE_OPTIONS) do
+            local option = options:getOptionByName(name)
+            saved[name] = option:getValue()
+            option:setValue(value == DEFAULT and option:getDefaultValue() or value)
+        end
+        ItemPickerJava.InitSandboxLootSettings()
+        DebugType.General:setLogSeverity(LogSeverity.Off)
+        return fn()
+    end, function()
+        DebugType.General:setLogSeverity(generalLog)
+        for name, value in pairs(saved) do
+            options:getOptionByName(name):setValue(value)
+        end
+        ItemPickerJava.InitSandboxLootSettings()
+    end)
 end
 
--- Adds the mod's items in the container to `counts` (fullType -> count), bags and boxes included.
-local function countItems(container, counts)
+-- Adds the items in the container to `counts` (fullType -> count), bags' and boxes' contents
+-- included: the mod's items, or every item with `everything`.
+local function countItems(container, counts, everything)
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         local fullType = item:getFullType()
-        if isModItem(fullType) then
+        if everything or isModItem(fullType) then
             counts[fullType] = (counts[fullType] or 0) + 1
-        elseif item:IsInventoryContainer() then
-            countItems(item:getInventory(), counts)
+        end
+        if item:IsInventoryContainer() then
+            countItems(item:getInventory(), counts, everything)
         end
     end
 end
@@ -357,21 +376,13 @@ local function forgetItems(container, processItems)
     end
 end
 
---- Calls fill(container) on an emptied `container` once and returns what it got: fullType ->
---- count, of the mod's items, or of every item with `everything`.
+--- Calls fill(container) on an emptied `container` once and returns what it got, bags' contents
+--- included: fullType -> count, of the mod's items, or of every item with `everything`.
 function Loot.fillOnce(fill, container, everything)
     container:removeAllItems()
     fill(container)
     local counts = {}
-    if everything then
-        local items = container:getItems()
-        for i = 0, items:size() - 1 do
-            local fullType = items:get(i):getFullType()
-            counts[fullType] = (counts[fullType] or 0) + 1
-        end
-    else
-        countItems(container, counts)
-    end
+    countItems(container, counts, everything)
     forgetItems(container, getCell():getProcessItems())
     container:removeAllItems()
     return counts

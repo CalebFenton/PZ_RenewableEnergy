@@ -436,25 +436,21 @@ local function syncModules(source, object)
 end
 
 -- Why a panel makes less than it would at its best in clear full sun: the biggest loss, if it
--- is big enough to matter.
+-- is big enough to matter. On a tie the first reason checked wins.
 local function lowReason(source, inSlot, light, clearLight, condition, context)
     if not inSlot then
         return "noController"
     elseif context.elevation <= 0 or clearLight <= 0 then
         return "night"
     end
-    local shares = {
-        snow = 1 - source.snow,
-        cloud = light / clearLight,
-        angle = clearLight / Sun.FULL_SUN,
-        cracked = condition,
-    }
     local reason, lowest = nil, LOW_SHARE
-    for name, share in pairs(shares) do
-        if share < lowest then
-            reason, lowest = name, share
-        end
-    end
+    local share = 1 - source.snow
+    if share < lowest then reason, lowest = "snow", share end
+    share = light / clearLight
+    if share < lowest then reason, lowest = "cloud", share end
+    share = clearLight / Sun.FULL_SUN
+    if share < lowest then reason, lowest = "angle", share end
+    if condition < lowest then reason = "cracked" end
     return reason
 end
 

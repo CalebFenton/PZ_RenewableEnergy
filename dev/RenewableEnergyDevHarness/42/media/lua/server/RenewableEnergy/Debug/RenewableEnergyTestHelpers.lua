@@ -30,29 +30,38 @@ function Helpers.check(name, fn)
     end)
 end
 
+--- Defers `undo` for a handler that changes shared state, and returns the function that runs it
+--- now, which the handler calls when done. Being deferred too, it still runs when the handler
+--- throws first (the harness unwinds a failed call at once). It runs once either way.
+function Helpers.deferOnce(defer, undo)
+    local done = false
+    local function once()
+        if done then
+            return
+        end
+        done = true
+        undo()
+    end
+    defer(once)
+    return once
+end
+
 --- Saves the mod's sandbox options `names` for a handler that changes them, and returns the
 --- function that puts them back and then calls `reapply`, if given, to rebuild what the game made
---- from them. The handler calls it when done; it is also deferred, so that a handler that throws
---- first still puts them back (the harness unwinds a failed call at once). It runs once.
+--- from them; Helpers.deferOnce says when it runs.
 function Helpers.saveOptions(defer, names, reapply)
-    local options, saved, restored = SandboxVars.RenewableEnergy, {}, false
+    local options, saved = SandboxVars.RenewableEnergy, {}
     for _, name in ipairs(names) do
         saved[name] = options[name]
     end
-    local function restore()
-        if restored then
-            return
-        end
-        restored = true
+    return Helpers.deferOnce(defer, function()
         for _, name in ipairs(names) do
             options[name] = saved[name]
         end
         if reapply then
             reapply()
         end
-    end
-    defer(restore)
-    return restore
+    end)
 end
 
 --- The square at `args` ({ x, y, z }), or nil when there is none or it isn't loaded here.

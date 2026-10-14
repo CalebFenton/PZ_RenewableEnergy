@@ -167,11 +167,16 @@ local function isModuleInput(input)
     return input:containsItem(getScriptManager():getItem(Specs.factoryModule))
 end
 
+-- The rounding CraftRecipeData.consumeInputFromItems forgives when scaled uses pay an input.
+local PAID_TOLERANCE = 1e-5
+
 --- The inventory items, bags included, that pay for a Repair Cracked Panel's inputs but the
 --- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
 --- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; nil when an
 --- input is missing. Second, each of those inputs as a need (RenewableEnergy.firstUnmet), `have`
---- being how much of its amount the items found pay.
+--- being how many whole units of its amount the items found pay.
+--- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
+--- drainables add up to one input, each giving the uses it has until the input is paid.
 function Recipes.panelRepairInputs(character)
     local inventory = character:getInventory()
     local inputs = Recipes.moduleRepairRecipe():getInputs()
@@ -185,22 +190,24 @@ function Recipes.panelRepairInputs(character)
                 return not taken[item] and not item:isBroken() and input:containsItem(item:getScriptItem())
             end)
             for j = 0, candidates:size() - 1 do
-                if needed <= 0 then break end
+                if needed <= PAID_TOLERANCE then break end
                 local item = candidates:get(j)
                 if instanceof(item, "DrainableComboItem") then
                     -- A line such as [Base.Epoxy;2:Base.Glue] takes more uses of some items.
-                    local uses = math.ceil(needed * input:getRelativeScale(item:getFullType()))
-                    if item:getCurrentUses() >= uses then
+                    local scale = input:getRelativeScale(item:getFullType())
+                    local uses = math.min(item:getCurrentUses(), math.ceil(needed * scale))
+                    if uses > 0 then
                         table.insert(picks, { item = item, uses = uses, keep = input:isKeep() })
-                        taken[item], needed = true, 0
+                        taken[item], needed = true, needed - uses / scale
                     end
                 else
                     table.insert(picks, { item = item, keep = input:isKeep(), wear = wearOf(input) })
                     taken[item], needed = true, needed - 1
                 end
             end
-            table.insert(needs, { kind = "item", input = input, have = amount - needed, need = amount })
-            complete = complete and needed <= 0
+            local paid = needed <= PAID_TOLERANCE
+            table.insert(needs, { kind = "item", input = input, have = paid and amount or math.floor(amount - needed), need = amount })
+            complete = complete and paid
         end
     end
     return complete and picks or nil, needs

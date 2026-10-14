@@ -12,6 +12,7 @@ local EngineStash = Stash
 local Stash = require "RenewableEnergy/StashHouses"
 
 local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
+local deferOnce = Helpers.deferOnce
 local countPairs = PZHarness.Fixtures.countPairs
 local Sprites = RenewableEnergy.Sprites
 
@@ -122,8 +123,9 @@ end
 
 -- Puts each house through Stash.relistUnfound in every case of `args.cases` ({ visited, read }),
 -- then back as it was. Answers { name, case, relisted } for each, in order.
-handler("stashRelist", function(_, args)
+handler("stashRelist", function(_, args, defer)
     local metaGrid = getWorld():getMetaGrid()
+    local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
     local houses = {}
     for stashMap in pairs(Stash.descriptions) do
         local room = metaGrid:getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
@@ -131,20 +133,33 @@ handler("stashRelist", function(_, args)
         if not building then
             return nil, "the building of " .. stashMap.name
         end
-        table.insert(houses, { name = stashMap.name, building = building })
+        table.insert(houses, { name = stashMap.name, building = building,
+            visited = building:isHasBeenVisited(), read = alreadyRead:contains(stashMap.name) })
     end
     if #houses == 0 then
         return nil, "a stash house"
     end
-    local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
     local savedPossible = {}
     for i = 0, possible:size() - 1 do
         table.insert(savedPossible, possible:get(i))
     end
+    local restore = deferOnce(defer, function()
+        for _, house in ipairs(houses) do
+            house.building:setHasBeenVisited(house.visited)
+            alreadyRead:remove(house.name)
+            if house.read then
+                alreadyRead:add(house.name)
+            end
+        end
+        -- Last, since marking a house visited drops it from the list.
+        possible:clear()
+        for _, stash in ipairs(savedPossible) do
+            possible:add(stash)
+        end
+    end)
     local results = {}
     for _, house in ipairs(houses) do
         local name, building = house.name, house.building
-        local visited, read = building:isHasBeenVisited(), alreadyRead:contains(name)
         for i, case in ipairs(args.cases) do
             removePossibleStash(name)
             building:setHasBeenVisited(case.visited)
@@ -155,17 +170,8 @@ handler("stashRelist", function(_, args)
             Stash.relistUnfound()
             table.insert(results, { name = name, case = i, relisted = isPossibleStash(name) })
         end
-        building:setHasBeenVisited(visited)
-        alreadyRead:remove(name)
-        if read then
-            alreadyRead:add(name)
-        end
     end
-    -- Last, since marking a house visited drops it from the list.
-    possible:clear()
-    for _, stash in ipairs(savedPossible) do
-        possible:add(stash)
-    end
+    restore()
     return { results = results }
 end)
 
@@ -182,10 +188,28 @@ end
 -- and StashSystem's possible list, which isStashBuilding also reads, emptied of them, so that what
 -- it reports afterwards is the stocking queue alone. Answers by house whether it was queued for
 -- stocking, marked as read, and has a chance at all; then puts everything back.
-handler("stashKnownOnStart", function()
+handler("stashKnownOnStart", function(_, _, defer)
     local all, possible = StashSystem.getAllStashes(), StashSystem.getPossibleStashes()
-    local added, chances = {}, {}
+    local alreadyRead = StashSystem.getAlreadyReadMap()
+    local added, chances, read = {}, {}, {}
+    local restore = deferOnce(defer, function()
+        for extra, chance in pairs(chances) do
+            extra.knownOnStart = chance
+        end
+        for _, engineStash in ipairs(added) do
+            all:remove(engineStash)
+        end
+        -- stockFromStart unmarks a house it stocks, even one read before.
+        for name, wasRead in pairs(read) do
+            alreadyRead:remove(name)
+            if wasRead then
+                alreadyRead:add(name)
+            end
+        end
+        Stash.relistUnfound()
+    end)
     for stashMap, extra in pairs(Stash.descriptions) do
+        read[stashMap.name] = alreadyRead:contains(stashMap.name)
         if not StashSystem.getStash(stashMap.name) then
             local engineStash = EngineStash.new(stashMap.name)
             engineStash:load(stashMap)
@@ -207,17 +231,11 @@ handler("stashKnownOnStart", function()
         local room = metaGrid:getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
         houses[stashMap.name] = {
             queued = room ~= nil and StashSystem.isStashBuilding(room:getBuilding()),
-            read = StashSystem.getAlreadyReadMap():contains(stashMap.name),
+            read = alreadyRead:contains(stashMap.name),
             hasChance = chances[extra] ~= nil,
         }
     end
-    for extra, chance in pairs(chances) do
-        extra.knownOnStart = chance
-    end
-    for _, engineStash in ipairs(added) do
-        all:remove(engineStash)
-    end
-    Stash.relistUnfound()
+    restore()
     return { houses = houses }
 end)
 

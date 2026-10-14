@@ -12,26 +12,13 @@ require "RenewableEnergy/PowerBank/BankSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, PowerBank, Wear = RenewableEnergy.Specs, RenewableEnergy.PowerBank, RenewableEnergy.Wear
+local isPosition, bankAt = PowerBank.isPosition, RenewableEnergy.BankSystem.bankAt
 
 local Commands = {}
 RenewableEnergy.Commands = Commands
 
 -- Longest name a bank takes.
 local NAME_LENGTH = 32
-
--- Whether a command argument is a { x, y, z } place.
-local function isPosition(position)
-    return type(position) == "table" and type(position.x) == "number" and type(position.y) == "number"
-        and type(position.z) == "number"
-end
-
-local function bankAt(position)
-    local system = PowerBank.serverSystem
-    if not (system and isPosition(position)) then
-        return nil
-    end
-    return system:getLuaObjectAt(position.x, position.y, position.z)
-end
 
 local function sourceAt(position)
     return isPosition(position) and PowerBank.sourceOn(getSquare(position.x, position.y, position.z)) or nil

@@ -176,13 +176,13 @@ end
 -- bank look at its container again and sends its status to everyone watching it.
 local REFRESH_MS = 1000
 
--- The bank a client command names, or nil.
-local function bankNamed(args)
-    local at = type(args) == "table" and args.bank
-    if not (type(at) == "table" and type(at.x) == "number" and type(at.y) == "number" and type(at.z) == "number") then
+--- The bank at `position`, or nil, also when `position` isn't a { x, y, z } place.
+function BankSystem.bankAt(position)
+    local system = PowerBank.serverSystem
+    if not (system and PowerBank.isPosition(position)) then
         return nil
     end
-    return BankSystem.instance:getLuaObjectAt(at.x, at.y, at.z)
+    return system:getLuaObjectAt(position.x, position.y, position.z)
 end
 
 local function mayRefresh(bank, player)
@@ -199,7 +199,7 @@ local function mayRefresh(bank, player)
 end
 
 function BankSystem:OnClientCommand(command, player, args)
-    local bank = player and bankNamed(args)
+    local bank = player and type(args) == "table" and BankSystem.bankAt(args.bank)
     if not bank then return end
     if command == "watch" and bank:inViewOf(player) then
         local new = bank:watch(player)
