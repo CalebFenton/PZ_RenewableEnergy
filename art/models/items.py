@@ -30,6 +30,12 @@ def M(name):
         "darkgrey": lambda: material("RE_DarkGrey", "#3a3c3f", roughness=0.5, grime=0.15),
         "grey": lambda: material("RE_GreyPaint", "#8b9089", roughness=0.55, grime=0.2),
         "battery": lambda: material("RE_BatteryCase", "#29292b", roughness=0.6, grime=0.15),
+        # The game's own car battery's grey and label, so the case stripped from one reads as it.
+        "carbattery": lambda: material("RE_CarBattery", "#3f3f3f", roughness=0.6, grime=0.15),
+        "carlabel": lambda: material("RE_CarLabel", "#698a5f", roughness=0.6, grime=0.1),
+        "bolt": lambda: material("RE_Bolt", "#e9e147", roughness=0.5, grime=0.0),
+        # The grey paste and sulphate a battery's plates leave smeared on the inside of its case.
+        "leadstain": lambda: material("RE_LeadStain", "#99958a", roughness=0.9, grime=0.4, scale=30),
         "marine": lambda: material("RE_MarineBlue", "#2155a8", roughness=0.45, grime=0.12),
         "maroon": lambda: material("RE_Maroon", "#6e2024", roughness=0.5, grime=0.15),
         "cream": lambda: material("RE_Cream", "#e6dfc8", roughness=0.6, grime=0.1),
@@ -330,9 +336,14 @@ def deep_cycle_battery(col):
             label=("DEEP CYCLE", 0.03), handle="rope", post_height=0.03)
 
 
+# An L-16's case, a little shorter than a real one's 0.43 m: at full height it towered over the
+# game's car battery, which is drawn small (DEVELOPMENT.md).
+L16 = (0.30, 0.18, 0.38)
+
+
 def l16_battery(col):
     """An L-16 6 V battery: tall, heavy, maroon, lifting handles at the ends."""
-    battery(col, "L16", (0.30, 0.18, 0.43), "maroon", "battery", caps=(-0.08, 0.0, 0.08), cap_colour="black",
+    battery(col, "L16", L16, "maroon", "battery", caps=(-0.08, 0.0, 0.08), cap_colour="black",
             label=("L-16", 0.05), handle="sides", post_height=0.035)
 
 
@@ -819,18 +830,41 @@ def lying(builder, **options):
 # Battery rebuilding -------------------------------------------------------------------------------
 
 
-def battery_case(col, name, size, colour, cells, handles=False):
-    """A stripped battery: the case with its lid cut off and its plates pulled, the cell walls
-    inside bare. `cells` is how many cells it holds: six for 12 V, three for 6 V."""
+def battery_case(col, name, size, colour, cells, label, words=None, bolt=False, handles=False):
+    """A stripped battery: the case with its lid cut off and its plates pulled, grey inside with the
+    paste they left, a ledge moulded along its foot and a torn scrap of its label on the front.
+    `cells` is how many cells it holds: six for 12 V, three for 6 V. `label` is the scrap's material,
+    `words` what is left of its lettering, and `bolt` puts the game's car battery's lightning bolt on it."""
     width, depth, height = size
-    wall = 0.006
+    wall, stain = 0.005, 0.003
+    inside = height - wall - 0.004  # the stain stops short of the cut, which shows the case's colour
     box(col, name + "_Floor", M(colour), (width, depth, wall))
+    box(col, name + "_Residue", M("leadstain"), (width - 2 * wall, depth - 2 * wall, 0.002), at=(0, 0, wall))
     for sign in (-1, 1):
         box(col, name + "_Side", M(colour), (wall, depth, height), at=(sign * (width - wall) / 2, 0, 0), bevel=0.002)
         box(col, name + "_End", M(colour), (width - 2 * wall, wall, height), at=(0, sign * (depth - wall) / 2, 0), bevel=0.002)
+        box(col, name + "_SideStain", M("leadstain"), (stain, depth - 2 * wall, inside),
+            at=(sign * (width / 2 - wall - stain / 2), 0, wall))
+        box(col, name + "_EndStain", M("leadstain"), (width - 2 * wall - 2 * stain, stain, inside),
+            at=(0, sign * (depth / 2 - wall - stain / 2), wall))
+        box(col, name + "_Ledge", M(colour), (width - 0.004, 0.008, 0.016), at=(0, sign * (depth / 2 + 0.004), 0), bevel=0.002)
     for i in range(1, cells):
-        box(col, name + "_CellWall", M(colour), (0.004, depth - 2 * wall, height - 0.025), at=(-width / 2 + i * width / cells, 0, wall))
-    box(col, name + "_Residue", M("lead"), (width - 2 * wall, depth - 2 * wall, 0.002), at=(0, 0, wall))
+        box(col, name + "_CellWall", M("leadstain"), (0.004, depth - 2 * (wall + stain), height - 0.025),
+            at=(-width / 2 + i * width / cells, 0, wall))
+    w, h = width * 0.6, height * 0.35
+    x, z = -width * 0.08, height * 0.2
+    torn = [(-0.5, 0), (0.2, 0), (0.32, 0.18), (0.22, 0.38), (0.42, 0.6), (0.3, 0.8), (0.5, 1.0), (-0.5, 1.0)]
+    prism(col, name + "_Label", M(label), [(x + u * w, z + v * h) for u, v in torn], 0.002, at=(0, -depth / 2 - 0.001, 0))
+    # Both kept left of the tear, which reaches in to 0.2 of the scrap's width from its middle.
+    if words:
+        lettering = text(col, name + "_Text", M("ink"), words, h * 0.4, at=(x - 0.44 * w, -depth / 2 - 0.0035, z + h * 0.3),
+                         align="LEFT")
+        lettering.scale *= min(1.0, 0.6 * w / lettering.dimensions.x)
+    if bolt:
+        s = h * 0.8
+        outline = [(-0.25, 0.45), (-0.02, 0.45), (-0.2, 0.0), (0.3, 0.58), (0.05, 0.58), (0.25, 1.0), (-0.15, 1.0)]
+        prism(col, name + "_Bolt", M("bolt"), [(x - 0.15 * w + u * s, z + h * 0.1 + v * s) for u, v in outline], 0.001,
+              at=(0, -depth / 2 - 0.0025, 0))
     if handles:
         for sign in (-1, 1):
             tube(col, name + "_Handle", M("black"), [(sign * width / 2, -depth / 4, height - 0.06),
@@ -840,15 +874,15 @@ def battery_case(col, name, size, colour, cells, handles=False):
 
 
 def car_battery_case(col):
-    battery_case(col, "CarCase", (0.26, 0.17, 0.2), "battery", 6)
+    battery_case(col, "CarCase", (0.26, 0.17, 0.2), "carbattery", 6, "carlabel", bolt=True)
 
 
 def deep_cycle_battery_case(col):
-    battery_case(col, "DeepCycleCase", (0.32, 0.17, 0.23), "marine", 6)
+    battery_case(col, "DeepCycleCase", (0.32, 0.17, 0.23), "marine", 6, "label")
 
 
 def l16_battery_case(col):
-    battery_case(col, "L16Case", (0.30, 0.18, 0.43), "maroon", 3, handles=True)
+    battery_case(col, "L16Case", L16, "maroon", 3, "label", words="L-16", handles=True)
 
 
 PLATE = (0.13, 0.12)  # a plate's width and height, without its lug
