@@ -1,10 +1,12 @@
 -- Battery banks and the panels connected to them, as both sides see them: what an object is,
--- what a bank holds and what it may take, and the bank's status as the server last reported it.
+-- what a bank holds and what it may take, and the bank's summary and status as the server last
+-- reported them.
 --
 -- The server runs the banks (server/RenewableEnergy/PowerBank) and adds perform(), place() and
--- remove() to this table; the client adds requestStatus() (client/RenewableEnergy/PowerBank/
--- ClientBankSystem.lua). Both register a Global Object System under SYSTEM_NAME, which keeps
--- each bank's state while its chunk is unloaded and copies the `status` field to every client.
+-- remove() to this table; the client adds watchStatus() and unwatchStatus() (client/
+-- RenewableEnergy/PowerBank/ClientBankSystem.lua). Both register a Global Object System under
+-- SYSTEM_NAME, which keeps each bank's state while its chunk is unloaded and copies its small
+-- `summary` to every client. The whole `status` goes only to the players watching it.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
@@ -17,6 +19,8 @@ RenewableEnergy.PowerBank = PowerBank
 local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
+-- The sendServerCommand module that carries a bank's status to the players watching it.
+PowerBank.STATUS_MODULE = "RenewableEnergyBankStatus"
 PowerBank.WIRE = "Base.ElectricWire"
 PowerBank.SCRAP = "Base.ElectronicsScrap"
 -- Item modData: the item was wired into a bank once, which taught its Electricity XP.
@@ -272,37 +276,66 @@ function PowerBank.adoptContainer(container)
     end
 end
 
---- Why `character` can't wire `item` into the bank `bankObject` now, as a translation key, or
---- nil if they can.
-function PowerBank.wiringRefusal(character, bankObject, item)
+-- Adds a need to a list for RenewableEnergy.firstUnmet, unless nothing of it is needed.
+local function addNeed(needs, need)
+    if need.need > 0 then
+        table.insert(needs, need)
+    end
+end
+
+--- What wiring a part of type `fullType` into a bank takes of `character`
+--- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
+--- Scrap.
+function PowerBank.wiringNeeds(character, fullType)
+    local wiring = PowerBank.wiringFor(fullType)
+    local inventory = character:getInventory()
+    local needs = {}
+    addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = wiring.skill })
+    addNeed(needs, { kind = "tool", tool = wiring.tool, have = hasTool(character, wiring.tool) and 1 or 0, need = 1 })
+    addNeed(needs, { kind = "wire", item = PowerBank.WIRE, have = inventory:getCountTypeRecurse(PowerBank.WIRE), need = wiring.wire })
+    addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = inventory:getCountTypeRecurse(PowerBank.SCRAP), need = wiring.scrap })
+    return needs
+end
+
+--- What keeps `character` from wiring `item` into the bank `bankObject` now whatever they
+--- carry, as a translation key, or nil.
+function PowerBank.wiringBlocker(character, bankObject, item)
     local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
     local container = bank and bankObject:getContainer()
-    local wiring = instanceof(item, "InventoryItem") and PowerBank.wiringFor(item:getFullType())
-    if not (container and wiring) then
+    local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
+    if not (container and kind) then
         return "Tooltip_RenewableEnergy_NotAPart"
-    end
-    local kind = PowerBank.partKind(item:getFullType())
-    if countParts(container, kind) >= maxParts(bank.spec, kind) then
+    elseif countParts(container, kind) >= maxParts(bank.spec, kind) then
         return "Tooltip_RenewableEnergy_NoSlot"
     elseif character:tooDarkToRead() then
         return "Tooltip_RenewableEnergy_TooDark"
-    elseif character:getPerkLevel(Perks.Electricity) < wiring.skill then
-        return "Tooltip_RenewableEnergy_NeedSkill"
-    elseif not hasTool(character, wiring.tool) then
-        return "Tooltip_RenewableEnergy_NeedTool"
-    end
-    local inventory = character:getInventory()
-    if inventory:getCountTypeRecurse(PowerBank.WIRE) < wiring.wire then
-        return "Tooltip_RenewableEnergy_NeedWire"
-    elseif inventory:getCountTypeRecurse(PowerBank.SCRAP) < wiring.scrap then
-        return "Tooltip_RenewableEnergy_NeedScrap"
     end
     return nil
 end
 
---- Why `character` can't repair the inverter or controller `item` with Electronics Scrap now,
---- as a translation key, or nil if they can.
-function PowerBank.repairRefusal(character, item)
+--- Why `character` can't wire `item` into the bank `bankObject` now, or nil if they can: what
+--- wiringBlocker says, else the kind of the first of wiringNeeds they are short of.
+function PowerBank.wiringRefusal(character, bankObject, item)
+    local blocker = PowerBank.wiringBlocker(character, bankObject, item)
+    if blocker then
+        return blocker
+    end
+    local short = RenewableEnergy.firstUnmet(PowerBank.wiringNeeds(character, item:getFullType()))
+    return short and short.kind
+end
+
+--- What repairing an inverter or controller takes of `character` (RenewableEnergy.firstUnmet):
+--- the Electricity level and one Electronics Scrap.
+function PowerBank.repairNeeds(character)
+    local needs = {}
+    addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = Specs.partRepair.skill })
+    addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = character:getInventory():getCountTypeRecurse(PowerBank.SCRAP), need = 1 })
+    return needs
+end
+
+--- What keeps `character` from repairing `item` with Electronics Scrap now whatever they carry,
+--- as a translation key, or nil.
+function PowerBank.repairBlocker(character, item)
     local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
     if kind ~= "inverter" and kind ~= "controller" then
         return "Tooltip_RenewableEnergy_NotRepairable"
@@ -310,12 +343,19 @@ function PowerBank.repairRefusal(character, item)
         return "Tooltip_RenewableEnergy_NoRepairNeeded"
     elseif character:tooDarkToRead() then
         return "Tooltip_RenewableEnergy_TooDark"
-    elseif character:getPerkLevel(Perks.Electricity) < Specs.partRepair.skill then
-        return "Tooltip_RenewableEnergy_NeedSkill"
-    elseif character:getInventory():getCountTypeRecurse(PowerBank.SCRAP) < 1 then
-        return "Tooltip_RenewableEnergy_NeedScrap"
     end
     return nil
+end
+
+--- Why `character` can't repair the inverter or controller `item` now, or nil if they can: what
+--- repairBlocker says, else the kind of the first of repairNeeds they are short of.
+function PowerBank.repairRefusal(character, item)
+    local blocker = PowerBank.repairBlocker(character, item)
+    if blocker then
+        return blocker
+    end
+    local short = RenewableEnergy.firstUnmet(PowerBank.repairNeeds(character))
+    return short and short.kind
 end
 
 -- Banks as either side knows them ---------------------------------------------------------
@@ -342,15 +382,22 @@ local function bankAt(x, y, z)
     return globalObject and globalObject:getModData()
 end
 
---- The bank's status (see Bank:buildStatus), or nil.
-function PowerBank.getStatus(x, y, z)
+--- What every client knows of the bank at x, y, z (see Bank:buildSummary), or nil.
+function PowerBank.getSummary(x, y, z)
     local bank = bankAt(x, y, z)
-    return bank and bank.status
+    return bank and bank.summary
 end
 
---- The status of the bank `isoObject`, or nil.
+--- The summary of the bank `isoObject`, or nil.
+function PowerBank.summaryOf(isoObject)
+    return PowerBank.getSummary(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+end
+
+--- The whole status of the bank `isoObject` (see Bank:buildStatus), or nil. It reaches only the
+--- players watching it, and the authority keeps it only while someone does.
 function PowerBank.statusOf(isoObject)
-    return PowerBank.getStatus(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    local bank = bankAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    return bank and bank.status
 end
 
 --- An object's square as { x, y, z }, the form commands and statuses name places in.
@@ -386,12 +433,12 @@ function PowerBank.banksInReach(x, y, z)
 end
 
 --- The bank the panel on this square is connected to, as { x, y, z }, or nil. The authority
---- reads the bank's own list of panels; a client has only the status the server last sent.
+--- reads the bank's own list of panels; a client has only the summary the server last sent.
 function PowerBank.bankOfSource(x, y, z)
     local found
     local authority = PowerBank.serverSystem ~= nil
     eachBank(function(bank)
-        local sources = authority and bank.sources or (bank.status and bank.status.sources)
+        local sources = authority and bank.sources or (bank.summary and bank.summary.sources)
         for _, source in ipairs(sources or {}) do
             if source.x == x and source.y == y and source.z == z then
                 found = { x = bank.x, y = bank.y, z = bank.z }

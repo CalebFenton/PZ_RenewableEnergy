@@ -1,3 +1,4 @@
+require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
@@ -24,15 +25,6 @@ SolarCellCharger.BATTERY_WH = 25
 local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"
 -- The charger's watt-hours not yet a whole use of a battery; uses are whole steps.
 local STORED_KEY = "RenewableEnergy_storedWh"
--- MapObjects keeps one function per sprite and priority.
-local LOAD_PRIORITY = 7
-
--- Place key -> { x, y, z } of every charger the authority has seen.
-local places = {}
-
-local function placeKey(x, y, z)
-    return x .. "," .. y .. "," .. z
-end
 
 function SolarCellCharger.isCharger(isoObject)
     return isoObject ~= nil and RenewableEnergy.Sprites.kindOf(RenewableEnergy.Sprites.nameOf(isoObject)) == "cellCharger"
@@ -46,24 +38,20 @@ function SolarCellCharger.findOn(square)
     return RenewableEnergy.findObjectOn(square, SolarCellCharger.isCharger)
 end
 
-local function adopt(isoObject)
+local function setFilter(isoObject)
     local container = isoObject:getContainer()
     if container then
         container:setAcceptItemFunction(ACCEPT_FUNCTION)
     end
-    if not isClient() then
-        places[placeKey(isoObject:getX(), isoObject:getY(), isoObject:getZ())] =
-            { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ() }
-    end
 end
 
-MapObjects.OnLoadWithSprite(RenewableEnergy.Sprites.cellCharger, adopt, LOAD_PRIORITY)
-
-Events.OnObjectAdded.Add(function(isoObject)
-    if SolarCellCharger.isCharger(isoObject) then
-        adopt(isoObject)
-    end
-end)
+-- Every side needs the filter, but only the authority charges.
+local chargers = RenewableEnergy.PlaceTracker.new({
+    sprites = { RenewableEnergy.Sprites.cellCharger },
+    matches = SolarCellCharger.isCharger,
+    onFound = setFilter,
+    keepPlaces = not isClient(),
+})
 
 local function isCell(item)
     return item:getFullType() == SolarCellCharger.BATTERY
@@ -100,17 +88,10 @@ function SolarCellCharger.charge(charger, hours, sky)
     return added
 end
 
--- Charges every charger the authority has seen whose square is loaded. One whose square is
--- unloaded is dropped; MapObjects reports it again when its chunk loads.
+-- Charges every loaded charger the authority has seen.
 function SolarCellCharger.chargeAll(hours)
     local sky = RenewableEnergy.Sun.skyNow()
-    for key, place in pairs(places) do
-        local square = getCell():getGridSquare(place.x, place.y, place.z)
-        local charger = SolarCellCharger.findOn(square)
-        if charger then
-            SolarCellCharger.charge(charger, hours, sky)
-        else
-            places[key] = nil
-        end
-    end
+    chargers:each(function(charger)
+        SolarCellCharger.charge(charger, hours, sky)
+    end)
 end

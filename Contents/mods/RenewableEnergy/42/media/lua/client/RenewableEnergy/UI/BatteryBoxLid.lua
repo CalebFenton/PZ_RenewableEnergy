@@ -1,8 +1,8 @@
 -- The arrow board's battery box lid is a trunk lid to vanilla (scripts/RenewableEnergy/Vehicles.txt
 -- says why), so vanilla's radial menu, joypad prompt, loot window and mechanics window would call it
 -- a trunk. These hooks give it the box's words on the trailer only, tell a player who tries the
--- padlocked box how to get in, offer Cut Padlock to one carrying bolt cutters, and show the box in
--- the loot window when the lid opens, wherever vanilla shows a trunk's container.
+-- padlocked box how to get in, offer Cut Padlock at the padlock, and show the box in the loot
+-- window when the lid opens, wherever vanilla shows a trunk's container.
 
 require "ISUI/ISButtonPrompt"
 require "ISUI/ISWorldObjectContextMenu"
@@ -42,6 +42,9 @@ end
 
 -- Cut Padlock --------------------------------------------------------------------------------------
 
+-- An item with the bolt cutters tag, to name where a player has none.
+BatteryBoxLid.CUTTERS = "Base.BoltCutters"
+
 --- The bolt cutters `character` would cut the lid's padlock with, those in hand first, or nil when
 --- there is no padlock to cut or no working pair to cut it with.
 function BatteryBoxLid.padlockCutters(character, lid)
@@ -69,9 +72,12 @@ end
 
 local vanillaShowRadialMenuOutside = ISVehicleMenu.showRadialMenuOutside
 
--- Renames the lid's Open and Close and adds Cut Padlock beside them. The menu joins the UI only on
--- the next UI update (UIManager.AddUI), so whether vanilla built it here shows only in what it was
--- before: shown, which the call hides, or the character in a vehicle, which builds nothing.
+-- Renames the lid's Open and Close and adds Cut Padlock beside them at a padlock that holds: one
+-- that cuts it for a player carrying bolt cutters, else one that only says what cutting takes and
+-- does nothing, as vanilla's radial says what hotwiring takes (ISVehicleMenu.showRadialMenu). The
+-- menu joins the UI only on the next UI update (UIManager.AddUI), so whether vanilla built it here
+-- shows only in what it was before: shown, which the call hides, or the character in a vehicle,
+-- which builds nothing.
 function ISVehicleMenu.showRadialMenuOutside(playerObj)
     local menu = getPlayerRadialMenu(playerObj:getPlayerNum())
     local wasShown = menu:isReallyVisible()
@@ -87,9 +93,15 @@ function ISVehicleMenu.showRadialMenuOutside(playerObj)
             menu:setSliceText(i, BatteryBoxLid.text(part, command == ISVehicleMenu.onOpenDoor and "IGUI_OpenTrunk" or "IGUI_CloseTrunk"))
         end
     end
-    local cutters = lid and BatteryBoxLid.padlockCutters(playerObj, lid)
+    if not (lid and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
+        return
+    end
+    local cutters = BatteryBoxLid.padlockCutters(playerObj, lid)
     if cutters then
         menu:addSlice(getText("IGUI_RenewableEnergy_CutPadlock"), cutters:getTex(), BatteryBoxLid.cutPadlock, playerObj, lid, cutters)
+    else
+        local script = getScriptManager():FindItem(BatteryBoxLid.CUTTERS)
+        menu:addSlice(getText("IGUI_RenewableEnergy_CutPadlockNeeds", script:getDisplayName()), script:getNormalTexture(), nil)
     end
 end
 

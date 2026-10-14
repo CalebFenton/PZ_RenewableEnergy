@@ -92,9 +92,9 @@ function Format.away(from, to)
     return getText(key, tiles, getText(COMPASS[eighth + 1]))
 end
 
---- A bank's name from its status: the one a player gave it, else its tier's.
-function Format.bankName(status)
-    return status.name or getItemNameFromFullType(status.bankType)
+--- A bank's name from its summary or status: the one a player gave it, else its tier's.
+function Format.bankName(bank)
+    return bank.name or getItemNameFromFullType(bank.bankType)
 end
 
 return Format

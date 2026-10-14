@@ -309,7 +309,8 @@ end
 
 -- Vanilla only lowers the odds of a part going on or coming off when a skill is below the part's
 -- (VehicleUtils.calculateInstallationSuccess). A panel is wired as well as bolted, so it asks for
--- every skill its table lists, through vanilla's own check that its tests leave unused.
+-- every skill its table lists, through vanilla's own check that its tests leave unused, and the
+-- mechanics window's tooltip lists them as needs (UI/PanelSkills.lua).
 local function hasPanelSkills(part, chr, tableName)
     return ISVehicleMechanics.cheat or VehicleUtils.testPerks(chr, part:getTable(tableName).skills)
 end

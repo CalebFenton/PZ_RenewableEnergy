@@ -91,10 +91,10 @@ function Action.isBoltCutters(item)
     return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and not item:isBroken()
 end
 
--- The status of the action's bank, or nil when there is no bank or no status yet.
-local function bankStatus(self)
+-- The summary of the action's bank, or nil when there is no bank or no summary yet.
+local function bankSummary(self)
     if isBank(self.bank) then
-        return PowerBank.statusOf(self.bank)
+        return PowerBank.summaryOf(self.bank)
     end
 end
 
@@ -108,47 +108,96 @@ local function holdsItem(self)
     return self.character:getInventory():containsRecursive(self.item)
 end
 
--- Whether the job applies to the world as it is now. Both sides ask: the client to offer and
--- start the job, the server again in complete(). The server re-checks everything it is told too.
-local CHECKS = {
+local function inWorld(vehicle)
+    return vehicle ~= nil and not vehicle:isRemovedFromWorld()
+end
+
+-- What each job needs from moment to moment, cheap enough for isValid to ask every tick: its
+-- target still in the world and its item still where the job needs it. These are what another
+-- player or the world can take away mid-job, and the character's own copy of the world shows
+-- them, so a multiplayer client asks them too.
+local KEEPS = {
     [Action.CONNECT_SOURCE] = function(self)
-        return isSource(self.object) and isBank(self.bank) and Action.bankInReach(self.object, self.bank)
-            and not samePosition(Action.connectedBank(self.object), positionOf(self.bank))
+        return isSource(self.object) and isBank(self.bank)
     end,
     [Action.DISCONNECT_SOURCE] = function(self)
-        return isSource(self.object) and Action.connectedBank(self.object) ~= nil
+        return isSource(self.object)
     end,
     [Action.CLEAR_SNOW] = function(self)
         return isSource(self.object) and PowerBank.sourceKind(self.object) == "flat"
             and Action.isSnowTool(self.item) and self.character:isPrimaryHandItem(self.item)
     end,
     [Action.TURN_ON] = function(self)
-        local status = bankStatus(self)
-        return status ~= nil and not status.on
+        return isBank(self.bank)
     end,
     [Action.TURN_OFF] = function(self)
-        local status = bankStatus(self)
-        return status ~= nil and status.on == true
+        return isBank(self.bank)
     end,
     [Action.ATTACH_MAINTAINER] = function(self)
-        return self.vehicle ~= nil and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
-            and self.character:getInventory():containsRecursive(self.item) and RenewableEnergy.SolarMaintainer.canAttach(self.vehicle)
+        return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
+            and holdsItem(self)
     end,
     [Action.DETACH_MAINTAINER] = function(self)
-        return self.vehicle ~= nil and RenewableEnergy.SolarMaintainer.isAttached(self.vehicle)
+        return inWorld(self.vehicle)
     end,
     [Action.WIRE_IN] = function(self)
-        return isBank(self.bank) and self.item ~= nil
-            and PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil
+        return isBank(self.bank) and self.item ~= nil and holdsItem(self)
     end,
     [Action.UNWIRE] = function(self)
         return self.item ~= nil and holdsItem(self) and PowerBank.partKind(self.item:getFullType()) ~= nil
     end,
     [Action.REPAIR_PART] = function(self)
-        return self.item ~= nil and holdsItem(self) and PowerBank.repairRefusal(self.character, self.item) == nil
+        return self.item ~= nil and holdsItem(self)
     end,
     [Action.RENAME] = function(self)
         return isBank(self.bank) and type(self.bankName) == "string"
+    end,
+    [Action.REPAIR_PANEL] = function(self)
+        local part = inWorld(self.vehicle) and self.vehicle:getPartById(self.partId)
+        return part and part:getInventoryItem() ~= nil or false
+    end,
+    [Action.REMOVE_BULB] = function(self)
+        return isGardenLight(self.object)
+    end,
+    [Action.ADD_BULB] = function(self)
+        return isGardenLight(self.object) and RenewableEnergy.SolarGardenLight.isBulb(self.item) and holdsItem(self)
+    end,
+    [Action.CUT_PADLOCK] = function(self)
+        return inWorld(self.vehicle) and Action.isBoltCutters(self.item) and self.character:isPrimaryHandItem(self.item)
+    end,
+}
+
+-- The rest of each job's rules: the state of its target and its bank, which a multiplayer
+-- client's copy can show late, and the checks too dear for every tick, which walk through every
+-- bank (the banks a panel reaches, the one it is wired to) or the whole inventory (the refusals).
+-- Single player asks them before the job starts, and the authority again in complete().
+local CHECKS = {
+    [Action.CONNECT_SOURCE] = function(self)
+        return Action.bankInReach(self.object, self.bank)
+            and not samePosition(Action.connectedBank(self.object), positionOf(self.bank))
+    end,
+    [Action.DISCONNECT_SOURCE] = function(self)
+        return Action.connectedBank(self.object) ~= nil
+    end,
+    [Action.TURN_ON] = function(self)
+        local summary = bankSummary(self)
+        return summary ~= nil and not summary.on
+    end,
+    [Action.TURN_OFF] = function(self)
+        local summary = bankSummary(self)
+        return summary ~= nil and summary.on == true
+    end,
+    [Action.ATTACH_MAINTAINER] = function(self)
+        return RenewableEnergy.SolarMaintainer.canAttach(self.vehicle)
+    end,
+    [Action.DETACH_MAINTAINER] = function(self)
+        return RenewableEnergy.SolarMaintainer.isAttached(self.vehicle)
+    end,
+    [Action.WIRE_IN] = function(self)
+        return PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil
+    end,
+    [Action.REPAIR_PART] = function(self)
+        return PowerBank.repairRefusal(self.character, self.item) == nil
     end,
     [Action.REPAIR_PANEL] = function(self)
         local ArrowBoard = RenewableEnergy.ArrowBoard
@@ -156,24 +205,43 @@ local CHECKS = {
             and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
     end,
     [Action.REMOVE_BULB] = function(self)
-        return isGardenLight(self.object) and RenewableEnergy.SolarGardenLight.getBulb(self.object) ~= nil
+        return RenewableEnergy.SolarGardenLight.getBulb(self.object) ~= nil
     end,
     [Action.ADD_BULB] = function(self)
-        local SolarGardenLight = RenewableEnergy.SolarGardenLight
-        return isGardenLight(self.object) and SolarGardenLight.getBulb(self.object) == nil
-            and SolarGardenLight.isBulb(self.item) and self.character:getInventory():containsRecursive(self.item)
+        return RenewableEnergy.SolarGardenLight.getBulb(self.object) == nil
     end,
     [Action.CUT_PADLOCK] = function(self)
         local ArrowBoard = RenewableEnergy.ArrowBoard
         local lid = ArrowBoard ~= nil and ArrowBoard.isTrailer(self.vehicle) and self.vehicle:getPartById(ArrowBoard.LID)
-        return lid and ArrowBoard.isPadlocked(lid) and Action.isBoltCutters(self.item)
-            and self.character:isPrimaryHandItem(self.item) or false
+        return lid and ArrowBoard.isPadlocked(lid) or false
     end,
 }
 
+--- Whether the job applies to the world as it is now, every rule of it.
 function Action:canPerform()
-    local check = CHECKS[self.mode]
-    return check ~= nil and check(self)
+    local keeps, check = KEEPS[self.mode], CHECKS[self.mode]
+    return keeps ~= nil and keeps(self) and (check == nil or check(self))
+end
+
+-- How far from the middle of the target's square, on each axis in squares, a character may work
+-- on a bank, a panel or a garden light: what luautils.walkAdj counts as already there, the square
+-- getCorrectSquareForWall moves a wall's target to, and a couple more for the character's drift
+-- and a multiplayer client's lag. A vehicle job gets as much past the vehicle's body, whose areas
+-- the menu walks the character to (ISPathFindAction.pathToVehicleArea).
+local REACH = 4.6
+
+-- Whether the character stands where the menu would have walked them for the job.
+local function withinReach(character, target)
+    if instanceof(target, "BaseVehicle") then
+        local extents = target:getScript():getExtents()
+        local reach = math.max(extents:x(), extents:z()) / 2 + REACH
+        return IsoUtils.DistanceTo(character:getX(), character:getY(), target:getX(), target:getY()) <= reach
+            and math.abs(character:getZ() - target:getZ()) < 1
+    end
+    local square = target:getSquare()
+    return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= REACH
+        and math.abs(character:getY() - (square:getY() + 0.5)) <= REACH
+        and math.abs(character:getZ() - square:getZ()) < 1
 end
 
 -- The bank's command for each mode, run on the authority by PowerBank.perform.
@@ -278,7 +346,10 @@ function Action:isValid()
     if self.action and self.action:getJobDelta() >= 0.9 then
         return true
     end
-    if self.item and not holdsItem(self) then
+    -- The game asks every tick (IsoGameCharacter.update), so this asks only what can change
+    -- mid-job and is cheap to see. The rest waits for start() and complete().
+    local keeps = KEEPS[self.mode]
+    if not (keeps and keeps(self)) then
         return false
     end
     -- The server can't tell whether a remote player stands in the dark
@@ -287,9 +358,7 @@ function Action:isValid()
         HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
         return false
     end
-    -- A multiplayer client's copy of the bank's status can lag behind the server's, which
-    -- checks again in complete().
-    return isClient() or self:canPerform()
+    return withinReach(self.character, self:target())
 end
 
 function Action:waitToStart()
@@ -305,9 +374,16 @@ function Action:update()
 end
 
 function Action:start()
+    -- Single player checks every rule once here, and again in complete(), as vanilla's crafting
+    -- checks its recipe in start() and leaves isValid to whether the bench is still in use
+    -- (ISHandcraftAction). A multiplayer client leaves them to the server's complete().
+    if not isClient() and not self:canPerform() then
+        self:forceStop()
+        return
+    end
     if isClient() and self.item then
         -- Server syncs can replace the item objects while the action waits in the queue. A bank
-        -- gone meanwhile leaves no item, which the server refuses.
+        -- gone meanwhile leaves no item, and isValid then stops the job.
         local container = self.character:getInventory()
         if PART_IN_BANK[self.mode] then
             container = isBank(self.bank) and self.bank:getContainer()
@@ -377,27 +453,6 @@ local function cutPadlock(self)
         ItemUtils.checkWeapon(self.character)
     end
     return true
-end
-
--- How far from the middle of the target's square, on each axis in squares, a multiplayer server
--- lets a character finish a job on a bank, a panel or a garden light: what luautils.walkAdj counts
--- as already there, the square getCorrectSquareForWall moves a wall's target to, and a couple more
--- for the character's drift and the client's lag. A vehicle job gets as much past the vehicle's
--- body, whose areas the menu walks the character to (ISPathFindAction.pathToVehicleArea).
-local REACH = 4.6
-
--- Whether the character stands where the menu would have walked them for the job.
-local function withinReach(character, target)
-    if instanceof(target, "BaseVehicle") then
-        local extents = target:getScript():getExtents()
-        local reach = math.max(extents:x(), extents:z()) / 2 + REACH
-        return IsoUtils.DistanceTo(character:getX(), character:getY(), target:getX(), target:getY()) <= reach
-            and math.abs(character:getZ() - target:getZ()) < 1
-    end
-    local square = target:getSquare()
-    return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= REACH
-        and math.abs(character:getY() - (square:getY() + 0.5)) <= REACH
-        and math.abs(character:getZ() - square:getZ()) < 1
 end
 
 -- The server never calls isValid(), so this checks the action again. NetTimedAction checks no

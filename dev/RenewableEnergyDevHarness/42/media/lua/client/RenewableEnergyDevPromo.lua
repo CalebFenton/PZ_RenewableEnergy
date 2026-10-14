@@ -9,16 +9,16 @@
 -- Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
 -- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
 -- recipe and skill names in the game's language.
--- The shots come in groups (GROUP_NAMES), and PROMO=<group>,... shoots only those, building only
--- the setups they need, so art/promo/extract.py replaces only their captures.
--- Shots of anything but the world are taken twice, on black (promo_<shot>_k.png) and on white
--- (promo_<shot>_w.png), so that art/promo/extract.py can recover how transparent each pixel is.
--- The empty floor is shot too, so that extract.py can find each item by comparing its shot with
--- the floor's.
+-- The shots come in groups (dev/harness.conf's MODE_GROUPS_promo), and PROMO=<group>,... shoots
+-- only those, building only the setups they need, so the extraction replaces only their captures.
+-- Shots of anything but the world are taken twice, on black and on white (PZHarness/Capture.lua).
+-- The empty floor is shot too, so that art/promo/extract.py can find each item by comparing its
+-- shot with the floor's.
 -- The run draws as many frames a second as it can, so its steps wait for what they need, such as
 -- the lighting settling, and count frames only for drawing.
 
 require "PZHarness/TestLib"
+local Capture = require "PZHarness/Capture"
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 require "RenewableEnergy/Specs"
@@ -36,12 +36,7 @@ local Promo = {}
 local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
 
--- The groups of shots, in the order a run takes them: the status window first, so that it reads
--- the same noon figures whatever else the run shoots, then the garden lights and the poster,
--- which are at night, the poster last since it moves the clock on to the next day.
--- run-debug-client.sh reads this line to refuse an unknown PROMO name before the game starts.
-local GROUP_NAMES = { "status", "menu", "world", "icons", "models", "trailer", "gardenlights", "poster" }
-local DRAW_FRAMES = Stage.DRAW_FRAMES
+local DRAW_FRAMES = Capture.DRAW_FRAMES
 
 -- The world shots are as wide as the README's images, in UI units.
 local WORLD_W = 1260
@@ -207,162 +202,14 @@ local POSTER = {
 -- float over the shots.
 local QUIET_RADIUS = 25
 
--- JSON -------------------------------------------------------------------------------------------
-
--- A table is an array when its keys are exactly 1 to #value; Kahlua has no next(), so the keys
--- are counted with pairs(). An empty table is an array.
-local function isArray(value)
-    local count = 0
-    for _ in pairs(value) do
-        count = count + 1
-    end
-    return count == #value
-end
-
-local function encode(value, out)
-    local kind = type(value)
-    if kind == "table" then
-        if isArray(value) then
-            table.insert(out, "[")
-            for i, element in ipairs(value) do
-                if i > 1 then
-                    table.insert(out, ",")
-                end
-                encode(element, out)
-            end
-            table.insert(out, "]")
-        else
-            local keys = {}
-            for key in pairs(value) do
-                table.insert(keys, key)
-            end
-            table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
-            table.insert(out, "{")
-            for i, key in ipairs(keys) do
-                if i > 1 then
-                    table.insert(out, ",")
-                end
-                encode(tostring(key), out)
-                table.insert(out, ":")
-                encode(value[key], out)
-            end
-            table.insert(out, "}")
-        end
-    elseif kind == "string" then
-        local escaped = string.gsub(value, '[%c"\\]', function(c)
-            return string.format("\\u%04x", string.byte(c))
-        end)
-        table.insert(out, '"' .. escaped .. '"')
-    elseif kind == "number" then
-        -- JSON has no NaN or infinity, so a figure that came out as one has to be fixed at its source.
-        if value ~= value or value == math.huge or value == -math.huge then
-            error("REPromo: non-finite number in the JSON")
-        end
-        table.insert(out, tostring(value))
-    elseif kind == "boolean" then
-        table.insert(out, tostring(value))
-    else
-        table.insert(out, "null")
-    end
-end
-
-local function writeJson(fileName, value)
-    local out = {}
-    encode(value, out)
-    local writer = getFileWriter(fileName, true, false)
-    writer:write(table.concat(out))
-    writer:close()
-end
-
 -- Steps ------------------------------------------------------------------------------------------
 
-local steps = {}
-local shots = {}
-local tinted = {}
--- The group whose steps are being added, which the shots name for extract.py.
-local currentGroup
+-- The run whose steps are being added; Promo.capture makes it.
+local run
+local region, elementRegion = Capture.region, Capture.elementRegion
 
 local function add(step)
-    table.insert(steps, step)
-end
-
-local function region(name, x, y, w, h)
-    return { name = name, x = math.floor(x), y = math.floor(y), w = math.floor(w), h = math.floor(h) }
-end
-
-local function elementRegion(name, element)
-    return region(name, element:getAbsoluteX(), element:getAbsoluteY(), element:getWidth(), element:getHeight())
-end
-
--- The game writes the file before the call returns (Core.TakeFullScreenshot), so no step waits
--- after a shot.
-local function screenshot(file)
-    Stage.screenshot("REPromo", file)
-end
-
--- Every tinted element, the backdrop first, takes the backdrop colour. Returns a runSteps wait
--- until the backdrop has drawn DRAW_FRAMES times since: the UI redraws at its own rate
--- (Core.StartFrameUI, the uiRenderFPS option) and the frames in between show its last drawing, so
--- at an uncapped frame rate a count of frames can pass with no UI drawn at all.
-local function setLevel(level)
-    for _, element in ipairs(tinted) do
-        element.backgroundColor = { r = level, g = level, b = level, a = 1 }
-    end
-    local backdrop = tinted[1]
-    local start = backdrop.drawn
-    return function()
-        return backdrop.drawn - start >= DRAW_FRAMES
-    end
-end
-
--- Takes the shot on black and on white. regions() runs once the shot is laid out.
-local function addMatted(name, regions)
-    local group = currentGroup
-    add(function()
-        return setLevel(0)
-    end)
-    add(function()
-        screenshot("promo_" .. name .. "_k")
-        return setLevel(1)
-    end)
-    add(function()
-        screenshot("promo_" .. name .. "_w")
-        table.insert(shots, { name = name, group = group, matte = true, regions = regions() })
-    end)
-end
-
-local function addOpaque(name, regions)
-    local group = currentGroup
-    add(function()
-        return DRAW_FRAMES
-    end)
-    add(function()
-        screenshot("promo_" .. name)
-        table.insert(shots, { name = name, group = group, matte = false, regions = regions() })
-    end)
-end
-
-local function newBackdrop()
-    local backdrop = ISPanel:new(0, 0, getCore():getScreenWidth(), getCore():getScreenHeight())
-    backdrop:initialise()
-    -- Counts its drawings for setLevel.
-    backdrop.drawn = 0
-    local prerender = backdrop.prerender
-    backdrop.prerender = function(self)
-        self.drawn = self.drawn + 1
-        prerender(self)
-    end
-    backdrop:addToUIManager()
-    backdrop:setVisible(true)
-    tinted = { backdrop }
-    return backdrop
-end
-
-local function removeBackdrop()
-    add(function()
-        tinted[1]:removeFromUIManager()
-        return 1
-    end)
+    run:add(step)
 end
 
 -- Names ------------------------------------------------------------------------------------------
@@ -536,7 +383,7 @@ end
 local function addIcons()
     local sheet
     add(function()
-        local backdrop = newBackdrop()
+        local backdrop = run:newBackdrop()
         sheet = IconSheet:new(100, 100, getCore():getScreenWidth() - 200, getCore():getScreenHeight() - 200)
         sheet:noBackground()
         sheet.icons = {}
@@ -553,14 +400,14 @@ local function addIcons()
         end
         backdrop:addChild(sheet)
     end)
-    addMatted("icons", function()
+    run:addMatted("icons", function()
         local regions = {}
         for _, icon in ipairs(sheet.icons) do
             table.insert(regions, region(icon.name, sheet:getAbsoluteX() + icon.x, sheet:getAbsoluteY() + icon.y, icon.w, icon.h))
         end
         return regions
     end)
-    removeBackdrop()
+    run:removeBackdrop()
 end
 
 -- World ------------------------------------------------------------------------------------------
@@ -1146,13 +993,13 @@ local lookedFrom = {}
 local function goTo(squares, stepsOut)
     for i, square in ipairs(squares) do
         if i == #squares or not lookedFrom[square] then
-            Stage.addLookAround(steps, getPlayer(), square)
+            Stage.addLookAround(run.steps, getPlayer(), square)
             lookedFrom[square] = true
         end
     end
     add(function()
         Stage.zoomOut(stepsOut)
-        return Stage.zoomSettled()
+        return Capture.zoomSettled()
     end)
 end
 
@@ -1171,10 +1018,11 @@ local function addWorldSettings(places)
     end)
 end
 
--- Logs each bank's status as the window reads it.
+-- Logs each bank's status as the window would read it. The promo runs single player, where the
+-- banks' records are at hand; the status itself goes only to players watching a bank.
 local function logBanks()
     for name, bank in pairs({ homestead = homesteadBank, ["stage 0"] = stage0Box }) do
-        local status = PowerBank.statusOf(bank)
+        local status = PowerBank.serverSystem:getLuaObjectAt(bank:getX(), bank:getY(), bank:getZ()):buildStatus()
         local reasons, kinds = {}, {}
         for _, source in ipairs(status.sources) do
             table.insert(reasons, tostring(source.reason))
@@ -1214,26 +1062,26 @@ local function addWorld()
     end
     table.insert(scouts, at(HOMESTEAD.player))
     goTo(scouts, 1)
-    addOpaque("homestead", function()
+    run:addOpaque("homestead", function()
         return { centred("homestead", homesteadSquares()) }
     end)
     -- The banner shows the whole homestead a step further out.
     add(function()
         getCore():doZoomScroll(0, 1)
-        return Stage.zoomSettled()
+        return Capture.zoomSettled()
     end)
-    addOpaque("world", function()
+    run:addOpaque("world", function()
         return { rightAligned("world", homesteadSquares()) }
     end)
     -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
     goTo({ at(HOMESTEAD.indoors) }, 0)
-    addOpaque("bank", function()
+    run:addOpaque("bank", function()
         return { cropped("bank", bankSquares()) }
     end)
     -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
     -- among them, then from the window.
     goTo({ atStage0(STAGE0.scout), atStage0(STAGE0.player) }, 0)
-    addOpaque("stage0", function()
+    run:addOpaque("stage0", function()
         return { centred("stage0", stage0Squares()) }
     end)
 end
@@ -1242,7 +1090,7 @@ end
 local function addStatus()
     local window
     add(function()
-        newBackdrop()
+        run:newBackdrop()
         window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(at(HOMESTEAD.bank)))
         window:setX(100)
         window:setY(100)
@@ -1251,13 +1099,13 @@ local function addStatus()
             return (window.renderedFrames or 0) >= 2
         end
     end)
-    addMatted("status", function()
+    run:addMatted("status", function()
         return { elementRegion("status", window) }
     end)
     add(function()
         window:close()
     end)
-    removeBackdrop()
+    run:removeBackdrop()
 end
 
 -- The submenu of `menu`'s option named `name`, opened as if the mouse were over the option.
@@ -1276,7 +1124,7 @@ end
 local function addMenu()
     local menus, carried = {}, {}
     add(function()
-        newBackdrop()
+        run:newBackdrop()
         -- In debug mode vanilla adds its debug options to every world menu unless told not to.
         getDebugOptions():setBoolean("UI.HideDebugContextMenuOptions", true)
         local inventory = getPlayer():getInventory()
@@ -1297,7 +1145,7 @@ local function addMenu()
         -- The world menu was made when the game started, under the backdrop.
         context:bringToTop()
     end)
-    addMatted("menu", function()
+    run:addMatted("menu", function()
         local left, top, right, bottom = math.huge, math.huge, 0, 0
         for _, menu in ipairs(menus) do
             left, top = math.min(left, menu:getAbsoluteX()), math.min(top, menu:getAbsoluteY())
@@ -1313,7 +1161,7 @@ local function addMenu()
         end
         return 1
     end)
-    removeBackdrop()
+    run:removeBackdrop()
 end
 
 -- Where extract.py looks for the item in a studio shot: STUDIO.window around the studio
@@ -1329,7 +1177,7 @@ end
 
 -- Every item alone on the studio floor. `models` gets one entry per item.
 local function addModels(items, models)
-    local group = currentGroup
+    local group = run.current
     local zoomLevels
     add(function()
         local asphalt = roadCar:getFloor():getSprite():getName()
@@ -1354,13 +1202,13 @@ local function addModels(items, models)
         end
     end)
     goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]) }, 0)
-    local floor = "promo_models_floor"
+    local floor = run.prefix .. "models_floor"
     add(function()
         studio:removeAllWorldObjects()
         return DRAW_FRAMES
     end)
     add(function()
-        screenshot(floor)
+        run:screenshot(floor)
     end)
     for _, item in ipairs(items) do
         local name = "model_" .. string.gsub(item.fullType, "%.", "_")
@@ -1371,8 +1219,8 @@ local function addModels(items, models)
             return DRAW_FRAMES
         end)
         add(function()
-            local file = "promo_" .. name
-            screenshot(file)
+            local file = run.prefix .. name
+            run:screenshot(file)
             table.insert(models, { name = name, group = group, file = file, floor = floor, window = studioWindow(name) })
             studio:removeAllWorldObjects()
         end)
@@ -1427,7 +1275,7 @@ local function addTrailer()
     -- From the item floor first, as a full run's character has by now: the hedges and fences along
     -- a road hide what lies past them from the road itself.
     goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]), atRoad(ROAD.player) }, 1)
-    addOpaque("trailer", function()
+    run:addOpaque("trailer", function()
         return { centred("trailer", roadSquares()) }
     end)
 end
@@ -1469,7 +1317,7 @@ local function addGardenLights()
         end
     end)
     goTo({ atWalk(WALK.scout), atWalk(WALK.player) }, 0)
-    addOpaque("gardenlights", function()
+    run:addOpaque("gardenlights", function()
         return { centred("gardenlights", walkSquares()) }
     end)
 end
@@ -1563,7 +1411,7 @@ local function addPoster()
         buildPoster()
         return Stage.lightingSettled(getPlayer(), true)
     end)
-    addOpaque("poster", function()
+    run:addOpaque("poster", function()
         return { posterRegion() }
     end)
 end
@@ -1630,9 +1478,9 @@ local function findPlaces(player, needs)
     return found
 end
 
--- The groups of GROUP_NAMES: the places of findPlaces their steps use, whether they need both
--- setups built, and what adds their steps. A run looks only for its groups' places, so that one
--- group can't fail for want of a place another needs.
+-- The groups of dev/harness.conf's MODE_GROUPS_promo: the places of findPlaces their steps use,
+-- whether they need both setups built, and what adds their steps. A run looks only for its groups'
+-- places, so that one group can't fail for want of a place another needs.
 local GROUPS = {
     world = { places = { "homestead", "stage0" }, setups = true, add = addWorld },
     status = { places = { "homestead", "stage0" }, setups = true, add = addStatus },
@@ -1660,57 +1508,24 @@ local function addTimer(label)
     end
 end
 
--- A group in only one of GROUP_NAMES and GROUPS, or nil: one missing from GROUP_NAMES is never
--- shot and run-debug-client.sh refuses its name, and one missing from GROUPS has no steps.
-local function unlistedGroup()
-    local listed = {}
-    for _, name in ipairs(GROUP_NAMES) do
-        if not GROUPS[name] then
-            return name .. " is in GROUP_NAMES but not GROUPS"
-        end
-        listed[name] = true
-    end
-    for name in pairs(GROUPS) do
-        if not listed[name] then
-            return name .. " is in GROUPS but not GROUP_NAMES"
-        end
-    end
-end
-
---- Shoots the groups named in `selection`, comma-separated, or every group if it is empty, and
---- calls onDone.
+--- Shoots the groups named in `selection`, comma-separated in the order to shoot them, which
+--- run-client.sh gives every group of MODE_GROUPS_promo when PROMO names none, and calls onDone.
 function Promo.capture(selection, onDone)
-    selection = selection or ""
-    print("REPromo START " .. (selection ~= "" and selection or "all"))
-    local unlisted = unlistedGroup()
-    if unlisted then
-        print("REPromo FAIL: group " .. unlisted)
-        getCore():quitToDesktop()
-        return
-    end
-    local selected, any = {}, false
-    for name in string.gmatch(selection, "[^,%s]+") do
+    print("REPromo START " .. selection)
+    run = Capture.new("REPromo")
+    local chosen, needs = Capture.names(selection), {}
+    for _, name in ipairs(chosen) do
         if not GROUPS[name] then
-            print("REPromo FAIL: no group " .. name .. "; the groups are " .. table.concat(GROUP_NAMES, ","))
-            getCore():quitToDesktop()
+            run:fail("MODE_GROUPS_promo names " .. name .. ", which GROUPS lacks")
             return
         end
-        selected[name], any = true, true
-    end
-    local chosen, needs = {}, {}
-    for _, name in ipairs(GROUP_NAMES) do
-        if selected[name] or not any then
-            table.insert(chosen, name)
-            for _, place in ipairs(GROUPS[name].places) do
-                needs[place] = true
-            end
+        for _, place in ipairs(GROUPS[name].places) do
+            needs[place] = true
         end
     end
     local places, missing = findPlaces(getPlayer(), needs)
     if not places then
-        -- Without "REPromo DONE", run-debug-client.sh reports the run as failed.
-        print("REPromo FAIL: within " .. Stage.SEARCH_RADIUS .. " squares, no " .. missing)
-        getCore():quitToDesktop()
+        run:fail("within " .. Stage.SEARCH_RADIUS .. " squares, no " .. missing)
         return
     end
     -- Hides the HUD, the debug console and every other window; the shots add their own.
@@ -1719,7 +1534,7 @@ function Promo.capture(selection, onDone)
     -- over, and menus follow it.
     setMouseXY(0, 0)
     -- The names come with every run, since they cost no shot.
-    local data = { items = itemsList(), recipes = {}, models = {}, groups = {} }
+    local data = { items = itemsList(), recipes = {}, models = {} }
     for _, name in ipairs(PZHarness.Test.recipeNames()) do
         table.insert(data.recipes, recipeEntry(name))
     end
@@ -1731,8 +1546,7 @@ function Promo.capture(selection, onDone)
     local setupsBuilt = false
     for _, name in ipairs(chosen) do
         local group = GROUPS[name]
-        table.insert(data.groups, name)
-        currentGroup = name
+        run:group(name)
         local endGroup = addTimer(name)
         if group.setups and not setupsBuilt then
             addSetups()
@@ -1742,19 +1556,7 @@ function Promo.capture(selection, onDone)
         endGroup()
     end
     endTotal()
-    Stage.runSteps(steps, function(gaveUp)
-        if gaveUp > 0 then
-            -- Without "REPromo DONE" the run fails, so extract.py keeps the committed captures
-            -- rather than replacing them with shots of a scene that never settled.
-            print("REPromo FAIL: " .. gaveUp .. " waits gave up")
-            getCore():quitToDesktop()
-            return
-        end
-        data.screen = { w = getCore():getScreenWidth(), h = getCore():getScreenHeight() }
-        data.shots = shots
-        writeJson("REPromo.json", data)
-        onDone()
-    end, "REPromo")
+    run:run(data, onDone)
 end
 
 return Promo

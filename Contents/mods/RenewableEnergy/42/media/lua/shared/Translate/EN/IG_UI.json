@@ -17,6 +17,7 @@
     "IGUI_RenewableEnergy_OpenBatteryBox": "Open Battery Box",
     "IGUI_RenewableEnergy_CloseBatteryBox": "Close Battery Box",
     "IGUI_RenewableEnergy_CutPadlock": "Cut Padlock",
+    "IGUI_RenewableEnergy_CutPadlockNeeds": "Padlocked. You need<br>%1<br>to cut it off.",
     "IGUI_RenewableEnergy_BoxLocked": "It's locked. Cut it with bolt cutters or remove the lid.",
     "IGUI_RenewableEnergy_StatusTitle": "Battery Bank",
     "IGUI_RenewableEnergy_Waiting": "Waiting for the bank's status...",

@@ -168,11 +168,12 @@ end
 --- The inventory items, bags included, that pay for a Repair Cracked Panel: for each of the
 --- recipe's inputs but the module, { item, uses, keep, wear }, `uses` being the drainable uses it takes
 --- (nil for a whole item), and `wear` the factor a kept tool's MayDegrade flag gives damageCheck.
---- Returns nil, and the first input nothing pays for, when one is missing.
+--- nil when an input is missing. Then, for every one of those inputs, the need it is
+--- (RenewableEnergy.firstUnmet), `have` being how much of its amount the items found pay.
 function Recipes.panelRepairInputs(character)
     local inventory = character:getInventory()
     local inputs = Recipes.moduleRepairRecipe():getInputs()
-    local picks, taken = {}, {}
+    local picks, taken, needs, complete = {}, {}, {}, true
     for i = 0, inputs:size() - 1 do
         local input = inputs:get(i)
         if not isModuleInput(input) then
@@ -195,32 +196,34 @@ function Recipes.panelRepairInputs(character)
                     taken[item], needed = true, needed - 1
                 end
             end
-            if needed > 0 then
-                return nil, input
-            end
+            table.insert(needs, { kind = "item", input = input, have = input:getIntAmount() - needed, need = input:getIntAmount() })
+            complete = complete and needed <= 0
         end
     end
-    return picks
+    return complete and picks or nil, needs
 end
 
---- Why the character can't do Repair Cracked Panel, as a translation key and its arguments,
---- or nil when they can: the recipe unknown, the skill short, or an input missing.
-function Recipes.panelRepairRefusal(character)
+--- What Repair Cracked Panel takes of `character` (RenewableEnergy.firstUnmet): the recipe
+--- known, its skills, and its inputs but the module.
+function Recipes.panelRepairNeeds(character)
     local recipe = Recipes.moduleRepairRecipe()
-    if not character:isRecipeKnown(recipe) then
-        return "Tooltip_RenewableEnergy_NeedRecipe", { recipe:getTranslationName() }
-    end
+    local needs = { { kind = "recipe", recipe = recipe, have = character:isRecipeKnown(recipe) and 1 or 0, need = 1 } }
     for i = 0, recipe:getRequiredSkillCount() - 1 do
         local skill = recipe:getRequiredSkill(i)
-        if character:getPerkLevel(skill:getPerk()) < skill:getLevel() then
-            return "Tooltip_RenewableEnergy_NeedSkill", { skill:getPerk():getName(), skill:getLevel() }
-        end
+        table.insert(needs, { kind = "skill", perk = skill:getPerk(), have = character:getPerkLevel(skill:getPerk()), need = skill:getLevel() })
     end
-    local picks, missing = Recipes.panelRepairInputs(character)
-    if not picks then
-        return "Tooltip_RenewableEnergy_NeedItem", { missing:getPossibleInputItems():get(0):getDisplayName() }
+    local _, inputs = Recipes.panelRepairInputs(character)
+    for _, need in ipairs(inputs) do
+        table.insert(needs, need)
     end
-    return nil
+    return needs
+end
+
+--- Why the character can't do Repair Cracked Panel, or nil when they can: the kind of the first
+--- of panelRepairNeeds they are short of.
+function Recipes.panelRepairRefusal(character)
+    local short = RenewableEnergy.firstUnmet(Recipes.panelRepairNeeds(character))
+    return short and short.kind
 end
 
 --- Uses up what Recipes.panelRepairInputs picked; tools are kept and may wear as the recipe's

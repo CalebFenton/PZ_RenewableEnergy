@@ -1068,18 +1068,23 @@ local function standAtBox(vehicle)
     standIn(vehicle, boxOf(vehicle):getArea(), 0.7)
 end
 
--- Whether the trailer's radial menu, opened where the character stands, offers Cut Padlock. The
--- menu goes away again before it is drawn.
-local function offersCutPadlock()
+-- What the trailer's radial menu, opened where the character stands, shows of Cut Padlock:
+-- "offered" when a slice cuts the padlock, "unavailable" when a slice only says what cutting takes
+-- (it has no command), "none" without either. The menu goes away again before it is drawn.
+local function cutPadlockSlice()
     local p = player()
     local menu = getPlayerRadialMenu(p:getPlayerNum())
     ISVehicleMenu.showRadialMenuOutside(p)
-    local offered = false
+    local shown = "none"
     for _, slice in ipairs(menu.slices) do
-        offered = offered or slice.command[1] == RenewableEnergy.BatteryBoxLid.cutPadlock
+        if slice.command[1] == RenewableEnergy.BatteryBoxLid.cutPadlock then
+            shown = "offered"
+        elseif slice.command[1] == nil then
+            shown = "unavailable"
+        end
     end
     menu:undisplay()
-    return offered
+    return shown
 end
 
 -- With bolt cutters a player cuts the battery box's padlock where the trailer's menu offers it: the
@@ -1099,7 +1104,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         T.step(function()
             local vehicle = trailer.vehicle
             standAtBox(vehicle)
-            self.offered = offersCutPadlock()
+            self.offered = cutPadlockSlice() == "offered"
             self.keyUnlocks = vehicle:canUnlockDoor(self.lid, p)
             local cutters = RenewableEnergy.BatteryBoxLid.padlockCutters(p, self.lid)
             if cutters then
@@ -1114,7 +1119,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
             self.cut = { server = trailer.state.lid, locked = door:isLocked(), broken = door:isLockBroken() }
             self.keyRelocks = vehicle:canLockDoor(self.lid, p)
             standAtBox(vehicle)
-            self.offeredCut = offersCutPadlock()
+            self.cutSlice = cutPadlockSlice()
             ISVehicleMenu.onOpenDoor(p, self.lid)
         end)
         T.waitForCopy(function() return self.lid and self.lid:getDoor():isOpen() end)
@@ -1143,7 +1148,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
             .. tostring(cut.server and cut.server.lockBroken and "broken" or "whole") .. " after the cut")
         expect(not cut.locked and cut.broken, "this game's lid isn't unlocked with a broken lock after the cut")
         expect(not self.keyRelocks, "the cut padlock locks again with the trailer's key")
-        expect(not self.offeredCut, "the menu offers Cut Padlock on a cut lock")
+        expect(self.cutSlice == "none", "the menu shows Cut Padlock on a cut lock (" .. tostring(self.cutSlice) .. ")")
         expect(self.openAccess, "the box doesn't open once its padlock is cut")
         expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the box")
         expect(player():getInventory():getFirstTypeRecurse("RenewableEnergy.DeepCycleBattery") ~= nil,
@@ -1153,7 +1158,8 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
 })
 
 -- The trailer's menu offers Cut Padlock only at a padlock that holds, to a player carrying bolt
--- cutters: not without them, not on an unlocked box, and not with the lid off.
+-- cutters; without them it shows the slice that only says what cutting takes, and on an unlocked
+-- box or with the lid off it shows neither.
 test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock", {
     instant = true,
     run = function(self)
@@ -1164,30 +1170,30 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
         local function look(name, want)
             T.step(function()
                 standAtBox(trailer.vehicle)
-                table.insert(self.seen, { name = name, want = want, offered = offersCutPadlock() })
+                table.insert(self.seen, { name = name, want = want, shown = cutPadlockSlice() })
             end)
         end
         padlockBox(self, trailer)
-        look("at a padlocked box without bolt cutters", false)
+        look("at a padlocked box without bolt cutters", "unavailable")
         T.give(self, "cutters", { { type = "Base.BoltCutters" } })
-        look("at a padlocked box with bolt cutters", true)
+        look("at a padlocked box with bolt cutters", "offered")
         T.onVehicle(self, trailer, "setTrailer", { lidLocked = false })
         T.waitForCopy(function() return not lidOf(trailer.vehicle):getDoor():isLocked() end)
-        look("at an unlocked box", false)
+        look("at an unlocked box", "none")
         T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false, lidLocked = true })
         T.waitForCopy(function()
             local lid = lidOf(trailer.vehicle)
             return lid:getInventoryItem() == nil and lid:getDoor():isLocked()
         end)
-        look("at a locked box without its lid", false)
+        look("at a locked box without its lid", "none")
     end,
     validate = function(self)
         if not expect(self.seen ~= nil and #self.seen == 4, "the trailer never spawned") then
             return
         end
         for _, seen in ipairs(self.seen) do
-            expect(seen.offered == seen.want, "the menu " .. seen.name .. (seen.offered and " offers" or " doesn't offer")
-                .. " Cut Padlock")
+            expect(seen.shown == seen.want, "the menu " .. seen.name .. " shows Cut Padlock " .. seen.shown
+                .. " rather than " .. seen.want)
         end
     end,
 })
@@ -1352,35 +1358,60 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
     end,
 })
 
--- A panel is wired as well as bolted, so without Electrical 1 the mechanics window neither takes
--- one off nor puts one on, even with Mechanics 2 and a wrench, and a queued removal does nothing.
--- The refused removal empties the action queue, so it comes last and the checks read the copy.
-test("renewable_energy_world_arrow_board_panels_need_electrical", {
-    instant = true,
-    run = function(self)
-        self.trailer = spawnTrailer(self)
-        if not self.trailer then return end
-        local trailer, p = self.trailer, player()
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.setPerk(self, Perks.Electricity, 0)
-        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = {} } })
-        waitForPanelsCopy(trailer)
-        T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
-        T.step(function()
-            local vehicle = trailer.vehicle
-            self.canTakeOff = vehicle:canUninstallPart(p, vehicle:getPartById(LEFT))
-            self.canPutOn = vehicle:canInstallPart(p, vehicle:getPartById(RIGHT))
-            ISTimedActionQueue.add(ISUninstallVehiclePart:new(p, vehicle:getPartById(LEFT), 200))
-        end)
-    end,
-    validate = function(self)
-        expect(not self.canTakeOff, "a panel comes off without Electrical")
-        expect(not self.canPutOn, "a panel goes on without Electrical")
-        local left = self.trailer.vehicle and self.trailer.vehicle:getPartById(LEFT)
-        expect(left and left:getInventoryItem() ~= nil, "the panel came off without Electrical")
-        expect(player():getInventory():getCountTypeRecurse(MODULE) == 1, "a module came off into the inventory")
-    end,
-})
+-- The mechanics window's menu for `part`, built by its own doPartContextMenu on a window that has
+-- just what that function reads.
+local function mechanicsMenu(vehicle, part)
+    local window = setmetatable({ chr = player(), playerNum = 0, vehicle = vehicle }, { __index = ISVehicleMechanics })
+    window.getAbsoluteX = function() return 0 end
+    window.getAbsoluteY = function() return 0 end
+    window:doPartContextMenu(part, 0, 0)
+    return window.context
+end
+
+-- A panel is wired as well as bolted, so it takes every skill its table lists: short of either, a
+-- panel neither comes off nor goes on, even with a wrench, the mechanics window greys out its
+-- Uninstall, and a queued removal does nothing. The refused removal empties the action queue, so
+-- it comes last and the checks read the copy.
+local function panelSkillTest(mechanics, electricity, short)
+    return {
+        instant = true,
+        run = function(self)
+            self.trailer = spawnTrailer(self)
+            if not self.trailer then return end
+            local trailer, p = self.trailer, player()
+            T.setPerk(self, Perks.Mechanics, mechanics)
+            T.setPerk(self, Perks.Electricity, electricity)
+            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = {} } })
+            waitForPanelsCopy(trailer)
+            T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
+            T.step(function()
+                local vehicle = trailer.vehicle
+                local left = vehicle:getPartById(LEFT)
+                self.canTakeOff = vehicle:canUninstallPart(p, left)
+                self.canPutOn = vehicle:canInstallPart(p, vehicle:getPartById(RIGHT))
+                local context = mechanicsMenu(vehicle, left)
+                local uninstall = context and context:getOptionFromName(getText("IGUI_Uninstall"))
+                self.uninstallOption = uninstall and (uninstall.notAvailable and "greyed out" or "offered") or "missing"
+                if context then
+                    context:closeAll()
+                end
+                ISTimedActionQueue.add(ISUninstallVehiclePart:new(p, left, 200))
+            end)
+        end,
+        validate = function(self)
+            expect(not self.canTakeOff, "a panel comes off without " .. short)
+            expect(not self.canPutOn, "a panel goes on without " .. short)
+            expect(self.uninstallOption == "greyed out", "without " .. short .. " the mechanics window's Uninstall is "
+                .. tostring(self.uninstallOption))
+            local left = self.trailer.vehicle and self.trailer.vehicle:getPartById(LEFT)
+            expect(left and left:getInventoryItem() ~= nil, "the panel came off without " .. short)
+            expect(player():getInventory():getCountTypeRecurse(MODULE) == 1, "a module came off into the inventory")
+        end,
+    }
+end
+
+test("renewable_energy_world_arrow_board_panels_need_mechanics", panelSkillTest(1, 1, "Mechanics 2"))
+test("renewable_energy_world_arrow_board_panels_need_electrical", panelSkillTest(2, 0, "Electrical 1"))
 
 -- The mechanics window offers to install an inventory item whose full type is in the part's item
 -- types (ISVehicleMechanics, VehicleUtils.getItems), so each panel lists both modules as they are

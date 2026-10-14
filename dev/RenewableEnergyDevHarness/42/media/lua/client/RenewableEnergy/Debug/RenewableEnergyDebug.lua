@@ -55,13 +55,13 @@ function Debug.setupPlayer(player)
     PZHarness.Test.placeWorkTable(player)
 end
 
--- The tests and the promo shots wait on `renderedFrames`, the frames a status window drew its rows
--- in, so that they read and shoot a window that has drawn.
+-- The tests and the promo shots wait on `renderedFrames`, the frames a status window drew a bank's
+-- status in, so that they read and shoot a window that has its status and has drawn it.
 local StatusWindow = RenewableEnergy.StatusWindow
 local render = StatusWindow.render
 function StatusWindow:render()
     render(self)
-    if not self.isCollapsed and self.left then
+    if not self.isCollapsed and self.status then
         self.renderedFrames = (self.renderedFrames or 0) + 1
     end
 end

@@ -1,7 +1,8 @@
 -- The battery bank's status window: a few lines on what the bank is doing, then what comes in,
 -- what draws and the parts on the left, and the batteries and the panels on the right. It draws
--- the status snapshot the server sends with the bank, so it reads the same in single player and
--- multiplayer. Clicking a panel's row highlights that panel in the world.
+-- the status the server sends to the players watching the bank, which it does while it is open,
+-- so it reads the same in single player and multiplayer. Clicking a panel's row highlights that
+-- panel in the world.
 
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
@@ -420,8 +421,8 @@ end
 --- Asks a local player for a new name for `bank` and queues the renaming. An empty name gives
 --- the bank back its tier's name.
 function StatusWindow.askName(playerNum, bank)
-    local status = PowerBank.statusOf(bank)
-    local modal = ISTextBox:new(0, 0, 280, 180, getText("IGUI_RenewableEnergy_NameThisBank"), status and status.name or "",
+    local summary = PowerBank.summaryOf(bank)
+    local modal = ISTextBox:new(0, 0, 280, 180, getText("IGUI_RenewableEnergy_NameThisBank"), summary and summary.name or "",
         nil, StatusWindow.onNameEntered, playerNum, playerNum, bank)
     modal:initialise()
     modal:addToUIManager()
@@ -589,6 +590,7 @@ function StatusWindow:close()
     self:clearHighlight()
     self:removeFromUIManager()
     StatusWindow.windows[self.playerNum] = nil
+    PowerBank.unwatchStatus(getSpecificPlayer(self.playerNum), self.bank)
     if JoypadState.players[self.playerNum + 1] then
         setPrevFocusForPlayer(self.playerNum)
     end
@@ -613,7 +615,7 @@ function StatusWindow:new(x, y, playerNum, bank)
 end
 
 --- Opens the status window of `bank` (the bank's IsoGenerator) for a local player, replacing
---- the one already open, and asks the server for a fresh snapshot.
+--- the one already open, and watches the bank's status until it closes.
 function StatusWindow.open(playerNum, bank)
     local open = StatusWindow.windows[playerNum]
     local x, y = getPlayerScreenLeft(playerNum) + 100, getPlayerScreenTop(playerNum) + 100
@@ -625,7 +627,7 @@ function StatusWindow.open(playerNum, bank)
     window:initialise()
     window:addToUIManager()
     StatusWindow.windows[playerNum] = window
-    PowerBank.requestStatus(getSpecificPlayer(playerNum), bank)
+    PowerBank.watchStatus(getSpecificPlayer(playerNum), bank)
     if JoypadState.players[playerNum + 1] then
         setJoypadFocus(playerNum, window)
     end

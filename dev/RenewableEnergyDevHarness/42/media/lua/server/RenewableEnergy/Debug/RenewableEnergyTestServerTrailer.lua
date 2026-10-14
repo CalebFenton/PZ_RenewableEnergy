@@ -30,11 +30,11 @@ local function spawnStocking(script, square, facing, roll)
     return vehicle
 end
 
--- T.placeVehicle's spawn: an arrow board through ArrowBoard.spawn when `args.stocked`, as the world
--- spawns one; with `args.recordStock` a plain spawn recording its panels' stock conditions
--- (arrowBoardStock); else the harness's spawn; whole when `args.repair`.
-PZHarness.serverSettings = PZHarness.serverSettings or {}
-function PZHarness.serverSettings.spawnVehicle(script, square, facing, args)
+--- T.placeVehicle's spawn, the `spawnVehicle` setting (RenewableEnergyTestSettings.lua): an arrow
+--- board through ArrowBoard.spawn when `args.stocked`, as the world spawns one; with
+--- `args.recordStock` a plain spawn recording its panels' stock conditions (arrowBoardStock); else
+--- the harness's spawn; whole when `args.repair`.
+function Trailer.spawnVehicle(script, square, facing, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local vehicle
     if args and args.stocked then

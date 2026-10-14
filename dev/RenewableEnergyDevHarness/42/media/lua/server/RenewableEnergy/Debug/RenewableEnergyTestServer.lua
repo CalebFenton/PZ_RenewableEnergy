@@ -25,7 +25,8 @@ local function firstOfType(container, fullType)
     return container and container:getFirstType(fullType)
 end
 
--- What the tests read of a bank on the authority: its record, its tile and the parts in it.
+-- What the tests read of a bank on the authority: its record, the status it would send a watching
+-- player now, how many players watch it, its tile and the parts in it.
 local function stateOf(record)
     if not record then
         return { found = false }
@@ -39,13 +40,17 @@ local function stateOf(record)
         table.insert(items, { type = item:getFullType(), id = item:getID(), condition = item:getCondition(),
             uses = item:getCurrentUsesFloat() })
     end
+    local watchers = 0
+    for _ in pairs(record.watchers or {}) do
+        watchers = watchers + 1
+    end
     return {
         found = true, on = record.on == true, name = record.name or "", charge = record.charge,
         storedWh = record.charge * record.nominalWh, nominalWh = record.nominalWh, overloaded = record.overloaded == true,
         cycleDepth = record.cycleDepth, limitW = record:limitW(), drawW = record:drawW(),
         sources = #record.sources, batteries = #record.batteries,
         activated = bank ~= nil and bank:isActivated(), powered = square ~= nil and square:haveElectricity(),
-        items = items, overlays = overlaysOf(bank), status = record.status,
+        items = items, overlays = overlaysOf(bank), status = record:buildStatus(), watchers = watchers,
     }
 end
 
@@ -641,8 +646,8 @@ end
 
 -- What the clock test's fixtures hold, on the squares and vehicles `args` names, in Wh: the bank's,
 -- the car battery's, the solar battery charger's in its cells and toward the next use, the garden
--- light's, and the trailer box battery's (-1 for none). Also the hour of the bank's status, the
--- world age of the bank's last pass and of now, and the watts the trailer's panels make in full sun.
+-- light's, and the trailer box battery's (-1 for none). Also the world age of the bank's last pass
+-- and of now, and the watts the trailer's panels make in full sun.
 local function gadgetCharges(args)
     local SolarCellCharger, Battery = RenewableEnergy.SolarCellCharger, RenewableEnergy.Battery
     local record = recordAt(args.bank)
@@ -662,7 +667,7 @@ local function gadgetCharges(args)
     local _, carBattery = batteryOf(car)
     local boxed = batteryBoxOf(trailer):getItems()
     return {
-        bank = record.charge * record.nominalWh, hour = record.status and record.status.hour or 0,
+        bank = record.charge * record.nominalWh,
         bankPassAge = record.lastHour, age = getGameTime():getWorldAgeHours(),
         car = whIn(carBattery), charger = cellWh,
         light = RenewableEnergy.SolarGardenLight.getCharge(light),

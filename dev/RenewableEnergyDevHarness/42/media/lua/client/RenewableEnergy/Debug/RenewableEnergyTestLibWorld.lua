@@ -30,9 +30,9 @@ function T.serverCheck(testName, name, args, sandbox)
 end
 
 -- Vehicles ----------------------------------------------------------------------------------------
--- A vehicle is a T.placeVehicle handle, spawned by the authority, which the server file's
--- serverSettings.spawnVehicle spawns as the world does when `args.stocked`, and whole when
--- `args.repair`. The handlers find it by T.vehicleArgs (RenewableEnergyTestLib.lua).
+-- A vehicle is a T.placeVehicle handle, spawned by the authority, which the trailer server file's
+-- Trailer.spawnVehicle (the `spawnVehicle` setting) spawns as the world does when `args.stocked`,
+-- and whole when `args.repair`. The handlers find it by T.vehicleArgs (RenewableEnergyTestLib.lua).
 
 --- Queues the server handler `name` on the vehicle with `args` (a table, or a function returning
 --- one when the call goes out) and leaves its answer in vehicle.answer and, if it holds one, the

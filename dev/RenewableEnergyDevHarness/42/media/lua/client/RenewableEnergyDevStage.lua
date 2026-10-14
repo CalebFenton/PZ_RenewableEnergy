@@ -1,13 +1,11 @@
 require "PZHarness/Fixtures"
--- Development only. What the --art and --promo captures share: finding a place near the
--- character, clearing its trees, the steps that walk the character to a shot and frame it, the
--- arrow board trailer hitched to a car and the waits for it to settle. The lid test waits on
--- lightingSettled too.
+-- Development only. What the --art and --promo captures share besides the harness's
+-- PZHarness/Capture.lua, which runs their steps: finding a place near the character, clearing its
+-- trees, the steps that walk the character to a shot and frame it, the arrow board trailer hitched
+-- to a car and the waits for it to settle. The lid test waits on lightingSettled too.
 
 local Stage = {}
 
--- Frames for a change to reach the screen, where the screenshot reads it.
-Stage.DRAW_FRAMES = 10
 -- How far around the character a place is looked for, in squares.
 Stage.SEARCH_RADIUS = 40
 -- How far from a place the trees go: near a building, a tree out of the character's sight draws
@@ -23,8 +21,6 @@ local LOOK_PASSES = 3
 local SETTLE_MS = 300
 -- How far around the character the lighting has to settle, in squares.
 local SETTLE_RADIUS = 15
--- How long a step's wait may poll before the run logs it and goes on; onDone counts these.
-local WAIT_MAX_MS = 10000
 -- Steps to scroll in to reach the closest zoom.
 local STEPS_TO_CLOSEST = 8
 local TOWING_CAR = "Base.OffRoad"
@@ -32,44 +28,6 @@ local TOWING_CAR = "Base.OffRoad"
 -- hitch then moves it up to the tow bar.
 local TRAILER_GAP = 5
 local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
-
---- Runs each step on its own tick, then waits before the next: as many ticks as the step returns,
---- or, if it returns a function, until that function returns true. A function polled for longer
---- than WAIT_MAX_MS is logged under `mark` and given up. Then calls onDone with how many waits
---- gave up, since a shot after one shows a scene that never settled.
-function Stage.runSteps(steps, onDone, mark)
-    local index, wait, poll, pollStart, gaveUp = 1, 0, nil, 0, 0
-    local function onTick()
-        if poll then
-            if poll() then
-                poll = nil
-            elseif getTimestampMs() - pollStart > WAIT_MAX_MS then
-                print(string.format("%s WAIT gave up on step %d after %d ms", mark or "Stage", index - 1, WAIT_MAX_MS))
-                poll = nil
-                gaveUp = gaveUp + 1
-            end
-            return
-        end
-        if wait > 0 then
-            wait = wait - 1
-            return
-        end
-        local step = steps[index]
-        if not step then
-            Events.OnTick.Remove(onTick)
-            onDone(gaveUp)
-            return
-        end
-        index = index + 1
-        local result = step()
-        if type(result) == "function" then
-            poll, pollStart = result, getTimestampMs()
-        else
-            wait = result or 0
-        end
-    end
-    Events.OnTick.Add(onTick)
-end
 
 -- How many squares around the character it has seen, and the sum of their light levels: together
 -- they change when a square is newly seen or its light changes.
@@ -114,17 +72,6 @@ function Stage.lightingSettled(player, change)
             return false
         end
         return changed and now - since >= SETTLE_MS
-    end
-end
-
---- A runSteps wait until the zoom stops changing, which eases towards its target every frame.
-function Stage.zoomSettled()
-    local last
-    return function()
-        local zoom = getCore():getZoom(0)
-        local settled = zoom == last
-        last = zoom
-        return settled
     end
 end
 
@@ -206,12 +153,6 @@ function Stage.zoomOut(stepsOut)
     end
 end
 
---- Saves a full screenshot as <cachedir>/Screenshots/<file>.png and logs it under `mark`.
-function Stage.screenshot(mark, file)
-    getCore():TakeFullScreenshot(file .. ".png")
-    print(mark .. " saved " .. file .. ".png")
-end
-
 --- The icon the crafting window draws for `fullType`: the script's, which for a moveable is not
 --- the tile the inventory shows, or else the item's own.
 function Stage.iconTexture(fullType)
@@ -229,7 +170,7 @@ function Stage.spawnTrailer(square, facing)
     local pair = {
         car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
         -- The tests' spawn, which keeps a whole trailer's panels whole past stocking.
-        trailer = PZHarness.serverSettings.spawnVehicle(RenewableEnergy.ArrowBoard.SCRIPT, trailerSquare, facing,
+        trailer = PZHarness.testSettings.spawnVehicle(RenewableEnergy.ArrowBoard.SCRIPT, trailerSquare, facing,
             { repair = true }),
         facing = facing,
     }

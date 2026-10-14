@@ -338,3 +338,29 @@ test("renewable_energy_tiles_cracked_modules_show", {
         end
     end,
 })
+
+-- The dev mod's remove hook takes away the tiles T.placeTile places, as it does every other
+-- fixture's: the harness reads one registration on both sides. A stand-in hook notes the tile and
+-- hands it on to the mod's. The check runs as an undo, since the tile goes only when the test
+-- ends; a multiplayer server takes it away in its own Lua, where the stand-in isn't.
+test("renewable_energy_tiles_remove_hook_takes_placed_tile", {
+    spOnly = "the server removes the tile in its own Lua, out of the stand-in hook's reach",
+    run = function(self)
+        local sprite = PZHarness.Fixtures.WORK_TABLE_SPRITE
+        -- Not next to the character, where it would count as the craft tests' work table.
+        local square = T.need(self, (T.squares(self, 1, { bare = true, minDistance = 2 }) or {})[1], "a free outdoor square")
+        if not square then return end
+        local settings = PZHarness.testSettings
+        local hook, taken = settings.remove, false
+        -- Undos run newest first: the tile's, then the check, then the hook goes back.
+        T.defer(self, function() settings.remove = hook end)
+        T.defer(self, function()
+            expect(taken, "the tile T.placeTile placed went without the dev mod's remove hook")
+        end)
+        settings.remove = function(object)
+            taken = taken or (object:getSquare() == square and object:getSprite():getName() == sprite)
+            return hook(object)
+        end
+        T.placeTile(self, square, sprite)
+    end,
+})

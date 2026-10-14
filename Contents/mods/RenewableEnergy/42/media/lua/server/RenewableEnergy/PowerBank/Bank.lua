@@ -34,7 +34,7 @@ Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
     "inverters", "chargers", "controllers", "sources", "loadW", "averageLoadW", "loadByKind", "chargeSource",
     "generator", "lastHour", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
-    "solarWhToday", "loadWhToday", "empty", "status",
+    "solarWhToday", "loadWhToday", "empty",
 }
 
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
@@ -892,10 +892,111 @@ function Bank:buildStatus()
     }
 end
 
---- Rebuild the status and send it to every client.
+--- What every client keeps of the bank wherever it stands: what the menus of the bank and its
+--- panels show and check. The Global Object System sends it to every client each time it
+--- changes, so it holds nothing that moves with every pass.
+function Bank:buildSummary()
+    local sources = {}
+    for _, source in ipairs(self.sources) do
+        table.insert(sources, { x = source.x, y = source.y, z = source.z, snowy = (source.snow or 0) > 0 or nil })
+    end
+    return { bankType = self.bankType, name = self.name, on = self.on, limitW = self:limitW(), sources = sources }
+end
+
+-- Whether two values are the same, tables by what they hold.
+local function same(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then
+        return a == b
+    end
+    for key, value in pairs(a) do
+        if not same(value, b[key]) then
+            return false
+        end
+    end
+    for key in pairs(b) do
+        if a[key] == nil then
+            return false
+        end
+    end
+    return true
+end
+
+-- A client loads at most this many squares each way around its player (the widest chunk grid a
+-- server lets a client connect with, GameServer.receivePlayerConnect), so a bank farther away
+-- can't be in its view.
+local VIEW_REACH = 80
+
+--- Whether the bank can be in `player`'s view: they are alive, still connected, and near enough
+--- for their client to have the bank loaded.
+function Bank:inViewOf(player)
+    if player:isDead() then
+        return false
+    end
+    -- The server forgets a player who leaves, and one who comes back is a new object.
+    if isServer() and getPlayerByOnlineID(player:getOnlineID()) ~= player then
+        return false
+    end
+    return math.abs(player:getX() - self.x) <= VIEW_REACH and math.abs(player:getY() - self.y) <= VIEW_REACH
+end
+
+-- The players watching the bank's status, once those who can no longer see the bank are dropped:
+-- the server hears of no disconnect, and a client that died or walked away never closes its window.
+local function watchersOf(bank)
+    local players, gone = {}, {}
+    for player in pairs(bank.watchers or {}) do
+        table.insert(bank:inViewOf(player) and players or gone, player)
+    end
+    for _, player in ipairs(gone) do
+        bank.watchers[player] = nil
+    end
+    return players
+end
+
+local function sendTo(bank, player)
+    sendServerCommand(player, PowerBank.STATUS_MODULE, "status", { x = bank.x, y = bank.y, z = bank.z, status = bank.status })
+end
+
+--- Tell the clients what changed: every client the summary, when it changed, and the players
+--- watching the bank its whole status. Single player has no network to send on; its status
+--- window reads the status the bank keeps while someone watches.
 function Bank:sendStatus()
-    self.status = self:buildStatus()
-    self:updateOnClient()
+    local summary = self:buildSummary()
+    if not same(summary, self.summary) then
+        self.summary = summary
+        self:updateOnClient()
+    end
+    local players = watchersOf(self)
+    self.status = #players > 0 and self:buildStatus() or nil
+    for _, player in ipairs(players) do
+        sendTo(self, player)
+    end
+end
+
+--- `player` opened the bank's status window, and gets the status after every change until they
+--- close it. Returns whether they weren't watching already.
+function Bank:watch(player)
+    self.watchers = self.watchers or {}
+    local new = not self.watchers[player]
+    self.watchers[player] = true
+    return new
+end
+
+--- Send the status as the other watchers last had it to `player` alone.
+function Bank:sendStatusTo(player)
+    self.status = self.status or self:buildStatus()
+    sendTo(self, player)
+end
+
+--- `player` closed the bank's status window. With nobody watching, the bank keeps no status.
+function Bank:unwatch(player)
+    local watchers = self.watchers
+    if not watchers then return end
+    watchers[player] = nil
+    for _ in pairs(watchers) do
+        return
+    end
+    self.watchers = nil
+    self.status = nil
 end
 
 return Bank

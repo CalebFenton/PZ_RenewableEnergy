@@ -40,10 +40,12 @@ require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
+local Capture = require "PZHarness/Capture"
 
 local Art = {}
 
 local Sprites = RenewableEnergy.Sprites
+local MARK = "REArt"
 
 local SCALE_ITEM = "Base.CarBattery1"
 local ITEMS_PER_ROW = 10
@@ -235,10 +237,10 @@ local function addStates(steps, pair, states)
                 pair().car:setStoplightsOn(false)
             end
             -- A part's new condition reaches the overlay on the vehicle's next update, once a frame.
-            return state.set(pair()) or Stage.DRAW_FRAMES
+            return state.set(pair()) or Capture.DRAW_FRAMES
         end)
         table.insert(steps, function()
-            Stage.screenshot("REArt", state.name)
+            Capture.screenshot(MARK, state.name)
         end)
     end
 end
@@ -367,8 +369,6 @@ local IconSheet = ISPanel:derive("RenewableEnergyDevArtIcons")
 local ICON_SIZE, CELL_W, CELL_H, ICON_COLUMNS = 64, 190, 96, 10
 
 function IconSheet:render()
-    -- Counted for the shot's wait: the UI draws at its own rate, not every frame.
-    self.drawn = (self.drawn or 0) + 1
     ISPanel.render(self)
     for i, icon in ipairs(self.icons) do
         local column, row = (i - 1) % ICON_COLUMNS, math.floor((i - 1) / ICON_COLUMNS)
@@ -397,13 +397,13 @@ local function addShot(steps, player, lot, shot)
     Stage.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
     table.insert(steps, function()
         Stage.zoomOut(shot.zoomSteps)
-        return Stage.zoomSettled()
+        return Capture.zoomSettled()
     end)
     table.insert(steps, function()
-        return Stage.DRAW_FRAMES
+        return Capture.DRAW_FRAMES
     end)
     table.insert(steps, function()
-        Stage.screenshot("REArt", shot.name)
+        Capture.screenshot(MARK, shot.name)
     end)
 end
 
@@ -476,12 +476,10 @@ local function addTileAndItemShots(steps, player, lot)
     addShot(steps, player, lot, SHOTS.items)
     table.insert(steps, function()
         iconSheet:addToUIManager()
-        return function()
-            return (iconSheet.drawn or 0) >= Stage.DRAW_FRAMES
-        end
+        return Capture.drawn(Capture.DRAW_FRAMES)
     end)
     table.insert(steps, function()
-        Stage.screenshot("REArt", "art_icons")
+        Capture.screenshot(MARK, "art_icons")
     end)
     table.insert(steps, function()
         iconSheet:removeFromUIManager()
@@ -528,12 +526,11 @@ local function addLoneAndCrackedShots(steps, player, lot, art)
 end
 
 function Art.capture(onDone)
+    local run = Capture.new(MARK)
     local player = getPlayer()
     local lot = findLot(player)
     if not lot then
-        -- Without "REArt DONE", run-debug-client.sh reports the run as failed.
-        print("REArt FAIL: no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
-        getCore():quitToDesktop()
+        run:fail("no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
         return
     end
     print(string.format("REArt stage at %d,%d", lot.x, lot.y))
@@ -541,19 +538,10 @@ function Art.capture(onDone)
     function art.currentPair()
         return art.trailer
     end
-    local steps = {}
-    addTileAndItemShots(steps, player, lot)
-    addHitchedTrailerShots(steps, player, lot, art)
-    addLoneAndCrackedShots(steps, player, lot, art)
-    Stage.runSteps(steps, function(gaveUp)
-        if gaveUp > 0 then
-            -- Without "REArt DONE", run-debug-client.sh reports the run as failed.
-            print("REArt FAIL: " .. gaveUp .. " waits gave up")
-            getCore():quitToDesktop()
-            return
-        end
-        onDone()
-    end, "REArt")
+    addTileAndItemShots(run.steps, player, lot)
+    addHitchedTrailerShots(run.steps, player, lot, art)
+    addLoneAndCrackedShots(run.steps, player, lot, art)
+    run:run(nil, onDone)
 end
 
 return Art

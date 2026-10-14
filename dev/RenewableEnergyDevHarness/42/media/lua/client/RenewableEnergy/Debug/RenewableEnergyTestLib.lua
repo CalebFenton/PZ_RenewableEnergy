@@ -41,11 +41,11 @@ end
 
 -- Fixtures -------------------------------------------------------------------------------------
 
--- This client's copy of the bank on `square` once it holds `count` items and has a status.
+-- This client's copy of the bank on `square` once it holds `count` items and has a summary.
 local function bankCopy(square, count)
     local bank = PowerBank.bankOn(square)
     local container = bank and bank:getContainer()
-    if container and container:getItems():size() >= count and PowerBank.statusOf(bank) then
+    if container and container:getItems():size() >= count and PowerBank.summaryOf(bank) then
         return bank
     end
     return nil
@@ -55,7 +55,7 @@ end
 --- into its container as world spawns do, its batteries charged to `opts.charge` (full by default).
 --- It stands on `opts.square`, else on a free square near `opts.near` (a handle, object or square):
 --- indoors unless `opts.outdoors`. Returns its handle { square, position }; `object` is this
---- client's copy of the bank (its IsoGenerator) once it has arrived with its parts and status.
+--- client's copy of the bank (its IsoGenerator) once it has arrived with its parts and summary.
 function T.bank(self, kind, items, opts)
     opts = opts or {}
     local square = opts.square or (T.squares(self, 1, { indoors = not opts.outdoors, near = squareOf(opts.near) }) or {})[1]
@@ -68,12 +68,12 @@ function T.bank(self, kind, items, opts)
         charge = opts.charge })
     T.waitUntil(function() return bankCopy(square, count) ~= nil end, COPY_FRAMES)
     T.step(function()
-        bank.object = T.need(self, bankCopy(square, count), "this client's copy of the bank, with its parts and status")
+        bank.object = T.need(self, bankCopy(square, count), "this client's copy of the bank, with its parts and summary")
     end)
     return bank
 end
 
--- Whether this client has its copy of the panel and, if it was connected, sees the bank's status
+-- Whether this client has its copy of the panel and, if it was connected, sees the bank's summary
 -- list it.
 local function panelArrived(panel, bank)
     local here = panel.position
@@ -181,9 +181,26 @@ function T.setPartCondition(self, bank, fullType, condition, recount)
     onBank(self, bank, "setPartCondition", { type = fullType, condition = condition, recount = recount })
 end
 
---- The status of `bank` (a handle) as this client last received it, or nil.
+--- The summary of `bank` (a handle) as this client last received it, or nil.
+function T.clientSummary(bank)
+    return bank.object and PowerBank.summaryOf(bank.object)
+end
+
+--- The whole status of `bank` (a handle) as this client last received it, or nil. It comes only
+--- while this client watches the bank (T.watch, or an open status window).
 function T.clientStatus(bank)
     return bank.object and PowerBank.statusOf(bank.object)
+end
+
+--- Queues watching the status of `bank` (a handle) as the status window does, until the test
+--- ends, and a wait until this client has it.
+function T.watch(self, bank)
+    T.step(function()
+        local p = T.player()
+        PowerBank.watchStatus(p, bank.object)
+        T.defer(self, function() PowerBank.unwatchStatus(p, bank.object) end)
+    end)
+    T.waitUntil(function() return T.clientStatus(bank) ~= nil end, COPY_FRAMES)
 end
 
 --- The server's entry for the first `fullType` in a bank state's items, or nil.
@@ -211,12 +228,12 @@ function T.perform(self, command, args)
 end
 
 --- Queues switching `bank` on with the bank system's command, and a wait until this client's copy
---- of its status says it is on, whatever the bank then does.
+--- of its summary says it is on, whatever the bank then does.
 function T.switchOn(self, bank)
     T.perform(self, "setBankOn", { bank = bank.position, on = true })
     T.waitUntil(function()
-        local status = T.clientStatus(bank)
-        return status ~= nil and status.on == true
+        local summary = T.clientSummary(bank)
+        return summary ~= nil and summary.on == true
     end, COPY_FRAMES)
 end
 

@@ -1,3 +1,4 @@
+require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
@@ -37,21 +38,12 @@ end
 -- The plain bulb's warm white, like the incandescent bulb of a 1993 garden light. Its script
 -- gives no colour, which is white.
 local LAMP_COLOR = { r = 1.0, g = 0.8, b = 0.55 }
--- MapObjects keeps one function per sprite and priority.
-local LOAD_PRIORITY = 7
 -- The server's word to its clients that a light's lamp changed: the tile and the bulb's modData
 -- reach them on their own, and a client would otherwise only catch up at its next game minute.
 local COMMAND_MODULE, LAMP_COMMAND = "RenewableEnergyGardenLight", "lamp"
 
--- The places of the lights this side has seen: the authority charges them, the drawing side
--- lights them.
-local places = {}
 -- Drawing side: the lamp lit at each place, by place key, as { source, bulb }.
 local lamps = {}
-
-local function placeKey(x, y, z)
-    return x .. "," .. y .. "," .. z
-end
 
 function SolarGardenLight.isLight(isoObject)
     return Sprites.kindOf(Sprites.nameOf(isoObject)) == "gardenLight"
@@ -112,7 +104,7 @@ end
 
 -- Gives the place x, y, z a lamp in the colour of `bulb`, or none if `bulb` is nil.
 local function drawLamp(x, y, z, bulb)
-    local key = placeKey(x, y, z)
+    local key = RenewableEnergy.PlaceTracker.key(x, y, z)
     if not bulb then
         removeLamp(key)
         return
@@ -152,19 +144,14 @@ function SolarGardenLight.syncLamp(light)
     drawLamp(light:getX(), light:getY(), light:getZ(), lampBulb(light))
 end
 
--- Calls `fn` with every light this side has seen. A light whose square is unloaded, or that is
--- gone, is dropped with its lamp; MapObjects reports it again when its chunk loads.
-local function forEachLight(fn)
-    for key, place in pairs(places) do
-        local light = SolarGardenLight.findOn(getCell():getGridSquare(place.x, place.y, place.z))
-        if light then
-            fn(light)
-        else
-            removeLamp(key)
-            places[key] = nil
-        end
-    end
-end
+-- The lights this side has seen: the authority runs them, the drawing side lights them. A light
+-- that goes takes its lamp with it.
+local lights = RenewableEnergy.PlaceTracker.new({
+    sprites = { Sprites.gardenLight.off, Sprites.gardenLight.lit },
+    matches = SolarGardenLight.isLight,
+    onFound = SolarGardenLight.syncLamp,
+    onLost = removeLamp,
+})
 
 -- Authority --------------------------------------------------------------------------------------
 
@@ -243,46 +230,28 @@ end
 --- Runs every loaded light the authority has seen.
 function SolarGardenLight.updateAll(hours)
     local sky = RenewableEnergy.Sun.skyNow()
-    forEachLight(function(light)
+    lights:each(function(light)
         SolarGardenLight.update(light, hours, false, sky)
     end)
 end
 
--- Finding lights ---------------------------------------------------------------------------------
-
-local function adopt(light)
-    places[placeKey(light:getX(), light:getY(), light:getZ())] = { x = light:getX(), y = light:getY(), z = light:getZ() }
-    SolarGardenLight.syncLamp(light)
-end
-
-MapObjects.OnLoadWithSprite({ Sprites.gardenLight.off, Sprites.gardenLight.lit }, adopt, LOAD_PRIORITY)
-
-Events.OnObjectAdded.Add(function(isoObject)
-    if SolarGardenLight.isLight(isoObject) then
-        adopt(isoObject)
-    end
-end)
-
-Events.OnObjectAboutToBeRemoved.Add(function(isoObject)
-    if SolarGardenLight.isLight(isoObject) then
-        removeLamp(placeKey(isoObject:getX(), isoObject:getY(), isoObject:getZ()))
-    end
-end)
+-- Keeping lamps up to date -----------------------------------------------------------------------
 
 -- The authority swaps the tile; the drawing side catches up with it, and with lights that went.
 -- A multiplayer client also draws what its server says a lamp became, at once, before the tile
 -- and the bulb's modData may have reached its copy of the light.
 if not isServer() then
     Events.EveryOneMinute.Add(function()
-        forEachLight(SolarGardenLight.syncLamp)
+        lights:each(SolarGardenLight.syncLamp)
     end)
     Events.OnServerCommand.Add(function(module, command, args)
         if module ~= COMMAND_MODULE or command ~= LAMP_COMMAND then
             return
         end
         local square = getCell():getGridSquare(args.x, args.y, args.z)
-        if SolarGardenLight.findOn(square) then
-            places[placeKey(args.x, args.y, args.z)] = { x = args.x, y = args.y, z = args.z }
+        local light = SolarGardenLight.findOn(square)
+        if light then
+            lights:add(light)
             drawLamp(args.x, args.y, args.z, args.bulb)
         end
     end)

@@ -8,6 +8,7 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
+require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/StatusWindow"
 
 -- The right-click menus, the actions they start and the status window. The wiring and repair
@@ -25,11 +26,10 @@ local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
 local Format = RenewableEnergy.Format
 local Menu = RenewableEnergy.Menu
+local Needs = RenewableEnergy.Needs
 local StatusWindow = RenewableEnergy.StatusWindow
 
 local POWER_INVERTER = "RenewableEnergy.PowerInverter"
--- The longest a test waits for the status window to draw.
-local DRAW_FRAMES = 30
 
 local function optionNamed(menu, name)
     return menu and menu.getOptionFromName and menu:getOptionFromName(name)
@@ -162,8 +162,8 @@ test("renewable_energy_ui_menu_panel_wired_to", {
         if not self.panel then return end
         T.perform(self, "rename", { bank = self.bank.position, name = "Shed Bank" })
         T.waitForCopy(function()
-            local status = T.clientStatus(self.bank)
-            return status ~= nil and status.name == "Shed Bank"
+            local summary = T.clientSummary(self.bank)
+            return summary ~= nil and summary.name == "Shed Bank"
         end)
     end,
     validate = function(self)
@@ -185,8 +185,18 @@ test("renewable_energy_ui_menu_panel_wired_to", {
     end,
 })
 
--- Wire In offers each carried part type once, shows why one can't go in, and offers it once it
--- can.
+-- Whether the tooltip's list of `needs` marks the need of `kind` as short (Needs.met).
+local function marksShort(needs, kind)
+    for _, need in ipairs(needs) do
+        if need.kind == kind and not Needs.met(need) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Wire In offers each carried part type once, greys out one that can't go in and marks what it
+-- lacks as short, and offers it once it can.
 test("renewable_energy_ui_menu_wire_in_options", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {})
@@ -202,7 +212,8 @@ test("renewable_energy_ui_menu_wire_in_options", {
                 end
             end
             local plugIn = optionFor(menu, self.items.parts[3])
-            self.withoutTools = { unavailable = plugIn ~= nil and plugIn.notAvailable, reason = tooltipOf(plugIn) }
+            self.withoutTools = { unavailable = plugIn ~= nil and plugIn.notAvailable, reason = tooltipOf(plugIn),
+                toolShort = marksShort(PowerBank.wiringNeeds(player(), "RenewableEnergy.PlugInInverter"), "tool") }
             context:hideAndChildren()
         end)
         local wire = PowerBank.wiringFor("RenewableEnergy.PlugInInverter").wire
@@ -216,17 +227,17 @@ test("renewable_energy_ui_menu_wire_in_options", {
     end,
     validate = function(self)
         expectNear("Wire In options for two batteries of one type", self.batteries, 1, 0)
-        local needScrewdriver = getText("Tooltip_RenewableEnergy_NeedTool", getItemNameFromFullType("Base.Screwdriver"))
-        expect(self.withoutTools.unavailable and self.withoutTools.reason == needScrewdriver,
-            "Wire In doesn't say an inverter needs a screwdriver (" .. tostring(self.withoutTools.reason) .. ")")
+        expect(self.withoutTools.unavailable and self.withoutTools.toolShort,
+            "Wire In doesn't grey out an inverter and mark the screwdriver short (" .. tostring(self.withoutTools.reason) .. ")")
         expect(self.withTools.available, "with a screwdriver and wire, the inverter can't be wired in ("
             .. tostring(self.withTools.reason) .. ")")
     end,
 })
 
--- In the dark nothing can be wired in or out: the menu says why and the action won't start. In
--- single player the authority refuses it too; a server can't tell whether a remote player stands
--- in the dark (IsoPlayer.tooDarkToRead), so in multiplayer the player's own side is what refuses.
+-- In the dark nothing can be wired in or out: the menu greys them out and the action won't start.
+-- In single player the authority refuses it too; a server can't tell whether a remote player
+-- stands in the dark (IsoPlayer.tooDarkToRead), so in multiplayer the player's own side is what
+-- refuses.
 test("renewable_energy_ui_wiring_refused_in_the_dark", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", POWER_INVERTER })
@@ -246,8 +257,8 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
         local context = newContext()
         local wireIn = optionFor(Menu.addWireInOptions(0, context, bank), battery)
         local dark = getText("Tooltip_RenewableEnergy_TooDark")
-        expect(wireIn ~= nil and wireIn.notAvailable and tooltipOf(wireIn) == dark,
-            "Wire In doesn't say it's too dark (" .. tostring(tooltipOf(wireIn)) .. ")")
+        expect(wireIn ~= nil and wireIn.notAvailable and PowerBank.wiringBlocker(p, bank, battery) == "Tooltip_RenewableEnergy_TooDark",
+            "Wire In isn't greyed out for the dark (" .. tostring(tooltipOf(wireIn)) .. ")")
         local unwire = Menu.addUnwireOptions(0, context, bank)
         local allDark = unwire ~= nil and #unwire.options > 0
         for _, option in ipairs(unwire and unwire.options or {}) do
@@ -264,8 +275,9 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
     end,
 })
 
--- Repair offers each inverter, says what a repair lacks, and once it has it, walks over and
--- mends the inverter in place with one scrap, on the server and this client's copy.
+-- Repair offers each inverter, greyed out and marking the scrap short while there is none, and
+-- once there is, walks over and mends the inverter in place with one scrap, on the server and this
+-- client's copy.
 local WORN = 50
 local REPAIRED = WORN + Specs.partRepair.condition
 test("renewable_energy_ui_repair_part", {
@@ -279,7 +291,8 @@ test("renewable_energy_ui_repair_part", {
         T.step(function()
             local context = newContext()
             local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
-            self.withoutScrap = { unavailable = option ~= nil and option.notAvailable, reason = tooltipOf(option) }
+            self.withoutScrap = { unavailable = option ~= nil and option.notAvailable, reason = tooltipOf(option),
+                scrapShort = marksShort(PowerBank.repairNeeds(player()), "scrap") }
             context:hideAndChildren()
         end)
         T.give(self, "scrap", { { type = PowerBank.SCRAP } })
@@ -296,9 +309,8 @@ test("renewable_energy_ui_repair_part", {
         end)
     end,
     validate = function(self)
-        local needScrap = getText("Tooltip_RenewableEnergy_NeedScrap", 1, getItemNameFromFullType(PowerBank.SCRAP))
-        expect(self.withoutScrap.unavailable and self.withoutScrap.reason == needScrap,
-            "Repair doesn't say it needs scrap (" .. tostring(self.withoutScrap.reason) .. ")")
+        expect(self.withoutScrap.unavailable and self.withoutScrap.scrapShort,
+            "Repair isn't greyed out with the scrap marked short (" .. tostring(self.withoutScrap.reason) .. ")")
         if not expect(self.offered, "with scrap in hand, Repair isn't offered for a worn inverter") then return end
         local inverter = stateItem(self.bank.state, POWER_INVERTER)
         if not expect(inverter ~= nil, "repairing took the inverter out of the bank") then return end
@@ -449,6 +461,7 @@ test("renewable_energy_ui_wire_in_and_unwire", {
         local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
         if not bank then return end
         self.bank = bank
+        T.watch(self, bank)
         T.give(self, "parts", { { type = "Base.CarBattery1" }, { type = "Base.Wrench" }, { type = PowerBank.WIRE } })
         T.step(function()
             local battery = self.items.parts[1]
@@ -520,14 +533,17 @@ test("renewable_energy_ui_rename_bank", {
             T.step(function()
                 self.renamed = Menu.bankLabel(bank.object)
                 local window = StatusWindow.open(0, bank.object)
-                window:setStatus(PowerBank.statusOf(bank.object))
-                self.title = window.title
-                window:close()
-                local action = Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "")
-                self.emptyAllowed = action:canPerform()
-                ISTimedActionQueue.add(action)
-                T.waitForCopy(function() return Menu.bankLabel(bank.object) ~= "Cellar" end)
-                T.bankState(self, bank)
+                T.defer(self, function() window:close() end)
+                T.waitForCopy(function() return window.status ~= nil end)
+                T.step(function()
+                    self.title = window.title
+                    window:close()
+                    local action = Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "")
+                    self.emptyAllowed = action:canPerform()
+                    ISTimedActionQueue.add(action)
+                    T.waitForCopy(function() return Menu.bankLabel(bank.object) ~= "Cellar" end)
+                    T.bankState(self, bank)
+                end)
             end)
         end)
     end,
@@ -600,12 +616,12 @@ local function rowLabelled(rows, label)
 end
 
 -- Opens the window of this client's copy of the bank, closed again when the test ends, and queues
--- a wait until it has drawn its rows.
+-- a wait until the bank's status has come and the window has drawn it.
 local function openWindow(self)
     local window = StatusWindow.open(0, self.bank.object)
     self.window = window
     T.defer(self, function() window:close() end)
-    T.waitUntil(function() return (window.renderedFrames or 0) > 0 end, DRAW_FRAMES)
+    T.waitForCopy(function() return (window.renderedFrames or 0) > 0 end)
 end
 
 -- A bank with nothing in it says it has no batteries, no inverter and no parts, and that it must
@@ -645,15 +661,17 @@ test("renewable_energy_ui_window_reflects_status", {
             { charge = 0.5 })
         if not bank then return end
         self.bank = bank
+        T.watch(self, bank)
         T.setPartCondition(self, bank, "Base.CarBatteryCharger", 0)
         T.setPartCondition(self, bank, "Base.CarBattery1", 70)
         for _ = 1, 3 do
             if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
         end
-        T.step(function()
+        T.waitForCopy(function()
             local status = T.clientStatus(bank)
-            self.withControllerSummary = status and StatusWindow.summary(status)
+            return status ~= nil and #status.sources == 3
         end)
+        T.step(function() self.withControllerSummary = StatusWindow.summary(T.clientStatus(bank)) end)
         T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
         T.bankSet(self, bank, { on = true })
         T.bankPass(self, bank, 1000)
@@ -751,6 +769,7 @@ test("renewable_energy_ui_window_full_bank", {
         local bank = T.bank(self, "batteryBankMetal", FULL_BANK, { charge = 0.7 })
         if not bank then return end
         self.bank = bank
+        T.watch(self, bank)
         T.setPartCondition(self, bank, "RenewableEnergy.L16Battery", 45)
         for _, source in ipairs(FULL_BANK_SOURCES) do
             if not T.panel(self, source.sprite, { near = bank, modules = source.modules, connect = true }) then return end

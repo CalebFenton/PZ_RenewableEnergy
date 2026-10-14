@@ -3,7 +3,7 @@
 --
 -- The vanilla Global Object System saves each bank's table with the world (not in the
 -- chunk), so a bank keeps charging and draining while nobody is near it, and its sync
--- keys push the bank's status to every client (zombie/globalObjects).
+-- key pushes the bank's summary to every client (zombie/globalObjects).
 
 if isClient() then return end
 
@@ -37,11 +37,22 @@ end
 function BankSystem:initSystem()
     PowerBank.serverSystem = self
     self.system:setObjectModDataKeys(Bank.SAVED_FIELDS)
-    self.system:setObjectSyncKeys({ "status" })
+    self.system:setObjectSyncKeys({ "summary" })
     if SandboxVars.RenewableEnergy.ChargeFreq == EVERY_TEN_MINUTES then
         Events.EveryTenMinutes.Add(BankSystem.updateAll)
     else
         Events.EveryHours.Add(BankSystem.updateAll)
+    end
+end
+
+-- Each loaded bank gets the summary the clients are sent, which isn't saved, before any client
+-- connects. Saves made while the whole status was synced still hold a copy of it, which goes.
+function BankSystem:initLuaObjects()
+    SGlobalObjectSystem.initLuaObjects(self)
+    for i = 1, self:getLuaObjectCount() do
+        local bank = self:getLuaObjectByIndex(i)
+        bank.status = nil
+        bank.summary = bank:buildSummary()
     end
 end
 
@@ -157,30 +168,24 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
     end
 end
 
--- Clients ask only for a fresh status, which the status window does when it opens. Every job
+-- Clients only watch a bank's status, which the status window does while it is open. Every job
 -- that changes a bank comes as a RenewableEnergyAction, whose complete() checks the character is
 -- at it, so a forged command packet can't reach a bank from afar.
 
--- A client loads at most this many squares each way around its player (the widest chunk grid a
--- server lets a client connect with, GameServer.receivePlayerConnect), so a bank farther away
--- can't be in its view.
-local REFRESH_REACH = 80
--- Real milliseconds a player waits between refreshes of one bank, since each refresh sends the
--- bank's status to every client.
+-- Real milliseconds a player waits between refreshes of one bank, since each refresh makes the
+-- bank look at its container again and sends its status to everyone watching it.
 local REFRESH_MS = 1000
 
-local function mayRefresh(player, args)
+-- The bank a client command names, or nil.
+local function bankNamed(args)
     local at = type(args) == "table" and args.bank
-    if not (player and type(at) == "table" and type(at.x) == "number" and type(at.y) == "number" and type(at.z) == "number") then
-        return false
+    if not (type(at) == "table" and type(at.x) == "number" and type(at.y) == "number" and type(at.z) == "number") then
+        return nil
     end
-    if math.abs(player:getX() - at.x) > REFRESH_REACH or math.abs(player:getY() - at.y) > REFRESH_REACH then
-        return false
-    end
-    local bank = BankSystem.instance:getLuaObjectAt(at.x, at.y, at.z)
-    if not bank then
-        return false
-    end
+    return BankSystem.instance:getLuaObjectAt(at.x, at.y, at.z)
+end
+
+local function mayRefresh(bank, player)
     -- Each player's last refresh, by name, kept unsaved on the bank's record: it goes when the bank
     -- goes, and a bank built in its place starts afresh.
     bank.refreshedAt = bank.refreshedAt or {}
@@ -194,8 +199,18 @@ local function mayRefresh(player, args)
 end
 
 function BankSystem:OnClientCommand(command, player, args)
-    if command == "refresh" and mayRefresh(player, args) then
-        PowerBank.perform(player, command, args)
+    local bank = player and bankNamed(args)
+    if not bank then return end
+    if command == "watch" and bank:inViewOf(player) then
+        local new = bank:watch(player)
+        if mayRefresh(bank, player) then
+            PowerBank.perform(player, "refresh", args)
+        elseif new then
+            -- A window closed and opened again within the wait still needs the status.
+            bank:sendStatusTo(player)
+        end
+    elseif command == "unwatch" then
+        bank:unwatch(player)
     end
 end
 

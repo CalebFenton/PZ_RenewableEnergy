@@ -102,20 +102,4 @@ PZHarness.register({
             SandboxVars.RenewableEnergy.GardenLights = NO_HOUSE_LIGHTS
         end
     end,
-    tests = {
-        -- Daylight, so crafting and wiring can see and panels have sun.
-        hour = 10,
-        -- The perks the mod's actions and recipes read.
-        perks = { Perks.Electricity, Perks.MetalWelding, Perks.Woodwork },
-        sandbox = "RenewableEnergy",
-        recipePrefix = "RenewableEnergy_",
-        isFreeSquare = RenewableEnergy.Debug.isFreeSquare,
-        remove = function(object)
-            if not RenewableEnergy.PowerBank.isBank(object) then
-                return false
-            end
-            RenewableEnergy.PowerBank.remove(object)
-            return true
-        end,
-    },
 })

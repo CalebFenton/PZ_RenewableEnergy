@@ -1,5 +1,6 @@
--- The banks as a client sees them: the server's status for each one, arriving through the
--- Global Object System (also in single player, where it loops back), and commands back.
+-- The banks as a client sees them: the server's summary of each one, arriving through the
+-- Global Object System (also in single player, where it loops back), the whole status of the
+-- banks this game's players watch, and commands back.
 --
 -- Bank generators and containers come to a multiplayer client as plain copies, so this
 -- side does on its copy what the server does on its own: keep the generator out of the
@@ -42,27 +43,67 @@ local function adoptCopy(isoObject)
     PowerBank.adoptContainer(isoObject:getContainer())
 end
 
--- Only later updates come here: a new bank's first status is copied in by the engine
--- without a call (CGlobalObjectSystem.receiveNewLuaObjectAt).
-function BankSystem:OnLuaObjectUpdated(bank)
-    if isClient() then
-        adoptCopy(bank:getIsoObject())
-    end
-end
-
 -- The server sends no system commands, and vanilla's default raises an error for any command.
 function BankSystem:OnServerCommand(command, args)
 end
 
 CGlobalObjectSystem.RegisterSystemClass(BankSystem)
 
---- Ask the server for a fresh status of `bank` (single player too). Jobs that change a bank go
---- through RenewableEnergyAction instead; the server takes no other command from a client.
-function PowerBank.requestStatus(player, bank)
-    if BankSystem.instance then
-        BankSystem.instance:sendCommand(player, "refresh", { bank = PowerBank.positionOf(bank) })
+-- The banks this game's players watch, as "x,y,z" to { [player number] = true }. The server sends
+-- a bank's status only to its watchers, so once nobody here watches it, this client's copy goes
+-- rather than show stale when a window next opens.
+local watching = {}
+
+local function keyOf(position)
+    return position.x .. "," .. position.y .. "," .. position.z
+end
+
+-- This client's copy of the bank at `position`.
+local function copyAt(position)
+    local globalObject = BankSystem.instance.system:getObjectAt(position.x, position.y, position.z)
+    return globalObject and globalObject:getModData()
+end
+
+--- `player` watches the status of `bank` (single player too): the server sends it now, after a
+--- fresh look at the bank, and after every change until unwatchStatus. The status window watches
+--- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; the server
+--- takes no other command from a client.
+function PowerBank.watchStatus(player, bank)
+    local position = PowerBank.positionOf(bank)
+    local key = keyOf(position)
+    watching[key] = watching[key] or {}
+    watching[key][player:getPlayerNum()] = true
+    BankSystem.instance:sendCommand(player, "watch", { bank = position })
+end
+
+--- `player` stops watching the status of `bank`.
+function PowerBank.unwatchStatus(player, bank)
+    local position = PowerBank.positionOf(bank)
+    local key = keyOf(position)
+    BankSystem.instance:sendCommand(player, "unwatch", { bank = position })
+    local players = watching[key]
+    if players then
+        players[player:getPlayerNum()] = nil
+        for _ in pairs(players) do
+            return
+        end
+    end
+    watching[key] = nil
+    local copy = copyAt(position)
+    if copy then
+        copy.status = nil
     end
 end
+
+-- A multiplayer server sends a bank's status to the players watching it. Single player has no such
+-- message: there the status window reads the bank on the authority.
+Events.OnServerCommand.Add(function(module, command, args)
+    if module ~= PowerBank.STATUS_MODULE or command ~= "status" then return end
+    local copy = watching[keyOf(args)] and copyAt(args)
+    if copy then
+        copy.status = args.status
+    end
+end)
 
 -- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos), 8
 -- squares a side.
@@ -89,10 +130,12 @@ local function releasePower(isoObject)
     end
 end
 
+-- A copy that arrives with its chunk, or that the server just placed.
 if isClient() then
     for _, name in ipairs(PowerBank.bankSprites()) do
         MapObjects.OnLoadWithSprite(name, adoptCopy, LOAD_PRIORITY)
     end
+    Events.OnObjectAdded.Add(adoptCopy)
     Events.OnObjectAboutToBeRemoved.Add(releasePower)
 end
 

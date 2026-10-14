@@ -233,6 +233,7 @@ test("renewable_energy_power_bank_refused_outdoors", {
         self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" },
             { square = outdoor[1] })
         if not self.bank then return end
+        T.watch(self, self.bank)
         T.switchOn(self, self.bank)
         T.bankState(self, self.bank)
     end,
@@ -255,6 +256,7 @@ test("renewable_energy_power_panel_charges_bank", {
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         self.bank = bank
+        T.watch(self, bank)
         T.bankState(self, bank)
         T.step(function() self.before = bank.state end)
         T.bankPass(self, bank, 1000)
@@ -364,7 +366,7 @@ test("renewable_energy_power_panel_slots", {
 
 -- The bank's limit is its working inverters' ratings together. A Plug-in Inverter runs a TV and
 -- a lamp, or a mini fridge, but not a full fridge. A broken inverter's loss shows in this client's
--- status.
+-- summary.
 test("renewable_energy_power_inverter_limits", {
     run = function(self)
         self.box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
@@ -377,8 +379,8 @@ test("renewable_energy_power_inverter_limits", {
         T.step(function() self.twoInverters = self.bank.state.limitW end)
         T.setPartCondition(self, self.bank, "RenewableEnergy.PowerInverter", 0, true)
         T.waitForCopy(function()
-            local status = T.clientStatus(self.bank)
-            return status ~= nil and status.limitW == self.bank.state.limitW
+            local summary = T.clientSummary(self.bank)
+            return summary ~= nil and summary.limitW == self.bank.state.limitW
         end)
     end,
     validate = function(self)
@@ -389,8 +391,8 @@ test("renewable_energy_power_inverter_limits", {
         local inverterW = Specs.inverters["RenewableEnergy.PowerInverter"].watts
         expectNear("limit of two Power Inverters", self.twoInverters, 2 * inverterW, 0)
         expectNear("limit with one of them broken", self.bank.state.limitW, inverterW, 0)
-        local status = T.clientStatus(self.bank)
-        expectNear("limit in this client's status", status and status.limitW, inverterW, 0)
+        local summary = T.clientSummary(self.bank)
+        expectNear("limit in this client's summary", summary and summary.limitW, inverterW, 0)
     end,
 })
 
@@ -402,6 +404,7 @@ test("renewable_energy_power_overload_cuts_and_returns", {
         local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
         if not bank then return end
         self.bank = bank
+        T.watch(self, bank)
         T.switchOn(self, bank)
         T.applyLoad(self, bank, { "television", "light" })
         T.step(function() self.fitting = bank.state.activated end)
@@ -730,8 +733,8 @@ test("renewable_energy_power_wiring_parts", {
             return tostring(self[key].reason)
         end
         expect(reason("hammer") == "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in (" .. reason("hammer") .. ")")
-        expect(reason("noTool") == "Tooltip_RenewableEnergy_NeedTool", "a battery was wired in without a wrench (" .. reason("noTool") .. ")")
-        expect(reason("noWire") == "Tooltip_RenewableEnergy_NeedWire", "a battery was wired in without wire (" .. reason("noWire") .. ")")
+        expect(reason("noTool") == "tool", "a battery was wired in without a wrench (" .. reason("noTool") .. ")")
+        expect(reason("noWire") == "wire", "a battery was wired in without wire (" .. reason("noWire") .. ")")
         expect(self.wired.ok, "wiring a battery in with a wrench and wire failed (" .. reason("wired") .. ")")
         expect(self.wired.xpAfter > self.wired.xpBefore, "the first wiring gave no Electricity XP")
         expectNear("wire left after wiring a battery in", self.counts.wired[PowerBank.WIRE], 0, 0)
@@ -739,7 +742,7 @@ test("renewable_energy_power_wiring_parts", {
         expectNear("wire back after unwiring", self.counts.unwired[PowerBank.WIRE], 1, 0)
         expect(self.rewired.ok, "wiring the battery in again failed (" .. reason("rewired") .. ")")
         expectNear("XP for wiring the same battery again", self.rewired.xpAfter - self.rewired.xpBefore, 0, 0)
-        expect(reason("skill") == "Tooltip_RenewableEnergy_NeedSkill", "an Inverter/Charger was wired in at Electricity 2 (" .. reason("skill") .. ")")
+        expect(reason("skill") == "skill", "an Inverter/Charger was wired in at Electricity 2 (" .. reason("skill") .. ")")
         expect(self.second.ok, "a battery box refused its second battery (" .. reason("second") .. ")")
         expect(reason("full") == "Tooltip_RenewableEnergy_NoSlot", "a battery box took a third battery (" .. reason("full") .. ")")
         expectNear("batteries in the box", self.bank.state.batteries, 2, 0)
@@ -845,11 +848,11 @@ test("renewable_energy_power_part_wear_and_repair", {
         expectNear("inverter condition lost in 100 hours on", self.worn[INVERTER], math.floor(Specs.partWear.inverterPerHour * 100), 0)
         expectNear("controller condition lost in 100 hours on", self.worn[Specs.controller], math.floor(Specs.partWear.controllerPerHour * 100), 0)
         expectNear("inverter condition lost to one overload", self.overloadWorn, Specs.partWear.overload, 0)
-        expect(reason("unskilled") == "Tooltip_RenewableEnergy_NeedSkill", "a part was repaired at Electricity 1 (" .. reason("unskilled") .. ")")
+        expect(reason("unskilled") == "skill", "a part was repaired at Electricity 1 (" .. reason("unskilled") .. ")")
         expect(self.repaired.ok, "repairing a worn inverter with scrap failed (" .. reason("repaired") .. ")")
         expectNear("condition after one scrap", self.repairedCondition, 60, 0)
         expectNear("scrap left", self.counts.scrap[PowerBank.SCRAP], 0, 0)
-        expect(reason("noScrap") == "Tooltip_RenewableEnergy_NeedScrap", "a part was repaired without scrap (" .. reason("noScrap") .. ")")
+        expect(reason("noScrap") == "scrap", "a part was repaired without scrap (" .. reason("noScrap") .. ")")
         expect(reason("whole") == "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair (" .. reason("whole") .. ")")
         expectNear("limit with the only inverter at 0", self.broken.limitW, 0, 0)
         expect(not self.broken.activated, "a bank whose only inverter is broken powers its area")
@@ -882,20 +885,20 @@ test("renewable_energy_power_failsafe_starts_generator", {
 
 -- A timed action's complete() hands the bank system a command built from what the client sent,
 -- which must survive forged arguments and refuse what the world doesn't allow; the server's record
--- changes, and the status it sends reaches this client's copy.
+-- changes, and the summary it sends reaches this client's copy.
 test("renewable_energy_power_commands_from_clients", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" })
         local panel = bank and T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
         if not panel then return end
         self.bank, self.panel = bank, panel
-        local function sourceSnow()
-            local status = T.clientStatus(bank)
-            return status and status.sources[1] and status.sources[1].snow
+        local function sourceSnowy()
+            local summary = T.clientSummary(bank)
+            return summary and summary.sources[1] and summary.sources[1].snowy == true
         end
         T.server(self, "setSnow", { bank = bank.position, source = panel.position, snow = 0.8 })
-        T.waitForCopy(function() return sourceSnow() == 0.8 end)
-        T.step(function() self.snowBefore = sourceSnow() end)
+        T.waitForCopy(sourceSnowy)
+        T.step(function() self.snowyBefore = sourceSnowy() end)
         local forged = {
             { "noSuchCommand", { bank = bank.position } },
             { "setBankOn", { bank = "nonsense" } },
@@ -914,34 +917,34 @@ test("renewable_energy_power_commands_from_clients", {
             end)
         end
         T.perform(self, "clearSnow", { source = panel.position })
-        T.waitForCopy(function() return sourceSnow() == 0 end)
+        T.waitForCopy(function() return not sourceSnowy() end)
         T.bankState(self, bank)
         T.step(function()
             self.afterForged = bank.state
-            self.snowAfter = sourceSnow()
+            self.snowyAfter = sourceSnowy()
         end)
         T.perform(self, "disconnectSource", { source = panel.position })
         T.perform(self, "rename", { bank = bank.position, name = "  Shed bank  " })
         T.perform(self, "setBankOn", { bank = bank.position, on = true })
         T.waitForCopy(function()
-            local status = T.clientStatus(bank)
-            return status ~= nil and status.on == true and status.name == "Shed bank" and #status.sources == 0
+            local summary = T.clientSummary(bank)
+            return summary ~= nil and summary.on == true and summary.name == "Shed bank" and #summary.sources == 0
         end)
         T.bankState(self, bank)
     end,
     validate = function(self)
-        local forged, state, status = self.afterForged, self.bank.state, T.clientStatus(self.bank)
+        local forged, state, summary = self.afterForged, self.bank.state, T.clientSummary(self.bank)
         expect(#self.accepted == 0, "the bank system accepted forged commands: " .. table.concat(self.accepted, ", "))
         expect(forged.sources == 1 and forged.batteries == 1 and forged.name == "" and not forged.on,
             string.format("forged commands changed the bank: %d panels, %d batteries, name %q, on %s",
                 forged.sources, forged.batteries, forged.name, tostring(forged.on)))
-        expect(self.snowBefore == 0.8 and self.snowAfter == 0, "clearing snow went from " .. tostring(self.snowBefore)
-            .. " to " .. tostring(self.snowAfter))
+        expect(self.snowyBefore and not self.snowyAfter, "clearing snow left the panel snowy in this client's summary: "
+            .. tostring(self.snowyBefore) .. " before, " .. tostring(self.snowyAfter) .. " after")
         expect(state.sources == 0, "disconnecting the panel left " .. state.sources .. " panels")
         expect(state.on, "setBankOn didn't switch the server's bank on")
         expect(state.name == "Shed bank", "the server names the bank " .. tostring(state.name))
-        expect(status and status.on == true and status.kind == "batteryBoxWood", "this client's copy of the status doesn't show the bank on")
-        expect(status and status.name == "Shed bank", "this client's copy names the bank " .. tostring(status and status.name))
+        expect(summary and summary.on == true, "this client's copy of the summary doesn't show the bank on")
+        expect(summary and summary.name == "Shed bank", "this client's copy names the bank " .. tostring(summary and summary.name))
     end,
 })
 
@@ -966,7 +969,7 @@ test("renewable_energy_power_removed_bank_leaves_no_power", {
         expect(not removed.powered, "the removed bank's square still has power")
         expect(not square:haveElectricity(), "the removed bank's square still has power on this client")
         expect(not removed.registered, "the removed bank is still registered")
-        expect(PowerBank.bankOn(square) == nil and PowerBank.statusOf(square) == nil, "this client still has the removed bank")
+        expect(PowerBank.bankOn(square) == nil and PowerBank.summaryOf(square) == nil, "this client still has the removed bank")
     end,
 })
 
@@ -991,6 +994,7 @@ test("renewable_energy_power_clock_drives_banks_and_gadgets", {
         local squares = T.need(self, T.squares(self, 2, { bare = true }), "two bare outdoor squares for the gadgets")
         if not (panel and squares) then return end
         self.bank = bank
+        T.watch(self, bank)
         local car = T.placeVehicle(self, "Base.CarNormal", { battery = "Base.CarBattery1", charge = 0.5 })
         local trailer = T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT)
         local charger = T.placeAsPlayer(self, squares[1], "RenewableEnergy.SolarCellCharger", Sprites.cellCharger)
@@ -1006,11 +1010,11 @@ test("renewable_energy_power_clock_drives_banks_and_gadgets", {
             self.before = self.server.stockGadgets
             T.setTime(self, getGameTime():getTimeOfDay() + CLOCK_JUMP_HOURS)
         end)
-        -- The bank's pass and the gadgets' run on the same tick; the bank's status coming back with
-        -- a later hour says both have.
+        -- The bank's pass and the gadgets' run on the same tick; the bank's status coming back an
+        -- hour on from its last pass says both have.
         T.waitForCopy(function()
             local status = T.clientStatus(bank)
-            return status ~= nil and status.hour >= self.before.hour + 1
+            return status ~= nil and status.hour >= self.before.bankPassAge + 1
         end)
         T.server(self, "gadgetCharges", fixtures)
     end,
@@ -1034,9 +1038,9 @@ test("renewable_energy_power_clock_drives_banks_and_gadgets", {
 
 -- Who may change a bank -------------------------------------------------------------------
 
--- The server takes no bank job as a client command, only the status window's refresh: a forged
--- packet can't switch, rename or strip a bank, while the refresh still brings its status up to
--- date.
+-- The server takes no bank job as a client command, only the status window's watch: a forged
+-- packet can't switch, rename or strip a bank, while the watch's refresh still brings its status
+-- up to date.
 test("renewable_energy_power_client_commands_ignored", {
     run = function(self)
         local inverter = "RenewableEnergy.PlugInInverter"
@@ -1046,7 +1050,7 @@ test("renewable_energy_power_client_commands_ignored", {
         T.bankState(self, bank)
         T.step(function() self.before = bank.state end)
         -- A battery taken out past the bank's commands shows in the status only once something makes
-        -- the bank look again: here the refresh sent after the forged commands, which the server
+        -- the bank look again: here the watch sent after the forged commands, which the server
         -- handles in the order they came.
         T.server(self, "removePart", { bank = bank.position, type = "Base.CarBattery1" })
         T.step(function()
@@ -1055,7 +1059,8 @@ test("renewable_energy_power_client_commands_ignored", {
             system:sendCommand(p, "setBankOn", { bank = bank.position, on = true })
             system:sendCommand(p, "rename", { bank = bank.position, name = "Forged" })
             system:sendCommand(p, "unwire", { bank = bank.position, itemId = part and part.id or -1 })
-            PowerBank.requestStatus(p, bank.object)
+            PowerBank.watchStatus(p, bank.object)
+            T.defer(self, function() PowerBank.unwatchStatus(p, bank.object) end)
         end)
         T.waitForCopy(function()
             local status = T.clientStatus(bank)
@@ -1068,7 +1073,52 @@ test("renewable_energy_power_client_commands_ignored", {
         expect(not after.on, "a client command switched the bank on")
         expect(after.name == before.name, "a client command renamed the bank " .. tostring(after.name))
         expect(stateItem(after, "RenewableEnergy.PlugInInverter") ~= nil, "a client command unwired the inverter")
-        expect(status ~= nil and #status.batteries == 1, "the status window's refresh didn't bring the bank's status up to date")
+        expect(status ~= nil and #status.batteries == 1, "the status window's watch didn't bring the bank's status up to date")
+    end,
+})
+
+-- Every client keeps a bank's summary, which the server sends again only when it changes, while
+-- the whole status goes only to the players watching the bank: from the watch on, after every
+-- change, until they stop.
+test("renewable_energy_power_status_only_to_watchers", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter" }, { charge = 0.5 })
+        local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not panel then return end
+        self.bank = bank
+        T.step(function() self.summary = T.clientSummary(bank) end)
+        T.bankPass(self, bank, 1000)
+        T.step(function()
+            self.unwatched = { status = T.clientStatus(bank), watchers = bank.state.watchers,
+                resent = T.clientSummary(bank) ~= self.summary }
+        end)
+        T.watch(self, bank)
+        T.bankPass(self, bank, 0)
+        T.waitForCopy(function()
+            local status = T.clientStatus(bank)
+            return status ~= nil and status.solarW == 0
+        end)
+        T.step(function()
+            self.watchers = bank.state.watchers
+            PowerBank.unwatchStatus(player(), bank.object)
+        end)
+        T.waitForCopy(function() return T.clientStatus(bank) == nil end)
+        T.step(function() self.dropped = T.clientStatus(bank) == nil end)
+        -- The unwatch and the pass's call are separate packets, which a server may take in either order.
+        T.serverUntil(self, "bankState", bank.position, function(state) return state.watchers == 0 end)
+        T.bankPass(self, bank, 1000)
+        T.step(function() self.stopped = { status = T.clientStatus(bank), watchers = bank.state.watchers } end)
+    end,
+    validate = function(self)
+        local unwatched, stopped = self.unwatched, self.stopped
+        if not expect(unwatched and stopped, "the queue stopped before the bank was watched and let go") then return end
+        expect(unwatched.status == nil, "this client has the status of a bank nobody here watches")
+        expect(unwatched.watchers == 0, unwatched.watchers .. " players watch a bank nobody opened")
+        expect(not unwatched.resent, "a pass that changed nothing in the summary sent it again")
+        expect(self.watchers == 1, tostring(self.watchers) .. " players watch the bank this client watches, expected 1")
+        expect(self.dropped, "this client kept the status of a bank it stopped watching")
+        expect(stopped.watchers == 0, stopped.watchers .. " players still watch the bank after this client stopped")
+        expect(stopped.status == nil, "a pass sent this client the status of a bank it stopped watching")
     end,
 })
 
@@ -1166,7 +1216,7 @@ test("renewable_energy_power_generator_fuel_follows_battery_room", {
 
 -- A bank tile that loads without its container is rebuilt into a working bank, and the rebuilt bank
 -- keeps what the bank's record held: its name and its panels, on the server and in this client's
--- status.
+-- summary.
 test("renewable_energy_power_rebuilt_bank_keeps_its_record", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", {})
@@ -1176,18 +1226,18 @@ test("renewable_energy_power_rebuilt_bank_keeps_its_record", {
         T.perform(self, "rename", { bank = bank.position, name = "Cellar" })
         T.server(self, "rebuildBank", { bank = bank.position })
         T.waitForCopy(function()
-            local rebuilt, status = PowerBank.bankOn(bank.square), PowerBank.statusOf(bank.square)
-            return rebuilt ~= nil and rebuilt ~= bank.object and status ~= nil and status.name == "Cellar"
+            local rebuilt, summary = PowerBank.bankOn(bank.square), PowerBank.summaryOf(bank.square)
+            return rebuilt ~= nil and rebuilt ~= bank.object and summary ~= nil and summary.name == "Cellar"
         end)
     end,
     validate = function(self)
         if not expect(self.panel.connected, "connecting the panel failed (" .. tostring(self.panel.reason) .. ")") then return end
-        local state, status = self.server.rebuildBank, PowerBank.statusOf(self.bank.square)
+        local state, summary = self.server.rebuildBank, PowerBank.summaryOf(self.bank.square)
         expect(state.name == "Cellar", "the rebuilt bank is named " .. string.format("%q", tostring(state.name)))
         expect(state.sources == 1, "the rebuilt bank has " .. tostring(state.sources) .. " panels")
-        expect(status ~= nil and status.name == "Cellar" and #status.sources == 1,
-            "this client's status of the rebuilt bank names it " .. tostring(status and status.name)
-            .. " with " .. tostring(status and #status.sources) .. " panels")
+        expect(summary ~= nil and summary.name == "Cellar" and #summary.sources == 1,
+            "this client's summary of the rebuilt bank names it " .. tostring(summary and summary.name)
+            .. " with " .. tostring(summary and #summary.sources) .. " panels")
     end,
 })
 
