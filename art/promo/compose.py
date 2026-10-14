@@ -49,7 +49,7 @@ HOMESTEAD = "A homestead"
 # reshoot that frames a shot differently needs its box moved. The setup shots share a shape so
 # that they line up side by side.
 SETUP_CROPS = {"stage0": (330, 50, 1230, 812), "homestead": (260, 0, 1160, 762)}
-BANK_CROP = (100, 200, 592, 588)
+BANK_CROP = (80, 222, 552, 704)
 MENU_CROP = (206, 105, 726, 385)
 TRAILER_CROP = (0, 140, 1260, 660)
 # bank.png: the status window's size against its capture, as large as leaves room for the menu.
@@ -326,14 +326,17 @@ def setup():
 def bank(width=WIDTH, status_scale=STATUS_SCALE, height=None):
     """The homestead's bank indoors over its right-click menu, beside its status window, centred
     in height if given. The menu's text is drawn larger than the status window's, so it is scaled
-    down to about the same size, and cropped to the bank's own submenu and Wire In."""
+    down to about the same size, and cropped to the bank's own submenu and Wire In. The room fills
+    the column, or less where the room and menu would stand taller than the status window, or than
+    the height."""
     margin, gap = 20, 16
     status = scaled(capture("status"), status_scale)
     column = width - 2 * margin - gap - status.width
     menu = capture("menu").crop(MENU_CROP)
     menu = scaled(menu, column / menu.width)
     room = capture("bank").crop(BANK_CROP).convert("RGBA")
-    room = scaled(room, column / room.width)
+    tallest = max(status.height, height - 2 * margin if height else 0)
+    room = scaled(room, min(column / room.width, (tallest - gap - menu.height) / room.height))
     inner = max(status.height, room.height + gap + menu.height)
     image = canvas(height or inner + 2 * margin, width)
     top = (image.height - inner) // 2

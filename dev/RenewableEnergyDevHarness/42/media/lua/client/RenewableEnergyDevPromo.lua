@@ -87,6 +87,19 @@ local HOMESTEAD_BANK = {
 local HOUSE_LIGHTS = 3
 local LIGHT_SEARCH = 10
 local MORNING_CHARGE = 0.55
+-- What the character wears at the homestead, a settler long into the apocalypse: road leathers,
+-- armour pieced together from scrap metal and tyres, goggles, a scarf against the dust, and a
+-- sawn-off in hand. Elsewhere it wears the clothes it came with.
+local SETTLER = {
+    clothes = {
+        "Base.Tshirt_DefaultTEXTURE", "Base.Jacket_LeatherBlack", "Base.Trousers_LeatherBlack",
+        "Base.Shoes_BlackBoots", "Base.Gloves_FingerlessLeatherGloves_Black", "Base.ShemaghScarf",
+        "Base.Glasses_SkiGoggles", "Base.Shoulderpad_MetalSpikeScrap_L", "Base.Shoulderpad_Tire_R",
+        "Base.VambraceScrap_Left", "Base.VambraceScrap_Right", "Base.GreaveScrap_Left", "Base.GreaveScrap_Right",
+        "Base.Bag_ALICE_BeltSus",
+    },
+    weapon = "Base.ShotgunSawnoff",
+}
 
 -- Stage 0, at another building: a battery box indoors beside a window, the character at the
 -- window, and the panels, a solar battery charger and a garden light outside in their sight.
@@ -135,7 +148,8 @@ local STUDIO = {
 
 -- The trailer shot, on a road: positions are (ahead, side) squares from the car, `side` towards
 -- the far side of the road from the camera. Road cones taper across the lane behind the
--- trailer, and the character stands at the trailer's battery box.
+-- trailer, and the character stands on the far side of the trailer's battery box, two squares
+-- off, where the arrow board hides none of them.
 local ROAD = {
     -- The car faces north on a north-south road, else west on an east-west one, so that the
     -- arrow board on the trailer's back faces the camera.
@@ -143,11 +157,11 @@ local ROAD = {
     -- The open road the setup needs: room on the near side keeps hedges and fences there from
     -- hiding the car.
     ahead = { -11, 3 },
-    side = { -3, 2 },
+    side = { -3, 3 },
     trailer = { -5, 0 },
     cones = { { -8, 1 }, { -9, 0 }, { -10, -1 } },
     cone = "street_decoration_01_26",
-    player = { -3, 1 },
+    player = { -3, 3 },
     -- Other vehicles this close to the car go, so that only the car and trailer are in the shot.
     clearRadius = 14,
 }
@@ -506,62 +520,60 @@ local function againstNorthWall(square)
     return nil
 end
 
-local function hasOpening(square)
-    return square:getDoorOrWindow(true) ~= nil or square:getDoorOrWindow(false) ~= nil
-end
-
 -- Where along the panels' wall the bank's column may be, nearest the panels first.
 local ALONG_PANELS = { 0, -1, 1, -2, 2 }
 -- The character's square from the bank's, (east, south), the first that fits: in front of it and
--- far enough off to one side that the character hides none of it.
-local BESIDE_BANK = { { 0, 2 }, { -2, 1 }, { 2, 1 } }
+-- far enough off to one side that the character hides none of it. In the shot a square south
+-- moves the character left as far as a square west does, so a square further east it stands a
+-- square further south.
+local BESIDE_BANK = { { 0, 2 }, { 1, 3 }, { -2, 1 } }
+-- How far east of the bank the room's floor runs on: the game draws the room's east wall faded
+-- rather than cut away, and closer it stands over the bank.
+local BANK_EAST_CLEAR = 4
 
--- The squares of the bank shot: from the bank to the character and a square either side.
+-- The squares of the bank shot: from the bank to the character, a square around the character,
+-- and the floor east of the bank.
 local function eachShotSquare(bank, player, fn)
     for y = bank:getY(), player:getY() + 1 do
-        for x = math.min(bank:getX(), player:getX()) - 1, math.max(bank:getX(), player:getX()) + 1 do
+        for x = math.min(bank:getX(), player:getX() - 1), math.max(bank:getX() + BANK_EAST_CLEAR, player:getX() + 1) do
             fn(getCell():getGridSquare(x, y, bank:getZ()))
         end
     end
 end
 
--- Whether `square` is in `room` with more of it to the east: the game draws a room's east wall
--- faded over whatever stands beside it rather than cutting it away.
-local function isClearOfEastWall(square, room)
-    local east = getCell():getGridSquare(square:getX() + 1, square:getY(), square:getZ())
-    return square:getRoom() == room and east ~= nil and east:getRoom() == room
-end
-
--- Whether the character may stand there for the bank shot: in the bank's room with only the room
--- between them, at no door or window, clear of the east wall.
-local function isBesideBank(bank, player)
-    local room = bank:getRoom()
-    if hasOpening(player) or not isClearOfEastWall(player, room) then
-        return false
-    end
-    for y = bank:getY(), player:getY() do
-        for x = math.min(bank:getX(), player:getX()), math.max(bank:getX(), player:getX()) do
-            local square = getCell():getGridSquare(x, y, bank:getZ())
-            if not (square and square:getRoom() == room) then
-                return false
+-- Whether the bank shot's squares are open floor of the bank's room, so that the character stands
+-- clear of every wall: no wall between them, and no door or window but in the back wall beside the
+-- bank. A room may have a wall through it, which the shot would show the character in.
+local function isOpenShot(bank, player)
+    local room, open = bank:getRoom(), true
+    eachShotSquare(bank, player, function(square)
+        local backWall = square and square:getY() == bank:getY() and square ~= bank
+        if not (square and square:getRoom() == room) or square:getDoorOrWindow(false)
+            or (square:getDoorOrWindow(true) and not backWall) then
+            open = false
+            return
+        end
+        local cell, x, y, z = getCell(), square:getX(), square:getY(), square:getZ()
+        for _, beyond in ipairs({ cell:getGridSquare(x + 1, y, z), cell:getGridSquare(x, y + 1, z) }) do
+            if beyond:getRoom() == room and square:isSomethingTo(beyond) then
+                open = false
             end
         end
-    end
-    return true
+    end)
+    return open
 end
 
 -- The homestead bank's square and the character's. The panels' wall faces south, so the bank
--- stands across the room from it, against the north wall, facing it, at no door or window and clear
--- of the east wall. Nil if the room has no such place.
+-- stands across the room from it, against the north wall, facing it, with open floor around it
+-- and the character. Nil if the room has no such place.
 local function bankPlace(site, origin)
     if site.facing ~= "S" then return nil end
     for _, along in ipairs(ALONG_PANELS) do
         local bank = againstNorthWall(siteSquare(site, origin, HOMESTEAD.inside[1] + along, HOMESTEAD.inside[2]))
-        if bank and RenewableEnergy.PowerBank.canPlaceBank(bank) and not hasOpening(bank)
-            and isClearOfEastWall(bank, bank:getRoom()) then
+        if bank and RenewableEnergy.PowerBank.canPlaceBank(bank) then
             for _, offset in ipairs(BESIDE_BANK) do
                 local player = getCell():getGridSquare(bank:getX() + offset[1], bank:getY() + offset[2], bank:getZ())
-                if player and isBesideBank(bank, player) then
+                if player and isOpenShot(bank, player) then
                     return bank, player
                 end
             end
@@ -571,32 +583,17 @@ local function bankPlace(site, origin)
 end
 
 -- Sets the room in the bank shot: takes the furniture, and anything else standing on the floor,
--- off it, so that nothing stands beside the bank or in front of it or the character. Walls, what
--- hangs on them, light switches, doors and windows stay.
+-- off it, so that nothing stands beside the bank or in front of it or the character, and the back
+-- wall's doors off their hinges, since the game draws them standing open into the room even once
+-- shut. Walls, what hangs on them, light switches and windows stay.
 local function clearBankShot(bank, player)
     eachShotSquare(bank, player, function(square)
-        if not (square and square:getRoom() == bank:getRoom()) then return end
         local floor, objects = square:getFloor(), square:getObjects()
         for i = objects:size() - 1, 0, -1 do
             local object = objects:get(i)
-            if object ~= floor and not isOnWall(object) and not instanceof(object, "IsoDoor")
-                and not instanceof(object, "IsoWindow") and not instanceof(object, "IsoLightSwitch") then
+            if instanceof(object, "IsoDoor") or (object ~= floor and not isOnWall(object)
+                and not instanceof(object, "IsoWindow") and not instanceof(object, "IsoLightSwitch")) then
                 square:RemoveTileObject(object)
-            end
-        end
-    end)
-end
-
--- Shuts the doors of the room in the bank shot, which the game draws faded when open, once the
--- character has come in through one.
-local function shutBankShotDoors(bank, player)
-    eachShotSquare(bank, player, function(square)
-        if not (square and square:getRoom() == bank:getRoom()) then return end
-        local objects = square:getObjects()
-        for i = 0, objects:size() - 1 do
-            local object = objects:get(i)
-            if instanceof(object, "IsoDoor") and object:IsOpen() then
-                object:ToggleDoor(getPlayer())
             end
         end
     end)
@@ -1081,6 +1078,38 @@ local function cropped(name, squares)
     return region(name, left, top, right - left, bottom - top)
 end
 
+-- The clothes the character came with, and the settler's, each made once.
+local ownClothes, settlerClothes, settlerWeapon
+
+-- Adds the step that dresses the character as the settler, or with `settler` false back in the
+-- clothes it came with and empty-handed.
+local function addOutfit(settler)
+    run:add(function()
+        local player = getPlayer()
+        if not ownClothes then
+            ownClothes, settlerClothes = {}, {}
+            local worn = player:getWornItems()
+            for i = 0, worn:size() - 1 do
+                table.insert(ownClothes, worn:get(i):getItem())
+            end
+            for _, fullType in ipairs(SETTLER.clothes) do
+                table.insert(settlerClothes, player:getInventory():AddItem(fullType))
+            end
+            settlerWeapon = player:getInventory():AddItem(SETTLER.weapon)
+        end
+        player:clearWornItems()
+        for _, item in ipairs(settler and settlerClothes or ownClothes) do
+            player:setWornItem(item:IsClothing() and item:getBodyLocation() or item:canBeEquipped(), item)
+        end
+        local held = settler and settlerWeapon or nil
+        player:setPrimaryHandItem(held)
+        player:setSecondaryHandItem(held and held:isTwoHandWeapon() and held or nil)
+        triggerEvent("OnClothingUpdated", player)
+        player:resetModelNextFrame()
+        return DRAW_FRAMES
+    end)
+end
+
 -- The squares the character has looked around from so far in the run. What it saw stays seen.
 local lookedFrom = {}
 
@@ -1153,6 +1182,7 @@ local function addWorld()
         end
     end
     table.insert(scouts, at(HOMESTEAD.player))
+    addOutfit(true)
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
     goTo(scouts, 1)
     run:addOpaque("homestead", function()
@@ -1168,15 +1198,12 @@ local function addWorld()
     end)
     -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
     goTo({ besideBank }, 0)
-    run:add(function()
-        shutBankShotDoors(bankSquare, besideBank)
-        return DRAW_FRAMES
-    end)
     run:addOpaque("bank", function()
         return { cropped("bank", bankSquares()) }
     end)
     -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
-    -- among them, then from the window.
+    -- among them, then from the window, early on, in the clothes it came with.
+    addOutfit(false)
     goTo({ atStage0(STAGE0.scout), atStage0(STAGE0.player) }, 0)
     run:addOpaque("stage0", function()
         return { centred("stage0", stage0Squares()) }
@@ -1349,6 +1376,7 @@ end
 -- closest zoom.
 local function addTrailer()
     local pair
+    addOutfit(false)
     run:add(function()
         local x, y, z, reach = roadCar:getX(), roadCar:getY(), roadCar:getZ(), ROAD.clearRadius
         Stage.removeTrees(x, y, z)
@@ -1384,6 +1412,7 @@ end
 -- Garden lights along a house's front walk, charged and lit at night, at the closest zoom.
 local function addGardenLights()
     local SolarGardenLight = RenewableEnergy.SolarGardenLight
+    addOutfit(false)
     run:add(function()
         Stage.removeTrees(walkOrigin:getX(), walkOrigin:getY(), walkOrigin:getZ())
         for along = WALK.open.along[1], WALK.open.along[2] do
@@ -1481,6 +1510,8 @@ local function posterRegion()
 end
 
 local function addPoster()
+    -- The homestead at night, its settler by the racks.
+    addOutfit(true)
     run:add(function()
         Stage.removeTrees(posterOrigin:getX(), posterOrigin:getY(), posterOrigin:getZ())
     end)
@@ -1516,11 +1547,13 @@ local function findPlaces(player, needs)
     if needs.homestead then
         site, origin = findSite(player)
         if not site then
-            return nil, "plain building wall with open ground in front and a room behind it with plain floor on its north wall"
+            return nil, "plain building wall with open ground in front and a room behind it with open floor along its north wall"
         end
         bankSquare, besideBank = bankPlace(site, origin)
         table.insert(found, origin)
-        table.insert(logged, string.format("homestead %d,%d facing %s", origin:getX(), origin:getY(), site.facing))
+        table.insert(logged, string.format("homestead %d,%d facing %s, bank %d,%d, character beside it %d,%d",
+            origin:getX(), origin:getY(), site.facing, bankSquare:getX(), bankSquare:getY(), besideBank:getX(),
+            besideBank:getY()))
     end
     if needs.stage0 then
         local atWindow
