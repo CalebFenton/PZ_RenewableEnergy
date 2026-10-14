@@ -23,7 +23,7 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 - `PROMO=<group>,... dev/run-debug-client.sh --promo`: reshoots only those groups (`MODE_GROUPS_promo` in `dev/harness.conf`) and replaces only their captures. Reshoot the group you are changing, then check `git status art/promo/captures`. There is no `--promo --stay`: a second run in the same world would find its places taken by what the first one built.
 - `dev/review.sh`: lays out the images, renders the README to HTML and PDF, and zips the mod as players install it, without starting the game. Its header says what it needs and where the files go.
 - `dev/workshop-txt.sh`: writes `workshop.txt`'s description from `README.md`, leaving out the sections `WORKSHOP_SKIP` in `dev/harness.conf` names; the static check fails while the two differ.
-- `dev/workshop-gallery.sh`: lists the Workshop item's gallery; `--upload` replaces its images with `art/promo/gallery`'s. Needs Steam running and the item published.
+- `dev/workshop-gallery.sh`: lists the Workshop item's gallery; `--upload` replaces its images with `art/promo/gallery`'s. Needs Google Chrome and the item published; the first run opens Chrome to log in to Steam.
 
 `README.md` is the Workshop page, and `dev/harness/docs/workshop-page.md` says what goes on it. It links the images by relative path, and `workshop.txt` by raw URL, which shows nothing until the repository is public; a renamed image breaks the Workshop page.
 
