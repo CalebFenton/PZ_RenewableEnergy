@@ -74,4 +74,4 @@ description=
 description=[h2]Credits[/h2]
 description=Inspired by [url=https://github.com/radx5Blue/ImmersiveSolarArrays]Immersive Solar Arrays[/url] by RadX5 and Poltergeist.
 tags=Build 42;Balance;Building;Items;Realistic
-visibility=private
+visibility=public
