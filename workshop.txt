@@ -72,6 +72,6 @@ description=[*][b]Can I remove it from a save?[/b] Not cleanly: what it built in
 description=[/list]
 description=
 description=[h2]Credits[/h2]
-description=By Caleb Fenton. Inspired by [url=https://github.com/radx5Blue/ImmersiveSolarArrays]Immersive Solar Arrays[/url] by RadX5 and Poltergeist. Licensed under the Apache License 2.0, see [url=https://github.com/CalebFenton/PZ_RenewableEnergy/blob/master/LICENSE]LICENSE[/url].
+description=Inspired by [url=https://github.com/radx5Blue/ImmersiveSolarArrays]Immersive Solar Arrays[/url] by RadX5 and Poltergeist.
 tags=Build 42;Balance;Building;Items;Realistic
 visibility=private

@@ -74,7 +74,7 @@ The rest, from storm damage to garden lights and solar sites, are on the **Renew
 
 ## Credits
 
-By Caleb Fenton. Inspired by [Immersive Solar Arrays](https://github.com/radx5Blue/ImmersiveSolarArrays) by RadX5 and Poltergeist. Licensed under the Apache License 2.0, see [LICENSE](LICENSE).
+Inspired by [Immersive Solar Arrays](https://github.com/radx5Blue/ImmersiveSolarArrays) by RadX5 and Poltergeist.
 
 ## Install
 
