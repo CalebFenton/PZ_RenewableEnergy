@@ -141,6 +141,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - Item keys are `"Module.Item"`, and craftRecipe keys are the bare recipe name. Prefixed keys go in the matching file: `IGUI_` keys in `IG_UI.json`, `Tooltip_` keys in `Tooltip.json`.
 - Debug builds parse strict JSON, without comments or trailing commas. Write `%%` for a literal percent sign.
 - Vanilla keys such as `ContextMenu_Turn_On`, `ContextMenu_AddBattery`, and `ContextMenu_Remove_Battery` are already translated into every language.
+- An entity style's `DisplayName` (a `xuiSkin` entry) is looked up, spaces removed, among the recipe names (`Recipes.json`) when the scripts load, and what comes of that goes through `getText` whenever the name is shown (`XuiSkinScript`, `XuiSkin.EntityUiStyle.getDisplayName`). A debug dedicated server logs a missing translation for every entity's name, vanilla's included, so `SERVER_IGNORE` in `dev/harness.conf` skips those lines.
 
 ## Lua runtime
 

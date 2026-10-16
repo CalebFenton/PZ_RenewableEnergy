@@ -86,23 +86,25 @@ local function fillTiles()
     return fill
 end
 
--- Each digester bare, then with each of its holder's overlays, a row to a digester from the back.
+-- Each digester bare, then with each of its holder's overlays, a column to a digester. The barrels'
+-- holders lie on the east side of their square, which the next barrel to the east would hide, so
+-- the variants run south.
 local function digesterTiles()
     local list, holder = {}, Sprites.digesterHolder
     local barrelHolders = { holder.bags[1], holder.bags[2], holder.bags[3], holder.bagsTorn, holder.tarp[1],
         holder.tarp[2], holder.tarp[3], holder.tarpTorn }
-    local rows = {
+    local columns = {
         { sprite = Sprites.digester.barrel.steel, overlays = barrelHolders },
         { sprite = Sprites.digester.barrel.plastic, overlays = barrelHolders },
         { sprite = Sprites.digester.insulated, overlays = holder.drum },
     }
-    for row, digester in ipairs(rows) do
-        table.insert(list, { x = 0, y = row * 2 - 1, sprite = digester.sprite })
+    for column, digester in ipairs(columns) do
+        table.insert(list, { x = column * 2 - 1, y = 0, sprite = digester.sprite })
         for i, overlay in ipairs(digester.overlays) do
-            table.insert(list, { x = i, y = row * 2 - 1, sprite = digester.sprite, overlays = { overlay } })
+            table.insert(list, { x = column * 2 - 1, y = i, sprite = digester.sprite, overlays = { overlay } })
         end
     end
-    table.insert(list, { x = 6, y = 5, sprite = Sprites.digester.dome })
+    table.insert(list, { x = 7, y = 5, sprite = Sprites.digester.dome })
     return list
 end
 
