@@ -120,6 +120,9 @@ handler("placePanel", function(player, args, defer)
     square:AddTileObject(panel)
     defer(function()
         if panel:getObjectIndex() ~= -1 then
+            -- A wired treadmill taken away drops its wire (TreadmillSource.unwire), which the
+            -- tests that follow would find lying about.
+            panel:getModData()[RenewableEnergy.Treadmill.WIRED] = nil
             -- Not "safely": that refuses one tile of a multi-tile object (a treadmill's) placed alone.
             square:transmitRemoveItemFromSquare(panel, false)
         end
@@ -355,6 +358,34 @@ onBank("removeBank", function(_, bank, args)
     local square = squareAt(args.bank)
     return { powered = square:haveElectricity(),
         registered = RenewableEnergy.PowerBank.serverSystem:getLuaObjectOnSquare(square) ~= nil }
+end)
+
+-- Takes the items lying on the squares `args.squares` ({ x, y, z } each) off the floor, as a player
+-- picking them up would leave none behind, and answers them: { { type, uses, modData }, ... },
+-- uses for drainable items, modData's plain values.
+handler("takeFloorItems", function(_, args)
+    local items = {}
+    for _, at in ipairs(args.squares or {}) do
+        local square = squareAt(at)
+        if not square then
+            return nil, "the square " .. at.x .. "," .. at.y .. " loaded on the server"
+        end
+        local objects = square:getWorldObjects()
+        for i = objects:size() - 1, 0, -1 do
+            local object = objects:get(i)
+            local item = object:getItem()
+            local modData = {}
+            for key, value in pairs(item:getModData()) do
+                if type(value) ~= "table" then
+                    modData[key] = value
+                end
+            end
+            table.insert(items, { type = item:getFullType(), modData = modData,
+                uses = instanceof(item, "DrainableComboItem") and item:getCurrentUsesFloat() or nil })
+            square:transmitRemoveItemFromSquare(object)
+        end
+    end
+    return { items = items }
 end)
 
 -- Takes the containers off the bank at `args.bank`, as a bank tile a map or a placement that failed

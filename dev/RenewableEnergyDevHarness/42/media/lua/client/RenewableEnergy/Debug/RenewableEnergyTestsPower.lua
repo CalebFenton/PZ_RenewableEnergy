@@ -1403,3 +1403,98 @@ test("renewable_energy_power_switch_on_bills_from_switch", {
         expect(passed.loadWhToday > 0, "the pass after the switch billed the mini fridge nothing")
     end,
 })
+
+-- A pass the batteries can't last bills the load for the part of it they carried: more than
+-- nothing, and no more than the energy they held less the inverters' losses. The fridge makes
+-- sure something draws. Catches a pass that empties the bank billing no load at all, and one
+-- billing the whole pass's load the batteries never had.
+test("renewable_energy_power_empty_pass_bills_what_it_carried", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood", { "Base.CarBattery1", INVERTER }, { charge = 0.02 })
+        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
+        if not fridge then return end
+        T.placeTile(self, fridge, MINI_FRIDGE)
+        T.batch(function()
+            perform(self, "switched", "setBankOn", { bank = bank.position, on = true })
+            T.bankState(self, bank)
+            T.step(function() self.before = bank.state end)
+            T.bankPass(self, bank, 0)
+            T.step(function() self.after = bank.state end)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.switched.ok, "switching the bank on failed (" .. reason(self, "switched") .. ")") then return end
+        local before, after = self.before, self.after
+        expect(after.storedWh == 0 and after.status.state == "empty",
+            "an hour of load left the bank at " .. after.storedWh .. " Wh, " .. after.status.state)
+        local billed, most = after.loadWhToday - before.loadWhToday, before.storedWh * Specs.inverterEfficiency
+        expect(billed > 0 and billed <= most + 1e-6, "the pass that emptied the bank billed " .. billed
+            .. " Wh of load, expected more than 0 and at most the " .. most .. " Wh the batteries could give")
+    end,
+})
+
+-- While a backup generator carries the load of a switched-on bank, the bank's own figure for the
+-- day stays at what its batteries carried, nothing, and the generator's share is kept apart; the
+-- batteries keep their charge. The fridge makes sure something draws. Catches the generator's
+-- work counted as the bank's, which makes a bank look as if it keeps up.
+test("renewable_energy_power_backup_load_kept_apart", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", PLUG_IN_INVERTER })
+        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
+        local backup = fridge and backupSquare(self, bank.square, 3)
+        if not backup then return end
+        T.placeTile(self, fridge, MINI_FRIDGE)
+        T.generator(self, { square = backup, running = true })
+        T.batch(function()
+            perform(self, "switched", "setBankOn", { bank = bank.position, on = true })
+            T.bankState(self, bank)
+            T.step(function() self.before = bank.state end)
+            T.bankPass(self, bank, 0)
+            T.step(function() self.after = bank.state end)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.switched.ok, "switching the bank on failed (" .. reason(self, "switched") .. ")") then return end
+        local before, after = self.before, self.after
+        expectNear("load Wh the bank carried while the generator ran", after.loadWhToday - before.loadWhToday, 0, 0)
+        local backupWh = (after.status.backupWhToday or 0) - (before.status.backupWhToday or 0)
+        expect(backupWh > 0, "an hour of the generator carrying the load counted " .. backupWh .. " Wh")
+        expectNear("Wh in the batteries while the generator carried the load", after.storedWh, before.storedWh, 0.01)
+    end,
+})
+
+-- Taking a sledgehammer to a bank brings it up to now first, so its batteries land on the floor
+-- with what the hour since its last pass took: at least its inverter's idle draw. Catches batteries
+-- leaving with the last pass's charge, which makes knocking a bank down before its pass free power.
+test("renewable_energy_power_sledgehammer_settles_batteries", {
+    instant = true,
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood", { "Base.CarBattery1", INVERTER }, { charge = 0.9 })
+        if not bank then return end
+        T.give(self, "sledgehammer", { { type = "Base.Sledgehammer", equip = "primary" } })
+        T.switchOn(self, bank)
+        T.batch(function()
+            T.server(self, "ageBank", { bank = bank.position, hours = 1 })
+            T.bankState(self, bank)
+        end)
+        T.step(function() self.before = bank.state end)
+        T.doJob(self, bank.square, function() return ISDestroyStuffAction:new(T.player(), bank.object) end)
+        T.waitFor(self, function() return PowerBank.bankOn(bank.square) == nil end, "the destroyed bank gone from this client")
+        T.server(self, "takeFloorItems", { squares = { T.at(bank.square) } })
+    end,
+    validate = function(self)
+        local battery
+        for _, item in ipairs(self.server.takeFloorItems.items) do
+            if item.type == "Base.CarBattery1" then
+                battery = item
+            end
+        end
+        if not expect(battery, "the destroyed bank left no battery on the floor") then return end
+        local most = self.before.charge - Specs.inverters[INVERTER].idle / self.before.nominalWh
+        expect(battery.uses <= most + 1e-4, "the battery left the destroyed bank at " .. battery.uses
+            .. " after an hour on since its last pass at " .. self.before.charge .. ", expected at most " .. most)
+    end,
+})

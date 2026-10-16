@@ -413,10 +413,13 @@ end
 
 -- Treadmill ------------------------------------------------------------------------------------
 
--- Run on Treadmill, for a wired treadmill, into its menu.
-local function addRunOption(playerNum, menu, treadmill)
-    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
-    Needs.refuse(option, Treadmill.runRefusal(treadmill))
+-- Run on Treadmill and Unwire, for a wired treadmill, into its menu.
+local function addWiredTreadmillOptions(playerNum, menu, treadmill)
+    local run = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
+    Needs.refuse(run, Treadmill.runRefusal(treadmill))
+    local unwire = menu:addOption(getText("ContextMenu_RenewableEnergy_UnwireTreadmill"), playerNum, queueSource,
+        Action.UNWIRE_TREADMILL, treadmill)
+    Needs.refuse(unwire, lightOr(getSpecificPlayer(playerNum), Action.UNWIRE_TREADMILL))
 end
 
 -- Wire to Bank, for a treadmill neither of whose tiles is wired yet.
@@ -570,7 +573,7 @@ function Menu.onFill(playerNum, context, worldobjects, test)
     if source then
         local menu = Menu.addSourceOptions(playerNum, context, source)
         if wiredTreadmill then
-            addRunOption(playerNum, menu, source)
+            addWiredTreadmillOptions(playerNum, menu, source)
         end
     end
     if treadmill and not wiredTreadmill then

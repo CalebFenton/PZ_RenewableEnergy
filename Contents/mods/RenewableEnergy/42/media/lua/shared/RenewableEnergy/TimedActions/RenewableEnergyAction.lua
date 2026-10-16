@@ -42,6 +42,7 @@ Action.BOARD_OFF = "BoardOff"
 Action.BRAKE = "Brake"
 Action.RELEASE_BRAKE = "ReleaseBrake"
 Action.WIRE_TREADMILL = "WireTreadmill"
+Action.UNWIRE_TREADMILL = "UnwireTreadmill"
 Action.REPLACE_BLADES = "ReplaceBlades"
 
 -- What clears snow off a panel without scratching it: a broom sweeps, a snow shovel pushes.
@@ -347,6 +348,14 @@ JOBS = {
         check = function(self) return Treadmill.wiringRefusal(self.character, self.object) == nil end,
         command = function(self) return "wireTreadmill", { source = positionOf(self.object) } end,
         units = function(self) return wiringUnits(self, Specs.treadmill.wiring) end,
+        light = true,
+        sound = "GeneratorConnect",
+    },
+    -- As a part comes out of a bank: half the wiring's time, no tools, the wire given back.
+    [Action.UNWIRE_TREADMILL] = {
+        keeps = function(self) return onSquare(self.object) and Treadmill.isWiredTile(self.object) end,
+        command = function(self) return "unwireTreadmill", { source = positionOf(self.object) } end,
+        units = function(self) return wiringUnits(self, Specs.treadmill.wiring, 0.5) end,
         light = true,
         sound = "GeneratorConnect",
     },

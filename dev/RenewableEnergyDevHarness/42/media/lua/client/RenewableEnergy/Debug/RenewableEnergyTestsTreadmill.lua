@@ -123,6 +123,8 @@ test("renewable_energy_treadmill_menu", {
             and option.toolTip.description == getText("Tooltip_RenewableEnergy_TreadmillNotConnected"),
             "the unwired tile of a wired, unconnected treadmill doesn't offer Run greyed with the reason")
         expect(menu == nil or menu:getOptionFromName(wire) == nil, "a wired treadmill offers to be wired again")
+        option = menu and menu:getOptionFromName(getText("ContextMenu_RenewableEnergy_UnwireTreadmill"))
+        expect(option ~= nil and not option.notAvailable, "a wired treadmill doesn't offer Unwire")
         if context then context:hideAndChildren() end
     end,
 })
@@ -237,5 +239,91 @@ test("renewable_energy_treadmill_unconnected_run_gives_nothing", {
         T.expectNear("Fitness XP from a run on a disconnected treadmill", idle.xpAfter - idle.xpBefore, 0, 0)
         T.expectNear("endurance a run on a disconnected treadmill cost", idle.enduranceBefore - idle.enduranceAfter, 0, 0)
         expect(ran.done and ran.xpAfter > ran.xpBefore, "connected again, the authority's run settled nothing")
+    end,
+})
+
+local function carried(self, key)
+    T.server(self, "carried", { types = { PowerBank.WIRE, PowerBank.SCRAP } })
+    T.step(function()
+        self[key] = { wire = carriedCount(self, PowerBank.WIRE), scrap = carriedCount(self, PowerBank.SCRAP) }
+    end)
+end
+
+-- Unwiring a treadmill takes it out of its bank and gives back its wire; the electronics scrap
+-- stays spent, as a bank's part gives back only its wire. Wired again, it takes wire and scrap
+-- again but teaches nothing more. Catches an unwire that leaves the bank feeding from it or keeps
+-- the wire, and a wire-unwire loop that farms Electricity XP.
+test("renewable_energy_treadmill_unwire_gives_back_wire", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank })
+        if not treadmill then return end
+        self.bank = bank
+        local wiring = Specs.treadmill.wiring
+        T.setPerk(self, Perks.Electricity, wiring.skill)
+        T.give(self, "parts", { { type = PowerBank.WIRE, count = wiring.wire }, { type = PowerBank.SCRAP, count = 2 * wiring.scrap },
+            { type = "Base.Screwdriver" } })
+        -- The wiring below uses the parts up; the step holds it until this client has them.
+        T.step(function() end)
+        T.perform(self, "wireTreadmill", { source = treadmill.position })
+        T.step(function() self.wired = self.server.perform end)
+        T.perform(self, "connectSource", { bank = bank.position, source = treadmill.position })
+        T.waitFor(self, function() return PowerBank.connectedBank(treadmill.object) ~= nil end,
+            "this client's copy of the wired, connected treadmill")
+        T.doJob(self, treadmill.square, function()
+            return RenewableEnergyAction:new(T.player(), RenewableEnergyAction.UNWIRE_TREADMILL, treadmill.object)
+        end)
+        T.waitFor(self, function() return not Treadmill.isWired(treadmill.object) end, "this client's copy of the unwired treadmill")
+        T.bankState(self, bank)
+        carried(self, "afterUnwire")
+        T.perform(self, "wireTreadmill", { source = treadmill.position })
+        T.step(function() self.rewired = self.server.perform end)
+    end,
+    validate = function(self)
+        local wiring = Specs.treadmill.wiring
+        expect(self.wired.ok and self.wired.xpAfter > self.wired.xpBefore, "the first wiring failed or taught nothing")
+        expect(self.bank.state.sources == 0, "the bank still feeds from the unwired treadmill")
+        local after = self.afterUnwire
+        expect(after.wire == wiring.wire and after.scrap == wiring.scrap, "unwiring left " .. after.wire .. " wire and "
+            .. after.scrap .. " scrap, expected the " .. wiring.wire .. " wire back and the spent scrap not")
+        expect(self.rewired.ok, "wiring the treadmill again failed (" .. tostring(self.rewired.reason) .. ")")
+        T.expectNear("Electricity XP for wiring the same treadmill again", self.rewired.xpAfter - self.rewired.xpBefore, 0, 0)
+    end,
+})
+
+-- Picking up a wired, connected treadmill leaves its wire on the floor and takes it out of its
+-- bank, and the treadmill it becomes carries no wiring to be placed with. Catches the wiring lost
+-- with nothing back, and wiring that travels with the item while its wire comes back too.
+test("renewable_energy_treadmill_pickup_drops_wire", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank, connect = true, wired = true })
+        if not treadmill then return end
+        self.bank, self.treadmill = bank, treadmill
+        -- Its console end, west of the rear (Sprites.treadmill).
+        local square = treadmill.square
+        local console = T.panel(self, Sprites.treadmill.W.console,
+            { square = getSquare(square:getX() - 1, square:getY(), square:getZ()) })
+        if not console then return end
+        T.pickUpAsPlayer(self, treadmill, Sprites.treadmill.W.rear)
+        T.bankState(self, bank)
+        T.server(self, "takeFloorItems", { squares = { treadmill.position, console.position } })
+    end,
+    validate = function(self)
+        expect(self.treadmill.connected, "the bank refused the wired treadmill: " .. tostring(self.treadmill.reason))
+        expect(self.bank.state.sources == 0, "the bank still feeds from the picked-up treadmill")
+        local wire, wiredItems = 0, 0
+        for _, item in ipairs(self.server.takeFloorItems.items) do
+            if item.type == PowerBank.WIRE then
+                wire = wire + 1
+            elseif item.modData[Treadmill.WIRED] then
+                wiredItems = wiredItems + 1
+            end
+        end
+        expect(wire == Specs.treadmill.wiring.wire, "picking up the wired treadmill left " .. wire .. " wire, expected "
+            .. Specs.treadmill.wiring.wire)
+        expect(wiredItems == 0, "the picked-up treadmill still carries its wiring")
     end,
 })

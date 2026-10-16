@@ -159,18 +159,39 @@ function Commands.replaceBlades(player, args)
     return true
 end
 
+-- The treadmill tile at `position`, or nil.
+local function treadmillAt(position)
+    return isPosition(position) and Treadmill.on(getSquare(position.x, position.y, position.z)) or nil
+end
+
 --- Wires the treadmill tile at `args.source` to feed a bank, from the player's wire and scrap.
 function Commands.wireTreadmill(player, args)
-    local object = isPosition(args.source) and Treadmill.on(getSquare(args.source.x, args.source.y, args.source.z))
+    local object = treadmillAt(args.source)
     if not (player and object) then return false, "no treadmill" end
     local refusal = Treadmill.wiringRefusal(player, object)
     if refusal then return false, refusal end
     local wiring = Specs.treadmill.wiring
     RenewableEnergy.takeItems(player, PowerBank.WIRE, wiring.wire)
     RenewableEnergy.takeItems(player, PowerBank.SCRAP, wiring.scrap)
-    object:getModData()[Treadmill.WIRED] = true
-    object:transmitModData()
-    addXp(player, Perks.Electricity, wiring.xp)
+    if RenewableEnergy.TreadmillSource.wire(object) then
+        addXp(player, Perks.Electricity, wiring.xp)
+    end
+    return true
+end
+
+--- Unwires the wired treadmill tile at `args.source`: it stops feeding its bank, and the player
+--- gets its wire back.
+function Commands.unwireTreadmill(player, args)
+    local object = treadmillAt(args.source)
+    if not (player and object and Treadmill.isWired(object)) then return false, "not wired" end
+    local bank = bankOfSource(args.source)
+    if bank then
+        -- What its runs banked up to now counts.
+        settle(bank)
+        bank:removeSource(args.source.x, args.source.y, args.source.z)
+        bank:sendStatus()
+    end
+    RenewableEnergy.TreadmillSource.unwire(object, player)
     return true
 end
 

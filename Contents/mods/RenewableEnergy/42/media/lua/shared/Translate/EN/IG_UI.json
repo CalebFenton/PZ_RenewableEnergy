@@ -51,6 +51,7 @@
     "IGUI_RenewableEnergy_GeneratorRunning": "Running",
     "IGUI_RenewableEnergy_GeneratorStopped": "Stopped",
     "IGUI_RenewableEnergy_UsedToday": "Used today",
+    "IGUI_RenewableEnergy_GeneratorToday": "Generator ran today",
     "IGUI_RenewableEnergy_Drawing": "Drawing",
     "IGUI_RenewableEnergy_NothingOn": "Nothing switched on",
     "IGUI_RenewableEnergy_LoadCount": "%1 x%2",

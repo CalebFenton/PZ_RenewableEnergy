@@ -8,16 +8,19 @@
 if isClient() then return end
 
 require "Map/SGlobalObjectSystem"
+require "TimedActions/ISDestroyStuffAction"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/PanelSource"
+require "RenewableEnergy/PowerBank/Treadmill"
+require "RenewableEnergy/PowerBank/TreadmillSource"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 
 RenewableEnergy = RenewableEnergy or {}
 local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
-local Sources, PanelSource = RenewableEnergy.Sources, RenewableEnergy.PanelSource
+local Sources, PanelSource, Treadmill = RenewableEnergy.Sources, RenewableEnergy.PanelSource, RenewableEnergy.Treadmill
 
 local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
 RenewableEnergy.BankSystem = BankSystem
@@ -169,7 +172,26 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
             bank:removeSource(x, y, z)
             bank:sendStatus()
         end
+        -- A wired treadmill picked up or destroyed leaves its wire on the floor; the item it
+        -- becomes doesn't keep the wiring (ISMoveableSpriteProps keeps a plain tile's movableData
+        -- alone).
+        if Treadmill.isWiredTile(isoObject) then
+            RenewableEnergy.TreadmillSource.unwire(isoObject)
+        end
     end
+end
+
+-- A sledgehammer is the one way a bank leaves with batteries in it (picking up and scrapping need
+-- it empty, ISMoveableSpriteProps), and it dumps them on the floor before it takes the tile
+-- (ISDestroyStuffAction.complete, IsoObject.dumpContentsInSquare). The bank comes up to now first,
+-- so they leave with what the time since its last pass gave and took.
+local destroyComplete = ISDestroyStuffAction.complete
+function ISDestroyStuffAction:complete()
+    local bank = self.item and PowerBank.isBank(self.item) and BankSystem.instance:getLuaObjectOnSquare(self.item:getSquare())
+    if bank then
+        BankSystem.updateBank(bank)
+    end
+    return destroyComplete(self)
 end
 
 -- Clients only watch a bank's status, which the status window does while it is open. Every job

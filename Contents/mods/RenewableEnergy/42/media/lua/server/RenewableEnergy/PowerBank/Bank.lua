@@ -41,7 +41,7 @@ Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
     "inverters", "chargers", "controllers", "sources", "loadW", "averageLoadW", "loadByKind", "chargeSource",
     "generator", "lastHour", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
-    "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday",
+    "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday",
 }
 
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
@@ -96,6 +96,7 @@ function Bank:initNew()
         self[total.today] = 0
     end
     self.loadWhToday = 0
+    self.backupWhToday = 0
     self.empty = false
     self.lastHour = getGameTime():getWorldAgeHours()
 end
@@ -559,6 +560,7 @@ function Bank:newDay(container, day)
             self[total.today] = 0
         end
         self.loadWhToday = 0
+        self.backupWhToday = 0
     end
     self.day = day
 end
@@ -600,14 +602,19 @@ function Bank:update(hours, context)
     end
 
     local drawW = self:drawW()
+    -- While the bank is on, a running backup generator carries the load in its place.
+    local backupW = (self:shouldPower() and self:backupCarriesLoad()) and self.averageLoadW or 0
     local capacity = self.nominalWh
     local before = self.charge * capacity
     -- The chargers fill what the sources and the load leave; with no batteries there is nothing to fill.
     local roomWh = capacity > 0 and capacity - before - (sourcesW - drawW) * hours or 0
     local chargerW = self:chargeFrom(generators, hours, roomWh)
     local inW = sourcesW + chargerW
-    local stored = math.max(0, math.min(capacity, before + (inW - drawW) * hours))
+    local availableWh = before + inW * hours
+    local stored = math.max(0, math.min(capacity, availableWh - drawW * hours))
     self.charge = capacity > 0 and stored / capacity or 0
+    -- The share of the pass the batteries carried the load: all of it, or until they ran out.
+    local carried = drawW > 0 and math.min(1, availableWh / (drawW * hours)) or 0
     -- An empty bank's inverters cut out, and come back once a pass of load is stored, so
     -- a bank that barely charges doesn't stop and start every pass.
     if drawW > 0 and stored <= 0 then
@@ -623,7 +630,8 @@ function Bank:update(hours, context)
     for family, total in pairs(TOTALS) do
         self[total.today] = (self[total.today] or 0) + watts[family] * hours
     end
-    self.loadWhToday = self.loadWhToday + (powering and self.averageLoadW or 0) * hours
+    self.loadWhToday = self.loadWhToday + self.averageLoadW * hours * carried
+    self.backupWhToday = (self.backupWhToday or 0) + backupW * hours
     self:trackCycle()
     self:newDay(container, today())
     if container then
@@ -735,7 +743,7 @@ function Bank:buildStatus()
         irradiance = now.irradiance or 0,
         windKph = now.windKph or 0,
         chargerW = now.chargerW or 0, chargeSource = chargeSource or nil, inW = inW,
-        loadWhToday = self.loadWhToday,
+        loadWhToday = self.loadWhToday, backupWhToday = self.backupWhToday or 0,
         loadW = self.loadW, drawW = drawW, limitW = self:limitW(), overloaded = self.overloaded,
         loadByKind = self.loadByKind,
         storedWh = stored, capacityWh = capacity, charge = self.charge,

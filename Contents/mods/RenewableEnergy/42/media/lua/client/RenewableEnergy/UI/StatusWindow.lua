@@ -174,6 +174,11 @@ local function powerRows(rows, status)
             not running and "dim" or nil)
     end
     row(rows, getText("IGUI_RenewableEnergy_UsedToday"), Format.wattHours(status.loadWhToday))
+    -- What the backup generator ran in the bank's place, kept apart so the bank's own figure
+    -- tells whether its batteries and sources keep up.
+    if status.backupWhToday > 0 then
+        row(rows, getText("IGUI_RenewableEnergy_GeneratorToday"), Format.wattHours(status.backupWhToday))
+    end
 end
 
 local LOAD_KINDS = {

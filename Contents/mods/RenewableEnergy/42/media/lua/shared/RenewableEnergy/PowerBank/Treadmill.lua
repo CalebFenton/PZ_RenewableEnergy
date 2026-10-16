@@ -1,6 +1,7 @@
 -- Vanilla's treadmill (Sprites.treadmill) as a source for a bank: two tiles, one of which a player
--- wires to feed a bank (Wire to Bank), after which a run on it (RenewableEnergyTreadmillAction)
--- banks watt-hours. Dismantled, a treadmill gives its motor (Moveables.lua).
+-- wires to feed a bank (Wire to a Bank), after which a run on it (RenewableEnergyTreadmillAction)
+-- banks watt-hours. Unwiring it, picking it up or destroying it gives back the wire
+-- (TreadmillSource.unwire). Dismantled, a treadmill gives its motor (Moveables.lua).
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
