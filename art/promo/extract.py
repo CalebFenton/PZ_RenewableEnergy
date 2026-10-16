@@ -81,6 +81,8 @@ def missing_captures(promo):
         for line in recipe["inputs"]:
             icons.update(item["icon"] for item in line["items"])
         icons.update(item["icon"] for item in recipe["outputs"])
+        if recipe.get("build"):
+            icons.add(recipe["build"]["icon"])
     models = {model["name"] for model in promo["models"]}
     for icon in sorted(icons):
         if not (CAPTURES / f"{icon}.png").exists():

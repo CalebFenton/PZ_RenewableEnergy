@@ -8,13 +8,13 @@ editing a layout; recapture only when the game's look or the mod's names change:
 
     art/promo/compose.py
 
-Writes images/{banner,setup,bank,items,recipes,trailer,gardenlights}.png, and the mod's poster,
-Contents/mods/RenewableEnergy/42/poster.png, with the Workshop preview, preview.png. Every image is
-1260 pixels wide, which the Workshop page shows at 630, so it stays sharp on high-density screens;
-the poster and preview are 512 square. Icons are scaled by whole numbers with nearest-neighbour
-sampling, so their pixels stay crisp. The item models are framed from the box extract.py found
-around each. Item, recipe and skill names come from captures/promo.json, which the game wrote in
-its own words; the setup captions are the README's.
+Writes images/{banner,setup,bank,biogas,woodgas,wind,treadmill,items,recipes,trailer,gardenlights}.png,
+and the mod's poster, Contents/mods/RenewableEnergy/42/poster.png, with the Workshop preview,
+preview.png. Every image is 1260 pixels wide, which the Workshop page shows at 630, so it stays sharp
+on high-density screens; the poster and preview are 512 square. Icons are scaled by whole numbers with
+nearest-neighbour sampling, so their pixels stay crisp. The item models are framed from the box
+extract.py found around each. Item, recipe and skill names come from captures/promo.json, which the
+game wrote in its own words; the setup captions are the README's.
 Also writes gallery/NN-<name>.jpg, the Workshop's 1920x1080 screenshot gallery, in upload order.
 """
 import json
@@ -48,10 +48,22 @@ HOMESTEAD = "A homestead"
 # Where each world shot is cropped, in capture pixels, around what the promo run built in it; a
 # reshoot that frames a shot differently needs its box moved. The setup shots share a shape so
 # that they line up side by side.
-SETUP_CROPS = {"stage0": (330, 50, 1230, 812), "homestead": (260, 0, 1160, 762)}
+SETUP_CROPS = {"stage0": (230, 0, 1230, 847), "homestead": (190, 80, 1190, 927)}
 BANK_CROP = (80, 222, 552, 704)
 MENU_CROP = (206, 105, 726, 385)
 TRAILER_CROP = (0, 140, 1260, 660)
+# banner.png: rows of the world capture above the homestead's wind charger, left out.
+BANNER_TOP = 70
+# biogas.png and woodgas.png: the world shot around the digesters or gasifiers, with the status
+# window of the brick dome or the gasifier set into the corner GAS_CORNERS names ("left" or
+# "right", at the top), over ground with nothing built on it, at GAS_WINDOW_SCALE.
+GAS_CROPS = {"biogas": (110, 0, 1110, 506), "woodgas": (200, 20, 1100, 480)}
+GAS_CORNERS = {"biogas": "left", "woodgas": "right"}
+GAS_WINDOW_SCALE = 1.4
+# wind.png: the four chargers, rotor tips to feet; treadmill.png: the runner and the battery box in
+# the room around them.
+WIND_CROP = (0, 90, 1260, 720)
+TREADMILL_CROP = (260, 130, 1260, 690)
 # bank.png: the status window's size against its capture, as large as leaves room for the menu.
 STATUS_SCALE = 1.25
 # items.png: one row per kind of thing, with its caption, wrapped at ITEM_COLUMNS.
@@ -75,6 +87,12 @@ ITEM_ROWS = [
     ("Gadgets, cells and magazines", ["RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger",
                                       "RenewableEnergy.SolarGardenLight", "RenewableEnergy.SolarCells",
                                       "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2"]),
+    ("Biogas", ["RenewableEnergy.GasConversionKit", "RenewableEnergy.FridgeCompressor", "RenewableEnergy.GasHeater",
+                "RenewableEnergy.HomesteadPowerMag3"]),
+    ("Wood gas", ["RenewableEnergy.WoodAsh", "RenewableEnergy.TarryPacking", "RenewableEnergy.FemaPamphlet"]),
+    ("Wind and treadmills", ["RenewableEnergy.TreadmillMotor", "RenewableEnergy.WoodenBlades",
+                             "RenewableEnergy.PipeBlades", "RenewableEnergy.SteelBlades",
+                             "RenewableEnergy.HomemadeAlternator", "RenewableEnergy.HomesteadPowerMag4"]),
 ]
 ITEM_COLUMNS = 6
 # recipes.png: the recipes by what they're for.
@@ -103,7 +121,23 @@ RECIPE_SECTIONS = [
                                      "RenewableEnergy_RecastBatteryPlates", "RenewableEnergy_RebuildCarBattery",
                                      "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery"]),
     ("Electronics", ["RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe"]),
+    ("Biogas: digesters in the build menu, the gas kit and the heater",
+     ["RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
+      "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome", "RenewableEnergy_MakeGasConversionKit",
+      "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle"]),
+    ("Wood gas: gasifiers in the build menu, drums and sprays",
+     ["RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
+      "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray",
+      "RenewableEnergy_MakeVinegarAphidSpray"]),
+    ("Wind: chargers in the build menu, blades and the alternator",
+     ["RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
+      "RenewableEnergy_AlternatorWindCharger", "RenewableEnergy_CarveWoodenBlades",
+      "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
+      "RenewableEnergy_MakeHomemadeAlternator"]),
 ]
+# The accent along the top of each section's recipe cards, by the section's first word: the panels'
+# blue for the solar recipes.
+SECTION_ACCENTS = {"Biogas:": (112, 168, 92), "Wood": (214, 132, 64), "Wind:": (120, 196, 204)}
 # The result shown for a recipe whose OnCreate gives it, which no output line names. A recipe that
 # improves an item it keeps shows that item.
 RECIPE_RESULTS = {"RenewableEnergy_RebuildCarBattery": "Base.CarBattery1"}
@@ -122,19 +156,25 @@ PAGE = (GALLERY_SIZE[0], GALLERY_SIZE[1] - CAPTION_BAND)
 # garden lights' height, around the trailer and the cones behind it.
 GALLERY_TRAILER_CROP = (0, 32, 1260, 944)
 # The bank's status window, as large as leaves the room and its menu as tall beside it.
-GALLERY_STATUS_SCALE = 1.94
+GALLERY_STATUS_SCALE = 1.86
+# The digester's and gasifier's windows, as large as leaves the world shot most of the page.
+GALLERY_GAS_WINDOW_SCALE = 1.8
+# The treadmill's room at its captured size, clear of the black past the rooms the character saw.
+GALLERY_TREADMILL_CROP = (0, 40, 1260, 650)
 # The item and recipe sheets drawn this many times the README's size: as large as the fullest page
 # allows, which keeps their smallest text at 18 and 16 pixels.
 ITEM_K = 1.1
 RECIPE_K = 1.33
-# The item sheet over two pictures, with how many cards to a line on each.
+# The item sheet over three pictures, with how many cards to a line on each.
 GALLERY_ITEMS = [
     ("items-power", "Panels to mount, banks to fill, parts to wire in", ITEM_ROWS[:3], 7),
-    ("items-batteries", "Batteries to rebuild, gadgets to take apart", ITEM_ROWS[3:], 6),
+    ("items-batteries", "Batteries to rebuild, gadgets to take apart", ITEM_ROWS[3:5], 6),
+    ("items-gas-wind", "Gas kits, blades, and the books that teach them", ITEM_ROWS[5:], 6),
 ]
 # The recipe sheet over as few pictures as its cards fit at RECIPE_K: for each picture, the
 # sections it shows by title, and which of each section's recipes.
 MOUNTS, CARE = "Panel mounts, and taking them down", "Battery care and rebuilding"
+BIOGAS, WOODGAS, WIND = (title for title, _ in RECIPE_SECTIONS[-3:])
 GALLERY_RECIPES = [
     ("recipes-storage", "Recipes: battery boxes, racks and banks", [("Battery storage", slice(None))]),
     ("recipes-mounts", "Recipes: building panel mounts", [(MOUNTS, slice(0, 5))]),
@@ -144,6 +184,12 @@ GALLERY_RECIPES = [
                                                               slice(None))]),
     ("recipes-battery-care", "Recipes: servicing and stripping batteries", [(CARE, slice(0, 5))]),
     ("recipes-rebuilding", "Recipes: casting plates, rebuilding batteries", [(CARE, slice(5, None))]),
+    ("recipes-digesters", "Build menu: the four digesters", [(BIOGAS, slice(0, 4))]),
+    ("recipes-gas-kit", "Recipes: the gas kit, the heater, propane", [(BIOGAS, slice(4, None))]),
+    ("recipes-woodgas", "Build menu: gasifiers. Recipes: drums and sprays", [(WOODGAS, slice(None))]),
+    ("recipes-wind-small", "Build menu: the scoop rotor, the wooden propeller", [(WIND, slice(0, 2))]),
+    ("recipes-wind-large", "Build menu: the pipe propeller, the alternator", [(WIND, slice(2, 4))]),
+    ("recipes-wind-parts", "Recipes: blades and the homemade alternator", [(WIND, slice(4, None))]),
 ]
 
 
@@ -174,9 +220,14 @@ def pixels(image, factor):
 
 
 def icon(key, size):
-    """An icon scaled by the largest whole number that keeps it within size."""
+    """An icon scaled by the largest whole number that keeps it within size, or, where that leaves
+    it at three quarters of size or less (the build menu's 48-pixel icons), smoothly to size."""
     image = capture(key)
-    return pixels(image, max(1, size // max(image.size)))
+    factor = max(1, size // max(image.size))
+    if max(image.size) * factor <= size * 3 / 4:
+        return image.resize((round(image.width * size / max(image.size)), round(image.height * size / max(image.size))),
+                            Image.LANCZOS)
+    return pixels(image, factor)
 
 
 def canvas(height, width=WIDTH):
@@ -290,8 +341,10 @@ def mod_title(image, size):
 
 
 def banner():
-    """The mod's name over the homestead, which the world capture holds against its right edge."""
+    """The mod's name over the homestead, which the world capture holds against its right edge,
+    less the grass above the wind charger's rotor."""
     image = full_width("world")
+    image = image.crop((0, BANNER_TOP, image.width, image.height))
     box = mod_title(image, 84)
     text(image, (64, box[3] + 22), "Off-grid power, 1993", 30, "Medium", MUTED)
     return image
@@ -461,6 +514,36 @@ def gardenlights():
     return full_width("gardenlights")
 
 
+def gas_shot(name, window, width=WIDTH, window_scale=GAS_WINDOW_SCALE, height=None):
+    """The world shot `name` cropped to GAS_CROPS, as wide as the image and centred in its height if
+    given, with the status window `window` of one of the things in it set into its GAS_CORNERS
+    corner."""
+    margin = 20
+    world = capture(name).crop(GAS_CROPS[name])
+    factor = width / world.width
+    if height:
+        factor = min(factor, height / world.height)
+    world = scaled(world, factor)
+    image = canvas(height or world.height, width)
+    left, top = (width - world.width) // 2, (image.height - world.height) // 2
+    image.alpha_composite(world, (left, top))
+    status = scaled(capture(window), window_scale)
+    x = left + margin if GAS_CORNERS[name] == "left" else left + world.width - margin - status.width
+    paste(image, status, (x + status.width / 2, top + margin + status.height / 2))
+    return image
+
+
+def wind():
+    """The four wind chargers turning, cropped to a strip."""
+    return full_width("wind").crop(WIND_CROP)
+
+
+def treadmill():
+    """The character running on the treadmill wired to a battery box, at the images' width."""
+    shot = capture("treadmill").crop(TREADMILL_CROP)
+    return scaled(shot, WIDTH / shot.width)
+
+
 def poster():
     """The lit house at night under the mod's name, in the banner's type. The name is set large
     enough to read where Steam shows the preview smallest, about 196 pixels across."""
@@ -514,11 +597,11 @@ def recipe_parts(recipe, items_by_type):
     """The recipe's tools, by name, and its inputs and results as slots, { item, count, uses,
     others, fluid, litres }. Tools are what it keeps without working on. Lines that take the same
     fluid from the same container make one slot, lines that pour a fluid into an empty container
-    are results, and a recipe without an output line shows what it gives back: its RECIPE_RESULTS
-    entry, or the item it keeps and works on."""
+    are results, and a recipe without an output line shows what it gives back: what it builds, for
+    a build menu recipe, its RECIPE_RESULTS entry, or the item it keeps and works on."""
     no_output = not recipe["outputs"] and not any(entry.get("fills") for entry in recipe["inputs"])
     subject = None
-    if no_output and recipe["id"] not in RECIPE_RESULTS:
+    if no_output and not recipe.get("build") and recipe["id"] not in RECIPE_RESULTS:
         subject = next((e for e in recipe["inputs"] if e["keep"] and not e["tag"] and not e.get("fluid")), None)
         assert subject, f"{recipe['id']} has no output and keeps nothing it works on: add it to RECIPE_RESULTS"
     tools, inputs, results = [], [], []
@@ -539,7 +622,8 @@ def recipe_parts(recipe, items_by_type):
                            "others": alternatives(entry["items"])})
     if no_output:
         given = RECIPE_RESULTS.get(recipe["id"])
-        results.insert(0, {"item": items_by_type[given] if given else subject["items"][0]})
+        built = recipe.get("build")
+        results.insert(0, {"item": built or (items_by_type[given] if given else subject["items"][0])})
     outputs = [{"item": item, "count": item["count"]} for item in recipe["outputs"]]
     return tools, inputs, outputs + results
 
@@ -597,19 +681,30 @@ def learn_line(recipe):
     if research:
         ways.append("by researching " + " or ".join(research))
     ways += [f"at {s['name']} {s['level']}" for s in learn["auto"]]
+    if learn.get("autoAll"):
+        ways.append("at " + " and ".join(f"{s['name']} {s['level']}" for s in learn["autoAll"]))
     return "Learn " + ", or ".join(ways)
 
 
+def accent_of(recipe_id):
+    """The accent of the section the recipe is in (SECTION_ACCENTS), else the panels' blue."""
+    title = next(title for title, ids in RECIPE_SECTIONS if recipe_id in ids)
+    return SECTION_ACCENTS.get(title.split()[0], SOLAR)
+
+
 def recipe_card(base, recipe, parts, box, k=1):
-    """Draws the card into box and returns how far down its contents reach."""
+    """Draws the card into box and returns how far down its contents reach. A build menu recipe
+    says so under its name."""
     left, top, right, bottom = box
-    panel(base, box, SOLAR, k)
+    panel(base, box, accent_of(recipe["id"]), k)
     tools, inputs, results = parts
     pad, name_w, slot_w, arrow_w = sized(CARD_PAD, k), sized(NAME_W, k), sized(SLOT, k), sized(ARROW_W, k)
     x = left + pad
     lines = text(base, (x, top + sized(16, k)), recipe["name"], sized(17, k), "Bold", width=name_w)
     skills = "  ·  ".join(f"{s['name']} {s['level']}" for s in recipe["skills"])
-    for line, size in [(skills, 13), (learn_line(recipe), 12), ("Tools: " + ", ".join(tools) if tools else "", 12)]:
+    built = "Build menu" if recipe.get("build") else ""
+    for line, size in [(built, 13), (skills, 13), (learn_line(recipe), 12),
+                       ("Tools: " + ", ".join(tools) if tools else "", 12)]:
         if line:
             lines = text(base, (x, lines[3] + sized(6, k)), line, sized(size, k), "Medium", MUTED, width=name_w)
     lowest = lines[3]
@@ -724,12 +819,15 @@ def hero():
 
 
 def progression():
-    """The setup's two shots at their captured size, an arrow leading from the first battery box to
-    the homestead."""
+    """The setup's two shots, an arrow leading from the first battery box to the homestead, both as
+    large as fit the page side by side, no larger than captured."""
     image = canvas(PAGE[1], PAGE[0])
     shots = [(capture(name).crop(SETUP_CROPS[name]), label) for name, label in [("stage0", FIRST_BOX),
                                                                                 ("homestead", HOMESTEAD)]]
-    gap = 72
+    gap, margin = 72, 40
+    factor = min(1, (PAGE[0] - gap - 2 * margin) / sum(shot.width for shot, _ in shots),
+                 (PAGE[1] - 2 * margin) / max(shot.height for shot, _ in shots))
+    shots = [(scaled(shot, factor), label) for shot, label in shots]
     left = (PAGE[0] - sum(shot.width for shot, _ in shots) - gap) // 2
     for i, (shot, label) in enumerate(shots):
         top = (PAGE[1] - shot.height) // 2
@@ -762,6 +860,13 @@ def gallery():
         ("progression", page("Start with a car battery in a box. End with a homestead.", progression())),
         ("bank", page("Every bank tells you what it's doing, panel by panel",
                       bank(PAGE[0], GALLERY_STATUS_SCALE, PAGE[1]))),
+        ("biogas", page("Digesters turn manure into gas for the generator",
+                        gas_shot("biogas", "digester", PAGE[0], GALLERY_GAS_WINDOW_SCALE, PAGE[1]))),
+        ("woodgas", page("Gasifiers run a generator on wood. Mind the tar.",
+                         gas_shot("woodgas", "gasifier", PAGE[0], GALLERY_GAS_WINDOW_SCALE, PAGE[1]))),
+        ("wind", page("Wind chargers from scrap and a treadmill motor", shot_page(capture("wind")))),
+        ("treadmill", page("No wind? Wire up the treadmill and run for it",
+                           shot_page(capture("treadmill").crop(GALLERY_TREADMILL_CROP)))),
         ("gardenlights", page("Garden lights charge by day and glow after dark", shot_page(capture("gardenlights")))),
         ("trailer", page("Road crews left their solar arrow boards running",
                          shot_page(capture("trailer").crop(GALLERY_TRAILER_CROP)))),
@@ -791,8 +896,9 @@ def save_gallery(pictures):
 
 
 def main():
-    for name, make in [("banner", banner), ("setup", setup), ("bank", bank), ("items", items),
-                       ("recipes", recipes), ("trailer", trailer), ("gardenlights", gardenlights)]:
+    for name, make in [("banner", banner), ("setup", setup), ("bank", bank), ("biogas", lambda: gas_shot("biogas", "digester")),
+                       ("woodgas", lambda: gas_shot("woodgas", "gasifier")), ("wind", wind), ("treadmill", treadmill),
+                       ("items", items), ("recipes", recipes), ("trailer", trailer), ("gardenlights", gardenlights)]:
         save(make(), name)
     save_poster(poster())
     save_gallery(gallery())

@@ -23,6 +23,12 @@ require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/StatusWindow"
 require "RenewableEnergy/UI/Menu"
+require "RenewableEnergy/Biogas/Digester"
+require "RenewableEnergy/WoodGas/Gasifier"
+require "RenewableEnergy/GasLine/GasKit"
+require "RenewableEnergy/UI/DigesterWindow"
+require "RenewableEnergy/UI/GasifierWindow"
+require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 local Stage = require "RenewableEnergyDevStage"
 
 local Promo = {}
@@ -38,10 +44,14 @@ local WORLD_W = 1260
 local MORNING, NOON = 8, 12
 -- Inputs that take any item with a tag show this one.
 local PREFER = { "Base.Hammer", "Base.Screwdriver", "Base.Pliers", "Base.Wrench", "Base.HandDrill", "Base.WeldingMask",
-    "Base.Saw", "Base.Matches", "Base.Charcoal" }
+    "Base.Saw", "Base.Matches", "Base.Charcoal", "Base.KitchenKnife", "Base.SmithingHammer", "Base.Tongs",
+    "Base.NormalBrake1", "Base.Bucket", "Base.Garbagebag", "Base.Shovel2", "Base.MasonsTrowel", "Base.BucketConcreteFull" }
 -- A recipe line that takes or fills any fluid container shows this one, by the fluid's type.
-local FLUID_CONTAINERS = { Acid = "RenewableEnergy.BatteryElectrolyte", Water = "Base.WaterBottle" }
-local MAGAZINES = { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2" }
+local FLUID_CONTAINERS = { Acid = "RenewableEnergy.BatteryElectrolyte", Water = "Base.WaterBottle",
+    RenewableEnergy_WoodVinegar = "Base.BottleCrafted" }
+-- The literature that teaches the mod's recipes, the build menu's among them.
+local MAGAZINES = { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2",
+    "RenewableEnergy.HomesteadPowerMag3", "RenewableEnergy.FemaPamphlet", "RenewableEnergy.HomesteadPowerMag4" }
 -- Banks take vanilla car batteries as they are, so the item sheet shows one.
 local VANILLA_ITEMS = { "Base.CarBattery1" }
 
@@ -57,10 +67,14 @@ local SITES = {
 -- hang on (`inside` is the square behind it), out of the yard shots, against the room's north wall
 -- with the character off to its side for a shot of its own (bankPlace). Outdoors, the character
 -- stands beside the last wall panel, where nothing is behind them, and the backup generator is
--- within a failsafe's reach of the bank.
+-- within a failsafe's reach of the bank. An insulated digester beside the generator feeds it gas
+-- through its kit, and a propeller wind charger stands at the far end of the wall, where its
+-- mast rises in front of the house rather than over the panels.
 local HOMESTEAD = {
     inside = { 0, -1 },
     generator = { -1, 1 },
+    digester = { -2, 1 },
+    windCharger = { 5, 1 },
     wallPanels = { { 0, 0, "wood" }, { 1, 0, "wood" }, { 2, 0, "metal" } },
     player = { 3, 1 },
     racks = { { -1, 3, "wood" }, { 0, 3, "wood" }, { 1, 3, "metal" }, { 2, 3, "metal" } },
@@ -70,7 +84,7 @@ local HOMESTEAD = {
 }
 -- The ground that must be clear (grass and weeds are cleared), and the plain wall the wall panels
 -- hang on.
-local OPEN = { along = { -1, 4 }, out = { 1, 5 } }
+local OPEN = { along = { -2, 5 }, out = { 1, 5 } }
 local AT_WALL = { 0, 2 }
 -- The rack with a cracked module, connected early so that its row shows in the status window.
 local CRACKED_RACK = 1
@@ -185,17 +199,21 @@ local WALK = {
     hour = 23,
 }
 -- The poster and the Workshop preview, after dark: a house with every light on, run by a bank
--- indoors behind a window and fed by racks and flat panels in its yard, while the neighbours'
--- houses, with the grid gone, stand dark. Positions are (along, out) from the square outside the
--- window, as the homestead's.
+-- indoors behind a window and fed by racks, flat panels and a propeller wind charger in its yard,
+-- with a kitted generator on a digester's gas beside them, while the neighbours' houses, with the
+-- grid gone, stand dark. Positions are (along, out) from the square outside the window, as the
+-- homestead's.
 local POSTER = {
     -- Lit windows sell it, so the wall the camera sees needs several, and the house some rooms.
     windows = { along = { -4, 4 }, count = 2 },
     rooms = 3,
     bank = { 0, -1 },
-    open = { along = { -1, 2 }, out = { 1, 3 } },
+    open = { along = { -2, 3 }, out = { 1, 3 } },
     racks = { { -1, 2, "metal" }, { 0, 2, "metal" }, { 1, 2, "metal" }, { 2, 2, "metal" } },
     flatPanels = { { -1, 3 }, { 0, 3 }, { 1, 3 } },
+    generator = { -2, 1 },
+    digester = { -2, 2 },
+    windCharger = { 3, 1 },
     player = { 2, 3 },
     -- Where the character looks around first, by day, so that the house, its rooms behind the
     -- windows and its neighbours are drawn rather than left black as unseen: indoors where the
@@ -207,6 +225,91 @@ local POSTER = {
     hour = 25,
     -- Out far enough for the whole house and the dark around it.
     zoomOut = 3,
+}
+
+-- The Release 2 setups (`yards`: biogas, wood gas, wind), each on open ground of its own, and the
+-- treadmill indoors (`gym`): positions are (east, south) squares from the place found, and `shot`
+-- names the positions the shot frames. A yard lays its things out along a line across the screen,
+-- nearest the camera in front, so `open` is the band of squares that must be clear (trees may
+-- stand there; they go): within the box `x`, `y`, the squares whose x + y is within `half` of
+-- `sum`.
+local R2 = {
+    yards = { "biogas", "woodgas", "wind" },
+    -- Every digester, working and full of gas, the brick dome feeding a kitted generator through
+    -- its hose, and a lit gas heater warming the steel barrel.
+    biogas = {
+        open = { x = { -2, 6 }, y = { -1, 6 }, sum = 4, half = 3 },
+        barrelSteel = { 0, 4 },
+        heater = { -1, 4 },
+        barrelPlastic = { 1, 3 },
+        insulated = { 2, 2 },
+        dome = { 3, 1 },
+        generator = { 4, 1 },
+        player = { 5, 0 },
+        scout = { 2, 4 },
+        shot = { "barrelSteel", "heater", "barrelPlastic", "insulated", "dome", "generator", "player" },
+    },
+    -- The gasifier and the advanced gasifier lit, each piped to a kitted generator to its east, and
+    -- the primitive gasifier with wood and charcoal beside it.
+    woodgas = {
+        open = { x = { -1, 6 }, y = { -1, 6 }, sum = 5, half = 3 },
+        primitive = { 0, 4 },
+        fuel = { 1, 4 },
+        standard = { 1, 3 },
+        standardGenerator = { 2, 3 },
+        advanced = { 3, 1 },
+        advancedGenerator = { 4, 1 },
+        player = { 4, 3 },
+        scout = { 2, 5 },
+        shot = { "primitive", "fuel", "standard", "standardGenerator", "advanced", "advancedGenerator", "player" },
+        -- On the ground beside the primitive gasifier, what it burns, as a player brings it: where
+        -- each lies on its square, as fractions of it, and which way it is turned.
+        fuelItems = {
+            { "Base.Log", 0.3, 0.3, 20 }, { "Base.Log", 0.62, 0.36, 110 }, { "Base.Firewood", 0.36, 0.66, 300 },
+            { "Base.Firewood", 0.7, 0.7, 200 }, { "Base.Charcoal", 0.5, 0.5, 45 },
+        },
+    },
+    -- The four wind chargers in a row across the screen, smallest first, every rotor facing the
+    -- same way.
+    wind = {
+        open = { x = { -1, 8 }, y = { -1, 8 }, sum = 6, half = 3 },
+        chargers = {
+            { 0, 6, kind = "scoop" }, { 2, 4, kind = "wood" }, { 4, 2, kind = "pipe" }, { 6, 0, kind = "alternator" },
+        },
+        facing = "S",
+        player = { 2, 6 },
+        scout = { 4, 5 },
+        shot = { "player" },
+    },
+    -- The treadmill, wired to a battery box beside it, the character running on it across the
+    -- screen, side on to the camera. The treadmill's two tiles, by the way its runner faces
+    -- (RenewableEnergy.Sprites): the rear tile the runner stands on, and the console in front. The
+    -- box stands past the console, and the character waits beside the console.
+    gym = {
+        rear = { 0, 0 },
+        console = { 1, 0 },
+        box = { 2, 0 },
+        stand = { 1, 1 },
+        facing = "E",
+        shot = { "rear", "console", "box", "stand" },
+        -- Floor of the same room between the treadmill and the camera, where furniture or the
+        -- room's near walls, drawn see-through, would stand in front of the runner.
+        front = { { -1, 1 }, { 0, 1 }, { 2, 1 }, { 3, 1 }, { -1, 2 }, { 0, 2 }, { 1, 2 }, { 2, 2 }, { 3, 2 },
+            { 0, 3 }, { 1, 3 }, { 2, 3 } },
+        -- Real time the run plays before the shot, past the blend into the run.
+        runMs = 2500,
+    },
+    -- The wind every shot is taken in, as the climate's wind intensity (ClimateManager: 120 km/h at
+    -- 1): a fresh breeze, past every charger's cut-in and below the storms that break blades.
+    windIntensity = 0.3,
+    -- A digester well into its working life: how long it has made gas, its warmth, the share of
+    -- its potential it holds, its sludge, and the manure waiting in its hopper.
+    digester = { ageHours = 24 * 30, temp = 32, potential = 0.6, sludge = 30,
+        feed = { "Base.Dung_Cow", "Base.Dung_Cow", "Base.Dung_Pig" } },
+    -- A gasifier at work: wood in its hopper, its filter packed with hay, a little of it already
+    -- tarry, a fire going if lit, its ash pit part full and some condensate waiting.
+    gasifier = { wood = { "Base.Firewood", 6 }, packing = { { "Base.HayTuft", 8 }, { "RenewableEnergy.TarryPacking", 2 } },
+        fireKg = 2, ash = 35, condensate = 0.8 },
 }
 -- How far around each setup radios and televisions are switched off, since their captions
 -- float over the shots.
@@ -237,6 +340,19 @@ end
 local function itemEntry(fullType, count)
     local key = iconFor(fullType)
     return { icon = key, name = icons[key].name, fullType = fullType, count = count }
+end
+
+-- What the build menu's recipe `name` builds (an entity of Entities.txt): its build menu icon,
+-- registered for the icon sheet, and its name.
+local function buildEntry(name)
+    local key = "icon_build_" .. name
+    if not icons[key] then
+        local script = getScriptManager():getGameEntityScript("Base." .. name)
+        local component = script:getComponentScriptFor(ComponentType.CraftRecipe)
+        icons[key] = { name = getRecipeDisplayName(name), texture = component:getIconTexture() }
+        table.insert(iconOrder, key)
+    end
+    return { icon = key, name = icons[key].name }
 end
 
 -- The fluid of a recipe line's fluid part and the litres it takes or gives: { name, litres }, and
@@ -335,7 +451,8 @@ local function researchedBy(name)
     return researchers[name] or {}
 end
 
-local function recipeEntry(name)
+-- The recipe `name`, a craftRecipe or, with `build`, the build menu's recipe of an entity.
+local function recipeEntry(name, build)
     local recipe = getScriptManager():getCraftRecipe(name)
     local entry = {
         id = name,
@@ -345,10 +462,12 @@ local function recipeEntry(name)
             needed = recipe:needToBeLearn(),
             magazines = magazinesTeaching(name),
             auto = skillList(recipe:getAutoLearnAnySkillCount(), function(i) return recipe:getAutoLearnAnySkill(i) end),
+            autoAll = skillList(recipe:getAutoLearnAllSkillCount(), function(i) return recipe:getAutoLearnAllSkill(i) end),
             research = researchedBy(name),
         },
         inputs = {},
         outputs = {},
+        build = build and buildEntry(name) or nil,
     }
     local inputs = recipe:getInputs()
     for i = 0, inputs:size() - 1 do
@@ -442,10 +561,11 @@ local function clearGroundCover(square)
     end
 end
 
--- Outdoors on solid floor, with no tree or vehicle, and nothing but the floor, ground cover and
--- the objects `allowed` accepts. A square's walls are objects on it, so walls count too.
-local function isClear(square, allowed)
-    if not (square and square:isOutside() and square:isSolidFloor() and not square:HasTree()
+-- Outdoors on solid floor, with no vehicle, no tree unless `trees`, and nothing but the floor,
+-- ground cover and the objects `allowed` accepts. A square's walls are objects on it, so walls
+-- count too.
+local function isClear(square, allowed, trees)
+    if not (square and square:isOutside() and square:isSolidFloor() and (trees or not square:HasTree())
         and square:getVehicleContainer() == nil) then
         return false
     end
@@ -780,6 +900,84 @@ local function findPoster(player, others)
     return nil
 end
 
+-- Outdoors on natural ground (grass or dirt, not a road or a yard's paving) with nothing on it but
+-- ground cover and trees, which the setups take away.
+local function isYardSquare(square, player)
+    local floor = square and square:getFloor()
+    local name = floor and floor:getSprite() and floor:getSprite():getName()
+    return name ~= nil and PZHarness.startsWith(name, "blends_natural")
+        and isClear(square, function(object) return instanceof(object, "IsoTree") end, true)
+        and square ~= player:getCurrentSquare()
+end
+
+local function offsetSquare(origin, position)
+    return getCell():getGridSquare(origin:getX() + position[1], origin:getY() + position[2], origin:getZ())
+end
+
+-- Calls fn(square) for each square of the band `open` (R2.biogas.open) around `origin`, until fn
+-- returns false; returns whether none did.
+local function everyBandSquare(origin, open, fn)
+    for dx = open.x[1], open.x[2] do
+        for dy = open.y[1], open.y[2] do
+            if math.abs(dx + dy - open.sum) <= open.half and not fn(offsetSquare(origin, { dx, dy })) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- The closest square clear of `others` with the band `open` around it clear.
+local function findYard(player, others, open)
+    return Stage.closestSquare(player, function(origin)
+        return isApart(origin, others) and everyBandSquare(origin, open, function(square)
+            return isYardSquare(square, player)
+        end)
+    end)
+end
+
+-- Whether `square` is floor of `room` with nothing standing on it, such as furniture or a pot
+-- plant: what lies flat, such as a rug, may.
+local function isBareFloor(square, room)
+    if not (square and square:getRoom() == room) then
+        return false
+    end
+    local objects = square:getObjects()
+    for i = 0, objects:size() - 1 do
+        local props = objects:get(i):getProperties()
+        if props and (props:has(IsoFlagType.solid) or props:has(IsoFlagType.solidtrans)) then
+            return false
+        end
+    end
+    return true
+end
+
+-- The closest indoor square clear of `others` with free floor of one room for the treadmill, its
+-- battery box and the character beside it, nothing between them, and bare floor in front.
+local function findGym(player, others)
+    local gym = R2.gym
+    local spots = { gym.rear, gym.console, gym.box, gym.stand }
+    return Stage.closestSquare(player, function(origin)
+        local room = origin:getRoom()
+        if not (room and isApart(origin, others)) then
+            return false
+        end
+        for _, spot in ipairs(spots) do
+            local square = offsetSquare(origin, spot)
+            if not (square and square:getRoom() == room and RenewableEnergy.Debug.isFreeSquare(square, true)
+                and not origin:isSomethingTo(square)) then
+                return false
+            end
+        end
+        for _, spot in ipairs(gym.front) do
+            if not isBareFloor(offsetSquare(origin, spot), room) then
+                return false
+            end
+        end
+        return true
+    end)
+end
+
 -- A placed tile, as the tests place one. A panel mount holds `modules` (a PowerBank.MODULES list),
 -- or without them whole factory modules.
 local function placeTile(square, spriteName, modules)
@@ -898,8 +1096,124 @@ local function switchOnLights(square, otherBank)
     print("REPromo switched on " .. switched .. " lights")
 end
 
+-- Release 2 ------------------------------------------------------------------------------------
+
+-- A generator plugged in on `square` with `fuel` of a full tank.
+local function placeGenerator(square, fuel)
+    clearGroundCover(square)
+    local generator = IsoGenerator.new(instanceItem("Base.Generator"), getCell(), square)
+    generator:setConnected(true)
+    generator:setFuel(generator:getMaxFuel() * fuel)
+    return generator
+end
+
+-- A digester of the Sprites.digester tile `tile` ("barrel.steel", "dome", ...) built on `square`
+-- as the build menu builds one (ISBuildIsoEntity:create): a thumpable, then the entity's OnCreate.
+-- It is made one at work (R2.digester), its record's `fields` set over that, a day passed so that
+-- it eats from its hopper and says what it makes a day, and its holder `full` of what it takes.
+local function placeDigester(square, tile, full, fields)
+    local sprite = Sprites.digester
+    for part in string.gmatch(tile, "[^.]+") do
+        sprite = sprite[part]
+    end
+    clearGroundCover(square)
+    local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
+    square:AddSpecialObject(thumpable)
+    RenewableEnergy.DigesterSystem.OnCreate({ thumpable = thumpable })
+    local record, working = RenewableEnergy.Digester.recordOf(thumpable), R2.digester
+    for _, fullType in ipairs(working.feed) do
+        thumpable:getContainer():AddItem(fullType)
+    end
+    record.fed, record.started, record.gasHours = true, true, working.ageHours
+    record.temp = working.temp
+    record.potential = record:tierSpec().potentialCap * working.potential
+    record.sludge = working.sludge
+    for key, value in pairs(fields or {}) do
+        record[key] = value
+    end
+    record.lastHour = getGameTime():getWorldAgeHours() - 24
+    record:update()
+    record.gas = full * record:capacity()
+    record:afterChange()
+    return thumpable, record
+end
+
+-- A gasifier of `tier` built on `square` as the build menu builds one, at work (R2.gasifier), lit
+-- if `lit`.
+local function placeGasifier(square, tier, lit)
+    clearGroundCover(square)
+    local Gasifier, working = RenewableEnergy.Gasifier, R2.gasifier
+    local thumpable = IsoThumpable.new(getCell(), square, Sprites.gasifier[tier], false, nil)
+    square:AddSpecialObject(thumpable)
+    RenewableEnergy.GasifierSystem.OnCreate({ thumpable = thumpable })
+    for _ = 1, working.wood[2] do
+        Gasifier.hopperOf(thumpable):AddItem(working.wood[1])
+    end
+    for _, packing in ipairs(working.packing) do
+        for _ = 1, packing[2] do
+            Gasifier.filterOf(thumpable):AddItem(packing[1])
+        end
+    end
+    local record = Gasifier.recordOf(thumpable)
+    record.lit = lit
+    record.fireKg = lit and working.fireKg or 0
+    record.ash, record.condensate = working.ash, working.condensate
+    record:afterChange()
+    return thumpable, record
+end
+
+-- Fits the gas kit to `generator` and runs its line to `source`, a digester or a gasifier, by
+-- the jobs a player does (GasLines.perform), the character holding what they take meanwhile.
+local function fitGasKit(generator, source)
+    local GasKit, GasLines = RenewableEnergy.GasKit, RenewableEnergy.GasLines
+    local player = getPlayer()
+    local inventory = player:getInventory()
+    local restore = PZHarness.Fixtures.setPerk(player, Perks.Mechanics, 2)
+    local given = { inventory:AddItem(GasKit.ITEM), inventory:AddItem("Base.Wrench"), inventory:AddItem(GasKit.PIPE) }
+    for _ = 1, GasKit.REACH / GasKit.HOSE_SQUARES do
+        table.insert(given, inventory:AddItem(GasKit.HOSE))
+    end
+    for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
+        if not GasLines.perform(player, job, generator, source) then
+            print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, source)))
+        end
+    end
+    for _, item in ipairs(given) do
+        if item:getContainer() == inventory then
+            inventory:Remove(item)
+        end
+    end
+    restore()
+end
+
+-- The squares wind chargers stand on, which the shots frame taller (screenBox).
+local tallSquares = {}
+
+-- A wind charger's tile on `square`, turning in the wind as one built does.
+local function placeWindCharger(square, spriteName)
+    clearGroundCover(square)
+    local object = placeTile(square, spriteName)
+    -- As placing it does in multiplayer; single player fires no OnObjectAdded.
+    triggerEvent("OnObjectAdded", object)
+    tallSquares[square] = true
+    return object
+end
+
+-- The tile of a wind charger of `kind`: "scoop", "wood" or "pipe" blades of a propeller, or
+-- "alternator", its rotor facing `facing`.
+local function windChargerSprite(kind, facing)
+    if kind == "scoop" then
+        return Sprites.windScoop
+    elseif kind == "alternator" then
+        return Sprites.windAlternator[facing]
+    end
+    return Sprites.windPropeller[kind][facing]
+end
+
 local site, origin, bankSquare, besideBank, stage0Site, stage0Origin
 local studio, roadHeading, roadCar, walkSite, walkOrigin, posterSite, posterOrigin
+-- The Release 2 places by name (R2), and what the shots of them show besides themselves.
+local r2Places, shown = {}, {}
 local homesteadBank, stage0Box, posterBank
 
 local function at(position)
@@ -920,6 +1234,10 @@ end
 
 local function atPoster(position)
     return siteSquare(posterSite, posterOrigin, position[1], position[2])
+end
+
+local function atPlace(name, position)
+    return offsetSquare(r2Places[name], position)
 end
 
 local function buildHomestead()
@@ -943,12 +1261,14 @@ local function buildHomestead()
     for _, spot in ipairs(HOMESTEAD.flatPanels) do
         connect(homesteadBank, placeTile(at(spot), Sprites.flat))
     end
-    -- A backup generator with a failsafe outside the bank's wall, plugged in and waiting.
+    -- A backup generator with a failsafe outside the bank's wall, plugged in and waiting, with a
+    -- gas kit on the insulated digester beside it.
     local generatorSquare = at(HOMESTEAD.generator)
-    local generator = IsoGenerator.new(instanceItem("Base.Generator"), getCell(), generatorSquare)
-    generator:setConnected(true)
-    generator:setFuel(generator:getMaxFuel() * 0.7)
+    local generator = placeGenerator(generatorSquare, 0.7)
     placeTile(generatorSquare, Sprites.failsafe)
+    fitGasKit(generator, (placeDigester(at(HOMESTEAD.digester), "insulated", 1)))
+    shown.homesteadCharger = placeWindCharger(at(HOMESTEAD.windCharger), Sprites.windPropeller.wood[site.facing])
+    connect(homesteadBank, shown.homesteadCharger)
     perform("setBankOn", { bank = PowerBank.positionOf(homesteadBank), on = true })
     switchOnLights(homesteadBank:getSquare(), atStage0(STAGE0.box))
 end
@@ -1006,8 +1326,9 @@ local function onScreen(square)
 end
 
 -- The screen rectangle a set of squares and what stands on them take up, in UI units. A square's
--- diamond is 128 by 64 units at zoom 1, and its tile reaches this far above the floor's centre.
-local TILE_TOP = 224
+-- diamond is 128 by 64 units at zoom 1, and its tile reaches this far above the floor's centre,
+-- or a wind charger's rotor, which is drawn as a model about two storeys tall, TALL_TOP.
+local TILE_TOP, TALL_TOP = 224, 560
 
 local function screenBox(squares)
     local zoom = getCore():getZoom(0)
@@ -1017,19 +1338,38 @@ local function screenBox(squares)
         local x, y = onScreen(square)
         box.left = math.min(box.left, x - halfW)
         box.right = math.max(box.right, x + halfW)
-        box.top = math.min(box.top, y - TILE_TOP / zoom)
+        box.top = math.min(box.top, y - (tallSquares[square] and TALL_TOP or TILE_TOP) / zoom)
         box.bottom = math.max(box.bottom, y + halfH)
     end
     return box
 end
 
+-- The squares at `positions` by `at`.
+local function squaresAt(atFn, positions)
+    local squares = {}
+    for _, position in ipairs(positions) do
+        table.insert(squares, atFn(position))
+    end
+    return squares
+end
+
 -- What the yard shots show; the bank stands indoors behind the wall, out of them.
 local function homesteadSquares()
-    local squares = { at(HOMESTEAD.generator), at(HOMESTEAD.player) }
+    local squares = squaresAt(at, { HOMESTEAD.generator, HOMESTEAD.player, HOMESTEAD.digester, HOMESTEAD.windCharger })
     for _, list in ipairs({ HOMESTEAD.wallPanels, HOMESTEAD.racks, HOMESTEAD.flatPanels }) do
         for _, spot in ipairs(list) do
             table.insert(squares, at(spot))
         end
+    end
+    return squares
+end
+
+-- What the shot of the Release 2 place `name` frames: its `shot` positions and its wind chargers.
+local function placeSquares(name)
+    local layout = R2[name]
+    local squares = squaresAt(function(position) return atPlace(name, position) end, layout.chargers or {})
+    for _, key in ipairs(layout.shot) do
+        table.insert(squares, atPlace(name, layout[key]))
     end
     return squares
 end
@@ -1129,14 +1469,22 @@ local function goTo(squares, stepsOut)
     end)
 end
 
--- What every group's shots share: noon without grid power, and no radio captions around the
--- `places` the run uses. The harness clears the weather.
+-- What every group's shots share: noon without grid power, a breeze that turns the wind
+-- chargers, and no radio captions around the `places` the run uses. The harness clears the rest
+-- of the weather.
 local function addWorldSettings(places)
     run:add(function()
         -- The grid would power the squares and leave the bank nothing to run.
         PZHarness.Fixtures.setGrid(false)
         getGameTime():setTimeOfDay(NOON)
+        local wind = getClimateManager():getClimateFloat(ClimateManager.FLOAT_WIND_INTENSITY)
+        wind:setEnableAdmin(true)
+        wind:setAdminValue(R2.windIntensity)
         silenceRadios(places)
+        -- The climate takes the wind on its next update.
+        return function()
+            return getClimateManager():getWindspeedKph() >= R2.windIntensity * 120 * 0.95
+        end
     end)
 end
 
@@ -1197,6 +1545,13 @@ local function addWorld()
         return { rightAligned("world", homesteadSquares()) }
     end)
     -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
+    -- The wind charger goes first: its rotor, drawn two storeys tall outside the wall, would stand
+    -- over the room once the wall is cut away. The status and menu groups, which list it, come
+    -- before this one in MODE_GROUPS_promo.
+    run:add(function()
+        local charger = shown.homesteadCharger
+        charger:getSquare():transmitRemoveItemFromSquare(charger)
+    end)
     goTo({ besideBank }, 0)
     run:addOpaque("bank", function()
         return { cropped("bank", bankSquares()) }
@@ -1462,6 +1817,8 @@ local function buildPoster()
     for _, spot in ipairs(POSTER.flatPanels) do
         connect(posterBank, placeTile(atPoster(spot), Sprites.flat))
     end
+    connect(posterBank, placeWindCharger(atPoster(POSTER.windCharger), Sprites.windPropeller.wood[posterSite.facing]))
+    fitGasKit(placeGenerator(atPoster(POSTER.generator), 0.7), (placeDigester(atPoster(POSTER.digester), "insulated", 1)))
     for _, bank in ipairs({ homesteadBank, stage0Box }) do
         perform("setBankOn", { bank = PowerBank.positionOf(bank), on = false })
     end
@@ -1498,7 +1855,7 @@ local function posterRegion()
             table.insert(squares, square)
         end
     end
-    for _, list in ipairs({ POSTER.racks, POSTER.flatPanels }) do
+    for _, list in ipairs({ POSTER.racks, POSTER.flatPanels, { POSTER.generator, POSTER.digester, POSTER.windCharger } }) do
         for _, spot in ipairs(list) do
             table.insert(squares, atPoster(spot))
         end
@@ -1537,6 +1894,162 @@ local function addPoster()
     end)
     run:addOpaque("poster", function()
         return { posterRegion() }
+    end)
+end
+
+-- Release 2 shots ---------------------------------------------------------------------------------
+
+-- Clears the trees around the Release 2 place `name` and the ground cover of its band.
+local function clearYard(name)
+    local origin = r2Places[name]
+    Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
+    everyBandSquare(origin, R2[name].open, function(square)
+        clearGroundCover(square)
+        return true
+    end)
+end
+
+-- Has the character look around the Release 2 place `name` from its scout square, if it has one,
+-- then stand on its `standAt` square (its player square by default), `stepsOut` from the closest
+-- zoom.
+local function goToPlace(name, stepsOut, standAt)
+    local layout = R2[name]
+    local squares = { atPlace(name, layout[standAt or "player"]) }
+    if layout.scout then
+        table.insert(squares, 1, atPlace(name, layout.scout))
+    end
+    goTo(squares, stepsOut)
+end
+
+-- The status window of `windowClass` (RenewableEnergy.DigesterWindow or GasifierWindow) on what
+-- the shots show under `key`, on a backdrop.
+local function addGasWindow(name, windowClass, key)
+    local window
+    run:add(function()
+        run:newBackdrop()
+        window = windowClass.open(0, shown[key])
+        window:setX(100)
+        window:setY(100)
+        -- The window lays its rows out from the summary as it draws.
+        return function()
+            return window.rowsToDraw ~= nil
+        end
+    end)
+    run:add(function()
+        return Capture.drawn(2)
+    end)
+    run:addMatted(name, function()
+        return { elementRegion(name, window) }
+    end)
+    run:add(function()
+        window:close()
+    end)
+    run:removeBackdrop()
+end
+
+-- Every digester at work, a step out from the closest zoom, then the brick dome's window.
+local function addBiogas()
+    local layout = R2.biogas
+    local function here(key) return atPlace("biogas", layout[key]) end
+    addOutfit(true)
+    run:add(function()
+        clearYard("biogas")
+        -- The heater first, so that the barrel's own pass finds it lit.
+        placeTile(here("heater"), Sprites.gasHeater.lit)
+        placeDigester(here("barrelSteel"), "barrel.steel", 1, { heaterLit = true })
+        placeDigester(here("barrelPlastic"), "barrel.plastic", 0.6, { holder = "tarp" })
+        placeDigester(here("insulated"), "insulated", 0.8)
+        shown.digester = placeDigester(here("dome"), "dome", 0.9)
+        local generator = placeGenerator(here("generator"), 0.2)
+        fitGasKit(generator, shown.digester)
+        generator:setActivated(true)
+        return DRAW_FRAMES
+    end)
+    goToPlace("biogas", 1)
+    run:addOpaque("biogas", function()
+        return { centred("biogas", placeSquares("biogas")) }
+    end)
+    addGasWindow("digester", RenewableEnergy.DigesterWindow, "digester")
+end
+
+-- The three gasifiers, two lit and piped to running generators, a step out from the closest
+-- zoom, then the gasifier's window.
+local function addWoodgas()
+    local layout = R2.woodgas
+    local function here(key) return atPlace("woodgas", layout[key]) end
+    addOutfit(true)
+    run:add(function()
+        clearYard("woodgas")
+        placeGasifier(here("primitive"), "primitive", false)
+        for _, fuel in ipairs(layout.fuelItems) do
+            local item = instanceItem(fuel[1])
+            item:setWorldZRotation(fuel[4])
+            here("fuel"):AddWorldInventoryItem(item, fuel[2], fuel[3], 0)
+        end
+        for _, tier in ipairs({ "standard", "advanced" }) do
+            local gasifier = placeGasifier(here(tier), tier, true)
+            local generator = placeGenerator(here(tier .. "Generator"), 0.2)
+            fitGasKit(generator, gasifier)
+            generator:setActivated(true)
+            shown[tier] = gasifier
+        end
+        return DRAW_FRAMES
+    end)
+    goToPlace("woodgas", 1)
+    run:addOpaque("woodgas", function()
+        return { centred("woodgas", placeSquares("woodgas")) }
+    end)
+    addGasWindow("gasifier", RenewableEnergy.GasifierWindow, "standard")
+end
+
+-- The four wind chargers turning in the breeze, a step out from the closest zoom.
+local function addWind()
+    local layout = R2.wind
+    addOutfit(true)
+    run:add(function()
+        clearYard("wind")
+        for _, spot in ipairs(layout.chargers) do
+            placeWindCharger(atPlace("wind", spot), windChargerSprite(spot.kind, layout.facing))
+        end
+        return DRAW_FRAMES
+    end)
+    goToPlace("wind", 1)
+    run:addOpaque("wind", function()
+        return { centred("wind", placeSquares("wind")) }
+    end)
+end
+
+-- The treadmill wired to a battery box of car batteries beside it, as stage 0's, then the
+-- character running on it, indoors at the closest zoom, in the clothes it came with.
+local function addTreadmill()
+    local layout = R2.gym
+    local function here(key) return atPlace("gym", layout[key]) end
+    addOutfit(false)
+    run:add(function()
+        local box = PowerBank.place(here("box"), Sprites.batteryBoxWood, -1)
+        fillBank(box, STAGE0_BOX, MORNING_CHARGE)
+        local tiles = Sprites.treadmill[layout.facing]
+        placeTile(here("rear"), tiles.rear)
+        shown.treadmill = placeTile(here("console"), tiles.console)
+        shown.treadmill:getModData()[PowerBank.TREADMILL_WIRED] = true
+        connect(box, shown.treadmill)
+        perform("setBankOn", { bank = PowerBank.positionOf(box), on = true })
+        return DRAW_FRAMES
+    end)
+    goToPlace("gym", 0, "stand")
+    run:add(function()
+        ISTimedActionQueue.add(RenewableEnergyTreadmillAction:new(getPlayer(), shown.treadmill))
+        local started = getTimestampMs()
+        return function()
+            return getTimestampMs() - started >= layout.runMs
+        end
+    end)
+    run:addOpaque("treadmill", function()
+        return { centred("treadmill", placeSquares("gym")) }
+    end)
+    run:add(function()
+        ISTimedActionQueue.clear(getPlayer())
+        return DRAW_FRAMES
     end)
 end
 
@@ -1599,6 +2112,24 @@ local function findPlaces(player, needs)
         table.insert(logged, string.format("poster %d,%d facing %s", posterOrigin:getX(), posterOrigin:getY(),
             posterSite.facing))
     end
+    for _, name in ipairs(R2.yards) do
+        if needs[name] then
+            r2Places[name] = findYard(player, found, R2[name].open)
+            if not r2Places[name] then
+                return nil, "open ground for the " .. name .. " shot"
+            end
+            table.insert(found, r2Places[name])
+            table.insert(logged, string.format("%s %d,%d", name, r2Places[name]:getX(), r2Places[name]:getY()))
+        end
+    end
+    if needs.gym then
+        r2Places.gym = findGym(player, found)
+        if not r2Places.gym then
+            return nil, "room with free floor for the treadmill"
+        end
+        table.insert(found, r2Places.gym)
+        table.insert(logged, string.format("treadmill %d,%d", r2Places.gym:getX(), r2Places.gym:getY()))
+    end
     if #logged > 0 then
         print("REPromo " .. table.concat(logged, "; "))
     end
@@ -1617,6 +2148,10 @@ local GROUPS = {
     models = { places = { "road", "studio" }, add = function(data) addModels(data.items, data.models) end },
     -- The character looks around from the item floor first, as a full run's has by then.
     trailer = { places = { "road", "studio" }, add = addTrailer },
+    biogas = { places = { "biogas" }, add = addBiogas },
+    woodgas = { places = { "woodgas" }, add = addWoodgas },
+    wind = { places = { "wind" }, add = addWind },
+    treadmill = { places = { "gym" }, add = addTreadmill },
     gardenlights = { places = { "walk" }, add = addGardenLights },
     poster = { places = { "poster" }, add = addPoster },
 }
@@ -1664,6 +2199,10 @@ function Promo.capture(selection, onDone)
     local data = { items = itemsList(), recipes = {}, models = {} }
     for _, name in ipairs(PZHarness.Test.recipeNames()) do
         table.insert(data.recipes, recipeEntry(name))
+    end
+    -- The build menu's, which recipeNames leaves out.
+    for _, name in ipairs(RenewableEnergy.Debug.ENTITY_RECIPES) do
+        table.insert(data.recipes, recipeEntry(name, true))
     end
     data.strings = {
         modName = getText("Sandbox_RenewableEnergy"),
