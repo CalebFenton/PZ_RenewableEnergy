@@ -41,5 +41,7 @@
     "ContextMenu_RenewableEnergy_GasifierStatus": "Gasifier Status",
     "ContextMenu_RenewableEnergy_LightGasifier": "Light Gasifier",
     "ContextMenu_RenewableEnergy_PutOutGasifier": "Put Out Gasifier",
-    "ContextMenu_RenewableEnergy_CleanOutAsh": "Clean Out Ash"
+    "ContextMenu_RenewableEnergy_CleanOutAsh": "Clean Out Ash",
+    "ContextMenu_RenewableEnergy_DrainCondensate": "Drain Condensate",
+    "ContextMenu_RenewableEnergy_OntoGround": "Onto the Ground"
 }

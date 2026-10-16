@@ -21,18 +21,49 @@ local function notBroken(item)
     return not item:isBroken()
 end
 
-local function queue(playerNum, job, gasifier)
+local function queue(playerNum, job, gasifier, item)
     local character = getSpecificPlayer(playerNum)
     if not luautils.walkAdj(character, gasifier:getSquare(), true) then
         return
     end
     if job == GasifierJobs.CLEAN_ASH then
         -- In hand, as vanilla's Clear Ashes takes its shovel.
-        ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), function(item)
-            return item:hasTag(ItemTag.TAKE_DIRT) and notBroken(item)
+        ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), function(tool)
+            return tool:hasTag(ItemTag.TAKE_DIRT) and notBroken(tool)
         end, true)
     end
-    ISTimedActionQueue.add(RenewableEnergyGasifierAction:new(character, job, gasifier))
+    ISTimedActionQueue.add(RenewableEnergyGasifierAction:new(character, job, gasifier, item))
+end
+
+-- The carried containers the condensate can go into now, by name.
+local function drainContainers(character, lit)
+    local found = {}
+    local items = character:getInventory():getAllEvalRecurse(function(item)
+        return Gasifier.takesCondensate(item, lit)
+    end)
+    for i = 0, items:size() - 1 do
+        table.insert(found, items:get(i))
+    end
+    table.sort(found, function(a, b) return a:getDisplayName() < b:getDisplayName() end)
+    return found
+end
+
+-- Drain Condensate: a choice of the containers that take it, and the ground.
+local function addDrain(menu, character, playerNum, gasifier, summary)
+    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. GasifierJobs.DRAIN))
+    local blocker = GasifierJobs.blocker(GasifierJobs.DRAIN, summary)
+    if blocker then
+        option.notAvailable = true
+        option.toolTip = ISWorldObjectContextMenu.addToolTip()
+        option.toolTip.description = getText(blocker)
+        return
+    end
+    local submenu = ISContextMenu:getNew(menu)
+    menu:addSubMenu(option, submenu)
+    for _, item in ipairs(drainContainers(character, summary.lit)) do
+        submenu:addOption(item:getDisplayName(), playerNum, queue, GasifierJobs.DRAIN, gasifier, item)
+    end
+    submenu:addOption(getText("ContextMenu_RenewableEnergy_OntoGround"), playerNum, queue, GasifierJobs.DRAIN, gasifier)
 end
 
 local function addJob(menu, character, playerNum, job, gasifier, summary)
@@ -64,6 +95,7 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
     menu:addOption(getText("ContextMenu_RenewableEnergy_GasifierStatus"), playerNum, GasifierWindow.open, gasifier)
     addJob(menu, character, playerNum, summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT, gasifier, summary)
     addJob(menu, character, playerNum, GasifierJobs.CLEAN_ASH, gasifier, summary)
+    addDrain(menu, character, playerNum, gasifier, summary)
     return menu
 end
 

@@ -88,16 +88,30 @@ local function cleanOutAsh(character, gasifier)
     gasifier.ash = gasifier.ash - count * Gasifier.ASH_PER_ITEM
 end
 
+-- Into `item` as much of the condensate as it takes, or all of it onto the ground.
+local function drain(gasifier, item)
+    if item then
+        local fluid = item:getFluidContainer()
+        local litres = math.min(gasifier.condensate, fluid:getFreeCapacity())
+        fluid:addFluid(Gasifier.VINEGAR, litres)
+        item:syncItemFields()
+        gasifier.condensate = gasifier.condensate - litres
+    else
+        gasifier.condensate = 0
+    end
+end
+
 --- Does `job` for `character` at the gasifier `isoObject`, on the authority, once the timed action
---- that does it has finished. Returns whether it was done.
-function GasifierSystem.perform(character, job, isoObject)
+--- that does it has finished. `item` is the container Drain Condensate fills. Returns whether it
+--- was done.
+function GasifierSystem.perform(character, job, isoObject, item)
     local gasifier = isoObject and Gasifier.recordOf(isoObject)
     if not gasifier then
         return false
     end
     -- Bring it up to now first, so the job works on what is there.
     gasifier:update()
-    if GasifierJobs.refusal(character, job, gasifier:buildSummary()) then
+    if GasifierJobs.refusal(character, job, gasifier:buildSummary(), item) then
         return false
     end
     if job == GasifierJobs.LIGHT then
@@ -112,6 +126,8 @@ function GasifierSystem.perform(character, job, isoObject)
         gasifier:goOut()
     elseif job == GasifierJobs.CLEAN_ASH then
         cleanOutAsh(character, gasifier)
+    elseif job == GasifierJobs.DRAIN then
+        drain(gasifier, item)
     end
     gasifier:afterChange()
     return true

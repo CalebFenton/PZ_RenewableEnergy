@@ -59,7 +59,7 @@
     "Tooltip_RenewableEnergy_HasTarp": "It already has a tarp bag in good repair.",
     "Tooltip_RenewableEnergy_NotBarrel": "Only a barrel digester can be upgraded.",
     "Tooltip_RenewableEnergy_NoDigester": "The digester is gone.",
-    "Tooltip_RenewableEnergy_GasConversionKit": "A mixer valve, hose and clamps that let a generator run on gas from a digester. On gas it carries a little over half of what it carries on gasoline.",
+    "Tooltip_RenewableEnergy_GasConversionKit": "A mixer valve, hose and clamps that let a generator run on gas from a digester or a gasifier. On gas it carries a little over half of what it carries on gasoline.",
     "Tooltip_RenewableEnergy_NoGenerator": "The generator is gone.",
     "Tooltip_RenewableEnergy_HasKit": "This generator already has a Gas Conversion Kit.",
     "Tooltip_RenewableEnergy_NoKit": "This generator has no Gas Conversion Kit.",
@@ -94,5 +94,7 @@
     "Tooltip_RenewableEnergy_NoWood": "There's no wood in the hopper.",
     "Tooltip_RenewableEnergy_LittleAsh": "There's too little ash to clean out.",
     "Tooltip_RenewableEnergy_NoGasifier": "The gasifier is gone.",
-    "Tooltip_RenewableEnergy_GasifierNotBeside": "A gasifier must stand right beside the generator."
+    "Tooltip_RenewableEnergy_GasifierNotBeside": "A gasifier must stand right beside the generator.",
+    "Tooltip_RenewableEnergy_NoCondensate": "There's no condensate to drain.",
+    "Tooltip_RenewableEnergy_WontTakeCondensate": "That won't take it. Drained hot, it needs metal, glass or a pot."
 }

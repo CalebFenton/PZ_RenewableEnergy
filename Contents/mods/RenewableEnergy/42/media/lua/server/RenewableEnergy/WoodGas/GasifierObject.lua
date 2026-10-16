@@ -25,7 +25,7 @@ RenewableEnergy.GasifierObject = GasifierObject
 -- The fields the Global Object System saves with the world; a field renamed here is lost from
 -- existing saves.
 GasifierObject.SAVED_FIELDS = {
-    "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "outSince", "pipe", "lastHour",
+    "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "condensate", "outSince", "pipe", "lastHour",
 }
 
 -- A pass longer than this (a save loaded after the clock jumped) counts as this long.
@@ -42,6 +42,7 @@ function GasifierObject:initNew()
     self.fireCharcoal = false
     self.ash = 0
     self.tarKg = 0
+    self.condensate = 0
     self.lastHour = getGameTime():getWorldAgeHours()
 end
 
@@ -134,7 +135,10 @@ function GasifierObject:burn(kg)
         burned = burned + now
         local charcoal = self.fireCharcoal
         self.ash = math.min(100, self.ash + now * spec.ashPerKg * (charcoal and Gasifier.CHARCOAL_ASH or 1))
-        self.tarKg = self.tarKg + now * (charcoal and Gasifier.CHARCOAL_TAR or 1)
+        -- An undrained filter tars its packing faster.
+        local tarFactor = self.condensate >= Gasifier.CONDENSATE_MAX and Gasifier.CONDENSATE_TAR or 1
+        self.tarKg = self.tarKg + now * (charcoal and Gasifier.CHARCOAL_TAR or 1) * tarFactor
+        self.condensate = math.min(Gasifier.CONDENSATE_MAX, self.condensate + now * Gasifier.CONDENSATE_PER_KG)
         local perItem = spec.tarKgPerItem
         while self.tarKg >= perItem do
             if not (filter and self:tarOne(filter)) then
@@ -259,7 +263,7 @@ function GasifierObject:buildSummary()
         fireKg = round(self.fireKg, 1),
         hopperKg = round(Gasifier.hopperKg(isoObject and Gasifier.hopperOf(isoObject)) + self.fireKg, 1),
         ash = math.floor(self.ash),
-        clean = clean, tarry = tarry,
+        clean = clean, tarry = tarry, condensate = round(self.condensate, 1),
         output = round(self:outputShare(), 2), wear = round(self:wearFactor(), 1),
         piped = self.pipe ~= nil,
     }

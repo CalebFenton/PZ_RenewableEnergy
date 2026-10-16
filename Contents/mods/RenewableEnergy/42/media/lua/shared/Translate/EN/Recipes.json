@@ -46,5 +46,7 @@
     "RenewableEnergy_PrimitiveGasifier": "Primitive Gasifier",
     "RenewableEnergy_Gasifier": "Gasifier",
     "RenewableEnergy_AdvancedGasifier": "Advanced Gasifier",
-    "RenewableEnergy_WeldMetalDrum": "Weld Metal Drum"
+    "RenewableEnergy_WeldMetalDrum": "Weld Metal Drum",
+    "RenewableEnergy_MakeVinegarMildewSpray": "Make Mildew Spray from Wood Vinegar",
+    "RenewableEnergy_MakeVinegarAphidSpray": "Make Aphid Spray from Wood Vinegar"
 }

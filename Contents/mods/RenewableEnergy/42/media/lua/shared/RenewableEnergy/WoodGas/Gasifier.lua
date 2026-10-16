@@ -50,6 +50,25 @@ Gasifier.ASH_PER_ITEM = 25
 Gasifier.WOOD_ASH = "RenewableEnergy.WoodAsh"
 Gasifier.TARRY = "RenewableEnergy.TarryPacking"
 
+-- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
+-- how much faster tar fills the packing while it is full. About a litre and a half a day's running.
+Gasifier.VINEGAR = "RenewableEnergy_WoodVinegar"
+Gasifier.CONDENSATE_PER_KG = 0.05
+Gasifier.CONDENSATE_MAX = 3
+Gasifier.CONDENSATE_TAR = 2
+
+--- Whether `item` can take the condensate now: a fluid container with room whose fluid wood
+--- vinegar may join (FluidContainer.canAddFluid). Drained from a lit gasifier it is near boiling
+--- and softens plastic, so then only metal, glass or cookware will do.
+function Gasifier.takesCondensate(item, lit)
+    local fluid = item and item:getFluidContainer()
+    if not (fluid and fluid:getFreeCapacity() > 0 and fluid:canAddFluid(Fluid.Get(Gasifier.VINEGAR))) then
+        return false
+    end
+    return not lit or item:hasTag(ItemTag.HAS_METAL) or item:hasTag(ItemTag.GLASS)
+        or item:hasTag(ItemTag.GLASS_BOTTLE) or item:hasTag(ItemTag.COOKABLE)
+end
+
 -- What packs the filter.
 local PACKING = {
     ["Base.HayTuft"] = true,

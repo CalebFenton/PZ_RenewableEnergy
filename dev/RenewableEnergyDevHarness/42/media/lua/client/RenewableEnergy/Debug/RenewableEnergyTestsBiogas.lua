@@ -1278,3 +1278,58 @@ test("renewable_energy_gas_gasifier_fumes_indoors", {
         T.expect(not self.reads.out.toxic, "the building stayed toxic once the gasifier went out")
     end,
 })
+
+-- Condensate drained hot goes only into metal, glass or cookware; a pot takes what it holds.
+test("renewable_energy_gas_gasifier_drain_condensate", {
+    instant = true,
+    run = function(self)
+        local square = (T.need(self, T.squares(self, 1), "a free square for a gasifier") or {})[1]
+        if not square then return end
+        local gasifier = placeGasifier(self, "primitive", square)
+        gasifierCall(self, "gasifierSet", gasifier, { fields = { lit = true, fireKg = 5, condensate = 2 } })
+        T.give(self, "containers", { { type = "Base.WaterBottle" }, { type = "Base.Pot" } })
+        T.server(self, "refillFluid", function() return { id = self.items.containers[1]:getID() } end)
+        T.server(self, "refillFluid", function() return { id = self.items.containers[2]:getID() } end)
+        T.step(function()
+            self.bottle = Gasifier.takesCondensate(self.items.containers[1], true)
+            self.pot = Gasifier.takesCondensate(self.items.containers[2], true)
+            self.coldBottle = Gasifier.takesCondensate(self.items.containers[1], false)
+        end)
+        T.waitUntil(function()
+            local summary = Gasifier.summaryOf(gasifier.object)
+            return summary ~= nil and summary.condensate >= 2
+        end, COPY_FRAMES, "this client's summary of the condensate")
+        T.goNextTo(self, gasifier.square)
+        T.step(function()
+            ISTimedActionQueue.add(RenewableEnergyGasifierAction:new(T.player(), GasifierJobs.DRAIN, gasifier.object, self.items.containers[2]))
+        end)
+        readGasifier(self, gasifier, "drained")
+        T.server(self, "carried", { fluids = { Gasifier.VINEGAR } })
+    end,
+    validate = function(self)
+        T.expect(not self.bottle, "a plastic bottle takes the condensate hot")
+        T.expect(self.pot, "a pot won't take the condensate hot")
+        T.expect(self.coldBottle, "a plastic bottle won't take it cold")
+        local potHolds = instanceItem("Base.Pot"):getFluidContainer():getCapacity()
+        local poured = math.min(2, potHolds)
+        T.expectNear("wood vinegar carried", self.server.carried.fluids[Gasifier.VINEGAR], poured, 0.01)
+        T.expectNear("condensate left", self.reads.drained.condensate, 2 - poured, 0.01)
+    end,
+})
+
+-- Wood vinegar cut with water makes the game's own mildew spray.
+T.craftTest("renewable_energy_gas_vinegar_mildew_spray", {
+    recipe = "RenewableEnergy_MakeVinegarMildewSpray",
+    from = "Base.GardeningSprayEmpty",
+    setup = function(self)
+        local fluids = { { Gasifier.VINEGAR, 0.5 }, { "Water", 1 } }
+        local index = 1
+        for _, item in ipairs(self.items.inputs or {}) do
+            if item:getFluidContainer() and fluids[index] then
+                T.server(self, "refillFluid", { id = item:getID(), fluid = fluids[index][1], liters = fluids[index][2] })
+                index = index + 1
+            end
+        end
+    end,
+    counts = { ["Base.GardeningSprayMilk"] = 1, ["Base.GardeningSprayEmpty"] = 0 },
+})

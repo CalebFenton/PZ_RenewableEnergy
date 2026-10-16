@@ -52,7 +52,7 @@ function Action:update()
 end
 
 function Action:start()
-    if not isClient() and GasifierJobs.refusal(self.character, self.job, Gasifier.currentSummary(self.gasifier)) then
+    if not isClient() and GasifierJobs.refusal(self.character, self.job, Gasifier.currentSummary(self.gasifier), self.item) then
         self:forceStop()
         return
     end
@@ -80,15 +80,17 @@ function Action:complete()
     if not onSquare(self.gasifier) or (isServer() and not withinReach(self.character, self.gasifier)) then
         return false
     end
-    return RenewableEnergy.GasifierSystem.perform(self.character, self.job, self.gasifier)
+    return RenewableEnergy.GasifierSystem.perform(self.character, self.job, self.gasifier, self.item)
 end
 
 -- Parameter names match the fields: the multiplayer server rebuilds the action by passing them to
--- new() in order (NetTimedAction).
-function Action:new(character, job, gasifier)
+-- new() in order (NetTimedAction). `item` is the container Drain Condensate fills, nil for the
+-- ground and the other jobs.
+function Action:new(character, job, gasifier, item)
     local o = ISBaseTimedAction.new(self, character)
     o.job = job
     o.gasifier = gasifier
+    o.item = item
     o.stopOnWalk = true
     o.stopOnRun = true
     o.maxTime = o:getDuration()

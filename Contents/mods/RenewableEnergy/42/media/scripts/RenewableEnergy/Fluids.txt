@@ -1,0 +1,32 @@
+/*
+    Wood vinegar: the condensate a gasifier's filter drains (RenewableEnergy.Gasifier). Antifungal
+    and an insect repellent, mixed with water into the game's own mildew and aphid sprays. A
+    modded fluid goes by its bare name (Fluid.Get), hence the mod's prefix.
+*/
+module Base
+{
+    fluid RenewableEnergy_WoodVinegar
+    {
+        ColorReference = Brown,
+        DisplayName = Fluid_Name_RenewableEnergy_WoodVinegar,
+        Categories
+        {
+            Hazardous,
+            Industrial,
+        }
+        Poison
+        {
+            maxEffect = Medium,
+            minAmount = 0.2,
+            diluteRatio = 0.3,
+        }
+        BlendWhiteList
+        {
+            whitelist = true,
+            categories
+            {
+                Water,
+            }
+        }
+    }
+}

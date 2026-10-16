@@ -386,6 +386,21 @@ Distributions.items = {
         }))),
     },
     {
+        -- Wood gas: government paper, as FEMA sent it out in 1989 to post offices, police, fire
+        -- and civil defense, libraries and the army surplus that sold it on; and preppers.
+        fullType = "RenewableEnergy.FemaPamphlet",
+        option = "LRMMisc",
+        entries = with(1, SURVIVOR_CRATES, with(0.5, SURVIVALIST_CORPSES, with(0.2, SAFEHOUSE_READING, {
+            { 2, "proc:PostOfficeMagazines" },
+            { 1, "proc:PoliceDesk" },
+            { 1, "proc:FireStorageTools" },
+            { 1, "proc:LibraryGeneralReference" },
+            { 2, "proc:ArmySurplusLiterature" },
+            { 0.5, "proc:SafehouseBookShelf" },
+            { 0.5, "proc:SurvivalGear" },
+        }))),
+    },
+    {
         fullType = "RenewableEnergy.SolarModule",
         option = "LRMSolarPanels",
         entries = with(2, SURVIVOR_CRATES, {

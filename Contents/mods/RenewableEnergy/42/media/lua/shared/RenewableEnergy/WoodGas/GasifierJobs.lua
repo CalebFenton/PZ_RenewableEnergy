@@ -14,14 +14,18 @@ local Gasifier = RenewableEnergy.Gasifier
 GasifierJobs.LIGHT = "LightGasifier"
 GasifierJobs.PUT_OUT = "PutOutGasifier"
 GasifierJobs.CLEAN_ASH = "CleanOutAsh"
+GasifierJobs.DRAIN = "DrainCondensate"
 
 -- In-game minutes each job takes; a cold start with the bellows takes COLD_LIGHT_MINUTES.
 GasifierJobs.MINUTES = {
     [GasifierJobs.LIGHT] = 2,
     [GasifierJobs.PUT_OUT] = 1,
     [GasifierJobs.CLEAN_ASH] = 10,
+    [GasifierJobs.DRAIN] = 2,
 }
 GasifierJobs.COLD_LIGHT_MINUTES = 10
+-- Less than this in the drain isn't worth draining.
+local MIN_CONDENSATE = 0.1
 
 local function notBroken(item)
     return not item:isBroken()
@@ -75,19 +79,28 @@ function GasifierJobs.blocker(job, summary)
         return not summary.lit and "Tooltip_RenewableEnergy_GasifierOut" or nil
     elseif job == GasifierJobs.CLEAN_ASH then
         return summary.ash < Gasifier.ASH_PER_ITEM and "Tooltip_RenewableEnergy_LittleAsh" or nil
+    elseif job == GasifierJobs.DRAIN then
+        return summary.condensate < MIN_CONDENSATE and "Tooltip_RenewableEnergy_NoCondensate" or nil
     end
     return nil
 end
 
 --- What refuses `character` doing `job` at the gasifier whose summary is `summary`: a blocker
---- key, "short" when they lack a need, or nil.
-function GasifierJobs.refusal(character, job, summary)
+--- key, "short" when they lack a need, or nil. `item` is the container Drain Condensate fills, or
+--- nil to drain it onto the ground.
+function GasifierJobs.refusal(character, job, summary, item)
     if not summary or not GasifierJobs.MINUTES[job] then
         return "Tooltip_RenewableEnergy_NoGasifier"
     end
-    return GasifierJobs.blocker(job, summary)
-        or (RenewableEnergy.firstUnmet(GasifierJobs.needs(character, job, summary)) and "short")
-        or nil
+    local blocker = GasifierJobs.blocker(job, summary)
+    if blocker then
+        return blocker
+    end
+    if job == GasifierJobs.DRAIN and item
+        and not (character:getInventory():containsRecursive(item) and Gasifier.takesCondensate(item, summary.lit)) then
+        return "Tooltip_RenewableEnergy_WontTakeCondensate"
+    end
+    return RenewableEnergy.firstUnmet(GasifierJobs.needs(character, job, summary)) and "short" or nil
 end
 
 return GasifierJobs

@@ -35,6 +35,8 @@ function GasifierWindow.rows(summary)
     add("IGUI_RenewableEnergy_GasifierAsh", percent(summary.ash / 100), summary.ash >= ASH_WARN and "warn" or nil)
     add("IGUI_RenewableEnergy_GasifierFilter", getText("IGUI_RenewableEnergy_FilterState", summary.clean, summary.tarry),
         summary.clean == 0 and "warn" or nil)
+    add("IGUI_RenewableEnergy_GasifierCondensate", string.format("%.1f / %d L", summary.condensate, Gasifier.CONDENSATE_MAX),
+        summary.condensate >= Gasifier.CONDENSATE_MAX and "warn" or nil)
     add("IGUI_RenewableEnergy_GasifierOutput", percent(summary.output), summary.output < 1 and "warn" or nil)
     if summary.wear > 1 then
         add("IGUI_RenewableEnergy_GasifierWear", getText("IGUI_RenewableEnergy_WearTimes", string.format("%.1f", summary.wear)), "warn")

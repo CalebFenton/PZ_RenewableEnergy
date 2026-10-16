@@ -522,6 +522,25 @@ module RenewableEnergy
         Tags = base:magazine;base:ignorezombiedensity,
     }
 
+    /*
+        FEMA's 1989 wood gas generator plans: the gasifiers (build menu recipes), the Gas
+        Conversion Kit and the wood vinegar sprays. Found where the government kept its paper.
+    */
+    item FemaPamphlet
+    {
+        DisplayCategory = RecipeResource,
+        ItemType = base:literature,
+        Weight = 0.1,
+        Icon = RenewableEnergy_FemaPamphlet,
+        StaticModel = Magazine,
+        WorldStaticModel = RenewableEnergy.FemaPamphlet_Ground,
+        BoredomChange = -10,
+        StressChange = -5,
+        LearnedRecipes = RenewableEnergy_PrimitiveGasifier;RenewableEnergy_Gasifier;RenewableEnergy_AdvancedGasifier;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeVinegarMildewSpray;RenewableEnergy_MakeVinegarAphidSpray,
+        OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
+        Tags = base:magazine;base:ignorezombiedensity,
+    }
+
     /**************************** Maps **************************************/
     item CrowcallRoadMap
     {

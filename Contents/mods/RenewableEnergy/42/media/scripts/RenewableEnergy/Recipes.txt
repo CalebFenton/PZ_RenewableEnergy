@@ -1045,4 +1045,50 @@ module Base
             item 1 Base.MetalDrum,
         }
     }
+
+    /* Wood vinegar from a gasifier's filter, cut with water, into the game's own mildew and aphid
+       sprays: it is antifungal and keeps insects off. Taught by the FEMA pamphlet. */
+    craftRecipe RenewableEnergy_MakeVinegarMildewSpray
+    {
+        timedAction = Making,
+        time = 40,
+        NeedToBeLearn = true,
+        Tags = InHandCraft;Farming,
+        category = Farming,
+        AutoLearnAny = Farming:7,
+        inputs
+        {
+            item 1 [Base.GardeningSprayEmpty],
+            item 1 [*],
+            -fluid 0.2 [RenewableEnergy_WoodVinegar],
+            item 1 [*],
+            -fluid 0.8 [Water],
+        }
+        outputs
+        {
+            item 1 Base.GardeningSprayMilk,
+        }
+    }
+
+    craftRecipe RenewableEnergy_MakeVinegarAphidSpray
+    {
+        timedAction = Making,
+        time = 40,
+        NeedToBeLearn = true,
+        Tags = InHandCraft;Farming,
+        category = Farming,
+        AutoLearnAny = Farming:7,
+        inputs
+        {
+            item 1 [Base.GardeningSprayEmpty],
+            item 1 [*],
+            -fluid 0.2 [RenewableEnergy_WoodVinegar],
+            item 1 [*],
+            -fluid 0.8 [Water],
+        }
+        outputs
+        {
+            item 1 Base.GardeningSprayAphids,
+        }
+    }
 }

@@ -55,7 +55,7 @@ end)
 
 -- What the character carries: for each type of `args.types` its items, bags included, { id,
 -- condition, uses (the fraction left), modData }; in `fluids` the litres of each fluid of
--- `args.fluids` (Fluid field names) in the fluid containers of its main inventory; and in `total`
+-- `args.fluids` (Fluid field names, or a modded fluid's name) in the fluid containers of its main inventory; and in `total`
 -- how many items its main inventory holds.
 handler("carried", function(player, args)
     local inventory = player:getInventory()
@@ -76,7 +76,7 @@ handler("carried", function(player, args)
         for i = 0, carried:size() - 1 do
             local container = carried:get(i):getFluidContainer()
             if container then
-                fluids[name] = fluids[name] + container:getSpecificFluidAmount(Fluid[name])
+                fluids[name] = fluids[name] + container:getSpecificFluidAmount(Fluid[name] or Fluid.Get(name))
             end
         end
     end

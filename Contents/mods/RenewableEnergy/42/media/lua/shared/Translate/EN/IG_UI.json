@@ -173,5 +173,6 @@
     "IGUI_RenewableEnergy_WearTimes": "%1 times as fast",
     "IGUI_RenewableEnergy_GasifierLine": "Generator",
     "IGUI_RenewableEnergy_Piped": "Piped",
-    "IGUI_RenewableEnergy_NotPiped": "Not piped"
+    "IGUI_RenewableEnergy_NotPiped": "Not piped",
+    "IGUI_RenewableEnergy_GasifierCondensate": "Condensate"
 }
