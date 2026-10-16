@@ -3,6 +3,7 @@
 
 require "ISUI/ISCollapsableWindow"
 require "RenewableEnergy/Biogas/Digester"
+require "RenewableEnergy/Biogas/GasHeater"
 
 RenewableEnergy = RenewableEnergy or {}
 local DigesterWindow = ISCollapsableWindow:derive("RenewableEnergyDigesterWindow")
@@ -95,6 +96,10 @@ function DigesterWindow.rows(summary)
         add("IGUI_RenewableEnergy_DigesterScrubber", getText("IGUI_RenewableEnergy_ScrubberState",
             string.format("%.1f", summary.scrubCO2), string.format("%.1f", summary.scrubWool)),
             (summary.scrubCO2 <= 0 or summary.scrubWool <= 0) and "warn" or nil)
+    end
+    if summary.heaterLit then
+        add("IGUI_RenewableEnergy_DigesterHeater", getText("IGUI_RenewableEnergy_HeaterBurning",
+            getText("IGUI_RenewableEnergy_PerDay", string.format("%.1f m³", RenewableEnergy.GasHeater.M3_PER_HOUR * 24))))
     end
     if summary.leaking then
         add("IGUI_RenewableEnergy_DigesterLeak", getText("IGUI_RenewableEnergy_DigesterLeaking"), "warn")

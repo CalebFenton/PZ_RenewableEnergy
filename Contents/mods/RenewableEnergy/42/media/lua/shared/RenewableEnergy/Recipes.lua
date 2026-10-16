@@ -334,4 +334,24 @@ function Recipes.takeApartGardenLight(craftRecipeData, character)
     end
 end
 
+-- Propane ----------------------------------------------------------------------------------------
+
+-- What a full lantern bottle holds, as a share of a full tank: a one-pound bottle off a twenty.
+Recipes.PROPANE_BOTTLE_SHARE = 0.05
+
+-- OnCreate of Refill Propane Bottle, as vanilla's Refill Blow Torch moves its propane
+-- (RecipeCodeOnCreate.refillBlowTorch): the new bottle starts as the old one was and takes what
+-- it has room for from the tank.
+function Recipes.refillPropaneBottle(craftRecipeData, character)
+    local bottle = craftRecipeData:getFirstCreatedItem()
+    local old = craftRecipeData:getAllConsumedItems():get(0)
+    local tank = craftRecipeData:getAllKeepInputItems():get(0)
+    local share = Recipes.PROPANE_BOTTLE_SHARE
+    local taken = math.min((1 - old:getCurrentUsesFloat()) * share, tank:getCurrentUsesFloat())
+    bottle:setCurrentUsesFloat(old:getCurrentUsesFloat() + taken / share)
+    tank:setCurrentUsesFloat(tank:getCurrentUsesFloat() - taken)
+    syncItemFields(character, tank)
+    syncItemFields(character, bottle)
+end
+
 return Recipes

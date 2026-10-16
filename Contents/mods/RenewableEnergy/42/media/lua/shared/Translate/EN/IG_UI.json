@@ -152,5 +152,7 @@
     "IGUI_RenewableEnergy_GasOut": "ran out of gas",
     "IGUI_RenewableEnergy_WaterLitres": "Water (litres)",
     "IGUI_RenewableEnergy_DigesterScrubber": "Scrubber",
-    "IGUI_RenewableEnergy_ScrubberState": "%1 m³ left in its water, %2 m³ in its steel wool"
+    "IGUI_RenewableEnergy_ScrubberState": "%1 m³ left in its water, %2 m³ in its steel wool",
+    "IGUI_RenewableEnergy_DigesterHeater": "Gas heater",
+    "IGUI_RenewableEnergy_HeaterBurning": "Lit, burning %1"
 }

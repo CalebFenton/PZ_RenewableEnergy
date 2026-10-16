@@ -1000,4 +1000,24 @@ module Base
             item 1 RenewableEnergy.GasHeater,
         }
     }
+
+    /* A lantern's propane bottle topped up from a tank, as Refill Blow Torch does (OnCreate moves
+       the propane). Free to all: decanting needs no book. */
+    craftRecipe RenewableEnergy_RefillPropaneBottle
+    {
+        timedAction = Making,
+        time = 50,
+        OnCreate = RenewableEnergy.Recipes.refillPropaneBottle,
+        Tags = InHandCraft,
+        category = Miscellaneous,
+        inputs
+        {
+            item 1 [Base.Propane_Refill] mode:destroy flags[NotFull;ItemCount],
+            item 1 [Base.PropaneTank] flags[NotEmpty;ItemCount] mode:keep,
+        }
+        outputs
+        {
+            item 1 Base.Propane_Refill,
+        }
+    }
 }

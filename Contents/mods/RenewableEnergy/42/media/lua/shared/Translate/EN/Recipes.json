@@ -41,5 +41,6 @@
     "RenewableEnergy_InsulatedDigester": "Insulated Digester",
     "RenewableEnergy_BrickDome": "Brick Dome Digester",
     "RenewableEnergy_MakeGasConversionKit": "Make Gas Conversion Kit",
-    "RenewableEnergy_MakeGasHeater": "Make Gas Heater"
+    "RenewableEnergy_MakeGasHeater": "Make Gas Heater",
+    "RenewableEnergy_RefillPropaneBottle": "Refill Propane Bottle"
 }

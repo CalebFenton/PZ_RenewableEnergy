@@ -381,7 +381,6 @@ Distributions.items = {
             { 1, "proc:ToolCabinetFarming" },
             { 1, "proc:BarnTools" },
             { 1, "proc:CrateFarming" },
-            { 0.5, "proc:FarmStorage" },
             { 1, "proc:SafehouseBookShelf" },
             { 2, "veh:FarmerTruckBed" },
         }))),

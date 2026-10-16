@@ -995,3 +995,46 @@ test("renewable_energy_biogas_heater_warms_digester", {
         T.expect(self.heaterSprite == RenewableEnergy.Sprites.gasHeater.off, "the heater still shows lit: " .. tostring(self.heaterSprite))
     end,
 })
+
+-- Refilling a half-empty lantern bottle from a half-full tank fills the bottle and takes its share
+-- of the tank.
+T.craftTest("renewable_energy_biogas_refill_propane_bottle", {
+    recipe = "RenewableEnergy_RefillPropaneBottle",
+    from = "Base.Propane_Refill",
+    setup = function(self)
+        for _, item in ipairs(self.items.inputs or {}) do
+            T.changeItem(self, item, { uses = 0.5 })
+        end
+    end,
+    counts = { ["Base.Propane_Refill"] = 1, [Digester.TANK] = 1 },
+    after = function(self)
+        readTanks(self, "refilled")
+        T.server(self, "carried", { types = { "Base.Propane_Refill" } })
+    end,
+    validate = function(self)
+        local share = RenewableEnergy.Recipes.PROPANE_BOTTLE_SHARE
+        T.expectNear("bottle after refilling", self.server.carried.items["Base.Propane_Refill"][1].uses, 1, 0.01)
+        T.expectNear("tank after refilling", self.tanks.refilled[1].uses, 0.5 - 0.5 * share, 0.002)
+    end,
+})
+
+-- The mechanics window offers Inflate Tire with a compressor only where it can be plugged in.
+test("renewable_energy_biogas_compressor_inflates_tires_on_power", {
+    run = function(self)
+        T.setGrid(self, false)
+        T.give(self, "compressor", { { type = Digester.COMPRESSOR } })
+        T.step(function() self.unpowered = ISVehicleMechanics:getTirePump(T.player()) end)
+        local generator = placeGenerator(self, 10, T.player():getCurrentSquare())
+        if not generator then return end
+        setGenerator(self, generator, { running = true })
+        T.waitUntil(function()
+            local here = T.player():getCurrentSquare()
+            return here ~= nil and here:haveElectricity()
+        end, COPY_FRAMES, "power where the character stands")
+        T.step(function() self.powered = ISVehicleMechanics:getTirePump(T.player()) end)
+    end,
+    validate = function(self)
+        T.expect(self.unpowered == nil, "a compressor with no power counts as a tire pump")
+        T.expect(self.powered and self.powered:getFullType() == Digester.COMPRESSOR, "a powered compressor doesn't count as a tire pump")
+    end,
+})

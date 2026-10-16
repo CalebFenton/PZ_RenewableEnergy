@@ -42,9 +42,18 @@ It's the hardware they sold in 1993: small modules, marine and L-16 batteries, i
 
 If what's switched on draws more than the inverters carry, the power cuts out until you switch something off. The bank powers everything a generator in its spot would, the neighbours' fridges and lights included, so switch those off or set up away from town.
 
+## Biogas
+
+Manure and kitchen scraps make gas, given warmth and patience. Build a digester from the **Farming** page of the build menu, from a barrel under garbage bags up to a buried brick dome that keeps itself warm, and feed it manure, scraps and grass.
+
+- **It's alive.** Below about 10 °C it stops, too much food sours it until you add wood ash, baking soda or quicklime, and its sludge comes out as compost. A **Gas Heater** keeps it going through the winter.
+- **It stinks.** A fresh or sour digester draws zombies, and one indoors can poison the house. The brick dome is the quiet one.
+- **Run the generator on it** with a **Gas Conversion Kit** and a hose: a lighter load, but no gasoline, ever.
+- **Bottle it.** A tire pump fills a propane tank a quarter of the way and wears you out; a scrubber and a compressor out of a fridge fill it. The tank refills lantern bottles, and the compressor inflates tires.
+
 ## Crafting
 
-Most recipes need a table and enough light, and a battery rebuild a furnace, a hand press and a kiln too. You learn them from two Homestead Power magazines, by levelling Electrical, or by researching a part you found. The inverters, the maintainer and the battery charger can't be crafted: you'll have to find them.
+Most recipes need a table and enough light, and a battery rebuild a furnace, a hand press and a kiln too. You learn them from three Homestead Power magazines, by levelling the skills they use, or by researching a part you found. The inverters, the maintainer and the battery charger can't be crafted: you'll have to find them.
 
 Every recipe's inputs, skills and tools are in the gallery, and on [one sheet](art/promo/images/recipes.png).
 
@@ -61,6 +70,7 @@ The box on the tongue holds deep cycle batteries and usually a charge controller
 ## Sandbox options
 
 - **Sunlight Multiplier**: how much power panels make. Out of the box they make more than they really did; 1 is true 1993 output, when it took a yard of panels to run one fridge.
+- **Biogas Multiplier**: how much gas digesters make. Out of the box they make more than they really did, since the game's animals drop far less manure than real ones.
 - **Loot Rarity Multiplier**, one each for modules, batteries and everything else: how often the mod's items turn up.
 - **Battery Wear**: how hard deep drains wear batteries. 0 turns wear off.
 - **Stash Houses**: adds houses stocked with solar gear, and maps that lead to them. Set it before you start.

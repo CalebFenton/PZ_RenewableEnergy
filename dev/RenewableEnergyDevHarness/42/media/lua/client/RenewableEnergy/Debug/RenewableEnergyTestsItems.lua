@@ -29,7 +29,7 @@ local RECIPES = {
     "RenewableEnergy_RebuildCarBattery", "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery",
     "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
     "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
-    "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater",
+    "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle",
 }
 
 -- "RenewableEnergy.HomesteadPowerMag1" -> "homestead_power_mag1".
