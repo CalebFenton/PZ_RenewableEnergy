@@ -312,10 +312,23 @@ function Bank:addSource(isoObject, player)
     table.insert(self.sources, source)
 end
 
+-- Takes the source at `index` off the bank. What it still owed the bank, a treadmill run not yet
+-- paid out (TreadmillSource.credit), goes into the batteries now, up to full, so taking a source
+-- away forfeits nothing it made.
+local function dropSource(bank, index)
+    local source = table.remove(bank.sources, index)
+    local wh = source.pendingWh
+    if wh and bank.nominalWh > 0 then
+        bank.charge = math.min(1, bank.charge + wh / bank.nominalWh)
+        local today = TOTALS[Sources.familyOf(source.kind)].today
+        bank[today] = (bank[today] or 0) + wh
+    end
+end
+
 function Bank:removeSource(x, y, z)
     local _, index = self:findSource(x, y, z)
     if index then
-        table.remove(self.sources, index)
+        dropSource(self, index)
         return true
     end
     return false
@@ -338,7 +351,7 @@ function Bank:updateSources(hours, context)
         local object = Sources.on(square)
         if square and not (object and Sources.squareOk(square, source.kind)
             and PowerBank.isInReach(self, source.x, source.y, source.z)) then
-            table.remove(self.sources, i)
+            dropSource(self, i)
         else
             local size = Sources.slotsOf(source.kind)
             local inSlot = used + size <= slots

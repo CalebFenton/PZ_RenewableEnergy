@@ -133,7 +133,9 @@ test("renewable_energy_biogas_stink_indoors", {
     end,
 })
 
--- A gas mask keeps the smell out, its filter draining as it does among corpses.
+-- A gas mask keeps the smell out, its filter draining as it does among corpses: no smell comes in,
+-- and the moodle rises no higher than it stood before, which an earlier test's smell can leave
+-- fading for a while.
 test("renewable_energy_biogas_stink_gas_mask", {
     run = function(self)
         local stand = T.square(self, nil, "a free outdoor square to stand on")
@@ -142,15 +144,18 @@ test("renewable_energy_biogas_stink_gas_mask", {
         standOn(stand)
         T.give(self, "mask", { { type = "Base.Hat_GasMask", worn = true } })
         withLevels(self, source, function(levels)
+            T.server(self, "stinkRead", T.at(source))
+            T.step(function() self.before = self.server.stinkRead end)
             stink(self, source, levels[#levels])
             -- The filter drains only while the mask keeps corpse smell out (getCorpseSicknessDefense).
             T.serverUntil(self, "stinkRead", T.at(source), function(read) return read.mask ~= nil and read.mask < 1 end, SMELL_MS)
         end)
     end,
     validate = function(self)
-        local read = self.server.stinkRead
+        local read, before = self.server.stinkRead, self.before
         T.expect(read.mask and read.mask < 1, "the gas mask's filter is at " .. tostring(read.mask))
-        T.expect(read.level == 0 and read.rate == 0, "with a gas mask, the smell is at level " .. tostring(read.level) .. ", rate " .. tostring(read.rate))
+        T.expect(read.rate == 0 and read.level <= before.level, "with a gas mask, the smell is at level " .. tostring(read.level)
+            .. " from " .. tostring(before.level) .. ", rate " .. tostring(read.rate))
     end,
 })
 

@@ -292,6 +292,34 @@ test("renewable_energy_treadmill_unwire_gives_back_wire", {
     end,
 })
 
+-- What a run banked that the passes haven't paid out yet goes into the batteries when the treadmill
+-- is unwired, as it would have over the passes. Catches unwiring, moving or picking up a treadmill
+-- right after a run forfeiting the run.
+test("renewable_energy_treadmill_unwire_keeps_the_run", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER }, { charge = 0.5 })
+        local treadmill = bank and T.panel(self, Sprites.treadmill.N.console, { near = bank, connect = true, wired = true })
+        if not treadmill then return end
+        self.bank, self.treadmill = bank, treadmill
+        T.goNextTo(self, treadmill.square)
+        T.bankState(self, bank)
+        T.step(function() self.before = bank.state end)
+        T.server(self, "completeTreadmillRun", T.at(treadmill))
+        T.perform(self, "unwireTreadmill", { source = treadmill.position })
+        T.step(function() self.unwired = self.server.perform end)
+        T.bankState(self, bank)
+    end,
+    validate = function(self)
+        expect(self.treadmill.connected, "the bank refused the wired treadmill: " .. tostring(self.treadmill.reason))
+        expect(self.server.completeTreadmillRun.done, "the authority settled no run")
+        expect(self.unwired.ok, "unwiring the treadmill failed (" .. tostring(self.unwired.reason) .. ")")
+        local spec = Specs.treadmill
+        T.expectNear("Wh in the batteries from the run once the treadmill was unwired",
+            self.bank.state.storedWh - self.before.storedWh, spec.watts * spec.runMinutes / 60, 1)
+    end,
+})
+
 -- Picking up a wired, connected treadmill leaves its wire on the floor and takes it out of its
 -- bank, and the treadmill it becomes carries no wiring to be placed with. Catches the wiring lost
 -- with nothing back, and wiring that travels with the item while its wire comes back too.
