@@ -1,0 +1,52 @@
+module RenewableEnergy
+{
+    /* Written by art/models/models.py: the sprite models placed objects are drawn as. */
+    spriteModel ScoopRotor0
+    {
+        modelScript = RenewableEnergy.ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel ScoopRotor1
+    {
+        modelScript = RenewableEnergy.ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 30 0.0,
+        scale = 0.6667,
+    }
+    spriteModel ScoopRotor2
+    {
+        modelScript = RenewableEnergy.ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 60 0.0,
+        scale = 0.6667,
+    }
+    spriteModel ScoopRotor3
+    {
+        modelScript = RenewableEnergy.ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel ScoopRotor4
+    {
+        modelScript = RenewableEnergy.ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 120 0.0,
+        scale = 0.6667,
+    }
+    spriteModel ScoopRotor5
+    {
+        modelScript = RenewableEnergy.ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 150 0.0,
+        scale = 0.6667,
+    }
+}

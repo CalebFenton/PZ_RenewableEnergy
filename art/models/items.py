@@ -1916,7 +1916,9 @@ def tarry_packing(col):
         beam(col, "Tarry_Strand", M("tarstraw"), start, end, (0.006, 0.002))
 
 
-PAMPHLET = (0.14, 0.215, 0.003)  # a government digest-size pamphlet
+# A government digest-size pamphlet. Its pages are thick enough to be modelled (models.py
+# DECAL_THICKNESS) for what is printed on its cover to be baked onto.
+PAMPHLET = (0.14, 0.215, 0.004)
 
 
 def fema_pamphlet(col):
@@ -1932,11 +1934,93 @@ def fema_pamphlet(col):
     for i, (line, size) in enumerate((("CONSTRUCTION OF A", 0.0085), ("SIMPLIFIED WOOD GAS", 0.0105),
                                       ("GENERATOR", 0.0105))):
         text(col, "Pamphlet_Title", M("ink"), line, size, at=(0, 0.025 - i * 0.016, top), rotate=flat)
-    _ring(col, "Pamphlet_Seal", M("marine"), (0, -0.05), 0.02, top, 0.002)
-    _ring(col, "Pamphlet_SealInner", M("marine"), (0, -0.05), 0.012, top, 0.0015)
+    _ring(col, "Pamphlet_Seal", M("marine"), (0, -0.05), 0.02, top, 0.001)
+    _ring(col, "Pamphlet_SealInner", M("marine"), (0, -0.05), 0.012, top, 0.0008)
     text(col, "Pamphlet_Date", M("ink"), "MARCH 1989", 0.0065, at=(0, -0.095, top), rotate=flat)
     for y in (-0.055, 0.055):
         box(col, "Pamphlet_Staple", M("galvanised"), (0.002, 0.018, 0.0006), at=(-width / 2 + 0.006, y, height))
+
+
+# Wind ---------------------------------------------------------------------------------------------
+#
+# A wind charger is drawn in play as a sprite model that the game turns about its vertical axis to
+# spin the rotor, so every part but the rotor is round about the shaft: turned, it looks the same.
+
+# The pole's height to the rotor's foot: the whole stands about 2.5 m, as tall as a tile's sprite
+# can draw it.
+SCOOP_POLE = 1.6
+SCOOP_OVERLAP = 0.15  # how far each scoop's inner edge reaches past the shaft, together
+
+
+def _scoop(col, name, centre, start, height, z):
+    """Half a 55 gallon drum cut lengthwise, standing at `centre` (the drum's axis), its arc from
+    `start` degrees round half a turn: painted outside with its rolling hoop, rust inside."""
+    radius = DRUM[0]
+    strips = 12
+    step = 180 / strips
+    chord = 2 * radius * math.sin(math.radians(step / 2))
+    for i in range(strips):
+        a = start + (i + 0.5) * step
+        for mat, out, thick in (("drumpaint", 0.002, 0.003), ("rust", -0.002, 0.003)):
+            x, y = _around(centre, a, radius + out)
+            box(col, name, M(mat), (chord + 0.004, thick, height), at=(x, y, z), rotate=(0, 0, a + 90))
+        for rise in (height / 3, 2 * height / 3):
+            x, y = _around(centre, a, radius + 0.006)
+            box(col, name + "_Hoop", M("drumpaint"), (chord + 0.004, 0.006, 0.022), at=(x, y, z + rise - 0.011), rotate=(0, 0, a + 90))
+
+
+def scoop_rotor(col):
+    """A homestead Savonius wind charger: the two halves of a 55 gallon drum cut lengthwise, set in
+    an S with their inner edges overlapping, between steel plates on a shaft, on a steel pole set in
+    a concrete footing, the treadmill motor it turns in a round housing at the pole's foot, its cable
+    buried, since anything off the shaft's axis would swing round as the rotor spins."""
+    radius, height = DRUM
+    offset = radius - SCOOP_OVERLAP / 2
+    reach = offset + radius + 0.01
+    cylinder(col, "Scoop_Footing", M("concrete"), 0.2, 0.06, segments=24)
+    cylinder(col, "Scoop_Housing", M("darkgrey"), 0.12, 0.24, at=(0, 0, 0.06), segments=20)
+    cylinder(col, "Scoop_HousingCap", M("weld"), 0.13, 0.025, at=(0, 0, 0.3), segments=20)
+    cylinder(col, "Scoop_Pole", M("galvanised"), 0.045, SCOOP_POLE - 0.325, at=(0, 0, 0.325), segments=14)
+    cylinder(col, "Scoop_Bearing", M("weld"), 0.07, 0.05, at=(0, 0, SCOOP_POLE - 0.05), segments=14)
+    plate = 0.008
+    cylinder(col, "Scoop_PlateLow", M("rustysteel"), reach, plate, at=(0, 0, SCOOP_POLE), segments=32)
+    foot = SCOOP_POLE + plate
+    _scoop(col, "Scoop_Half", (offset, 0), 180, height, foot)
+    _scoop(col, "Scoop_Half", (-offset, 0), 0, height, foot)
+    top = foot + height
+    cylinder(col, "Scoop_PlateTop", M("rustysteel"), reach, plate, at=(0, 0, top), segments=32)
+    cylinder(col, "Scoop_Shaft", M("galvanised"), 0.025, 0.09, at=(0, 0, top + plate), segments=12)
+    cylinder(col, "Scoop_ShaftCap", M("weld"), 0.035, 0.03, at=(0, 0, top + plate + 0.06), segments=12)
+
+
+def treadmill_motor(col):
+    """A home treadmill's permanent-magnet DC drive motor, lying on its mounting bracket: a black
+    can between aluminium end bells, a grooved flywheel pulley on its shaft, its maker's label, and
+    two leads, red and black, out of the back."""
+    radius, length = 0.045, 0.15
+    axis = 0.058
+    box(col, "Motor_Bracket", M("rawsteel"), (0.09, 0.07, 0.008), at=(0, 0, 0))
+    cylinder(col, "Motor_Can", M("black"), radius, length, at=(-length / 2, 0, axis), rotate=(0, 90, 0), segments=18)
+    for x in (-length / 2 - 0.012, length / 2):
+        cylinder(col, "Motor_EndBell", M("aluminium"), radius + 0.002, 0.012, at=(x, 0, axis), rotate=(0, 90, 0), segments=18)
+    box(col, "Motor_Label", M("label"), (0.06, 0.035, 0.001), at=(0, 0, axis + radius - 0.0005))
+    front = length / 2 + 0.012
+    cylinder(col, "Motor_Shaft", M("galvanised"), 0.006, 0.02, at=(front, 0, axis), rotate=(0, 90, 0), segments=8)
+    cylinder(col, "Motor_Pulley", M("aluminium"), 0.052, 0.03, at=(front + 0.012, 0, axis), rotate=(0, 90, 0), segments=24)
+    for groove in (0.008, 0.016, 0.024):
+        cylinder(col, "Motor_PulleyGroove", M("darkgrey"), 0.053, 0.002, at=(front + 0.012 + groove, 0, axis), rotate=(0, 90, 0),
+                 segments=24)
+    back = -length / 2 - 0.012
+    for colour, side in (("red", -1), ("black", 1)):
+        tube(col, "Motor_Lead", M(colour), [(back, side * 0.012, axis), (back - 0.03, side * 0.02, axis - 0.01),
+                                             (back - 0.06, side * 0.035, 0.006)], 0.0035, 6)
+
+
+# Sprite models by name: the builder and the yaws, in degrees, of the steps the game turns it through.
+# The scoop rotor is the same after half a turn, so six steps cover its whole spin.
+SPRITE_MODELS = {
+    "ScoopRotor": {"model": scoop_rotor, "steps": (0, 30, 60, 90, 120, 150)},
+}
 
 
 # Vehicles -----------------------------------------------------------------------------------------
@@ -2184,6 +2268,7 @@ ITEMS = {
     "GasHeater": {"model": gas_heater},
     "TarryPacking": {"model": tarry_packing, "icon_elevation": 35},
     "FemaPamphlet": {"model": fema_pamphlet, "icon_elevation": 70},
+    "TreadmillMotor": {"model": treadmill_motor},
 }
 
 # Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes

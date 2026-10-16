@@ -81,6 +81,9 @@ Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = 
 -- it, and `gasifierPipeGen` on the generator's tile with the kit, by the gasifier's direction.
 Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
 Sprites.gasifierPipeGen = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }
+-- The scoop rotor wind charger. In play the game draws the object as a sprite model instead
+-- (scripts SpriteModels.txt: RenewableEnergy.ScoopRotor0 to 5, the rotor turned 30 degrees a step).
+Sprites.windScoop = tile(264)
 
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
 Sprites.snow = {

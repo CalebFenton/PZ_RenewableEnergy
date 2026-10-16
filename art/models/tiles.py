@@ -148,8 +148,12 @@ for offset, side in enumerate("NESW"):
                            layer(items.gasifier, frame=False, tier="standard", pipe=side)]
     TILES[260 + offset] = [layer(items.generator_gas_pipe, side=side)]
 
+# The scoop rotor wind charger as a tile: what the object is and how the build menu shows it. In
+# play the game draws its sprite model (items.SPRITE_MODELS) instead, and spins that.
+TILES[264] = [layer(items.scoop_rotor)]
+
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
-# working, its holder full, and each gasifier.
+# working, its holder full, each gasifier and the wind charger.
 BUILD_ICONS = {
     "BarrelDigesterSteel": [layer(items.barrel_digester, holder="bags")],
     "BarrelDigesterPlastic": [layer(items.barrel_digester, plastic=True, holder="tarp")],
@@ -158,4 +162,5 @@ BUILD_ICONS = {
     "PrimitiveGasifier": [layer(items.gasifier, tier="primitive")],
     "Gasifier": [layer(items.gasifier, tier="standard")],
     "AdvancedGasifier": [layer(items.gasifier, tier="advanced")],
+    "ScoopRotor": [layer(items.scoop_rotor)],
 }
