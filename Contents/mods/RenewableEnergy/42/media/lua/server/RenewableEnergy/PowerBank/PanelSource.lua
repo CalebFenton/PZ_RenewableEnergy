@@ -1,6 +1,7 @@
 -- How a bank runs a solar panel (the "panel" family of RenewableEnergy.Sources) on the authority:
 -- its modules' watts in the sun, snow lying on it, and storms cracking its modules. Bank.lua calls
--- init, update and status for each panel it holds.
+-- connect, update and status for each panel it holds. The one writer of a placed panel's module
+-- record (PowerBank.MODULES) and of its crack and snow overlays.
 
 if isClient() then return end
 
@@ -19,12 +20,12 @@ local PanelSource = {}
 RenewableEnergy.PanelSource = PanelSource
 
 -- Snow cover on a panel, as a share of the panel per hour: falling snow adds it, mild air and
--- sun melt it, and a rack sheds it in sun or mild air.
+-- sun melt it, and a mount that sheds snow (Specs.mounts shedsSnow) sheds it in sun or mild air.
 local SNOW_PER_HOUR = 0.5
 local SNOW_MELT_PER_HOUR = 0.1
 local SNOW_SUN_MELT_PER_HOUR = 0.05
-local RACK_SHED_PER_HOUR = 0.5
-local RACK_SHEDS_ABOVE_C = -2
+local SHED_PER_HOUR = 0.5
+local SHEDS_ABOVE_C = -2
 -- Snow this deep shows on the panel's tile.
 local SNOW_SHOWN = 0.5
 -- A panel making less than this share of what it would in clear full sun names the biggest
@@ -52,17 +53,19 @@ local function moduleWatts(source)
     return now, best
 end
 
+--- Records `modules` on a placed panel and sends the record to clients.
+function PanelSource.writeModules(isoObject, modules)
+    isoObject:getModData()[PowerBank.MODULES] = PowerBank.copyModules(modules)
+    isoObject:transmitModData()
+end
+
 -- Cracks and snow draw over a panel's tile; snow lies on the glass, so it draws last.
 local isCrackOrSnow = Sprites.matcher(Sprites.cracks, Sprites.snow)
 
---- Shows a cracked glass over each of a placed panel's modules below Specs.crackedBelow and over
---- none of the others, keeping the snow it shows on top, and sends the overlays to clients if
---- they changed. Authority only: a client's own overlays would be overwritten by the server's next
---- sprite update.
-function PanelSource.showCracks(isoObject)
-    local kind, facing, material = Sources.kindOf(isoObject)
-    if Sources.familyOf(kind) ~= "panel" then return end
-    local wanted = Sprites.crackOverlays(kind, facing, material, PowerBank.modulesOf(isoObject, kind))
+-- Shows the cracks of `modules` on the panel `isoObject` of kind, facing and material, keeping the
+-- snow it shows on top.
+local function showCracksOf(isoObject, kind, facing, material, modules)
+    local wanted = Sprites.crackOverlays(kind, facing, material, modules)
     local attached = isoObject:getAttachedAnimSprite()
     for i = 0, (attached and attached:size() or 0) - 1 do
         local name = attached:get(i):getName()
@@ -73,9 +76,19 @@ function PanelSource.showCracks(isoObject)
     RenewableEnergy.showOverlays(isoObject, isCrackOrSnow, wanted)
 end
 
+--- Shows a cracked glass over each of a placed panel's modules below Specs.crackedBelow and over
+--- none of the others, keeping the snow it shows on top, and sends the overlays to clients if
+--- they changed. Does nothing for an object that is no panel.
+function PanelSource.showCracks(isoObject)
+    local kind, facing, material = Sources.kindOf(isoObject)
+    if Sources.familyOf(kind) ~= "panel" then return end
+    showCracksOf(isoObject, kind, facing, material, PowerBank.modulesOf(isoObject, kind))
+end
+
 -- Snow cover after `hours` of the weather in `context`.
 local function updateSnow(source, hours, context)
-    if source.kind == "wall" then
+    local mount = Specs.mounts[source.kind]
+    if not mount.holdsSnow then
         source.snow = 0
         return
     end
@@ -88,23 +101,15 @@ local function updateSnow(source, hours, context)
     end
     local sun = context.irradiance(source.kind, source.facing) / Sun.FULL_SUN
     snow = snow - SNOW_SUN_MELT_PER_HOUR * sun * hours
-    if source.kind == "rack" and (context.airC > RACK_SHEDS_ABOVE_C or sun > 0) then
-        snow = snow - RACK_SHED_PER_HOUR * hours
+    if mount.shedsSnow and (context.airC > SHEDS_ABOVE_C or sun > 0) then
+        snow = snow - SHED_PER_HOUR * hours
     end
     source.snow = math.max(0, math.min(1, snow))
 end
 
--- The snow overlay of the panel's tile; none for an upright wall panel.
-local function snowOverlay(source)
-    if source.kind == "flat" then
-        return Sprites.snow.flat
-    end
-    local rack = source.kind == "rack" and Sprites.snow.rack[source.material]
-    return rack and rack[source.facing]
-end
-
 local function showSnow(object, source)
-    RenewableEnergy.showOverlay(object, Sprites.isSnow, source.snow >= SNOW_SHOWN and snowOverlay(source) or nil)
+    local shown = source.snow >= SNOW_SHOWN and Sprites.snowOverlay(source.kind, source.facing, source.material) or nil
+    RenewableEnergy.showOverlay(object, Sprites.isSnow, shown)
 end
 
 --- Someone swept the panel `source` (a bank's record), whose object is `object` when loaded.
@@ -157,12 +162,12 @@ end
 -- is the truth. Either way the tile shows the cracks the record now holds.
 local function syncModules(source, object)
     if source.modulesChanged then
-        PowerBank.writeModules(object, source.modules)
+        PanelSource.writeModules(object, source.modules)
         source.modulesChanged = nil
     else
         source.modules = PowerBank.modulesOf(object, source.kind)
     end
-    PanelSource.showCracks(object)
+    showCracksOf(object, source.kind, source.facing, source.material, source.modules)
 end
 
 -- Why a panel makes less than it would at its best in clear full sun: the biggest loss, if it
@@ -184,10 +189,23 @@ local function lowReason(source, inSlot, light, clearLight, condition, context)
     return reason
 end
 
---- A new panel's record: its mount's facing and material, no snow, and the modules it holds.
-function PanelSource.init(source, isoObject, facing, material)
-    source.facing, source.material, source.snow = facing, material, 0
-    source.modules = PowerBank.modulesOf(isoObject, source.kind)
+--- A newly connected panel's record: its mount's facing and material, no snow, and the modules
+--- it holds. Each module teaches a little the first time it is ever connected, and the module
+--- record keeps that, through moves between banks and with the module when it comes off its mount.
+function PanelSource.connect(player, source, isoObject, facing, material)
+    local modules = PowerBank.modulesOf(isoObject, source.kind)
+    local learned = 0
+    for _, module in ipairs(modules) do
+        if not module.connected then
+            module.connected = true
+            learned = learned + 1
+        end
+    end
+    if learned > 0 then
+        PanelSource.writeModules(isoObject, modules)
+        addXp(player, Perks.Electricity, Specs.connectXp * learned)
+    end
+    source.facing, source.material, source.snow, source.modules = facing, material, 0, modules
 end
 
 --- The panel's output over the pass, and why it is low.
@@ -206,7 +224,7 @@ function PanelSource.update(source, object, inSlot, hours, context)
     local clearLight = context.clearIrradiance(source.kind, source.facing)
     local now, best = moduleWatts(source)
     source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
-    source.fullSunPct = math.floor(100 * light * (1 - source.snow) / Sun.FULL_SUN + 0.5)
+    source.fullSunPct = RenewableEnergy.round(100 * light * (1 - source.snow) / Sun.FULL_SUN)
     source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
 end
 

@@ -64,15 +64,16 @@ function Battery.setFoundCharge(item)
 end
 
 --- The item in `container` with the lowest charge that isn't full, of those `accepts(item)`
---- takes, or nil. Any drainable item will do, a vanilla cell as well as a bank battery.
+--- takes, or nil. Any drainable item will do, a vanilla cell as well as a bank battery. Full is
+--- counted in whole uses: a full Base.Battery's 142 uses of 0.007 read 0.994 as a float.
 function Battery.emptiestIn(container, accepts)
     local emptiest, lowest
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        if accepts(item) then
+        if accepts(item) and item:getCurrentUses() < item:getMaxUses() then
             local charge = Battery.getCharge(item)
-            if charge < 1 and (not emptiest or charge < lowest) then
+            if not emptiest or charge < lowest then
                 emptiest, lowest = item, charge
             end
         end
@@ -95,6 +96,20 @@ end
 --- changed, so the caller knows to sync the item.
 function Battery.wear(item, fraction)
     return Wear.take(item, fraction * item:getConditionMax())
+end
+
+--- Wears every battery in `container` by one discharge `depth` deep (Battery.cycleWear, scaled by
+--- the Battery Wear option) and sends those whose condition changed. Authority only.
+function Battery.wearAll(container, depth)
+    local scale = Battery.wearScale()
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        local spec = Battery.spec(item)
+        if spec and Battery.wear(item, Battery.cycleWear(spec, depth) * scale) then
+            sendItemStats(item)
+        end
+    end
 end
 
 return Battery

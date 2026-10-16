@@ -24,22 +24,9 @@ GasHeater.REACH = 1
 GasHeater.LIGHT = "LightHeater"
 GasHeater.OFF = "HeaterOff"
 
--- In-game minutes each job takes, as long as lighting a lamp.
-GasHeater.MINUTES = {
-    [GasHeater.LIGHT] = 1,
-    [GasHeater.OFF] = 1,
-}
-
--- How each job looks (RenewableEnergyGasAction).
-GasHeater.LOOK = {
-    [GasHeater.LIGHT] = { doneSound = "CampfireLight" },
-}
-
 function GasHeater.isHeater(object)
     return Sprites.kindOf(Sprites.nameOf(object)) == "gasHeater"
 end
-
-GasHeater.isTarget = GasHeater.isHeater
 
 function GasHeater.isLit(object)
     return Sprites.nameOf(object) == Sprites.gasHeater.lit
@@ -76,9 +63,32 @@ function GasHeater.litHeaterFor(digester)
     end)
 end
 
+-- Every job, by name, as DigesterJobs.JOBS has them: minutes, as long as lighting a lamp;
+-- blocker(heater); materials; doneSound. `lit`: how it leaves the heater.
+GasHeater.JOBS = {
+    [GasHeater.LIGHT] = {
+        minutes = 1, lit = true, doneSound = "CampfireLight",
+        blocker = function(heater)
+            if GasHeater.isLit(heater) then
+                return "Tooltip_RenewableEnergy_HeaterLit"
+            end
+            local digester = GasHeater.digesterNear(heater)
+            local summary = digester and Digester.currentSummary(digester)
+            return not (summary and summary.gas > 0) and "Tooltip_RenewableEnergy_NoDigesterNear" or nil
+        end,
+        materials = { Materials.FIRE_STARTER },
+    },
+    [GasHeater.OFF] = {
+        minutes = 1, lit = false,
+        blocker = function(heater)
+            return not GasHeater.isLit(heater) and "Tooltip_RenewableEnergy_HeaterOut" or nil
+        end,
+    },
+}
+
 --- What `job` takes (RenewableEnergy.Materials).
 function GasHeater.materials(job)
-    return job == GasHeater.LIGHT and { Materials.FIRE_STARTER } or {}
+    return GasHeater.JOBS[job].materials or {}
 end
 
 --- What `job` takes of `character`, as needs (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).
@@ -86,31 +96,15 @@ function GasHeater.needs(character, job)
     return Materials.needs(character, GasHeater.materials(job))
 end
 
-function GasHeater.minutesFor(job)
-    return GasHeater.MINUTES[job]
-end
-
 --- The state of `heater` that refuses `job`, as a translation key, or nil.
 function GasHeater.blocker(job, heater)
-    if job == GasHeater.LIGHT then
-        if GasHeater.isLit(heater) then
-            return "Tooltip_RenewableEnergy_HeaterLit"
-        end
-        local digester = GasHeater.digesterNear(heater)
-        local summary = digester and Digester.currentSummary(digester)
-        if not (summary and summary.gas > 0) then
-            return "Tooltip_RenewableEnergy_NoDigesterNear"
-        end
-    elseif job == GasHeater.OFF then
-        return not GasHeater.isLit(heater) and "Tooltip_RenewableEnergy_HeaterOut" or nil
-    end
-    return nil
+    return GasHeater.JOBS[job].blocker(heater)
 end
 
 --- What refuses `character` doing `job` at `heater`: a blocker key, "short" when they lack a
 --- need, or nil.
 function GasHeater.refusal(character, job, heater)
-    if not (RenewableEnergy.onSquare(heater) and GasHeater.isHeater(heater) and GasHeater.MINUTES[job]) then
+    if not (RenewableEnergy.onSquare(heater) and GasHeater.isHeater(heater) and GasHeater.JOBS[job]) then
         return "Tooltip_RenewableEnergy_NoHeater"
     end
     return GasHeater.blocker(job, heater)

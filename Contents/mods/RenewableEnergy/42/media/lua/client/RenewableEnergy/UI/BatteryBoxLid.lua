@@ -26,17 +26,16 @@ local TEXTS = {
     IGUI_CloseTrunk = "IGUI_RenewableEnergy_CloseBatteryBox",
 }
 
---- Whether `part` is an arrow board's battery box lid. ArrowBoard is server Lua, which loads after
---- this file, so it is looked up only when a hook runs.
-function BatteryBoxLid.isLid(part)
+-- Whether `part` is an arrow board's battery box lid. ArrowBoard is server Lua, which loads after
+-- this file, so it is looked up only when a hook runs.
+local function isLid(part)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     return part ~= nil and part:getId() == ArrowBoard.LID and ArrowBoard.isTrailer(part:getVehicle())
 end
 
---- The text `part` shows where vanilla shows `key`'s: the box's words for the arrow board's lid,
---- else vanilla's.
-function BatteryBoxLid.text(part, key)
-    return getText(BatteryBoxLid.isLid(part) and TEXTS[key] or key)
+-- The lid's words where vanilla shows `key`'s.
+local function lidText(key)
+    return getText(TEXTS[key])
 end
 
 -- Cut Padlock --------------------------------------------------------------------------------------
@@ -47,7 +46,7 @@ BatteryBoxLid.CUTTERS = "Base.BoltCutters"
 --- The bolt cutters `character` would cut the lid's padlock with, those in hand first, or nil when
 --- there is no padlock to cut or no working pair to cut it with.
 function BatteryBoxLid.padlockCutters(character, lid)
-    if not (BatteryBoxLid.isLid(lid) and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
+    if not (isLid(lid) and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
         return nil
     end
     local held = character:getPrimaryHandItem()
@@ -116,9 +115,9 @@ function ISVehicleMenu.showRadialMenuOutside(playerObj)
     local lid
     for i, slice in ipairs(menu.slices) do
         local command, part = slice.command[1], slice.command[3]
-        if (command == ISVehicleMenu.onOpenDoor or command == ISVehicleMenu.onCloseDoor) and BatteryBoxLid.isLid(part) then
+        if (command == ISVehicleMenu.onOpenDoor or command == ISVehicleMenu.onCloseDoor) and isLid(part) then
             lid = part
-            menu:setSliceText(i, BatteryBoxLid.text(part, command == ISVehicleMenu.onOpenDoor and "IGUI_OpenTrunk" or "IGUI_CloseTrunk"))
+            menu:setSliceText(i, lidText(command == ISVehicleMenu.onOpenDoor and "IGUI_OpenTrunk" or "IGUI_CloseTrunk"))
         end
     end
     addSwitchSlice(menu, playerObj)
@@ -142,8 +141,8 @@ function ISButtonPrompt:testInteractButtonAction(dir)
     vanillaTestInteractButtonAction(self, dir)
     local opens = self.aFunc == ISButtonPrompt.cmdOpenVehicleDoor
     local part = self.aParams and self.aParams[2]
-    if (opens or self.aFunc == ISButtonPrompt.cmdCloseVehicleDoor) and BatteryBoxLid.isLid(part) then
-        self.aPrompt = BatteryBoxLid.text(part, opens and "IGUI_OpenTrunk" or "IGUI_CloseTrunk")
+    if (opens or self.aFunc == ISButtonPrompt.cmdCloseVehicleDoor) and isLid(part) then
+        self.aPrompt = lidText(opens and "IGUI_OpenTrunk" or "IGUI_CloseTrunk")
     end
 end
 
@@ -159,8 +158,8 @@ end
 function CloseTrunk:getControl()
     local control = vanillaCloseTrunkControl(self)
     local lid = handlerLid(self)
-    if BatteryBoxLid.isLid(lid) then
-        control = self:getButtonControl(BatteryBoxLid.text(lid, "IGUI_CloseTrunk"))
+    if isLid(lid) then
+        control = self:getButtonControl(lidText("IGUI_CloseTrunk"))
     end
     return control
 end
@@ -168,9 +167,9 @@ end
 function CloseTrunk:handleJoypadContextMenu(context)
     vanillaCloseTrunkJoypadMenu(self, context)
     local lid = handlerLid(self)
-    local option = BatteryBoxLid.isLid(lid) and context:getOptionFromName(getText("IGUI_CloseTrunk"))
+    local option = isLid(lid) and context:getOptionFromName(getText("IGUI_CloseTrunk"))
     if option then
-        option.name = BatteryBoxLid.text(lid, "IGUI_CloseTrunk")
+        option.name = lidText("IGUI_CloseTrunk")
         context:setWidth(context:calcWidth())
     end
 end
@@ -188,8 +187,8 @@ function ISVehicleMechanics:initParts()
     for _, list in ipairs({ self.listbox, self.bodyworklist }) do
         for _, row in ipairs(list.items) do
             local part = row.item.part
-            if BatteryBoxLid.isLid(part) then
-                row.item.name = BatteryBoxLid.text(part, "IGUI_VehiclePart" .. part:getId())
+            if isLid(part) then
+                row.item.name = lidText("IGUI_VehiclePart" .. part:getId())
                 row.text = row.item.name
             end
         end
@@ -207,7 +206,7 @@ local vanillaUnlockStop = ISUnlockVehicleDoor.stop
 -- (HaloTextHelper.addBadText, as ISVehiclePartMenu does for a fuel inlet out of reach).
 function ISUnlockVehicleDoor:stop()
     vanillaUnlockStop(self)
-    if BatteryBoxLid.isLid(self.part) and RenewableEnergy.ArrowBoard.isPadlocked(self.part) then
+    if isLid(self.part) and RenewableEnergy.ArrowBoard.isPadlocked(self.part) then
         HaloTextHelper.addBadText(self.character, getText("IGUI_RenewableEnergy_BoxLocked"))
     end
 end
@@ -222,7 +221,7 @@ local vanillaSelectContainer = ISOpenVehicleDoor.selectContainerInLootWindow
 -- conditions. Vanilla calls this from complete(), and returns at once on a server, so a
 -- multiplayer client's loot window never jumps, to a trunk or to the box.
 function ISOpenVehicleDoor:selectContainerInLootWindow()
-    if not BatteryBoxLid.isLid(self.part) then
+    if not isLid(self.part) then
         return vanillaSelectContainer(self)
     end
     local vehicle, box = self.vehicle, RenewableEnergy.ArrowBoard.BATTERY_BOX

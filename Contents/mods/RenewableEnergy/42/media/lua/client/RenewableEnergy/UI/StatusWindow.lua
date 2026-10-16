@@ -1,10 +1,11 @@
 -- The battery bank's status window. It draws the status the server sends to the players watching
 -- the bank, which it does while the window is open, so it reads the same in single player and
--- multiplayer. Clicking a source's row highlights that source in the world.
+-- multiplayer. Clicking a source's row highlights that source in the world. Its Turn On/Off and
+-- Rename buttons queue the menu's jobs (RenewableEnergy.Menu), which requires this file for its
+-- Status option, so they look Menu up when clicked.
 
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
-require "ISUI/ISTextBox"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -34,7 +35,7 @@ local MORE_LINE = 1
 local HIGHLIGHT_MS = 5000
 
 -- One window per local player.
-StatusWindow.windows = {}
+local windows = {}
 
 local COLORS = {
     text = { r = 1, g = 1, b = 1 },
@@ -190,8 +191,8 @@ local LOAD_KINDS = {
     other = "IGUI_RenewableEnergy_LoadOther",
 }
 
---- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`.
-function StatusWindow.loadLabel(entry)
+-- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`.
+local function loadLabel(entry)
     local name = getText(LOAD_KINDS[entry.kind] or LOAD_KINDS.other)
     if entry.count > 1 then
         return getText("IGUI_RenewableEnergy_LoadCount", name, entry.count)
@@ -206,7 +207,7 @@ local function loadRows(rows, status)
         return
     end
     for _, entry in ipairs(status.loadByKind) do
-        row(rows, StatusWindow.loadLabel(entry), Format.watts(entry.watts))
+        row(rows, loadLabel(entry), Format.watts(entry.watts))
     end
 end
 
@@ -227,9 +228,9 @@ local CHARGING_FROM = {
     generator = "IGUI_RenewableEnergy_ChargingFromGenerator",
 }
 
---- "84%, working" or "0%, broken": a part from Bank status `inverters`, `controllers` or
---- `chargers`, and its color.
-function StatusWindow.partValue(part)
+-- "84%, working" or "0%, broken": a part from Bank status `inverters`, `controllers` or
+-- `chargers`, and its color.
+local function partValue(part)
     local condition = Format.condition(part.type, part.condition)
     if not part.working then
         return getText("IGUI_RenewableEnergy_PartBroken", condition), "bad"
@@ -244,7 +245,7 @@ local function partRows(rows, status)
     local count = 0
     for _, list in ipairs({ status.inverters, status.controllers, status.chargers }) do
         for _, part in ipairs(list) do
-            row(rows, getItemNameFromFullType(part.type), StatusWindow.partValue(part))
+            row(rows, getItemNameFromFullType(part.type), partValue(part))
             count = count + 1
         end
     end
@@ -264,8 +265,8 @@ local function batteryRepair(condition)
     end
 end
 
---- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
-function StatusWindow.batteryValue(battery)
+-- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
+local function batteryValue(battery)
     local charge, condition = Format.percent(battery.charge), Format.condition(battery.fullType, battery.condition)
     local repair = batteryRepair(battery.condition)
     if repair then
@@ -277,7 +278,7 @@ end
 local function batteryRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Batteries", #status.batteries)
     for _, battery in ipairs(status.batteries) do
-        row(rows, getItemNameFromFullType(battery.fullType), StatusWindow.batteryValue(battery), battery.condition <= 0 and "bad" or nil)
+        row(rows, getItemNameFromFullType(battery.fullType), batteryValue(battery), battery.condition <= 0 and "bad" or nil)
     end
 end
 
@@ -329,9 +330,9 @@ local OUTPUTS = {
     treadmill = function(source) return Format.watts(source.watts) end,
 }
 
---- "45 W, 64% sun, cloudy", "30 W, 25 km/h" or "75 W" for a source of the bank `status`, and its
---- color.
-function StatusWindow.sourceValue(source, status)
+-- "45 W, 64% sun, cloudy", "30 W, 25 km/h" or "75 W" for a source of the bank `status`, and its
+-- color.
+local function sourceValue(source, status)
     local value = OUTPUTS[Sources.familyOf(source.kind)](source, status)
     local reason = REASONS[source.reason]
     if not reason then
@@ -343,7 +344,7 @@ end
 local function sourceRows(rows, status, bank)
     header(rows, "IGUI_RenewableEnergy_Sources", #status.sources)
     for _, source in ipairs(status.sources) do
-        local value, colorName = StatusWindow.sourceValue(source, status)
+        local value, colorName = sourceValue(source, status)
         table.insert(rows, { label = StatusWindow.sourceLabel(source, bank), value = value, color = colorName, source = source })
     end
 end
@@ -447,45 +448,17 @@ function StatusWindow:createChildren()
     self.renameButton = addButton(self, getText("ContextMenu_RenewableEnergy_Rename"), StatusWindow.onRename)
 end
 
-local function queueAtBank(playerNum, bank, mode, bankName)
-    local character = getSpecificPlayer(playerNum)
-    if luautils.walkAdj(character, bank:getSquare(), true) then
-        ISTimedActionQueue.add(Action:new(character, mode, nil, bank, nil, nil, bankName))
-    end
-end
-
 function StatusWindow:onSwitch()
-    queueAtBank(self.playerNum, self.bank, self.status and self.status.on and Action.TURN_OFF or Action.TURN_ON)
-end
-
---- Asks a local player for a new name for `bank` and queues the renaming. An empty name gives
---- the bank back its tier's name.
-function StatusWindow.askName(playerNum, bank)
-    local summary = PowerBank.summaryOf(bank)
-    local modal = ISTextBox:new(0, 0, 280, 180, getText("IGUI_RenewableEnergy_NameThisBank"), summary and summary.name or "",
-        nil, StatusWindow.onNameEntered, playerNum, playerNum, bank)
-    modal:initialise()
-    modal:addToUIManager()
-    if JoypadState.players[playerNum + 1] then
-        setJoypadFocus(playerNum, modal)
-    end
-    return modal
-end
-
-function StatusWindow.onNameEntered(target, button, playerNum, bank)
-    if button.internal == "OK" then
-        queueAtBank(playerNum, bank, Action.RENAME, button.parent.entry:getText())
-    end
+    RenewableEnergy.Menu.queueBank(self.playerNum, self.status.on and Action.TURN_OFF or Action.TURN_ON, self.bank)
 end
 
 function StatusWindow:onRename()
-    StatusWindow.askName(self.playerNum, self.bank)
+    RenewableEnergy.Menu.askName(self.playerNum, self.bank)
 end
 
 -- Rebuilds the rows and the layout when a new snapshot arrives.
 function StatusWindow:setStatus(status)
     self.status = status
-    self.statusHour = status and status.hour
     if not status then
         self.summaryLines = {}
         self.left, self.right = { { label = getText("IGUI_RenewableEnergy_Waiting"), value = "", color = "dim" } }, {}
@@ -503,9 +476,13 @@ function StatusWindow:setStatus(status)
     local top = self:titleBarHeight() + PAD
     self.columnsTop = top + summary.height + (summary.height > 0 and PAD or 0)
     local buttonY = self.columnsTop + math.max(left.height, right.height) + PAD
-    self.switchButton:setTitle(getText(status and status.on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On"))
+    local on = status ~= nil and status.on == true
+    self.switchButton:setTitle(getText(on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On"))
     fitButton(self.switchButton, PAD, buttonY)
-    self.switchButton:setEnable(status ~= nil and (status.on or status.limitW > 0))
+    -- Greyed and explained as the menu's Turn On is.
+    local refusal = status and PowerBank.switchRefusal(status, not on)
+    self.switchButton:setEnable(status ~= nil and not refusal)
+    self.switchButton:setTooltip(refusal and getText(refusal) or nil)
     fitButton(self.renameButton, PAD + self.switchButton:getWidth() + BUTTON_GAP, buttonY)
     self.renameButton:setEnable(status ~= nil)
 
@@ -562,16 +539,17 @@ function StatusWindow:onMouseDown(x, y)
 end
 
 function StatusWindow:prerender()
-    -- -1: the bank is on no square any more (IsoObject.getObjectIndex), picked up or destroyed.
-    if self.bank:getObjectIndex() == -1 then
+    -- Picked up or destroyed.
+    if not RenewableEnergy.onSquare(self.bank) then
         self:close()
         return
     end
     if self.highlight and getTimestampMs() >= self.highlight.untilMs then
         self:clearHighlight()
     end
+    -- Every snapshot is a new table (Bank:sendStatus, ClientBankSystem's OnServerCommand).
     local status = PowerBank.statusOf(self.bank)
-    if status ~= self.status or (status and status.hour ~= self.statusHour) or not self.left then
+    if status ~= self.status or not self.left then
         self:setStatus(status)
     end
     ISCollapsableWindow.prerender(self)
@@ -630,7 +608,7 @@ end
 function StatusWindow:close()
     self:clearHighlight()
     self:removeFromUIManager()
-    StatusWindow.windows[self.playerNum] = nil
+    windows[self.playerNum] = nil
     PowerBank.unwatchStatus(getSpecificPlayer(self.playerNum), self.bank)
     if JoypadState.players[self.playerNum + 1] then
         setPrevFocusForPlayer(self.playerNum)
@@ -658,7 +636,7 @@ end
 --- Opens the status window of `bank` (the bank's IsoGenerator) for a local player, replacing
 --- the one already open, and watches the bank's status until it closes.
 function StatusWindow.open(playerNum, bank)
-    local open = StatusWindow.windows[playerNum]
+    local open = windows[playerNum]
     local x, y = getPlayerScreenLeft(playerNum) + 100, getPlayerScreenTop(playerNum) + 100
     if open then
         x, y = open:getX(), open:getY()
@@ -667,7 +645,7 @@ function StatusWindow.open(playerNum, bank)
     local window = StatusWindow:new(x, y, playerNum, bank)
     window:initialise()
     window:addToUIManager()
-    StatusWindow.windows[playerNum] = window
+    windows[playerNum] = window
     PowerBank.watchStatus(getSpecificPlayer(playerNum), bank)
     if JoypadState.players[playerNum + 1] then
         setJoypadFocus(playerNum, window)

@@ -1,14 +1,16 @@
-require "RenewableEnergy/Gadgets/SolarMaintainer"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/World/ArrowBoard"
-
 -- Runs the small solar gadgets and the arrow board trailers' panels, on the authority: single
 -- player or the server. Only loaded vehicles, chargers and garden lights run, as vanilla's own
 -- battery chargers do.
 if isClient() then
     return
 end
+
+require "RenewableEnergy/Sun"
+require "RenewableEnergy/Gadgets/SolarMaintainerServer"
+require "RenewableEnergy/Gadgets/SolarCellChargerServer"
+require "RenewableEnergy/Gadgets/SolarGardenLightServer"
+require "RenewableEnergy/World/ArrowBoard"
+require "RenewableEnergy/World/ArrowBoardPower"
 
 RenewableEnergy = RenewableEnergy or {}
 local GadgetCharging = {}

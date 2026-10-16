@@ -28,12 +28,22 @@ function SummaryWindow.row(rows, key, value, color)
     table.insert(rows, { label = getText(key), value = value, color = color or "text" })
 end
 
+-- The rows are laid out again only when the summary changed. A summary read is a fresh copy with
+-- what the object's containers hold now (RenewableEnergy.GlobalObjects), so it is compared by value.
 function SummaryWindow:prerender()
     local summary = self:summaryNow()
     if not summary or not RenewableEnergy.onSquare(self.object) then
         self:close()
         return
     end
+    if not RenewableEnergy.sameValue(summary, self.summary) then
+        self.summary = summary
+        self:layOut(summary)
+    end
+    ISCollapsableWindow.prerender(self)
+end
+
+function SummaryWindow:layOut(summary)
     self.title = self:titleOf(summary)
     local rows = self:rowsOf(summary)
     local font = UIFont.Small
@@ -44,13 +54,9 @@ function SummaryWindow:prerender()
         labelWidth = math.max(labelWidth, getTextManager():MeasureStringX(font, row.label))
         valueWidth = math.max(valueWidth, getTextManager():MeasureStringX(font, row.value))
     end
-    local width = math.max(WIDTH, PAD * 2 + labelWidth + LABEL_GAP + valueWidth)
-    if self:getHeight() ~= height or self:getWidth() ~= width then
-        self:setHeight(height)
-        self:setWidth(width)
-    end
+    self:setHeight(height)
+    self:setWidth(math.max(WIDTH, PAD * 2 + labelWidth + LABEL_GAP + valueWidth))
     self.rowsToDraw, self.lineHeight, self.labelWidth = rows, lineHeight, labelWidth
-    ISCollapsableWindow.prerender(self)
 end
 
 function SummaryWindow:render()

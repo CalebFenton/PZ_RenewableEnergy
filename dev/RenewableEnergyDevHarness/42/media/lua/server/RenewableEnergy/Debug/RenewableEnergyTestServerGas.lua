@@ -45,13 +45,13 @@ handler("generatorRead", function(player, args)
     }
 end)
 
--- Sets the generator's fuel (`args.fuel`, as pouring petrol in does) and switches it on or off
--- (`args.running`), as a player does.
+-- Pours `args.pour` litres into the generator at x, y, z, as a player pouring petrol does (onto
+-- whatever it shows), and switches it on or off (`args.running`), as a player does.
 handler("generatorSet", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
-    if args.fuel then
-        generator:setFuel(args.fuel)
+    if args.pour then
+        generator:setFuel(math.min(generator:getMaxFuel(), generator:getFuel() + args.pour))
     end
     if args.running ~= nil then
         generator:setActivated(args.running)
@@ -59,14 +59,30 @@ handler("generatorSet", function(player, args)
     return {}
 end)
 
--- Runs the gas pass as though `args.hours` had passed since the last of the generator at x, y, z.
-handler("gasPass", function(player, args)
+-- Sets the last pass of the kitted generator at x, y, z `args.hours` ago, as though that time had
+-- passed since. Answers what is missing, or nil.
+local function age(args)
     local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
+    if not generator then return missing end
     local state = RenewableEnergy.GasKit.stateOf(generator)
-    if state then
-        state.lastHour = getGameTime():getWorldAgeHours() - args.hours
-    end
+    if not state then return "a kit on the generator at " .. args.x .. "," .. args.y end
+    state.lastHour = getGameTime():getWorldAgeHours() - args.hours
+    return nil
+end
+
+-- `args.hours` since the last pass of the generator at x, y, z, without running one: the next pass
+-- or job bills them.
+handler("gasAge", function(player, args)
+    local missing = age(args)
+    if missing then return nil, missing end
+    return {}
+end)
+
+-- Runs the gas pass as though `args.hours` had passed since the last of the generator at x, y, z,
+-- or, without `args.hours`, from its last pass as it stands.
+handler("gasPass", function(player, args)
+    local missing = args.hours and age(args)
+    if missing then return nil, missing end
     RenewableEnergy.GasLines.updateAll()
     return {}
 end)

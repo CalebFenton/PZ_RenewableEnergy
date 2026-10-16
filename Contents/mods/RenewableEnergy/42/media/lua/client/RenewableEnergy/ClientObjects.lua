@@ -43,10 +43,11 @@ function ClientObjects.adopt(sprites, isObject, adoptCopy, adoptContainer)
     end)
 end
 
---- Defines and registers the client system of a feature the authority keeps with
---- RenewableEnergy.ObjectSystem.define, of the same `spec.name`, `kind`, `owner` (whose
---- clientSystem it sets, for GlobalObjects' accessors) and `isObject`, and adopts its copies
---- (ClientObjects.adopt) with `spec.adoptCopy` and `spec.adoptContainer`.
+--- Defines and registers the client system of a feature the authority keeps in a Global Object
+--- System of the same `spec.name`: `owner` (its shared module, with SYSTEM_NAME; it gets
+--- clientSystem, for GlobalObjects' accessors) and `isObject`, and adopts the copies of its tiles,
+--- whose sprite names are `spec.sprites` (ClientObjects.adopt), with `spec.adoptCopy` and
+--- `spec.adoptContainer`. Returns the system class.
 function ClientObjects.define(spec)
     local ClientObject = CGlobalObject:derive("RenewableEnergy_Client" .. spec.name)
     local System = CGlobalObjectSystem:derive("RenewableEnergy_Client" .. spec.name .. "System")
@@ -72,7 +73,7 @@ function ClientObjects.define(spec)
     end
 
     CGlobalObjectSystem.RegisterSystemClass(System)
-    ClientObjects.adopt(Sprites.namesOf(spec.kind), spec.isObject, spec.adoptCopy, spec.adoptContainer)
+    ClientObjects.adopt(spec.sprites, spec.isObject, spec.adoptCopy, spec.adoptContainer)
     return System
 end
 

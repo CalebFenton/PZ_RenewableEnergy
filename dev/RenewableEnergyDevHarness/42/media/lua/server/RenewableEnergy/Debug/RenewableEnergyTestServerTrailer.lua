@@ -128,14 +128,12 @@ local function partState(vehicle, partId)
 end
 
 --- What the tests read of a vehicle on either side: each panel's module, condition and shown
---- models, the frame's parts and the lamp board, what the battery box holds, the lid, the switch,
---- the lamps and whether this side's copy shows them lit this moment (windowLights), the towing
---- car's id and where the vehicle is.
+--- models, the frame's parts and the lamp board, the blood on each side, what the battery box
+--- holds, the lid, the switch, the lamps, the towing car's id, the colour and where the vehicle is.
 function Trailer.vehicleState(vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local state = {
-        id = vehicle:getId(), x = vehicle:getX(), y = vehicle:getY(), atRest = vehicle:isAtRest(),
-        up = vehicle:getUpVectorDot(), panels = {}, frame = {}, blood = {},
+        id = vehicle:getId(), x = vehicle:getX(), y = vehicle:getY(), panels = {}, frame = {}, blood = {},
         towedBy = vehicle:getVehicleTowedBy() and vehicle:getVehicleTowedBy():getId() or nil,
         colorSat = vehicle:getColorSaturation(), colorVal = vehicle:getColorValue(),
     }
@@ -160,7 +158,7 @@ function Trailer.vehicleState(vehicle)
         local items = container:getItems()
         for i = 0, items:size() - 1 do
             local item = items:get(i)
-            table.insert(state.box.items, { type = item:getFullType(), id = item:getID(), condition = item:getCondition(),
+            table.insert(state.box.items, { type = item:getFullType(), condition = item:getCondition(),
                 charge = RenewableEnergy.Battery.isBattery(item) and RenewableEnergy.Battery.getCharge(item) or nil })
         end
     end
@@ -173,7 +171,6 @@ function Trailer.vehicleState(vehicle)
     end
     state.switchOn = ArrowBoard.isSwitchedOn(vehicle)
     state.lamps = ArrowBoard.lamps(vehicle)
-    state.windowLights = vehicle:getWindowLightsOn()
     return state
 end
 
@@ -309,13 +306,14 @@ onVehicle("arrowBoardSwitchRolls", function(vehicle, args, _, defer)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local modData = box:getModData()
-    local own, on = modData.RenewableEnergy_switchOn, 0
+    local key = ArrowBoard.SWITCH_KEY
+    local own, on = modData[key], 0
     local restore = deferOnce(defer, function()
-        modData.RenewableEnergy_switchOn = own
+        modData[key] = own
         vehicle:transmitPartModData(box)
     end)
     for _ = 1, args.rolls do
-        modData.RenewableEnergy_switchOn = nil
+        modData[key] = nil
         ArrowBoard.rollSwitch(vehicle)
         if ArrowBoard.isSwitchedOn(vehicle) then
             on = on + 1
@@ -365,7 +363,7 @@ onVehicle("arrowBoardOldPanels", function(vehicle)
         end
     end
     empty()
-    vehicle:getModData().RenewableEnergy_panelsStocked = nil
+    vehicle:getModData()[ArrowBoard.PANELS_STOCKED] = nil
     load()
     local first = Trailer.vehicleState(vehicle)
     empty()

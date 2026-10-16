@@ -167,7 +167,7 @@ test("renewable_energy_wind_propeller_storm_and_blades", {
             T.bankPass(self, bank, 0, { windKph = spec.breakKph })
             T.step(function() self.storm = bank.state end)
         end)
-        T.waitForCopy(function() return Wind.isBroken(self.left.object) end, "this client's copy of the broken blades")
+        T.waitFor(self, function() return Wind.isBroken(self.left.object) end, "this client's copy of the broken blades")
         T.step(function()
             local menu, context = T.worldSubmenu(self.left.object, RenewableEnergy.Menu.nameOf(self.left.object))
             local option = menu and menu:getOptionFromName(getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
@@ -179,7 +179,7 @@ test("renewable_energy_wind_propeller_storm_and_blades", {
             return RenewableEnergyAction:new(T.player(), RenewableEnergyAction.REPLACE_BLADES, self.left.object,
                 nil, nil, self.items.blades[1])
         end)
-        T.waitForCopy(function() return not Wind.isBroken(self.left.object) end, "this client's copy of the new blades")
+        T.waitFor(self, function() return not Wind.isBroken(self.left.object) end, "this client's copy of the new blades")
         T.batch(function()
             T.server(self, "carried", { types = { "RenewableEnergy.WoodenBlades" } })
             T.bankPass(self, bank, 0, { windKph = 30 })
@@ -215,16 +215,20 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
     run = function(self)
         local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
         if not box then return end
-        self.panel = T.panel(self, Sprites.flat, { near = box, connect = true })
-        self.scoop = T.panel(self, Sprites.windScoop, { near = box, connect = true })
-        self.refused = T.panel(self, Sprites.windAlternator.N, { near = box, connect = true })
-        T.bankState(self, box)
-        T.step(function() self.box = box.state end)
+        T.batch(function()
+            self.panel = T.panel(self, Sprites.flat, { near = box, connect = true })
+            self.scoop = T.panel(self, Sprites.windScoop, { near = box, connect = true })
+            self.refused = T.panel(self, Sprites.windAlternator.N, { near = box, connect = true })
+            T.bankState(self, box)
+            T.step(function() self.box = box.state end)
+        end)
         local rack = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
         if not rack then return end
-        self.alternator = T.panel(self, Sprites.windAlternator.E, { near = rack, connect = true })
-        self.after = T.panel(self, Sprites.flat, { near = rack, connect = true })
-        if not (self.alternator and self.after) then return end
+        T.batch(function()
+            self.alternator = T.panel(self, Sprites.windAlternator.E, { near = rack, connect = true })
+            self.after = T.panel(self, Sprites.flat, { near = rack, connect = true })
+        end)
+        if not (self.panel and self.scoop and self.refused and self.alternator and self.after) then return end
         local spec = Specs.wind.turbines.alternator
         self.passes = {}
         local function pass(label, kph, light)

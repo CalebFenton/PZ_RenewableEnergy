@@ -6,6 +6,10 @@ require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/StashHouses"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/ArrowBoard"
+require "RenewableEnergy/World/ArrowBoardPower"
+require "RenewableEnergy/Gadgets/SolarMaintainer"
+require "RenewableEnergy/Gadgets/SolarCellCharger"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 
 -- Where the mod's items spawn, 1993 style. Distributions.items lists every entry; apply() puts
 -- them into the game's loot tables in OnInitGlobalModData, scaled by the save's loot rarity
@@ -18,7 +22,7 @@ RenewableEnergy.Distributions = Distributions
 local subDist = SuburbsDistributions
 local procLists = ProceduralDistributions.list
 local vehDist = VehicleDistributions
-local Battery = RenewableEnergy.Battery
+local Battery, Specs = RenewableEnergy.Battery, RenewableEnergy.Specs
 local Stash = RenewableEnergy.Stash
 local WorldSpawns = RenewableEnergy.WorldSpawns
 local ArrowBoard = RenewableEnergy.ArrowBoard
@@ -60,7 +64,7 @@ procLists.RenewableEnergyBatteryStock = {
 local OWN_CONTAINER_TYPES = {
     "RenewableEnergyBatteryBoxWood", "RenewableEnergyBatteryBoxMetal", "RenewableEnergyBatteryRackWood",
     "RenewableEnergyBatteryRackMetal", "RenewableEnergyBatteryBankWood", "RenewableEnergyBatteryBankMetal",
-    "RenewableEnergyCellCharger", "RenewableEnergySolarBox",
+    "RenewableEnergyCellCharger", Stash.CRATE_TYPE,
 }
 for _, containerType in ipairs(OWN_CONTAINER_TYPES) do
     subDist.all[containerType] = { rolls = 0, items = {} }
@@ -69,15 +73,16 @@ end
 -- The spawn table of the mod's stash houses (StashHouses.lua). StashSystem.doBuildingStash
 -- refills each container of the house whose type is a key here; the house's other containers keep
 -- the loot of their own rooms. The crate the stash places rolls the kit's lists, more times.
-subDist.RenewableEnergyStashCache = copyTable(subDist.electronicsstorage)
-subDist.RenewableEnergyStashCache.RenewableEnergySolarBox = {
+local stashCache = copyTable(subDist.electronicsstorage)
+subDist[Stash.SPAWN_TABLE] = stashCache
+stashCache[Stash.CRATE_TYPE] = {
     rolls = 24,
     ignoreZombieDensity = true,
     items = procLists.RenewableEnergySolarKit.items,
     junk = procLists.RenewableEnergySolarKit.junk,
 }
-subDist.RenewableEnergyStashCache.crate = { procedural = true, procList = {} }
-subDist.RenewableEnergyStashCache.metal_shelves = { procedural = true, procList = {} }
+stashCache.crate = { procedural = true, procList = {} }
+stashCache.metal_shelves = { procedural = true, procList = {} }
 
 -- Rooms that pick the kit or the battery stock. Rooms whose only vanilla entry has no weightChance
 -- (it counts as 1) are left out, because any entry added there would take half the picks.
@@ -99,9 +104,9 @@ local ROOM_PICKS = {
     { "SafehouseLoot", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
     { "SafehouseLoot_Mid", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
     { "SafehouseLoot_Late", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
-    { "RenewableEnergyStashCache", "crate", pick("RenewableEnergySolarKit", 25, 3) },
-    { "RenewableEnergyStashCache", "crate", pick("RenewableEnergyBatteryStock", 10) },
-    { "RenewableEnergyStashCache", "metal_shelves", pick("RenewableEnergySolarKit", 20, 3) },
+    { Stash.SPAWN_TABLE, "crate", pick("RenewableEnergySolarKit", 25, 3) },
+    { Stash.SPAWN_TABLE, "crate", pick("RenewableEnergyBatteryStock", 10) },
+    { Stash.SPAWN_TABLE, "metal_shelves", pick("RenewableEnergySolarKit", 20, 3) },
 }
 for _, roomPick in ipairs(ROOM_PICKS) do
     local room = subDist[roomPick[1]]
@@ -286,7 +291,7 @@ Distributions.items = {
         }),
     },
     {
-        fullType = "RenewableEnergy.SolarMaintainer",
+        fullType = RenewableEnergy.SolarMaintainer.ITEM,
         option = "LRMMisc",
         entries = with(1, SURVIVOR_CRATES, {
             -- Kept on the batteries of RVs, boats and seasonal tractors.
@@ -309,7 +314,7 @@ Distributions.items = {
         }),
     },
     {
-        fullType = "RenewableEnergy.SolarCellCharger",
+        fullType = RenewableEnergy.SolarCellCharger.ITEM,
         option = "LRMMisc",
         entries = with(1.5, SURVIVOR_CRATES, {
             { 2, "proc:ElectronicStoreMisc" },
@@ -328,7 +333,7 @@ Distributions.items = {
     {
         -- Sold by the boxful at garden centres and hardware stores in the early 1990s, and
         -- put away in sheds and garages once their batteries died.
-        fullType = "RenewableEnergy.SolarGardenLight",
+        fullType = RenewableEnergy.SolarGardenLight.ITEM,
         option = "LRMMisc",
         entries = {
             { 6, "proc:GardenStoreMisc" },
@@ -418,7 +423,7 @@ Distributions.items = {
         }))),
     },
     {
-        fullType = "RenewableEnergy.SolarModule",
+        fullType = Specs.factoryModule,
         option = "LRMSolarPanels",
         entries = with(2, SURVIVOR_CRATES, {
             -- RV roofs, installers' stock, preppers, telecom repeaters and arrow boards.
@@ -555,29 +560,48 @@ Distributions.items = {
 
 -- Applying ---------------------------------------------------------------------------------------
 
+-- The items-list holder each prefix of a list reference names, by the name after the prefix.
+local LIST_HOLDERS = {
+    -- A ProceduralDistributions list, or "<list>.junk" for its junk.
+    proc = function(name)
+        local listName = string.match(name, "^([^.]+)%.junk$")
+        if listName then
+            return procLists[listName] and procLists[listName].junk
+        end
+        return procLists[name]
+    end,
+    veh = function(name)
+        return vehDist[name]
+    end,
+    -- A dotted path into SuburbsDistributions.
+    sub = function(name)
+        local holder = subDist
+        for part in string.gmatch(name, "[^.]+") do
+            holder = type(holder) == "table" and holder[part] or nil
+        end
+        return holder
+    end,
+}
+
+--- The loot table a "proc:", "veh:" or "sub:" name refers to, the one whose `items` the name's
+--- entries go into ("proc:<list>.junk": the list's junk table), or nil if the game has no such
+--- table.
+---@param reference string
+---@return table?
+function Distributions.resolveTable(reference)
+    local prefix, name = string.match(reference, "^(%a+):(.+)$")
+    local holderOf = LIST_HOLDERS[prefix]
+    local holder = holderOf and holderOf(name)
+    return type(holder) == "table" and holder or nil
+end
+
 --- The items list a "proc:", "veh:" or "sub:" name refers to, or nil if the game has no such
 --- list.
 ---@param reference string
 ---@return table?
 function Distributions.resolveItemList(reference)
-    local kind, name = string.match(reference, "^(%a+):(.+)$")
-    local list
-    if kind == "proc" then
-        local listName = string.match(name, "^([^.]+)%.junk$")
-        if listName then
-            list = procLists[listName] and procLists[listName].junk
-        else
-            list = procLists[name]
-        end
-    elseif kind == "veh" then
-        list = vehDist[name]
-    elseif kind == "sub" then
-        list = subDist
-        for part in string.gmatch(name, "[^.]+") do
-            list = type(list) == "table" and list[part] or nil
-        end
-    end
-    return type(list) == "table" and list.items or nil
+    local holder = Distributions.resolveTable(reference)
+    return holder and holder.items or nil
 end
 
 -- Items lists are flat name, weight pairs.
@@ -689,7 +713,7 @@ end
 
 --- The chance that a container of this weight gets a cracked module, at the save's options.
 function Distributions.crackedModuleChance(weight)
-    local multiplier = ItemPickerJava.getLootModifier(RenewableEnergy.Specs.factoryModule)
+    local multiplier = ItemPickerJava.getLootModifier(Specs.factoryModule)
     return weight * multiplier * SandboxVars.RenewableEnergy.LRMSolarPanels / 100
 end
 

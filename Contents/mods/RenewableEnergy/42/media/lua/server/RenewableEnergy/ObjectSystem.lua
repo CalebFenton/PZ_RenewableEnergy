@@ -31,10 +31,6 @@ local LONGEST_PASS = 24 * 7
 local Object = SGlobalObject:derive("RenewableEnergy_Object")
 ObjectSystem.Object = Object
 
-function Object:new(luaSystem, globalObject)
-    return SGlobalObject.new(self, luaSystem, globalObject)
-end
-
 --- What the record goes by in session-only services (Stink, Fumes).
 function Object:key()
     return self.luaSystem.kind .. ":" .. self.x .. "," .. self.y .. "," .. self.z
@@ -84,7 +80,7 @@ end
 --- Defines and registers a feature's system. `spec`: name (the class is RenewableEnergy_<name>System),
 --- kind (its tiles' Sprites kind), owner (its shared module: SYSTEM_NAME, TIERS, and the
 --- accessors of GlobalObjects.addAccessors), Object (its record class), isObject(isoObject).
---- Returns the class, whose OnCreate(params) is the build menu's for its tiles.
+--- Returns the class, whose System.OnCreate(params) is the build menu's for its tiles.
 function ObjectSystem.define(spec)
     local System = SGlobalObjectSystem:derive("RenewableEnergy_" .. spec.name .. "System")
     System.kind, System.owner = spec.kind, spec.owner
@@ -126,7 +122,8 @@ function ObjectSystem.define(spec)
         end
     end
 
-    function System.updateAll()
+    -- Every record, loaded or not, each ten minutes.
+    local function updateAll()
         local self = System.instance
         for i = 1, self:getLuaObjectCount() do
             self:getLuaObjectByIndex(i):update()
@@ -141,24 +138,24 @@ function ObjectSystem.define(spec)
     for _, name in ipairs(Sprites.namesOf(spec.kind)) do
         MapObjects.OnLoadWithSprite(name, load, Sprites.LOAD_PRIORITY)
     end
-    Events.EveryTenMinutes.Add(System.updateAll)
+    Events.EveryTenMinutes.Add(updateAll)
     SGlobalObjectSystem.RegisterSystemClass(System)
     return System
 end
 
 --- Does `job` for `character` at `isoObject`, on the authority, once the timed action that does it
 --- has finished: brings the record up to now, so the job works on what is there, checks the job
---- again (`Jobs.refusal`), does it (`apply(character, job, record, isoObject, item, other)`, which
---- returns whether it was done), then shows and tells. `owner` is the feature's shared module.
---- Returns whether it was done.
-function ObjectSystem.perform(owner, Jobs, apply, character, job, isoObject, item, other)
+--- again (`Jobs.refusal`), does it (`apply(character, job, record, isoObject, with)`, which returns
+--- whether it was done), then shows and tells. `owner` is the feature's shared module; `with` what
+--- the job works with (RenewableEnergyGasAction). Returns whether it was done.
+function ObjectSystem.perform(owner, Jobs, apply, character, job, isoObject, with)
     local record = isoObject and owner.recordOf(isoObject)
     if not record then
         return false
     end
     record:advance(record:elapsedHours())
-    local done = not Jobs.refusal(character, job, isoObject, item, other)
-        and apply(character, job, record, isoObject, item, other)
+    local done = not Jobs.refusal(character, job, isoObject, with)
+        and apply(character, job, record, isoObject, with)
     record:afterChange()
     return done == true
 end

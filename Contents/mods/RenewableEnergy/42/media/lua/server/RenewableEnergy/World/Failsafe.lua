@@ -28,7 +28,7 @@ local function moveToTop(failsafe)
 end
 
 local function onObjectAdded(isoObject)
-    if Sprites.kindOf(Sprites.nameOf(isoObject)) == "failsafe" then
+    if Sprites.nameOf(isoObject) == FAILSAFE then
         moveToTop(isoObject)
     end
 end

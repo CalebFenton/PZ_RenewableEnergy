@@ -39,8 +39,10 @@ Gasifier.KG_PER_KWH = 0.6
 -- Charcoal makes this share of wood's tar and ash.
 Gasifier.CHARCOAL_TAR = 0.25
 Gasifier.CHARCOAL_ASH = 0.5
--- A full ash pit, or a filter with no clean packing left, cuts what the generator carries to this
--- share; the tar a spent filter lets through wears the generator up to WEAR_DIRTY times as fast.
+-- A full ash pit (ASH_FULL percent), or a filter with no clean packing left, cuts what the
+-- generator carries to this share; the tar a spent filter lets through wears the generator up to
+-- WEAR_DIRTY times as fast.
+Gasifier.ASH_FULL = 100
 Gasifier.DIRTY_OUTPUT = 0.5
 Gasifier.WEAR_DIRTY = 3
 -- Out longer than this, a gasifier is cold, and lighting it takes bellows.
@@ -178,7 +180,7 @@ end
 --- and `clean` packing left in its filter: a full pit or a spent filter halves it.
 function Gasifier.outputShare(ash, clean)
     local share = 1
-    if ash >= 100 then
+    if ash >= Gasifier.ASH_FULL then
         share = share * Gasifier.DIRTY_OUTPUT
     end
     if clean == 0 then

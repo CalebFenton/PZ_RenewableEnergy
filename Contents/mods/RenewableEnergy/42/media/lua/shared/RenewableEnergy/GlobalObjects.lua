@@ -15,30 +15,24 @@ RenewableEnergy.GlobalObjects = GlobalObjects
 --- not, nil elsewhere;
 --- owner.currentSummary(isoObject), the summary as this side knows it: the authority builds it
 --- from its record, which a job may have changed since the last summary went out.
---- `decorate(summary, isoObject)`, if given, adds to each summary read what this side's copies of
---- the object's containers hold now. Every side has those copies, and the summary is only as
---- fresh as the authority's last pass, so values that follow from the containers aren't sent.
+--- `decorate(summary, isoObject)` adds to each summary read what this side's copies of the
+--- object's containers hold now. Every side has those copies, and the summary is only as fresh as
+--- the authority's last pass, so values that follow from the containers aren't sent.
 function GlobalObjects.addAccessors(owner, decorate)
-    local function decorated(summary, isoObject)
-        if summary and decorate then
-            decorate(summary, isoObject)
-        end
-        return summary
-    end
-
     function owner.summaryOf(isoObject)
         local system = owner.clientSystem
         local globalObject = system and system.system:getObjectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-        local summary = globalObject and globalObject:getModData().summary
-        if not (summary and decorate) then
-            return summary
+        local received = globalObject and globalObject:getModData().summary
+        if not received then
+            return nil
         end
         -- A copy: the received summary is the system's own table.
-        local copy = {}
-        for key, value in pairs(summary) do
-            copy[key] = value
+        local summary = {}
+        for key, value in pairs(received) do
+            summary[key] = value
         end
-        return decorated(copy, isoObject)
+        decorate(summary, isoObject)
+        return summary
     end
 
     function owner.recordAt(x, y, z)
@@ -52,10 +46,12 @@ function GlobalObjects.addAccessors(owner, decorate)
 
     function owner.currentSummary(isoObject)
         local record = owner.recordOf(isoObject)
-        if record then
-            return decorated(record:buildSummary(), isoObject)
+        if not record then
+            return owner.summaryOf(isoObject)
         end
-        return owner.summaryOf(isoObject)
+        local summary = record:buildSummary()
+        decorate(summary, isoObject)
+        return summary
     end
 end
 

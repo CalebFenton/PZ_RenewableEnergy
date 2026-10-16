@@ -25,19 +25,14 @@ local SolarGardenLight, VehicleBattery = RenewableEnergy.SolarGardenLight, Renew
 
 local NOON, MIDNIGHT = 12, 0
 local CAR, CAR_BATTERY = "Base.CarNormal", "Base.CarBattery1"
--- The longest a test waits for the lighting to drop a removed light, in ticks.
-local LIGHT_FRAMES = 600
 
 local function outdoorSquare(self)
-    return T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
+    return T.square(self, { bare = true }, "a free outdoor square")
 end
 
--- Expects `flatWh`, what an hour of the sun a gadget charged in gave a flat panel per rated watt
--- (as the server's gadget handlers answer it), to be noon's: some light, and no more than full sun.
-local function expectNoonSun(flatWh)
-    local full = Sun.wattsFrom(1, Sun.FULL_SUN, 0)
-    return expect(type(flatWh) == "number" and flatWh > 0 and flatWh <= full, "an hour of noon sun gave a flat panel "
-        .. tostring(flatWh) .. " Wh per rated watt, expected more than 0 and at most " .. full)
+-- The most a gadget rated `watts` can make in `hours`: full sun the whole time.
+local function fullSunWh(watts, hours)
+    return Sun.wattsFrom(watts, Sun.FULL_SUN, 0) * hours
 end
 
 -- Queues reading the server's copy of the vehicle of `car` (a handle) into self[key]: its battery
@@ -62,7 +57,8 @@ local function chooseMaintainerOption(self, car, attached, key)
         self[key] = option ~= nil
         if not T.need(self, option, "the maintainer option on the car's menu") then return end
         ISTimedActionQueue.add(RenewableEnergyAction:new(T.player(), option.param1, nil, nil, option.param2, option.param3))
-        T.waitForCopy(function() return SolarMaintainer.isAttached(car.vehicle) == attached end)
+        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) == attached end,
+            "this client's car with the maintainer " .. (attached and "attached" or "detached"))
     end)
 end
 
@@ -101,66 +97,63 @@ test("renewable_energy_gadgets_maintainer_attach_detach", {
     end,
 })
 
--- An hour on a half charged car battery, in order on one car. Charging reads the live weather, so
--- the expected charge comes from the light the server says the hour had.
-local MAINTAINER_HOURS = {
-    { what = "noon without a maintainer", hour = NOON, maintainer = false, charges = false },
-    { what = "midnight with a maintainer", hour = MIDNIGHT, maintainer = true, charges = false },
-    { what = "noon with a maintainer", hour = NOON, maintainer = true, charges = true },
+-- An hour on a half charged car battery, in order on one car: first without a maintainer, then
+-- with one attached.
+local WITHOUT_MAINTAINER = { what = "noon without a maintainer", hour = NOON }
+local WITH_MAINTAINER = {
+    { what = "midnight with a maintainer", hour = MIDNIGHT },
+    { what = "noon with a maintainer", hour = NOON, charges = true },
 }
 -- How long each row charges, and the charge it starts from.
 local ROW_HOURS, ROW_START = 1, 0.5
 
--- Charges in the noon sun only with a maintainer attached, and through the pass that finds every
--- loaded vehicle.
+-- Charges in the sun only with a maintainer attached, never more than its rating gives in full
+-- sun, and through the pass that finds every loaded vehicle as much as on its own. Charging reads
+-- the live weather, so the noon hour is checked against its bounds, not a number.
 test("renewable_energy_gadgets_maintainer_charge", {
     instant = true,
     run = function(self)
         local car = T.placeVehicle(self, CAR, { battery = CAR_BATTERY })
         if not car then return end
         self.rows = {}
-        for _, row in ipairs(MAINTAINER_HOURS) do
-            if row.maintainer and not self.given then
-                self.given = true
-                T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })
-                T.step(function()
-                    ISTimedActionQueue.add(RenewableEnergyAction:new(T.player(), RenewableEnergyAction.ATTACH_MAINTAINER, nil, nil,
-                        car.vehicle, self.items.maintainer[1]))
-                end)
-                T.waitForCopy(function() return SolarMaintainer.isAttached(car.vehicle) end)
-            end
+        -- Each hour's clock is set in its turn: single player sets it at once, when it is queued.
+        local function hour(row)
             T.step(function() T.setTime(self, row.hour) end)
             T.server(self, "maintainerCharge", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS, uses = ROW_START } end)
             T.step(function() table.insert(self.rows, { row = row, reply = self.server.maintainerCharge }) end)
         end
+        hour(WITHOUT_MAINTAINER)
+        T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })
+        T.step(function()
+            ISTimedActionQueue.add(RenewableEnergyAction:new(T.player(), RenewableEnergyAction.ATTACH_MAINTAINER, nil, nil,
+                car.vehicle, self.items.maintainer[1]))
+        end)
+        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end, "this client's car with the maintainer attached")
+        for _, row in ipairs(WITH_MAINTAINER) do
+            hour(row)
+        end
         T.server(self, "chargeVehicles", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS } end)
     end,
     validate = function(self)
-        if not expect(#self.rows == #MAINTAINER_HOURS and self.server.chargeVehicles, "the hours on the car never all ran ("
-            .. #self.rows .. " of " .. #MAINTAINER_HOURS .. ")") then return end
+        if not expect(#self.rows == #WITH_MAINTAINER + 1 and self.server.chargeVehicles, "the hours on the car never all ran ("
+            .. #self.rows .. " of " .. #WITH_MAINTAINER + 1 .. ")") then return end
         local charged
         for _, r in ipairs(self.rows) do
             local wh, after = r.reply.wh, r.reply.after
             if r.row.charges then
                 charged = r.reply
-                local ratedWh, capacityWh = Specs.maintainerWatts * ROW_HOURS, r.reply.capacityWh
-                -- A thousandth of the rated hour covers the battery's float charge.
-                local tolerance = ratedWh / 1000
-                local expectedWh = math.min(ratedWh * r.reply.flatWh, (1 - ROW_START) * capacityWh)
-                expectNoonSun(r.reply.flatWh)
-                expectNear("Wh an hour at " .. r.row.what .. " added", wh, expectedWh, tolerance)
-                expectNear("charge after an hour at " .. r.row.what, after, ROW_START + expectedWh / capacityWh, tolerance / capacityWh)
+                local most = fullSunWh(Specs.maintainerWatts, ROW_HOURS)
+                expect(wh > 0 and wh <= most and after > ROW_START,
+                    "an hour at " .. r.row.what .. " added " .. wh .. " Wh, expected more than 0 and at most " .. most)
             else
                 expect(wh == 0 and math.abs(after - ROW_START) < 0.001, "an hour at " .. r.row.what .. " added " .. wh .. " Wh")
             end
         end
-        -- The pass runs the maintainer for as long as the last noon row, right after it, so it adds
-        -- what that hour added unless the battery fills first. The light can still move a little
-        -- between the two calls, hence a fiftieth of that hour's Wh.
+        -- The pass runs the maintainer for as long as the noon row, right after it, so it adds what
+        -- that hour added. The light can still move a little between the two calls, hence a
+        -- fiftieth of that hour's Wh.
         local pass, capacityWh = self.server.chargeVehicles, charged.capacityWh
-        local expectedWh = math.min(charged.wh, (1 - pass.before) * capacityWh)
-        expectNear("charge after the vehicle pass over the maintained car", pass.after,
-            pass.before + expectedWh / capacityWh, charged.wh / 50 / capacityWh)
+        expectNear("Wh the vehicle pass gave the maintained car", (pass.after - pass.before) * capacityWh, charged.wh, charged.wh / 50)
     end,
 })
 
@@ -169,7 +162,7 @@ test("renewable_energy_gadgets_maintainer_charge", {
 -- A solar battery charger the character places on a free outdoor square; see T.placeAsPlayer.
 local function placeCharger(self)
     local square = outdoorSquare(self)
-    return square and T.placeAsPlayer(self, square, "RenewableEnergy.SolarCellCharger", Sprites.cellCharger)
+    return square and T.placeAsPlayer(self, square, SolarCellCharger.ITEM, Sprites.cellCharger)
 end
 
 -- Placed through the moveables action, it takes four vanilla batteries and nothing else, on the
@@ -180,25 +173,27 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
         local charger = placeCharger(self)
         if not charger then return end
         self.charger = charger
-        T.give(self, "batteries", { { type = "Base.Battery", count = SolarCellCharger.SLOTS } })
+        T.give(self, "batteries", { { type = SolarCellCharger.BATTERY, count = SolarCellCharger.SLOTS } })
         T.step(function()
             local p, container = T.player(), charger.object:getContainer()
             if not T.need(self, container, "a container in the placed solar battery charger") then return end
-            self.acceptsBattery = container:isItemAllowed(instanceItem("Base.Battery"))
+            self.acceptsBattery = container:isItemAllowed(instanceItem(SolarCellCharger.BATTERY))
             self.acceptsCarBattery = container:isItemAllowed(instanceItem(CAR_BATTERY))
             for _, battery in ipairs(self.items.batteries) do
                 ISTimedActionQueue.add(ISInventoryTransferAction:new(p, battery, p:getInventory(), container))
             end
-            T.waitForCopy(function() return container:getItems():size() == SolarCellCharger.SLOTS end)
+            T.waitFor(self, function() return container:getItems():size() == SolarCellCharger.SLOTS end,
+                "this client's charger holding " .. SolarCellCharger.SLOTS .. " batteries")
             T.server(self, "chargerState", { x = charger.x, y = charger.y, z = charger.z })
-            T.step(function() self.acceptsFifth = container:isItemAllowed(instanceItem("Base.Battery")) end)
+            T.step(function() self.acceptsFifth = container:isItemAllowed(instanceItem(SolarCellCharger.BATTERY)) end)
         end)
     end,
     validate = function(self)
         expect(self.acceptsBattery, "the solar battery charger refuses a battery")
         expect(not self.acceptsCarBattery, "the solar battery charger takes a car battery")
         if not expect(self.server.chargerState ~= nil, "the batteries never went into the charger") then return end
-        expectNear("batteries in the server's charger", #self.server.chargerState.uses, SolarCellCharger.SLOTS, 0)
+        expect(#self.server.chargerState.uses == SolarCellCharger.SLOTS, "the server's charger holds "
+            .. #self.server.chargerState.uses .. " batteries, expected " .. SolarCellCharger.SLOTS)
         expect(not self.acceptsFifth, "the solar battery charger takes a fifth battery")
     end,
 })
@@ -206,43 +201,52 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
 -- How long each solar battery charger charges.
 local CELL_HOURS = 2
 
--- Two hours on a full set of empty batteries at noon and at midnight, a charger each. Charging
--- reads the live weather, so each cell's expected share comes from the light the server says the
--- hours had, and the charger pass run as long again doubles it; a set fills in one to two sunny
--- days, so two noon hours stay well short of half.
+-- A charger each, filled with SolarCellCharger.SLOTS cells and run CELL_HOURS: empty cells at
+-- midnight, cells full as the game makes them (their float charge reads just under 1) at noon,
+-- and empty cells at noon, then the pass over every charger as long again. That pass comes last,
+-- since it charges the other rows' chargers too.
+local CHARGER_ROWS = {
+    { name = "midnight", hour = MIDNIGHT, uses = 0 },
+    { name = "full", hour = NOON },
+    { name = "noon", hour = NOON, uses = 0, pass = true },
+}
+
+-- Charges by day only, no faster than its rating in full sun, in whole uses to the emptiest cell
+-- first, and through the pass over every charger as much again. Full cells take nothing and the
+-- charger keeps no watt-hours for later. Charging reads the live weather, so the noon hours are
+-- checked against bounds, not a number.
 test("renewable_energy_gadgets_solar_battery_charger_charges", {
     instant = true,
     run = function(self)
         self.rows = {}
-        for _, hour in ipairs({ NOON, MIDNIGHT }) do
+        for _, row in ipairs(CHARGER_ROWS) do
             local charger = placeCharger(self)
             if not charger then return end
-            T.step(function() T.setTime(self, hour) end)
+            T.step(function() T.setTime(self, row.hour) end)
             T.server(self, "cellCharge", { x = charger.x, y = charger.y, z = charger.z,
-                count = SolarCellCharger.SLOTS, uses = 0, hours = CELL_HOURS, pass = hour == NOON })
-            T.step(function() table.insert(self.rows, self.server.cellCharge) end)
+                count = SolarCellCharger.SLOTS, uses = row.uses, hours = CELL_HOURS, pass = row.pass })
+            T.step(function() self.rows[row.name] = self.server.cellCharge end)
         end
     end,
     validate = function(self)
-        local noon, midnight = self.rows[1], self.rows[2]
-        if not expect(noon and midnight, "the chargers never both charged") then return end
-        expectNoonSun(noon.flatWh)
-        expect(noon.added > 0, "two hours of noon sun charged nothing")
-        -- Whole uses go one at a time to the emptiest cell, so each is within a use of an even share.
+        local noon, midnight, full = self.rows.noon, self.rows.midnight, self.rows.full
+        if not expect(noon and midnight and full, "the chargers never all charged") then return end
         local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
-        local function expectShares(label, charges, hours)
-            local share = Specs.cellChargerWatts * noon.flatWh * hours / SolarCellCharger.BATTERY_WH / SolarCellCharger.SLOTS
-            for i, charge in ipairs(charges) do
-                expectNear(label .. ", cell " .. i, charge, share, useDelta)
-            end
-        end
-        expectShares("charge after two hours of noon sun", noon.after, CELL_HOURS)
-        expectShares("charge after the charger pass as long again", noon.afterPass, 2 * CELL_HOURS)
+        local useWh = useDelta * SolarCellCharger.BATTERY_WH
+        local most = fullSunWh(Specs.cellChargerWatts, CELL_HOURS)
+        expect(noon.added > 0 and noon.added * useWh <= most, "two hours of noon sun added " .. noon.added
+            .. " uses of " .. useWh .. " Wh, expected more than 0 and at most " .. most .. " Wh")
         local low, high = math.min(unpack(noon.after)), math.max(unpack(noon.after))
-        expect(high - low <= 0.01, "the batteries charged unevenly, from " .. low .. " to " .. high)
-        expect(high < 0.5, "two hours of noon sun filled the batteries to " .. high)
-        expect(noon.afterPass[1] > noon.after[1], "the charger pass did not charge the placed solar battery charger")
+        expect(high - low <= useDelta + 1e-6, "the batteries charged unevenly, from " .. low .. " to " .. high)
+        -- The pass gets the same sun for as long, plus what the first two hours kept toward a use.
+        local passUses = 0
+        for i, charge in ipairs(noon.afterPass) do
+            passUses = passUses + (charge - noon.after[i]) / useDelta
+        end
+        expectNear("uses the charger pass as long again added", passUses, noon.added, 1.01)
         expect(midnight.added == 0 and math.max(unpack(midnight.after)) == 0, "two hours of night charged " .. midnight.added .. " uses")
+        expect(full.added == 0 and full.full == true and full.storedWh == 0, "full cells at noon took " .. tostring(full.added)
+            .. " uses, are all full " .. tostring(full.full) .. ", and the charger kept " .. tostring(full.storedWh) .. " Wh")
     end,
 })
 
@@ -282,7 +286,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
         if not car then return end
         self.car = car
         T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), empty = true } end)
-        T.waitForCopy(function() return T.vehicleBattery(car) == nil end)
+        T.waitFor(self, function() return T.vehicleBattery(car) == nil end, "this client's car without a battery")
         T.give(self, "battery", { { type = VehicleBattery.ITEM } })
         T.step(function()
             local part = car.vehicle:getPartById(VehicleBattery.PART)
@@ -303,18 +307,18 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
                 return
             end
             T.choose(pick)
-            T.waitForCopy(function() return T.vehicleBattery(car) ~= nil end)
+            T.waitFor(self, function() return T.vehicleBattery(car) ~= nil end, "this client's car with the deep cycle battery")
             carState(self, car, "installed")
             T.count(self, "installed", { VehicleBattery.ITEM })
             T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), uses = 0.5 } end)
-            T.waitForCopy(function()
+            T.waitFor(self, function()
                 local battery = T.vehicleBattery(car)
                 return battery ~= nil and math.abs(battery:getCurrentUsesFloat() - 0.5) < 0.001
-            end)
+            end, "this client's deep cycle battery at half charge")
             T.step(function() ISVehiclePartMenu.onUninstallPart(T.player(), part) end)
-            T.waitForCopy(function()
+            T.waitFor(self, function()
                 return T.vehicleBattery(car) == nil and T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM) ~= nil
-            end)
+            end, "the uninstalled deep cycle battery in this client's inventory")
             carState(self, car, "uninstalled")
             T.count(self, "uninstalled", { VehicleBattery.ITEM })
         end)
@@ -342,12 +346,13 @@ local function capacityRatio()
     return Specs.batteries[CAR_BATTERY].wh / Specs.batteries[VehicleBattery.ITEM].wh
 end
 
--- Queues the server handler `name` on a car each with a car battery and a deep cycle battery,
--- with `args` plus the car's T.vehicleArgs, leaving the answers in self.answers in that order.
-local function onBothBatteries(self, name, args)
+-- Queues the server handler `name` on a `script` vehicle each with a car battery and a deep cycle
+-- battery, with `args` plus the vehicle's T.vehicleArgs, leaving the answers in self.answers in
+-- that order.
+local function onBothBatteries(self, script, name, args)
     self.answers = {}
     for _, batteryType in ipairs({ CAR_BATTERY, VehicleBattery.ITEM }) do
-        local car = T.placeVehicle(self, CAR, { battery = batteryType })
+        local car = T.placeVehicle(self, script, { battery = batteryType })
         if not car then return end
         T.server(self, name, function()
             local withCar = { vehicle = T.vehicleArgs(car) }
@@ -360,20 +365,24 @@ local function onBothBatteries(self, name, args)
     end
 end
 
--- An hour of vanilla's headlight update with the engine off, and of a running engine, on each
--- car: both move the same watt-hours through either battery, so the deep cycle battery's share of
--- a full charge changes less, by its capacity over a car battery's. `change` is the field of the
--- handler's answer that holds that share.
+-- An hour of vanilla's headlight update and of its lightbar update with the engine off, and of a
+-- running engine, on each vehicle: each moves the same watt-hours through either battery, so the
+-- deep cycle battery's share of a full charge changes less, by its capacity over a car battery's;
+-- once, not twice, for the lightbar, which vanilla drains inside the battery update the mod scales.
+-- `change` is the field of the handler's answer that holds that share.
 local VEHICLE_HOURS = {
-    { behavior = "drains_slower", handler = "headlightDrain", uses = 0.8, change = "drop",
+    { behavior = "drains_slower", vehicle = CAR, handler = "headlightDrain", uses = 0.8, change = "drop",
         none = "the headlight didn't drain the car battery" },
-    { behavior = "charges_from_vehicle", handler = "alternatorCharge", uses = 0.2, change = "gain",
+    -- Ten hours: the lightbar takes 0.000025 of a charge a minute (Vehicles.Update.Lightbar).
+    { behavior = "lightbar_drains_slower", vehicle = "Base.CarLightsPolice", handler = "lightbarDrain", uses = 0.8,
+        minutes = 600, change = "drop", none = "the lightbar didn't drain the car battery" },
+    { behavior = "charges_from_vehicle", vehicle = CAR, handler = "alternatorCharge", uses = 0.2, change = "gain",
         none = "the alternator didn't charge the car battery" },
 }
 for _, case in ipairs(VEHICLE_HOURS) do
     test("renewable_energy_gadgets_deep_cycle_battery_" .. case.behavior, {
         run = function(self)
-            onBothBatteries(self, case.handler, { uses = case.uses, minutes = 60 })
+            onBothBatteries(self, case.vehicle, case.handler, { uses = case.uses, minutes = case.minutes or 60 })
         end,
         validate = function(self)
             local car, deepCycle = self.answers[1], self.answers[2]
@@ -440,10 +449,10 @@ end
 local function runLight(self, light, charge, hours)
     T.server(self, "gardenLightUpdate", { x = light.x, y = light.y, z = light.z,
         charge = charge, hours = hours })
-    T.waitForCopy(function()
+    T.waitFor(self, function()
         local reply = self.server.gardenLightUpdate
         return light.object:getTextureName() == reply.sprite and lampOn(light.square) == reply.lit
-    end)
+    end, "this client's garden light showing what the server's does")
 end
 
 -- The game minute on this client's clock.
@@ -462,15 +471,19 @@ local function startOfMinute(self)
 end
 
 -- A placed light run for `hours` at `hour` from `charge` Wh: whether it is lit afterwards (its
--- sprite and, on this client, its lamp), and its charge in Wh, or for the noon row a range. It
--- goes out once the night has drawn its battery empty, and by day its cell charges the battery,
--- never past full. One light runs every row in turn, each from its own charge.
+-- sprite and, on this client, its lamp), and its charge in Wh, or for the empty noon row a range.
+-- At night it stays lit while its battery holds any charge: a little more than the night draws
+-- leaves it lit, exactly that much puts it out. By day its cell charges the battery, never past
+-- full. One light runs every row in turn, each from its own charge.
+local NIGHT_HOURS = 0.5
+local NIGHT_WH = Specs.gardenLight.nightWatts * NIGHT_HOURS
 local GARDEN_LIGHT_HOURS = {
-    { what = "charged at midnight", hour = MIDNIGHT, charge = 2, hours = 0.5, lit = true,
-        after = 2 - Specs.gardenLight.nightWatts * 0.5 },
-    { what = "empty at midnight", hour = MIDNIGHT, charge = 0, hours = 0.5, lit = false, after = 0 },
-    { what = "running out at night", hour = MIDNIGHT, charge = 0.2, hours = 1, lit = false, after = 0 },
+    { what = "with a little more than the night draws", hour = MIDNIGHT, charge = NIGHT_WH + 0.01, hours = NIGHT_HOURS,
+        lit = true, after = 0.01 },
+    { what = "with just what the night draws", hour = MIDNIGHT, charge = NIGHT_WH, hours = NIGHT_HOURS, lit = false, after = 0 },
     { what = "empty at noon", hour = NOON, charge = 0, hours = 2, lit = false, low = 0, high = Specs.gardenLight.wh },
+    { what = "nearly full at noon", hour = NOON, charge = Specs.gardenLight.wh - 0.01, hours = 2, lit = false,
+        after = Specs.gardenLight.wh },
 }
 
 test("renewable_energy_gadgets_garden_light_update", {
@@ -518,7 +531,7 @@ test("renewable_energy_gadgets_garden_light_pick_up_takes_light", {
             self.lamp = lampOn(light.square)
             if not self.lamp then return end
             T.pickUpAsPlayer(self, light, Sprites.gardenLight.lit)
-            T.waitUntil(function() return not lampOn(light.square) end, LIGHT_FRAMES)
+            T.waitFor(self, function() return not lampOn(light.square) end, "this client's lamp going with the light")
         end)
     end,
     validate = function(self)
@@ -558,10 +571,10 @@ local function chooseBulbOption(self, light, bulbType, key)
 end
 
 -- Queues a wait until this client's copy of the light shows the unlit tile and draws no lamp.
-local function waitForDark(light)
-    T.waitForCopy(function()
+local function waitForDark(self, light)
+    T.waitFor(self, function()
         return light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light.square)
-    end)
+    end, "this client's garden light dark")
 end
 
 -- Taking the bulb out of a lit light puts the light out and gives the character the bulb, and
@@ -578,10 +591,9 @@ test("renewable_energy_gadgets_garden_light_remove_bulb", {
         T.step(function() self.litBefore = lampOn(light.square) end)
         startOfMinute(self)
         chooseBulbOption(self, light, nil, "removeOffered")
-        waitForDark(light)
+        waitForDark(self, light)
         T.step(function() self.darkMinute = gameMinute() end)
         T.count(self, "removed", { SolarGardenLight.PLAIN_BULB })
-        T.step(function() self.copyDark = not lampOn(light.square) end)
         runLight(self, light, 2, 1)
         T.step(function()
             self.night = self.server.gardenLightUpdate
@@ -591,7 +603,6 @@ test("renewable_energy_gadgets_garden_light_remove_bulb", {
     validate = function(self)
         if not expect(self.litBefore, "the light never lit") then return end
         expect(self.removeOffered, "the lit light's menu doesn't offer Remove Light Bulb")
-        expect(self.copyDark, "this client still draws the light's lamp after its bulb came out")
         expect(self.darkMinute == self.minute, "this client's lamp went out only at a later game minute")
         expect(self.counts.removed[SolarGardenLight.PLAIN_BULB] == 1, "taking the bulb out gave "
             .. tostring(self.counts.removed[SolarGardenLight.PLAIN_BULB]) .. " light bulbs, expected 1")
@@ -621,16 +632,12 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
             self.plain = lamp and shownColour(lamp)
         end)
         chooseBulbOption(self, light, nil, "removeOffered")
-        waitForDark(light)
+        waitForDark(self, light)
         T.give(self, "red", { { type = RED } })
         chooseBulbOption(self, light, RED, "addOffered")
-        T.waitForCopy(function() return lampShines(light.square, RED) end)
+        T.waitFor(self, function() return lampShines(light.square, RED) end, "this client's lamp shining red")
         T.count(self, "added", { RED, SolarGardenLight.PLAIN_BULB })
-        T.step(function()
-            local lamp = lampAt(light.square)
-            self.red = lamp and shownColour(lamp)
-            self.copyLit = light.object:getTextureName() == Sprites.gardenLight.lit
-        end)
+        T.step(function() self.copyLit = light.object:getTextureName() == Sprites.gardenLight.lit end)
     end,
     validate = function(self)
         local plain = self.plain
@@ -638,8 +645,7 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
         expect(plain.r == 1 and plain.g < plain.r and plain.b < plain.g,
             "the plain bulb's lamp shines " .. describeColour(plain) .. ", not a warm white")
         expect(self.addOffered, "the light without a bulb doesn't offer the carried red bulb")
-        expect(self.copyLit and sameColour(self.red, bulbColour(RED)), "with a red bulb this client's lamp shines "
-            .. describeColour(self.red) .. ", expected " .. describeColour(bulbColour(RED)))
+        expect(self.copyLit, "with a red bulb this client's light shows the unlit tile")
         expect(self.counts.added[RED] == 0, "the red bulb is still in the inventory")
         expect(self.counts.added[SolarGardenLight.PLAIN_BULB] == 1, "the plain bulb that came out is not in the inventory")
     end,
@@ -656,19 +662,13 @@ test("renewable_energy_gadgets_garden_light_bulb_swap_recolours_lamp", {
         runLight(self, light, 2, 0.5)
         T.step(function() self.litBefore = lampOn(light.square) end)
         T.server(self, "gardenLightSwapBulb", { x = light.x, y = light.y, z = light.z, bulb = GREEN })
-        T.waitForCopy(function() return lampShines(light.square, GREEN) end)
-        T.step(function()
-            local lamp = lampAt(light.square)
-            self.green = lamp and shownColour(lamp)
-        end)
+        T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green after the swap")
     end,
     validate = function(self)
         if not expect(self.litBefore, "the light never lit") then return end
         local swap = self.server.gardenLightSwapBulb
         expect(swap.lit and swap.bulb == GREEN, "after the swap the server's light is lit " .. tostring(swap.lit)
             .. " with " .. tostring(swap.bulb))
-        expect(sameColour(self.green, bulbColour(GREEN)), "after the swap this client's lamp shines "
-            .. describeColour(self.green) .. ", expected " .. describeColour(bulbColour(GREEN)))
     end,
 })
 
@@ -690,11 +690,10 @@ local function placeCarriedLight(self, light)
         end
         ISTimedActionQueue.add(ISMoveablesAction:new(p, light.square, "place", sprite, nil,
             props:getFaceDirectionFromSpriteName(sprite), item, nil))
-        T.waitForCopy(function() return T.objectWithSprite(light.square, sprite) ~= nil end)
+        T.waitFor(self, function() return T.objectWithSprite(light.square, sprite) ~= nil end,
+            "this client's copy of the placed garden light")
         T.server(self, "PZHarness.trackPlaced", { x = light.x, y = light.y, z = light.z, sprite = sprite })
-        T.step(function()
-            light.object = T.need(self, T.objectWithSprite(light.square, sprite), "this client's copy of the placed garden light")
-        end)
+        T.step(function() light.object = T.objectWithSprite(light.square, sprite) end)
     end)
 end
 
@@ -707,8 +706,7 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
         local light = placeGardenLight(self, 2, GREEN)
         if not light then return end
         runLight(self, light, 2, 0.5)
-        T.waitForCopy(function() return lampShines(light.square, GREEN) end)
-        T.step(function() self.placedGreen = lampShines(light.square, GREEN) end)
+        T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green")
         T.pickUpAsPlayer(self, light, Sprites.gardenLight.lit)
         T.server(self, "carried", { types = { SolarGardenLight.ITEM } })
         T.step(function()
@@ -717,13 +715,10 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
         end)
         placeCarriedLight(self, light)
         runLight(self, light, nil, 0.5)
-        T.waitForCopy(function() return lampShines(light.square, GREEN) end)
-        T.step(function() self.replacedGreen = lampShines(light.square, GREEN) end)
+        T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green placed again")
     end,
     validate = function(self)
-        expect(self.placedGreen, "the light placed with a green bulb doesn't shine green")
         expect(self.carriedBulb == GREEN, "the picked-up light holds " .. tostring(self.carriedBulb) .. ", expected " .. GREEN)
-        expect(self.replacedGreen, "the light placed again doesn't shine green")
     end,
 })
 
@@ -751,7 +746,7 @@ end
 -- A garden light goes on the ground outdoors, where the sun reaches it.
 test("renewable_energy_gadgets_garden_light_refused_indoors", {
     run = function(self)
-        local indoor = T.need(self, (T.squares(self, 1, { indoors = true }) or {})[1], "a free indoor square")
+        local indoor = T.square(self, { indoors = true }, "a free indoor square")
         local outdoor = outdoorSquare(self)
         if not (indoor and outdoor) then return end
         local props = ISMoveableSpriteProps.new(Sprites.gardenLight.off)

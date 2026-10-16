@@ -21,19 +21,24 @@ local Needs, DigesterWindow = RenewableEnergy.Needs, RenewableEnergy.DigesterWin
 local queue = RenewableEnergyGasAction.queue
 
 RenewableEnergy.ClientObjects.define({
-    name = "Digester", kind = "digester", owner = Digester, isObject = Digester.isDigester,
+    name = "Digester", sprites = RenewableEnergy.Sprites.namesOf("digester"), owner = Digester, isObject = Digester.isDigester,
     adoptCopy = function(isoObject)
         Digester.adoptContainer(isoObject:getContainer())
     end,
     adoptContainer = Digester.adoptContainer,
 })
 
--- Adds the option for `job`: greyed out with the digester's reason when its state refuses it, or
--- with the needs listed when the character lacks any.
+-- Adds the option for `job`, with `item` the bag or tank it fills: greyed out with the digester's
+-- reason when its state refuses it, with the needs listed when the character lacks any, or with
+-- what is wrong with the item. A job for another state of the digester (hideBlocked) is left out.
 local function addJob(menu, character, playerNum, job, digester, summary, item)
+    local blocker = DigesterJobs.blocker(job, summary)
+    if blocker and DigesterJobs.JOBS[job].hideBlocked then
+        return
+    end
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job), playerNum, queue, "digester", job, digester, item)
-    Needs.show(option, DigesterJobs.needs(character, job), DigesterJobs.blocker(job, summary))
-    return option
+    Needs.show(option, DigesterJobs.needs(character, job), blocker)
+    Needs.refuse(option, not option.notAvailable and DigesterJobs.check(character, job, summary, item))
 end
 
 --- Adds the digester's submenu to `context`. Returns the submenu, or nil before this client has
@@ -42,46 +47,25 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     local summary = Digester.summaryOf(digester)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
-    local menu = ISContextMenu:getNew(context)
-    context:addSubMenu(context:addOption(getText("IGUI_RenewableEnergy_Digester_" .. summary.tier)), menu)
+    local menu = Needs.addSubMenu(context, getText("IGUI_RenewableEnergy_Digester_" .. summary.tier))
     menu:addOption(getText("ContextMenu_RenewableEnergy_DigesterStatus"), playerNum, DigesterWindow.open, digester)
 
-    local bag = DigesterJobs.sludgeBag(character)
-    local sludge = addJob(menu, character, playerNum, DigesterJobs.TAKE_SLUDGE, digester, summary, bag)
-    if not sludge.notAvailable and not bag then
-        Needs.disable(sludge, getText("Tooltip_RenewableEnergy_NeedsSandbag"))
+    addJob(menu, character, playerNum, DigesterJobs.TAKE_SLUDGE, digester, summary, DigesterJobs.sludgeBag(character))
+    for _, job in ipairs({ DigesterJobs.VENT, DigesterJobs.REPLACE_BAGS, DigesterJobs.SEW_TARP, DigesterJobs.UPGRADE }) do
+        addJob(menu, character, playerNum, job, digester, summary)
     end
-    addJob(menu, character, playerNum, DigesterJobs.VENT, digester, summary)
-    if summary.holder == "bags" then
-        addJob(menu, character, playerNum, DigesterJobs.REPLACE_BAGS, digester, summary)
-    end
-    if summary.holder == "bags" or summary.torn then
-        addJob(menu, character, playerNum, DigesterJobs.SEW_TARP, digester, summary)
-    end
-    if summary.tier == "barrel" then
-        addJob(menu, character, playerNum, DigesterJobs.UPGRADE, digester, summary)
-    end
-
     local tank = DigesterJobs.tankToFill(character)
     for _, job in ipairs({ DigesterJobs.FILL_PUMP, DigesterJobs.FILL_COMPRESSOR }) do
-        local option = addJob(menu, character, playerNum, job, digester, summary, tank)
-        local refusal = not option.notAvailable and DigesterJobs.fillRefusal(character, job, summary, tank)
-        if refusal then
-            Needs.disable(option, getText(refusal))
-        end
+        addJob(menu, character, playerNum, job, digester, summary, tank)
     end
-
-    if not summary.scrubber then
-        addJob(menu, character, playerNum, DigesterJobs.FIT_SCRUBBER, digester, summary)
-    else
-        local charge = menu:addOption(getText("ContextMenu_RenewableEnergy_ChargeScrubber"))
-        local chargeMenu = ISContextMenu:getNew(menu)
-        menu:addSubMenu(charge, chargeMenu)
+    addJob(menu, character, playerNum, DigesterJobs.FIT_SCRUBBER, digester, summary)
+    if summary.scrubber then
+        local chargeMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_ChargeScrubber"))
         for _, job in ipairs({ DigesterJobs.CHARGE_WATER, DigesterJobs.CHARGE_ASH, DigesterJobs.CHARGE_LIME }) do
             addJob(chargeMenu, character, playerNum, job, digester, summary)
         end
-        addJob(menu, character, playerNum, DigesterJobs.REPACK_WOOL, digester, summary)
     end
+    addJob(menu, character, playerNum, DigesterJobs.REPACK_WOOL, digester, summary)
     return menu
 end
 

@@ -27,21 +27,31 @@ Digester.SYSTEM_NAME = "renewable_energy_digester"
 -- stink: its share of the stink score; the Brick Dome stays below the second smell level whatever
 -- state it is in (stinkCap).
 -- warmTo, heatShare: the dome is buried and burns a share of its gas to keep at least this warm.
+-- holder: the gas holder it is built with (HOLDERS). upgrade: the tier its Upgrade job makes of it.
+-- sealed: it never fumes indoors.
 Digester.TIERS = {
-    barrel = { potentialCap = 5, days = 1, stink = 1.0 },
-    insulated = { potentialCap = 15, days = 3, stink = 0.6 },
-    dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, heatShare = 0.25 },
+    barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", upgrade = "insulated" },
+    insulated = { potentialCap = 15, days = 3, stink = 0.6, holder = "drum" },
+    dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, heatShare = 0.25, holder = "dome",
+        sealed = true },
 }
 
 -- capacity: gas the holder stores. wearPerDay: condition lost a day; a holder at none is torn,
--- holds nothing and leaks. The drum and the dome don't wear.
+-- holds nothing and leaks. The drum and the dome don't wear. levels: its overlays from slack to
+-- full, and torn: its overlay once torn; the dome's holder is the dome itself.
 Digester.HOLDERS = {
-    bags = { capacity = 0.6, wearPerDay = 1 },
-    tarp = { capacity = 1.0, wearPerDay = 0.25 },
-    drum = { capacity = 1.5 },
+    bags = { capacity = 0.6, wearPerDay = 1, levels = Sprites.digesterHolder.bags, torn = Sprites.digesterHolder.bagsTorn },
+    tarp = { capacity = 1.0, wearPerDay = 0.25, levels = Sprites.digesterHolder.tarp, torn = Sprites.digesterHolder.tarpTorn },
+    drum = { capacity = 1.5, levels = Sprites.digesterHolder.drum },
     dome = { capacity = 4.0 },
 }
-Digester.HOLDER_OF_TIER = { insulated = "drum", dome = "dome" }
+
+-- The stink score at which each smell level starts (DigesterObject.corpsesFor, the status window).
+Digester.SMELL_SCORES = { 0.2, 1, 2 }
+-- The souring buffer: a digester sours with more acid than ACID_LIMIT per unit of potentialCap, and
+-- recovers below ACID_RECOVER of that limit.
+Digester.ACID_LIMIT = 0.8
+Digester.ACID_RECOVER = 0.5
 
 -- Digestion rate k (share of the undigested potential a day) by temperature in °C, between which
 -- it runs in straight lines: nothing at the first, the mesophilic best at 35 to 40, nothing again
@@ -185,11 +195,11 @@ Digester.isScrubberOverlay = Sprites.matcher(Sprites.digesterScrubber)
 --- The holder overlay for a holder kind, its fill (0..1) and whether it's torn, or nil for the
 --- dome, whose holder is itself.
 function Digester.holderOverlay(holder, fill, torn)
-    local set = Sprites.digesterHolder
-    if torn and (holder == "bags" or holder == "tarp") then
-        return holder == "bags" and set.bagsTorn or set.tarpTorn
+    local spec = Digester.HOLDERS[holder]
+    if torn then
+        return spec.torn
     end
-    local levels = set[holder]
+    local levels = spec.levels
     if not levels then
         return nil
     end

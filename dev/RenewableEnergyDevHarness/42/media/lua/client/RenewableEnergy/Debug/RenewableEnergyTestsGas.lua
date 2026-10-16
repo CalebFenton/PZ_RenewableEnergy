@@ -7,19 +7,65 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local T = RenewableEnergyTest
 local test = T.test
 
-local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
+local Digester, GasKit, Materials = RenewableEnergy.Digester, RenewableEnergy.GasKit, RenewableEnergy.Materials
 local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
 local Sprites = RenewableEnergy.Sprites
 
+-- What this client's copy of a generator's kit state shows once each job is done. The next job's
+-- action checks this client's copy, so it waits for it.
+local KIT_DONE = {
+    [GasKit.INSTALL] = function(state) return state ~= nil end,
+    [GasKit.REMOVE] = function(state) return state == nil end,
+    [GasKit.CONNECT] = function(state) return state ~= nil and state.source ~= nil end,
+    [GasKit.DISCONNECT] = function(state) return state ~= nil and state.source == nil end,
+    [GasKit.TO_PETROL] = function(state) return state ~= nil and state.mode == "petrol" end,
+    [GasKit.TO_GAS] = function(state) return state ~= nil and state.mode == "gas" end,
+}
+
+-- Queues the kit job `job` at `generator` (to the record `source` for Connect Gas Line), and a wait
+-- until this client's copy shows it done.
 local function kitJob(self, generator, job, source)
-    T.gasJob(self, "kit", generator, job, nil, source)
+    T.gasJob(self, "kit", generator, job, source)
+    T.waitFor(self, function() return KIT_DONE[job](GasKit.stateOf(generator.object)) end,
+        "this client's copy of the generator after " .. job)
 end
+
+-- Queues fitting the kit to `generator`, with what that takes given first.
+local function fitKit(self, generator)
+    T.giveMaterials(self, "kit", GasKit.materials(GasKit.INSTALL))
+    kitJob(self, generator, GasKit.INSTALL)
+end
+
+-- Queues fitting the kit and connecting the line to the record `source`, with what each takes
+-- given first; self.line is what the line took.
+local function fitAndConnect(self, generator, source)
+    fitKit(self, generator)
+    T.step(function()
+        self.line = GasKit.materials(GasKit.CONNECT, generator.object, source.object)
+        T.giveMaterials(self, "line", self.line)
+    end)
+    kitJob(self, generator, GasKit.CONNECT, source)
+end
+
+-- A free outdoor square at one of `offsets` from `square`, or nil.
+local function squareAt(square, offsets)
+    for _, offset in ipairs(offsets) do
+        local found = getSquare(square:getX() + offset[1], square:getY() + offset[2], square:getZ())
+        if RenewableEnergy.Debug.isFreeSquare(found, false) then
+            return found
+        end
+    end
+    return nil
+end
+
+local SIDES = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }
+local CORNERS = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } }
 
 -- A digester beside the generator's square, holding `gas` and mature.
 local function digesterWithGas(self, tile, gas)
     local digester = T.placeRecord(self, "digester", tile)
     if not digester then return nil end
-    local state = T.matureDigester(Digester.TIERS[tile:match("^[^.]+")].potentialCap)
+    local state = T.matureDigester(tile:match("^[^.]+"))
     state.gas = gas
     T.setRecord(self, digester, state)
     return digester
@@ -32,21 +78,21 @@ end
 test("renewable_energy_gas_kit_install_and_remove", {
     instant = true,
     run = function(self)
-        local generator = T.generator(self, { fuel = 3 })
+        self.fuel = 3
+        local generator = T.generator(self, { fuel = self.fuel })
         if not generator then return end
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" } })
-        kitJob(self, generator, GasKit.INSTALL)
+        self.install = GasKit.materials(GasKit.INSTALL)
+        fitKit(self, generator)
         T.batch(function()
             T.readGenerator(self, generator, "fitted")
-            T.count(self, "afterFit", { GasKit.ITEM })
+            T.countMaterials(self, "afterFit", self.install)
             T.setGenerator(self, generator, { running = true })
         end)
-        T.waitForCopy(function() return generator.object:isActivated() and GasKit.hasKit(generator.object) end,
+        T.waitFor(self, function() return generator.object:isActivated() and GasKit.hasKit(generator.object) end,
             "this client's copy of the kitted generator running")
         T.step(function() self.runningRefusal = GasKit.refusal(T.player(), GasKit.REMOVE, generator.object) end)
         T.setGenerator(self, generator, { running = false })
-        T.waitForCopy(function() return not generator.object:isActivated() end, "this client's copy of the generator stopped")
+        T.waitFor(self, function() return not generator.object:isActivated() end, "this client's copy of the generator stopped")
         kitJob(self, generator, GasKit.REMOVE)
         T.batch(function()
             T.readGenerator(self, generator, "removed")
@@ -56,15 +102,15 @@ test("renewable_energy_gas_kit_install_and_remove", {
     validate = function(self)
         local fitted, removed = self.reads.fitted, self.reads.removed
         if T.expect(fitted.state ~= nil and fitted.listed, "the kit isn't fitted") then
-            T.expectNear("tank with the kit", fitted.state.tank, 3, 0.01)
+            T.expectNear("tank with the kit", fitted.state.tank, self.fuel, 0.01)
         end
         T.expect(T.hasOverlay(fitted, Sprites.gasKit), "the fitted kit doesn't show")
-        T.expect(self.counts.afterFit[GasKit.ITEM] == 0, "fitting didn't take the kit")
+        T.expectMaterialsUsed(self, "afterFit", self.install, "fitting the kit")
         T.expect(self.runningRefusal == "Tooltip_RenewableEnergy_GeneratorRunning",
             "taking the kit off a running generator: " .. tostring(self.runningRefusal))
         T.expect(removed.state == nil and not removed.listed, "the kit is still fitted")
         T.expect(not T.hasOverlay(removed, Sprites.gasKit), "the removed kit still shows")
-        T.expectNear("fuel after removing it", removed.fuel, 3, 0.01)
+        T.expectNear("fuel after removing it", removed.fuel, self.fuel, 0.01)
         T.expect(self.counts.afterRemove[GasKit.ITEM] == 1, "removing didn't give the kit back")
     end,
 })
@@ -76,14 +122,13 @@ test("renewable_energy_gas_kit_install_and_remove", {
 test("renewable_energy_gas_generator_runs_on_gas", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "barrel.steel", 0.6)
+        self.gas, self.load, self.poured = Digester.HOLDERS.bags.capacity, 500, 3
+        local digester = digesterWithGas(self, "barrel.steel", self.gas)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
-        self.load = 500
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.HOSE, count = 2 } })
-        kitJob(self, generator, GasKit.INSTALL)
-        kitJob(self, generator, GasKit.CONNECT, digester)
+        -- One more hose than the line takes, so the count shows what it took.
+        T.give(self, "spare", { { type = GasKit.HOSE } })
+        fitAndConnect(self, generator, digester)
         T.batch(function()
             T.readGenerator(self, generator, "connected")
             T.count(self, "connected", { GasKit.HOSE })
@@ -92,13 +137,7 @@ test("renewable_energy_gas_generator_runs_on_gas", {
             T.gasPass(self, generator, 0.5)
             T.readGenerator(self, generator, "running")
             T.readRecord(self, digester, "fed")
-        end)
-        T.server(self, "generatorSet", function()
-            local args = T.at(generator)
-            args.fuel = self.reads.running.fuel + 3
-            return args
-        end)
-        T.batch(function()
+            T.setGenerator(self, generator, { pour = self.poured })
             T.gasPass(self, generator, 0.1)
             T.readGenerator(self, generator, "poured")
         end)
@@ -111,64 +150,153 @@ test("renewable_energy_gas_generator_runs_on_gas", {
         end)
         kitJob(self, generator, GasKit.TO_GAS)
         T.batch(function()
-            T.setRecord(self, digester, { gas = 0.001 })
+            T.setRecord(self, digester, { gas = 0 })
             T.gasPass(self, generator, 0.5)
             T.readGenerator(self, generator, "out")
         end)
         kitJob(self, generator, GasKit.DISCONNECT)
-        T.count(self, "hoses", { GasKit.HOSE })
-        T.step(function() self.hoses = GasKit.hosesFor(generator.object, digester.object) end)
+        T.count(self, "cut", { GasKit.HOSE })
     end,
     validate = function(self)
         local reads = self.reads
         local connected, running, poured, petrol, out = reads.connected, reads.running, reads.poured, reads.petrol, reads.out
+        local hoses = 0
+        for _, material in ipairs(self.line) do
+            hoses = material.item == GasKit.HOSE and material.need or hoses
+        end
+        T.expect(hoses > 0, "the line from a digester takes no hoses")
         T.expect(connected.state and connected.state.connected, "the gas line isn't connected")
         T.expect(connected.fuel >= GasKit.PHANTOM_FUEL - 0.01, "on gas, the generator shows " .. connected.fuel .. " L, too little to start")
-        T.expect(self.counts.connected[GasKit.HOSE] == 2 - self.hoses, "the line took " .. tostring(2 - (self.counts.connected[GasKit.HOSE] or 0)) .. " hoses, not " .. self.hoses)
+        T.expect(self.counts.connected[GasKit.HOSE] == 1,
+            "the line left " .. tostring(self.counts.connected[GasKit.HOSE]) .. " of " .. (hoses + 1) .. " hoses, not 1")
         T.expect(running.running, "the generator didn't keep running on gas")
         if T.expect(running.state ~= nil, "the running generator lost its kit") then
             T.expectNear("tank while on gas", running.state.tank, 0, 0.001)
         end
         -- The digester's own pass may add a little gas meanwhile.
-        T.expectNear("gas the load burned in half an hour", 0.6 - reads.fed.gas, GasKit.gasFor(self.load, 0.5), 0.02)
+        T.expectNear("gas the load burned in half an hour", self.gas - reads.fed.gas, GasKit.gasFor(self.load, 0.5), 0.02)
         if T.expect(poured.state ~= nil, "the generator lost its kit after pouring") then
-            T.expectNear("tank after pouring 3 L", poured.state.tank, 3, 0.01)
+            T.expectNear("tank after pouring", poured.state.tank, self.poured, 0.01)
         end
         T.expect(petrol.running and petrol.state ~= nil and not petrol.state.onGas, "switched to petrol, it doesn't run on its tank")
-        T.expectNear("fuel on petrol", petrol.fuel, 3, 0.05)
+        T.expectNear("fuel on petrol", petrol.fuel, self.poured, 0.05)
         T.expectNear("gas burned on petrol", reads.afterPetrol.gas, reads.beforePetrol.gas, 0.001)
         T.expect(not out.running and out.state ~= nil and out.state.outOfGas, "the generator kept running with no gas")
-        T.expectNear("fuel once the gas ran out", out.fuel, 3, 0.05)
-        T.expect(self.counts.hoses[GasKit.HOSE] == 2, "cutting the line gave back " .. tostring(self.counts.hoses[GasKit.HOSE]) .. " hoses")
+        T.expectNear("fuel once the gas ran out", out.fuel, self.poured, 0.05)
+        T.expect(self.counts.cut[GasKit.HOSE] == hoses + 1, "cutting the line left " .. tostring(self.counts.cut[GasKit.HOSE]) .. " hoses")
     end,
 })
 
--- A load past what a generator carries on gas stalls it; once the load fits, it starts again on
--- its own.
+-- A job at a kitted generator first settles the time since the last pass as it ran: switching to
+-- petrol pays for the gas burned until then, and switching back to gas doesn't bill the time on
+-- petrol as gas.
+test("renewable_energy_gas_job_bills_the_time_before_it", {
+    instant = true,
+    run = function(self)
+        self.gas, self.load, self.hours = Digester.HOLDERS.bags.capacity, 500, 0.5
+        local digester = digesterWithGas(self, "barrel.steel", self.gas)
+        local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
+        if not generator then return end
+        fitAndConnect(self, generator, digester)
+        T.batch(function()
+            T.gasLoad(self, self.load)
+            T.setGenerator(self, generator, { running = true })
+            T.gasPass(self, generator, 0)
+            T.readRecord(self, digester, "onGas")
+            T.gasAge(self, generator, self.hours)
+        end)
+        kitJob(self, generator, GasKit.TO_PETROL)
+        T.batch(function()
+            T.readRecord(self, digester, "onPetrol")
+            T.gasAge(self, generator, self.hours)
+        end)
+        kitJob(self, generator, GasKit.TO_GAS)
+        T.batch(function()
+            -- A pass from the last as it stands, which the job set.
+            T.gasPass(self, generator, nil)
+            T.readRecord(self, digester, "backOnGas")
+        end)
+    end,
+    validate = function(self)
+        local reads = self.reads
+        T.expectNear("gas Run on Petrol billed for the " .. self.hours .. " hours on gas before it", reads.onGas.gas - reads.onPetrol.gas,
+            GasKit.gasFor(self.load, self.hours), 0.02)
+        T.expectNear("gas billed for the " .. self.hours .. " hours on petrol", reads.onPetrol.gas - reads.backOnGas.gas, 0, 0.02)
+    end,
+})
+
+-- A load past what a generator carries on gas stalls it, at its cap it runs, and once the load fits
+-- again it starts on its own. A line cut while it is stalled forgets the stall, so a new line
+-- doesn't start it.
 test("renewable_energy_gas_generator_stalls_over_cap", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "dome", 4)
+        local digester = digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.HOSE, count = 1 } })
-        kitJob(self, generator, GasKit.INSTALL)
-        kitJob(self, generator, GasKit.CONNECT, digester)
+        fitAndConnect(self, generator, digester)
         T.batch(function()
             T.setGenerator(self, generator, { running = true })
-            for _, case in ipairs({ { "atCap", GasKit.CAP_W }, { "over", GasKit.CAP_W + 1 }, { "fits", GasKit.CAP_W } }) do
+            for _, case in ipairs({ { "atCap", GasKit.CAP_W }, { "over", GasKit.CAP_W + 1 }, { "fits", GasKit.CAP_W },
+                { "stalled", GasKit.CAP_W + 1 } }) do
                 T.gasLoad(self, case[2])
                 T.gasPass(self, generator, 0.2)
                 T.readGenerator(self, generator, case[1])
             end
         end)
+        -- Cutting the line gives its hoses back, for the next.
+        kitJob(self, generator, GasKit.DISCONNECT)
+        T.readGenerator(self, generator, "cut")
+        kitJob(self, generator, GasKit.CONNECT, digester)
+        T.batch(function()
+            T.gasLoad(self, GasKit.CAP_W)
+            T.gasPass(self, generator, 0.2)
+            T.readGenerator(self, generator, "reconnected")
+        end)
     end,
     validate = function(self)
-        local atCap, over, fits = self.reads.atCap, self.reads.over, self.reads.fits
+        local reads = self.reads
+        local atCap, over, fits = reads.atCap, reads.over, reads.fits
         T.expect(atCap.running and atCap.state ~= nil and not atCap.state.stalled, "the generator stalled at exactly its cap")
         T.expect(not over.running and over.state ~= nil and over.state.stalled, "a watt over its cap didn't stall it")
         T.expect(fits.running and fits.state ~= nil and not fits.state.stalled, "the generator didn't start again once the load fit")
+        T.expect(reads.stalled.state ~= nil and reads.stalled.state.stalled, "a watt over its cap didn't stall it again")
+        T.expect(reads.cut.state ~= nil and not reads.cut.state.stalled, "cutting the line left the generator stalled")
+        T.expect(not reads.reconnected.running, "a new line started a generator stalled on the line before")
+    end,
+})
+
+-- A line whose gasifier is gone is lost with it while the generator runs on petrol too: no line in
+-- its state, no pipe on the generator, and on this client a new line can be connected.
+test("renewable_energy_gas_line_lost_with_its_source_on_petrol", {
+    instant = true,
+    run = function(self)
+        local generator = T.generator(self, { fuel = 3 })
+        if not generator then return end
+        local square = T.need(self, squareAt(generator.square, SIDES), "a free square beside the generator")
+        local gasifier = square and T.placeRecord(self, "gasifier", "primitive", { square = square })
+        if not gasifier then return end
+        self.side = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
+        fitAndConnect(self, generator, gasifier)
+        kitJob(self, generator, GasKit.TO_PETROL)
+        T.batch(function()
+            T.setGenerator(self, generator, { running = true })
+            T.removeRecord(self, gasifier)
+            T.gasPass(self, generator, 0.1)
+            T.readGenerator(self, generator, "lost")
+        end)
+        T.waitFor(self, function()
+            local state = GasKit.stateOf(generator.object)
+            return state ~= nil and state.source == nil
+        end, "this client's copy of the generator without its line")
+        T.step(function() self.connect = GasKit.refusal(T.player(), GasKit.CONNECT, generator.object) end)
+    end,
+    validate = function(self)
+        local lost = self.reads.lost
+        T.expect(lost.running and lost.state ~= nil and lost.state.mode == "petrol", "the generator stopped running on petrol")
+        T.expect(lost.state ~= nil and not lost.state.connected, "the line to a gasifier that is gone is still connected")
+        T.expect(not T.hasOverlay(lost, Sprites.gasifierPipeGen[self.side]), "the generator still shows a pipe to a gasifier that is gone")
+        T.expect(self.connect ~= "Tooltip_RenewableEnergy_HasLine", "this client refuses a new line: the generator still has one")
     end,
 })
 
@@ -177,7 +305,7 @@ test("renewable_energy_gas_generator_stalls_over_cap", {
 test("renewable_energy_gas_kit_menu", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "barrel.steel", 0.6)
+        local digester = digesterWithGas(self, "barrel.steel", Digester.HOLDERS.bags.capacity)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         self.generator = generator
@@ -190,11 +318,8 @@ test("renewable_energy_gas_kit_menu", {
                 context:hideAndChildren()
             end
         end)
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.HOSE, count = 1 } })
-        kitJob(self, generator, GasKit.INSTALL)
-        kitJob(self, generator, GasKit.CONNECT, digester)
-        T.waitForCopy(function()
+        fitAndConnect(self, generator, digester)
+        T.waitFor(self, function()
             local state = GasKit.stateOf(generator.object)
             return state ~= nil and state.onGas == true
         end, "this client's copy of the kit's state")
@@ -223,7 +348,7 @@ test("renewable_energy_gas_kit_menu", {
 
 -- A building is toxic while any of the mod's sources in it fumes: a sour digester and a lit
 -- gasifier, either alone, and clear only once the last stops. A digester whose gas overflows
--- indoors leaks fumes for a while too.
+-- indoors leaks fumes for LEAK_HOURS, and no longer.
 test("renewable_energy_gas_fumes_last_source_clears", {
     run = function(self)
         local digester = T.placeRecord(self, "digester", "barrel.steel", { indoors = true })
@@ -232,22 +357,25 @@ test("renewable_energy_gas_fumes_last_source_clears", {
         if not T.need(self, square:getBuilding() == digester.square:getBuilding(), "two indoor squares in one building") then return end
         local gasifier = T.placeRecord(self, "gasifier", "primitive", { square = square })
         if not gasifier then return end
-        local sour = T.matureDigester(5)
-        sour.sour, sour.acid = true, 5
-        local overflowing = { sour = false, acid = 0, potential = 0, gas = Digester.HOLDERS.bags.capacity + 0.1 }
+        local sour = T.sourDigester("barrel")
+        local overflowing = { sour = false, acid = 0, potential = 0, leakHours = 0, gas = Digester.HOLDERS.bags.capacity + 0.1 }
+        -- The pass that overflows starts the leak; half an hour short of LEAK_HOURS after, it still
+        -- leaks, and at LEAK_HOURS it has stopped.
+        local overflow = 0.5
         T.batch(function()
             T.setRecord(self, digester, sour)
             T.readRecord(self, digester, "sour")
             T.setRecord(self, gasifier, { lit = true, fireKg = 2 })
-            T.setRecord(self, digester, { sour = false, acid = 0 })
+            T.setRecord(self, digester, T.matureDigester("barrel"))
             T.readRecord(self, gasifier, "gasifierOnly")
             T.setRecord(self, digester, sour)
             T.setRecord(self, gasifier, { lit = false })
             T.readRecord(self, digester, "digesterOnly")
             T.setRecord(self, digester, overflowing)
-            T.runDigester(self, digester, 0.5, 30)
+            T.runDigester(self, digester, overflow, 30)
+            T.runDigester(self, digester, Digester.LEAK_HOURS - overflow, 30)
             T.readRecord(self, digester, "leaking")
-            T.runDigester(self, digester, Digester.LEAK_HOURS, 30)
+            T.runDigester(self, digester, overflow, 30)
             T.readRecord(self, digester, "leaked")
         end)
     end,
@@ -256,30 +384,27 @@ test("renewable_energy_gas_fumes_last_source_clears", {
         T.expect(reads.sour.toxic, "a sour digester indoors left the building clear")
         T.expect(reads.gasifierOnly.toxic, "a lit gasifier indoors left the building clear once the digester was fixed")
         T.expect(reads.digesterOnly.toxic, "the building cleared when the gasifier went out with the digester still sour")
-        T.expect(reads.leaking.toxic, "a digester overflowing indoors left the building clear")
+        T.expect(reads.leaking.toxic, "the building cleared before a leak's " .. Digester.LEAK_HOURS .. " hours were over")
         T.expect(not reads.leaked.toxic, "the building stayed toxic once the leak was over")
     end,
 })
 
 -- Wood gas ----------------------------------------------------------------------------------------
 
--- A free outdoor square at one of `offsets` from `square`, or nil.
-local function squareAt(square, offsets)
-    for _, offset in ipairs(offsets) do
-        local found = getSquare(square:getX() + offset[1], square:getY() + offset[2], square:getZ())
-        if RenewableEnergy.Debug.isFreeSquare(found, false) then
-            return found
-        end
-    end
-    return nil
+-- Queues lighting the gasifier once this client sees wood in it, with what that takes then given
+-- first.
+local function light(self, gasifier)
+    T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
+    T.step(function()
+        T.giveMaterials(self, "light", GasifierJobs.materials(GasifierJobs.LIGHT, T.recordSummary(gasifier)))
+    end)
+    T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
 end
 
-local SIDES = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }
-local CORNERS = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } }
-
 -- A gasifier beside a kitted generator, piped to it and lit, runs the generator with an empty tank,
--- burning wood for the idle and for the load; a full ash pit or a spent filter halves what it
--- carries, so a load that fitted stalls it; out of wood, the generator stops.
+-- burning wood for the idle and for the load. A full ash pit, or a spent filter, cuts what it
+-- carries to DIRTY_OUTPUT of the cap: a watt over that stalls the generator, a pit one short of full
+-- doesn't, and at exactly that it runs. Out of wood, the generator stops.
 test("renewable_energy_gas_gasifier_runs_generator", {
     instant = true,
     run = function(self)
@@ -288,19 +413,15 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         local square = T.need(self, squareAt(generator.square, SIDES), "a free square beside the generator")
         local gasifier = square and T.placeRecord(self, "gasifier", "standard", { square = square })
         if not gasifier then return end
+        local spec = Gasifier.TIERS.standard
         self.generatorSide = Gasifier.sideOf(gasifier.x, gasifier.y, generator.x, generator.y)
         self.gasifierSide = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
-        self.load = 2000
+        self.load, self.dirtyCap = 2000, GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
         -- One tuft in the filter, so burning one item's worth of tar spends it.
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 6 } }, filter = { { type = "Base.HayTuft" } } })
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.PIPE }, { type = "Base.Matches" }, { type = "Base.Bellows" } })
-        kitJob(self, generator, GasKit.INSTALL)
         -- Lit first, so gas reaches the generator the moment the line is in.
-        T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
-        kitJob(self, generator, GasKit.CONNECT, gasifier)
-        local fits, halved = 0.75 * GasKit.CAP_W, GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
-        self.fits = fits
+        light(self, gasifier)
+        fitAndConnect(self, generator, gasifier)
         T.batch(function()
             T.readRecord(self, gasifier, "lit")
             T.readGenerator(self, generator, "connected")
@@ -309,33 +430,31 @@ test("renewable_energy_gas_gasifier_runs_generator", {
             T.gasPass(self, generator, 1)
             T.ageRecord(self, gasifier, 1, "fed")
             T.readGenerator(self, generator, "running")
-            T.gasLoad(self, fits)
-            T.setRecord(self, gasifier, { ash = 100 })
+            T.gasLoad(self, self.dirtyCap + 1)
+            for _, case in ipairs({ { "ashNearlyFull", Gasifier.ASH_FULL - 1 }, { "ashFull", Gasifier.ASH_FULL }, { "ashCleared", 0 } }) do
+                T.setRecord(self, gasifier, { ash = case[2] })
+                T.gasPass(self, generator, 0.1)
+                T.readGenerator(self, generator, case[1])
+            end
+            T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = spec.tarKgPerItem }))
             T.gasPass(self, generator, 0.1)
-            T.readGenerator(self, generator, "ashFull")
-            T.setRecord(self, gasifier, { ash = 0 })
+            T.readGenerator(self, generator, "filterSpent")
+            T.readRecord(self, gasifier, "spent")
+            T.gasLoad(self, self.dirtyCap)
             T.gasPass(self, generator, 0.1)
-            T.readGenerator(self, generator, "ashCleared")
-        end)
-        T.step(function()
-            local spec = Gasifier.TIERS.standard
-            T.batch(function()
-                T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = spec.tarKgPerItem }))
-                T.gasPass(self, generator, 0.1)
-                T.readGenerator(self, generator, "filterSpent")
-                T.readRecord(self, gasifier, "spent")
-                -- Within what a spent filter carries, it runs again; then the wood runs out.
-                T.gasLoad(self, halved)
-                T.gasPass(self, generator, 0.1)
-                T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = 100 }))
-                T.gasPass(self, generator, 0.1)
-                T.readGenerator(self, generator, "out")
-            end)
+            T.readGenerator(self, generator, "dirtyRuns")
+            -- More than the hopper and the firebox hold.
+            T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = 2 * spec.hopperKg }))
+            T.gasPass(self, generator, 0.1)
+            T.readGenerator(self, generator, "out")
         end)
     end,
     validate = function(self)
         local reads = self.reads
         local lit, fed, connected, running = reads.lit, reads.fed, reads.connected, reads.running
+        local function stalled(read)
+            return not read.running and read.state ~= nil and read.state.stalled
+        end
         T.expect(lit.lit and lit.fireKg > 0, "lighting it didn't start a fire from the hopper")
         T.expect(lit.containers == 2, "the gasifier has " .. tostring(lit.containers) .. " containers, not a hopper and a filter")
         T.expect(connected.state and connected.state.sourceKind == "gasifier", "the line doesn't lead to the gasifier")
@@ -346,12 +465,13 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         local kg = Gasifier.IDLE_KG_PER_HOUR + Gasifier.KG_PER_KWH * self.load / 1000
         T.expectNear("wood burned in an hour at " .. self.load .. " W", (lit.hopperKg + lit.fireKg) - (fed.hopperKg + fed.fireKg), kg, 0.05)
         T.expectNear("ash after that hour", fed.ash - lit.ash, kg * Gasifier.TIERS.standard.ashPerKg, 0.15)
-        T.expect(not reads.ashFull.running and reads.ashFull.state and reads.ashFull.state.stalled,
-            "a full ash pit didn't stall a generator at " .. self.fits .. " W")
+        local over = (self.dirtyCap + 1) .. " W"
+        T.expect(reads.ashNearlyFull.running, "an ash pit one short of full stalled a generator at " .. over)
+        T.expect(stalled(reads.ashFull), "a full ash pit didn't stall a generator at " .. over)
         T.expect(reads.ashCleared.running, "the generator didn't start again once the ash was cleared")
         T.expect(reads.spent.clean == 0, "the filter still has " .. tostring(reads.spent.clean) .. " clean packing")
-        T.expect(not reads.filterSpent.running and reads.filterSpent.state and reads.filterSpent.state.stalled,
-            "a spent filter didn't stall a generator at " .. self.fits .. " W")
+        T.expect(stalled(reads.filterSpent), "a spent filter didn't stall a generator at " .. over)
+        T.expect(reads.dirtyRuns.running, "a spent filter didn't run a generator at " .. self.dirtyCap .. " W")
         T.expect(not reads.out.running and reads.out.state and reads.out.state.outOfGas, "out of wood, the generator kept running")
     end,
 })
@@ -365,25 +485,22 @@ test("renewable_energy_gas_gasifier_must_stand_beside", {
         local square = T.need(self, squareAt(generator.square, CORNERS), "a free square on a corner of the generator")
         local gasifier = square and T.placeRecord(self, "gasifier", "primitive", { square = square })
         if not gasifier then return end
-        T.setPerk(self, Perks.Mechanics, 2)
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.PIPE } })
-        kitJob(self, generator, GasKit.INSTALL)
-        T.waitForCopy(function() return GasKit.hasKit(generator.object) end, "this client's copy of the kit")
-        T.step(function() self.refusal = GasKit.refusal(T.player(), GasKit.CONNECT, generator.object, nil, gasifier.object) end)
+        fitKit(self, generator)
+        T.step(function() self.refusal = GasKit.refusal(T.player(), GasKit.CONNECT, generator.object, gasifier.object) end)
     end,
     validate = function(self)
         T.expect(self.refusal == "Tooltip_RenewableEnergy_GasifierNotBeside", "a gasifier on a corner: " .. tostring(self.refusal))
     end,
 })
 
--- The ash pit fills as wood burns; Clean Out Ash with a shovel gives Wood Ash for it, until too
--- little is left for one. The filter's packing turns tarry.
+-- The ash pit fills as wood burns; Clean Out Ash with a shovel gives Wood Ash for it and leaves the
+-- rest, and refuses with one short of an item's worth, not with exactly one. The filter's packing
+-- turns tarry.
 test("renewable_energy_gas_gasifier_ash_and_tar", {
     instant = true,
     run = function(self)
         local gasifier = T.placeRecord(self, "gasifier", "standard")
         if not gasifier then return end
-        self.gasifier = gasifier
         local spec = Gasifier.TIERS.standard
         self.burned = 2 * spec.tarKgPerItem + 0.5
         self.ash = 2 * Gasifier.ASH_PER_ITEM + Gasifier.ASH_PER_ITEM / 2
@@ -395,62 +512,74 @@ test("renewable_energy_gas_gasifier_ash_and_tar", {
             -- Out, so no pass burns more meanwhile.
             T.setRecord(self, gasifier, { ash = self.ash, lit = false })
         end)
-        T.give(self, "shovel", { { type = "Base.Shovel" } })
+        T.giveMaterials(self, "shovel", GasifierJobs.materials(GasifierJobs.CLEAN_ASH))
+        T.waitForSummary(self, gasifier, function(summary) return summary.ash == math.floor(self.ash) end,
+            "this client's summary of the ash pit")
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.CLEAN_ASH)
         T.batch(function()
             T.readRecord(self, gasifier, "cleaned")
             T.count(self, "ash", { Gasifier.WOOD_ASH })
         end)
-        T.waitForSummary(gasifier, function(summary) return summary.ash < Gasifier.ASH_PER_ITEM end, "this client's summary of the cleaned pit")
-        T.step(function() self.littleAsh = GasifierJobs.refusal(T.player(), GasifierJobs.CLEAN_ASH, gasifier.object) end)
+        self.refusals = {}
+        for _, case in ipairs({ { "short", Gasifier.ASH_PER_ITEM - 1 }, { "enough", Gasifier.ASH_PER_ITEM } }) do
+            T.setRecord(self, gasifier, { ash = case[2] })
+            T.waitForSummary(self, gasifier, function(summary) return summary.ash == case[2] end, "this client's summary of the ash pit")
+            T.step(function() self.refusals[case[1]] = GasifierJobs.refusal(T.player(), GasifierJobs.CLEAN_ASH, gasifier.object) end)
+        end
     end,
     validate = function(self)
         local burned, cleaned = self.reads.burned, self.reads.cleaned
-        local spec = Gasifier.TIERS.standard
-        T.expectNear("ash after burning", burned.ash, self.burned * spec.ashPerKg, 0.05)
+        T.expectNear("ash after burning", burned.ash, self.burned * Gasifier.TIERS.standard.ashPerKg, 0.05)
         T.expect(burned.clean == 0 and burned.tarry == 2, "packing after burning: " .. tostring(burned.clean) .. " clean, " .. tostring(burned.tarry) .. " tarry")
         T.expectNear("ash after cleaning out", cleaned.ash, self.ash - 2 * Gasifier.ASH_PER_ITEM, 0.01)
         T.expect(self.counts.ash[Gasifier.WOOD_ASH] == 2, "cleaning out gave " .. tostring(self.counts.ash[Gasifier.WOOD_ASH]) .. " wood ash, not 2")
-        T.expect(self.littleAsh == "Tooltip_RenewableEnergy_LittleAsh", "Clean Out Ash with too little for one: " .. tostring(self.littleAsh))
+        T.expect(self.refusals.short == "Tooltip_RenewableEnergy_LittleAsh", "Clean Out Ash one short of an item: " .. tostring(self.refusals.short))
+        T.expect(self.refusals.enough == nil, "Clean Out Ash with an item's worth: " .. tostring(self.refusals.enough))
     end,
 })
 
--- A cold gasifier takes bellows to light; one just put out doesn't, and one out longer than it
--- stays warm is cold again.
+-- A cold gasifier takes bellows to light; one just put out doesn't, nor one out a little less than
+-- it stays warm, while one out a little longer is cold again.
 test("renewable_energy_gas_gasifier_cold_start", {
     instant = true,
     run = function(self)
         local gasifier = T.placeRecord(self, "gasifier", "primitive")
         if not gasifier then return end
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 2 } } })
-        T.give(self, "matches", { { type = "Base.Matches" } })
-        T.waitForSummary(gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
+        T.give(self, "matches", { { type = Materials.FIRE_STARTER.item } })
+        T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
         T.step(function()
             self.coldNeed = RenewableEnergy.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
         end)
-        T.give(self, "bellows", { { type = "Base.Bellows" } })
+        T.give(self, "bellows", { { type = Gasifier.BELLOWS[1] } })
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.PUT_OUT)
-        T.server(self, "takeItems", { type = "Base.Bellows" })
-        T.waitForSummary(gasifier, function(summary) return not summary.lit end, "this client's summary of the gasifier put out")
-        T.waitForCopy(function() return not T.player():getInventory():containsTypeRecurse("Base.Bellows") end,
+        T.server(self, "takeItems", { type = Gasifier.BELLOWS[1] })
+        T.waitForSummary(self, gasifier, function(summary) return not summary.lit end, "this client's summary of the gasifier put out")
+        T.waitFor(self, function() return not T.player():getInventory():containsTypeRecurse(Gasifier.BELLOWS[1]) end,
             "this client's copy of the bellows gone")
         T.step(function()
-            self.warmRefusal = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object)
-            -- Out a little longer than it stays warm.
-            T.setRecord(self, gasifier, { outSince = getGameTime():getWorldAgeHours() - Gasifier.COLD_HOURS - 0.05 })
+            self.outAt = T.recordSummary(gasifier).outSince
+            self.refusals = { justOut = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object) }
         end)
-        T.waitForSummary(gasifier, function(summary) return summary.cold end, "this client's summary of the gasifier gone cold")
-        T.step(function()
-            local summary = T.recordSummary(gasifier)
-            self.cold = summary and summary.cold
-        end)
+        local step = 0.05
+        for _, case in ipairs({ { "warm", Gasifier.COLD_HOURS - step }, { "cold", Gasifier.COLD_HOURS + step } }) do
+            T.setRecord(self, gasifier, nil, { outSince = case[2] })
+            -- Each case puts outSince further back than the one before, by more than `step`.
+            T.waitForSummary(self, gasifier, function(summary) return summary.outSince < self.outAt - step end,
+                "this client's summary of the gasifier out " .. case[2] .. " hours")
+            T.step(function()
+                self.refusals[case[1]] = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object)
+                self.outAt = T.recordSummary(gasifier).outSince
+            end)
+        end
     end,
     validate = function(self)
         T.expect(self.coldNeed and self.coldNeed.item == Gasifier.BELLOWS[1], "a cold gasifier lit without bellows: "
             .. tostring(self.coldNeed and self.coldNeed.item))
-        T.expect(self.warmRefusal == nil, "just put out, it still wants something to light: " .. tostring(self.warmRefusal))
-        T.expect(self.cold, "out longer than it stays warm, it isn't cold")
+        T.expect(self.refusals.justOut == nil, "just put out, it still wants something to light: " .. tostring(self.refusals.justOut))
+        T.expect(self.refusals.warm == nil, "out a little less than it stays warm, it wants something to light: " .. tostring(self.refusals.warm))
+        T.expect(self.refusals.cold == "short", "out a little longer than it stays warm, it lit without bellows: " .. tostring(self.refusals.cold))
     end,
 })
 
@@ -460,15 +589,20 @@ test("renewable_energy_gas_gasifier_drain_condensate", {
     run = function(self)
         local gasifier = T.placeRecord(self, "gasifier", "primitive")
         if not gasifier then return end
-        T.setRecord(self, gasifier, { lit = true, fireKg = 5, condensate = 2 })
-        T.give(self, "containers", { { type = "Base.WaterBottle" }, { type = "Base.Pot" } })
-        T.server(self, "refillFluid", function() return { id = self.items.containers[1]:getID() } end)
-        T.server(self, "refillFluid", function() return { id = self.items.containers[2]:getID() } end)
-        T.waitForSummary(gasifier, function(summary) return summary.condensate >= 2 end, "this client's summary of the condensate")
+        self.condensate = 2
+        T.batch(function()
+            T.setRecord(self, gasifier, { lit = true, fireKg = 5, condensate = self.condensate })
+            T.give(self, "containers", { { type = "Base.WaterBottle" }, { type = "Base.Pot" } })
+            T.server(self, "refillFluid", { type = "Base.WaterBottle" })
+            T.server(self, "refillFluid", { type = "Base.Pot" })
+        end)
+        T.waitForSummary(self, gasifier, function(summary) return summary.condensate >= self.condensate end, "this client's summary of the condensate")
+        T.waitFor(self, function() return self.items.containers[1]:getFluidContainer():isEmpty() end, "this client's copy of the emptied bottle")
         T.step(function()
-            self.bottleHot = GasifierJobs.refusal(T.player(), GasifierJobs.DRAIN, gasifier.object, self.items.containers[1])
-            self.potHot = GasifierJobs.refusal(T.player(), GasifierJobs.DRAIN, gasifier.object, self.items.containers[2])
-            self.coldBottle = Gasifier.takesCondensate(self.items.containers[1], false)
+            local bottle, pot = self.items.containers[1], self.items.containers[2]
+            self.bottleHot = GasifierJobs.refusal(T.player(), GasifierJobs.DRAIN, gasifier.object, bottle)
+            self.potHot = GasifierJobs.refusal(T.player(), GasifierJobs.DRAIN, gasifier.object, pot)
+            self.coldBottle = Gasifier.takesCondensate(bottle, false)
         end)
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.DRAIN, function() return self.items.containers[2] end)
         T.batch(function()
@@ -480,10 +614,9 @@ test("renewable_energy_gas_gasifier_drain_condensate", {
         T.expect(self.bottleHot == "Tooltip_RenewableEnergy_WontTakeCondensate", "a plastic bottle takes the condensate hot: " .. tostring(self.bottleHot))
         T.expect(self.potHot == nil, "a pot won't take the condensate hot: " .. tostring(self.potHot))
         T.expect(self.coldBottle, "a plastic bottle won't take it cold")
-        local potHolds = instanceItem("Base.Pot"):getFluidContainer():getCapacity()
-        local poured = math.min(2, potHolds)
+        local poured = math.min(self.condensate, instanceItem("Base.Pot"):getFluidContainer():getCapacity())
         T.expectNear("wood vinegar carried", self.server.carried.fluids[Gasifier.VINEGAR], poured, 0.01)
-        T.expectNear("condensate left", self.reads.drained.condensate, 2 - poured, 0.01)
+        T.expectNear("condensate left", self.reads.drained.condensate, self.condensate - poured, 0.01)
     end,
 })
 

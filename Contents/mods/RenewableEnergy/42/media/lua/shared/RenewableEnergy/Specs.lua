@@ -19,13 +19,13 @@ Specs.batteries = {
 
 -- Inverters by item type: the watts it carries (a bank's limit is the sum over its working
 -- inverters), the watts it draws itself while on, the watts its built-in charger puts into the
--- bank from grid or generator power (0 for none), the Electricity level wiring it in needs, and
--- the Electricity XP of the first time one is ever wired in.
+-- bank from grid or generator power (0 for none), and the Electricity level wiring it in needs and
+-- the Electricity XP of the first time one is ever wired in (over Specs.wiring.inverter's).
 -- The Plug-in Inverter carries a TV and one lamp, or a mini fridge, but not a full fridge.
 Specs.inverters = {
-    ["RenewableEnergy.PlugInInverter"] = { watts = 150, idle = 4, chargerWatts = 0, wireSkill = 0, wireXp = 10 },
-    ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wireSkill = 2, wireXp = 15 },
-    ["RenewableEnergy.InverterCharger"] = { watts = 2500, idle = 15, chargerWatts = 1500, wireSkill = 4, wireXp = 25 },
+    ["RenewableEnergy.PlugInInverter"] = { watts = 150, idle = 4, chargerWatts = 0, wiring = { skill = 0, xp = 10 } },
+    ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wiring = { skill = 2, xp = 15 } },
+    ["RenewableEnergy.InverterCharger"] = { watts = 2500, idle = 15, chargerWatts = 1500, wiring = { skill = 4, xp = 25 } },
 }
 
 -- A 1993 modified-sine inverter turns about this much of the battery's power into AC.
@@ -81,13 +81,11 @@ Specs.treadmill = {
 -- reaches the bank.
 Specs.chargerWatts = 250
 
--- Condition inverters and controllers lose per hour while their bank powers its area, and an
--- inverter's extra loss each time an overload cuts the bank: about one Electronics Scrap of
--- repairs a week per inverter.
+-- Condition each kind of bank part loses per hour while its bank powers its area, and per overload
+-- that cuts the bank: about one Electronics Scrap of repairs a week per inverter.
 Specs.partWear = {
-    inverterPerHour = 0.06,
-    controllerPerHour = 0.03,
-    overload = 1,
+    perHour = { inverter = 0.06, controller = 0.03 },
+    perOverload = { inverter = 1 },
 }
 -- An Electronics Scrap repairs this much of a part's condition, at this Electricity level or more
 -- (as vanilla's ISFixGenerator).
@@ -105,10 +103,12 @@ Specs.factoryModule = "RenewableEnergy.SolarModule"
 
 -- Panel mounts by kind (RenewableEnergy.Sprites.kindOf): input slots, modules held, tilt from
 -- flat, and how likely a storm is to crack one of its modules, before the material's own factor.
+-- Snow settles on a mount that holdsSnow (not on an upright wall panel) and lies there until it
+-- melts or is swept off, unless the mount shedsSnow as a tilted rack does in sun or mild air.
 Specs.mounts = {
-    flat = { slots = 1, modules = 1, tilt = 0, stormFactor = 1 },
+    flat = { slots = 1, modules = 1, tilt = 0, stormFactor = 1, holdsSnow = true },
     wall = { slots = 1, modules = 1, tilt = 90, stormFactor = 0 },
-    rack = { slots = 1, modules = 2, tilt = 38, stormFactor = 1 },
+    rack = { slots = 1, modules = 2, tilt = 38, stormFactor = 1, holdsSnow = true, shedsSnow = true },
 }
 -- A wooden mount flexes and lets modules crack; a welded one holds them.
 Specs.materials = {
@@ -137,10 +137,10 @@ Specs.banks = {
     ["RenewableEnergy.BatteryBankMetal"] = { sprite = "batteryBankMetal", maxBatteries = 16, maxInverters = 2, maxChargers = 2, maxControllers = 4 },
 }
 
--- What wiring each kind of part into a bank takes: game seconds at Electricity 0, Electric Wire
--- (Unwire gives it back), Electronics Scrap (kept by the part), the tool (an ItemTag field) and
--- the Electricity level. xp is the Electricity XP of the first time an item is ever wired in.
--- Inverters take their own wireSkill and wireXp.
+-- What wiring each kind of part into a bank takes: seconds at normal game speed at Electricity 0
+-- (RenewableEnergyAction), Electric Wire (Unwire gives it back), Electronics Scrap (kept by the
+-- part), the tool (an ItemTag field) and the Electricity level. xp is the Electricity XP of the
+-- first time an item is ever wired in. Each inverter type takes its own skill and xp (Specs.inverters).
 Specs.wiring = {
     battery = { seconds = 30, wire = 1, scrap = 0, tool = "WRENCH", skill = 0, xp = 5 },
     inverter = { seconds = 60, wire = 2, scrap = 0, tool = "SCREWDRIVER" },

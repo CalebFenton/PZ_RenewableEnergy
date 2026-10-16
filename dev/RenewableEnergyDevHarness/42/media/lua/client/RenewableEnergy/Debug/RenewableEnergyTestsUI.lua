@@ -168,10 +168,10 @@ test("renewable_energy_ui_menu_panel_wired_to", {
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
         if not self.panel then return end
         T.perform(self, "rename", { bank = self.bank.position, name = "Shed Bank" })
-        T.waitForCopy(function()
+        T.waitFor(self, function()
             local summary = T.clientSummary(self.bank)
             return summary ~= nil and summary.name == "Shed Bank"
-        end)
+        end, "this client's summary of the renamed bank")
     end,
     validate = function(self)
         local context = newContext()
@@ -240,20 +240,14 @@ test("renewable_energy_ui_menu_wire_in_options", {
 })
 
 -- In the dark nothing can be wired in or out: the menu greys them out and the action won't start.
--- In single player the authority refuses it too; a server can't tell whether a remote player
--- stands in the dark (IsoPlayer.tooDarkToRead), so in multiplayer the player's own side is what
--- refuses.
+-- The action's own check is the rule, on the player's side: a server can't tell whether a remote
+-- player stands in the dark (IsoPlayer.tooDarkToRead).
 test("renewable_energy_ui_wiring_refused_in_the_dark", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", POWER_INVERTER })
         if not self.bank then return end
         T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Wrench" }, { type = PowerBank.WIRE } })
         T.makeDark(self)
-        if not isClient() then
-            T.perform(self, "wireIn", function()
-                return { bank = self.bank.position, itemId = self.items.parts[1]:getID() }
-            end)
-        end
     end,
     validate = function(self)
         local p = player()
@@ -272,11 +266,6 @@ test("renewable_energy_ui_wiring_refused_in_the_dark", {
         expect(allDark, "a part can be unwired in the dark")
         context:hideAndChildren()
         expect(not Action:new(p, Action.WIRE_IN, nil, bank, nil, battery):isValid(), "the Wire In action runs in the dark")
-        local refused = self.server.perform
-        if refused then
-            expect(not refused.ok and refused.reason == "Tooltip_RenewableEnergy_TooDark",
-                "the authority wired a battery in in the dark (" .. tostring(refused.reason) .. ")")
-        end
     end,
 })
 
@@ -292,7 +281,10 @@ test("renewable_energy_ui_repair_part", {
         if not bank then return end
         self.bank = bank
         T.setPartCondition(self, bank, POWER_INVERTER, WORN)
-        T.waitForCopy(function() return copyItem(bank, POWER_INVERTER):getCondition() == WORN end)
+        T.waitFor(self, function()
+            local inverter = copyItem(bank, POWER_INVERTER)
+            return inverter ~= nil and inverter:getCondition() == WORN
+        end, "this client's copy of the worn inverter")
         T.step(function()
             local context = newContext()
             local option = optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
@@ -308,7 +300,10 @@ test("renewable_energy_ui_repair_part", {
             self.offered = option ~= nil and not option.notAvailable
             if not self.offered then return end
             T.choose(option)
-            T.waitForCopy(function() return copyItem(bank, POWER_INVERTER):getCondition() == REPAIRED end)
+            T.waitFor(self, function()
+                local inverter = copyItem(bank, POWER_INVERTER)
+                return inverter ~= nil and inverter:getCondition() == REPAIRED
+            end, "this client's copy of the repaired inverter")
             T.bankState(self, bank)
             T.count(self, "scrap", { PowerBank.SCRAP })
         end)
@@ -371,9 +366,9 @@ test("renewable_energy_ui_connect_panel", {
             end)
             if not walkTo(self, self.panel.square, "the panel") then return end
             ISTimedActionQueue.add(action)
-            T.waitForCopy(function()
+            T.waitFor(self, function()
                 return PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position)
-            end)
+            end, "this client's copy of the connection")
             T.bankState(self, self.bank)
         end)
     end,
@@ -407,7 +402,7 @@ test("renewable_energy_ui_disconnect_panel", {
             if not self.offered then return end
             T.standNextTo(self.panel.square)
             T.choose(option)
-            T.waitForCopy(function() return PowerBank.connectedBank(self.panel.object) == nil end, "this client's copy of the disconnection")
+            T.waitFor(self, function() return PowerBank.connectedBank(self.panel.object) == nil end, "this client's copy of the disconnection")
             T.bankState(self, self.bank)
         end)
     end,
@@ -437,10 +432,10 @@ test("renewable_energy_ui_clear_snow_requirements", {
         self.wall = self.flat and T.panel(self, Sprites.wall.wood.E)
         if not self.wall then return end
         T.server(self, "setSnow", { bank = self.bank.position, source = self.flat.position, snow = 0.8 })
-        T.waitForCopy(function()
+        T.waitFor(self, function()
             local summary = T.clientSummary(self.bank)
             return summary ~= nil and summary.sources[1] ~= nil and summary.sources[1].snowy == true
-        end)
+        end, "this client's summary with the panel snowy")
         T.step(function() self.withoutTool = clearSnowOption(self.flat) end)
         T.give(self, "tools", { { type = "Base.Broom" }, { type = "Base.SnowShovel" }, { type = "Base.Hammer" } })
         T.step(function() self.withTool = clearSnowOption(self.flat) end)
@@ -517,10 +512,10 @@ test("renewable_energy_ui_wire_in_and_unwire", {
                 return
             end
             T.choose(option)
-            T.waitForCopy(function()
+            T.waitFor(self, function()
                 local status = T.clientStatus(bank)
                 return bank.object:getContainer():getItemWithID(self.batteryId) ~= nil and status ~= nil and #status.batteries == 1
-            end)
+            end, "this client's copy of the bank with the battery wired in")
             T.bankState(self, bank)
         end)
     end,
@@ -558,26 +553,26 @@ test("renewable_energy_ui_rename_bank", {
         T.step(function()
             if not walkTo(self, bank.square, "the bank") then return end
             ISTimedActionQueue.add(Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "  Cellar  "))
-            T.waitForCopy(function() return Menu.bankLabel(bank.object) == "Cellar" end)
+            T.waitFor(self, function() return Menu.bankLabel(bank.object) == "Cellar" end, "this client's label of the renamed bank")
             T.step(function()
-                self.renamed = Menu.bankLabel(bank.object)
+                -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
                 local window = StatusWindow.open(0, bank.object)
                 T.defer(self, function() window:close() end)
-                T.waitForCopy(function() return window.status ~= nil end)
+                T.waitFor(self, function() return window.status ~= nil end, "the window's status of the renamed bank")
                 T.step(function()
                     self.title = window.title
                     window:close()
                     local action = Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "")
                     self.emptyAllowed = action:canPerform()
                     ISTimedActionQueue.add(action)
-                    T.waitForCopy(function() return Menu.bankLabel(bank.object) ~= "Cellar" end)
+                    T.waitFor(self, function() return Menu.bankLabel(bank.object) ~= "Cellar" end,
+                        "this client's label of the bank renamed to nothing")
                     T.bankState(self, bank)
                 end)
             end)
         end)
     end,
     validate = function(self)
-        expect(self.renamed == "Cellar", "the renamed bank's menu reads " .. tostring(self.renamed))
         expect(self.title == "Cellar", "the window of the renamed bank is titled " .. tostring(self.title))
         expect(self.emptyAllowed, "renaming to an empty name was refused")
         local tier = getItemNameFromFullType("RenewableEnergy.BatteryRackMetal")
@@ -650,11 +645,7 @@ local function openWindow(self)
     local window = StatusWindow.open(0, self.bank.object)
     self.window = window
     T.defer(self, function() window:close() end)
-    T.waitForCopy(function() return (window.renderedFrames or 0) > 0 end)
-end
-
-local function expectDrawn(window)
-    return expect((window.renderedFrames or 0) > 0 and window.status ~= nil, "the window never drew a status")
+    T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
 end
 
 -- A bank with nothing in it says it has no batteries, no inverter and no parts, and that it must
@@ -666,7 +657,6 @@ test("renewable_energy_ui_window_empty_bank", {
     end,
     validate = function(self)
         local window = self.window
-        if not expectDrawn(window) then return end
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_NoBatteries")), "an empty bank does not say it has no batteries")
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_NoWorkingInverter")), "an empty bank does not say it has no inverter")
         expect(hasLine(window.summaryLines, getText("IGUI_RenewableEnergy_StateOutdoors")), "a bank outdoors doesn't say it must go inside")
@@ -675,11 +665,11 @@ test("renewable_energy_ui_window_empty_bank", {
 })
 
 -- Queues a wait until this client's status of `bank` has the load the server's last answer gave.
-local function waitForLoad(bank)
-    T.waitForCopy(function()
+local function waitForLoad(self, bank)
+    T.waitFor(self, function()
         local status = T.clientStatus(bank)
         return status ~= nil and status.loadW == bank.state.status.loadW and status.solarW == bank.state.status.solarW
-    end)
+    end, "this client's status with the load the server measured")
 end
 
 -- The window's lines follow the bank: the overload with its load and limit, the panel slots with
@@ -701,10 +691,10 @@ test("renewable_energy_ui_window_reflects_status", {
                 if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
             end
         end)
-        T.waitForCopy(function()
+        T.waitFor(self, function()
             local status = T.clientStatus(bank)
             return status ~= nil and #status.sources == 3
-        end)
+        end, "this client's status listing the three panels")
         T.step(function() self.withControllerSummary = StatusWindow.summary(T.clientStatus(bank)) end)
         T.batch(function()
             T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
@@ -712,7 +702,7 @@ test("renewable_energy_ui_window_reflects_status", {
             T.bankPass(self, bank, 1000)
             T.applyLoad(self, bank, { "television", "light", "light", "fridge" })
         end)
-        waitForLoad(bank)
+        waitForLoad(self, bank)
     end,
     validate = function(self)
         expect(self.withControllerSummary ~= nil and hasLine(self.withControllerSummary,
@@ -809,12 +799,11 @@ test("renewable_energy_ui_window_full_bank", {
             T.bankPass(self, bank, 650)
             T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
         end)
-        waitForLoad(bank)
+        waitForLoad(self, bank)
         T.step(function() openWindow(self) end)
     end,
     validate = function(self)
         local window = self.window
-        if not expectDrawn(window) then return end
         local status = window.status
         local found = headers(window.right)
         expect(found[getText("IGUI_RenewableEnergy_Batteries", 5)],
@@ -825,5 +814,92 @@ test("renewable_energy_ui_window_full_bank", {
             expect(rowLabelled(window.left, getItemNameFromFullType(fullType)) ~= nil, "the window does not list the " .. fullType)
         end
         expect(window.switchButton.enable, "the switch is disabled on a bank with an inverter")
+    end,
+})
+
+-- Refusals every layer shares ------------------------------------------------------------------
+
+-- Turn On is refused without a working inverter by every layer: the window's switch greys out
+-- saying why, the action won't start, and the authority's command refuses it. Catches a switch that
+-- only the menu greyed, which a queued action or the window's button went around.
+test("renewable_energy_ui_turn_on_refused_without_inverter", {
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
+        if not self.bank then return end
+        T.step(function() openWindow(self) end)
+        T.perform(self, "setBankOn", { bank = self.bank.position, on = true })
+        T.step(function() self.refused = self.server.perform end)
+        T.bankState(self, self.bank)
+    end,
+    validate = function(self)
+        local bank, button, why = self.bank.object, self.window.switchButton, getText("Tooltip_RenewableEnergy_NoInverter")
+        expect(not Action:new(player(), Action.TURN_ON, nil, bank):canPerform(), "Turn On can start on a bank without an inverter")
+        expect(not self.refused.ok and self.refused.reason == "Tooltip_RenewableEnergy_NoInverter",
+            "the authority switched on a bank without an inverter (" .. tostring(self.refused.reason) .. ")")
+        expect(not self.bank.state.on, "the bank without an inverter is on")
+        expect(not button.enable and button.tooltip == why,
+            "the window's switch isn't greyed out saying there's no inverter (" .. tostring(button.tooltip) .. ")")
+    end,
+})
+
+-- Connect options on a bank, with `loose` sources in its reach, and on the loose panel `panel`,
+-- read from this client's copies: whether they show greyed, and why.
+local function connectOptions(bank, panel, loose)
+    local context = newContext()
+    local bankMenu = Menu.addBankOptions(0, context, bank.object)
+    local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
+    local function read(option)
+        return { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable == true, reason = tooltipOf(option) }
+    end
+    local options = {
+        all = read(optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
+        one = read(optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank.object),
+            Format.away(panel.position, bank.position)))),
+    }
+    context:hideAndChildren()
+    return options
+end
+
+-- A bank with every input slot taken greys out connecting another panel, from the bank's menu and
+-- from the panel's, saying there's no slot; one slot freed, both offer it. Read on this client's
+-- summary, which carries the free slots. Catches a menu that offers a connection the bank then
+-- refuses, or still refuses once a slot is free.
+test("renewable_energy_ui_connect_refused_without_free_slot", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        if not bank then return end
+        self.bank = bank
+        local wired = {}
+        T.batch(function()
+            for i = 1, Specs.freeSlots do
+                wired[i] = T.panel(self, Sprites.flat, { near = bank, connect = true })
+                if not wired[i] then return end
+            end
+            self.loose = T.panel(self, Sprites.flat, { near = bank })
+        end)
+        if not self.loose then return end
+        local function freeSlots(count)
+            T.waitFor(self, function()
+                local summary = T.clientSummary(bank)
+                return summary ~= nil and summary.freeSlots == count
+            end, "this client's summary with " .. count .. " free input slots")
+        end
+        freeSlots(0)
+        T.step(function() self.full = connectOptions(bank, self.loose, 1) end)
+        T.perform(self, "disconnectSource", { bank = bank.position, source = wired[1].position })
+        freeSlots(1)
+        -- The disconnected panel is loose in reach now too.
+        T.step(function() self.freed = connectOptions(bank, self.loose, 2) end)
+    end,
+    validate = function(self)
+        local why = getText("Tooltip_RenewableEnergy_NoInputSlot")
+        for name, option in pairs(self.full) do
+            expect(option.unavailable and option.reason == why, "with every slot taken, the " .. name
+                .. " connect option isn't greyed out saying there's no slot (" .. tostring(option.reason) .. ")")
+        end
+        for name, option in pairs(self.freed) do
+            expect(option.offered and not option.unavailable, "with a slot free, the " .. name
+                .. " connect option isn't offered (" .. tostring(option.reason) .. ")")
+        end
     end,
 })

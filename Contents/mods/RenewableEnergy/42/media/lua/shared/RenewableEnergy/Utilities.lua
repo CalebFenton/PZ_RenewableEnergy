@@ -94,14 +94,55 @@ function RenewableEnergy.onSquare(object)
     return object ~= nil and object:getObjectIndex() ~= -1
 end
 
---- Whether `character` stands within `reach` squares on each axis of the middle of `object`'s
+--- Whether `character` stands within `reach` squares on each axis of the middle of `target`'s
 --- square, on its level: where the menu walked them for a job there (luautils.walkAdj), with room
---- for drift and a client's lag. The authority checks it before doing a job.
-function RenewableEnergy.withinReach(character, object, reach)
-    local square = object:getSquare()
+--- for drift and a client's lag. A vehicle `target` gets `reach` past half its longest side, round
+--- its middle, as the menu walks the character to one of its areas
+--- (ISPathFindAction.pathToVehicleArea). The authority checks it before doing a job.
+function RenewableEnergy.withinReach(character, target, reach)
+    if instanceof(target, "BaseVehicle") then
+        local extents = target:getScript():getExtents()
+        local around = math.max(extents:x(), extents:z()) / 2 + reach
+        return IsoUtils.DistanceTo(character:getX(), character:getY(), target:getX(), target:getY()) <= around
+            and math.abs(character:getZ() - target:getZ()) < 1
+    end
+    local square = target:getSquare()
     return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= reach
         and math.abs(character:getY() - (square:getY() + 0.5)) <= reach
         and math.abs(character:getZ() - square:getZ()) < 1
+end
+
+-- The map's lowest and highest levels (IsoChunk.getGridSquare).
+local LOWEST_LEVEL, HIGHEST_LEVEL = -32, 31
+
+--- Whether the square x, y, z is in a generator's reach of `origin` (an IsoGridSquare or an
+--- IsoObject on one): GeneratorTileRange squares between square middles and
+--- GeneratorVerticalPowerRange levels, as IsoGenerator.isPoweringSquare measures it. That one reads
+--- copies of the options taken only as a generator is built, so this reads the options.
+function RenewableEnergy.inGeneratorReach(origin, x, y, z)
+    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
+    local dx, dy, dz = x - origin:getX(), y - origin:getY(), z - origin:getZ()
+    return z >= LOWEST_LEVEL and z <= HIGHEST_LEVEL and math.abs(dz) <= levels and dx * dx + dy * dy <= radius * radius
+end
+
+--- Calls `fn(square)` for every loaded square in a generator's reach of `origin`
+--- (RenewableEnergy.inGeneratorReach).
+function RenewableEnergy.eachSquareInGeneratorReach(origin, fn)
+    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
+    local cx, cy, cz = origin:getX(), origin:getY(), origin:getZ()
+    local cell = getCell()
+    local radiusSquared = radius * radius
+    for z = math.max(LOWEST_LEVEL, cz - levels), math.min(HIGHEST_LEVEL, cz + levels) do
+        for x = cx - radius, cx + radius do
+            local dxSquared = (x - cx) * (x - cx)
+            for y = cy - radius, cy + radius do
+                local square = dxSquared + (y - cy) * (y - cy) <= radiusSquared and cell:getGridSquare(x, y, z)
+                if square then
+                    fn(square)
+                end
+            end
+        end
+    end
 end
 
 --- Shows `wanted` (a list of sprite names, in drawing order) as the overlays of the kind

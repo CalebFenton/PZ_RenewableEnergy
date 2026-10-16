@@ -15,19 +15,36 @@ handler("electricityAward", function(player, args)
     return { gained = xp:getXP(Perks.Electricity) - before, xp = xp:getXP(Perks.Electricity) }
 end)
 
--- Empties the fluid container of the character's item `args.id`, fills it with `args.liters` of
--- `args.fluid` (a fluid name, none when nil), and sends the item to the character's client.
+-- Empties the fluid container of the character's item `args.id`, or of every carried item of
+-- full type `args.type`, fills it with `args.liters` of `args.fluid` (a fluid name, none when
+-- nil), and sends the item to the character's client. By type, a test passes its args as a table,
+-- which T.batch and sendAhead may send early, where an id known only once the item arrived can't.
 handler("refillFluid", function(player, args)
-    local item = player:getInventory():getItemById(args.id)
-    local fluids = item and item:getFluidContainer()
-    if not fluids then
-        return nil, "the character's fluid container " .. tostring(args.id) .. " on the server"
+    local inventory, items = player:getInventory(), {}
+    if args.type then
+        local all = inventory:getAllTypeRecurse(args.type)
+        for i = 0, all:size() - 1 do
+            if all:get(i):getFluidContainer() then
+                table.insert(items, all:get(i))
+            end
+        end
+    else
+        local item = inventory:getItemById(args.id)
+        if item and item:getFluidContainer() then
+            table.insert(items, item)
+        end
     end
-    fluids:Empty()
-    if args.fluid then
-        fluids:addFluid(args.fluid, args.liters)
+    if #items == 0 then
+        return nil, "the character's fluid container " .. tostring(args.type or args.id) .. " on the server"
     end
-    item:syncItemFields()
+    for _, item in ipairs(items) do
+        local fluids = item:getFluidContainer()
+        fluids:Empty()
+        if args.fluid then
+            fluids:addFluid(args.fluid, args.liters)
+        end
+        item:syncItemFields()
+    end
     return {}
 end)
 
@@ -95,10 +112,15 @@ handler("knownRecipes", function(player, args)
     return { known = known }
 end)
 
--- Forgets that the character read the literature `args.title`, whose cooldown would make reading
--- it again teach nothing.
+-- Forgets that the character read the title (modData literatureTitle) of its carried
+-- `args.type`, whose cooldown would make reading it again teach nothing.
 handler("forgetLiterature", function(player, args)
-    player:getReadLiterature():remove(args.title)
+    local item = player:getInventory():getFirstTypeRecurse(args.type)
+    local title = item and item:getModData().literatureTitle
+    if not title then
+        return nil, "a titled " .. tostring(args.type) .. " in the character's inventory on the server"
+    end
+    player:getReadLiterature():remove(title)
     return {}
 end)
 

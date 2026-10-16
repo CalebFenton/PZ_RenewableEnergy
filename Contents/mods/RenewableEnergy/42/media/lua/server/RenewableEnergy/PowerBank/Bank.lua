@@ -24,6 +24,7 @@ require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/GasLine/GasKit"
+require "RenewableEnergy/GasLine/GasLines"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -49,9 +50,10 @@ local BACKUP_REACH = 3
 -- Vanilla bills generators in fuel per hour per unit of power; a unit is this many watts.
 local WATTS_PER_FUEL_UNIT = Specs.loads.other.wattsPerConsumption
 
--- How the bank runs each family of source (RenewableEnergy.Sources): init(source, isoObject,
--- facing, material) fills a new record, update(source, object, inSlot, hours, context) sets its
--- watts and reason for a pass, and status(entry, source), if any, adds to its status entry.
+-- How the bank runs each family of source (RenewableEnergy.Sources): connect(player, source,
+-- isoObject, facing, material), if any, fills a newly connected source's record and teaches
+-- `player` what connecting it first teaches; update(source, object, inSlot, hours, context) sets
+-- its watts and reason for a pass; and status(entry, source), if any, adds to its status entry.
 local FAMILY = {
     panel = RenewableEnergy.PanelSource,
     wind = RenewableEnergy.WindSource,
@@ -150,27 +152,28 @@ function Bank:recount()
     local isoObject = self:getIsoObject()
     local container = isoObject and isoObject:getContainer()
     if not container then return end
-    local parts = { battery = {}, inverter = {}, charger = {}, controller = {} }
+    local parts = {}
+    for kind in pairs(PowerBank.PARTS) do
+        parts[kind] = {}
+    end
     local nominalWh, storedWh = 0, 0
     local items = container:getItems()
     for i = items:size() - 1, 0, -1 do
         local item = items:get(i)
         local kind = PowerBank.partKind(item:getFullType())
-        if kind == "battery" then
-            local wh = Battery.nominalWh(item)
-            nominalWh = nominalWh + wh
-            storedWh = storedWh + wh * Battery.getCharge(item)
+        if kind then
             local entry = partEntry(item)
-            entry.nominalWh = wh
-            table.insert(parts.battery, entry)
-        elseif kind then
-            table.insert(parts[kind], partEntry(item))
+            if Battery.isBattery(item) then
+                entry.nominalWh = Battery.nominalWh(item)
+                nominalWh = nominalWh + entry.nominalWh
+                storedWh = storedWh + entry.nominalWh * Battery.getCharge(item)
+            end
+            table.insert(parts[kind], entry)
         end
     end
-    self.batteries = parts.battery
-    self.inverters = parts.inverter
-    self.chargers = parts.charger
-    self.controllers = parts.controller
+    for kind, part in pairs(PowerBank.PARTS) do
+        self[part.field] = parts[kind]
+    end
     self.nominalWh = nominalWh
     self.charge = nominalWh > 0 and storedWh / nominalWh or 0
 end
@@ -200,19 +203,6 @@ function Bank:writeBatteries(container, applyPending)
     end
     if applyPending then
         self.pendingDepths = {}
-    end
-end
-
--- Wear every battery by one discharge `depth` deep.
-function Bank:wearBatteries(container, depth)
-    local scale = Battery.wearScale()
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        local spec = Battery.spec(item)
-        if spec and Battery.wear(item, Battery.cycleWear(spec, depth) * scale) then
-            sendItemStats(item)
-        end
     end
 end
 
@@ -268,16 +258,15 @@ function Bank:slotsUsed()
     return used
 end
 
--- Inverters and controllers wear while they work, and an overload strains the inverters.
+-- Inverters and controllers wear while they work, and an overload strains the inverters
+-- (Specs.partWear).
 function Bank:wearParts(container, hours, overloads)
     local wear = Specs.partWear
-    local inverterPoints = wear.inverterPerHour * hours + wear.overload * overloads
-    local controllerPoints = wear.controllerPerHour * hours
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         local kind = PowerBank.partKind(item:getFullType())
-        local points = (kind == "inverter" and inverterPoints) or (kind == "controller" and controllerPoints) or 0
+        local points = kind and (wear.perHour[kind] or 0) * hours + (wear.perOverload[kind] or 0) * overloads or 0
         if Wear.take(item, points) then
             sendItemStats(item)
         end
@@ -311,10 +300,14 @@ function Bank:findSource(x, y, z)
     return nil
 end
 
-function Bank:addSource(isoObject)
+--- Connects the source `isoObject`, which `player` wired to the bank.
+function Bank:addSource(isoObject, player)
     local kind, facing, material = Sources.kindOf(isoObject)
     local source = { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(), kind = kind, watts = 0 }
-    FAMILY[Sources.familyOf(kind)].init(source, isoObject, facing, material)
+    local connect = FAMILY[Sources.familyOf(kind)].connect
+    if connect then
+        connect(player, source, isoObject, facing, material)
+    end
     table.insert(self.sources, source)
 end
 
@@ -363,7 +356,7 @@ end
 -- Backup generator -----------------------------------------------------------------------
 
 local function isFailsafe(object)
-    return Sprites.kindOf(Sprites.nameOf(object)) == "failsafe"
+    return Sprites.nameOf(object) == Sprites.failsafe
 end
 
 --- The nearest plugged-in generator, one with a failsafe on its square first.
@@ -391,19 +384,19 @@ end
 local function runFailsafe(generator, on, charge)
     local options = SandboxVars.RenewableEnergy
     local gas = RenewableEnergy.GasKit.stateOf(generator)
-    local wantsOff = not on or charge * 100 >= options.FailsafeStopCharge
+    -- The charge comes back from whole battery uses (DrainableComboItem.getCurrentUsesFloat), a
+    -- hair off the percent it was set to, so it is compared to two places.
+    local percent = RenewableEnergy.round(charge * 100, 2)
+    local wantsOff = not on or percent >= options.FailsafeStopCharge
     if generator:isActivated() then
         if wantsOff then
             generator:setActivated(false)
         end
     elseif gas and gas.stalled then
         if wantsOff then
-            gas.stalled = false
-            if isServer() then
-                generator:transmitModData()
-            end
+            RenewableEnergy.GasLines.cancelStall(generator)
         end
-    elseif on and charge * 100 < options.FailsafeStartCharge and generator:getFuel() > 0 and generator:getCondition() > 20 then
+    elseif on and percent < options.FailsafeStartCharge and generator:getFuel() > 0 and generator:getCondition() > 20 then
         generator:setActivated(true)
     end
 end
@@ -556,7 +549,7 @@ function Bank:newDay(container, day)
     if self.day and self.day ~= day then
         local depth = self.cycleDepth
         if container then
-            self:wearBatteries(container, depth)
+            Battery.wearAll(container, depth)
         elseif depth > 0 then
             table.insert(self.pendingDepths, depth)
         end
@@ -774,7 +767,8 @@ function Bank:buildSummary()
     for _, source in ipairs(self.sources) do
         table.insert(sources, { x = source.x, y = source.y, z = source.z, snowy = (source.snow or 0) > 0 or nil })
     end
-    return { bankType = self.bankType, name = self.name, on = self.on, limitW = self:limitW(), sources = sources }
+    return { bankType = self.bankType, name = self.name, on = self.on, limitW = self:limitW(),
+        freeSlots = self:inputSlots() - self:slotsUsed(), sources = sources }
 end
 
 -- A client loads at most this many squares each way around its player (the widest chunk grid a

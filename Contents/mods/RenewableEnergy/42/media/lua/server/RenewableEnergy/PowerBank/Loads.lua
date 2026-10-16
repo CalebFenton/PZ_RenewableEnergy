@@ -12,6 +12,7 @@
 
 if isClient() then return end
 
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 
@@ -21,8 +22,6 @@ RenewableEnergy.Loads = Loads
 
 local LOADS = RenewableEnergy.Specs.loads
 local PowerBank = RenewableEnergy.PowerBank
--- The map's lowest and highest levels (IsoChunk.getGridSquare).
-local LOWEST_LEVEL, HIGHEST_LEVEL = -32, 31
 
 local function isMiniFridge(object)
     local properties = object:getProperties()
@@ -118,33 +117,18 @@ end
 ---@param square IsoGridSquare the bank's square
 function Loads.scan(square)
     local load = Loads.new()
-    local radius = SandboxVars.GeneratorTileRange
-    local levels = SandboxVars.GeneratorVerticalPowerRange
     local allowExterior = SandboxVars.AllowExteriorGenerator
-    local cx, cy, cz = square:getX(), square:getY(), square:getZ()
-    local cell = square:getCell()
-    local radiusSquared = radius * radius
-    for z = math.max(LOWEST_LEVEL, cz - levels), math.min(HIGHEST_LEVEL, cz + levels) do
-        for x = cx - radius, cx + radius do
-            local dxSquared = (x - cx) * (x - cx)
-            for y = cy - radius, cy + radius do
-                -- The engine's reach test between square centres (IsoUtils.DistanceToSquared), in Lua
-                -- rather than a Java call per square.
-                local scanned = dxSquared + (y - cy) * (y - cy) <= radiusSquared and cell:getGridSquare(x, y, z)
-                if scanned then
-                    local objects = scanned:getObjects()
-                    for i = 0, objects:size() - 1 do
-                        local object = objects:get(i)
-                        if drawsFromGenerator(object, allowExterior) then
-                            addAppliances(load, object)
-                        elseif isRunningGenerator(object) then
-                            table.insert(load.generators, object)
-                        end
-                    end
-                end
+    RenewableEnergy.eachSquareInGeneratorReach(square, function(scanned)
+        local objects = scanned:getObjects()
+        for i = 0, objects:size() - 1 do
+            local object = objects:get(i)
+            if drawsFromGenerator(object, allowExterior) then
+                addAppliances(load, object)
+            elseif isRunningGenerator(object) then
+                table.insert(load.generators, object)
             end
         end
-    end
+    end)
     return load
 end
 

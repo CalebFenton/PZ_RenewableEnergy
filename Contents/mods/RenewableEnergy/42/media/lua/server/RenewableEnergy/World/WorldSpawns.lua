@@ -167,8 +167,8 @@ function WorldSpawns.weatheredCondition()
     return WorldSpawns.rollBetween(WorldSpawns.WEATHERED)
 end
 
---- A site module's condition: cracked or weathered.
-function WorldSpawns.siteModuleCondition()
+-- A site module's condition: cracked or weathered.
+local function siteModuleCondition()
     if ZombRandFloat(0, 1) < WorldSpawns.SITE_CRACKED_SHARE then
         return WorldSpawns.crackedCondition()
     end
@@ -179,7 +179,7 @@ end
 function WorldSpawns.siteModules(count)
     local modules = {}
     for i = 1, count do
-        modules[i] = { type = MODULE, condition = WorldSpawns.siteModuleCondition() }
+        modules[i] = { type = MODULE, condition = siteModuleCondition() }
     end
     return modules
 end
@@ -220,7 +220,7 @@ end
 
 local function addFound(container, fullType)
     if fullType == MODULE then
-        return WorldSpawns.addModule(container, WorldSpawns.siteModuleCondition())
+        return WorldSpawns.addModule(container, siteModuleCondition())
     end
     local item = container:AddItem(fullType)
     if item and Battery.isBattery(item) then
@@ -292,13 +292,8 @@ function WorldSpawns.placeBank(square, stockName)
     return bank
 end
 
--- The item count from which vanilla shows a filled container's "many items" overlay
--- (ContainerOverlays.updateContainerOverlaySprite).
-local CRATE_FULL_ITEMS = 7
-
---- Places a crate of solar gear stocked as CRATE_STOCK[stockName] says. It shows its lid overlay
---- as ItemPickerJava does for a filled container, set here without a transmit, because the
---- clients get the whole object right after.
+--- Places a crate of solar gear stocked as CRATE_STOCK[stockName] says, with the lid overlay
+--- vanilla gives a filled container (CrateOverlays.lua), as ItemPickerJava does after filling one.
 ---@param square IsoGridSquare
 ---@param stockName string a CRATE_STOCK key
 ---@return IsoObject
@@ -309,13 +304,12 @@ function WorldSpawns.placeCrate(square, stockName)
     WorldSpawns.stockCrate(container, stockName)
     container:setExplored(true)
     square:AddSpecialObject(crate)
-    local itemCount = container:getItems():size()
-    if itemCount > 0 then
-        crate:setOverlaySprite(itemCount < CRATE_FULL_ITEMS and Sprites.crateOverlays.closed or Sprites.crateOverlays.full, false)
-    end
     if isServer() then
         crate:transmitCompleteItemToClients()
     end
+    -- After the clients have the crate: on a server this sends its overlay, naming the crate by its
+    -- index on the square (IsoObject.setOverlaySprite).
+    ItemPickerJava.updateOverlaySprite(crate)
     -- The game fires OnObjectAdded only for an object a client sends (AddItemToMapPacket), so an
     -- object Lua places fires it itself, as vanilla's TrapBO does.
     triggerEvent("OnObjectAdded", crate)

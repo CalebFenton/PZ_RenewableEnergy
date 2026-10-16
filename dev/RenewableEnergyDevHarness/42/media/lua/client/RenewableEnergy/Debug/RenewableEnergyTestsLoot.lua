@@ -52,7 +52,7 @@ serverCheck("renewable_energy_loot_rarity_options_scale_weights", "lootRarityOpt
 -- square the way the game fills them.
 test("renewable_energy_loot_found_batteries_part_charged", {
     run = function(self)
-        local square = (T.need(self, T.squares(self, 1), "a free outdoor square") or {})[1]
+        local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
         T.server(self, "lootFoundBatteries", { x = square:getX(), y = square:getY(), z = square:getZ() })
     end,
@@ -66,13 +66,7 @@ test("renewable_energy_loot_found_batteries_part_charged", {
 -- bank is an IsoGenerator; if any room handed its container type a loot list, a bank someone took a
 -- battery out of would refill with free batteries every respawn. Checked in rooms near the
 -- character.
-serverCheck("renewable_energy_loot_player_containers_not_refilled", "lootPlayerContainers", { containers = {
-    { sprite = "batteryBoxWood", type = "RenewableEnergyBatteryBoxWood" },
-    { sprite = "batteryBoxMetal", type = "RenewableEnergyBatteryBoxMetal" },
-    { sprite = "batteryRackWood", type = "RenewableEnergyBatteryRackWood" },
-    { sprite = "batteryRackMetal", type = "RenewableEnergyBatteryRackMetal" },
-    { sprite = "batteryBankWood", type = "RenewableEnergyBatteryBankWood" },
-    { sprite = "batteryBankMetal", type = "RenewableEnergyBatteryBankMetal" },
-    { sprite = "cellCharger", type = "RenewableEnergyCellCharger" },
-    { sprite = "crate", type = "RenewableEnergySolarBox" },
+serverCheck("renewable_energy_loot_player_containers_not_refilled", "lootPlayerContainers", { sprites = {
+    "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood", "batteryBankMetal",
+    "cellCharger", "crate",
 } })

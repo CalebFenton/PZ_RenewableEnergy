@@ -181,6 +181,28 @@ function Helpers.recordAt(args)
     return record, object
 end
 
+--- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
+--- "barrel.steel", "standard") on `square`, as the build menu does (ISBuildIsoEntity:create): a
+--- thumpable, then the entity's OnCreate. Sends nothing to clients. Returns the thumpable, or nil
+--- and what is missing.
+function Helpers.placeRecord(kind, tile, square)
+    local spec = KINDS[kind]
+    if not (spec and square) then
+        return nil, "a loaded square for a " .. tostring(kind)
+    end
+    local sprite = RenewableEnergy.Sprites[kind]
+    for part in string.gmatch(tile, "[^.]+") do
+        sprite = sprite and sprite[part]
+    end
+    if type(sprite) ~= "string" then
+        return nil, "the " .. kind .. " tile " .. tostring(tile)
+    end
+    local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
+    square:AddSpecialObject(thumpable)
+    spec.system().OnCreate({ thumpable = thumpable })
+    return thumpable
+end
+
 --- The record of kind `kind` as plain values: its saved fields, its kind's extras and, while its
 --- tile is loaded (`object`), its building's toxicity, tile, overlays and the summary this side
 --- builds.

@@ -16,11 +16,12 @@ local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 -- Whether a source of each family must stand outdoors: a treadmill works under a roof.
-Sources.FAMILIES = { panel = { outdoors = true }, wind = { outdoors = true }, treadmill = { outdoors = false } }
+local OUTDOORS = { panel = true, wind = true, treadmill = false }
 
 local NO_BLADES = {}
 
--- Kind -> { family, spec, blades }, blades the set of blade items that mend a broken wind charger.
+-- Kind -> { family, spec, blades, isPlaced }: blades the set of blade items that mend a broken
+-- wind charger; isPlaced(isoObject), if any, whether a tile of the kind is a source yet.
 local KINDS = {}
 for kind, spec in pairs(Specs.mounts) do
     KINDS[kind] = { family = "panel", spec = spec }
@@ -32,7 +33,8 @@ for kind, spec in pairs(Specs.wind.turbines) do
     end
     KINDS[kind] = { family = "wind", spec = spec, blades = blades }
 end
-KINDS.treadmill = { family = "treadmill", spec = Specs.treadmill }
+-- A treadmill's tile is a source once it is wired to feed a bank.
+KINDS.treadmill = { family = "treadmill", spec = Specs.treadmill, isPlaced = Treadmill.isWired }
 
 --- "panel", "wind" or "treadmill" for a source kind; nil for anything else.
 function Sources.familyOf(kind)
@@ -45,9 +47,20 @@ function Sources.slotsOf(kind)
     return KINDS[kind].spec.slots
 end
 
---- Whether a source of `kind` must stand outdoors.
-function Sources.needsOutdoors(kind)
-    return Sources.FAMILIES[KINDS[kind].family].outdoors
+--- Why a source of `kind` can't go on a bank with `freeSlots` input slots free, or nil. The
+--- authority counts them from the bank's container; a client has its summary's freeSlots.
+function Sources.slotRefusal(kind, freeSlots)
+    if Sources.slotsOf(kind) > freeSlots then
+        return "Tooltip_RenewableEnergy_NoInputSlot"
+    end
+    return nil
+end
+
+--- Whether snow lies on a source of `kind` until someone sweeps it off (Specs.mounts holdsSnow,
+--- shedsSnow): a flat panel's.
+function Sources.sweepable(kind)
+    local entry = kind and KINDS[kind]
+    return entry ~= nil and entry.spec.holdsSnow == true and not entry.spec.shedsSnow
 end
 
 --- The blade items that make a wind charger of `kind` whole again, as a set of full types; empty
@@ -61,7 +74,8 @@ end
 --- anything else, a treadmill's tile included until it is wired to feed a bank.
 function Sources.kindOf(isoObject)
     local kind, facing, material = Sprites.kindOf(Sprites.nameOf(isoObject))
-    if not KINDS[kind] or (kind == "treadmill" and not Treadmill.isWired(isoObject)) then
+    local entry = kind and KINDS[kind]
+    if not entry or (entry.isPlaced and not entry.isPlaced(isoObject)) then
         return nil
     end
     return kind, facing, material
@@ -79,7 +93,7 @@ end
 --- Whether a source of `kind` may feed a bank from `square`: outdoors, unless its family works
 --- indoors.
 function Sources.squareOk(square, kind)
-    return square ~= nil and (square:isOutside() or not Sources.needsOutdoors(kind))
+    return square ~= nil and (square:isOutside() or not OUTDOORS[KINDS[kind].family])
 end
 
 --- The banks, as { x, y, z }, a source of `kind` at x, y, z may be connected to.

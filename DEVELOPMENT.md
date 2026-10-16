@@ -56,6 +56,9 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 - `IsoCell.getVehicles()` is a Java `Set`, which Lua can neither index nor walk. Find vehicles through the squares they stand on, with `square:getVehicleContainer()`.
 - A hard knock on a hitched pair, such as a crash, snaps the hitch unless it was made in the last two seconds (`Bullet.onVehicleConstraintImpulse`), so a test that pushes a hitched pair keeps it on open ground rather than relying on how soon the knock comes.
 - `teleportTo` a square that isn't loaded, called from a timed action's `update`, doesn't stick: the character stays put. Teleport from an `Events.OnTick` handler and keep a `RenewableEnergyTest.waitUntil` on the queue until it is done.
+- Harness fixtures such as `T.setPerk` take effect when called, not in queue order, and on a multiplayer client `T.setPerk` holds its level for the rest of the test. Give each perk level its own test rather than setting several levels in one.
+- A multiplayer client's perk levels follow the server's once a second (`PlayerXpPacket`), so a client check can pass a level the server refuses: set a recipe's skills on both sides even when the client has them.
+- A `T.server` call with table args (`T.perform` too) goes to the server ahead of a `T.give` queued before it, which waits for this client's copies. A call that uses the given items up can do so before they reach this client, and the give's wait then fails; queue a `T.step` after the give to hold such a call back.
 
 ## Ground truth
 
@@ -116,6 +119,7 @@ Build 41 `recipe` blocks no longer load.
 - Input lines take distinct items, line by line in the order they are listed: a line skips items an earlier line took (`CraftRecipeData.consumeInputFromItems`). So `item 2 [A]` followed by `item 1 [A;B]` takes three A, or two A and a B.
 - `Tags = AnySurfaceCraft` needs a table or counter within 3 tiles (`HandcraftLogic`), and the craft walks the character to it. A tag other than `InHandCraft`, `AnySurfaceCraft`, `EntityRecipe`, and `Outdoors`, on a recipe without one of them, makes it need a crafting bench entity (`CraftRecipe.requiresSpecificWorkstation`). The `Electrical` tag does nothing else; `category = Electrical` sets the crafting window category.
 - Every recipe needs light unless it has the `CanBeDoneInDark` tag (`CraftRecipeData`, `IsoPlayer.tooDarkToRead`).
+- When the server refuses a craft at perform (a skill short, the recipe unknown, a container out of reach: `CraftRecipeManager.isValidRecipeForCharacter`, `HandcraftLogic.performCurrentRecipe`), it drops the craft without a word, and `ISHandcraftAction:complete` still returns true, so the client's action ends as if it had crafted.
 - `xpAward = Electricity:10` and `SkillRequired = Electricity:2` replace Build 41 `OnGiveXP` and `SkillRequired:`. The global `addXp(player, perk, amount)` gives what an `xpAward` gives (`CraftRecipe.addXP`), multipliers included, only without the halo text, so OnCreate can award XP that depends on the inputs. None of vanilla's kiln recipes has an `xpAward`.
 - `OnCreate(craftRecipeData, character)` runs once, locally in single player and on the server in multiplayer, after the outputs were sent to the client. Call `result:syncItemFields()` after changing an output.
 - `OnTest(item, character)` runs for every candidate input item, tools included.
@@ -158,6 +162,8 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - `getVehicleById` returns nil in single player, because vehicles are registered with `VehicleManager` only on a server (`BaseVehicle.createPhysics`). Find a vehicle through the squares it stands on instead.
 - The game's Lua has no `next`: a call fails with "tried to call nil". Count a table with `#` or a loop over `pairs` instead.
 - `getScriptManager():getAllBuildableRecipes()` lists the build menu's entity recipes, which `getAllCraftRecipes()` leaves out (`ScriptManager.java`).
+- `IsoPlayer.tooDarkToRead()` is false for any player that isn't local (`IsoPlayer.java:8605`), so a server can't refuse a remote player's job for the dark; that rule belongs in the client's menu and `isValid()`.
+- `getChunkSizeInSquares()` is a global that returns 8 (`LuaManager`).
 
 ### State and syncing
 
@@ -169,13 +175,14 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - A container's `AcceptItemFunction` filter is not saved with the container. Set it again whenever the object loads (`MapObjects.OnLoadWithSprite`) and whenever it is placed (`OnObjectAdded`), on every side. `sendObjectChange(IsoObjectChange.CONTAINERS)`, which a container's new capacity needs to reach clients, replaces the clients' container objects and so drops their filters too (`IsoObject.loadChange`).
 - `MapObjects.OnLoadWithSprite` keeps one function per sprite and priority: a second registration replaces the first without a word (`MapObjects.java`). Single player loads the client and server folders into one state, so a client and a server handler for the same sprite need different priorities.
 - On a server the global `sendItemStats(item)` sends the item to the clients near its container's square, object or player, and to every client when the container has none, which throws while it writes the container's place (`GameServer.sendItemStats`). Only scratch containers that never enter the world, as tests and loot measurements make, have none.
-- A battery's charge is stored as whole uses of its `UseDelta` (`InventoryItem.setCurrentUsesFloat` rounds) and read back as a 32-bit float, so a charge read back after it is set is off by up to half a use.
+- A battery's charge is stored as whole uses of its `UseDelta` (`InventoryItem.setCurrentUsesFloat` rounds) and read back as a 32-bit float, so a charge read back after it is set is off by up to half a use: 0.80 on a car battery reads 0.79999995. Compare charges in whole uses, `getCurrentUses()` against `getMaxUses()`, which is `floor(1 / UseDelta)` (`DrainableComboItem`).
 - The noxious smell moodle and the food sickness from corpses come from a count per chunk level, split by building (`CorpseCount`), which only `IsoDeadBody.addToWorld` and `removeFromWorld` change, and neither needs the body on a square: a body made with `IsoDeadBody.new(getCell())`, moved with `setX`, `setY` and `setZ` and added to the world counts without being drawn, looted, rotted or saved. A chunk zeroes its counts when it unloads, with no event, and again just before `LoadChunk` fires (`IsoChunk.doLoadGridsquare`), and an outdoor count goes below zero if a body is removed after that (`CorpseCount.ChunkLevelData.corpseRemoved`). A multiplayer client's moodle follows the rate the server sends every two seconds (`PlayerDamagePacket`, `NetworkPlayerManager`).
 
 ### Timed actions in multiplayer
 
 - If an action class has `complete()`, the client runs `start()`, `update()`, and `perform()`, and the server runs `complete()`. Single player runs `perform()` and then `complete()` in the same tick (`IsoGameCharacter`'s action loop).
 - The server rebuilds the action by calling `<Class>:new()` with the values of the fields named like `new()`'s parameters, in parameter order (`NetTimedAction`). Parameter names must equal field names, and every argument must be serializable. Items are sent as container plus id, so they must be in a container. An unsupported argument type is dropped and shifts the arguments after it.
+- `NetTimedAction` sends each `new()` argument by its type at run time (`PZNetKahluaTableImpl.save`), so one parameter can carry an `InventoryItem` or an `IsoObject`.
 - The server never calls `isValid()`, `update()`, or `perform()`, so check the action again in `complete()`; returning `false` rejects it.
 - The server times an action in real time, at 20 ms per tick of its `getDuration()` (`NetTimedAction.getDuration`), whatever the frame rate or the game speed. Vanilla's mechanics cheat (`setMechanicsCheat`) makes a vehicle part's install and uninstall take one tick and skips their `isValid`.
 - On the client, fetch items again by id in `start()`, as vanilla does, because server syncs can replace the item objects.
@@ -191,7 +198,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 | `OnInitGlobalModData` | Single player, server, and multiplayer client, once per loaded game, after the sandbox options load. A client has received the server's options by then. |
 | `OnLoadedMapZones` | Every side, after `StashSystem.load` (`IsoWorld.init`). |
 | `OnGameStart` | Only where `IngameState.enter()` runs, which a dedicated server never calls, so never on a dedicated server. |
-| `OnObjectAboutToBeRemoved` | Whenever `IsoGridSquare.RemoveTileObject` runs: picking an object up, destroying it, and lifting it to reorder a square. |
+| `OnObjectAboutToBeRemoved` | Whenever `IsoGridSquare.RemoveTileObject` runs: picking an object up, destroying it, and lifting it to reorder a square. The object is still in the square's list, and a handler that removes it makes the game throw (`IsoGridSquare.java:5745`). A global object record dropped because its chunk loaded without the tile gets no such event. |
 | `OnServerCommand` | Multiplayer clients, for `sendServerCommand()` from the server. Commands both ways are reliable but unordered (`PacketTypes.ClientCommand`, reliability 2), and two sent in the same tick can arrive swapped, so a command that must follow another waits for its effect or carries a sequence number. |
 | `OnFillContainer` | Room containers, corpses, zombies and vehicle containers (`BaseVehicle.randomizeContainer`), but not `ItemPickerJava.fillContainerType` fills such as stashes and `RBSafehouse`. Two callers pass a bag's loot table instead of a container (`ItemPickerJava.fillContainerInternal` and `doRollItemInternal`). |
 
@@ -203,6 +210,7 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 - `getTotalPowerUsing()` is multiplied by the GeneratorFuelConsumption sandbox option (default 0.1).
 - Toxicity belongs to the whole building, and gas generators set it when they start and once an in-game hour after. Restore only what your own `setActivated` changed.
 - Squares stay powered after a running generator is removed, until `setSurroundingElectricity()` runs on it switched off (`IsoChunk.isGeneratorPoweringSquare`). Switch it off before it leaves the square.
+- `IsoGenerator.isPoweringSquare` reads static copies of the GeneratorTileRange and GeneratorVerticalPowerRange options that only constructing a generator sets (`IsoGenerator.java:107-113`), so before the first generator, or after the options change, they are stale. Measure a generator's reach from `SandboxVars` (`RenewableEnergy.inGeneratorReach`).
 - `IsoGenerator.update()` is what acts on `chunkLoaded`'s request to repower squares in newly loaded chunks; a generator taken out of the cell's process list has to call `setSurroundingElectricity()` itself.
 - `setConnected`, `setCondition` and `setFuel` sync on the server. Call them after `transmitCompleteItemToClients()`, because a sync names the object by its index on the square.
 - An overlay changed with `addAttachedAnimSpriteByName` reaches clients only through `transmitUpdatedSpriteToClients()`.
@@ -210,6 +218,7 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 
 ### UI
 
+- `ISContextMenu:getNew(parentContext)` ignores `self` and takes the player and position from `parentContext` (`ISContextMenu.lua`).
 - To add inventory context menu options, handle `Events.OnFillInventoryObjectContextMenu(playerNum, context, items)` and pass `items` through `ISInventoryPane.getActualItems(items)`, which unpacks stacks.
 - `ISToolTipInv` also shows things that aren't items, such as fluid containers and energy resources. Check `instanceof(x, "InventoryItem")` before calling item methods.
 - Vanilla explains a greyed-out option two ways. An option held back by one state or one tool says so in a plain sentence, as the generator's Plug In and Fix do (`ISWorldObjectContextMenu`, `ContextMenu_GeneratorFixTT`). An option that takes several things lists them all under "Needs" (`Tooltip_craft_Needs`) as `have/need`, in the good colour when met and the bad colour when short, and greys out while any is short: fixing an item (`ISInventoryPaneContextMenu.addFixerSubOption`), the build menu (`ISEntityBuildMenu`) and the mechanics window (`ISVehicleMechanics.doMenuTooltip`).
@@ -243,6 +252,9 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 - The server sends each client a vehicle's part changes (`transmitPartCondition`, `transmitPartItem`, model changes) every 100 ms, only while the vehicle is near that client, and clears them either way (`VehicleManager.sendVehicles`). A client that gets an update for a vehicle it doesn't have asks for the whole vehicle, and may ask twice; the server folds the part changes of that moment into the second full update, which a client that already has the vehicle reads only for its position (`VehicleFullUpdatePacket.parse`). So a change made within a few hundred milliseconds of a vehicle reaching a client can stay missing on that client until the part changes again.
 - `vehicle:transmitPartModData(part)` sends the part's whole modData to the clients near the vehicle with its other part changes (`VehiclePartModData`); it does nothing outside a server. The part saves its modData with the vehicle, a container part's included.
 - The game lights a vehicle's mask zones from its `textureLights` texture, over the scene's lighting, in every frame it draws the vehicle (`BaseVehicle.updateLights`, from `render`): the headlights, stop lights and lightbar only with charge in a `Battery` part, but the window zones whenever `windowLightsOn` is set and the part of the window's id holds an item. `setWindowLightsOn` sets a plain field that nothing in the game sets or sends, so each game can flash a zone through it with no battery and no traffic. The zone colours are `vehicle_common.frag.h`'s `colZone` list; the enable arrays index `texen[a][b]` at `b * 4 + a`. `WindshieldRear` is index 14, the zone `(0, 127, 0)`: its part's condition dents it (`checkDamage`), rear blood stains it (`doBloodOverlayRear`), and rear crashes damage the part (`addDamageRear`).
+- A part's `create` and `init` Lua run on every side whenever the vehicle's physics are made (`VehicleParts.createParts`, `initParts`), and `VehiclePart.repair()` runs `init` again. A part's `update` Lua runs only on the authority, at most once a game minute (`VehicleParts.update`).
+- A lightbar or siren drains the battery only while the engine is off (`Vehicles.Update.Lightbar`, vanilla `Vehicles.lua`), so a battery update never both gains from the alternator and loses to the lightbar.
+- `BaseVehicle.isAtRest()` means moving under 0.025 m/s, with no pending hit and no engine force, on the ground.
 - `getCell():addLamppost(x, y, z, r, g, b, radius)` adds a light anywhere, in this game only, and `removeLamppost(light)` takes it away; each add or remove relights the cell (`IsoGridSquare.recalcLightTime`, `Core.dirtyGlobalLightsCount`), as vanilla's lightbar does on every flash (`BaseVehicle.updateWorldLights`).
 
 ## Art
@@ -279,6 +291,7 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 - Loot respawn refills any explored container below `MaxItemsForLootRespawn` in a town or trailer park zone, generators' containers included (`LootRespawn.respawnInContainer`). Give a container type that players stock an empty loot table.
 - `ZombRand(min, max)` never returns `max`.
 - `ItemContainer.AddItem` puts every new item on the cell's processed items (`IsoCell.addToProcessItems`), an `ArrayList` it scans on every add, and the cell drops an item only on a later frame. Filling scratch containers thousands of times in one frame piles them up until the game crawls and runs out of memory, so take each sample's items off `getCell():getProcessItems()` yourself.
+- A container shows its "few items" overlay below 7 items and its "full" overlay from 7 (`ContainerOverlays.java:162`). `ItemPickerJava.updateOverlaySprite(object)` picks and sets it; on a server the overlay goes out by the object's index on its square, so call it only after clients have the object.
 - The map zones loot and Lua read with `getZonesAt` (`TownZone`, `TrailerPark`, `Farm`, the forests) come from Build 42's biome map (`media/maps/<map>/maps/biomemap_<x>_<y>.png`, `BiomeMapConfig.lua`) and exist only once their cell has loaded; a far square has only its `Region` zone. The map's `objects.lua` doesn't match them. Most farmhouses sit in `TownZone` there, and `Farm` marks fields.
 
 ## Workshop page

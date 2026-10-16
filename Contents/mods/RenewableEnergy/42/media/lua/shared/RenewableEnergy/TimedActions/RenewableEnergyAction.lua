@@ -44,8 +44,8 @@ Action.RELEASE_BRAKE = "ReleaseBrake"
 Action.WIRE_TREADMILL = "WireTreadmill"
 Action.REPLACE_BLADES = "ReplaceBlades"
 
--- What clears snow off a flat panel without scratching it: a broom sweeps, a snow shovel pushes.
-Action.SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
+-- What clears snow off a panel without scratching it: a broom sweeps, a snow shovel pushes.
+local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
 
 -- At normal speed an action advances this many units each real second, whatever the day length:
 -- an in-game minute is 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
@@ -59,11 +59,11 @@ local UNITS_PER_SECOND = 48
 local REACH = 4.6
 
 function Action.isSnowTool(item)
-    return item ~= nil and Action.SNOW_TOOLS[item:getFullType()] == true and not item:isBroken()
+    return item ~= nil and SNOW_TOOLS[item:getFullType()] == true and RenewableEnergy.notBroken(item)
 end
 
 function Action.isBoltCutters(item)
-    return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and not item:isBroken()
+    return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and RenewableEnergy.notBroken(item)
 end
 
 local function isBank(bank)
@@ -75,7 +75,7 @@ local function isSource(object)
 end
 
 local function isWindCharger(object)
-    return onSquare(object) and Sources.familyOf(Sources.kindOf(object)) == "wind"
+    return onSquare(object) and Wind.isCharger(object)
 end
 
 local function isGardenLight(object)
@@ -169,7 +169,7 @@ JOBS = {
     },
     [Action.CLEAR_SNOW] = {
         keeps = function(self)
-            return isSource(self.object) and Sources.kindOf(self.object) == "flat"
+            return isSource(self.object) and Sources.sweepable(Sources.kindOf(self.object))
                 and Action.isSnowTool(self.item) and self.character:isPrimaryHandItem(self.item)
         end,
         command = function(self) return "clearSnow", { source = positionOf(self.object) } end,
@@ -188,7 +188,7 @@ JOBS = {
         keeps = function(self) return isBank(self.bank) end,
         check = function(self)
             local summary = bankSummary(self)
-            return summary ~= nil and not summary.on
+            return summary ~= nil and PowerBank.switchRefusal(summary, true) == nil
         end,
         command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = true } end,
         minutes = 0.5,
@@ -198,7 +198,7 @@ JOBS = {
         keeps = function(self) return isBank(self.bank) end,
         check = function(self)
             local summary = bankSummary(self)
-            return summary ~= nil and summary.on == true
+            return summary ~= nil and PowerBank.switchRefusal(summary, false) == nil
         end,
         command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = false } end,
         minutes = 0.5,
@@ -229,9 +229,7 @@ JOBS = {
         sound = "GeneratorConnect",
     },
     [Action.UNWIRE] = {
-        keeps = function(self)
-            return self.item ~= nil and holdsItem(self) and PowerBank.partKind(self.item:getFullType()) ~= nil
-        end,
+        keeps = function(self) return PowerBank.unwireBlocker(self.bank, self.item) == nil end,
         command = function(self) return "unwire", { bank = positionOf(self.bank), itemId = self.item:getID() } end,
         units = function(self) return wiringUnits(self, partWiring(self), 0.5) end,
         light = true,
@@ -284,11 +282,10 @@ JOBS = {
         run = function(self) return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item) end,
         minutes = 1,
     },
-    -- Cut Padlock: the lid unlocked, its lock broken. Vanilla saves and sends a broken lock with the
-    -- door, never locks it again (BaseVehicle.canLockDoor), and keeps it on the lid's item while
-    -- the lid is off (Vehicles.UninstallComplete.Door). The cutters wear as vanilla's cutting
-    -- recipes wear them (MayDegradeLight in CutUpTire, CraftRecipeData.processKeepInputItem), and a
-    -- pair that breaks leaves the hands as a broken weapon does (ISDestroyStuffAction).
+    -- Cut Padlock: the lid unlocked, its lock broken (ArrowBoard.cutPadlock). The cutters wear as
+    -- vanilla's cutting recipes wear them (MayDegradeLight in CutUpTire,
+    -- CraftRecipeData.processKeepInputItem), and a pair that breaks leaves the hands as a broken
+    -- weapon does (ISDestroyStuffAction).
     [Action.CUT_PADLOCK] = {
         keeps = function(self)
             return inWorld(self.vehicle) and Action.isBoltCutters(self.item) and self.character:isPrimaryHandItem(self.item)
@@ -299,11 +296,9 @@ JOBS = {
             return lid and ArrowBoard.isPadlocked(lid) or false
         end,
         run = function(self)
-            local lid = self.vehicle:getPartById(arrowBoard().LID)
-            local door = lid:getDoor()
-            door:setLocked(false)
-            door:setLockBroken(true)
-            self.vehicle:transmitPartDoor(lid)
+            if not arrowBoard().cutPadlock(self.vehicle) then
+                return false
+            end
             if self.item:damageCheck(0, 3) then
                 ItemUtils.checkWeapon(self.character)
             end
@@ -372,15 +367,15 @@ function Action:canPerform()
     return job ~= nil and job.keeps(self) and (job.check == nil or job.check(self))
 end
 
+--- Whether the job of `mode` needs light to see by: isValid stops it in the dark, and the menu
+--- greys it there.
+function Action.needsLight(mode)
+    return JOBS[mode].light == true
+end
+
 -- Whether the character stands where the menu would have walked them for the job.
-local function withinReach(character, target)
-    if instanceof(target, "BaseVehicle") then
-        local extents = target:getScript():getExtents()
-        local reach = math.max(extents:x(), extents:z()) / 2 + REACH
-        return IsoUtils.DistanceTo(character:getX(), character:getY(), target:getX(), target:getY()) <= reach
-            and math.abs(character:getZ() - target:getZ()) < 1
-    end
-    return RenewableEnergy.withinReach(character, target, REACH)
+local function atJob(self)
+    return RenewableEnergy.withinReach(self.character, self:target(), REACH)
 end
 
 -- A job field that is a value or a function of the action.
@@ -426,7 +421,7 @@ function Action:isValid()
         HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
         return false
     end
-    return withinReach(self.character, self:target())
+    return atJob(self)
 end
 
 function Action:waitToStart()
@@ -498,7 +493,7 @@ function Action:complete()
     if not self:canPerform() then
         return false
     end
-    if isServer() and not withinReach(self.character, self:target()) then
+    if isServer() and not atJob(self) then
         return false
     end
     local job = JOBS[self.mode]

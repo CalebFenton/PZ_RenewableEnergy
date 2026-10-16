@@ -20,7 +20,7 @@ local Needs, GasifierWindow = RenewableEnergy.Needs, RenewableEnergy.GasifierWin
 local queue = RenewableEnergyGasAction.queue
 
 RenewableEnergy.ClientObjects.define({
-    name = "Gasifier", kind = "gasifier", owner = Gasifier, isObject = Gasifier.isGasifier,
+    name = "Gasifier", sprites = RenewableEnergy.Sprites.namesOf("gasifier"), owner = Gasifier, isObject = Gasifier.isGasifier,
     adoptCopy = Gasifier.adoptContainers, adoptContainer = Gasifier.adoptContainer,
 })
 
@@ -40,14 +40,12 @@ end
 -- Drain Condensate: a choice of the containers that take it, and the ground.
 local function addDrain(menu, character, playerNum, gasifier, summary)
     local job = GasifierJobs.DRAIN
-    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job))
     local blocker = GasifierJobs.blocker(job, summary)
     if blocker then
-        Needs.disable(option, getText(blocker))
+        Needs.refuse(menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job)), blocker)
         return
     end
-    local submenu = ISContextMenu:getNew(menu)
-    menu:addSubMenu(option, submenu)
+    local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_" .. job))
     for _, item in ipairs(drainContainers(character, summary.lit)) do
         submenu:addOption(item:getDisplayName(), playerNum, queue, "gasifier", job, gasifier, item)
     end
@@ -65,8 +63,7 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
     local summary = Gasifier.summaryOf(gasifier)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
-    local menu = ISContextMenu:getNew(context)
-    context:addSubMenu(context:addOption(getText("IGUI_RenewableEnergy_Gasifier_" .. summary.tier)), menu)
+    local menu = Needs.addSubMenu(context, getText("IGUI_RenewableEnergy_Gasifier_" .. summary.tier))
     menu:addOption(getText("ContextMenu_RenewableEnergy_GasifierStatus"), playerNum, GasifierWindow.open, gasifier)
     addJob(menu, character, playerNum, summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT, gasifier, summary)
     addJob(menu, character, playerNum, GasifierJobs.CLEAN_ASH, gasifier, summary)

@@ -133,9 +133,10 @@ end
 -- between them for the rotor's swing, and once as its plain tile.
 local function windTiles()
     local list = {}
-    for step = 0, 5 do
+    local prefix, model = Sprites.windModelOf(Sprites.windScoop)
+    for step = 0, model.steps - 1 do
         table.insert(list, { x = (step % 3) * 3 + 1, y = math.floor(step / 3) * 3 + 1, sprite = Sprites.windScoop,
-            spriteModel = "RenewableEnergy.ScoopRotor" .. step })
+            spriteModel = prefix .. step })
     end
     table.insert(list, { x = 1, y = 7, sprite = Sprites.windScoop })
     return list
@@ -146,15 +147,10 @@ end
 -- spin step.
 local function tallWindTiles()
     local list = {}
-    local rows = {
-        { sprites = Sprites.windPropeller.wood, model = "RenewableEnergy.PropellerWood" },
-        { sprites = Sprites.windPropeller.pipe, model = "RenewableEnergy.PropellerPipe" },
-        { sprites = Sprites.windAlternator, model = "RenewableEnergy.Alternator" },
-    }
-    for row, kind in ipairs(rows) do
+    for row, sprites in ipairs({ Sprites.windPropeller.wood, Sprites.windPropeller.pipe, Sprites.windAlternator }) do
         for column, facing in ipairs({ "N", "E", "S", "W" }) do
-            table.insert(list, { x = (column - 1) * 3, y = row * 4 - 2, sprite = kind.sprites[facing],
-                spriteModel = kind.model .. facing .. (column - 1) })
+            table.insert(list, { x = (column - 1) * 3, y = row * 4 - 2, sprite = sprites[facing],
+                spriteModel = Sprites.windModelOf(sprites[facing]) .. (column - 1) })
         end
     end
     return list
@@ -183,6 +179,8 @@ local STAGE_1, STAGE_2 = 50, 20
 -- The frame's front and back, and the battery box lid.
 local BODY_PARTS = { "EngineDoor", "TruckBed", "TrunkDoor" }
 local BLOOD_SIDES = { "Front", "Rear", "Left", "Right" }
+-- Indices into ArrowBoard.PANELS, which the server folder defines only after this file loads.
+local LEFT, RIGHT = 1, 2
 
 local function setBlood(vehicle, sides)
     for _, side in ipairs(BLOOD_SIDES) do
@@ -239,16 +237,11 @@ local FLASH_SHOT_MS = 500
 -- lamppost, and for lit lamps until they are a little way into a flash.
 local function setLamps(pair, lit, night)
     local ArrowBoard = RenewableEnergy.ArrowBoard
-    local container = pair.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
-    container:removeAllItems()
-    if lit then
-        RenewableEnergy.Battery.setCharge(container:AddItem("RenewableEnergy.DeepCycleBattery"), 0.8)
-    end
+    pair.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer():removeAllItems()
     if night then
         getGameTime():setTimeOfDay(0)
     end
-    ArrowBoard.setSwitch(pair.trailer, true)
-    ArrowBoard.runLamps(pair.trailer, 0, night)
+    Stage.lightLamps(pair.trailer, lit and 0.8 or nil, night)
     local settled = night and Stage.lightingSettled(getPlayer(), true)
     return function()
         if settled and not settled() then
@@ -282,14 +275,14 @@ local HITCHED_STATES = {
     {
         name = "art_trailer_panel_cracked",
         set = function(pair)
-            pair.trailer:getPartById("RenewableEnergyPanelRight"):setCondition(30)
+            pair.trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[RIGHT]):setCondition(30)
             RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
         end,
     },
     {
         name = "art_trailer_panel_removed",
         set = function(pair)
-            pair.trailer:getPartById("RenewableEnergyPanelLeft"):setInventoryItem(nil)
+            pair.trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[LEFT]):setInventoryItem(nil)
             RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
         end,
     },
@@ -369,20 +362,6 @@ local function lotSquare(lot, x, y)
     return getCell():getGridSquare(lot.x + x, lot.y + y, lot.z)
 end
 
--- `spriteModel`, a sprite model's name, draws the object as that model instead of its tile; an
--- animating object stays out of the cached chunk, so the model shows at once.
-local function placeTile(square, spriteName, overlays, spriteModel)
-    local object = IsoObject.new(square, spriteName, spriteName)
-    square:AddTileObject(object)
-    for _, overlay in ipairs(overlays or {}) do
-        object:addAttachedAnimSpriteByName(overlay)
-    end
-    if spriteModel then
-        object:setSpriteModelName(spriteModel)
-        object:setAnimating(true)
-    end
-end
-
 local function recalcLot(lot)
     for x = 0, AREA.w - 1 do
         for y = 0, AREA.h - 1 do
@@ -418,11 +397,20 @@ local function clearVehicles(lot)
         lot.y + AREA.h + VEHICLE_MARGIN - 1, lot.z)
 end
 
+-- Places each entry of `list` ({ x, y, sprite, overlays, spriteModel }) on the lot. A sprite model
+-- draws the object as that model instead of its tile; an animating object stays out of the cached
+-- chunk, so the model shows at once.
 local function placeTiles(lot, list)
     for _, tile in ipairs(list) do
-        placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite, tile.overlays, tile.spriteModel)
+        local object = Stage.placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite)
+        for _, overlay in ipairs(tile.overlays or {}) do
+            object:addAttachedAnimSpriteByName(overlay)
+        end
+        if tile.spriteModel then
+            object:setSpriteModelName(tile.spriteModel)
+            object:setAnimating(true)
+        end
     end
-    recalcLot(lot)
 end
 
 local function buildTileStage(lot)
@@ -524,7 +512,7 @@ local function addCrackedShot(steps, player, lot)
         for _, panel in ipairs(CRACKED_PANELS) do
             local modules = {}
             for slot, condition in ipairs(panel.conditions) do
-                modules[slot] = { type = "RenewableEnergy.SolarModule", condition = condition }
+                modules[slot] = { type = RenewableEnergy.Specs.factoryModule, condition = condition }
             end
             RenewableEnergy.WorldSpawns.placePanel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
         end
@@ -541,8 +529,8 @@ local function addCrackedShot(steps, player, lot)
     end)
     table.insert(steps, function()
         trailer:repair()
-        trailer:getPartById("RenewableEnergyPanelLeft"):setCondition(30)
-        trailer:getPartById("RenewableEnergyPanelRight"):setCondition(100)
+        trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[LEFT]):setCondition(30)
+        trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[RIGHT]):setCondition(100)
         RenewableEnergy.ArrowBoard.showPanels(trailer)
         -- Dark, as Stage.spawnTrailer leaves its trailers.
         RenewableEnergy.ArrowBoard.setSwitch(trailer, false)

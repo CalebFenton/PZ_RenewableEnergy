@@ -137,7 +137,7 @@ function BankSystem:OnObjectAdded(isoObject)
         makeBank(isoObject:getSquare(), name, isoObject:getObjectIndex(), isoObject)
     elseif PowerBank.isBank(isoObject) then
         self:loadIsoObject(isoObject)
-    elseif Sources.familyOf(Sources.kindOf(isoObject)) == "panel" then
+    else
         -- Placing a mount, rotating it (picked up and placed again) and world spawns all land
         -- here, with the modules the item carried.
         PanelSource.showCracks(isoObject)
@@ -163,7 +163,10 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
         local x, y, z = isoObject:getX(), isoObject:getY(), isoObject:getZ()
         local found = PowerBank.bankOfSource(x, y, z)
         local bank = found and self:getLuaObjectAt(found.x, found.y, found.z)
-        if bank and bank:removeSource(x, y, z) then
+        if bank then
+            -- What the source made up to now counts.
+            BankSystem.updateBank(bank)
+            bank:removeSource(x, y, z)
             bank:sendStatus()
         end
     end

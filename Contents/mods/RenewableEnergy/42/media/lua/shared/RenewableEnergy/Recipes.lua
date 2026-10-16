@@ -1,13 +1,18 @@
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- Callbacks of the craftRecipes in media/scripts/RenewableEnergy/Recipes.txt. Shared, since
--- OnTest runs wherever the craft is checked. OnCreate runs once, on the authority (single
--- player or the server), after the outputs were already sent to a multiplayer client, so
--- whatever it changes on an item is sent again.
+-- OnTest runs wherever the craft is checked, and every side looks up all of a recipe's Lua calls
+-- when it sets up a craft (CraftRecipeData, "Could not find lua function"). OnCreate runs once,
+-- on the authority (single player or the server), after the outputs were already sent to a
+-- multiplayer client, so whatever it changes on an item is sent again: an output, which is in
+-- the character's inventory, with syncItemFields (condition, uses and modData); an input, which
+-- may lie in a nearby container or on the floor, with sendItemStats (condition and uses).
 --
 -- OnTest is asked about every candidate item of every input, tools included, so each one
 -- answers only for the items it is about and lets the rest through.
@@ -16,30 +21,20 @@ local Recipes = {}
 RenewableEnergy.Recipes = Recipes
 
 local Specs, Battery, Wear, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
-local SolarGardenLight = RenewableEnergy.SolarGardenLight
+local SolarGardenLight, VehicleBattery = RenewableEnergy.SolarGardenLight, RenewableEnergy.VehicleBattery
 -- Case modData: the full type of the vanilla car battery it came out of.
 local CASE_BATTERY_KEY = "RenewableEnergy_batteryType"
--- What Rebuild Car Battery makes from a case that doesn't say.
-local CAR_BATTERY = "Base.CarBattery1"
 
--- Mount item types by their Specs.mounts kind.
-local MOUNT_KINDS = {
-    ["RenewableEnergy.SolarFlat"] = "flat",
-    ["RenewableEnergy.SolarWallWood"] = "wall",
-    ["RenewableEnergy.SolarWallMetal"] = "wall",
-    ["RenewableEnergy.SolarRackWood"] = "rack",
-    ["RenewableEnergy.SolarRackMetal"] = "rack",
-}
-
--- What each mount recipe teaches when every module in it is new to mounting, by perk name. A
--- module teaches its share only the first time it is ever mounted (PowerBank.MOUNTED_ONCE), so
--- unmounting and mounting the same modules again teaches nothing.
-Recipes.MOUNT_XP = {
-    ["RenewableEnergy.SolarFlat"] = { Electricity = 10 },
-    ["RenewableEnergy.SolarWallWood"] = { Electricity = 15, Woodwork = 5 },
-    ["RenewableEnergy.SolarWallMetal"] = { Electricity = 15, MetalWelding = 5 },
-    ["RenewableEnergy.SolarRackWood"] = { Electricity = 20, Woodwork = 10 },
-    ["RenewableEnergy.SolarRackMetal"] = { Electricity = 20, MetalWelding = 10 },
+-- Panel mounts by item type: kind, the Specs.mounts row; xp, what the mount recipe teaches, by
+-- perk name, when every module in it is new to mounting. A module teaches its share only the
+-- first time it is ever mounted (PowerBank.MOUNTED_ONCE), so unmounting and mounting the same
+-- modules again teaches nothing.
+Recipes.MOUNTS = {
+    ["RenewableEnergy.SolarFlat"] = { kind = "flat", xp = { Electricity = 10 } },
+    ["RenewableEnergy.SolarWallWood"] = { kind = "wall", xp = { Electricity = 15, Woodwork = 5 } },
+    ["RenewableEnergy.SolarWallMetal"] = { kind = "wall", xp = { Electricity = 15, MetalWelding = 5 } },
+    ["RenewableEnergy.SolarRackWood"] = { kind = "rack", xp = { Electricity = 20, Woodwork = 10 } },
+    ["RenewableEnergy.SolarRackMetal"] = { kind = "rack", xp = { Electricity = 20, MetalWelding = 10 } },
 }
 
 -- Repair Cracked Module: condition it adds, and the most it brings each module type to. A
@@ -47,7 +42,7 @@ Recipes.MOUNT_XP = {
 -- ConditionMax.
 Recipes.MODULE_REPAIR = 30
 Recipes.MODULE_REPAIR_CAP = {
-    ["RenewableEnergy.SolarModule"] = 80,
+    [Specs.factoryModule] = 80,
     ["RenewableEnergy.HomemadeSolarModule"] = 60,
 }
 
@@ -71,12 +66,6 @@ local function firstInput(craftRecipeData, matches)
     return nil
 end
 
-local function sendModData(character, item)
-    if isServer() then
-        syncItemModData(character, item)
-    end
-end
-
 -- Panel mounts -----------------------------------------------------------------------------------
 
 -- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will, and
@@ -97,16 +86,16 @@ function Recipes.mountModules(craftRecipeData, character)
     end
     local mount = craftRecipeData:getFirstCreatedItem()
     mount:getModData()[PowerBank.MODULES] = modules
-    sendModData(character, mount)
+    mount:syncItemFields()
     if new > 0 then
-        for perk, xp in pairs(Recipes.MOUNT_XP[mount:getFullType()]) do
+        for perk, xp in pairs(Recipes.MOUNTS[mount:getFullType()].xp) do
             addXp(character, Perks[perk], xp * new / #modules)
         end
     end
 end
 
 local function isMount(item)
-    return MOUNT_KINDS[item:getFullType()] ~= nil
+    return Recipes.MOUNTS[item:getFullType()] ~= nil
 end
 
 -- OnCreate of the Unmount recipes: the modules come back as they went in.
@@ -115,11 +104,11 @@ function Recipes.unmountModules(craftRecipeData, character)
     if not mount then
         return
     end
-    for _, module in ipairs(PowerBank.modulesOf(mount, MOUNT_KINDS[mount:getFullType()])) do
+    for _, module in ipairs(PowerBank.modulesOf(mount, Recipes.MOUNTS[mount:getFullType()].kind)) do
         local item = instanceItem(module.type)
         Wear.setCondition(item, module.condition)
         PowerBank.markModule(item, module)
-        Actions.addOrDropItem(character, item)
+        RenewableEnergy.giveItems(character, item)
     end
 end
 
@@ -295,7 +284,7 @@ function Recipes.stripCarBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
     local case = craftRecipeData:getFirstCreatedItem()
     case:getModData()[CASE_BATTERY_KEY] = battery:getFullType()
-    sendModData(character, case)
+    case:syncItemFields()
 end
 
 local function setRebuilt(battery)
@@ -307,7 +296,7 @@ end
 function Recipes.rebuildBattery(craftRecipeData, character)
     local battery = craftRecipeData:getFirstCreatedItem()
     setRebuilt(battery)
-    sendItemStats(battery)
+    battery:syncItemFields()
 end
 
 -- OnCreate of Rebuild Car Battery, which has no script output: it makes the car battery type
@@ -316,9 +305,9 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
     local case = firstInput(craftRecipeData, function(item)
         return item:getFullType() == "RenewableEnergy.CarBatteryCase"
     end)
-    local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or CAR_BATTERY)
+    local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or VehicleBattery.CAR_BATTERY)
     setRebuilt(battery)
-    Actions.addOrDropItem(character, battery)
+    RenewableEnergy.giveItems(character, battery)
 end
 
 -- Gadgets ----------------------------------------------------------------------------------------
@@ -330,7 +319,7 @@ function Recipes.takeApartGardenLight(craftRecipeData, character)
     end)
     local bulb = light and SolarGardenLight.getBulb(light)
     if bulb then
-        Actions.addOrDropItem(character, instanceItem(bulb))
+        RenewableEnergy.giveItems(character, bulb)
     end
 end
 
@@ -341,17 +330,19 @@ Recipes.PROPANE_BOTTLE_SHARE = 0.05
 
 -- OnCreate of Refill Propane Bottle, as vanilla's Refill Blow Torch moves its propane
 -- (RecipeCodeOnCreate.refillBlowTorch): the new bottle starts as the old one was and takes what
--- it has room for from the tank.
+-- it has room for from the tank. The propane moves in whole uses of the tank, the coarser of the
+-- two, so that rounding the tank's store can't make propane from nothing.
 function Recipes.refillPropaneBottle(craftRecipeData, character)
     local bottle = craftRecipeData:getFirstCreatedItem()
     local old = craftRecipeData:getAllConsumedItems():get(0)
     local tank = craftRecipeData:getAllKeepInputItems():get(0)
-    local share = Recipes.PROPANE_BOTTLE_SHARE
-    local taken = math.min((1 - old:getCurrentUsesFloat()) * share, tank:getCurrentUsesFloat())
-    bottle:setCurrentUsesFloat(old:getCurrentUsesFloat() + taken / share)
-    tank:setCurrentUsesFloat(tank:getCurrentUsesFloat() - taken)
-    syncItemFields(character, tank)
-    syncItemFields(character, bottle)
+    local share, tankUse = Recipes.PROPANE_BOTTLE_SHARE, tank:getUseDelta()
+    local room = RenewableEnergy.round((1 - old:getCurrentUsesFloat()) * share / tankUse)
+    local taken = math.min(room, tank:getCurrentUses())
+    bottle:setCurrentUsesFloat(old:getCurrentUsesFloat() + taken * tankUse / share)
+    tank:setCurrentUses(tank:getCurrentUses() - taken)
+    bottle:syncItemFields()
+    sendItemStats(tank)
 end
 
 return Recipes

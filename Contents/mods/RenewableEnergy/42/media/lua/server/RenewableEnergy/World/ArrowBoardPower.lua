@@ -1,0 +1,364 @@
+require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sun"
+require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/PowerBank/PanelSource"
+require "RenewableEnergy/World/ArrowBoard"
+
+-- The arrow board trailer's power (ArrowBoard.lua): its panels charge the batteries in its box,
+-- and the lamps run off them through the controller in it: lit day and night while its switch is
+-- on, the lamp board isn't beaten to nothing and a battery is above the controller's cutoff,
+-- dimmed by the photocell after dark. Once every battery is down to the cutoff they stay off
+-- until one is back up at the reconnect level, so a board that barely charges doesn't flicker
+-- from pass to pass.
+--
+-- The authority sets them in the charge pass, and at once when the switch moves, in the battery
+-- box part's modData, which the part saves and the server sends its clients (transmitPartModData).
+-- Every game that draws the trailer flashes them itself, by the real clock, through the vehicle's
+-- windowLightsOn flag, which nothing else sets or sends and which lights the board's zone of the
+-- lamps texture each frame it is set (Vehicles.txt). After dark it also gives the board a steady
+-- lamppost, since moving a lamppost relights the cell, too dear to do every flash.
+
+local ArrowBoard = RenewableEnergy.ArrowBoard
+local Specs = RenewableEnergy.Specs
+
+-- Battery box part modData: the switch (true on), the lamps as the authority last set them
+-- (LAMPS_DAY or LAMPS_NIGHT, nil while dark), and whether the controller has cut them off for flat
+-- batteries. The box's discharge cycle of the day, as a bank tracks its own (Bank:trackCycle): the
+-- day, the highest charge that day and the deepest discharge from it.
+ArrowBoard.SWITCH_KEY = "RenewableEnergy_switchOn"
+local LAMPS_KEY, CUT_OFF_KEY = "RenewableEnergy_lamps", "RenewableEnergy_cutOff"
+local CYCLE_DAY, CYCLE_HIGH, CYCLE_DEPTH = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
+local LAMPS_DAY, LAMPS_NIGHT = "day", "night"
+
+-- The lamps' amber, halved, since the native lighting doubles a lamp's colour (SolarGardenLight).
+local GROUND_LIGHT = { r = 0.5, g = 0.35, b = 0.08 }
+
+local function boxOf(vehicle)
+    return vehicle:getPartById(ArrowBoard.BATTERY_BOX)
+end
+
+-- Batteries -------------------------------------------------------------------------------------
+
+-- A battery in the box that can still hold a charge.
+local function holdsCharge(item)
+    return RenewableEnergy.Battery.nominalWh(item) > 0
+end
+
+-- `charge` in whole uses of the battery. The game keeps a charge in uses and rounds a charge it is
+-- given to the nearest (InventoryItem.setCurrentUsesFloat), and reads it back as a float a hair
+-- off it (0.1 comes back as 0.09999999), so charges are compared in uses.
+local function usesAt(battery, charge)
+    return math.floor(charge / battery:getUseDelta() + 0.5)
+end
+
+-- The battery in the box furthest from `target` on the side `direction` gives (1: below it,
+-- -1: above it), and how far, as a charge; nil if every battery is there.
+local function furthestFrom(container, target, direction)
+    local furthest, furthestGap
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if holdsCharge(item) then
+            local gap = (usesAt(item, target) - item:getCurrentUses()) * direction * item:getUseDelta()
+            if gap > 0 and (not furthest or gap > furthestGap) then
+                furthest, furthestGap = item, gap
+            end
+        end
+    end
+    return furthest, furthestGap
+end
+
+-- Moves up to `wh` into or out of the batteries in the box, toward `target`: 1 to charge them,
+-- the controller's cutoff to drain them. The one furthest from it goes first, so that a mixed set
+-- evens out. Authority only. Returns the watt-hours moved.
+local function shift(container, wh, target, direction)
+    local Battery = RenewableEnergy.Battery
+    local moved = 0
+    local battery, gap = furthestFrom(container, target, direction)
+    while battery and wh > 0 do
+        local before, nominal = Battery.getCharge(battery), Battery.nominalWh(battery)
+        local room = gap * nominal
+        local step = math.min(wh, room)
+        -- Exactly at the target when it gets there, so the next pick moves on.
+        Battery.setCharge(battery, step == room and target or before + direction * step / nominal)
+        -- As the maintainer does: clients hear of the charge once it shows at two decimals.
+        if VehicleUtils.compareFloats(before, Battery.getCharge(battery), 2) then
+            sendItemStats(battery)
+        end
+        wh, moved = wh - step, moved + step
+        battery, gap = furthestFrom(container, target, direction)
+    end
+    return moved
+end
+
+-- How many uses the fullest battery in the box that holds a charge has over `charge` (negative
+-- when under it), or nil when the box holds none.
+local function fullestOver(container, charge)
+    local most
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if holdsCharge(item) then
+            local over = item:getCurrentUses() - usesAt(item, charge)
+            most = most and math.max(most, over) or over
+        end
+    end
+    return most
+end
+
+-- Charging -------------------------------------------------------------------------------------
+
+--- Adds `hours` of its panels' output under `sky` (Sun.skyNow, now if nil) to the batteries in
+--- its battery box, the emptiest first, so that a mixed set fills evenly. The panels count as
+--- flat, since the trailer may face any way, and make nothing under a roof. Authority only.
+--- Returns the watt-hours stored.
+---@param vehicle BaseVehicle
+function ArrowBoard.charge(vehicle, hours, sky)
+    if not ArrowBoard.isTrailer(vehicle) then
+        return 0
+    end
+    local square = vehicle:getSquare()
+    local box = boxOf(vehicle)
+    local container = box and box:getItemContainer()
+    if not (container and square and square:isOutside()) then
+        return 0
+    end
+    local Sun = RenewableEnergy.Sun
+    local wh = Sun.wattsFrom(ArrowBoard.panelWatts(vehicle), (sky or Sun.skyNow()).flat, 0) * hours
+    return shift(container, wh, 1, 1)
+end
+
+-- Switch and lamps ------------------------------------------------------------------------------
+
+--- Whether the controller's switch is on.
+function ArrowBoard.isSwitchedOn(vehicle)
+    local box = boxOf(vehicle)
+    return box ~= nil and box:getModData()[ArrowBoard.SWITCH_KEY] == true
+end
+
+--- The lamps as the authority last set them: "day", "night" (dimmed), or nil while dark.
+function ArrowBoard.lamps(vehicle)
+    local box = boxOf(vehicle)
+    return box and box:getModData()[LAMPS_KEY] or nil
+end
+
+-- Whether the lamp board can light: on the trailer, and not beaten to nothing.
+local function boardIntact(vehicle)
+    local board = vehicle:getPartById(ArrowBoard.BOARD)
+    return board ~= nil and board:getInventoryItem() ~= nil and board:getCondition() > 0
+end
+
+--- Whether a character at the box can reach the switch: inside the box, so only with the lid open
+--- or off, as the padlock means it to be.
+function ArrowBoard.switchReachable(vehicle)
+    local lid = vehicle:getPartById(ArrowBoard.LID)
+    local door = lid and lid:getDoor()
+    if not (door and lid:getInventoryItem()) then
+        return true
+    end
+    return door:isOpen()
+end
+
+--- Whether the switch can be set to `on`: on an arrow board, reachable, and not there already.
+function ArrowBoard.canSwitch(vehicle, on)
+    return ArrowBoard.isTrailer(vehicle) and ArrowBoard.switchReachable(vehicle) and ArrowBoard.isSwitchedOn(vehicle) ~= on
+end
+
+--- Sets the switch of a trailer that has none yet: on by STOCK.switchedOnChance. Authority only.
+function ArrowBoard.rollSwitch(vehicle)
+    local box = vehicle and boxOf(vehicle)
+    local modData = box and box:getModData()
+    if modData and modData[ArrowBoard.SWITCH_KEY] == nil then
+        modData[ArrowBoard.SWITCH_KEY] = ZombRandFloat(0, 1) < ArrowBoard.STOCK.switchedOnChance
+        vehicle:transmitPartModData(box)
+    end
+end
+
+--- The lamps' average draw while they flash, in watts: full by day, dimmed at `night`.
+function ArrowBoard.lampWatts(night)
+    local spec = Specs.arrowBoard
+    return (night and spec.nightWatts or spec.dayWatts) * spec.onShare + spec.offWatts * (1 - spec.onShare)
+end
+
+-- Follows the box's discharge cycle, and on a new day wears its batteries by the day before's
+-- deepest discharge, as a bank does (Bank:trackCycle, Bank:newDay).
+local function trackCycle(box, container)
+    local Battery = RenewableEnergy.Battery
+    local storedWh, nominalWh = 0, 0
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        local wh = Battery.nominalWh(item)
+        if wh > 0 then
+            storedWh, nominalWh = storedWh + Battery.getCharge(item) * wh, nominalWh + wh
+        end
+    end
+    if nominalWh <= 0 then
+        return
+    end
+    local charge = storedWh / nominalWh
+    local modData = box:getModData()
+    local high = math.max(modData[CYCLE_HIGH] or charge, charge)
+    local depth = math.max(modData[CYCLE_DEPTH] or 0, high - charge)
+    local day = math.floor(getGameTime():getWorldAgeHours() / 24)
+    if modData[CYCLE_DAY] ~= day then
+        if modData[CYCLE_DAY] and depth > 0 then
+            Battery.wearAll(container, depth)
+        end
+        modData[CYCLE_DAY] = day
+        high, depth = charge, 0
+    end
+    modData[CYCLE_HIGH], modData[CYCLE_DEPTH] = high, depth
+end
+
+-- Sets the lamps by the switch, the board, the batteries and the photocell, which sees dark at
+-- `night`, and sends them to the clients when they change.
+local function setLamps(vehicle, box, night)
+    local spec, modData = Specs.arrowBoard, box:getModData()
+    local container = box:getItemContainer()
+    local overCutoff = fullestOver(container, spec.cutoff)
+    if not overCutoff or overCutoff <= 0 then
+        modData[CUT_OFF_KEY] = true
+    elseif fullestOver(container, spec.reconnect) >= 0 then
+        modData[CUT_OFF_KEY] = nil
+    end
+    local lit = modData[ArrowBoard.SWITCH_KEY] == true and not modData[CUT_OFF_KEY] and boardIntact(vehicle)
+    local lamps = lit and (night and LAMPS_NIGHT or LAMPS_DAY) or nil
+    if modData[LAMPS_KEY] ~= lamps then
+        modData[LAMPS_KEY] = lamps
+        vehicle:transmitPartModData(box)
+    end
+end
+
+-- Whether the photocell sees dark: the sun below the horizon, when a garden light comes on too.
+local function isNight()
+    return RenewableEnergy.Sun.positionNow().up <= 0
+end
+
+--- `hours` of the lamps as they were lit, drawn from the box, then the lamps set again for the
+--- switch, the board, the batteries and the photocell (`night`, now if nil) as they are now.
+--- Authority only. Returns the watt-hours the lamps drew.
+function ArrowBoard.runLamps(vehicle, hours, night)
+    local box = boxOf(vehicle)
+    local container = box and box:getItemContainer()
+    if not container then
+        return 0
+    end
+    local lamps = box:getModData()[LAMPS_KEY]
+    local drawn = lamps and shift(container, ArrowBoard.lampWatts(lamps == LAMPS_NIGHT) * hours, Specs.arrowBoard.cutoff, -1) or 0
+    trackCycle(box, container)
+    if night == nil then
+        night = isNight()
+    end
+    setLamps(vehicle, box, night)
+    return drawn
+end
+
+--- Sets the switch on or off, the lamps following at once. Authority only, from the switch
+--- action's complete(). Returns whether it could.
+function ArrowBoard.setSwitch(vehicle, on)
+    local box = boxOf(vehicle)
+    if not (box and box:getItemContainer()) then
+        return false
+    end
+    box:getModData()[ArrowBoard.SWITCH_KEY] = on
+    vehicle:transmitPartModData(box)
+    setLamps(vehicle, box, isNight())
+    return true
+end
+
+--- The charge pass for one loaded vehicle under `sky` (Sun.skyNow, now if nil): if it is an
+--- arrow board, storms may crack its panels, its panels show what they hold, they charge its box
+--- and its lamps draw from it. Authority only. Returns the watt-hours its panels stored.
+function ArrowBoard.update(vehicle, hours, sky)
+    if not ArrowBoard.isTrailer(vehicle) then
+        return 0
+    end
+    sky = sky or RenewableEnergy.Sun.skyNow()
+    ArrowBoard.stormCrack(vehicle, RenewableEnergy.PanelSource.stormHours(hours))
+    ArrowBoard.showPanels(vehicle)
+    local stored = ArrowBoard.charge(vehicle, hours, sky)
+    ArrowBoard.runLamps(vehicle, hours, sky.up <= 0)
+    return stored
+end
+
+-- Flashing -------------------------------------------------------------------------------------
+
+--- Whether the flashing lamps are lit at real time `ms`, and how many milliseconds they have been
+--- lit or dark.
+function ArrowBoard.flashPhase(ms)
+    local spec = Specs.arrowBoard
+    local period = 60000 / spec.flashesPerMinute
+    local into, litFor = ms % period, period * spec.onShare
+    if into < litFor then
+        return true, into
+    end
+    return false, into - litFor
+end
+
+-- Every loaded trailer this game draws, by vehicle: its battery box part, and while it lights the
+-- ground its lamppost and that lamppost's square (x, y, z).
+local boards = {}
+
+local function removeGroundLight(entry)
+    if entry.light then
+        getCell():removeLamppost(entry.light)
+        entry.light = nil
+    end
+end
+
+-- Gives the board a lamppost on the trailer's square, moved only when the trailer moves to another.
+local function placeGroundLight(entry, vehicle)
+    local x, y, z = math.floor(vehicle:getX()), math.floor(vehicle:getY()), math.floor(vehicle:getZ())
+    if entry.light and entry.x == x and entry.y == y and entry.z == z then
+        return
+    end
+    removeGroundLight(entry)
+    entry.light = getCell():addLamppost(x, y, z, GROUND_LIGHT.r, GROUND_LIGHT.g, GROUND_LIGHT.b, Specs.arrowBoard.radius)
+    entry.x, entry.y, entry.z = x, y, z
+end
+
+-- OnTick, but on a dedicated server: flashes the lamps of every loaded trailer that is lit, and
+-- lights the ground around those dimmed for the night.
+--
+-- Per tick: a modData read and a flag compare for each trailer this game draws, which are few,
+-- and the trailer's square for one dimmed for the night. The flash follows the real clock and the
+-- flag lights only the frame it is set in, so this runs every frame; the lamps' state comes from
+-- the authority's modData, which no event announces. Allocates nothing unless a lamppost moves.
+local function flashLamps()
+    local flashLit = ArrowBoard.flashPhase(getTimestampMs())
+    for vehicle, entry in pairs(boards) do
+        if vehicle:isRemovedFromWorld() then
+            removeGroundLight(entry)
+            boards[vehicle] = nil
+        else
+            local lamps = entry.box:getModData()[LAMPS_KEY]
+            local show = lamps ~= nil and flashLit
+            if vehicle:getWindowLightsOn() ~= show then
+                vehicle:setWindowLightsOn(show)
+            end
+            if lamps == LAMPS_NIGHT then
+                placeGroundLight(entry, vehicle)
+            else
+                removeGroundLight(entry)
+            end
+        end
+    end
+end
+
+--- Part `init` of the lamp board: runs on every side each time the trailer loads. A trailer saved
+--- before it had the board and the switch gets them here.
+function ArrowBoard.initBoard(vehicle, part)
+    ArrowBoard.initFrame(vehicle, part)
+    if not isClient() then
+        ArrowBoard.rollSwitch(vehicle)
+    end
+    local box = boxOf(vehicle)
+    if box and not isServer() and not boards[vehicle] then
+        boards[vehicle] = { box = box }
+    end
+end
+
+if not isServer() then
+    Events.OnTick.Add(flashLamps)
+end

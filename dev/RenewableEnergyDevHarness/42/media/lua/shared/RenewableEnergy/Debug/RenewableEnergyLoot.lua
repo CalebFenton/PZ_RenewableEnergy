@@ -13,6 +13,7 @@
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
 require "PZHarness/Fixtures"
+local Stash = require "RenewableEnergy/StashHouses"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loot = {}
@@ -111,8 +112,10 @@ local LABELS = {
     ["sub:SurvivorCache1.SurvivorCrate"] = "Survivor stash crates",
     ["sub:SurvivorCache2.SurvivorCrate"] = "Survivor stash crates (8 rolls)",
     ["sub:SurvivorCacheBigBuilding.SurvivorCrate"] = "Survivor stash crates (big buildings)",
-    ["sub:RenewableEnergyStashCache.RenewableEnergySolarBox"] = "Solar crate in the mod's stash houses",
 }
+-- The solar crate of the mod's stash houses.
+local STASH_CRATE = "sub:" .. Stash.SPAWN_TABLE .. "." .. Stash.CRATE_TYPE
+LABELS[STASH_CRATE] = "Solar crate in the mod's stash houses"
 
 local function labelFor(reference)
     local outfit = string.match(reference, "^sub:all%.Outfit_(.+)$")
@@ -130,8 +133,8 @@ local ROOM_CONTAINERS = {
     { room = "storageunit", container = "other", label = "Storage units" },
     { room = "garagestorage", container = "crate", label = "Garage crates" },
     { room = "SafehouseLoot", container = "metal_shelves", label = "Survivor safehouse metal shelves" },
-    { room = "RenewableEnergyStashCache", container = "crate", label = "Crates in the mod's stash houses" },
-    { room = "RenewableEnergyStashCache", container = "metal_shelves", label = "Metal shelves in the mod's stash houses" },
+    { room = Stash.SPAWN_TABLE, container = "crate", label = "Crates in the mod's stash houses" },
+    { room = Stash.SPAWN_TABLE, container = "metal_shelves", label = "Metal shelves in the mod's stash houses" },
 }
 
 -- Sandbox options while measuring: a new default-preset game's loot settings, without the zombie
@@ -178,26 +181,6 @@ local function withLootRarity(lrm, fn)
         end
         RenewableEnergy.Distributions.apply()
     end)
-end
-
---- The loot table a reference from RenewableEnergy.Distributions.items names. A junk list is
---- rolled with the list it belongs to, so "proc:X.junk" gives the table of X.
----@param reference string
----@return table?
-function Loot.lootTable(reference)
-    local kind, name = string.match(reference, "^(%a+):(.+)$")
-    local list
-    if kind == "proc" then
-        list = ProceduralDistributions.list[string.match(name, "^([^.]+)%.junk$") or name]
-    elseif kind == "veh" then
-        list = VehicleDistributions[name]
-    elseif kind == "sub" then
-        list = SuburbsDistributions
-        for part in string.gmatch(name, "[^.]+") do
-            list = type(list) == "table" and list[part] or nil
-        end
-    end
-    return type(list) == "table" and list or nil
 end
 
 --- The references in RenewableEnergy.Distributions.items with junk lists folded into their own,
@@ -278,7 +261,7 @@ end
 function Loot.tablesFor(targets, modOnly)
     local tables = {}
     for i, target in ipairs(targets) do
-        local lootTable = Loot.lootTable(target.reference)
+        local lootTable = RenewableEnergy.Distributions.resolveTable(target.reference)
         if lootTable and modOnly then
             lootTable = modItemsOnly(lootTable)
         end
@@ -475,7 +458,7 @@ end
 function Loot.report(samples)
     return Loot.withMeasureOptions(function()
         local targets = Loot.targets()
-        table.insert(targets, { reference = "sub:RenewableEnergyStashCache.RenewableEnergySolarBox", items = {} })
+        table.insert(targets, { reference = STASH_CRATE, items = {} })
         local function build()
             local containers, lists = roomContainersModOnly()
             for key, lootTable in pairs(Loot.tablesFor(targets, true)) do

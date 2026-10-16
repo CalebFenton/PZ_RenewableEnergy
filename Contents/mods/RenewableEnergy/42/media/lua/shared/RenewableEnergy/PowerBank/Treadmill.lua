@@ -20,10 +20,11 @@ Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
 
 -- A step in each facing, in squares.
 local FACING_STEPS = { N = { 0, -1 }, S = { 0, 1 }, E = { 1, 0 }, W = { -1, 0 } }
+-- Steps back from each end of the treadmill (Sprites.treadmill) to its rear end.
+local STEPS_TO_REAR = { rear = 0, console = 1 }
 
-function Treadmill.isSprite(spriteName)
-    return Sprites.kindOf(spriteName) == "treadmill"
-end
+--- Whether a sprite is one of a treadmill's tiles (Sprites.treadmill).
+Treadmill.isSprite = Sprites.matcher(Sprites.treadmill)
 
 --- Whether `isoObject` is a treadmill's tile, wired or not.
 function Treadmill.isTreadmill(isoObject)
@@ -33,6 +34,11 @@ end
 --- Whether the treadmill tile `tile` is the one wired to feed a bank.
 function Treadmill.isWired(tile)
     return tile:getModData()[Treadmill.WIRED] == true
+end
+
+--- Whether `isoObject` is a treadmill's tile wired to feed a bank.
+function Treadmill.isWiredTile(isoObject)
+    return Treadmill.isTreadmill(isoObject) and Treadmill.isWired(isoObject)
 end
 
 --- A treadmill's tile on `square`, wired or not, or nil.
@@ -47,10 +53,8 @@ function Treadmill.ends(tile)
     local _, facing, part = Sprites.kindOf(Sprites.nameOf(tile))
     local step = FACING_STEPS[facing]
     local square = tile:getSquare()
-    local x, y = square:getX(), square:getY()
-    if part == "console" then
-        x, y = x - step[1], y - step[2]
-    end
+    local back = STEPS_TO_REAR[part]
+    local x, y = square:getX() - step[1] * back, square:getY() - step[2] * back
     return { x = x, y = y }, { x = x + step[1], y = y + step[2] }, step
 end
 
@@ -90,6 +94,15 @@ function Treadmill.wiringRefusal(character, tile)
     end
     local short = RenewableEnergy.firstUnmet(Treadmill.needs(character))
     return short and short.kind
+end
+
+--- Why a run on the wired treadmill tile `tile` would bank nothing, or nil: it feeds no bank, as
+--- this side last heard (PowerBank.connectedBank).
+function Treadmill.runRefusal(tile)
+    if not PowerBank.connectedBank(tile) then
+        return "Tooltip_RenewableEnergy_TreadmillNotConnected"
+    end
+    return nil
 end
 
 return Treadmill

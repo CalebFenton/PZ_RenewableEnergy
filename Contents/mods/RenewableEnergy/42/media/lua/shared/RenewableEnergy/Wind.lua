@@ -1,6 +1,7 @@
 -- Wind chargers: their output from the game's wind (ClimateManager.getWindspeedKph, stronger in
 -- winter, no day and night), the turbine's power curve, how high it stands and what shelters it;
--- and the brake and broken blades a placed charger keeps in its modData.
+-- and the brake and broken blades a placed charger keeps in its modData, which only the authority's
+-- RenewableEnergy.WindSource writes.
 --
 -- Shelter has no direction: the game's wind angle is a screen-space value for its weather effects
 -- (ClimateManager.getWindAngleDegrees), so a turbine counts what stands around it on every side.
@@ -18,24 +19,17 @@ local Specs, Sources = RenewableEnergy.Specs, RenewableEnergy.Sources
 Wind.BRAKED = "RenewableEnergy_braked"
 Wind.BROKEN = "RenewableEnergy_bladesBroken"
 
+--- Whether `isoObject` is a placed wind charger.
+function Wind.isCharger(isoObject)
+    return Sources.familyOf(Sources.kindOf(isoObject)) == "wind"
+end
+
 function Wind.isBraked(isoObject)
     return isoObject:getModData()[Wind.BRAKED] == true
 end
 
---- Sets a placed wind charger's brake and sends it to clients. Authority only.
-function Wind.setBraked(isoObject, braked)
-    isoObject:getModData()[Wind.BRAKED] = braked or nil
-    isoObject:transmitModData()
-end
-
 function Wind.isBroken(isoObject)
     return isoObject:getModData()[Wind.BROKEN] == true
-end
-
---- Marks a placed wind charger's blades broken or whole and sends it to clients. Authority only.
-function Wind.setBroken(isoObject, broken)
-    isoObject:getModData()[Wind.BROKEN] = broken or nil
-    isoObject:transmitModData()
 end
 
 --- Why the blades `item` can't go on the wind charger `isoObject` now, or nil if they can: "not

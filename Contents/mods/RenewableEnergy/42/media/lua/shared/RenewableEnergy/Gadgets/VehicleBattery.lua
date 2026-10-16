@@ -23,7 +23,7 @@ VehicleBattery.PART = "Battery"
 VehicleBattery.ITEM = "RenewableEnergy.DeepCycleBattery"
 
 -- The battery vanilla's charge and drain rates are sized for.
-local CAR_BATTERY = "Base.CarBattery1"
+VehicleBattery.CAR_BATTERY = "Base.CarBattery1"
 
 --- Whether `part` is a vehicle's battery slot that the deep cycle battery fits.
 function VehicleBattery.isBatteryPart(part)
@@ -38,7 +38,7 @@ function VehicleBattery.chargeScale(item)
     if not spec then
         return 1
     end
-    return Specs.batteries[CAR_BATTERY].wh / spec.wh
+    return Specs.batteries[VehicleBattery.CAR_BATTERY].wh / spec.wh
 end
 
 return VehicleBattery

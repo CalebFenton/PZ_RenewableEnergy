@@ -2,20 +2,20 @@ require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Sun"
 
 -- The Solar Garden Light: a cell on a stake that charges its little battery by day, and at
 -- night lights its bulb for as long as the charge lasts.
 --
 -- The authority (single player or the server) keeps each light's charge and bulb in its modData
--- and swaps its tile between unlit and lit. Light sources exist only where the game draws, so
--- every client, and single player, gives each lit tile it sees a lamp of its own, in its bulb's
--- colour. A server tells its clients when a light's lamp changes, so they draw it at once.
+-- and swaps its tile between unlit and lit (server/RenewableEnergy/Gadgets/SolarGardenLightServer.lua).
+-- Light sources exist only where the game draws, so every client, and single player, gives each
+-- lit tile it sees a lamp of its own, in its bulb's colour (here). A server tells its clients
+-- when a light's lamp changes, so they draw it at once.
 RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
 RenewableEnergy.SolarGardenLight = SolarGardenLight
 
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
+local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 SolarGardenLight.ITEM = "RenewableEnergy.SolarGardenLight"
 -- Object modData: watt-hours in the light's battery. Picking the light up carries it along
@@ -32,15 +32,17 @@ SolarGardenLight.NO_BULB = "none"
 -- Vanilla's bulbs, the plain one and the coloured ones, whose scripts give their colour.
 SolarGardenLight.BULBS = {}
 for _, colour in ipairs({ "", "Red", "Green", "Blue", "Yellow", "Cyan", "Magenta", "Orange", "Pink", "Purple" }) do
-    SolarGardenLight.BULBS["Base.LightBulb" .. colour] = true
+    SolarGardenLight.BULBS[SolarGardenLight.PLAIN_BULB .. colour] = true
 end
+
+-- The server's word to its clients that a light's lamp changed, with { x, y, z, bulb }: the tile
+-- and the bulb's modData reach them on their own, and a client would otherwise only catch up at
+-- its next game minute.
+SolarGardenLight.COMMAND_MODULE, SolarGardenLight.LAMP_COMMAND = "RenewableEnergyGardenLight", "lamp"
 
 -- The plain bulb's warm white, like the incandescent bulb of a 1993 garden light. Its script
 -- gives no colour, which is white.
 local LAMP_COLOR = { r = 1.0, g = 0.8, b = 0.55 }
--- The server's word to its clients that a light's lamp changed: the tile and the bulb's modData
--- reach them on their own, and a client would otherwise only catch up at its next game minute.
-local COMMAND_MODULE, LAMP_COMMAND = "RenewableEnergyGardenLight", "lamp"
 
 -- Drawing side: the lamp lit at each place, by place key, as { source, bulb }.
 local lamps = {}
@@ -79,6 +81,13 @@ function SolarGardenLight.getBulb(holder)
     return bulb ~= SolarGardenLight.NO_BULB and bulb or nil
 end
 
+--- The bulb a light's lamp shines with, or nil if it has no lamp.
+function SolarGardenLight.lampBulb(light)
+    return SolarGardenLight.isLit(light) and SolarGardenLight.getBulb(light) or nil
+end
+
+-- Drawing side -----------------------------------------------------------------------------------
+
 -- The colour the lamp of `bulb` is given. The native lighting doubles a lamp's colour and clips
 -- it at 1 (LightingJNI.checkLights), so given its bulb's own colour a lamp washes out toward
 -- white: the warm plain bulb would shine pure white. It gets half of it instead.
@@ -89,8 +98,6 @@ local function lampColor(bulb)
     local script = getScriptManager():FindItem(bulb)
     return script:getColorRed() / 2, script:getColorGreen() / 2, script:getColorBlue() / 2
 end
-
--- Drawing side -----------------------------------------------------------------------------------
 
 local function removeLamp(key)
     local lamp = lamps[key]
@@ -128,11 +135,6 @@ local function drawLamp(x, y, z, bulb)
     lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, Specs.gardenLight.radius), bulb = bulb }
 end
 
--- The bulb a light's lamp shines with, or nil if it has no lamp.
-local function lampBulb(light)
-    return SolarGardenLight.isLit(light) and SolarGardenLight.getBulb(light) or nil
-end
-
 --- Gives a lit light a lamp in its bulb's colour and takes an unlit one's away. Not on a
 --- dedicated server, which draws nothing.
 function SolarGardenLight.syncLamp(light)
@@ -141,7 +143,7 @@ function SolarGardenLight.syncLamp(light)
     end
     -- A client can get the bulb's removal before the unlit tile that follows it, hence the bulb
     -- and the tile both.
-    drawLamp(light:getX(), light:getY(), light:getZ(), lampBulb(light))
+    drawLamp(light:getX(), light:getY(), light:getZ(), SolarGardenLight.lampBulb(light))
 end
 
 -- The lights this side has seen: the authority runs them, the drawing side lights them. A light
@@ -153,88 +155,10 @@ local lights = RenewableEnergy.PlaceTracker.new({
     onLost = removeLamp,
 })
 
--- Authority --------------------------------------------------------------------------------------
-
--- Swaps the tile to lit or unlit and gives the light the lamp that goes with it here and, on a
--- server, on every client, when the tile or the bulb (`bulbChanged`) changed.
-local function setLit(light, lit, bulbChanged)
-    local changed = SolarGardenLight.isLit(light) ~= lit
-    if changed then
-        -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-        light:setSprite(getSprite(lit and Sprites.gardenLight.lit or Sprites.gardenLight.off))
-        if isServer() then
-            light:transmitUpdatedSpriteToClients()
-        end
-    end
-    -- Also when the tile stays lit, since its bulb may have changed.
-    SolarGardenLight.syncLamp(light)
-    if isServer() and (changed or bulbChanged) then
-        sendServerCommand(COMMAND_MODULE, LAMP_COMMAND,
-            { x = light:getX(), y = light:getY(), z = light:getZ(), bulb = lampBulb(light) })
-    end
+--- Calls `fn(light)` for every loaded light this side has seen.
+function SolarGardenLight.eachLoaded(fn)
+    lights:each(fn)
 end
-
---- Runs a light for `hours` at the sun of the moment: by day its cell charges the battery, and
---- after sunset its bulb draws on it until it is empty. A light without a bulb draws nothing.
---- `bulbChanged` says its bulb has just changed, so that its lamp's colour reaches the clients
---- even if it stays lit. `sky` is Sun.skyNow(), worked out here if nil. Authority only. Returns
---- whether the light is lit.
-function SolarGardenLight.update(light, hours, bulbChanged, sky)
-    local spec = Specs.gardenLight
-    sky = sky or Sun.skyNow()
-    local night = sky.up <= 0
-    local bulb = SolarGardenLight.getBulb(light) ~= nil
-    local charge = SolarGardenLight.getCharge(light)
-    if not night then
-        charge = math.min(spec.wh, charge + Sun.squareWatts(light:getSquare(), spec.watts, sky) * hours)
-    elseif bulb then
-        charge = math.max(0, charge - spec.nightWatts * hours)
-    end
-    light:getModData()[SolarGardenLight.CHARGE_KEY] = charge
-    local lit = night and bulb and charge > 0
-    setLit(light, lit, bulbChanged)
-    return lit
-end
-
--- Puts `bulb` (nil for none) in the light, tells the clients, and lights or darkens it at once.
-local function setBulb(light, bulb)
-    light:getModData()[SolarGardenLight.BULB_KEY] = bulb or SolarGardenLight.NO_BULB
-    light:transmitModData()
-    SolarGardenLight.update(light, 0, true)
-end
-
---- Takes the bulb out of `light` and gives it to `character`. Authority only, from a timed
---- action's complete(). Returns whether it did.
-function SolarGardenLight.removeBulb(character, light)
-    local bulb = SolarGardenLight.getBulb(light)
-    if not bulb then
-        return false
-    end
-    setBulb(light, nil)
-    Actions.addOrDropItem(character, instanceItem(bulb))
-    return true
-end
-
---- Takes the bulb `item` from `character` and puts it in `light`, which has none. Authority only,
---- from a timed action's complete(). Returns whether it did.
-function SolarGardenLight.addBulb(character, light, item)
-    if SolarGardenLight.getBulb(light) or not SolarGardenLight.isBulb(item) then
-        return false
-    end
-    RenewableEnergy.takeItem(character, item)
-    setBulb(light, item:getFullType())
-    return true
-end
-
---- Runs every loaded light the authority has seen.
-function SolarGardenLight.updateAll(hours)
-    local sky = Sun.skyNow()
-    lights:each(function(light)
-        SolarGardenLight.update(light, hours, false, sky)
-    end)
-end
-
--- Keeping lamps up to date -----------------------------------------------------------------------
 
 -- The authority swaps the tile; the drawing side catches up with it, and with lights that went.
 -- A multiplayer client also draws what its server says a lamp became, at once, before the tile
@@ -244,7 +168,7 @@ if not isServer() then
         lights:each(SolarGardenLight.syncLamp)
     end)
     Events.OnServerCommand.Add(function(module, command, args)
-        if module ~= COMMAND_MODULE or command ~= LAMP_COMMAND then
+        if module ~= SolarGardenLight.COMMAND_MODULE or command ~= SolarGardenLight.LAMP_COMMAND then
             return
         end
         local square = getCell():getGridSquare(args.x, args.y, args.z)

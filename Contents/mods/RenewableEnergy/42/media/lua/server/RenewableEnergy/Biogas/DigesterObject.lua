@@ -36,18 +36,18 @@ DigesterObject.SAVED_FIELDS = {
 
 -- Sour slows digestion to this share.
 local SOUR_K = 0.15
--- The souring buffer: acid decays by this share a day, and a digester sours above its limit
--- (ACID_LIMIT per unit of potentialCap) and recovers below half of it. Alkali banked beyond the
--- limit below zero is lost.
+-- Acid decays by this share a day. Alkali banked beyond the souring limit (Digester.ACID_LIMIT)
+-- below zero is lost.
 local ACID_DECAY_PER_DAY = 0.1
-local ACID_LIMIT = 0.8
 -- Sludge, in percent, that each m³ of potential fed adds, for a digester holding 1 m³; bigger ones
 -- fill slower in proportion, so each tier needs emptying about weekly when fed to its cap.
 local SLUDGE_PER_POTENTIAL = 35
 -- Air below this outdoors is held in by the dome's earth (ground temperature).
 local GROUND_TEMP = 12
 -- What a room does to the outdoor temperature while its chunk is unloaded, as
--- ClimateManager.getAirTemperatureForSquare does for a ground floor room at an average daylight.
+-- ClimateManager.getAirTemperatureForSquare does for a ground floor room at an average daylight:
+-- pulls it toward ROOM_TEMP.
+local ROOM_TEMP = 22
 local ROOM_PULL_COLD, ROOM_PULL_HOT = 0.5, 0.425
 -- The made-per-day figure follows the last few hours.
 local RATE_HOURS = 6
@@ -80,7 +80,7 @@ end
 function DigesterObject:stateFromIsoObject(isoObject)
     self:initNew()
     self.tier, self.material = Digester.tileOf(isoObject)
-    self.holder = Digester.HOLDER_OF_TIER[self.tier] or "bags"
+    self.holder = self:tierSpec().holder
     self.temp = getClimateManager():getAirTemperatureForSquare(isoObject:getSquare())
     self:loaded(isoObject)
 end
@@ -104,8 +104,15 @@ function DigesterObject:loaded(isoObject)
     self:sendSummary()
 end
 
+-- Its stink goes, and the heater it fed goes out; a tile picked up or destroyed is still on its
+-- square here (OnObjectAboutToBeRemoved).
 function DigesterObject:aboutToRemoveFromSystem()
     Stink.clear(self:key())
+    local isoObject = self:getIsoObject()
+    local heater = isoObject and GasHeater.litHeaterFor(isoObject)
+    if heater then
+        DigesterObject.showHeaterLit(heater, false)
+    end
     RenewableEnergy.ObjectSystem.Object.aboutToRemoveFromSystem(self)
 end
 
@@ -122,7 +129,7 @@ function DigesterObject:isTorn()
 end
 
 function DigesterObject:acidLimit()
-    return ACID_LIMIT * self:tierSpec().potentialCap
+    return Digester.ACID_LIMIT * self:tierSpec().potentialCap
 end
 
 -- Feed ----------------------------------------------------------------------------------------
@@ -278,10 +285,10 @@ function DigesterObject:airTemp(square)
     end
     local temp = climate:getTemperature()
     if self.inRoom then
-        if temp <= 22 then
-            temp = temp + (22 - temp) * ROOM_PULL_COLD
+        if temp <= ROOM_TEMP then
+            temp = temp + (ROOM_TEMP - temp) * ROOM_PULL_COLD
         else
-            temp = temp - (temp - 22) * ROOM_PULL_HOT
+            temp = temp - (temp - ROOM_TEMP) * ROOM_PULL_HOT
         end
     end
     return temp
@@ -345,7 +352,7 @@ function DigesterObject:step(hours, air)
     local limit = self:acidLimit()
     if self.acid > limit then
         self.sour = true
-    elseif self.acid < limit / 2 then
+    elseif self.acid < limit * Digester.ACID_RECOVER then
         self.sour = false
     end
 
@@ -437,23 +444,26 @@ function DigesterObject:stinkScore()
     return spec.stinkCap and math.min(score, spec.stinkCap) or score
 end
 
---- The corpses the stink score smells like (Stink.LEVEL_CORPSES).
+--- The corpses the stink score smells like: none below the first smell level's score
+--- (Digester.SMELL_SCORES), then rising through each level's corpses (Stink.LEVEL_CORPSES).
 function DigesterObject.corpsesFor(score)
-    local first, second, third = Stink.LEVEL_CORPSES[1], Stink.LEVEL_CORPSES[2], Stink.LEVEL_CORPSES[3]
-    if score < 0.2 then
+    local scores, corpses = Digester.SMELL_SCORES, Stink.LEVEL_CORPSES
+    if score < scores[1] then
         return 0
-    elseif score < 1 then
-        return first + math.floor((score - 0.2) / 0.8 * (second - first))
-    elseif score < 2 then
-        return second + math.floor((score - 1) * (third - second))
     end
-    return third
+    for level = 1, #scores - 1 do
+        if score < scores[level + 1] then
+            local share = (score - scores[level]) / (scores[level + 1] - scores[level])
+            return corpses[level] + math.floor(share * (corpses[level + 1] - corpses[level]))
+        end
+    end
+    return corpses[#corpses]
 end
 
---- Whether the digester fills its building with fumes: badly sour or leaking, indoors. The dome
---- is sealed and buried.
+--- Whether the digester fills its building with fumes: badly sour or leaking, indoors, unless it
+--- is sealed.
 function DigesterObject:fuming()
-    return self.indoors and self.tier ~= "dome" and (self.sour or self.leakHours > 0)
+    return self.indoors and not self:tierSpec().sealed and (self.sour or self.leakHours > 0)
 end
 
 -- Tile -----------------------------------------------------------------------------------------
@@ -492,16 +502,17 @@ function DigesterObject:show()
     end
 end
 
---- Makes it an insulated digester under a floating drum: its tile, and the bigger hopper of the
---- tile's ContainerCapacity, which a multiplayer client gets only with the containers.
+--- Makes it the tier its Upgrade makes of it (Digester.TIERS), with that tier's new holder: its
+--- tile, and the bigger hopper of the tile's ContainerCapacity, which a multiplayer client gets
+--- only with the containers.
 function DigesterObject:upgrade(isoObject)
-    self.tier = "insulated"
+    self.tier = self:tierSpec().upgrade
     self.material = nil
-    self.holder = "drum"
+    self.holder = self:tierSpec().holder
     self.holderCondition = 100
-    self.gas = math.min(self.gas, Digester.HOLDERS.drum.capacity)
+    self.gas = math.min(self.gas, self:capacity())
     -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-    isoObject:setSprite(getSprite(Sprites.digester.insulated))
+    isoObject:setSprite(getSprite(Sprites.digester[self.tier]))
     local container = isoObject:getContainer()
     if container then
         container:setCapacity(tonumber(isoObject:getProperties():get("ContainerCapacity")) or container:getCapacity())

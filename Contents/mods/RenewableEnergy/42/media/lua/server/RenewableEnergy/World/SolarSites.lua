@@ -76,33 +76,33 @@ end
 
 -- Placing ------------------------------------------------------------------------------------------
 
-local PLACERS = {
-    panel = function(square, spot)
-        local modules = WorldSpawns.siteModules(moduleCount(spot.siteKind, spot.mount))
-        WorldSpawns.placePanel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
-    end,
-    bank = function(square, spot)
-        WorldSpawns.placeBank(square, spot.stock)
-    end,
-    crate = function(square, spot)
-        WorldSpawns.placeCrate(square, spot.stock)
-    end,
-    gardenLights = function(square)
-        local building = square:getBuilding()
-        if building then
-            RenewableEnergy.GardenLights.queue(building:getDef(), true)
-        end
-    end,
-    arrowBoard = function(square, spot)
-        return RenewableEnergy.ArrowBoard.spawn(square, spot.facing) ~= nil
-    end,
+-- What a spot (its global object's modData) puts down on its square, by its `what`. Vehicles
+-- can't safely join the world while their chunk is still loading, so a spot that `waits` is placed
+-- at the next minute, its spot kept until then; its `place` returns whether the game took it, and
+-- one the game refuses, with another vehicle in the way, keeps its spot and tries once more each
+-- time its chunk loads.
+local SPOTS = {
+    panel = {
+        place = function(square, spot)
+            local modules = WorldSpawns.siteModules(moduleCount(spot.siteKind, spot.mount))
+            WorldSpawns.placePanel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
+        end,
+    },
+    bank = { place = function(square, spot) WorldSpawns.placeBank(square, spot.stock) end },
+    crate = { place = function(square, spot) WorldSpawns.placeCrate(square, spot.stock) end },
+    gardenLights = {
+        place = function(square)
+            local building = square:getBuilding()
+            if building then
+                RenewableEnergy.GardenLights.queue(building:getDef(), true)
+            end
+        end,
+    },
+    arrowBoard = {
+        waits = true,
+        place = function(square, spot) return RenewableEnergy.ArrowBoard.spawn(square, spot.facing) ~= nil end,
+    },
 }
-
---- Puts down what a site spot (its global object's modData) holds on its square. Returns false
---- when the game refused an arrow board, so its spot can stay for another try.
-function SolarSites.place(square, spot)
-    return PLACERS[spot.what](square, spot) ~= false
-end
 
 -- Rolling ------------------------------------------------------------------------------------------
 
@@ -161,17 +161,15 @@ local function rollSites()
     end
 end
 
--- Vehicles can't safely join the world while their chunk is still loading, so arrow boards wait
--- for the next minute, their spots kept until then. One the game refuses, with another vehicle in
--- the way, keeps its spot and tries once more each time its chunk loads.
-local waitingArrowBoards = {}
+-- The spots that wait for the next minute, each { x, y, z, spot }.
+local waiting = {}
 
-local function placeWaitingArrowBoards()
-    for i = #waitingArrowBoards, 1, -1 do
-        local entry = table.remove(waitingArrowBoards, i)
+local function placeWaiting()
+    for i = #waiting, 1, -1 do
+        local entry = table.remove(waiting, i)
         local object = system:getObjectAt(entry.x, entry.y, entry.z)
         local square = getSquare(entry.x, entry.y, entry.z)
-        if object and square and SolarSites.place(square, entry.spot) then
+        if object and square and SPOTS[entry.spot.what].place(square, entry.spot) then
             system:removeObject(object)
         end
     end
@@ -190,13 +188,13 @@ function SolarSites.placeChunk(wx, wy)
         for key, value in pairs(object:getModData()) do
             spot[key] = value
         end
-        if spot.what == "arrowBoard" then
-            table.insert(waitingArrowBoards, { x = x, y = y, z = z, spot = spot })
+        if SPOTS[spot.what].waits then
+            table.insert(waiting, { x = x, y = y, z = z, spot = spot })
         else
             system:removeObject(object)
             local square = getSquare(x, y, z)
             if square then
-                SolarSites.place(square, spot)
+                SPOTS[spot.what].place(square, spot)
             end
         end
     end
@@ -233,6 +231,6 @@ local function onSGlobalObjectSystemInit()
 end
 
 Events.OnSGlobalObjectSystemInit.Add(onSGlobalObjectSystemInit)
-Events.EveryOneMinute.Add(placeWaitingArrowBoards)
+Events.EveryOneMinute.Add(placeWaiting)
 
 return SolarSites

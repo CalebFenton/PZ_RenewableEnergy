@@ -120,9 +120,9 @@ local function doorsteps(def)
     return found
 end
 
---- Up to `count` squares for lights: either side of the path from each door, nearest the door
---- first, then any free square around the house.
-function GardenLights.frontSquares(def, count)
+-- Up to `count` squares for lights: either side of the path from each door, nearest the door
+-- first, then any free square around the house.
+local function frontSquares(def, count)
     local chosen, taken = {}, {}
     local function take(x, y)
         local key = x .. "," .. y
@@ -154,12 +154,12 @@ end
 
 -- Rolling ----------------------------------------------------------------------------------------
 
---- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
---- Returns how many it placed.
-function GardenLights.place(def)
+-- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
+-- Returns how many it placed.
+local function place(def)
     local count = WorldSpawns.rollBetween(GardenLights.COUNT)
     local charged = { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh }
-    local squares = GardenLights.frontSquares(def, count)
+    local squares = frontSquares(def, count)
     for _, square in ipairs(squares) do
         WorldSpawns.placeMoveable(square, Sprites.gardenLight.off, charged)
     end
@@ -176,15 +176,14 @@ function GardenLights.roll(def, always)
     end
     local placed = 0
     if always or ZombRandFloat(0, 1) < GardenLights.chanceFor(def) then
-        placed = GardenLights.place(def)
+        placed = place(def)
     end
     rolled[key] = placed
     pending[key] = nil
     return placed
 end
 
--- Squares along a chunk's side (IsoChunkMap.CHUNK_SIZE_IN_SQUARES).
-local CHUNK_SIZE = 8
+local CHUNK_SIZE = getChunkSizeInSquares()
 
 -- Whether every chunk that the house's REACH touches is loaded: one square per chunk tells. The
 -- loaded area around several players needn't be a rectangle, so each chunk is checked.

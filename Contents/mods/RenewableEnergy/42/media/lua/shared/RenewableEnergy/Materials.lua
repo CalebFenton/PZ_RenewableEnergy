@@ -41,7 +41,7 @@ local function haveOf(character, material)
     elseif material.tool then
         return RenewableEnergy.hasWorkingTool(character, ItemTag[material.tool]) and 1 or 0
     elseif material.tag then
-        return inventory:getCountTagRecurse(ItemTag[material.tag])
+        return inventory:getCountTagEvalRecurse(ItemTag[material.tag], RenewableEnergy.notBroken)
     elseif material.water then
         local litres = 0
         for _, item in ipairs(waterSources(character)) do
@@ -134,12 +134,9 @@ function Materials.consume(character, list)
         elseif material.item and not material.keep then
             local left = material.need or 1
             for _, fullType in ipairs(material.types or { material.item }) do
-                if left <= 0 then break end
-                local items = inventory:getSomeTypeRecurse(fullType, left)
-                for i = 0, items:size() - 1 do
-                    RenewableEnergy.takeItem(character, items:get(i))
-                end
-                left = left - items:size()
+                local take = math.min(left, inventory:getCountTypeRecurse(fullType))
+                RenewableEnergy.takeItems(character, fullType, take)
+                left = left - take
             end
         end
     end

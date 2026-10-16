@@ -48,47 +48,15 @@ function GasKit.gasFor(watts, hours)
     return (GasKit.IDLE_M3_PER_HOUR + GasKit.M3_PER_KWH * watts / 1000) * hours
 end
 
--- Jobs at a generator.
-GasKit.INSTALL = "InstallKit"
-GasKit.REMOVE = "RemoveKit"
-GasKit.CONNECT = "ConnectLine"
-GasKit.DISCONNECT = "DisconnectLine"
-GasKit.TO_GAS = "RunOnGas"
-GasKit.TO_PETROL = "RunOnPetrol"
-
-GasKit.MINUTES = {
-    [GasKit.INSTALL] = 30,
-    [GasKit.REMOVE] = 15,
-    [GasKit.CONNECT] = 20,
-    [GasKit.DISCONNECT] = 5,
-    [GasKit.TO_GAS] = 1,
-    [GasKit.TO_PETROL] = 1,
-}
-
--- How each job looks (RenewableEnergyGasAction): the switch-overs are a turn of the valve, the
--- rest spanner work.
-local SPANNER = { anim = "VehicleWorkOnMid", sound = "GeneratorRepair" }
-GasKit.LOOK = {
-    [GasKit.INSTALL] = SPANNER,
-    [GasKit.REMOVE] = SPANNER,
-    [GasKit.CONNECT] = SPANNER,
-    [GasKit.DISCONNECT] = SPANNER,
-}
-
--- The modules of the sources a line runs from, by their tiles' kind (Sprites.kindOf), which the
--- line keeps as its source's `kind`.
-GasKit.SOURCES = { digester = Digester, gasifier = Gasifier }
-
 --- Whether `object` is a vanilla generator: a placed IsoGenerator that isn't one of the mod's
 --- battery banks.
 function GasKit.isGenerator(object)
     return object ~= nil and instanceof(object, "IsoGenerator") and not PowerBank.isBank(object)
 end
 
-GasKit.isTarget = GasKit.isGenerator
-
 --- The generator's gas state, or nil without a kit: { kit, source = { x, y, z, kind } or nil,
---- hoses, mode = "gas" or "petrol", tank, set, onGas, watts, stalled, outOfGas }.
+--- line = { item, count } (what the line took) or nil, mode = "gas" or "petrol", tank, set, onGas,
+--- watts, stalled, outOfGas }.
 function GasKit.stateOf(generator)
     local state = GasKit.isGenerator(generator) and generator:getModData()[GasKit.MOD_DATA]
     return state and state.kit and state or nil
@@ -98,42 +66,71 @@ function GasKit.hasKit(generator)
     return GasKit.stateOf(generator) ~= nil
 end
 
---- "digester" or "gasifier" for a gas source's tile, else nil.
-function GasKit.sourceKind(object)
-    local kind = Sprites.kindOf(Sprites.nameOf(object))
-    return kind and GasKit.SOURCES[kind] and kind or nil
-end
-
---- The gasifiers on the four squares beside `generator`.
-function GasKit.gasifiersBeside(generator)
-    local found = {}
-    local gx, gy, z = generator:getX(), generator:getY(), generator:getZ()
-    for _, offset in ipairs({ { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } }) do
-        local square = getSquare(gx + offset[1], gy + offset[2], z)
-        local gasifier = square and RenewableEnergy.findObjectOn(square, Gasifier.isGasifier)
-        if gasifier then
-            table.insert(found, gasifier)
-        end
-    end
-    return found
-end
-
 --- Rubber hoses a line from `generator` to `digester` takes.
 function GasKit.hosesFor(generator, digester)
     local distance = IsoUtils.DistanceTo(generator:getX(), generator:getY(), digester:getX(), digester:getY())
     return math.max(1, math.ceil(distance / GasKit.HOSE_SQUARES))
 end
 
---- The digesters within reach of `generator` on its level, nearest first.
-function GasKit.digestersInReach(generator)
+-- Sources -------------------------------------------------------------------------------------
+
+-- The sources a line runs from, by their tiles' kind (Sprites.kindOf), which the line keeps as its
+-- source's `kind`:
+-- - owner: the source's shared module, whose recordAt gives the authority its record.
+-- - nameKey, tierOf(object): its name in the menu, the key's ending its tier.
+-- - inReach(generator, source): whether it may feed `generator`, else the key `tooFar` says why.
+-- - line(generator, source): what the line takes (a RenewableEnergy.Materials item).
+-- - piped: the line is a pipe drawn on both ends.
+GasKit.SOURCES = {
+    digester = {
+        owner = Digester, nameKey = "IGUI_RenewableEnergy_Digester_", tierOf = Digester.tileOf,
+        inReach = function(generator, source)
+            return IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY()) <= GasKit.REACH
+        end,
+        tooFar = "Tooltip_RenewableEnergy_DigesterOutOfReach",
+        line = function(generator, source)
+            return { item = GasKit.HOSE, need = GasKit.hosesFor(generator, source) }
+        end,
+    },
+    gasifier = {
+        owner = Gasifier, nameKey = "IGUI_RenewableEnergy_Gasifier_", tierOf = Gasifier.tierOf,
+        inReach = function(generator, source)
+            return Gasifier.sideOf(generator:getX(), generator:getY(), source:getX(), source:getY()) ~= nil
+        end,
+        tooFar = "Tooltip_RenewableEnergy_GasifierNotBeside",
+        line = function()
+            return { item = GasKit.PIPE, need = 1 }
+        end,
+        piped = true,
+    },
+}
+
+--- The kind of gas source `object`'s tile is (a key of SOURCES), else nil.
+function GasKit.sourceKind(object)
+    local kind = Sprites.kindOf(Sprites.nameOf(object))
+    return kind and GasKit.SOURCES[kind] and kind or nil
+end
+
+-- What keeps `source` from feeding `generator`, as a translation key, or nil: on the generator's
+-- level and in its reach.
+local function sourceBlocker(generator, source)
+    local kind = GasKit.sourceKind(source)
+    if not kind or not RenewableEnergy.onSquare(source) or source:getZ() ~= generator:getZ() then
+        return "Tooltip_RenewableEnergy_DigesterOutOfReach"
+    end
+    local spec = GasKit.SOURCES[kind]
+    return not spec.inReach(generator, source) and spec.tooFar or nil
+end
+
+--- The sources that may feed `generator`, nearest first.
+function GasKit.sourcesNear(generator)
     local found = {}
     local gx, gy, z = generator:getX(), generator:getY(), generator:getZ()
     for x = gx - GasKit.REACH, gx + GasKit.REACH do
         for y = gy - GasKit.REACH, gy + GasKit.REACH do
-            local square = getSquare(x, y, z)
-            local digester = square and RenewableEnergy.findObjectOn(square, Digester.isDigester)
-            if digester and IsoUtils.DistanceTo(gx, gy, x, y) <= GasKit.REACH then
-                table.insert(found, digester)
+            local source = RenewableEnergy.findObjectOn(getSquare(x, y, z), GasKit.sourceKind)
+            if source and not sourceBlocker(generator, source) then
+                table.insert(found, source)
             end
         end
     end
@@ -143,48 +140,99 @@ function GasKit.digestersInReach(generator)
     return found
 end
 
-local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+-- Jobs ----------------------------------------------------------------------------------------
 
---- What `job` takes (RenewableEnergy.Materials). `source` is the line's other end for Connect
---- Gas Line: a gasifier's line is a pipe, a digester's a hose for every HOSE_SQUARES.
-function GasKit.materials(job, generator, source)
-    if job == GasKit.INSTALL then
-        return { { perk = "Mechanics", need = 2 }, WRENCH, { item = GasKit.ITEM, need = 1 } }
-    elseif job == GasKit.REMOVE then
-        return { WRENCH }
-    elseif job == GasKit.CONNECT then
-        if GasKit.sourceKind(source) == "gasifier" then
-            return { WRENCH, { item = GasKit.PIPE, need = 1 } }
+-- Jobs at a generator.
+GasKit.INSTALL = "InstallKit"
+GasKit.REMOVE = "RemoveKit"
+GasKit.CONNECT = "ConnectLine"
+GasKit.DISCONNECT = "DisconnectLine"
+GasKit.TO_GAS = "RunOnGas"
+GasKit.TO_PETROL = "RunOnPetrol"
+
+local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+-- The kit's fitting is spanner work at the engine; a switch-over is a turn of the valve.
+local SPANNER_ANIM, SPANNER_SOUND = "VehicleWorkOnMid", "GeneratorRepair"
+
+-- A blocker of a job on the kit: none fitted refuses it, else `blocker(state, generator, source)`.
+local function withKit(blocker)
+    return function(state, generator, source)
+        if not state then
+            return "Tooltip_RenewableEnergy_NoKit"
         end
-        return { WRENCH, { item = GasKit.HOSE, need = source and GasKit.hosesFor(generator, source) or 1 } }
+        return blocker(state, generator, source)
     end
-    return {}
+end
+
+-- The job that switches the generator to `mode`, which `already` refuses it in.
+local function switchTo(mode, already)
+    return {
+        minutes = 1, mode = mode, hideBlocked = true,
+        blocker = withKit(function(state)
+            return state.mode == mode and already or nil
+        end),
+    }
+end
+
+-- Every job, by name, as DigesterJobs.JOBS has them: minutes; blocker(state, generator, source),
+-- with `state` nil without a kit; materials, or a function(generator, source) of them; xp; how it
+-- looks. `mode`: the fuel the job switches to.
+GasKit.JOBS = {
+    [GasKit.INSTALL] = {
+        minutes = 30, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        blocker = function(state)
+            return state and "Tooltip_RenewableEnergy_HasKit" or nil
+        end,
+        materials = { { perk = "Mechanics", need = 2 }, WRENCH, { item = GasKit.ITEM, need = 1 } },
+        xp = { perk = "Mechanics", amount = 15 },
+    },
+    [GasKit.REMOVE] = {
+        minutes = 15, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        blocker = withKit(function(state, generator)
+            return generator:isActivated() and "Tooltip_RenewableEnergy_GeneratorRunning" or nil
+        end),
+        materials = { WRENCH },
+    },
+    -- To the source `source`: a digester within REACH on its level, or a gasifier beside it.
+    [GasKit.CONNECT] = {
+        minutes = 20, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        blocker = withKit(function(state, generator, source)
+            if state.source then
+                return "Tooltip_RenewableEnergy_HasLine"
+            end
+            return sourceBlocker(generator, source)
+        end),
+        materials = function(generator, source)
+            local kind = GasKit.sourceKind(source)
+            if not kind then
+                return { WRENCH }
+            end
+            return { WRENCH, GasKit.SOURCES[kind].line(generator, source) }
+        end,
+        xp = { perk = "Mechanics", amount = 5 },
+    },
+    [GasKit.DISCONNECT] = {
+        minutes = 5, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        blocker = withKit(function(state)
+            return not state.source and "Tooltip_RenewableEnergy_NoLine" or nil
+        end),
+    },
+    [GasKit.TO_GAS] = switchTo("gas", "Tooltip_RenewableEnergy_OnGasAlready"),
+    [GasKit.TO_PETROL] = switchTo("petrol", "Tooltip_RenewableEnergy_OnPetrolAlready"),
+}
+
+--- What `job` takes (RenewableEnergy.Materials). `source` is Connect Gas Line's other end.
+function GasKit.materials(job, generator, source)
+    local materials = GasKit.JOBS[job].materials
+    if type(materials) == "function" then
+        return materials(generator, source)
+    end
+    return materials or {}
 end
 
 --- What `job` takes of `character` (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).
 function GasKit.needs(character, job, generator, source)
     return Materials.needs(character, GasKit.materials(job, generator, source))
-end
-
-function GasKit.minutesFor(job)
-    return GasKit.MINUTES[job]
-end
-
--- What keeps `source` from feeding `generator`, as a translation key, or nil: a digester within
--- REACH on its level, or a gasifier on a square beside it.
-local function sourceBlocker(generator, source)
-    local kind = GasKit.sourceKind(source)
-    if not kind or not RenewableEnergy.onSquare(source) or source:getZ() ~= generator:getZ() then
-        return "Tooltip_RenewableEnergy_DigesterOutOfReach"
-    end
-    if kind == "gasifier" then
-        if not Gasifier.sideOf(generator:getX(), generator:getY(), source:getX(), source:getY()) then
-            return "Tooltip_RenewableEnergy_GasifierNotBeside"
-        end
-    elseif IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY()) > GasKit.REACH then
-        return "Tooltip_RenewableEnergy_DigesterOutOfReach"
-    end
-    return nil
 end
 
 --- The state of the generator (or the line's source) that refuses `job`, as a translation key,
@@ -193,35 +241,13 @@ function GasKit.blocker(job, generator, source)
     if not (GasKit.isGenerator(generator) and RenewableEnergy.onSquare(generator)) then
         return "Tooltip_RenewableEnergy_NoGenerator"
     end
-    local state = GasKit.stateOf(generator)
-    if job == GasKit.INSTALL then
-        return state and "Tooltip_RenewableEnergy_HasKit" or nil
-    end
-    if not state then
-        return "Tooltip_RenewableEnergy_NoKit"
-    end
-    if job == GasKit.REMOVE then
-        return generator:isActivated() and "Tooltip_RenewableEnergy_GeneratorRunning" or nil
-    elseif job == GasKit.CONNECT then
-        if state.source then
-            return "Tooltip_RenewableEnergy_HasLine"
-        end
-        return sourceBlocker(generator, source)
-    elseif job == GasKit.DISCONNECT then
-        return not state.source and "Tooltip_RenewableEnergy_NoLine" or nil
-    elseif job == GasKit.TO_GAS then
-        return state.mode ~= "petrol" and "Tooltip_RenewableEnergy_OnGasAlready" or nil
-    elseif job == GasKit.TO_PETROL then
-        return state.mode == "petrol" and "Tooltip_RenewableEnergy_OnPetrolAlready" or nil
-    end
-    return nil
+    return GasKit.JOBS[job].blocker(GasKit.stateOf(generator), generator, source)
 end
 
---- What refuses `character` doing `job`: a blocker key, "short" when they lack a need, or nil.
---- No kit job takes an inventory item of its own, so the slot every gas job has for one (the
---- fourth) is unused; `source` is Connect Gas Line's.
-function GasKit.refusal(character, job, generator, _, source)
-    if not GasKit.MINUTES[job] then
+--- What refuses `character` doing `job` at `generator`: a blocker key, "short" when they lack a
+--- need, or nil. `source` is Connect Gas Line's other end, nil for the other jobs.
+function GasKit.refusal(character, job, generator, source)
+    if not GasKit.JOBS[job] then
         return "Tooltip_RenewableEnergy_NoGenerator"
     end
     return GasKit.blocker(job, generator, source)

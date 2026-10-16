@@ -41,9 +41,10 @@ Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
 --- the mod's recipe prefix (RenewableEnergyTestSettings.lua), as the build menu lists them.
 function Debug.buildRecipes()
     local names, recipes = {}, getScriptManager():getAllBuildableRecipes()
+    local prefix = PZHarness.testSettings.recipePrefix
     for i = 0, recipes:size() - 1 do
         local name = recipes:get(i):getName()
-        if PZHarness.startsWith(name, "RenewableEnergy_") then
+        if PZHarness.startsWith(name, prefix) then
             table.insert(names, name)
         end
     end

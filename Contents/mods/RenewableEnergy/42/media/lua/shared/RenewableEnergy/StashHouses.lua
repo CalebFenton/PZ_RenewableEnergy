@@ -3,14 +3,15 @@ require "RenewableEnergy/Sprites"
 -- Stash houses: buildings of the Muldraugh, KY map that the game's StashSystem stocks with a crate
 -- of solar gear, once someone reads an annotated map leading there or, for some, from the first
 -- day, as the Stash Houses option chooses. StashSystem reads StashDescriptions on the server and
--- in single player; Distributions.lua puts the mod's own map items into corpse loot.
+-- in single player; Distributions.lua puts the mod's own map items into corpse loot, and
+-- server/RenewableEnergy/World/StashStocking.lua stocks and relists the houses on the authority.
 
 RenewableEnergy = RenewableEnergy or {}
 local Stash = {}
 RenewableEnergy.Stash = Stash
 
 -- Values of the StashMode sandbox option.
-local StashMode = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }
+Stash.MODE = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }
 
 -- Description (the table StashSystem reads) -> what only the mod uses: knownOnStart, the percent
 -- chance that the house is stocked from the start; rarity, the map item's weight in the corpse
@@ -18,8 +19,8 @@ local StashMode = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }
 Stash.descriptions = {}
 
 -- The room definition that stocks a stash house (Distributions.lua) and the crate it brings.
-local SPAWN_TABLE = "RenewableEnergyStashCache"
-local CRATE_TYPE = "RenewableEnergySolarBox"
+Stash.SPAWN_TABLE = "RenewableEnergyStashCache"
+Stash.CRATE_TYPE = "RenewableEnergySolarBox"
 -- Vanilla's name for a map that has been drawn on.
 local ANNOTATED_MAP = "Stash_AnnotedMap"
 
@@ -148,14 +149,14 @@ local function describe(house)
         customName = ANNOTATED_MAP,
         buildingX = house.buildingX,
         buildingY = house.buildingY,
-        spawnTable = SPAWN_TABLE,
+        spawnTable = Stash.SPAWN_TABLE,
         zombies = house.zombies,
         barricades = house.barricades,
         -- "min-max", but StashSystem.doSpecificBuildingProperties places max - min traps, not a
         -- count between them.
         traps = house.traps,
         containers = { {
-            containerType = CRATE_TYPE,
+            containerType = Stash.CRATE_TYPE,
             containerSprite = RenewableEnergy.Sprites.crate,
             contX = house.crateX, contY = house.crateY, contZ = house.crateZ,
         } },
@@ -179,55 +180,27 @@ for _, house in ipairs(HOUSES) do
     Stash.mapAreas[house.name] = house.mapArea
 end
 
+--- Whether the Stash Houses option uses the houses at all.
+function Stash.enabled()
+    return SandboxVars.RenewableEnergy.StashMode ~= Stash.MODE.NONE
+end
+
 --- Whether the Stash Houses option puts the maps into corpse loot.
 function Stash.mapsInLoot()
     local mode = SandboxVars.RenewableEnergy.StashMode
-    return mode == StashMode.MAPS or mode == StashMode.MAPS_AND_STOCKED
+    return mode == Stash.MODE.MAPS or mode == Stash.MODE.MAPS_AND_STOCKED
 end
 
---- Stocks each house that rolls its knownOnStart chance. StashSystem.prepareBuildingStash also
---- records the stash as a map already read, and the world map draws every such entry as a found
---- map (ISWorldMap.renderStashMaps), which would give the house away on day one.
-function Stash.stockFromStart()
-    local alreadyRead = StashSystem.getAlreadyReadMap()
-    for description, extra in pairs(Stash.descriptions) do
-        if extra.knownOnStart and ZombRand(100) < extra.knownOnStart then
-            StashSystem.prepareBuildingStash(description.name)
-            alreadyRead:remove(description.name)
-        end
-    end
-end
-
---- Puts each house back among StashSystem's possible stashes if it is missing there, nobody has
---- read its map and nobody has entered it, so that a map found later leads to it.
----
---- IsoWorld.init fills the possible stashes from StashDescriptions and then replaces them with
---- the list the save stored. A world saved before the option was turned on, or before a house was
---- added, has none of them there, so their maps would drop with nothing drawn on them.
-function Stash.relistUnfound()
-    local possible = StashSystem.getPossibleStashes()
-    local listed = {}
-    for i = 0, possible:size() - 1 do
-        listed[possible:get(i):getName()] = true
-    end
-    local alreadyRead = StashSystem.getAlreadyReadMap()
-    local metaGrid = getWorld():getMetaGrid()
-    for description in pairs(Stash.descriptions) do
-        local name = description.name
-        if not listed[name] and not alreadyRead:contains(name) then
-            local room = metaGrid:getRoomAt(description.buildingX, description.buildingY, 0)
-            local building = room and room:getBuilding()
-            if building and not building:isHasBeenVisited() then
-                possible:add(StashBuilding.new(name, description.buildingX, description.buildingY))
-            end
-        end
-    end
+--- Whether the Stash Houses option stocks some houses from the start.
+function Stash.stockedFromStart()
+    local mode = SandboxVars.RenewableEnergy.StashMode
+    return mode == Stash.MODE.MAPS_AND_STOCKED or mode == Stash.MODE.STOCKED
 end
 
 --- Adds the houses to StashDescriptions, once however often it is called, unless the Stash Houses
 --- option leaves them out. Returns whether the option uses them.
 function Stash.register()
-    if SandboxVars.RenewableEnergy.StashMode == StashMode.NONE then
+    if not Stash.enabled() then
         return false
     end
     StashDescriptions = StashDescriptions or {}
@@ -243,32 +216,8 @@ function Stash.register()
     return true
 end
 
--- Stocking needs StashSystem to know the houses, which it does by the first tick of the game.
-local function stockOnFirstTick()
-    Events.OnTick.Remove(stockOnFirstTick)
-    Stash.stockFromStart()
-end
-
--- OnLoadedMapZones follows StashSystem.load on every side. A multiplayer client keeps no stash
--- state.
-local function onLoadedMapZones()
-    if not isClient() then
-        Stash.relistUnfound()
-    end
-end
-
 -- StashSystem.init reads StashDescriptions after OnInitGlobalModData (IsoWorld.init), by which
 -- time the save's sandbox options are loaded.
-local function onInitGlobalModData(isNewGame)
-    if not Stash.register() then
-        return
-    end
-    Events.OnLoadedMapZones.Add(onLoadedMapZones)
-    if isNewGame and not isClient() and SandboxVars.RenewableEnergy.StashMode ~= StashMode.MAPS then
-        Events.OnTick.Add(stockOnFirstTick)
-    end
-end
-
-Events.OnInitGlobalModData.Add(onInitGlobalModData)
+Events.OnInitGlobalModData.Add(Stash.register)
 
 return Stash

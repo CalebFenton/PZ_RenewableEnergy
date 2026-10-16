@@ -65,37 +65,27 @@ function PowerBank.bankOn(square)
     return RenewableEnergy.findObjectOn(square, PowerBank.isBank)
 end
 
-local function copyModule(module)
-    return { type = module.type, condition = module.condition, mounted = module.mounted, connected = module.connected }
+--- A fresh copy of a list of module records.
+function PowerBank.copyModules(modules)
+    local copy = {}
+    for i, module in ipairs(modules) do
+        copy[i] = { type = module.type, condition = module.condition, mounted = module.mounted, connected = module.connected }
+    end
+    return copy
 end
 
 --- The modules a panel holds, as a fresh list of module records: what the item or placed object
 --- `holder` recorded under MODULES or, without a record (a mount spawned by debug), the `mount`
 --- kind's full load of factory modules at full condition.
 function PowerBank.modulesOf(holder, mount)
-    local modules = {}
     local recorded = holder:getModData()[PowerBank.MODULES]
-    if type(recorded) == "table" then
-        for _, module in ipairs(recorded) do
-            table.insert(modules, copyModule(module))
-        end
-    end
+    local modules = type(recorded) == "table" and PowerBank.copyModules(recorded) or {}
     if #modules == 0 then
         for i = 1, Specs.mounts[mount].modules do
             modules[i] = { type = Specs.factoryModule, condition = 100 }
         end
     end
     return modules
-end
-
---- Records `modules` on a placed panel and sends the record to clients.
-function PowerBank.writeModules(isoObject, modules)
-    local record = {}
-    for i, module in ipairs(modules) do
-        record[i] = copyModule(module)
-    end
-    isoObject:getModData()[PowerBank.MODULES] = record
-    isoObject:transmitModData()
 end
 
 --- The module record of a solar module item.
@@ -130,26 +120,35 @@ end
 
 -- Parts --------------------------------------------------------------------------------------
 
---- What kind of bank part an item type is: "battery", "inverter", "charger", "controller", or
---- nil.
-function PowerBank.partKind(fullType)
-    if Specs.batteries[fullType] then
-        return "battery"
-    elseif Specs.inverters[fullType] then
-        return "inverter"
-    elseif fullType == Specs.charger then
-        return "charger"
-    elseif fullType == Specs.controller then
-        return "controller"
+--- Every kind of bank part: its item types (each type's Specs row), the bank record field that
+--- lists the bank's parts of the kind (Bank.SAVED_FIELDS), the Specs.banks field that caps how
+--- many a bank takes, and whether Electronics Scrap repairs it.
+PowerBank.PARTS = {
+    battery = { types = Specs.batteries, field = "batteries", max = "maxBatteries" },
+    inverter = { types = Specs.inverters, field = "inverters", max = "maxInverters", repairable = true },
+    charger = { types = { [Specs.charger] = {} }, field = "chargers", max = "maxChargers" },
+    controller = { types = { [Specs.controller] = {} }, field = "controllers", max = "maxControllers", repairable = true },
+}
+
+-- Item type to { kind, spec }: its PARTS kind and its row of the kind's types.
+local PART_TYPES = {}
+for kind, part in pairs(PowerBank.PARTS) do
+    for fullType, spec in pairs(part.types) do
+        PART_TYPES[fullType] = { kind = kind, spec = spec }
     end
-    return nil
 end
 
-local MAX_FIELDS = { battery = "maxBatteries", inverter = "maxInverters", charger = "maxChargers", controller = "maxControllers" }
+--- What kind of bank part an item type is (PowerBank.PARTS): "battery", "inverter", "charger",
+--- "controller", or nil.
+function PowerBank.partKind(fullType)
+    local part = fullType and PART_TYPES[fullType]
+    return part and part.kind
+end
 
---- How many parts of `kind` a bank of Specs.banks row `bankSpec` takes.
-local function maxParts(bankSpec, kind)
-    return bankSpec[MAX_FIELDS[kind]]
+--- Whether an item type is a bank part that Electronics Scrap repairs.
+function PowerBank.isRepairable(fullType)
+    local kind = PowerBank.partKind(fullType)
+    return kind ~= nil and PowerBank.PARTS[kind].repairable == true
 end
 
 --- How many parts of `kind` a bank container holds.
@@ -164,20 +163,19 @@ local function countParts(container, kind)
     return count
 end
 
---- What wiring `fullType` into a bank takes (Specs.wiring), with the Electricity level and XP
---- filled in, or nil if it is no part.
+--- What wiring `fullType` into a bank takes: its kind's Specs.wiring, with what its own type's row
+--- says over it (an inverter's skill and xp), or nil if it is no part.
 function PowerBank.wiringFor(fullType)
-    local kind = PowerBank.partKind(fullType)
-    if not kind then
+    local part = fullType and PART_TYPES[fullType]
+    if not part then
         return nil
     end
     local wiring = {}
-    for key, value in pairs(Specs.wiring[kind]) do
+    for key, value in pairs(Specs.wiring[part.kind]) do
         wiring[key] = value
     end
-    if kind == "inverter" then
-        wiring.skill = Specs.inverters[fullType].wireSkill
-        wiring.xp = Specs.inverters[fullType].wireXp
+    for key, value in pairs(part.spec.wiring or {}) do
+        wiring[key] = value
     end
     return wiring
 end
@@ -224,18 +222,17 @@ function PowerBank.wiringNeeds(character, fullType)
     return PowerBank.jobNeeds(character, PowerBank.wiringFor(fullType))
 end
 
---- What keeps `character` from wiring `item` into the bank `bankObject` now whatever they
---- carry, as a translation key, or nil.
-function PowerBank.wiringBlocker(character, bankObject, item)
+--- What keeps anyone from wiring `item` into the bank `bankObject` now whatever they carry, as a
+--- translation key, or nil. The light is the action's to check (RenewableEnergyAction.needsLight):
+--- only the player's own side can see it (IsoPlayer.tooDarkToRead is false for a remote player).
+function PowerBank.wiringBlocker(bankObject, item)
     local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
     local container = bank and bankObject:getContainer()
     local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
     if not (container and kind) then
         return "Tooltip_RenewableEnergy_NotAPart"
-    elseif countParts(container, kind) >= maxParts(bank.spec, kind) then
+    elseif countParts(container, kind) >= bank.spec[PowerBank.PARTS[kind].max] then
         return "Tooltip_RenewableEnergy_NoSlot"
-    elseif character:tooDarkToRead() then
-        return "Tooltip_RenewableEnergy_TooDark"
     end
     return nil
 end
@@ -243,7 +240,7 @@ end
 --- Why `character` can't wire `item` into the bank `bankObject` now, or nil if they can: what
 --- wiringBlocker says, else the kind of the first of wiringNeeds they are short of.
 function PowerBank.wiringRefusal(character, bankObject, item)
-    local blocker = PowerBank.wiringBlocker(character, bankObject, item)
+    local blocker = PowerBank.wiringBlocker(bankObject, item)
     if blocker then
         return blocker
     end
@@ -260,16 +257,13 @@ function PowerBank.repairNeeds(character)
     return needs
 end
 
---- What keeps `character` from repairing `item` with Electronics Scrap now whatever they carry,
---- as a translation key, or nil.
-function PowerBank.repairBlocker(character, item)
-    local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
-    if kind ~= "inverter" and kind ~= "controller" then
+--- What keeps anyone from repairing `item` with Electronics Scrap now whatever they carry, as a
+--- translation key, or nil. The light is the action's to check, as for wiringBlocker.
+function PowerBank.repairBlocker(item)
+    if not (instanceof(item, "InventoryItem") and PowerBank.isRepairable(item:getFullType())) then
         return "Tooltip_RenewableEnergy_NotRepairable"
     elseif item:getCondition() >= item:getConditionMax() then
         return "Tooltip_RenewableEnergy_NoRepairNeeded"
-    elseif character:tooDarkToRead() then
-        return "Tooltip_RenewableEnergy_TooDark"
     end
     return nil
 end
@@ -277,12 +271,34 @@ end
 --- Why `character` can't repair the inverter or controller `item` now, or nil if they can: what
 --- repairBlocker says, else the kind of the first of repairNeeds they are short of.
 function PowerBank.repairRefusal(character, item)
-    local blocker = PowerBank.repairBlocker(character, item)
+    local blocker = PowerBank.repairBlocker(item)
     if blocker then
         return blocker
     end
     local short = RenewableEnergy.firstUnmet(PowerBank.repairNeeds(character))
     return short and short.kind
+end
+
+--- What keeps anyone from unwiring `item` from the bank `bankObject` now, as a translation key,
+--- or nil: it must be a part in the bank's container.
+function PowerBank.unwireBlocker(bankObject, item)
+    local container = PowerBank.isBank(bankObject) and bankObject:getContainer()
+    if not (container and instanceof(item, "InventoryItem") and container:contains(item)
+        and PowerBank.partKind(item:getFullType())) then
+        return "Tooltip_RenewableEnergy_NotAPart"
+    end
+    return nil
+end
+
+--- Why the bank whose summary or status is `bank` can't be switched `on` (true) or off now, or
+--- nil: "already on" or "already off", or, switching on, no working inverter to carry a load.
+function PowerBank.switchRefusal(bank, on)
+    if bank.on == on then
+        return on and "already on" or "already off"
+    elseif on and (bank.limitW or 0) <= 0 then
+        return "Tooltip_RenewableEnergy_NoInverter"
+    end
+    return nil
 end
 
 -- Banks as either side knows them ---------------------------------------------------------

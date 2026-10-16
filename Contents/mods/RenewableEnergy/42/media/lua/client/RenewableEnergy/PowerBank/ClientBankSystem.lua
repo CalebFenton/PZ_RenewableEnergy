@@ -8,43 +8,20 @@
 -- filter, which is neither saved nor sent, and let go of the squares a running bank powered
 -- when it is taken away.
 
-require "Map/CGlobalObjectSystem"
-require "Map/CGlobalObject"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/ClientObjects"
 
 local PowerBank, ClientObjects = RenewableEnergy.PowerBank, RenewableEnergy.ClientObjects
-
-local ClientBank = CGlobalObject:derive("RenewableEnergy_ClientBank")
-
-local BankSystem = CGlobalObjectSystem:derive("RenewableEnergy_ClientBankSystem")
-
-function BankSystem:new()
-    return CGlobalObjectSystem.new(self, PowerBank.SYSTEM_NAME)
-end
-
-function BankSystem:initSystem()
-    PowerBank.clientSystem = self
-end
-
-function BankSystem:isValidIsoObject(isoObject)
-    return PowerBank.isBank(isoObject)
-end
-
-function BankSystem:newLuaObject(globalObject)
-    return ClientBank:new(self, globalObject)
-end
 
 local function adoptCopy(isoObject)
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
     PowerBank.adoptContainer(isoObject:getContainer())
 end
 
--- The server sends no system commands, and vanilla's default raises an error for any command.
-function BankSystem:OnServerCommand(command, args)
-end
-
-CGlobalObjectSystem.RegisterSystemClass(BankSystem)
+local BankSystem = ClientObjects.define({
+    name = "Bank", sprites = PowerBank.bankSprites(), owner = PowerBank, isObject = PowerBank.isBank,
+    adoptCopy = adoptCopy, adoptContainer = PowerBank.adoptContainer,
+})
 
 -- The banks this game's players watch, as "x,y,z" to { [player number] = true }. The server sends
 -- a bank's status only to its watchers, so once nobody here watches it, this client's copy goes
@@ -127,7 +104,6 @@ local function releasePower(isoObject)
     end
 end
 
-ClientObjects.adopt(PowerBank.bankSprites(), PowerBank.isBank, adoptCopy, PowerBank.adoptContainer)
 if isClient() then
     Events.OnObjectAboutToBeRemoved.Add(releasePower)
 end

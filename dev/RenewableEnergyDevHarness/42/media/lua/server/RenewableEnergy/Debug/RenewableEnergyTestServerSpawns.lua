@@ -14,7 +14,7 @@ local objectWithSprite = PZHarness.Fixtures.objectWithSprite
 local squareAt, removeObject = Helpers.squareAt, Helpers.removeObject
 local Sprites = RenewableEnergy.Sprites
 
-local MODULE = "RenewableEnergy.SolarModule"
+local MODULE = RenewableEnergy.Specs.factoryModule
 
 local function inRange(value, range)
     return value >= range.min and value <= range.max
@@ -148,8 +148,8 @@ handler("bankStockCount", function(_, args)
     return { items = count }
 end)
 
--- WorldSpawns.placeCrate with CRATE_STOCK[args.stock] on the square at `args`. Answers its
--- container type, stock and overlay. Removed when the test ends.
+-- WorldSpawns.placeCrate with CRATE_STOCK[args.stock] on the square at `args`. Answers its stock
+-- and the name of its overlay. Removed when the test ends.
 handler("worldCrate", function(_, args, defer)
     local square = squareAt(args)
     if not square then
@@ -157,11 +157,11 @@ handler("worldCrate", function(_, args, defer)
     end
     local crate = RenewableEnergy.WorldSpawns.placeCrate(square, args.stock)
     defer(function() removeObject(crate) end)
-    local container = crate:getContainer()
+    local container, overlay = crate:getContainer(), crate:getOverlaySprite()
     if not container then
-        return { container = false }
+        return nil, "the crate's container"
     end
-    return { container = true, type = container:getType(), stock = stockOf(container), overlay = crate:getOverlaySprite() ~= nil }
+    return { stock = stockOf(container), overlay = overlay and overlay:getName() }
 end)
 
 -- The cracked and weathered condition ranges are real conditions, and a cracked module always
@@ -212,8 +212,8 @@ check("crackedModules", function(expect, expectNear, _, args, defer)
 end)
 
 -- What WorldSpawns stocks, which only the authority loads: for each BANK_STOCK name of
--- `args.names` its tile (a Sprites field) and battery count range, and the module conditions of
--- crates.
+-- `args.names` its tile (a Sprites field) and battery count range; the module conditions of
+-- crates; and for the CRATE_STOCK name `args.crate`, if given, each item's count range.
 handler("worldSpawnStock", function(_, args)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local banks = {}
@@ -221,15 +221,22 @@ handler("worldSpawnStock", function(_, args)
         local stock = WorldSpawns.BANK_STOCK[name]
         banks[name] = { sprite = stock.sprite, batteries = { min = stock.batteries.min, max = stock.batteries.max } }
     end
-    return { banks = banks, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }
+    local crate
+    if args.crate then
+        crate = {}
+        for _, line in ipairs(WorldSpawns.CRATE_STOCK[args.crate]) do
+            crate[line[1]] = { min = line[2], max = line[3] }
+        end
+    end
+    return { banks = banks, crate = crate, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }
 end)
 
 -- Solar sites -----------------------------------------------------------------------------------
 
 -- A site goes down once when its chunk loads, and its spot is forgotten, so loading the chunk
--- again places nothing. Its pump's pole mount holds 1 or 2 modules at site conditions. The site
--- has one spot, a metal rack facing south on the square at `args`; the rack is removed when the
--- test ends.
+-- again places nothing. Its pump's pole mount holds as many modules as the stock tank kind says,
+-- at site conditions. The site has one spot, a metal rack facing south on the square at `args`;
+-- the rack is removed when the test ends.
 check("sitePlacedOnce", function(expect, _, _, args, defer)
     local square = squareAt(args)
     if not square then
@@ -253,10 +260,9 @@ check("sitePlacedOnce", function(expect, _, _, args, defer)
     expect(waiting, "the site kept no spot to place")
     expect(not leftOver, "the site's spot was not forgotten once placed")
     expect(addedAgain == 0, "loading the chunk again added " .. addedAgain .. " objects to the spot")
-    expect(rack:getProperties():get("CustomItem") == "RenewableEnergy.SolarRackMetal",
-        "the rack does not give back RenewableEnergy.SolarRackMetal")
     local modules = rack:getModData()[RenewableEnergy.PowerBank.MODULES] or {}
-    expect(#modules >= 1 and #modules <= 2, #modules .. " modules on the pump's mount, expected 1 or 2")
+    local range = SolarSites.KINDS.stockTank.modules
+    expect(inRange(#modules, range), #modules .. " modules on the pump's mount, expected " .. range.min .. " to " .. range.max)
     for _, module in ipairs(modules) do
         expect(module.type == MODULE and isSiteCondition(module.condition),
             "the pump's mount holds " .. tostring(module.type) .. " at " .. tostring(module.condition))

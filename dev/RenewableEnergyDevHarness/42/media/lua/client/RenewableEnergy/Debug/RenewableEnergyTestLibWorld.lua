@@ -79,9 +79,26 @@ function T.lidPose(vehicle)
 end
 
 --- Queues a wait, as long as a fixture's, until this side's copy of the vehicle matches
---- `matches(state)`, its state as T.copyState reads it.
-function T.waitForVehicleCopy(vehicle, matches)
-    T.waitForCopy(function() return vehicle.vehicle ~= nil and matches(T.copyState(vehicle)) end)
+--- `matches(state)`, its state as T.copyState reads it; fails the test as missing `what` if it
+--- never does.
+function T.waitForVehicleCopy(self, vehicle, matches, what)
+    T.waitFor(self, function() return vehicle.vehicle ~= nil and matches(T.copyState(vehicle)) end, what)
+end
+
+-- Spawns ----------------------------------------------------------------------------------------
+
+--- Whether `value` lies in `range` ({ min, max }), both ends included.
+function T.inRange(value, range)
+    return value >= range.min and value <= range.max
+end
+
+--- Expects every charge of `charges` to be one a found battery holds (Specs.foundCharge).
+function T.expectFoundCharges(charges, what)
+    local range = RenewableEnergy.Specs.foundCharge
+    for _, charge in ipairs(charges) do
+        T.expect(T.inRange(charge, range), what .. " holds a battery at " .. charge .. ", expected " .. range.min .. " to "
+            .. range.max)
+    end
 end
 
 return T

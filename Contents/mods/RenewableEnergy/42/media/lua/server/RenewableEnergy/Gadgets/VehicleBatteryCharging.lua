@@ -27,8 +27,9 @@ end
 
 local vanillaUpdateBattery = Vehicles.Update.Battery
 
--- Scales only what the alternator added; the lightbar drain this update also runs went through
--- chargeBattery, scaled already.
+-- Scales only a rise, which is the alternator's alone: the lightbar drain this update also runs
+-- comes only with the engine off (Vehicles.Update.Lightbar), when the alternator adds nothing, and
+-- went through chargeBattery, scaled already.
 function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
     local item = part:getInventoryItem()
     local before = item and item:getCurrentUsesFloat()

@@ -1,7 +1,3 @@
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- The Solar Battery Maintainer: a small panel clipped to a vehicle that keeps its battery
@@ -9,81 +5,30 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 --
 -- An attached maintainer is a mark in the modData of the vehicle's Battery part. That part
 -- stays when its battery is swapped, and vehicle:transmitPartModData sends its modData to
--- multiplayer clients, so the menu there can tell what is attached. attach and detach run on
--- the authority, from a timed action's complete().
+-- multiplayer clients, so the menu there can tell what is attached. Attaching, detaching and
+-- charging are the authority's: server/RenewableEnergy/Gadgets/SolarMaintainerServer.lua.
 RenewableEnergy = RenewableEnergy or {}
 local SolarMaintainer = {}
 RenewableEnergy.SolarMaintainer = SolarMaintainer
-local Battery, Specs, Sun, VehicleBattery = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun,
-    RenewableEnergy.VehicleBattery
+local VehicleBattery = RenewableEnergy.VehicleBattery
 
 SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 
 -- Battery part modData: { condition } of the attached maintainer.
-local ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"
+SolarMaintainer.ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"
 
-local function batteryPart(vehicle)
+--- The vehicle's Battery part, which holds the maintainer's mark, or nil.
+function SolarMaintainer.batteryPart(vehicle)
     return vehicle and vehicle:getPartById(VehicleBattery.PART)
 end
 
 function SolarMaintainer.isAttached(vehicle)
-    local part = batteryPart(vehicle)
-    return part ~= nil and part:getModData()[ATTACHED_KEY] ~= nil
+    local part = SolarMaintainer.batteryPart(vehicle)
+    return part ~= nil and part:getModData()[SolarMaintainer.ATTACHED_KEY] ~= nil
 end
 
 function SolarMaintainer.canAttach(vehicle)
-    return batteryPart(vehicle) ~= nil and not SolarMaintainer.isAttached(vehicle)
-end
-
--- Takes `item` out of its container and clips it to the vehicle. Returns whether it did.
-function SolarMaintainer.attach(character, vehicle, item)
-    if not (item and item:getFullType() == SolarMaintainer.ITEM and SolarMaintainer.canAttach(vehicle)) then
-        return false
-    end
-    RenewableEnergy.takeItem(character, item)
-    local part = batteryPart(vehicle)
-    part:getModData()[ATTACHED_KEY] = { condition = item:getCondition() }
-    vehicle:transmitPartModData(part)
-    return true
-end
-
--- Unclips the maintainer and gives it to the character, with the condition it went on with.
-function SolarMaintainer.detach(character, vehicle)
-    if not SolarMaintainer.isAttached(vehicle) then
-        return false
-    end
-    local part = batteryPart(vehicle)
-    local item = instanceItem(SolarMaintainer.ITEM)
-    item:setCondition(part:getModData()[ATTACHED_KEY].condition)
-    part:getModData()[ATTACHED_KEY] = nil
-    vehicle:transmitPartModData(part)
-    Actions.addOrDropItem(character, item)
-    return true
-end
-
--- Adds `hours` of the maintainer's output under `sky` (Sun.skyNow, now if nil) to the vehicle's
--- battery. The panel lies flat on the dashboard or roof, so a vehicle under a roof gets no sun.
--- Authority only. Returns the watt-hours it added.
-function SolarMaintainer.charge(vehicle, hours, sky)
-    local part = batteryPart(vehicle)
-    local battery = part and part:getModData()[ATTACHED_KEY] ~= nil and part:getInventoryItem()
-    if not battery then
-        return 0
-    end
-    local capacityWh = Battery.nominalWh(battery)
-    local wh = Sun.squareWatts(vehicle:getSquare(), Specs.maintainerWatts, sky) * hours
-    if capacityWh <= 0 or wh <= 0 then
-        return 0
-    end
-    -- As vanilla's alternator charging does (Vehicles.Update.Battery): the server sends the
-    -- charge to clients only when it shows a change at two decimals.
-    local before = battery:getCurrentUsesFloat()
-    local after = math.min(1, before + wh / capacityWh)
-    battery:setCurrentUsesFloat(after)
-    if VehicleUtils.compareFloats(before, after, 2) then
-        vehicle:transmitPartUsedDelta(part)
-    end
-    return (after - before) * capacityWh
+    return SolarMaintainer.batteryPart(vehicle) ~= nil and not SolarMaintainer.isAttached(vehicle)
 end
 
 return SolarMaintainer

@@ -32,24 +32,27 @@ function DigesterWindow.stateText(summary)
     return getText("IGUI_RenewableEnergy_DigesterWorking")
 end
 
--- The smell levels of DigesterObject.corpsesFor.
+-- Each smell level's word, from none below Digester.SMELL_SCORES' first.
+local SMELLS = { "IGUI_RenewableEnergy_SmellNone", "IGUI_RenewableEnergy_SmellFaint", "IGUI_RenewableEnergy_SmellStrong",
+    "IGUI_RenewableEnergy_SmellVile" }
+
 local function smellText(score)
-    if score < 0.2 then
-        return getText("IGUI_RenewableEnergy_SmellNone")
-    elseif score < 1 then
-        return getText("IGUI_RenewableEnergy_SmellFaint")
-    elseif score < 2 then
-        return getText("IGUI_RenewableEnergy_SmellStrong")
+    local level = 0
+    for i, from in ipairs(Digester.SMELL_SCORES) do
+        if score >= from then
+            level = i
+        end
     end
-    return getText("IGUI_RenewableEnergy_SmellVile")
+    return getText(SMELLS[level + 1])
 end
 
+-- The holder, with its condition if it wears.
 local function holderText(summary)
     local name = getText("IGUI_RenewableEnergy_Holder_" .. summary.holder)
     if summary.torn then
         return getText("IGUI_RenewableEnergy_HolderTorn", name)
     end
-    if summary.holder == "bags" or summary.holder == "tarp" then
+    if Digester.HOLDERS[summary.holder].wearPerDay then
         return name .. " " .. Format.percent(summary.holderCondition / 100)
     end
     return name
@@ -74,7 +77,7 @@ function DigesterWindow:rowsOf(summary)
     row(rows, "IGUI_RenewableEnergy_DigesterFill", Format.percent(summary.fill))
     row(rows, "IGUI_RenewableEnergy_DigesterHopper", tostring(summary.hopper))
     row(rows, "IGUI_RenewableEnergy_DigesterSludge", Format.percent(summary.sludge / 100), summary.sludge >= Digester.SLUDGE_SLOW and "warn" or nil)
-    row(rows, "IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= 1 and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= Digester.SMELL_SCORES[2] and "warn" or nil)
     if summary.scrubber then
         row(rows, "IGUI_RenewableEnergy_DigesterScrubber", getText("IGUI_RenewableEnergy_ScrubberState",
             string.format("%.1f", summary.scrubCO2), string.format("%.1f", summary.scrubWool)),

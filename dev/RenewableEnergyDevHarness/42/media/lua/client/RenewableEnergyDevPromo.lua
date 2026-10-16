@@ -56,6 +56,12 @@ local MAGAZINES = { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.Homes
 -- Banks take vanilla car batteries as they are, so the item sheet shows one.
 local VANILLA_ITEMS = { "Base.CarBattery1" }
 
+-- Every setup is a place (newPlace): a square its positions are measured from, and a frame, the
+-- directions a position's two numbers run in, `along` and `out`. An area of a place is the
+-- squares from along[1] to along[2] and out[1] to out[2]; with `sum` and `half`, only those whose
+-- along + out is within `half` of `sum`, a band across the screen.
+-- The frame of places measured in (east, south) squares.
+local GRID = { along = { 1, 0 }, out = { 0, 1 } }
 -- Both setups stand at an outside wall that the camera sees: the north edge of a square south of
 -- a building (preferred: wall panels face south), or the west edge of one east of it. Positions
 -- are (along, out) from the square outside the wall: `along` runs along the wall, `out` away
@@ -87,10 +93,10 @@ local HOMESTEAD = {
 -- hang on.
 local OPEN = { along = { -2, 5 }, out = { 1, 5 } }
 local AT_WALL = { 0, 2 }
--- The rack with a cracked module, connected early so that its row shows in the status window.
-local CRACKED_RACK = 1
-local CRACKED_CONDITION = 30
+-- The rack with a cracked module, connected early so that its row shows in the status window: the
+-- modules of HOMESTEAD.racks by index.
 local MODULE = RenewableEnergy.Specs.factoryModule
+local HOMESTEAD_MODULES = { [1] = { { type = MODULE, condition = 30 }, { type = MODULE, condition = 100 } } }
 local HOMESTEAD_BANK = {
     "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery",
     "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery",
@@ -150,8 +156,8 @@ local STUDIO = {
     -- The open ground the patch needs, and how far around the studio square the asphalt goes
     -- where the ground is clear, and the plants go anyway, since the bigger items' shots reach
     -- past the patch.
-    reach = 3,
-    floorReach = 5,
+    open = { along = { -3, 3 }, out = { -3, 3 } },
+    floor = { along = { -5, 5 }, out = { -5, 5 } },
     zoom = 25,
     player = { -1, 1 },
     -- What extract.py searches for the item, in UI units around its square's floor centre: room
@@ -162,17 +168,16 @@ local STUDIO = {
 }
 
 -- The trailer shot, on a road: positions are (ahead, side) squares from the car, `side` towards
--- the far side of the road from the camera. Road cones taper across the lane behind the
--- trailer, and the character stands on the far side of the trailer's battery box, two squares
--- off, where the arrow board hides none of them.
+-- the far side of the road from the camera, so a heading's frame runs `along` ahead and `out` to
+-- the side. Road cones taper across the lane behind the trailer, and the character stands on the
+-- far side of the trailer's battery box, two squares off, where the arrow board hides none of them.
 local ROAD = {
     -- The car faces north on a north-south road, else west on an east-west one, so that the
     -- arrow board on the trailer's back faces the camera.
-    headings = { { facing = "N", ahead = { 0, -1 }, side = { -1, 0 } }, { facing = "W", ahead = { -1, 0 }, side = { 0, -1 } } },
+    headings = { { facing = "N", along = { 0, -1 }, out = { -1, 0 } }, { facing = "W", along = { -1, 0 }, out = { 0, -1 } } },
     -- The open road the setup needs: room on the near side keeps hedges and fences there from
     -- hiding the car.
-    ahead = { -11, 3 },
-    side = { -3, 3 },
+    open = { along = { -11, 3 }, out = { -3, 3 } },
     trailer = { -5, 0 },
     cones = { { -8, 1 }, { -9, 0 }, { -10, -1 } },
     cone = "street_decoration_01_26",
@@ -232,14 +237,13 @@ local POSTER = {
 -- treadmill indoors (`gym`): positions are (east, south) squares from the place found, and `shot`
 -- names the positions the shot frames. A yard lays its things out along a line across the screen,
 -- nearest the camera in front, so `open` is the band of squares that must be clear (trees may
--- stand there; they go): within the box `x`, `y`, the squares whose x + y is within `half` of
--- `sum`.
+-- stand there; they go).
 local R2 = {
     yards = { "biogas", "woodgas", "wind" },
     -- Every digester, working and full of gas, the brick dome feeding a kitted generator through
     -- its hose, and a lit gas heater warming the steel barrel.
     biogas = {
-        open = { x = { -2, 6 }, y = { -1, 6 }, sum = 4, half = 3 },
+        open = { along = { -2, 6 }, out = { -1, 6 }, sum = 4, half = 3 },
         barrelSteel = { 0, 4 },
         heater = { -1, 4 },
         barrelPlastic = { 1, 3 },
@@ -253,7 +257,7 @@ local R2 = {
     -- The gasifier and the advanced gasifier lit, each piped to a kitted generator to its east, and
     -- the primitive gasifier with wood and charcoal beside it.
     woodgas = {
-        open = { x = { -1, 6 }, y = { -1, 6 }, sum = 5, half = 3 },
+        open = { along = { -1, 6 }, out = { -1, 6 }, sum = 5, half = 3 },
         primitive = { 0, 4 },
         fuel = { 1, 4 },
         standard = { 1, 3 },
@@ -270,14 +274,13 @@ local R2 = {
             { "Base.Firewood", 0.7, 0.7, 200 }, { "Base.Charcoal", 0.5, 0.5, 45 },
         },
     },
-    -- The four wind chargers in a row across the screen, smallest first, every rotor facing the
-    -- same way.
+    -- The four wind chargers in a row across the screen, smallest first, every rotor facing south.
     wind = {
-        open = { x = { -1, 8 }, y = { -1, 8 }, sum = 6, half = 3 },
+        open = { along = { -1, 8 }, out = { -1, 8 }, sum = 6, half = 3 },
         chargers = {
-            { 0, 6, kind = "scoop" }, { 2, 4, kind = "wood" }, { 4, 2, kind = "pipe" }, { 6, 0, kind = "alternator" },
+            { 0, 6, sprite = Sprites.windScoop }, { 2, 4, sprite = Sprites.windPropeller.wood.S },
+            { 4, 2, sprite = Sprites.windPropeller.pipe.S }, { 6, 0, sprite = Sprites.windAlternator.S },
         },
-        facing = "S",
         player = { 2, 6 },
         scout = { 4, 5 },
         shot = { "player" },
@@ -545,6 +548,10 @@ local function perform(name, args)
     end
 end
 
+local function setBankOn(bank, on)
+    perform("setBankOn", { bank = PowerBank.positionOf(bank), on = on })
+end
+
 -- Grass, weeds and bushes a character could pull up (as vanilla's remove-grass and building code
 -- tell them from other objects). The setups clear them off their squares.
 local function isGroundCover(object)
@@ -602,30 +609,101 @@ local function isOnWall(object)
     return false
 end
 
-local function siteSquare(site, origin, along, out)
-    return getCell():getGridSquare(origin:getX() + along * site.along[1] + out * site.out[1],
-        origin:getY() + along * site.along[2] + out * site.out[2], origin:getZ())
+-- Places -----------------------------------------------------------------------------------------
+
+-- The places found, by the names of findPlaces' PLACES.
+local places = {}
+
+-- A place (see GRID) on `origin` in `frame`: GRID, a SITES entry or a ROAD heading.
+local function newPlace(origin, frame)
+    return { origin = origin, frame = frame }
+end
+
+-- The square at `position` ({ along, out }) of `place`, or nil where none is loaded.
+local function at(place, position)
+    local origin, frame = place.origin, place.frame
+    local along, out = position[1], position[2]
+    return getCell():getGridSquare(origin:getX() + along * frame.along[1] + out * frame.out[1],
+        origin:getY() + along * frame.along[2] + out * frame.out[2], origin:getZ())
+end
+
+-- The squares of `place` at the positions of each list of positions given, in order.
+local function squaresAt(place, ...)
+    local squares = {}
+    for i = 1, select("#", ...) do
+        for _, position in ipairs((select(i, ...))) do
+            table.insert(squares, at(place, position))
+        end
+    end
+    return squares
+end
+
+-- The squares of `place` at `positions` that are loaded and, if given, pass `accepts(square)`.
+local function loadedSquares(place, positions, accepts)
+    local squares = {}
+    for _, position in ipairs(positions) do
+        local square = at(place, position)
+        if square and (not accepts or accepts(square)) then
+            table.insert(squares, square)
+        end
+    end
+    return squares
+end
+
+local function removeTrees(place)
+    local origin = place.origin
+    Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
+end
+
+-- Whether fn(square) holds for every square of `area` (see GRID) of `place`, stopping at the first
+-- that fails. From out `outFrom` rather than the area's own first if given.
+local function everyAreaSquare(place, area, fn, outFrom)
+    for along = area.along[1], area.along[2] do
+        for out = outFrom or area.out[1], area.out[2] do
+            local inBand = not area.sum or math.abs(along + out - area.sum) <= area.half
+            if inBand and not fn(at(place, { along, out })) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+local function isOpenArea(place, player, area)
+    return everyAreaSquare(place, area, function(square)
+        return isOpen(square, player)
+    end)
+end
+
+-- Clears the ground cover off `area` of `place`, and with `fromWall` off the row along its wall
+-- (out 0) too.
+local function clearArea(place, area, fromWall)
+    everyAreaSquare(place, area, function(square)
+        clearGroundCover(square)
+        return true
+    end, fromWall and 0 or nil)
 end
 
 -- Outdoors, against a wall of a room. A panel hangs on a `plain` wall: not a door, a garage door
 -- or a window.
-local function isAtWall(site, origin, along, plain)
-    local square, inside = siteSquare(site, origin, along, 0), siteSquare(site, origin, along, -1)
-    if not (square and inside and inside:getRoom() and square:getWall(site.wallNorth) and isClear(square, isOnWall)) then
+local function isAtWall(place, along, plain)
+    local square, inside, wallNorth = at(place, { along, 0 }), at(place, { along, -1 }), place.frame.wallNorth
+    if not (square and inside and inside:getRoom() and square:getWall(wallNorth) and isClear(square, isOnWall)) then
         return false
     end
-    return not plain or (square:getDoorOrWindow(site.wallNorth) == nil and square:getGarageDoor(site.wallNorth) == nil)
+    return not plain or (square:getDoorOrWindow(wallNorth) == nil and square:getGarageDoor(wallNorth) == nil)
 end
 
--- Whether the outside wall at `along` has a window into a room.
-local function hasWindow(site, origin, along)
-    local square, inside = siteSquare(site, origin, along, 0), siteSquare(site, origin, along, -1)
+-- Whether the outside wall at `along` has a door or window of class `class` ("IsoDoor",
+-- "IsoWindow") into a room.
+local function hasOpening(place, along, class)
+    local square, inside = at(place, { along, 0 }), at(place, { along, -1 })
     return square ~= nil and inside ~= nil and inside:getRoom() ~= nil and square:isOutside()
-        and instanceof(square:getDoorOrWindow(site.wallNorth), "IsoWindow")
+        and instanceof(square:getDoorOrWindow(place.frame.wallNorth), class)
 end
 
-local function isFreeIndoorsAt(site, origin, position)
-    return RenewableEnergy.Debug.isFreeSquare(siteSquare(site, origin, position[1], position[2]), true)
+local function isFreeIndoorsAt(place, position)
+    return RenewableEnergy.Debug.isFreeSquare(at(place, position), true)
 end
 
 -- North from `square` through its room to the room's north wall: a bank faces south, so it stands
@@ -687,11 +765,11 @@ end
 -- The homestead bank's square and the character's. The panels' wall faces south, so the bank
 -- stands across the room from it, against the north wall, facing it, with open floor around it
 -- and the character. Nil if the room has no such place.
-local function bankPlace(site, origin)
-    if site.facing ~= "S" then return nil end
+local function bankPlace(place)
+    if place.frame.facing ~= "S" then return nil end
     for _, along in ipairs(ALONG_PANELS) do
-        local bank = againstNorthWall(siteSquare(site, origin, HOMESTEAD.inside[1] + along, HOMESTEAD.inside[2]))
-        if bank and RenewableEnergy.PowerBank.canPlaceBank(bank) then
+        local bank = againstNorthWall(at(place, { HOMESTEAD.inside[1] + along, HOMESTEAD.inside[2] }))
+        if bank and PowerBank.canPlaceBank(bank) then
             for _, offset in ipairs(BESIDE_BANK) do
                 local player = getCell():getGridSquare(bank:getX() + offset[1], bank:getY() + offset[2], bank:getZ())
                 if player and isOpenShot(bank, player) then
@@ -720,99 +798,42 @@ local function clearBankShot(bank, player)
     end)
 end
 
-local function isOpenArea(site, origin, player, area)
-    for along = area.along[1], area.along[2] do
-        for out = area.out[1], area.out[2] do
-            if not isOpen(siteSquare(site, origin, along, out), player) then
-                return false
-            end
-        end
-    end
-    return true
-end
-
-local function fits(site, origin, player)
+local function fitsHomestead(place, player)
     for along = AT_WALL[1], AT_WALL[2] do
-        if not isAtWall(site, origin, along, true) then
+        if not isAtWall(place, along, true) then
             return false
         end
     end
-    return bankPlace(site, origin) ~= nil and isOpenArea(site, origin, player, OPEN)
+    return bankPlace(place) ~= nil and isOpenArea(place, player, OPEN)
 end
 
 -- At a window if `needWindow`, else at any outside wall.
-local function fitsStage0(site, origin, player, needWindow)
-    local window = hasWindow(site, origin, 0)
-    if (needWindow and not window) or not (window or isAtWall(site, origin, 0, false)) then
+local function fitsStage0(place, player, needWindow)
+    local window = hasOpening(place, 0, "IsoWindow")
+    if (needWindow and not window) or not (window or isAtWall(place, 0, false)) then
         return false
     end
-    return isFreeIndoorsAt(site, origin, STAGE0.box) and isFreeIndoorsAt(site, origin, STAGE0.player)
-        and isOpenArea(site, origin, player, STAGE0.open)
+    return isFreeIndoorsAt(place, STAGE0.box) and isFreeIndoorsAt(place, STAGE0.player)
+        and isOpenArea(place, player, STAGE0.open)
 end
 
--- The closest place to the character that takes the whole homestead, facing south if any does.
-local function findSite(player)
-    for _, site in ipairs(SITES) do
-        local best = Stage.closestSquare(player, function(origin)
-            return fits(site, origin, player)
-        end)
-        if best then
-            return site, best
-        end
+-- A window into a house (a building with a bedroom and POSTER.rooms rooms), on a wall with
+-- POSTER.windows.count windows near it, with free floor for the bank behind it and open ground for
+-- the panels in front.
+local function fitsPoster(place, player)
+    if not (hasOpening(place, 0, "IsoWindow") and isFreeIndoorsAt(place, POSTER.bank)
+        and isOpenArea(place, player, POSTER.open)) then
+        return false
     end
-    return nil
-end
-
--- Whether `square` stands at least SITE_DISTANCE from each of `others` along x or y.
-local function isApart(square, others)
-    for _, other in ipairs(others) do
-        if math.abs(square:getX() - other:getX()) < SITE_DISTANCE and math.abs(square:getY() - other:getY()) < SITE_DISTANCE then
-            return false
-        end
+    local building = at(place, { 0, -1 }):getBuilding()
+    if not (building and building:isResidential() and building:getDef():getRooms():size() >= POSTER.rooms) then
+        return false
     end
-    return true
-end
-
--- The closest place for stage 0 clear of `others`: at a window if any, facing south first.
-local function findStage0(player, others)
-    for _, needWindow in ipairs({ true, false }) do
-        for _, site in ipairs(SITES) do
-            local best = Stage.closestSquare(player, function(origin)
-                return isApart(origin, others) and fitsStage0(site, origin, player, needWindow)
-            end)
-            if best then
-                return site, best, needWindow
-            end
-        end
+    local windows = 0
+    for along = POSTER.windows.along[1], POSTER.windows.along[2] do
+        windows = windows + (hasOpening(place, along, "IsoWindow") and 1 or 0)
     end
-    return nil
-end
-
-local function studioSquare(studio, dx, dy)
-    return getCell():getGridSquare(studio:getX() + dx, studio:getY() + dy, studio:getZ())
-end
-
--- The closest square clear of `others` with open ground all over the studio's floor.
-local function findStudio(player, others)
-    return Stage.closestSquare(player, function(studio)
-        if not isApart(studio, others) then
-            return false
-        end
-        for dx = -STUDIO.reach, STUDIO.reach do
-            for dy = -STUDIO.reach, STUDIO.reach do
-                if not isOpen(studioSquare(studio, dx, dy), player) then
-                    return false
-                end
-            end
-        end
-        return true
-    end)
-end
-
-local function roadSquare(heading, car, position)
-    local ahead, side = position[1], position[2]
-    return getCell():getGridSquare(car:getX() + ahead * heading.ahead[1] + side * heading.side[1],
-        car:getY() + ahead * heading.ahead[2] + side * heading.side[2], car:getZ())
+    return windows >= POSTER.windows.count
 end
 
 -- The markings and blends painted over a road's floor.
@@ -829,78 +850,6 @@ local function isOpenRoad(square, player)
         and square ~= player:getCurrentSquare()
 end
 
--- The closest square clear of `others` for the car, with open road all around the car, the
--- trailer and the cones, on a north-south road if any.
-local function findRoad(player, others)
-    for _, heading in ipairs(ROAD.headings) do
-        local best = Stage.closestSquare(player, function(car)
-            if not isApart(car, others) then
-                return false
-            end
-            for ahead = ROAD.ahead[1], ROAD.ahead[2] do
-                for side = ROAD.side[1], ROAD.side[2] do
-                    if not isOpenRoad(roadSquare(heading, car, { ahead, side }), player) then
-                        return false
-                    end
-                end
-            end
-            return true
-        end)
-        if best then
-            return heading, best
-        end
-    end
-    return nil
-end
-
--- Outdoors, at a door into a room.
-local function hasDoor(site, origin)
-    local square, inside = siteSquare(site, origin, 0, 0), siteSquare(site, origin, 0, -1)
-    return square ~= nil and inside ~= nil and inside:getRoom() ~= nil and square:isOutside()
-        and instanceof(square:getDoorOrWindow(site.wallNorth), "IsoDoor")
-end
-
--- The closest door clear of `others` with open ground in front of it for the walk, facing south
--- first.
-local function findWalk(player, others)
-    for _, site in ipairs(SITES) do
-        local best = Stage.closestSquare(player, function(origin)
-            return isApart(origin, others) and hasDoor(site, origin) and isOpenArea(site, origin, player, WALK.open)
-        end)
-        if best then
-            return site, best
-        end
-    end
-    return nil
-end
-
--- The closest window clear of `others` into a house (a building with a bedroom and POSTER.rooms
--- rooms), on a wall with POSTER.windows.count windows near it, with free floor for the bank behind
--- it and open ground for the panels in front, facing south first.
-local function findPoster(player, others)
-    for _, site in ipairs(SITES) do
-        local best = Stage.closestSquare(player, function(origin)
-            if not (isApart(origin, others) and hasWindow(site, origin, 0)
-                and isFreeIndoorsAt(site, origin, POSTER.bank) and isOpenArea(site, origin, player, POSTER.open)) then
-                return false
-            end
-            local building = siteSquare(site, origin, 0, -1):getBuilding()
-            if not (building and building:isResidential() and building:getDef():getRooms():size() >= POSTER.rooms) then
-                return false
-            end
-            local windows = 0
-            for along = POSTER.windows.along[1], POSTER.windows.along[2] do
-                windows = windows + (hasWindow(site, origin, along) and 1 or 0)
-            end
-            return windows >= POSTER.windows.count
-        end)
-        if best then
-            return site, best
-        end
-    end
-    return nil
-end
-
 -- Outdoors on natural ground (grass or dirt, not a road or a yard's paving) with nothing on it but
 -- ground cover and trees, which the setups take away.
 local function isYardSquare(square, player)
@@ -909,32 +858,6 @@ local function isYardSquare(square, player)
     return name ~= nil and PZHarness.startsWith(name, "blends_natural")
         and isClear(square, function(object) return instanceof(object, "IsoTree") end, true)
         and square ~= player:getCurrentSquare()
-end
-
-local function offsetSquare(origin, position)
-    return getCell():getGridSquare(origin:getX() + position[1], origin:getY() + position[2], origin:getZ())
-end
-
--- Calls fn(square) for each square of the band `open` (R2.biogas.open) around `origin`, until fn
--- returns false; returns whether none did.
-local function everyBandSquare(origin, open, fn)
-    for dx = open.x[1], open.x[2] do
-        for dy = open.y[1], open.y[2] do
-            if math.abs(dx + dy - open.sum) <= open.half and not fn(offsetSquare(origin, { dx, dy })) then
-                return false
-            end
-        end
-    end
-    return true
-end
-
--- The closest square clear of `others` with the band `open` around it clear.
-local function findYard(player, others, open)
-    return Stage.closestSquare(player, function(origin)
-        return isApart(origin, others) and everyBandSquare(origin, open, function(square)
-            return isYardSquare(square, player)
-        end)
-    end)
 end
 
 -- Whether `square` is floor of `room` with nothing standing on it, such as furniture or a pot
@@ -953,42 +876,51 @@ local function isBareFloor(square, room)
     return true
 end
 
--- The closest indoor square clear of `others` with free floor of one room for the treadmill, its
--- battery box and the character beside it, nothing between them, and bare floor in front.
-local function findGym(player, others)
-    local gym = R2.gym
-    local spots = { gym.rear, gym.console, gym.box, gym.stand }
-    return Stage.closestSquare(player, function(origin)
-        local room = origin:getRoom()
-        if not (room and isApart(origin, others)) then
+-- Indoors, with free floor of one room for the treadmill, its battery box and the character beside
+-- it, nothing between them, and bare floor in front.
+local function fitsGym(place)
+    local gym, origin = R2.gym, place.origin
+    local room = origin:getRoom()
+    if not room then
+        return false
+    end
+    for _, key in ipairs(gym.shot) do
+        local square = at(place, gym[key])
+        if not (square and square:getRoom() == room and RenewableEnergy.Debug.isFreeSquare(square, true)
+            and not origin:isSomethingTo(square)) then
             return false
         end
-        for _, spot in ipairs(spots) do
-            local square = offsetSquare(origin, spot)
-            if not (square and square:getRoom() == room and RenewableEnergy.Debug.isFreeSquare(square, true)
-                and not origin:isSomethingTo(square)) then
-                return false
-            end
+    end
+    for _, spot in ipairs(gym.front) do
+        if not isBareFloor(at(place, spot), room) then
+            return false
         end
-        for _, spot in ipairs(gym.front) do
-            if not isBareFloor(offsetSquare(origin, spot), room) then
-                return false
-            end
-        end
-        return true
-    end)
+    end
+    return true
 end
 
--- A placed tile, as the tests place one. A panel mount holds `modules` (a PowerBank.MODULES list),
--- or without them whole factory modules.
-local function placeTile(square, spriteName, modules)
-    local object = IsoObject.new(square, spriteName, spriteName)
-    if modules then
-        object:getModData()[PowerBank.MODULES] = modules
+-- Whether `square` stands at least SITE_DISTANCE from each of `others` along x or y.
+local function isApart(square, others)
+    for _, other in ipairs(others) do
+        if math.abs(square:getX() - other:getX()) < SITE_DISTANCE and math.abs(square:getY() - other:getY()) < SITE_DISTANCE then
+            return false
+        end
     end
-    square:AddTileObject(object)
-    square:RecalcAllWithNeighbours(true)
-    return object
+    return true
+end
+
+-- The place closest to the character, its origin clear of `others`, in the first of `frames` that
+-- has one for which fits(place) holds; nil if none has.
+local function findPlace(player, others, frames, fits)
+    for _, frame in ipairs(frames) do
+        local best = Stage.closestSquare(player, function(origin)
+            return isApart(origin, others) and fits(newPlace(origin, frame))
+        end)
+        if best then
+            return newPlace(best, frame)
+        end
+    end
+    return nil
 end
 
 -- Puts the parts straight into the bank's container, as world spawns stock a bank, then has the
@@ -1004,29 +936,25 @@ local function fillBank(bank, items, charge)
     perform("refresh", { bank = PowerBank.positionOf(bank) })
 end
 
-local function connect(bank, panel)
-    perform("connectSource", { bank = PowerBank.positionOf(bank), source = PowerBank.positionOf(panel) })
+local function connect(bank, source)
+    perform("connectSource", { bank = PowerBank.positionOf(bank), source = PowerBank.positionOf(source) })
 end
 
--- Whether `square` is in reach of a bank on `bankSquare`, as RenewableEnergy.Loads measures it.
-local function isInReach(bankSquare, square)
-    local radius = SandboxVars.GeneratorTileRange
-    return math.abs(square:getZ() - bankSquare:getZ()) <= SandboxVars.GeneratorVerticalPowerRange
-        and IsoUtils.DistanceToSquared(square:getX(), square:getY(), bankSquare:getX(), bankSquare:getY()) <= radius * radius
-end
-
-local function forSquaresInReach(bankSquare, fn)
-    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
-    for z = bankSquare:getZ() - levels, bankSquare:getZ() + levels do
-        for x = bankSquare:getX() - radius, bankSquare:getX() + radius do
-            for y = bankSquare:getY() - radius, bankSquare:getY() + radius do
-                local square = getCell():getGridSquare(x, y, z)
-                if square and isInReach(bankSquare, square) then
-                    fn(square)
-                end
-            end
-        end
+-- Places a panel on each of `spots` ({ along, out, material }) of `place` and connects it to
+-- `bank`, in order: a `mount` ("wall" or "rack") of the spot's material facing the place's way, or
+-- without one a flat panel. A mount holds the modules (a PowerBank.MODULES list) of its index in
+-- `modules` if given, else whole factory modules.
+local function placePanels(bank, place, spots, mount, modules)
+    for i, spot in ipairs(spots) do
+        local sprite = mount and Sprites[mount][spot[3]][place.frame.facing] or Sprites.flat
+        local held = modules and modules[i]
+        connect(bank, Stage.placeTile(at(place, spot), sprite, held and { [PowerBank.MODULES] = held } or nil))
     end
+end
+
+-- Switches a light on or off; returns whether that changed it.
+local function switchLight(light, on)
+    return light:isActivated() ~= on and light:setActive(on, false, true) == on
 end
 
 -- Switches off every light in reach of the banks, which houses keep on once the grid goes, and
@@ -1035,13 +963,12 @@ end
 local function quietNeighbourhood(homesteadSquare, stage0Square)
     local lights, fridges = 0, 0
     for _, bankSquare in ipairs({ homesteadSquare, stage0Square }) do
-        forSquaresInReach(bankSquare, function(square)
+        RenewableEnergy.eachSquareInGeneratorReach(bankSquare, function(square)
             local objects = square:getObjects()
             for i = objects:size() - 1, 0, -1 do
                 local object = objects:get(i)
-                if instanceof(object, "IsoLightSwitch") and object:isActivated() then
-                    object:setActive(false, false, true)
-                    lights = lights + 1
+                if instanceof(object, "IsoLightSwitch") then
+                    lights = lights + (switchLight(object, false) and 1 or 0)
                 elseif bankSquare == stage0Square and object:getPipedFuelAmount() <= 0
                     and object:getContainerByEitherType("fridge", "freezer") then
                     square:RemoveTileObject(object)
@@ -1053,14 +980,14 @@ local function quietNeighbourhood(homesteadSquare, stage0Square)
     print(string.format("REPromo switched off %d lights and took away %d fridges", lights, fridges))
 end
 
--- Switches off the radios and televisions around each of `places`, which play with their
+-- Switches off the radios and televisions around each of `origins`, which play with their
 -- captions floating over them.
-local function silenceRadios(places)
+local function silenceRadios(origins)
     local silenced = 0
-    for _, place in ipairs(places) do
-        for x = place:getX() - QUIET_RADIUS, place:getX() + QUIET_RADIUS do
-            for y = place:getY() - QUIET_RADIUS, place:getY() + QUIET_RADIUS do
-                local square = getCell():getGridSquare(x, y, place:getZ())
+    for _, origin in ipairs(origins) do
+        for x = origin:getX() - QUIET_RADIUS, origin:getX() + QUIET_RADIUS do
+            for y = origin:getY() - QUIET_RADIUS, origin:getY() + QUIET_RADIUS do
+                local square = getCell():getGridSquare(x, y, origin:getZ())
                 local objects = square and square:getObjects()
                 for i = 0, (objects and objects:size() or 0) - 1 do
                     local object = objects:get(i)
@@ -1083,12 +1010,11 @@ local function switchOnLights(square, otherBank)
     for radius = 0, LIGHT_SEARCH do
         for x, y in PZHarness.Fixtures.ring(square:getX(), square:getY(), radius) do
             local near = getCell():getGridSquare(x, y, square:getZ())
-            local objects = near and building and near:getBuilding() == building and not isInReach(otherBank, near)
-                and near:getObjects()
+            local objects = near and building and near:getBuilding() == building
+                and not RenewableEnergy.inGeneratorReach(otherBank, x, y, square:getZ()) and near:getObjects()
             for i = 0, (objects and objects:size() or 0) - 1 do
                 local object = objects:get(i)
-                if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and not object:isActivated()
-                    and object:setActive(true, false, true) then
+                if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and switchLight(object, true) then
                     switched = switched + 1
                 end
             end
@@ -1108,19 +1034,24 @@ local function placeGenerator(square, fuel)
     return generator
 end
 
--- A digester of the Sprites.digester tile `tile` ("barrel.steel", "dome", ...) built on `square`
--- as the build menu builds one (ISBuildIsoEntity:create): a thumpable, then the entity's OnCreate.
+-- A record of RECORD_KINDS kind `kind` built on its Sprites tile `tile` on `square` as the build
+-- menu builds one (the tests' Helpers.placeRecord), clear of ground cover. Helpers is server Lua,
+-- which loads after this file, so it is required here.
+local function placeRecord(kind, tile, square)
+    clearGroundCover(square)
+    local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+    local thumpable, missing = Helpers.placeRecord(kind, tile, square)
+    if not thumpable then
+        print("REPromo no " .. kind .. ": " .. tostring(missing))
+    end
+    return thumpable
+end
+
+-- A digester of the Sprites.digester tile `tile` ("barrel.steel", "dome", ...) built on `square`.
 -- It is made one at work (R2.digester), its record's `fields` set over that, a day passed so that
 -- it eats from its hopper and says what it makes a day, and its holder `full` of what it takes.
 local function placeDigester(square, tile, full, fields)
-    local sprite = Sprites.digester
-    for part in string.gmatch(tile, "[^.]+") do
-        sprite = sprite[part]
-    end
-    clearGroundCover(square)
-    local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
-    square:AddSpecialObject(thumpable)
-    RenewableEnergy.DigesterSystem.OnCreate({ thumpable = thumpable })
+    local thumpable = placeRecord("digester", tile, square)
     local record, working = RenewableEnergy.Digester.recordOf(thumpable), R2.digester
     for _, fullType in ipairs(working.feed) do
         thumpable:getContainer():AddItem(fullType)
@@ -1136,17 +1067,13 @@ local function placeDigester(square, tile, full, fields)
     record:update()
     record.gas = full * record:capacity()
     record:afterChange()
-    return thumpable, record
+    return thumpable
 end
 
--- A gasifier of `tier` built on `square` as the build menu builds one, at work (R2.gasifier), lit
--- if `lit`.
+-- A gasifier of `tier` built on `square`, at work (R2.gasifier), lit if `lit`.
 local function placeGasifier(square, tier, lit)
-    clearGroundCover(square)
     local Gasifier, working = RenewableEnergy.Gasifier, R2.gasifier
-    local thumpable = IsoThumpable.new(getCell(), square, Sprites.gasifier[tier], false, nil)
-    square:AddSpecialObject(thumpable)
-    RenewableEnergy.GasifierSystem.OnCreate({ thumpable = thumpable })
+    local thumpable = placeRecord("gasifier", tier, square)
     for _ = 1, working.wood[2] do
         Gasifier.hopperOf(thumpable):AddItem(working.wood[1])
     end
@@ -1160,7 +1087,7 @@ local function placeGasifier(square, tier, lit)
     record.fireKg = lit and working.fireKg or 0
     record.ash, record.condensate = working.ash, working.condensate
     record:afterChange()
-    return thumpable, record
+    return thumpable
 end
 
 -- Fits the gas kit to `generator` and runs its line to `source`, a digester or a gasifier, by
@@ -1175,8 +1102,8 @@ local function fitGasKit(generator, source)
         table.insert(given, inventory:AddItem(GasKit.HOSE))
     end
     for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
-        if not GasLines.perform(player, job, generator, nil, source) then
-            print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, nil, source)))
+        if not GasLines.perform(player, job, generator, source) then
+            print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, source)))
         end
     end
     for _, item in ipairs(given) do
@@ -1187,105 +1114,58 @@ local function fitGasKit(generator, source)
     restore()
 end
 
+-- A generator plugged in and waiting at `layout.generator` of `place`, with a gas kit on an
+-- insulated digester at `layout.digester`. Returns the generator.
+local function placeKittedGenerator(place, layout)
+    local generator = placeGenerator(at(place, layout.generator), 0.7)
+    fitGasKit(generator, (placeDigester(at(place, layout.digester), "insulated", 1)))
+    return generator
+end
+
 -- The squares wind chargers stand on, which the shots frame taller (screenBox).
 local tallSquares = {}
 
 -- A wind charger's tile on `square`, turning in the wind as one built does.
 local function placeWindCharger(square, spriteName)
     clearGroundCover(square)
-    local object = placeTile(square, spriteName)
+    local object = Stage.placeTile(square, spriteName)
     -- As placing it does in multiplayer; single player fires no OnObjectAdded.
     triggerEvent("OnObjectAdded", object)
     tallSquares[square] = true
     return object
 end
 
--- The tile of a wind charger of `kind`: "scoop", "wood" or "pipe" blades of a propeller, or
--- "alternator", its rotor facing `facing`.
-local function windChargerSprite(kind, facing)
-    if kind == "scoop" then
-        return Sprites.windScoop
-    elseif kind == "alternator" then
-        return Sprites.windAlternator[facing]
-    end
-    return Sprites.windPropeller[kind][facing]
-end
-
-local site, origin, bankSquare, besideBank, stage0Site, stage0Origin
-local studio, roadHeading, roadCar, walkSite, walkOrigin, posterSite, posterOrigin
--- The Release 2 places by name (R2), and what the shots of them show besides themselves.
-local r2Places, shown = {}, {}
+-- What the shots show besides the setups' places, by name.
+local shown = {}
 local homesteadBank, stage0Box, posterBank
 
-local function at(position)
-    return siteSquare(site, origin, position[1], position[2])
-end
-
-local function atStage0(position)
-    return siteSquare(stage0Site, stage0Origin, position[1], position[2])
-end
-
-local function atRoad(position)
-    return roadSquare(roadHeading, roadCar, position)
-end
-
-local function atWalk(position)
-    return siteSquare(walkSite, walkOrigin, position[1], position[2])
-end
-
-local function atPoster(position)
-    return siteSquare(posterSite, posterOrigin, position[1], position[2])
-end
-
-local function atPlace(name, position)
-    return offsetSquare(r2Places[name], position)
-end
-
 local function buildHomestead()
-    quietNeighbourhood(bankSquare, atStage0(STAGE0.box))
-    for along = OPEN.along[1], OPEN.along[2] do
-        for out = 0, OPEN.out[2] do
-            clearGroundCover(at({ along, out }))
-        end
-    end
-    clearBankShot(bankSquare, besideBank)
-    homesteadBank = PowerBank.place(bankSquare, Sprites.batteryBankMetal, -1)
+    local home = places.homestead
+    quietNeighbourhood(home.bank, at(places.stage0, STAGE0.box))
+    clearArea(home, OPEN, true)
+    clearBankShot(home.bank, home.beside)
+    homesteadBank = PowerBank.place(home.bank, Sprites.batteryBankMetal, -1)
     fillBank(homesteadBank, HOMESTEAD_BANK, MORNING_CHARGE)
-    for _, spot in ipairs(HOMESTEAD.wallPanels) do
-        connect(homesteadBank, placeTile(at(spot), Sprites.wall[spot[3]][site.facing]))
-    end
-    for i, spot in ipairs(HOMESTEAD.racks) do
-        local modules = i == CRACKED_RACK
-            and { { type = MODULE, condition = CRACKED_CONDITION }, { type = MODULE, condition = 100 } } or nil
-        connect(homesteadBank, placeTile(at(spot), Sprites.rack[spot[3]][site.facing], modules))
-    end
-    for _, spot in ipairs(HOMESTEAD.flatPanels) do
-        connect(homesteadBank, placeTile(at(spot), Sprites.flat))
-    end
+    placePanels(homesteadBank, home, HOMESTEAD.wallPanels, "wall")
+    placePanels(homesteadBank, home, HOMESTEAD.racks, "rack", HOMESTEAD_MODULES)
+    placePanels(homesteadBank, home, HOMESTEAD.flatPanels)
     -- A backup generator with a failsafe outside the bank's wall, plugged in and waiting, with a
     -- gas kit on the insulated digester beside it.
-    local generatorSquare = at(HOMESTEAD.generator)
-    local generator = placeGenerator(generatorSquare, 0.7)
-    placeTile(generatorSquare, Sprites.failsafe)
-    fitGasKit(generator, (placeDigester(at(HOMESTEAD.digester), "insulated", 1)))
-    shown.homesteadCharger = placeWindCharger(at(HOMESTEAD.windCharger), Sprites.windPropeller.wood[site.facing])
+    local generator = placeKittedGenerator(home, HOMESTEAD)
+    Stage.placeTile(generator:getSquare(), Sprites.failsafe)
+    shown.homesteadCharger = placeWindCharger(at(home, HOMESTEAD.windCharger), Sprites.windPropeller.wood[home.frame.facing])
     connect(homesteadBank, shown.homesteadCharger)
-    perform("setBankOn", { bank = PowerBank.positionOf(homesteadBank), on = true })
-    switchOnLights(homesteadBank:getSquare(), atStage0(STAGE0.box))
+    setBankOn(homesteadBank, true)
+    switchOnLights(homesteadBank:getSquare(), at(places.stage0, STAGE0.box))
 end
 
 local function buildStage0()
-    for along = STAGE0.open.along[1], STAGE0.open.along[2] do
-        for out = STAGE0.open.out[1], STAGE0.open.out[2] do
-            clearGroundCover(atStage0({ along, out }))
-        end
-    end
-    stage0Box = PowerBank.place(atStage0(STAGE0.box), Sprites.batteryBoxWood, -1)
+    local stage0 = places.stage0
+    clearArea(stage0, STAGE0.open)
+    stage0Box = PowerBank.place(at(stage0, STAGE0.box), Sprites.batteryBoxWood, -1)
     fillBank(stage0Box, STAGE0_BOX, MORNING_CHARGE)
-    for _, spot in ipairs(STAGE0.flatPanels) do
-        connect(stage0Box, placeTile(atStage0(spot), Sprites.flat))
-    end
-    local charger = placeTile(atStage0(STAGE0.cellCharger), Sprites.cellCharger)
+    placePanels(stage0Box, stage0, STAGE0.flatPanels)
+    local charger = Stage.placeTile(at(stage0, STAGE0.cellCharger), Sprites.cellCharger)
     if not charger:getContainer() then
         charger:createContainersFromSpriteProperties()
     end
@@ -1294,9 +1174,9 @@ local function buildStage0()
         battery:setCurrentUsesFloat(0.5)
     end
     -- Set out the way garden light spawns set one out, charged and unlit by day.
-    RenewableEnergy.WorldSpawns.placeMoveable(atStage0(STAGE0.gardenLight), Sprites.gardenLight.off,
+    RenewableEnergy.WorldSpawns.placeMoveable(at(stage0, STAGE0.gardenLight), Sprites.gardenLight.off,
         { [RenewableEnergy.SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh })
-    perform("setBankOn", { bank = PowerBank.positionOf(stage0Box), on = true })
+    setBankOn(stage0Box, true)
 end
 
 -- Bank passes hour by hour from the morning to noon, as the game's own passes would have run,
@@ -1345,46 +1225,23 @@ local function screenBox(squares)
     return box
 end
 
--- The squares at `positions` by `at`.
-local function squaresAt(atFn, positions)
-    local squares = {}
-    for _, position in ipairs(positions) do
-        table.insert(squares, atFn(position))
-    end
-    return squares
-end
-
 -- What the yard shots show; the bank stands indoors behind the wall, out of them.
 local function homesteadSquares()
-    local squares = squaresAt(at, { HOMESTEAD.generator, HOMESTEAD.player, HOMESTEAD.digester, HOMESTEAD.windCharger })
-    for _, list in ipairs({ HOMESTEAD.wallPanels, HOMESTEAD.racks, HOMESTEAD.flatPanels }) do
-        for _, spot in ipairs(list) do
-            table.insert(squares, at(spot))
-        end
-    end
-    return squares
+    return squaresAt(places.homestead, { HOMESTEAD.generator, HOMESTEAD.player, HOMESTEAD.digester, HOMESTEAD.windCharger },
+        HOMESTEAD.wallPanels, HOMESTEAD.racks, HOMESTEAD.flatPanels)
 end
 
--- What the shot of the Release 2 place `name` frames: its `shot` positions and its wind chargers.
+-- What the shot of the Release 2 place `name` frames: its wind chargers and its `shot` positions.
 local function placeSquares(name)
-    local layout = R2[name]
-    local squares = squaresAt(function(position) return atPlace(name, position) end, layout.chargers or {})
+    local layout, shot = R2[name], {}
     for _, key in ipairs(layout.shot) do
-        table.insert(squares, atPlace(name, layout[key]))
+        table.insert(shot, layout[key])
     end
-    return squares
-end
-
-local function bankSquares()
-    return { bankSquare, besideBank }
+    return squaresAt(places[name], layout.chargers or {}, shot)
 end
 
 local function stage0Squares()
-    local squares = { atStage0(STAGE0.box), atStage0(STAGE0.player), atStage0(STAGE0.cellCharger), atStage0(STAGE0.gardenLight) }
-    for _, spot in ipairs(STAGE0.flatPanels) do
-        table.insert(squares, atStage0(spot))
-    end
-    return squares
+    return squaresAt(places.stage0, { STAGE0.box, STAGE0.player, STAGE0.cellCharger, STAGE0.gardenLight }, STAGE0.flatPanels)
 end
 
 local CROP_MARGIN = 40
@@ -1471,9 +1328,9 @@ local function goTo(squares, stepsOut)
 end
 
 -- What every group's shots share: noon without grid power, a breeze that turns the wind
--- chargers, and no radio captions around the `places` the run uses. The harness clears the rest
--- of the weather.
-local function addWorldSettings(places)
+-- chargers, and no radio captions around the `origins` of the places the run uses. The harness
+-- clears the rest of the weather.
+local function addWorldSettings(origins)
     run:add(function()
         -- The grid would power the squares and leave the bank nothing to run.
         PZHarness.Fixtures.setGrid(false)
@@ -1481,7 +1338,7 @@ local function addWorldSettings(places)
         local wind = getClimateManager():getClimateFloat(ClimateManager.FLOAT_WIND_INTENSITY)
         wind:setEnableAdmin(true)
         wind:setAdminValue(R2.windIntensity)
-        silenceRadios(places)
+        silenceRadios(origins)
         -- The climate takes the wind on its next update.
         return function()
             return getClimateManager():getWindspeedKph() >= R2.windIntensity * 120 * 0.95
@@ -1502,7 +1359,7 @@ local function logBanks()
             table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
         end
         print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
-            .. " %d of %d input slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
+            .. " %d of %d input slots, source reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
             table.concat(kinds, ", "), status.charge * 100, status.inputSlots.used, status.inputSlots.total,
             table.concat(reasons, ",")))
     end
@@ -1512,8 +1369,8 @@ end
 local function addSetups()
     run:add(function()
         getGameTime():setTimeOfDay(MORNING)
-        Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
-        Stage.removeTrees(stage0Origin:getX(), stage0Origin:getY(), stage0Origin:getZ())
+        removeTrees(places.homestead)
+        removeTrees(places.stage0)
         buildHomestead()
         buildStage0()
         chargeThroughMorning()
@@ -1523,14 +1380,9 @@ local function addSetups()
 end
 
 local function addWorld()
-    local scouts = {}
-    for _, spot in ipairs(HOMESTEAD.scouts) do
-        local square = at(spot)
-        if square then
-            table.insert(scouts, square)
-        end
-    end
-    table.insert(scouts, at(HOMESTEAD.player))
+    local home = places.homestead
+    local scouts = loadedSquares(home, HOMESTEAD.scouts)
+    table.insert(scouts, at(home, HOMESTEAD.player))
     addOutfit(true)
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
     goTo(scouts, 1)
@@ -1553,39 +1405,51 @@ local function addWorld()
         local charger = shown.homesteadCharger
         charger:getSquare():transmitRemoveItemFromSquare(charger)
     end)
-    goTo({ besideBank }, 0)
+    goTo({ home.beside }, 0)
     run:addOpaque("bank", function()
-        return { cropped("bank", bankSquares()) }
+        return { cropped("bank", { home.bank, home.beside }) }
     end)
     -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
     -- among them, then from the window, early on, in the clothes it came with.
     addOutfit(false)
-    goTo({ atStage0(STAGE0.scout), atStage0(STAGE0.player) }, 0)
+    goTo(squaresAt(places.stage0, { STAGE0.scout, STAGE0.player }), 0)
     run:addOpaque("stage0", function()
         return { centred("stage0", stage0Squares()) }
     end)
 end
 
--- The homestead bank's status window on a backdrop.
-local function addStatus()
+-- Adds the steps that open the window `open()` returns at (100, 100) on a backdrop, wait until
+-- `ready(window)` and the UI has drawn it twice more, shoot it as `name` and close it.
+local function addWindowShot(name, open, ready)
     local window
     run:add(function()
         run:newBackdrop()
-        window = RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(bankSquare))
+        window = open()
         window:setX(100)
         window:setY(100)
-        -- The window lays its rows out from the bank's status as it draws.
         return function()
-            return (window.renderedFrames or 0) >= 2
+            return ready(window)
         end
     end)
-    run:addMatted("status", function()
-        return { elementRegion("status", window) }
+    run:add(function()
+        return Capture.drawn(2)
+    end)
+    run:addMatted(name, function()
+        return { elementRegion(name, window) }
     end)
     run:add(function()
         window:close()
     end)
     run:removeBackdrop()
+end
+
+-- The homestead bank's status window, which lays its rows out from the bank's status as it draws.
+local function addStatus()
+    addWindowShot("status", function()
+        return RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(places.homestead.bank))
+    end, function(window)
+        return (window.renderedFrames or 0) >= 2
+    end)
 end
 
 -- The submenu of `menu`'s option named `name`, opened as if the mouse were over the option.
@@ -1654,7 +1518,7 @@ end
 -- Where extract.py looks for the item in a studio shot: STUDIO.window around the studio
 -- square's floor centre, kept on the screen.
 local function studioWindow(name)
-    local x, y = onScreen(studio)
+    local x, y = onScreen(places.studio.origin)
     local window = STUDIO.window
     local left, top = math.max(0, x - window.half), math.max(0, y - window.up)
     local right = math.min(getCore():getScreenWidth(), x + window.half)
@@ -1665,19 +1529,19 @@ end
 -- Every item alone on the studio floor. `models` gets one entry per item.
 local function addModels(items, models)
     local group = run.current
+    local studio = places.studio
+    local floorSquare = studio.origin
     local zoomLevels
     run:add(function()
-        local asphalt = roadCar:getFloor():getSprite():getName()
+        local asphalt = places.road.origin:getFloor():getSprite():getName()
         print("REPromo item floor " .. asphalt)
-        for dx = -STUDIO.floorReach, STUDIO.floorReach do
-            for dy = -STUDIO.floorReach, STUDIO.floorReach do
-                local square = studioSquare(studio, dx, dy)
-                clearGroundCover(square)
-                if isClear(square) then
-                    square:addFloor(asphalt)
-                end
+        everyAreaSquare(studio, STUDIO.floor, function(square)
+            clearGroundCover(square)
+            if isClear(square) then
+                square:addFloor(asphalt)
             end
-        end
+            return true
+        end)
         zoomLevels = { getCore():getOptionZoomLevels1x(), getCore():getOptionZoomLevels2x() }
         getCore():setOptionZoomLevels1x(zoomLevels[1] .. ";" .. STUDIO.zoom)
         getCore():setOptionZoomLevels2x(zoomLevels[2] .. ";" .. STUDIO.zoom)
@@ -1685,13 +1549,13 @@ local function addModels(items, models)
         -- Every item at once, so that their models load while the character looks around: Lua
         -- can't tell when a model has loaded, and a loaded one draws on the next frame.
         for _, item in ipairs(items) do
-            studio:AddWorldInventoryItem(instanceItem(item.fullType), 0.5, 0.5, 0)
+            floorSquare:AddWorldInventoryItem(instanceItem(item.fullType), 0.5, 0.5, 0)
         end
     end)
-    goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]) }, 0)
+    goTo({ at(studio, STUDIO.player) }, 0)
     local floor = run.prefix .. "models_floor"
     run:add(function()
-        studio:removeAllWorldObjects()
+        floorSquare:removeAllWorldObjects()
         return DRAW_FRAMES
     end)
     run:add(function()
@@ -1702,14 +1566,14 @@ local function addModels(items, models)
         run:add(function()
             local placed = instanceItem(item.fullType)
             placed:setWorldZRotation(STUDIO.rotation)
-            studio:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
+            floorSquare:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
             return DRAW_FRAMES
         end)
         run:add(function()
             local file = run.prefix .. name
             run:screenshot(file)
             table.insert(models, { name = name, group = group, file = file, floor = floor, window = studioWindow(name) })
-            studio:removeAllWorldObjects()
+            floorSquare:removeAllWorldObjects()
         end)
     end
     run:add(function()
@@ -1719,28 +1583,21 @@ local function addModels(items, models)
     end)
 end
 
--- What the trailer shot shows: the car's nose, the trailer, the character and the cones.
-local function roadSquares()
-    local squares = { atRoad({ 2, 0 }), atRoad(ROAD.trailer), atRoad(ROAD.player) }
-    for _, spot in ipairs(ROAD.cones) do
-        table.insert(squares, atRoad(spot))
-    end
-    return squares
-end
-
 -- The arrow board trailer hitched to a car on the road, cones behind it, a step out from the
 -- closest zoom.
 local function addTrailer()
+    local road = places.road
     local pair
     addOutfit(false)
     run:add(function()
-        local x, y, z, reach = roadCar:getX(), roadCar:getY(), roadCar:getZ(), ROAD.clearRadius
-        Stage.removeTrees(x, y, z)
+        local car = road.origin
+        local x, y, z, reach = car:getX(), car:getY(), car:getZ(), ROAD.clearRadius
+        removeTrees(road)
         Stage.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
         for _, spot in ipairs(ROAD.cones) do
-            placeTile(atRoad(spot), ROAD.cone)
+            Stage.placeTile(at(road, spot), ROAD.cone)
         end
-        pair = Stage.spawnTrailer(roadCar, roadHeading.facing)
+        pair = Stage.spawnTrailer(car, road.frame.facing)
         return Stage.vehiclesAtRest(pair, false)
     end)
     run:add(function()
@@ -1751,33 +1608,23 @@ local function addTrailer()
     end)
     -- From the item floor first, as a full run's character has by now: the hedges and fences along
     -- a road hide what lies past them from the road itself.
-    goTo({ studioSquare(studio, STUDIO.player[1], STUDIO.player[2]), atRoad(ROAD.player) }, 1)
+    goTo({ at(places.studio, STUDIO.player), at(road, ROAD.player) }, 1)
     run:addOpaque("trailer", function()
-        return { centred("trailer", roadSquares()) }
+        -- The car's nose, the trailer, the character and the cones.
+        return { centred("trailer", squaresAt(road, { { 2, 0 }, ROAD.trailer, ROAD.player }, ROAD.cones)) }
     end)
-end
-
-local function walkSquares()
-    local squares = { atWalk({ 0, -1 }), atWalk(WALK.player) }
-    for _, spot in ipairs(WALK.lights) do
-        table.insert(squares, atWalk(spot))
-    end
-    return squares
 end
 
 -- Garden lights along a house's front walk, charged and lit at night, at the closest zoom.
 local function addGardenLights()
     local SolarGardenLight = RenewableEnergy.SolarGardenLight
+    local walk = places.walk
     addOutfit(false)
     run:add(function()
-        Stage.removeTrees(walkOrigin:getX(), walkOrigin:getY(), walkOrigin:getZ())
-        for along = WALK.open.along[1], WALK.open.along[2] do
-            for out = WALK.open.out[1], WALK.open.out[2] do
-                clearGroundCover(atWalk({ along, out }))
-            end
-        end
+        removeTrees(walk)
+        clearArea(walk, WALK.open)
         for _, spot in ipairs(WALK.lights) do
-            RenewableEnergy.WorldSpawns.placeMoveable(atWalk(spot), Sprites.gardenLight.off,
+            RenewableEnergy.WorldSpawns.placeMoveable(at(walk, spot), Sprites.gardenLight.off,
                 { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh, [SolarGardenLight.BULB_KEY] = spot.bulb })
         end
         getGameTime():setTimeOfDay(WALK.hour)
@@ -1788,15 +1635,15 @@ local function addGardenLights()
         -- Lit now, rather than at the next minute's pass. Their light shows while the character
         -- looks around.
         for _, spot in ipairs(WALK.lights) do
-            local light = SolarGardenLight.findOn(atWalk(spot))
+            local light = SolarGardenLight.findOn(at(walk, spot))
             if light then
                 SolarGardenLight.update(light, 0)
             end
         end
     end)
-    goTo({ atWalk(WALK.scout), atWalk(WALK.player) }, 0)
+    goTo(squaresAt(walk, { WALK.scout, WALK.player }), 0)
     run:addOpaque("gardenlights", function()
-        return { centred("gardenlights", walkSquares()) }
+        return { centred("gardenlights", squaresAt(walk, { { 0, -1 }, WALK.player }, WALK.lights)) }
     end)
 end
 
@@ -1805,40 +1652,27 @@ end
 -- reaches goes on, upstairs too, and every other light in its reach off; the other setups' banks
 -- go off, so that this is the one lit house.
 local function buildPoster()
-    for along = POSTER.open.along[1], POSTER.open.along[2] do
-        for out = 0, POSTER.open.out[2] do
-            clearGroundCover(atPoster({ along, out }))
-        end
-    end
-    posterBank = PowerBank.place(atPoster(POSTER.bank), Sprites.batteryBankMetal, -1)
+    local poster = places.poster
+    clearArea(poster, POSTER.open, true)
+    posterBank = PowerBank.place(at(poster, POSTER.bank), Sprites.batteryBankMetal, -1)
     fillBank(posterBank, HOMESTEAD_BANK, 1)
-    for _, spot in ipairs(POSTER.racks) do
-        connect(posterBank, placeTile(atPoster(spot), Sprites.rack[spot[3]][posterSite.facing]))
-    end
-    for _, spot in ipairs(POSTER.flatPanels) do
-        connect(posterBank, placeTile(atPoster(spot), Sprites.flat))
-    end
-    connect(posterBank, placeWindCharger(atPoster(POSTER.windCharger), Sprites.windPropeller.wood[posterSite.facing]))
-    fitGasKit(placeGenerator(atPoster(POSTER.generator), 0.7), (placeDigester(atPoster(POSTER.digester), "insulated", 1)))
+    placePanels(posterBank, poster, POSTER.racks, "rack")
+    placePanels(posterBank, poster, POSTER.flatPanels)
+    connect(posterBank, placeWindCharger(at(poster, POSTER.windCharger), Sprites.windPropeller.wood[poster.frame.facing]))
+    placeKittedGenerator(poster, POSTER)
     for _, bank in ipairs({ homesteadBank, stage0Box }) do
-        perform("setBankOn", { bank = PowerBank.positionOf(bank), on = false })
+        setBankOn(bank, false)
     end
-    perform("setBankOn", { bank = PowerBank.positionOf(posterBank), on = true })
-    local bankSquare = posterBank:getSquare()
-    local building = bankSquare:getBuilding()
+    setBankOn(posterBank, true)
+    local building = posterBank:getSquare():getBuilding()
     local lit, unlit = 0, 0
-    forSquaresInReach(bankSquare, function(square)
+    RenewableEnergy.eachSquareInGeneratorReach(posterBank:getSquare(), function(square)
         local inHouse = square:getBuilding() == building
         local objects = square:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)
-            if instanceof(object, "IsoLightSwitch") then
-                if inHouse and not object:isActivated() and object:setActive(true, false, true) then
-                    lit = lit + 1
-                elseif not inHouse and object:isActivated() then
-                    object:setActive(false, false, true)
-                    unlit = unlit + 1
-                end
+            if instanceof(object, "IsoLightSwitch") and switchLight(object, inHouse) then
+                lit, unlit = lit + (inHouse and 1 or 0), unlit + (inHouse and 0 or 1)
             end
         end
     end)
@@ -1847,18 +1681,15 @@ end
 
 -- A square as tall as the screen, centred across on the house and the panels.
 local function posterRegion()
+    local poster = places.poster
     local def = posterBank:getSquare():getBuilding():getDef()
-    local squares = { atPoster(POSTER.player) }
+    local squares = squaresAt(poster, { POSTER.player }, POSTER.racks, POSTER.flatPanels,
+        { POSTER.generator, POSTER.digester, POSTER.windCharger })
     for _, corner in ipairs({ { def:getX(), def:getY() }, { def:getX2() - 1, def:getY() },
         { def:getX(), def:getY2() - 1 }, { def:getX2() - 1, def:getY2() - 1 } }) do
-        local square = getCell():getGridSquare(corner[1], corner[2], posterOrigin:getZ())
+        local square = getCell():getGridSquare(corner[1], corner[2], poster.origin:getZ())
         if square then
             table.insert(squares, square)
-        end
-    end
-    for _, list in ipairs({ POSTER.racks, POSTER.flatPanels, { POSTER.generator, POSTER.digester, POSTER.windCharger } }) do
-        for _, spot in ipairs(list) do
-            table.insert(squares, atPoster(spot))
         end
     end
     local box = screenBox(squares)
@@ -1868,25 +1699,19 @@ local function posterRegion()
 end
 
 local function addPoster()
+    local poster = places.poster
     -- The homestead at night, its settler by the racks.
     addOutfit(true)
     run:add(function()
-        Stage.removeTrees(posterOrigin:getX(), posterOrigin:getY(), posterOrigin:getZ())
+        removeTrees(poster)
     end)
-    local scouts = {}
-    for _, spot in ipairs(POSTER.indoors) do
-        local square = atPoster(spot)
-        if RenewableEnergy.Debug.isFreeSquare(square, true) then
-            table.insert(scouts, square)
-        end
+    local scouts = loadedSquares(poster, POSTER.indoors, function(square)
+        return RenewableEnergy.Debug.isFreeSquare(square, true)
+    end)
+    for _, square in ipairs(loadedSquares(poster, POSTER.scouts)) do
+        table.insert(scouts, square)
     end
-    for _, spot in ipairs(POSTER.scouts) do
-        local square = atPoster(spot)
-        if square then
-            table.insert(scouts, square)
-        end
-    end
-    table.insert(scouts, atPoster(POSTER.player))
+    table.insert(scouts, at(poster, POSTER.player))
     goTo(scouts, POSTER.zoomOut)
     run:add(function()
         getGameTime():setTimeOfDay(POSTER.hour)
@@ -1900,14 +1725,18 @@ end
 
 -- Release 2 shots ---------------------------------------------------------------------------------
 
+-- A function giving the square of the Release 2 place `name` at its R2 layout's position `key`.
+local function spotsOf(name)
+    local place, layout = places[name], R2[name]
+    return function(key)
+        return at(place, layout[key])
+    end
+end
+
 -- Clears the trees around the Release 2 place `name` and the ground cover of its band.
 local function clearYard(name)
-    local origin = r2Places[name]
-    Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
-    everyBandSquare(origin, R2[name].open, function(square)
-        clearGroundCover(square)
-        return true
-    end)
+    removeTrees(places[name])
+    clearArea(places[name], R2[name].open)
 end
 
 -- Has the character look around the Release 2 place `name` from its scout square, if it has one,
@@ -1915,49 +1744,33 @@ end
 -- zoom.
 local function goToPlace(name, stepsOut, standAt)
     local layout = R2[name]
-    local squares = { atPlace(name, layout[standAt or "player"]) }
+    local squares = { at(places[name], layout[standAt or "player"]) }
     if layout.scout then
-        table.insert(squares, 1, atPlace(name, layout.scout))
+        table.insert(squares, 1, at(places[name], layout.scout))
     end
     goTo(squares, stepsOut)
 end
 
--- The status window of `windowClass` (RenewableEnergy.DigesterWindow or GasifierWindow) on what
--- the shots show under `key`, on a backdrop.
+-- The window of `windowClass` (RenewableEnergy.DigesterWindow or GasifierWindow) on what the shots
+-- show under `key`, which lays its rows out from the summary as it draws.
 local function addGasWindow(name, windowClass, key)
-    local window
-    run:add(function()
-        run:newBackdrop()
-        window = windowClass.open(0, shown[key])
-        window:setX(100)
-        window:setY(100)
-        -- The window lays its rows out from the summary as it draws.
-        return function()
-            return window.rowsToDraw ~= nil
-        end
+    addWindowShot(name, function()
+        return windowClass.open(0, shown[key])
+    end, function(window)
+        return window.rowsToDraw ~= nil
     end)
-    run:add(function()
-        return Capture.drawn(2)
-    end)
-    run:addMatted(name, function()
-        return { elementRegion(name, window) }
-    end)
-    run:add(function()
-        window:close()
-    end)
-    run:removeBackdrop()
 end
 
 -- Every digester at work, a step out from the closest zoom, then the brick dome's window.
 local function addBiogas()
-    local layout = R2.biogas
-    local function here(key) return atPlace("biogas", layout[key]) end
     addOutfit(true)
     run:add(function()
+        local here = spotsOf("biogas")
         clearYard("biogas")
-        -- The heater first, so that the barrel's own pass finds it lit.
-        placeTile(here("heater"), Sprites.gasHeater.lit)
-        placeDigester(here("barrelSteel"), "barrel.steel", 1, { heaterLit = true })
+        -- The heater first: the barrel's pass reads whether it is heated from the lit heater tile
+        -- beside it (DigesterObject:advance).
+        Stage.placeTile(here("heater"), Sprites.gasHeater.lit)
+        placeDigester(here("barrelSteel"), "barrel.steel", 1)
         placeDigester(here("barrelPlastic"), "barrel.plastic", 0.6, { holder = "tarp" })
         placeDigester(here("insulated"), "insulated", 0.8)
         shown.digester = placeDigester(here("dome"), "dome", 0.9)
@@ -1976,13 +1789,12 @@ end
 -- The three gasifiers, two lit and piped to running generators, a step out from the closest
 -- zoom, then the gasifier's window.
 local function addWoodgas()
-    local layout = R2.woodgas
-    local function here(key) return atPlace("woodgas", layout[key]) end
     addOutfit(true)
     run:add(function()
+        local here = spotsOf("woodgas")
         clearYard("woodgas")
         placeGasifier(here("primitive"), "primitive", false)
-        for _, fuel in ipairs(layout.fuelItems) do
+        for _, fuel in ipairs(R2.woodgas.fuelItems) do
             local item = instanceItem(fuel[1])
             item:setWorldZRotation(fuel[4])
             here("fuel"):AddWorldInventoryItem(item, fuel[2], fuel[3], 0)
@@ -2005,12 +1817,11 @@ end
 
 -- The four wind chargers turning in the breeze, a step out from the closest zoom.
 local function addWind()
-    local layout = R2.wind
     addOutfit(true)
     run:add(function()
         clearYard("wind")
-        for _, spot in ipairs(layout.chargers) do
-            placeWindCharger(atPlace("wind", spot), windChargerSprite(spot.kind, layout.facing))
+        for _, spot in ipairs(R2.wind.chargers) do
+            placeWindCharger(at(places.wind, spot), spot.sprite)
         end
         return DRAW_FRAMES
     end)
@@ -2024,17 +1835,16 @@ end
 -- character running on it, indoors at the closest zoom, in the clothes it came with.
 local function addTreadmill()
     local layout = R2.gym
-    local function here(key) return atPlace("gym", layout[key]) end
     addOutfit(false)
     run:add(function()
+        local here = spotsOf("gym")
         local box = PowerBank.place(here("box"), Sprites.batteryBoxWood, -1)
         fillBank(box, STAGE0_BOX, MORNING_CHARGE)
         local tiles = Sprites.treadmill[layout.facing]
-        placeTile(here("rear"), tiles.rear)
-        shown.treadmill = placeTile(here("console"), tiles.console)
-        shown.treadmill:getModData()[RenewableEnergy.Treadmill.WIRED] = true
+        Stage.placeTile(here("rear"), tiles.rear)
+        shown.treadmill = Stage.placeTile(here("console"), tiles.console, { [RenewableEnergy.Treadmill.WIRED] = true })
         connect(box, shown.treadmill)
-        perform("setBankOn", { bank = PowerBank.positionOf(box), on = true })
+        setBankOn(box, true)
         return DRAW_FRAMES
     end)
     goToPlace("gym", 0, "stand")
@@ -2054,82 +1864,138 @@ local function addTreadmill()
     end)
 end
 
--- Finds the places in `needs`, each clear of those found before it, and returns them, or nil and
--- the first it can't find. A run of every group looks for all of them.
+-- Finding the places ------------------------------------------------------------------------------
+
+-- A Release 2 yard: a band of natural ground (R2[name].open) clear for it.
+local function yard(name)
+    return {
+        name = name,
+        label = name,
+        missing = "open ground for the " .. name .. " shot",
+        frames = { GRID },
+        fits = function(place, player)
+            return everyAreaSquare(place, R2[name].open, function(square)
+                return isYardSquare(square, player)
+            end)
+        end,
+    }
+end
+
+-- Every place a group may need (GROUPS' `places`), in the order findPlaces looks for them: what the
+-- log calls it, what is missing when there is none, and either the `frames` to try in order and
+-- whether a place `fits(place, player)`, or `find(player, others)` returning the place or nil;
+-- `detail(place)` adds to its line in the log.
+local PLACES = {
+    {
+        name = "homestead",
+        label = "homestead",
+        missing = "plain building wall with open ground in front and a room behind it with open floor along its north wall",
+        find = function(player, others)
+            local place = findPlace(player, others, SITES, function(candidate)
+                return fitsHomestead(candidate, player)
+            end)
+            if place then
+                place.bank, place.beside = bankPlace(place)
+            end
+            return place
+        end,
+        detail = function(place)
+            return string.format(", bank %d,%d, character beside it %d,%d", place.bank:getX(), place.bank:getY(),
+                place.beside:getX(), place.beside:getY())
+        end,
+    },
+    {
+        name = "stage0",
+        label = "stage 0",
+        missing = "outside wall with free floor indoors behind it and open ground in front, for stage 0",
+        -- At a window if any.
+        find = function(player, others)
+            for _, needWindow in ipairs({ true, false }) do
+                local place = findPlace(player, others, SITES, function(candidate)
+                    return fitsStage0(candidate, player, needWindow)
+                end)
+                if place then
+                    place.atWindow = needWindow
+                    return place
+                end
+            end
+            return nil
+        end,
+        detail = function(place)
+            return place.atWindow and ", at a window" or ", at a wall"
+        end,
+    },
+    {
+        name = "road",
+        label = "trailer",
+        missing = "stretch of open road for the trailer",
+        frames = ROAD.headings,
+        fits = function(place, player)
+            return everyAreaSquare(place, ROAD.open, function(square)
+                return isOpenRoad(square, player)
+            end)
+        end,
+    },
+    {
+        name = "studio",
+        label = "items",
+        missing = "open ground for the item shots' floor",
+        frames = { GRID },
+        fits = function(place, player)
+            return isOpenArea(place, player, STUDIO.open)
+        end,
+    },
+    {
+        name = "walk",
+        label = "garden lights",
+        missing = "door with open ground in front, for the garden lights",
+        frames = SITES,
+        fits = function(place, player)
+            return hasOpening(place, 0, "IsoDoor") and isOpenArea(place, player, WALK.open)
+        end,
+    },
+    {
+        name = "poster",
+        label = "poster",
+        missing = "wall with " .. POSTER.windows.count .. " windows and open ground in front, for the poster",
+        frames = SITES,
+        fits = fitsPoster,
+    },
+    yard("biogas"),
+    yard("woodgas"),
+    yard("wind"),
+    {
+        name = "gym",
+        label = "treadmill",
+        missing = "room with free floor for the treadmill",
+        frames = { GRID },
+        fits = fitsGym,
+    },
+}
+
+-- Finds the places in `needs` into `places`, each clear of those found before it, and returns
+-- their origins, or nil and the first it can't find. A run of every group looks for all of them.
 local function findPlaces(player, needs)
     local found, logged = {}, {}
-    if needs.homestead then
-        site, origin = findSite(player)
-        if not site then
-            return nil, "plain building wall with open ground in front and a room behind it with open floor along its north wall"
-        end
-        bankSquare, besideBank = bankPlace(site, origin)
-        table.insert(found, origin)
-        table.insert(logged, string.format("homestead %d,%d facing %s, bank %d,%d, character beside it %d,%d",
-            origin:getX(), origin:getY(), site.facing, bankSquare:getX(), bankSquare:getY(), besideBank:getX(),
-            besideBank:getY()))
-    end
-    if needs.stage0 then
-        local atWindow
-        stage0Site, stage0Origin, atWindow = findStage0(player, found)
-        if not stage0Site then
-            return nil, "outside wall with free floor indoors behind it and open ground in front, for stage 0"
-        end
-        table.insert(found, stage0Origin)
-        table.insert(logged, string.format("stage 0 %d,%d facing %s, %s", stage0Origin:getX(), stage0Origin:getY(),
-            stage0Site.facing, atWindow and "at a window" or "at a wall"))
-    end
-    if needs.road then
-        roadHeading, roadCar = findRoad(player, found)
-        if not roadHeading then
-            return nil, "stretch of open road for the trailer"
-        end
-        table.insert(found, roadCar)
-        table.insert(logged, string.format("trailer %d,%d facing %s", roadCar:getX(), roadCar:getY(), roadHeading.facing))
-    end
-    if needs.studio then
-        studio = findStudio(player, found)
-        if not studio then
-            return nil, "open ground for the item shots' floor"
-        end
-        table.insert(found, studio)
-        table.insert(logged, string.format("items %d,%d", studio:getX(), studio:getY()))
-    end
-    if needs.walk then
-        walkSite, walkOrigin = findWalk(player, found)
-        if not walkSite then
-            return nil, "door with open ground in front, for the garden lights"
-        end
-        table.insert(found, walkOrigin)
-        table.insert(logged, string.format("garden lights %d,%d facing %s", walkOrigin:getX(), walkOrigin:getY(),
-            walkSite.facing))
-    end
-    if needs.poster then
-        posterSite, posterOrigin = findPoster(player, found)
-        if not posterSite then
-            return nil, "wall with " .. POSTER.windows.count .. " windows and open ground in front, for the poster"
-        end
-        table.insert(found, posterOrigin)
-        table.insert(logged, string.format("poster %d,%d facing %s", posterOrigin:getX(), posterOrigin:getY(),
-            posterSite.facing))
-    end
-    for _, name in ipairs(R2.yards) do
-        if needs[name] then
-            r2Places[name] = findYard(player, found, R2[name].open)
-            if not r2Places[name] then
-                return nil, "open ground for the " .. name .. " shot"
+    for _, spec in ipairs(PLACES) do
+        if needs[spec.name] then
+            local place
+            if spec.find then
+                place = spec.find(player, found)
+            else
+                place = findPlace(player, found, spec.frames, function(candidate)
+                    return spec.fits(candidate, player)
+                end)
             end
-            table.insert(found, r2Places[name])
-            table.insert(logged, string.format("%s %d,%d", name, r2Places[name]:getX(), r2Places[name]:getY()))
+            if not place then
+                return nil, spec.missing
+            end
+            places[spec.name] = place
+            local origin, facing = place.origin, place.frame.facing
+            table.insert(found, origin)
+            table.insert(logged, string.format("%s %d,%d", spec.label, origin:getX(), origin:getY())
+                .. (facing and " facing " .. facing or "") .. (spec.detail and spec.detail(place) or ""))
         end
-    end
-    if needs.gym then
-        r2Places.gym = findGym(player, found)
-        if not r2Places.gym then
-            return nil, "room with free floor for the treadmill"
-        end
-        table.insert(found, r2Places.gym)
-        table.insert(logged, string.format("treadmill %d,%d", r2Places.gym:getX(), r2Places.gym:getY()))
     end
     if #logged > 0 then
         print("REPromo " .. table.concat(logged, "; "))
@@ -2186,8 +2052,8 @@ function Promo.capture(selection, onDone)
             needs[place] = true
         end
     end
-    local places, missing = findPlaces(getPlayer(), needs)
-    if not places then
+    local origins, missing = findPlaces(getPlayer(), needs)
+    if not origins then
         run:fail("within " .. Stage.SEARCH_RADIUS .. " squares, no " .. missing)
         return
     end
@@ -2209,7 +2075,7 @@ function Promo.capture(selection, onDone)
         modName = getText("Sandbox_RenewableEnergy"),
     }
     local endTotal = addTimer("total")
-    addWorldSettings(places)
+    addWorldSettings(origins)
     local setupsBuilt = false
     for _, name in ipairs(chosen) do
         local group = GROUPS[name]

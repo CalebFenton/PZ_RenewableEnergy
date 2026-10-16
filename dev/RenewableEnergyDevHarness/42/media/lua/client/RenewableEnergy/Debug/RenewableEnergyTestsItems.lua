@@ -9,32 +9,6 @@ local T = RenewableEnergyTest
 local test, expect, player = T.test, T.expect, T.player
 local Debug = RenewableEnergy.Debug
 
--- Every recipe Recipes.txt defines. Listed rather than read from the game, so that one that
--- fails to load is caught.
-local RECIPES = {
-    "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
-    "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal",
-    "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal",
-    "RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood", "RenewableEnergy_MakeSolarWallMetal",
-    "RenewableEnergy_MakeSolarRackWood", "RenewableEnergy_MakeSolarRackMetal",
-    "RenewableEnergy_UnmountSolarFlat", "RenewableEnergy_UnmountSolarWallWood", "RenewableEnergy_UnmountSolarWallMetal",
-    "RenewableEnergy_UnmountSolarRackWood", "RenewableEnergy_UnmountSolarRackMetal",
-    "RenewableEnergy_RepairCrackedModule", "RenewableEnergy_MakeHomemadeSolarModule",
-    "RenewableEnergy_TakeApartCalculator", "RenewableEnergy_TakeApartSolarGardenLight",
-    "RenewableEnergy_TakeApartSolarCellCharger", "RenewableEnergy_TakeApartSolarMaintainer",
-    "RenewableEnergy_TakeApartShatteredModule",
-    "RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery",
-    "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery", "RenewableEnergy_StripL16Battery",
-    "RenewableEnergy_RecastBatteryPlates",
-    "RenewableEnergy_RebuildCarBattery", "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery",
-    "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
-    "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
-    "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle",
-    "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray", "RenewableEnergy_MakeVinegarAphidSpray",
-    "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
-    "RenewableEnergy_MakeHomemadeAlternator",
-}
-
 -- "RenewableEnergy.HomesteadPowerMag1" -> "homestead_power_mag1".
 local function snakeName(fullType)
     return T.snake(string.match(fullType, "%.(.+)") or fullType)
@@ -44,16 +18,24 @@ end
 
 -- The inventory and the crafting window draw an item's icon, the floor its ground model, and a
 -- missing ItemName.json entry shows the full type, since the scripts set no DisplayName
--- (Translator.getItemNameFromFullType).
+-- (Translator.getItemNameFromFullType). The promo and the art list the items by hand
+-- (Debug.ITEMS, Debug.PART_ITEMS): a new item missing there, or a listed one renamed, would
+-- silently drop out of them.
 test("renewable_energy_items_have_icons_names_and_ground_models", {
     validate = function()
+        local listed = {}
+        for _, list in ipairs({ Debug.ITEMS, Debug.PART_ITEMS }) do
+            for _, fullType in ipairs(list) do
+                listed[fullType] = true
+                expect(getScriptManager():getItem(fullType) ~= nil, "Debug lists " .. fullType .. ", which doesn't load")
+            end
+        end
         local items = getScriptManager():getAllItems()
-        local checked = 0
         for i = 0, items:size() - 1 do
             local item = items:get(i)
             if item:getModuleName() == "RenewableEnergy" then
-                checked = checked + 1
                 local fullType = item:getFullName()
+                expect(listed[fullType], fullType .. " is in neither Debug.ITEMS nor Debug.PART_ITEMS")
                 local model = item:getWorldStaticModel()
                 expect(model ~= nil and getScriptManager():getModelScript(model) ~= nil,
                     fullType .. " has no ground model (" .. tostring(model) .. ")")
@@ -63,8 +45,6 @@ test("renewable_energy_items_have_icons_names_and_ground_models", {
                 expect(instance ~= nil and instance:getDisplayName() ~= fullType, fullType .. " has no name")
             end
         end
-        local expected = #Debug.ITEMS + #Debug.PART_ITEMS
-        expect(checked == expected, checked .. " RenewableEnergy items loaded, expected " .. expected)
     end,
 })
 
@@ -86,13 +66,16 @@ test("renewable_energy_items_new_start_right", {
 
 -- Recipes -------------------------------------------------------------------------------------
 
--- Every recipe loads, resolves by its bare name in module Base (research and the magazines look
--- it up so), and names only items that exist: a missing item makes a recipe impossible without
--- a word. Expanding "Possible Items" in the crafting window reads the icon of every item an
--- input accepts (ISCraftInventoryPanel.populate), and throws for one without.
+-- Every recipe of the mod's resolves by its bare name in module Base (research and the magazines
+-- look it up so), and names only items that exist: a missing item makes a recipe impossible
+-- without a word. Expanding "Possible Items" in the crafting window reads the icon of every item
+-- an input accepts (ISCraftInventoryPanel.populate), and throws for one without. A recipe that
+-- fails to load fails the craft, magazine and research tests that name it.
 test("renewable_energy_items_recipes_load", {
     validate = function()
-        for _, name in ipairs(RECIPES) do
+        local names = T.recipeNames()
+        expect(#names > 0, "no RenewableEnergy_ recipe loaded")
+        for _, name in ipairs(names) do
             local recipe = getScriptManager():getCraftRecipe(name)
             if expect(recipe ~= nil, name .. " does not resolve by its bare name") then
                 expect(recipe:getModule():getName() == "Base", name .. " is in module " .. recipe:getModule():getName())
@@ -117,8 +100,6 @@ test("renewable_energy_items_recipes_load", {
                 end
             end
         end
-        local loaded = #T.recipeNames()
-        expect(loaded == #RECIPES, loaded .. " RenewableEnergy_ recipes loaded, expected " .. #RECIPES)
     end,
 })
 
@@ -197,7 +178,7 @@ local function awaitKnown(self, recipes)
         return true
     end
     T.serverUntil(self, "knownRecipes", { prefix = "RenewableEnergy_" }, function(reply) return knowsAll(reply.known) end)
-    T.waitForCopy(function() return knowsAll(knownHere()) end, "this client learning the recipes")
+    T.waitFor(self, function() return knowsAll(knownHere()) end, "this client learning the recipes")
     T.step(function()
         self.known = { server = self.server.knownRecipes.known, client = knownHere() }
     end)
@@ -249,7 +230,7 @@ for magazine, crafts in pairs(MAGAZINES) do
             -- onCreateRecipeMagazine gives every copy a literatureTitle, and a title read within
             -- the literature cooldown teaches nothing (ISReadABook:complete), so the title is
             -- forgotten on both sides first, or a second run in the same world would fail.
-            T.server(self, "forgetLiterature", function() return { title = self.items.magazine[1]:getModData().literatureTitle } end)
+            T.server(self, "forgetLiterature", { type = magazine })
             T.step(function()
                 local item = self.items.magazine[1]
                 p:getReadLiterature():remove(item:getModData().literatureTitle)

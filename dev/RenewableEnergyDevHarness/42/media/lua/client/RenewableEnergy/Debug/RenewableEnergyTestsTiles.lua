@@ -230,7 +230,7 @@ end
 test("renewable_energy_tiles_place_and_pick_up", {
     instant = true,
     run = function(self)
-        local square = T.need(self, (T.squares(self, 1, { bare = true }) or {})[1], "a free outdoor square")
+        local square = T.square(self, { bare = true }, "a free outdoor square")
         if not square then return end
         electrician(self)
         self.results = {}
@@ -307,21 +307,22 @@ end
 -- placed and changed on the authority (panelCracks); what is checked is what this client shows,
 -- the same as the authority's.
 local CRACKED_AT, WHOLE_AT = Specs.crackedBelow - 1, Specs.crackedBelow
+local CRACKS, SNOW = Sprites.cracks, Sprites.snow
 local CRACKED = {
-    { name = "flatCracked", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), shows = "renewable_energy_01_115",
+    { name = "flatCracked", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), shows = CRACKS.flat,
         what = "a flat panel just below the crack" },
     { name = "flatWhole", sprite = Sprites.flat, modules = modulesAt(WHOLE_AT), shows = "", what = "a flat panel at the crack" },
-    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = modulesAt(100, CRACKED_AT), shows = "renewable_energy_01_127",
+    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = modulesAt(100, CRACKED_AT), shows = CRACKS.rack.metal.W[2],
         what = "a metal rack facing west with its upper module cracked" },
     { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = modulesAt(0, CRACKED_AT),
-        shows = "renewable_energy_01_130,renewable_energy_01_131", what = "a wooden rack facing east with both modules cracked" },
+        shows = CRACKS.rack.wood.E[1] .. "," .. CRACKS.rack.wood.E[2], what = "a wooden rack facing east with both modules cracked" },
     -- A wall panel needs a wall to be placed against, so this one is a bare tile.
-    { name = "wall", sprite = Sprites.wall.wood.E, modules = modulesAt(CRACKED_AT), shows = "renewable_energy_01_119",
+    { name = "wall", sprite = Sprites.wall.wood.E, modules = modulesAt(CRACKED_AT), shows = CRACKS.wall.wood.E,
         what = "a cracked wooden wall panel facing east" },
-    { name = "repaired", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), change = { modules = modulesAt(85) }, shows = "",
-        what = "a cracked flat panel repaired to 85" },
-    { name = "snowed", sprite = Sprites.flat, modules = modulesAt(100), change = { modules = modulesAt(30), snow = true },
-        shows = "renewable_energy_01_115,renewable_energy_01_16", what = "a snowed-on flat panel at 30" },
+    { name = "repaired", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), change = { modules = modulesAt(WHOLE_AT) },
+        shows = "", what = "a cracked flat panel repaired to the crack" },
+    { name = "snowed", sprite = Sprites.flat, modules = modulesAt(100), change = { modules = modulesAt(CRACKED_AT), snow = true },
+        shows = CRACKS.flat .. "," .. SNOW.flat, what = "a snowed-on flat panel cracked under the snow" },
 }
 
 test("renewable_energy_tiles_cracked_modules_show", {
@@ -334,9 +335,9 @@ test("renewable_energy_tiles_cracked_modules_show", {
                 if not panel then return end
                 local at = panel.position
                 T.server(self, "panelCracks", { x = at.x, y = at.y, z = at.z, sprite = case.sprite, change = case.change })
-                T.waitForCopy(function()
+                T.waitFor(self, function()
                     return T.overlays(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
-                end)
+                end, "this client's overlays of " .. case.what)
                 T.step(function()
                     self.shown[case.name] = {
                         server = table.concat(self.server.panelCracks.overlays, ","),
@@ -364,7 +365,7 @@ test("renewable_energy_tiles_remove_hook_takes_placed_tile", {
     run = function(self)
         local sprite = PZHarness.Fixtures.WORK_TABLE_SPRITE
         -- Not next to the character, where it would count as the craft tests' work table.
-        local square = T.need(self, (T.squares(self, 1, { bare = true, minDistance = 2 }) or {})[1], "a free outdoor square")
+        local square = T.square(self, { bare = true, minDistance = 2 }, "a free outdoor square")
         if not square then return end
         local settings = PZHarness.testSettings
         local hook, taken = settings.remove, false

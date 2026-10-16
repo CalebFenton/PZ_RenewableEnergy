@@ -1,5 +1,6 @@
--- The authority's half of the biogas tests: the stink, the digesters, and the Global Object System
--- records both digesters and gasifiers are (Helpers.recordAt), which the wood gas tests drive too.
+-- The authority's half of the biogas tests: the stink, the digesters, propane on the floor, and the
+-- Global Object System records both digesters and gasifiers are (Helpers.recordAt), which the wood
+-- gas tests drive too.
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
@@ -47,47 +48,34 @@ handler("stinkRead", function(player, args)
     }
 end)
 
--- The stink score's edges: none below 0.2, then each smell level from the corpse count it starts
--- at, up to the third at 2.
+-- The stink score's edges (Digester.SMELL_SCORES): none just below the first, then each smell
+-- level's corpses from its edge up to just below the next.
 Helpers.check("digesterCorpsesFor", function(expect)
     local corpsesFor = RenewableEnergy.DigesterObject.corpsesFor
-    local levels = RenewableEnergy.Stink.LEVEL_CORPSES
-    local function band(score, lowest, below)
+    local levels, scores = RenewableEnergy.Stink.LEVEL_CORPSES, RenewableEnergy.Digester.SMELL_SCORES
+    local below = 0.001
+    local function band(score, lowest, under)
         local corpses = corpsesFor(score)
-        expect(corpses >= lowest and (not below or corpses < below),
+        expect(corpses >= lowest and (not under or corpses < under),
             "a stink score of " .. score .. " smells like " .. corpses .. " corpses")
     end
-    band(0.19, 0, 1)
-    band(0.2, levels[1], levels[2])
-    band(0.999, levels[1], levels[2])
-    band(1, levels[2], levels[3])
-    band(1.999, levels[2], levels[3])
-    band(2, levels[3])
+    band(scores[1] - below, 0, 1)
+    for i, score in ipairs(scores) do
+        band(score, levels[i], levels[i + 1])
+        if scores[i + 1] then
+            band(scores[i + 1] - below, levels[i], levels[i + 1])
+        end
+    end
 end)
 
 -- Records (digesters and gasifiers) -----------------------------------------------------------------
 
--- Builds the record of kind `args.kind` on the Sprites[kind] tile `args.tile` (a dotted path:
--- "barrel.steel", "standard") at x, y, z, as the build menu does (ISBuildIsoEntity:create): a
--- thumpable on the square, then the entity's OnCreate. Taken away when the test ends, the way the
--- game removes it, found again by its place, since a chunk that unloaded and loaded meanwhile holds
--- a new copy.
+-- Builds the record of kind `args.kind` on the Sprites[kind] tile `args.tile` at x, y, z as the
+-- build menu does (Helpers.placeRecord). Taken away when the test ends, the way the game removes
+-- it, found again by its place, since a chunk that unloaded and loaded meanwhile holds a new copy.
 handler("recordPlace", function(player, args, defer)
-    local kind = Helpers.RECORD_KINDS[args.kind]
-    local square = Helpers.squareAt(args)
-    if not (kind and square) then
-        return nil, "a loaded square for a " .. tostring(args.kind)
-    end
-    local sprite = RenewableEnergy.Sprites[args.kind]
-    for part in string.gmatch(args.tile, "[^.]+") do
-        sprite = sprite and sprite[part]
-    end
-    if type(sprite) ~= "string" then
-        return nil, "the " .. args.kind .. " tile " .. tostring(args.tile)
-    end
-    local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
-    square:AddSpecialObject(thumpable)
-    kind.system().OnCreate({ thumpable = thumpable })
+    local thumpable, missing = Helpers.placeRecord(args.kind, args.tile, Helpers.squareAt(args))
+    if not thumpable then return nil, missing end
     thumpable:transmitCompleteItemToClients()
     defer(function() Helpers.removeObject(select(2, Helpers.recordAt(args)) or thumpable) end)
     return {}
@@ -105,15 +93,20 @@ handler("recordTrack", function(player, args, defer)
     return {}
 end)
 
--- Sets the record's fields `args.fields` (its SAVED_FIELDS) as of now, then shows and sends what
--- changed.
+-- Sets the record's fields `args.fields` (its SAVED_FIELDS) as of now, and each field of
+-- `args.ago` ({ [field] = hours }) to the world hour that many hours before now, then shows and
+-- sends what changed.
 handler("recordSet", function(player, args)
     local record, _, missing = Helpers.recordAt(args)
     if not record then return nil, missing end
-    for key, value in pairs(args.fields) do
+    local now = getGameTime():getWorldAgeHours()
+    for key, value in pairs(args.fields or {}) do
         record[key] = value
     end
-    record.lastHour = getGameTime():getWorldAgeHours()
+    for key, hours in pairs(args.ago or {}) do
+        record[key] = now - hours
+    end
+    record.lastHour = now
     record:afterChange()
     return {}
 end)
@@ -166,6 +159,14 @@ handler("recordRead", function(player, args)
     return Helpers.recordState(args.kind, record, object)
 end)
 
+-- Takes the record's tile away the way the game does, as a sledgehammer or a pickup would.
+handler("recordRemove", function(player, args)
+    local _, object, missing = Helpers.recordAt(args)
+    if not object then return nil, missing end
+    Helpers.removeObject(object)
+    return {}
+end)
+
 -- Digesters -------------------------------------------------------------------------------------
 
 -- Runs the digester at x, y, z for `args.hours` at the air temperature `args.air` (°C), feeding
@@ -176,5 +177,28 @@ handler("digesterRun", function(player, args)
     record:run(args.hours, object:getContainer(), args.air)
     record.lastHour = getGameTime():getWorldAgeHours()
     record:afterChange()
+    return {}
+end)
+
+-- Propane --------------------------------------------------------------------------------------
+
+-- Drops an `args.type` holding `args.uses` (its share of full) on the floor of the square at x, y,
+-- z, as a player dropping it does, for everyone to see. Taken away when the test ends.
+handler("floorItem", function(player, args, defer)
+    local square = Helpers.squareAt(args)
+    local item = square and instanceItem(args.type)
+    if not item then
+        return nil, "a loaded square and an item " .. tostring(args.type)
+    end
+    if args.uses then
+        item:setCurrentUsesFloat(args.uses)
+    end
+    square:AddWorldInventoryItem(item, 0.5, 0.5, 0)
+    defer(function()
+        local world = item:getWorldItem()
+        if world and world:getSquare() then
+            world:getSquare():transmitRemoveItemFromSquare(world)
+        end
+    end)
     return {}
 end)

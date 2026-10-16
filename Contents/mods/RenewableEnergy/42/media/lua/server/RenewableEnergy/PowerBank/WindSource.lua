@@ -1,20 +1,47 @@
 -- How a bank runs a wind charger (the "wind" family of RenewableEnergy.Sources) on the authority:
--- its output in the wind and its blades breaking in a gale. Bank.lua calls init, update and status
--- for each wind charger it holds.
+-- its output in the wind and its blades breaking in a gale. Bank.lua calls connect, update and
+-- status for each wind charger it holds. The one writer of a charger's brake and broken blades,
+-- on the object (Wind.BRAKED, Wind.BROKEN) and on its bank's record alike.
 
 if isClient() then return end
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
+require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
+local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
 
 local WindSource = {}
 RenewableEnergy.WindSource = WindSource
 
 -- A charger losing more than this share of its watts to shelter says so in the status.
 local SHELTERED_LOSS = 0.3
+
+local function setFlag(isoObject, key, on)
+    isoObject:getModData()[key] = on or nil
+    isoObject:transmitModData()
+end
+
+--- Sets the brake of the wind charger `isoObject`, and of `source`, its bank's record, if it feeds
+--- one (else nil).
+function WindSource.setBraked(isoObject, braked, source)
+    setFlag(isoObject, Wind.BRAKED, braked)
+    if source then
+        source.braked = braked
+    end
+end
+
+--- Marks the blades of the wind charger `isoObject` broken or whole, and of `source`, its bank's
+--- record, if it feeds one (else nil).
+function WindSource.setBroken(isoObject, broken, source)
+    setFlag(isoObject, Wind.BROKEN, broken)
+    if source then
+        source.broken = broken
+    end
+end
 
 --- Whether a wind charger left running through `hours` of a wind of `kph` breaks its blades, at
 --- its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage options.
@@ -28,18 +55,23 @@ local function breaks(source, kph, hours)
     return ZombRandFloat(0, 1) < 1 - (1 - math.min(1, perHour)) ^ hours
 end
 
---- A new wind charger's record: its brake and blades as the object has them, and its shelter.
-function WindSource.init(source, isoObject)
+--- A newly connected wind charger's record: its brake and blades as the object has them, and its
+--- shelter. A charger teaches its wiring the first time it is ever connected.
+function WindSource.connect(player, source, isoObject)
     source.braked = Wind.isBraked(isoObject)
     source.broken = Wind.isBroken(isoObject)
     source.shelter = Wind.shelterAt(source.x, source.y, source.z)
+    if not isoObject:getModData()[PowerBank.CONNECTED_ONCE] then
+        setFlag(isoObject, PowerBank.CONNECTED_ONCE, true)
+        addXp(player, Perks.Electricity, Specs.connectXp * Sources.slotsOf(source.kind))
+    end
 end
 
 --- The charger's output over the pass, and why it makes nothing or little: braked, broken, calm,
---- furled or sheltered. Its brake is the object's while it is loaded (the brake command sets
---- both); its broken blades are the record's, which a gale may break while the object is
---- unloaded, and go to the object when it is loaded. Its shelter is counted again then, since the
---- trees and buildings around it change.
+--- furled or sheltered. Its brake is the object's while it is loaded (setBraked sets both); its
+--- broken blades are the record's, which a gale may break while the object is unloaded, and go to
+--- the object when it is loaded. Its shelter is counted again then, since the trees and buildings
+--- around it change.
 function WindSource.update(source, object, inSlot, hours, context)
     if object then
         source.braked = Wind.isBraked(object)
@@ -49,7 +81,7 @@ function WindSource.update(source, object, inSlot, hours, context)
         source.broken = true
     end
     if object and Wind.isBroken(object) ~= (source.broken == true) then
-        Wind.setBroken(object, source.broken)
+        setFlag(object, Wind.BROKEN, source.broken)
     end
     local spec = Specs.wind.turbines[source.kind]
     local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0)
@@ -74,7 +106,7 @@ end
 --- The charger's part of its status entry: its brake, blades and shelter.
 function WindSource.status(entry, source)
     entry.braked, entry.broken = source.braked == true, source.broken == true
-    entry.shelterPct = math.floor(100 * (source.shelter or 0) + 0.5)
+    entry.shelterPct = RenewableEnergy.round(100 * (source.shelter or 0))
 end
 
 return WindSource

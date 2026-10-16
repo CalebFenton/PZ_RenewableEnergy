@@ -35,7 +35,7 @@ Stink.LEVEL_CORPSES = { 6, 15, 25 }
 -- of them the chunk counts now }.
 local sources = {}
 
-local CHUNK_SIZE = 8
+local CHUNK_SIZE = getChunkSizeInSquares()
 
 local function newGhost(source)
     local ghost = IsoDeadBody.new(getCell())

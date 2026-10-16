@@ -4,6 +4,8 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/VehicleBattery"
+require "RenewableEnergy/Gadgets/SolarCellCharger"
+require "RenewableEnergy/Gadgets/SolarGardenLight"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (dev/harness/mod/42/media/lua/client/PZHarness/TestLib.lua explains the runner and the rules
@@ -46,8 +48,6 @@ function T.at(handleOrSquare)
     return { x = square:getX(), y = square:getY(), z = square:getZ() }
 end
 
-local positionOf = T.at
-
 --- A free square as T.squares picks one by `opts`, whose `near` may also be a fixture handle; nil,
 --- and missing `what`, without one.
 function T.square(self, opts, what)
@@ -60,10 +60,13 @@ function T.square(self, opts, what)
     return (T.need(self, T.squares(self, 1, picked), what) or {})[1]
 end
 
---- Queues a wait, as long as a fixture's, until `condition()` holds on this client; `what` says
---- what it waits for if the runner's limit stops it.
-function T.waitForCopy(condition, what)
-    T.waitUntil(condition, COPY_FRAMES, what)
+--- Queues a wait until `condition()` holds on this client, at most `maxFrames` ticks (by default as
+--- long as a fixture waits for the server's copy), then fails the test as missing `what` if it
+--- still doesn't, so a copy that never came can't pass as one that did; the harness's T.waitUntil
+--- just ends.
+function T.waitFor(self, condition, what, maxFrames)
+    T.waitUntil(condition, maxFrames or COPY_FRAMES, what)
+    T.step(function() T.need(self, condition(), what) end)
 end
 
 -- Fixtures -------------------------------------------------------------------------------------
@@ -90,14 +93,14 @@ function T.bank(self, kind, items, opts)
     if not square then
         return nil
     end
-    local bank = { square = square, position = positionOf(square) }
+    local bank = { square = square, position = T.at(square) }
     local count = #(items or {})
     T.server(self, "placeBank", { x = square:getX(), y = square:getY(), z = square:getZ(), kind = kind, items = items,
         charge = opts.charge })
-    T.waitForCopy(function() return bankCopy(square, count) ~= nil end, "this client's copy of the bank")
-    T.step(function()
-        bank.object = T.need(self, bankCopy(square, count), "this client's copy of the bank, with its parts and summary")
-    end)
+    T.waitFor(self, function()
+        bank.object = bankCopy(square, count)
+        return bank.object ~= nil
+    end, "this client's copy of the bank, with its parts and summary")
     return bank
 end
 
@@ -127,17 +130,17 @@ function T.panel(self, sprite, opts)
     if not square then
         return nil
     end
-    local panel = { square = square, position = positionOf(square) }
+    local panel = { square = square, position = T.at(square) }
     local bank = opts.connect and opts.near
     T.server(self, "placePanel", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = sprite,
         modules = opts.modules, bank = bank and bank.position, wired = opts.wired })
     T.step(function()
         panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason
     end)
-    T.waitForCopy(function() return panelArrived(panel, bank) end, "this client's copy of the panel")
-    T.step(function()
-        panel.object = T.need(self, panelArrived(panel, bank) and placedOn(square), "this client's copy of the panel")
-    end)
+    T.waitFor(self, function()
+        panel.object = panelArrived(panel, bank) and placedOn(square) or nil
+        return panel.object ~= nil
+    end, "this client's copy of the panel")
     return panel
 end
 
@@ -162,11 +165,10 @@ function T.generator(self, opts)
     T.step(function()
         T.defer(self, function() RenewableEnergy.Debug.releaseGeneratorPower(handle.x, handle.y, handle.z) end)
     end)
-    T.waitForCopy(function()
+    T.waitFor(self, function()
         handle.object = square:getGenerator()
         return handle.object ~= nil
     end, "this client's copy of the generator")
-    T.step(function() T.need(self, handle.object, "this client's copy of the generator") end)
     return handle
 end
 
@@ -219,11 +221,11 @@ function T.placeVehicle(self, script, opts)
         T.server(self, "vehicleBattery", function()
             return { vehicle = T.vehicleArgs(vehicle), type = opts.battery, uses = opts.charge }
         end)
-        T.waitForCopy(function()
+        T.waitFor(self, function()
             local item = T.vehicleBattery(vehicle)
             return item ~= nil and (not opts.battery or item:getFullType() == opts.battery)
                 and (not opts.charge or math.abs(item:getCurrentUsesFloat() - opts.charge) < 0.001)
-        end)
+        end, "this client's copy of the vehicle's new battery")
     end
     return vehicle
 end
@@ -290,7 +292,7 @@ function T.watch(self, bank)
         PowerBank.watchStatus(p, bank.object)
         T.defer(self, function() PowerBank.unwatchStatus(p, bank.object) end)
     end)
-    T.waitUntil(function() return T.clientStatus(bank) ~= nil end, COPY_FRAMES)
+    T.waitFor(self, function() return T.clientStatus(bank) ~= nil end, "this client's copy of the bank's status")
 end
 
 --- The server's entry for the first `fullType` in a bank state's items, or nil.
@@ -307,27 +309,24 @@ function T.copyItem(bank, fullType)
     return bank.object:getContainer():getFirstType(fullType)
 end
 
---- Queues the bank system's command `command` with `args` (a table, or a function the queue calls
---- for one) on the authority as the server's character, the way a timed action's complete() runs
---- it: the server takes no such command from a client. Its answer, { ok, reason, xpBefore,
---- xpAfter }, lands in self.server.perform.
-function T.perform(self, command, args)
-    if type(args) == "function" then
-        T.server(self, "perform", function() return { command = command, args = args() } end)
-    else
-        -- A table goes out ahead of its turn where it can (T.server).
-        T.server(self, "perform", { command = command, args = args })
-    end
+--- Queues the bank system's command `command` with `args` on the authority as the server's
+--- character, the way a timed action's complete() runs it: the server takes no such command from a
+--- client. With `item` ({ type = full type, inBank = true for the first in the bank `args.bank`,
+--- else the first the character carries }), the server puts that item's id in args.itemId when the
+--- call runs, so the call needs no earlier answer and can go out in a T.batch. Its answer, { ok,
+--- reason, xpBefore, xpAfter }, lands in self.server.perform.
+function T.perform(self, command, args, item)
+    T.server(self, "perform", { command = command, args = args, item = item })
 end
 
 --- Queues switching `bank` on with the bank system's command, and a wait until this client's copy
 --- of its summary says it is on, whatever the bank then does.
 function T.switchOn(self, bank)
     T.perform(self, "setBankOn", { bank = bank.position, on = true })
-    T.waitUntil(function()
+    T.waitFor(self, function()
         local summary = T.clientSummary(bank)
         return summary ~= nil and summary.on == true
-    end, COPY_FRAMES)
+    end, "this client's copy of the bank's summary, switched on")
 end
 
 --- The overlays `object` shows, as their sprite names joined by commas, in order; a server's
@@ -356,9 +355,9 @@ end
 T.PLACED_TILES = {
     { sprite = Sprites.flat, item = "RenewableEnergy.SolarFlat", kind = "flat" },
     { sprite = Sprites.failsafe, item = "RenewableEnergy.SolarFailsafe", kind = "failsafe" },
-    { sprite = Sprites.cellCharger, item = "RenewableEnergy.SolarCellCharger", kind = "cellCharger", container = true },
-    { sprite = Sprites.gardenLight.off, item = "RenewableEnergy.SolarGardenLight", kind = "gardenLight" },
-    { sprite = Sprites.gardenLight.lit, item = "RenewableEnergy.SolarGardenLight", kind = "gardenLight" },
+    { sprite = Sprites.cellCharger, item = RenewableEnergy.SolarCellCharger.ITEM, kind = "cellCharger", container = true },
+    { sprite = Sprites.gardenLight.off, item = RenewableEnergy.SolarGardenLight.ITEM, kind = "gardenLight" },
+    { sprite = Sprites.gardenLight.lit, item = RenewableEnergy.SolarGardenLight.ITEM, kind = "gardenLight" },
 }
 for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
     for _, mount in ipairs({ "wall", "rack" }) do

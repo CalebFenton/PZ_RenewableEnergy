@@ -119,7 +119,7 @@ function GasifierObject:burn(kg)
         self.fireKg = self.fireKg - now
         burned = burned + now
         local charcoal = self.fireCharcoal
-        self.ash = math.min(100, self.ash + now * spec.ashPerKg * (charcoal and Gasifier.CHARCOAL_ASH or 1))
+        self.ash = math.min(Gasifier.ASH_FULL, self.ash + now * spec.ashPerKg * (charcoal and Gasifier.CHARCOAL_ASH or 1))
         -- An undrained filter tars its packing faster.
         local tarFactor = self.condensate >= Gasifier.CONDENSATE_MAX and Gasifier.CONDENSATE_TAR or 1
         self.tarKg = self.tarKg + now * (charcoal and Gasifier.CHARCOAL_TAR or 1) * tarFactor
@@ -139,7 +139,7 @@ end
 
 --- Lights the fire, stoking it first if the firebox is empty. Returns whether there was fuel.
 function GasifierObject:light(isoObject)
-    if self.fireKg <= 0 and not self:stoke(Gasifier.hopperOf(isoObject)) then
+    if self.fireKg <= EPSILON and not self:stoke(Gasifier.hopperOf(isoObject)) then
         return false
     end
     self.lit = true

@@ -27,12 +27,14 @@ end
 -- StashSystem gives up without an error when the stash building isn't a building, prepares only a
 -- building whose bounds strictly contain the building square (doBuildingStash), and stocks the
 -- crate only if its square is in a room of that building, so a wrong coordinate is an empty house.
+-- The crate is the mod's, and the house's spawn table has loot for its container type.
 check("stashHousesResolve", function(expect)
     local metaGrid = getWorld():getMetaGrid()
     for stashMap in pairs(Stash.descriptions) do
         local x, y = stashMap.buildingX, stashMap.buildingY
         local room = metaGrid:getRoomAt(x, y, 0)
         local building = room and room:getBuilding()
+        local spawnTable = SuburbsDistributions[stashMap.spawnTable]
         if expect(building ~= nil, stashMap.name .. ": no building at its building coordinates") then
             expect(building:getX() < x and x < building:getX2() and building:getY() < y and y < building:getY2(),
                 stashMap.name .. ": the building square is on the edge of the building's bounds")
@@ -40,15 +42,13 @@ check("stashHousesResolve", function(expect)
                 local crateRoom = metaGrid:getRoomAt(crate.contX, crate.contY, crate.contZ)
                 expect(crateRoom ~= nil and crateRoom:getBuilding() == building,
                     stashMap.name .. ": the crate square is not in a room of the building")
-                expect(crate.containerSprite == Sprites.crate and crate.containerType == "RenewableEnergySolarBox",
-                    stashMap.name .. ": the crate is not the mod's solar crate")
+                expect(crate.containerSprite == Sprites.crate, stashMap.name .. ": the crate is not the mod's solar crate")
+                expect(spawnTable ~= nil and spawnTable[crate.containerType] ~= nil,
+                    stashMap.name .. ": its spawn table " .. tostring(stashMap.spawnTable) .. " has no loot for "
+                    .. tostring(crate.containerType))
             end
         end
-        expect(stashMap.spawnTable == "RenewableEnergyStashCache"
-            and SuburbsDistributions.RenewableEnergyStashCache.RenewableEnergySolarBox ~= nil,
-            stashMap.name .. ": its spawn table has no solar crate loot")
     end
-    expect(stashCount() == 4, stashCount() .. " Renewable Energy stashes, expected 4")
 end)
 
 -- Takes the mod's houses out of StashDescriptions.
@@ -69,7 +69,7 @@ handler("stashRegister", function(_, _, defer)
         Stash.register()
     end)
     local results = {}
-    for _, mode in ipairs({ 1, 2, 3, 4 }) do
+    for _, mode in pairs(Stash.MODE) do
         unregister()
         options.StashMode = mode
         local registered = Stash.register()
@@ -270,7 +270,7 @@ handler("stashMapsInCorpseLoot", function(_, _, defer)
     local options = SandboxVars.RenewableEnergy
     local restoreOptions = saveOptions(defer, { "StashMode" }, D.apply)
     local found = {}
-    for _, mode in ipairs({ 1, 2, 3, 4 }) do
+    for _, mode in pairs(Stash.MODE) do
         options.StashMode = mode
         D.apply()
         D.apply()

@@ -6,7 +6,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
 local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
-local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
+local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 local CAR_BATTERY = "Base.CarBattery1"
 local INVERTER = "RenewableEnergy.PlugInInverter"
@@ -69,12 +69,12 @@ test("renewable_energy_treadmill_wired_to_bank", {
             local restore = PZHarness.Fixtures.setPerk(T.player(), Perks.Electricity, wiring.skill - 1)
             self.unskilled = Treadmill.wiringRefusal(T.player(), treadmill.object)
             restore()
-            self.looseKind = Sources.kindOf(treadmill.object)
+            self.looseWired = Treadmill.isWiredTile(treadmill.object)
         end)
         T.doJob(self, treadmill.square, function()
             return RenewableEnergyAction:new(T.player(), RenewableEnergyAction.WIRE_TREADMILL, treadmill.object)
         end)
-        T.waitForCopy(function() return Sources.kindOf(treadmill.object) == "treadmill" end,
+        T.waitFor(self, function() return Treadmill.isWiredTile(treadmill.object) end,
             "this client's copy of the wired treadmill")
         T.batch(function()
             T.server(self, "carried", { types = { PowerBank.WIRE, PowerBank.SCRAP } })
@@ -85,9 +85,8 @@ test("renewable_energy_treadmill_wired_to_bank", {
         end)
     end,
     validate = function(self)
-        expect(self.looseKind == nil, "an unwired treadmill is already a source")
+        expect(not self.looseWired, "an unwired treadmill is already wired")
         expect(self.unskilled == "skill", "below the Electricity level the wiring is refused for " .. tostring(self.unskilled))
-        expect(Sources.kindOf(self.treadmill.object) == "treadmill", "the treadmill wasn't wired")
         expect(carriedCount(self, PowerBank.WIRE) == 0 and carriedCount(self, PowerBank.SCRAP) == 0,
             "wiring left " .. carriedCount(self, PowerBank.WIRE) .. " wire and " .. carriedCount(self, PowerBank.SCRAP) .. " scrap")
         expect(self.connected.ok == true, "the bank refused the wired treadmill: " .. tostring(self.connected.reason))
@@ -128,6 +127,25 @@ test("renewable_energy_treadmill_menu", {
     end,
 })
 
+-- In the dark, Wire to Bank on a treadmill is greyed out saying it's too dark, not with the list
+-- of what it takes, which the character can't fix by carrying more. Catches the light check
+-- missing from the treadmill's menu, as the other wiring menus have it.
+test("renewable_energy_treadmill_wiring_refused_in_the_dark", {
+    run = function(self)
+        self.treadmill = T.panel(self, Sprites.treadmill.E.rear)
+        if self.treadmill then T.makeDark(self) end
+    end,
+    validate = function(self)
+        if not expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands") then return end
+        local menu, context = T.worldSubmenu(self.treadmill.object, getText("IGUI_RenewableEnergy_Treadmill"))
+        local option = menu and menu:getOptionFromName(getText("ContextMenu_RenewableEnergy_WireTreadmill"))
+        local reason = option and option.toolTip and option.toolTip.description
+        expect(option ~= nil and option.notAvailable and reason == getText("Tooltip_RenewableEnergy_TooDark"),
+            "Wire to Bank in the dark isn't greyed out saying it's too dark (" .. tostring(reason) .. ")")
+        if context then context:hideAndChildren() end
+    end,
+})
+
 -- A run on a treadmill wired to a bank banks its watt-hours, paid out over the passes after it at
 -- no more than a runner's watts, and costs the runner endurance and water and trains Fitness.
 test("renewable_energy_treadmill_run_feeds_bank", {
@@ -143,7 +161,7 @@ test("renewable_energy_treadmill_run_feeds_bank", {
             T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
             T.server(self, "setCharacterStatUntilEnd", { stat = "THIRST", value = 0 })
         end)
-        T.waitForCopy(function() return T.player():getStats():get(CharacterStat.ENDURANCE) > 0.99 end,
+        T.waitFor(self, function() return T.player():getStats():get(CharacterStat.ENDURANCE) > 0.99 end,
             "this client's copy of the rested runner")
         T.batch(function()
             T.server(self, "perkXp", { perk = "Fitness" })
@@ -181,5 +199,43 @@ test("renewable_energy_treadmill_run_feeds_bank", {
         expect(self.server.perkXp.value > self.xpBefore, "the run taught no Fitness")
         local label = RenewableEnergy.StatusWindow.sourceLabel(after, after)
         expect(label:find(getText("IGUI_RenewableEnergy_Treadmill"), 1, true) == 1, "the window calls the treadmill " .. label)
+    end,
+})
+
+-- A run on a wired treadmill whose bank was disconnected banks nothing, so it costs the runner
+-- nothing and trains nothing: the menu and the action say why, and the authority settling a whole
+-- run, as a server finishes a client's action, changes nothing. Connected again, the same run
+-- settles, which shows the runner stood close enough for it to. Catches a run that pays its XP
+-- and sweat whether or not a bank took its watt-hours.
+test("renewable_energy_treadmill_unconnected_run_gives_nothing", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local treadmill = bank and T.panel(self, Sprites.treadmill.N.console, { near = bank, connect = true, wired = true })
+        if not treadmill then return end
+        self.treadmill = treadmill
+        local args = { bank = bank.position, source = treadmill.position }
+        T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
+        T.goNextTo(self, treadmill.square)
+        T.perform(self, "disconnectSource", args)
+        T.waitFor(self, function() return PowerBank.connectedBank(treadmill.object) == nil end,
+            "this client's copy of the disconnected treadmill")
+        T.step(function() self.refusal = Treadmill.runRefusal(treadmill.object) end)
+        T.batch(function()
+            T.server(self, "completeTreadmillRun", T.at(treadmill))
+            T.step(function() self.unconnected = self.server.completeTreadmillRun end)
+            T.perform(self, "connectSource", args)
+            T.server(self, "completeTreadmillRun", T.at(treadmill))
+            T.step(function() self.connected = self.server.completeTreadmillRun end)
+        end)
+    end,
+    validate = function(self)
+        expect(self.refusal == "Tooltip_RenewableEnergy_TreadmillNotConnected",
+            "a run on a disconnected treadmill isn't refused for want of a bank: " .. tostring(self.refusal))
+        local idle, ran = self.unconnected, self.connected
+        expect(not idle.done, "the authority settled a run on a treadmill that feeds no bank")
+        T.expectNear("Fitness XP from a run on a disconnected treadmill", idle.xpAfter - idle.xpBefore, 0, 0)
+        T.expectNear("endurance a run on a disconnected treadmill cost", idle.enduranceBefore - idle.enduranceAfter, 0, 0)
+        expect(ran.done and ran.xpAfter > ran.xpBefore, "connected again, the authority's run settled nothing")
     end,
 })

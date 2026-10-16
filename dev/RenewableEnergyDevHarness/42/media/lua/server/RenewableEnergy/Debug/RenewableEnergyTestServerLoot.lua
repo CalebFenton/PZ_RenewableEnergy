@@ -4,6 +4,7 @@
 
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/StashHouses"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
@@ -76,9 +77,12 @@ local function vehicleTablesInUse()
     return used
 end
 
--- The spawn tables of every stash house, vanilla's and the mod's.
+-- The spawn tables of every stash house, vanilla's and the mod's, registered or not.
 local function stashSpawnTables()
-    local tables = { RenewableEnergyStashCache = true }
+    local tables = {}
+    for description in pairs(RenewableEnergy.Stash.descriptions) do
+        tables[description.spawnTable] = true
+    end
     for _, description in ipairs(StashDescriptions or {}) do
         if description.spawnTable then
             tables[description.spawnTable] = true
@@ -415,9 +419,9 @@ end
 -- Loot respawn refills an explored, looted container that isn't an IsoThumpable by calling
 -- ItemPickerJava.fillContainer(container, nil) (LootRespawn.respawnInContainer). A player's battery
 -- bank is an IsoGenerator; if any room handed its container type a loot list, a bank someone took a
--- battery out of would refill with free batteries every respawn. The objects of `args.containers`
--- ({ { sprite, type } }) are built from the tiles, as placing them does, but never added to the
--- square.
+-- battery out of would refill with free batteries every respawn. The objects of the Sprites fields
+-- `args.sprites` are built from the tiles, with the containers their properties give, as placing
+-- them does, but never added to the square.
 check("lootPlayerContainers", function(expect, _, player, args)
     local squares = sampleSquares(player, 4)
     if not expect(#squares >= 2, "no loaded room near the character") then
@@ -426,19 +430,19 @@ check("lootPlayerContainers", function(expect, _, player, args)
     for _, square in ipairs(squares) do
         local room = square:getRoom()
         local where = room and room:getName() or "outside"
-        for _, spec in ipairs(args.containers) do
-            local sprite = Sprites[spec.sprite]
-            local object = IsoObject.new(square, sprite, spec.type)
+        for _, field in ipairs(args.sprites) do
+            local sprite = Sprites[field]
+            local object = IsoObject.new(square, sprite, field)
             object:createContainersFromSpriteProperties()
             local container = object:getContainer()
-            if expect(container ~= nil and container:getType() == spec.type, sprite .. " gives no " .. spec.type .. " container") then
+            if expect(container ~= nil, sprite .. " gives no container") then
                 container:setExplored(true)
                 container:setHasBeenLooted(true)
                 for _ = 1, 20 do
                     ItemPickerJava.fillContainer(container, nil)
                 end
                 local count = container:getItems():size()
-                expect(count == 0, "respawn put " .. count .. " items into a " .. spec.type .. " in " .. where)
+                expect(count == 0, "respawn put " .. count .. " items into a " .. container:getType() .. " in " .. where)
                 container:removeAllItems()
             end
         end

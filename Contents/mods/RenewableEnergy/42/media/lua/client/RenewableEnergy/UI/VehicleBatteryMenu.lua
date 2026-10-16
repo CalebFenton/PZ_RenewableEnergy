@@ -6,16 +6,12 @@
 require "Vehicles/ISUI/ISVehicleMechanics"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
-RenewableEnergy = RenewableEnergy or {}
-local VehicleBatteryMenu = {}
-RenewableEnergy.VehicleBatteryMenu = VehicleBatteryMenu
-
 local VehicleBattery = RenewableEnergy.VehicleBattery
 
---- Adds the deep cycle battery to the Install submenu that `mechanics:doPartContextMenu` built
---- for `part` in `mechanics.context`. Vanilla builds no submenu when the slot is full or can't
---- be worked on now, and then there is nothing to add to.
-function VehicleBatteryMenu.addInstallOptions(mechanics, part)
+-- Adds the deep cycle battery to the Install submenu that `mechanics:doPartContextMenu` built
+-- for `part` in `mechanics.context`. Vanilla builds no submenu when the slot is full or can't
+-- be worked on now, and then there is nothing to add to.
+local function addInstallOptions(mechanics, part)
     if not (VehicleBattery.isBatteryPart(part) and not part:getInventoryItem() and mechanics.context) then
         return
     end
@@ -52,8 +48,6 @@ function ISVehicleMechanics:doPartContextMenu(part, x, y)
     -- Vanilla returns before building a menu while the game is paused or the character sits in
     -- the vehicle; self.context is then the last menu, closed.
     if self.context and self.context:getIsVisible() then
-        VehicleBatteryMenu.addInstallOptions(self, part)
+        addInstallOptions(self, part)
     end
 end
-
-return VehicleBatteryMenu

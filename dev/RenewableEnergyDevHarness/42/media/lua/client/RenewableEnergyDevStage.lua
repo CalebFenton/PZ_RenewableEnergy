@@ -181,6 +181,14 @@ function Stage.iconTexture(fullType)
     return icon and getTexture("Item_" .. icon) or instanceItem(fullType):getTex()
 end
 
+--- A tile of `spriteName` placed on `square` as the tests place one (PZHarness.Fixtures.newTile),
+--- with `modData`, its neighbours recalculated so it draws at once. Returns it.
+function Stage.placeTile(square, spriteName, modData)
+    local object = PZHarness.Fixtures.newTile(square, spriteName, modData)
+    square:RecalcAllWithNeighbours(true)
+    return object
+end
+
 --- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer
 --- behind it, both repaired, the trailer's lamps switched off: { car, trailer, facing }. A vehicle
 --- joins the cell's list, and gets its physics, only on a later update, so wait with
@@ -216,7 +224,7 @@ function Stage.hitchTrailer(pair, player, mark)
         lid:getDoor():setOpen(true)
     end
     if container then
-        container:AddItem("RenewableEnergy.DeepCycleBattery")
+        container:AddItem(RenewableEnergy.ArrowBoard.STOCK.battery)
     end
     print(string.format("%s trailer towedBy=%s lid=%s container=%s items=%d", mark,
         tostring(trailer:getVehicleTowedBy() == car), tostring(lid ~= nil), tostring(container ~= nil),
@@ -259,6 +267,18 @@ function Stage.vehiclesAtRest(pair, hitch)
     end
 end
 
+--- Switches the trailer on and sets its lamps as the clock's pass sets them, dimmed for the night
+--- if `night`, after putting a battery charged to `charge` in its box if `charge` is given.
+function Stage.lightLamps(trailer, charge, night)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    if charge then
+        local container = trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
+        RenewableEnergy.Battery.setCharge(container:AddItem(ArrowBoard.STOCK.battery), charge)
+    end
+    ArrowBoard.setSwitch(trailer, true)
+    ArrowBoard.runLamps(trailer, 0, night)
+end
+
 -- Trailers whose lamps Stage.holdLampsLit holds lit, by vehicle.
 local heldLit
 
@@ -266,11 +286,7 @@ local heldLit
 --- their flashes, for a shot that can't time its frame to a flash. The holding runs after
 --- ArrowBoard's flashing in each tick, since it is added later, once a shot first asks for it.
 function Stage.holdLampsLit(trailer)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
-    local container = trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
-    RenewableEnergy.Battery.setCharge(container:AddItem("RenewableEnergy.DeepCycleBattery"), 1)
-    ArrowBoard.setSwitch(trailer, true)
-    ArrowBoard.runLamps(trailer, 0, false)
+    Stage.lightLamps(trailer, 1, false)
     if not heldLit then
         heldLit = {}
         Events.OnTick.Add(function()

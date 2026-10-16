@@ -12,10 +12,10 @@ local Specs = RenewableEnergy.Specs
 local Sprites = {}
 RenewableEnergy.Sprites = Sprites
 
-Sprites.TILESET = "renewable_energy_01"
+local TILESET = "renewable_energy_01"
 
 local function tile(index)
-    return Sprites.TILESET .. "_" .. index
+    return TILESET .. "_" .. index
 end
 
 -- `count` tiles numbered from `first`, in order.
@@ -258,8 +258,6 @@ function Sprites.nameOf(isoObject)
     return sprite and sprite:getName()
 end
 
---- Whether a sprite is a crack overlay of Sprites.cracks.
-Sprites.isCrack = Sprites.matcher(Sprites.cracks)
 --- Whether a sprite is a snow overlay of Sprites.snow.
 Sprites.isSnow = Sprites.matcher(Sprites.snow)
 --- Whether a sprite is one of the overlays above, which are never placed on their own.
@@ -294,17 +292,36 @@ end
 -- loader of the same sprites needs a priority of its own, as RenewableEnergy.PlaceTracker's has.
 Sprites.LOAD_PRIORITY = 6
 
--- A mount's crack overlays by module slot.
-local function crackSlots(kind, facing, material)
-    if kind == "flat" then
-        return { Sprites.cracks.flat }
+-- What a mount's tile shows of `byKind` (Sprites.snow or Sprites.cracks): the kind's own entry, or
+-- for a kind that has one per material and facing, that one; nil for none.
+local function ofMount(byKind, kind, facing, material)
+    local entry = byKind[kind]
+    if type(entry) == "table" then
+        entry = entry[material]
+        return entry and entry[facing]
     end
-    local mount = Sprites.cracks[kind] and Sprites.cracks[kind][material]
-    local slots = mount and mount[facing]
+    return entry
+end
+
+local NO_SLOTS = {}
+
+-- A mount's crack overlays by module slot. Shared: don't change it.
+local function crackSlots(kind, facing, material)
+    local slots = ofMount(Sprites.cracks, kind, facing, material)
     if type(slots) == "string" then
         return { slots }
     end
-    return slots or {}
+    return slots or NO_SLOTS
+end
+
+--- The snow overlay a mount's tile shows under snow (Sprites.snow), or nil for a mount that holds
+--- none.
+---@param kind string "flat", "wall" or "rack" (see kindOf)
+---@param facing string? the mount's facing, for walls and racks
+---@param material string? "wood" or "metal", for walls and racks
+---@return string?
+function Sprites.snowOverlay(kind, facing, material)
+    return ofMount(Sprites.snow, kind, facing, material)
 end
 
 --- The crack overlays a mount's tile shows: one for each module below Specs.crackedBelow, by slot.
@@ -334,10 +351,8 @@ function Sprites.meterLevel(chargeFraction)
     return #METER_LIMITS + 1
 end
 
---- The look a battery's overlay draws it with: "car", "deepCycle" or "l16" (Sprites.bankFill).
----@param fullType string the battery's item type
----@return string
-function Sprites.batteryLook(fullType)
+-- The look a battery's overlay draws it with: "car", "deepCycle" or "l16" (Sprites.bankFill).
+local function batteryLook(fullType)
     return BATTERY_LOOKS[fullType] or "car"
 end
 
@@ -355,7 +370,7 @@ function Sprites.bankOverlays(bankSpriteField, batteryTypes, chargeFraction)
     end
     local shown = {}
     for slot = 1, math.min(#batteryTypes, #fill.batteries.car) do
-        shown[slot] = fill.batteries[Sprites.batteryLook(batteryTypes[slot])][slot]
+        shown[slot] = fill.batteries[batteryLook(batteryTypes[slot])][slot]
     end
     table.insert(shown, fill.meter[Sprites.meterLevel(chargeFraction)])
     return shown
