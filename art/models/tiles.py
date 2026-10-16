@@ -124,6 +124,17 @@ for holder, first in (("bags", 232), ("tarp", 236)):
     TILES[first + 3] = _overlay(items.barrel_digester, (0, 0, 0), holder=holder, torn=True)
 for level in range(1, 5):
     TILES[239 + level] = _overlay(items.insulated_digester, (0, 0, 0), level=level)
+# The scrubber fitted to each digester, drawn over its tile.
+TILES[247] = _overlay(items.barrel_digester, (0, 0, 0), scrubber=True)
+TILES[248] = _overlay(items.insulated_digester, (0, 0, 0), scrubber=True)
+TILES[249] = _overlay(items.dome_digester, (0, 0, 0), scrubber=True)
+
+# The gas heater, off and lit, one facing.
+TILES[244] = [layer(items.gas_heater)]
+TILES[245] = [layer(items.gas_heater, lit=True)]
+# The gas kit fitted to a generator: an overlay on the game's own generator tiles, so it has no
+# base of the mod's to hold out and keeps to the front corner, which the generator leaves clear.
+TILES[246] = [layer(items.generator_gas_kit)]
 
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
 # working, its holder full.

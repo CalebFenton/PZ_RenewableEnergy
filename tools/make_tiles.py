@@ -5,9 +5,10 @@ tileGeometry.txt.
 
 Tile numbers match art/models/tiles.py, which renders them, and
 media/lua/shared/RenewableEnergy/Sprites.lua, which names them for Lua. Overlay tiles (snow, cracked
-glass, batteries, the charge meter, the crate's contents and lid, the digesters' gas holders) are
-only ever attached to another tile, so they have no properties. Property names and values follow the
-vanilla tile definitions (newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:
+glass, batteries, the charge meter, the crate's contents and lid, the digesters' gas holders and
+scrubbers, the generator's gas kit) are only ever attached to another tile, so they have no
+properties. Property names and values follow the vanilla tile definitions
+(newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:
 
 - CustomItem: the item that picking the tile up gives, instead of a generic Moveables item.
 - Facing and N/S/E/Woffset: the placing cursor's rotation, the offsets pointing from one facing's
@@ -34,7 +35,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 31
+COLUMNS, ROWS = 8, 32
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -77,6 +78,13 @@ def garden_light():
     return moveable("SolarGardenLight", tool=None, CustomName="Solar Garden Light", Material="Electric")
 
 
+def gas_heater():
+    # Off and lit both give the heater back. Its gas line comes off with a wrench, which, like the
+    # game's sinks and toilets, asks no skill level.
+    return moveable("GasHeater", tool=None, PickUpTool="Wrench", PlaceTool="Wrench", CustomName="Gas Heater",
+                    Material="MetalPlates", BlocksPlacement="", solidtrans="", IsLow="")
+
+
 def digester(name, capacity, material, material2, **props):
     """A biogas digester. It is built where it stands and scrapped there, never carried, so it gives
     no item and is too heavy to pick up. Scrap materials are the game's own."""
@@ -108,6 +116,8 @@ TILES = {
     229: digester("Barrel Digester", 30, "Plastic", "Rubber", GroupName="Plastic"),
     230: digester("Insulated Digester", 50, "Wood", "Nails"),
     231: digester("Brick Dome Digester", 100, "Brick", "Stone", IsLow=""),
+    244: gas_heater(),
+    245: gas_heater(),
 }
 for material, first_wall, first_rack in (("Metal", 1, 3), ("Wood", 21, 24)):
     for offset, facing in enumerate("SE"):

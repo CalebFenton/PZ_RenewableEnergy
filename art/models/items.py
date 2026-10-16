@@ -62,6 +62,7 @@ def M(name):
         "ink": lambda: material("RE_Ink", "#1b1b1b", roughness=0.6, grime=0.0),
         "magazine1": lambda: material("RE_Mag1", "#e7a42c", roughness=0.4, grime=0.05),
         "magazine2": lambda: material("RE_Mag2", "#2f6f8f", roughness=0.4, grime=0.05),
+        "magazine3": lambda: material("RE_Mag3", "#4f7d32", roughness=0.4, grime=0.05),
         "sky": lambda: material("RE_Sky", "#8fc4e8", roughness=0.4, grime=0.05),
         "sun": lambda: material("RE_Sun", "#ffd640", roughness=0.4, grime=0.0),
         # Pine boards and 2 x 4s, two shades so neighbouring boards read apart.
@@ -113,8 +114,12 @@ def M(name):
         "mortar": lambda: material("RE_Mortar", "#b0aa9c", roughness=0.95, grime=0.2, scale=30),
         "concrete": lambda: material("RE_Concrete", "#a9a69d", roughness=0.9, grime=0.3, scale=20),
         "sludge": lambda: material("RE_Sludge", "#4f4330", roughness=0.5, grime=0.2, scale=20),
-        "ash": lambda: material("RE_Ash", "#b4b1aa", roughness=1.0, grime=0.2, scale=40, speckle=("#86837d", 0.4)),
+        "ash": lambda: material("RE_Ash", "#a3a09a", roughness=1.0, grime=0.3, scale=6, speckle=("#75726c", 0.5)),
         "charcoal": lambda: material("RE_Charcoal", "#36312d", roughness=0.8, grime=0.1),
+        "brass": lambda: material("RE_Brass", "#c8a24c", roughness=0.35, metallic=0.85, grime=0.15),
+        # A gas flame: yellow-orange where it licks the steel, blue at the burner.
+        "flame": lambda: material("RE_Flame", "#ff9a3c", roughness=0.3, grime=0.0, emission="#ff8a2a"),
+        "flameblue": lambda: material("RE_FlameBlue", "#5a8cff", roughness=0.3, grime=0.0, emission="#4a7dff"),
     }[name]()
 
 
@@ -826,30 +831,44 @@ def solar_maintainer(col):
 MAGAZINE = (0.21, 0.275, 0.004)
 
 
+# Each issue's cover colour, whether its title is printed dark, and the line under its picture.
+MAGAZINE_ISSUES = {1: ("magazine1", True, "SUN & BATTERIES"), 2: ("magazine2", False, "INVERTERS & CONTROL"),
+                   3: ("magazine3", False, "BIOGAS FROM MANURE")}
+
+
 def magazine(col, issue):
     """Homestead Power, a fictional 1990s homesteading magazine: issue 1 on sun and batteries,
-    issue 2 on inverters and control."""
+    issue 2 on inverters and control, issue 3 on biogas from the farm's manure."""
     width, depth, height = MAGAZINE
-    cover = "magazine1" if issue == 1 else "magazine2"
+    cover, dark_title, line = MAGAZINE_ISSUES[issue]
+    title = M("ink" if dark_title else "white")
     box(col, "Mag%d_Pages" % issue, M("white"), (width - 0.004, depth - 0.004, height - 0.001))
     box(col, "Mag%d_Cover" % issue, M(cover), (width, depth, 0.001), at=(0, 0, height - 0.001))
     top = height + 0.0003
     flat = (0, 0, 0)
-    text(col, "Mag%d_Title" % issue, M("white" if issue == 2 else "ink"), "HOMESTEAD", 0.03, at=(0, 0.09, top), rotate=flat)
-    text(col, "Mag%d_Title2" % issue, M("white" if issue == 2 else "ink"), "POWER", 0.036, at=(0, 0.052, top), rotate=flat)
+    text(col, "Mag%d_Title" % issue, title, "HOMESTEAD", 0.03, at=(0, 0.09, top), rotate=flat)
+    text(col, "Mag%d_Title2" % issue, title, "POWER", 0.036, at=(0, 0.052, top), rotate=flat)
     text(col, "Mag%d_Issue" % issue, M("red"), "#%d" % issue, 0.03, at=(0.075, 0.105, top), rotate=flat)
     box(col, "Mag%d_Picture" % issue, M("sky"), (0.17, 0.13, 0.0004), at=(0, -0.04, height))
     if issue == 1:
         cylinder(col, "Mag1_Sun", M("sun"), 0.025, 0.0006, at=(-0.045, -0.0, height + 0.0002), segments=16)
         box(col, "Mag1_Panel", M("cells"), (0.09, 0.05, 0.0008), at=(0.025, -0.065, height + 0.0002), rotate=(0, 0, -8))
         box(col, "Mag1_Battery", M("marine"), (0.04, 0.025, 0.0009), at=(-0.05, -0.085, height + 0.0002))
-        line = "SUN & BATTERIES"
-    else:
+    elif issue == 2:
         box(col, "Mag2_Inverter", M("bluegrey"), (0.08, 0.05, 0.0008), at=(-0.02, -0.05, height + 0.0002))
         box(col, "Mag2_Panel", M("black"), (0.04, 0.03, 0.0009), at=(-0.03, -0.05, height + 0.0003))
         prism(col, "Mag2_Bolt", M("sun"), [(0, 0.05), (0.02, 0.0), (0.008, 0.0), (0.016, -0.04), (-0.006, 0.01), (0.006, 0.01)],
               0.0008, at=(0.055, -0.04, height + 0.0002), rotate=(90, 0, 0))
-        line = "INVERTERS & CONTROL"
+    else:
+        # A brick dome in the farmyard's mud, a cow beside it, and the blue flame its gas burns with.
+        box(col, "Mag3_Ground", M("earth"), (0.17, 0.045, 0.0008), at=(0, -0.0825, height + 0.0002))
+        prism(col, "Mag3_Dome", M("brick"), [(-0.04, 0), (0.04, 0), (0.03, 0.025), (0.0, 0.035), (-0.03, 0.025)], 0.0008,
+              at=(-0.03, -0.06, height + 0.0003), rotate=(-90, 0, 0))
+        box(col, "Mag3_Cow", M("white"), (0.04, 0.022, 0.0009), at=(0.045, -0.05, height + 0.0003))
+        for x in (0.03, 0.06):
+            box(col, "Mag3_CowSpot", M("ink"), (0.01, 0.008, 0.001), at=(x, -0.045, height + 0.0003))
+        prism(col, "Mag3_Flame", M("flameblue"), [(-0.01, 0), (0.01, 0), (0.0, 0.03)], 0.0008, at=(0.05, -0.005, height + 0.0003),
+              rotate=(-90, 0, 0))
     text(col, "Mag%d_Line" % issue, M("white"), line, 0.015, at=(0, -0.122, top), rotate=flat)
 
 
@@ -859,6 +878,10 @@ def magazine_1(col):
 
 def magazine_2(col):
     magazine(col, 2)
+
+
+def magazine_3(col):
+    magazine(col, 3)
 
 
 CRATE = (0.99, 0.5, 0.3)
@@ -1184,12 +1207,14 @@ def drum(col, name, paint, at, rust=False):
             _drum_patch(col, name + "_Rust", M("rust"), at, radius + (proud if on_hoop else 0), angle, z, size)
 
 
-def barrel_digester(col, plastic=False, frame=True, holder=None, fill=3, torn=False):
+def barrel_digester(col, plastic=False, frame=True, holder=None, fill=3, torn=False, scrubber=False):
     """A homestead batch digester: a 55 gallon drum of slurry, steel or blue poly, fed down a pipe
     through its big bung that ends near the bottom, so feeding lets no gas out, under a funnel;
     emptied at a spigot near its foot; its gas taken off the small bung through a valve and a hose
     down to a holder on the ground beside it. `holder` draws the holder alone, "bags" or "tarp",
-    `fill` its level from 1 (slack) to 3 (taut), `torn` it ripped and empty."""
+    `fill` its level from 1 (slack) to 3 (taut), `torn` it ripped and empty. `scrubber` draws the
+    scrubber alone, in front of the barrel where neither it nor the holder hides it, teed off the
+    head and led on to the holder."""
     radius, height = DRUM
     x, y = BARREL_AT
     if frame:
@@ -1227,6 +1252,15 @@ def barrel_digester(col, plastic=False, frame=True, holder=None, fill=3, torn=Fa
         _garbage_bags(col, fill, torn)
     elif holder == "tarp":
         _tarp_bag(col, fill, torn)
+    if scrubber:
+        tee = (x + 0.17, y - 0.1)
+        cylinder(col, "Barrel_ScrubberTee", M("copper"), 0.014, 0.04, at=(*tee, height), segments=10)
+        inlet, outlet = _scrubber(col, (0.32, -0.33), (0.45, -0.21))
+        tube(col, "Barrel_ScrubberHose", M("black"), [(*tee, height + 0.04), (tee[0] + 0.05, tee[1] - 0.04, height + 0.08),
+                                                      (0.24, -0.27, 0.6), inlet], 0.012, 8)
+        # Back into the holder's south end, where the bags and the tarp both lie.
+        tube(col, "Barrel_ScrubberReturn", M("black"), [outlet, (outlet[0], outlet[1] + 0.03, outlet[2] + 0.04),
+                                                        (0.4, -0.08, 0.12), (0.36, -0.02, 0.04)], 0.012, 8)
 
 
 # The garbage bags' centres, half lengths and widths, and turns: three lying round the hose's end,
@@ -1302,12 +1336,14 @@ FLOAT_RISE = (0.08, 0.2, 0.32, 0.44)
 GUIDE_TOP = DRUM[1] + FLOAT_RISE[-1] + 0.22
 
 
-def insulated_digester(col, frame=True, level=0):
+def insulated_digester(col, frame=True, level=0, scrubber=False):
     """A floating-drum digester of the village kind, built for a cold winter: the slurry in a 55
     gallon drum packed round with straw in a box of planks, a tarp thrown over the back corner, a
     guide pipe standing up out of the slurry. The gas holder is a smaller drum turned upside down
     in the slurry, riding up the pipe as gas fills it: `level` draws it alone at its height from 1
-    (low) to 4 (high), its gas valve and hose on its head."""
+    (low) to 4 (high), its gas valve and hose on its head. `scrubber` draws the scrubber alone: the
+    box fills its square, so it stands on the front corner of the box's top, clear of both drums,
+    fed from a fitting on the slurry drum's rim outside the floating drum."""
     size, height = INSULATED
     radius, rim = DRUM
     if frame:
@@ -1333,6 +1369,16 @@ def insulated_digester(col, frame=True, level=0):
         tube(col, "Insulated_Hose", M("black"), [(vx, vy, top + 0.05), (vx - 0.04, vy - 0.06, top + 0.09),
                                                  (-0.27, front + 0.05, height + 0.07), (-0.29, front - 0.03, height - 0.05),
                                                  (-0.3, front - 0.035, 0.25), (-0.33, front - 0.06, 0.03)], 0.014, 8)
+    if scrubber:
+        base = height + 0.02
+        fitting = _around((0, 0), -45, radius - 0.015)
+        cylinder(col, "Insulated_ScrubberFitting", M("copper"), 0.012, 0.04, at=(*fitting, rim), segments=10)
+        inlet, outlet = _scrubber(col, (0.3, -0.3), (0.08, -0.38), z=base)
+        tube(col, "Insulated_ScrubberHose", M("black"), [(*fitting, rim + 0.04), (fitting[0] + 0.03, fitting[1] - 0.03, rim + 0.12),
+                                                         (inlet[0] - 0.03, inlet[1] + 0.03, inlet[2] + 0.08), inlet], 0.012, 8)
+        tube(col, "Insulated_ScrubberOut", M("black"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.06, outlet[2] + 0.02),
+                                                        (0.1, -size / 2 - 0.03, height - 0.05), (0.11, -size / 2 - 0.035, 0.25),
+                                                        (0.13, -size / 2 - 0.06, 0.03)], 0.012, 8)
 
 
 def _straw_box(col):
@@ -1378,11 +1424,28 @@ DOME_FOOTING = 0.04
 BRICK = (0.2, 0.05, 0.068)  # a brick as laid: along the course, into the dome, up
 
 
-def dome_digester(col):
+def dome_digester(col, frame=True, scrubber=False):
     """A fixed-dome digester of the Chinese kind, buried: a low mound of earth over the pit with the
     top of its brick dome showing, knee high, a concrete collar on its crown and the gas pipe and
-    valve out of that, a feed pipe and funnel slanting down into it on one side and the box its
-    spent slurry overflows into on the other."""
+    valve out of that, its hose led off behind the dome, a feed pipe and funnel slanting down into it
+    on one side and the box its spent slurry overflows into on the other. `scrubber` draws the
+    scrubber alone, on the mound's east shoulder, teed off the gas pipe above the valve."""
+    cx, cy = DOME_AT
+    crown = DOME_FOOTING + DOME[1]
+    if frame:
+        _dome(col)
+    if scrubber:
+        tee = (cx + 0.03, cy + 0.03, crown + 0.17)
+        tube(col, "Dome_ScrubberTee", M("galvanised"), [(cx, cy, tee[2]), tee], 0.014, 8)
+        inlet, outlet = _scrubber(col, (0.34, 0.24), (0.44, 0.06), z=0.07, can_z=0.05)
+        tube(col, "Dome_ScrubberHose", M("black"), [tee, (tee[0] + 0.08, tee[1] + 0.06, tee[2] + 0.03), (0.25, 0.22, inlet[2] + 0.12),
+                                                    inlet], 0.012, 8)
+        # On to the house, underground.
+        tube(col, "Dome_ScrubberOut", M("black"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.02, outlet[2] + 0.03),
+                                                   (0.48, 0.02, 0.12), (0.49, 0.0, 0.02)], 0.012, 8)
+
+
+def _dome(col):
     cx, cy = DOME_AT
     radius, rise = DOME
     mound(col, "Dome_Earth", M("earth"), (0.48, 0.48, 0.14), squareness=1.4, lumps=0.05, seed=40, segments=24, rings=5)
@@ -1408,8 +1471,8 @@ def dome_digester(col):
     cylinder(col, "Dome_GasPipe", M("galvanised"), 0.016, pipe_top - crown, at=(cx, cy, crown), segments=10)
     box(col, "Dome_Valve", M("copper"), (0.04, 0.04, 0.04), at=(cx, cy, crown + 0.08))
     box(col, "Dome_ValveLever", M("red"), (0.09, 0.014, 0.01), at=(cx + 0.035, cy, crown + 0.12))
-    tube(col, "Dome_GasHose", M("black"), [(cx, cy, pipe_top), (cx + 0.02, cy + 0.04, pipe_top + 0.04), (cx + 0.1, cy + 0.12, pipe_top),
-                                            (cx + 0.22, cy + 0.24, crown - 0.2), (0.3, 0.32, 0.1), (0.36, 0.38, 0.02)], 0.014, 8)
+    tube(col, "Dome_GasHose", M("black"), [(cx, cy, pipe_top), (cx - 0.02, cy + 0.04, pipe_top + 0.04), (cx - 0.1, cy + 0.12, pipe_top),
+                                            (cx - 0.2, cy + 0.25, crown - 0.2), (-0.25, 0.4, 0.08), (-0.28, 0.46, 0.02)], 0.014, 8)
     # The feed: a PVC pipe slanting down into the dome's foot from a funnel standing clear of it.
     fx, fy = _around((cx, cy), 225, radius + 0.13)
     lx, ly = _around((cx, cy), 225, radius - 0.02)
@@ -1428,15 +1491,156 @@ def dome_digester(col):
 def wood_ash(col):
     """A shovelful of wood ash out of a stove: a soft pale grey heap with bits of charcoal in it."""
     rx, ry, height = 0.12, 0.1, 0.075
-    mound(col, "Ash_Heap", M("ash"), (rx, ry, height), lumps=0.06, seed=50, segments=20, rings=6)
+    mound(col, "Ash_Heap", M("ash"), (rx, ry, height), lumps=0.08, seed=50, segments=20, rings=6)
     rng = random.Random(51)
-    for _ in range(18):
-        u, v = rng.uniform(-0.8, 0.8), rng.uniform(-0.8, 0.8)
-        if u * u + v * v > 0.6:
-            continue
-        size = (rng.uniform(0.008, 0.016), rng.uniform(0.006, 0.01), 0.006)
-        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u * rx, v * ry, height * math.sqrt(1 - u * u - v * v) - 0.004),
+    # Spread evenly over the heap, on a golden-angle spiral, so no side of it is bare.
+    for i in range(12):
+        spread = 0.75 * math.sqrt((i + 0.5) / 12)
+        angle = i * 137.5
+        u, v = _around((0, 0), angle, spread)
+        size = (rng.uniform(0.012, 0.022), rng.uniform(0.008, 0.014), 0.01)
+        # Clear of the heap's lumps, which raise its surface by up to a twelfth.
+        surface = height * math.sqrt(1 - spread * spread) * 1.06
+        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u * rx, v * ry, surface - 0.004),
             rotate=(rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 180)))
+
+
+SCRUBBER_BUCKET = (0.12, 0.34)  # a 5 gallon bucket's radius at its rim and its height
+SCRUBBER_CAN = (0.045, 0.2)  # the steel wool can's radius and height
+
+
+def _scrubber(col, bucket_at, can_at, z=0.0, can_z=None):
+    """A biogas scrubber: an orange 5 gallon bucket of water, its lid on, the gas bubbling in through
+    one pipe stub and out of the other, then through a coffee can packed with steel wool, capped,
+    that takes out the rotten-egg gas. The bucket stands at `bucket_at` on `z`, the can at `can_at`
+    on `can_z` (default `z`). Returns the tops of the bucket's inlet stub and the can's outlet."""
+    radius, height = SCRUBBER_BUCKET
+    bx, by = bucket_at
+    cylinder(col, "Scrubber_Bucket", M("safety"), radius * 0.88, height, at=(bx, by, z), radius_top=radius, segments=20)
+    for rib in (0.5, 0.88):
+        _ring(col, "Scrubber_Rib", M("safety"), bucket_at, radius * (0.88 + 0.12 * rib), z + height * rib, 0.006)
+    cylinder(col, "Scrubber_Lid", M("hdpe"), radius + 0.008, 0.022, at=(bx, by, z + height), segments=20)
+    top = z + height + 0.022
+    stubs = []
+    for dx, dy in ((-0.05, 0.03), (0.05, -0.03)):
+        cylinder(col, "Scrubber_Stub", M("pvc"), 0.013, 0.05, at=(bx + dx, by + dy, top), segments=10)
+        stubs.append((bx + dx, by + dy, top + 0.05))
+    can_radius, can_height = SCRUBBER_CAN
+    cx, cy = can_at
+    cz = z if can_z is None else can_z
+    cylinder(col, "Scrubber_Can", M("galvanised"), can_radius, can_height, at=(cx, cy, cz), segments=16)
+    cylinder(col, "Scrubber_CanLabel", M("red"), can_radius + 0.001, 0.07, at=(cx, cy, cz + 0.06), segments=16)
+    cylinder(col, "Scrubber_CanCap", M("black"), can_radius + 0.004, 0.018, at=(cx, cy, cz + can_height), segments=16)
+    can_top = cz + can_height + 0.018
+    cylinder(col, "Scrubber_CanStub", M("pvc"), 0.011, 0.04, at=(cx - 0.015, cy, can_top), segments=10)
+    cylinder(col, "Scrubber_CanOut", M("pvc"), 0.011, 0.04, at=(cx + 0.015, cy, can_top), segments=10)
+    out = stubs[1]
+    tube(col, "Scrubber_Hose", M("black"), [out, (out[0], out[1], out[2] + 0.06), (cx - 0.015, cy, can_top + 0.1),
+                                            (cx - 0.015, cy, can_top + 0.04)], 0.012, 8)
+    return stubs[0], (cx + 0.015, cy, can_top + 0.04)
+
+
+# Biogas appliances and parts ----------------------------------------------------------------------
+
+HEATER = (0.42, 0.28, 0.4)  # its box's width, depth and height
+HEATER_LEGS = 0.08
+
+
+def gas_heater(col, lit=False):
+    """A homemade gas heater: a box bent up from sheet steel and welded, on four short angle-iron
+    legs, its front punched with rows of holes, a burner across its foot behind a slot, a flue
+    collar on top and a gas pipe stub with a valve out of its side. `lit` burns blue in the slot
+    and glows orange through the holes."""
+    width, depth, height = HEATER
+    legs = HEATER_LEGS
+    front = -depth / 2
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box(col, "Heater_Leg", M("weld"), (0.025, 0.025, legs + 0.02), at=(sx * (width / 2 - 0.0125), sy * (depth / 2 - 0.0125), 0))
+    box(col, "Heater_Body", M("rustysteel"), (width, depth, height), at=(0, 0, legs), bevel=0.006)
+    box(col, "Heater_Top", M("rustysteel"), (width + 0.02, depth + 0.02, 0.012), at=(0, 0, legs + height), bevel=0.003)
+    cylinder(col, "Heater_Flue", M("rawsteel"), 0.045, 0.07, at=(0, depth / 4, legs + height + 0.012), segments=14)
+    for sx in (-1, 1):
+        box(col, "Heater_Seam", M("weld"), (0.008, 0.004, height - 0.01), at=(sx * (width / 2 - 0.002), front - 0.001, legs + 0.005))
+    holes = M("flame" if lit else "black")
+    for row in range(4):
+        for column in range(6):
+            cylinder(col, "Heater_Hole", holes, 0.014, 0.003, at=(-width / 2 + (column + 1) * width / 7, front - 0.0005,
+                                                                  legs + 0.17 + row * 0.055), rotate=(90, 0, 0), segments=8)
+    box(col, "Heater_Slot", M("flameblue" if lit else "black"), (width * 0.7, 0.003, 0.045), at=(0, front - 0.0015, legs + 0.05))
+    stub_z = legs + 0.07
+    tube(col, "Heater_GasStub", M("galvanised"), [(width / 2 - 0.01, 0.04, stub_z), (width / 2 + 0.1, 0.04, stub_z)], 0.012, 8)
+    box(col, "Heater_GasValve", M("brass"), (0.035, 0.03, 0.03), at=(width / 2 + 0.06, 0.04, stub_z - 0.015))
+    box(col, "Heater_GasHandle", M("red"), (0.012, 0.06, 0.01), at=(width / 2 + 0.06, 0.04, stub_z + 0.015))
+
+
+def _mixer(col, name, at, turn):
+    """The kit's mixer valve: a brass body for the air horn's end, a hose barb at each end, a branch
+    up for the gas and a red throttle lever on its side. Lies along X at `at`, turned `turn`."""
+    axis = 0.026
+    parts = [cylinder(col, name + "_Body", M("brass"), 0.024, 0.13, at=(-0.065, 0, axis), rotate=(0, 90, 0), segments=14)]
+    for sign in (-1, 1):
+        parts.append(cylinder(col, name + "_Nut", M("brass"), 0.03, 0.016, at=(sign * 0.065 - (sign > 0) * 0.016, 0, axis),
+                              rotate=(0, 90, 0), segments=6))
+        parts.append(cylinder(col, name + "_Barb", M("brass"), 0.013, 0.035, at=(sign * 0.065 + (sign < 0) * -0.035, 0, axis),
+                              rotate=(0, 90, 0), segments=10))
+    parts.append(cylinder(col, name + "_Branch", M("brass"), 0.017, 0.05, at=(0, 0, axis), segments=12))
+    parts.append(cylinder(col, name + "_Shaft", M("galvanised"), 0.006, 0.03, at=(0.02, -0.02, axis), rotate=(90, 0, 0), segments=8))
+    parts.append(box(col, name + "_Lever", M("red"), (0.065, 0.01, 0.014), at=(0.045, -0.05, axis - 0.007)))
+    return group(col, name, parts, at=at, rotate=(0, 0, turn))
+
+
+def gas_conversion_kit(col):
+    """The kit that lets a petrol engine run on gas: the mixer valve, a coil of black rubber hose,
+    two worm-drive hose clamps and the steel plate that adapts the mixer to the carburettor's air
+    horn, as it lies out of its box."""
+    _mixer(col, "Kit_Mixer", (-0.07, -0.05, 0), 10)
+    box(col, "Kit_Plate", M("rawsteel"), (0.12, 0.09, 0.005), at=(0.08, -0.05, 0), rotate=(0, 0, -8))
+    cylinder(col, "Kit_PlateHole", M("black"), 0.026, 0.001, at=(0.08, -0.05, 0.005), segments=16)
+    for sx in (-1, 1):
+        cylinder(col, "Kit_PlateBolt", M("black"), 0.005, 0.001, at=(0.08 + sx * 0.045, -0.05 - sx * 0.006, 0.005), segments=8)
+    for i in range(3):
+        _ring(col, "Kit_Hose", M("black"), (-0.02, 0.07), 0.075 - 0.004 * i, 0.012 + 0.022 * i, 0.012)
+    tube(col, "Kit_HoseEnd", M("black"), [(0.051, 0.07, 0.056), (0.1, 0.05, 0.03), (0.14, 0.06, 0.012)], 0.012, 8)
+    for x, y in ((0.1, 0.07), (0.15, 0.03)):
+        _ring(col, "Kit_Clamp", M("galvanised"), (x, y), 0.022, 0.004, 0.004)
+        box(col, "Kit_ClampScrew", M("galvanised"), (0.012, 0.016, 0.01), at=(x + 0.026, y, 0))
+
+
+def generator_gas_kit(col):
+    """The kit fitted to a generator, as the overlay on the generator's square shows it: the mixer
+    lying across the square's front corner, clear of a generator in its middle, a hose up from its
+    branch into the generator and the gas line in from the side."""
+    # Half again its size: true to life, the generator's foot hides all but a few pixels of it.
+    scale = 1.5
+    cx, cy = 0.35, -0.34
+    _mixer(col, "GenKit_Mixer", (cx, cy, 0), 45).scale = (scale, scale, scale)
+    end = 0.1 * scale / math.sqrt(2)
+    tube(col, "GenKit_Hose", M("black"), [(cx, cy, 0.07 * scale), (cx - 0.01, cy + 0.01, 0.12 * scale), (cx - 0.05, cy + 0.05, 0.2),
+                                          (cx - 0.1, cy + 0.1, 0.24)], 0.013 * scale, 8)
+    tube(col, "GenKit_Line", M("black"), [(cx - end, cy - end, 0.026 * scale), (cx - end + 0.01, cy - end - 0.03, 0.02),
+                                          (cx - end + 0.04, cy - end - 0.05, 0.018)], 0.013 * scale, 8)
+
+
+def fridge_compressor(col):
+    """A hermetic compressor cut out of a dead fridge: the black welded can, its copper suction,
+    discharge and process stubs pinched shut, the relay box clipped to its side and its maker's
+    label, on its mounting plate and rubber feet."""
+    plate = 0.02
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            cylinder(col, "Comp_Foot", M("black"), 0.016, plate, at=(sx * 0.1, sy * 0.065, 0), segments=10)
+    box(col, "Comp_Plate", M("rawsteel"), (0.26, 0.17, 0.006), at=(0, 0, plate))
+    base = plate + 0.006
+    radius, can = 0.1, 0.11
+    cylinder(col, "Comp_Can", M("black"), radius, can, at=(0, 0, base), segments=24)
+    mound(col, "Comp_Dome", M("black"), (radius, radius, 0.075), at=(0, 0, base + can), segments=24, rings=6)
+    _ring(col, "Comp_Seam", M("darkgrey"), (0, 0), radius + 0.002, base + can, 0.005)
+    box(col, "Comp_Label", M("label"), (0.07, 0.002, 0.04), at=(0.0, -radius - 0.001, base + 0.04))
+    box(col, "Comp_Relay", M("darkgrey"), (0.045, 0.07, 0.06), at=(-radius - 0.02, 0, base + 0.03), bevel=0.004)
+    for (x, y), lean in (((0.04, 0.05), (0.05, 0.07)), ((0.06, -0.02), (0.08, -0.03)), ((-0.02, 0.06), (-0.03, 0.08))):
+        tube(col, "Comp_Stub", M("copper"), [(x, y, base + can + 0.04), (x + lean[0] * 0.4, y + lean[1] * 0.4, base + can + 0.09),
+                                             (x + lean[0], y + lean[1], base + can + 0.11)], 0.007, 8)
 
 
 # Vehicles -----------------------------------------------------------------------------------------
@@ -1677,7 +1881,11 @@ ITEMS = {
     "BatteryElectrolyte": {"model": battery_electrolyte},
     "HomesteadPowerMag1": {"model": magazine_1, "icon_elevation": 70},
     "HomesteadPowerMag2": {"model": magazine_2, "icon_elevation": 70},
-    "WoodAsh": {"model": wood_ash},
+    "HomesteadPowerMag3": {"model": magazine_3, "icon_elevation": 70},
+    "WoodAsh": {"model": wood_ash, "icon_elevation": 25},
+    "GasConversionKit": {"model": gas_conversion_kit, "icon_elevation": 45},
+    "FridgeCompressor": {"model": fridge_compressor},
+    "GasHeater": {"model": gas_heater},
 }
 
 # Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes

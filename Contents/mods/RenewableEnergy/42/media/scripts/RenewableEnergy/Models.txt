@@ -211,10 +211,34 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_HomesteadPowerMag2,
         scale = 1,
     }
+    model HomesteadPowerMag3_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomesteadPowerMag3,
+        texture = WorldItems/RenewableEnergy_HomesteadPowerMag3,
+        scale = 1,
+    }
     model WoodAsh_Ground
     {
         mesh = WorldItems/RenewableEnergy_WoodAsh,
         texture = WorldItems/RenewableEnergy_WoodAsh,
+        scale = 1,
+    }
+    model GasConversionKit_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_GasConversionKit,
+        texture = WorldItems/RenewableEnergy_GasConversionKit,
+        scale = 1,
+    }
+    model FridgeCompressor_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_FridgeCompressor,
+        texture = WorldItems/RenewableEnergy_FridgeCompressor,
+        scale = 1,
+    }
+    model GasHeater_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_GasHeater,
+        texture = WorldItems/RenewableEnergy_GasHeater,
         scale = 1,
     }
 }
