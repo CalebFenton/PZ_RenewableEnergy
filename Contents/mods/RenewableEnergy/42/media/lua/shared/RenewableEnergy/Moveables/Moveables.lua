@@ -55,6 +55,32 @@ Events.OnGameBoot.Add(function()
     defs.addScrapItem("Fridge", RenewableEnergy.Digester.COMPRESSOR, 1, 80, true)
 end)
 
+-- A treadmill (vanilla's "Hamster Wheel" moveable, two tiles in four facings) gives its motor when
+-- dismantled: the wind charger's generator. Vanilla scraps each tile of a multi-tile object in
+-- turn (ISMoveableSpriteProps.scrapObject), so the motor comes with the tile that was clicked.
+RenewableEnergy.TREADMILL_MOTOR = "RenewableEnergy.TreadmillMotor"
+local TREADMILL_SPRITES = {}
+for _, index in ipairs({ 28, 29, 30, 31, 36, 37, 38, 39 }) do
+    TREADMILL_SPRITES["recreational_sports_01_" .. index] = true
+end
+
+local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
+function ISMoveableSpriteProps:scrapObjectInternal(character, scrapDef, square, object, ...)
+    self.scrappingMainTile = object == self.object
+    local added = vanillaScrapInternal(self, character, scrapDef, square, object, ...)
+    self.scrappingMainTile = nil
+    return added
+end
+
+local vanillaScrapItems = ISMoveableSpriteProps.getScrapItemsList
+function ISMoveableSpriteProps:getScrapItemsList(character)
+    local items = vanillaScrapItems(self, character)
+    if items and TREADMILL_SPRITES[self.spriteName] and self.scrappingMainTile ~= false then
+        table.insert(items.usable, RenewableEnergy.TREADMILL_MOTOR)
+    end
+    return items
+end
+
 -- Placing -----------------------------------------------------------------------------------------
 
 --- Why the item `fullType` may not be placed on `square`: a translation key, or nil if it may.

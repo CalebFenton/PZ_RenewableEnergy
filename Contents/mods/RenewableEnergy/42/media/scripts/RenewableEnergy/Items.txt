@@ -617,6 +617,21 @@ module RenewableEnergy
         Tags = base:ignorezombiedensity,
     }
 
+    /*
+        The permanent-magnet motor out of a dismantled treadmill (shared/RenewableEnergy/Moveables);
+        turned by a wind charger it makes power.
+    */
+    item TreadmillMotor
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 3.0,
+        Icon = RenewableEnergy_TreadmillMotor,
+        WorldStaticModel = RenewableEnergy.TreadmillMotor_Ground,
+        Tooltip = Tooltip_RenewableEnergy_TreadmillMotor,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
     /* Fitted to a vanilla generator, lets it run on gas from a digester or gasifier (RenewableEnergy.GasKit). */
     item GasConversionKit
     {

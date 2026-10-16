@@ -29,6 +29,7 @@ Debug.ITEMS = {
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
     "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.FridgeCompressor",
     "RenewableEnergy.GasHeater", "RenewableEnergy.TarryPacking", "RenewableEnergy.FemaPamphlet",
+    "RenewableEnergy.TreadmillMotor",
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
@@ -41,8 +42,9 @@ Debug.DIGESTER_RECIPES = {
 Debug.GASIFIER_RECIPES = {
     "RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
 }
+Debug.WIND_RECIPES = { "RenewableEnergy_ScoopRotor" }
 Debug.ENTITY_RECIPES = {}
-for _, list in ipairs({ Debug.DIGESTER_RECIPES, Debug.GASIFIER_RECIPES }) do
+for _, list in ipairs({ Debug.DIGESTER_RECIPES, Debug.GASIFIER_RECIPES, Debug.WIND_RECIPES }) do
     for _, name in ipairs(list) do
         table.insert(Debug.ENTITY_RECIPES, name)
     end

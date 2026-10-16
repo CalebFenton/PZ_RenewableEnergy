@@ -154,10 +154,11 @@ function T.bankState(self, bank)
 end
 
 --- Queues a pass of `opts.hours` (1 by default) of `bank` on the server, with the weather fixed
---- clear: `light` W/m² on every mount, no snow, and `opts.stormHours` of storm.
+--- clear: `light` W/m² on every mount, no snow, `opts.stormHours` of storm and a wind of
+--- `opts.windKph` (calm by default).
 function T.bankPass(self, bank, light, opts)
     opts = opts or {}
-    onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours })
+    onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours, windKph = opts.windKph })
 end
 
 --- Queues replacing the measured load of `bank` with appliances of the Specs.loads kinds

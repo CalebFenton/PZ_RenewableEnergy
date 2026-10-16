@@ -1,12 +1,13 @@
 /*
-    What the build menu builds: the biogas digesters and the wood gas gasifiers. Each tile becomes
-    one through OnCreate (server/RenewableEnergy/Biogas/DigesterSystem.lua,
-    server/RenewableEnergy/WoodGas/GasifierSystem.lua). In module Base with the mod's prefix, as
-    the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without its spaces,
-    in Recipes.json.
+    What the build menu builds: the biogas digesters, the wood gas gasifiers and the wind chargers.
+    A digester or gasifier tile becomes one through OnCreate
+    (server/RenewableEnergy/Biogas/DigesterSystem.lua, server/RenewableEnergy/WoodGas/GasifierSystem.lua);
+    a wind charger is a plain tile a bank connects to like a panel. In module Base with the mod's
+    prefix, as the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without
+    its spaces, in Recipes.json.
 
-    The digesters are taught by Homestead Power #3, the gasifiers by the FEMA pamphlet, or both
-    are learned with the skills below.
+    The digesters are taught by Homestead Power #3, the gasifiers by the FEMA pamphlet, or all are
+    learned with the skills below.
 */
 module Base
 {
@@ -53,6 +54,12 @@ module Base
             LuaWindowClass = ISEntityWindow,
             DisplayName = RenewableEnergy_AdvancedGasifier,
             Icon = RenewableEnergy_Build_AdvancedGasifier,
+        }
+        entity ES_RenewableEnergy_ScoopRotor
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_ScoopRotor,
+            Icon = RenewableEnergy_Build_ScoopRotor,
         }
     }
 
@@ -351,6 +358,52 @@ module Base
                 item 3 [Base.MetalPipe],
                 item 2 [Base.IronBar],
                 item 1 tags[base:bucket],
+            }
+        }
+    }
+
+    /* A Savonius rotor: a drum cut in half lengthwise into two scoops on a shaft, a treadmill motor
+       for a generator, on a short welded pole. Weak, but it takes any wind and never breaks. */
+    entity RenewableEnergy_ScoopRotor
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_ScoopRotor,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_264,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildMetalStructureMedium,
+            time = 300,
+            category = Welding,
+            Tags = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = MetalWelding:3;Electricity:3,
+            SkillRequired = MetalWelding:2;Electricity:2,
+            xpAward = MetalWelding:20;Electricity:15,
+            Tooltip = Tooltip_RenewableEnergy_ScoopRotor,
+            inputs
+            {
+                item 1 tags[base:weldingmask] mode:keep,
+                item 3 [Base.BlowTorch] flags[DontRecordInput],
+                item 2 [Base.WeldingRods] flags[DontRecordInput],
+                item 1 [Base.MetalDrum],
+                item 1 [RenewableEnergy.TreadmillMotor],
+                item 2 [Base.MetalPipe],
+                item 2 [Base.ElectricWire],
+                item 1 [Base.ElectronicsScrap],
             }
         }
     }

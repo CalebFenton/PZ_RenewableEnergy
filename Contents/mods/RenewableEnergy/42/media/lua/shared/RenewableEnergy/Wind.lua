@@ -60,4 +60,14 @@ function Wind.shelterAt(x, y, z)
     return count > 0 and blocked / count or 0
 end
 
+--- The build menu's OnCreate for every wind charger (scripts/RenewableEnergy/Entities.txt), on the
+--- authority. In single player that is this client too, which fires no OnObjectAdded, so the
+--- new charger starts turning here (RenewableEnergy.WindSpin); a multiplayer client gets it from
+--- OnObjectAdded.
+function Wind.OnCreate(params)
+    if params.thumpable and RenewableEnergy.WindSpin then
+        RenewableEnergy.WindSpin.track(params.thumpable)
+    end
+end
+
 return Wind

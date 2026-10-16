@@ -37,7 +37,7 @@ It's the hardware they sold in 1993: small modules, marine and L-16 batteries, i
 1. **Build a bank.** Craft a battery box, right-click it and **Place Object** indoors.
 2. **Wire in the parts.** Right-click the bank and **Wire In** batteries and an inverter. It tells you what you're missing.
 3. **Mount the panels.** Craft a module into a flat or wall panel, or two onto a ground rack, and place it outside.
-4. **Connect them.** Right-click the bank and **Connect Panels in Reach**.
+4. **Connect them.** Right-click the bank and **Connect Sources in Reach**.
 5. **Turn it on.** Right-click the bank and **Turn On**. **Status** shows what it's doing, down to why each panel isn't at full sun.
 
 If what's switched on draws more than the inverters carry, the power cuts out until you switch something off. The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town.

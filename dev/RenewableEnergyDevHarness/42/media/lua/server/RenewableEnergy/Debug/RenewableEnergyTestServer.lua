@@ -54,11 +54,11 @@ end
 
 -- A bank pass's context with fixed, clear weather: `light` W/m² on every mount, the sun above the
 -- horizon only when there is light (a sun below it reads as night), and `stormHours` of storm.
-local function passContext(light, stormHours)
+local function passContext(light, stormHours, windKph)
     local function irradiance() return light end
     return {
         weather = RenewableEnergy.Sun.CLEAR_WEATHER, precipitation = 0, airC = 25, elevation = light > 0 and 45 or -10,
-        stormHours = stormHours or 0, irradiance = irradiance, clearIrradiance = irradiance,
+        stormHours = stormHours or 0, irradiance = irradiance, clearIrradiance = irradiance, windKph = windKph or 0,
     }
 end
 
@@ -207,7 +207,7 @@ end)
 
 -- RenewableEnergyTest.bankPass's handler; answers the bank's state after the pass.
 onBank("bankPass", function(record, _, args)
-    record:update(args.hours or 1, passContext(args.light or 0, args.stormHours))
+    record:update(args.hours or 1, passContext(args.light or 0, args.stormHours, args.windKph))
     return stateOf(record)
 end)
 
