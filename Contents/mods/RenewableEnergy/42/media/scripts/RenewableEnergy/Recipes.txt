@@ -1091,4 +1091,105 @@ module Base
             item 1 Base.GardeningSprayAphids,
         }
     }
+
+    /******************************* Wind chargers ********************************/
+
+    /* Three propeller blades carved from planks, each a long twisted airfoil. Taught by Homestead
+       Power #4. */
+    craftRecipe RenewableEnergy_CarveWoodenBlades
+    {
+        timedAction = SharpenStakeWood,
+        time = 600,
+        Tags = AnySurfaceCraft,
+        category = Carving,
+        NeedToBeLearn = true,
+        AutoLearnAll = Carving:6,
+        SkillRequired = Carving:3,
+        xpAward = Carving:30,
+        inputs
+        {
+            item 1 tags[base:sharpknife] mode:keep flags[IsNotDull;MayDegradeLight;Prop1],
+            item 1 tags[base:saw;base:smallsaw;base:crudesaw] mode:keep flags[MayDegradeLight],
+            item 3 [Base.Plank],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.WoodenBlades,
+        }
+    }
+
+    /* Three blades sawn from a length of plastic pipe: a curved airfoil for free, the quick way
+       to a propeller. */
+    craftRecipe RenewableEnergy_CutPipeBlades
+    {
+        timedAction = Making,
+        time = 200,
+        Tags = AnySurfaceCraft,
+        category = Carving,
+        NeedToBeLearn = true,
+        AutoLearnAll = Carving:3,
+        xpAward = Carving:10,
+        inputs
+        {
+            item 1 tags[base:saw;base:smallsaw;base:crudesaw] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:sharpknife] mode:keep flags[MayDegradeLight],
+            item 2 [Base.Pipe],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.PipeBlades,
+        }
+    }
+
+    /* Three steel blades hammered out of sheet steel at a forge, for the homemade alternator. */
+    craftRecipe RenewableEnergy_ForgeSteelBlades
+    {
+        timedAction = HammerMetalStanding,
+        time = 800,
+        Tags = Forge,
+        category = Blacksmithing,
+        NeedToBeLearn = true,
+        AutoLearnAll = Blacksmith:8,
+        SkillRequired = Blacksmith:6,
+        xpAward = Blacksmith:30,
+        inputs
+        {
+            item 3 tags[base:charcoal],
+            item 1 [Base.SheetMetal],
+            item 1 tags[base:smithinghammer] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:tongs] mode:keep flags[Prop2;MayDegradeLight],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.SteelBlades,
+        }
+    }
+
+    /* An axial-flux alternator: magnets from speakers on a car's brake hub, turning past coils
+       wound from electric wire, and a scrap-board rectifier to charge a battery. */
+    craftRecipe RenewableEnergy_MakeHomemadeAlternator
+    {
+        timedAction = MakingElectrical,
+        time = 400,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAll = Electricity:7;Mechanics:4,
+        SkillRequired = Electricity:5;Mechanics:3,
+        xpAward = Electricity:40;Mechanics:10,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:wrench] mode:keep flags[MayDegradeLight],
+            item 1 tags[base:brake],
+            item 2 [Base.Speaker],
+            item 4 [Base.ElectricWire],
+            item 2 [Base.ElectronicsScrap],
+            item 1 [Base.SmallSheetMetal],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.HomemadeAlternator,
+        }
+    }
 }

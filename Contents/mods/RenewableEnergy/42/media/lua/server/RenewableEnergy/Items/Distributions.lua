@@ -401,6 +401,23 @@ Distributions.items = {
         }))),
     },
     {
+        -- Wind and the treadmill: on farms, with electricians and in hobby shops; preppers. As
+        -- rare as the third magazine; the skills teach its recipes too.
+        fullType = "RenewableEnergy.HomesteadPowerMag4",
+        option = "LRMMisc",
+        entries = with(1, SURVIVOR_CRATES, with(0.3, SURVIVALIST_CORPSES, with(0.3, SAFEHOUSE_READING, {
+            { 2, "proc:BookstoreFarming" },
+            { 1.5, "proc:Homesteading" },
+            { 1, "proc:ToolStoreFarming" },
+            { 1, "proc:BarnTools" },
+            { 1, "proc:ElectricianTools" },
+            { 1, "proc:Hobbies" },
+            { 0.5, "proc:SafehouseBookShelf" },
+            { 1.5, "veh:FarmerTruckBed" },
+            { 1, "veh:ElectricianTruckBed" },
+        }))),
+    },
+    {
         fullType = "RenewableEnergy.SolarModule",
         option = "LRMSolarPanels",
         entries = with(2, SURVIVOR_CRATES, {

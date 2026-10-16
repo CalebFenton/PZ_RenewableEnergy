@@ -6,8 +6,8 @@
     prefix, as the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without
     its spaces, in Recipes.json.
 
-    The digesters are taught by Homestead Power #3, the gasifiers by the FEMA pamphlet, or all are
-    learned with the skills below.
+    The digesters are taught by Homestead Power #3, the gasifiers by the FEMA pamphlet, the wind
+    chargers by Homestead Power #4, or all are learned with the skills below.
 */
 module Base
 {
@@ -60,6 +60,24 @@ module Base
             LuaWindowClass = ISEntityWindow,
             DisplayName = RenewableEnergy_ScoopRotor,
             Icon = RenewableEnergy_Build_ScoopRotor,
+        }
+        entity ES_RenewableEnergy_PropellerWood
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_PropellerWood,
+            Icon = RenewableEnergy_Build_Propeller,
+        }
+        entity ES_RenewableEnergy_PropellerPipe
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_PropellerPipe,
+            Icon = RenewableEnergy_Build_Propeller,
+        }
+        entity ES_RenewableEnergy_AlternatorWindCharger
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_AlternatorWindCharger,
+            Icon = RenewableEnergy_Build_Alternator,
         }
     }
 
@@ -404,6 +422,138 @@ module Base
                 item 2 [Base.MetalPipe],
                 item 2 [Base.ElectricWire],
                 item 1 [Base.ElectronicsScrap],
+            }
+        }
+    }
+
+    /* A three-bladed propeller on a treadmill motor, with a sheet-metal tail to keep it in the
+       wind, on a welded pipe mast; its blades carved from planks. Real power in a good wind, but
+       brake it before a storm. */
+    entity RenewableEnergy_PropellerWood
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_PropellerWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_265, } }
+            face E { layer { row = renewable_energy_01_266, } }
+            face S { layer { row = renewable_energy_01_267, } }
+            face W { layer { row = renewable_energy_01_268, } }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildMetalStructureMedium,
+            time = 500,
+            category = Welding,
+            Tags = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = MetalWelding:5;Electricity:4,
+            SkillRequired = MetalWelding:3;Electricity:3,
+            xpAward = MetalWelding:30;Electricity:20,
+            Tooltip = Tooltip_RenewableEnergy_Propeller,
+            inputs
+            {
+                item 1 tags[base:weldingmask] mode:keep,
+                item 4 [Base.BlowTorch] flags[DontRecordInput],
+                item 3 [Base.WeldingRods] flags[DontRecordInput],
+                item 1 [RenewableEnergy.WoodenBlades],
+                item 1 [RenewableEnergy.TreadmillMotor],
+                item 1 [Base.SheetMetal],
+                item 4 [Base.MetalPipe],
+                item 3 [Base.ElectricWire],
+                item 1 [Base.ElectronicsScrap],
+            }
+        }
+    }
+
+    /* The same propeller with blades sawn from plastic pipe. */
+    entity RenewableEnergy_PropellerPipe
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_PropellerPipe,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_269, } }
+            face E { layer { row = renewable_energy_01_270, } }
+            face S { layer { row = renewable_energy_01_271, } }
+            face W { layer { row = renewable_energy_01_272, } }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildMetalStructureMedium,
+            time = 500,
+            category = Welding,
+            Tags = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = MetalWelding:5;Electricity:4,
+            SkillRequired = MetalWelding:3;Electricity:3,
+            xpAward = MetalWelding:30;Electricity:20,
+            Tooltip = Tooltip_RenewableEnergy_Propeller,
+            inputs
+            {
+                item 1 tags[base:weldingmask] mode:keep,
+                item 4 [Base.BlowTorch] flags[DontRecordInput],
+                item 3 [Base.WeldingRods] flags[DontRecordInput],
+                item 1 [RenewableEnergy.PipeBlades],
+                item 1 [RenewableEnergy.TreadmillMotor],
+                item 1 [Base.SheetMetal],
+                item 4 [Base.MetalPipe],
+                item 3 [Base.ElectricWire],
+                item 1 [Base.ElectronicsScrap],
+            }
+        }
+    }
+
+    /* Forged steel blades on a homemade alternator, a hinged tail that turns the head out of a
+       gale, on a braced two-storey tripod mast. The best of them, and it looks after itself. */
+    entity RenewableEnergy_AlternatorWindCharger
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_AlternatorWindCharger,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_273, } }
+            face E { layer { row = renewable_energy_01_274, } }
+            face S { layer { row = renewable_energy_01_275, } }
+            face W { layer { row = renewable_energy_01_276, } }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildMetalStructureMedium,
+            time = 800,
+            category = Welding,
+            Tags = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = MetalWelding:7;Electricity:6,
+            SkillRequired = MetalWelding:5;Electricity:5,
+            xpAward = MetalWelding:50;Electricity:30,
+            Tooltip = Tooltip_RenewableEnergy_AlternatorWindCharger,
+            inputs
+            {
+                item 1 tags[base:weldingmask] mode:keep,
+                item 6 [Base.BlowTorch] flags[DontRecordInput],
+                item 5 [Base.WeldingRods] flags[DontRecordInput],
+                item 1 [RenewableEnergy.SteelBlades],
+                item 1 [RenewableEnergy.HomemadeAlternator],
+                item 2 [Base.SheetMetal],
+                item 8 [Base.MetalPipe],
+                item 4 [Base.ElectricWire],
+                item 2 [Base.ElectronicsScrap],
             }
         }
     }

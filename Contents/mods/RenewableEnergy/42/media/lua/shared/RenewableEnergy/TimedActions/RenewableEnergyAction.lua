@@ -36,6 +36,7 @@ Action.BOARD_OFF = "BoardOff"
 Action.BRAKE = "Brake"
 Action.RELEASE_BRAKE = "ReleaseBrake"
 Action.WIRE_TREADMILL = "WireTreadmill"
+Action.REPLACE_BLADES = "ReplaceBlades"
 
 -- Jobs on the bank's wiring or a cracked panel, which need light to see by.
 local NEEDS_LIGHT = {
@@ -196,6 +197,9 @@ local KEEPS = {
     [Action.WIRE_TREADMILL] = function(self)
         return isLooseTreadmill(self.object)
     end,
+    [Action.REPLACE_BLADES] = function(self)
+        return isWindCharger(self.object) and self.item ~= nil and holdsItem(self)
+    end,
 }
 
 -- The rest of each job's rules: the state of its target and its bank, which a multiplayer
@@ -262,6 +266,10 @@ local CHECKS = {
     end,
     [Action.WIRE_TREADMILL] = function(self)
         return RenewableEnergy.firstUnmet(PowerBank.treadmillNeeds(self.character)) == nil
+    end,
+    [Action.REPLACE_BLADES] = function(self)
+        return PowerBank.isBroken(self.object)
+            and PowerBank.bladesFor(PowerBank.sourceKind(self.object))[self.item:getFullType()] == true
     end,
 }
 
@@ -330,6 +338,9 @@ local COMMANDS = {
     [Action.WIRE_TREADMILL] = function(self)
         return "wireTreadmill", { source = positionOf(self.object) }
     end,
+    [Action.REPLACE_BLADES] = function(self)
+        return "replaceBlades", { source = positionOf(self.object), itemId = self.item:getID() }
+    end,
 }
 
 -- In-game minutes of the jobs that skill doesn't speed up.
@@ -348,6 +359,8 @@ local MINUTES = {
     -- A lever or pin at the foot of the mast.
     [Action.BRAKE] = 1,
     [Action.RELEASE_BRAKE] = 1,
+    -- Lowering the head, unbolting the broken blades and bolting new ones on.
+    [Action.REPLACE_BLADES] = 20,
 }
 
 -- The share of its full time a job takes at an Electricity level: all of it at level 3, less

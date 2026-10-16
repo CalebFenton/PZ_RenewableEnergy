@@ -42,7 +42,10 @@ Debug.DIGESTER_RECIPES = {
 Debug.GASIFIER_RECIPES = {
     "RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
 }
-Debug.WIND_RECIPES = { "RenewableEnergy_ScoopRotor" }
+Debug.WIND_RECIPES = {
+    "RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
+    "RenewableEnergy_AlternatorWindCharger",
+}
 Debug.ENTITY_RECIPES = {}
 for _, list in ipairs({ Debug.DIGESTER_RECIPES, Debug.GASIFIER_RECIPES, Debug.WIND_RECIPES }) do
     for _, name in ipairs(list) do

@@ -33,8 +33,9 @@ PowerBank.MODULES = "RenewableEnergy_modules"
 -- charger keeps CONNECTED_ONCE too.
 PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
 PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
--- Placed wind charger modData: its brake is on.
+-- Placed wind charger modData: its brake is on; its blades are broken.
 PowerBank.BRAKED = "RenewableEnergy_braked"
+PowerBank.BROKEN = "RenewableEnergy_bladesBroken"
 -- Treadmill tile modData: the tile wired to feed a bank (one of its two tiles).
 PowerBank.TREADMILL_WIRED = "RenewableEnergy_treadmillWired"
 
@@ -141,6 +142,27 @@ end
 function PowerBank.setBraked(isoObject, braked)
     isoObject:getModData()[PowerBank.BRAKED] = braked or nil
     isoObject:transmitModData()
+end
+
+function PowerBank.isBroken(isoObject)
+    return isoObject:getModData()[PowerBank.BROKEN] == true
+end
+
+--- Marks a placed wind charger's blades broken or whole and sends it to clients. Authority only.
+function PowerBank.setBroken(isoObject, broken)
+    isoObject:getModData()[PowerBank.BROKEN] = broken or nil
+    isoObject:transmitModData()
+end
+
+--- The blade items that make a wind charger of `kind` whole again (Specs.wind.turbines blades),
+--- as a set of full types; empty for a kind that never breaks.
+function PowerBank.bladesFor(kind)
+    local spec = Specs.wind.turbines[kind]
+    local set = {}
+    for _, fullType in ipairs(spec and spec.blades or {}) do
+        set[fullType] = true
+    end
+    return set
 end
 
 local function isSource(object)

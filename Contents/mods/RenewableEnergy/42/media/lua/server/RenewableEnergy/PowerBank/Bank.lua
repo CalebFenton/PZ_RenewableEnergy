@@ -329,6 +329,7 @@ function Bank:addSource(isoObject)
     local source = { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(), kind = kind, watts = 0 }
     if PowerBank.isWind(kind) then
         source.braked = PowerBank.isBraked(isoObject)
+        source.broken = PowerBank.isBroken(isoObject)
         source.shelter = Wind.shelterAt(source.x, source.y, source.z)
     elseif kind == "treadmill" then
         source.facing = facing
@@ -501,24 +502,48 @@ local function panelWatts(source, object, inSlot, hours, context)
     source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
 end
 
--- A wind charger's output over the pass, and why it makes nothing or little: braked, calm, or
--- sheltered. Its brake is the object's while it is loaded (the menu sets both), and its shelter is
--- counted again then, since the trees and buildings around it change.
-local function windWatts(source, object, inSlot, context)
+--- Whether a wind charger left running through `hours` of a wind of `kph` breaks its blades, at
+--- its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage options.
+function Bank.windBreak(source, kph, hours)
+    local options = SandboxVars.RenewableEnergy
+    local spec = Specs.wind.turbines[source.kind]
+    if not options.StormDamage or hours <= 0 or source.braked or source.broken or not Wind.canBreak(spec, kph) then
+        return false
+    end
+    local perHour = spec.breakPerHour * options.StormDamageRate / 100
+    return ZombRandFloat(0, 1) < 1 - (1 - math.min(1, perHour)) ^ hours
+end
+
+-- A wind charger's output over the pass, and why it makes nothing or little: braked, broken,
+-- calm, furled or sheltered. Its brake is the object's while it is loaded (the menu sets both);
+-- its broken blades are the record's, which a storm may break while the object is unloaded, and
+-- go to the object when it is loaded. Its shelter is counted again then, since the trees and
+-- buildings around it change.
+local function windWatts(source, object, inSlot, hours, context)
     if object then
         source.braked = PowerBank.isBraked(object)
         source.shelter = Wind.shelterAt(source.x, source.y, source.z)
     end
+    if Bank.windBreak(source, context.windKph, hours) then
+        source.broken = true
+    end
+    if object and PowerBank.isBroken(object) ~= (source.broken == true) then
+        PowerBank.setBroken(object, source.broken)
+    end
     local spec = Specs.wind.turbines[source.kind]
     local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0)
     source.windKph = math.floor(context.windKph + 0.5)
-    source.watts = (inSlot and not source.braked) and watts or 0
+    source.watts = (inSlot and not source.braked and not source.broken) and watts or 0
     if not inSlot then
         source.reason = "noController"
     elseif source.braked then
         source.reason = "braked"
+    elseif source.broken then
+        source.reason = "broken"
     elseif context.windKph <= spec.cutInKph then
         source.reason = "calm"
+    elseif Wind.furled(spec, context.windKph) then
+        source.reason = "furled"
     elseif (source.shelter or 0) * Specs.wind.shelterLoss > 1 - LOW_SHARE then
         source.reason = "sheltered"
     else
@@ -563,7 +588,7 @@ function Bank:updateSources(hours, context)
             used = used + PowerBank.slotsOf(source.kind)
             local inSlot = used <= slots
             if PowerBank.isWind(source.kind) then
-                windWatts(source, object, inSlot, context)
+                windWatts(source, object, inSlot, hours, context)
                 windW = windW + source.watts
             elseif source.kind == "treadmill" then
                 runWatts(source, inSlot, hours)
@@ -935,7 +960,7 @@ function Bank:sourceStatus()
             reason = source.reason,
         }
         if PowerBank.isWind(source.kind) then
-            entry.braked, entry.windKph = source.braked == true, source.windKph or 0
+            entry.braked, entry.broken, entry.windKph = source.braked == true, source.broken == true, source.windKph or 0
             entry.shelterPct = math.floor(100 * (source.shelter or 0) + 0.5)
         elseif PowerBank.isPanel(source.kind) then
             local modules = {}

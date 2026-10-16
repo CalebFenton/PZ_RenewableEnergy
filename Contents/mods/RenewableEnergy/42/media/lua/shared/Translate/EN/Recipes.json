@@ -49,5 +49,12 @@
     "RenewableEnergy_WeldMetalDrum": "Weld Metal Drum",
     "RenewableEnergy_MakeVinegarMildewSpray": "Make Mildew Spray from Wood Vinegar",
     "RenewableEnergy_MakeVinegarAphidSpray": "Make Aphid Spray from Wood Vinegar",
-    "RenewableEnergy_ScoopRotor": "Scoop Rotor Wind Charger"
+    "RenewableEnergy_ScoopRotor": "Scoop Rotor Wind Charger",
+    "RenewableEnergy_PropellerWood": "Propeller Wind Charger (Wooden Blades)",
+    "RenewableEnergy_PropellerPipe": "Propeller Wind Charger (Pipe Blades)",
+    "RenewableEnergy_AlternatorWindCharger": "Homemade Alternator Wind Charger",
+    "RenewableEnergy_CarveWoodenBlades": "Carve Wooden Blades",
+    "RenewableEnergy_CutPipeBlades": "Cut Pipe Blades",
+    "RenewableEnergy_ForgeSteelBlades": "Forge Steel Blades",
+    "RenewableEnergy_MakeHomemadeAlternator": "Make Homemade Alternator"
 }

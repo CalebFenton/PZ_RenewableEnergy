@@ -145,6 +145,26 @@ function Commands.setBrake(player, args)
     return true
 end
 
+--- Puts the blades `itemId` from the player's inventory on the wind charger at `args.source`,
+--- whose blades a storm broke. Its bank's record, if it feeds one, mends with the object.
+function Commands.replaceBlades(player, args)
+    local object = sourceAt(args.source)
+    local kind = object and PowerBank.sourceKind(object)
+    if not PowerBank.isWind(kind) then return false, "no wind charger" end
+    local bank = bankOfSource(args.source)
+    local source = bank and bank:findSource(args.source.x, args.source.y, args.source.z)
+    if not (PowerBank.isBroken(object) or (source and source.broken)) then return false, "not broken" end
+    local item = type(args.itemId) == "number" and player:getInventory():getItemWithIDRecursiv(args.itemId)
+    if not (item and PowerBank.bladesFor(kind)[item:getFullType()]) then return false, "no blades" end
+    RenewableEnergy.takeItem(player, item)
+    PowerBank.setBroken(object, false)
+    if source then
+        source.broken = false
+        bank:sendStatus()
+    end
+    return true
+end
+
 --- Wires the treadmill tile at `args.source` to feed a bank, from the player's wire and scrap.
 function Commands.wireTreadmill(player, args)
     local object = isPosition(args.source) and PowerBank.treadmillOn(getSquare(args.source.x, args.source.y, args.source.z))

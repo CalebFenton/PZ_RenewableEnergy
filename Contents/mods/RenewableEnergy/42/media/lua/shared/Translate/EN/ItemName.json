@@ -44,5 +44,10 @@
     "RenewableEnergy.HomesteadPowerMag3": "Homestead Power #3",
     "RenewableEnergy.TarryPacking": "Tarry Packing",
     "RenewableEnergy.FemaPamphlet": "FEMA Wood Gas Generator Plans",
-    "RenewableEnergy.TreadmillMotor": "Treadmill Motor"
+    "RenewableEnergy.TreadmillMotor": "Treadmill Motor",
+    "RenewableEnergy.HomesteadPowerMag4": "Homestead Power #4",
+    "RenewableEnergy.WoodenBlades": "Carved Wooden Blades",
+    "RenewableEnergy.PipeBlades": "Plastic Pipe Blades",
+    "RenewableEnergy.SteelBlades": "Forged Steel Blades",
+    "RenewableEnergy.HomemadeAlternator": "Homemade Alternator"
 }

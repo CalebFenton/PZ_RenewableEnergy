@@ -287,6 +287,8 @@ local MOUNTS = {
 -- Wind chargers by kind.
 local WIND_KINDS = {
     scoop = "IGUI_RenewableEnergy_WindScoop",
+    propeller = "IGUI_RenewableEnergy_WindPropeller",
+    alternator = "IGUI_RenewableEnergy_WindAlternator",
 }
 
 -- Why a source makes less than it could (Bank status `reason`), and whether the player can do
@@ -299,7 +301,9 @@ local REASONS = {
     cracked = { key = "IGUI_RenewableEnergy_ReasonCracked", fixable = true },
     noController = { key = "IGUI_RenewableEnergy_ReasonNoController", fixable = true },
     braked = { key = "IGUI_RenewableEnergy_ReasonBraked", fixable = true },
+    broken = { key = "IGUI_RenewableEnergy_ReasonBroken", fixable = true },
     calm = { key = "IGUI_RenewableEnergy_ReasonCalm" },
+    furled = { key = "IGUI_RenewableEnergy_ReasonFurled" },
     sheltered = { key = "IGUI_RenewableEnergy_ReasonSheltered", fixable = true },
     idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }

@@ -12,17 +12,33 @@ RenewableEnergy.Wind = Wind
 
 local Specs = RenewableEnergy.Specs
 
+--- Whether a turbine of `spec` has turned its head out of a wind of `kph` (Specs.wind.turbines
+--- furlKph): only the homemade alternator does.
+function Wind.furled(spec, kph)
+    return spec.furlKph ~= nil and kph >= spec.furlKph
+end
+
 --- The watts a turbine of `spec` (Specs.wind.turbines) makes in a wind of `kph`, standing on level
 --- `z` with `shelter` (0 open .. 1 walled in) around it: nothing below its cut-in speed, rising
---- with the cube of the speed to its rating at its rated speed, and no more above it.
+--- with the cube of the speed to its rating at its rated speed, and no more above it; furled, its
+--- furled share of the rating.
 function Wind.watts(spec, kph, z, shelter)
     local wind = Specs.wind
     if kph <= spec.cutInKph then
         return 0
     end
-    local share = math.min(1, (kph - spec.cutInKph) / (spec.ratedKph - spec.cutInKph))
+    local share = math.min(1, (kph - spec.cutInKph) / (spec.ratedKph - spec.cutInKph)) ^ 3
+    if Wind.furled(spec, kph) then
+        share = spec.furledShare
+    end
     local height = 1 + wind.heightBonusPerLevel * math.min(math.max(z, 0), wind.maxBonusLevel)
-    return spec.ratedW * share ^ 3 * height * (1 - wind.shelterLoss * shelter)
+    return spec.ratedW * share * height * (1 - wind.shelterLoss * shelter)
+end
+
+--- Whether wind of `kph` can break a turbine of `spec` left running: never the scoop rotor; the
+--- homemade alternator, furled, only in the worst.
+function Wind.canBreak(spec, kph)
+    return spec.breakKph ~= nil and kph >= spec.breakKph
 end
 
 -- How much a square shelters a turbine on level `z`: a tree, or a wall or a building's square that

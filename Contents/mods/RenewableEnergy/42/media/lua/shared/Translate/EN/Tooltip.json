@@ -99,5 +99,11 @@
     "Tooltip_RenewableEnergy_WontTakeCondensate": "That won't take it. Drained hot, it needs metal, glass or a pot.",
     "Tooltip_RenewableEnergy_TreadmillMotor": "A treadmill's motor. Turn it and it makes power: the generator of a homemade wind charger.",
     "Tooltip_RenewableEnergy_ScoopRotor": "Two half-drum scoops turning a treadmill motor on a short pole. Weak and slow, but it takes any wind and never needs the brake. Connect it to a bank like a panel.",
-    "Tooltip_RenewableEnergy_TreadmillNotConnected": "Connect it to a bank first, or the running goes nowhere."
+    "Tooltip_RenewableEnergy_TreadmillNotConnected": "Connect it to a bank first, or the running goes nowhere.",
+    "Tooltip_RenewableEnergy_NeedBlades": "Needs one of: %1.",
+    "Tooltip_RenewableEnergy_Propeller": "A three-bladed propeller on a treadmill motor, high on a pipe mast. Real power in a good wind; set the brake before a storm or the blades break. Takes two input slots.",
+    "Tooltip_RenewableEnergy_AlternatorWindCharger": "Steel blades on a homemade alternator, on a braced two-storey mast. The best of them: its tail turns it out of a gale. Takes three input slots.",
+    "Tooltip_RenewableEnergy_PropellerBlades": "A propeller wind charger's blades. A spare set mends one a storm broke.",
+    "Tooltip_RenewableEnergy_SteelBlades": "The homemade alternator wind charger's blades. A spare set mends one a storm broke.",
+    "Tooltip_RenewableEnergy_HomemadeAlternator": "Speaker magnets on a car's brake hub, turning past hand-wound coils: the generator of the best wind charger."
 }

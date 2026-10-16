@@ -40,15 +40,23 @@ Specs.charger = "Base.CarBatteryCharger"
 -- controller adds. Every source takes slots by what it can make (`sourceSlots`, by kind).
 Specs.freeSlots = 2
 Specs.slotsPerController = 7
-Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1, treadmill = 1 }
+Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1, treadmill = 1, propeller = 2, alternator = 3 }
 
 -- Wind chargers by kind (RenewableEnergy.Wind): watts at the rated speed, the wind it starts
 -- turning in and the wind it makes its rating in, in km/h. The game's wind runs
--- ClimateManager's windPower × 120, mostly 10 to 40 km/h, stronger in winter. The scoop rotor is
--- weak and slow but takes any wind and never breaks.
+-- ClimateManager's windPower × 120, mostly 10 to 40 km/h, stronger in winter, past 60 in a bad
+-- storm. Left unbraked in a wind of `breakKph` or more, its blades break at `breakPerHour` (scaled
+-- by the StormDamage options), and any of `blades` makes it whole again. The scoop rotor is weak
+-- and slow but takes any wind and never breaks; the propeller makes real power and wants braking
+-- before a storm; the homemade alternator turns its head out of a wind of `furlKph`, making
+-- `furledShare` of its rating, and breaks only in the worst.
 Specs.wind = {
     turbines = {
         scoop = { ratedW = 150, cutInKph = 8, ratedKph = 50 },
+        propeller = { ratedW = 500, cutInKph = 10, ratedKph = 40, breakKph = 55, breakPerHour = 0.25,
+            blades = { "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades" } },
+        alternator = { ratedW = 1000, cutInKph = 9, ratedKph = 40, furlKph = 55, furledShare = 0.3,
+            breakKph = 90, breakPerHour = 0.1, blades = { "RenewableEnergy.SteelBlades" } },
     },
     -- Each level it stands above the ground adds this share, up to maxBonusLevel.
     heightBonusPerLevel = 0.15,

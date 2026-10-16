@@ -174,6 +174,14 @@ for facing, ends in pairs(Sprites.treadmill) do
         KINDS[name] = { "treadmill", facing, part }
     end
 end
+for material, facings in pairs(Sprites.windPropeller) do
+    for facing, name in pairs(facings) do
+        KINDS[name] = { "propeller", facing, material }
+    end
+end
+for facing, name in pairs(Sprites.windAlternator) do
+    KINDS[name] = { "alternator", facing }
+end
 
 local function addAll(set, names)
     for _, name in pairs(names) do
@@ -231,6 +239,17 @@ function Sprites.kindOf(spriteName)
         return nil
     end
     return entry[1], entry[2], entry[3]
+end
+
+--- The sprite names of `kind` (Sprites.kindOf), in no order.
+function Sprites.namesOf(kind)
+    local names = {}
+    for name, entry in pairs(KINDS) do
+        if entry[1] == kind then
+            table.insert(names, name)
+        end
+    end
+    return names
 end
 
 --- The sprite name of a placed object, or nil for anything else or an object without a sprite.

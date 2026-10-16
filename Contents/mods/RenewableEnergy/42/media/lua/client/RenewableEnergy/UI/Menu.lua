@@ -29,13 +29,19 @@ local Format = RenewableEnergy.Format
 local Needs = RenewableEnergy.Needs
 local StatusWindow = RenewableEnergy.StatusWindow
 
---- The name of the item a placed tile is: its CustomItem, which picking it up gives back. A
---- vanilla treadmill has none.
+--- The name of a placed tile: the item it is (CustomItem), which picking it up gives back, else
+--- its moveable's name (CustomName, Moveables.json), as a wind charger has. A vanilla treadmill's
+--- moveable name is "Hamster Wheel", so it gets its own.
 function Menu.nameOf(isoObject)
     if PowerBank.isTreadmill(isoObject) then
         return getText("IGUI_RenewableEnergy_Treadmill")
     end
-    return getItemNameFromFullType(isoObject:getProperties():get("CustomItem"))
+    local properties = isoObject:getProperties()
+    local item = properties:get("CustomItem")
+    if item then
+        return getItemNameFromFullType(item)
+    end
+    return Translator.getMoveableDisplayName(properties:get("CustomName"))
 end
 
 --- A bank's name: the one a player gave it, else its tier's.
@@ -318,6 +324,31 @@ local function addBrakeOption(playerNum, menu, source)
         playerNum, queueSource, braked and Action.RELEASE_BRAKE or Action.BRAKE, source)
 end
 
+local function queueBlades(playerNum, source, blades)
+    queueAt(playerNum, source:getSquare(), Action.REPLACE_BLADES, source, nil, nil, blades)
+end
+
+-- Replace Blades, for a wind charger a storm broke: the first blades carried that fit it, or the
+-- option greyed, naming the ones that would.
+local function addBladesOption(playerNum, menu, source)
+    if not PowerBank.isBroken(source) then
+        return
+    end
+    local fits = PowerBank.bladesFor(PowerBank.sourceKind(source))
+    local blades = getSpecificPlayer(playerNum):getInventory():getFirstEvalRecurse(function(item)
+        return fits[item:getFullType()] == true
+    end)
+    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ReplaceBlades"), playerNum, queueBlades, source, blades)
+    if not blades then
+        local names = {}
+        for fullType in pairs(fits) do
+            table.insert(names, getItemNameFromFullType(fullType))
+        end
+        table.sort(names)
+        disable(option, getText("Tooltip_RenewableEnergy_NeedBlades", table.concat(names, ", ")))
+    end
+end
+
 function Menu.addSourceOptions(playerNum, context, source)
     local menu = addSubMenu(context, Menu.nameOf(source))
 
@@ -329,6 +360,7 @@ function Menu.addSourceOptions(playerNum, context, source)
         addSnowOption(playerNum, menu, source, sourceSummary(connected, source))
     end
     addBrakeOption(playerNum, menu, source)
+    addBladesOption(playerNum, menu, source)
 
     local offered = 0
     local kind = PowerBank.sourceKind(source)

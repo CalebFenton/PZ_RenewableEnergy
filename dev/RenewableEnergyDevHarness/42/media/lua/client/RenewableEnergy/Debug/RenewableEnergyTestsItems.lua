@@ -147,6 +147,10 @@ local MAGAZINES = {
     ["RenewableEnergy.FemaPamphlet"] = {
         "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeVinegarMildewSpray", "RenewableEnergy_MakeVinegarAphidSpray",
     },
+    ["RenewableEnergy.HomesteadPowerMag4"] = {
+        "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
+        "RenewableEnergy_MakeHomemadeAlternator",
+    },
 }
 
 -- Which of the mod's recipes this client's character has learned; the knownRecipes handler reads
@@ -230,6 +234,7 @@ end
 local TEACHES_BUILDS = {
     ["RenewableEnergy.HomesteadPowerMag3"] = "DIGESTER_RECIPES",
     ["RenewableEnergy.FemaPamphlet"] = "GASIFIER_RECIPES",
+    ["RenewableEnergy.HomesteadPowerMag4"] = "WIND_RECIPES",
 }
 
 for literature, list in pairs(TEACHES_BUILDS) do

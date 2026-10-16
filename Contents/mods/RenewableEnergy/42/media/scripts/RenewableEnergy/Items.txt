@@ -522,6 +522,22 @@ module RenewableEnergy
         Tags = base:magazine;base:ignorezombiedensity,
     }
 
+    /* Wind and the treadmill: the wind chargers (build menu recipes), their blades and the homemade alternator. */
+    item HomesteadPowerMag4
+    {
+        DisplayCategory = RecipeResource,
+        ItemType = base:literature,
+        Weight = 0.1,
+        Icon = RenewableEnergy_HomesteadPowerMag4,
+        StaticModel = Magazine,
+        WorldStaticModel = RenewableEnergy.HomesteadPowerMag4_Ground,
+        BoredomChange = -20,
+        StressChange = -15,
+        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_PropellerPipe;RenewableEnergy_AlternatorWindCharger;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator,
+        OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
+        Tags = base:magazine;base:ignorezombiedensity,
+    }
+
     /*
         FEMA's 1989 wood gas generator plans: the gasifiers (build menu recipes), the Gas
         Conversion Kit and the wood vinegar sprays. Found where the government kept its paper.
@@ -629,6 +645,53 @@ module RenewableEnergy
         Icon = RenewableEnergy_TreadmillMotor,
         WorldStaticModel = RenewableEnergy.TreadmillMotor_Ground,
         Tooltip = Tooltip_RenewableEnergy_TreadmillMotor,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /* A propeller wind charger's blades: carved from planks, or cut from plastic pipe. A spare set mends a storm-broken one. */
+    item WoodenBlades
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 3.0,
+        Icon = RenewableEnergy_WoodenBlades,
+        WorldStaticModel = RenewableEnergy.WoodenBlades_Ground,
+        Tooltip = Tooltip_RenewableEnergy_PropellerBlades,
+        Tags = base:ignorezombiedensity,
+    }
+
+    item PipeBlades
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 2.0,
+        Icon = RenewableEnergy_PipeBlades,
+        WorldStaticModel = RenewableEnergy.PipeBlades_Ground,
+        Tooltip = Tooltip_RenewableEnergy_PropellerBlades,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /* The homemade alternator wind charger's blades, forged from sheet steel. */
+    item SteelBlades
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 6.0,
+        Icon = RenewableEnergy_SteelBlades,
+        WorldStaticModel = RenewableEnergy.SteelBlades_Ground,
+        Tooltip = Tooltip_RenewableEnergy_SteelBlades,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /* An axial-flux alternator built on a car's brake hub, with speaker magnets and hand-wound coils. */
+    item HomemadeAlternator
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 8.0,
+        Icon = RenewableEnergy_HomemadeAlternator,
+        WorldStaticModel = RenewableEnergy.HomemadeAlternator_Ground,
+        Tooltip = Tooltip_RenewableEnergy_HomemadeAlternator,
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 

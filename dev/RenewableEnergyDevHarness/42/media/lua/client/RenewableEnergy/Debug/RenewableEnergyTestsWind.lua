@@ -89,15 +89,28 @@ test("renewable_energy_wind_power_curve", {
     end,
 })
 
--- This client draws a wind charger as its turning model, once the charger is added to the map
--- (OnObjectAdded, which the placePanel handler fires as placing does).
+-- This client draws each wind charger as its turning model, once the charger is added to the map
+-- (OnObjectAdded, which the placePanel handler fires as placing does): the propeller's by its
+-- blades and facing, the alternator's by its facing.
+local DRAWN = {
+    scoop = Sprites.windScoop,
+    propellerPipeE = Sprites.windPropeller.pipe.E,
+    propellerWoodN = Sprites.windPropeller.wood.N,
+    alternatorW = Sprites.windAlternator.W,
+}
+
 test("renewable_energy_wind_charger_drawn_as_model", {
     run = function(self)
-        self.rotor = T.panel(self, Sprites.windScoop)
+        self.chargers = {}
+        for label, sprite in pairs(DRAWN) do
+            self.chargers[label] = T.panel(self, sprite)
+        end
     end,
     validate = function(self)
-        local object = self.rotor and self.rotor.object
-        expect(object ~= nil and object:getSpriteModel() ~= nil, "the wind charger has no sprite model on this client")
+        for label, charger in pairs(self.chargers) do
+            local object = charger and charger.object
+            expect(object ~= nil and object:getSpriteModel() ~= nil, "the " .. label .. " charger has no sprite model on this client")
+        end
     end,
 })
 
@@ -257,5 +270,102 @@ test("renewable_energy_wind_treadmill_run_feeds_bank", {
         expect(self.server.perkXp.value > self.xpBefore, "the run taught no Fitness")
         local label = RenewableEnergy.StatusWindow.panelLabel(source, source)
         expect(label:find(getText("IGUI_RenewableEnergy_Treadmill"), 1, true) == 1, "the window calls the treadmill " .. label)
+    end,
+})
+
+-- Propeller and homemade alternator ------------------------------------------------------------
+
+local CONTROLLER = "RenewableEnergy.ChargeController"
+
+-- The status entry of the source at `position` in a bank state.
+local function sourceAt(state, position)
+    for _, source in ipairs(state and state.status and state.status.sources or {}) do
+        if PowerBank.samePosition(source, position) then
+            return source
+        end
+    end
+    return nil
+end
+
+-- Left unbraked through a storm, a propeller's blades break and it makes nothing until a spare set
+-- goes on; a braked one comes through whole. The menu offers Replace Blades, greyed until the
+-- character carries blades that fit.
+test("renewable_energy_wind_propeller_storm_and_blades", {
+    instant = true,
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
+    run = function(self)
+        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
+        if not bank then return end
+        self.left = T.panel(self, Sprites.windPropeller.wood.S, { near = bank, connect = true })
+        self.braked = T.panel(self, Sprites.windPropeller.pipe.S, { near = bank, connect = true })
+        if not (self.left and self.braked) then return end
+        T.server(self, "perform", function()
+            return { command = "setBrake", args = { source = self.braked.position, braked = true } }
+        end)
+        -- Long enough in a gale that an unbraked propeller all but surely breaks: 1 - 0.75^60.
+        local spec = Specs.wind.turbines.propeller
+        T.bankPass(self, bank, 0, { windKph = spec.breakKph + 5, hours = 60 })
+        T.step(function() self.storm = bank.state end)
+        T.waitUntil(function() return PowerBank.isBroken(self.left.object) end, 120)
+        T.step(function()
+            local context = ISContextMenu.get(0, 0, 0)
+            local menu = RenewableEnergy.Menu.addSourceOptions(0, context, self.left.object)
+            self.emptyHanded = menu:getOptionFromName(getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
+            self.emptyHanded = self.emptyHanded and self.emptyHanded.notAvailable
+            context:hideAndChildren()
+        end)
+        T.give(self, "blades", { { type = "RenewableEnergy.WoodenBlades" } })
+        T.goNextTo(self, self.left.square)
+        T.step(function()
+            ISTimedActionQueue.add(RenewableEnergyAction:new(T.player(), RenewableEnergyAction.REPLACE_BLADES, self.left.object,
+                nil, nil, self.items.blades[1]))
+        end)
+        T.waitUntil(function() return not PowerBank.isBroken(self.left.object) end, 120)
+        T.server(self, "carried", { types = { "RenewableEnergy.WoodenBlades" } })
+        T.bankPass(self, bank, 0, { windKph = 30 })
+        T.step(function() self.mended = bank.state end)
+    end,
+    validate = function(self)
+        expect(self.left.connected and self.braked.connected, "the bank refused a propeller")
+        local left, braked = sourceAt(self.storm, self.left.position), sourceAt(self.storm, self.braked.position)
+        if not expect(left and braked, "the bank's status lists no propellers") then return end
+        expect(left.broken and left.watts == 0 and left.reason == "broken",
+            "unbraked through the gale it reads broken " .. tostring(left.broken) .. ", " .. left.watts .. " W, " .. tostring(left.reason))
+        expect(not braked.broken, "the braked propeller broke")
+        expect(self.emptyHanded == true, "with no blades carried, Replace Blades isn't offered greyed out")
+        expect(#(self.server.carried.items["RenewableEnergy.WoodenBlades"] or {}) == 0, "replacing the blades left them in the inventory")
+        local mended = sourceAt(self.mended, self.left.position)
+        expect(mended and not mended.broken and mended.watts > 0, "with new blades it still makes nothing")
+    end,
+})
+
+-- The homemade alternator takes three input slots, more than a bank without a controller has; in a
+-- gale it turns out of the wind and makes its furled share, without breaking.
+test("renewable_energy_wind_alternator_slots_and_furling", {
+    instant = true,
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
+    run = function(self)
+        local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        if not box then return end
+        self.refused = T.panel(self, Sprites.windAlternator.N, { near = box, connect = true })
+        local rack = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
+        if not rack then return end
+        self.alternator = T.panel(self, Sprites.windAlternator.E, { near = rack, connect = true })
+        if not self.alternator then return end
+        local spec = Specs.wind.turbines.alternator
+        T.bankPass(self, rack, 0, { windKph = spec.furlKph + 5, hours = 60 })
+        T.step(function() self.gale = rack.state end)
+    end,
+    validate = function(self)
+        expect(not self.refused.connected and self.refused.reason == "Tooltip_RenewableEnergy_NoInputSlot",
+            "a battery box with two free slots took the alternator: " .. tostring(self.refused.reason))
+        expect(self.alternator.connected, "a rack with a controller refused the alternator: " .. tostring(self.alternator.reason))
+        local source = sourceAt(self.gale, self.alternator.position)
+        if not expect(source ~= nil, "the rack's status lists no alternator") then return end
+        local spec = Specs.wind.turbines.alternator
+        local expected = Wind.watts(spec, spec.furlKph + 5, source.z, source.shelterPct / 100)
+        T.expectNear("furled alternator watts", source.watts, expected, 2)
+        T.expectNear("furled share", expected / Wind.watts(spec, spec.ratedKph, source.z, source.shelterPct / 100), spec.furledShare, 0.001)
+        expect(source.reason == "furled" and not source.broken, "in a gale it reads " .. tostring(source.reason) .. ", broken " .. tostring(source.broken))
     end,
 })
