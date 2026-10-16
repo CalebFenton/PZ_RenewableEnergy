@@ -1,10 +1,12 @@
 /*
-    What the build menu builds: the biogas digesters. Each tile becomes a digester through
-    OnCreate (server/RenewableEnergy/Biogas/DigesterSystem.lua). In module Base with the mod's
-    prefix, as the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without
-    its spaces, in Recipes.json.
+    What the build menu builds: the biogas digesters and the wood gas gasifiers. Each tile becomes
+    one through OnCreate (server/RenewableEnergy/Biogas/DigesterSystem.lua,
+    server/RenewableEnergy/WoodGas/GasifierSystem.lua). In module Base with the mod's prefix, as
+    the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without its spaces,
+    in Recipes.json.
 
-    The digesters are taught by Homestead Power #3, or learned with the skills below.
+    The digesters are taught by Homestead Power #3, the gasifiers by the FEMA pamphlet, or both
+    are learned with the skills below.
 */
 module Base
 {
@@ -33,6 +35,24 @@ module Base
             LuaWindowClass = ISEntityWindow,
             DisplayName = RenewableEnergy_BrickDome,
             Icon = RenewableEnergy_Build_BrickDome,
+        }
+        entity ES_RenewableEnergy_PrimitiveGasifier
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_PrimitiveGasifier,
+            Icon = RenewableEnergy_Build_PrimitiveGasifier,
+        }
+        entity ES_RenewableEnergy_Gasifier
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_Gasifier,
+            Icon = RenewableEnergy_Build_Gasifier,
+        }
+        entity ES_RenewableEnergy_AdvancedGasifier
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_AdvancedGasifier,
+            Icon = RenewableEnergy_Build_AdvancedGasifier,
         }
     }
 
@@ -200,6 +220,137 @@ module Base
                 item 4 tags[base:concrete] flags[DontRecordInput],
                 item 2 [Base.RubberHose],
                 item 1 [Base.Pipe],
+            }
+        }
+    }
+
+    /* The FEMA unit: a galvanized trash can over a cooking-pot firebox, a bucket for its filter. */
+    entity RenewableEnergy_PrimitiveGasifier
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_PrimitiveGasifier,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.GasifierSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_250,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildLowNoTool,
+            time = 200,
+            category = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = Mechanics:3;MetalWelding:2,
+            SkillRequired = Mechanics:2;MetalWelding:1,
+            xpAward = Mechanics:20,
+            Tooltip = Tooltip_RenewableEnergy_PrimitiveGasifier,
+            inputs
+            {
+                item 1 tags[base:hammer] mode:keep flags[MayDegradeLight],
+                item 1 [Base.Mov_BinRound;Base.Mov_PublicGarbageBin],
+                item 1 [Base.Pot],
+                item 2 [Base.MetalPipe],
+                item 1 tags[base:bucket],
+                item 2 [Base.DuctTape],
+            }
+        }
+    }
+
+    /* A steel drum with an ash door and a filter drum. */
+    entity RenewableEnergy_Gasifier
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_Gasifier,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.GasifierSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_251,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildMetalStructureMedium,
+            time = 300,
+            category = Welding,
+            Tags = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = MetalWelding:5;Mechanics:4,
+            SkillRequired = MetalWelding:4;Mechanics:3,
+            xpAward = MetalWelding:40,
+            Tooltip = Tooltip_RenewableEnergy_Gasifier,
+            inputs
+            {
+                item 1 tags[base:weldingmask] mode:keep,
+                item 4 [Base.BlowTorch] flags[DontRecordInput],
+                item 2 [Base.WeldingRods] flags[DontRecordInput],
+                item 1 [Base.MetalDrum],
+                item 2 [Base.SheetMetal],
+                item 2 [Base.MetalPipe],
+                item 1 tags[base:bucket],
+            }
+        }
+    }
+
+    /* A welded body with a forged grate and restriction, made for charcoal. */
+    entity RenewableEnergy_AdvancedGasifier
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_AdvancedGasifier,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.GasifierSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_252,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildMetalStructureMedium,
+            time = 500,
+            category = Welding,
+            Tags = Welding,
+            NeedToBeLearn = true,
+            AutoLearnAll = MetalWelding:7;Blacksmith:4;Mechanics:5,
+            SkillRequired = MetalWelding:6;Blacksmith:3;Mechanics:4,
+            xpAward = MetalWelding:60;Blacksmith:20,
+            Tooltip = Tooltip_RenewableEnergy_AdvancedGasifier,
+            inputs
+            {
+                item 1 tags[base:weldingmask] mode:keep,
+                item 1 tags[base:hammer] mode:keep flags[MayDegradeLight],
+                item 6 [Base.BlowTorch] flags[DontRecordInput],
+                item 4 [Base.WeldingRods] flags[DontRecordInput],
+                item 6 [Base.SheetMetal],
+                item 3 [Base.MetalPipe],
+                item 2 [Base.IronBar],
+                item 1 tags[base:bucket],
             }
         }
     }

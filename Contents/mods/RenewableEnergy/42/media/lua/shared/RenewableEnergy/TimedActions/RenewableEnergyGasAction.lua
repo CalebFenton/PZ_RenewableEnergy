@@ -50,7 +50,7 @@ function Action:update()
 end
 
 function Action:start()
-    if not isClient() and GasKit.refusal(self.character, self.job, self.generator, self.digester) then
+    if not isClient() and GasKit.refusal(self.character, self.job, self.generator, self.source) then
         self:forceStop()
         return
     end
@@ -84,16 +84,17 @@ function Action:complete()
     if not onSquare(self.generator) or (isServer() and not withinReach(self.character, self.generator)) then
         return false
     end
-    return RenewableEnergy.GasLines.perform(self.character, self.job, self.generator, self.digester)
+    return RenewableEnergy.GasLines.perform(self.character, self.job, self.generator, self.source)
 end
 
 -- Parameter names match the fields: the multiplayer server rebuilds the action by passing them to
--- new() in order (NetTimedAction). `digester` is the far end of Connect Gas Line, else nil.
-function Action:new(character, job, generator, digester)
+-- new() in order (NetTimedAction). `source` is the digester or gasifier at the far end of Connect
+-- Gas Line, else nil.
+function Action:new(character, job, generator, source)
     local o = ISBaseTimedAction.new(self, character)
     o.job = job
     o.generator = generator
-    o.digester = digester
+    o.source = source
     o.stopOnWalk = true
     o.stopOnRun = true
     o.maxTime = o:getDuration()

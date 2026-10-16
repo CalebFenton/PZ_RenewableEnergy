@@ -1020,4 +1020,29 @@ module Base
             item 1 Base.Propane_Refill,
         }
     }
+
+    /* A drum rolled and welded from sheet metal, once the found ones run out: the Gasifier and the
+       digesters take one. Vanilla has no drum recipe. */
+    craftRecipe RenewableEnergy_WeldMetalDrum
+    {
+        timedAction = Welding,
+        time = 300,
+        Tags = AnySurfaceCraft;Welding,
+        category = Metalworking,
+        NeedToBeLearn = true,
+        AutoLearnAll = MetalWelding:6,
+        SkillRequired = MetalWelding:5,
+        xpAward = MetalWelding:30,
+        inputs
+        {
+            item 1 tags[base:weldingmask] mode:keep,
+            item 4 [Base.BlowTorch],
+            item 2 [Base.WeldingRods],
+            item 4 [Base.SheetMetal],
+        }
+        outputs
+        {
+            item 1 Base.MetalDrum,
+        }
+    }
 }

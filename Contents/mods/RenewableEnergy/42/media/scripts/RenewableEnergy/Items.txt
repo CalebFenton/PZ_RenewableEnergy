@@ -583,7 +583,22 @@ module RenewableEnergy
         Tags = base:iscompostable;base:ignorezombiedensity,
     }
 
-    /* Fitted to a vanilla generator, lets it run on gas from a digester (RenewableEnergy.GasKit). */
+    /*
+        A gasifier filter's packing once tar has soaked it (RenewableEnergy.Gasifier). FEMA: the
+        used chips "can be dumped into the fuel hopper and burned", so the hopper takes it.
+    */
+    item TarryPacking
+    {
+        DisplayCategory = Junk,
+        ItemType = base:normal,
+        Weight = 0.1,
+        Icon = RenewableEnergy_TarryPacking,
+        WorldStaticModel = RenewableEnergy.TarryPacking_Ground,
+        Tooltip = Tooltip_RenewableEnergy_TarryPacking,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /* Fitted to a vanilla generator, lets it run on gas from a digester or gasifier (RenewableEnergy.GasKit). */
     item GasConversionKit
     {
         DisplayCategory = VehicleMaintenance,

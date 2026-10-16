@@ -67,7 +67,7 @@
     "Tooltip_RenewableEnergy_HasLine": "A gas line is already connected.",
     "Tooltip_RenewableEnergy_NoLine": "No gas line is connected.",
     "Tooltip_RenewableEnergy_DigesterOutOfReach": "The digester is too far away, or on another floor.",
-    "Tooltip_RenewableEnergy_NoDigesterInReach": "No digester within %1 squares on this floor.",
+    "Tooltip_RenewableEnergy_NoDigesterInReach": "No digester within %1 squares on this floor, and no gasifier beside the generator.",
     "Tooltip_RenewableEnergy_OnGasAlready": "It already runs on gas.",
     "Tooltip_RenewableEnergy_OnPetrolAlready": "It already runs on gasoline.",
     "Tooltip_RenewableEnergy_RemoveKitFirst": "Remove the Gas Conversion Kit first.",
@@ -84,5 +84,15 @@
     "Tooltip_RenewableEnergy_NeedsFire": "Needs something to light it with.",
     "Tooltip_RenewableEnergy_HeaterLit": "It's already lit.",
     "Tooltip_RenewableEnergy_HeaterOut": "It isn't lit.",
-    "Tooltip_RenewableEnergy_NoHeater": "The heater is gone."
+    "Tooltip_RenewableEnergy_NoHeater": "The heater is gone.",
+    "Tooltip_RenewableEnergy_PrimitiveGasifier": "Burns wood to make gas for a generator beside it with a Gas Conversion Kit. Small, tarry and needs cleaning often.",
+    "Tooltip_RenewableEnergy_Gasifier": "Burns wood to make gas for a generator beside it with a Gas Conversion Kit. Runs most of a night on a load.",
+    "Tooltip_RenewableEnergy_AdvancedGasifier": "Burns wood or, best, charcoal to make gas for a generator beside it with a Gas Conversion Kit. Little tar and little cleaning.",
+    "Tooltip_RenewableEnergy_TarryPacking": "A gasifier filter's packing, soaked with tar. Burns in the gasifier's hopper.",
+    "Tooltip_RenewableEnergy_GasifierLit": "It's already lit.",
+    "Tooltip_RenewableEnergy_GasifierOut": "It isn't lit.",
+    "Tooltip_RenewableEnergy_NoWood": "There's no wood in the hopper.",
+    "Tooltip_RenewableEnergy_LittleAsh": "There's too little ash to clean out.",
+    "Tooltip_RenewableEnergy_NoGasifier": "The gasifier is gone.",
+    "Tooltip_RenewableEnergy_GasifierNotBeside": "A gasifier must stand right beside the generator."
 }

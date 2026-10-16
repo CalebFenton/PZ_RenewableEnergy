@@ -1,5 +1,5 @@
--- The authority's half of the biogas tests: digesters and their stink live where the authority
--- runs them. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
+-- The authority's half of the biogas and wood gas tests: digesters, gasifiers and their stink live
+-- where the authority runs them. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
@@ -204,6 +204,7 @@ handler("gasRead", function(player, args)
             end
         end
         copy.connected = state.source ~= nil
+        copy.sourceKind = state.source and state.source.kind
     end
     local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
     return {
@@ -246,4 +247,112 @@ handler("gasCap", function(player, args, defer)
     GasKit.CAP_W = args.watts
     defer(function() GasKit.CAP_W = cap end)
     return {}
+end)
+
+-- Gasifiers ------------------------------------------------------------------------------------
+
+local function gasifierAt(args)
+    local square = Helpers.squareAt(args)
+    local object = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.Gasifier.isGasifier)
+    local record = object and RenewableEnergy.Gasifier.recordOf(object)
+    if not record then
+        return nil, nil, "a gasifier at " .. tostring(args.x) .. "," .. tostring(args.y)
+    end
+    return record, object
+end
+
+-- Builds a gasifier of tier `args.tier` at x, y, z as the build menu does, as digesterPlace does.
+handler("gasifierPlace", function(player, args, defer)
+    local square = Helpers.squareAt(args)
+    if not square then
+        return nil, "a loaded square for a gasifier"
+    end
+    local thumpable = IsoThumpable.new(getCell(), square, RenewableEnergy.Sprites.gasifier[args.tier], false, nil)
+    square:AddSpecialObject(thumpable)
+    RenewableEnergy.GasifierSystem.OnCreate({ thumpable = thumpable })
+    thumpable:transmitCompleteItemToClients()
+    defer(function() Helpers.removeObject(select(2, gasifierAt(args)) or thumpable) end)
+    return {}
+end)
+
+-- Sets the record's fields `args.fields` (GasifierObject.SAVED_FIELDS), then shows and sends what
+-- changed.
+handler("gasifierSet", function(player, args)
+    local record, _, missing = gasifierAt(args)
+    if not record then return nil, missing end
+    for key, value in pairs(args.fields) do
+        record[key] = value
+    end
+    record.lastHour = getGameTime():getWorldAgeHours()
+    record:afterChange()
+    return {}
+end)
+
+-- Puts `args.hopper` and `args.filter` ({ type, count }) in the gasifier's containers, past their
+-- filters, as a player's transfer would, and sends the summary.
+handler("gasifierFill", function(player, args)
+    local record, object, missing = gasifierAt(args)
+    if not object then return nil, missing end
+    local Gasifier = RenewableEnergy.Gasifier
+    for key, container in pairs({ hopper = Gasifier.hopperOf(object), filter = Gasifier.filterOf(object) }) do
+        for _, entry in ipairs(args[key] or {}) do
+            for _ = 1, entry.count or 1 do
+                local item = container:AddItem(entry.type)
+                if item then
+                    sendAddItemToContainer(container, item)
+                end
+            end
+        end
+    end
+    record:afterChange()
+    return {}
+end)
+
+-- Runs the gasifier's own pass as though `args.hours` had passed since its last.
+handler("gasifierPass", function(player, args)
+    local record, _, missing = gasifierAt(args)
+    if not record then return nil, missing end
+    record.lastHour = getGameTime():getWorldAgeHours() - args.hours
+    record:update()
+    return {}
+end)
+
+-- Burns `args.kg` in the gasifier, as a pass would, to leave its ash and tar.
+handler("gasifierBurn", function(player, args)
+    local record, _, missing = gasifierAt(args)
+    if not record then return nil, missing end
+    local burned = record:burn(args.kg)
+    record:afterChange()
+    return { burned = burned }
+end)
+
+-- What the gasifier burns to supply a generator delivering `args.watts` for `args.hours`: the
+-- firebox and hopper's kilograms before and after, and whether it kept up.
+handler("gasifierSupply", function(player, args)
+    local record, object, missing = gasifierAt(args)
+    if not record then return nil, missing end
+    local Gasifier = RenewableEnergy.Gasifier
+    local before = record.fireKg + Gasifier.hopperKg(Gasifier.hopperOf(object))
+    local kept = record:supply(args.watts, args.hours)
+    record:afterChange()
+    return { burned = before - record.fireKg - Gasifier.hopperKg(Gasifier.hopperOf(object)), kept = kept }
+end)
+
+-- The record as plain values, plus its containers, building, overlays and summary.
+handler("gasifierRead", function(player, args)
+    local record, object, missing = gasifierAt(args)
+    if not record then return nil, missing end
+    local Gasifier = RenewableEnergy.Gasifier
+    local state = {}
+    for _, key in ipairs(RenewableEnergy.GasifierObject.SAVED_FIELDS) do
+        state[key] = record[key]
+    end
+    local building = object:getSquare():getBuilding()
+    state.toxic = building ~= nil and building:isToxic()
+    state.overlays = Helpers.overlaysOf(object)
+    state.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(object))
+    state.containers = object:getContainerCount()
+    state.clean, state.tarry = Gasifier.filterCounts(Gasifier.filterOf(object))
+    state.summary = record:buildSummary()
+    return state
 end)

@@ -29,6 +29,30 @@ function RenewableEnergy.takeItem(character, item)
     end
 end
 
+--- Shows `wanted` (a sprite name, or nil for none) as the one overlay of the kind `isKind(name)`
+--- tells on `isoObject`, and sends the tile on when that changes it. Authority only.
+function RenewableEnergy.showOverlay(isoObject, isKind, wanted)
+    local attached = isoObject:getAttachedAnimSprite()
+    local count = attached and attached:size() or 0
+    local shown
+    for i = 0, count - 1 do
+        local name = attached:get(i):getName()
+        if isKind(name) then
+            shown = name
+        end
+    end
+    if shown == wanted then return end
+    for i = count - 1, 0, -1 do
+        if isKind(attached:get(i):getName()) then
+            isoObject:RemoveAttachedAnim(i)
+        end
+    end
+    if wanted then
+        isoObject:addAttachedAnimSpriteByName(wanted)
+    end
+    isoObject:transmitUpdatedSpriteToClients()
+end
+
 -- A job's needs are a list of what it takes of the character, each { kind, have, need } with
 -- what it names: `perk` for a skill, `tool` (an ItemTag field) for a tool, `item` (a full type)
 -- for an item counted by type, `input` (an InputScript) for a recipe's input, `recipe` for a

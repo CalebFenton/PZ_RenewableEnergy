@@ -15,7 +15,8 @@ local PAD = 10
 local LABEL_GAP = 16
 local WIDTH = 300
 
--- One window per local player.
+-- One status window per local player, of either kind (this or a class derived from it, such as
+-- RenewableEnergy.GasifierWindow).
 DigesterWindow.windows = {}
 
 local COLORS = {
@@ -111,15 +112,23 @@ function DigesterWindow:titleOf(summary)
     return getText("IGUI_RenewableEnergy_Digester_" .. summary.tier)
 end
 
+function DigesterWindow:summaryNow()
+    return Digester.summaryOf(self.object)
+end
+
+function DigesterWindow:rowsOf(summary)
+    return DigesterWindow.rows(summary)
+end
+
 function DigesterWindow:prerender()
-    local summary = Digester.summaryOf(self.digester)
-    if not summary or self.digester:getObjectIndex() == -1 then
+    local summary = self:summaryNow()
+    if not summary or self.object:getObjectIndex() == -1 then
         self:close()
         return
     end
     self.summary = summary
     self.title = self:titleOf(summary)
-    local rows = DigesterWindow.rows(summary)
+    local rows = self:rowsOf(summary)
     local font = UIFont.Small
     local lineHeight = getTextManager():getFontHeight(font) + 2
     local height = self:titleBarHeight() + PAD * 2 + #rows * lineHeight
@@ -160,27 +169,35 @@ function DigesterWindow:close()
     self:removeFromUIManager()
 end
 
-function DigesterWindow:new(x, y, playerNum, digester)
+function DigesterWindow:new(x, y, playerNum, object)
     local o = ISCollapsableWindow.new(self, x, y, WIDTH, 100)
     o.playerNum = playerNum
-    o.digester = digester
+    o.object = object
     o.resizable = false
     return o
 end
 
---- Opens `playerNum`'s window on the digester `digester`, replacing one they had open.
-function DigesterWindow.open(playerNum, digester)
+--- Opens `playerNum`'s window of this class on `object`, replacing the one they had open.
+function DigesterWindow:openOn(playerNum, object)
     local old = DigesterWindow.windows[playerNum]
     if old then
         old:close()
     end
     local x = getPlayerScreenLeft(playerNum) + 100
     local y = getPlayerScreenTop(playerNum) + 100
-    local window = DigesterWindow:new(x, y, playerNum, digester)
+    local window = self:new(x, y, playerNum, object)
     window:initialise()
     window:addToUIManager()
     DigesterWindow.windows[playerNum] = window
     return window
 end
+
+--- Opens `playerNum`'s window on the digester `digester`.
+function DigesterWindow.open(playerNum, digester)
+    return DigesterWindow:openOn(playerNum, digester)
+end
+
+-- Formatting for derived windows.
+DigesterWindow.percent, DigesterWindow.temperature = percent, temperature
 
 return DigesterWindow

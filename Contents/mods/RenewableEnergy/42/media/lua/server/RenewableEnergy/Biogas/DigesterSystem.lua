@@ -8,6 +8,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/Stink"
+require "RenewableEnergy/Fumes"
 local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -52,28 +53,8 @@ function DigesterSystem:OnObjectAboutToBeRemoved(isoObject)
     local digester = self:getLuaObjectOnSquare(isoObject:getSquare())
     if not digester then return end
     Stink.set(digester:key(), digester.x, digester.y, digester.z, 0)
-    if digester.madeToxic then
-        local building = isoObject:getSquare():getBuilding()
-        digester.madeToxic = nil
-        if building and not self:buildingNeedsFumes(building, digester) then
-            building:setToxic(false)
-        end
-    end
+    RenewableEnergy.Fumes.set(digester:key(), isoObject:getSquare():getBuilding(), false)
     self:removeLuaObject(digester)
-end
-
---- Whether a digester other than `except` fills `building` with fumes.
-function DigesterSystem:buildingNeedsFumes(building, except)
-    for i = 1, self:getLuaObjectCount() do
-        local digester = self:getLuaObjectByIndex(i)
-        if digester ~= except and digester.madeToxic then
-            local square = digester:getSquare()
-            if square and square:getBuilding() == building then
-                return true
-            end
-        end
-    end
-    return false
 end
 
 --- The digester at `position` ({ x, y, z }), or nil.

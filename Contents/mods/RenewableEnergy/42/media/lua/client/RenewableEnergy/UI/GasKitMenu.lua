@@ -6,6 +6,7 @@ require "ISUI/ISGeneratorInfoWindow"
 require "TimedActions/ISTakeGenerator"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/Biogas/Digester"
+require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
 require "RenewableEnergy/UI/Needs"
 
@@ -13,13 +14,13 @@ RenewableEnergy = RenewableEnergy or {}
 local GasKitMenu = {}
 RenewableEnergy.GasKitMenu = GasKitMenu
 
-local GasKit, Digester, Needs = RenewableEnergy.GasKit, RenewableEnergy.Digester, RenewableEnergy.Needs
+local GasKit, Digester, Gasifier, Needs = RenewableEnergy.GasKit, RenewableEnergy.Digester, RenewableEnergy.Gasifier, RenewableEnergy.Needs
 local Action = RenewableEnergyGasAction
 
-local function queue(playerNum, job, generator, digester)
+local function queue(playerNum, job, generator, source)
     local character = getSpecificPlayer(playerNum)
     if luautils.walkAdj(character, generator:getSquare(), true) then
-        ISTimedActionQueue.add(Action:new(character, job, generator, digester))
+        ISTimedActionQueue.add(Action:new(character, job, generator, source))
     end
 end
 
@@ -29,15 +30,15 @@ local function disable(option, description)
     option.toolTip.description = description
 end
 
-local function addJob(menu, playerNum, label, job, generator, digester)
+local function addJob(menu, playerNum, label, job, generator, source)
     local character = getSpecificPlayer(playerNum)
-    local option = menu:addOption(label, playerNum, queue, job, generator, digester)
-    local blocker = GasKit.blocker(job, generator, digester)
+    local option = menu:addOption(label, playerNum, queue, job, generator, source)
+    local blocker = GasKit.blocker(job, generator, source)
     if blocker then
         disable(option, getText(blocker))
         return option
     end
-    local needs = GasKit.needs(character, job, generator, digester)
+    local needs = GasKit.needs(character, job, generator, source)
     if #needs > 0 then
         option.notAvailable = RenewableEnergy.firstUnmet(needs) ~= nil
         option.toolTip = ISWorldObjectContextMenu.addToolTip()
@@ -46,10 +47,15 @@ local function addJob(menu, playerNum, label, job, generator, digester)
     return option
 end
 
-local function digesterLabel(generator, digester)
-    local summary = Digester.summaryOf(digester)
-    local name = getText("IGUI_RenewableEnergy_Digester_" .. (summary and summary.tier or "barrel"))
-    local squares = math.floor(IsoUtils.DistanceTo(generator:getX(), generator:getY(), digester:getX(), digester:getY()) + 0.5)
+local function sourceLabel(generator, source)
+    local name
+    if GasKit.sourceKind(source) == "gasifier" then
+        name = getText("IGUI_RenewableEnergy_Gasifier_" .. (Gasifier.tierOf(source) or "standard"))
+    else
+        local summary = Digester.summaryOf(source)
+        name = getText("IGUI_RenewableEnergy_Digester_" .. (summary and summary.tier or "barrel"))
+    end
+    local squares = math.floor(IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY()) + 0.5)
     return getText("ContextMenu_RenewableEnergy_LineTo", name, squares)
 end
 
@@ -63,15 +69,18 @@ function GasKitMenu.addOptions(playerNum, menu, generator)
     if state.source then
         addJob(menu, playerNum, getText("ContextMenu_RenewableEnergy_DisconnectLine"), GasKit.DISCONNECT, generator)
     else
-        local digesters = GasKit.digestersInReach(generator)
+        local sources = GasKit.gasifiersBeside(generator)
+        for _, digester in ipairs(GasKit.digestersInReach(generator)) do
+            table.insert(sources, digester)
+        end
         local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectLine"))
-        if #digesters == 0 then
+        if #sources == 0 then
             disable(connect, getText("Tooltip_RenewableEnergy_NoDigesterInReach", GasKit.REACH))
         else
             local submenu = ISContextMenu:getNew(menu)
             menu:addSubMenu(connect, submenu)
-            for _, digester in ipairs(digesters) do
-                addJob(submenu, playerNum, digesterLabel(generator, digester), GasKit.CONNECT, generator, digester)
+            for _, source in ipairs(sources) do
+                addJob(submenu, playerNum, sourceLabel(generator, source), GasKit.CONNECT, generator, source)
             end
         end
     end

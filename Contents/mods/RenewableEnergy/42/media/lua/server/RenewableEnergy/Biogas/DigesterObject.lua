@@ -14,6 +14,8 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/Stink"
 require "RenewableEnergy/Biogas/GasHeater"
+require "RenewableEnergy/Fumes"
+require "RenewableEnergy/GasLine/GasKit"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, Stink, Sprites = RenewableEnergy.Digester, RenewableEnergy.Stink, RenewableEnergy.Sprites
@@ -479,53 +481,16 @@ function DigesterObject:fuming()
     return self.indoors and self.tier ~= "dome" and (self.sour or self.leakHours > 0)
 end
 
--- Toxicity belongs to the whole building, isn't saved, and any vanilla generator there sets it
--- again within the hour while it runs, so this sets it while fuming and clears what it set.
+-- Toxic while fuming (RenewableEnergy.Fumes).
 function DigesterObject:fumes()
     local isoObject = self:getIsoObject()
     local building = isoObject and isoObject:getSquare():getBuilding()
-    if not building then
-        return
-    end
-    local fuming = self:fuming()
-    if fuming then
-        if not building:isToxic() then
-            building:setToxic(true)
-        end
-        self.madeToxic = true
-    elseif self.madeToxic then
-        self.madeToxic = nil
-        if not self.luaSystem:buildingNeedsFumes(building, self) then
-            building:setToxic(false)
-        end
-    end
+    RenewableEnergy.Fumes.set(self:key(), building, self:fuming())
 end
 
 -- Holder -------------------------------------------------------------------------------------
 
--- Shows `wanted` (a sprite name, or nil for none) as the one overlay of the kind `isKind` tells on
--- the digester's tile, and sends the tile on when that changes it.
-local function showOverlay(isoObject, isKind, wanted)
-    local attached = isoObject:getAttachedAnimSprite()
-    local count = attached and attached:size() or 0
-    local shown
-    for i = 0, count - 1 do
-        local name = attached:get(i):getName()
-        if isKind(name) then
-            shown = name
-        end
-    end
-    if shown == wanted then return end
-    for i = count - 1, 0, -1 do
-        if isKind(attached:get(i):getName()) then
-            isoObject:RemoveAttachedAnim(i)
-        end
-    end
-    if wanted then
-        isoObject:addAttachedAnimSpriteByName(wanted)
-    end
-    isoObject:transmitUpdatedSpriteToClients()
-end
+local showOverlay = RenewableEnergy.showOverlay
 
 function DigesterObject:showHolder()
     local isoObject = self:getIsoObject()
@@ -557,6 +522,29 @@ function DigesterObject:takeGas(m3)
     local taken = math.min(m3, self.gas)
     self.gas = self.gas - taken
     return taken
+end
+
+-- As the gas line's source (GasLines.run): gas below MIN_GAS is too little to run on, and a
+-- generator burns GasKit.gasFor its load.
+local MIN_GAS = 0.01
+
+function DigesterObject:canSupply()
+    return self.gas >= MIN_GAS
+end
+
+function DigesterObject:capW()
+    return RenewableEnergy.GasKit.CAP_W
+end
+
+function DigesterObject:wearFactor()
+    return 1
+end
+
+--- Gives the gas a generator delivering `watts` burns over `hours`. Returns whether there was
+--- enough.
+function DigesterObject:supply(watts, hours)
+    local need = RenewableEnergy.GasKit.gasFor(watts, hours)
+    return self:takeGas(need) + 1e-4 >= need
 end
 
 -- Summary --------------------------------------------------------------------------------------

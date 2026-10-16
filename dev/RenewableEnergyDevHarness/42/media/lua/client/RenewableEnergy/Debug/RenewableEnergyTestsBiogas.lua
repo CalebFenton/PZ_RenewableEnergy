@@ -1,8 +1,8 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Biogas. The stink is the game's own corpse smell, from ghosts (server/RenewableEnergy/Biogas/
--- Stink.lua) that the authority counts; on a multiplayer client the moodle follows the rate the
--- server sends every two seconds (PlayerDamagePacket).
+-- Biogas and wood gas. The stink is the game's own corpse smell, from ghosts
+-- (server/RenewableEnergy/Biogas/Stink.lua) that the authority counts; on a multiplayer client the
+-- moodle follows the rate the server sends every two seconds (PlayerDamagePacket).
 
 local T = RenewableEnergyTest
 local test = T.test
@@ -1036,5 +1036,245 @@ test("renewable_energy_biogas_compressor_inflates_tires_on_power", {
     validate = function(self)
         T.expect(self.unpowered == nil, "a compressor with no power counts as a tire pump")
         T.expect(self.powered and self.powered:getFullType() == Digester.COMPRESSOR, "a powered compressor doesn't count as a tire pump")
+    end,
+})
+
+-- Wood gas ---------------------------------------------------------------------------------------
+
+local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
+
+local function gasifierOn(handle)
+    return RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), Gasifier.isGasifier)
+end
+
+--- Queues a gasifier of `tier` built on `square`. Returns its handle { x, y, z, square }; `object`
+--- is this client's copy once it has its summary.
+local function placeGasifier(self, tier, square)
+    local handle = at(square)
+    handle.square = square
+    local args = at(square)
+    args.tier = tier
+    T.server(self, "gasifierPlace", args)
+    T.waitUntil(function()
+        local object = gasifierOn(handle)
+        handle.object = object and Gasifier.summaryOf(object) and object or nil
+        return handle.object ~= nil
+    end, COPY_FRAMES, "this client's copy of the gasifier")
+    T.step(function() T.need(self, handle.object, "this client's copy of the gasifier") end)
+    return handle
+end
+
+-- A free outdoor square on one of the four sides of `square`, or nil.
+local function besideSquare(square)
+    for _, offset in ipairs({ { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }) do
+        local beside = getSquare(square:getX() + offset[1], square:getY() + offset[2], square:getZ())
+        if RenewableEnergy.Debug.isFreeSquare(beside, false) then
+            return beside
+        end
+    end
+    return nil
+end
+
+local function gasifierCall(self, name, handle, args)
+    args = args or {}
+    args.x, args.y, args.z = handle.x, handle.y, handle.z
+    T.server(self, name, args)
+end
+
+local function readGasifier(self, handle, label)
+    gasifierCall(self, "gasifierRead", handle)
+    T.step(function()
+        self.reads = self.reads or {}
+        self.reads[label] = self.server.gasifierRead
+    end)
+end
+
+local function gasifierJob(self, handle, job)
+    T.goNextTo(self, handle.square)
+    T.step(function()
+        ISTimedActionQueue.add(RenewableEnergyGasifierAction:new(T.player(), job, handle.object))
+    end)
+end
+
+local function hasOverlay(read, name)
+    for _, overlay in ipairs(read.overlays or {}) do
+        if overlay == name then
+            return true
+        end
+    end
+    return false
+end
+
+-- A gasifier beside a kitted generator, piped to it and lit, runs the generator with an empty tank;
+-- out of wood, the generator stops.
+test("renewable_energy_gas_gasifier_runs_generator", {
+    instant = true,
+    run = function(self)
+        local generator = placeGenerator(self, 0)
+        if not generator then return end
+        local square = T.need(self, besideSquare(generator.square), "a free square beside the generator")
+        if not square then return end
+        local gasifier = placeGasifier(self, "standard", square)
+        self.generatorSide = Gasifier.sideOf(gasifier.x, gasifier.y, generator.x, generator.y)
+        self.gasifierSide = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
+        gasifierCall(self, "gasifierFill", gasifier, { hopper = { { type = "Base.Plank", count = 4 } }, filter = { { type = "Base.HayTuft", count = 10 } } })
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.PIPE }, { type = "Base.Matches" }, { type = "Base.Bellows" } })
+        gasJob(self, generator, GasKit.INSTALL)
+        -- Lit first, so gas reaches the generator the moment the line is in.
+        gasifierJob(self, gasifier, GasifierJobs.LIGHT)
+        gasJob(self, generator, GasKit.CONNECT, gasifier)
+        readGasifier(self, gasifier, "lit")
+        readGas(self, generator, "connected")
+        setGenerator(self, generator, { running = true })
+        gasPass(self, generator, 1)
+        gasifierCall(self, "gasifierPass", gasifier, { hours = 1 })
+        readGas(self, generator, "running")
+        readGasifier(self, gasifier, "fed")
+        gasifierCall(self, "gasifierBurn", gasifier, { kg = 100 })
+        gasPass(self, generator, 0.5)
+        readGas(self, generator, "out")
+    end,
+    validate = function(self)
+        local lit, fed = self.reads.lit, self.reads.fed
+        local connected, running, out = self.gas.connected, self.gas.running, self.gas.out
+        T.expect(lit.lit and lit.fireKg > 0, "lighting it didn't start a fire from the hopper")
+        T.expect(lit.containers == 2, "the gasifier has " .. tostring(lit.containers) .. " containers, not a hopper and a filter")
+        T.expect(connected.state and connected.state.sourceKind == "gasifier", "the line doesn't lead to the gasifier")
+        T.expect(hasOverlay(lit, RenewableEnergy.Sprites.gasifierLit.standard), "the lit gasifier shows no fire")
+        local Sprites = RenewableEnergy.Sprites
+        T.expect(hasOverlay(lit, Sprites.gasifierPipe[self.generatorSide]), "the gasifier shows no pipe toward the generator")
+        T.expect(hasOverlay(connected, Sprites.gasifierPipeGen[self.gasifierSide]), "the generator shows no pipe toward the gasifier")
+        T.expect(running.running and running.fuel >= GasKit.PHANTOM_FUEL, "the generator didn't run on wood gas with an empty tank")
+        local kg = Gasifier.IDLE_KG_PER_HOUR + Gasifier.KG_PER_KWH * (running.state.watts or 0) / 1000
+        T.expectNear("ash after an hour's running", fed.ash, kg * Gasifier.TIERS.standard.ashPerKg, 0.05)
+        T.expect(not out.running and out.state.outOfGas, "out of wood, the generator kept running")
+    end,
+})
+
+-- The load the generator carries takes wood on top of the idle burn.
+test("renewable_energy_gas_gasifier_wood_scales_with_load", {
+    instant = true,
+    run = function(self)
+        local square = (T.need(self, T.squares(self, 1), "a free square for a gasifier") or {})[1]
+        if not square then return end
+        local gasifier = placeGasifier(self, "standard", square)
+        gasifierCall(self, "gasifierFill", gasifier, { hopper = { { type = "Base.Plank", count = 4 } } })
+        gasifierCall(self, "gasifierSet", gasifier, { fields = { lit = true } })
+        gasifierCall(self, "gasifierSupply", gasifier, { watts = 2000, hours = 1 })
+        T.step(function() self.loaded = self.server.gasifierSupply end)
+        gasifierCall(self, "gasifierSupply", gasifier, { watts = 0, hours = 1 })
+        T.step(function() self.idle = self.server.gasifierSupply end)
+    end,
+    validate = function(self)
+        T.expectNear("wood for an hour at 2 kW", self.loaded.burned, Gasifier.KG_PER_KWH * 2, 0.01)
+        T.expect(self.loaded.kept, "a gasifier with wood didn't keep up")
+        T.expectNear("wood for an hour at no load", self.idle.burned, 0, 0.01)
+    end,
+})
+
+-- Only a gasifier right beside the generator can be piped to it.
+test("renewable_energy_gas_gasifier_must_stand_beside", {
+    instant = true,
+    run = function(self)
+        local generator = placeGenerator(self, 0)
+        if not generator then return end
+        local square = (T.need(self, T.squares(self, 1, { near = generator.square, minDistance = 2 }), "a free square two from the generator") or {})[1]
+        if not square then return end
+        local gasifier = placeGasifier(self, "primitive", square)
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.PIPE } })
+        gasJob(self, generator, GasKit.INSTALL)
+        T.waitUntil(function() return GasKit.hasKit(generator.object) end, COPY_FRAMES, "this client's copy of the kit")
+        T.step(function() self.blocker = GasKit.blocker(GasKit.CONNECT, generator.object, gasifier.object) end)
+    end,
+    validate = function(self)
+        T.expect(self.blocker == "Tooltip_RenewableEnergy_GasifierNotBeside", "a gasifier two squares off: " .. tostring(self.blocker))
+    end,
+})
+
+-- The ash pit fills as wood burns; Clean Out Ash with a shovel gives Wood Ash for it. The filter's
+-- packing turns tarry, and with none clean the gas halves and wears the generator.
+test("renewable_energy_gas_gasifier_ash_and_tar", {
+    instant = true,
+    run = function(self)
+        local square = (T.need(self, T.squares(self, 1), "a free square for a gasifier") or {})[1]
+        if not square then return end
+        local gasifier = placeGasifier(self, "standard", square)
+        local spec = Gasifier.TIERS.standard
+        gasifierCall(self, "gasifierFill", gasifier, { hopper = { { type = "Base.Plank", count = 7 } }, filter = { { type = "Base.HayTuft", count = 2 } } })
+        gasifierCall(self, "gasifierSet", gasifier, { fields = { lit = true } })
+        gasifierCall(self, "gasifierBurn", gasifier, { kg = 2 * spec.tarKgPerItem + 0.5 })
+        readGasifier(self, gasifier, "burned")
+        -- Out, so no pass burns more meanwhile.
+        gasifierCall(self, "gasifierSet", gasifier, { fields = { ash = 60, lit = false } })
+        T.give(self, "shovel", { { type = "Base.Shovel" } })
+        gasifierJob(self, gasifier, GasifierJobs.CLEAN_ASH)
+        readGasifier(self, gasifier, "cleaned")
+        T.count(self, "ash", { Gasifier.WOOD_ASH })
+    end,
+    validate = function(self)
+        local burned, cleaned = self.reads.burned, self.reads.cleaned
+        local spec = Gasifier.TIERS.standard
+        T.expectNear("ash after burning", burned.ash, (2 * spec.tarKgPerItem + 0.5) * spec.ashPerKg, 0.05)
+        T.expect(burned.clean == 0 and burned.tarry == 2, "packing after burning: " .. tostring(burned.clean) .. " clean, " .. tostring(burned.tarry) .. " tarry")
+        T.expect(burned.summary.output == Gasifier.DIRTY_OUTPUT, "a spent filter gives " .. tostring(burned.summary.output) .. " of the gas")
+        T.expect(burned.summary.wear == Gasifier.WEAR_DIRTY, "a spent filter wears the generator " .. tostring(burned.summary.wear) .. " times")
+        T.expectNear("ash after cleaning out", cleaned.ash, 60 - 2 * Gasifier.ASH_PER_ITEM, 0.01)
+        T.expect(self.counts.ash[Gasifier.WOOD_ASH] == 2, "cleaning out 60% gave " .. tostring(self.counts.ash[Gasifier.WOOD_ASH]) .. " wood ash")
+    end,
+})
+
+-- A cold gasifier takes bellows to light; one just put out doesn't.
+test("renewable_energy_gas_gasifier_cold_start", {
+    instant = true,
+    run = function(self)
+        local square = (T.need(self, T.squares(self, 1), "a free square for a gasifier") or {})[1]
+        if not square then return end
+        local gasifier = placeGasifier(self, "primitive", square)
+        gasifierCall(self, "gasifierFill", gasifier, { hopper = { { type = "Base.Plank", count = 2 } } })
+        T.give(self, "matches", { { type = "Base.Matches" } })
+        T.waitUntil(function()
+            local summary = Gasifier.summaryOf(gasifier.object)
+            return summary ~= nil and summary.hopperKg > 0
+        end, COPY_FRAMES, "this client's summary of the gasifier's wood")
+        T.step(function()
+            self.coldRefusal = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, Gasifier.summaryOf(gasifier.object))
+        end)
+        T.give(self, "bellows", { { type = "Base.Bellows" } })
+        gasifierJob(self, gasifier, GasifierJobs.LIGHT)
+        gasifierJob(self, gasifier, GasifierJobs.PUT_OUT)
+        T.waitUntil(function()
+            local summary = Gasifier.summaryOf(gasifier.object)
+            return summary ~= nil and not summary.lit
+        end, COPY_FRAMES, "this client's summary of the gasifier put out")
+        T.step(function()
+            local summary = Gasifier.summaryOf(gasifier.object)
+            self.warm = { cold = summary.cold, needs = #GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, summary) }
+        end)
+        readGasifier(self, gasifier, "out")
+    end,
+    validate = function(self)
+        T.expect(self.coldRefusal == "short", "a cold gasifier lit without bellows: " .. tostring(self.coldRefusal))
+        T.expect(self.reads.out.outSince ~= nil, "lighting and putting it out never lit it")
+        T.expect(not self.warm.cold and self.warm.needs == 1, "just put out, it still wants bellows")
+    end,
+})
+
+-- Lit indoors, a gasifier fills the building with fumes until it goes out.
+test("renewable_energy_gas_gasifier_fumes_indoors", {
+    instant = true,
+    run = function(self)
+        local square = (T.need(self, T.squares(self, 1, { indoors = true }), "a free indoor square for a gasifier") or {})[1]
+        if not square then return end
+        local gasifier = placeGasifier(self, "primitive", square)
+        gasifierCall(self, "gasifierSet", gasifier, { fields = { lit = true, fireKg = 2 } })
+        readGasifier(self, gasifier, "lit")
+        gasifierCall(self, "gasifierSet", gasifier, { fields = { lit = false } })
+        readGasifier(self, gasifier, "out")
+    end,
+    validate = function(self)
+        T.expect(self.reads.lit.toxic, "a lit gasifier indoors left the building clean")
+        T.expect(not self.reads.out.toxic, "the building stayed toxic once the gasifier went out")
     end,
 })

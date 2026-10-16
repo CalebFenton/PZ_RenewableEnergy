@@ -30,6 +30,7 @@ local RECIPES = {
     "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
     "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
     "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle",
+    "RenewableEnergy_WeldMetalDrum",
 }
 
 -- "RenewableEnergy.HomesteadPowerMag1" -> "homestead_power_mag1".
@@ -228,7 +229,7 @@ test("renewable_energy_items_read_homestead_power_mag3_teaches_the_digesters", {
     instant = true,
     run = function(self)
         local p = player()
-        local names = RenewableEnergy.Debug.ENTITY_RECIPES
+        local names = RenewableEnergy.Debug.DIGESTER_RECIPES
         PZHarness.Fixtures.forgetRecipes(p, names)
         T.defer(self, function() PZHarness.Fixtures.learnRecipes(p, names) end)
         T.server(self, "forgetRecipesUntilEnd", { names = names })
@@ -253,7 +254,7 @@ test("renewable_energy_items_read_homestead_power_mag3_teaches_the_digesters", {
         end)
     end,
     validate = function(self)
-        for _, name in ipairs(RenewableEnergy.Debug.ENTITY_RECIPES) do
+        for _, name in ipairs(RenewableEnergy.Debug.DIGESTER_RECIPES) do
             expect(self.server.knownRecipes.known[name], "reading Homestead Power #3 did not teach " .. name .. " on the server")
             expect(self.client[name], "reading Homestead Power #3 did not teach " .. name .. " on the client")
         end

@@ -28,16 +28,25 @@ Debug.ITEMS = {
     "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
     "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.FridgeCompressor",
-    "RenewableEnergy.GasHeater",
+    "RenewableEnergy.GasHeater", "RenewableEnergy.TarryPacking",
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
 -- The build menu's recipes, which getAllCraftRecipes (and so PZHarness.Test.learnRecipes) leaves out:
 -- they belong to entity scripts (scripts/RenewableEnergy/Entities.txt).
-Debug.ENTITY_RECIPES = {
+Debug.DIGESTER_RECIPES = {
     "RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
     "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
 }
+Debug.GASIFIER_RECIPES = {
+    "RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
+}
+Debug.ENTITY_RECIPES = {}
+for _, list in ipairs({ Debug.DIGESTER_RECIPES, Debug.GASIFIER_RECIPES }) do
+    for _, name in ipairs(list) do
+        table.insert(Debug.ENTITY_RECIPES, name)
+    end
+end
 
 local function isContainerGeneratorOrPanel(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
