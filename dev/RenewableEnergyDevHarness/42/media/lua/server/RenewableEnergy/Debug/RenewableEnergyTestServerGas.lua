@@ -20,8 +20,8 @@ local function generatorOn(args)
 end
 
 -- The generator at x, y, z: whether it runs, its fuel, its kit's state (nil without a kit) with
--- whether a line is connected and to what kind of source, whether the gas pass lists it, and its
--- overlays.
+-- whether a line is connected and to what kind of source, whether the gas pass lists it, its
+-- overlays and its sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor).
 handler("generatorRead", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
@@ -41,7 +41,7 @@ handler("generatorRead", function(player, args)
     return {
         running = generator:isActivated(), fuel = generator:getFuel(), state = plain,
         listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
-        overlays = Helpers.overlaysOf(generator),
+        overlays = Helpers.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
     }
 end)
 

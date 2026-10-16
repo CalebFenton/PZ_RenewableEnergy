@@ -182,7 +182,7 @@ function Helpers.recordAt(args)
 end
 
 --- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
---- "barrel.steel", "standard") on `square`, as the build menu does (ISBuildIsoEntity:create): a
+--- "barrel.MetalDrum", "standard") on `square`, as the build menu does (ISBuildIsoEntity:create): a
 --- thumpable, then the entity's OnCreate. Sends nothing to clients. Returns the thumpable, or nil
 --- and what is missing.
 function Helpers.placeRecord(kind, tile, square)

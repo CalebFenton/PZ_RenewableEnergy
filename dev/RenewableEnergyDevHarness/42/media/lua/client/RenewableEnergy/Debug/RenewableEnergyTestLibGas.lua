@@ -35,7 +35,7 @@ function T.recordObject(handle)
 end
 
 --- Queues a record of `kind` ("digester", "gasifier") on the Sprites[kind] tile `tile` (a dotted
---- path: "barrel.steel", "standard"), built as the build menu builds it on `opts.square`, else on
+--- path: "barrel.MetalDrum", "standard"), built as the build menu builds it on `opts.square`, else on
 --- a free square (outdoors unless `opts.indoors`) near `opts.near`, at least `opts.minDistance`
 --- away. Returns its handle, or nil when there is no square.
 function T.placeRecord(self, kind, tile, opts)

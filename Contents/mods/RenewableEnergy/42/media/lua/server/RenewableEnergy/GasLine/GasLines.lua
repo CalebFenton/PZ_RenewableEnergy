@@ -87,7 +87,8 @@ end
 -- Lays a pipe between `generator` and the piped source `source`, each half on its own tile.
 local function pipe(generator, source)
     local gx, gy, x, y = generator:getX(), generator:getY(), source:getX(), source:getY()
-    RenewableEnergy.showOverlay(generator, isGeneratorPipe, Sprites.gasifierPipeGen[Gasifier.sideOf(gx, gy, x, y)])
+    RenewableEnergy.showOverlay(generator, isGeneratorPipe,
+        Sprites.gasifierPipeGenFor(Sprites.nameOf(generator), Gasifier.sideOf(gx, gy, x, y)))
     local record = Gasifier.recordOf(source)
     if record then
         record:setPipe(Gasifier.sideOf(x, y, gx, gy))
@@ -276,7 +277,7 @@ local DO = {
         generator:getModData()[GasKit.MOD_DATA] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
         registry()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
-        RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKit)
+        RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
     end,
     [GasKit.REMOVE] = function(character, generator, state)
         disconnect(character, generator, state)

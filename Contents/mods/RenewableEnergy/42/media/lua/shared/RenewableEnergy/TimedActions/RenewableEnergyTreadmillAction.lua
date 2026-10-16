@@ -59,6 +59,18 @@ local function runSpot(self)
     return rear.x + 0.5 + step[1] * TOWARD_CONSOLE, rear.y + 0.5 + step[2] * TOWARD_CONSOLE
 end
 
+-- How far the belt's top stands above the floor, in levels: the belt's box in the tiles' depth
+-- geometry (tileGeometry.txt) reaches 0.17 of the 2.449 units a level stands (TileDepthTexture).
+-- A runner on the floor would have their feet drawn inside the belt.
+local BELT_HEIGHT = 0.17 / 2.449
+
+local function holdOnBelt(self)
+    self.character:setZ(self.object:getSquare():getZ() + BELT_HEIGHT)
+    -- Vanilla pulls anyone above the floor down every frame (IsoGameCharacter.updateFalling); the
+    -- fall speed, left to build, would carry them to the floor between updates.
+    self.character:setLastFallSpeed(0)
+end
+
 function Action:start()
     -- A run on a treadmill that feeds no bank banks nothing; single player says so before it
     -- starts, and the authority's command refuses it in multiplayer.
@@ -71,6 +83,7 @@ function Action:start()
     local x, y = runSpot(self)
     self.character:setX(x)
     self.character:setY(y)
+    holdOnBelt(self)
     self.character:setDir(facing(self))
     self:setActionAnim("RenewableEnergyTreadmill")
     -- The run animation's root motion would carry the runner off the belt.
@@ -79,6 +92,7 @@ end
 
 function Action:update()
     self.character:setDir(facing(self))
+    holdOnBelt(self)
     self.character:setMetabolicTarget(Metabolics.Running10kmh)
 end
 
@@ -87,6 +101,7 @@ local function stepOff(self)
     if self.fromX then
         self.character:setX(self.fromX)
         self.character:setY(self.fromY)
+        self.character:setZ(self.object:getSquare():getZ())
     end
 end
 

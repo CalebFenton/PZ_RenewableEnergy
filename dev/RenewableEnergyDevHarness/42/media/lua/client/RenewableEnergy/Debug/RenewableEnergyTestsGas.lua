@@ -104,12 +104,15 @@ test("renewable_energy_gas_kit_install_and_remove", {
         if T.expect(fitted.state ~= nil and fitted.listed, "the kit isn't fitted") then
             T.expectNear("tank with the kit", fitted.state.tank, self.fuel, 0.01)
         end
-        T.expect(T.hasOverlay(fitted, Sprites.gasKit), "the fitted kit doesn't show")
+        -- On the game's own generator the kit sits on its air intake, not on the floor.
+        local kit = Sprites.gasKitFor(fitted.sprite)
+        T.expect(kit ~= Sprites.gasKit.default and T.hasOverlay(fitted, kit),
+            "the fitted kit doesn't show on " .. tostring(fitted.sprite) .. "'s intake")
         T.expectMaterialsUsed(self, "afterFit", self.install, "fitting the kit")
         T.expect(self.runningRefusal == "Tooltip_RenewableEnergy_GeneratorRunning",
             "taking the kit off a running generator: " .. tostring(self.runningRefusal))
         T.expect(removed.state == nil and not removed.listed, "the kit is still fitted")
-        T.expect(not T.hasOverlay(removed, Sprites.gasKit), "the removed kit still shows")
+        T.expect(not T.hasOverlay(removed, kit), "the removed kit still shows")
         T.expectNear("fuel after removing it", removed.fuel, self.fuel, 0.01)
         T.expect(self.counts.afterRemove[GasKit.ITEM] == 1, "removing didn't give the kit back")
     end,
@@ -123,7 +126,7 @@ test("renewable_energy_gas_generator_runs_on_gas", {
     instant = true,
     run = function(self)
         self.gas, self.load, self.poured = Digester.HOLDERS.bags.capacity, 500, 3
-        local digester = digesterWithGas(self, "barrel.steel", self.gas)
+        local digester = digesterWithGas(self, "barrel.MetalDrum", self.gas)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         -- One more hose than the line takes, so the count shows what it took.
@@ -194,7 +197,7 @@ test("renewable_energy_gas_job_bills_the_time_before_it", {
     instant = true,
     run = function(self)
         self.gas, self.load, self.hours = Digester.HOLDERS.bags.capacity, 500, 0.5
-        local digester = digesterWithGas(self, "barrel.steel", self.gas)
+        local digester = digesterWithGas(self, "barrel.MetalDrum", self.gas)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         fitAndConnect(self, generator, digester)
@@ -295,7 +298,8 @@ test("renewable_energy_gas_line_lost_with_its_source_on_petrol", {
         local lost = self.reads.lost
         T.expect(lost.running and lost.state ~= nil and lost.state.mode == "petrol", "the generator stopped running on petrol")
         T.expect(lost.state ~= nil and not lost.state.connected, "the line to a gasifier that is gone is still connected")
-        T.expect(not T.hasOverlay(lost, Sprites.gasifierPipeGen[self.side]), "the generator still shows a pipe to a gasifier that is gone")
+        T.expect(not T.hasOverlay(lost, Sprites.gasifierPipeGenFor(lost.sprite, self.side)),
+            "the generator still shows a pipe to a gasifier that is gone")
         T.expect(self.connect ~= "Tooltip_RenewableEnergy_HasLine", "this client refuses a new line: the generator still has one")
     end,
 })
@@ -305,7 +309,7 @@ test("renewable_energy_gas_line_lost_with_its_source_on_petrol", {
 test("renewable_energy_gas_kit_menu", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "barrel.steel", Digester.HOLDERS.bags.capacity)
+        local digester = digesterWithGas(self, "barrel.MetalDrum", Digester.HOLDERS.bags.capacity)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         self.generator = generator
@@ -351,7 +355,7 @@ test("renewable_energy_gas_kit_menu", {
 -- indoors leaks fumes for LEAK_HOURS, and no longer.
 test("renewable_energy_gas_fumes_last_source_clears", {
     run = function(self)
-        local digester = T.placeRecord(self, "digester", "barrel.steel", { indoors = true })
+        local digester = T.placeRecord(self, "digester", "barrel.MetalDrum", { indoors = true })
         local square = digester and T.square(self, { indoors = true, near = digester.square, minDistance = 2 }, "another indoor square")
         if not square then return end
         if not T.need(self, square:getBuilding() == digester.square:getBuilding(), "two indoor squares in one building") then return end
@@ -460,7 +464,8 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         T.expect(connected.state and connected.state.sourceKind == "gasifier", "the line doesn't lead to the gasifier")
         T.expect(T.hasOverlay(lit, Sprites.gasifierLit.standard), "the lit gasifier shows no fire")
         T.expect(T.hasOverlay(reads.spent, Sprites.gasifierPipe[self.generatorSide]), "the gasifier shows no pipe toward the generator")
-        T.expect(T.hasOverlay(connected, Sprites.gasifierPipeGen[self.gasifierSide]), "the generator shows no pipe toward the gasifier")
+        T.expect(T.hasOverlay(connected, Sprites.gasifierPipeGenFor(connected.sprite, self.gasifierSide)),
+            "the generator shows no pipe toward the gasifier")
         T.expect(running.running and running.fuel >= GasKit.PHANTOM_FUEL, "the generator didn't run on wood gas with an empty tank")
         local kg = Gasifier.IDLE_KG_PER_HOUR + Gasifier.KG_PER_KWH * self.load / 1000
         T.expectNear("wood burned in an hour at " .. self.load .. " W", (lit.hopperKg + lit.fireKg) - (fed.hopperKg + fed.fireKg), kg, 0.05)

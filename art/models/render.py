@@ -74,11 +74,12 @@ def setup():
     world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.55, 0.56, 0.6, 1)
     world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.0
     scene.world = world
-    # The game's own tiles are lit from the upper left of the screen: west, a little south.
+    # The game's own tiles are lit from the upper left of the screen: west, a little south. A sun
+    # shines down its -Z axis, so that is the axis turned along the light's way.
     sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
-    sun.data.energy = 4.2
+    sun.data.energy = 3.2
     sun.data.angle = math.radians(8)
-    sun.rotation_euler = Vector((0.85, 0.35, -1.0)).to_track_quat("Z", "Y").to_euler()
+    sun.rotation_euler = Vector((0.85, 0.35, -1.0)).to_track_quat("-Z", "Y").to_euler()
     scene.collection.objects.link(sun)
     camera = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera"))
     camera.data.type = "ORTHO"

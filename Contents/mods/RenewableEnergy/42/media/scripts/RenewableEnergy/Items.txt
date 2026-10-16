@@ -517,7 +517,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag3_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_BarrelDigesterSteel;RenewableEnergy_BarrelDigesterPlastic;RenewableEnergy_InsulatedDigester;RenewableEnergy_BrickDome;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeGasHeater,
+        LearnedRecipes = RenewableEnergy_BarrelDigester;RenewableEnergy_InsulatedDigester;RenewableEnergy_BrickDome;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeGasHeater,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

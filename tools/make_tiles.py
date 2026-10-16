@@ -35,7 +35,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 35
+COLUMNS, ROWS = 8, 43
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -118,8 +118,6 @@ TILES = {
     32: storage("BatteryRackWood", "Wooden", "Battery Rack", 3, 100),
     33: storage("BatteryRackMetal", "Metal", "Battery Rack", 3, 100),
     34: storage("BatteryBankWood", "Wooden", "Battery Bank", 4, 100),
-    228: built_in_place("Barrel Digester", "Digester", 30, "MetalPlates", "MetalScrap", GroupName="Steel"),
-    229: built_in_place("Barrel Digester", "Digester", 30, "Plastic", "Rubber", GroupName="Plastic"),
     230: built_in_place("Insulated Digester", "Digester", 50, "Wood", "Nails"),
     231: built_in_place("Brick Dome Digester", "Digester", 100, "Brick", "Stone", IsLow=""),
     244: gas_heater(),
@@ -141,6 +139,11 @@ for first, name, material2 in ((265, "Propeller Wind Charger", "Wood"), (269, "P
                                (273, "Homemade Alternator Wind Charger", "MetalScrap")):
     for offset in range(4):
         TILES[first + offset] = wind_charger(name, "MetalPipe", material2)
+
+# The barrel digester, a tile per barrel it can be built from: the Metal Drum, then the orange, dark
+# green and light green barrels, all steel like the game's own.
+for index in (228, 229, 277, 278):
+    TILES[index] = built_in_place("Barrel Digester", "Digester", 30, "MetalPlates", "MetalScrap")
 
 
 def main():

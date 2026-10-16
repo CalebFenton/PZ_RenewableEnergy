@@ -241,7 +241,7 @@ end
 -- one item an hour until the tank holds its cap; manure eaten brings its head start.
 test("renewable_energy_biogas_digester_hopper_meters", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         self.digester = handle
         self.cow = Digester.feedOf(instanceItem("Base.Dung_Cow"))
@@ -279,7 +279,7 @@ test("renewable_energy_biogas_digester_hopper_meters", {
 -- shortens it by at most its share.
 test("renewable_energy_biogas_digester_startup_then_gas", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         local needed = getSandboxOptions():getCompostHours()
         local edge, below = Digester.STARTUP_MIN_TEMP, Digester.STARTUP_MIN_TEMP - 1
@@ -326,7 +326,7 @@ test("renewable_energy_biogas_digester_startup_then_gas", {
 -- the same along the best stretch. The barrel follows the air within days.
 test("renewable_energy_biogas_digester_temperature", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         local rows = Digester.K_BY_TEMP
         local best = 0
@@ -374,7 +374,7 @@ test("renewable_energy_biogas_digester_temperature", {
 -- below the share of the limit it recovers at. Wood ash fixes it whole, baking soda a use at a time.
 test("renewable_energy_biogas_digester_sour_and_fix", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         local limit = Digester.ACID_LIMIT * Digester.TIERS.barrel.potentialCap
         local function set(share, sour)
@@ -420,7 +420,7 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
 test("renewable_energy_biogas_digester_sludge_into_bags", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         local full, part = 3.5 * Digester.SLUDGE_PER_BAG, Digester.SLUDGE_PER_BAG / 2
         self.full = full
@@ -460,7 +460,7 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
 test("renewable_energy_biogas_digester_holder", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         local bags = Digester.HOLDERS.bags
         local overfull = T.matureDigester("barrel")
@@ -499,7 +499,7 @@ test("renewable_energy_biogas_digester_holder", {
 -- at the second; an unfed one not at all; the Brick Dome never past the first, at its worst.
 test("renewable_energy_biogas_digester_stink_levels", {
     run = function(self)
-        local barrel = placeDigester(self, "barrel.steel")
+        local barrel = placeDigester(self, "barrel.MetalDrum")
         local dome = barrel and placeDigester(self, "dome")
         if not dome then return end
         -- Mid-startup, when the startup stinks most, full, its sludge at the top and sour.
@@ -538,7 +538,7 @@ test("renewable_energy_biogas_digester_stink_levels", {
 test("renewable_energy_biogas_digester_upgrade", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "barrel.steel")
+        local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         self.digester = handle
         self.capacity = tonumber(getSprite(Sprites.digester.insulated):getProperties():get("ContainerCapacity"))
@@ -603,76 +603,86 @@ local function buildEntry(entity)
     return nil
 end
 
--- The build menu's own path builds a working digester: the entity's recipe takes its materials,
--- keeps its tools, and its OnCreate makes the tile a digester on the authority (ISBuildIsoEntity,
--- ISBuildAction).
-test("renewable_energy_biogas_build_menu_builds_digester", {
-    instant = true,
-    run = function(self)
-        -- Bare: grass and the like block placing anything built (BlocksPlacement), as for vanilla's.
-        local square = T.square(self, { bare = true }, "a bare outdoor square for a digester")
-        if not square then return end
-        local info = T.need(self, buildEntry("Base.RenewableEnergy_BarrelDigesterSteel"), "the barrel digester's build menu entry")
-        local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
-        if not T.need(self, recipe, "the barrel digester's build recipe") then return end
-        local handle = T.at(square)
-        handle.square, handle.kind = square, "digester"
-        for i = 0, recipe:getRequiredSkillCount() - 1 do
-            local skill = recipe:getRequiredSkill(i)
-            T.setPerk(self, skill:getPerk(), skill:getLevel())
-        end
-        local inputs, unmatched = T.recipeInputs(recipe)
-        if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return end
-        -- What a build should leave carried: its kept tools, and none of the items it takes whole.
-        -- A drainable it takes uses of stays part-used, so isn't counted.
-        self.expected, self.types = {}, {}
-        for i, entry in ipairs(inputs) do
-            local input = recipe:getInputs():get(i - 1)
-            if input:isKeep() then
-                self.expected[entry.type] = entry.count
-            elseif input:isItemCount() or not getScriptManager():FindItem(entry.type):isItemType(ItemType.DRAINABLE) then
-                self.expected[entry.type] = 0
+-- The build menu's own path builds a working digester from the barrel `barrel` (an item type): the
+-- entity's recipe takes its materials, keeps its tools, and its OnCreate makes the tile a digester
+-- that looks like that barrel on the authority (ISBuildIsoEntity, ISBuildAction), as this client
+-- sees it.
+local function buildsBarrelDigester(barrel)
+    return {
+        instant = true,
+        run = function(self)
+            -- Bare: grass and the like block placing anything built (BlocksPlacement), as for vanilla's.
+            local square = T.square(self, { bare = true }, "a bare outdoor square for a digester")
+            if not square then return end
+            local info = T.need(self, buildEntry("Base.RenewableEnergy_BarrelDigester"), "the barrel digester's build menu entry")
+            local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
+            if not T.need(self, recipe, "the barrel digester's build recipe") then return end
+            local handle = T.at(square)
+            handle.square, handle.kind = square, "digester"
+            for i = 0, recipe:getRequiredSkillCount() - 1 do
+                local skill = recipe:getRequiredSkill(i)
+                T.setPerk(self, skill:getPerk(), skill:getLevel())
             end
-            table.insert(self.types, entry.type)
-        end
-        T.give(self, "materials", inputs)
-        T.server(self, "recordTrack", T.recordArgs(handle))
-        T.step(function()
-            local player = T.player()
-            T.standNextTo(square)
-            local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
-            -- What the build panel does before the cursor can build (ISBuildPanel): the player
-            -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
-            build.player = player:getPlayerNum()
-            build.buildPanelLogic:refresh()
-            build.buildPanelLogic:autoPopulateInputs()
-            self.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
-            self.validSquare = build:isValid(square)
-            build:tryBuild(handle.x, handle.y, handle.z)
-        end)
-        T.batch(function()
-            T.readRecord(self, handle, "built")
-            T.count(self, "left", self.types)
-        end)
-    end,
-    validate = function(self)
-        local built = self.reads.built
-        T.expect(self.canBuild and self.validSquare, "the build menu can't build a barrel digester from its materials on a bare square")
-        T.expect(built.tier == "barrel" and built.material == "steel", "the build menu built " .. tostring(built.tier))
-        T.expect(built.sprite == Sprites.digester.barrel.steel, "the built tile is " .. tostring(built.sprite))
-        for fullType, count in pairs(self.expected) do
-            local left = self.counts.left[fullType] or 0
-            T.expect(left == count, "building left " .. left .. " " .. fullType .. ", not " .. count)
-        end
-    end,
-})
+            local inputs, unmatched = T.recipeInputs(recipe, { "Base." .. barrel })
+            if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return end
+            -- What a build should leave carried: its kept tools, and none of the items it takes whole.
+            -- A drainable it takes uses of stays part-used, so isn't counted.
+            self.expected, self.types = {}, {}
+            for i, entry in ipairs(inputs) do
+                local input = recipe:getInputs():get(i - 1)
+                if input:isKeep() then
+                    self.expected[entry.type] = entry.count
+                elseif input:isItemCount() or not getScriptManager():FindItem(entry.type):isItemType(ItemType.DRAINABLE) then
+                    self.expected[entry.type] = 0
+                end
+                table.insert(self.types, entry.type)
+            end
+            T.give(self, "materials", inputs)
+            T.server(self, "recordTrack", T.recordArgs(handle))
+            T.step(function()
+                local player = T.player()
+                T.standNextTo(square)
+                local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
+                -- What the build panel does before the cursor can build (ISBuildPanel): the player
+                -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
+                build.player = player:getPlayerNum()
+                build.buildPanelLogic:refresh()
+                build.buildPanelLogic:autoPopulateInputs()
+                self.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
+                self.validSquare = build:isValid(square)
+                build:tryBuild(handle.x, handle.y, handle.z)
+            end)
+            local tile = Sprites.digester.barrel[barrel]
+            T.waitFor(self, function() return T.objectWithSprite(square, tile) ~= nil end,
+                "this client's copy of the " .. tostring(tile) .. " digester")
+            T.batch(function()
+                T.readRecord(self, handle, "built")
+                T.count(self, "left", self.types)
+            end)
+        end,
+        validate = function(self)
+            local built = self.reads.built
+            T.expect(self.canBuild and self.validSquare, "the build menu can't build a barrel digester from its materials on a bare square")
+            T.expect(built.tier == "barrel", "the build menu built " .. tostring(built.tier))
+            T.expect(built.sprite == Sprites.digester.barrel[barrel], "the built tile is " .. tostring(built.sprite))
+            for fullType, count in pairs(self.expected) do
+                local left = self.counts.left[fullType] or 0
+                T.expect(left == count, "building left " .. left .. " " .. fullType .. ", not " .. count)
+            end
+        end,
+    }
+end
+
+test("renewable_energy_biogas_build_menu_builds_digester", buildsBarrelDigester("MetalDrum"))
+-- The game's barrels are steel drums too; the digester shows the one it took.
+test("renewable_energy_biogas_build_from_orange_barrel_shows_orange", buildsBarrelDigester("Mov_OrangeBarrel"))
 
 -- Right-clicking a barrel digester shows its submenu through vanilla's menu builder: its status,
 -- and its jobs greyed out with the reason while the digester or the character can't do them. The
 -- status window opens on it and shows its state.
 test("renewable_energy_biogas_digester_menu", {
     run = function(self)
-        self.digester = placeDigester(self, "barrel.steel")
+        self.digester = placeDigester(self, "barrel.MetalDrum")
     end,
     validate = function(self)
         local object = self.digester.object
@@ -711,7 +721,7 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
     timeoutSeconds = 120,
     run = function(self)
         local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local handle = stand and placeDigester(self, "barrel.steel", { near = stand, minDistance = 2 })
+        local handle = stand and placeDigester(self, "barrel.MetalDrum", { near = stand, minDistance = 2 })
         if not handle then return end
         T.fillRecord(self, handle, { hopper = { { type = "Base.Dung_Cow", count = 4 } } })
         -- Half an hour on the meter, so three more hours eat three.
@@ -871,9 +881,9 @@ end
 test("renewable_energy_biogas_heater_warms_digester", {
     instant = true,
     run = function(self)
-        local first = placeDigester(self, "barrel.steel")
+        local first = placeDigester(self, "barrel.MetalDrum")
         local square = first and T.square(self, { near = first.square }, "a square beside the digester for a heater")
-        local second = square and placeDigester(self, "barrel.steel", { near = square })
+        local second = square and placeDigester(self, "barrel.MetalDrum", { near = square })
         if not second then return end
         self.digesters = { first, second }
         self.temp, self.gas = 5, Digester.HOLDERS.bags.capacity
@@ -917,7 +927,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
 test("renewable_energy_biogas_heater_out_when_digester_gone", {
     instant = true,
     run = function(self)
-        local digester = placeDigester(self, "barrel.steel")
+        local digester = placeDigester(self, "barrel.MetalDrum")
         local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
         if not square then return end
         local fed = T.matureDigester("barrel")

@@ -277,7 +277,7 @@
     {
       "name": "model_RenewableEnergy_SolarFlat",
       "box": [
-        65,
+        66,
         133,
         446,
         234
@@ -313,7 +313,7 @@
     {
       "name": "model_RenewableEnergy_SolarRackMetal",
       "box": [
-        48,
+        49,
         111,
         330,
         428
@@ -333,7 +333,7 @@
       "box": [
         105,
         105,
-        361,
+        360,
         407
       ]
     },
@@ -424,7 +424,7 @@
         46,
         46,
         178,
-        167
+        166
       ]
     },
     {
@@ -637,37 +637,37 @@
     {
       "name": "model_RenewableEnergy_WoodenBlades",
       "box": [
-        85,
-        119,
-        427,
-        194
+        73,
+        128,
+        438,
+        210
       ]
     },
     {
       "name": "model_RenewableEnergy_PipeBlades",
       "box": [
-        85,
-        119,
-        427,
-        193
+        82,
+        122,
+        430,
+        182
       ]
     },
     {
       "name": "model_RenewableEnergy_SteelBlades",
       "box": [
-        51,
-        144,
-        461,
-        209
+        53,
+        142,
+        459,
+        192
       ]
     },
     {
       "name": "model_RenewableEnergy_HomemadeAlternator",
       "box": [
-        88,
-        88,
-        340,
-        255
+        89,
+        89,
+        342,
+        256
       ]
     },
     {
@@ -5743,139 +5743,6 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_BarrelDigesterSteel",
-        "name": "Barrel Digester (Steel Drum)"
-      },
-      "id": "RenewableEnergy_BarrelDigesterSteel",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.HandDrill",
-              "icon": "icon_Base_HandDrill",
-              "name": "Hand Drill"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.MetalDrum",
-              "icon": "icon_Base_MetalDrum",
-              "name": "Metal Drum"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.RubberHose",
-              "icon": "icon_Base_RubberHose",
-              "name": "Rubber Hose"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Funnel",
-              "icon": "icon_Base_Funnel",
-              "name": "Funnel"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.DuctTape",
-              "icon": "icon_Base_DuctTape",
-              "name": "Duct Tape"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Glue",
-              "icon": "icon_Base_Glue",
-              "name": "Glue"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.Garbagebag",
-              "icon": "icon_Base_Garbagebag",
-              "name": "Garbage Bag"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [
-          {
-            "level": 3,
-            "name": "Agriculture"
-          },
-          {
-            "level": 3,
-            "name": "Mechanics"
-          }
-        ],
-        "autoAll": [],
-        "magazines": [
-          "Homestead Power #3"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Barrel Digester (Steel Drum)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 1,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_InsulatedDigester",
         "name": "Insulated Digester"
       },
@@ -6349,151 +6216,6 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_BarrelDigesterPlastic",
-        "name": "Barrel Digester (Plastic Barrel)"
-      },
-      "id": "RenewableEnergy_BarrelDigesterPlastic",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.HandDrill",
-              "icon": "icon_Base_HandDrill",
-              "name": "Hand Drill"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Mov_OrangeBarrel",
-              "icon": "icon_Base_Mov_OrangeBarrel",
-              "name": "Orange Barrel"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Mov_DarkGreenBarrel",
-              "icon": "icon_Base_Mov_DarkGreenBarrel",
-              "name": "Dark Green Barrel"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Mov_LightGreenBarrel",
-              "icon": "icon_Base_Mov_LightGreenBarrel",
-              "name": "Light Green Barrel"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.RubberHose",
-              "icon": "icon_Base_RubberHose",
-              "name": "Rubber Hose"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Funnel",
-              "icon": "icon_Base_Funnel",
-              "name": "Funnel"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.DuctTape",
-              "icon": "icon_Base_DuctTape",
-              "name": "Duct Tape"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Glue",
-              "icon": "icon_Base_Glue",
-              "name": "Glue"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.Garbagebag",
-              "icon": "icon_Base_Garbagebag",
-              "name": "Garbage Bag"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [
-          {
-            "level": 3,
-            "name": "Agriculture"
-          },
-          {
-            "level": 3,
-            "name": "Mechanics"
-          }
-        ],
-        "autoAll": [],
-        "magazines": [
-          "Homestead Power #3"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Barrel Digester (Plastic Barrel)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 1,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_AdvancedGasifier",
         "name": "Advanced Gasifier"
       },
@@ -6647,6 +6369,157 @@
         },
         {
           "level": 4,
+          "name": "Mechanics"
+        }
+      ]
+    },
+    {
+      "build": {
+        "icon": "icon_build_RenewableEnergy_BarrelDigester",
+        "name": "Barrel Digester"
+      },
+      "id": "RenewableEnergy_BarrelDigester",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MetalDrum",
+              "icon": "icon_Base_MetalDrum",
+              "name": "Metal Drum"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Mov_OrangeBarrel",
+              "icon": "icon_Base_Mov_OrangeBarrel",
+              "name": "Orange Barrel"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Mov_DarkGreenBarrel",
+              "icon": "icon_Base_Mov_DarkGreenBarrel",
+              "name": "Dark Green Barrel"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Mov_LightGreenBarrel",
+              "icon": "icon_Base_Mov_LightGreenBarrel",
+              "name": "Light Green Barrel"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.RubberHose",
+              "icon": "icon_Base_RubberHose",
+              "name": "Rubber Hose"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Funnel",
+              "icon": "icon_Base_Funnel",
+              "name": "Funnel"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.DuctTape",
+              "icon": "icon_Base_DuctTape",
+              "name": "Duct Tape"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Glue",
+              "icon": "icon_Base_Glue",
+              "name": "Glue"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Garbagebag",
+              "icon": "icon_Base_Garbagebag",
+              "name": "Garbage Bag"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 3,
+            "name": "Agriculture"
+          },
+          {
+            "level": 3,
+            "name": "Mechanics"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #3"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Barrel Digester",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 1,
           "name": "Mechanics"
         }
       ]
@@ -7216,8 +7089,7 @@
       "icon_RenewableEnergy_WornBatteryPlates",
       "icon_build_RenewableEnergy_AdvancedGasifier",
       "icon_build_RenewableEnergy_AlternatorWindCharger",
-      "icon_build_RenewableEnergy_BarrelDigesterPlastic",
-      "icon_build_RenewableEnergy_BarrelDigesterSteel",
+      "icon_build_RenewableEnergy_BarrelDigester",
       "icon_build_RenewableEnergy_BrickDome",
       "icon_build_RenewableEnergy_Gasifier",
       "icon_build_RenewableEnergy_InsulatedDigester",

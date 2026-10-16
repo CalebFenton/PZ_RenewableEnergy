@@ -127,8 +127,7 @@ local MAGAZINES = {
     ["RenewableEnergy.HomesteadPowerMag3"] = {
         "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater",
         builds = {
-            "RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
-            "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
+            "RenewableEnergy_BarrelDigester", "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
         },
     },
     ["RenewableEnergy.FemaPamphlet"] = {

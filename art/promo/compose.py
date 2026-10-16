@@ -122,7 +122,7 @@ RECIPE_SECTIONS = [
                                      "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery"]),
     ("Electronics", ["RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe"]),
     ("Biogas: digesters in the build menu, the gas kit and the heater",
-     ["RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
+     ["RenewableEnergy_BarrelDigester",
       "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome", "RenewableEnergy_MakeGasConversionKit",
       "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle"]),
     ("Wood gas: gasifiers in the build menu, drums and sprays",

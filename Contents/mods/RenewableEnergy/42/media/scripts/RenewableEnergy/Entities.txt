@@ -13,17 +13,11 @@ module Base
 {
     xuiSkin default
     {
-        entity ES_RenewableEnergy_BarrelDigesterSteel
+        entity ES_RenewableEnergy_BarrelDigester
         {
             LuaWindowClass = ISEntityWindow,
-            DisplayName = RenewableEnergy_BarrelDigesterSteel,
-            Icon = RenewableEnergy_Build_BarrelDigesterSteel,
-        }
-        entity ES_RenewableEnergy_BarrelDigesterPlastic
-        {
-            LuaWindowClass = ISEntityWindow,
-            DisplayName = RenewableEnergy_BarrelDigesterPlastic,
-            Icon = RenewableEnergy_Build_BarrelDigesterPlastic,
+            DisplayName = RenewableEnergy_BarrelDigester,
+            Icon = RenewableEnergy_Build_BarrelDigester,
         }
         entity ES_RenewableEnergy_InsulatedDigester
         {
@@ -81,12 +75,14 @@ module Base
         }
     }
 
-    entity RenewableEnergy_BarrelDigesterSteel
+    /* Any of the game's four drums; its tile is the Metal Drum's, and OnCreate swaps in the tile of
+       the barrel it took (DigesterSystem.lua). */
+    entity RenewableEnergy_BarrelDigester
     {
         component UiConfig
         {
             xuiSkin = default,
-            entityStyle = ES_RenewableEnergy_BarrelDigesterSteel,
+            entityStyle = ES_RenewableEnergy_BarrelDigester,
             uiEnabled = false,
         }
         component SpriteConfig
@@ -113,49 +109,7 @@ module Base
             inputs
             {
                 item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
-                item 1 [Base.MetalDrum],
-                item 1 [Base.RubberHose],
-                item 1 [Base.Funnel],
-                item 2 [Base.DuctTape],
-                item 1 [Base.Glue],
-                item 3 tags[base:garbagebag],
-            }
-        }
-    }
-
-    entity RenewableEnergy_BarrelDigesterPlastic
-    {
-        component UiConfig
-        {
-            xuiSkin = default,
-            entityStyle = ES_RenewableEnergy_BarrelDigesterPlastic,
-            uiEnabled = false,
-        }
-        component SpriteConfig
-        {
-            OnCreate = RenewableEnergy.DigesterSystem.OnCreate,
-            face S
-            {
-                layer
-                {
-                    row = renewable_energy_01_229,
-                }
-            }
-        }
-        component CraftRecipe
-        {
-            timedAction = BuildLowNoTool,
-            time = 150,
-            category = Farming,
-            NeedToBeLearn = true,
-            AutoLearnAny = Farming:3;Mechanics:3,
-            SkillRequired = Mechanics:1,
-            xpAward = Mechanics:15,
-            Tooltip = Tooltip_RenewableEnergy_BarrelDigester,
-            inputs
-            {
-                item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
-                item 1 [Base.Mov_OrangeBarrel;Base.Mov_DarkGreenBarrel;Base.Mov_LightGreenBarrel],
+                item 1 [Base.MetalDrum;Base.Mov_OrangeBarrel;Base.Mov_DarkGreenBarrel;Base.Mov_LightGreenBarrel],
                 item 1 [Base.RubberHose],
                 item 1 [Base.Funnel],
                 item 2 [Base.DuctTape],
@@ -249,7 +203,7 @@ module Base
         }
     }
 
-    /* The FEMA unit: a galvanized trash can over a cooking-pot firebox, a bucket for its filter. */
+    /* The FEMA unit: a round bin over a cooking-pot firebox, a bucket for its filter. */
     entity RenewableEnergy_PrimitiveGasifier
     {
         component UiConfig
@@ -291,7 +245,7 @@ module Base
         }
     }
 
-    /* A steel drum with an ash door and a filter drum. */
+    /* A steel drum with an ash door, a bucket for its filter. */
     entity RenewableEnergy_Gasifier
     {
         component UiConfig

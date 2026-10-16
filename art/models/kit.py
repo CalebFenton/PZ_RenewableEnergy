@@ -35,20 +35,40 @@ def _principled(material):
 _MATERIALS = {}
 
 # Wood grain, by kind: the size across the grain of the figure the grain lines follow (metres),
-# how many times longer it runs along the grain, and how many lines cross one figure. Boards are
-# sawn, so their grain runs in long straight streaks; plywood's face is a veneer peeled off the
-# log, its figure broad and wavy.
-GRAIN = {"board": (0.08, 12.0, 3.0), "veneer": (0.09, 4.0, 3.0)}
-GRAIN_LINE, GRAIN_EARLY = 0.5, 1.1  # a grain line's shade, and the pale wood between lines
+# how many times longer it runs along the grain, how many lines cross one figure, and how dark a
+# line is. Boards are sawn, so their grain runs in long straight streaks; plywood's face is a veneer
+# peeled off the log, its figure broad and wavy. Weathered planks, as the game draws its own crates
+# and composters, are dark with grain cut deep by the rain.
+GRAIN = {"board": (0.08, 12.0, 3.0, 0.5), "veneer": (0.09, 4.0, 3.0, 0.5), "weathered": (0.05, 14.0, 4.0, 0.3)}
+GRAIN_EARLY = 1.1  # the pale wood between grain lines
 
 
-def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None):
+def _math(nodes, links, operation, a, b=None, c=None, clamp=False):
+    """A math node on sockets or numbers, returning its output socket."""
+    node = nodes.new("ShaderNodeMath")
+    node.operation = operation
+    node.use_clamp = clamp
+    for i, value in enumerate((a, b, c)):
+        if value is None:
+            continue
+        if isinstance(value, (int, float)):
+            node.inputs[i].default_value = value
+        else:
+            links.new(value, node.inputs[i])
+    return node.outputs[0]
+
+
+def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None,
+             streaks=None, scorch=None):
     """A painted, plastic or metal surface. `grime` darkens it in blotches, so flat colours don't
     look like a render. `speckle` = (colour, amount) mottles it with a second colour in a web of
     flakes, the base colour left at each flake's centre and less of it the higher `amount`: the way
-    multicrystalline cells sparkle, or rust on scrap steel. `emission` makes it glow, for lit LEDs.
-    `grain`, a kind in GRAIN, draws dark grain lines along each part's longest side, as `_object`
-    laid them out."""
+    multicrystalline cells sparkle, or rust on scrap steel. `streaks` = (colour, amount) runs that
+    colour down its sides in thin streaks, as rust and soot run down a drum left out in the rain.
+    `scorch` = (soot, tint, height) blackens it from its foot up to a ragged line `height` metres
+    up, with a band of heat tint above, as a fire inside leaves a stove. `emission` makes it glow,
+    for lit LEDs. `grain`, a kind in GRAIN, draws dark grain lines along each part's longest side,
+    as `_object` laid them out."""
     key = name
     if key in _MATERIALS:
         return _MATERIALS[key]
@@ -90,8 +110,60 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         links.new(color_out, mix.inputs[6])
         mix.inputs[7].default_value = (*hex_rgb(speckle[0]), 1.0)
         color_out = mix.outputs[2]
+    if streaks:
+        # Noise squeezed tall: its features run down the part's local Z, and only its peaks show.
+        squeeze = nodes.new("ShaderNodeVectorMath")
+        squeeze.operation = "MULTIPLY"
+        squeeze.inputs[1].default_value = (1.0, 1.0, 0.06)
+        links.new(coords.outputs["Object"], squeeze.inputs[0])
+        runs = nodes.new("ShaderNodeTexNoise")
+        runs.inputs["Scale"].default_value = scale * 1.5
+        runs.inputs["Detail"].default_value = 4.0
+        links.new(squeeze.outputs[0], runs.inputs["Vector"])
+        peaks = nodes.new("ShaderNodeValToRGB")
+        peaks.color_ramp.elements[0].position = 0.5
+        peaks.color_ramp.elements[0].color = (0, 0, 0, 1)
+        peaks.color_ramp.elements[1].position = 0.75
+        peaks.color_ramp.elements[1].color = (streaks[1], streaks[1], streaks[1], 1)
+        links.new(runs.outputs["Fac"], peaks.inputs["Fac"])
+        # Only down the sides: rain runs down a wall, not across a lid.
+        normal = nodes.new("ShaderNodeNewGeometry")
+        axes = nodes.new("ShaderNodeSeparateXYZ")
+        links.new(normal.outputs["Normal"], axes.inputs[0])
+        flat = _math(nodes, links, "ABSOLUTE", axes.outputs["Z"])
+        side = _math(nodes, links, "SUBTRACT", 1.0, flat)
+        amount = _math(nodes, links, "MULTIPLY", peaks.outputs["Color"], side)
+        run = nodes.new("ShaderNodeMix")
+        run.data_type = "RGBA"
+        links.new(amount, run.inputs["Factor"])
+        links.new(color_out, run.inputs[6])
+        run.inputs[7].default_value = (*hex_rgb(streaks[0]), 1.0)
+        color_out = run.outputs[2]
+    if scorch:
+        # Soot up to a ragged line `scorch[2]` above the part's foot, and a band of heat tint above it.
+        soot, tint, height = scorch
+        axes = nodes.new("ShaderNodeSeparateXYZ")
+        links.new(coords.outputs["Object"], axes.inputs[0])
+        ragged = nodes.new("ShaderNodeTexNoise")
+        ragged.inputs["Scale"].default_value = 9.0
+        ragged.inputs["Detail"].default_value = 3.0
+        links.new(coords.outputs["Object"], ragged.inputs["Vector"])
+        wobble = _math(nodes, links, "MULTIPLY_ADD", ragged.outputs["Fac"], 0.16, -0.08)
+        level = _math(nodes, links, "ADD", axes.outputs["Z"], wobble)
+        below = _math(nodes, links, "SUBTRACT", height, level)
+        sooted = _math(nodes, links, "MULTIPLY", below, 20.0, clamp=True)
+        above = _math(nodes, links, "SUBTRACT", level, height + 0.05)
+        band = _math(nodes, links, "ABSOLUTE", above)
+        tinted = _math(nodes, links, "MULTIPLY_ADD", band, -12.0, 0.7, clamp=True)
+        for factor, colour in ((tinted, tint), (sooted, soot)):
+            mix = nodes.new("ShaderNodeMix")
+            mix.data_type = "RGBA"
+            links.new(factor, mix.inputs["Factor"])
+            links.new(color_out, mix.inputs[6])
+            mix.inputs[7].default_value = (*hex_rgb(colour), 1.0)
+            color_out = mix.outputs[2]
     if grain:
-        across, stretch, lines = GRAIN[grain]
+        across, stretch, lines, line = GRAIN[grain]
         attribute = nodes.new("ShaderNodeAttribute")
         attribute.attribute_name = "grain"
         along = nodes.new("ShaderNodeVectorMath")
@@ -114,7 +186,7 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         links.new(count.outputs[0], wave.inputs[0])
         shade = nodes.new("ShaderNodeValToRGB")
         shade.color_ramp.elements[0].position = 0.0
-        shade.color_ramp.elements[0].color = (GRAIN_LINE, GRAIN_LINE, GRAIN_LINE, 1)
+        shade.color_ramp.elements[0].color = (line, line, line, 1)
         shade.color_ramp.elements[1].position = 0.3
         shade.color_ramp.elements[1].color = (1, 1, 1, 1)
         early = shade.color_ramp.elements.new(1.0)
@@ -204,12 +276,24 @@ def beam(collection, name, mat, start, end, section, bevel=0.0):
     return obj
 
 
+def _round_sides(bm, ends):
+    """Smooth-shades every face but `ends`, and keeps the edges round them sharp: a drum or a pipe
+    drawn in flat facets shows vertical bands that the game's own round things don't."""
+    for face in bm.faces:
+        face.smooth = face not in ends
+    for face in ends:
+        for edge in face.edges:
+            edge.smooth = False
+
+
 def cylinder(collection, name, mat, radius, height, at=(0, 0, 0), rotate=None, segments=12, radius_top=None):
     """An upright cylinder (or cone, with `radius_top`) whose bottom centre is at `at`."""
     bm = bmesh.new()
     bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segments, radius1=radius,
                           radius2=radius if radius_top is None else radius_top, depth=height)
     bmesh.ops.translate(bm, vec=Vector((0, 0, height / 2)), verts=bm.verts)
+    bm.normal_update()
+    _round_sides(bm, {face for face in bm.faces if abs(face.normal.z) > 0.999})
     obj = _object(name, bm, mat, collection)
     place(obj, at, rotate)
     return obj
@@ -229,8 +313,8 @@ def tube(collection, name, mat, points, radius, sides=6):
     for a, b in zip(rings, rings[1:]):
         for k in range(sides):
             bm.faces.new((a[k], a[(k + 1) % sides], b[(k + 1) % sides], b[k]))
-    bm.faces.new(list(reversed(rings[0])))
-    bm.faces.new(rings[-1])
+    ends = {bm.faces.new(list(reversed(rings[0]))), bm.faces.new(rings[-1])}
+    _round_sides(bm, ends)
     return _object(name, bm, mat, collection)
 
 

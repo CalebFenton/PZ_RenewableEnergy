@@ -13,12 +13,30 @@ local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local Materials, ObjectSystem = RenewableEnergy.Materials, RenewableEnergy.ObjectSystem
+local Materials, ObjectSystem, Sprites = RenewableEnergy.Materials, RenewableEnergy.ObjectSystem, RenewableEnergy.Sprites
 
 local DigesterSystem = ObjectSystem.define({
     name = "Digester", kind = "digester", owner = Digester, Object = DigesterObject, isObject = Digester.isDigester,
 })
 RenewableEnergy.DigesterSystem = DigesterSystem
+
+-- A barrel digester shows the barrel it was built from, though its entity has one tile. Swapped
+-- before the record reads the tile, and before ISBuildIsoEntity:create sends the object, so clients
+-- get it whole.
+local onCreate = DigesterSystem.OnCreate
+function DigesterSystem.OnCreate(params)
+    local thumpable, data = params.thumpable, params.craftRecipeData
+    local items = thumpable and data and data:getAllConsumedItems()
+    for i = 0, items and items:size() - 1 or -1 do
+        local tile = Sprites.digester.barrel[items:get(i):getType()]
+        if tile then
+            -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
+            thumpable:setSprite(getSprite(tile))
+            break
+        end
+    end
+    onCreate(params)
+end
 
 -- Jobs ------------------------------------------------------------------------------------------
 

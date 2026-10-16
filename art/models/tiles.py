@@ -111,11 +111,13 @@ for item, base, first_batteries, first_meter in STORAGE_TILES:
     for level in range(1, 6):
         TILES[first_meter + level - 1] = _overlay(build, at, meter_level=level)
 
-# Biogas digesters: a base tile each, then their gas holders' overlays. A barrel's holder overlays
-# fit the steel and the plastic barrel alike, which share one outline. Level n of a holder shows
-# it that full, from slack to taut; the insulated digester's shows its floating drum risen to n.
-TILES[228] = [layer(items.barrel_digester)]
-TILES[229] = [layer(items.barrel_digester, plastic=True)]
+# Biogas digesters: a base tile each, then their gas holders' overlays. The barrel digester has a tile
+# for each of the game's drums it may be built from (Sprites.digester.barrel); its holder overlays fit
+# them all, which share one outline. Level n of a holder shows it that full, from slack to taut; the
+# insulated digester's shows its floating drum risen to n.
+TILES[228] = [layer(items.barrel_digester)]  # the Metal Drum, the builder's default
+for index, look in ((229, "Mov_OrangeBarrel"), (277, "Mov_DarkGreenBarrel"), (278, "Mov_LightGreenBarrel")):
+    TILES[index] = [layer(items.barrel_digester, look=look)]
 TILES[230] = [layer(items.insulated_digester)]
 TILES[231] = [layer(items.dome_digester)]
 for holder, first in (("bags", 232), ("tarp", 236)):
@@ -133,13 +135,22 @@ TILES[249] = _overlay(items.dome_digester, (0, 0, 0), scrubber=True)
 TILES[244] = [layer(items.gas_heater)]
 TILES[245] = [layer(items.gas_heater, lit=True)]
 # The gas kit fitted to a generator: an overlay on the game's own generator tiles, so it has no
-# base of the mod's to hold out and keeps to the front corner, which the generator leaves clear.
+# base of the mod's to hold out. Tile 246 lies on the floor at the front corner of a generator the
+# game doesn't know; from GENERATOR_KIT_FIRST, one sits on the air intake of each of the game's
+# generator bodies in each facing (Sprites.generatorFittings).
+GENERATOR_BODIES = ("frame", "old", "inverter")
+GENERATOR_KIT_FIRST = 280
+GENERATOR_PIPE_FIRST = GENERATOR_KIT_FIRST + 4 * len(GENERATOR_BODIES)
 TILES[246] = [layer(items.generator_gas_kit)]
+for b, body in enumerate(GENERATOR_BODIES):
+    for f, facing in enumerate("NESW"):
+        TILES[GENERATOR_KIT_FIRST + 4 * b + f] = [layer(items.generator_gas_kit, body=body, facing=facing)]
 
 # Gasifiers: each tier's tile, then its lit overlay. The pipe overlays on its square, one by the
-# direction of the generator they run to, fit every tier, whose filters share one outline at their
-# foot; the preview draws them over the drum's. The pipe's other half lies on the generator's
-# square with the kit, one by the direction of the gasifier it comes from.
+# direction of the generator they run to, rise off the filter's outlet, which is in one place in
+# every tier; the preview draws them over the drum's. The pipe's other half lies on the generator's
+# square with the kit, one by the direction of the gasifier it comes from: 260 to 263 for a
+# generator the game doesn't know, from GENERATOR_PIPE_FIRST four for each body and facing.
 for offset, tier in enumerate(("primitive", "standard", "advanced")):
     TILES[250 + offset] = [layer(items.gasifier, tier=tier)]
     TILES[253 + offset] = [layer(items.gasifier, holdout=True, tier=tier), layer(items.gasifier, frame=False, tier=tier, lit=True)]
@@ -147,6 +158,9 @@ for offset, side in enumerate("NESW"):
     TILES[256 + offset] = [layer(items.gasifier, holdout=True, tier="standard"),
                            layer(items.gasifier, frame=False, tier="standard", pipe=side)]
     TILES[260 + offset] = [layer(items.generator_gas_pipe, side=side)]
+    for b, body in enumerate(GENERATOR_BODIES):
+        for f, facing in enumerate("NESW"):
+            TILES[GENERATOR_PIPE_FIRST + 16 * b + 4 * f + offset] = [layer(items.generator_gas_pipe, side=side, body=body, facing=facing)]
 
 # The scoop rotor wind charger as a tile: what the object is and how the build menu shows it. In
 # play the game draws its sprite model (items.SPRITE_MODELS) instead, and spins that.
@@ -166,8 +180,7 @@ for first, build, scale, options in ((265, items.propeller_charger, WIND_TILE_SC
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
 # working, its holder full, each gasifier and each wind charger.
 BUILD_ICONS = {
-    "BarrelDigesterSteel": [layer(items.barrel_digester, holder="bags")],
-    "BarrelDigesterPlastic": [layer(items.barrel_digester, plastic=True, holder="tarp")],
+    "BarrelDigester": [layer(items.barrel_digester, holder="bags")],
     "InsulatedDigester": [layer(items.insulated_digester, level=3)],
     "BrickDome": [layer(items.dome_digester)],
     "PrimitiveGasifier": [layer(items.gasifier, tier="primitive")],

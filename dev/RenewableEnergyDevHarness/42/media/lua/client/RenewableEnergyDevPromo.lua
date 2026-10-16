@@ -246,13 +246,13 @@ local R2 = {
         open = { along = { -2, 6 }, out = { -1, 6 }, sum = 4, half = 3 },
         barrelSteel = { 0, 4 },
         heater = { -1, 4 },
-        barrelPlastic = { 1, 3 },
+        barrelOrange = { 1, 3 },
         insulated = { 2, 2 },
         dome = { 3, 1 },
         generator = { 4, 1 },
         player = { 5, 0 },
         scout = { 2, 4 },
-        shot = { "barrelSteel", "heater", "barrelPlastic", "insulated", "dome", "generator", "player" },
+        shot = { "barrelSteel", "heater", "barrelOrange", "insulated", "dome", "generator", "player" },
     },
     -- The gasifier and the advanced gasifier lit, each piped to a kitted generator to its east, and
     -- the primitive gasifier with wood and charcoal beside it.
@@ -288,13 +288,13 @@ local R2 = {
     -- The treadmill, wired to a battery box beside it, the character running on it across the
     -- screen, side on to the camera. The treadmill's two tiles, by the way its runner faces
     -- (RenewableEnergy.Sprites): the rear tile the runner stands on, and the console in front. The
-    -- box stands past the console, and the character waits beside the console.
+    -- box stands past the rear end, and the character waits beside the belt.
     gym = {
-        rear = { 0, 0 },
-        console = { 1, 0 },
+        rear = { 1, 0 },
+        console = { 0, 0 },
         box = { 2, 0 },
         stand = { 1, 1 },
-        facing = "E",
+        facing = "W",
         shot = { "rear", "console", "box", "stand" },
         -- Floor of the same room between the treadmill and the camera, where furniture or the
         -- room's near walls, drawn see-through, would stand in front of the runner.
@@ -1047,7 +1047,7 @@ local function placeRecord(kind, tile, square)
     return thumpable
 end
 
--- A digester of the Sprites.digester tile `tile` ("barrel.steel", "dome", ...) built on `square`.
+-- A digester of the Sprites.digester tile `tile` ("barrel.MetalDrum", "dome", ...) built on `square`.
 -- It is made one at work (R2.digester), its record's `fields` set over that, a day passed so that
 -- it eats from its hopper and says what it makes a day, and its holder `full` of what it takes.
 local function placeDigester(square, tile, full, fields)
@@ -1770,8 +1770,8 @@ local function addBiogas()
         -- The heater first: the barrel's pass reads whether it is heated from the lit heater tile
         -- beside it (DigesterObject:advance).
         Stage.placeTile(here("heater"), Sprites.gasHeater.lit)
-        placeDigester(here("barrelSteel"), "barrel.steel", 1)
-        placeDigester(here("barrelPlastic"), "barrel.plastic", 0.6, { holder = "tarp" })
+        placeDigester(here("barrelSteel"), "barrel.MetalDrum", 1)
+        placeDigester(here("barrelOrange"), "barrel.Mov_OrangeBarrel", 0.6, { holder = "tarp" })
         placeDigester(here("insulated"), "insulated", 0.8)
         shown.digester = placeDigester(here("dome"), "dome", 0.9)
         local generator = placeGenerator(here("generator"), 0.2)

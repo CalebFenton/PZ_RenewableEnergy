@@ -16,14 +16,18 @@ from kit import beam, box, cylinder, group, material, mound, prism, text, tube
 def M(name):
     """The shared materials, made on first use."""
     return {
-        "aluminium": lambda: material("RE_Aluminium", "#b9bdc1", roughness=0.35, metallic=0.8, grime=0.08),
+        "aluminium": lambda: material("RE_Aluminium", "#a9adb1", roughness=0.5, metallic=0.8, grime=0.08),
         "galvanised": lambda: material("RE_Galvanised", "#b4babc", roughness=0.5, metallic=0.7, grime=0.2),
-        "cells": lambda: material("RE_PolyCells", "#1d3a7c", roughness=0.25, metallic=0.2, grime=0.05,
-                                  speckle=("#4c78c8", 0.9)),
+        # The game's metal pipe, a dull grey as its icon draws it.
+        "metalpipe": lambda: material("RE_MetalPipe", "#7f8487", roughness=0.6, metallic=0.5, grime=0.3, scale=12),
+        # Cell faces and their busbars under glass, rough enough that the sun, whose mirror image off
+        # a module tilted south at a rack's angle falls on the camera, doesn't white them out.
+        "cells": lambda: material("RE_PolyCells", "#142c63", roughness=0.75, metallic=0.2, grime=0.05,
+                                  speckle=("#3a60a8", 0.9)),
         "backsheet": lambda: material("RE_Backsheet", "#e9e8df", roughness=0.5, grime=0.05),
-        "busbar": lambda: material("RE_Busbar", "#cfd2d6", roughness=0.3, metallic=0.9, grime=0.0),
-        "amorphous": lambda: material("RE_Amorphous", "#2c3a78", roughness=0.2, metallic=0.25, grime=0.05),
-        "mono": lambda: material("RE_MonoCells", "#222838", roughness=0.25, metallic=0.3, grime=0.04),
+        "busbar": lambda: material("RE_Busbar", "#aeb2b6", roughness=0.7, metallic=0.6, grime=0.0),
+        "amorphous": lambda: material("RE_Amorphous", "#2c3a78", roughness=0.75, metallic=0.25, grime=0.05),
+        "mono": lambda: material("RE_MonoCells", "#222838", roughness=0.75, metallic=0.3, grime=0.04),
         # Broken cover glass: the fractures catch the light and read pale over the cells.
         "crack": lambda: material("RE_Crack", "#dfe7ee", roughness=0.3, grime=0.0),
         # Black and dark grey plastic as light as the game's own black radios and speakers, which it
@@ -98,17 +102,48 @@ def M(name):
         "amberlamp": lambda: material("RE_AmberLamp", "#f5a623", roughness=0.3, grime=0.05),
         "amberlampdark": lambda: material("RE_AmberLampDark", "#6e4510", roughness=0.3, grime=0.05),
         # Biogas digesters. The garbage bags are glossy, so their folds and bulge catch the light
-        # that a black as dark as the game's own would lose.
-        "drumpaint": lambda: material("RE_DrumPaint", "#6f8291", roughness=0.6, metallic=0.2, grime=0.3, scale=8,
-                                      speckle=("#8a5a36", 0.18)),
+        # that a black as dark as the game's own would lose. The drums are the game's own four, as
+        # its sprites paint them (crafted_01_32, industry_01_22, location_military_generic_01_14 and
+        # _6): dull, weathered steel, rust and grime run down their sides by the rain.
+        "drummetal": lambda: material("RE_DrumMetal", "#76776f", roughness=0.7, metallic=0.25, grime=0.4, scale=8,
+                                      speckle=("#7a5434", 0.12), streaks=("#4c4136", 0.55)),
+        "drumorange": lambda: material("RE_DrumOrange", "#a2683d", roughness=0.75, metallic=0.15, grime=0.4, scale=8,
+                                       speckle=("#6e4a32", 0.3), streaks=("#5a3f2c", 0.6)),
+        "drumgreen": lambda: material("RE_DrumGreen", "#4d5d46", roughness=0.75, metallic=0.15, grime=0.35, scale=8,
+                                      speckle=("#6b5034", 0.15), streaks=("#2f362b", 0.5)),
+        "drumolive": lambda: material("RE_DrumOlive", "#77714f", roughness=0.75, metallic=0.15, grime=0.35, scale=8,
+                                      speckle=("#6b5034", 0.15), streaks=("#4a4433", 0.5)),
         "ducttape": lambda: material("RE_DuctTape", "#a7aaab", roughness=0.35, metallic=0.3, grime=0.1),
-        "polydrum": lambda: material("RE_PolyDrum", "#2862b4", roughness=0.45, grime=0.15),
-        "olivedrum": lambda: material("RE_OliveDrum", "#66734a", roughness=0.6, metallic=0.2, grime=0.3, scale=8,
-                                      speckle=("#8a5a36", 0.15)),
         "garbagebag": lambda: material("RE_GarbageBag", "#45484d", roughness=0.25, grime=0.08),
-        "tarp": lambda: material("RE_Tarp", "#2f6cc0", roughness=0.6, grime=0.15),
-        "pvc": lambda: material("RE_Pvc", "#d0d0c8", roughness=0.4, grime=0.15),
+        # The game's own tarp, rubber hose, funnel and plastic pipe, as its icons draw them: tan
+        # canvas, tan rubber, a yellow funnel and grey pipe, a light grey, which the game draws
+        # darker on a model.
+        "tarp": lambda: material("RE_Tarp", "#c09347", roughness=0.85, grime=0.3, scale=14),
+        "rubberhose": lambda: material("RE_RubberHose", "#8c7a50", roughness=0.7, grime=0.25),
+        "funnel": lambda: material("RE_Funnel", "#c9b234", roughness=0.45, grime=0.15),
+        "pvc": lambda: material("RE_Pvc", "#a4a6a8", roughness=0.45, grime=0.2),
         "straw": lambda: material("RE_Straw", "#d6bd6c", roughness=0.9, grime=0.25, scale=60, speckle=("#a2833a", 0.5)),
+        # Planks nailed up outdoors, as dark and deeply grained as the game's own composters and
+        # crates, two shades so neighbouring boards read apart.
+        "planks": lambda: material("RE_Planks", "#80573a", roughness=0.85, grime=0.35, scale=10, grain="weathered"),
+        "planksdark": lambda: material("RE_PlanksDark", "#634129", roughness=0.85, grime=0.35, scale=10, grain="weathered"),
+        "nail": lambda: material("RE_Nail", "#3b3936", roughness=0.6, metallic=0.5, grime=0.2),
+        # The game's round bin, a plain steel can painted near black, and its galvanised bucket.
+        "roundbin": lambda: material("RE_RoundBin", "#3a352f", roughness=0.7, metallic=0.2, grime=0.35, scale=8,
+                                     streaks=("#5b4a3a", 0.4)),
+        "bucket": lambda: material("RE_Bucket", "#8e9091", roughness=0.55, metallic=0.5, grime=0.35, scale=10,
+                                   streaks=("#5d5a55", 0.4)),
+        # The stove black a welded body is painted with, rusting where the rain runs down it. A body
+        # with a fire in it is sooted from its foot up to a ragged line and tinted brown by the heat
+        # above that.
+        "stoveblack": lambda: material("RE_StoveBlack", "#45443f", roughness=0.75, metallic=0.2, grime=0.35, scale=8,
+                                       streaks=("#6b4a30", 0.45)),
+        "stovescorched": lambda: material("RE_StoveScorched", "#45443f", roughness=0.75, metallic=0.2, grime=0.35, scale=8,
+                                          streaks=("#6b4a30", 0.45), scorch=("#262320", "#7a4b2a", 0.28)),
+        "drumscorched": lambda: material("RE_DrumScorched", "#76776f", roughness=0.7, metallic=0.25, grime=0.4, scale=8,
+                                         speckle=("#7a5434", 0.12), streaks=("#4c4136", 0.55), scorch=("#2a2622", "#7b5232", 0.34)),
+        "potscorched": lambda: material("RE_PotScorched", "#8d9396", roughness=0.5, metallic=0.6, grime=0.3, scale=10,
+                                        scorch=("#2a2622", "#6e5a48", 0.14)),
         "earth": lambda: material("RE_Earth", "#6e5b43", roughness=1.0, grime=0.3, scale=20, speckle=("#54462f", 0.35)),
         "brick": lambda: material("RE_Brick", "#a5503a", roughness=0.85, grime=0.2, scale=30),
         "brickdark": lambda: material("RE_BrickDark", "#86412d", roughness=0.85, grime=0.2, scale=30),
@@ -124,9 +159,12 @@ def M(name):
         # Wood tar: black-brown and wet, so it shines; the straw it soaks stays a shade lighter.
         "tar": lambda: material("RE_Tar", "#3d2c1e", roughness=0.25, grime=0.25, scale=20, speckle=("#1f1712", 0.4)),
         "tarstraw": lambda: material("RE_TarStraw", "#7a5a2e", roughness=0.6, grime=0.3),
-        # Blades hammered out of spring steel and left dark, and the amber casting resin a homemade
-        # alternator's coils are set in.
-        "forged": lambda: material("RE_Forged", "#55524e", roughness=0.55, metallic=0.5, grime=0.3, scale=12),
+        # Blades: carved from the game's planks and oiled; and hammered out of sheet steel at the
+        # forge, left bare, pocked by the hammer and rusting at the edges, the amber casting resin a
+        # homemade alternator's coils are set in.
+        "carvedwood": lambda: material("RE_CarvedWood", "#9a6a43", roughness=0.6, grime=0.25, scale=10, grain="board"),
+        "hammered": lambda: material("RE_Hammered", "#9a9c9b", roughness=0.5, metallic=0.6, grime=0.3, scale=30,
+                                     speckle=("#55595b", 0.35), streaks=("#7a5434", 0.35)),
         "resin": lambda: material("RE_Resin", "#c99a4a", roughness=0.35, grime=0.15),
     }[name]()
 
@@ -1215,41 +1253,58 @@ def _drum_patch(col, name, mat, centre, radius, angle, z, size):
         box(col, name, mat, (width / strips + 0.004, 0.002, height), at=(x, y, z), rotate=(0, 0, a + 90))
 
 
-def drum(col, name, paint, at, rust=False):
-    """A tight-head 55 gallon drum standing at `at`, its two rolling hoops and the chimes at its
-    ends standing proud. Steel and poly drums are drawn to the one outline, so an overlay fits over
-    either. `rust` eats at a steel one where the wet ground and the rain on its head reach, on the
-    sides the viewer sees."""
+# The game's four drums, which a barrel digester may be built from, by the item: its paint, and
+# whether it is the game's homemade Metal Drum, rolled from sheet with a welded seam up its side and a
+# band round its middle, or a bought drum with two rolling hoops.
+DRUM_LOOKS = {"MetalDrum": ("drummetal", "seam"), "Mov_OrangeBarrel": ("drumorange", "hoops"),
+              "Mov_DarkGreenBarrel": ("drumgreen", "hoops"), "Mov_LightGreenBarrel": ("drumolive", "hoops")}
+
+
+def drum(col, name, at, look="MetalDrum", paint=None):
+    """One of the game's 55 gallon drums (DRUM_LOOKS) standing at `at`, its chimes and hoops or band
+    standing proud, the top chime dark as the game outlines its own, rust eating at it where the wet
+    ground and the rain on its head reach, on the sides the viewer sees. `paint` overrides its
+    look's material, for a drum a fire has scorched. Every look has the one outline, so an overlay
+    fits over any."""
     radius, height = DRUM
+    look_paint, kind = DRUM_LOOKS[look]
+    paint = paint or look_paint
     hoop, proud = 0.025, 0.008
-    cylinder(col, name, M(paint), radius, height, at=(at[0], at[1], 0), segments=28)
-    for z in (0, height / 3 - hoop / 2, 2 * height / 3 - hoop / 2):
-        cylinder(col, name + "_Hoop", M(paint), radius + proud, hoop, at=(at[0], at[1], z), segments=28)
-    _ring(col, name + "_Chime", M(paint), at, radius - 0.002, height + 0.002, 0.01)
-    if rust:
-        for angle, z, size, on_hoop in ((-112, 0, (0.13, hoop), True), (-98, hoop, (0.05, 0.03), False),
-                                        (-30, 0, (0.09, hoop), True), (-62, height - 0.035, (0.08, 0.03), False),
-                                        (-48, height - 0.085, (0.02, 0.05), False), (15, height / 3 - hoop / 2, (0.06, hoop), True)):
-            _drum_patch(col, name + "_Rust", M("rust"), at, radius + (proud if on_hoop else 0), angle, z, size)
+    cylinder(col, name, M(paint), radius, height, at=(at[0], at[1], 0), segments=32)
+    bands = (height / 2 - hoop / 2,) if kind == "seam" else (height / 3 - hoop / 2, 2 * height / 3 - hoop / 2)
+    # Each hoop is its own part, its paint measured from its own foot, so only the drum's foot
+    # takes a scorched body's soot.
+    for z in (0,) + bands:
+        cylinder(col, name + "_Hoop", M(paint if z == 0 else look_paint), radius + proud, hoop, at=(at[0], at[1], z), segments=32)
+    _ring(col, name + "_Chime", M("weld"), at, radius - 0.002, height + 0.002, 0.011)
+    if kind == "seam":
+        _drum_patch(col, name + "_Seam", M("weld"), at, radius + 0.001, -15, 0.0, (0.012, height))
+        for z in (0.06, 0.2, 0.33, 0.55, 0.68, 0.82):
+            x, y = _around(at, -11, radius + 0.004)
+            cylinder(col, name + "_Rivet", M("weld"), 0.006, 0.004, at=(x, y, z), rotate=(90, 0, -11 + 90), segments=6)
+    for angle, z, size, on_hoop in ((-112, 0, (0.13, hoop), True), (-98, hoop, (0.05, 0.03), False),
+                                    (-30, 0, (0.09, hoop), True), (-62, height - 0.035, (0.08, 0.03), False),
+                                    (-48, height - 0.085, (0.02, 0.05), False), (15, bands[0], (0.06, hoop), True)):
+        _drum_patch(col, name + "_Rust", M("rust"), at, radius + (proud if on_hoop else 0), angle, z, size)
 
 
-def barrel_digester(col, plastic=False, frame=True, holder=None, fill=3, torn=False, scrubber=False):
-    """A homestead batch digester: a 55 gallon drum of slurry, steel or blue poly, fed down a pipe
-    through its big bung that ends near the bottom, so feeding lets no gas out, under a funnel;
-    emptied at a spigot near its foot; its gas taken off the small bung through a valve and a hose
-    down to a holder on the ground beside it. `holder` draws the holder alone, "bags" or "tarp",
-    `fill` its level from 1 (slack) to 3 (taut), `torn` it ripped and empty. `scrubber` draws the
-    scrubber alone, in front of the barrel where neither it nor the holder hides it, teed off the
-    head and led on to the holder."""
+def barrel_digester(col, look="MetalDrum", frame=True, holder=None, fill=3, torn=False, scrubber=False):
+    """A homestead batch digester: a 55 gallon drum of slurry, any of the game's four (DRUM_LOOKS,
+    by `look`), fed through a funnel taped into its big bung, the recipe's rubber hose run down
+    inside it to near the bottom so feeding lets no gas out; emptied at a spigot near its foot; its
+    gas taken off the small bung through a valve and a hose down to a holder on the ground beside
+    it. `holder` draws the holder alone, "bags" or "tarp", `fill` its level from 1 (slack) to 3
+    (taut), `torn` it ripped and empty. `scrubber` draws the scrubber alone, in front of the barrel
+    where neither it nor the holder hides it, teed off the head and led on to the holder."""
     radius, height = DRUM
     x, y = BARREL_AT
     if frame:
-        drum(col, "Barrel", "polydrum" if plastic else "drumpaint", BARREL_AT, rust=not plastic)
+        drum(col, "Barrel", BARREL_AT, look)
         fx, fy = x + FEED_BUNG[0], y + FEED_BUNG[1]
         cylinder(col, "Barrel_FeedBung", M("darkgrey"), 0.042, 0.012, at=(fx, fy, height), segments=14)
-        cylinder(col, "Barrel_Feed", M("pvc"), 0.027, 0.22, at=(fx, fy, height), segments=14)
-        cylinder(col, "Barrel_Funnel", M("red"), 0.032, 0.1, at=(fx, fy, height + 0.2), radius_top=0.1, segments=18)
-        cylinder(col, "Barrel_FunnelMouth", M("black"), 0.088, 0.003, at=(fx, fy, height + 0.298), segments=18)
+        cylinder(col, "Barrel_FeedTape", M("ducttape"), 0.034, 0.04, at=(fx, fy, height + 0.012), segments=14)
+        cylinder(col, "Barrel_Funnel", M("funnel"), 0.03, 0.12, at=(fx, fy, height + 0.05), radius_top=0.1, segments=18)
+        cylinder(col, "Barrel_FunnelMouth", M("black"), 0.088, 0.003, at=(fx, fy, height + 0.168), segments=18)
         gx, gy = x + GAS_BUNG[0], y + GAS_BUNG[1]
         cylinder(col, "Barrel_GasBung", M("darkgrey"), 0.026, 0.012, at=(gx, gy, height), segments=12)
         cylinder(col, "Barrel_GasValve", M("copper"), 0.014, 0.05, at=(gx, gy, height + 0.012), segments=10)
@@ -1258,7 +1313,7 @@ def barrel_digester(col, plastic=False, frame=True, holder=None, fill=3, torn=Fa
         run = math.hypot(hx - x, hy - y)
         ux, uy = (hx - x) / run, (hy - y) / run
         ex, ey = x + ux * (radius + 0.035), y + uy * (radius + 0.035)
-        tube(col, "Barrel_Hose", M("black"), [(gx, gy, height + 0.06), (gx + ux * 0.04, gy + uy * 0.04, height + 0.12),
+        tube(col, "Barrel_Hose", M("rubberhose"), [(gx, gy, height + 0.06), (gx + ux * 0.04, gy + uy * 0.04, height + 0.12),
                                               (ex - ux * 0.05, ey - uy * 0.05, height + 0.09), (ex, ey, height - 0.06),
                                               (ex + ux * 0.015, ey + uy * 0.015, 0.4), (hx - ux * 0.02, hy - uy * 0.02, 0.12),
                                               (hx, hy, 0.04)], 0.014, 8)
@@ -1282,10 +1337,10 @@ def barrel_digester(col, plastic=False, frame=True, holder=None, fill=3, torn=Fa
         tee = (x + 0.17, y - 0.1)
         cylinder(col, "Barrel_ScrubberTee", M("copper"), 0.014, 0.04, at=(*tee, height), segments=10)
         inlet, outlet = _scrubber(col, (0.32, -0.33), (0.45, -0.21))
-        tube(col, "Barrel_ScrubberHose", M("black"), [(*tee, height + 0.04), (tee[0] + 0.05, tee[1] - 0.04, height + 0.08),
+        tube(col, "Barrel_ScrubberHose", M("rubberhose"), [(*tee, height + 0.04), (tee[0] + 0.05, tee[1] - 0.04, height + 0.08),
                                                       (0.24, -0.27, 0.6), inlet], 0.012, 8)
         # Back into the holder's south end, where the bags and the tarp both lie.
-        tube(col, "Barrel_ScrubberReturn", M("black"), [outlet, (outlet[0], outlet[1] + 0.03, outlet[2] + 0.04),
+        tube(col, "Barrel_ScrubberReturn", M("rubberhose"), [outlet, (outlet[0], outlet[1] + 0.03, outlet[2] + 0.04),
                                                         (0.4, -0.08, 0.12), (0.36, -0.02, 0.04)], 0.012, 8)
 
 
@@ -1374,25 +1429,25 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
     radius, rim = DRUM
     if frame:
         _straw_box(col)
-        cylinder(col, "Insulated_Drum", M("drumpaint"), radius, rim, segments=28)
-        _ring(col, "Insulated_Chime", M("drumpaint"), (0, 0), radius, rim, 0.01)
+        cylinder(col, "Insulated_Drum", M("drummetal"), radius, rim, segments=32)
+        _ring(col, "Insulated_Chime", M("weld"), (0, 0), radius, rim, 0.011)
         cylinder(col, "Insulated_Slurry", M("sludge"), radius - 0.006, 0.002, at=(0, 0, rim), segments=28)
         cylinder(col, "Insulated_Guide", M("galvanised"), 0.021, GUIDE_TOP - rim, at=(0, 0, rim), segments=10)
         cylinder(col, "Insulated_GuideCap", M("galvanised"), 0.028, 0.025, at=(0, 0, GUIDE_TOP), segments=10)
     if level:
         top = rim + FLOAT_RISE[level - 1]
         float_radius, float_height = FLOAT_DRUM
-        cylinder(col, "Insulated_Float", M("olivedrum"), float_radius, float_height, at=(0, 0, top - float_height), segments=28)
-        cylinder(col, "Insulated_FloatHoop", M("olivedrum"), float_radius + 0.007, 0.022, at=(0, 0, top - float_height / 2 - 0.01),
-                 segments=28)
-        _ring(col, "Insulated_FloatChime", M("olivedrum"), (0, 0), float_radius - 0.002, top + 0.002, 0.009)
+        cylinder(col, "Insulated_Float", M("drummetal"), float_radius, float_height, at=(0, 0, top - float_height), segments=32)
+        cylinder(col, "Insulated_FloatHoop", M("drummetal"), float_radius + 0.007, 0.022, at=(0, 0, top - float_height / 2 - 0.01),
+                 segments=32)
+        _ring(col, "Insulated_FloatChime", M("weld"), (0, 0), float_radius - 0.002, top + 0.002, 0.01)
         cylinder(col, "Insulated_Sleeve", M("galvanised"), 0.034, 0.07, at=(0, 0, top), segments=10)
         vx, vy = -0.1, -0.12
         cylinder(col, "Insulated_GasValve", M("copper"), 0.014, 0.05, at=(vx, vy, top), segments=10)
         box(col, "Insulated_GasLever", M("red"), (0.07, 0.014, 0.01), at=(vx + 0.03, vy, top + 0.03))
         # The hose to the stove, slack enough for the drum's whole rise, over the box's front.
         front = -size / 2
-        tube(col, "Insulated_Hose", M("black"), [(vx, vy, top + 0.05), (vx - 0.04, vy - 0.06, top + 0.09),
+        tube(col, "Insulated_Hose", M("rubberhose"), [(vx, vy, top + 0.05), (vx - 0.04, vy - 0.06, top + 0.09),
                                                  (-0.27, front + 0.05, height + 0.07), (-0.29, front - 0.03, height - 0.05),
                                                  (-0.3, front - 0.035, 0.25), (-0.33, front - 0.06, 0.03)], 0.014, 8)
     if scrubber:
@@ -1400,34 +1455,54 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
         fitting = _around((0, 0), -45, radius - 0.015)
         cylinder(col, "Insulated_ScrubberFitting", M("copper"), 0.012, 0.04, at=(*fitting, rim), segments=10)
         inlet, outlet = _scrubber(col, (0.3, -0.3), (0.08, -0.38), z=base)
-        tube(col, "Insulated_ScrubberHose", M("black"), [(*fitting, rim + 0.04), (fitting[0] + 0.03, fitting[1] - 0.03, rim + 0.12),
+        tube(col, "Insulated_ScrubberHose", M("rubberhose"), [(*fitting, rim + 0.04), (fitting[0] + 0.03, fitting[1] - 0.03, rim + 0.12),
                                                          (inlet[0] - 0.03, inlet[1] + 0.03, inlet[2] + 0.08), inlet], 0.012, 8)
-        tube(col, "Insulated_ScrubberOut", M("black"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.06, outlet[2] + 0.02),
+        tube(col, "Insulated_ScrubberOut", M("rubberhose"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.06, outlet[2] + 0.02),
                                                         (0.1, -size / 2 - 0.03, height - 0.05), (0.11, -size / 2 - 0.035, 0.25),
                                                         (0.13, -size / 2 - 0.06, 0.03)], 0.012, 8)
 
 
 def _straw_box(col):
-    """Weathered boards nailed round the drum with gaps between them, a batten down the middle of
+    """Weathered planks nailed round the drum to corner posts with gaps between them, each a little
+    off true as boards nailed up by hand are, nail heads at their ends, a batten down the middle of
     each side, straw packed inside and heaped over the top, tufts of it poking out of the gaps, and
     the tarp."""
     size, height = INSULATED
     rows = 4
     board = (height - (rows - 1) * INSULATED_GAP) / rows
-    shades = ("wood", "pinedark")
+    shades = ("planks", "planksdark")
+    post = 0.05
     box(col, "Insulated_Straw", M("straw"), (size - 0.03, size - 0.03, height - 0.01))
     mound(col, "Insulated_StrawTop", M("straw"), (size / 2 - 0.02, size / 2 - 0.02, 0.1), at=(0, 0, height - 0.05),
           squareness=3, lumps=0.12, seed=30, segments=24, rings=5)
+    # Corner posts inside the boards, which are nailed to them.
+    inside = size / 2 - BOARD - post / 2
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box(col, "Insulated_Post", M("planksdark"), (post, post, height), at=(sx * inside, sy * inside, 0), bevel=0.005)
+    rng = random.Random(32)
     for row in range(rows):
         z = row * (board + INSULATED_GAP)
         for sign in (-1, 1):
-            box(col, "Insulated_FrontBack", M(shades[row % 2]), (size, BOARD, board), at=(0, sign * (size - BOARD) / 2, z),
-                bevel=0.004)
+            lift, tilt = rng.uniform(-0.006, 0.006), rng.uniform(-0.8, 0.8)
+            box(col, "Insulated_FrontBack", M(shades[row % 2]), (size, BOARD, board), at=(0, sign * (size - BOARD) / 2, z + lift),
+                rotate=(0, tilt, 0), bevel=0.005)
+            lift, tilt = rng.uniform(-0.006, 0.006), rng.uniform(-0.8, 0.8)
             box(col, "Insulated_Side", M(shades[(row + 1) % 2]), (BOARD, size - 2 * BOARD, board),
-                at=(sign * (size - BOARD) / 2, 0, z), bevel=0.004)
+                at=(sign * (size - BOARD) / 2, 0, z + lift), rotate=(tilt, 0, 0), bevel=0.005)
+        # The nail heads the viewer sees, on the front (-Y) and east (+X) faces: into the posts at
+        # each end, and through the battens.
+        for up in (0.3, 0.7):
+            nz = z + board * up
+            for along, proud in ((-inside, 0), (inside, 0), (-0.05, 0.022)):
+                cylinder(col, "Insulated_Nail", M("nail"), 0.006, 0.003, at=(along, -size / 2 - proud - 0.001, nz),
+                         rotate=(90, 0, 0), segments=6)
+            for along, proud in ((-inside, 0), (inside, 0), (-0.05, 0.022)):
+                cylinder(col, "Insulated_Nail", M("nail"), 0.006, 0.003, at=(size / 2 + proud + 0.001, along, nz),
+                         rotate=(0, 90, 0), segments=6)
     for sign in (-1, 1):
-        box(col, "Insulated_Batten", M("pinedark"), (0.07, 0.022, height), at=(0.05 * sign, sign * (size / 2 + 0.011), 0), bevel=0.004)
-        box(col, "Insulated_Batten", M("pinedark"), (0.022, 0.07, height), at=(sign * (size / 2 + 0.011), -0.05 * sign, 0), bevel=0.004)
+        box(col, "Insulated_Batten", M("planksdark"), (0.07, 0.022, height), at=(0.05 * sign, sign * (size / 2 + 0.011), 0), bevel=0.005)
+        box(col, "Insulated_Batten", M("planksdark"), (0.022, 0.07, height), at=(sign * (size / 2 + 0.011), -0.05 * sign, 0), bevel=0.005)
     rng = random.Random(31)
     for _ in range(14):
         row = rng.randrange(1, rows)
@@ -1444,18 +1519,23 @@ def _straw_box(col):
         rotate=(0, -2, 0))
 
 
-DOME = (0.3, 0.42)  # the brick dome's radius and its height above its footing
-DOME_AT = (-0.03, 0.05)
-DOME_FOOTING = 0.04
+# A real fixed dome holding the 4 m³ of gas the game gives it is 2 to 3 m across and mostly buried;
+# on one square it fills the square, thigh high above an earth berm, bigger than the insulated
+# digester beside it as it is in play.
+DOME = (0.4, 0.5)  # the brick dome's radius and its height above its footing
+DOME_AT = (-0.06, 0.06)
+DOME_FOOTING = 0.1  # where the berm leaves off and the bricks show
+BERM = (0.5, 0.5, 0.2)
 BRICK = (0.2, 0.05, 0.068)  # a brick as laid: along the course, into the dome, up
 
 
 def dome_digester(col, frame=True, scrubber=False):
-    """A fixed-dome digester of the Chinese kind, buried: a low mound of earth over the pit with the
-    top of its brick dome showing, knee high, a concrete collar on its crown and the gas pipe and
-    valve out of that, its hose led off behind the dome, a feed pipe and funnel slanting down into it
-    on one side and the box its spent slurry overflows into on the other. `scrubber` draws the
-    scrubber alone, on the mound's east shoulder, teed off the gas pipe above the valve."""
+    """A fixed-dome digester of the Chinese kind, buried: an earth berm over the pit filling its
+    square, the upper part of its brick dome showing above it, a concrete collar on its crown and
+    the gas pipe and valve out of that, its hose led off behind the dome, the feed pipe slanting
+    down into it from a concrete inlet basin on one side and the box its spent slurry overflows into
+    against the dome on the other. `scrubber` draws the scrubber alone, on the berm's back corner,
+    teed off the gas pipe above the valve."""
     cx, cy = DOME_AT
     crown = DOME_FOOTING + DOME[1]
     if frame:
@@ -1463,24 +1543,26 @@ def dome_digester(col, frame=True, scrubber=False):
     if scrubber:
         tee = (cx + 0.03, cy + 0.03, crown + 0.17)
         tube(col, "Dome_ScrubberTee", M("galvanised"), [(cx, cy, tee[2]), tee], 0.014, 8)
-        inlet, outlet = _scrubber(col, (0.34, 0.24), (0.44, 0.06), z=0.07, can_z=0.05)
-        tube(col, "Dome_ScrubberHose", M("black"), [tee, (tee[0] + 0.08, tee[1] + 0.06, tee[2] + 0.03), (0.25, 0.22, inlet[2] + 0.12),
-                                                    inlet], 0.012, 8)
+        inlet, outlet = _scrubber(col, (0.37, 0.37), (0.43, 0.1), z=0.04, can_z=0.05)
+        tube(col, "Dome_ScrubberHose", M("rubberhose"), [tee, (tee[0] + 0.08, tee[1] + 0.06, tee[2] + 0.03),
+                                                         (0.24, 0.3, inlet[2] + 0.14), inlet], 0.012, 8)
         # On to the house, underground.
-        tube(col, "Dome_ScrubberOut", M("black"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.02, outlet[2] + 0.03),
-                                                   (0.48, 0.02, 0.12), (0.49, 0.0, 0.02)], 0.012, 8)
+        tube(col, "Dome_ScrubberOut", M("rubberhose"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.02, outlet[2] + 0.03),
+                                                        (0.48, 0.02, 0.12), (0.49, 0.0, 0.02)], 0.012, 8)
 
 
 def _dome(col):
     cx, cy = DOME_AT
     radius, rise = DOME
-    mound(col, "Dome_Earth", M("earth"), (0.48, 0.48, 0.14), squareness=1.4, lumps=0.05, seed=40, segments=24, rings=5)
-    mound(col, "Dome_Mortar", M("mortar"), (radius - 0.008, radius - 0.008, rise), at=(cx, cy, DOME_FOOTING), segments=28, rings=8)
+    mound(col, "Dome_Earth", M("earth"), BERM, squareness=1.8, lumps=0.04, seed=40, segments=32, rings=6)
+    # The mortar behind the bricks, from below the berm so no gap shows at its foot.
+    mound(col, "Dome_Mortar", M("mortar"), (radius - 0.008, radius - 0.008, rise + DOME_FOOTING), segments=32, rings=10,
+          at=(cx, cy, 0))
     rng = random.Random(41)
-    polar, course = 0.0, 0
-    while polar < math.radians(66):
-        ring, z = radius * math.cos(polar), DOME_FOOTING + rise * math.sin(polar)
-        tilt = math.degrees(math.atan2(math.sin(polar) / rise, math.cos(polar) / radius))
+    polar, course = math.asin(DOME_FOOTING / (rise + DOME_FOOTING)), 0
+    while polar < math.radians(70):
+        ring, z = radius * math.cos(polar), (rise + DOME_FOOTING) * math.sin(polar)
+        tilt = math.degrees(math.atan2(math.sin(polar) / (rise + DOME_FOOTING), math.cos(polar) / radius))
         count = max(6, round(2 * math.pi * ring / (BRICK[0] + 0.012)))
         for k in range(count):
             azimuth = 360 * (k + 0.5 * (course % 2)) / count
@@ -1489,25 +1571,26 @@ def _dome(col):
             box(col, "Dome_Brick", M("brick" if rng.random() < 0.6 else "brickdark"), (length, BRICK[1], BRICK[2]),
                 at=(x, y, z), rotate=(tilt, 0, azimuth - 90))
         # The next course starts a brick and its mortar further up the curve.
-        polar += (BRICK[2] + 0.01) / math.hypot(radius * math.sin(polar), rise * math.cos(polar))
+        polar += (BRICK[2] + 0.01) / math.hypot(radius * math.sin(polar), (rise + DOME_FOOTING) * math.cos(polar))
         course += 1
     crown = DOME_FOOTING + rise
-    cylinder(col, "Dome_Collar", M("concrete"), 0.14, 0.08, at=(cx, cy, crown - 0.06), radius_top=0.12, segments=20)
+    cylinder(col, "Dome_Collar", M("concrete"), 0.17, 0.09, at=(cx, cy, crown - 0.07), radius_top=0.14, segments=24)
     pipe_top = crown + 0.2
     cylinder(col, "Dome_GasPipe", M("galvanised"), 0.016, pipe_top - crown, at=(cx, cy, crown), segments=10)
     box(col, "Dome_Valve", M("copper"), (0.04, 0.04, 0.04), at=(cx, cy, crown + 0.08))
     box(col, "Dome_ValveLever", M("red"), (0.09, 0.014, 0.01), at=(cx + 0.035, cy, crown + 0.12))
-    tube(col, "Dome_GasHose", M("black"), [(cx, cy, pipe_top), (cx - 0.02, cy + 0.04, pipe_top + 0.04), (cx - 0.1, cy + 0.12, pipe_top),
-                                            (cx - 0.2, cy + 0.25, crown - 0.2), (-0.25, 0.4, 0.08), (-0.28, 0.46, 0.02)], 0.014, 8)
-    # The feed: a PVC pipe slanting down into the dome's foot from a funnel standing clear of it.
-    fx, fy = _around((cx, cy), 225, radius + 0.13)
+    tube(col, "Dome_GasHose", M("rubberhose"), [(cx, cy, pipe_top), (cx - 0.02, cy + 0.04, pipe_top + 0.04),
+                                                (cx - 0.1, cy + 0.12, pipe_top), (cx - 0.24, cy + 0.3, crown - 0.15),
+                                                (-0.36, 0.44, 0.12), (-0.38, 0.48, 0.03)], 0.014, 8)
+    # The feed: the recipe's pipe slanting down into the dome's foot from a little concrete basin
+    # the slurry is mixed in, standing on the berm clear of the dome.
+    fx, fy = _around((cx, cy), 225, radius + 0.08)
     lx, ly = _around((cx, cy), 225, radius - 0.02)
-    tube(col, "Dome_Feed", M("pvc"), [(lx, ly, 0.06), (fx, fy, 0.3)], 0.03, 12)
-    cylinder(col, "Dome_Funnel", M("red"), 0.034, 0.11, at=(fx, fy, 0.28), radius_top=0.11, segments=18)
-    cylinder(col, "Dome_FunnelMouth", M("black"), 0.098, 0.003, at=(fx, fy, 0.388), segments=18)
-    # The overflow box: cast concrete, full of spent slurry to its lip.
-    ox, oy, side, wall, tall = 0.29, -0.16, 0.26, 0.03, 0.17
-    cylinder(col, "Dome_Overflow", M("galvanised"), 0.03, 0.12, at=(ox - side / 2 - 0.03, oy + 0.04, 0.09), rotate=(0, 90, 0), segments=10)
+    tube(col, "Dome_Feed", M("pvc"), [(lx, ly, 0.12), (fx, fy, 0.2)], 0.03, 12)
+    cylinder(col, "Dome_Inlet", M("concrete"), 0.09, 0.14, at=(fx, fy, 0.06), radius_top=0.1, segments=20)
+    cylinder(col, "Dome_InletSlurry", M("sludge"), 0.08, 0.002, at=(fx, fy, 0.195), segments=20)
+    # The overflow box: cast concrete against the dome's foot, full of spent slurry to its lip.
+    ox, oy, side, wall, tall = 0.33, -0.33, 0.21, 0.03, 0.26
     box(col, "Dome_Sludge", M("sludge"), (side - wall, side - wall, tall - 0.025), at=(ox, oy, 0))
     for sign in (-1, 1):
         box(col, "Dome_BoxWall", M("concrete"), (side, wall, tall), at=(ox, oy + sign * (side - wall) / 2, 0), bevel=0.004)
@@ -1561,7 +1644,7 @@ def _scrubber(col, bucket_at, can_at, z=0.0, can_z=None):
     cylinder(col, "Scrubber_CanStub", M("pvc"), 0.011, 0.04, at=(cx - 0.015, cy, can_top), segments=10)
     cylinder(col, "Scrubber_CanOut", M("pvc"), 0.011, 0.04, at=(cx + 0.015, cy, can_top), segments=10)
     out = stubs[1]
-    tube(col, "Scrubber_Hose", M("black"), [out, (out[0], out[1], out[2] + 0.06), (cx - 0.015, cy, can_top + 0.1),
+    tube(col, "Scrubber_Hose", M("rubberhose"), [out, (out[0], out[1], out[2] + 0.06), (cx - 0.015, cy, can_top + 0.1),
                                             (cx - 0.015, cy, can_top + 0.04)], 0.012, 8)
     return stubs[0], (cx + 0.015, cy, can_top + 0.04)
 
@@ -1626,40 +1709,76 @@ def gas_conversion_kit(col):
     for sx in (-1, 1):
         cylinder(col, "Kit_PlateBolt", M("black"), 0.005, 0.001, at=(0.08 + sx * 0.045, -0.05 - sx * 0.006, 0.005), segments=8)
     for i in range(3):
-        _ring(col, "Kit_Hose", M("black"), (-0.02, 0.07), 0.075 - 0.004 * i, 0.012 + 0.022 * i, 0.012)
-    tube(col, "Kit_HoseEnd", M("black"), [(0.051, 0.07, 0.056), (0.1, 0.05, 0.03), (0.14, 0.06, 0.012)], 0.012, 8)
+        _ring(col, "Kit_Hose", M("rubberhose"), (-0.02, 0.07), 0.075 - 0.004 * i, 0.012 + 0.022 * i, 0.012)
+    tube(col, "Kit_HoseEnd", M("rubberhose"), [(0.051, 0.07, 0.056), (0.1, 0.05, 0.03), (0.14, 0.06, 0.012)], 0.012, 8)
     for x, y in ((0.1, 0.07), (0.15, 0.03)):
         _ring(col, "Kit_Clamp", M("galvanised"), (x, y), 0.022, 0.004, 0.004)
         box(col, "Kit_ClampScrew", M("galvanised"), (0.012, 0.016, 0.01), at=(x + 0.026, y, 0))
 
 
-# Where the kit's mixer lies on the generator's square, and how much larger than life: true to life,
-# the generator's foot hides all but a few pixels of it.
+# The game's generators (appliances_misc_01): three bodies, the red and the yellow sharing one, each
+# in four facings. A real kit goes on the engine's air intake, where the carburettor draws the gas
+# in, so the kit overlay is drawn there, per body and facing. Each body is given as it faces south
+# (-Y), in metres from its square's centre: where its intake is (picked on the game's sprites, read
+# back through its depth map), which way the intake faces, and the box the gas pipe keeps clear of.
+# The red and yellow ones take air at the front panel's engine end, the old open-frame one at the
+# end of its air cleaner's horn, the blue inverter low in its front cover.
+GENERATOR_BODIES = {
+    "frame": {"intake": (0.225, -0.186, 0.366), "facing": (0, -1), "box": ((-0.34, -0.27, 0.0), (0.34, 0.13, 0.6))},
+    "old": {"intake": (-0.272, 0.127, 0.423), "facing": (-1, 0), "box": ((-0.3, -0.43, 0.0), (0.3, 0.34, 0.68))},
+    "inverter": {"intake": (0.102, -0.172, 0.131), "facing": (0, -1), "box": ((-0.36, -0.25, 0.0), (0.3, 0.15, 0.42))},
+}
+# The turn, in degrees about Z, from a body facing south to one facing each way.
+BODY_TURN = {"S": 0, "E": 90, "N": 180, "W": 270}
+GAS_KIT_SCALE = 1.2  # a little larger than life, so the mixer reads beside the game's chunky generators
+# Where the kit lies on a generator the game doesn't know, another mod's: on the floor across the
+# square's front corner, which a generator in its middle leaves clear.
 GAS_KIT_AT = (0.35, -0.34)
-GAS_KIT_SCALE = 1.5
 
 
-def _gas_kit_ends():
-    """The mixer's two barbs as the kit overlay lays it, south-west then north-east, and the end of
-    the gas line off the south-west one, at the square's front edge."""
-    cx, cy = GAS_KIT_AT
-    end = 0.1 * GAS_KIT_SCALE / math.sqrt(2)
-    z = 0.026 * GAS_KIT_SCALE
-    return (cx - end, cy - end, z), (cx + end, cy + end, z), (cx - end + 0.04, cy - end - 0.05, 0.018)
+def _turned(point, degrees):
+    a = math.radians(degrees)
+    x, y = point[0], point[1]
+    return (x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a), *point[2:])
 
 
-def generator_gas_kit(col):
+def _generator_fit(body, facing):
+    """For a generator of `body` facing `facing`, or None for an unknown one: the mixer's origin and
+    turn, the top of its gas branch where the pipe comes down into it, the intake and its outward
+    direction, and the body's box (lowest and highest corner) on its square."""
+    s = GAS_KIT_SCALE
+    if body is None:
+        origin, turn = (*GAS_KIT_AT, 0.0), 45
+        intake, out, box_ = None, None, None
+    else:
+        spec, degrees = GENERATOR_BODIES[body], BODY_TURN[facing]
+        intake = _turned(spec["intake"], degrees)
+        out = _turned(spec["facing"], degrees)
+        # The mixer lies along the intake's axis, its +X barb in the intake, its axis at the intake.
+        origin = (intake[0] + out[0] * 0.1 * s, intake[1] + out[1] * 0.1 * s, intake[2] - 0.026 * s)
+        turn = math.degrees(math.atan2(-out[1], -out[0]))
+        corners = [_turned((x, y, 0), degrees) for x in (spec["box"][0][0], spec["box"][1][0]) for y in (spec["box"][0][1], spec["box"][1][1])]
+        box_ = ((min(c[0] for c in corners), min(c[1] for c in corners), 0.0),
+                (max(c[0] for c in corners), max(c[1] for c in corners), spec["box"][1][2]))
+    branch = (origin[0], origin[1], origin[2] + 0.076 * s)
+    return origin, turn, branch, intake, out, box_
+
+
+def generator_gas_kit(col, body=None, facing="S"):
     """The kit fitted to a generator, as the overlay on the generator's square shows it: the mixer
-    lying across the square's front corner, clear of a generator in its middle, a hose up from its
-    branch into the generator and the gas line in from the side."""
-    scale = GAS_KIT_SCALE
-    cx, cy = GAS_KIT_AT
-    _mixer(col, "GenKit_Mixer", (cx, cy, 0), 45).scale = (scale, scale, scale)
-    south_west, _, line_end = _gas_kit_ends()
-    tube(col, "GenKit_Hose", M("black"), [(cx, cy, 0.07 * scale), (cx - 0.01, cy + 0.01, 0.12 * scale), (cx - 0.05, cy + 0.05, 0.2),
-                                          (cx - 0.1, cy + 0.1, 0.24)], 0.013 * scale, 8)
-    tube(col, "GenKit_Line", M("black"), [south_west, (south_west[0] + 0.01, south_west[1] - 0.03, 0.02), line_end],
-          0.013 * scale, 8)
+    on the engine's air intake of a generator of `body` facing `facing` (GENERATOR_BODIES), its
+    adapter plate against the intake, its gas branch up for the line; on a generator the game
+    doesn't know (`body` None), lying across the square's front corner with a hose up into it."""
+    s = GAS_KIT_SCALE
+    origin, turn, _, intake, out, _ = _generator_fit(body, facing)
+    _mixer(col, "GenKit_Mixer", origin, turn).scale = (s, s, s)
+    if body is None:
+        cx, cy = GAS_KIT_AT
+        tube(col, "GenKit_Hose", M("rubberhose"), [(cx, cy, 0.07 * s), (cx - 0.01, cy + 0.01, 0.12 * s), (cx - 0.05, cy + 0.05, 0.2),
+                                                   (cx - 0.1, cy + 0.1, 0.24)], 0.013 * s, 8)
+    else:
+        box(col, "GenKit_Plate", M("rawsteel"), (0.11, 0.006, 0.09), at=(intake[0] + out[0] * 0.003, intake[1] + out[1] * 0.003,
+                                                                        intake[2] - 0.045), rotate=(0, 0, turn + 90))
 
 
 def fridge_compressor(col):
@@ -1687,44 +1806,84 @@ def fridge_compressor(col):
 #
 # A gasifier stands on its square as a digester does: its body in the west and its filter in the
 # east, side by side as the viewer sees them, so neither hides the other. Its glow while lit and the
-# metal pipe on to a generator on the next square are overlays. The pipe leaves from under the
-# filter, which stands on legs in one place and to one outline at its foot in every tier, so one set
-# of pipe overlays fits all three.
+# metal pipe on to a generator on the next square are overlays. As in the FEMA plans (ORNL-6404,
+# 2.2, steps 8 to 11), every hole is in the filter's lid: the gas comes in from the body, goes down
+# through wood chips on one side of a divider and up the other, and leaves by the outlet beside the
+# blower's stack for the engine. Every tier's filter is the bucket its recipe takes, so one set of
+# pipe overlays, rising from the outlet, fits all three.
 
 GASIFIER_AT = (-0.14, -0.04)
 GASIFIER_FILTER_AT = (0.3, 0.08)
-GASIFIER_FILTER_RADIUS = 0.15
-GASIFIER_FILTER_LEGS = 0.1
+FILTER_BUCKET = (0.13, 0.15, 0.34)  # the game's bucket: its radius at the foot and the rim, its height
+FILTER_TOP = FILTER_BUCKET[2] + 0.012  # the lid's top
+FILTER_INLET = (GASIFIER_FILTER_AT[0] - 0.07, GASIFIER_FILTER_AT[1] + 0.03)
+FILTER_OUTLET = (GASIFIER_FILTER_AT[0] + 0.06, GASIFIER_FILTER_AT[1] - 0.05)
+FILTER_BLOWER = (GASIFIER_FILTER_AT[0] + 0.0, GASIFIER_FILTER_AT[1] + 0.09)
+OUTLET_STUB = 0.05  # the outlet's threaded stub above the lid, capped while no pipe is on it
 # The side the fire's ash or air door faces, in degrees from east: the front, clear of the filter.
 GASIFIER_DOOR_ANGLE = -100
-PIPE_Z = 0.06
 PIPE_RADIUS = 0.021
+# The height the pipe to a generator runs at: over every generator's body and in front of every
+# gasifier's, from where it rises off the filter to where it comes down to the generator's intake.
+PIPE_RUN_Z = 0.78
 # Where the pipe leaves the gasifier's square for a generator on the next square, by the generator's
-# direction, and comes onto the generator's square, by the gasifier's. The pipes keep to the front,
-# where the kit lies on the generator's square, and pass in front of the gasifier's body; each pair
-# meets across the squares' shared edge.
-GASIFIER_PIPE_EDGES = {"N": (0.3, 0.5), "E": (0.5, -0.3), "S": (0.3, -0.5), "W": (-0.5, -0.4)}
-GENERATOR_PIPE_EDGES = {"N": (0.3, 0.5), "E": (0.5, -0.4), "S": (0.3, -0.5), "W": (-0.5, -0.3)}
+# direction: straight off the outlet, or round the front of the body to the west.
+GASIFIER_PIPE_EDGES = {"N": (FILTER_OUTLET[0], 0.5), "E": (0.5, FILTER_OUTLET[1]), "S": (FILTER_OUTLET[0], -0.5), "W": (-0.5, -0.44)}
+OPPOSITE = {"N": "S", "E": "W", "S": "N", "W": "E"}
+STEP = {"N": (0, 1), "E": (1, 0), "S": (0, -1), "W": (-1, 0)}
+
+
+def _generator_pipe_edge(side):
+    """Where the pipe comes onto a generator's square from the gasifier on its `side`: the gasifier
+    half's end at the shared edge, in the generator square's frame."""
+    x, y = GASIFIER_PIPE_EDGES[OPPOSITE[side]]
+    dx, dy = STEP[side]
+    return x + dx, y + dy, PIPE_RUN_Z
 
 
 def _pipe(col, name, points):
-    """Galvanised pipe through `points`, square at each bend as a threaded elbow is."""
+    """The recipes' metal pipe through `points`, square at each bend as a threaded elbow is."""
     for start, end in zip(points, points[1:]):
-        tube(col, name, M("galvanised"), [start, end], PIPE_RADIUS, 10)
+        tube(col, name, M("metalpipe"), [start, end], PIPE_RADIUS, 10)
     for x, y, z in points[1:-1]:
-        box(col, name + "_Elbow", M("galvanised"), (0.05, 0.05, 0.05), at=(x, y, z - 0.025), bevel=0.008)
+        box(col, name + "_Elbow", M("metalpipe"), (0.05, 0.05, 0.05), at=(x, y, z - 0.025), bevel=0.008)
 
 
-def _gasifier_outlet(col, name, radius, z, filter_top, clear=None):
-    """The gas pipe out of the body's side near the fire, up and over into the filter's top. It
-    leaves the body turned toward the viewer from the filter, where there is room to rise, and rises
-    clear of `clear`, the widest the body gets above the outlet (default `radius`)."""
-    fx, fy = GASIFIER_FILTER_AT
+def _gasifier_outlet(col, name, radius, z, clear=None):
+    """The gas pipe out of the body's side near the fire, up and over into the filter lid's inlet.
+    It leaves the body turned toward the viewer from the filter, where there is room to rise, and
+    rises clear of `clear`, the widest the body gets above the outlet (default `radius`)."""
+    fx, fy = FILTER_INLET
     angle = math.degrees(math.atan2(fy - GASIFIER_AT[1], fx - GASIFIER_AT[0])) - 35
     inside = _around(GASIFIER_AT, angle, radius - 0.01)
     out = _around(GASIFIER_AT, angle, (clear or radius) + 0.03)
-    over = filter_top + 0.1
-    _pipe(col, name, [(*inside, z), (*out, z), (*out, over), (fx, fy, over), (fx, fy, filter_top)])
+    over = FILTER_TOP + 0.12
+    _pipe(col, name, [(*inside, z), (*out, z), (*out, over), (fx, fy, over), (fx, fy, FILTER_TOP)])
+
+
+def _filter(col, name):
+    """The filter: the game's galvanised bucket of wood chips, a lid cut from sheet and latched down
+    on a hose seal, three holes in it: the inlet from the body, the blower's stack with its cap, and
+    the outlet to the engine, capped until a pipe is screwed on; the drain cock at its foot."""
+    foot, rim, height = FILTER_BUCKET
+    fx, fy = GASIFIER_FILTER_AT
+    cylinder(col, name + "_Bucket", M("bucket"), foot, height, at=(fx, fy, 0), radius_top=rim, segments=28)
+    for t in (0.3, 0.7):
+        _ring(col, name + "_BucketRib", M("bucket"), GASIFIER_FILTER_AT, foot + (rim - foot) * t + 0.003, height * t, 0.005)
+    _ring(col, name + "_Seal", M("black"), GASIFIER_FILTER_AT, rim + 0.002, height, 0.008)
+    cylinder(col, name + "_Lid", M("rawsteel"), rim + 0.012, 0.012, at=(fx, fy, height), segments=28)
+    for angle in (-60, 60, 180):
+        x, y = _around(GASIFIER_FILTER_AT, angle, rim + 0.012)
+        box(col, name + "_Latch", M("weld"), (0.025, 0.012, 0.05), at=(x, y, height - 0.035), rotate=(0, 0, angle + 90))
+    cylinder(col, name + "_Outlet", M("galvanised"), PIPE_RADIUS, OUTLET_STUB, at=(*FILTER_OUTLET, FILTER_TOP), segments=12)
+    cylinder(col, name + "_OutletCap", M("galvanised"), PIPE_RADIUS + 0.006, 0.02, at=(*FILTER_OUTLET, FILTER_TOP + OUTLET_STUB - 0.012),
+             segments=12)
+    bx, by = FILTER_BLOWER
+    cylinder(col, name + "_Blower", M("darkgrey"), 0.045, 0.05, at=(bx, by, FILTER_TOP), segments=16)
+    cylinder(col, name + "_Stack", M("galvanised"), 0.02, 0.18, at=(bx, by, FILTER_TOP + 0.05), segments=12)
+    cylinder(col, name + "_StackCap", M("red"), 0.026, 0.025, at=(bx, by, FILTER_TOP + 0.23), segments=12)
+    cock = _around(GASIFIER_FILTER_AT, -80, foot + 0.02)
+    box(col, name + "_DrainCock", M("brass"), (0.03, 0.03, 0.03), at=(*cock, 0.02))
 
 
 def _facing(radius, z, out=0.0):
@@ -1744,44 +1903,38 @@ def _disc_at(col, name, mat, at, disc):
     cylinder(col, name, mat, disc, 0.004, at=at, rotate=(90, 0, GASIFIER_DOOR_ANGLE + 90), segments=12)
 
 
-def _filter_legs(col, name):
-    """Three angle-iron legs under a filter."""
-    for angle in (90, 210, 330):
-        x, y = _around(GASIFIER_FILTER_AT, angle, GASIFIER_FILTER_RADIUS - 0.03)
-        box(col, name, M("weld"), (0.025, 0.025, GASIFIER_FILTER_LEGS + 0.01), at=(x, y, 0), rotate=(0, 0, angle))
-
-
 def gasifier(col, tier="standard", frame=True, lit=False, pipe=None):
     """A downdraft wood gas generator as the 1989 FEMA plans build one, in three tiers: "primitive"
     the plans' own, "standard" a steel drum, "advanced" a welded body with a forged grate. `lit`
-    draws only the fire's glow at its door, `pipe` only the metal pipe from under its filter to the
-    square's edge toward a generator that way ("N", "E", "S" or "W")."""
+    draws only the fire's glow at its door, `pipe` only the metal pipe up off the filter's outlet and
+    across to the square's edge toward a generator that way ("N", "E", "S" or "W")."""
     if frame:
         {"primitive": _primitive_gasifier, "standard": _drum_gasifier, "advanced": _welded_gasifier}[tier](col)
+        _filter(col, "Filter")
     if lit:
         _gasifier_glow(col, tier)
     if pipe:
-        fx, fy = GASIFIER_FILTER_AT
+        ox, oy = FILTER_OUTLET
         ex, ey = GASIFIER_PIPE_EDGES[pipe]
-        points = [(fx, fy, GASIFIER_FILTER_LEGS), (fx, fy, PIPE_Z)]
-        if pipe in "EW":
-            points.append((fx, ey, PIPE_Z))
-        _pipe(col, "Gasifier_Pipe", points + [(ex, ey, PIPE_Z)])
+        points = [(ox, oy, FILTER_TOP + OUTLET_STUB - 0.01), (ox, oy, PIPE_RUN_Z)]
+        if pipe == "W":
+            points.append((ox, ey, PIPE_RUN_Z))
+        _pipe(col, "Gasifier_Pipe", points + [(ex, ey, PIPE_RUN_Z)])
 
 
 PRIMITIVE_POT = (0.2, 0.22)  # the cooking pot's radius and height
-PRIMITIVE_CAN = (0.24, 0.62)  # the trash can's radius at its rim and its height
+PRIMITIVE_BIN = (0.21, 0.24, 0.6)  # the game's round bin: its radius at the foot and the rim, its height
 DRUM_DOOR_Z = 0.05  # the drum's ash door's foot
 WELDED = (0.27, 0.86)  # the welded body's radius and height to its shoulder
 
 
 def _primitive_gasifier(col):
-    """The FEMA unit itself: a galvanised trash can for the hopper, standing on a big steel cooking
-    pot that holds the fire, an air hole in the pot's side, the gas pipe out of it, and a galvanised
-    bucket of wood chips on two bricks for the filter."""
+    """The FEMA unit itself, from what a scavenger finds: the game's round bin, a plain steel can
+    painted near black, for the hopper, its seam to the big steel cooking pot that holds the fire
+    taped round, an air hole in the pot's side and the gas pipe out of it, soot up both."""
     bx, by = GASIFIER_AT
     pot_radius, pot_height = PRIMITIVE_POT
-    cylinder(col, "Prim_Pot", M("darkgrey"), pot_radius, pot_height, at=(bx, by, 0), segments=24)
+    cylinder(col, "Prim_Pot", M("potscorched"), pot_radius, pot_height, at=(bx, by, 0), segments=28)
     for angle in (30, 210):
         a, b = _around(GASIFIER_AT, angle - 12, pot_radius), _around(GASIFIER_AT, angle + 12, pot_radius)
         c, d = _around(GASIFIER_AT, angle - 8, pot_radius + 0.035), _around(GASIFIER_AT, angle + 8, pot_radius + 0.035)
@@ -1789,49 +1942,33 @@ def _primitive_gasifier(col):
                                                     (*b, pot_height - 0.04)], 0.007, 6)
     hole, _ = _facing(pot_radius, 0.07)
     _disc_at(col, "Prim_AirHole", M("black"), hole, 0.04)
-    can_radius, can_height = PRIMITIVE_CAN
-    cylinder(col, "Prim_Can", M("galvanised"), can_radius * 0.94, can_height, at=(bx, by, pot_height), radius_top=can_radius,
-             segments=24)
-    for t in (0.25, 0.55, 0.85):
-        _ring(col, "Prim_CanRib", M("galvanised"), GASIFIER_AT, can_radius * (0.94 + 0.06 * t) + 0.002, pot_height + can_height * t,
-              0.008)
-    top = pot_height + can_height
-    cylinder(col, "Prim_Lid", M("galvanised"), can_radius + 0.012, 0.03, at=(bx, by, top), segments=24)
-    mound(col, "Prim_LidDome", M("galvanised"), (can_radius + 0.008, can_radius + 0.008, 0.05), at=(bx, by, top + 0.03), segments=24,
-          rings=4)
-    tube(col, "Prim_LidHandle", M("galvanised"), [(bx - 0.06, by, top + 0.07), (bx - 0.05, by, top + 0.11), (bx + 0.05, by, top + 0.11),
-                                                  (bx + 0.06, by, top + 0.07)], 0.008, 6)
-    fx, fy = GASIFIER_FILTER_AT
-    for sx in (-1, 1):
-        box(col, "Prim_Brick", M("brick"), (0.065, 0.2, GASIFIER_FILTER_LEGS), at=(fx + sx * 0.07, fy, 0), rotate=(0, 0, -40))
-    bucket = 0.3
-    radius = GASIFIER_FILTER_RADIUS
-    cylinder(col, "Prim_Bucket", M("galvanised"), radius, bucket, at=(fx, fy, GASIFIER_FILTER_LEGS), radius_top=radius + 0.02,
-             segments=20)
-    _ring(col, "Prim_BucketRib", M("galvanised"), GASIFIER_FILTER_AT, radius + 0.012, GASIFIER_FILTER_LEGS + bucket * 0.6, 0.006)
-    filter_top = GASIFIER_FILTER_LEGS + bucket + 0.02
-    cylinder(col, "Prim_BucketLid", M("galvanised"), radius + 0.025, 0.02, at=(fx, fy, filter_top - 0.02), segments=20)
-    _gasifier_outlet(col, "Prim_Pipe", pot_radius, 0.13, filter_top, clear=can_radius + 0.01)
+    foot, rim, height = PRIMITIVE_BIN
+    cylinder(col, "Prim_Bin", M("roundbin"), foot, height, at=(bx, by, pot_height), radius_top=rim, segments=28)
+    _ring(col, "Prim_BinRim", M("roundbin"), GASIFIER_AT, rim + 0.004, pot_height + height, 0.01)
+    cylinder(col, "Prim_Tape", M("ducttape"), foot + 0.006, 0.05, at=(bx, by, pot_height - 0.02), segments=28)
+    top = pot_height + height
+    cylinder(col, "Prim_Lid", M("rawsteel"), rim + 0.012, 0.012, at=(bx, by, top), segments=28)
+    tube(col, "Prim_LidHandle", M("weld"), [(bx - 0.06, by, top + 0.01), (bx - 0.05, by, top + 0.05), (bx + 0.05, by, top + 0.05),
+                                            (bx + 0.06, by, top + 0.01)], 0.008, 6)
+    _gasifier_outlet(col, "Prim_Pipe", pot_radius, 0.13, clear=rim + 0.01)
 
 
 def _drum_gasifier(col):
-    """A steel drum scorched black about its fire, its head made a lid clamped on with a ring, an
-    ash door welded on at its foot with draft holes punched in it, and a small drum on legs for the
-    filter, a drain cock at its foot."""
+    """The game's Metal Drum scorched black about its fire and tinted brown above, its head made a
+    lid clamped on with a ring, tar wept from under the clamp, an ash door welded on at its foot with
+    draft holes punched in it."""
     radius, height = DRUM
     bx, by = GASIFIER_AT
-    cylinder(col, "Drum_Body", M("rustysteel"), radius, height, at=(bx, by, 0), segments=28)
-    for z in (0, height / 3 - 0.0125, 2 * height / 3 - 0.0125):
-        cylinder(col, "Drum_Hoop", M("rustysteel"), radius + 0.008, 0.025, at=(bx, by, z), segments=28)
-    rng = random.Random(70)
-    for angle in range(-170, 40, 18):
-        _drum_patch(col, "Drum_Soot", M("charcoal"), GASIFIER_AT, radius, angle, 0.025, (0.07, rng.uniform(0.1, 0.24)))
-    cylinder(col, "Drum_Lid", M("rawsteel"), radius + 0.008, 0.02, at=(bx, by, height), segments=28)
+    drum(col, "Drum_Body", GASIFIER_AT, "MetalDrum", paint="drumscorched")
+    rng = random.Random(72)
+    for angle in (-130, -95, -60, -20):
+        _drum_patch(col, "Drum_Tar", M("tar"), GASIFIER_AT, radius + 0.002, angle, height - rng.uniform(0.08, 0.16), (0.02, rng.uniform(0.06, 0.14)))
+    cylinder(col, "Drum_Lid", M("rawsteel"), radius + 0.008, 0.02, at=(bx, by, height), segments=32)
     _ring(col, "Drum_Clamp", M("weld"), GASIFIER_AT, radius + 0.01, height + 0.01, 0.012)
     tube(col, "Drum_LidHandle", M("weld"), [(bx - 0.07, by, height + 0.02), (bx - 0.06, by, height + 0.07), (bx + 0.06, by, height + 0.07),
                                             (bx + 0.07, by, height + 0.02)], 0.008, 6)
     at, turn = _facing(radius, DRUM_DOOR_Z, 0.004)
-    box(col, "Drum_AshDoor", M("rawsteel"), (0.22, 0.008, 0.14), at=at, rotate=turn, bevel=0.002)
+    box(col, "Drum_AshDoor", M("rustysteel"), (0.22, 0.008, 0.14), at=at, rotate=turn, bevel=0.002)
     for side in (-1, 1):
         hinge, _ = _facing(radius, DRUM_DOOR_Z + 0.055 + side * 0.04, 0.012)
         box(col, "Drum_DoorHinge", M("weld"), (0.02, 0.02, 0.03), at=_along(hinge, -0.11), rotate=turn)
@@ -1840,33 +1977,23 @@ def _drum_gasifier(col):
     hole, _ = _facing(radius, DRUM_DOOR_Z + 0.09, 0.008)
     for offset in (-0.05, 0.0, 0.05):
         _disc_at(col, "Drum_DraftHole", M("black"), _along(hole, offset), 0.014)
-    fx, fy = GASIFIER_FILTER_AT
-    _filter_legs(col, "Drum_FilterLeg")
-    filter_height = 0.45
-    cylinder(col, "Drum_Filter", M("drumpaint"), GASIFIER_FILTER_RADIUS, filter_height, at=(fx, fy, GASIFIER_FILTER_LEGS), segments=22)
-    _ring(col, "Drum_FilterHoop", M("drumpaint"), GASIFIER_FILTER_AT, GASIFIER_FILTER_RADIUS + 0.004,
-          GASIFIER_FILTER_LEGS + filter_height / 2, 0.007)
-    filter_top = GASIFIER_FILTER_LEGS + filter_height + 0.015
-    cylinder(col, "Drum_FilterLid", M("drumpaint"), GASIFIER_FILTER_RADIUS + 0.008, 0.015, at=(fx, fy, filter_top - 0.015), segments=22)
-    cock = _around(GASIFIER_FILTER_AT, -80, GASIFIER_FILTER_RADIUS + 0.02)
-    box(col, "Drum_DrainCock", M("brass"), (0.03, 0.03, 0.03), at=(*cock, GASIFIER_FILTER_LEGS + 0.02))
-    _gasifier_outlet(col, "Drum_Pipe", radius, 0.2, filter_top)
+    _gasifier_outlet(col, "Drum_Pipe", radius, 0.2)
 
 
 def _welded_gasifier(col):
-    """A body welded up from sheet steel and painted with stove black: seams round it, a shoulder
-    up to a clamped hopper lid, a forged grate door at its foot, and a filter canister on legs with
-    a bolted flange lid and a gauge."""
+    """A body welded up from sheet steel and painted with stove black, the paint burnt off and rusting
+    low round the fire: seams round it, a shoulder up to a clamped hopper lid, a forged grate door at
+    its foot."""
     radius, height = WELDED
     bx, by = GASIFIER_AT
-    cylinder(col, "Welded_Body", M("darkgrey"), radius, height, at=(bx, by, 0), segments=28)
+    cylinder(col, "Welded_Body", M("stovescorched"), radius, height, at=(bx, by, 0), segments=32)
     for z in (0.3, 0.6):
         _ring(col, "Welded_Seam", M("weld"), GASIFIER_AT, radius + 0.001, z, 0.005)
-    cylinder(col, "Welded_Shoulder", M("darkgrey"), radius, 0.12, at=(bx, by, height), radius_top=0.13, segments=28)
+    cylinder(col, "Welded_Shoulder", M("stoveblack"), radius, 0.12, at=(bx, by, height), radius_top=0.13, segments=32)
     _ring(col, "Welded_ShoulderSeam", M("weld"), GASIFIER_AT, radius + 0.001, height, 0.005)
     neck = height + 0.12
-    cylinder(col, "Welded_Neck", M("rawsteel"), 0.13, 0.05, at=(bx, by, neck), segments=20)
-    cylinder(col, "Welded_Lid", M("weld"), 0.145, 0.025, at=(bx, by, neck + 0.05), segments=20)
+    cylinder(col, "Welded_Neck", M("rawsteel"), 0.13, 0.05, at=(bx, by, neck), segments=24)
+    cylinder(col, "Welded_Lid", M("weld"), 0.145, 0.025, at=(bx, by, neck + 0.05), segments=24)
     box(col, "Welded_LidClamp", M("weld"), (0.03, 0.08, 0.02), at=(bx + 0.13, by, neck + 0.05), bevel=0.004)
     tube(col, "Welded_LidHandle", M("weld"), [(bx - 0.05, by, neck + 0.075), (bx - 0.04, by, neck + 0.12), (bx + 0.04, by, neck + 0.12),
                                               (bx + 0.05, by, neck + 0.075)], 0.008, 6)
@@ -1878,18 +2005,7 @@ def _welded_gasifier(col):
     bar, _ = _facing(radius, 0.06, 0.008)
     for offset in (-0.105, -0.05, 0.0, 0.05, 0.105):
         box(col, "Welded_GrateBar", M("weld"), (0.014, 0.012, 0.16), at=_along(bar, offset), rotate=turn)
-    fx, fy = GASIFIER_FILTER_AT
-    _filter_legs(col, "Welded_FilterLeg")
-    can = 0.5
-    cylinder(col, "Welded_Filter", M("rawsteel"), GASIFIER_FILTER_RADIUS, can, at=(fx, fy, GASIFIER_FILTER_LEGS), segments=22)
-    flange = GASIFIER_FILTER_LEGS + can
-    cylinder(col, "Welded_FilterFlange", M("weld"), GASIFIER_FILTER_RADIUS + 0.02, 0.022, at=(fx, fy, flange), segments=22)
-    for k in range(8):
-        bolt = _around(GASIFIER_FILTER_AT, 45 * k, GASIFIER_FILTER_RADIUS + 0.01)
-        cylinder(col, "Welded_FilterBolt", M("galvanised"), 0.007, 0.01, at=(*bolt, flange + 0.022), segments=6)
-    gauge = _around(GASIFIER_FILTER_AT, -70, GASIFIER_FILTER_RADIUS)
-    cylinder(col, "Welded_Gauge", M("white"), 0.03, 0.012, at=(*gauge, flange - 0.08), rotate=(90, 0, -70 + 90), segments=16)
-    _gasifier_outlet(col, "Welded_Pipe", radius, 0.2, flange + 0.022)
+    _gasifier_outlet(col, "Welded_Pipe", radius, 0.2)
 
 
 def _gasifier_glow(col, tier):
@@ -1910,17 +2026,31 @@ def _gasifier_glow(col, tier):
         box(col, "Glow_Grate", M("flame"), (0.19, 0.003, 0.15), at=at, rotate=turn)
 
 
-def generator_gas_pipe(col, side):
+def _clear_of(start, end, box_, margin=0.05):
+    """Whether the straight run from `start` to `end` keeps `margin` clear of the box."""
+    if box_ is None:
+        return True
+    (x0, y0, z0), (x1, y1, z1) = box_
+    for k in range(41):
+        t = k / 40
+        x, y, z = (start[i] + (end[i] - start[i]) * t for i in range(3))
+        if x0 - margin < x < x1 + margin and y0 - margin < y < y1 + margin and z < z1 + margin:
+            return False
+    return True
+
+
+def generator_gas_pipe(col, side, body=None, facing="S"):
     """The metal pipe on a generator's square from the gasifier on the square to its `side` ("N",
-    "E", "S" or "W") to the kit's mixer: into its free barb from the east, onto the end of its gas
-    line from the front, and round the generator to them from behind or the west."""
-    _, north_east, line_end = _gas_kit_ends()
-    ex, ey = GENERATOR_PIPE_EDGES[side]
-    edge = (ex, ey, PIPE_Z)
-    route = {"N": [edge, (ex, 0.42, PIPE_Z), (0.47, 0.42, PIPE_Z), (0.47, -0.19, PIPE_Z), north_east],
-             "E": [edge, north_east],
-             "S": [edge, line_end],
-             "W": [edge, (-0.45, ey, PIPE_Z), (-0.45, -0.485, PIPE_Z), (0.25, -0.485, PIPE_Z), line_end]}[side]
+    "E", "S" or "W") down into the gas branch of the kit's mixer on a generator of `body` facing
+    `facing` (generator_gas_kit): sloping straight down from the shared edge to above the branch
+    where nothing is in the way, else over the generator's body and down, then down into it."""
+    _, _, branch, _, _, box_ = _generator_fit(body, facing)
+    edge = _generator_pipe_edge(side)
+    above = (branch[0], branch[1], branch[2] + 0.12)
+    if _clear_of(edge, above, box_):
+        route = [edge, above, branch]
+    else:
+        route = [edge, (above[0], above[1], PIPE_RUN_Z), branch]
     _pipe(col, "GenPipe", route)
 
 
@@ -1984,12 +2114,12 @@ def _scoop(col, name, centre, start, height, z):
     chord = 2 * radius * math.sin(math.radians(step / 2))
     for i in range(strips):
         a = start + (i + 0.5) * step
-        for mat, out, thick in (("drumpaint", 0.002, 0.003), ("rust", -0.002, 0.003)):
+        for mat, out, thick in (("drummetal", 0.002, 0.003), ("rust", -0.002, 0.003)):
             x, y = _around(centre, a, radius + out)
             box(col, name, M(mat), (chord + 0.004, thick, height), at=(x, y, z), rotate=(0, 0, a + 90))
         for rise in (height / 3, 2 * height / 3):
             x, y = _around(centre, a, radius + 0.006)
-            box(col, name + "_Hoop", M("drumpaint"), (chord + 0.004, 0.006, 0.022), at=(x, y, z + rise - 0.011), rotate=(0, 0, a + 90))
+            box(col, name + "_Hoop", M("drummetal"), (chord + 0.004, 0.006, 0.022), at=(x, y, z + rise - 0.011), rotate=(0, 0, a + 90))
 
 
 def scoop_rotor(col):
@@ -2047,28 +2177,69 @@ ROTOR = "Rotor_"
 PROPELLER_HUB = 3.8  # the hub's height, a storey and a half up
 PROPELLER_BLADE = (0.82, 0.13, 0.02)  # a blade's length past its root, its chord at the root, its thickness
 ALTERNATOR_HUB = 4.3
-ALTERNATOR_BLADE = (1.0, 0.16, 0.012)
+ALTERNATOR_BLADE = (1.0, 0.14, 0.005)
 # The rotor turned a step at a time: three blades look the same after a third of a turn.
 ROTOR_SPINS = (0, 20, 40, 60, 80, 100)
+# The radius of the 8 inch plastic pipe pipe blades are sawn from: its curve is their airfoil.
+PIPE_BLADE_CURVE = 0.1
 
 
-def _blade(col, name, mat, size):
-    """A blade along +Z from a bolting plate at the origin, its chord along X tapering to two fifths
-    at the tip and its pitch flattening toward it, in five pieces."""
+def _blade(col, name, kind, size):
+    """A blade along +Z from its root at the origin, its chord along X, made the way its material
+    allows, so each reads apart at a glance:
+    - "wood": carved from a plank, thick at a square root block bolted on, a twisted airfoil
+      tapering to a rounded tip, the grain along it;
+    - "pipe": sawn lengthwise from plastic pipe, a thin curved shell that keeps the pipe's grey,
+      cut on a straight taper, its flat root bolted to a steel strap;
+    - "steel": hammered from sheet, thin, flat and narrow to a point, a welded strap at its root,
+      bare steel pocked by the hammer."""
     length, chord, thick = size
-    pieces = 5
-    parts = [box(col, name, M(mat), (chord * 0.8, thick * 1.5, 0.08), bevel=0.003)]
-    for i in range(pieces):
-        t = (i + 0.5) / pieces
-        parts.append(box(col, name, M(mat), (chord * (1 - 0.6 * t), thick, length / pieces + 0.002),
-                         at=(chord * 0.2 * t, 0, 0.06 + i * length / pieces), rotate=(0, 0, 18 - 13 * t), bevel=0.002))
+    pieces = 6
+    bolt = M("weld")
+    parts = []
+    if kind == "wood":
+        mat = M("carvedwood")
+        parts.append(box(col, name, mat, (chord * 0.9, thick * 2.2, 0.1), bevel=0.006))
+        for i in range(pieces):
+            t = (i + 0.5) / pieces
+            parts.append(box(col, name, mat, (chord * (1 - 0.55 * t), thick * (1.6 - 0.9 * t), length / pieces + 0.004),
+                             at=(chord * 0.18 * t, 0, 0.08 + i * length / pieces), rotate=(0, 0, 26 - 20 * t), bevel=0.006))
+        parts.append(mound(col, name, mat, (chord * 0.22, thick * 0.35, 0.05), at=(chord * 0.18, 0, 0.08 + length - 0.004),
+                           segments=10, rings=3))
+        for z in (0.03, 0.07):
+            parts.append(cylinder(col, name, bolt, 0.01, 0.006, at=(0, -thick * 1.1, z), rotate=(90, 0, 0), segments=6))
+    elif kind == "pipe":
+        mat = M("pvc")
+        parts.append(box(col, name, M("rawsteel"), (chord * 0.6, 0.006, 0.12), at=(0, 0.004, -0.02)))
+        strips = 4
+        for i in range(pieces):
+            t = (i + 0.5) / pieces
+            width = chord * (1 - 0.6 * t)
+            arc = width / PIPE_BLADE_CURVE
+            for s in range(strips):
+                a = (s + 0.5) / strips - 0.5
+                x = math.sin(a * arc) * PIPE_BLADE_CURVE
+                y = PIPE_BLADE_CURVE * (1 - math.cos(a * arc))
+                parts.append(box(col, name, mat, (width / strips + 0.002, 0.005, length / pieces + 0.002),
+                                 at=(x + chord * 0.2 * t, -y, 0.06 + i * length / pieces), rotate=(0, 0, 12 + math.degrees(a * arc))))
+        for z in (0.0, 0.06):
+            parts.append(cylinder(col, name, bolt, 0.008, 0.006, at=(0, -0.003, z), rotate=(90, 0, 0), segments=6))
+    else:
+        mat = M("hammered")
+        parts.append(box(col, name, M("weld"), (chord * 0.7, thick * 3, 0.07), bevel=0.002))
+        for i in range(pieces):
+            t = (i + 0.5) / pieces
+            parts.append(box(col, name, mat, (chord * (1 - 0.85 * t), thick, length / pieces + 0.002),
+                             at=(chord * 0.1 * t, 0, 0.05 + i * length / pieces), rotate=(0, 0, 14 - 10 * t)))
+        for z in (0.02, 0.05):
+            parts.append(cylinder(col, name, M("galvanised"), 0.008, 0.005, at=(0, -thick * 1.5, z), rotate=(90, 0, 0), segments=6))
     return parts
 
 
-def _rotor_blades(col, hub, mat, size):
-    """Three blades bolted round `hub`, turning in the plane that faces -Y."""
+def _rotor_blades(col, hub, kind, size):
+    """Three blades of `kind` (_blade) bolted round `hub`, turning in the plane that faces -Y."""
     for k in range(3):
-        group(col, ROTOR + "Blade", _blade(col, ROTOR + "Blade", mat, size), at=hub, rotate=(0, 120 * k, 0))
+        group(col, ROTOR + "Blade", _blade(col, ROTOR + "Blade", kind, size), at=hub, rotate=(0, 120 * k, 0))
 
 
 def _tail(col, name, start, length, vane, z):
@@ -2076,7 +2247,7 @@ def _tail(col, name, start, length, vane, z):
     that keeps the rotor into the wind."""
     end = (0, start[1] + length, z + 0.03)
     tube(col, name + "_Boom", M("galvanised"), [(0, start[1], z), end], 0.02, 8)
-    box(col, name + "_Vane", M("drumpaint"), (0.004, vane[0], vane[1]), at=(0, end[1] + vane[0] / 2 - 0.05, z - vane[1] / 2 + 0.05))
+    box(col, name + "_Vane", M("drummetal"), (0.004, vane[0], vane[1]), at=(0, end[1] + vane[0] / 2 - 0.05, z - vane[1] / 2 + 0.05))
 
 
 def propeller_charger(col, blades="wood"):
@@ -2102,7 +2273,7 @@ def propeller_charger(col, blades="wood"):
                                          (0.2, 0.2, 0.0)], 0.007, 6)
     cylinder(col, ROTOR + "Spinner", M("rawsteel"), 0.07, 0.05, at=(0, -0.255, hub), rotate=(90, 0, 0), segments=16)
     cylinder(col, ROTOR + "Nose", M("rawsteel"), 0.07, 0.05, at=(0, -0.305, hub), rotate=(90, 0, 0), radius_top=0.02, segments=16)
-    _rotor_blades(col, (0, -0.28, hub), {"wood": "pine", "pipe": "pvc"}[blades], PROPELLER_BLADE)
+    _rotor_blades(col, (0, -0.28, hub), blades, PROPELLER_BLADE)
 
 
 def _alternator_head(col, rotor):
@@ -2154,38 +2325,43 @@ def alternator_charger(col):
             beam(col, "Alt_Diagonal", M("rustysteel"), on_leg(leg, low), on_leg((leg + 1) % 3, z), (0.025, 0.025))
     cylinder(col, "Alt_TopPlate", M("weld"), 0.12, 0.02, at=(0, 0, top), segments=16)
     cylinder(col, "Alt_YawBearing", M("weld"), 0.06, 0.1, at=(0, 0, top + 0.02), segments=14)
-    beam(col, "Alt_Frame", M("forged"), (0, 0.02, top + 0.11), (0, ALTERNATOR_HEAD_Y + 0.3, hub), (0.05, 0.05))
+    beam(col, "Alt_Frame", M("rustysteel"), (0, 0.02, top + 0.11), (0, ALTERNATOR_HEAD_Y + 0.3, hub), (0.05, 0.05))
     group(col, "Alt_Head", _alternator_head(col, ROTOR), at=(0, ALTERNATOR_HEAD_Y, hub))
     cylinder(col, "Alt_FurlHinge", M("weld"), 0.025, 0.22, at=(0.06, 0.05, hub - 0.12), segments=10)
     _tail(col, "Alt_Tail", (0, 0.05), 1.05, (0.55, 0.42), hub)
     tube(col, "Alt_Cable", M("black"), [(0.03, 0.05, hub - 0.1), on_leg(0, top - 0.05), on_leg(0, 0.3), (feet[0][0] + 0.05, feet[0][1], 0.0)],
          0.007, 6)
-    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), "forged", ALTERNATOR_BLADE)
+    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), "steel", ALTERNATOR_BLADE)
 
 
-def _blade_bundle(col, name, mat, size):
-    """Three blades stacked flat and tied with twine at two places."""
+# How far apart blades of each kind stack in a bundle: their roots' thickness, or a pipe blade's curve.
+BUNDLE_SPACING = {"wood": 2.4 * PROPELLER_BLADE[2], "pipe": 0.03, "steel": 3.2 * ALTERNATOR_BLADE[2]}
+
+
+def _blade_bundle(col, name, kind, size):
+    """Three blades of `kind` stacked flat and tied with twine at two places."""
     length, chord, thick = size
+    spacing = BUNDLE_SPACING[kind]
     for i in range(3):
         # Span along X, chord along Y, flat side up.
-        group(col, name, _blade(col, name, mat, size), at=(-length / 2, 0, thick * 0.75 + i * thick * 2), rotate=(90, 0, 90))
+        group(col, name, _blade(col, name, kind, size), at=(-length / 2, 0, spacing * (0.5 + i)), rotate=(90, 0, 90))
     for x in (-length * 0.2, length * 0.25):
-        box(col, name + "_Twine", M("tape"), (0.012, chord + 0.02, thick * 6.5), at=(x, chord * 0.1, 0))
+        box(col, name + "_Twine", M("tape"), (0.012, chord + 0.02, spacing * 3.2), at=(x, chord * 0.1, 0))
 
 
 def wooden_blades(col):
-    """Three propeller blades carved from pine planks, tied in a bundle."""
-    _blade_bundle(col, "WoodBlades", "pine", PROPELLER_BLADE)
+    """Three propeller blades carved from planks, tied in a bundle."""
+    _blade_bundle(col, "WoodBlades", "wood", PROPELLER_BLADE)
 
 
 def pipe_blades(col):
-    """Three propeller blades cut from grey plastic pipe, tied in a bundle."""
-    _blade_bundle(col, "PipeBlades", "pvc", PROPELLER_BLADE)
+    """Three propeller blades sawn from grey plastic pipe, tied in a bundle."""
+    _blade_bundle(col, "PipeBlades", "pipe", PROPELLER_BLADE)
 
 
 def steel_blades(col):
-    """Three blades hammered out of steel at the forge, tied in a bundle."""
-    _blade_bundle(col, "SteelBlades", "forged", ALTERNATOR_BLADE)
+    """Three blades hammered out of sheet steel at the forge, tied in a bundle."""
+    _blade_bundle(col, "SteelBlades", "steel", ALTERNATOR_BLADE)
 
 
 def homemade_alternator(col):

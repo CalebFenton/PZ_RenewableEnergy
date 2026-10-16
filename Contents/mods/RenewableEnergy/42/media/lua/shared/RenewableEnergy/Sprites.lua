@@ -54,9 +54,19 @@ Sprites.batteryRackMetal = tile(33)
 Sprites.batteryBankWood = tile(34)
 Sprites.batteryBankMetal = tile(9)
 
--- Biogas digesters, built in place, one facing each.
-Sprites.digester = { barrel = { steel = tile(228), plastic = tile(229) }, insulated = tile(230), dome = tile(231) }
--- Their gas holders, drawn over the digester's own tile: `bags` and `tarp` beside either barrel,
+-- Biogas digesters, built in place, one facing each. A barrel digester looks like the barrel it was
+-- built from, so its tiles are keyed by that item's type (DigesterSystem.OnCreate).
+Sprites.digester = {
+    barrel = {
+        MetalDrum = tile(228),
+        Mov_OrangeBarrel = tile(229),
+        Mov_DarkGreenBarrel = tile(277),
+        Mov_LightGreenBarrel = tile(278),
+    },
+    insulated = tile(230),
+    dome = tile(231),
+}
+-- Their gas holders, drawn over the digester's own tile: `bags` and `tarp` beside any barrel,
 -- from 1 (slack) to 3 (taut), or torn; `drum` the insulated digester's floating drum, from 1 (low)
 -- to 4 (risen highest).
 Sprites.digesterHolder = {
@@ -70,17 +80,59 @@ Sprites.digesterHolder = {
 Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = tile(249) }
 -- The homemade gas heater, one facing; both tiles give the heater back.
 Sprites.gasHeater = { off = tile(244), lit = tile(245) }
--- The gas kit fitted to a generator, drawn over the game's own generator tile in any facing.
-Sprites.gasKit = tile(246)
+-- The gas kit fitted to a generator and the generator's half of a gasifier's pipe, drawn over the
+-- game's own generator tile. On each of the game's generators the kit sits on the engine's air
+-- intake and the pipe comes down into it, so they are drawn per body and facing (art/models/tiles.py
+-- GENERATOR_KIT_FIRST and GENERATOR_PIPE_FIRST, from 280): the red and yellow generators share a
+-- body, the old open-frame one and the blue inverter have their own. `default` lies on the floor
+-- at the front corner of a generator the game doesn't know, another mod's.
+Sprites.gasKit = { default = tile(246), bySprite = {} }
+-- The pipe by the gasifier's direction from the generator.
+Sprites.gasifierPipeGen = { default = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }, bySprite = {} }
+do
+    local KIT_FIRST, PIPE_FIRST = 280, 292
+    local SIDES = { "N", "E", "S", "W" }
+    -- The game's generator sprites (appliances_misc_01) by body, in the order of their facings.
+    local BODIES = {
+        { first = { 0, 8 }, facings = { "E", "S", "W", "N" } },
+        { first = { 4 }, facings = { "E", "S", "W", "N" } },
+        { first = { 12 }, facings = { "S", "E", "N", "W" } },
+    }
+    for body, spec in ipairs(BODIES) do
+        for _, first in ipairs(spec.first) do
+            for offset, facing in ipairs(spec.facings) do
+                local name = "appliances_misc_01_" .. (first + offset - 1)
+                local fitting = (body - 1) * 4 + ({ N = 0, E = 1, S = 2, W = 3 })[facing]
+                Sprites.gasKit.bySprite[name] = tile(KIT_FIRST + fitting)
+                local pipes = {}
+                for side, letter in ipairs(SIDES) do
+                    pipes[letter] = tile(PIPE_FIRST + fitting * 4 + side - 1)
+                end
+                Sprites.gasifierPipeGen.bySprite[name] = pipes
+            end
+        end
+    end
+end
+
+--- The gas kit's overlay for a generator whose sprite is `generatorSprite`.
+function Sprites.gasKitFor(generatorSprite)
+    return Sprites.gasKit.bySprite[generatorSprite] or Sprites.gasKit.default
+end
+
+--- The generator's half of the pipe from a gasifier on its `side` ("N", "E", "S" or "W"), for a
+--- generator whose sprite is `generatorSprite`.
+function Sprites.gasifierPipeGenFor(generatorSprite, side)
+    return (Sprites.gasifierPipeGen.bySprite[generatorSprite] or Sprites.gasifierPipeGen.default)[side]
+end
+
 -- Wood gas generators, built in place, one facing each, and the glow at each one's door while lit,
 -- drawn over its own tile.
 Sprites.gasifier = { primitive = tile(250), standard = tile(251), advanced = tile(252) }
 Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = tile(255) }
 -- The metal gas pipe from a gasifier to a generator on the next square, in two halves that meet at
 -- the squares' shared edge: `gasifierPipe` on the gasifier's tile, by the generator's direction from
--- it, and `gasifierPipeGen` on the generator's tile with the kit, by the gasifier's direction.
+-- it, and the generator's half (Sprites.gasifierPipeGenFor) on the generator's tile with the kit.
 Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
-Sprites.gasifierPipeGen = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }
 -- The scoop rotor wind charger, the propeller wind charger (its blades carved from wood or cut from
 -- plastic pipe), and the homemade alternator wind charger, the last two a tile per facing of the
 -- rotor. In play the game draws each as a sprite model instead (Sprites.windModels).
@@ -103,12 +155,14 @@ Sprites.windModels = {
 }
 
 -- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles in each of four facings, by the way
--- a runner on it faces (the tiles' Facing): the console end, and the rear end the runner stands on.
+-- a runner on it faces: the console end, and the rear end the runner stands on. The runner faces
+-- away from the tiles' Facing; the console is the tile its depth geometry (tileGeometry.txt) puts
+-- the console's box on.
 Sprites.treadmill = {
-    W = { console = "recreational_sports_01_28", rear = "recreational_sports_01_29" },
-    N = { console = "recreational_sports_01_31", rear = "recreational_sports_01_30" },
-    E = { console = "recreational_sports_01_37", rear = "recreational_sports_01_36" },
-    S = { console = "recreational_sports_01_38", rear = "recreational_sports_01_39" },
+    W = { console = "recreational_sports_01_36", rear = "recreational_sports_01_37" },
+    N = { console = "recreational_sports_01_39", rear = "recreational_sports_01_38" },
+    E = { console = "recreational_sports_01_29", rear = "recreational_sports_01_28" },
+    S = { console = "recreational_sports_01_30", rear = "recreational_sports_01_31" },
 }
 
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
@@ -169,11 +223,12 @@ local KINDS = {
     [Sprites.windScoop] = { "scoop" },
     [Sprites.gasHeater.off] = { "gasHeater" },
     [Sprites.gasHeater.lit] = { "gasHeater" },
-    [Sprites.digester.barrel.steel] = { "digester", "barrel", "steel" },
-    [Sprites.digester.barrel.plastic] = { "digester", "barrel", "plastic" },
     [Sprites.digester.insulated] = { "digester", "insulated" },
     [Sprites.digester.dome] = { "digester", "dome" },
 }
+for barrel, name in pairs(Sprites.digester.barrel) do
+    KINDS[name] = { "digester", "barrel", barrel }
+end
 for _, mount in ipairs({ "wall", "rack" }) do
     for material, facings in pairs(Sprites[mount]) do
         for facing, name in pairs(facings) do
@@ -229,7 +284,7 @@ end
 ---@param spriteName string?
 ---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
 ---@return string? facing "S", "E", "N" or "W" for walls, racks, propellers, alternators and treadmills; a digester's or gasifier's tier
----@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood" or "pipe" for propellers, a barrel digester's "steel" or "plastic"; a treadmill tile's end, "console" or "rear"
+---@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood" or "pipe" for propellers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"
 function Sprites.kindOf(spriteName)
     local entry = spriteName and KINDS[spriteName]
     if not entry then
