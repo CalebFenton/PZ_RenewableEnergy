@@ -66,6 +66,12 @@ Sprites.digesterHolder = {
     tarpTorn = tile(239),
     drum = tiles(240, 4),
 }
+-- The scrubber fitted to each digester, drawn over the digester's own tile.
+Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = tile(249) }
+-- The homemade gas heater, one facing; both tiles give the heater back.
+Sprites.gasHeater = { off = tile(244), lit = tile(245) }
+-- The gas kit fitted to a generator, drawn over the game's own generator tile in any facing.
+Sprites.gasKit = tile(246)
 
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
 Sprites.snow = {
@@ -172,6 +178,8 @@ for _, holder in pairs(Sprites.digesterHolder) do
         OVERLAYS[holder] = true
     end
 end
+addAll(OVERLAYS, Sprites.digesterScrubber)
+OVERLAYS[Sprites.gasKit] = true
 
 --- What a placed tile is.
 ---@param spriteName string?

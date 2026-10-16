@@ -105,6 +105,17 @@ local function digesterTiles()
         end
     end
     table.insert(list, { x = 7, y = 5, sprite = Sprites.digester.dome })
+    -- Each digester with its scrubber, over a holder where it has one, then the gas heater off and
+    -- lit and the game's generator in two facings with the gas kit.
+    local scrubber = Sprites.digesterScrubber
+    table.insert(list, { x = 7, y = 0, sprite = Sprites.digester.barrel.steel, overlays = { holder.bags[3], scrubber.barrel } })
+    table.insert(list, { x = 7, y = 1, sprite = Sprites.digester.barrel.plastic, overlays = { holder.tarp[2], scrubber.barrel } })
+    table.insert(list, { x = 7, y = 3, sprite = Sprites.digester.insulated, overlays = { holder.drum[2], scrubber.insulated } })
+    table.insert(list, { x = 7, y = 7, sprite = Sprites.digester.dome, overlays = { scrubber.dome } })
+    table.insert(list, { x = 9, y = 0, sprite = Sprites.gasHeater.off })
+    table.insert(list, { x = 9, y = 2, sprite = Sprites.gasHeater.lit })
+    table.insert(list, { x = 9, y = 4, sprite = "appliances_misc_01_0", overlays = { Sprites.gasKit } })
+    table.insert(list, { x = 9, y = 6, sprite = "appliances_misc_01_1", overlays = { Sprites.gasKit } })
     return list
 end
 
