@@ -251,6 +251,45 @@ def prism(collection, name, mat, outline, depth, at=(0, 0, 0), rotate=None):
     return obj
 
 
+def mound(collection, name, mat, radii, at=(0, 0, 0), rotate=None, squareness=1.0, lumps=0.0, seed=0, segments=16,
+          rings=6):
+    """A heap, a filled sack or a dome: the top half of an ellipsoid with semi-axes `radii`, its flat
+    base on z = 0, so nothing of it shows below the floor of a tile. `squareness` above 1 squares
+    its outline and shoulders, as a stuffed pillow's; `lumps` pushes each vertex out or in by up to
+    that fraction at random (from `seed`), so a heap or a slack bag isn't turned as on a lathe. It
+    is smooth shaded, having no edges to catch the light."""
+    rng = random.Random(seed)
+
+    def shaped(c):
+        return math.copysign(abs(c) ** (1 / squareness), c)
+
+    bm = bmesh.new()
+    rows = []
+    for i in range(rings):
+        polar = math.pi / 2 * i / rings
+        row = []
+        for k in range(segments):
+            azimuth = 2 * math.pi * k / segments
+            bump = 1 + lumps * rng.uniform(-1, 1)
+            out = shaped(math.cos(polar)) * bump
+            up = radii[2] * shaped(math.sin(polar)) * bump
+            row.append(bm.verts.new((radii[0] * out * shaped(math.cos(azimuth)), radii[1] * out * shaped(math.sin(azimuth)), up)))
+        rows.append(row)
+    top = bm.verts.new((0, 0, radii[2] * (1 + lumps * rng.uniform(-1, 1))))
+    for a, b in zip(rows, rows[1:]):
+        for k in range(segments):
+            bm.faces.new((a[k], a[(k + 1) % segments], b[(k + 1) % segments], b[k]))
+    for k in range(segments):
+        bm.faces.new((rows[-1][k], rows[-1][(k + 1) % segments], top))
+    for face in bm.faces:
+        face.smooth = True
+    bm.faces.new(list(reversed(rows[0])))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    obj = _object(name, bm, mat, collection)
+    place(obj, at, rotate)
+    return obj
+
+
 def text(collection, name, mat, body, size, at=(0, 0, 0), rotate=(90, 0, 0), align="CENTER"):
     """Flat lettering as a mesh, by default standing upright and reading from the front (-Y), its
     baseline centre at `at`. Lift it a millimetre off the surface it is printed on."""

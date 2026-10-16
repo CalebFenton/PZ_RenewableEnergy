@@ -5,9 +5,9 @@ tileGeometry.txt.
 
 Tile numbers match art/models/tiles.py, which renders them, and
 media/lua/shared/RenewableEnergy/Sprites.lua, which names them for Lua. Overlay tiles (snow, cracked
-glass, batteries, the charge meter, the crate's contents and lid) are only ever attached to another tile,
-so they have no properties. Property names and values follow the vanilla tile definitions
-(newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:
+glass, batteries, the charge meter, the crate's contents and lid, the digesters' gas holders) are
+only ever attached to another tile, so they have no properties. Property names and values follow the
+vanilla tile definitions (newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:
 
 - CustomItem: the item that picking the tile up gives, instead of a generic Moveables item.
 - Facing and N/S/E/Woffset: the placing cursor's rotation, the offsets pointing from one facing's
@@ -34,7 +34,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 29
+COLUMNS, ROWS = 8, 31
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -77,6 +77,14 @@ def garden_light():
     return moveable("SolarGardenLight", tool=None, CustomName="Solar Garden Light", Material="Electric")
 
 
+def digester(name, capacity, material, material2, **props):
+    """A biogas digester. It is built where it stands and scrapped there, never carried, so it gives
+    no item and is too heavy to pick up. Scrap materials are the game's own."""
+    return {"IsMoveAble": "", "CustomName": name, "container": "RenewableEnergyDigester",
+            "ContainerCapacity": str(capacity), "Material": material, "Material2": material2, "CanScrap": "",
+            "PickUpWeight": "400", "BlocksPlacement": "", "solidtrans": "", **props}
+
+
 TILES = {
     0: panel("Flat", "SolarFlat", 2, RenderLayer="Floor", IsLow=""),
     # Sits on the generator's square, which a floor rug's move type allows.
@@ -96,6 +104,10 @@ TILES = {
     32: storage("BatteryRackWood", "Wooden", "Battery Rack", 3, 100),
     33: storage("BatteryRackMetal", "Metal", "Battery Rack", 3, 100),
     34: storage("BatteryBankWood", "Wooden", "Battery Bank", 4, 100),
+    228: digester("Barrel Digester", 30, "MetalPlates", "MetalScrap", GroupName="Steel"),
+    229: digester("Barrel Digester", 30, "Plastic", "Rubber", GroupName="Plastic"),
+    230: digester("Insulated Digester", 50, "Wood", "Nails"),
+    231: digester("Brick Dome Digester", 100, "Brick", "Stone", IsLow=""),
 }
 for material, first_wall, first_rack in (("Metal", 1, 3), ("Wood", 21, 24)):
     for offset, facing in enumerate("SE"):

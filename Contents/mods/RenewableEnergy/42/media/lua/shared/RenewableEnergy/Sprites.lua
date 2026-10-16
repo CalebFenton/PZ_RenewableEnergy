@@ -54,6 +54,19 @@ Sprites.batteryRackMetal = tile(33)
 Sprites.batteryBankWood = tile(34)
 Sprites.batteryBankMetal = tile(9)
 
+-- Biogas digesters, built in place, one facing each.
+Sprites.digester = { barrel = { steel = tile(228), plastic = tile(229) }, insulated = tile(230), dome = tile(231) }
+-- Their gas holders, drawn over the digester's own tile: `bags` and `tarp` beside either barrel,
+-- from 1 (slack) to 3 (taut), or torn; `drum` the insulated digester's floating drum, from 1 (low)
+-- to 4 (risen highest).
+Sprites.digesterHolder = {
+    bags = tiles(232, 3),
+    bagsTorn = tile(235),
+    tarp = tiles(236, 3),
+    tarpTorn = tile(239),
+    drum = tiles(240, 4),
+}
+
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
 Sprites.snow = {
     flat = tile(16),
@@ -151,6 +164,13 @@ for _, fill in pairs(Sprites.bankFill) do
         addAll(OVERLAYS, slots)
     end
     addAll(OVERLAYS, fill.meter)
+end
+for _, holder in pairs(Sprites.digesterHolder) do
+    if type(holder) == "table" then
+        addAll(OVERLAYS, holder)
+    else
+        OVERLAYS[holder] = true
+    end
 end
 
 --- What a placed tile is.
