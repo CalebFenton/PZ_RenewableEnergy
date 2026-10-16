@@ -547,4 +547,23 @@ module RenewableEnergy
         MechanicsItem = true,
         WorldStaticModel = CarHood,
     }
+
+    /******************************** Biogas ********************************/
+
+    /*
+        Ash from a gasifier's grate or a cleared campfire. Food that can't be eaten, like
+        vanilla's dung, because the composter only takes Food; a digester takes it to fix souring
+        (RenewableEnergy.Digester).
+    */
+    item WoodAsh
+    {
+        DisplayCategory = Junk,
+        ItemType = base:food,
+        Weight = 0.5,
+        CantEat = true,
+        Icon = RenewableEnergy_WoodAsh,
+        WorldStaticModel = RenewableEnergy.WoodAsh_Ground,
+        Tooltip = Tooltip_RenewableEnergy_WoodAsh,
+        Tags = base:iscompostable;base:ignorezombiedensity,
+    }
 }

@@ -14,10 +14,12 @@ RenewableEnergy.Needs = Needs
 local TOOL_ITEMS = { WRENCH = "Base.Wrench", SCREWDRIVER = "Base.Screwdriver" }
 
 local function nameOf(need)
-    if need.perk then
+    if need.label then
+        return need.label
+    elseif need.perk then
         return need.perk:getName()
     elseif need.tool then
-        return getItemNameFromFullType(TOOL_ITEMS[need.tool])
+        return getItemNameFromFullType(TOOL_ITEMS[need.tool] or need.item)
     elseif need.item then
         return getItemNameFromFullType(need.item)
     end

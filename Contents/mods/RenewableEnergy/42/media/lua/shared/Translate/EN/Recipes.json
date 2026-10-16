@@ -35,5 +35,9 @@
     "RenewableEnergy_PressBatteryPlateMold": "Press Battery Plate Mold",
     "RenewableEnergy_FireBatteryPlateMold": "Fire Battery Plate Mold",
     "RenewableEnergy_MakeChargeController": "Make Charge Controller",
-    "RenewableEnergy_MakeSolarFailsafe": "Make Solar Failsafe"
+    "RenewableEnergy_MakeSolarFailsafe": "Make Solar Failsafe",
+    "RenewableEnergy_BarrelDigesterSteel": "Barrel Digester (Steel Drum)",
+    "RenewableEnergy_BarrelDigesterPlastic": "Barrel Digester (Plastic Barrel)",
+    "RenewableEnergy_InsulatedDigester": "Insulated Digester",
+    "RenewableEnergy_BrickDome": "Brick Dome Digester"
 }

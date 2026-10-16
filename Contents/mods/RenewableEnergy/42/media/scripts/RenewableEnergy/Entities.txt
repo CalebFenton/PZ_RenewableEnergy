@@ -1,0 +1,206 @@
+/*
+    What the build menu builds: the biogas digesters. Each tile becomes a digester through
+    OnCreate (server/RenewableEnergy/Biogas/DigesterSystem.lua). In module Base with the mod's
+    prefix, as the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without
+    its spaces, in Recipes.json.
+
+    The digesters are taught by Homestead Power #3, or learned with the skills below.
+*/
+module Base
+{
+    xuiSkin default
+    {
+        entity ES_RenewableEnergy_BarrelDigesterSteel
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_BarrelDigesterSteel,
+            Icon = RenewableEnergy_Build_BarrelDigesterSteel,
+        }
+        entity ES_RenewableEnergy_BarrelDigesterPlastic
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_BarrelDigesterPlastic,
+            Icon = RenewableEnergy_Build_BarrelDigesterPlastic,
+        }
+        entity ES_RenewableEnergy_InsulatedDigester
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_InsulatedDigester,
+            Icon = RenewableEnergy_Build_InsulatedDigester,
+        }
+        entity ES_RenewableEnergy_BrickDome
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_BrickDome,
+            Icon = RenewableEnergy_Build_BrickDome,
+        }
+    }
+
+    entity RenewableEnergy_BarrelDigesterSteel
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_BarrelDigesterSteel,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.DigesterSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_232,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildLowNoTool,
+            time = 150,
+            category = Farming,
+            NeedToBeLearn = true,
+            AutoLearnAny = Farming:3;Mechanics:3,
+            SkillRequired = Mechanics:1,
+            xpAward = Mechanics:15,
+            Tooltip = Tooltip_RenewableEnergy_BarrelDigester,
+            inputs
+            {
+                item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
+                item 1 [Base.MetalDrum],
+                item 1 [Base.RubberHose],
+                item 1 [Base.Funnel],
+                item 2 [Base.DuctTape],
+                item 1 [Base.Glue],
+                item 3 tags[base:garbagebag],
+            }
+        }
+    }
+
+    entity RenewableEnergy_BarrelDigesterPlastic
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_BarrelDigesterPlastic,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.DigesterSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_233,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildLowNoTool,
+            time = 150,
+            category = Farming,
+            NeedToBeLearn = true,
+            AutoLearnAny = Farming:3;Mechanics:3,
+            SkillRequired = Mechanics:1,
+            xpAward = Mechanics:15,
+            Tooltip = Tooltip_RenewableEnergy_BarrelDigester,
+            inputs
+            {
+                item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
+                item 1 [Base.Mov_OrangeBarrel;Base.Mov_DarkGreenBarrel;Base.Mov_LightGreenBarrel],
+                item 1 [Base.RubberHose],
+                item 1 [Base.Funnel],
+                item 2 [Base.DuctTape],
+                item 1 [Base.Glue],
+                item 3 tags[base:garbagebag],
+            }
+        }
+    }
+
+    entity RenewableEnergy_InsulatedDigester
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_InsulatedDigester,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.DigesterSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_234,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildWoodenStructureMedium,
+            time = 300,
+            category = Farming,
+            NeedToBeLearn = true,
+            AutoLearnAll = Woodwork:5;Farming:4,
+            SkillRequired = Woodwork:4;Mechanics:2,
+            xpAward = Woodwork:40,
+            Tooltip = Tooltip_RenewableEnergy_InsulatedDigester,
+            inputs
+            {
+                item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+                item 1 tags[base:saw] mode:keep flags[MayDegradeLight],
+                item 2 [Base.MetalDrum],
+                item 6 [Base.Plank],
+                item 12 [Base.Nails],
+                item 1 [Base.Tarp],
+                item 10 [Base.HayTuft;Base.Straw2],
+                item 1 [Base.RubberHose],
+            }
+        }
+    }
+
+    entity RenewableEnergy_BrickDome
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_BrickDome,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.DigesterSystem.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_235,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildWallNoTool,
+            time = 600,
+            category = Farming,
+            NeedToBeLearn = true,
+            AutoLearnAll = Masonry:6;Farming:5,
+            SkillRequired = Masonry:5;Woodwork:2,
+            xpAward = Masonry:80,
+            Tooltip = Tooltip_RenewableEnergy_BrickDome,
+            inputs
+            {
+                item 1 tags[base:masonstrowel] mode:keep flags[Prop1;MayDegradeLight],
+                item 1 tags[base:diggrave] mode:keep flags[MayDegradeLight],
+                item 40 [Base.ClayBrick],
+                item 4 tags[base:concrete] flags[DontRecordInput],
+                item 2 [Base.RubberHose],
+                item 1 [Base.Pipe],
+            }
+        }
+    }
+}
