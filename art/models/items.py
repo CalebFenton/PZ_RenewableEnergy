@@ -63,6 +63,7 @@ def M(name):
         "magazine1": lambda: material("RE_Mag1", "#e7a42c", roughness=0.4, grime=0.05),
         "magazine2": lambda: material("RE_Mag2", "#2f6f8f", roughness=0.4, grime=0.05),
         "magazine3": lambda: material("RE_Mag3", "#4f7d32", roughness=0.4, grime=0.05),
+        "magazine4": lambda: material("RE_Mag4", "#8c3b2e", roughness=0.4, grime=0.05),
         "sky": lambda: material("RE_Sky", "#8fc4e8", roughness=0.4, grime=0.05),
         "sun": lambda: material("RE_Sun", "#ffd640", roughness=0.4, grime=0.0),
         # Pine boards and 2 x 4s, two shades so neighbouring boards read apart.
@@ -123,6 +124,10 @@ def M(name):
         # Wood tar: black-brown and wet, so it shines; the straw it soaks stays a shade lighter.
         "tar": lambda: material("RE_Tar", "#3d2c1e", roughness=0.25, grime=0.25, scale=20, speckle=("#1f1712", 0.4)),
         "tarstraw": lambda: material("RE_TarStraw", "#7a5a2e", roughness=0.6, grime=0.3),
+        # Blades hammered out of spring steel and left dark, and the amber casting resin a homemade
+        # alternator's coils are set in.
+        "forged": lambda: material("RE_Forged", "#55524e", roughness=0.55, metallic=0.5, grime=0.3, scale=12),
+        "resin": lambda: material("RE_Resin", "#c99a4a", roughness=0.35, grime=0.15),
     }[name]()
 
 
@@ -836,12 +841,13 @@ MAGAZINE = (0.21, 0.275, 0.004)
 
 # Each issue's cover colour, whether its title is printed dark, and the line under its picture.
 MAGAZINE_ISSUES = {1: ("magazine1", True, "SUN & BATTERIES"), 2: ("magazine2", False, "INVERTERS & CONTROL"),
-                   3: ("magazine3", False, "BIOGAS FROM MANURE")}
+                   3: ("magazine3", False, "BIOGAS FROM MANURE"), 4: ("magazine4", False, "WIND & TREADMILL POWER")}
 
 
 def magazine(col, issue):
     """Homestead Power, a fictional 1990s homesteading magazine: issue 1 on sun and batteries,
-    issue 2 on inverters and control, issue 3 on biogas from the farm's manure."""
+    issue 2 on inverters and control, issue 3 on biogas from the farm's manure, issue 4 on wind
+    chargers and the treadmill."""
     width, depth, height = MAGAZINE
     cover, dark_title, line = MAGAZINE_ISSUES[issue]
     title = M("ink" if dark_title else "white")
@@ -862,7 +868,7 @@ def magazine(col, issue):
         box(col, "Mag2_Panel", M("black"), (0.04, 0.03, 0.0009), at=(-0.03, -0.05, height + 0.0003))
         prism(col, "Mag2_Bolt", M("sun"), [(0, 0.05), (0.02, 0.0), (0.008, 0.0), (0.016, -0.04), (-0.006, 0.01), (0.006, 0.01)],
               0.0008, at=(0.055, -0.04, height + 0.0002), rotate=(90, 0, 0))
-    else:
+    elif issue == 3:
         # A brick dome in the farmyard's mud, a cow beside it, and the blue flame its gas burns with.
         box(col, "Mag3_Ground", M("earth"), (0.17, 0.045, 0.0008), at=(0, -0.0825, height + 0.0002))
         prism(col, "Mag3_Dome", M("brick"), [(-0.04, 0), (0.04, 0), (0.03, 0.025), (0.0, 0.035), (-0.03, 0.025)], 0.0008,
@@ -872,6 +878,19 @@ def magazine(col, issue):
             box(col, "Mag3_CowSpot", M("ink"), (0.01, 0.008, 0.001), at=(x, -0.045, height + 0.0003))
         prism(col, "Mag3_Flame", M("flameblue"), [(-0.01, 0), (0.01, 0), (0.0, 0.03)], 0.0008, at=(0.05, -0.005, height + 0.0003),
               rotate=(-90, 0, 0))
+    else:
+        # A propeller wind charger on its mast over a red barn, and a treadmill in the yard.
+        box(col, "Mag4_Ground", M("earth"), (0.17, 0.035, 0.0008), at=(0, -0.0875, height + 0.0002))
+        prism(col, "Mag4_Barn", M("red"), [(-0.03, 0), (0.03, 0), (0.03, 0.03), (0.0, 0.048), (-0.03, 0.03)], 0.0008,
+              at=(-0.045, -0.07, height + 0.0003), rotate=(-90, 0, 0))
+        hub = (0.035, -0.005)
+        box(col, "Mag4_Mast", M("ink"), (0.003, 0.065, 0.0009), at=(hub[0], hub[1] - 0.0325, height + 0.0003))
+        for k in range(3):
+            angle = 120 * k + 15
+            x, y = _around(hub, angle + 90, 0.0125)
+            box(col, "Mag4_Blade", M("white"), (0.004, 0.025, 0.001), at=(x, y, height + 0.0003), rotate=(0, 0, angle))
+        box(col, "Mag4_Treadmill", M("black"), (0.035, 0.012, 0.001), at=(0.06, -0.08, height + 0.0003))
+        box(col, "Mag4_TreadmillRail", M("black"), (0.003, 0.018, 0.001), at=(0.077, -0.07, height + 0.0003))
     text(col, "Mag%d_Line" % issue, M("white"), line, 0.015, at=(0, -0.122, top), rotate=flat)
 
 
@@ -885,6 +904,10 @@ def magazine_2(col):
 
 def magazine_3(col):
     magazine(col, 3)
+
+
+def magazine_4(col):
+    magazine(col, 4)
 
 
 CRATE = (0.99, 0.5, 0.3)
@@ -2016,11 +2039,188 @@ def treadmill_motor(col):
                                              (back - 0.06, side * 0.035, 0.006)], 0.0035, 6)
 
 
-# Sprite models by name: the builder and the yaws, in degrees, of the steps the game turns it through.
-# The scoop rotor is the same after half a turn, so six steps cover its whole spin.
+# The propeller and alternator chargers face the wind on a heading fixed when they are built. Each
+# is built facing south (-Y), its mast at the origin, and the game turns the whole to face the other
+# ways. Only its rotor spins: the parts named with ROTOR are turned about the hub's axis within the
+# mesh, a mesh per spin step (models.py), the mast staying put.
+ROTOR = "Rotor_"
+PROPELLER_HUB = 3.8  # the hub's height, a storey and a half up
+PROPELLER_BLADE = (0.82, 0.13, 0.02)  # a blade's length past its root, its chord at the root, its thickness
+ALTERNATOR_HUB = 4.3
+ALTERNATOR_BLADE = (1.0, 0.16, 0.012)
+# The rotor turned a step at a time: three blades look the same after a third of a turn.
+ROTOR_SPINS = (0, 20, 40, 60, 80, 100)
+
+
+def _blade(col, name, mat, size):
+    """A blade along +Z from a bolting plate at the origin, its chord along X tapering to two fifths
+    at the tip and its pitch flattening toward it, in five pieces."""
+    length, chord, thick = size
+    pieces = 5
+    parts = [box(col, name, M(mat), (chord * 0.8, thick * 1.5, 0.08), bevel=0.003)]
+    for i in range(pieces):
+        t = (i + 0.5) / pieces
+        parts.append(box(col, name, M(mat), (chord * (1 - 0.6 * t), thick, length / pieces + 0.002),
+                         at=(chord * 0.2 * t, 0, 0.06 + i * length / pieces), rotate=(0, 0, 18 - 13 * t), bevel=0.002))
+    return parts
+
+
+def _rotor_blades(col, hub, mat, size):
+    """Three blades bolted round `hub`, turning in the plane that faces -Y."""
+    for k in range(3):
+        group(col, ROTOR + "Blade", _blade(col, ROTOR + "Blade", mat, size), at=hub, rotate=(0, 120 * k, 0))
+
+
+def _tail(col, name, start, length, vane, z):
+    """A tail boom back (+Y) from `start` and a sheet-metal vane on its end, `vane` long and high,
+    that keeps the rotor into the wind."""
+    end = (0, start[1] + length, z + 0.03)
+    tube(col, name + "_Boom", M("galvanised"), [(0, start[1], z), end], 0.02, 8)
+    box(col, name + "_Vane", M("drumpaint"), (0.004, vane[0], vane[1]), at=(0, end[1] + vane[0] / 2 - 0.05, z - vane[1] / 2 + 0.05))
+
+
+def propeller_charger(col, blades="wood"):
+    """A homestead propeller wind charger: a welded pipe mast on a concrete footing, a yaw bearing
+    on top, the treadmill motor as its generator, three blades on its shaft, carved from pine planks
+    ("wood") or cut from plastic pipe ("pipe"), to the same shape, and a tail vane behind."""
+    hub = PROPELLER_HUB
+    box(col, "Prop_Footing", M("concrete"), (0.4, 0.4, 0.08), bevel=0.01)
+    box(col, "Prop_BasePlate", M("rawsteel"), (0.26, 0.26, 0.012), at=(0, 0, 0.08))
+    for angle in (45, 135, 225, 315):
+        box(col, "Prop_Gusset", M("weld"), (0.1, 0.008, 0.12), at=(*_around((0, 0), angle, 0.09), 0.092), rotate=(0, 0, angle))
+    top = hub - 0.12
+    cylinder(col, "Prop_Mast", M("galvanised"), 0.045, top - 0.092, at=(0, 0, 0.092), segments=14)
+    for z in (top / 3, 2 * top / 3):
+        _ring(col, "Prop_MastWeld", M("weld"), (0, 0), 0.046, z, 0.006)
+    cylinder(col, "Prop_YawBearing", M("weld"), 0.065, 0.07, at=(0, 0, top), segments=14)
+    box(col, "Prop_MotorPlate", M("rawsteel"), (0.1, 0.36, 0.01), at=(0, -0.08, hub - 0.075))
+    cylinder(col, "Prop_Motor", M("black"), 0.065, 0.3, at=(0, 0.06, hub), rotate=(90, 0, 0), segments=18)
+    for y in (0.075, -0.24):
+        cylinder(col, "Prop_MotorBell", M("aluminium"), 0.067, 0.015, at=(0, y, hub), rotate=(90, 0, 0), segments=18)
+    _tail(col, "Prop_Tail", (0, 0.06), 0.8, (0.42, 0.32), hub)
+    tube(col, "Prop_Cable", M("black"), [(0.04, 0.04, hub - 0.07), (0.055, 0.0, top), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09),
+                                         (0.2, 0.2, 0.0)], 0.007, 6)
+    cylinder(col, ROTOR + "Spinner", M("rawsteel"), 0.07, 0.05, at=(0, -0.255, hub), rotate=(90, 0, 0), segments=16)
+    cylinder(col, ROTOR + "Nose", M("rawsteel"), 0.07, 0.05, at=(0, -0.305, hub), rotate=(90, 0, 0), radius_top=0.02, segments=16)
+    _rotor_blades(col, (0, -0.28, hub), {"wood": "pine", "pipe": "pvc"}[blades], PROPELLER_BLADE)
+
+
+def _alternator_head(col, rotor):
+    """A homemade axial-flux alternator built on a car's front brake hub, its axis along Y, the hub's
+    face at the origin and the rest behind (+Y): a steel magnet disc either side of an amber resin
+    stator with its copper coils showing round the rim, the hub's wheel studs and the disc bolts in
+    front, the knuckle's spindle behind. The parts that turn are named with `rotor`."""
+    parts = [cylinder(col, rotor + "Hub", M("darkgrey"), 0.09, 0.06, at=(0, 0.06, 0), rotate=(90, 0, 0), segments=18)]
+    for k in range(5):
+        x, z = _around((0, 0), 72 * k + 90, 0.055)
+        parts.append(cylinder(col, rotor + "Stud", M("galvanised"), 0.007, 0.025, at=(x, 0.002, z), rotate=(90, 0, 0), segments=6))
+    for name, y in (("Front", 0.072), ("Rear", 0.133)):
+        parts.append(cylinder(col, rotor + "MagnetDisc" + name, M("rawsteel"), 0.2, 0.012, at=(0, y, 0), rotate=(90, 0, 0), segments=28))
+    for k in range(6):
+        x, z = _around((0, 0), 60 * k + 30, 0.15)
+        parts.append(cylinder(col, rotor + "DiscBolt", M("galvanised"), 0.009, 0.006, at=(x, 0.06, z), rotate=(90, 0, 0), segments=6))
+    parts.append(cylinder(col, "Alt_Stator", M("resin"), 0.23, 0.035, at=(0, 0.115, 0), rotate=(90, 0, 0), segments=28))
+    for k in range(9):
+        x, z = _around((0, 0), 40 * k, 0.205)
+        parts.append(cylinder(col, "Alt_Coil", M("copper"), 0.032, 0.039, at=(x, 0.117, z), rotate=(90, 0, 0), segments=12))
+    parts.append(cylinder(col, "Alt_Spindle", M("weld"), 0.05, 0.13, at=(0, 0.27, 0), rotate=(90, 0, 0), segments=14))
+    return parts
+
+
+ALTERNATOR_HEAD_Y = -0.32  # the hub's face, in front of the mast
+
+
+def alternator_charger(col):
+    """The best of the homestead wind chargers: a two-storey braced tripod of welded angle iron,
+    kept inside its own square, a homemade alternator on its head, three forged steel blades and a
+    tail vane that folds it out of a storm."""
+    hub = ALTERNATOR_HUB
+    top = hub - 0.2
+    feet = [_around((0, 0), angle, 0.42) for angle in (90, 210, 330)]
+    heads = [_around((0, 0), angle, 0.07) for angle in (90, 210, 330)]
+
+    def on_leg(leg, z):
+        t = z / top
+        return (feet[leg][0] + (heads[leg][0] - feet[leg][0]) * t, feet[leg][1] + (heads[leg][1] - feet[leg][1]) * t, z)
+
+    for leg in range(3):
+        cylinder(col, "Alt_Footing", M("concrete"), 0.08, 0.05, at=(*feet[leg], 0), segments=12)
+        beam(col, "Alt_Leg", M("rustysteel"), on_leg(leg, 0.05), on_leg(leg, top), (0.045, 0.045))
+    levels = (0.9, 1.9, 2.8, 3.6)
+    for i, z in enumerate(levels):
+        for leg in range(3):
+            beam(col, "Alt_Brace", M("rustysteel"), on_leg(leg, z), on_leg((leg + 1) % 3, z), (0.03, 0.03))
+            low = levels[i - 1] if i else 0.05
+            beam(col, "Alt_Diagonal", M("rustysteel"), on_leg(leg, low), on_leg((leg + 1) % 3, z), (0.025, 0.025))
+    cylinder(col, "Alt_TopPlate", M("weld"), 0.12, 0.02, at=(0, 0, top), segments=16)
+    cylinder(col, "Alt_YawBearing", M("weld"), 0.06, 0.1, at=(0, 0, top + 0.02), segments=14)
+    beam(col, "Alt_Frame", M("forged"), (0, 0.02, top + 0.11), (0, ALTERNATOR_HEAD_Y + 0.3, hub), (0.05, 0.05))
+    group(col, "Alt_Head", _alternator_head(col, ROTOR), at=(0, ALTERNATOR_HEAD_Y, hub))
+    cylinder(col, "Alt_FurlHinge", M("weld"), 0.025, 0.22, at=(0.06, 0.05, hub - 0.12), segments=10)
+    _tail(col, "Alt_Tail", (0, 0.05), 1.05, (0.55, 0.42), hub)
+    tube(col, "Alt_Cable", M("black"), [(0.03, 0.05, hub - 0.1), on_leg(0, top - 0.05), on_leg(0, 0.3), (feet[0][0] + 0.05, feet[0][1], 0.0)],
+         0.007, 6)
+    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), "forged", ALTERNATOR_BLADE)
+
+
+def _blade_bundle(col, name, mat, size):
+    """Three blades stacked flat and tied with twine at two places."""
+    length, chord, thick = size
+    for i in range(3):
+        # Span along X, chord along Y, flat side up.
+        group(col, name, _blade(col, name, mat, size), at=(-length / 2, 0, thick * 0.75 + i * thick * 2), rotate=(90, 0, 90))
+    for x in (-length * 0.2, length * 0.25):
+        box(col, name + "_Twine", M("tape"), (0.012, chord + 0.02, thick * 6.5), at=(x, chord * 0.1, 0))
+
+
+def wooden_blades(col):
+    """Three propeller blades carved from pine planks, tied in a bundle."""
+    _blade_bundle(col, "WoodBlades", "pine", PROPELLER_BLADE)
+
+
+def pipe_blades(col):
+    """Three propeller blades cut from grey plastic pipe, tied in a bundle."""
+    _blade_bundle(col, "PipeBlades", "pvc", PROPELLER_BLADE)
+
+
+def steel_blades(col):
+    """Three blades hammered out of steel at the forge, tied in a bundle."""
+    _blade_bundle(col, "SteelBlades", "forged", ALTERNATOR_BLADE)
+
+
+def homemade_alternator(col):
+    """The homemade alternator lying on its back, the hub's face up."""
+    group(col, "AltItem", _alternator_head(col, "AltItem_"), at=(0, 0, 0.27), rotate=(-90, 0, 0))
+
+
+# The sprite model's yaw that turns a south-facing model to face each way. The game draws an
+# exported model half a turn round from how it was built, so these are tiles.FACING_TURN's turned
+# half round again (seen in the art mode's art_wind_tall shot).
+FACING_YAWS = {"N": 0, "E": -90, "S": 180, "W": 90}
+
+# Sprite models by name. "skins" are the builders' options for each texture the same mesh takes,
+# by the name after the model's; "yaws" the turns of the whole model, by the name after that;
+# "spins" the rotor's angles in degrees about the hub at height "hub", a mesh each, named by their
+# index last. A sprite model's name is the model's, the skin's, the yaw's and the spin's, so the
+# scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor0 to 5.
 SPRITE_MODELS = {
-    "ScoopRotor": {"model": scoop_rotor, "steps": (0, 30, 60, 90, 120, 150)},
+    "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): 30 * step for step in range(6)}},
+    "Propeller": {"model": propeller_charger, "skins": {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}},
+                  "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": PROPELLER_HUB},
+    "Alternator": {"model": alternator_charger, "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": ALTERNATOR_HUB},
 }
+
+
+def sprite_model_names(name):
+    """A sprite model's meshes, one per spin step, its textures, one per skin, and its sprite models
+    as (name, mesh, texture, yaw)."""
+    spec = SPRITE_MODELS[name]
+    skins = spec.get("skins") or {"": {}}
+    spins = spec.get("spins", (0,))
+    meshes = [name + (str(index) if len(spins) > 1 else "") for index in range(len(spins))]
+    sprites = [(name + skin + label + (str(index) if len(spins) > 1 else ""), mesh, name + skin, yaw)
+               for skin in skins for label, yaw in spec["yaws"].items() for index, mesh in enumerate(meshes)]
+    return meshes, [name + skin for skin in skins], sprites
 
 
 # Vehicles -----------------------------------------------------------------------------------------
@@ -2262,6 +2462,7 @@ ITEMS = {
     "HomesteadPowerMag1": {"model": magazine_1, "icon_elevation": 70},
     "HomesteadPowerMag2": {"model": magazine_2, "icon_elevation": 70},
     "HomesteadPowerMag3": {"model": magazine_3, "icon_elevation": 70},
+    "HomesteadPowerMag4": {"model": magazine_4, "icon_elevation": 70},
     "WoodAsh": {"model": wood_ash, "icon_elevation": 25},
     "GasConversionKit": {"model": gas_conversion_kit, "icon_elevation": 45},
     "FridgeCompressor": {"model": fridge_compressor},
@@ -2269,6 +2470,10 @@ ITEMS = {
     "TarryPacking": {"model": tarry_packing, "icon_elevation": 35},
     "FemaPamphlet": {"model": fema_pamphlet, "icon_elevation": 70},
     "TreadmillMotor": {"model": treadmill_motor},
+    "WoodenBlades": {"model": wooden_blades, "icon_elevation": 50},
+    "PipeBlades": {"model": pipe_blades, "icon_elevation": 50},
+    "SteelBlades": {"model": steel_blades, "icon_elevation": 50},
+    "HomemadeAlternator": {"model": homemade_alternator, "icon_elevation": 40},
 }
 
 # Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes

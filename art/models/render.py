@@ -96,7 +96,8 @@ def build(stage, layers):
         before = set(stage.objects)
         spec["build"](stage, **spec["options"])
         new = [obj for obj in stage.objects if obj not in before]
-        kit.group(stage, "Layer", [obj for obj in new if obj.parent is None], at=spec["at"], rotate=(0, 0, spec["turn"]))
+        placed = kit.group(stage, "Layer", [obj for obj in new if obj.parent is None], at=spec["at"], rotate=(0, 0, spec["turn"]))
+        placed.scale = (spec["scale"],) * 3
         if spec["holdout"]:
             for obj in new:
                 if obj.type == "MESH":

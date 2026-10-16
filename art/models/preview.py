@@ -102,10 +102,16 @@ def model_sheet():
     scene.camera = camera
     cells = []
     # A vehicle shows as its body with its part models, once whole and once with every cracked
-    # variant in place of the part it replaces. A sprite model shows from one side at each of its
-    # yaw steps, in turn, as the game spins it.
+    # variant in place of the part it replaces. A sprite model shows from one side: one mesh at each
+    # of its yaws, as the game spins it whole, or each spin step's mesh, then each other skin.
     models = [("WorldItems", name, name, [name], None) for name in items.ITEMS]
-    models += [("WorldItems", name, name, [name], spec["steps"]) for name, spec in items.SPRITE_MODELS.items()]
+    for name, spec in items.SPRITE_MODELS.items():
+        meshes, textures, _ = items.sprite_model_names(name)
+        if len(meshes) == 1:
+            models.append(("WorldItems", name, textures[0], meshes, list(spec["yaws"].values())))
+            continue
+        models += [("WorldItems", mesh, textures[0], [mesh], [0]) for mesh in meshes]
+        models += [("WorldItems", texture, texture, meshes[:1], [0]) for texture in textures[1:]]
     for name, spec in items.VEHICLES.items():
         whole = [s for s in spec["pieces"] if not s.endswith("Cracked")]
         cracked = [s + "Cracked" if s + "Cracked" in spec["pieces"] else s for s in whole]

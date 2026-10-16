@@ -11,8 +11,8 @@ its west edge x = -0.5 (see kit.py).
 import items
 
 
-def layer(build, holdout=False, at=(0, 0, 0), turn=0, **options):
-    return {"build": build, "options": options, "at": at, "turn": turn, "holdout": holdout}
+def layer(build, holdout=False, at=(0, 0, 0), turn=0, scale=1, **options):
+    return {"build": build, "options": options, "at": at, "turn": turn, "scale": scale, "holdout": holdout}
 
 
 # Turning an object whose front faces south (-Y) to face each direction.
@@ -152,8 +152,19 @@ for offset, side in enumerate("NESW"):
 # play the game draws its sprite model (items.SPRITE_MODELS) instead, and spins that.
 TILES[264] = [layer(items.scoop_rotor)]
 
+# The propeller and alternator chargers, wooden and pipe propellers first, one tile per facing in
+# Sprites.lua's N, E, S, W order, each its sprite model's first spin step. They stand taller than a
+# tile's sprite can draw, so the tiles show them shrunk to fit, whole; in play the game draws their
+# sprite models at full size.
+WIND_TILE_SCALE = {"Propeller": 0.55, "Alternator": 0.48}
+for first, build, scale, options in ((265, items.propeller_charger, WIND_TILE_SCALE["Propeller"], {"blades": "wood"}),
+                                     (269, items.propeller_charger, WIND_TILE_SCALE["Propeller"], {"blades": "pipe"}),
+                                     (273, items.alternator_charger, WIND_TILE_SCALE["Alternator"], {})):
+    for offset, facing in enumerate("NESW"):
+        TILES[first + offset] = [layer(build, turn=FACING_TURN[facing], scale=scale, **options)]
+
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
-# working, its holder full, each gasifier and the wind charger.
+# working, its holder full, each gasifier and each wind charger.
 BUILD_ICONS = {
     "BarrelDigesterSteel": [layer(items.barrel_digester, holder="bags")],
     "BarrelDigesterPlastic": [layer(items.barrel_digester, plastic=True, holder="tarp")],
@@ -163,4 +174,6 @@ BUILD_ICONS = {
     "Gasifier": [layer(items.gasifier, tier="standard")],
     "AdvancedGasifier": [layer(items.gasifier, tier="advanced")],
     "ScoopRotor": [layer(items.scoop_rotor)],
+    "Propeller": [layer(items.propeller_charger)],
+    "Alternator": [layer(items.alternator_charger)],
 }

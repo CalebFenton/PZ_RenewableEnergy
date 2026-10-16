@@ -141,6 +141,25 @@ local function windTiles()
     return list
 end
 
+-- The propeller chargers, wooden then pipe, and the alternator charger, a row each, as their sprite
+-- models facing N, E, S and W in turn, three squares apart for their rotors, each at a different
+-- spin step.
+local function tallWindTiles()
+    local list = {}
+    local rows = {
+        { sprites = Sprites.windPropeller.wood, model = "RenewableEnergy.PropellerWood" },
+        { sprites = Sprites.windPropeller.pipe, model = "RenewableEnergy.PropellerPipe" },
+        { sprites = Sprites.windAlternator, model = "RenewableEnergy.Alternator" },
+    }
+    for row, kind in ipairs(rows) do
+        for column, facing in ipairs({ "N", "E", "S", "W" }) do
+            table.insert(list, { x = (column - 1) * 3, y = row * 4 - 2, sprite = kind.sprites[facing],
+                spriteModel = kind.model .. facing .. (column - 1) })
+        end
+    end
+    return list
+end
+
 -- Where the character stands for each shot, and how far it zooms out from the closest zoom. For
 -- the tiles it stands in front of a wall panel, which the depth map must draw behind it.
 local SHOTS = {
@@ -153,6 +172,10 @@ local SHOTS = {
     digesters = { name = "art_digesters", x = 5, y = 8, zoomSteps = 2 },
     -- Beside the second row's middle turbine, for its size against a person.
     wind = { name = "art_wind", x = 5, y = 5, zoomSteps = 2 },
+    -- In front of the tall chargers, all in view; then just behind the east-facing alternator, which
+    -- stands between the character and the camera.
+    windTall = { name = "art_wind_tall", x = 5, y = 12, zoomSteps = 3 },
+    windBehind = { name = "art_wind_behind", x = 3, y = 9, zoomSteps = 1 },
 }
 
 -- Damage stage 1 is a condition from 40 to 59, stage 2 below 40 (BaseVehicle.doDamageOverlay).
@@ -570,6 +593,12 @@ local function addTileAndItemShots(steps, player, lot)
         placeTiles(lot, windTiles())
     end)
     addShot(steps, player, lot, SHOTS.wind)
+    table.insert(steps, function()
+        clearLot(lot)
+        placeTiles(lot, tallWindTiles())
+    end)
+    addShot(steps, player, lot, SHOTS.windTall)
+    addShot(steps, player, lot, SHOTS.windBehind)
 end
 
 -- The trailer hitched to its car, then the rear in each of its states. `art.pair` holds the pair

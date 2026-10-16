@@ -217,6 +217,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_HomesteadPowerMag3,
         scale = 1,
     }
+    model HomesteadPowerMag4_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomesteadPowerMag4,
+        texture = WorldItems/RenewableEnergy_HomesteadPowerMag4,
+        scale = 1,
+    }
     model WoodAsh_Ground
     {
         mesh = WorldItems/RenewableEnergy_WoodAsh,
@@ -259,10 +265,106 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_TreadmillMotor,
         scale = 1,
     }
+    model WoodenBlades_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_WoodenBlades,
+        texture = WorldItems/RenewableEnergy_WoodenBlades,
+        scale = 1,
+    }
+    model PipeBlades_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_PipeBlades,
+        texture = WorldItems/RenewableEnergy_PipeBlades,
+        scale = 1,
+    }
+    model SteelBlades_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SteelBlades,
+        texture = WorldItems/RenewableEnergy_SteelBlades,
+        scale = 1,
+    }
+    model HomemadeAlternator_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomemadeAlternator,
+        texture = WorldItems/RenewableEnergy_HomemadeAlternator,
+        scale = 1,
+    }
     model ScoopRotor
     {
         mesh = WorldItems/RenewableEnergy_ScoopRotor,
         texture = WorldItems/RenewableEnergy_ScoopRotor,
+        scale = 1,
+    }
+    model Propeller0
+    {
+        mesh = WorldItems/RenewableEnergy_Propeller0,
+        texture = WorldItems/RenewableEnergy_PropellerWood,
+        scale = 1,
+    }
+    model Propeller1
+    {
+        mesh = WorldItems/RenewableEnergy_Propeller1,
+        texture = WorldItems/RenewableEnergy_PropellerWood,
+        scale = 1,
+    }
+    model Propeller2
+    {
+        mesh = WorldItems/RenewableEnergy_Propeller2,
+        texture = WorldItems/RenewableEnergy_PropellerWood,
+        scale = 1,
+    }
+    model Propeller3
+    {
+        mesh = WorldItems/RenewableEnergy_Propeller3,
+        texture = WorldItems/RenewableEnergy_PropellerWood,
+        scale = 1,
+    }
+    model Propeller4
+    {
+        mesh = WorldItems/RenewableEnergy_Propeller4,
+        texture = WorldItems/RenewableEnergy_PropellerWood,
+        scale = 1,
+    }
+    model Propeller5
+    {
+        mesh = WorldItems/RenewableEnergy_Propeller5,
+        texture = WorldItems/RenewableEnergy_PropellerWood,
+        scale = 1,
+    }
+    model Alternator0
+    {
+        mesh = WorldItems/RenewableEnergy_Alternator0,
+        texture = WorldItems/RenewableEnergy_Alternator,
+        scale = 1,
+    }
+    model Alternator1
+    {
+        mesh = WorldItems/RenewableEnergy_Alternator1,
+        texture = WorldItems/RenewableEnergy_Alternator,
+        scale = 1,
+    }
+    model Alternator2
+    {
+        mesh = WorldItems/RenewableEnergy_Alternator2,
+        texture = WorldItems/RenewableEnergy_Alternator,
+        scale = 1,
+    }
+    model Alternator3
+    {
+        mesh = WorldItems/RenewableEnergy_Alternator3,
+        texture = WorldItems/RenewableEnergy_Alternator,
+        scale = 1,
+    }
+    model Alternator4
+    {
+        mesh = WorldItems/RenewableEnergy_Alternator4,
+        texture = WorldItems/RenewableEnergy_Alternator,
+        scale = 1,
+    }
+    model Alternator5
+    {
+        mesh = WorldItems/RenewableEnergy_Alternator5,
+        texture = WorldItems/RenewableEnergy_Alternator,
         scale = 1,
     }
 }

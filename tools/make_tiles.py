@@ -35,7 +35,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 34
+COLUMNS, ROWS = 8, 35
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -134,6 +134,13 @@ for material, first_wall, first_rack in (("Metal", 1, 3), ("Wood", 21, 24)):
         TILES[first_wall + offset] = wall("SolarWall" + material, facing)
     for offset, facing in enumerate("SENW"):
         TILES[first_rack + offset] = rack("SolarRack" + material, facing)
+
+# The propeller and alternator chargers, a tile per facing (N, E, S, W): the wooden propeller's,
+# the pipe propeller's, then the alternator's.
+for first, name, material2 in ((265, "Propeller Wind Charger", "Wood"), (269, "Propeller Wind Charger", "Plastic"),
+                               (273, "Homemade Alternator Wind Charger", "MetalScrap")):
+    for offset in range(4):
+        TILES[first + offset] = wind_charger(name, "MetalPipe", material2)
 
 
 def main():

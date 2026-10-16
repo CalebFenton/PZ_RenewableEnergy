@@ -84,6 +84,15 @@ Sprites.gasifierPipeGen = { N = tile(260), E = tile(261), S = tile(262), W = til
 -- The scoop rotor wind charger. In play the game draws the object as a sprite model instead
 -- (scripts SpriteModels.txt: RenewableEnergy.ScoopRotor0 to 5, the rotor turned 30 degrees a step).
 Sprites.windScoop = tile(264)
+-- The propeller wind charger, its blades carved from wood or cut from plastic pipe, and the
+-- homemade alternator wind charger, a tile per facing of its rotor. In play the game draws each as
+-- a sprite model instead (SpriteModels.txt: RenewableEnergy.Propeller<Wood|Pipe><N|E|S|W><0-5>,
+-- RenewableEnergy.Alternator<N|E|S|W><0-5>, the rotor turned 20 degrees a step).
+Sprites.windPropeller = {
+    wood = { N = tile(265), E = tile(266), S = tile(267), W = tile(268) },
+    pipe = { N = tile(269), E = tile(270), S = tile(271), W = tile(272) },
+}
+Sprites.windAlternator = { N = tile(273), E = tile(274), S = tile(275), W = tile(276) }
 
 -- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles in each of four facings, by the way
 -- a runner on it faces (the tiles' Facing): the console end, and the rear end the runner stands on.
