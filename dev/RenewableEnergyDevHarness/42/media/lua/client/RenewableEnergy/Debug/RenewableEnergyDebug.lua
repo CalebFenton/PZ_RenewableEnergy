@@ -27,6 +27,7 @@ Debug.ITEMS = {
     "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
     "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
+    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit",
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }

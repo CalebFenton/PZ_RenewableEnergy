@@ -126,8 +126,9 @@ handler("placePanel", function(player, args, defer)
     return { connected = connected, reason = reason }
 end)
 
--- A fuelled Base.Generator plugged in on the square at `args`, running if `args.running`, with a
--- failsafe tile beside it if `args.failsafe`. Removed, switched off first, when the test ends.
+-- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
+-- unless given), running if `args.running`, with a failsafe tile beside it if `args.failsafe`.
+-- Removed, switched off first, when the test ends.
 handler("placeGenerator", function(_, args, defer)
     local square = squareAt(args)
     if not square then
@@ -144,7 +145,7 @@ handler("placeGenerator", function(_, args, defer)
         end
     end)
     generator:setConnected(true)
-    generator:setFuel(10)
+    generator:setFuel(args.fuel or 10)
     generator:setCondition(100)
     if args.failsafe then
         local failsafe = IsoObject.new(square, RenewableEnergy.Sprites.failsafe, "RenewableEnergy")

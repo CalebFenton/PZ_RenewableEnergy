@@ -19,6 +19,7 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/GasLine/GasKit"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -518,12 +519,22 @@ function Bank:findGenerator()
 end
 
 --- Start or stop a backup generator with a failsafe by the charge, as a generator
---- auto-start relay does.
+--- auto-start relay does. A generator stalled on gas starts again by itself once its load fits
+--- (GasLines), so the relay leaves it be, and only calls that off when it would stop it.
 local function runFailsafe(generator, on, charge)
     local options = SandboxVars.RenewableEnergy
+    local gas = RenewableEnergy.GasKit.stateOf(generator)
+    local wantsOff = not on or charge * 100 >= options.FailsafeStopCharge
     if generator:isActivated() then
-        if not on or charge * 100 >= options.FailsafeStopCharge then
+        if wantsOff then
             generator:setActivated(false)
+        end
+    elseif gas and gas.stalled then
+        if wantsOff then
+            gas.stalled = false
+            if isServer() then
+                generator:transmitModData()
+            end
         end
     elseif on and charge * 100 < options.FailsafeStartCharge and generator:getFuel() > 0 and generator:getCondition() > 20 then
         generator:setActivated(true)

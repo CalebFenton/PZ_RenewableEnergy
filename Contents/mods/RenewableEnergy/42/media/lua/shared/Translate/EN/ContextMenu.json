@@ -20,5 +20,12 @@
     "ContextMenu_RenewableEnergy_VentGas": "Vent Gas",
     "ContextMenu_RenewableEnergy_ReplaceBags": "Replace Gas Bags",
     "ContextMenu_RenewableEnergy_SewTarp": "Sew Tarp Gas Bag",
-    "ContextMenu_RenewableEnergy_Upgrade": "Upgrade to Insulated Digester"
+    "ContextMenu_RenewableEnergy_Upgrade": "Upgrade to Insulated Digester",
+    "ContextMenu_RenewableEnergy_InstallKit": "Install Gas Conversion Kit",
+    "ContextMenu_RenewableEnergy_RemoveKit": "Remove Gas Conversion Kit",
+    "ContextMenu_RenewableEnergy_ConnectLine": "Connect Gas Line",
+    "ContextMenu_RenewableEnergy_LineTo": "%1 (%2 squares)",
+    "ContextMenu_RenewableEnergy_DisconnectLine": "Disconnect Gas Line",
+    "ContextMenu_RenewableEnergy_RunOnGas": "Run on Gas",
+    "ContextMenu_RenewableEnergy_RunOnPetrol": "Run on Gasoline"
 }

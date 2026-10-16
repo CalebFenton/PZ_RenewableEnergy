@@ -169,3 +169,74 @@ handler("digesterCatchUp", function(player, args)
     end
     return { loaded = record:getIsoObject() ~= nil, hopper = #record.hopper, eaten = eaten, potential = record.potential }
 end)
+
+-- Gas lines -------------------------------------------------------------------------------------
+
+local function generatorOn(args)
+    local square = Helpers.squareAt(args)
+    local generator = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.GasKit.isGenerator)
+    if not generator then
+        return nil, "a generator at " .. tostring(args.x) .. "," .. tostring(args.y)
+    end
+    return generator
+end
+
+-- The generator at x, y, z: whether it runs, its fuel, its kit's state and overlays, and whether
+-- the pass lists it.
+handler("gasRead", function(player, args)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    local GasKit = RenewableEnergy.GasKit
+    local state = GasKit.stateOf(generator)
+    local copy
+    if state then
+        copy = {}
+        for key, value in pairs(state) do
+            if type(value) ~= "table" then
+                copy[key] = value
+            end
+        end
+        copy.connected = state.source ~= nil
+    end
+    local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
+    return {
+        running = generator:isActivated(), fuel = generator:getFuel(), state = copy,
+        listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
+        overlays = Helpers.overlaysOf(generator),
+    }
+end)
+
+-- Sets the generator's fuel (`args.fuel`, as pouring petrol in does) and switches it on or off
+-- (`args.running`), as a player does.
+handler("gasGenerator", function(player, args)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    if args.fuel then
+        generator:setFuel(args.fuel)
+    end
+    if args.running ~= nil then
+        generator:setActivated(args.running)
+    end
+    return {}
+end)
+
+-- Runs the gas pass as though `args.hours` had passed since the generator's last.
+handler("gasPass", function(player, args)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    local state = RenewableEnergy.GasKit.stateOf(generator)
+    if state then
+        state.lastHour = getGameTime():getWorldAgeHours() - args.hours
+    end
+    RenewableEnergy.GasLines.updateAll()
+    return {}
+end)
+
+-- Sets the watts a generator carries on gas to `args.watts` until the test ends.
+handler("gasCap", function(player, args, defer)
+    local GasKit = RenewableEnergy.GasKit
+    local cap = GasKit.CAP_W
+    GasKit.CAP_W = args.watts
+    defer(function() GasKit.CAP_W = cap end)
+    return {}
+end)

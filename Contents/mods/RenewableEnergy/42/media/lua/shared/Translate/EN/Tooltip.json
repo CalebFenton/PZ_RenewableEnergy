@@ -58,5 +58,17 @@
     "Tooltip_RenewableEnergy_NotBags": "This digester has no garbage bags to replace.",
     "Tooltip_RenewableEnergy_HasTarp": "It already has a tarp bag in good repair.",
     "Tooltip_RenewableEnergy_NotBarrel": "Only a barrel digester can be upgraded.",
-    "Tooltip_RenewableEnergy_NoDigester": "The digester is gone."
+    "Tooltip_RenewableEnergy_NoDigester": "The digester is gone.",
+    "Tooltip_RenewableEnergy_GasConversionKit": "A mixer valve, hose and clamps that let a generator run on gas from a digester. On gas it carries a little over half of what it carries on gasoline.",
+    "Tooltip_RenewableEnergy_NoGenerator": "The generator is gone.",
+    "Tooltip_RenewableEnergy_HasKit": "This generator already has a Gas Conversion Kit.",
+    "Tooltip_RenewableEnergy_NoKit": "This generator has no Gas Conversion Kit.",
+    "Tooltip_RenewableEnergy_GeneratorRunning": "Turn the generator off first.",
+    "Tooltip_RenewableEnergy_HasLine": "A gas line is already connected.",
+    "Tooltip_RenewableEnergy_NoLine": "No gas line is connected.",
+    "Tooltip_RenewableEnergy_DigesterOutOfReach": "The digester is too far away, or on another floor.",
+    "Tooltip_RenewableEnergy_NoDigesterInReach": "No digester within %1 squares on this floor.",
+    "Tooltip_RenewableEnergy_OnGasAlready": "It already runs on gas.",
+    "Tooltip_RenewableEnergy_OnPetrolAlready": "It already runs on gasoline.",
+    "Tooltip_RenewableEnergy_RemoveKitFirst": "Remove the Gas Conversion Kit first."
 }

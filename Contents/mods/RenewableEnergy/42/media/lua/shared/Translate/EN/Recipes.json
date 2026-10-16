@@ -39,5 +39,6 @@
     "RenewableEnergy_BarrelDigesterSteel": "Barrel Digester (Steel Drum)",
     "RenewableEnergy_BarrelDigesterPlastic": "Barrel Digester (Plastic Barrel)",
     "RenewableEnergy_InsulatedDigester": "Insulated Digester",
-    "RenewableEnergy_BrickDome": "Brick Dome Digester"
+    "RenewableEnergy_BrickDome": "Brick Dome Digester",
+    "RenewableEnergy_MakeGasConversionKit": "Make Gas Conversion Kit"
 }

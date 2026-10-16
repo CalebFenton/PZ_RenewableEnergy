@@ -607,3 +607,206 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
         T.expect(self.reads.back.hopperItems == 1, "back, the hopper holds " .. self.reads.back.hopperItems .. " items, not 1")
     end,
 })
+
+-- Gas lines ---------------------------------------------------------------------------------------
+
+local GasKit = RenewableEnergy.GasKit
+
+--- Queues a vanilla generator, plugged in, holding `fuel` litres, on a free outdoor square near
+--- `near`. Returns its handle { x, y, z, square }; `object` is this client's copy.
+local function placeGenerator(self, fuel, near)
+    local square = (T.need(self, T.squares(self, 1, { near = near, minDistance = 2 }), "a free square for a generator") or {})[1]
+    if not square then return nil end
+    local handle = at(square)
+    handle.square = square
+    local args = at(square)
+    args.fuel = fuel
+    T.server(self, "placeGenerator", args)
+    T.waitUntil(function()
+        handle.object = RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), GasKit.isGenerator)
+        return handle.object ~= nil
+    end, COPY_FRAMES, "this client's copy of the generator")
+    T.step(function() T.need(self, handle.object, "this client's copy of the generator") end)
+    return handle
+end
+
+local function gasJob(self, generator, job, digester)
+    T.step(function()
+        T.standNextTo(generator.square)
+        ISTimedActionQueue.add(RenewableEnergyGasAction:new(T.player(), job, generator.object, digester and digester.object))
+    end)
+end
+
+local function readGas(self, generator, label)
+    T.server(self, "gasRead", { x = generator.x, y = generator.y, z = generator.z })
+    T.step(function()
+        self.gas = self.gas or {}
+        self.gas[label] = self.server.gasRead
+    end)
+end
+
+local function gasPass(self, generator, hours)
+    T.server(self, "gasPass", { x = generator.x, y = generator.y, z = generator.z, hours = hours })
+end
+
+local function setGenerator(self, generator, fields)
+    local args = { x = generator.x, y = generator.y, z = generator.z }
+    for key, value in pairs(fields) do
+        args[key] = value
+    end
+    T.server(self, "gasGenerator", args)
+end
+
+-- Fitting the kit takes the kit and keeps the tank; taking it off gives the kit back with the tank
+-- as it was.
+test("renewable_energy_gas_kit_install_and_remove", {
+    instant = true,
+    run = function(self)
+        local generator = placeGenerator(self, 3)
+        if not generator then return end
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" } })
+        gasJob(self, generator, GasKit.INSTALL)
+        readGas(self, generator, "fitted")
+        T.count(self, "afterFit", { GasKit.ITEM })
+        gasJob(self, generator, GasKit.REMOVE)
+        readGas(self, generator, "removed")
+        T.count(self, "afterRemove", { GasKit.ITEM })
+    end,
+    validate = function(self)
+        local fitted, removed = self.gas.fitted, self.gas.removed
+        T.expect(fitted.state and fitted.state.kit and fitted.listed, "the kit isn't fitted")
+        T.expectNear("tank with the kit", fitted.state and fitted.state.tank or -1, 3, 0.01)
+        T.expect(self.counts.afterFit[GasKit.ITEM] == 0, "fitting didn't take the kit")
+        T.expect(removed.state == nil and not removed.listed, "the kit is still fitted")
+        T.expectNear("fuel after removing it", removed.fuel, 3, 0.01)
+        T.expect(self.counts.afterRemove[GasKit.ITEM] == 1, "removing didn't give the kit back")
+    end,
+})
+
+-- On a line from a digester with gas, an empty-tanked generator runs: it burns the digester's gas
+-- for what it powers, its tank stays empty, petrol poured in goes into the tank, and when the gas
+-- runs out it stops, holding only its tank. The line's hoses come back when it is cut.
+test("renewable_energy_gas_generator_runs_on_gas", {
+    instant = true,
+    run = function(self)
+        local digester = placeDigester(self, "barrel.steel")
+        if not digester then return end
+        local full = mature(5)
+        full.gas = 0.6
+        setDigester(self, digester, full)
+        local generator = placeGenerator(self, 0, digester.square)
+        if not generator then return end
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.HOSE, count = 2 } })
+        gasJob(self, generator, GasKit.INSTALL)
+        gasJob(self, generator, GasKit.CONNECT, digester)
+        readGas(self, generator, "connected")
+        setGenerator(self, generator, { running = true })
+        gasPass(self, generator, 0.5)
+        readGas(self, generator, "running")
+        readDigester(self, digester, "fed")
+        T.step(function() setGenerator(self, generator, { fuel = self.gas.running.fuel + 3 }) end)
+        gasPass(self, generator, 0.1)
+        readGas(self, generator, "poured")
+        setDigester(self, digester, { gas = 0.001 })
+        gasPass(self, generator, 0.5)
+        readGas(self, generator, "out")
+        gasJob(self, generator, GasKit.DISCONNECT)
+        T.count(self, "hoses", { GasKit.HOSE })
+    end,
+    validate = function(self)
+        local connected, running, poured, out = self.gas.connected, self.gas.running, self.gas.poured, self.gas.out
+        T.expect(connected.state and connected.state.connected, "the gas line isn't connected")
+        T.expect(connected.fuel >= GasKit.PHANTOM_FUEL - 0.01, "on gas, the generator shows " .. connected.fuel .. " L, too little to start")
+        T.expect(running.running, "the generator didn't keep running on gas")
+        T.expectNear("tank while on gas", running.state.tank, 0, 0.001)
+        -- The digester's own pass may add a little gas meanwhile.
+        T.expect(self.reads.fed.gas < 0.6 - GasKit.gasFor(0, 0.5) + 0.02, "the generator burned " .. (0.6 - self.reads.fed.gas) .. " m³ in half an hour")
+        T.expectNear("tank after pouring 3 L", poured.state.tank, 3, 0.01)
+        T.expect(not out.running and out.state.outOfGas, "the generator kept running with no gas")
+        T.expectNear("fuel once the gas ran out", out.fuel, 3, 0.01)
+        T.expect(self.counts.hoses[GasKit.HOSE] == 2, "cutting the line gave back " .. tostring(self.counts.hoses[GasKit.HOSE]) .. " hoses")
+    end,
+})
+
+-- More switched on than the generator carries on gas stalls it; once the load fits, it starts
+-- again on its own.
+test("renewable_energy_gas_generator_stalls_over_cap", {
+    instant = true,
+    run = function(self)
+        local digester = placeDigester(self, "dome")
+        if not digester then return end
+        local full = mature(45)
+        full.gas = 4
+        setDigester(self, digester, full)
+        local generator = placeGenerator(self, 0, digester.square)
+        if not generator then return end
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.HOSE, count = 1 } })
+        gasJob(self, generator, GasKit.INSTALL)
+        gasJob(self, generator, GasKit.CONNECT, digester)
+        setGenerator(self, generator, { running = true })
+        T.server(self, "gasCap", { watts = -1 })
+        gasPass(self, generator, 0.2)
+        readGas(self, generator, "over")
+        T.server(self, "gasCap", { watts = 1000000 })
+        gasPass(self, generator, 0.2)
+        readGas(self, generator, "fits")
+    end,
+    validate = function(self)
+        T.expect(not self.gas.over.running and self.gas.over.state.stalled, "an overloaded generator didn't stall")
+        T.expect(self.gas.fits.running and not self.gas.fits.state.stalled, "the generator didn't start again once the load fit")
+    end,
+})
+
+-- A kitted generator's menu has the kit's jobs and greys out Take Generator; the client refuses the
+-- take too, and the info window shows the real tank and that it runs on gas.
+test("renewable_energy_gas_kit_menu", {
+    instant = true,
+    run = function(self)
+        local digester = placeDigester(self, "barrel.steel")
+        if not digester then return end
+        local full = mature(5)
+        full.gas = 0.6
+        setDigester(self, digester, full)
+        local generator = placeGenerator(self, 0, digester.square)
+        if not generator then return end
+        self.generator = generator
+        T.step(function()
+            local context = ISWorldObjectContextMenu.createMenu(0, { generator.object }, 0, 0)
+            local entry = context:getOptionFromName(getText("ContextMenu_Generator"))
+            local submenu = entry and entry.subOption and context:getSubMenu(entry.subOption)
+            local install = submenu and submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_InstallKit"))
+            self.installShown = install ~= nil
+            self.installGreyed = install ~= nil and install.notAvailable == true
+            context:hideAndChildren()
+        end)
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" }, { type = GasKit.HOSE, count = 1 } })
+        gasJob(self, generator, GasKit.INSTALL)
+        gasJob(self, generator, GasKit.CONNECT, digester)
+        T.waitUntil(function()
+            local state = GasKit.stateOf(generator.object)
+            return state ~= nil and state.onGas == true
+        end, COPY_FRAMES, "this client's copy of the kit's state")
+    end,
+    validate = function(self)
+        T.expect(self.installShown and self.installGreyed, "without a kit and wrench, Install isn't offered greyed out")
+        local generator = self.generator.object
+        local context = ISWorldObjectContextMenu.createMenu(0, { generator }, 0, 0)
+        local entry = context:getOptionFromName(getText("ContextMenu_Generator"))
+        local submenu = entry and entry.subOption and context:getSubMenu(entry.subOption)
+        if T.expect(submenu ~= nil, "a kitted generator has no generator submenu") then
+            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_DisconnectLine")) ~= nil, "no Disconnect Gas Line")
+            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_RemoveKit")) ~= nil, "no Remove Gas Conversion Kit")
+            local take = submenu:getOptionFromName(getText("ContextMenu_GeneratorTake"))
+            T.expect(take == nil or take.notAvailable, "Take Generator is offered on a kitted generator")
+        end
+        context:hideAndChildren()
+        T.expect(not ISTakeGenerator:new(T.player(), generator):isValid(), "the client lets a kitted generator be taken")
+        local text = ISGeneratorInfoWindow.getRichText(generator, true)
+        T.expect(text:find(getText("IGUI_Generator_FuelAmount", 0), 1, true) ~= nil, "the info window doesn't show the empty tank")
+        T.expect(text:find(getText("IGUI_RenewableEnergy_GasOn"), 1, true) ~= nil, "the info window doesn't say it runs on gas")
+    end,
+})

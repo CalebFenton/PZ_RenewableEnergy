@@ -566,4 +566,16 @@ module RenewableEnergy
         Tooltip = Tooltip_RenewableEnergy_WoodAsh,
         Tags = base:iscompostable;base:ignorezombiedensity,
     }
+
+    /* Fitted to a vanilla generator, lets it run on gas from a digester (RenewableEnergy.GasKit). */
+    item GasConversionKit
+    {
+        DisplayCategory = VehicleMaintenance,
+        ItemType = base:normal,
+        Weight = 1.5,
+        Icon = RubberHose,
+        WorldStaticModel = RubberHose,
+        Tooltip = Tooltip_RenewableEnergy_GasConversionKit,
+        Tags = base:ignorezombiedensity,
+    }
 }

@@ -943,4 +943,36 @@ module Base
             item 1 RenewableEnergy.SolarFailsafe,
         }
     }
+
+    /******************************* Gas lines ********************************/
+
+    /*
+        The mixer valve, hose and clamps that let a gasoline engine breathe gas: one valve does
+        wood gas and biogas alike. The scrap is the valve's throttle linkage.
+    */
+    craftRecipe RenewableEnergy_MakeGasConversionKit
+    {
+        timedAction = MakingElectrical,
+        time = 240,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Mechanics:5,
+        SkillRequired = Mechanics:3,
+        xpAward = Mechanics:20,
+        inputs
+        {
+            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 [Base.RubberHose],
+            item 1 [Base.Pipe],
+            item 2 [Base.DuctTape],
+            item 1 [Base.ElectronicsScrap],
+            item 1 [Base.SmallSheetMetal],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.GasConversionKit,
+        }
+    }
 }

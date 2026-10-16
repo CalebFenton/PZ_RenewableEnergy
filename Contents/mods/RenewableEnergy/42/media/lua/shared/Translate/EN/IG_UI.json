@@ -142,5 +142,12 @@
     "IGUI_RenewableEnergy_SmellStrong": "Strong",
     "IGUI_RenewableEnergy_SmellVile": "Vile",
     "IGUI_RenewableEnergy_DigesterLeak": "Leak",
-    "IGUI_RenewableEnergy_DigesterLeaking": "Gas is escaping"
+    "IGUI_RenewableEnergy_DigesterLeaking": "Gas is escaping",
+    "IGUI_RenewableEnergy_GasKit": "Gas Conversion Kit",
+    "IGUI_RenewableEnergy_GasOn": "running on gas; the tank is untouched",
+    "IGUI_RenewableEnergy_GasNone": "no gas in the digester",
+    "IGUI_RenewableEnergy_GasNoLine": "no gas line",
+    "IGUI_RenewableEnergy_GasPetrol": "set to run on gasoline",
+    "IGUI_RenewableEnergy_GasStalled": "stalled: more switched on than it can carry on gas",
+    "IGUI_RenewableEnergy_GasOut": "ran out of gas"
 }
