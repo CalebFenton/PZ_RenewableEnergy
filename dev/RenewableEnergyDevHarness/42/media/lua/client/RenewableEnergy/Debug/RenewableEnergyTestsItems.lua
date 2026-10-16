@@ -31,6 +31,8 @@ local RECIPES = {
     "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
     "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle",
     "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray", "RenewableEnergy_MakeVinegarAphidSpray",
+    "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
+    "RenewableEnergy_MakeHomemadeAlternator",
 }
 
 -- "RenewableEnergy.HomesteadPowerMag1" -> "homestead_power_mag1".

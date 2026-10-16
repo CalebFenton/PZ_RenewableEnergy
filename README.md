@@ -1,6 +1,6 @@
 # ![Renewable Energy](art/promo/images/banner.png)
 
-Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels and batteries, a manure digester, a wood gas generator. You start with a car battery in a wooden box and an inverter that plugs into a lighter socket, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
+Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels and batteries, a wind charger, a manure digester, a wood gas generator. You start with a car battery in a wooden box and an inverter that plugs into a lighter socket, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
 
 **Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress.
 
@@ -15,18 +15,16 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 | Months later | The freezer, the washer, the microwave | A bank of L-16s, an inverter/charger, two charge controllers, a failsafe on the generator, a yard of panels |
 | The long haul | The electric range and the dryer | A metal bank, two inverter/chargers, four charge controllers, and every panel you can find |
 
-Panels are what you'll spend the game chasing: you find a few, fix the cracked ones, and in the end build your own out of anything with solar cells in it.
+You'll spend the game chasing panels: finding them, fixing the cracked ones, and in the end building your own.
 
 ## Everything you can find or build
 
 ![Every item's model lying on the ground with its inventory icon: panels, battery storage, parts, batteries and gadgets](art/promo/images/items.png)
 
-It's the hardware they sold in 1993: small modules, marine and L-16 batteries, inverters for RVs and cabins.
-
 - **Batteries wear** with every deep drain: a deep cycle kept above half lasts years, a car battery run down every day is done in months. Service it with water and a rag or baking soda, or rebuild it: strip the plates, recast them at a furnace, and put it back together.
-- **Panels follow the sun** as it moves over Knox County. Flat panels make the most in summer and lose most of it by December, wall panels do best in winter, and ground racks over the year. Snow piles up on flat panels until you sweep it off, and thunderstorms crack modules now and then.
+- **Panels follow the sun.** Flat panels make the most in summer and lose most of it by December, wall panels do best in winter, and ground racks over the year. Snow piles up on flat panels until you sweep it off, and thunderstorms crack modules now and then.
 - **The generator stays the backup.** Plug it in beside the bank and, with a charger wired in, it fills the batteries while it runs; a **Solar Failsafe** starts it when they run low and stops it when they're full.
-- **Small gadgets** work without a bank: a maintainer that trickle-charges a parked car's battery, a charger for flashlight batteries, and garden lights. Some houses still have a row of them along the front walk:
+- **Small gadgets** work without a bank: a maintainer that trickle-charges a parked car's battery, a charger for flashlight batteries, and garden lights. Some houses still have a row along the front walk:
 
 ![Solar garden lights glowing at night along a house's front walk](art/promo/images/gardenlights.png)
 
@@ -49,11 +47,15 @@ Manure and kitchen scraps make gas, given warmth and patience. Build a digester 
 - **It's alive.** Below about 10 °C it stops, too much food sours it until you add wood ash, baking soda or quicklime, and its sludge comes out as compost. A **Gas Heater** keeps it going through the winter.
 - **It stinks.** A fresh or sour digester draws zombies, and one indoors can poison the house. The brick dome is the quiet one.
 - **Run the generator on it** with a **Gas Conversion Kit** and a hose: a lighter load, but no gasoline, ever.
-- **Bottle it.** A tire pump fills a propane tank a quarter of the way and wears you out; a scrubber and a compressor out of a fridge fill it. The tank refills lantern bottles, and the compressor inflates tires.
+- **Bottle it.** A tire pump fills a propane tank a quarter of the way; a scrubber and a fridge's compressor fill it. The tank refills lantern bottles, and the compressor inflates tires.
 
 ## Wood gas
 
 FEMA's 1989 plans run a generator on wood: build a **gasifier** (**Welding** page) beside a generator with the kit and pipe it in. Keep the hopper full and light it, with bellows once it's gone cold. Shovel out the ash, change the filter's packing as tar soaks it, and drain the condensate: wood vinegar, for mildew and aphid spray. Charcoal burns cleanest. Lit indoors, it poisons the house.
+
+## Wind
+
+A **wind charger** (**Welding** page) feeds the bank like a panel: a scoop rotor from a cut drum, a propeller on a pipe mast, or steel blades on a brake-hub alternator. Open, high ground helps, and winter blows hardest, when panels are weakest. Brake the propeller before a storm or its blades break. A treadmill wired to the bank turns running into power; dismantled, it gives up its motor.
 
 ## Crafting
 
@@ -69,12 +71,12 @@ The easiest start is on the road. Road crews and army checkpoints left solar arr
 
 ![The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a car](art/promo/images/trailer.png)
 
-The box on the tongue holds deep cycle batteries and usually a charge controller, often behind a padlock, and the panels come off with a wrench and a little Mechanics. Strip it where it stands, or tow it home.
+Its box holds deep cycle batteries, often padlocked, and the panels come off with a wrench. Strip it where it stands, or tow it home.
 
 ## Sandbox options
 
-- **Sunlight Multiplier**: how much power panels make. Out of the box they make more than they really did; at 1 it takes a yard of panels to run one fridge, as in 1993.
-- **Biogas Multiplier**: how much gas digesters make. Out of the box more than real ones, since the game's animals drop far less manure.
+- **Sunlight Multiplier**: how much power panels make. At 1 it takes a yard of panels to run one fridge, as in 1993.
+- **Biogas Multiplier**: how much gas digesters make.
 - **Loot Rarity Multiplier**, one each for modules, batteries and everything else: how often the mod's items turn up.
 - **Battery Wear**: how hard deep drains wear batteries. 0 turns wear off.
 - **Stash Houses**: adds houses stocked with solar gear, and maps that lead to them. Set it before you start.
