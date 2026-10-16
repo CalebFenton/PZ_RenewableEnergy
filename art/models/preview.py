@@ -3,13 +3,14 @@
     blender -b --factory-startup -P art/models/preview.py
 
 - models.png: every exported ground model and vehicle body (FBX plus its baked texture) from two
-  sides.
+  sides, and every sprite model from one side at each of its yaw steps.
 - tiles.png: every tile at four times its size on a floor diamond, overlays drawn over their base.
 - icons.png: every icon at four times its size.
 - build_icons.png: every build-menu icon at four times its size.
 
 Writes to PREVIEWS (default $TMPDIR/renewable-energy-previews) and prints the folder.
 """
+import math
 import os
 import sys
 import tempfile
@@ -101,15 +102,17 @@ def model_sheet():
     scene.camera = camera
     cells = []
     # A vehicle shows as its body with its part models, once whole and once with every cracked
-    # variant in place of the part it replaces.
-    models = [("WorldItems", name, name, [name]) for name in items.ITEMS]
+    # variant in place of the part it replaces. A sprite model shows from one side at each of its
+    # yaw steps, in turn, as the game spins it.
+    models = [("WorldItems", name, name, [name], None) for name in items.ITEMS]
+    models += [("WorldItems", name, name, [name], spec["steps"]) for name, spec in items.SPRITE_MODELS.items()]
     for name, spec in items.VEHICLES.items():
         whole = [s for s in spec["pieces"] if not s.endswith("Cracked")]
         cracked = [s + "Cracked" if s + "Cracked" in spec["pieces"] else s for s in whole]
-        models.append(("vehicles", name, name, [name + s for s in [""] + whole]))
+        models.append(("vehicles", name, name, [name + s for s in [""] + whole], None))
         if cracked != whole:
-            models.append(("vehicles", name + "Cracked", name, [name + s for s in [""] + cracked]))
-    for folder, name, texture_name, files in models:
+            models.append(("vehicles", name + "Cracked", name, [name + s for s in [""] + cracked], None))
+    for folder, name, texture_name, files, steps in models:
         bpy.ops.object.select_all(action="DESELECT")
         imported = []
         for file in files:
@@ -131,12 +134,15 @@ def model_sheet():
         points = [obj.matrix_world @ v.co for obj in meshes for v in obj.data.vertices]
         centre = sum(points, Vector()) / len(points)
         size = max((p - centre).length for p in points) * 2.1
-        for direction in ((-1, 1, -0.8), (1, -1, -0.8)):
+        views = [((-1, 1, -0.8), 0), ((1, -1, -0.8), 0)] if steps is None else [((-1, 1, -0.6), yaw) for yaw in steps]
+        for view, (direction, yaw) in enumerate(views):
+            for obj in meshes:
+                obj.rotation_euler.z = math.radians(yaw)
             direction = Vector(direction).normalized()
             camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
             camera.location = centre - direction * 10
             camera.data.ortho_scale = size
-            path = os.path.join(OUT, "model_%s_%d.png" % (name, direction.x > 0))
+            path = os.path.join(OUT, "model_%s_%d.png" % (name, view))
             scene.render.filepath = path
             bpy.ops.render.render(write_still=True)
             cells.append(kit.load_pixels(path))

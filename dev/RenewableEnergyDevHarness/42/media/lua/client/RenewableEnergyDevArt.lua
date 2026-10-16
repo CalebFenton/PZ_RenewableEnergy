@@ -129,6 +129,18 @@ local function digesterTiles()
     return list
 end
 
+-- The scoop rotor wind charger as its sprite model at each spin step, three to a row with a square
+-- between them for the rotor's swing, and once as its plain tile.
+local function windTiles()
+    local list = {}
+    for step = 0, 5 do
+        table.insert(list, { x = (step % 3) * 3 + 1, y = math.floor(step / 3) * 3 + 1, sprite = Sprites.windScoop,
+            spriteModel = "RenewableEnergy.ScoopRotor" .. step })
+    end
+    table.insert(list, { x = 1, y = 7, sprite = Sprites.windScoop })
+    return list
+end
+
 -- Where the character stands for each shot, and how far it zooms out from the closest zoom. For
 -- the tiles it stands in front of a wall panel, which the depth map must draw behind it.
 local SHOTS = {
@@ -139,6 +151,8 @@ local SHOTS = {
     trailer = { name = "art_trailer", x = 8, y = 7, zoomSteps = 2 },
     trailerFront = { name = "art_trailer_front", x = 3, y = 6, zoomSteps = 2 },
     digesters = { name = "art_digesters", x = 5, y = 8, zoomSteps = 2 },
+    -- Beside the second row's middle turbine, for its size against a person.
+    wind = { name = "art_wind", x = 5, y = 5, zoomSteps = 2 },
 }
 
 -- Damage stage 1 is a condition from 40 to 59, stage 2 below 40 (BaseVehicle.doDamageOverlay).
@@ -332,11 +346,17 @@ local function lotSquare(lot, x, y)
     return getCell():getGridSquare(lot.x + x, lot.y + y, lot.z)
 end
 
-local function placeTile(square, spriteName, overlays)
+-- `spriteModel`, a sprite model's name, draws the object as that model instead of its tile; an
+-- animating object stays out of the cached chunk, so the model shows at once.
+local function placeTile(square, spriteName, overlays, spriteModel)
     local object = IsoObject.new(square, spriteName, spriteName)
     square:AddTileObject(object)
     for _, overlay in ipairs(overlays or {}) do
         object:addAttachedAnimSpriteByName(overlay)
+    end
+    if spriteModel then
+        object:setSpriteModelName(spriteModel)
+        object:setAnimating(true)
     end
 end
 
@@ -377,7 +397,7 @@ end
 
 local function placeTiles(lot, list)
     for _, tile in ipairs(list) do
-        placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite, tile.overlays)
+        placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite, tile.overlays, tile.spriteModel)
     end
     recalcLot(lot)
 end
@@ -508,7 +528,8 @@ local function addCrackedShot(steps, player, lot)
     addShot(steps, player, lot, CRACKED_SHOT)
 end
 
--- The tile, overlay, item, icon, fill and digester shots, each on the lot cleared of the one before.
+-- The tile, overlay, item, icon, fill, digester and wind shots, each on the lot cleared of the one
+-- before.
 local function addTileAndItemShots(steps, player, lot)
     local iconSheet = IconSheet:new()
     table.insert(steps, function()
@@ -544,6 +565,11 @@ local function addTileAndItemShots(steps, player, lot)
         placeTiles(lot, digesterTiles())
     end)
     addShot(steps, player, lot, SHOTS.digesters)
+    table.insert(steps, function()
+        clearLot(lot)
+        placeTiles(lot, windTiles())
+    end)
+    addShot(steps, player, lot, SHOTS.wind)
 end
 
 -- The trailer hitched to its car, then the rear in each of its states. `art.pair` holds the pair

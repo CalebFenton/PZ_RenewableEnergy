@@ -1,5 +1,6 @@
-"""Bakes and exports the ground model of every item in items.ITEMS and the body of every vehicle in
-items.VEHICLES, and writes Models.txt.
+"""Bakes and exports the ground model of every item in items.ITEMS, the model of every sprite model
+in items.SPRITE_MODELS and the body of every vehicle in items.VEHICLES, and writes Models.txt and
+SpriteModels.txt.
 
     PYTHONHASHSEED=0 blender -b --factory-startup --python-use-system-env -P art/models/models.py
 
@@ -12,7 +13,9 @@ Models.txt gets a model <Item>_Ground in module RenewableEnergy for the item's W
 vehicle's mesh goes to models_X/vehicles, cut into the body and the part models items.VEHICLES
 names, a hinged one skinned to a bone with the clip that swings it, and its texture, with the mask,
 lights, rust, damage and blood textures of its shader, to textures/Vehicles;
-scripts/RenewableEnergy/Vehicles.txt names them.
+scripts/RenewableEnergy/Vehicles.txt names them. A sprite model's mesh and texture go where an
+item's do, Models.txt gets a model of its own name, and SpriteModels.txt a spriteModel <Name><n>
+for each of its yaw steps, which the game draws a placed object as in place of its tile.
 
 An item's exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the
 vertices (like HearingAid's ground model): the game draws a dropped item that way.
@@ -61,6 +64,13 @@ DEFAULT_TEXTURE_SIZE = 256
 # Real size reads well on the ground next to most of the game's own items; an item's
 # "ground_scale" in items.ITEMS overrides it where the game draws its kind smaller (batteries).
 WORLD_SCALE = 1.0
+# A sprite model's translate is in squares and its scale undoes the 1.5 the game's model camera
+# scales everything by (IsoObjectModelDrawer.renderMain, WorldModelCamera.Begin), as vanilla's
+# doors' 0.6667 does, so a mesh in metres stands at its real size.
+SPRITE_MODEL_SCALE = 1 / 1.5
+# A sprite model stands taller than a person, so it needs the texels of the big flat things.
+SPRITE_MODEL_TEXTURE_SIZE = 512
+SPRITE_MODELS_TXT = os.path.join(MOD, "42/media/scripts/RenewableEnergy/SpriteModels.txt")
 
 
 def setup():
@@ -304,12 +314,14 @@ def export(obj, name, path):
                              bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0, **options)
 
 
-def build_baked(stage, builder, name, size, to_ground):
+def build_baked(stage, builder, name, size, to_ground, light=True):
     """Builds one model's parts as a single mesh, unwrapped, and bakes its texture: colour
-    darkened by ambient occlusion. `to_ground` centres it standing on the ground and paints the
-    light in, as for a world item; otherwise it keeps the builder's origin and the light is the
-    game's, as for a vehicle. Returns the mesh object, the texture's pixels and the parts the
-    mesh's "part" attribute indexes; the parts stay on `stage` until the next build."""
+    darkened by ambient occlusion. `to_ground` centres it standing on the ground and, with `light`,
+    paints the light in, as for a world item; otherwise it keeps the builder's origin and the light
+    is the game's, as for a vehicle. A model the game turns, as a spinning sprite model, takes no
+    light painted in, or its lit side would turn with it. Returns the mesh object, the texture's
+    pixels and the parts the mesh's "part" attribute indexes; the parts stay on `stage` until the
+    next build."""
     kit.clear(stage)
     builder(stage)
     bpy.context.view_layer.update()
@@ -324,24 +336,46 @@ def build_baked(stage, builder, name, size, to_ground):
     high.hide_render = True
     occlusion = bake(low, "AO", size, "Non-Color")[..., :1]
     colour[..., :3] *= 0.55 + 0.45 * occlusion
-    if to_ground:
+    if to_ground and light:
         colour[..., :3] *= paint_light(low, size, occlusion)
     bpy.data.objects.remove(high)
     stage.hide_render = False
     return low, colour, solid
 
 
-def models_txt(specs):
+def models_txt(specs, sprite_models):
     lines = ["module RenewableEnergy", "{",
-             "    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel. */"]
-    for name, spec in specs.items():
-        lines += ["    model %s_Ground" % name, "    {",
+             "    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel, then the"
+             " sprite models' models. */"]
+    models = [(name + "_Ground", name, spec.get("ground_scale", WORLD_SCALE)) for name, spec in specs.items()]
+    models += [(name, name, WORLD_SCALE) for name in sprite_models]
+    for model, name, scale in models:
+        lines += ["    model %s" % model, "    {",
                   "        mesh = WorldItems/%s%s," % (PREFIX, name),
                   "        texture = WorldItems/%s%s," % (PREFIX, name),
-                  "        scale = %g," % spec.get("ground_scale", WORLD_SCALE),
+                  "        scale = %g," % scale,
                   "    }"]
     lines.append("}")
     with open(MODELS_TXT, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def sprite_models_txt(sprite_models):
+    """A spriteModel per yaw step, centred on its square. It names its texture: without one the
+    game draws the model white."""
+    lines = ["module RenewableEnergy", "{",
+             "    /* Written by art/models/models.py: the sprite models placed objects are drawn as. */"]
+    for name, spec in sprite_models.items():
+        for step, yaw in enumerate(spec["steps"]):
+            lines += ["    spriteModel %s%d" % (name, step), "    {",
+                      "        modelScript = RenewableEnergy.%s," % name,
+                      "        texture = WorldItems/%s%s," % (PREFIX, name),
+                      "        translate = 0.0 0.0 0.0,",
+                      "        rotate = 0.0 %g 0.0," % yaw,
+                      "        scale = %.4f," % SPRITE_MODEL_SCALE,
+                      "    }"]
+    lines.append("}")
+    with open(SPRITE_MODELS_TXT, "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -667,7 +701,16 @@ def main():
         export(low, name, os.path.join(MESH_DIR, PREFIX + name + ".fbx"))
         print("model %s: %d faces, %d px texture" % (name, len(low.data.polygons), size))
         bpy.data.objects.remove(low)
-    models_txt(items.ITEMS)
+    for name in items.SPRITE_MODELS:
+        builder = items.SPRITE_MODELS[name]["model"]
+        size = SPRITE_MODEL_TEXTURE_SIZE
+        low, colour, _ = build_baked(stage, builder, name, size, to_ground=True, light=False)
+        save_texture(os.path.join(TEXTURE_DIR, PREFIX + name + ".png"), colour)
+        export(low, name, os.path.join(MESH_DIR, PREFIX + name + ".fbx"))
+        print("sprite model %s: %d faces, %d px texture" % (name, len(low.data.polygons), size))
+        bpy.data.objects.remove(low)
+    models_txt(items.ITEMS, items.SPRITE_MODELS)
+    sprite_models_txt(items.SPRITE_MODELS)
     build_vehicles(stage)
 
 

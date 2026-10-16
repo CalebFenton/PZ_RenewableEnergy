@@ -35,7 +35,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 TILESET = "renewable_energy_01"
-COLUMNS, ROWS = 8, 33
+COLUMNS, ROWS = 8, 34
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -93,6 +93,12 @@ def built_in_place(name, container, capacity, material, material2, **props):
             "PickUpWeight": "400", "BlocksPlacement": "", "solidtrans": "", **props}
 
 
+def wind_charger(name, material, material2):
+    """A wind charger: built in place and scrapped there like a digester, but it holds nothing."""
+    return {"IsMoveAble": "", "CustomName": name, "Material": material, "Material2": material2, "CanScrap": "",
+            "PickUpWeight": "400", "BlocksPlacement": ""}
+
+
 TILES = {
     0: panel("Flat", "SolarFlat", 2, RenderLayer="Floor", IsLow=""),
     # Sits on the generator's square, which a floor rug's move type allows.
@@ -121,6 +127,7 @@ TILES = {
     250: built_in_place("Primitive Gasifier", "Gasifier", 8, "SmallMetalPlates", "MetalPipe"),
     251: built_in_place("Gasifier", "Gasifier", 20, "MetalPlates", "MetalPipe"),
     252: built_in_place("Advanced Gasifier", "Gasifier", 30, "MetalPlates", "MetalBars"),
+    264: wind_charger("Scoop Rotor Wind Charger", "MetalPlates", "MetalPipe"),
 }
 for material, first_wall, first_rack in (("Metal", 1, 3), ("Wood", 21, 24)):
     for offset, facing in enumerate("SE"):

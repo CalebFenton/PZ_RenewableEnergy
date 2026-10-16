@@ -1,6 +1,6 @@
 module RenewableEnergy
 {
-    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel. */
+    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel, then the sprite models' models. */
     model SolarModule_Ground
     {
         mesh = WorldItems/RenewableEnergy_SolarModule,
@@ -251,6 +251,18 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_FemaPamphlet,
         texture = WorldItems/RenewableEnergy_FemaPamphlet,
+        scale = 1,
+    }
+    model TreadmillMotor_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_TreadmillMotor,
+        texture = WorldItems/RenewableEnergy_TreadmillMotor,
+        scale = 1,
+    }
+    model ScoopRotor
+    {
+        mesh = WorldItems/RenewableEnergy_ScoopRotor,
+        texture = WorldItems/RenewableEnergy_ScoopRotor,
         scale = 1,
     }
 }

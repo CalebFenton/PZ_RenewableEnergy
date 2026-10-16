@@ -2,8 +2,8 @@
 # Rebuilds every model, texture, icon and tile of the mod, with Blender (made with 5.2) but for the
 # mod list icon, from the parts in items.py and the tile layout in tiles.py:
 #
-#   models.py    ground models and their baked textures (common/media/models_X and textures/
-#                WorldItems) and scripts/RenewableEnergy/Models.txt
+#   models.py    ground and sprite models and their baked textures (common/media/models_X and
+#                textures/WorldItems), scripts/RenewableEnergy/Models.txt and SpriteModels.txt
 #   render.py    tile sprites (tools/tiles), their depth map (common/media/depthmaps), the
 #                32 x 32 item icons and the 48 x 48 build-menu icons (tools/textures)
 #   mod_icon.py  the mod list icon, drawn pixel by pixel with Pillow (the poster and the Workshop
