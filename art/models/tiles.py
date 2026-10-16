@@ -110,3 +110,26 @@ for item, base, first_batteries, first_meter in STORAGE_TILES:
             TILES[first_battery + slot] = _battery_overlay(build, at, slot, look)
     for level in range(1, 6):
         TILES[first_meter + level - 1] = _overlay(build, at, meter_level=level)
+
+# Biogas digesters: a base tile each, then their gas holders' overlays. A barrel's holder overlays
+# fit the steel and the plastic barrel alike, which share one outline. Level n of a holder shows
+# it that full, from slack to taut; the insulated digester's shows its floating drum risen to n.
+TILES[228] = [layer(items.barrel_digester)]
+TILES[229] = [layer(items.barrel_digester, plastic=True)]
+TILES[230] = [layer(items.insulated_digester)]
+TILES[231] = [layer(items.dome_digester)]
+for holder, first in (("bags", 232), ("tarp", 236)):
+    for fill in (1, 2, 3):
+        TILES[first + fill - 1] = _overlay(items.barrel_digester, (0, 0, 0), holder=holder, fill=fill)
+    TILES[first + 3] = _overlay(items.barrel_digester, (0, 0, 0), holder=holder, torn=True)
+for level in range(1, 5):
+    TILES[239 + level] = _overlay(items.insulated_digester, (0, 0, 0), level=level)
+
+# Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
+# working, its holder full.
+BUILD_ICONS = {
+    "BarrelDigesterSteel": [layer(items.barrel_digester, holder="bags")],
+    "BarrelDigesterPlastic": [layer(items.barrel_digester, plastic=True, holder="tarp")],
+    "InsulatedDigester": [layer(items.insulated_digester, level=3)],
+    "BrickDome": [layer(items.dome_digester)],
+}

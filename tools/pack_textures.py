@@ -8,9 +8,9 @@
     tools/pack_textures.py
 
 art/models/make.sh runs it after rendering. It packs every PNG in tools/tiles (the tile sprites)
-and tools/textures (the item icons) onto one fresh atlas page, so a deleted source leaves no stale
-sprite behind. It needs uv (https://docs.astral.sh/uv/), which brings Pillow. The pack format is
-dev/harness/check/packs.py's, which the static check reads packs with.
+and tools/textures (the item and build-menu icons) onto one fresh atlas page, so a deleted source
+leaves no stale sprite behind. It needs uv (https://docs.astral.sh/uv/), which brings Pillow. The
+pack format is dev/harness/check/packs.py's, which the static check reads packs with.
 
 The game knows a packed sprite by its bare name, globally. So a sprite named after the file it
 replaces resolves with no code change, `Icon = X` finds Item_X, and every name carries the mod's

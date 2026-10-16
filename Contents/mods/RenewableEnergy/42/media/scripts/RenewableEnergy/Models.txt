@@ -211,4 +211,10 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_HomesteadPowerMag2,
         scale = 1,
     }
+    model WoodAsh_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_WoodAsh,
+        texture = WorldItems/RenewableEnergy_WoodAsh,
+        scale = 1,
+    }
 }

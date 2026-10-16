@@ -86,6 +86,26 @@ local function fillTiles()
     return fill
 end
 
+-- Each digester bare, then with each of its holder's overlays, a row to a digester from the back.
+local function digesterTiles()
+    local list, holder = {}, Sprites.digesterHolder
+    local barrelHolders = { holder.bags[1], holder.bags[2], holder.bags[3], holder.bagsTorn, holder.tarp[1],
+        holder.tarp[2], holder.tarp[3], holder.tarpTorn }
+    local rows = {
+        { sprite = Sprites.digester.barrel.steel, overlays = barrelHolders },
+        { sprite = Sprites.digester.barrel.plastic, overlays = barrelHolders },
+        { sprite = Sprites.digester.insulated, overlays = holder.drum },
+    }
+    for row, digester in ipairs(rows) do
+        table.insert(list, { x = 0, y = row * 2 - 1, sprite = digester.sprite })
+        for i, overlay in ipairs(digester.overlays) do
+            table.insert(list, { x = i, y = row * 2 - 1, sprite = digester.sprite, overlays = { overlay } })
+        end
+    end
+    table.insert(list, { x = 6, y = 5, sprite = Sprites.digester.dome })
+    return list
+end
+
 -- Where the character stands for each shot, and how far it zooms out from the closest zoom. For
 -- the tiles it stands in front of a wall panel, which the depth map must draw behind it.
 local SHOTS = {
@@ -95,6 +115,7 @@ local SHOTS = {
     fill = { name = "art_fill", x = 6, y = 12, zoomSteps = 3 },
     trailer = { name = "art_trailer", x = 8, y = 7, zoomSteps = 2 },
     trailerFront = { name = "art_trailer_front", x = 3, y = 6, zoomSteps = 2 },
+    digesters = { name = "art_digesters", x = 5, y = 8, zoomSteps = 2 },
 }
 
 -- Damage stage 1 is a condition from 40 to 59, stage 2 below 40 (BaseVehicle.doDamageOverlay).
@@ -464,7 +485,7 @@ local function addCrackedShot(steps, player, lot)
     addShot(steps, player, lot, CRACKED_SHOT)
 end
 
--- The tile, overlay, item, icon and fill shots, each on the lot cleared of the one before.
+-- The tile, overlay, item, icon, fill and digester shots, each on the lot cleared of the one before.
 local function addTileAndItemShots(steps, player, lot)
     local iconSheet = IconSheet:new()
     table.insert(steps, function()
@@ -495,6 +516,11 @@ local function addTileAndItemShots(steps, player, lot)
         placeTiles(lot, fillTiles())
     end)
     addShot(steps, player, lot, SHOTS.fill)
+    table.insert(steps, function()
+        clearLot(lot)
+        placeTiles(lot, digesterTiles())
+    end)
+    addShot(steps, player, lot, SHOTS.digesters)
 end
 
 -- The trailer hitched to its car, then the rear in each of its states. `art.pair` holds the pair

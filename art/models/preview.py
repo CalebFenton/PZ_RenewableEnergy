@@ -6,6 +6,7 @@
   sides.
 - tiles.png: every tile at four times its size on a floor diamond, overlays drawn over their base.
 - icons.png: every icon at four times its size.
+- build_icons.png: every build-menu icon at four times its size.
 
 Writes to PREVIEWS (default $TMPDIR/renewable-energy-previews) and prints the folder.
 """
@@ -81,6 +82,9 @@ def icon_sheet():
     cells = [enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/Item_RenewableEnergy_%s.png" % name)), 4)
              for name in items.ITEMS]
     kit.save_pixels(os.path.join(OUT, "icons.png"), grid(cells, 8, 136, 136))
+    cells = [enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/RenewableEnergy_Build_%s.png" % name)), 4)
+             for name in tiles.BUILD_ICONS]
+    kit.save_pixels(os.path.join(OUT, "build_icons.png"), grid(cells, 4, 200, 200))
 
 
 def model_sheet():

@@ -1,10 +1,12 @@
-"""Renders the tile sprites, their depth map and the inventory icons from the models in items.py.
+"""Renders the tile sprites, their depth map, the inventory icons and the build-menu icons from the
+models in items.py.
 
     blender -b --factory-startup -P art/models/render.py [-- tiles|icons ...]
 
 Tiles go to tools/tiles as whole 128 x 256 cells, which tools/pack_textures.py trims and packs.
-Icons go to tools/textures as Item_RenewableEnergy_<Item>.png, 32 x 32 like the game's own.
-The depth map goes to common/media/depthmaps.
+Icons go to tools/textures as Item_RenewableEnergy_<Item>.png, 32 x 32 like the game's own, and
+the build-menu icons of tiles.BUILD_ICONS as RenewableEnergy_Build_<Name>.png, 48 x 48 like the
+game's Build_ icons in UI2.pack. The depth map goes to common/media/depthmaps.
 
 The projection is the game's (TileDepthTexture, TileGeometryUtils): an orthographic camera 30
 degrees above the horizon looking north-west, a tile floor 128 x 64 pixels, so 64 * sqrt(2)
@@ -39,7 +41,8 @@ COLUMNS = 8  # the game reads tilesets and their depth maps eight tiles wide
 PIXELS_PER_METRE = 64 * math.sqrt(2)
 STOREY = 2.44949
 ICON_SIZE = 32
-ICON_RENDER = 256  # rendered larger, then averaged down, so edges stay clean
+BUILD_ICON_SIZE = 48
+ICON_OVERSAMPLE = 8  # rendered larger, then averaged down, so edges stay clean
 
 
 def view_direction(elevation=30.0):
@@ -196,7 +199,7 @@ def render_tiles(camera, stage):
 # Icons --------------------------------------------------------------------------------------------
 
 
-def icon_camera(camera, stage, elevation):
+def icon_camera(camera, stage, elevation, icon_size):
     direction = view_direction(elevation)
     rotation = direction.to_track_quat("-Z", "Y")
     right, up = rotation @ Vector((1, 0, 0)), rotation @ Vector((0, 1, 0))
@@ -205,16 +208,16 @@ def icon_camera(camera, stage, elevation):
     along = [p.dot(up) for p in points]
     size = max(max(across) - min(across), max(along) - min(along))
     centre = right * (max(across) + min(across)) / 2 + up * (max(along) + min(along)) / 2
-    aim(camera, direction, centre, size * ICON_RENDER / (ICON_RENDER - 3 * ICON_RENDER / ICON_SIZE))
+    aim(camera, direction, centre, size * icon_size / (icon_size - 3))
 
 
-def pixel_icon(pixels):
-    """Averages a large render down to ICON_SIZE and draws the game's dark outline: vanilla icons
+def pixel_icon(pixels, size):
+    """Averages a large render down to `size` and draws the game's dark outline: vanilla icons
     are pixel art with a solid silhouette whose edge pixels are a dark shade of the object."""
-    factor = pixels.shape[0] // ICON_SIZE
+    factor = pixels.shape[0] // size
     alpha = pixels[..., 3:4]
-    blocks = (pixels[..., :3] * alpha).reshape(ICON_SIZE, factor, ICON_SIZE, factor, 3).mean(axis=(1, 3))
-    coverage = alpha.reshape(ICON_SIZE, factor, ICON_SIZE, factor).mean(axis=(1, 3))
+    blocks = (pixels[..., :3] * alpha).reshape(size, factor, size, factor, 3).mean(axis=(1, 3))
+    coverage = alpha.reshape(size, factor, size, factor).mean(axis=(1, 3))
     colour = blocks / np.maximum(coverage, 1e-4)[..., None]
     # A little more contrast and saturation, as the hand-drawn icons have.
     grey = colour.mean(axis=2, keepdims=True)
@@ -224,25 +227,33 @@ def pixel_icon(pixels):
     padded = np.pad(solid, 1, constant_values=False)
     edge = solid & ~(padded[:-2, 1:-1] & padded[2:, 1:-1] & padded[1:-1, :-2] & padded[1:-1, 2:])
     colour[edge] = colour[edge] * 0.28
-    out = np.zeros((ICON_SIZE, ICON_SIZE, 4), dtype=np.float32)
+    out = np.zeros((size, size, 4), dtype=np.float32)
     out[..., :3] = colour
     out[..., 3] = solid
     return out
 
 
+def render_icon(camera, stage, layers, elevation, size, path):
+    kit.clear(stage)
+    build(stage, layers)
+    icon_camera(camera, stage, elevation, size)
+    raw = os.path.join(SCRATCH, "icon.png")
+    render(raw, size * ICON_OVERSAMPLE, size * ICON_OVERSAMPLE)
+    kit.save_pixels(path, pixel_icon(kit.load_pixels(raw), size))
+
+
 def render_icons(camera, stage):
-    # Only item icons: an item that's gone leaves no icon behind.
+    # Only this script's icons: an item or build icon that's gone leaves none behind.
     for stale in os.listdir(ICON_DIR):
-        if stale.startswith("Item_RenewableEnergy_"):
+        if stale.startswith(("Item_RenewableEnergy_", "RenewableEnergy_Build_")):
             os.remove(os.path.join(ICON_DIR, stale))
     for name, spec in items.ITEMS.items():
-        kit.clear(stage)
-        build(stage, [tiles.layer(spec.get("icon", spec["model"]))])
-        icon_camera(camera, stage, spec.get("icon_elevation", 30))
-        raw = os.path.join(SCRATCH, "icon_%s.png" % name)
-        render(raw, ICON_RENDER, ICON_RENDER)
-        kit.save_pixels(os.path.join(ICON_DIR, "Item_RenewableEnergy_%s.png" % name), pixel_icon(kit.load_pixels(raw)))
+        render_icon(camera, stage, [tiles.layer(spec.get("icon", spec["model"]))], spec.get("icon_elevation", 30), ICON_SIZE,
+                    os.path.join(ICON_DIR, "Item_RenewableEnergy_%s.png" % name))
         print("icon %s" % name)
+    for name, layers in tiles.BUILD_ICONS.items():
+        render_icon(camera, stage, layers, 30, BUILD_ICON_SIZE, os.path.join(ICON_DIR, "RenewableEnergy_Build_%s.png" % name))
+        print("build icon %s" % name)
 
 
 def main():
