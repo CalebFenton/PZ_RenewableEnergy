@@ -63,12 +63,12 @@ end
 function Commands.connectSource(player, args)
     local bank = bankAt(args.bank)
     local source = sourceAt(args.source)
-    if not (bank and source) then return false, "no bank or panel" end
+    if not (bank and source) then return false, "no bank or source" end
     local x, y, z = source:getX(), source:getY(), source:getZ()
     if not (source:getSquare():isOutside() and PowerBank.isInReach(bank, x, y, z)) then
         return false, "out of reach"
     end
-    -- A panel feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
+    -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
     -- snow and all.
     local previous = bankOfSource(args.source)
     if previous == bank then
@@ -76,26 +76,36 @@ function Commands.connectSource(player, args)
     end
     -- The container is the truth about the controllers, whatever filled it since the last pass.
     bank:recount()
-    if #bank.sources >= bank:panelSlots() then
-        return false, "Tooltip_RenewableEnergy_NoPanelSlot"
+    local kind = PowerBank.sourceKind(source)
+    if bank:slotsUsed() + PowerBank.slotsOf(kind) > bank:inputSlots() then
+        return false, "Tooltip_RenewableEnergy_NoInputSlot"
     end
     if previous then
         previous:removeSource(x, y, z)
         previous:sendStatus()
     end
-    -- Each module teaches a little the first time it is ever connected, and the record keeps
-    -- that, through moves between banks and with the module when it comes off its mount.
-    local modules = PowerBank.modulesOf(source, PowerBank.sourceKind(source))
-    local learned = 0
-    for _, module in ipairs(modules) do
-        if not module.connected then
-            module.connected = true
-            learned = learned + 1
+    if PowerBank.isWind(kind) then
+        -- A wind charger teaches its wiring the first time it is ever connected.
+        if not source:getModData()[PowerBank.CONNECTED_ONCE] then
+            source:getModData()[PowerBank.CONNECTED_ONCE] = true
+            source:transmitModData()
+            addXp(player, Perks.Electricity, Specs.connectXp * PowerBank.slotsOf(kind))
         end
-    end
-    if learned > 0 then
-        PowerBank.writeModules(source, modules)
-        addXp(player, Perks.Electricity, Specs.connectXp * learned)
+    else
+        -- Each module teaches a little the first time it is ever connected, and the record keeps
+        -- that, through moves between banks and with the module when it comes off its mount.
+        local modules = PowerBank.modulesOf(source, kind)
+        local learned = 0
+        for _, module in ipairs(modules) do
+            if not module.connected then
+                module.connected = true
+                learned = learned + 1
+            end
+        end
+        if learned > 0 then
+            PowerBank.writeModules(source, modules)
+            addXp(player, Perks.Electricity, Specs.connectXp * learned)
+        end
     end
     bank:addSource(source)
     bank:sendStatus()
@@ -117,6 +127,21 @@ function Commands.clearSnow(player, args)
     if not source then return false, "not connected" end
     bank:clearSnow(source, sourceAt(args.source))
     bank:sendStatus()
+    return true
+end
+
+-- Brakes a wind charger, or lets it go. One on no bank keeps the brake on its object.
+function Commands.setBrake(player, args)
+    local object = sourceAt(args.source)
+    if not (object and PowerBank.isWind(PowerBank.sourceKind(object))) then return false, "no wind charger" end
+    local bank = bankOfSource(args.source)
+    local source = bank and bank:findSource(args.source.x, args.source.y, args.source.z)
+    if source then
+        bank:setBrake(source, args.braked == true, object)
+        bank:sendStatus()
+    else
+        PowerBank.setBraked(object, args.braked == true)
+    end
     return true
 end
 

@@ -368,7 +368,7 @@ test("renewable_energy_power_panel_slots", {
     validate = function(self)
         local box = self.boxPanels
         expect(box[1].connected and box[2].connected, "a battery box refused its first two panels")
-        expect(not box[3].connected and box[3].reason == "Tooltip_RenewableEnergy_NoPanelSlot",
+        expect(not box[3].connected and box[3].reason == "Tooltip_RenewableEnergy_NoInputSlot",
             "a battery box took a third panel without a controller (" .. tostring(box[3].reason) .. ")")
         local connected = 0
         for _, panel in ipairs(self.rackPanels) do
@@ -376,7 +376,7 @@ test("renewable_energy_power_panel_slots", {
         end
         expectNear("panels a battery rack with a controller took", connected, 3, 0)
         local status = self.rack.state.status
-        local slots, second, third = status.panelSlots, status.sources[2], status.sources[3]
+        local slots, second, third = status.inputSlots, status.sources[2], status.sources[3]
         if not expect(third ~= nil, "the third panel was disconnected when the controller left") then return end
         expect(slots.used == 3 and slots.total == 2, "panel slots read " .. slots.used .. " of " .. slots.total)
         expect(third.watts == 0 and third.reason == "noController",
@@ -1321,7 +1321,7 @@ test("renewable_energy_power_reconnecting_a_panel_keeps_it", {
                 .. reply.state.sources .. " panels")
             expectNear("snow on a panel connected again to " .. what .. " it feeds", snowOn(reply.state, self.panel) or -1, 0.8, 0)
         end
-        expect(self.full.reason ~= "Tooltip_RenewableEnergy_NoPanelSlot",
+        expect(self.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
             "a full bank turned its own panel away for want of a slot")
     end,
 })

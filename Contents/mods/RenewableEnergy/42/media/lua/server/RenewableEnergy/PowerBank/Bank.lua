@@ -1,6 +1,6 @@
 -- One battery bank on the authority (single player or the server): its batteries, inverters,
--- chargers, controllers, panels and backup generator, and the energy that moves between them
--- each pass.
+-- chargers, controllers, panels, wind chargers and backup generator, and the energy that moves
+-- between them each pass.
 --
 -- The table is the bank's global object (SGlobalObject), so every field named in
 -- SAVED_FIELDS is saved with the world and kept while the chunk is unloaded. While loaded,
@@ -16,6 +16,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
+require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -23,7 +24,7 @@ require "RenewableEnergy/GasLine/GasKit"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
 
 RenewableEnergy = RenewableEnergy or {}
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
+local Specs, Sprites, Sun, Wind = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.Wind
 local Battery, Wear, PowerBank = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
 
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
@@ -35,7 +36,7 @@ Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
     "inverters", "chargers", "controllers", "sources", "loadW", "averageLoadW", "loadByKind", "chargeSource",
     "generator", "lastHour", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
-    "solarWhToday", "loadWhToday", "empty",
+    "solarWhToday", "loadWhToday", "empty", "windWhToday",
 }
 
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
@@ -82,6 +83,7 @@ function Bank:initNew()
     self.pendingDepths = {}
     self.pendingPartWear = { hours = 0, overloads = 0 }
     self.solarWhToday = 0
+    self.windWhToday = 0
     self.loadWhToday = 0
     self.empty = false
     self.lastHour = getGameTime():getWorldAgeHours()
@@ -237,15 +239,24 @@ function Bank:chargerW()
     return watts
 end
 
---- How many panels the bank takes: a few on their own, and more for each working controller.
-function Bank:panelSlots()
-    local slots = Specs.freePanels
+--- How many input slots the bank has: a few on their own, and more for each working controller.
+function Bank:inputSlots()
+    local slots = Specs.freeSlots
     for _, controller in ipairs(self.controllers) do
         if working(controller) then
-            slots = slots + Specs.panelsPerController
+            slots = slots + Specs.slotsPerController
         end
     end
     return slots
+end
+
+--- The input slots its sources take.
+function Bank:slotsUsed()
+    local used = 0
+    for _, source in ipairs(self.sources) do
+        used = used + PowerBank.slotsOf(source.kind)
+    end
+    return used
 end
 
 -- Inverters and controllers wear while they work, and an overload strains the inverters.
@@ -314,11 +325,23 @@ end
 
 function Bank:addSource(isoObject)
     local kind, facing, material = PowerBank.sourceKind(isoObject)
-    table.insert(self.sources, {
-        x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(),
-        kind = kind, facing = facing, material = material, snow = 0, watts = 0,
-        modules = PowerBank.modulesOf(isoObject, kind),
-    })
+    local source = { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(), kind = kind, watts = 0 }
+    if PowerBank.isWind(kind) then
+        source.braked = PowerBank.isBraked(isoObject)
+        source.shelter = Wind.shelterAt(source.x, source.y, source.z)
+    else
+        source.facing, source.material, source.snow = facing, material, 0
+        source.modules = PowerBank.modulesOf(isoObject, kind)
+    end
+    table.insert(self.sources, source)
+end
+
+--- Brakes the wind charger `source` (on `object` when loaded) or lets it go.
+function Bank:setBrake(source, braked, object)
+    source.braked = braked
+    if object then
+        PowerBank.setBraked(object, braked)
+    end
 end
 
 function Bank:removeSource(x, y, z)
@@ -455,12 +478,57 @@ local function lowReason(source, inSlot, light, clearLight, condition, context)
     return reason
 end
 
---- Panel output over the pass. A panel whose square is loaded is checked for still being
---- there and outdoors; one that is gone is dropped. Panels past the bank's slots stay wired
---- and make nothing.
+-- A panel's output over the pass, and why it is low.
+local function panelWatts(source, object, inSlot, hours, context)
+    if Bank.stormCrack(source, context.stormHours) then
+        source.modulesChanged = true
+    end
+    if object then
+        syncModules(source, object)
+    end
+    updateSnow(source, hours, context)
+    if object then
+        showSnow(object, source)
+    end
+    local light = context.irradiance(source.kind, source.facing)
+    local clearLight = context.clearIrradiance(source.kind, source.facing)
+    local now, best = sourceWatts(source)
+    source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
+    source.fullSunPct = math.floor(100 * light * (1 - source.snow) / Sun.FULL_SUN + 0.5)
+    source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
+end
+
+-- A wind charger's output over the pass, and why it makes nothing or little: braked, calm, or
+-- sheltered. Its brake is the object's while it is loaded (the menu sets both), and its shelter is
+-- counted again then, since the trees and buildings around it change.
+local function windWatts(source, object, inSlot, context)
+    if object then
+        source.braked = PowerBank.isBraked(object)
+        source.shelter = Wind.shelterAt(source.x, source.y, source.z)
+    end
+    local spec = Specs.wind.turbines[source.kind]
+    local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0)
+    source.windKph = math.floor(context.windKph + 0.5)
+    source.watts = (inSlot and not source.braked) and watts or 0
+    if not inSlot then
+        source.reason = "noController"
+    elseif source.braked then
+        source.reason = "braked"
+    elseif context.windKph <= spec.cutInKph then
+        source.reason = "calm"
+    elseif (source.shelter or 0) * Specs.wind.shelterLoss > 1 - LOW_SHARE then
+        source.reason = "sheltered"
+    else
+        source.reason = nil
+    end
+end
+
+--- Panel and wind charger output over the pass, as solar and wind watts. A source whose square is
+--- loaded is checked for still being there and outdoors; one that is gone is dropped. Sources
+--- past the bank's input slots stay wired and make nothing.
 function Bank:updateSources(hours, context)
-    local solarW, slots = 0, self:panelSlots()
-    -- A dropped panel gives its place in the list, and so its slot, to the next one.
+    local solarW, windW, slots, used = 0, 0, self:inputSlots(), 0
+    -- A dropped source gives its place in the list, and so its slots, to the next one.
     local i = 1
     while i <= #self.sources do
         local source = self.sources[i]
@@ -469,28 +537,19 @@ function Bank:updateSources(hours, context)
         if square and not (object and square:isOutside() and PowerBank.isInReach(self, source.x, source.y, source.z)) then
             table.remove(self.sources, i)
         else
-            if Bank.stormCrack(source, context.stormHours) then
-                source.modulesChanged = true
+            used = used + PowerBank.slotsOf(source.kind)
+            local inSlot = used <= slots
+            if PowerBank.isWind(source.kind) then
+                windWatts(source, object, inSlot, context)
+                windW = windW + source.watts
+            else
+                panelWatts(source, object, inSlot, hours, context)
+                solarW = solarW + source.watts
             end
-            if object then
-                syncModules(source, object)
-            end
-            updateSnow(source, hours, context)
-            if object then
-                showSnow(object, source)
-            end
-            local light = context.irradiance(source.kind, source.facing)
-            local clearLight = context.clearIrradiance(source.kind, source.facing)
-            local now, best = sourceWatts(source)
-            local inSlot = i <= slots
-            source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
-            source.fullSunPct = math.floor(100 * light * (1 - source.snow) / Sun.FULL_SUN + 0.5)
-            source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
-            solarW = solarW + source.watts
             i = i + 1
         end
     end
-    return solarW
+    return solarW, windW
 end
 
 -- Backup generator -----------------------------------------------------------------------
@@ -696,6 +755,7 @@ function Bank:newDay(container, day)
         self.cycleHigh = self.charge
         self.cycleDepth = 0
         self.solarWhToday = 0
+        self.windWhToday = 0
         self.loadWhToday = 0
     end
     self.day = day
@@ -726,7 +786,8 @@ function Bank:update(hours, context)
     local container = isoObject and isoObject:getContainer()
     self:recount()
 
-    local solarW = self:updateSources(hours, context)
+    local solarW, windW = self:updateSources(hours, context)
+    local sourcesW = solarW + windW
     self:updateGenerator()
     local generators = self:measure()
     if self:checkOverload() then
@@ -736,10 +797,10 @@ function Bank:update(hours, context)
     local drawW = self:drawW()
     local capacity = self.nominalWh
     local before = self.charge * capacity
-    -- The chargers fill what the sun and the load leave; with no batteries there is nothing to fill.
-    local roomWh = capacity > 0 and capacity - before - (solarW - drawW) * hours or 0
+    -- The chargers fill what the sources and the load leave; with no batteries there is nothing to fill.
+    local roomWh = capacity > 0 and capacity - before - (sourcesW - drawW) * hours or 0
     local chargerW = self:chargeFrom(generators, hours, roomWh)
-    local inW = solarW + chargerW
+    local inW = sourcesW + chargerW
     local stored = math.max(0, math.min(capacity, before + (inW - drawW) * hours))
     self.charge = capacity > 0 and stored / capacity or 0
     -- An empty bank's inverters cut out, and come back once a pass of load is stored, so
@@ -755,6 +816,7 @@ function Bank:update(hours, context)
     end
 
     self.solarWhToday = self.solarWhToday + solarW * hours
+    self.windWhToday = (self.windWhToday or 0) + windW * hours
     self.loadWhToday = self.loadWhToday + (powering and self.averageLoadW or 0) * hours
     self:trackCycle()
     self:newDay(container, today())
@@ -765,8 +827,8 @@ function Bank:update(hours, context)
     self:switchGenerator()
     self:showBatteries()
 
-    self.now = { solarW = solarW, chargerW = chargerW, drawW = drawW,
-        irradiance = context.irradiance("flat"), elevation = context.elevation }
+    self.now = { solarW = solarW, windW = windW, chargerW = chargerW, drawW = drawW,
+        irradiance = context.irradiance("flat"), elevation = context.elevation, windKph = context.windKph }
     self:sendStatus()
 end
 
@@ -830,15 +892,22 @@ end
 function Bank:sourceStatus()
     local sources = {}
     for _, source in ipairs(self.sources) do
-        local modules = {}
-        for _, module in ipairs(source.modules) do
-            table.insert(modules, { type = module.type, condition = module.condition })
+        local entry = {
+            x = source.x, y = source.y, z = source.z, kind = source.kind, watts = source.watts or 0,
+            reason = source.reason,
+        }
+        if PowerBank.isWind(source.kind) then
+            entry.braked, entry.windKph = source.braked == true, source.windKph or 0
+            entry.shelterPct = math.floor(100 * (source.shelter or 0) + 0.5)
+        else
+            local modules = {}
+            for _, module in ipairs(source.modules) do
+                table.insert(modules, { type = module.type, condition = module.condition })
+            end
+            entry.material, entry.facing, entry.fullSunPct = source.material, source.facing, source.fullSunPct or 0
+            entry.snow, entry.modules = source.snow or 0, modules
         end
-        table.insert(sources, {
-            x = source.x, y = source.y, z = source.z, kind = source.kind, material = source.material,
-            facing = source.facing, watts = source.watts or 0, fullSunPct = source.fullSunPct or 0,
-            reason = source.reason, snow = source.snow or 0, modules = modules,
-        })
+        table.insert(sources, entry)
     end
     return sources
 end
@@ -859,7 +928,7 @@ function Bank:buildStatus()
     local now = self.now or {}
     local capacity = self.nominalWh
     local stored = self.charge * capacity
-    local inW = (now.solarW or 0) + (now.chargerW or 0)
+    local inW = (now.solarW or 0) + (now.windW or 0) + (now.chargerW or 0)
     local drawW = now.drawW or 0
     local batteries = partStatus(self.batteries, function(entry, part)
         entry.fullType, entry.nominalWh, entry.charge = part.type, part.nominalWh, self.charge
@@ -879,14 +948,15 @@ function Bank:buildStatus()
         hour = getGameTime():getWorldAgeHours(),
         sunElevation = now.elevation or 0,
         irradiance = now.irradiance or 0,
-        solarW = now.solarW or 0, chargerW = now.chargerW or 0, chargeSource = chargeSource or nil, inW = inW,
-        solarWhToday = self.solarWhToday, loadWhToday = self.loadWhToday,
+        solarW = now.solarW or 0, windW = now.windW or 0, windKph = now.windKph or 0,
+        chargerW = now.chargerW or 0, chargeSource = chargeSource or nil, inW = inW,
+        solarWhToday = self.solarWhToday, windWhToday = self.windWhToday or 0, loadWhToday = self.loadWhToday,
         loadW = self.loadW, drawW = drawW, limitW = self:limitW(), overloaded = self.overloaded,
         loadByKind = self.loadByKind,
         storedWh = stored, capacityWh = capacity, charge = self.charge,
         charging = chargingStatus(inW - drawW, stored, capacity),
         cycleDepth = self.cycleDepth,
-        panelSlots = { used = #self.sources, total = self:panelSlots() },
+        inputSlots = { used = self:slotsUsed(), total = self:inputSlots() },
         inverters = partStatus(self.inverters),
         controllers = partStatus(self.controllers),
         chargers = chargers,
@@ -905,7 +975,8 @@ end
 function Bank:buildSummary()
     local sources = {}
     for _, source in ipairs(self.sources) do
-        table.insert(sources, { x = source.x, y = source.y, z = source.z, snowy = (source.snow or 0) > 0 or nil })
+        table.insert(sources, { x = source.x, y = source.y, z = source.z, kind = source.kind,
+            snowy = (source.snow or 0) > 0 or nil, braked = source.braked or nil })
     end
     return { bankType = self.bankType, name = self.name, on = self.on, limitW = self:limitW(), sources = sources }
 end

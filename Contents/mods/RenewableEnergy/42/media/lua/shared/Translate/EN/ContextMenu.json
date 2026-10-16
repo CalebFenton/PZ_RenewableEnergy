@@ -1,6 +1,6 @@
 {
     "ContextMenu_RenewableEnergy_Status": "Status",
-    "ContextMenu_RenewableEnergy_ConnectPanelsInReach": "Connect Panels in Reach (%1)",
+    "ContextMenu_RenewableEnergy_ConnectPanelsInReach": "Connect Sources in Reach (%1)",
     "ContextMenu_RenewableEnergy_ConnectPanel": "Connect to %1 (%2)",
     "ContextMenu_RenewableEnergy_ConnectToBank": "Connect to a Battery Bank",
     "ContextMenu_RenewableEnergy_DisconnectPanel": "Disconnect",
@@ -43,5 +43,7 @@
     "ContextMenu_RenewableEnergy_PutOutGasifier": "Put Out Gasifier",
     "ContextMenu_RenewableEnergy_CleanOutAsh": "Clean Out Ash",
     "ContextMenu_RenewableEnergy_DrainCondensate": "Drain Condensate",
-    "ContextMenu_RenewableEnergy_OntoGround": "Onto the Ground"
+    "ContextMenu_RenewableEnergy_OntoGround": "Onto the Ground",
+    "ContextMenu_RenewableEnergy_Brake": "Set the Brake",
+    "ContextMenu_RenewableEnergy_ReleaseBrake": "Release the Brake"
 }

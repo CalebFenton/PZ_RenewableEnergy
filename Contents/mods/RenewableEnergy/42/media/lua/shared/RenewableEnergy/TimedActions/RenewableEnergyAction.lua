@@ -33,6 +33,8 @@ Action.ADD_BULB = "AddBulb"
 Action.CUT_PADLOCK = "CutPadlock"
 Action.BOARD_ON = "BoardOn"
 Action.BOARD_OFF = "BoardOff"
+Action.BRAKE = "Brake"
+Action.RELEASE_BRAKE = "ReleaseBrake"
 
 -- Jobs on the bank's wiring or a cracked panel, which need light to see by.
 local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true }
@@ -63,6 +65,10 @@ end
 
 local function isSource(object)
     return onSquare(object) and PowerBank.sourceKind(object) ~= nil
+end
+
+local function isWindCharger(object)
+    return isSource(object) and PowerBank.isWind(PowerBank.sourceKind(object))
 end
 
 local function isGardenLight(object)
@@ -173,6 +179,12 @@ local KEEPS = {
     [Action.BOARD_OFF] = function(self)
         return inWorld(self.vehicle)
     end,
+    [Action.BRAKE] = function(self)
+        return isWindCharger(self.object)
+    end,
+    [Action.RELEASE_BRAKE] = function(self)
+        return isWindCharger(self.object)
+    end,
 }
 
 -- The rest of each job's rules: the state of its target and its bank, which a multiplayer
@@ -230,6 +242,12 @@ local CHECKS = {
     [Action.BOARD_OFF] = function(self)
         local ArrowBoard = RenewableEnergy.ArrowBoard
         return ArrowBoard ~= nil and ArrowBoard.canSwitch(self.vehicle, false)
+    end,
+    [Action.BRAKE] = function(self)
+        return not PowerBank.isBraked(self.object)
+    end,
+    [Action.RELEASE_BRAKE] = function(self)
+        return PowerBank.isBraked(self.object)
     end,
 }
 
@@ -289,6 +307,12 @@ local COMMANDS = {
     [Action.RENAME] = function(self)
         return "rename", { bank = positionOf(self.bank), name = self.bankName }
     end,
+    [Action.BRAKE] = function(self)
+        return "setBrake", { source = positionOf(self.object), braked = true }
+    end,
+    [Action.RELEASE_BRAKE] = function(self)
+        return "setBrake", { source = positionOf(self.object), braked = false }
+    end,
 }
 
 -- In-game minutes of the jobs that skill doesn't speed up.
@@ -304,6 +328,9 @@ local MINUTES = {
     -- As long as vanilla's for a lamp's bulb at the default day length (ISLightActions).
     [Action.REMOVE_BULB] = 1,
     [Action.ADD_BULB] = 1,
+    -- A lever or pin at the foot of the mast.
+    [Action.BRAKE] = 1,
+    [Action.RELEASE_BRAKE] = 1,
 }
 
 -- The share of its full time a job takes at an Electricity level: all of it at level 3, less

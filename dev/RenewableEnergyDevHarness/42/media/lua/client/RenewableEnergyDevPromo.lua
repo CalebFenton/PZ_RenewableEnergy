@@ -1153,8 +1153,8 @@ local function logBanks()
             table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
         end
         print(string.format("REPromo %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
-            .. " %d of %d panel slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
-            table.concat(kinds, ", "), status.charge * 100, status.panelSlots.used, status.panelSlots.total,
+            .. " %d of %d input slots, panel reasons %s", name, status.state, status.inW, status.loadW, status.limitW,
+            table.concat(kinds, ", "), status.charge * 100, status.inputSlots.used, status.inputSlots.total,
             table.concat(reasons, ",")))
     end
 end

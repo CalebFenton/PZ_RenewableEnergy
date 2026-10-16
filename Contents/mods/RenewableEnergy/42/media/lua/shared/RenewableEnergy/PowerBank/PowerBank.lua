@@ -29,11 +29,18 @@ PowerBank.WIRED_ONCE = "RenewableEnergy_wiredOnce"
 -- connected }, ... }. mounted and connected say the module already taught the XP of its first
 -- mounting and its first connection to a bank, so moving modules around teaches nothing new.
 PowerBank.MODULES = "RenewableEnergy_modules"
--- Solar module item modData: the same two flags, while the module is off its mount.
+-- Solar module item modData: the same two flags, while the module is off its mount. A placed wind
+-- charger keeps CONNECTED_ONCE too.
 PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
 PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
+-- Placed wind charger modData: its brake is on.
+PowerBank.BRAKED = "RenewableEnergy_braked"
 
+-- Panels by mount, and wind chargers by kind (Specs.wind.turbines).
 local SOURCE_KINDS = { flat = true, wall = true, rack = true }
+for kind in pairs(Specs.wind.turbines) do
+    SOURCE_KINDS[kind] = true
+end
 
 -- Placed bank sprite to its Specs.banks row, and to the item it is.
 local BANKS_BY_SPRITE = {}
@@ -66,14 +73,33 @@ function PowerBank.bankOn(square)
     return RenewableEnergy.findObjectOn(square, PowerBank.isBank)
 end
 
---- The mount of a placed panel, "flat", "wall" or "rack", the way it faces and what it is made
---- of; nil for anything else.
+--- The kind of a placed source: a panel's mount, "flat", "wall" or "rack", the way it faces and
+--- what it is made of; or a wind charger's kind (Specs.wind.turbines). Nil for anything else.
 function PowerBank.sourceKind(isoObject)
     local kind, facing, material = Sprites.kindOf(Sprites.nameOf(isoObject))
     if SOURCE_KINDS[kind] then
         return kind, facing, material
     end
     return nil
+end
+
+function PowerBank.isWind(kind)
+    return kind ~= nil and Specs.wind.turbines[kind] ~= nil
+end
+
+--- The input slots a source of `kind` takes in a bank.
+function PowerBank.slotsOf(kind)
+    return Specs.sourceSlots[kind] or 1
+end
+
+function PowerBank.isBraked(isoObject)
+    return isoObject:getModData()[PowerBank.BRAKED] == true
+end
+
+--- Sets a placed wind charger's brake and sends it to clients. Authority only.
+function PowerBank.setBraked(isoObject, braked)
+    isoObject:getModData()[PowerBank.BRAKED] = braked or nil
+    isoObject:transmitModData()
 end
 
 local function isSource(object)

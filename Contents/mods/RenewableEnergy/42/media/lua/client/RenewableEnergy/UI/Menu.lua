@@ -220,8 +220,8 @@ local function forSquaresAround(center, radius, levels, fn)
     end
 end
 
---- Panels in the bank's reach that are not connected to it yet. This bank's summary says which
---- are, rather than asking every bank about every panel found.
+--- Panels and wind chargers in the bank's reach that are not connected to it yet. This bank's
+--- summary says which are, rather than asking every bank about every source found.
 function Menu.unconnectedSources(bank)
     local here = PowerBank.positionOf(bank)
     local reach = RenewableEnergy.Specs.sourceReach
@@ -301,6 +301,16 @@ local function addSnowOption(playerNum, menu, source, entry)
     end
 end
 
+-- A wind charger's brake, set or let go, connected or not.
+local function addBrakeOption(playerNum, menu, source)
+    if not PowerBank.isWind(PowerBank.sourceKind(source)) then
+        return
+    end
+    local braked = PowerBank.isBraked(source)
+    menu:addOption(getText(braked and "ContextMenu_RenewableEnergy_ReleaseBrake" or "ContextMenu_RenewableEnergy_Brake"),
+        playerNum, queueSource, braked and Action.RELEASE_BRAKE or Action.BRAKE, source)
+end
+
 function Menu.addSourceOptions(playerNum, context, source)
     local menu = addSubMenu(context, Menu.nameOf(source))
 
@@ -311,6 +321,7 @@ function Menu.addSourceOptions(playerNum, context, source)
         menu:addOption(getText("ContextMenu_RenewableEnergy_DisconnectPanel"), playerNum, queueSource, Action.DISCONNECT_SOURCE, source)
         addSnowOption(playerNum, menu, source, sourceSummary(connected, source))
     end
+    addBrakeOption(playerNum, menu, source)
 
     local offered = 0
     for _, bankPosition in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ())) do

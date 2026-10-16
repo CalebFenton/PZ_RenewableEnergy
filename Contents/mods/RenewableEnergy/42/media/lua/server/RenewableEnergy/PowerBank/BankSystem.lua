@@ -136,7 +136,7 @@ function BankSystem:OnObjectAdded(isoObject)
         makeBank(isoObject:getSquare(), name, isoObject:getObjectIndex(), isoObject)
     elseif PowerBank.isBank(isoObject) then
         self:loadIsoObject(isoObject)
-    elseif PowerBank.sourceKind(isoObject) then
+    elseif PowerBank.sourceKind(isoObject) and not PowerBank.isWind(PowerBank.sourceKind(isoObject)) then
         -- Placing a mount, rotating it (picked up and placed again) and world spawns all land
         -- here, with the modules the item carried.
         PowerBank.showCracks(isoObject)
@@ -283,6 +283,7 @@ function BankSystem.passContext(hours)
         precipitation = climate:getPrecipitationIntensity(),
         airC = climate:getTemperature(),
         elevation = Sun.elevation(),
+        windKph = climate:getWindspeedKph(),
         stormHours = Bank.stormHours(hours),
         irradiance = averaged(weather),
         clearIrradiance = averaged(Sun.CLEAR_WEATHER),

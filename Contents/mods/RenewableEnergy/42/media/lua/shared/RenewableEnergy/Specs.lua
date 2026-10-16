@@ -36,10 +36,27 @@ Specs.inverterEfficiency = 0.9
 Specs.controller = "RenewableEnergy.ChargeController"
 Specs.charger = "Base.CarBatteryCharger"
 
--- Panels a bank takes without a charge controller, and how many more each working controller
--- adds.
-Specs.freePanels = 2
-Specs.panelsPerController = 7
+-- Input slots: what a bank takes without a charge controller, and how many more each working
+-- controller adds. Every source takes slots by what it can make (`sourceSlots`, by kind).
+Specs.freeSlots = 2
+Specs.slotsPerController = 7
+Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1 }
+
+-- Wind chargers by kind (RenewableEnergy.Wind): watts at the rated speed, the wind it starts
+-- turning in and the wind it makes its rating in, in km/h. The game's wind runs
+-- ClimateManager's windPower × 120, mostly 10 to 40 km/h, stronger in winter. The scoop rotor is
+-- weak and slow but takes any wind and never breaks.
+Specs.wind = {
+    turbines = {
+        scoop = { ratedW = 150, cutInKph = 8, ratedKph = 50 },
+    },
+    -- Each level it stands above the ground adds this share, up to maxBonusLevel.
+    heightBonusPerLevel = 0.15,
+    maxBonusLevel = 3,
+    -- Shelter counts the squares this far around; hemmed in all round, it loses this share.
+    shelterRadius = 8,
+    shelterLoss = 0.7,
+}
 
 -- Watts each Car Battery Charger wired into a bank puts in while grid or generator power
 -- reaches the bank.

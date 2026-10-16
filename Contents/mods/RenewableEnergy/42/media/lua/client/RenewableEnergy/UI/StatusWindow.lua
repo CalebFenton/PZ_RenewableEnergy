@@ -90,15 +90,15 @@ local function loadLine(status)
     return { text = getText("IGUI_RenewableEnergy_LoadOf", Format.watts(status.loadW), Format.watts(status.limitW)) }
 end
 
-local function panelSlotsLine(status)
-    local slots, controllers = status.panelSlots, #status.controllers
+local function inputSlotsLine(status)
+    local slots, controllers = status.inputSlots, #status.controllers
     local text
     if controllers == 0 then
-        text = getText("IGUI_RenewableEnergy_PanelSlots", slots.used, slots.total)
+        text = getText("IGUI_RenewableEnergy_InputSlots", slots.used, slots.total)
     elseif controllers == 1 then
-        text = getText("IGUI_RenewableEnergy_PanelSlotsOneController", slots.used, slots.total)
+        text = getText("IGUI_RenewableEnergy_InputSlotsOneController", slots.used, slots.total)
     else
-        text = getText("IGUI_RenewableEnergy_PanelSlotsControllers", slots.used, slots.total, controllers)
+        text = getText("IGUI_RenewableEnergy_InputSlotsControllers", slots.used, slots.total, controllers)
     end
     return { text = text, color = slots.used > slots.total and "bad" or nil }
 end
@@ -114,7 +114,7 @@ local STATE_LINES = {
 
 --- The summary lines for a status snapshot.
 function StatusWindow.summary(status)
-    local lines = { chargingLine(status), loadLine(status), panelSlotsLine(status) }
+    local lines = { chargingLine(status), loadLine(status), inputSlotsLine(status) }
     local state = STATE_LINES[status.state]
     if state then
         table.insert(lines, { text = getText(state.key), color = state.color })
@@ -147,6 +147,11 @@ local function powerRows(rows, status)
     end
     row(rows, getText("IGUI_RenewableEnergy_PanelsNow"), Format.watts(status.solarW))
     row(rows, getText("IGUI_RenewableEnergy_PanelsToday"), Format.wattHours(status.solarWhToday))
+    if status.windW > 0 or status.windWhToday > 0 then
+        row(rows, getText("IGUI_RenewableEnergy_WindNow"), getText("IGUI_RenewableEnergy_WindOutput",
+            Format.watts(status.windW), status.windKph))
+        row(rows, getText("IGUI_RenewableEnergy_WindToday"), Format.wattHours(status.windWhToday))
+    end
     if status.chargerW > 0 then
         row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
     end
@@ -273,7 +278,12 @@ local MOUNTS = {
     rackmetal = "IGUI_RenewableEnergy_MountRackMetal",
 }
 
--- Why a panel makes less than it could (Bank status `reason`), and whether the player can do
+-- Wind chargers by kind.
+local WIND_KINDS = {
+    scoop = "IGUI_RenewableEnergy_WindScoop",
+}
+
+-- Why a source makes less than it could (Bank status `reason`), and whether the player can do
 -- something about it.
 local REASONS = {
     night = { key = "IGUI_RenewableEnergy_ReasonNight" },
@@ -282,17 +292,26 @@ local REASONS = {
     snow = { key = "IGUI_RenewableEnergy_ReasonSnow", fixable = true },
     cracked = { key = "IGUI_RenewableEnergy_ReasonCracked", fixable = true },
     noController = { key = "IGUI_RenewableEnergy_ReasonNoController", fixable = true },
+    braked = { key = "IGUI_RenewableEnergy_ReasonBraked", fixable = true },
+    calm = { key = "IGUI_RenewableEnergy_ReasonCalm" },
+    sheltered = { key = "IGUI_RenewableEnergy_ReasonSheltered", fixable = true },
 }
 
---- "Wooden rack, 6 tiles north-east": a panel from Bank status `sources`, from the bank at `bank`.
+--- "Wooden rack, 6 tiles north-east": a panel or wind charger from Bank status `sources`, from
+--- the bank at `bank`.
 function StatusWindow.panelLabel(source, bank)
-    local mount = getText(MOUNTS[source.kind .. (source.material or "")] or MOUNTS.flat)
-    return getText("IGUI_RenewableEnergy_PanelWhere", mount, Format.away(bank, source))
+    local name = WIND_KINDS[source.kind] or MOUNTS[source.kind .. (source.material or "")] or MOUNTS.flat
+    return getText("IGUI_RenewableEnergy_PanelWhere", getText(name), Format.away(bank, source))
 end
 
---- "45 W, 64% sun, cloudy", and its color.
+--- "45 W, 64% sun, cloudy" or "30 W, 25 km/h", and its color.
 function StatusWindow.panelValue(source)
-    local value = getText("IGUI_RenewableEnergy_PanelOutput", Format.watts(source.watts), source.fullSunPct)
+    local value
+    if WIND_KINDS[source.kind] then
+        value = getText("IGUI_RenewableEnergy_WindOutput", Format.watts(source.watts), source.windKph)
+    else
+        value = getText("IGUI_RenewableEnergy_PanelOutput", Format.watts(source.watts), source.fullSunPct)
+    end
     local reason = REASONS[source.reason]
     if not reason then
         return value, nil

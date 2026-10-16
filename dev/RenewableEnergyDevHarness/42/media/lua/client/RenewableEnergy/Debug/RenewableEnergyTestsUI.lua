@@ -715,8 +715,8 @@ test("renewable_energy_ui_window_reflects_status", {
     end,
     validate = function(self)
         expect(self.withControllerSummary ~= nil and hasLine(self.withControllerSummary,
-            getText("IGUI_RenewableEnergy_PanelSlotsOneController", 3, Specs.freePanels + Specs.panelsPerController)),
-            "the slots line doesn't read 3 panels of " .. (Specs.freePanels + Specs.panelsPerController) .. " with 1 controller")
+            getText("IGUI_RenewableEnergy_InputSlotsOneController", 3, Specs.freeSlots + Specs.slotsPerController)),
+            "the slots line doesn't read 3 inputs of " .. (Specs.freeSlots + Specs.slotsPerController) .. " with 1 controller")
         local status = T.clientStatus(self.bank)
         if not expect(status ~= nil, "the bank sent no status") then return end
         local summary = StatusWindow.summary(status)
@@ -724,8 +724,8 @@ test("renewable_energy_ui_window_reflects_status", {
         local limit = Specs.inverters["RenewableEnergy.PlugInInverter"].watts
         expect(hasLine(summary, getText("IGUI_RenewableEnergy_Overloaded", Format.watts(load), Format.watts(limit))),
             "the window doesn't say the bank is overloaded with " .. load .. " W on " .. limit .. " W")
-        expect(hasLine(summary, getText("IGUI_RenewableEnergy_PanelSlots", 3, Specs.freePanels)),
-            "without its controller the slots line doesn't read 3 panels of " .. Specs.freePanels)
+        expect(hasLine(summary, getText("IGUI_RenewableEnergy_InputSlots", 3, Specs.freeSlots)),
+            "without its controller the slots line doesn't read 3 inputs of " .. Specs.freeSlots)
         local left, right = StatusWindow.rows(status, self.bank.position)
         local lights = rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
         expect(lights ~= nil and lights.value == Format.watts(2 * Specs.loads.light.watts), "the window doesn't list 2 lights and their watts")
