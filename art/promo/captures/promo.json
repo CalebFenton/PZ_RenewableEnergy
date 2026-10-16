@@ -6553,12 +6553,6 @@
               "fullType": "Base.Mov_BinRound",
               "icon": "icon_Base_Mov_BinRound",
               "name": "Round Bin"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Mov_PublicGarbageBin",
-              "icon": "icon_Base_Mov_PublicGarbageBin",
-              "name": "Public Garbage Bin"
             }
           ],
           "keep": false,
@@ -7012,7 +7006,6 @@
       "icon_Base_Mov_DarkGreenBarrel",
       "icon_Base_Mov_LightGreenBarrel",
       "icon_Base_Mov_OrangeBarrel",
-      "icon_Base_Mov_PublicGarbageBin",
       "icon_Base_Nails",
       "icon_Base_NormalBrake1",
       "icon_Base_Pipe",

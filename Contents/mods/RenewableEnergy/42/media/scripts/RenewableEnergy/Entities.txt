@@ -236,7 +236,7 @@ module Base
             inputs
             {
                 item 1 tags[base:hammer] mode:keep flags[MayDegradeLight],
-                item 1 [Base.Mov_BinRound;Base.Mov_PublicGarbageBin],
+                item 1 [Base.Mov_BinRound],
                 item 1 [Base.Pot],
                 item 2 [Base.MetalPipe],
                 item 1 tags[base:bucket],
