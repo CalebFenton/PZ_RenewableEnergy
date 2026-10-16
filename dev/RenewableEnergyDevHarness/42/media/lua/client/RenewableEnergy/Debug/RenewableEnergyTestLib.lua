@@ -1,6 +1,8 @@
 require "PZHarness/TestLib"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
+require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
@@ -19,6 +21,7 @@ RenewableEnergyTest = setmetatable({}, { __index = PZHarness.Test })
 local T = RenewableEnergyTest
 
 local PowerBank, Sprites = RenewableEnergy.PowerBank, RenewableEnergy.Sprites
+local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
 
 -- The longest a fixture waits for the server's object, and the bank's status, to reach this
 -- client, in ticks. Single player has them at once; a multiplayer server sends them a tick or more
@@ -33,8 +36,34 @@ local function squareOf(near)
     return near
 end
 
-local function positionOf(square)
+--- The { x, y, z } of a handle (its x, y, z, else its square) or a square, the form the server
+--- handlers take.
+function T.at(handleOrSquare)
+    if type(handleOrSquare) == "table" and handleOrSquare.x then
+        return { x = handleOrSquare.x, y = handleOrSquare.y, z = handleOrSquare.z }
+    end
+    local square = squareOf(handleOrSquare)
     return { x = square:getX(), y = square:getY(), z = square:getZ() }
+end
+
+local positionOf = T.at
+
+--- A free square as T.squares picks one by `opts`, whose `near` may also be a fixture handle; nil,
+--- and missing `what`, without one.
+function T.square(self, opts, what)
+    opts = opts or {}
+    local picked = {}
+    for key, value in pairs(opts) do
+        picked[key] = value
+    end
+    picked.near = squareOf(opts.near)
+    return (T.need(self, T.squares(self, 1, picked), what) or {})[1]
+end
+
+--- Queues a wait, as long as a fixture's, until `condition()` holds on this client; `what` says
+--- what it waits for if the runner's limit stops it.
+function T.waitForCopy(condition, what)
+    T.waitUntil(condition, COPY_FRAMES, what)
 end
 
 -- Fixtures -------------------------------------------------------------------------------------
@@ -56,15 +85,16 @@ end
 --- client's copy of the bank (its IsoGenerator) once it has arrived with its parts and summary.
 function T.bank(self, kind, items, opts)
     opts = opts or {}
-    local square = opts.square or (T.squares(self, 1, { indoors = not opts.outdoors, near = squareOf(opts.near) }) or {})[1]
-    if not T.need(self, square, "a free " .. (opts.outdoors and "outdoor" or "indoor") .. " square for a bank") then
+    local square = opts.square or T.square(self, { indoors = not opts.outdoors, near = opts.near },
+        "a free " .. (opts.outdoors and "outdoor" or "indoor") .. " square for a bank")
+    if not square then
         return nil
     end
     local bank = { square = square, position = positionOf(square) }
     local count = #(items or {})
     T.server(self, "placeBank", { x = square:getX(), y = square:getY(), z = square:getZ(), kind = kind, items = items,
         charge = opts.charge })
-    T.waitUntil(function() return bankCopy(square, count) ~= nil end, COPY_FRAMES)
+    T.waitForCopy(function() return bankCopy(square, count) ~= nil end, "this client's copy of the bank")
     T.step(function()
         bank.object = T.need(self, bankCopy(square, count), "this client's copy of the bank, with its parts and summary")
     end)
@@ -73,7 +103,7 @@ end
 
 -- A source on the square, or a treadmill not yet wired to be one.
 local function placedOn(square)
-    return PowerBank.sourceOn(square) or PowerBank.treadmillOn(square)
+    return Sources.on(square) or Treadmill.on(square)
 end
 
 -- Whether this client has its copy of the panel and, if it was connected, sees the bank's summary
@@ -84,16 +114,17 @@ local function panelArrived(panel, bank)
         and (not panel.connected or PowerBank.samePosition(PowerBank.bankOfSource(here.x, here.y, here.z), bank.position))
 end
 
---- Queues a panel tile of `sprite` on a free outdoor square near `opts.near` (a handle, object or
---- square), holding `opts.modules` ({ { type, condition } }) if given, placed as the moveables
---- cursor places one and, when `opts.connect`, connected by the server's character to the bank
---- handle `opts.near`. Returns its handle { square, position }; the server's answer fills in
---- `connected` and `reason` (the refusal), and `object` is this client's copy once it has arrived,
---- connection included. Any source tile goes; a treadmill's comes wired when `opts.wired`.
+--- Queues a panel tile of `sprite` on `opts.square`, else on a free outdoor square near
+--- `opts.near` (a handle, object or square), holding `opts.modules` ({ { type, condition } }) if
+--- given, placed as the moveables cursor places one and, when `opts.connect`, connected by the
+--- server's character to the bank handle `opts.near`. Returns its handle { square, position };
+--- the server's answer fills in `connected` and `reason` (the refusal), and `object` is this
+--- client's copy once it has arrived, connection included. Any source tile goes; a treadmill's
+--- comes wired when `opts.wired`.
 function T.panel(self, sprite, opts)
     opts = opts or {}
-    local square = (T.squares(self, 1, { near = squareOf(opts.near) }) or {})[1]
-    if not T.need(self, square, "a free outdoor square for a panel") then
+    local square = opts.square or T.square(self, { near = opts.near }, "a free outdoor square for a panel")
+    if not square then
         return nil
     end
     local panel = { square = square, position = positionOf(square) }
@@ -103,11 +134,66 @@ function T.panel(self, sprite, opts)
     T.step(function()
         panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason
     end)
-    T.waitUntil(function() return panelArrived(panel, bank) end, COPY_FRAMES)
+    T.waitForCopy(function() return panelArrived(panel, bank) end, "this client's copy of the panel")
     T.step(function()
         panel.object = T.need(self, panelArrived(panel, bank) and placedOn(square), "this client's copy of the panel")
     end)
     return panel
+end
+
+--- Queues a Base.Generator plugged in on `opts.square`, else on a free outdoor square near
+--- `opts.near` (a handle, object or square) at least `opts.minDistance` (2) away, with
+--- `opts.fuel` litres (the placeGenerator handler's default if nil), running if `opts.running`,
+--- with a failsafe beside it if `opts.failsafe`. The server switches it off and removes it when
+--- the test ends, and this client lets go of its squares (RenewableEnergy.Debug.
+--- releaseGeneratorPower). Returns its handle { x, y, z, square }; `object` is this client's copy.
+function T.generator(self, opts)
+    opts = opts or {}
+    local square = opts.square
+        or T.square(self, { near = opts.near, minDistance = opts.minDistance or 2 }, "a free square for a generator")
+    if not square then
+        return nil
+    end
+    local handle = T.at(square)
+    handle.square = square
+    local args = T.at(square)
+    args.fuel, args.running, args.failsafe = opts.fuel, opts.running, opts.failsafe
+    T.server(self, "placeGenerator", args)
+    T.step(function()
+        T.defer(self, function() RenewableEnergy.Debug.releaseGeneratorPower(handle.x, handle.y, handle.z) end)
+    end)
+    T.waitForCopy(function()
+        handle.object = square:getGenerator()
+        return handle.object ~= nil
+    end, "this client's copy of the generator")
+    T.step(function() T.need(self, handle.object, "this client's copy of the generator") end)
+    return handle
+end
+
+--- Queues a job at `square`: the character goes next to it (T.goNextTo), unless the last T.doJob
+--- went to the same square and the character hasn't moved since, then `makeAction()`'s action is
+--- queued. Decided when the queue reaches it, so a teleport between jobs counts.
+function T.doJob(self, square, makeAction)
+    T.step(function()
+        local p = T.player()
+        if self.jobSquare ~= square or self.jobStand ~= p:getCurrentSquare() then
+            T.goNextTo(self, square)
+            T.step(function() self.jobSquare, self.jobStand = square, T.player():getCurrentSquare() end)
+        end
+        T.step(function() ISTimedActionQueue.add(makeAction()) end)
+    end)
+end
+
+--- The submenu labelled `label` that a right-click on `object` builds through vanilla's menu
+--- builder (ISWorldObjectContextMenu.createMenu), and the context menu, to hide once read; both
+--- nil when no menu was built.
+function T.worldSubmenu(object, label)
+    local context = ISWorldObjectContextMenu.createMenu(0, { object }, 0, 0)
+    if type(context) ~= "table" then
+        return nil, nil
+    end
+    local option = context:getOptionFromName(label)
+    return option and option.subOption and context:getSubMenu(option.subOption), context
 end
 
 --- The server handlers' name for the vehicle of a T.placeVehicle handle: its id and the square
@@ -242,11 +328,6 @@ function T.switchOn(self, bank)
         local summary = T.clientSummary(bank)
         return summary ~= nil and summary.on == true
     end, COPY_FRAMES)
-end
-
---- Queues a wait, as long as a fixture's, until `condition()` holds on this client.
-function T.waitForCopy(condition)
-    T.waitUntil(condition, COPY_FRAMES)
 end
 
 --- The overlays `object` shows, as their sprite names joined by commas, in order; a server's

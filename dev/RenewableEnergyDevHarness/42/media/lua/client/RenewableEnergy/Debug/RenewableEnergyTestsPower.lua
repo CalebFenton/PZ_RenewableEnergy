@@ -503,18 +503,6 @@ local function generatorState(self, square, key)
     T.step(function() self[key] = self.server.generatorState end)
 end
 
--- Queues a fuelled generator on `square` from the placeGenerator handler, running if
--- `opts.running`, with a failsafe beside it if `opts.failsafe`; the server switches it off and
--- removes it when the test ends, and this client lets go of its squares
--- (RenewableEnergy.Debug.releaseGeneratorPower).
-local function placeGenerator(self, square, opts)
-    local x, y, z = square:getX(), square:getY(), square:getZ()
-    T.server(self, "placeGenerator", { x = x, y = y, z = z, running = opts.running, failsafe = opts.failsafe })
-    T.step(function()
-        T.defer(self, function() RenewableEnergy.Debug.releaseGeneratorPower(x, y, z) end)
-    end)
-end
-
 local CHARGED_BATTERY = "Base.CarBattery1"
 
 -- With the grid off, a rack bank with two batteries, two car battery chargers and an
@@ -550,7 +538,7 @@ test("renewable_energy_power_charger_sources", {
         T.batch(function()
             T.bankPass(self, bank, 0)
             T.step(function() self.alone, self.ownPower = bank.state.status.chargerW, bank.state.activated end)
-            placeGenerator(self, backup, { running = true })
+            T.generator(self, { square = backup, running = true })
             T.bankSet(self, bank, { charge = charge })
             T.bankPass(self, bank, 0, { hours = self.hours })
             T.step(function()
@@ -896,7 +884,7 @@ test("renewable_energy_power_failsafe_starts_generator", {
         local backup = bank and backupSquare(self, bank.square, 3)
         if not backup then return end
         T.batch(function()
-            placeGenerator(self, backup, { failsafe = true })
+            T.generator(self, { square = backup, failsafe = true })
             T.bankSet(self, bank, { on = true })
             T.bankPass(self, bank, 0, { hours = 0.01 })
             T.step(function() self.failsafe = bank.state.status.generator and bank.state.status.generator.failsafe end)
@@ -1214,7 +1202,7 @@ test("renewable_energy_power_generator_fuel_follows_battery_room", {
         end
         -- The bank stays out: its copy waits for every part, and the batteries leave.
         T.batch(function()
-            placeGenerator(self, backup, { running = true })
+            T.generator(self, { square = backup, running = true })
             pass("full")
             T.bankSet(self, bank, { charge = self.low }, true)
             pass("room")

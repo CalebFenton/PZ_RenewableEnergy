@@ -37,10 +37,10 @@ Specs.controller = "RenewableEnergy.ChargeController"
 Specs.charger = "Base.CarBatteryCharger"
 
 -- Input slots: what a bank takes without a charge controller, and how many more each working
--- controller adds. Every source takes slots by what it can make (`sourceSlots`, by kind).
+-- controller adds. Every source takes the `slots` of its kind's row (Specs.mounts,
+-- Specs.wind.turbines, Specs.treadmill), by what it can make.
 Specs.freeSlots = 2
 Specs.slotsPerController = 7
-Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1, treadmill = 1, propeller = 2, alternator = 3 }
 
 -- Wind chargers by kind (RenewableEnergy.Wind): watts at the rated speed, the wind it starts
 -- turning in and the wind it makes its rating in, in km/h. The game's wind runs
@@ -52,10 +52,10 @@ Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1, treadmill = 1, pr
 -- `furledShare` of its rating, and breaks only in the worst.
 Specs.wind = {
     turbines = {
-        scoop = { ratedW = 150, cutInKph = 8, ratedKph = 50 },
-        propeller = { ratedW = 500, cutInKph = 10, ratedKph = 40, breakKph = 55, breakPerHour = 0.25,
+        scoop = { slots = 1, watts = 150, cutInKph = 8, ratedKph = 50 },
+        propeller = { slots = 2, watts = 500, cutInKph = 10, ratedKph = 40, breakKph = 55, breakPerHour = 0.25,
             blades = { "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades" } },
-        alternator = { ratedW = 1000, cutInKph = 9, ratedKph = 40, furlKph = 55, furledShare = 0.3,
+        alternator = { slots = 3, watts = 1000, cutInKph = 9, ratedKph = 40, furlKph = 55, furledShare = 0.3,
             breakKph = 90, breakPerHour = 0.1, blades = { "RenewableEnergy.SteelBlades" } },
     },
     -- Each level it stands above the ground adds this share, up to maxBonusLevel.
@@ -70,6 +70,7 @@ Specs.wind = {
 -- Specs.wiring), the watts a runner puts in (an hour of running is about an hour of TV), how long
 -- one run lasts, and what an hour of it costs and teaches.
 Specs.treadmill = {
+    slots = 1,
     wiring = { seconds = 90, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 2, xp = 10 },
     watts = 75, runMinutes = 30,
     endurancePerHour = 0.6, thirstPerHour = 0.2,
@@ -102,12 +103,12 @@ Specs.modules = {
 -- world spawns place.
 Specs.factoryModule = "RenewableEnergy.SolarModule"
 
--- Panel mounts by kind (RenewableEnergy.Sprites.kindOf): modules held, tilt from flat, and how
--- likely a storm is to crack one of its modules, before the material's own factor.
+-- Panel mounts by kind (RenewableEnergy.Sprites.kindOf): input slots, modules held, tilt from
+-- flat, and how likely a storm is to crack one of its modules, before the material's own factor.
 Specs.mounts = {
-    flat = { modules = 1, tilt = 0, stormFactor = 1 },
-    wall = { modules = 1, tilt = 90, stormFactor = 0 },
-    rack = { modules = 2, tilt = 38, stormFactor = 1 },
+    flat = { slots = 1, modules = 1, tilt = 0, stormFactor = 1 },
+    wall = { slots = 1, modules = 1, tilt = 90, stormFactor = 0 },
+    rack = { slots = 1, modules = 2, tilt = 38, stormFactor = 1 },
 }
 -- A wooden mount flexes and lets modules crack; a welded one holds them.
 Specs.materials = {

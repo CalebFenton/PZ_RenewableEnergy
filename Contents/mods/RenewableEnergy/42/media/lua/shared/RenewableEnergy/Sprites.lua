@@ -81,18 +81,26 @@ Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = 
 -- it, and `gasifierPipeGen` on the generator's tile with the kit, by the gasifier's direction.
 Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
 Sprites.gasifierPipeGen = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }
--- The scoop rotor wind charger. In play the game draws the object as a sprite model instead
--- (scripts SpriteModels.txt: RenewableEnergy.ScoopRotor0 to 5, the rotor turned 30 degrees a step).
+-- The scoop rotor wind charger, the propeller wind charger (its blades carved from wood or cut from
+-- plastic pipe), and the homemade alternator wind charger, the last two a tile per facing of the
+-- rotor. In play the game draws each as a sprite model instead (Sprites.windModels).
 Sprites.windScoop = tile(264)
--- The propeller wind charger, its blades carved from wood or cut from plastic pipe, and the
--- homemade alternator wind charger, a tile per facing of its rotor. In play the game draws each as
--- a sprite model instead (SpriteModels.txt: RenewableEnergy.Propeller<Wood|Pipe><N|E|S|W><0-5>,
--- RenewableEnergy.Alternator<N|E|S|W><0-5>, the rotor turned 20 degrees a step).
 Sprites.windPropeller = {
     wood = { N = tile(265), E = tile(266), S = tile(267), W = tile(268) },
     pipe = { N = tile(269), E = tile(270), S = tile(271), W = tile(272) },
 }
 Sprites.windAlternator = { N = tile(273), E = tile(274), S = tile(275), W = tile(276) }
+-- Each wind charger kind's sprite models (scripts SpriteModels.txt, written by art/models/items.py
+-- SPRITE_MODELS): the name before the step number, which for the propeller and the alternator goes
+-- on with the blade material and the way the rotor faces (Propeller<Wood|Pipe><N..W>,
+-- Alternator<N..W>); `steps` models, each the rotor turned a step on, and how many steps make the
+-- turn back to where it started (the scoop rotor looks the same every half turn, three blades every
+-- third).
+Sprites.windModels = {
+    scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
+    propeller = { name = "RenewableEnergy.Propeller", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
+    alternator = { name = "RenewableEnergy.Alternator", byFacing = true, steps = 6, stepsPerTurn = 18 },
+}
 
 -- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles in each of four facings, by the way
 -- a runner on it faces (the tiles' Facing): the console end, and the rear end the runner stands on.
@@ -149,7 +157,8 @@ local BATTERY_LOOKS = { ["RenewableEnergy.DeepCycleBattery"] = "deepCycle", ["Re
 -- The charge fraction each meter level starts below.
 local METER_LIMITS = { 0.10, 0.35, 0.65, 0.95 }
 
--- Sprite name to { kind, facing, material }; facing and material are nil where there's none.
+-- Sprite name to { kind, facing, variant } (Sprites.kindOf); facing and variant are nil where
+-- there's none.
 local KINDS = {
     [Sprites.flat] = { "flat" },
     [Sprites.failsafe] = { "failsafe" },
@@ -158,6 +167,12 @@ local KINDS = {
     [Sprites.gardenLight.off] = { "gardenLight" },
     [Sprites.gardenLight.lit] = { "gardenLight" },
     [Sprites.windScoop] = { "scoop" },
+    [Sprites.gasHeater.off] = { "gasHeater" },
+    [Sprites.gasHeater.lit] = { "gasHeater" },
+    [Sprites.digester.barrel.steel] = { "digester", "barrel", "steel" },
+    [Sprites.digester.barrel.plastic] = { "digester", "barrel", "plastic" },
+    [Sprites.digester.insulated] = { "digester", "insulated" },
+    [Sprites.digester.dome] = { "digester", "dome" },
 }
 for _, mount in ipairs({ "wall", "rack" }) do
     for material, facings in pairs(Sprites[mount]) do
@@ -182,57 +197,39 @@ end
 for facing, name in pairs(Sprites.windAlternator) do
     KINDS[name] = { "alternator", facing }
 end
-
-local function addAll(set, names)
-    for _, name in pairs(names) do
-        set[name] = true
-    end
+for tier, name in pairs(Sprites.gasifier) do
+    KINDS[name] = { "gasifier", tier }
 end
 
-local SNOW, CRACKS, OVERLAYS = {}, {}, {}
-SNOW[Sprites.snow.flat] = true
-for _, facings in pairs(Sprites.snow.rack) do
-    addAll(SNOW, facings)
-end
-CRACKS[Sprites.cracks.flat] = true
-for _, facings in pairs(Sprites.cracks.wall) do
-    addAll(CRACKS, facings)
-end
-for _, facings in pairs(Sprites.cracks.rack) do
-    for _, slots in pairs(facings) do
-        addAll(CRACKS, slots)
+-- Adds every sprite name in `value`, a name or a table of them nested to any depth, to `set`.
+local function addNames(set, value)
+    if type(value) == "table" then
+        for _, inner in pairs(value) do
+            addNames(set, inner)
+        end
+    elseif value then
+        set[value] = true
     end
 end
-for _, set in ipairs({ SNOW, CRACKS }) do
-    for name in pairs(set) do
-        OVERLAYS[name] = true
+
+--- A function telling whether a sprite name is one of the names in the arguments, each a sprite
+--- name or a table of them nested to any depth, such as Sprites.digesterHolder.
+---@return fun(spriteName: string?): boolean
+function Sprites.matcher(...)
+    local set = {}
+    for i = 1, select("#", ...) do
+        addNames(set, select(i, ...))
     end
-end
-addAll(OVERLAYS, Sprites.crateOverlays)
-for _, fill in pairs(Sprites.bankFill) do
-    for _, slots in pairs(fill.batteries) do
-        addAll(OVERLAYS, slots)
+    return function(spriteName)
+        return spriteName ~= nil and set[spriteName] == true
     end
-    addAll(OVERLAYS, fill.meter)
-end
-for _, holder in pairs(Sprites.digesterHolder) do
-    if type(holder) == "table" then
-        addAll(OVERLAYS, holder)
-    else
-        OVERLAYS[holder] = true
-    end
-end
-addAll(OVERLAYS, Sprites.digesterScrubber)
-OVERLAYS[Sprites.gasKit] = true
-for _, set in ipairs({ Sprites.gasifierLit, Sprites.gasifierPipe, Sprites.gasifierPipeGen }) do
-    addAll(OVERLAYS, set)
 end
 
 --- What a placed tile is.
 ---@param spriteName string?
----@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
----@return string? facing "S", "E", "N" or "W" for walls and racks
----@return string? material "wood" or "metal" for walls, racks and banks
+---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
+---@return string? facing "S", "E", "N" or "W" for walls, racks, propellers, alternators and treadmills; a digester's or gasifier's tier
+---@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood" or "pipe" for propellers, a barrel digester's "steel" or "plastic"; a treadmill tile's end, "console" or "rear"
 function Sprites.kindOf(spriteName)
     local entry = spriteName and KINDS[spriteName]
     if not entry then
@@ -261,20 +258,41 @@ function Sprites.nameOf(isoObject)
     return sprite and sprite:getName()
 end
 
---- Whether a sprite is one of the overlays above, which are never placed on their own.
-function Sprites.isOverlay(spriteName)
-    return spriteName ~= nil and OVERLAYS[spriteName] == true
-end
-
 --- Whether a sprite is a crack overlay of Sprites.cracks.
-function Sprites.isCrack(spriteName)
-    return spriteName ~= nil and CRACKS[spriteName] == true
+Sprites.isCrack = Sprites.matcher(Sprites.cracks)
+--- Whether a sprite is a snow overlay of Sprites.snow.
+Sprites.isSnow = Sprites.matcher(Sprites.snow)
+--- Whether a sprite is one of the overlays above, which are never placed on their own.
+Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.crateOverlays, Sprites.bankFill,
+    Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.gasKit, Sprites.gasifierLit, Sprites.gasifierPipe,
+    Sprites.gasifierPipeGen)
+
+--- The name of the sprite model a wind charger tile is drawn as, but for the step number, and its
+--- kind's row of Sprites.windModels; nil for any other sprite.
+---@param spriteName string?
+---@return string? prefix
+---@return table? model
+function Sprites.windModelOf(spriteName)
+    local kind, facing, material = Sprites.kindOf(spriteName)
+    local model = kind and Sprites.windModels[kind]
+    if not model then
+        return nil
+    end
+    local prefix = model.name
+    if model.byMaterial then
+        prefix = prefix .. material:sub(1, 1):upper() .. material:sub(2)
+    end
+    if model.byFacing then
+        prefix = prefix .. facing
+    end
+    return prefix, model
 end
 
---- Whether a sprite is a snow overlay of Sprites.snow.
-function Sprites.isSnow(spriteName)
-    return spriteName ~= nil and SNOW[spriteName] == true
-end
+-- The priority every loader of the mod's sprites passes to MapObjects.OnLoadWithSprite. MapObjects
+-- keeps one function per sprite and priority, a later one silently replacing an earlier
+-- (MapObjects.java), and single player loads the client and the server folders both; so a second
+-- loader of the same sprites needs a priority of its own, as RenewableEnergy.PlaceTracker's has.
+Sprites.LOAD_PRIORITY = 6
 
 -- A mount's crack overlays by module slot.
 local function crackSlots(kind, facing, material)

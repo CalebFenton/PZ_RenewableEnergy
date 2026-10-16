@@ -5,7 +5,7 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/Bank"
+require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
@@ -328,13 +328,13 @@ local function installedPanels(vehicle)
     return panels
 end
 
---- A thunderstorm may crack each panel as it would a flat panel's module (Bank.stormCrack), over
+--- A thunderstorm may crack each panel as it would a flat panel's module (PanelSource.stormCrack), over
 --- `stormHours` of storm. Authority only. Returns how many cracked.
 function ArrowBoard.stormCrack(vehicle, stormHours)
     local cracked = 0
     for _, part in ipairs(installedPanels(vehicle)) do
         local source = { kind = "flat", modules = { { condition = part:getCondition() } } }
-        if RenewableEnergy.Bank.stormCrack(source, stormHours) then
+        if RenewableEnergy.PanelSource.stormCrack(source, stormHours) then
             setPanelCondition(vehicle, part, source.modules[1].condition)
             cracked = cracked + 1
         end
@@ -945,7 +945,7 @@ function ArrowBoard.update(vehicle, hours, sky)
         return 0
     end
     sky = sky or RenewableEnergy.Sun.skyNow()
-    ArrowBoard.stormCrack(vehicle, RenewableEnergy.Bank.stormHours(hours))
+    ArrowBoard.stormCrack(vehicle, RenewableEnergy.PanelSource.stormHours(hours))
     ArrowBoard.showPanels(vehicle)
     local stored = ArrowBoard.charge(vehicle, hours, sky)
     ArrowBoard.runLamps(vehicle, hours, sky.up <= 0)

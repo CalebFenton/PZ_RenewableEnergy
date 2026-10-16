@@ -66,18 +66,19 @@ option RenewableEnergy.LRMMisc {
 	type = double, min = 0, max = 100, default = 1,
 }
 /*
-    In-game minutes to connect one panel, at Electricity 3. Roughly a third of that at
-    10, roughly a quarter longer at 0.
+    In-game minutes to connect one source (panel, wind charger or treadmill), at Electricity 3.
+    Roughly a third of that at 10, roughly a quarter longer at 0.
 */
 option RenewableEnergy.ConnectPanelMin {
 	page = RenewableEnergy, translation = RenewableEnergy_ConnectPanelMin,
 	type = integer, min = 1, max = 1440, default = 10,
 }
+/* Thunderstorms crack solar modules, and strong wind breaks the blades of wind chargers left unbraked. */
 option RenewableEnergy.StormDamage {
 	page = RenewableEnergy, translation = RenewableEnergy_StormDamage,
 	type = boolean, default = true,
 }
-/* Percent of the chance that a thunderstorm cracks a solar module. */
+/* Percent of the chance that a thunderstorm cracks a solar module or strong wind breaks unbraked blades. */
 option RenewableEnergy.StormDamageRate {
 	page = RenewableEnergy, translation = RenewableEnergy_StormDamageRate,
 	type = integer, min = 0, max = 1000, default = 100,

@@ -1,6 +1,6 @@
--- Battery banks and the panels connected to them, as both sides see them: what an object is,
--- what a bank holds and what it may take, and the bank's summary and status as the server last
--- reported them.
+-- Battery banks as both sides see them: what an object is, what a bank holds and what it may
+-- take, the sources connected to it, and the bank's summary and status as the server last
+-- reported them. What each kind of source is lives in RenewableEnergy.Sources.
 --
 -- The server runs the banks (server/RenewableEnergy/PowerBank) and adds perform(), place() and
 -- remove() to this table; the client adds watchStatus() and unwatchStatus() (client/
@@ -33,17 +33,6 @@ PowerBank.MODULES = "RenewableEnergy_modules"
 -- charger keeps CONNECTED_ONCE too.
 PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
 PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
--- Placed wind charger modData: its brake is on; its blades are broken.
-PowerBank.BRAKED = "RenewableEnergy_braked"
-PowerBank.BROKEN = "RenewableEnergy_bladesBroken"
--- Treadmill tile modData: the tile wired to feed a bank (one of its two tiles).
-PowerBank.TREADMILL_WIRED = "RenewableEnergy_treadmillWired"
-
--- Panels by mount, wind chargers by kind (Specs.wind.turbines), and wired treadmills.
-local SOURCE_KINDS = { flat = true, wall = true, rack = true, treadmill = true }
-for kind in pairs(Specs.wind.turbines) do
-    SOURCE_KINDS[kind] = true
-end
 
 -- Placed bank sprite to its Specs.banks row, and to the item it is.
 local BANKS_BY_SPRITE = {}
@@ -74,109 +63,6 @@ end
 --- The working bank on a square, or nil.
 function PowerBank.bankOn(square)
     return RenewableEnergy.findObjectOn(square, PowerBank.isBank)
-end
-
---- The kind of a placed source: a panel's mount, "flat", "wall" or "rack", the way it faces and
---- what it is made of; a wind charger's kind (Specs.wind.turbines); or "treadmill" and the way its
---- runner faces, for a treadmill's tile wired to feed a bank. Nil for anything else.
-function PowerBank.sourceKind(isoObject)
-    local kind, facing, material = Sprites.kindOf(Sprites.nameOf(isoObject))
-    if not SOURCE_KINDS[kind] then
-        return nil
-    end
-    if kind == "treadmill" and not PowerBank.isWiredTreadmill(isoObject) then
-        return nil
-    end
-    return kind, facing, material
-end
-
-function PowerBank.isTreadmill(isoObject)
-    return Sprites.kindOf(Sprites.nameOf(isoObject)) == "treadmill"
-end
-
-function PowerBank.isWiredTreadmill(isoObject)
-    return isoObject:getModData()[PowerBank.TREADMILL_WIRED] == true
-end
-
--- A step in each facing, in squares.
-local FACING_STEPS = { N = { 0, -1 }, S = { 0, 1 }, E = { 1, 0 }, W = { -1, 0 } }
-
---- Where the treadmill of the tile `isoObject` has its rear end, which the runner stands on, and
---- its console end, as { x, y } each, and the step from rear to console, the way the runner faces
---- (Sprites.treadmill).
-function PowerBank.treadmillEnds(isoObject)
-    local _, facing, part = Sprites.kindOf(Sprites.nameOf(isoObject))
-    local step = FACING_STEPS[facing]
-    local square = isoObject:getSquare()
-    local x, y = square:getX(), square:getY()
-    if part == "console" then
-        x, y = x - step[1], y - step[2]
-    end
-    return { x = x, y = y }, { x = x + step[1], y = y + step[2] }, step
-end
-
---- Whether a source of `kind` must stand outdoors: panels and wind chargers do, a treadmill not.
-function PowerBank.needsOutdoors(kind)
-    return kind ~= "treadmill"
-end
-
---- Whether a source of `kind` is a panel mount (Specs.mounts), with modules.
-function PowerBank.isPanel(kind)
-    return kind ~= nil and Specs.mounts[kind] ~= nil
-end
-
-function PowerBank.isWind(kind)
-    return kind ~= nil and Specs.wind.turbines[kind] ~= nil
-end
-
---- The input slots a source of `kind` takes in a bank.
-function PowerBank.slotsOf(kind)
-    return Specs.sourceSlots[kind] or 1
-end
-
-function PowerBank.isBraked(isoObject)
-    return isoObject:getModData()[PowerBank.BRAKED] == true
-end
-
---- Sets a placed wind charger's brake and sends it to clients. Authority only.
-function PowerBank.setBraked(isoObject, braked)
-    isoObject:getModData()[PowerBank.BRAKED] = braked or nil
-    isoObject:transmitModData()
-end
-
-function PowerBank.isBroken(isoObject)
-    return isoObject:getModData()[PowerBank.BROKEN] == true
-end
-
---- Marks a placed wind charger's blades broken or whole and sends it to clients. Authority only.
-function PowerBank.setBroken(isoObject, broken)
-    isoObject:getModData()[PowerBank.BROKEN] = broken or nil
-    isoObject:transmitModData()
-end
-
---- The blade items that make a wind charger of `kind` whole again (Specs.wind.turbines blades),
---- as a set of full types; empty for a kind that never breaks.
-function PowerBank.bladesFor(kind)
-    local spec = Specs.wind.turbines[kind]
-    local set = {}
-    for _, fullType in ipairs(spec and spec.blades or {}) do
-        set[fullType] = true
-    end
-    return set
-end
-
-local function isSource(object)
-    return PowerBank.sourceKind(object) ~= nil
-end
-
---- The placed panel on a square, or nil.
-function PowerBank.sourceOn(square)
-    return RenewableEnergy.findObjectOn(square, isSource)
-end
-
---- A treadmill's tile on `square`, wired or not.
-function PowerBank.treadmillOn(square)
-    return RenewableEnergy.findObjectOn(square, PowerBank.isTreadmill)
 end
 
 local function copyModule(module)
@@ -231,57 +117,6 @@ function PowerBank.markModule(item, module)
     local data = item:getModData()
     data[PowerBank.MOUNTED_ONCE] = module.mounted or nil
     data[PowerBank.CONNECTED_ONCE] = module.connected or nil
-end
-
---- Shows a cracked glass over each of a placed panel's modules below Specs.crackedBelow and over
---- none of the others, then sends the overlays to clients if they changed. Authority only: a
---- client's own overlays would be overwritten by the server's next sprite update.
-function PowerBank.showCracks(isoObject)
-    local kind, facing, material = PowerBank.sourceKind(isoObject)
-    if not kind then return end
-    local list = Sprites.crackOverlays(kind, facing, material, PowerBank.modulesOf(isoObject, kind))
-    local wanted = {}
-    for _, name in ipairs(list) do
-        wanted[name] = true
-    end
-    local shown, changed = {}, false
-    local attached = isoObject:getAttachedAnimSprite()
-    for i = (attached and attached:size() or 0) - 1, 0, -1 do
-        local name = attached:get(i):getName()
-        if Sprites.isCrack(name) then
-            if wanted[name] and not shown[name] then
-                shown[name] = true
-            else
-                isoObject:RemoveAttachedAnim(i)
-                changed = true
-            end
-        end
-    end
-    local added = false
-    for _, name in ipairs(list) do
-        if not shown[name] then
-            isoObject:addAttachedAnimSpriteByName(name)
-            added = true
-        end
-    end
-    if added then
-        -- Snow lies on the glass, so it goes back on top of the cracks just added.
-        local snow = {}
-        attached = isoObject:getAttachedAnimSprite()
-        for i = attached:size() - 1, 0, -1 do
-            local name = attached:get(i):getName()
-            if Sprites.isSnow(name) then
-                table.insert(snow, 1, name)
-                isoObject:RemoveAttachedAnim(i)
-            end
-        end
-        for _, name in ipairs(snow) do
-            isoObject:addAttachedAnimSpriteByName(name)
-        end
-    end
-    if changed or added then
-        isoObject:transmitUpdatedSpriteToClients()
-    end
 end
 
 --- Where a bank may stand: inside a building, out of the weather. Returns true, or false and
@@ -347,15 +182,6 @@ function PowerBank.wiringFor(fullType)
     return wiring
 end
 
-local function notBroken(item)
-    return not item:isBroken()
-end
-
---- Whether the character carries a working tool with ItemTag field `tag`.
-local function hasTool(character, tag)
-    return character:getInventory():containsTagEvalRecurse(ItemTag[tag], notBroken)
-end
-
 --- The bank container's filter (ItemContainer.isItemAllowed). Parts go in only by being wired
 --- in, which moves them without asking the filter, so it refuses every transfer.
 function PowerBank.acceptItem(container, item)
@@ -377,12 +203,15 @@ local function addNeed(needs, need)
     end
 end
 
--- What `wiring` (as Specs.wiring's) takes of `character`.
-local function needsOf(character, wiring)
+--- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`
+--- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
+--- Scrap.
+function PowerBank.jobNeeds(character, wiring)
     local inventory = character:getInventory()
     local needs = {}
     addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = wiring.skill })
-    addNeed(needs, { kind = "tool", tool = wiring.tool, have = hasTool(character, wiring.tool) and 1 or 0, need = 1 })
+    addNeed(needs, { kind = "tool", tool = wiring.tool,
+        have = RenewableEnergy.hasWorkingTool(character, ItemTag[wiring.tool]) and 1 or 0, need = 1 })
     addNeed(needs, { kind = "wire", item = PowerBank.WIRE, have = inventory:getCountTypeRecurse(PowerBank.WIRE), need = wiring.wire })
     addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = inventory:getCountTypeRecurse(PowerBank.SCRAP), need = wiring.scrap })
     return needs
@@ -392,12 +221,7 @@ end
 --- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
 --- Scrap.
 function PowerBank.wiringNeeds(character, fullType)
-    return needsOf(character, PowerBank.wiringFor(fullType))
-end
-
---- What wiring a treadmill to feed a bank takes of `character`, as wiringNeeds.
-function PowerBank.treadmillNeeds(character)
-    return needsOf(character, Specs.treadmill.wiring)
+    return PowerBank.jobNeeds(character, PowerBank.wiringFor(fullType))
 end
 
 --- What keeps `character` from wiring `item` into the bank `bankObject` now whatever they
@@ -469,7 +293,8 @@ local function system()
     return PowerBank.serverSystem or PowerBank.clientSystem
 end
 
-local function eachBank(fn)
+--- Calls `fn(bank)` for each bank record this side has, until it returns true.
+function PowerBank.eachBank(fn)
     local sys = system()
     if not sys then return end
     local objects = sys.system
@@ -519,39 +344,19 @@ function PowerBank.isPosition(position)
         and type(position.z) == "number"
 end
 
---- Whether a panel at x, y, z is within Specs.sourceReach of `bank`, anything with x, y and z.
+--- Whether a source at x, y, z is within Specs.sourceReach of `bank`, anything with x, y and z.
 function PowerBank.isInReach(bank, x, y, z)
     local reach = Specs.sourceReach
     return IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) <= reach.tiles * reach.tiles
         and math.abs(z - bank.z) <= reach.levels
 end
 
---- Whether a source of `kind` may feed a bank from `square`: outdoors, unless it is a kind that
---- works indoors (PowerBank.needsOutdoors).
-function PowerBank.sourceSquareOk(square, kind)
-    return square ~= nil and (square:isOutside() or not PowerBank.needsOutdoors(kind))
-end
-
---- Banks a source of `kind` on this square may be connected to.
-function PowerBank.banksInReach(x, y, z, kind)
-    local found = {}
-    if not PowerBank.sourceSquareOk(getSquare(x, y, z), kind) then
-        return found
-    end
-    eachBank(function(bank)
-        if PowerBank.isInReach(bank, x, y, z) then
-            table.insert(found, { x = bank.x, y = bank.y, z = bank.z })
-        end
-    end)
-    return found
-end
-
---- The bank the panel on this square is connected to, as { x, y, z }, or nil. The authority
---- reads the bank's own list of panels; a client has only the summary the server last sent.
+--- The bank the source on this square is connected to, as { x, y, z }, or nil. The authority
+--- reads the bank's own list of sources; a client has only the summary the server last sent.
 function PowerBank.bankOfSource(x, y, z)
     local found
     local authority = PowerBank.serverSystem ~= nil
-    eachBank(function(bank)
+    PowerBank.eachBank(function(bank)
         local sources = authority and bank.sources or (bank.summary and bank.summary.sources)
         for _, source in ipairs(sources or {}) do
             if source.x == x and source.y == y and source.z == z then
@@ -561,6 +366,11 @@ function PowerBank.bankOfSource(x, y, z)
         end
     end)
     return found
+end
+
+--- The bank the placed source `isoObject` is connected to, as { x, y, z }, or nil.
+function PowerBank.connectedBank(isoObject)
+    return PowerBank.bankOfSource(isoObject:getX(), isoObject:getY(), isoObject:getZ())
 end
 
 return PowerBank

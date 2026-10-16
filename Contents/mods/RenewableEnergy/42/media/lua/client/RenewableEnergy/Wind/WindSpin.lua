@@ -1,66 +1,37 @@
 -- Turns the wind chargers this client can see, a cosmetic only it draws. Each charger is drawn as a
--- 3D model through a sprite model (scripts/RenewableEnergy/SpriteModels.txt), and the rotor turns
--- by stepping the object through models yawed a step apart (IsoObject.setSpriteModelName);
--- animating keeps it out of the cached chunk, so each step shows at once. The game's wind is the
--- same on every client, and a charger's brake is in its modData, so nothing needs sending.
+-- 3D model through a sprite model (Sprites.windModels), and the rotor turns by stepping the object
+-- through models yawed a step apart (IsoObject.setSpriteModelName); animating keeps it out of the
+-- cached chunk, so each step shows at once. The game's wind is the same on every client, and a
+-- charger's brake is in its modData, so nothing needs sending.
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/Wind"
 
-local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
+local Specs, Sprites, Wind = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Wind
 
 local WindSpin = {}
 RenewableEnergy.WindSpin = WindSpin
 
--- Sprite models by kind: the name before the step number, which for the propeller and the
--- alternator goes on with the blade material and the way the rotor faces (Propeller<Wood|Pipe><N..W>,
--- Alternator<N..W>), and how many steps make the turn back to where it started (the scoop rotor
--- looks the same every half turn, three blades every third).
-local MODELS = {
-    scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
-    propeller = { name = "RenewableEnergy.Propeller", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
-    alternator = { name = "RenewableEnergy.Alternator", byFacing = true, steps = 6, stepsPerTurn = 18 },
-}
 -- Turns a second: a slow start at the cut-in speed, faster with the wind, no faster than this.
 local START_TPS, TPS_PER_KPH, MAX_TPS = 0.3, 0.04, 2
--- MapObjects keeps one function per sprite and priority.
-local LOAD_PRIORITY = 6
 
 -- Wind charger objects this client has, and how far round each one is, in steps.
 local turbines = {}
 
-local function capitalized(word)
-    return word:sub(1, 1):upper() .. word:sub(2)
-end
-
--- The name of `object`'s sprite models but for the step number.
-local function modelPrefix(model, object)
-    local _, facing, material = PowerBank.sourceKind(object)
-    local prefix = model.name
-    if model.byMaterial then
-        prefix = prefix .. capitalized(material)
-    end
-    if model.byFacing then
-        prefix = prefix .. facing
-    end
-    return prefix
-end
-
---- Starts turning `object` if it is a wind charger. A charger built in single player comes here
---- from its OnCreate (RenewableEnergy.Wind.OnCreate), since single player fires no OnObjectAdded.
+--- Starts turning `object` if it is a wind charger: as its chunk loads, or as it is added to the
+--- map (OnObjectAdded, which Wind.OnCreate fires for a charger built in single player).
 function WindSpin.track(object)
-    local kind = PowerBank.sourceKind(object)
-    local model = kind and MODELS[kind]
-    if not model or turbines[object] then return end
-    local prefix = modelPrefix(model, object)
-    turbines[object] = { kind = kind, model = model, prefix = prefix, phase = 0, shown = 0 }
+    if turbines[object] then return end
+    local name = Sprites.nameOf(object)
+    local prefix, model = Sprites.windModelOf(name)
+    if not prefix then return end
+    turbines[object] = { spec = Specs.wind.turbines[Sprites.kindOf(name)], model = model, prefix = prefix, phase = 0, shown = 0 }
     object:setSpriteModelName(prefix .. "0")
     object:setAnimating(true)
 end
 
-local function turnsPerSecond(kind, kph)
-    local spec = Specs.wind.turbines[kind]
+local function turnsPerSecond(spec, kph)
     if kph <= spec.cutInKph then
         return 0
     end
@@ -78,9 +49,9 @@ local function spin()
     for object, state in pairs(turbines) do
         if object:getObjectIndex() == -1 then
             turbines[object] = nil
-        elseif not (PowerBank.isBraked(object) or PowerBank.isBroken(object)) then
+        elseif not (Wind.isBraked(object) or Wind.isBroken(object)) then
             local model = state.model
-            state.phase = (state.phase + turnsPerSecond(state.kind, kph) * model.stepsPerTurn * seconds) % model.steps
+            state.phase = (state.phase + turnsPerSecond(state.spec, kph) * model.stepsPerTurn * seconds) % model.steps
             local step = math.floor(state.phase)
             if step ~= state.shown then
                 state.shown = step
@@ -90,8 +61,8 @@ local function spin()
     end
 end
 
-for kind in pairs(MODELS) do
-    MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), WindSpin.track, LOAD_PRIORITY)
+for kind in pairs(Sprites.windModels) do
+    MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), WindSpin.track, Sprites.LOAD_PRIORITY)
 end
 Events.OnObjectAdded.Add(WindSpin.track)
 Events.OnTick.Add(spin)

@@ -1,20 +1,26 @@
 require "TimedActions/ISBaseTimedAction"
 require "Util/BuildingHelper"
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Specs"
+require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
+require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 
--- Every hands-on job at a battery bank, a panel, a garden light or a vehicle. In multiplayer the
+-- Every hands-on job at a battery bank, a source, a garden light or a vehicle. In multiplayer the
 -- client runs start() and perform(), and the server rebuilds the action from new()'s parameters
 -- and runs complete(), which makes the change; single player runs both. The server finds the
--- class by its Type with a plain global lookup (NetTimedAction.parse), which is why this one class
--- is a global outside the RenewableEnergy table.
+-- class by its Type with a plain global lookup (NetTimedAction.parse), which is why the class is a
+-- global outside the RenewableEnergy table.
 RenewableEnergyAction = ISBaseTimedAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
-local PowerBank = RenewableEnergy.PowerBank
-local positionOf, samePosition = PowerBank.positionOf, PowerBank.samePosition
+local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
+local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
+local positionOf, onSquare = PowerBank.positionOf, RenewableEnergy.onSquare
 
 Action.CONNECT_SOURCE = "ConnectSource"
 Action.DISCONNECT_SOURCE = "DisconnectSource"
@@ -38,67 +44,19 @@ Action.RELEASE_BRAKE = "ReleaseBrake"
 Action.WIRE_TREADMILL = "WireTreadmill"
 Action.REPLACE_BLADES = "ReplaceBlades"
 
--- Jobs on the bank's wiring or a cracked panel, which need light to see by.
-local NEEDS_LIGHT = {
-    [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true,
-    [Action.WIRE_TREADMILL] = true,
-}
--- Jobs on a part already in the bank's container rather than in the character's inventory.
-local PART_IN_BANK = { [Action.UNWIRE] = true, [Action.REPAIR_PART] = true }
-
 -- What clears snow off a flat panel without scratching it: a broom sweeps, a snow shovel pushes.
 Action.SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
-
--- An action advances by GameTime.getMultiplier() each tick (BaseAction.update), and in the same
--- tick the clock advances getMultiplier() / (2 * minutesPerDay) in-game minutes (GameTime.update),
--- so one in-game minute is 2 * minutesPerDay units at any frame rate or game speed.
-function Action.unitsPerMinute()
-    return 2 * getGameTime():getMinutesPerDay()
-end
 
 -- At normal speed an action advances this many units each real second, whatever the day length:
 -- an in-game minute is 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
 local UNITS_PER_SECOND = 48
 
-local function onSquare(object)
-    return object ~= nil and object:getObjectIndex() ~= -1
-end
-
-local function isBank(bank)
-    return onSquare(bank) and PowerBank.isBank(bank)
-end
-
-local function isSource(object)
-    return onSquare(object) and PowerBank.sourceKind(object) ~= nil
-end
-
-local function isWindCharger(object)
-    return isSource(object) and PowerBank.isWind(PowerBank.sourceKind(object))
-end
-
-local function isGardenLight(object)
-    return onSquare(object) and RenewableEnergy.SolarGardenLight.isLight(object)
-end
-
-local function isLooseTreadmill(object)
-    return onSquare(object) and PowerBank.isTreadmill(object) and not PowerBank.isWiredTreadmill(object)
-end
-
---- The bank the panel `source` is connected to, as { x, y, z }, or nil.
-function Action.connectedBank(source)
-    return PowerBank.bankOfSource(source:getX(), source:getY(), source:getZ())
-end
-
---- Whether the panel `source` may be connected to `bank`.
-function Action.bankInReach(source, bank)
-    local here = positionOf(bank)
-    for _, reachable in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ(), PowerBank.sourceKind(source))) do
-        if samePosition(reachable, here) then
-            return true
-        end
-    end
-    return false
-end
+-- How far from the middle of the target's square, on each axis in squares, a character may work
+-- on a bank, a source or a garden light: what luautils.walkAdj counts as already there, the square
+-- getCorrectSquareForWall moves a wall's target to, and a couple more for the character's drift
+-- and a multiplayer client's lag. A vehicle job gets as much past the vehicle's body, whose areas
+-- the menu walks the character to (ISPathFindAction.pathToVehicleArea).
+local REACH = 4.6
 
 function Action.isSnowTool(item)
     return item ~= nil and Action.SNOW_TOOLS[item:getFullType()] == true and not item:isBroken()
@@ -108,6 +66,26 @@ function Action.isBoltCutters(item)
     return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and not item:isBroken()
 end
 
+local function isBank(bank)
+    return onSquare(bank) and PowerBank.isBank(bank)
+end
+
+local function isSource(object)
+    return onSquare(object) and Sources.kindOf(object) ~= nil
+end
+
+local function isWindCharger(object)
+    return onSquare(object) and Sources.familyOf(Sources.kindOf(object)) == "wind"
+end
+
+local function isGardenLight(object)
+    return onSquare(object) and RenewableEnergy.SolarGardenLight.isLight(object)
+end
+
+local function inWorld(vehicle)
+    return vehicle ~= nil and not vehicle:isRemovedFromWorld()
+end
+
 -- The summary of the action's bank, or nil when there is no bank or no summary yet.
 local function bankSummary(self)
     if isBank(self.bank) then
@@ -115,176 +93,284 @@ local function bankSummary(self)
     end
 end
 
+-- The share of its full time a job takes at an Electricity level: all of it at level 3, less
+-- above it and more below, in a straight line.
+local function skillFactor(level)
+    return 1 - 0.095 * (level - 3)
+end
+
+local function electricity(self)
+    return self.character:getPerkLevel(Perks.Electricity)
+end
+
+-- Units a wiring job of `wiring` (as Specs.wiring's) takes: its seconds at Electricity 0, less with
+-- skill, times `share`. A part that is gone takes no time, and complete() refuses it.
+local function wiringUnits(self, wiring, share)
+    if not wiring then
+        return 1
+    end
+    return wiring.seconds * skillFactor(electricity(self)) / skillFactor(0) * (share or 1) * UNITS_PER_SECOND
+end
+
+local function partWiring(self)
+    return self.item and PowerBank.wiringFor(self.item:getFullType())
+end
+
+local function connectMinutes(self)
+    return SandboxVars.RenewableEnergy.ConnectPanelMin * skillFactor(electricity(self))
+end
+
+local function arrowBoard()
+    return RenewableEnergy.ArrowBoard
+end
+
+local JOBS
+
 -- Whether the action's item is where its job needs it: in the bank for a part already wired
 -- in, else anywhere in the character's inventory.
 local function holdsItem(self)
-    if PART_IN_BANK[self.mode] then
+    if JOBS[self.mode].partInBank then
         local container = isBank(self.bank) and self.bank:getContainer()
         return container and container:contains(self.item) or false
     end
     return self.character:getInventory():containsRecursive(self.item)
 end
 
-local function inWorld(vehicle)
-    return vehicle ~= nil and not vehicle:isRemovedFromWorld()
-end
-
--- What each job needs from moment to moment, cheap enough for isValid to ask every tick: its
--- target still in the world and its item still where the job needs it. These are what another
--- player or the world can take away mid-job, and the character's own copy of the world shows
--- them, so a multiplayer client asks them too.
-local KEEPS = {
-    [Action.CONNECT_SOURCE] = function(self)
-        return isSource(self.object) and isBank(self.bank)
-    end,
-    [Action.DISCONNECT_SOURCE] = function(self)
-        return isSource(self.object)
-    end,
-    [Action.CLEAR_SNOW] = function(self)
-        return isSource(self.object) and PowerBank.sourceKind(self.object) == "flat"
-            and Action.isSnowTool(self.item) and self.character:isPrimaryHandItem(self.item)
-    end,
-    [Action.TURN_ON] = function(self)
-        return isBank(self.bank)
-    end,
-    [Action.TURN_OFF] = function(self)
-        return isBank(self.bank)
-    end,
-    [Action.ATTACH_MAINTAINER] = function(self)
-        return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
-            and holdsItem(self)
-    end,
-    [Action.DETACH_MAINTAINER] = function(self)
-        return inWorld(self.vehicle)
-    end,
-    [Action.WIRE_IN] = function(self)
-        return isBank(self.bank) and self.item ~= nil and holdsItem(self)
-    end,
-    [Action.UNWIRE] = function(self)
-        return self.item ~= nil and holdsItem(self) and PowerBank.partKind(self.item:getFullType()) ~= nil
-    end,
-    [Action.REPAIR_PART] = function(self)
-        return self.item ~= nil and holdsItem(self)
-    end,
-    [Action.RENAME] = function(self)
-        return isBank(self.bank) and type(self.bankName) == "string"
-    end,
-    [Action.REPAIR_PANEL] = function(self)
-        local part = inWorld(self.vehicle) and self.vehicle:getPartById(self.partId)
-        return part and part:getInventoryItem() ~= nil or false
-    end,
-    [Action.REMOVE_BULB] = function(self)
-        return isGardenLight(self.object)
-    end,
-    [Action.ADD_BULB] = function(self)
-        return isGardenLight(self.object) and RenewableEnergy.SolarGardenLight.isBulb(self.item) and holdsItem(self)
-    end,
-    [Action.CUT_PADLOCK] = function(self)
-        return inWorld(self.vehicle) and Action.isBoltCutters(self.item) and self.character:isPrimaryHandItem(self.item)
-    end,
-    [Action.BOARD_ON] = function(self)
-        return inWorld(self.vehicle)
-    end,
-    [Action.BOARD_OFF] = function(self)
-        return inWorld(self.vehicle)
-    end,
-    [Action.BRAKE] = function(self)
-        return isWindCharger(self.object)
-    end,
-    [Action.RELEASE_BRAKE] = function(self)
-        return isWindCharger(self.object)
-    end,
-    [Action.WIRE_TREADMILL] = function(self)
-        return isLooseTreadmill(self.object)
-    end,
-    [Action.REPLACE_BLADES] = function(self)
-        return isWindCharger(self.object) and self.item ~= nil and holdsItem(self)
-    end,
-}
-
--- The rest of each job's rules: the state of its target and its bank, which a multiplayer
--- client's copy can show late, and the checks too dear for every tick, which walk through every
--- bank (the banks a panel reaches, the one it is wired to) or the whole inventory (the refusals).
--- Single player asks them before the job starts, and the authority again in complete().
-local CHECKS = {
-    [Action.CONNECT_SOURCE] = function(self)
-        return Action.bankInReach(self.object, self.bank)
-            and not samePosition(Action.connectedBank(self.object), positionOf(self.bank))
-    end,
-    [Action.DISCONNECT_SOURCE] = function(self)
-        return Action.connectedBank(self.object) ~= nil
-    end,
-    [Action.TURN_ON] = function(self)
-        local summary = bankSummary(self)
-        return summary ~= nil and not summary.on
-    end,
-    [Action.TURN_OFF] = function(self)
-        local summary = bankSummary(self)
-        return summary ~= nil and summary.on == true
-    end,
-    [Action.ATTACH_MAINTAINER] = function(self)
-        return RenewableEnergy.SolarMaintainer.canAttach(self.vehicle)
-    end,
-    [Action.DETACH_MAINTAINER] = function(self)
-        return RenewableEnergy.SolarMaintainer.isAttached(self.vehicle)
-    end,
-    [Action.WIRE_IN] = function(self)
-        return PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil
-    end,
-    [Action.REPAIR_PART] = function(self)
-        return PowerBank.repairRefusal(self.character, self.item) == nil
-    end,
-    [Action.REPAIR_PANEL] = function(self)
-        local ArrowBoard = RenewableEnergy.ArrowBoard
-        return ArrowBoard ~= nil and ArrowBoard.repairablePanel(self.vehicle, self.partId) ~= nil
-            and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
-    end,
-    [Action.REMOVE_BULB] = function(self)
-        return RenewableEnergy.SolarGardenLight.getBulb(self.object) ~= nil
-    end,
-    [Action.ADD_BULB] = function(self)
-        return RenewableEnergy.SolarGardenLight.getBulb(self.object) == nil
-    end,
-    [Action.CUT_PADLOCK] = function(self)
-        local ArrowBoard = RenewableEnergy.ArrowBoard
-        local lid = ArrowBoard ~= nil and ArrowBoard.isTrailer(self.vehicle) and self.vehicle:getPartById(ArrowBoard.LID)
-        return lid and ArrowBoard.isPadlocked(lid) or false
-    end,
-    [Action.BOARD_ON] = function(self)
-        local ArrowBoard = RenewableEnergy.ArrowBoard
-        return ArrowBoard ~= nil and ArrowBoard.canSwitch(self.vehicle, true)
-    end,
-    [Action.BOARD_OFF] = function(self)
-        local ArrowBoard = RenewableEnergy.ArrowBoard
-        return ArrowBoard ~= nil and ArrowBoard.canSwitch(self.vehicle, false)
-    end,
-    [Action.BRAKE] = function(self)
-        return not PowerBank.isBraked(self.object)
-    end,
-    [Action.RELEASE_BRAKE] = function(self)
-        return PowerBank.isBraked(self.object)
-    end,
-    [Action.WIRE_TREADMILL] = function(self)
-        return RenewableEnergy.firstUnmet(PowerBank.treadmillNeeds(self.character)) == nil
-    end,
-    [Action.REPLACE_BLADES] = function(self)
-        return PowerBank.isBroken(self.object)
-            and PowerBank.bladesFor(PowerBank.sourceKind(self.object))[self.item:getFullType()] == true
-    end,
+-- Every job, by mode:
+-- - keeps(self): what the job needs from moment to moment, cheap enough for isValid to ask every
+--   tick: its target still in the world and its item still where the job needs it. These are what
+--   another player or the world can take away mid-job, and the character's own copy of the world
+--   shows them, so a multiplayer client asks them too.
+-- - check(self), if any: the rest of its rules, the state of its target and its bank, which a
+--   multiplayer client's copy can show late, and the checks too dear for every tick. Single player
+--   asks them before the job starts, and the authority again in complete().
+-- - command(self): the bank command (Commands.lua) and its args that complete() runs on the
+--   authority; or run(self), the job itself for one that isn't the bank's.
+-- - minutes: the in-game minutes it takes (a number, or a function of the action); or units, its
+--   length in action units.
+-- - light: it needs light to see by. partInBank: its item is in the bank's container rather than
+--   the character's inventory. sound: what it sounds like while it runs; doneSound: when it ends.
+-- - begin(self), if any, starts its animation in place of the crouch over the target.
+JOBS = {
+    [Action.CONNECT_SOURCE] = {
+        keeps = function(self) return isSource(self.object) and isBank(self.bank) end,
+        check = function(self) return Sources.connectRefusal(self.object, positionOf(self.bank)) == nil end,
+        command = function(self)
+            return "connectSource", { bank = positionOf(self.bank), source = positionOf(self.object) }
+        end,
+        minutes = connectMinutes,
+        sound = "GeneratorConnect",
+    },
+    [Action.DISCONNECT_SOURCE] = {
+        keeps = function(self) return isSource(self.object) end,
+        check = function(self) return PowerBank.connectedBank(self.object) ~= nil end,
+        command = function(self) return "disconnectSource", { source = positionOf(self.object) } end,
+        minutes = function(self) return connectMinutes(self) / 2 end,
+    },
+    [Action.CLEAR_SNOW] = {
+        keeps = function(self)
+            return isSource(self.object) and Sources.kindOf(self.object) == "flat"
+                and Action.isSnowTool(self.item) and self.character:isPrimaryHandItem(self.item)
+        end,
+        command = function(self) return "clearSnow", { source = positionOf(self.object) } end,
+        minutes = 5,
+        metabolics = Metabolics.LightWork,
+        begin = function(self)
+            if self.item and self.item:getType() == "SnowShovel" then
+                self:setActionAnim(BuildingHelper.getShovelAnim(self.item))
+                self.sound = self.character:playSound("Shoveling")
+            else
+                self:setActionAnim("Rake")
+            end
+        end,
+    },
+    [Action.TURN_ON] = {
+        keeps = function(self) return isBank(self.bank) end,
+        check = function(self)
+            local summary = bankSummary(self)
+            return summary ~= nil and not summary.on
+        end,
+        command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = true } end,
+        minutes = 0.5,
+        doneSound = "LightSwitch",
+    },
+    [Action.TURN_OFF] = {
+        keeps = function(self) return isBank(self.bank) end,
+        check = function(self)
+            local summary = bankSummary(self)
+            return summary ~= nil and summary.on == true
+        end,
+        command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = false } end,
+        minutes = 0.5,
+        doneSound = "LightSwitch",
+    },
+    [Action.ATTACH_MAINTAINER] = {
+        keeps = function(self)
+            return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
+                and holdsItem(self)
+        end,
+        check = function(self) return RenewableEnergy.SolarMaintainer.canAttach(self.vehicle) end,
+        run = function(self) return RenewableEnergy.SolarMaintainer.attach(self.character, self.vehicle, self.item) end,
+        minutes = 1,
+        sound = "GeneratorConnect",
+    },
+    [Action.DETACH_MAINTAINER] = {
+        keeps = function(self) return inWorld(self.vehicle) end,
+        check = function(self) return RenewableEnergy.SolarMaintainer.isAttached(self.vehicle) end,
+        run = function(self) return RenewableEnergy.SolarMaintainer.detach(self.character, self.vehicle) end,
+        minutes = 1,
+    },
+    [Action.WIRE_IN] = {
+        keeps = function(self) return isBank(self.bank) and self.item ~= nil and holdsItem(self) end,
+        check = function(self) return PowerBank.wiringRefusal(self.character, self.bank, self.item) == nil end,
+        command = function(self) return "wireIn", { bank = positionOf(self.bank), itemId = self.item:getID() } end,
+        units = function(self) return wiringUnits(self, partWiring(self)) end,
+        light = true,
+        sound = "GeneratorConnect",
+    },
+    [Action.UNWIRE] = {
+        keeps = function(self)
+            return self.item ~= nil and holdsItem(self) and PowerBank.partKind(self.item:getFullType()) ~= nil
+        end,
+        command = function(self) return "unwire", { bank = positionOf(self.bank), itemId = self.item:getID() } end,
+        units = function(self) return wiringUnits(self, partWiring(self), 0.5) end,
+        light = true,
+        partInBank = true,
+        sound = "GeneratorConnect",
+    },
+    [Action.REPAIR_PART] = {
+        keeps = function(self) return self.item ~= nil and holdsItem(self) end,
+        check = function(self) return PowerBank.repairRefusal(self.character, self.item) == nil end,
+        command = function(self) return "repairPart", { bank = positionOf(self.bank), itemId = self.item:getID() } end,
+        -- As vanilla's ISFixGenerator.
+        units = function(self) return 150 - electricity(self) * 3 end,
+        light = true,
+        partInBank = true,
+        sound = "GeneratorRepair",
+    },
+    [Action.RENAME] = {
+        keeps = function(self) return isBank(self.bank) and type(self.bankName) == "string" end,
+        command = function(self) return "rename", { bank = positionOf(self.bank), name = self.bankName } end,
+        minutes = 0.5,
+    },
+    [Action.REPAIR_PANEL] = {
+        keeps = function(self)
+            local part = inWorld(self.vehicle) and self.vehicle:getPartById(self.partId)
+            return part and part:getInventoryItem() ~= nil or false
+        end,
+        check = function(self)
+            local ArrowBoard = arrowBoard()
+            return ArrowBoard ~= nil and ArrowBoard.repairablePanel(self.vehicle, self.partId) ~= nil
+                and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
+        end,
+        run = function(self) return arrowBoard().repairPanel(self.character, self.vehicle, self.partId) end,
+        -- As the crafting window times Repair Cracked Module (ISHandcraftAction).
+        units = function(self) return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
+        light = true,
+        sound = "GeneratorRepair",
+    },
+    -- As long as vanilla's for a lamp's bulb at the default day length (ISLightActions).
+    [Action.REMOVE_BULB] = {
+        keeps = function(self) return isGardenLight(self.object) end,
+        check = function(self) return RenewableEnergy.SolarGardenLight.getBulb(self.object) ~= nil end,
+        run = function(self) return RenewableEnergy.SolarGardenLight.removeBulb(self.character, self.object) end,
+        minutes = 1,
+    },
+    [Action.ADD_BULB] = {
+        keeps = function(self)
+            return isGardenLight(self.object) and RenewableEnergy.SolarGardenLight.isBulb(self.item) and holdsItem(self)
+        end,
+        check = function(self) return RenewableEnergy.SolarGardenLight.getBulb(self.object) == nil end,
+        run = function(self) return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item) end,
+        minutes = 1,
+    },
+    -- Cut Padlock: the lid unlocked, its lock broken. Vanilla saves and sends a broken lock with the
+    -- door, never locks it again (BaseVehicle.canLockDoor), and keeps it on the lid's item while
+    -- the lid is off (Vehicles.UninstallComplete.Door). The cutters wear as vanilla's cutting
+    -- recipes wear them (MayDegradeLight in CutUpTire, CraftRecipeData.processKeepInputItem), and a
+    -- pair that breaks leaves the hands as a broken weapon does (ISDestroyStuffAction).
+    [Action.CUT_PADLOCK] = {
+        keeps = function(self)
+            return inWorld(self.vehicle) and Action.isBoltCutters(self.item) and self.character:isPrimaryHandItem(self.item)
+        end,
+        check = function(self)
+            local ArrowBoard = arrowBoard()
+            local lid = ArrowBoard ~= nil and ArrowBoard.isTrailer(self.vehicle) and self.vehicle:getPartById(ArrowBoard.LID)
+            return lid and ArrowBoard.isPadlocked(lid) or false
+        end,
+        run = function(self)
+            local lid = self.vehicle:getPartById(arrowBoard().LID)
+            local door = lid:getDoor()
+            door:setLocked(false)
+            door:setLockBroken(true)
+            self.vehicle:transmitPartDoor(lid)
+            if self.item:damageCheck(0, 3) then
+                ItemUtils.checkWeapon(self.character)
+            end
+            return true
+        end,
+        -- A squeeze of the handles, far quicker than unbolting the lid.
+        units = 100,
+        -- As vanilla works on a vehicle part at waist height (ISUninstallVehiclePart).
+        begin = function(self) self:setActionAnim("VehicleWorkOnMid") end,
+        -- The sound of a lock giving way, as when a character forces a locked window
+        -- (OpenWindowState).
+        doneSound = "BreakLockOnWindow",
+    },
+    [Action.BOARD_ON] = {
+        keeps = function(self) return inWorld(self.vehicle) end,
+        check = function(self) return arrowBoard() ~= nil and arrowBoard().canSwitch(self.vehicle, true) end,
+        run = function(self) return arrowBoard().setSwitch(self.vehicle, true) end,
+        minutes = 0.5,
+        doneSound = "LightSwitch",
+    },
+    [Action.BOARD_OFF] = {
+        keeps = function(self) return inWorld(self.vehicle) end,
+        check = function(self) return arrowBoard() ~= nil and arrowBoard().canSwitch(self.vehicle, false) end,
+        run = function(self) return arrowBoard().setSwitch(self.vehicle, false) end,
+        minutes = 0.5,
+        doneSound = "LightSwitch",
+    },
+    -- A lever or pin at the foot of the mast.
+    [Action.BRAKE] = {
+        keeps = function(self) return isWindCharger(self.object) end,
+        check = function(self) return not Wind.isBraked(self.object) end,
+        command = function(self) return "setBrake", { source = positionOf(self.object), braked = true } end,
+        minutes = 1,
+    },
+    [Action.RELEASE_BRAKE] = {
+        keeps = function(self) return isWindCharger(self.object) end,
+        check = function(self) return Wind.isBraked(self.object) end,
+        command = function(self) return "setBrake", { source = positionOf(self.object), braked = false } end,
+        minutes = 1,
+    },
+    -- Either tile of a treadmill wired by someone else meanwhile ends the job, so it is wired once.
+    [Action.WIRE_TREADMILL] = {
+        keeps = function(self)
+            return onSquare(self.object) and Treadmill.isTreadmill(self.object) and Treadmill.wiredHalf(self.object) == nil
+        end,
+        check = function(self) return Treadmill.wiringRefusal(self.character, self.object) == nil end,
+        command = function(self) return "wireTreadmill", { source = positionOf(self.object) } end,
+        units = function(self) return wiringUnits(self, Specs.treadmill.wiring) end,
+        light = true,
+        sound = "GeneratorConnect",
+    },
+    -- Lowering the head, unbolting the broken blades and bolting new ones on.
+    [Action.REPLACE_BLADES] = {
+        keeps = function(self) return isWindCharger(self.object) and self.item ~= nil and holdsItem(self) end,
+        check = function(self) return Wind.bladesRefusal(self.object, self.item) == nil end,
+        command = function(self)
+            return "replaceBlades", { source = positionOf(self.object), itemId = self.item:getID() }
+        end,
+        minutes = 20,
+    },
 }
 
 --- Whether the job applies to the world as it is now, every rule of it.
 function Action:canPerform()
-    local keeps, check = KEEPS[self.mode], CHECKS[self.mode]
-    return keeps ~= nil and keeps(self) and (check == nil or check(self))
+    local job = JOBS[self.mode]
+    return job ~= nil and job.keeps(self) and (job.check == nil or job.check(self))
 end
-
--- How far from the middle of the target's square, on each axis in squares, a character may work
--- on a bank, a panel or a garden light: what luautils.walkAdj counts as already there, the square
--- getCorrectSquareForWall moves a wall's target to, and a couple more for the character's drift
--- and a multiplayer client's lag. A vehicle job gets as much past the vehicle's body, whose areas
--- the menu walks the character to (ISPathFindAction.pathToVehicleArea).
-local REACH = 4.6
 
 -- Whether the character stands where the menu would have walked them for the job.
 local function withinReach(character, target)
@@ -294,126 +380,26 @@ local function withinReach(character, target)
         return IsoUtils.DistanceTo(character:getX(), character:getY(), target:getX(), target:getY()) <= reach
             and math.abs(character:getZ() - target:getZ()) < 1
     end
-    local square = target:getSquare()
-    return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= REACH
-        and math.abs(character:getY() - (square:getY() + 0.5)) <= REACH
-        and math.abs(character:getZ() - square:getZ()) < 1
+    return RenewableEnergy.withinReach(character, target, REACH)
 end
 
--- The bank's command for each mode, run on the authority by PowerBank.perform.
-local COMMANDS = {
-    [Action.CONNECT_SOURCE] = function(self)
-        return "connectSource", { bank = positionOf(self.bank), source = positionOf(self.object) }
-    end,
-    [Action.DISCONNECT_SOURCE] = function(self)
-        return "disconnectSource", { source = positionOf(self.object) }
-    end,
-    [Action.CLEAR_SNOW] = function(self)
-        return "clearSnow", { source = positionOf(self.object) }
-    end,
-    [Action.TURN_ON] = function(self)
-        return "setBankOn", { bank = positionOf(self.bank), on = true }
-    end,
-    [Action.TURN_OFF] = function(self)
-        return "setBankOn", { bank = positionOf(self.bank), on = false }
-    end,
-    [Action.WIRE_IN] = function(self)
-        return "wireIn", { bank = positionOf(self.bank), itemId = self.item:getID() }
-    end,
-    [Action.UNWIRE] = function(self)
-        return "unwire", { bank = positionOf(self.bank), itemId = self.item:getID() }
-    end,
-    [Action.REPAIR_PART] = function(self)
-        return "repairPart", { bank = positionOf(self.bank), itemId = self.item:getID() }
-    end,
-    [Action.RENAME] = function(self)
-        return "rename", { bank = positionOf(self.bank), name = self.bankName }
-    end,
-    [Action.BRAKE] = function(self)
-        return "setBrake", { source = positionOf(self.object), braked = true }
-    end,
-    [Action.RELEASE_BRAKE] = function(self)
-        return "setBrake", { source = positionOf(self.object), braked = false }
-    end,
-    [Action.WIRE_TREADMILL] = function(self)
-        return "wireTreadmill", { source = positionOf(self.object) }
-    end,
-    [Action.REPLACE_BLADES] = function(self)
-        return "replaceBlades", { source = positionOf(self.object), itemId = self.item:getID() }
-    end,
-}
-
--- In-game minutes of the jobs that skill doesn't speed up.
-local MINUTES = {
-    [Action.CLEAR_SNOW] = 5,
-    [Action.TURN_ON] = 0.5,
-    [Action.TURN_OFF] = 0.5,
-    [Action.BOARD_ON] = 0.5,
-    [Action.BOARD_OFF] = 0.5,
-    [Action.ATTACH_MAINTAINER] = 1,
-    [Action.DETACH_MAINTAINER] = 1,
-    [Action.RENAME] = 0.5,
-    -- As long as vanilla's for a lamp's bulb at the default day length (ISLightActions).
-    [Action.REMOVE_BULB] = 1,
-    [Action.ADD_BULB] = 1,
-    -- A lever or pin at the foot of the mast.
-    [Action.BRAKE] = 1,
-    [Action.RELEASE_BRAKE] = 1,
-    -- Lowering the head, unbolting the broken blades and bolting new ones on.
-    [Action.REPLACE_BLADES] = 20,
-}
-
--- The share of its full time a job takes at an Electricity level: all of it at level 3, less
--- above it and more below, in a straight line.
-local function skillFactor(level)
-    return 1 - 0.095 * (level - 3)
-end
-
--- Wiring a part in takes PowerBank.wiringFor's seconds at Electricity 0, less with skill;
--- unwiring takes half that. A part that is gone takes no time, and complete() refuses it. A
--- treadmill's wiring is Specs.treadmill's.
-local function wiringUnits(self)
-    local wiring
-    if self.mode == Action.WIRE_TREADMILL then
-        wiring = RenewableEnergy.Specs.treadmill.wiring
-    else
-        wiring = self.item and PowerBank.wiringFor(self.item:getFullType())
+-- A job field that is a value or a function of the action.
+local function valueOf(field, self)
+    if type(field) == "function" then
+        return field(self)
     end
-    if not wiring then
-        return 1
-    end
-    local level = self.character:getPerkLevel(Perks.Electricity)
-    local seconds = wiring.seconds * skillFactor(level) / skillFactor(0)
-    if self.mode == Action.UNWIRE then
-        seconds = seconds / 2
-    end
-    return seconds * UNITS_PER_SECOND
+    return field
 end
 
 function Action:getDuration()
     if self.character:isTimedActionInstant() then
         return 1
     end
-    local level = self.character:getPerkLevel(Perks.Electricity)
-    if self.mode == Action.CONNECT_SOURCE or self.mode == Action.DISCONNECT_SOURCE then
-        local minutes = SandboxVars.RenewableEnergy.ConnectPanelMin * skillFactor(level)
-        if self.mode == Action.DISCONNECT_SOURCE then
-            minutes = minutes / 2
-        end
-        return minutes * Action.unitsPerMinute()
-    elseif self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE or self.mode == Action.WIRE_TREADMILL then
-        return wiringUnits(self)
-    elseif self.mode == Action.REPAIR_PART then
-        -- As vanilla's ISFixGenerator.
-        return 150 - level * 3
-    elseif self.mode == Action.REPAIR_PANEL then
-        -- As the crafting window times Repair Cracked Module (ISHandcraftAction).
-        return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5
-    elseif self.mode == Action.CUT_PADLOCK then
-        -- A squeeze of the handles, far quicker than unbolting the lid.
-        return 100
+    local job = JOBS[self.mode]
+    if job.units then
+        return valueOf(job.units, self)
     end
-    return MINUTES[self.mode] * Action.unitsPerMinute()
+    return valueOf(job.minutes, self) * RenewableEnergy.unitsPerMinute()
 end
 
 function Action:target()
@@ -430,13 +416,13 @@ function Action:isValid()
     end
     -- The game asks every tick (IsoGameCharacter.update), so this asks only what can change
     -- mid-job and is cheap to see. The rest waits for start() and complete().
-    local keeps = KEEPS[self.mode]
-    if not (keeps and keeps(self)) then
+    local job = JOBS[self.mode]
+    if not (job and job.keeps(self)) then
         return false
     end
     -- The server can't tell whether a remote player stands in the dark
     -- (IsoPlayer.tooDarkToRead), so the player's own side checks the light.
-    if NEEDS_LIGHT[self.mode] and self.character:tooDarkToRead() then
+    if job.light and self.character:tooDarkToRead() then
         HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
         return false
     end
@@ -450,8 +436,9 @@ end
 
 function Action:update()
     self.character:faceThisObject(self:target())
-    if self.mode == Action.CLEAR_SNOW then
-        self.character:setMetabolicTarget(Metabolics.LightWork)
+    local metabolics = JOBS[self.mode].metabolics
+    if metabolics then
+        self.character:setMetabolicTarget(metabolics)
     end
 end
 
@@ -463,37 +450,25 @@ function Action:start()
         self:forceStop()
         return
     end
+    local job = JOBS[self.mode]
     if isClient() and self.item then
         -- Server syncs can replace the item objects while the action waits in the queue. A bank
         -- gone meanwhile leaves no item, and isValid then stops the job.
         local container = self.character:getInventory()
-        if PART_IN_BANK[self.mode] then
+        if job.partInBank then
             container = isBank(self.bank) and self.bank:getContainer()
         end
         self.item = container and container:getItemWithIDRecursiv(self.item:getID()) or nil
     end
-    if self.mode == Action.CLEAR_SNOW then
-        if self.item and self.item:getType() == "SnowShovel" then
-            self:setActionAnim(BuildingHelper.getShovelAnim(self.item))
-            self.sound = self.character:playSound("Shoveling")
-        else
-            self:setActionAnim("Rake")
-        end
-        return
-    end
-    if self.mode == Action.CUT_PADLOCK then
-        -- As vanilla works on a vehicle part at waist height (ISUninstallVehiclePart).
-        self:setActionAnim("VehicleWorkOnMid")
+    if job.begin then
+        job.begin(self)
         return
     end
     self:setActionAnim("Loot")
     self.character:SetVariable("LootPosition", self.vehicle and "Mid" or "Low")
     self.character:reportEvent("EventLootItem")
-    if self.mode == Action.CONNECT_SOURCE or self.mode == Action.ATTACH_MAINTAINER
-        or self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE or self.mode == Action.WIRE_TREADMILL then
-        self.sound = self.character:playSound("GeneratorConnect")
-    elseif self.mode == Action.REPAIR_PART or self.mode == Action.REPAIR_PANEL then
-        self.sound = self.character:playSound("GeneratorRepair")
+    if job.sound then
+        self.sound = self.character:playSound(job.sound)
     end
 end
 
@@ -508,34 +483,12 @@ function Action:perform()
     if self.sound then
         self.character:stopOrTriggerSound(self.sound)
     end
-    if self.mode == Action.TURN_ON or self.mode == Action.TURN_OFF or self.mode == Action.BOARD_ON
-        or self.mode == Action.BOARD_OFF then
-        self.character:playSound("LightSwitch")
-    end
-    if self.mode == Action.CUT_PADLOCK then
-        -- The sound of a lock giving way, as when a character forces a locked window
-        -- (OpenWindowState).
-        self.character:playSound("BreakLockOnWindow")
+    local doneSound = JOBS[self.mode].doneSound
+    if doneSound then
+        self.character:playSound(doneSound)
     end
     ISInventoryPage.renderDirty = true
     ISBaseTimedAction.perform(self)
-end
-
--- Cut Padlock, on the authority: the lid unlocked, its lock broken. Vanilla saves and sends a
--- broken lock with the door, never locks it again (BaseVehicle.canLockDoor), and keeps it on the
--- lid's item while the lid is off (Vehicles.UninstallComplete.Door). The cutters wear as vanilla's
--- cutting recipes wear them (MayDegradeLight in CutUpTire, CraftRecipeData.processKeepInputItem),
--- and a pair that breaks leaves the hands as a broken weapon does (ISDestroyStuffAction).
-local function cutPadlock(self)
-    local lid = self.vehicle:getPartById(RenewableEnergy.ArrowBoard.LID)
-    local door = lid:getDoor()
-    door:setLocked(false)
-    door:setLockBroken(true)
-    self.vehicle:transmitPartDoor(lid)
-    if self.item:damageCheck(0, 3) then
-        ItemUtils.checkWeapon(self.character)
-    end
-    return true
 end
 
 -- The server never calls isValid(), so this checks the action again. NetTimedAction checks no
@@ -548,28 +501,16 @@ function Action:complete()
     if isServer() and not withinReach(self.character, self:target()) then
         return false
     end
-    if self.mode == Action.ATTACH_MAINTAINER then
-        return RenewableEnergy.SolarMaintainer.attach(self.character, self.vehicle, self.item)
-    elseif self.mode == Action.DETACH_MAINTAINER then
-        return RenewableEnergy.SolarMaintainer.detach(self.character, self.vehicle)
-    elseif self.mode == Action.REPAIR_PANEL then
-        return RenewableEnergy.ArrowBoard.repairPanel(self.character, self.vehicle, self.partId)
-    elseif self.mode == Action.REMOVE_BULB then
-        return RenewableEnergy.SolarGardenLight.removeBulb(self.character, self.object)
-    elseif self.mode == Action.ADD_BULB then
-        return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item)
-    elseif self.mode == Action.CUT_PADLOCK then
-        return cutPadlock(self)
-    elseif self.mode == Action.BOARD_ON or self.mode == Action.BOARD_OFF then
-        return RenewableEnergy.ArrowBoard.setSwitch(self.vehicle, self.mode == Action.BOARD_ON)
+    local job = JOBS[self.mode]
+    if job.run then
+        return job.run(self)
     end
-    local command, args = COMMANDS[self.mode](self)
-    local ok = PowerBank.perform(self.character, command, args)
+    local ok = PowerBank.perform(self.character, job.command(self))
     return ok == true
 end
 
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
--- passing those fields to new() in parameter order (NetTimedAction). `object` is the panel or the
+-- passing those fields to new() in parameter order (NetTimedAction). `object` is the source or the
 -- garden light, `bank` the bank's IsoGenerator, `item` the tool or part the job uses, `bankName`
 -- the bank's new name, `partId` the vehicle part worked on; unused ones are nil. The name can't
 -- be a field called `name`, which NetTimedAction reads as the action's own name.

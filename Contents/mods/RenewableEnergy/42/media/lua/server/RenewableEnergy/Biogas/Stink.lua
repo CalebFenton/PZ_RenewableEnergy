@@ -27,6 +27,10 @@ RenewableEnergy = RenewableEnergy or {}
 local Stink = {}
 RenewableEnergy.Stink = Stink
 
+-- The corpses at which each smell level starts at the default corpse option: nothing below the
+-- first, the game's cap at the last (BodyDamage and MoodleStat).
+Stink.LEVEL_CORPSES = { 6, 15, 25 }
+
 -- Source key -> { x, y, z, want = ghosts asked for, ghosts = { IsoDeadBody, ... }, live = how many
 -- of them the chunk counts now }.
 local sources = {}
@@ -63,6 +67,14 @@ local function settle(source)
     end
 end
 
+-- Settles the source `key` and forgets it once it has nothing left.
+local function settleKey(key, source)
+    settle(source)
+    if source.want == 0 and source.live == 0 then
+        sources[key] = nil
+    end
+end
+
 --- Makes the source `key` at square x, y, z smell like `count` corpses. Takes effect now if the
 --- square is loaded, else when its chunk loads.
 function Stink.set(key, x, y, z, count)
@@ -75,11 +87,33 @@ function Stink.set(key, x, y, z, count)
         sources[key] = source
     end
     source.want = math.max(0, math.floor(count))
-    settle(source)
-    if source.want == 0 and source.live == 0 then
-        sources[key] = nil
+    settleKey(key, source)
+end
+
+-- Sources cleared since the last minute.
+local clearing = {}
+
+--- Takes the source `key`'s stink away for good, at the next game minute or when its chunk next
+--- loads. Not at once: a source whose record goes as its chunk loads (SGlobalObjectSystem's
+--- OnChunkLoaded) is cleared after the chunk zeroed its counts and before LoadChunk counts its
+--- ghosts again, when taking one out would take a real corpse's place.
+function Stink.clear(key)
+    local source = sources[key]
+    if source then
+        source.want = 0
+        clearing[key] = true
     end
 end
+
+Events.EveryOneMinute.Add(function()
+    for key in pairs(clearing) do
+        local source = sources[key]
+        if source then
+            settleKey(key, source)
+        end
+    end
+    clearing = {}
+end)
 
 --- The corpses the source `key` smells like in its chunk's count now.
 function Stink.counted(key)
@@ -101,10 +135,7 @@ local function onLoadChunk(chunk)
                 ghost:addToWorld()
             end
             source.live = #source.ghosts
-            settle(source)
-            if source.want == 0 and source.live == 0 then
-                sources[key] = nil
-            end
+            settleKey(key, source)
         end
     end
 end

@@ -124,7 +124,7 @@ test("renewable_energy_items_recipes_load", {
 
 -- Learning ------------------------------------------------------------------------------------
 
--- What each magazine teaches.
+-- What each magazine teaches: its crafting recipes and its build-menu recipes (entity scripts).
 local MAGAZINES = {
     ["RenewableEnergy.HomesteadPowerMag1"] = {
         "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
@@ -145,21 +145,39 @@ local MAGAZINES = {
     },
     ["RenewableEnergy.HomesteadPowerMag3"] = {
         "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater",
+        builds = {
+            "RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
+            "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
+        },
     },
     ["RenewableEnergy.FemaPamphlet"] = {
         "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeVinegarMildewSpray", "RenewableEnergy_MakeVinegarAphidSpray",
+        builds = { "RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier" },
     },
     ["RenewableEnergy.HomesteadPowerMag4"] = {
         "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
         "RenewableEnergy_MakeHomemadeAlternator",
+        builds = {
+            "RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
+            "RenewableEnergy_AlternatorWindCharger",
+        },
     },
 }
+
+-- Every recipe of the mod's a character can learn: the crafting recipes and the build menu's.
+local function learnable()
+    local names = T.recipeNames()
+    for _, name in ipairs(Debug.buildRecipes()) do
+        table.insert(names, name)
+    end
+    return names
+end
 
 -- Which of the mod's recipes this client's character has learned; the knownRecipes handler reads
 -- the authority's list. A multiplayer server teaches and sends what it taught.
 local function knownHere()
     local known, list = {}, player():getKnownRecipes()
-    for _, name in ipairs(T.recipeNames()) do
+    for _, name in ipairs(learnable()) do
         if list:contains(name) then
             known[name] = true
         end
@@ -179,7 +197,7 @@ local function awaitKnown(self, recipes)
         return true
     end
     T.serverUntil(self, "knownRecipes", { prefix = "RenewableEnergy_" }, function(reply) return knowsAll(reply.known) end)
-    T.waitForCopy(function() return knowsAll(knownHere()) end)
+    T.waitForCopy(function() return knowsAll(knownHere()) end, "this client learning the recipes")
     T.step(function()
         self.known = { server = self.server.knownRecipes.known, client = knownHere() }
     end)
@@ -195,21 +213,38 @@ local function expectTaught(self, what, recipes)
         for _, name in ipairs(recipes) do
             expect(known[name], what .. " did not teach " .. name .. " on the " .. side)
         end
-        for _, name in ipairs(T.recipeNames()) do
+        for _, name in ipairs(learnable()) do
             expect(expected[name] or not known[name], what .. " taught " .. name .. " on the " .. side)
         end
     end
 end
 
--- Reading a magazine through the vanilla action teaches exactly its recipes, each one a recipe
--- that has to be learned.
-for magazine, recipes in pairs(MAGAZINES) do
+-- Forgets every recipe of the mod's on both sides until the test ends, so that what a test teaches
+-- is all that is known; the scenario taught them all.
+local function forgetAll(self, p)
+    T.forgetRecipes(p)
+    T.defer(self, function() T.learnRecipes(p) end)
+    -- The build menu's recipes, which T.forgetRecipes leaves out.
+    local builds = Debug.buildRecipes()
+    PZHarness.Fixtures.forgetRecipes(p, builds)
+    T.defer(self, function() PZHarness.Fixtures.learnRecipes(p, builds) end)
+    T.server(self, "forgetRecipesUntilEnd", { names = builds })
+end
+
+-- Reading a magazine through the vanilla action teaches exactly its recipes, the crafting ones
+-- each a recipe that has to be learned, and its build-menu recipes.
+for magazine, crafts in pairs(MAGAZINES) do
+    local recipes = {}
+    for _, list in ipairs({ crafts, crafts.builds or {} }) do
+        for _, name in ipairs(list) do
+            table.insert(recipes, name)
+        end
+    end
     test("renewable_energy_items_read_" .. snakeName(magazine) .. "_teaches_its_recipes", {
         instant = true,
         run = function(self)
             local p = player()
-            T.forgetRecipes(p)
-            T.defer(self, function() T.learnRecipes(p) end)
+            forgetAll(self, p)
             T.give(self, "magazine", { { type = magazine } })
             -- onCreateRecipeMagazine gives every copy a literatureTitle, and a title read within
             -- the literature cooldown teaches nothing (ISReadABook:complete), so the title is
@@ -223,7 +258,7 @@ for magazine, recipes in pairs(MAGAZINES) do
             awaitKnown(self, recipes)
         end,
         validate = function(self)
-            for _, name in ipairs(recipes) do
+            for _, name in ipairs(crafts) do
                 local recipe = getScriptManager():getCraftRecipe(name)
                 expect(recipe ~= nil and recipe:needToBeLearn(), magazine .. " teaches " .. name .. ", which needs no learning")
             end
@@ -232,50 +267,19 @@ for magazine, recipes in pairs(MAGAZINES) do
     })
 end
 
--- The literature also teaches build-menu recipes (entity scripts), which the loop above can't see.
-local TEACHES_BUILDS = {
-    ["RenewableEnergy.HomesteadPowerMag3"] = "DIGESTER_RECIPES",
-    ["RenewableEnergy.FemaPamphlet"] = "GASIFIER_RECIPES",
-    ["RenewableEnergy.HomesteadPowerMag4"] = "WIND_RECIPES",
-}
-
-for literature, list in pairs(TEACHES_BUILDS) do
-    test("renewable_energy_items_read_" .. snakeName(literature) .. "_teaches_its_builds", {
-        instant = true,
-        run = function(self)
-            local p = player()
-            local names = RenewableEnergy.Debug[list]
-            PZHarness.Fixtures.forgetRecipes(p, names)
-            T.defer(self, function() PZHarness.Fixtures.learnRecipes(p, names) end)
-            T.server(self, "forgetRecipesUntilEnd", { names = names })
-            T.give(self, "magazine", { { type = literature } })
-            T.server(self, "forgetLiterature", function() return { title = self.items.magazine[1]:getModData().literatureTitle } end)
-            T.step(function()
-                local item = self.items.magazine[1]
-                p:getReadLiterature():remove(item:getModData().literatureTitle)
-                ISTimedActionQueue.add(ISReadABook:new(p, item))
-            end)
-            T.serverUntil(self, "knownRecipes", { prefix = "RenewableEnergy_" }, function(reply)
-                for _, name in ipairs(names) do
-                    if not reply.known[name] then return false end
-                end
-                return true
-            end)
-            T.step(function()
-                self.client = {}
-                for _, name in ipairs(names) do
-                    self.client[name] = p:getKnownRecipes():contains(name)
-                end
-            end)
-        end,
-        validate = function(self)
-            for _, name in ipairs(RenewableEnergy.Debug[list]) do
-                expect(self.server.knownRecipes.known[name], "reading " .. literature .. " did not teach " .. name .. " on the server")
-                expect(self.client[name], "reading " .. literature .. " did not teach " .. name .. " on the client")
-            end
-        end,
-    })
-end
+-- Cutting up a fridge with a blowtorch also gives its compressor, which a digester uses to fill
+-- propane tanks.
+test("renewable_energy_items_fridge_scraps_to_compressor", {
+    validate = function()
+        local fridge = ISMoveableDefinitions:getInstance().getScrapDefinition("Fridge")
+        local found = false
+        -- Moveables.lua adds it with a static size, as vanilla adds the fridge's other scrap.
+        for _, entry in ipairs(fridge and fridge.returnItemsStatic or {}) do
+            found = found or entry.returnItem == RenewableEnergy.Digester.COMPRESSOR
+        end
+        expect(found, "scrapping a fridge doesn't list " .. tostring(RenewableEnergy.Digester.COMPRESSOR))
+    end,
+})
 
 -- Researching found hardware teaches exactly what to build from it: the item's own recipe
 -- (OutputMapper) and its ResearchableRecipes.
@@ -297,8 +301,7 @@ for fullType, recipes in pairs(RESEARCH) do
         instant = true,
         run = function(self)
             local p = player()
-            T.forgetRecipes(p)
-            T.defer(self, function() T.learnRecipes(p) end)
+            forgetAll(self, p)
             -- Research needs two thirds of a recipe's highest skill requirement
             -- (CraftRecipe.getResearchSkillLevel); the top level meets any.
             for _, perk in ipairs({ Perks.Electricity, Perks.MetalWelding, Perks.Woodwork }) do

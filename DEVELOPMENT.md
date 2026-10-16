@@ -142,6 +142,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - Debug builds parse strict JSON, without comments or trailing commas. Write `%%` for a literal percent sign.
 - Vanilla keys such as `ContextMenu_Turn_On`, `ContextMenu_AddBattery`, and `ContextMenu_Remove_Battery` are already translated into every language.
 - An entity style's `DisplayName` (a `xuiSkin` entry) is looked up, spaces removed, among the recipe names (`Recipes.json`) when the scripts load, and what comes of that goes through `getText` whenever the name is shown (`XuiSkinScript`, `XuiSkin.EntityUiStyle.getDisplayName`). A debug dedicated server logs a missing translation for every entity's name and, since it loads no textures, "Could not find icon" for every style's `Icon`, vanilla's included, so `SERVER_IGNORE` in `dev/harness.conf` skips ours.
+- The game's Lua compiler keeps a source string one byte per character and then decodes it as UTF-8 (Kahlua `LexState.save`, `newstring`), so a non-ASCII character in a Lua literal, such as `°` or `³`, shows as `?`. JSON translations load as UTF-8 and keep them; take such text from a translation, or from Java (`Temperature.getTemperaturePostfix`).
 
 ## Lua runtime
 
@@ -156,6 +157,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - Server Lua loads after client Lua, so client Lua can't `require` a server file at load time. It has to require it at runtime, when `require` hands back the loaded file's table.
 - `getVehicleById` returns nil in single player, because vehicles are registered with `VehicleManager` only on a server (`BaseVehicle.createPhysics`). Find a vehicle through the squares it stands on instead.
 - The game's Lua has no `next`: a call fails with "tried to call nil". Count a table with `#` or a loop over `pairs` instead.
+- `getScriptManager():getAllBuildableRecipes()` lists the build menu's entity recipes, which `getAllCraftRecipes()` leaves out (`ScriptManager.java`).
 
 ### State and syncing
 
@@ -164,7 +166,8 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 - A client sends its whole player modData to the server (`transmitModData`), and the server replaces its copy with it. ISHotbar does this after every clothing change, so anything the server writes to player modData can disappear.
 - The Global Object System (`zombie/globalObjects`) saves the modData keys an object system names with `setObjectModDataKeys` with the world, even while the object's chunk is unloaded. Loading puts back every key the save holds, named or not (`SGlobalObject.load`), so a key dropped from the list stays in old saves until the mod clears it. `setObjectSyncKeys` sends the keys it names to every client, in single player too: each `updateOnClient`, like the system's `sendCommand`, goes to every connection however far away (`SGlobalObjectNetwork.sendPacket`). A client copies the keys it gets onto its copy and keeps any key the update left out (`CGlobalObjectSystem.receiveUpdateLuaObjectAt`), so a value that can become nil belongs inside a synced table. To reach one player, the server calls the global `sendServerCommand(player, module, command, args)`, which does nothing in single player.
 - A system registered with `SGlobalObjects.registerSystem` must put a `getInitialStateForClient` function in its modData, or the game throws when a client connects (`SGlobalObjectSystem.getInitialStateForClient`). `SGlobalObjectSystem.lua` defines one for the systems derived from it.
-- A container's `AcceptItemFunction` filter is not saved with the container. Set it again whenever the object loads (`MapObjects.OnLoadWithSprite`) and whenever it is placed (`OnObjectAdded`), on every side.
+- A container's `AcceptItemFunction` filter is not saved with the container. Set it again whenever the object loads (`MapObjects.OnLoadWithSprite`) and whenever it is placed (`OnObjectAdded`), on every side. `sendObjectChange(IsoObjectChange.CONTAINERS)`, which a container's new capacity needs to reach clients, replaces the clients' container objects and so drops their filters too (`IsoObject.loadChange`).
+- `MapObjects.OnLoadWithSprite` keeps one function per sprite and priority: a second registration replaces the first without a word (`MapObjects.java`). Single player loads the client and server folders into one state, so a client and a server handler for the same sprite need different priorities.
 - On a server the global `sendItemStats(item)` sends the item to the clients near its container's square, object or player, and to every client when the container has none, which throws while it writes the container's place (`GameServer.sendItemStats`). Only scratch containers that never enter the world, as tests and loot measurements make, have none.
 - A battery's charge is stored as whole uses of its `UseDelta` (`InventoryItem.setCurrentUsesFloat` rounds) and read back as a 32-bit float, so a charge read back after it is set is off by up to half a use.
 - The noxious smell moodle and the food sickness from corpses come from a count per chunk level, split by building (`CorpseCount`), which only `IsoDeadBody.addToWorld` and `removeFromWorld` change, and neither needs the body on a square: a body made with `IsoDeadBody.new(getCell())`, moved with `setX`, `setY` and `setZ` and added to the world counts without being drawn, looted, rotted or saved. A chunk zeroes its counts when it unloads, with no event, and again just before `LoadChunk` fires (`IsoChunk.doLoadGridsquare`), and an outdoor count goes below zero if a body is removed after that (`CorpseCount.ChunkLevelData.corpseRemoved`). A multiplayer client's moodle follows the rate the server sends every two seconds (`PlayerDamagePacket`, `NetworkPlayerManager`).
@@ -184,6 +187,7 @@ The game loads only JSON translations, from `media/lua/shared/Translate/<LANG>/<
 | Event | Where it fires |
 |---|---|
 | `EveryOneMinute` | Single player, multiplayer client, and server. It fires at most once per tick however much game time passed, so compute elapsed time from `getGameTime():getWorldAgeHours()`. |
+| `OnObjectAdded` | Multiplayer clients, for an object the server adds (`AddItemToMapPacket`). Single player fires it only where Lua calls `triggerEvent("OnObjectAdded", object)`, so a build-menu entity's `OnCreate` fires it, as vanilla's `TrapBO` does. |
 | `OnInitGlobalModData` | Single player, server, and multiplayer client, once per loaded game, after the sandbox options load. A client has received the server's options by then. |
 | `OnLoadedMapZones` | Every side, after `StashSystem.load` (`IsoWorld.init`). |
 | `OnGameStart` | Only where `IngameState.enter()` runs, which a dedicated server never calls, so never on a dedicated server. |

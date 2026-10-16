@@ -1,5 +1,6 @@
--- The authority's half of the biogas and wood gas tests: digesters, gasifiers and their stink live
--- where the authority runs them. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
+-- The authority's half of the biogas tests: the stink, the digesters, and the Global Object System
+-- records both digesters and gasifiers are (Helpers.recordAt), which the wood gas tests drive too.
+-- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
@@ -18,9 +19,10 @@ handler("stinkSet", function(player, args, defer)
     return { counted = Stink.counted(args.key) }
 end)
 
--- What the authority's copy of the character smells: its corpse sickness rate, its noxious smell
--- moodle level and food sickness; the corpses on the square at x, y, z, which ghosts never join;
--- and what is left of the filter of a worn gas mask, if any.
+-- What the authority's copy of the character smells: its noxious smell moodle level and corpse
+-- sickness rate; the corpses and moving objects on the square at x, y, z, which ghosts never join;
+-- what is left of the filter of a worn gas mask, if any; and the corpse counts at which the game's
+-- smell levels start (Stink.LEVEL_CORPSES), which a multiplayer client's Lua doesn't have.
 handler("stinkRead", function(player, args)
     local square = getSquare(args.x, args.y, args.z)
     local mask
@@ -31,54 +33,71 @@ handler("stinkRead", function(player, args)
             mask = item:getUsedDelta()
         end
     end
+    local levels = {}
+    for i, count in ipairs(RenewableEnergy.Stink.LEVEL_CORPSES) do
+        levels[i] = count
+    end
     return {
-        rate = player:getCorpseSicknessRate(),
         level = player:getMoodles():getMoodleLevel(MoodleType.NOXIOUS_SMELL),
-        sickness = player:getStats():get(CharacterStat.FOOD_SICKNESS),
+        rate = player:getCorpseSicknessRate(),
         bodies = square and square:getDeadBodys():size() or -1,
         objects = square and square:getMovingObjects():size() or -1,
         mask = mask,
+        levels = levels,
     }
 end)
 
--- Digesters -------------------------------------------------------------------------------------
-
-local function digesterAt(args)
-    local square = Helpers.squareAt(args)
-    local object = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.Digester.isDigester)
-    local record = object and RenewableEnergy.Digester.recordOf(object)
-    if not record then
-        return nil, nil, "a digester at " .. tostring(args.x) .. "," .. tostring(args.y)
+-- The stink score's edges: none below 0.2, then each smell level from the corpse count it starts
+-- at, up to the third at 2.
+Helpers.check("digesterCorpsesFor", function(expect)
+    local corpsesFor = RenewableEnergy.DigesterObject.corpsesFor
+    local levels = RenewableEnergy.Stink.LEVEL_CORPSES
+    local function band(score, lowest, below)
+        local corpses = corpsesFor(score)
+        expect(corpses >= lowest and (not below or corpses < below),
+            "a stink score of " .. score .. " smells like " .. corpses .. " corpses")
     end
-    return record, object
-end
+    band(0.19, 0, 1)
+    band(0.2, levels[1], levels[2])
+    band(0.999, levels[1], levels[2])
+    band(1, levels[2], levels[3])
+    band(1.999, levels[2], levels[3])
+    band(2, levels[3])
+end)
 
--- Builds a digester of the Sprites.digester tile `args.tile` ("barrel.steel", "insulated", ...)
--- at x, y, z, as the build menu does (ISBuildIsoEntity:create): a thumpable on the square, then the
--- entity's OnCreate. Taken away when the test ends, the way the game removes it, found again by its
--- place, since a chunk that unloaded and loaded meanwhile holds a new copy.
-handler("digesterPlace", function(player, args, defer)
+-- Records (digesters and gasifiers) -----------------------------------------------------------------
+
+-- Builds the record of kind `args.kind` on the Sprites[kind] tile `args.tile` (a dotted path:
+-- "barrel.steel", "standard") at x, y, z, as the build menu does (ISBuildIsoEntity:create): a
+-- thumpable on the square, then the entity's OnCreate. Taken away when the test ends, the way the
+-- game removes it, found again by its place, since a chunk that unloaded and loaded meanwhile holds
+-- a new copy.
+handler("recordPlace", function(player, args, defer)
+    local kind = Helpers.RECORD_KINDS[args.kind]
     local square = Helpers.squareAt(args)
-    if not square then
-        return nil, "a loaded square for a digester"
+    if not (kind and square) then
+        return nil, "a loaded square for a " .. tostring(args.kind)
     end
-    local sprite = RenewableEnergy.Sprites.digester
+    local sprite = RenewableEnergy.Sprites[args.kind]
     for part in string.gmatch(args.tile, "[^.]+") do
-        sprite = sprite[part]
+        sprite = sprite and sprite[part]
+    end
+    if type(sprite) ~= "string" then
+        return nil, "the " .. args.kind .. " tile " .. tostring(args.tile)
     end
     local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
     square:AddSpecialObject(thumpable)
-    RenewableEnergy.DigesterSystem.OnCreate({ thumpable = thumpable })
+    kind.system().OnCreate({ thumpable = thumpable })
     thumpable:transmitCompleteItemToClients()
-    defer(function() Helpers.removeObject(select(2, digesterAt(args)) or thumpable) end)
+    defer(function() Helpers.removeObject(select(2, Helpers.recordAt(args)) or thumpable) end)
     return {}
 end)
 
--- Takes away, when the test ends, whatever digester the test builds at x, y, z by other means
--- (the build menu).
-handler("trackDigester", function(player, args, defer)
+-- Takes away, when the test ends, whatever record of kind `args.kind` the test builds at x, y, z by
+-- other means (the build menu).
+handler("recordTrack", function(player, args, defer)
     defer(function()
-        local _, object = digesterAt(args)
+        local _, object = Helpers.recordAt(args)
         if object then
             Helpers.removeObject(object)
         end
@@ -86,10 +105,10 @@ handler("trackDigester", function(player, args, defer)
     return {}
 end)
 
--- Sets the record's fields `args.fields` (DigesterObject.SAVED_FIELDS), then shows and sends what
+-- Sets the record's fields `args.fields` (its SAVED_FIELDS) as of now, then shows and sends what
 -- changed.
-handler("digesterSet", function(player, args)
-    local record, _, missing = digesterAt(args)
+handler("recordSet", function(player, args)
+    local record, _, missing = Helpers.recordAt(args)
     if not record then return nil, missing end
     for key, value in pairs(args.fields) do
         record[key] = value
@@ -99,260 +118,63 @@ handler("digesterSet", function(player, args)
     return {}
 end)
 
--- Puts `args.items` ({ type, count, rotten }) in the digester's hopper, past its filter, as a
--- player's transfer would.
-handler("digesterFill", function(player, args)
-    local _, object, missing = digesterAt(args)
+-- Puts `args.items` ({ [container name] = { { type, count, rotten } } }, the names of
+-- Helpers.RECORD_KINDS) in the record's containers, past their filters, as a player's transfer
+-- would: the record hears of it only in its next pass.
+handler("recordFill", function(player, args)
+    local _, object, missing = Helpers.recordAt(args)
     if not object then return nil, missing end
-    local container = object:getContainer()
-    for _, entry in ipairs(args.items) do
-        for _ = 1, entry.count or 1 do
-            local item = container:AddItem(entry.type)
-            if item and entry.rotten then
-                item:setAge(item:getOffAgeMax() + 1)
-            end
-            sendAddItemToContainer(container, item)
+    local containers = Helpers.RECORD_KINDS[args.kind].containers(object)
+    for name, entries in pairs(args.items) do
+        local container = containers[name]
+        if not container then
+            return nil, "a " .. name .. " on the " .. args.kind
         end
-    end
-    return {}
-end)
-
--- Runs the digester `args.hours` in hour steps at the air temperature `args.air` (°C), feeding
--- from its hopper as its pass does, without moving the clock.
-handler("digesterRun", function(player, args)
-    local record, object, missing = digesterAt(args)
-    if not record then return nil, missing end
-    local container = object:getContainer()
-    local left = args.hours
-    while left > 0 do
-        local step = math.min(1, left)
-        record:meter(step, container)
-        record:step(step, args.air)
-        left = left - step
-    end
-    record:snapshotHopper(container)
-    record.lastHour = getGameTime():getWorldAgeHours()
-    record:afterChange()
-    return {}
-end)
-
--- The record as plain values, plus what only the authority sees: the ghosts its stink counts, its
--- building's toxicity, its overlays and its hopper's items.
-handler("digesterRead", function(player, args)
-    local record, object, missing = digesterAt(args)
-    if not record then return nil, missing end
-    local state = {}
-    for _, key in ipairs(RenewableEnergy.DigesterObject.SAVED_FIELDS) do
-        if type(record[key]) ~= "table" then
-            state[key] = record[key]
-        end
-    end
-    local building = object:getSquare():getBuilding()
-    state.capacity = record:capacity()
-    state.torn = record:isTorn()
-    state.stink = record:stinkScore()
-    state.ghosts = RenewableEnergy.Stink.counted(record:key())
-    state.toxic = building ~= nil and building:isToxic()
-    state.sprite = object:getSprite():getName()
-    state.overlays = Helpers.overlaysOf(object)
-    state.containerCapacity = object:getContainer():getCapacity()
-    state.hopperItems = object:getContainer():getItems():size()
-    state.summary = record:buildSummary()
-    return state
-end)
-
--- Brings the digester at x, y, z up to now as its pass does, as though `args.hours` had passed
--- since its last pass, loaded or not. Answers what it holds by its record alone.
-handler("digesterCatchUp", function(player, args)
-    local record = RenewableEnergy.Digester.serverSystem:getLuaObjectAt(args.x, args.y, args.z)
-    if not record then
-        return nil, "a digester record at " .. args.x .. "," .. args.y
-    end
-    record.lastHour = getGameTime():getWorldAgeHours() - args.hours
-    record:update()
-    local eaten = 0
-    for _ in pairs(record.eaten) do
-        eaten = eaten + 1
-    end
-    return { loaded = record:getIsoObject() ~= nil, hopper = #record.hopper, eaten = eaten, potential = record.potential }
-end)
-
--- Gas lines -------------------------------------------------------------------------------------
-
-local function generatorOn(args)
-    local square = Helpers.squareAt(args)
-    local generator = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.GasKit.isGenerator)
-    if not generator then
-        return nil, "a generator at " .. tostring(args.x) .. "," .. tostring(args.y)
-    end
-    return generator
-end
-
--- The generator at x, y, z: whether it runs, its fuel, its kit's state and overlays, and whether
--- the pass lists it.
-handler("gasRead", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    local GasKit = RenewableEnergy.GasKit
-    local state = GasKit.stateOf(generator)
-    local copy
-    if state then
-        copy = {}
-        for key, value in pairs(state) do
-            if type(value) ~= "table" then
-                copy[key] = value
-            end
-        end
-        copy.connected = state.source ~= nil
-        copy.sourceKind = state.source and state.source.kind
-    end
-    local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
-    return {
-        running = generator:isActivated(), fuel = generator:getFuel(), state = copy,
-        listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
-        overlays = Helpers.overlaysOf(generator),
-    }
-end)
-
--- Sets the generator's fuel (`args.fuel`, as pouring petrol in does) and switches it on or off
--- (`args.running`), as a player does.
-handler("gasGenerator", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    if args.fuel then
-        generator:setFuel(args.fuel)
-    end
-    if args.running ~= nil then
-        generator:setActivated(args.running)
-    end
-    return {}
-end)
-
--- Runs the gas pass as though `args.hours` had passed since the generator's last.
-handler("gasPass", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    local state = RenewableEnergy.GasKit.stateOf(generator)
-    if state then
-        state.lastHour = getGameTime():getWorldAgeHours() - args.hours
-    end
-    RenewableEnergy.GasLines.updateAll()
-    return {}
-end)
-
--- Sets the watts a generator carries on gas to `args.watts` until the test ends.
-handler("gasCap", function(player, args, defer)
-    local GasKit = RenewableEnergy.GasKit
-    local cap = GasKit.CAP_W
-    GasKit.CAP_W = args.watts
-    defer(function() GasKit.CAP_W = cap end)
-    return {}
-end)
-
--- Gasifiers ------------------------------------------------------------------------------------
-
-local function gasifierAt(args)
-    local square = Helpers.squareAt(args)
-    local object = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.Gasifier.isGasifier)
-    local record = object and RenewableEnergy.Gasifier.recordOf(object)
-    if not record then
-        return nil, nil, "a gasifier at " .. tostring(args.x) .. "," .. tostring(args.y)
-    end
-    return record, object
-end
-
--- Builds a gasifier of tier `args.tier` at x, y, z as the build menu does, as digesterPlace does.
-handler("gasifierPlace", function(player, args, defer)
-    local square = Helpers.squareAt(args)
-    if not square then
-        return nil, "a loaded square for a gasifier"
-    end
-    local thumpable = IsoThumpable.new(getCell(), square, RenewableEnergy.Sprites.gasifier[args.tier], false, nil)
-    square:AddSpecialObject(thumpable)
-    RenewableEnergy.GasifierSystem.OnCreate({ thumpable = thumpable })
-    thumpable:transmitCompleteItemToClients()
-    defer(function() Helpers.removeObject(select(2, gasifierAt(args)) or thumpable) end)
-    return {}
-end)
-
--- Sets the record's fields `args.fields` (GasifierObject.SAVED_FIELDS), then shows and sends what
--- changed.
-handler("gasifierSet", function(player, args)
-    local record, _, missing = gasifierAt(args)
-    if not record then return nil, missing end
-    for key, value in pairs(args.fields) do
-        record[key] = value
-    end
-    record.lastHour = getGameTime():getWorldAgeHours()
-    record:afterChange()
-    return {}
-end)
-
--- Puts `args.hopper` and `args.filter` ({ type, count }) in the gasifier's containers, past their
--- filters, as a player's transfer would, and sends the summary.
-handler("gasifierFill", function(player, args)
-    local record, object, missing = gasifierAt(args)
-    if not object then return nil, missing end
-    local Gasifier = RenewableEnergy.Gasifier
-    for key, container in pairs({ hopper = Gasifier.hopperOf(object), filter = Gasifier.filterOf(object) }) do
-        for _, entry in ipairs(args[key] or {}) do
+        for _, entry in ipairs(entries) do
             for _ = 1, entry.count or 1 do
                 local item = container:AddItem(entry.type)
+                if item and entry.rotten then
+                    item:setAge(item:getOffAgeMax() + 1)
+                end
                 if item then
                     sendAddItemToContainer(container, item)
                 end
             end
         end
     end
-    record:afterChange()
     return {}
 end)
 
--- Runs the gasifier's own pass as though `args.hours` had passed since its last.
-handler("gasifierPass", function(player, args)
-    local record, _, missing = gasifierAt(args)
-    if not record then return nil, missing end
+-- Brings the record of kind `args.kind` at x, y, z up to now as its pass does, as though
+-- `args.hours` had passed since its last, its chunk loaded or not. Answers its state
+-- (Helpers.recordState), from the record alone while unloaded.
+handler("recordAge", function(player, args)
+    local kind = Helpers.RECORD_KINDS[args.kind]
+    local record = kind and kind.owner().recordAt(args.x, args.y, args.z)
+    if not record then
+        return nil, "a " .. tostring(args.kind) .. " record at " .. args.x .. "," .. args.y
+    end
     record.lastHour = getGameTime():getWorldAgeHours() - args.hours
     record:update()
+    return Helpers.recordState(args.kind, record, record:getIsoObject())
+end)
+
+-- The record's state (Helpers.recordState).
+handler("recordRead", function(player, args)
+    local record, object, missing = Helpers.recordAt(args)
+    if not record then return nil, missing end
+    return Helpers.recordState(args.kind, record, object)
+end)
+
+-- Digesters -------------------------------------------------------------------------------------
+
+-- Runs the digester at x, y, z for `args.hours` at the air temperature `args.air` (°C), feeding
+-- from its hopper as its pass does, without moving the clock.
+handler("digesterRun", function(player, args)
+    local record, object, missing = Helpers.recordAt({ kind = "digester", x = args.x, y = args.y, z = args.z })
+    if not record then return nil, missing end
+    record:run(args.hours, object:getContainer(), args.air)
+    record.lastHour = getGameTime():getWorldAgeHours()
+    record:afterChange()
     return {}
-end)
-
--- Burns `args.kg` in the gasifier, as a pass would, to leave its ash and tar.
-handler("gasifierBurn", function(player, args)
-    local record, _, missing = gasifierAt(args)
-    if not record then return nil, missing end
-    local burned = record:burn(args.kg)
-    record:afterChange()
-    return { burned = burned }
-end)
-
--- What the gasifier burns to supply a generator delivering `args.watts` for `args.hours`: the
--- firebox and hopper's kilograms before and after, and whether it kept up.
-handler("gasifierSupply", function(player, args)
-    local record, object, missing = gasifierAt(args)
-    if not record then return nil, missing end
-    local Gasifier = RenewableEnergy.Gasifier
-    local before = record.fireKg + Gasifier.hopperKg(Gasifier.hopperOf(object))
-    local kept = record:supply(args.watts, args.hours)
-    record:afterChange()
-    return { burned = before - record.fireKg - Gasifier.hopperKg(Gasifier.hopperOf(object)), kept = kept }
-end)
-
--- The record as plain values, plus its containers, building, overlays and summary.
-handler("gasifierRead", function(player, args)
-    local record, object, missing = gasifierAt(args)
-    if not record then return nil, missing end
-    local Gasifier = RenewableEnergy.Gasifier
-    local state = {}
-    for _, key in ipairs(RenewableEnergy.GasifierObject.SAVED_FIELDS) do
-        state[key] = record[key]
-    end
-    local building = object:getSquare():getBuilding()
-    state.toxic = building ~= nil and building:isToxic()
-    state.overlays = Helpers.overlaysOf(object)
-    state.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(object))
-    state.containers = object:getContainerCount()
-    state.clean, state.tarry = Gasifier.filterCounts(Gasifier.filterOf(object))
-    state.summary = record:buildSummary()
-    return state
 end)

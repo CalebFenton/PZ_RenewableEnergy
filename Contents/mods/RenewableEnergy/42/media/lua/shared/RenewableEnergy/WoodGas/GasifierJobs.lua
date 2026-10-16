@@ -1,15 +1,17 @@
 -- The hands-on jobs at a gasifier: what each takes of the character and what refuses it. The menu
--- shows the same needs the authority checks (RenewableEnergy.firstUnmet). Loading wood and changing
--- the filter's packing are the loot window's.
+-- shows the same needs the authority checks (RenewableEnergy.firstUnmet); the authority does them
+-- (server/RenewableEnergy/WoodGas/GasifierSystem.lua). Loading wood and changing the filter's
+-- packing are the loot window's.
 
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Materials"
 require "RenewableEnergy/WoodGas/Gasifier"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasifierJobs = {}
 RenewableEnergy.GasifierJobs = GasifierJobs
 
-local Gasifier = RenewableEnergy.Gasifier
+local Gasifier, Materials = RenewableEnergy.Gasifier, RenewableEnergy.Materials
 
 GasifierJobs.LIGHT = "LightGasifier"
 GasifierJobs.PUT_OUT = "PutOutGasifier"
@@ -27,41 +29,41 @@ GasifierJobs.COLD_LIGHT_MINUTES = 10
 -- Less than this in the drain isn't worth draining.
 local MIN_CONDENSATE = 0.1
 
-local function notBroken(item)
-    return not item:isBroken()
-end
+-- How each job looks (RenewableEnergyGasAction): Clean Out Ash digs with the shovel in hand, as
+-- vanilla's Clear Ashes does.
+GasifierJobs.LOOK = {
+    [GasifierJobs.LIGHT] = { doneSound = "CampfireLight" },
+    [GasifierJobs.CLEAN_ASH] = { shovel = true },
+}
 
-local function hasTag(character, tag)
-    return character:getInventory():containsTagEvalRecurse(tag, notBroken) and 1 or 0
-end
+GasifierJobs.isTarget = Gasifier.isGasifier
 
-local function bellowsCount(character)
-    local inventory = character:getInventory()
-    for _, fullType in ipairs(Gasifier.BELLOWS) do
-        if inventory:containsTypeRecurse(fullType) then
-            return 1
-        end
-    end
-    return 0
-end
+local BELLOWS = { item = Gasifier.BELLOWS[1], types = Gasifier.BELLOWS, keep = true }
+local SHOVEL = { tool = "TAKE_DIRT", item = "Base.Shovel" }
 
---- What `job` takes of `character` (RenewableEnergy.firstUnmet, RenewableEnergy.Needs), at a
---- gasifier whose summary is `summary`: a cold one also takes bellows to light.
-function GasifierJobs.needs(character, job, summary)
-    local needs = {}
+--- What `job` takes (RenewableEnergy.Materials) at a gasifier whose summary is `summary`: a cold
+--- one also takes bellows to light.
+function GasifierJobs.materials(job, summary)
     if job == GasifierJobs.LIGHT then
-        table.insert(needs, { kind = "tool", item = "Base.Matches", have = hasTag(character, ItemTag.START_FIRE), need = 1 })
         if summary and summary.cold then
-            table.insert(needs, { kind = "tool", item = Gasifier.BELLOWS[1], have = bellowsCount(character), need = 1 })
+            return { Materials.FIRE_STARTER, BELLOWS }
         end
+        return { Materials.FIRE_STARTER }
     elseif job == GasifierJobs.CLEAN_ASH then
-        table.insert(needs, { kind = "tool", item = "Base.Shovel", have = hasTag(character, ItemTag.TAKE_DIRT), need = 1 })
+        return { SHOVEL }
     end
-    return needs
+    return {}
 end
 
---- In-game minutes `job` takes at a gasifier whose summary is `summary`.
-function GasifierJobs.minutesFor(job, summary)
+--- What `job` takes of `character` (RenewableEnergy.firstUnmet, RenewableEnergy.Needs) at a
+--- gasifier whose summary is `summary`.
+function GasifierJobs.needs(character, job, summary)
+    return Materials.needs(character, GasifierJobs.materials(job, summary))
+end
+
+--- In-game minutes `job` takes at `gasifier`.
+function GasifierJobs.minutesFor(job, gasifier)
+    local summary = Gasifier.currentSummary(gasifier)
     if job == GasifierJobs.LIGHT and summary and summary.cold then
         return GasifierJobs.COLD_LIGHT_MINUTES
     end
@@ -88,7 +90,7 @@ end
 --- What refuses `character` doing `job` at the gasifier whose summary is `summary`: a blocker
 --- key, "short" when they lack a need, or nil. `item` is the container Drain Condensate fills, or
 --- nil to drain it onto the ground.
-function GasifierJobs.refusal(character, job, summary, item)
+function GasifierJobs.refusalFor(character, job, summary, item)
     if not summary or not GasifierJobs.MINUTES[job] then
         return "Tooltip_RenewableEnergy_NoGasifier"
     end
@@ -101,6 +103,11 @@ function GasifierJobs.refusal(character, job, summary, item)
         return "Tooltip_RenewableEnergy_WontTakeCondensate"
     end
     return RenewableEnergy.firstUnmet(GasifierJobs.needs(character, job, summary)) and "short" or nil
+end
+
+--- refusalFor at `gasifier` as this side knows it now.
+function GasifierJobs.refusal(character, job, gasifier, item)
+    return GasifierJobs.refusalFor(character, job, Gasifier.currentSummary(gasifier), item)
 end
 
 return GasifierJobs

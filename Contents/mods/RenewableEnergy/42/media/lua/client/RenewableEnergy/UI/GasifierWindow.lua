@@ -1,16 +1,16 @@
--- A gasifier's status window: the digester's window (RenewableEnergy.DigesterWindow) reading the
--- gasifier's summary, which every client keeps.
+-- A gasifier's status window: its summary (RenewableEnergy.Gasifier.summaryOf) as rows.
 
-require "RenewableEnergy/UI/DigesterWindow"
 require "RenewableEnergy/WoodGas/Gasifier"
+require "RenewableEnergy/UI/Format"
+require "RenewableEnergy/UI/SummaryWindow"
 
 RenewableEnergy = RenewableEnergy or {}
-local DigesterWindow = RenewableEnergy.DigesterWindow
-local GasifierWindow = DigesterWindow:derive("RenewableEnergyGasifierWindow")
+local SummaryWindow = RenewableEnergy.SummaryWindow
+local GasifierWindow = SummaryWindow:derive("RenewableEnergyGasifierWindow")
 RenewableEnergy.GasifierWindow = GasifierWindow
 
-local Gasifier = RenewableEnergy.Gasifier
-local percent = DigesterWindow.percent
+local Gasifier, Format = RenewableEnergy.Gasifier, RenewableEnergy.Format
+local row = SummaryWindow.row
 
 -- The ash pit warns from here.
 local ASH_WARN = 80
@@ -24,27 +24,6 @@ function GasifierWindow.stateText(summary)
     return getText("IGUI_RenewableEnergy_GasifierOut")
 end
 
---- The rows the window shows for `summary`: { label, value, color }.
-function GasifierWindow.rows(summary)
-    local rows = {}
-    local function add(key, value, color)
-        table.insert(rows, { label = getText(key), value = value, color = color or "text" })
-    end
-    add("IGUI_RenewableEnergy_GasifierState", GasifierWindow.stateText(summary))
-    add("IGUI_RenewableEnergy_GasifierWood", string.format("%.1f kg", summary.hopperKg), summary.hopperKg <= 0 and "warn" or nil)
-    add("IGUI_RenewableEnergy_GasifierAsh", percent(summary.ash / 100), summary.ash >= ASH_WARN and "warn" or nil)
-    add("IGUI_RenewableEnergy_GasifierFilter", getText("IGUI_RenewableEnergy_FilterState", summary.clean, summary.tarry),
-        summary.clean == 0 and "warn" or nil)
-    add("IGUI_RenewableEnergy_GasifierCondensate", string.format("%.1f / %d L", summary.condensate, Gasifier.CONDENSATE_MAX),
-        summary.condensate >= Gasifier.CONDENSATE_MAX and "warn" or nil)
-    add("IGUI_RenewableEnergy_GasifierOutput", percent(summary.output), summary.output < 1 and "warn" or nil)
-    if summary.wear > 1 then
-        add("IGUI_RenewableEnergy_GasifierWear", getText("IGUI_RenewableEnergy_WearTimes", string.format("%.1f", summary.wear)), "warn")
-    end
-    add("IGUI_RenewableEnergy_GasifierLine", getText(summary.piped and "IGUI_RenewableEnergy_Piped" or "IGUI_RenewableEnergy_NotPiped"))
-    return rows
-end
-
 function GasifierWindow:titleOf(summary)
     return getText("IGUI_RenewableEnergy_Gasifier_" .. summary.tier)
 end
@@ -53,8 +32,22 @@ function GasifierWindow:summaryNow()
     return Gasifier.summaryOf(self.object)
 end
 
+--- The rows the window shows for `summary`: { label, value, color }.
 function GasifierWindow:rowsOf(summary)
-    return GasifierWindow.rows(summary)
+    local rows = {}
+    row(rows, "IGUI_RenewableEnergy_GasifierState", GasifierWindow.stateText(summary))
+    row(rows, "IGUI_RenewableEnergy_GasifierWood", string.format("%.1f kg", summary.hopperKg), summary.hopperKg <= 0 and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_GasifierAsh", Format.percent(summary.ash / 100), summary.ash >= ASH_WARN and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_GasifierFilter", getText("IGUI_RenewableEnergy_FilterState", summary.clean, summary.tarry),
+        summary.clean == 0 and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_GasifierCondensate", string.format("%.1f / %d L", summary.condensate, Gasifier.CONDENSATE_MAX),
+        summary.condensate >= Gasifier.CONDENSATE_MAX and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_GasifierOutput", Format.percent(summary.output), summary.output < 1 and "warn" or nil)
+    if summary.wear > 1 then
+        row(rows, "IGUI_RenewableEnergy_GasifierWear", getText("IGUI_RenewableEnergy_WearTimes", string.format("%.1f", summary.wear)), "warn")
+    end
+    row(rows, "IGUI_RenewableEnergy_GasifierLine", getText(summary.piped and "IGUI_RenewableEnergy_Piped" or "IGUI_RenewableEnergy_NotPiped"))
+    return rows
 end
 
 --- Opens `playerNum`'s window on the gasifier `gasifier`.

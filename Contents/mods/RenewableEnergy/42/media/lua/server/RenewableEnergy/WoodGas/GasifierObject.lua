@@ -1,25 +1,24 @@
 -- One gasifier on the authority (single player or the server): its fire, the wood it burns, the
 -- ash and tar that burning leaves, and the gas it gives the generator it is piped to.
 --
--- The table is the gasifier's global object (SGlobalObject), so every field in SAVED_FIELDS is
--- saved with the world. A lit gasifier burns IDLE_KG_PER_HOUR in its own pass; the generator's gas
--- line (GasLines.run) bills the load on top through supply(). The hopper and filter are its
--- containers, so it only takes more wood, and tars more packing, while its chunk is loaded; while
--- unloaded a lit gasifier burns down what is in the firebox (`fireKg`) and goes out.
+-- The table is the gasifier's global object (RenewableEnergy.ObjectSystem), so every field in
+-- SAVED_FIELDS is saved with the world. A lit gasifier burns IDLE_KG_PER_HOUR in its own pass; the
+-- generator's gas line (GasLines.run) bills the load on top through supply(). The hopper and filter
+-- are its containers, so it only takes more wood, and tars more packing, while its chunk is
+-- loaded; while unloaded a lit gasifier burns down what is in the firebox (`fireKg`) and goes out.
 
 if isClient() then return end
 
-require "Map/SGlobalObject"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Fumes"
+require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier, GasKit, Sprites = RenewableEnergy.Gasifier, RenewableEnergy.GasKit, RenewableEnergy.Sprites
 
-local GasifierObject = SGlobalObject:derive("RenewableEnergy_Gasifier")
+local GasifierObject = RenewableEnergy.ObjectSystem.Object:derive("RenewableEnergy_Gasifier")
 RenewableEnergy.GasifierObject = GasifierObject
 
 -- The fields the Global Object System saves with the world; a field renamed here is lost from
@@ -28,13 +27,7 @@ GasifierObject.SAVED_FIELDS = {
     "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "condensate", "outSince", "pipe", "lastHour",
 }
 
--- A pass longer than this (a save loaded after the clock jumped) counts as this long.
-local LONGEST_PASS = 24 * 7
 local EPSILON = 1e-4
-
-function GasifierObject:new(luaSystem, globalObject)
-    return SGlobalObject.new(self, luaSystem, globalObject)
-end
 
 function GasifierObject:initNew()
     self.lit = false
@@ -52,7 +45,7 @@ function GasifierObject:stateFromIsoObject(isoObject)
     self.tier = Gasifier.tierOf(isoObject)
     if not Gasifier.filterOf(isoObject) then
         local filter = ItemContainer.new(Gasifier.FILTER, isoObject:getSquare(), isoObject)
-        filter:setCapacity(Gasifier.TIERS[self.tier].filterCapacity)
+        filter:setCapacity(self:tierSpec().filterCapacity)
         isoObject:addSecondaryContainer(filter)
         if isServer() then
             isoObject:sendObjectChange(IsoObjectChange.CONTAINERS)
@@ -70,14 +63,6 @@ function GasifierObject:loaded(isoObject)
     self.indoors = square:getBuilding() ~= nil and not square:isOutside()
     Gasifier.adoptContainers(isoObject)
     self:afterChange()
-end
-
-function GasifierObject:tierSpec()
-    return Gasifier.TIERS[self.tier]
-end
-
-function GasifierObject:key()
-    return "gasifier:" .. self.x .. "," .. self.y .. "," .. self.z
 end
 
 -- Burning ------------------------------------------------------------------------------------
@@ -152,6 +137,16 @@ function GasifierObject:burn(kg)
     return burned
 end
 
+--- Lights the fire, stoking it first if the firebox is empty. Returns whether there was fuel.
+function GasifierObject:light(isoObject)
+    if self.fireKg <= 0 and not self:stoke(Gasifier.hopperOf(isoObject)) then
+        return false
+    end
+    self.lit = true
+    self.outSince = nil
+    return true
+end
+
 function GasifierObject:goOut()
     if self.lit then
         self.lit = false
@@ -159,10 +154,11 @@ function GasifierObject:goOut()
     end
 end
 
---- Whether lighting it takes bellows: out long enough to have gone cold, or never lit.
-function GasifierObject:isCold()
-    return not self.lit and (self.outSince == nil
-        or getGameTime():getWorldAgeHours() - self.outSince > Gasifier.COLD_HOURS)
+--- Sets the pipe toward the generator it feeds, by the generator's side of it (Gasifier.sideOf),
+--- or nil for none. The gas line lays and cuts it.
+function GasifierObject:setPipe(side)
+    self.pipe = side
+    self:afterChange()
 end
 
 -- The gas line's source ------------------------------------------------------------------------
@@ -172,35 +168,16 @@ function GasifierObject:filterCounts()
     return Gasifier.filterCounts(isoObject and Gasifier.filterOf(isoObject))
 end
 
---- What it carries, as a share of what a generator carries on gas: a full ash pit or a spent
---- filter halves it.
-function GasifierObject:outputShare()
-    local clean = self:filterCounts()
-    local share = 1
-    if self.ash >= 100 then
-        share = share * Gasifier.DIRTY_OUTPUT
-    end
-    if clean == 0 then
-        share = share * Gasifier.DIRTY_OUTPUT
-    end
-    return share
-end
-
 function GasifierObject:canSupply()
     return self.lit and self:getIsoObject() ~= nil
 end
 
 function GasifierObject:capW()
-    return GasKit.CAP_W * self:outputShare()
+    return GasKit.CAP_W * Gasifier.outputShare(self.ash, (self:filterCounts()))
 end
 
---- How much faster the generator wears on this gas: with the tar the filter lets through.
 function GasifierObject:wearFactor()
-    local clean, tarry = self:filterCounts()
-    if clean == 0 then
-        return Gasifier.WEAR_DIRTY
-    end
-    return 1 + (Gasifier.WEAR_DIRTY - 1) * tarry / (clean + tarry)
+    return Gasifier.wearFactor(self:filterCounts())
 end
 
 --- Burns the wood a generator delivering `watts` for `hours` takes beyond the idle burn, which
@@ -212,83 +189,37 @@ end
 
 -- The pass --------------------------------------------------------------------------------------
 
---- Brings the gasifier up to now: a lit one burns its idle wood.
-function GasifierObject:update()
-    local now = getGameTime():getWorldAgeHours()
-    local hours = math.min(LONGEST_PASS, now - (self.lastHour or now))
-    self.lastHour = now
+--- Burns the idle wood of the `hours` since it last caught up, if lit.
+function GasifierObject:advance(hours)
     if hours > 0 and self.lit then
         self:burn(Gasifier.IDLE_KG_PER_HOUR * hours)
     end
-    self:afterChange()
 end
 
 --- Shows and tells what changed, after a pass or a job.
 function GasifierObject:afterChange()
+    self:setFuming(self.lit and self.indoors)
     local isoObject = self:getIsoObject()
-    RenewableEnergy.Fumes.set(self:key(), isoObject and isoObject:getSquare():getBuilding(), self.lit and self.indoors)
-    self:showLit()
-    self:showPipe()
+    if isoObject then
+        RenewableEnergy.showOverlay(isoObject, Gasifier.isLitOverlay, self.lit and Sprites.gasifierLit[self.tier] or nil)
+        RenewableEnergy.showOverlay(isoObject, Gasifier.isPipeOverlay, self.pipe and Sprites.gasifierPipe[self.pipe] or nil)
+    end
     self:sendSummary()
-end
-
-local showOverlay = RenewableEnergy.showOverlay
-
-function GasifierObject:showLit()
-    local isoObject = self:getIsoObject()
-    if not isoObject then return end
-    showOverlay(isoObject, Gasifier.isLitOverlay, self.lit and Sprites.gasifierLit[self.tier] or nil)
-end
-
--- The pipe toward the generator it feeds (`pipe`, the generator's side of it), set by the gas line.
-function GasifierObject:showPipe()
-    local isoObject = self:getIsoObject()
-    if not isoObject then return end
-    showOverlay(isoObject, Gasifier.isPipeOverlay, self.pipe and Sprites.gasifierPipe[self.pipe] or nil)
 end
 
 -- Summary --------------------------------------------------------------------------------------
 
-local function round(value, places)
-    local scale = 10 ^ places
-    return math.floor(value * scale + 0.5) / scale
-end
-
 --- What every client keeps of the gasifier: what its menu checks and its status window shows.
+--- Gasifier's accessors add what its containers hold and what follows from that.
 function GasifierObject:buildSummary()
-    local isoObject = self:getIsoObject()
-    local clean, tarry = self:filterCounts()
+    local round = RenewableEnergy.round
     return {
-        tier = self.tier, lit = self.lit == true, cold = self:isCold(),
+        tier = self.tier, lit = self.lit == true, outSince = self.outSince,
         fireKg = round(self.fireKg, 1),
-        hopperKg = round(Gasifier.hopperKg(isoObject and Gasifier.hopperOf(isoObject)) + self.fireKg, 1),
         ash = math.floor(self.ash),
-        clean = clean, tarry = tarry, condensate = round(self.condensate, 1),
-        output = round(self:outputShare(), 2), wear = round(self:wearFactor(), 1),
+        condensate = round(self.condensate, 1),
         piped = self.pipe ~= nil,
     }
-end
-
-local function same(a, b)
-    for key, value in pairs(a) do
-        if b[key] ~= value then
-            return false
-        end
-    end
-    for key in pairs(b) do
-        if a[key] == nil then
-            return false
-        end
-    end
-    return true
-end
-
-function GasifierObject:sendSummary()
-    local summary = self:buildSummary()
-    if not (self.summary and same(summary, self.summary)) then
-        self.summary = summary
-        self:updateOnClient()
-    end
 end
 
 return GasifierObject

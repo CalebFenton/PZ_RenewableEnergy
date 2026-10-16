@@ -1,5 +1,6 @@
--- Biogas digesters, as both sides know them: the three tiers and their gas holders, what each
--- feed is worth, which tiles are digesters, and the summary every client keeps of each one.
+-- Biogas digesters, as both sides know them: the three tiers and their gas holders, how they
+-- digest, what each feed is worth, which tiles are digesters, and the summary every client keeps
+-- of each one.
 --
 -- A digester is a tile the build menu places (scripts/RenewableEnergy/Entities.txt) with a
 -- container that is its feed hopper. The authority keeps its state in a Global Object System
@@ -10,15 +11,16 @@
 -- time in game hours.
 
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/GlobalObjects"
+require "RenewableEnergy/WoodGas/Gasifier"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester = {}
 RenewableEnergy.Digester = Digester
 
-local Sprites = RenewableEnergy.Sprites
+local Sprites, Gasifier = RenewableEnergy.Sprites, RenewableEnergy.Gasifier
 
 Digester.SYSTEM_NAME = "renewable_energy_digester"
-Digester.CONTAINER = "RenewableEnergyDigester"
 
 -- potentialCap: undigested potential it holds; feed waits in the hopper above it.
 -- days: how many days its temperature takes to follow the air (a time constant).
@@ -40,6 +42,18 @@ Digester.HOLDERS = {
     dome = { capacity = 4.0 },
 }
 Digester.HOLDER_OF_TIER = { insulated = "drum", dome = "dome" }
+
+-- Digestion rate k (share of the undigested potential a day) by temperature in °C, between which
+-- it runs in straight lines: nothing at the first, the mesophilic best at 35 to 40, nothing again
+-- at the last.
+Digester.K_BY_TEMP = { { 10, 0 }, { 15, 0.01 }, { 25, 1 / 30 }, { 35, 1 / 15 }, { 40, 1 / 15 }, { 50, 0 } }
+-- Startup counts only hours this warm, and manure's head start covers at most this share of it.
+Digester.STARTUP_MIN_TEMP = 10
+Digester.SEED_SHARE = 0.7
+-- Sludge, in percent, past which digestion slows to SLUDGE_K.
+Digester.SLUDGE_SLOW, Digester.SLUDGE_K = 80, 0.5
+-- A holder that vents indoors leaks for this many hours.
+Digester.LEAK_HOURS = 2
 
 -- Sludge, in percent of the tank, that one compost bag holds, as vanilla's composter
 -- (ISGetCompost).
@@ -81,7 +95,7 @@ local FEEDS = {
 }
 -- Alkalis that fix a sour digester: acid taken off per item, or per use of a drainable.
 local NEUTRALISERS = {
-    ["RenewableEnergy.WoodAsh"] = -3,
+    [Gasifier.WOOD_ASH] = -3,
     ["Base.BakingSoda"] = -3,
     ["Base.Quicklime"] = -6,
 }
@@ -92,7 +106,7 @@ local MEAT_TYPES = { Meat = true, Game = true, Beef = true, Poultry = true, Saus
 -- Dung of the other animals (mice, rats) is worth a little.
 local OTHER_DUNG = { potential = 0.01, acid = 0 }
 
-local function isNeutraliser(item)
+function Digester.isNeutraliser(item)
     return NEUTRALISERS[item:getFullType()] ~= nil
 end
 
@@ -138,100 +152,56 @@ function Digester.adoptContainer(container)
     end
 end
 
-Digester.isNeutraliser = isNeutraliser
+--- How many feeds wait in the hopper `container`.
+function Digester.feedCount(container)
+    local count = 0
+    local items = container and container:getItems()
+    for i = 0, (items and items:size() or 0) - 1 do
+        if Digester.feedOf(items:get(i)) then
+            count = count + 1
+        end
+    end
+    return count
+end
 
 -- Tiles --------------------------------------------------------------------------------------
 
--- Base tile name -> { tier, material }.
-local TILES = {
-    [Sprites.digester.barrel.steel] = { tier = "barrel", material = "steel" },
-    [Sprites.digester.barrel.plastic] = { tier = "barrel", material = "plastic" },
-    [Sprites.digester.insulated] = { tier = "insulated" },
-    [Sprites.digester.dome] = { tier = "dome" },
-}
-
-local HOLDER_OVERLAYS = {}
-for _, list in pairs({ Sprites.digesterHolder.bags, Sprites.digesterHolder.tarp, Sprites.digesterHolder.drum }) do
-    for _, name in ipairs(list) do
-        HOLDER_OVERLAYS[name] = true
-    end
-end
-HOLDER_OVERLAYS[Sprites.digesterHolder.bagsTorn] = true
-HOLDER_OVERLAYS[Sprites.digesterHolder.tarpTorn] = true
-
---- { tier, material } of a digester tile, or nil.
+--- The tier and, for a barrel, the material of a digester tile; nil for any other object.
 function Digester.tileOf(isoObject)
-    local name = Sprites.nameOf(isoObject)
-    return name and TILES[name]
+    local kind, tier, material = Sprites.kindOf(Sprites.nameOf(isoObject))
+    if kind ~= "digester" then
+        return nil
+    end
+    return tier, material
 end
 
 function Digester.isDigester(isoObject)
     return isoObject ~= nil and Digester.tileOf(isoObject) ~= nil
 end
 
-function Digester.isHolderOverlay(spriteName)
-    return HOLDER_OVERLAYS[spriteName] == true
-end
-
-local SCRUBBER_OVERLAYS = {}
-for _, name in pairs(Sprites.digesterScrubber) do
-    SCRUBBER_OVERLAYS[name] = true
-end
-
-function Digester.isScrubberOverlay(spriteName)
-    return SCRUBBER_OVERLAYS[spriteName] == true
-end
-
---- Every digester base tile, for MapObjects.OnLoadWithSprite.
-function Digester.sprites()
-    local names = {}
-    for name in pairs(TILES) do
-        table.insert(names, name)
-    end
-    return names
-end
+Digester.isHolderOverlay = Sprites.matcher(Sprites.digesterHolder)
+Digester.isScrubberOverlay = Sprites.matcher(Sprites.digesterScrubber)
 
 --- The holder overlay for a holder kind, its fill (0..1) and whether it's torn, or nil for the
 --- dome, whose holder is itself.
 function Digester.holderOverlay(holder, fill, torn)
     local set = Sprites.digesterHolder
-    if holder == "bags" or holder == "tarp" then
-        if torn then
-            return holder == "bags" and set.bagsTorn or set.tarpTorn
-        end
-        local levels = set[holder]
-        return levels[math.min(#levels, 1 + math.floor(fill * #levels))]
-    elseif holder == "drum" then
-        local levels = set.drum
-        return levels[math.min(#levels, 1 + math.floor(fill * #levels))]
+    if torn and (holder == "bags" or holder == "tarp") then
+        return holder == "bags" and set.bagsTorn or set.tarpTorn
     end
-    return nil
+    local levels = set[holder]
+    if not levels then
+        return nil
+    end
+    return levels[math.min(#levels, 1 + math.floor(fill * #levels))]
 end
 
--- Clients ------------------------------------------------------------------------------------
+-- Summary --------------------------------------------------------------------------------------
 
---- What every client keeps of the digester at x, y, z (DigesterObject:buildSummary), or nil.
-function Digester.getSummary(x, y, z)
-    local system = Digester.clientSystem
-    local globalObject = system and system.system:getObjectAt(x, y, z)
-    return globalObject and globalObject:getModData().summary
-end
-
-function Digester.summaryOf(isoObject)
-    return Digester.getSummary(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-end
-
---- The digester's record on the authority (single player or the server), or nil elsewhere.
-function Digester.recordOf(isoObject)
-    local system = not isClient() and Digester.serverSystem
-    return system and system:getLuaObjectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-end
-
---- The digester's summary as this side knows it, or nil: the authority builds it from its record,
---- which a job may have changed since the last summary went out, and has no client copy.
-function Digester.currentSummary(isoObject)
-    local record = Digester.recordOf(isoObject)
-    return record and record:buildSummary() or Digester.summaryOf(isoObject)
-end
+-- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
+-- copy of the hopper.
+RenewableEnergy.GlobalObjects.addAccessors(Digester, function(summary, isoObject)
+    summary.hopper = Digester.feedCount(isoObject:getContainer())
+end)
 
 return Digester

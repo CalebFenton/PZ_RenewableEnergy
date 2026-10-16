@@ -31,7 +31,7 @@ handler("panelCracks", function(_, args)
             panel:transmitModData()
         end
     end
-    PowerBank.showCracks(panel)
+    RenewableEnergy.PanelSource.showCracks(panel)
     return { overlays = overlaysOf(panel) }
 end)
 

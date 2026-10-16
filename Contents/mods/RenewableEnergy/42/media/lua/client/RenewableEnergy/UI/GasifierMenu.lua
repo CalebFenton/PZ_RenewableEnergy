@@ -1,12 +1,13 @@
--- A gasifier's right-click menu. Loading wood and changing the filter's packing are the loot
--- window's: the hopper and the filter are its containers. Each job queues a timed action, which
--- walks the character over and does it; one the character can't do yet stays greyed out, saying
--- what it needs.
+-- A gasifier's right-click menu, and the client's gasifier system. Loading wood and changing the
+-- filter's packing are the loot window's: the hopper and the filter are its containers. Each job
+-- queues a timed action, which walks the character over and does it; one the character can't do
+-- yet stays greyed out, saying what it needs.
 
 require "ISUI/ISWorldObjectContextMenu"
+require "RenewableEnergy/ClientObjects"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
-require "RenewableEnergy/TimedActions/RenewableEnergyGasifierAction"
+require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/GasifierWindow"
 
@@ -16,24 +17,12 @@ RenewableEnergy.GasifierMenu = GasifierMenu
 
 local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
 local Needs, GasifierWindow = RenewableEnergy.Needs, RenewableEnergy.GasifierWindow
+local queue = RenewableEnergyGasAction.queue
 
-local function notBroken(item)
-    return not item:isBroken()
-end
-
-local function queue(playerNum, job, gasifier, item)
-    local character = getSpecificPlayer(playerNum)
-    if not luautils.walkAdj(character, gasifier:getSquare(), true) then
-        return
-    end
-    if job == GasifierJobs.CLEAN_ASH then
-        -- In hand, as vanilla's Clear Ashes takes its shovel.
-        ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), function(tool)
-            return tool:hasTag(ItemTag.TAKE_DIRT) and notBroken(tool)
-        end, true)
-    end
-    ISTimedActionQueue.add(RenewableEnergyGasifierAction:new(character, job, gasifier, item))
-end
+RenewableEnergy.ClientObjects.define({
+    name = "Gasifier", kind = "gasifier", owner = Gasifier, isObject = Gasifier.isGasifier,
+    adoptCopy = Gasifier.adoptContainers, adoptContainer = Gasifier.adoptContainer,
+})
 
 -- The carried containers the condensate can go into now, by name.
 local function drainContainers(character, lit)
@@ -50,38 +39,24 @@ end
 
 -- Drain Condensate: a choice of the containers that take it, and the ground.
 local function addDrain(menu, character, playerNum, gasifier, summary)
-    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. GasifierJobs.DRAIN))
-    local blocker = GasifierJobs.blocker(GasifierJobs.DRAIN, summary)
+    local job = GasifierJobs.DRAIN
+    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job))
+    local blocker = GasifierJobs.blocker(job, summary)
     if blocker then
-        option.notAvailable = true
-        option.toolTip = ISWorldObjectContextMenu.addToolTip()
-        option.toolTip.description = getText(blocker)
+        Needs.disable(option, getText(blocker))
         return
     end
     local submenu = ISContextMenu:getNew(menu)
     menu:addSubMenu(option, submenu)
     for _, item in ipairs(drainContainers(character, summary.lit)) do
-        submenu:addOption(item:getDisplayName(), playerNum, queue, GasifierJobs.DRAIN, gasifier, item)
+        submenu:addOption(item:getDisplayName(), playerNum, queue, "gasifier", job, gasifier, item)
     end
-    submenu:addOption(getText("ContextMenu_RenewableEnergy_OntoGround"), playerNum, queue, GasifierJobs.DRAIN, gasifier)
+    submenu:addOption(getText("ContextMenu_RenewableEnergy_OntoGround"), playerNum, queue, "gasifier", job, gasifier)
 end
 
 local function addJob(menu, character, playerNum, job, gasifier, summary)
-    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job), playerNum, queue, job, gasifier)
-    local blocker = GasifierJobs.blocker(job, summary)
-    if blocker then
-        option.notAvailable = true
-        option.toolTip = ISWorldObjectContextMenu.addToolTip()
-        option.toolTip.description = getText(blocker)
-        return option
-    end
-    local needs = GasifierJobs.needs(character, job, summary)
-    if #needs > 0 then
-        option.notAvailable = RenewableEnergy.firstUnmet(needs) ~= nil
-        option.toolTip = ISWorldObjectContextMenu.addToolTip()
-        option.toolTip.description = Needs.describe(needs)
-    end
-    return option
+    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job), playerNum, queue, "gasifier", job, gasifier)
+    Needs.show(option, GasifierJobs.needs(character, job, summary), GasifierJobs.blocker(job, summary))
 end
 
 --- Adds the gasifier's submenu to `context`. Returns the submenu, or nil before this client has
@@ -100,21 +75,14 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
 end
 
 function GasifierMenu.onFill(playerNum, context, worldobjects, test)
-    local seen = {}
-    for _, clicked in ipairs(worldobjects) do
-        local square = clicked:getSquare()
-        if square and not seen[square] then
-            seen[square] = true
-            local gasifier = RenewableEnergy.findObjectOn(square, Gasifier.isGasifier)
-            if gasifier then
-                if test then
-                    return ISWorldObjectContextMenu.setTest()
-                end
-                GasifierMenu.addOptions(playerNum, context, gasifier)
-                return
-            end
-        end
+    local gasifier = Needs.findClicked(worldobjects, Gasifier.isGasifier)
+    if not gasifier then
+        return
     end
+    if test then
+        return ISWorldObjectContextMenu.setTest()
+    end
+    GasifierMenu.addOptions(playerNum, context, gasifier)
 end
 
 Events.OnFillWorldObjectContextMenu.Add(GasifierMenu.onFill)

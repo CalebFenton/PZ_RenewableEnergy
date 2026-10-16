@@ -10,6 +10,7 @@
 -- Units: fuel in kilograms (an item's weight), time in game hours.
 
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/GlobalObjects"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier = {}
@@ -45,10 +46,13 @@ Gasifier.WEAR_DIRTY = 3
 -- Out longer than this, a gasifier is cold, and lighting it takes bellows.
 Gasifier.COLD_HOURS = 1
 Gasifier.BELLOWS = { "Base.Bellows", "Base.LargeBellows" }
--- Clean Out Ash gives one Wood Ash per this much of the pit.
+-- Clean Out Ash gives one Wood Ash per this much of the pit. Wood Ash also neutralises a digester
+-- and charges its scrubber, and a campfire's ashes give it.
 Gasifier.ASH_PER_ITEM = 25
 Gasifier.WOOD_ASH = "RenewableEnergy.WoodAsh"
 Gasifier.TARRY = "RenewableEnergy.TarryPacking"
+-- Hay and straw pack the filter, and insulate a digester's upgrade.
+Gasifier.HAY = { "Base.HayTuft", "Base.Straw2" }
 
 -- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
 -- how much faster tar fills the packing while it is full. About a litre and a half a day's running.
@@ -71,8 +75,8 @@ end
 
 -- What packs the filter.
 local PACKING = {
-    ["Base.HayTuft"] = true,
-    ["Base.Straw2"] = true,
+    [Gasifier.HAY[1]] = true,
+    [Gasifier.HAY[2]] = true,
     ["Base.Splinters"] = true,
     ["Base.GrassTuft"] = true,
 }
@@ -170,47 +174,47 @@ function Gasifier.hopperKg(container)
     return kg
 end
 
+--- What it carries, as a share of what a generator carries on gas, with `ash` percent in its pit
+--- and `clean` packing left in its filter: a full pit or a spent filter halves it.
+function Gasifier.outputShare(ash, clean)
+    local share = 1
+    if ash >= 100 then
+        share = share * Gasifier.DIRTY_OUTPUT
+    end
+    if clean == 0 then
+        share = share * Gasifier.DIRTY_OUTPUT
+    end
+    return share
+end
+
+--- How much faster the generator wears on its gas: with the tar the filter lets through.
+function Gasifier.wearFactor(clean, tarry)
+    if clean == 0 then
+        return Gasifier.WEAR_DIRTY
+    end
+    return 1 + (Gasifier.WEAR_DIRTY - 1) * tarry / (clean + tarry)
+end
+
+--- Whether lighting it takes bellows: out long enough to have gone cold (since the world hour
+--- `outSince`), or never lit.
+function Gasifier.isCold(lit, outSince)
+    return not lit and (outSince == nil or getGameTime():getWorldAgeHours() - outSince > Gasifier.COLD_HOURS)
+end
+
 -- Tiles --------------------------------------------------------------------------------------
 
--- Base tile name -> tier.
-local TILES = {}
-for tier, name in pairs(Sprites.gasifier) do
-    TILES[name] = tier
-end
-
-local LIT_OVERLAYS, PIPE_OVERLAYS = {}, {}
-for _, name in pairs(Sprites.gasifierLit) do
-    LIT_OVERLAYS[name] = true
-end
-for _, name in pairs(Sprites.gasifierPipe) do
-    PIPE_OVERLAYS[name] = true
-end
-
+--- The tier of a gasifier tile, or nil for any other object.
 function Gasifier.tierOf(isoObject)
-    local name = Sprites.nameOf(isoObject)
-    return name and TILES[name]
+    local kind, tier = Sprites.kindOf(Sprites.nameOf(isoObject))
+    return kind == "gasifier" and tier or nil
 end
 
 function Gasifier.isGasifier(isoObject)
     return isoObject ~= nil and Gasifier.tierOf(isoObject) ~= nil
 end
 
-function Gasifier.isLitOverlay(spriteName)
-    return LIT_OVERLAYS[spriteName] == true
-end
-
-function Gasifier.isPipeOverlay(spriteName)
-    return PIPE_OVERLAYS[spriteName] == true
-end
-
---- Every gasifier base tile, for MapObjects.OnLoadWithSprite.
-function Gasifier.sprites()
-    local names = {}
-    for name in pairs(TILES) do
-        table.insert(names, name)
-    end
-    return names
-end
+Gasifier.isLitOverlay = Sprites.matcher(Sprites.gasifierLit)
+Gasifier.isPipeOverlay = Sprites.matcher(Sprites.gasifierPipe)
 
 --- The side of (x, y) that (tx, ty), a square next to it, is on: "N", "E", "S" or "W", or nil if
 --- it isn't one of the four beside it.
@@ -222,30 +226,18 @@ function Gasifier.sideOf(x, y, tx, ty)
     return nil
 end
 
--- State ----------------------------------------------------------------------------------------
+-- Summary --------------------------------------------------------------------------------------
 
---- What every client keeps of the gasifier at x, y, z (GasifierObject:buildSummary), or nil.
-function Gasifier.getSummary(x, y, z)
-    local system = Gasifier.clientSystem
-    local globalObject = system and system.system:getObjectAt(x, y, z)
-    return globalObject and globalObject:getModData().summary
-end
-
-function Gasifier.summaryOf(isoObject)
-    return Gasifier.getSummary(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-end
-
---- The gasifier's record on the authority (single player or the server), or nil elsewhere.
-function Gasifier.recordOf(isoObject)
-    local system = not isClient() and Gasifier.serverSystem
-    return system and system:getLuaObjectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-end
-
---- The gasifier's summary as this side knows it, or nil: the authority builds it from its record,
---- which a job may have changed since the last summary went out, and has no client copy.
-function Gasifier.currentSummary(isoObject)
-    local record = Gasifier.recordOf(isoObject)
-    return record and record:buildSummary() or Gasifier.summaryOf(isoObject)
-end
+-- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
+-- containers and the clock: `hopperKg` (the hopper and the firebox), the filter's `clean` and
+-- `tarry` packing, the `output` share and `wear` factor they make, and whether it is `cold`.
+RenewableEnergy.GlobalObjects.addAccessors(Gasifier, function(summary, isoObject)
+    local clean, tarry = Gasifier.filterCounts(Gasifier.filterOf(isoObject))
+    summary.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(isoObject)) + summary.fireKg
+    summary.clean, summary.tarry = clean, tarry
+    summary.output = Gasifier.outputShare(summary.ash, clean)
+    summary.wear = Gasifier.wearFactor(clean, tarry)
+    summary.cold = Gasifier.isCold(summary.lit, summary.outSince)
+end)
 
 return Gasifier

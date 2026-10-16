@@ -1,161 +1,72 @@
--- The gasifiers on the authority: the Global Object System that keeps them, building one, the pass
--- that runs them all, and the jobs players do at them.
+-- The gasifiers on the authority (RenewableEnergy.ObjectSystem), and the jobs players do at them,
+-- whose rules are GasifierJobs'.
 
 if isClient() then return end
 
-require "Map/SGlobalObjectSystem"
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Fumes"
+require "RenewableEnergy/Materials"
+require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 local GasifierObject = require "RenewableEnergy/WoodGas/GasifierObject"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
+local Materials, ObjectSystem = RenewableEnergy.Materials, RenewableEnergy.ObjectSystem
 
-local GasifierSystem = SGlobalObjectSystem:derive("RenewableEnergy_GasifierSystem")
+local GasifierSystem = ObjectSystem.define({
+    name = "Gasifier", kind = "gasifier", owner = Gasifier, Object = GasifierObject, isObject = Gasifier.isGasifier,
+})
 RenewableEnergy.GasifierSystem = GasifierSystem
-
--- MapObjects keeps one function per sprite and priority.
-local LOAD_PRIORITY = 6
-
-function GasifierSystem:new()
-    return SGlobalObjectSystem.new(self, Gasifier.SYSTEM_NAME)
-end
-
-function GasifierSystem:initSystem()
-    Gasifier.serverSystem = self
-    self.system:setObjectModDataKeys(GasifierObject.SAVED_FIELDS)
-    self.system:setObjectSyncKeys({ "summary" })
-end
-
--- The summary isn't saved; each gasifier gets it before any client connects.
-function GasifierSystem:initLuaObjects()
-    SGlobalObjectSystem.initLuaObjects(self)
-    for i = 1, self:getLuaObjectCount() do
-        local gasifier = self:getLuaObjectByIndex(i)
-        gasifier.summary = gasifier:buildSummary()
-    end
-end
-
-function GasifierSystem:isValidIsoObject(isoObject)
-    return Gasifier.isGasifier(isoObject)
-end
-
-function GasifierSystem:newLuaObject(globalObject)
-    return GasifierObject:new(self, globalObject)
-end
-
-function GasifierSystem:OnObjectAboutToBeRemoved(isoObject)
-    if not Gasifier.isGasifier(isoObject) then return end
-    local gasifier = self:getLuaObjectOnSquare(isoObject:getSquare())
-    if not gasifier then return end
-    RenewableEnergy.Fumes.set(gasifier:key(), isoObject:getSquare():getBuilding(), false)
-    self:removeLuaObject(gasifier)
-end
-
--- Building -------------------------------------------------------------------------------------
-
--- The build menu's OnCreate for every gasifier (scripts/RenewableEnergy/Entities.txt), on the
--- authority: the new tile becomes a gasifier, with its filter. The build adds it to the square
--- before this runs and sends it to the clients after.
-function GasifierSystem.OnCreate(params)
-    local thumpable = params.thumpable
-    if thumpable and thumpable:getSquare() then
-        GasifierSystem.instance:loadIsoObject(thumpable)
-    end
-end
 
 -- Jobs ------------------------------------------------------------------------------------------
 
-local function notBroken(item)
-    return not item:isBroken()
-end
+-- What each job does to the gasifier `gasifier` (its tile `isoObject`). `item` is the container
+-- Drain Condensate fills, nil for the ground. Returns whether it was done.
+local DO = {
+    [GasifierJobs.LIGHT] = function(character, gasifier, isoObject)
+        return gasifier:light(isoObject)
+    end,
+    [GasifierJobs.PUT_OUT] = function(character, gasifier)
+        gasifier:goOut()
+        return true
+    end,
+    [GasifierJobs.CLEAN_ASH] = function(character, gasifier)
+        local count = math.floor(gasifier.ash / Gasifier.ASH_PER_ITEM)
+        RenewableEnergy.giveItems(character, Gasifier.WOOD_ASH, count)
+        gasifier.ash = gasifier.ash - count * Gasifier.ASH_PER_ITEM
+        return true
+    end,
+    -- Into `item` as much of the condensate as it takes, or all of it onto the ground.
+    [GasifierJobs.DRAIN] = function(character, gasifier, isoObject, item)
+        if item then
+            local fluid = item:getFluidContainer()
+            local litres = math.min(gasifier.condensate, fluid:getFreeCapacity())
+            fluid:addFluid(Gasifier.VINEGAR, litres)
+            item:syncItemFields()
+            gasifier.condensate = gasifier.condensate - litres
+        else
+            gasifier.condensate = 0
+        end
+        return true
+    end,
+}
 
--- Lighting takes one use of a match or lighter, as a campfire does.
-local function useFireStarter(character)
-    local item = character:getInventory():getFirstTagEvalRecurse(ItemTag.START_FIRE, notBroken)
-    if item and instanceof(item, "DrainableComboItem") then
-        item:UseAndSync()
+local function apply(character, job, gasifier, isoObject, item)
+    -- Read before the job: lighting makes it warm.
+    local materials = GasifierJobs.materials(job, Gasifier.currentSummary(isoObject))
+    if not DO[job](character, gasifier, isoObject, item) then
+        return false
     end
-end
-
-local function cleanOutAsh(character, gasifier)
-    local count = math.floor(gasifier.ash / Gasifier.ASH_PER_ITEM)
-    for _ = 1, count do
-        Actions.addOrDropItem(character, instanceItem(Gasifier.WOOD_ASH))
-    end
-    gasifier.ash = gasifier.ash - count * Gasifier.ASH_PER_ITEM
-end
-
--- Into `item` as much of the condensate as it takes, or all of it onto the ground.
-local function drain(gasifier, item)
-    if item then
-        local fluid = item:getFluidContainer()
-        local litres = math.min(gasifier.condensate, fluid:getFreeCapacity())
-        fluid:addFluid(Gasifier.VINEGAR, litres)
-        item:syncItemFields()
-        gasifier.condensate = gasifier.condensate - litres
-    else
-        gasifier.condensate = 0
-    end
+    Materials.consume(character, materials)
+    return true
 end
 
 --- Does `job` for `character` at the gasifier `isoObject`, on the authority, once the timed action
 --- that does it has finished. `item` is the container Drain Condensate fills. Returns whether it
 --- was done.
 function GasifierSystem.perform(character, job, isoObject, item)
-    local gasifier = isoObject and Gasifier.recordOf(isoObject)
-    if not gasifier then
-        return false
-    end
-    -- Bring it up to now first, so the job works on what is there.
-    gasifier:update()
-    if GasifierJobs.refusal(character, job, gasifier:buildSummary(), item) then
-        return false
-    end
-    if job == GasifierJobs.LIGHT then
-        useFireStarter(character)
-        if gasifier.fireKg <= 0 and not gasifier:stoke(Gasifier.hopperOf(isoObject)) then
-            return false
-        end
-        gasifier.lit = true
-        gasifier.outSince = nil
-        gasifier.lastHour = getGameTime():getWorldAgeHours()
-    elseif job == GasifierJobs.PUT_OUT then
-        gasifier:goOut()
-    elseif job == GasifierJobs.CLEAN_ASH then
-        cleanOutAsh(character, gasifier)
-    elseif job == GasifierJobs.DRAIN then
-        drain(gasifier, item)
-    end
-    gasifier:afterChange()
-    return true
+    return ObjectSystem.perform(Gasifier, GasifierJobs, apply, character, job, isoObject, item)
 end
-
--- Map loading ---------------------------------------------------------------------------------
-
-local function loadGasifier(isoObject)
-    if Gasifier.isGasifier(isoObject) then
-        GasifierSystem.instance:loadIsoObject(isoObject)
-    end
-end
-
-for _, name in ipairs(Gasifier.sprites()) do
-    MapObjects.OnLoadWithSprite(name, loadGasifier, LOAD_PRIORITY)
-end
-
--- The pass ---------------------------------------------------------------------------------------
-
-function GasifierSystem.updateAll()
-    local self = GasifierSystem.instance
-    for i = 1, self:getLuaObjectCount() do
-        self:getLuaObjectByIndex(i):update()
-    end
-end
-
-Events.EveryTenMinutes.Add(GasifierSystem.updateAll)
-
-SGlobalObjectSystem.RegisterSystemClass(GasifierSystem)
 
 return GasifierSystem

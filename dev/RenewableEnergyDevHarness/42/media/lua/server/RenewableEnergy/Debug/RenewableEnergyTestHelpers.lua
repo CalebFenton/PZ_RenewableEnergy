@@ -102,4 +102,101 @@ function Helpers.overlaysOf(object)
     return names
 end
 
+--- The fields `keys` of `source` that aren't tables, as plain values for an answer.
+function Helpers.plainFields(source, keys)
+    local fields = {}
+    for _, key in ipairs(keys) do
+        if type(source[key]) ~= "table" then
+            fields[key] = source[key]
+        end
+    end
+    return fields
+end
+
+local function count(entries)
+    local n = 0
+    for _ in pairs(entries or {}) do
+        n = n + 1
+    end
+    return n
+end
+
+-- The kinds of Global Object System record the tests build and drive (RenewableEnergyTestLibGas.lua):
+-- the shared module that owns the tile and which tiles are its, the server object and system, the
+-- containers by the names the tests use, and what a read adds to the saved fields, from the record
+-- and, while loaded, its tile.
+local KINDS = {
+    digester = {
+        owner = function() return RenewableEnergy.Digester end,
+        isObject = function(object) return RenewableEnergy.Digester.isDigester(object) end,
+        object = function() return RenewableEnergy.DigesterObject end,
+        system = function() return RenewableEnergy.DigesterSystem end,
+        containers = function(object) return { hopper = object:getContainer() } end,
+        extras = function(record, object, state)
+            state.capacity = record:capacity()
+            state.torn = record:isTorn()
+            state.acidLimit = record:acidLimit()
+            state.ghosts = RenewableEnergy.Stink.counted(record:key())
+            state.eaten = count(record.eaten)
+            state.snapshot = #record.hopper
+            if object then
+                state.containerCapacity = object:getContainer():getCapacity()
+                state.hopperItems = object:getContainer():getItems():size()
+            end
+        end,
+    },
+    gasifier = {
+        owner = function() return RenewableEnergy.Gasifier end,
+        isObject = function(object) return RenewableEnergy.Gasifier.isGasifier(object) end,
+        object = function() return RenewableEnergy.GasifierObject end,
+        system = function() return RenewableEnergy.GasifierSystem end,
+        containers = function(object)
+            local Gasifier = RenewableEnergy.Gasifier
+            return { hopper = Gasifier.hopperOf(object), filter = Gasifier.filterOf(object) }
+        end,
+        extras = function(record, object, state)
+            if object then
+                local Gasifier = RenewableEnergy.Gasifier
+                state.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(object))
+                state.containers = object:getContainerCount()
+                state.clean, state.tarry = Gasifier.filterCounts(Gasifier.filterOf(object))
+            end
+        end,
+    },
+}
+Helpers.RECORD_KINDS = KINDS
+
+--- The record of kind `args.kind` at x, y, z and its tile, or nil, nil and what is missing.
+function Helpers.recordAt(args)
+    local kind = KINDS[args.kind]
+    if not kind then
+        return nil, nil, "a record kind " .. tostring(args.kind)
+    end
+    local square = Helpers.squareAt(args)
+    local object = square and RenewableEnergy.findObjectOn(square, kind.isObject)
+    local record = object and kind.owner().recordOf(object)
+    if not record then
+        return nil, nil, "a " .. args.kind .. " at " .. tostring(args.x) .. "," .. tostring(args.y)
+    end
+    return record, object
+end
+
+--- The record of kind `kind` as plain values: its saved fields, its kind's extras and, while its
+--- tile is loaded (`object`), its building's toxicity, tile, overlays and the summary this side
+--- builds.
+function Helpers.recordState(kind, record, object)
+    local spec = KINDS[kind]
+    local state = Helpers.plainFields(record, spec.object().SAVED_FIELDS)
+    state.loaded = object ~= nil
+    if object then
+        local building = object:getSquare():getBuilding()
+        state.toxic = building ~= nil and building:isToxic()
+        state.sprite = object:getSprite():getName()
+        state.overlays = Helpers.overlaysOf(object)
+        state.summary = spec.owner().currentSummary(object)
+    end
+    spec.extras(record, object, state)
+    return state
+end
+
 return Helpers

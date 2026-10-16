@@ -4,18 +4,14 @@ if isClient() then return end
 -- Vanilla's Clear Ashes just deletes them (ISClearAshes.complete, which runs on the authority).
 
 require "TimedActions/ISClearAshes"
-
-local WOOD_ASH = "RenewableEnergy.WoodAsh"
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/WoodGas/Gasifier"
 
 local complete = ISClearAshes.complete
 function ISClearAshes:complete()
     local done = complete(self)
     if done then
-        local inventory = self.character:getInventory()
-        local ash = inventory:AddItem(WOOD_ASH)
-        if ash then
-            sendAddItemToContainer(inventory, ash)
-        end
+        RenewableEnergy.giveItems(self.character, RenewableEnergy.Gasifier.WOOD_ASH)
     end
     return done
 end

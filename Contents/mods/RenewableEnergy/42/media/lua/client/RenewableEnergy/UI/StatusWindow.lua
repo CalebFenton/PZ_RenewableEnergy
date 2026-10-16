@@ -1,6 +1,6 @@
 -- The battery bank's status window. It draws the status the server sends to the players watching
 -- the bank, which it does while the window is open, so it reads the same in single player and
--- multiplayer. Clicking a panel's row highlights that panel in the world.
+-- multiplayer. Clicking a source's row highlights that source in the world.
 
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
@@ -8,6 +8,7 @@ require "ISUI/ISTextBox"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 
@@ -16,7 +17,7 @@ local StatusWindow = ISCollapsableWindow:derive("RenewableEnergyStatusWindow")
 RenewableEnergy.StatusWindow = StatusWindow
 
 local Format = RenewableEnergy.Format
-local PowerBank = RenewableEnergy.PowerBank
+local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
 local Recipes = RenewableEnergy.Recipes
 local Sun = RenewableEnergy.Sun
 local Action = RenewableEnergyAction
@@ -27,9 +28,9 @@ local LABEL_GAP = 16
 local MIN_COLUMN_WIDTH = 220
 local BAR_HEIGHT = 8
 local BUTTON_GAP = 8
--- Lines of the right column kept for "and N more" when the panels don't fit.
+-- Lines of the right column kept for "and N more" when the sources don't fit.
 local MORE_LINE = 1
--- How long a clicked panel stays highlighted, in real milliseconds.
+-- How long a clicked source stays highlighted, in real milliseconds.
 local HIGHLIGHT_MS = 5000
 
 -- One window per local player.
@@ -138,6 +139,17 @@ local function row(rows, label, value, colorName)
     table.insert(rows, { label = label, value = value, color = colorName })
 end
 
+-- Each family of source's rows: its watts now and today (the Bank status fields), always for
+-- panels and for the others once they have made anything today.
+local FAMILY_ROWS = {
+    { now = "solarW", today = "solarWhToday", nowKey = "IGUI_RenewableEnergy_PanelsNow",
+        todayKey = "IGUI_RenewableEnergy_PanelsToday", always = true },
+    { now = "windW", today = "windWhToday", nowKey = "IGUI_RenewableEnergy_WindNow", todayKey = "IGUI_RenewableEnergy_WindToday",
+        value = function(status) return Format.windOutput(status.windW, status.windKph) end },
+    { now = "runW", today = "runWhToday", nowKey = "IGUI_RenewableEnergy_TreadmillsNow",
+        todayKey = "IGUI_RenewableEnergy_TreadmillsToday" },
+}
+
 local function powerRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Power")
     if status.sunElevation > 0 then
@@ -145,16 +157,11 @@ local function powerRows(rows, status)
     else
         row(rows, getText("IGUI_RenewableEnergy_Sunlight"), getText("IGUI_RenewableEnergy_Night"), "dim")
     end
-    row(rows, getText("IGUI_RenewableEnergy_PanelsNow"), Format.watts(status.solarW))
-    row(rows, getText("IGUI_RenewableEnergy_PanelsToday"), Format.wattHours(status.solarWhToday))
-    if status.windW > 0 or status.windWhToday > 0 then
-        row(rows, getText("IGUI_RenewableEnergy_WindNow"), getText("IGUI_RenewableEnergy_WindOutput",
-            Format.watts(status.windW), status.windKph))
-        row(rows, getText("IGUI_RenewableEnergy_WindToday"), Format.wattHours(status.windWhToday))
-    end
-    if status.runW > 0 or status.runWhToday > 0 then
-        row(rows, getText("IGUI_RenewableEnergy_TreadmillsNow"), Format.watts(status.runW))
-        row(rows, getText("IGUI_RenewableEnergy_TreadmillsToday"), Format.wattHours(status.runWhToday))
+    for _, family in ipairs(FAMILY_ROWS) do
+        if family.always or status[family.now] > 0 or status[family.today] > 0 then
+            row(rows, getText(family.nowKey), family.value and family.value(status) or Format.watts(status[family.now]))
+            row(rows, getText(family.todayKey), Format.wattHours(status[family.today]))
+        end
     end
     if status.chargerW > 0 then
         row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
@@ -274,21 +281,18 @@ local function batteryRows(rows, status)
     end
 end
 
--- Panels by mount and material, and the treadmill, which has neither.
-local MOUNTS = {
+-- Sources by kind and material (Bank status `sources`): panels by mount and material, wind
+-- chargers by kind, and the treadmill.
+local SOURCE_NAMES = {
     flat = "IGUI_RenewableEnergy_MountFlat",
     wallwood = "IGUI_RenewableEnergy_MountWallWood",
     wallmetal = "IGUI_RenewableEnergy_MountWallMetal",
     rackwood = "IGUI_RenewableEnergy_MountRackWood",
     rackmetal = "IGUI_RenewableEnergy_MountRackMetal",
-    treadmill = "IGUI_RenewableEnergy_Treadmill",
-}
-
--- Wind chargers by kind.
-local WIND_KINDS = {
     scoop = "IGUI_RenewableEnergy_WindScoop",
     propeller = "IGUI_RenewableEnergy_WindPropeller",
     alternator = "IGUI_RenewableEnergy_WindAlternator",
+    treadmill = "IGUI_RenewableEnergy_Treadmill",
 }
 
 -- Why a source makes less than it could (Bank status `reason`), and whether the player can do
@@ -308,35 +312,39 @@ local REASONS = {
     idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }
 
---- "Wooden rack, 6 tiles north-east": a panel, wind charger or treadmill from Bank status
---- `sources`, from the bank at `bank`.
-function StatusWindow.panelLabel(source, bank)
-    local name = WIND_KINDS[source.kind] or MOUNTS[source.kind .. (source.material or "")] or MOUNTS.flat
-    return getText("IGUI_RenewableEnergy_PanelWhere", getText(name), Format.away(bank, source))
+--- "Wooden rack, 6 tiles north-east": a source from Bank status `sources`, from the bank at
+--- `bank`.
+function StatusWindow.sourceLabel(source, bank)
+    local name = SOURCE_NAMES[source.kind .. (source.material or "")]
+    return getText("IGUI_RenewableEnergy_SourceWhere", getText(name), Format.away(bank, source))
 end
 
---- "45 W, 64% sun, cloudy", "30 W, 25 km/h" or "75 W", and its color.
-function StatusWindow.panelValue(source)
-    local value
-    if WIND_KINDS[source.kind] then
-        value = getText("IGUI_RenewableEnergy_WindOutput", Format.watts(source.watts), source.windKph)
-    elseif source.kind == "treadmill" then
-        value = Format.watts(source.watts)
-    else
-        value = getText("IGUI_RenewableEnergy_PanelOutput", Format.watts(source.watts), source.fullSunPct)
-    end
+-- A source's output, by family: a panel's with its share of full sun, a wind charger's with the
+-- bank's wind.
+local OUTPUTS = {
+    panel = function(source)
+        return getText("IGUI_RenewableEnergy_PanelOutput", Format.watts(source.watts), source.fullSunPct)
+    end,
+    wind = function(source, status) return Format.windOutput(source.watts, status.windKph) end,
+    treadmill = function(source) return Format.watts(source.watts) end,
+}
+
+--- "45 W, 64% sun, cloudy", "30 W, 25 km/h" or "75 W" for a source of the bank `status`, and its
+--- color.
+function StatusWindow.sourceValue(source, status)
+    local value = OUTPUTS[Sources.familyOf(source.kind)](source, status)
     local reason = REASONS[source.reason]
     if not reason then
         return value, nil
     end
-    return getText("IGUI_RenewableEnergy_PanelOutputReason", value, getText(reason.key)), reason.fixable and "bad" or "dim"
+    return getText("IGUI_RenewableEnergy_SourceOutputReason", value, getText(reason.key)), reason.fixable and "bad" or "dim"
 end
 
-local function panelRows(rows, status, bank)
-    header(rows, "IGUI_RenewableEnergy_Panels", #status.sources)
+local function sourceRows(rows, status, bank)
+    header(rows, "IGUI_RenewableEnergy_Sources", #status.sources)
     for _, source in ipairs(status.sources) do
-        local value, colorName = StatusWindow.panelValue(source)
-        table.insert(rows, { label = StatusWindow.panelLabel(source, bank), value = value, color = colorName, source = source })
+        local value, colorName = StatusWindow.sourceValue(source, status)
+        table.insert(rows, { label = StatusWindow.sourceLabel(source, bank), value = value, color = colorName, source = source })
     end
 end
 
@@ -348,7 +356,7 @@ function StatusWindow.rows(status, bank)
     storageRows(left, status)
     partRows(left, status)
     batteryRows(right, status)
-    panelRows(right, status, bank)
+    sourceRows(right, status, bank)
     return left, right
 end
 
@@ -505,7 +513,7 @@ function StatusWindow:setStatus(status)
     self:setHeight(buttonY + self.switchButton:getHeight() + PAD)
 end
 
--- Highlighting a panel --------------------------------------------------------------------------
+-- Highlighting a source -------------------------------------------------------------------------
 
 function StatusWindow:clearHighlight()
     local highlight = self.highlight
@@ -515,12 +523,12 @@ function StatusWindow:clearHighlight()
     end
 end
 
---- Highlights the panel of a Bank status `sources` entry in the world for a few seconds, the
---- way vanilla shows the object a moveable action works on. Returns the panel, or nil if its
+--- Highlights the source of a Bank status `sources` entry in the world for a few seconds, the
+--- way vanilla shows the object a moveable action works on. Returns the source, or nil if its
 --- square isn't loaded.
-function StatusWindow:highlightPanel(source)
+function StatusWindow:highlightSource(source)
     self:clearHighlight()
-    local object = PowerBank.sourceOn(getSquare(source.x, source.y, source.z))
+    local object = Sources.on(getSquare(source.x, source.y, source.z))
     if not object then
         return nil
     end
@@ -531,8 +539,8 @@ function StatusWindow:highlightPanel(source)
     return object
 end
 
--- The panel row under a point in the window, if any.
-function StatusWindow:panelRowAt(x, y)
+-- The source row under a point in the window, if any.
+function StatusWindow:sourceRowAt(x, y)
     local layout = self.rightLayout
     if not (layout and layout.x) or x < layout.x or x > layout.x + layout.width then
         return nil
@@ -545,9 +553,9 @@ function StatusWindow:panelRowAt(x, y)
 end
 
 function StatusWindow:onMouseDown(x, y)
-    local r = not self.isCollapsed and self:panelRowAt(x, y)
+    local r = not self.isCollapsed and self:sourceRowAt(x, y)
     if r then
-        self:highlightPanel(r.source)
+        self:highlightSource(r.source)
         return true
     end
     return ISCollapsableWindow.onMouseDown(self, x, y)

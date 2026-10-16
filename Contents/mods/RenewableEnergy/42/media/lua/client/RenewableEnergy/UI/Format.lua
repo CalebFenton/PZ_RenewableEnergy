@@ -1,5 +1,6 @@
--- Text for the status window, the menus and the battery tooltip. Unit symbols are SI and the
--- same in every language, so they are not translated.
+-- Text for the status windows, the menus and the battery tooltip. Unit symbols are SI and the
+-- same in every language, so they are not translated (m³ is a translation key only for its
+-- character; see Format.cubicMetres).
 
 RenewableEnergy = RenewableEnergy or {}
 local Format = {}
@@ -36,6 +37,18 @@ end
 -- A 0..1 fraction as "64%".
 function Format.percent(fraction)
     return string.format("%d%%", round((fraction or 0) * 100))
+end
+
+-- "18 °C" or "64 °F", as the player's options show temperatures, with vanilla's unit.
+function Format.temperature(celsius)
+    return Temperature.getRoundedDisplayTemperature(celsius) .. " " .. Temperature.getTemperaturePostfix()
+end
+
+-- "1.25 m³" with `places` decimals. The symbol comes from a translation, which is read as UTF-8:
+-- the Lua compiler turns any non-ASCII character in a literal into "?" (Kahlua's LexState keeps
+-- each source character as one byte, then decodes the bytes as UTF-8).
+function Format.cubicMetres(m3, places)
+    return getText("IGUI_RenewableEnergy_CubicMetres", string.format("%." .. places .. "f", m3))
 end
 
 -- "72%": an item's condition as a share of its type's ConditionMax, which is 10 for an item
@@ -91,6 +104,11 @@ function Format.away(from, to)
     local eighth = (math.floor(math.deg(math.atan2(dx, -dy)) / 45 + 0.5) + 8) % 8
     local key = tiles == 1 and "IGUI_RenewableEnergy_AwayOne" or "IGUI_RenewableEnergy_Away"
     return getText(key, tiles, getText(COMPASS[eighth + 1]))
+end
+
+--- "30 W, 25 km/h": what wind chargers make in the bank's wind, in whole km/h.
+function Format.windOutput(watts, kph)
+    return getText("IGUI_RenewableEnergy_WindOutput", Format.watts(watts), string.format("%d", round(kph or 0)))
 end
 
 --- A bank's name from its summary or status: the one a player gave it, else its tier's.

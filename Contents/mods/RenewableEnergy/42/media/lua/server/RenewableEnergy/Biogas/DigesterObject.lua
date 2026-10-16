@@ -1,27 +1,28 @@
 -- One digester on the authority (single player or the server): what it holds, how warm it is, the
 -- gas it makes and stores, its sludge and souring, and the stink and fumes that come of them.
 --
--- The table is the digester's global object (SGlobalObject), so every field in SAVED_FIELDS is
--- saved with the world and the digester keeps working while its chunk is unloaded. While loaded
--- its hopper is the truth about the feed; while unloaded it eats from a snapshot of the hopper
--- (`hopper`), and what it ate (`eaten`) leaves the hopper when the chunk loads again.
+-- The table is the digester's global object (RenewableEnergy.ObjectSystem), so every field in
+-- SAVED_FIELDS is saved with the world and the digester keeps working while its chunk is unloaded.
+-- While loaded its hopper is the truth about the feed; while unloaded it eats from a snapshot of the
+-- hopper (`hopper`), and what it ate (`eaten`) leaves the hopper when the chunk loads again. Its
+-- heater's lit tile is the truth about the heater while loaded; `heaterLit` carries it through
+-- unloaded passes.
 
 if isClient() then return end
 
-require "Map/SGlobalObject"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/Stink"
 require "RenewableEnergy/Biogas/GasHeater"
-require "RenewableEnergy/Fumes"
 require "RenewableEnergy/GasLine/GasKit"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, Stink, Sprites = RenewableEnergy.Digester, RenewableEnergy.Stink, RenewableEnergy.Sprites
-local GasHeater = RenewableEnergy.GasHeater
+local GasHeater, GasKit = RenewableEnergy.GasHeater, RenewableEnergy.GasKit
 
-local DigesterObject = SGlobalObject:derive("RenewableEnergy_Digester")
+local DigesterObject = RenewableEnergy.ObjectSystem.Object:derive("RenewableEnergy_Digester")
 RenewableEnergy.DigesterObject = DigesterObject
 
 -- The fields the Global Object System saves with the world; a field renamed here is lost from
@@ -33,15 +34,8 @@ DigesterObject.SAVED_FIELDS = {
     "heaterLit",
 }
 
--- Digestion rate k (share of the undigested potential a day) by temperature, between which it runs
--- in straight lines: nothing below 10 °C, the mesophilic best at 35 to 40, falling off above.
-local K_BY_TEMP = { { 10, 0 }, { 15, 0.01 }, { 25, 1 / 30 }, { 35, 1 / 15 }, { 40, 1 / 15 }, { 50, 0 } }
--- Sour slows digestion to this share; sludge past SLUDGE_SLOW halves it.
+-- Sour slows digestion to this share.
 local SOUR_K = 0.15
-local SLUDGE_SLOW, SLUDGE_K = 80, 0.5
--- Startup counts only hours this warm, and manure's head start covers at most this share of it.
-local STARTUP_MIN_TEMP = 10
-local SEED_SHARE = 0.7
 -- The souring buffer: acid decays by this share a day, and a digester sours above its limit
 -- (ACID_LIMIT per unit of potentialCap) and recovers below half of it. Alkali banked beyond the
 -- limit below zero is lost.
@@ -50,8 +44,6 @@ local ACID_LIMIT = 0.8
 -- Sludge, in percent, that each m³ of potential fed adds, for a digester holding 1 m³; bigger ones
 -- fill slower in proportion, so each tier needs emptying about weekly when fed to its cap.
 local SLUDGE_PER_POTENTIAL = 35
--- A holder that vents indoors leaks for this many hours.
-local LEAK_HOURS = 2
 -- Air below this outdoors is held in by the dome's earth (ground temperature).
 local GROUND_TEMP = 12
 -- What a room does to the outdoor temperature while its chunk is unloaded, as
@@ -59,12 +51,6 @@ local GROUND_TEMP = 12
 local ROOM_PULL_COLD, ROOM_PULL_HOT = 0.5, 0.425
 -- The made-per-day figure follows the last few hours.
 local RATE_HOURS = 6
--- A pass longer than this (a save loaded after the clock jumped) counts as this long.
-local LONGEST_PASS = 24 * 7
-
-function DigesterObject:new(luaSystem, globalObject)
-    return SGlobalObject.new(self, luaSystem, globalObject)
-end
 
 function DigesterObject:initNew()
     self.holderCondition = 100
@@ -86,14 +72,14 @@ function DigesterObject:initNew()
     self.scrubber = false
     self.scrubCO2 = 0
     self.scrubWool = 0
+    self.heaterLit = false
     self.lastHour = getGameTime():getWorldAgeHours()
 end
 
 --- An object the system has not seen: a digester just built.
 function DigesterObject:stateFromIsoObject(isoObject)
     self:initNew()
-    local tile = Digester.tileOf(isoObject)
-    self.tier, self.material = tile.tier, tile.material
+    self.tier, self.material = Digester.tileOf(isoObject)
     self.holder = Digester.HOLDER_OF_TIER[self.tier] or "bags"
     self.temp = getClimateManager():getAirTemperatureForSquare(isoObject:getSquare())
     self:loaded(isoObject)
@@ -114,18 +100,13 @@ function DigesterObject:loaded(isoObject)
     self.inRoom = square:isInARoom()
     Digester.adoptContainer(isoObject:getContainer())
     self:snapshotHopper(isoObject:getContainer())
-    self:showHolder()
-    self:showScrubber()
-    self:showHeater()
+    self:show()
     self:sendSummary()
 end
 
-function DigesterObject:tierSpec()
-    return Digester.TIERS[self.tier]
-end
-
-function DigesterObject:key()
-    return "digester:" .. self.x .. "," .. self.y .. "," .. self.z
+function DigesterObject:aboutToRemoveFromSystem()
+    Stink.clear(self:key())
+    RenewableEnergy.ObjectSystem.Object.aboutToRemoveFromSystem(self)
 end
 
 --- The gas the holder stores, nothing once torn.
@@ -274,19 +255,19 @@ end
 -- Temperature ----------------------------------------------------------------------------------
 
 local function kAt(temp)
-    if temp <= K_BY_TEMP[1][1] or temp >= K_BY_TEMP[#K_BY_TEMP][1] then
+    local points = Digester.K_BY_TEMP
+    if temp <= points[1][1] or temp >= points[#points][1] then
         return 0
     end
-    for i = 2, #K_BY_TEMP do
-        local hi = K_BY_TEMP[i]
+    for i = 2, #points do
+        local hi = points[i]
         if temp <= hi[1] then
-            local lo = K_BY_TEMP[i - 1]
+            local lo = points[i - 1]
             return lo[2] + (hi[2] - lo[2]) * (temp - lo[1]) / (hi[1] - lo[1])
         end
     end
     return 0
 end
-DigesterObject.kAt = kAt
 
 -- The air the digester sits in: its square's while loaded (rooms and heat sources included), else
 -- the outdoor air, pulled toward a room's as the game pulls it.
@@ -330,7 +311,7 @@ end
 
 function DigesterObject:startupProgress()
     local needed = self:startupNeeded()
-    local seeded = math.min(self.seedHours, needed * SEED_SHARE)
+    local seeded = math.min(self.seedHours, needed * Digester.SEED_SHARE)
     return math.min(1, (self.startupHours + seeded) / needed)
 end
 
@@ -342,13 +323,14 @@ function DigesterObject:step(hours, air)
 
     local made = 0
     if not self.started then
-        if self.fed and self.temp >= STARTUP_MIN_TEMP then
+        if self.fed and self.temp >= Digester.STARTUP_MIN_TEMP then
             self.startupHours = self.startupHours + hours
         end
         self.started = self:startupProgress() >= 1
     else
         self.gasHours = self.gasHours + hours
-        local k = kAt(self.temp) * (self.sour and SOUR_K or 1) * (self.sludge > SLUDGE_SLOW and SLUDGE_K or 1)
+        local k = kAt(self.temp) * (self.sour and SOUR_K or 1)
+            * (self.sludge > Digester.SLUDGE_SLOW and Digester.SLUDGE_K or 1)
         local digested = self.potential * (1 - math.exp(-k * hours / 24))
         self.potential = self.potential - digested
         made = digested * SandboxVars.RenewableEnergy.BiogasMultiplier
@@ -384,26 +366,15 @@ function DigesterObject:step(hours, air)
     if self.gas > capacity then
         self.gas = capacity
         if self.indoors then
-            self.leakHours = LEAK_HOURS
+            self.leakHours = Digester.LEAK_HOURS
         end
     end
 end
 
---- Brings the digester up to now.
-function DigesterObject:update()
-    local now = getGameTime():getWorldAgeHours()
-    local hours = math.min(LONGEST_PASS, now - (self.lastHour or now))
-    self.lastHour = now
-    if hours <= 0 then
-        return
-    end
-    local isoObject = self:getIsoObject()
-    local container = isoObject and isoObject:getContainer()
-    local square = isoObject and isoObject:getSquare()
-    if isoObject then
-        self.heaterLit = GasHeater.litHeaterNear(self.x, self.y, self.z) ~= nil
-    end
-    local air = self:airTemp(square)
+--- Runs `hours` of the digester, an hour at a time, at the air temperature `air`: feeding from
+--- `container` (its loaded hopper, or nil for the snapshot) and digesting, then snapshots the
+--- hopper.
+function DigesterObject:run(hours, container, air)
     while hours > 0 do
         local step = math.min(1, hours)
         self:meter(step, container)
@@ -413,16 +384,26 @@ function DigesterObject:update()
     if container then
         self:snapshotHopper(container)
     end
-    self:afterChange()
+end
+
+--- Runs the `hours` since it last caught up, in its square's air while loaded. A loaded digester's
+--- heater counts as its tile shows.
+function DigesterObject:advance(hours)
+    if hours <= 0 then
+        return
+    end
+    local isoObject = self:getIsoObject()
+    if isoObject then
+        self.heaterLit = GasHeater.litHeaterFor(isoObject) ~= nil
+    end
+    self:run(hours, isoObject and isoObject:getContainer(), self:airTemp(isoObject and isoObject:getSquare()))
 end
 
 --- Shows and tells what changed, after a pass or a job.
 function DigesterObject:afterChange()
-    self:smell()
-    self:fumes()
-    self:showHolder()
-    self:showScrubber()
-    self:showHeater()
+    Stink.set(self:key(), self.x, self.y, self.z, DigesterObject.corpsesFor(self:stinkScore()))
+    self:setFuming(self:fuming())
+    self:show()
     self:sendSummary()
 end
 
@@ -435,9 +416,6 @@ local YOUNG_STINK, MATURE_STINK, MATURE_HOURS = 0.8, 0.4, 14 * 24
 local SLUDGE_STINK, SOUR_STINK = 0.8, 1.5
 -- A part-filled digester stinks less than a full one.
 local EMPTY_SHARE = 0.5
--- Smell levels in the game's corpse count at the default corpse option: nothing for five or
--- fewer, the first level from 6, the second from 15, the third at 25 (BodyDamage and MoodleStat).
-local FIRST, SECOND, THIRD = 6, 15, 25
 
 --- The stink score: under 0.2 none, then up to 1 the first smell level, up to 2 the second, and
 --- the third beyond.
@@ -459,20 +437,17 @@ function DigesterObject:stinkScore()
     return spec.stinkCap and math.min(score, spec.stinkCap) or score
 end
 
---- The corpses the stink score smells like.
+--- The corpses the stink score smells like (Stink.LEVEL_CORPSES).
 function DigesterObject.corpsesFor(score)
+    local first, second, third = Stink.LEVEL_CORPSES[1], Stink.LEVEL_CORPSES[2], Stink.LEVEL_CORPSES[3]
     if score < 0.2 then
         return 0
     elseif score < 1 then
-        return FIRST + math.floor((score - 0.2) / 0.8 * (SECOND - FIRST))
+        return first + math.floor((score - 0.2) / 0.8 * (second - first))
     elseif score < 2 then
-        return SECOND + math.floor((score - 1) * (THIRD - SECOND))
+        return second + math.floor((score - 1) * (third - second))
     end
-    return THIRD
-end
-
-function DigesterObject:smell()
-    Stink.set(self:key(), self.x, self.y, self.z, DigesterObject.corpsesFor(self:stinkScore()))
+    return third
 end
 
 --- Whether the digester fills its building with fumes: badly sour or leaking, indoors. The dome
@@ -481,37 +456,59 @@ function DigesterObject:fuming()
     return self.indoors and self.tier ~= "dome" and (self.sour or self.leakHours > 0)
 end
 
--- Toxic while fuming (RenewableEnergy.Fumes).
-function DigesterObject:fumes()
-    local isoObject = self:getIsoObject()
-    local building = isoObject and isoObject:getSquare():getBuilding()
-    RenewableEnergy.Fumes.set(self:key(), building, self:fuming())
-end
-
--- Holder -------------------------------------------------------------------------------------
+-- Tile -----------------------------------------------------------------------------------------
 
 local showOverlay = RenewableEnergy.showOverlay
 
-function DigesterObject:showHolder()
+--- Lights or puts out `heater`, by its tile.
+function DigesterObject.showHeaterLit(heater, lit)
+    if GasHeater.isLit(heater) == lit then return end
+    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
+    heater:setSprite(getSprite(lit and Sprites.gasHeater.lit or Sprites.gasHeater.off))
+    if isServer() then
+        heater:transmitUpdatedSpriteToClients()
+    end
+end
+
+--- Lights or puts out `heater`, the one that warms this digester (GasHeater.digesterNear).
+function DigesterObject:setHeaterLit(heater, lit)
+    self.heaterLit = lit
+    DigesterObject.showHeaterLit(heater, lit)
+end
+
+-- The holder's fill, the scrubber, and a heater put out once the digester stops feeding it: out
+-- of gas, here or while its chunk was unloaded.
+function DigesterObject:show()
     local isoObject = self:getIsoObject()
     if not isoObject then return end
     local capacity = Digester.HOLDERS[self.holder].capacity
     showOverlay(isoObject, Digester.isHolderOverlay, Digester.holderOverlay(self.holder, self.gas / capacity, self:isTorn()))
-end
-
-function DigesterObject:showScrubber()
-    local isoObject = self:getIsoObject()
-    if not isoObject then return end
     showOverlay(isoObject, Digester.isScrubberOverlay, self.scrubber and Sprites.digesterScrubber[self.tier] or nil)
+    if not self.heaterLit then
+        local heater = GasHeater.litHeaterFor(isoObject)
+        if heater then
+            DigesterObject.showHeaterLit(heater, false)
+        end
+    end
 end
 
--- A heater beside it goes out once the digester stops feeding it: out of gas, here or while its
--- chunk was unloaded.
-function DigesterObject:showHeater()
-    if self.heaterLit or not self:getIsoObject() then return end
-    local heater = GasHeater.litHeaterNear(self.x, self.y, self.z)
-    if heater then
-        GasHeater.setLit(heater, false)
+--- Makes it an insulated digester under a floating drum: its tile, and the bigger hopper of the
+--- tile's ContainerCapacity, which a multiplayer client gets only with the containers.
+function DigesterObject:upgrade(isoObject)
+    self.tier = "insulated"
+    self.material = nil
+    self.holder = "drum"
+    self.holderCondition = 100
+    self.gas = math.min(self.gas, Digester.HOLDERS.drum.capacity)
+    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
+    isoObject:setSprite(getSprite(Sprites.digester.insulated))
+    local container = isoObject:getContainer()
+    if container then
+        container:setCapacity(tonumber(isoObject:getProperties():get("ContainerCapacity")) or container:getCapacity())
+    end
+    if isServer() then
+        isoObject:transmitUpdatedSpriteToClients()
+        isoObject:sendObjectChange(IsoObjectChange.CONTAINERS)
     end
 end
 
@@ -533,7 +530,7 @@ function DigesterObject:canSupply()
 end
 
 function DigesterObject:capW()
-    return RenewableEnergy.GasKit.CAP_W
+    return GasKit.CAP_W
 end
 
 function DigesterObject:wearFactor()
@@ -543,58 +540,33 @@ end
 --- Gives the gas a generator delivering `watts` burns over `hours`. Returns whether there was
 --- enough.
 function DigesterObject:supply(watts, hours)
-    local need = RenewableEnergy.GasKit.gasFor(watts, hours)
+    local need = GasKit.gasFor(watts, hours)
     return self:takeGas(need) + 1e-4 >= need
 end
 
 -- Summary --------------------------------------------------------------------------------------
 
-local function round(value, places)
-    local scale = 10 ^ places
-    return math.floor(value * scale + 0.5) / scale
-end
-
 --- What every client keeps of the digester: what its menu checks and its status window shows,
---- rounded so a pass that changes little sends nothing.
+--- rounded so a pass that changes little sends nothing. Digester's accessors add what its hopper
+--- holds.
 function DigesterObject:buildSummary()
+    local round = RenewableEnergy.round
     local spec = self:tierSpec()
     return {
         tier = self.tier, material = self.material, holder = self.holder,
-        holderCondition = math.floor(self.holderCondition + 0.5), torn = self:isTorn(),
+        holderCondition = round(self.holderCondition), torn = self:isTorn(),
         gas = round(self.gas, 2), capacity = self:capacity(),
-        temp = round(self.temp, 0),
+        temp = round(self.temp),
         fed = self.fed, started = self.started, startup = round(self:startupProgress(), 2),
         sludge = math.floor(self.sludge), sour = self.sour, leaking = self.leakHours > 0,
         fill = round(math.min(1, self.potential / spec.potentialCap), 2),
         madePerDay = round(self.madePerDay, 2),
-        hopper = #self.hopper,
         stink = round(self:stinkScore(), 1),
         scrubber = self.scrubber == true,
         scrubCO2 = round(self.scrubCO2 or 0, 1),
         scrubWool = round(self.scrubWool or 0, 1),
+        heaterLit = self.heaterLit == true,
     }
-end
-
-local function same(a, b)
-    for key, value in pairs(a) do
-        if b[key] ~= value then
-            return false
-        end
-    end
-    for key in pairs(b) do
-        if a[key] == nil then
-            return false
-        end
-    end
-    return true
-end
-
-function DigesterObject:sendSummary()
-    local summary = self:buildSummary()
-    if not (self.summary and same(summary, self.summary)) then
-        self.summary = summary
-        self:updateOnClient()
-    end
 end
 
 return DigesterObject

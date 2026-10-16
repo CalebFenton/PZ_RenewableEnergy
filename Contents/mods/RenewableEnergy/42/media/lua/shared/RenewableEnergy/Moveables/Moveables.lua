@@ -2,6 +2,7 @@ require "Moveables/ISMoveableDefinitions"
 require "Moveables/ISMoveableSpriteProps"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Biogas/Digester"
 
@@ -58,10 +59,7 @@ end)
 -- A treadmill (Sprites.treadmill) gives its motor when dismantled: the wind charger's generator.
 -- Vanilla scraps each tile of a multi-tile object in turn (ISMoveableSpriteProps.scrapObject), so
 -- the motor comes with the tile that was clicked.
-RenewableEnergy.TREADMILL_MOTOR = "RenewableEnergy.TreadmillMotor"
-local function isTreadmillSprite(name)
-    return RenewableEnergy.Sprites.kindOf(name) == "treadmill"
-end
+local Treadmill = RenewableEnergy.Treadmill
 
 local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
 function ISMoveableSpriteProps:scrapObjectInternal(character, scrapDef, square, object, ...)
@@ -74,8 +72,8 @@ end
 local vanillaScrapItems = ISMoveableSpriteProps.getScrapItemsList
 function ISMoveableSpriteProps:getScrapItemsList(character)
     local items = vanillaScrapItems(self, character)
-    if items and isTreadmillSprite(self.spriteName) and self.scrappingMainTile ~= false then
-        table.insert(items.usable, RenewableEnergy.TREADMILL_MOTOR)
+    if items and Treadmill.isSprite(self.spriteName) and self.scrappingMainTile ~= false then
+        table.insert(items.usable, Treadmill.MOTOR)
     end
     return items
 end

@@ -1,7 +1,9 @@
 require "TimedActions/ISBaseTimedAction"
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+require "RenewableEnergy/PowerBank/Sources"
+require "RenewableEnergy/PowerBank/Treadmill"
 
 -- Run on Treadmill: the character runs in place on a treadmill wired to a bank, the belt turning
 -- its motor. A run lasts Specs.treadmill.runMinutes and stopping early counts the share run. The
@@ -11,23 +13,22 @@ RenewableEnergyTreadmillAction = ISBaseTimedAction:derive("RenewableEnergyTreadm
 
 local Action = RenewableEnergyTreadmillAction
 local Specs, PowerBank = RenewableEnergy.Specs, RenewableEnergy.PowerBank
+local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
 
 -- Endurance below which the runner gives up, as vanilla stops a sprint (IsoPlayer, exhausted).
 local GIVE_UP_ENDURANCE = 0.1
 
 -- How far from the middle of the treadmill's square, on each axis, the runner may stand: on it,
--- with a little for drift and a client's lag.
+-- with a little for drift and a client's lag. Stepping off puts them back beside it, still within.
 local REACH = 1.6
 
 local function isWiredTreadmill(object)
-    return object ~= nil and object:getObjectIndex() ~= -1 and PowerBank.sourceKind(object) == "treadmill"
+    return RenewableEnergy.onSquare(object) and Sources.kindOf(object) == "treadmill"
 end
 
-local function onTreadmill(character, object)
-    local square = object:getSquare()
-    return square ~= nil and math.abs(character:getX() - (square:getX() + 0.5)) <= REACH
-        and math.abs(character:getY() - (square:getY() + 0.5)) <= REACH
-        and math.abs(character:getZ() - square:getZ()) < 1
+-- Whether the runner is on the wired treadmill.
+local function running(self)
+    return isWiredTreadmill(self.object) and RenewableEnergy.withinReach(self.character, self.object, REACH)
 end
 
 local function runHours()
@@ -38,12 +39,11 @@ function Action:getDuration()
     if self.character:isTimedActionInstant() then
         return 1
     end
-    return Specs.treadmill.runMinutes * RenewableEnergyAction.unitsPerMinute()
+    return Specs.treadmill.runMinutes * RenewableEnergy.unitsPerMinute()
 end
 
 function Action:isValid()
-    return isWiredTreadmill(self.object) and onTreadmill(self.character, self.object)
-        and self.character:getStats():get(CharacterStat.ENDURANCE) > GIVE_UP_ENDURANCE
+    return running(self) and self.character:getStats():get(CharacterStat.ENDURANCE) > GIVE_UP_ENDURANCE
 end
 
 -- How far past the middle of the rear tile, toward the console, the runner stands.
@@ -51,14 +51,14 @@ local TOWARD_CONSOLE = 0.3
 
 -- The way the belt runs the runner, from the treadmill's tile.
 function Action:facing()
-    local _, facing = PowerBank.sourceKind(self.object)
+    local _, facing = Sources.kindOf(self.object)
     return IsoDirections[facing] or self.character:getDir()
 end
 
 -- Where the runner stands: on the rear tile, a little toward the console, whichever of the two
 -- tiles is the wired one.
 function Action:runSpot()
-    local rear, _, step = PowerBank.treadmillEnds(self.object)
+    local rear, _, step = Treadmill.ends(self.object)
     return rear.x + 0.5 + step[1] * TOWARD_CONSOLE, rear.y + 0.5 + step[2] * TOWARD_CONSOLE
 end
 
@@ -88,11 +88,12 @@ local function stepOff(self)
 end
 
 -- The authority's side of `share` of a run: the bank's watt-hours and the runner's sweat and
--- training.
+-- training. The server never calls isValid() and NetTimedAction checks no distance, so it checks
+-- here, on every path that settles, that the runner is at the treadmill.
 local function settle(self, share)
     local hours = runHours() * math.max(0, math.min(1, share))
-    if hours <= 0 or not isWiredTreadmill(self.object) then
-        return
+    if hours <= 0 or not running(self) then
+        return false
     end
     local spec, character = Specs.treadmill, self.character
     PowerBank.perform(character, "runTreadmill", { source = PowerBank.positionOf(self.object), hours = hours })
@@ -106,13 +107,15 @@ local function settle(self, share)
     for perk, xp in pairs(spec.xpPerHour) do
         addXp(character, Perks[perk], xp * hours)
     end
+    return true
 end
 
 function Action:stop()
-    stepOff(self)
+    -- Settled before the runner steps off, while still on the belt.
     if not isClient() then
         settle(self, self:getJobDelta())
     end
+    stepOff(self)
     ISBaseTimedAction.stop(self)
 end
 
@@ -125,14 +128,8 @@ function Action:perform()
     ISBaseTimedAction.perform(self)
 end
 
--- The server never calls isValid() and NetTimedAction checks no distance, so it checks the
--- runner is at the treadmill. Stepping off puts them back beside it, still within REACH.
 function Action:complete()
-    if isServer() and not (isWiredTreadmill(self.object) and onTreadmill(self.character, self.object)) then
-        return false
-    end
-    settle(self, 1)
-    return true
+    return settle(self, 1)
 end
 
 -- Parameter names match the fields set on `o`: the multiplayer server rebuilds the action by

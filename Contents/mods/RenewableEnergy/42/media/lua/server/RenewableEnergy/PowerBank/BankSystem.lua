@@ -11,10 +11,13 @@ require "Map/SGlobalObjectSystem"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
+require "RenewableEnergy/PowerBank/PanelSource"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 
 RenewableEnergy = RenewableEnergy or {}
 local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
+local Sources, PanelSource = RenewableEnergy.Sources, RenewableEnergy.PanelSource
 
 local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
 RenewableEnergy.BankSystem = BankSystem
@@ -27,8 +30,6 @@ local SUN_STEP = 1 / 6
 -- Longer gaps than this between passes (a save loaded after the clock jumped) count as
 -- this long, so one pass never swings the charge by days of sun.
 local LONGEST_PASS = 24
--- MapObjects keeps one function per sprite and priority.
-local LOAD_PRIORITY = 6
 
 function BankSystem:new()
     return SGlobalObjectSystem.new(self, PowerBank.SYSTEM_NAME)
@@ -136,10 +137,10 @@ function BankSystem:OnObjectAdded(isoObject)
         makeBank(isoObject:getSquare(), name, isoObject:getObjectIndex(), isoObject)
     elseif PowerBank.isBank(isoObject) then
         self:loadIsoObject(isoObject)
-    elseif PowerBank.isPanel(PowerBank.sourceKind(isoObject)) then
+    elseif Sources.familyOf(Sources.kindOf(isoObject)) == "panel" then
         -- Placing a mount, rotating it (picked up and placed again) and world spawns all land
         -- here, with the modules the item carried.
-        PowerBank.showCracks(isoObject)
+        PanelSource.showCracks(isoObject)
     end
 end
 
@@ -158,7 +159,7 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
         if bank then
             self:removeLuaObject(bank)
         end
-    elseif PowerBank.sourceKind(isoObject) then
+    elseif Sources.kindOf(isoObject) then
         local x, y, z = isoObject:getX(), isoObject:getY(), isoObject:getZ()
         local found = PowerBank.bankOfSource(x, y, z)
         local bank = found and self:getLuaObjectAt(found.x, found.y, found.z)
@@ -228,20 +229,14 @@ local function loadBank(isoObject)
 end
 
 for _, name in ipairs(PowerBank.bankSprites()) do
-    MapObjects.OnLoadWithSprite(name, loadBank, LOAD_PRIORITY)
+    MapObjects.OnLoadWithSprite(name, loadBank, Sprites.LOAD_PRIORITY)
 end
 
 -- A panel's chunk loaded: its overlays were saved with it, but a save from before the mod drew
 -- cracks has none.
-local mountSprites = { Sprites.flat }
-for _, mount in ipairs({ "wall", "rack" }) do
-    for _, facings in pairs(Sprites[mount]) do
-        for _, name in pairs(facings) do
-            table.insert(mountSprites, name)
-        end
-    end
+for kind in pairs(RenewableEnergy.Specs.mounts) do
+    MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), PanelSource.showCracks, Sprites.LOAD_PRIORITY)
 end
-MapObjects.OnLoadWithSprite(mountSprites, PowerBank.showCracks, LOAD_PRIORITY)
 
 -- The charge pass ------------------------------------------------------------------------
 
@@ -284,7 +279,7 @@ function BankSystem.passContext(hours)
         airC = climate:getTemperature(),
         elevation = Sun.elevation(),
         windKph = climate:getWindspeedKph(),
-        stormHours = Bank.stormHours(hours),
+        stormHours = PanelSource.stormHours(hours),
         irradiance = averaged(weather),
         clearIrradiance = averaged(Sun.CLEAR_WEATHER),
     }

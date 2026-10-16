@@ -1,9 +1,9 @@
 {
     "ContextMenu_RenewableEnergy_Status": "Status",
-    "ContextMenu_RenewableEnergy_ConnectPanelsInReach": "Connect Sources in Reach (%1)",
-    "ContextMenu_RenewableEnergy_ConnectPanel": "Connect to %1 (%2)",
+    "ContextMenu_RenewableEnergy_ConnectSourcesInReach": "Connect Sources in Reach (%1)",
+    "ContextMenu_RenewableEnergy_ConnectSource": "Connect to %1 (%2)",
     "ContextMenu_RenewableEnergy_ConnectToBank": "Connect to a Battery Bank",
-    "ContextMenu_RenewableEnergy_DisconnectPanel": "Disconnect",
+    "ContextMenu_RenewableEnergy_DisconnectSource": "Disconnect",
     "ContextMenu_RenewableEnergy_ClearSnow": "Clear Snow",
     "ContextMenu_RenewableEnergy_WiredTo": "Connected to: %1, %2",
     "ContextMenu_RenewableEnergy_WireIn": "Wire In",

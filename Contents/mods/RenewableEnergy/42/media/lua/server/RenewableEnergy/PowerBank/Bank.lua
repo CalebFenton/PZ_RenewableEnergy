@@ -1,6 +1,6 @@
 -- One battery bank on the authority (single player or the server): its batteries, inverters,
--- chargers, controllers, panels, wind chargers and backup generator, and the energy that moves
--- between them each pass.
+-- chargers, controllers, sources (panels, wind chargers and treadmills, each family run by its
+-- <Family>Source.lua) and backup generator, and the energy that moves between them each pass.
 --
 -- The table is the bank's global object (SGlobalObject), so every field named in
 -- SAVED_FIELDS is saved with the world and kept while the chunk is unloaded. While loaded,
@@ -16,7 +16,10 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
-require "RenewableEnergy/Wind"
+require "RenewableEnergy/PowerBank/Sources"
+require "RenewableEnergy/PowerBank/PanelSource"
+require "RenewableEnergy/PowerBank/WindSource"
+require "RenewableEnergy/PowerBank/TreadmillSource"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -24,8 +27,9 @@ require "RenewableEnergy/GasLine/GasKit"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
 
 RenewableEnergy = RenewableEnergy or {}
-local Specs, Sprites, Sun, Wind = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.Wind
-local Battery, Wear, PowerBank = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
+local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
+local Battery, Wear, PowerBank, Sources = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank,
+    RenewableEnergy.Sources
 
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
 RenewableEnergy.Bank = Bank
@@ -42,20 +46,24 @@ Bank.SAVED_FIELDS = {
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
 -- bank's floor.
 local BACKUP_REACH = 3
--- Snow cover on a panel, as a share of the panel per hour: falling snow adds it, mild air and
--- sun melt it, and a rack sheds it in sun or mild air.
-local SNOW_PER_HOUR = 0.5
-local SNOW_MELT_PER_HOUR = 0.1
-local SNOW_SUN_MELT_PER_HOUR = 0.05
-local RACK_SHED_PER_HOUR = 0.5
-local RACK_SHEDS_ABOVE_C = -2
--- Snow this deep shows on the panel's tile.
-local SNOW_SHOWN = 0.5
--- A panel making less than this share of what it would in clear full sun names the biggest
--- reason in the status.
-local LOW_SHARE = 0.7
 -- Vanilla bills generators in fuel per hour per unit of power; a unit is this many watts.
 local WATTS_PER_FUEL_UNIT = Specs.loads.other.wattsPerConsumption
+
+-- How the bank runs each family of source (RenewableEnergy.Sources): init(source, isoObject,
+-- facing, material) fills a new record, update(source, object, inSlot, hours, context) sets its
+-- watts and reason for a pass, and status(entry, source), if any, adds to its status entry.
+local FAMILY = {
+    panel = RenewableEnergy.PanelSource,
+    wind = RenewableEnergy.WindSource,
+    treadmill = RenewableEnergy.TreadmillSource,
+}
+-- Each family's watts now in the status, and its watt-hours today, saved; solarWhToday is Release
+-- 1's and keeps its name.
+local TOTALS = {
+    panel = { now = "solarW", today = "solarWhToday" },
+    wind = { now = "windW", today = "windWhToday" },
+    treadmill = { now = "runW", today = "runWhToday" },
+}
 
 function Bank:new(luaSystem, globalObject)
     return SGlobalObject.new(self, luaSystem, globalObject)
@@ -82,9 +90,9 @@ function Bank:initNew()
     self.cycleDepth = 0
     self.pendingDepths = {}
     self.pendingPartWear = { hours = 0, overloads = 0 }
-    self.solarWhToday = 0
-    self.windWhToday = 0
-    self.runWhToday = 0
+    for _, total in pairs(TOTALS) do
+        self[total.today] = 0
+    end
     self.loadWhToday = 0
     self.empty = false
     self.lastHour = getGameTime():getWorldAgeHours()
@@ -255,7 +263,7 @@ end
 function Bank:slotsUsed()
     local used = 0
     for _, source in ipairs(self.sources) do
-        used = used + PowerBank.slotsOf(source.kind)
+        used = used + Sources.slotsOf(source.kind)
     end
     return used
 end
@@ -292,28 +300,7 @@ function Bank:applyPendingPartWear(container)
     self.pendingPartWear = { hours = 0, overloads = 0 }
 end
 
--- Panels ---------------------------------------------------------------------------------
-
-local CONDITION_MAX = {}
-
--- A module type's ConditionMax, from its item script.
-local function conditionMax(fullType)
-    if not CONDITION_MAX[fullType] then
-        local script = getScriptManager():FindItem(fullType)
-        CONDITION_MAX[fullType] = script and script:getConditionMax() or 100
-    end
-    return CONDITION_MAX[fullType]
-end
-
---- The watts a panel's modules are rated for as they are now, and at their best.
-local function sourceWatts(source)
-    local now, best = 0, 0
-    for _, module in ipairs(source.modules) do
-        now = now + PowerBank.moduleWatts(module.type, module.condition)
-        best = best + PowerBank.moduleWatts(module.type, conditionMax(module.type))
-    end
-    return now, best
-end
+-- Sources ---------------------------------------------------------------------------------
 
 function Bank:findSource(x, y, z)
     for i, source in ipairs(self.sources) do
@@ -325,27 +312,10 @@ function Bank:findSource(x, y, z)
 end
 
 function Bank:addSource(isoObject)
-    local kind, facing, material = PowerBank.sourceKind(isoObject)
+    local kind, facing, material = Sources.kindOf(isoObject)
     local source = { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(), kind = kind, watts = 0 }
-    if PowerBank.isWind(kind) then
-        source.braked = PowerBank.isBraked(isoObject)
-        source.broken = PowerBank.isBroken(isoObject)
-        source.shelter = Wind.shelterAt(source.x, source.y, source.z)
-    elseif kind == "treadmill" then
-        source.facing = facing
-    else
-        source.facing, source.material, source.snow = facing, material, 0
-        source.modules = PowerBank.modulesOf(isoObject, kind)
-    end
+    FAMILY[Sources.familyOf(kind)].init(source, isoObject, facing, material)
     table.insert(self.sources, source)
-end
-
---- Brakes the wind charger `source` (on `object` when loaded) or lets it go.
-function Bank:setBrake(source, braked, object)
-    source.braked = braked
-    if object then
-        PowerBank.setBraked(object, braked)
-    end
 end
 
 function Bank:removeSource(x, y, z)
@@ -357,260 +327,37 @@ function Bank:removeSource(x, y, z)
     return false
 end
 
--- Snow cover after `hours` of the weather in `context`.
-local function updateSnow(source, hours, context)
-    if source.kind == "wall" then
-        source.snow = 0
-        return
-    end
-    local snow = source.snow or 0
-    if context.weather.snowing then
-        snow = snow + SNOW_PER_HOUR * context.precipitation * hours
-    end
-    if context.airC > 0 then
-        snow = snow - SNOW_MELT_PER_HOUR * hours
-    end
-    local sun = context.irradiance(source.kind, source.facing) / Sun.FULL_SUN
-    snow = snow - SNOW_SUN_MELT_PER_HOUR * sun * hours
-    if source.kind == "rack" and (context.airC > RACK_SHEDS_ABOVE_C or sun > 0) then
-        snow = snow - RACK_SHED_PER_HOUR * hours
-    end
-    source.snow = math.max(0, math.min(1, snow))
-end
-
-local function snowOverlay(source)
-    if source.kind == "flat" then
-        return Sprites.snow.flat
-    end
-    local rack = source.kind == "rack" and Sprites.snow.rack[source.material]
-    return rack and rack[source.facing]
-end
-
-local function showSnow(object, source)
-    local overlay = snowOverlay(source)
-    if not overlay then return end
-    local wanted = source.snow >= SNOW_SHOWN
-    local attached = object:getAttachedAnimSprite()
-    local index
-    for i = 0, (attached and attached:size() or 0) - 1 do
-        if attached:get(i):getName() == overlay then
-            index = i
-        end
-    end
-    if wanted == (index ~= nil) then return end
-    if wanted then
-        object:addAttachedAnimSpriteByName(overlay)
-    else
-        object:RemoveAttachedAnim(index)
-    end
-    object:transmitUpdatedSpriteToClients()
-end
-
---- Someone swept the panel.
-function Bank:clearSnow(source, object)
-    source.snow = 0
-    if object then
-        showSnow(object, source)
-    end
-end
-
---- How likely a storm is to crack a module of a mount, relative to Specs.storm.chancePerHour.
-local function stormFactor(mount, material)
-    local materialSpec = material and Specs.materials[material]
-    return Specs.mounts[mount].stormFactor * (materialSpec and materialSpec.stormFactor or 1)
-end
-
---- The hours of a pass of `hours`, ending now, in which a thunderstorm can crack modules: all
---- of them while one blows hard enough, else none.
-function Bank.stormHours(hours)
-    local climate = getClimateManager()
-    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.windMin
-    return storming and hours or 0
-end
-
---- A thunderstorm may crack one of a panel's modules. Returns whether it did.
-function Bank.stormCrack(source, stormHours)
-    local options = SandboxVars.RenewableEnergy
-    if not options.StormDamage or stormHours <= 0 then
-        return false
-    end
-    local perHour = Specs.storm.chancePerHour * stormFactor(source.kind, source.material) * options.StormDamageRate / 100
-    local chance = 1 - (1 - math.min(1, perHour)) ^ stormHours
-    local whole = {}
-    for _, module in ipairs(source.modules) do
-        if module.condition > 0 then
-            table.insert(whole, module)
-        end
-    end
-    if #whole == 0 or ZombRandFloat(0, 1) >= chance then
-        return false
-    end
-    local module = whole[ZombRand(#whole) + 1]
-    module.condition = math.max(0, module.condition - Specs.storm.crack)
-    return true
-end
-
--- Keep a panel's module record and the bank's copy the same: a crack while the panel's square
--- was unloaded goes to the object, otherwise the object (which unmounting and repairs change)
--- is the truth. Either way the tile shows the cracks the record now holds.
-local function syncModules(source, object)
-    if source.modulesChanged then
-        PowerBank.writeModules(object, source.modules)
-        source.modulesChanged = nil
-    else
-        source.modules = PowerBank.modulesOf(object, source.kind)
-    end
-    PowerBank.showCracks(object)
-end
-
--- Why a panel makes less than it would at its best in clear full sun: the biggest loss, if it
--- is big enough to matter. On a tie the first reason checked wins.
-local function lowReason(source, inSlot, light, clearLight, condition, context)
-    if not inSlot then
-        return "noController"
-    elseif context.elevation <= 0 or clearLight <= 0 then
-        return "night"
-    end
-    local reason, lowest = nil, LOW_SHARE
-    local share = 1 - source.snow
-    if share < lowest then reason, lowest = "snow", share end
-    share = light / clearLight
-    if share < lowest then reason, lowest = "cloud", share end
-    share = clearLight / Sun.FULL_SUN
-    if share < lowest then reason, lowest = "angle", share end
-    if condition < lowest then reason = "cracked" end
-    return reason
-end
-
--- A panel's output over the pass, and why it is low.
-local function panelWatts(source, object, inSlot, hours, context)
-    if Bank.stormCrack(source, context.stormHours) then
-        source.modulesChanged = true
-    end
-    if object then
-        syncModules(source, object)
-    end
-    updateSnow(source, hours, context)
-    if object then
-        showSnow(object, source)
-    end
-    local light = context.irradiance(source.kind, source.facing)
-    local clearLight = context.clearIrradiance(source.kind, source.facing)
-    local now, best = sourceWatts(source)
-    source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
-    source.fullSunPct = math.floor(100 * light * (1 - source.snow) / Sun.FULL_SUN + 0.5)
-    source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
-end
-
---- Whether a wind charger left running through `hours` of a wind of `kph` breaks its blades, at
---- its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage options.
-function Bank.windBreak(source, kph, hours)
-    local options = SandboxVars.RenewableEnergy
-    local spec = Specs.wind.turbines[source.kind]
-    if not options.StormDamage or hours <= 0 or source.braked or source.broken or not Wind.canBreak(spec, kph) then
-        return false
-    end
-    local perHour = spec.breakPerHour * options.StormDamageRate / 100
-    return ZombRandFloat(0, 1) < 1 - (1 - math.min(1, perHour)) ^ hours
-end
-
--- A wind charger's output over the pass, and why it makes nothing or little: braked, broken,
--- calm, furled or sheltered. Its brake is the object's while it is loaded (the menu sets both);
--- its broken blades are the record's, which a storm may break while the object is unloaded, and
--- go to the object when it is loaded. Its shelter is counted again then, since the trees and
--- buildings around it change.
-local function windWatts(source, object, inSlot, hours, context)
-    if object then
-        source.braked = PowerBank.isBraked(object)
-        source.shelter = Wind.shelterAt(source.x, source.y, source.z)
-    end
-    if Bank.windBreak(source, context.windKph, hours) then
-        source.broken = true
-    end
-    if object and PowerBank.isBroken(object) ~= (source.broken == true) then
-        PowerBank.setBroken(object, source.broken)
-    end
-    local spec = Specs.wind.turbines[source.kind]
-    local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0)
-    source.windKph = math.floor(context.windKph + 0.5)
-    source.watts = (inSlot and not source.braked and not source.broken) and watts or 0
-    if not inSlot then
-        source.reason = "noController"
-    elseif source.braked then
-        source.reason = "braked"
-    elseif source.broken then
-        source.reason = "broken"
-    elseif context.windKph <= spec.cutInKph then
-        source.reason = "calm"
-    elseif Wind.furled(spec, context.windKph) then
-        source.reason = "furled"
-    elseif (source.shelter or 0) * Specs.wind.shelterLoss > 1 - LOW_SHARE then
-        source.reason = "sheltered"
-    else
-        source.reason = nil
-    end
-end
-
--- A treadmill's output over the pass: the runs finished since the last pass (Bank:creditRun),
--- spread over it. Runs past the bank's input slots are lost.
-local function runWatts(source, inSlot, hours)
-    local wh = source.pendingWh or 0
-    if hours <= 0 then
-        source.watts = 0
-        return
-    end
-    source.pendingWh = nil
-    source.watts = inSlot and wh / hours or 0
-    if not inSlot then
-        source.reason = "noController"
-    elseif wh <= 0 then
-        source.reason = "idle"
-    else
-        source.reason = nil
-    end
-end
-
---- Panel, wind charger and treadmill output over the pass, as solar, wind and treadmill watts. A
---- source whose square is loaded is checked for still being there, and outdoors if it must be;
---- one that is gone is dropped. Sources past the bank's input slots stay wired and make nothing.
+--- Every source's output over the pass, as watts by family (TOTALS). A source whose square is
+--- loaded is checked for still being there, where its kind works and in reach; one that is gone
+--- is dropped. Each source takes its slots if they fit in what the sources before it in the
+--- list left free; one that doesn't fit stays wired and makes nothing.
 function Bank:updateSources(hours, context)
-    local solarW, windW, runW, slots, used = 0, 0, 0, self:inputSlots(), 0
+    local watts, slots, used = {}, self:inputSlots(), 0
+    for family in pairs(TOTALS) do
+        watts[family] = 0
+    end
     -- A dropped source gives its place in the list, and so its slots, to the next one.
     local i = 1
     while i <= #self.sources do
         local source = self.sources[i]
         local square = getSquare(source.x, source.y, source.z)
-        local object = PowerBank.sourceOn(square)
-        if square and not (object and PowerBank.sourceSquareOk(square, source.kind)
+        local object = Sources.on(square)
+        if square and not (object and Sources.squareOk(square, source.kind)
             and PowerBank.isInReach(self, source.x, source.y, source.z)) then
             table.remove(self.sources, i)
         else
-            used = used + PowerBank.slotsOf(source.kind)
-            local inSlot = used <= slots
-            if PowerBank.isWind(source.kind) then
-                windWatts(source, object, inSlot, hours, context)
-                windW = windW + source.watts
-            elseif source.kind == "treadmill" then
-                runWatts(source, inSlot, hours)
-                runW = runW + source.watts
-            else
-                panelWatts(source, object, inSlot, hours, context)
-                solarW = solarW + source.watts
+            local size = Sources.slotsOf(source.kind)
+            local inSlot = used + size <= slots
+            if inSlot then
+                used = used + size
             end
+            local family = Sources.familyOf(source.kind)
+            FAMILY[family].update(source, object, inSlot, hours, context)
+            watts[family] = watts[family] + source.watts
             i = i + 1
         end
     end
-    return solarW, windW, runW
-end
-
---- Banks a treadmill run's Wh for the next pass. False when the treadmill isn't this bank's source.
-function Bank:creditRun(x, y, z, wh)
-    local source = self:findSource(x, y, z)
-    if not (source and source.kind == "treadmill") then
-        return false
-    end
-    source.pendingWh = (source.pendingWh or 0) + wh
-    return true
+    return watts
 end
 
 -- Backup generator -----------------------------------------------------------------------
@@ -815,9 +562,9 @@ function Bank:newDay(container, day)
         end
         self.cycleHigh = self.charge
         self.cycleDepth = 0
-        self.solarWhToday = 0
-        self.windWhToday = 0
-        self.runWhToday = 0
+        for _, total in pairs(TOTALS) do
+            self[total.today] = 0
+        end
         self.loadWhToday = 0
     end
     self.day = day
@@ -848,8 +595,11 @@ function Bank:update(hours, context)
     local container = isoObject and isoObject:getContainer()
     self:recount()
 
-    local solarW, windW, runW = self:updateSources(hours, context)
-    local sourcesW = solarW + windW + runW
+    local watts = self:updateSources(hours, context)
+    local sourcesW = 0
+    for _, w in pairs(watts) do
+        sourcesW = sourcesW + w
+    end
     self:updateGenerator()
     local generators = self:measure()
     if self:checkOverload() then
@@ -877,9 +627,9 @@ function Bank:update(hours, context)
         self:addPartWear(container, hours, 0)
     end
 
-    self.solarWhToday = self.solarWhToday + solarW * hours
-    self.windWhToday = (self.windWhToday or 0) + windW * hours
-    self.runWhToday = (self.runWhToday or 0) + runW * hours
+    for family, total in pairs(TOTALS) do
+        self[total.today] = (self[total.today] or 0) + watts[family] * hours
+    end
     self.loadWhToday = self.loadWhToday + (powering and self.averageLoadW or 0) * hours
     self:trackCycle()
     self:newDay(container, today())
@@ -890,8 +640,11 @@ function Bank:update(hours, context)
     self:switchGenerator()
     self:showBatteries()
 
-    self.now = { solarW = solarW, windW = windW, runW = runW, chargerW = chargerW, drawW = drawW,
-        irradiance = context.irradiance("flat"), elevation = context.elevation, windKph = context.windKph }
+    self.now = { chargerW = chargerW, drawW = drawW, irradiance = context.irradiance("flat"), elevation = context.elevation,
+        windKph = context.windKph }
+    for family, total in pairs(TOTALS) do
+        self.now[total.now] = watts[family]
+    end
     self:sendStatus()
 end
 
@@ -904,27 +657,7 @@ function Bank:showBatteries()
     for i = #self.batteries, 1, -1 do
         table.insert(types, self.batteries[i].type)
     end
-    local wanted = Sprites.bankOverlays(self:spec().sprite, types, self.charge)
-    local attached = isoObject:getAttachedAnimSprite()
-    local count = attached and attached:size() or 0
-    local shown, matches = 0, true
-    for i = 0, count - 1 do
-        local name = attached:get(i):getName()
-        if Sprites.isOverlay(name) then
-            shown = shown + 1
-            matches = matches and wanted[shown] == name
-        end
-    end
-    if matches and shown == #wanted then return end
-    for i = count - 1, 0, -1 do
-        if Sprites.isOverlay(attached:get(i):getName()) then
-            isoObject:RemoveAttachedAnim(i)
-        end
-    end
-    for _, name in ipairs(wanted) do
-        isoObject:addAttachedAnimSpriteByName(name)
-    end
-    isoObject:transmitUpdatedSpriteToClients()
+    RenewableEnergy.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(self:spec().sprite, types, self.charge))
 end
 
 -- Status ---------------------------------------------------------------------------------
@@ -959,16 +692,9 @@ function Bank:sourceStatus()
             x = source.x, y = source.y, z = source.z, kind = source.kind, watts = source.watts or 0,
             reason = source.reason,
         }
-        if PowerBank.isWind(source.kind) then
-            entry.braked, entry.broken, entry.windKph = source.braked == true, source.broken == true, source.windKph or 0
-            entry.shelterPct = math.floor(100 * (source.shelter or 0) + 0.5)
-        elseif PowerBank.isPanel(source.kind) then
-            local modules = {}
-            for _, module in ipairs(source.modules) do
-                table.insert(modules, { type = module.type, condition = module.condition })
-            end
-            entry.material, entry.facing, entry.fullSunPct = source.material, source.facing, source.fullSunPct or 0
-            entry.snow, entry.modules = source.snow or 0, modules
+        local status = FAMILY[Sources.familyOf(source.kind)].status
+        if status then
+            status(entry, source)
         end
         table.insert(sources, entry)
     end
@@ -991,7 +717,10 @@ function Bank:buildStatus()
     local now = self.now or {}
     local capacity = self.nominalWh
     local stored = self.charge * capacity
-    local inW = (now.solarW or 0) + (now.windW or 0) + (now.runW or 0) + (now.chargerW or 0)
+    local inW = now.chargerW or 0
+    for _, total in pairs(TOTALS) do
+        inW = inW + (now[total.now] or 0)
+    end
     local drawW = now.drawW or 0
     local batteries = partStatus(self.batteries, function(entry, part)
         entry.fullType, entry.nominalWh, entry.charge = part.type, part.nominalWh, self.charge
@@ -1001,7 +730,7 @@ function Bank:buildStatus()
         entry.charging = entry.working and (now.chargerW or 0) > 0 and chargeSource or nil
     end)
     local generator = self:getIsoObject()
-    return {
+    local status = {
         kind = self:spec().sprite,
         bankType = self.bankType,
         name = self.name,
@@ -1011,9 +740,8 @@ function Bank:buildStatus()
         hour = getGameTime():getWorldAgeHours(),
         sunElevation = now.elevation or 0,
         irradiance = now.irradiance or 0,
-        solarW = now.solarW or 0, windW = now.windW or 0, windKph = now.windKph or 0, runW = now.runW or 0,
+        windKph = now.windKph or 0,
         chargerW = now.chargerW or 0, chargeSource = chargeSource or nil, inW = inW,
-        solarWhToday = self.solarWhToday, windWhToday = self.windWhToday or 0, runWhToday = self.runWhToday or 0,
         loadWhToday = self.loadWhToday,
         loadW = self.loadW, drawW = drawW, limitW = self:limitW(), overloaded = self.overloaded,
         loadByKind = self.loadByKind,
@@ -1031,36 +759,22 @@ function Bank:buildStatus()
             failsafe = self.generator.failsafe,
         } or nil,
     }
+    for _, total in pairs(TOTALS) do
+        status[total.now] = now[total.now] or 0
+        status[total.today] = self[total.today] or 0
+    end
+    return status
 end
 
 --- What every client keeps of the bank wherever it stands: what the menus of the bank and its
---- panels show and check. The Global Object System sends it to every client each time it
+--- sources show and check. The Global Object System sends it to every client each time it
 --- changes, so it holds nothing that moves with every pass.
 function Bank:buildSummary()
     local sources = {}
     for _, source in ipairs(self.sources) do
-        table.insert(sources, { x = source.x, y = source.y, z = source.z, kind = source.kind,
-            snowy = (source.snow or 0) > 0 or nil, braked = source.braked or nil })
+        table.insert(sources, { x = source.x, y = source.y, z = source.z, snowy = (source.snow or 0) > 0 or nil })
     end
     return { bankType = self.bankType, name = self.name, on = self.on, limitW = self:limitW(), sources = sources }
-end
-
--- Whether two values are the same, tables by what they hold.
-local function same(a, b)
-    if type(a) ~= "table" or type(b) ~= "table" then
-        return a == b
-    end
-    for key, value in pairs(a) do
-        if not same(value, b[key]) then
-            return false
-        end
-    end
-    for key in pairs(b) do
-        if a[key] == nil then
-            return false
-        end
-    end
-    return true
 end
 
 -- A client loads at most this many squares each way around its player (the widest chunk grid a
@@ -1103,7 +817,7 @@ end
 --- window reads the status the bank keeps while someone watches.
 function Bank:sendStatus()
     local summary = self:buildSummary()
-    if not same(summary, self.summary) then
+    if not RenewableEnergy.sameValue(summary, self.summary) then
         self.summary = summary
         self:updateOnClient()
     end

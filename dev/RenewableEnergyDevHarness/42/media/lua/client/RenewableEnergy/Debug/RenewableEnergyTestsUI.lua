@@ -4,6 +4,7 @@ require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
@@ -22,7 +23,7 @@ local test, expect, expectNear, player, stateItem, copyItem = T.test, T.expect, 
 local Action = RenewableEnergyAction
 local Specs = RenewableEnergy.Specs
 local Sprites = RenewableEnergy.Sprites
-local PowerBank = RenewableEnergy.PowerBank
+local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
 local Format = RenewableEnergy.Format
 local Menu = RenewableEnergy.Menu
 local StatusWindow = RenewableEnergy.StatusWindow
@@ -131,7 +132,7 @@ test("renewable_energy_ui_menu_panel_connect", {
         if not self.panel then return end
         T.step(function()
             local panel = self.panel.object
-            self.banksBefore = #PowerBank.banksInReach(panel:getX(), panel:getY(), panel:getZ())
+            self.banksBefore = #Sources.banksInReach(panel:getX(), panel:getY(), panel:getZ(), Sources.kindOf(panel))
             local context = newContext()
             local submenu = Menu.addSourceOptions(0, context, panel)
             local option = optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectToBank"))
@@ -151,10 +152,10 @@ test("renewable_energy_ui_menu_panel_connect", {
         end
         local context = newContext()
         local submenu = Menu.addSourceOptions(0, context, panel)
-        local connect = optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectPanel", Menu.bankLabel(self.bank.object),
+        local connect = optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(self.bank.object),
             Format.away(self.panel.position, self.bank.position)))
         expect(connect ~= nil and not connect.notAvailable, "a panel next to a bank offers no connection to it")
-        expect(optionNamed(submenu, getText("ContextMenu_RenewableEnergy_DisconnectPanel")) == nil,
+        expect(optionNamed(submenu, getText("ContextMenu_RenewableEnergy_DisconnectSource")) == nil,
             "a panel that isn't connected offers to disconnect")
         context:hideAndChildren()
     end,
@@ -371,7 +372,7 @@ test("renewable_energy_ui_connect_panel", {
             if not walkTo(self, self.panel.square, "the panel") then return end
             ISTimedActionQueue.add(action)
             T.waitForCopy(function()
-                return PowerBank.samePosition(Action.connectedBank(self.panel.object), self.bank.position)
+                return PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position)
             end)
             T.bankState(self, self.bank)
         end)
@@ -379,7 +380,7 @@ test("renewable_energy_ui_connect_panel", {
     validate = function(self)
         expect(self.valid, "connecting a panel next to a bank is refused")
         expect(self.bank.state.sources == 1, "the server's bank lists " .. self.bank.state.sources .. " panels")
-        expect(PowerBank.samePosition(Action.connectedBank(self.panel.object), self.bank.position),
+        expect(PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position),
             "this client's status of the bank does not list the connected panel")
         expect(not self.action:canPerform(), "a panel already on this bank can be connected again")
         if not expect(self.started ~= nil and self.ended ~= nil, "the connect action never started or ended") then return end
@@ -400,13 +401,13 @@ test("renewable_energy_ui_disconnect_panel", {
         T.step(function()
             local context = newContext()
             local option = optionNamed(Menu.addSourceOptions(0, context, self.panel.object),
-                getText("ContextMenu_RenewableEnergy_DisconnectPanel"))
+                getText("ContextMenu_RenewableEnergy_DisconnectSource"))
             context:hideAndChildren()
             self.offered = option ~= nil and not option.notAvailable
             if not self.offered then return end
             T.standNextTo(self.panel.square)
             T.choose(option)
-            T.waitForCopy(function() return Action.connectedBank(self.panel.object) == nil end)
+            T.waitForCopy(function() return PowerBank.connectedBank(self.panel.object) == nil end, "this client's copy of the disconnection")
             T.bankState(self, self.bank)
         end)
     end,
@@ -414,7 +415,7 @@ test("renewable_energy_ui_disconnect_panel", {
         expect(self.panel.connected, "the bank refused to connect a wall panel next to it (" .. tostring(self.panel.reason) .. ")")
         if not expect(self.offered, "a connected panel's menu offers no Disconnect") then return end
         expect(self.bank.state.sources == 0, "the server's bank still lists the panel after disconnecting it")
-        expect(Action.connectedBank(self.panel.object) == nil, "this client still sees the panel connected after disconnecting it")
+        expect(PowerBank.connectedBank(self.panel.object) == nil, "this client still sees the panel connected after disconnecting it")
     end,
 })
 
@@ -818,8 +819,8 @@ test("renewable_energy_ui_window_full_bank", {
         local found = headers(window.right)
         expect(found[getText("IGUI_RenewableEnergy_Batteries", 5)],
             "the window does not list 5 batteries; the status holds " .. #status.batteries)
-        expect(found[getText("IGUI_RenewableEnergy_Panels", #FULL_BANK_SOURCES)],
-            "the window does not list " .. #FULL_BANK_SOURCES .. " panels; the status holds " .. #status.sources)
+        expect(found[getText("IGUI_RenewableEnergy_Sources", #FULL_BANK_SOURCES)],
+            "the window does not list " .. #FULL_BANK_SOURCES .. " sources; the status holds " .. #status.sources)
         for _, fullType in ipairs({ "RenewableEnergy.InverterCharger", POWER_INVERTER, Specs.controller, "Base.CarBatteryCharger" }) do
             expect(rowLabelled(window.left, getItemNameFromFullType(fullType)) ~= nil, "the window does not list the " .. fullType)
         end

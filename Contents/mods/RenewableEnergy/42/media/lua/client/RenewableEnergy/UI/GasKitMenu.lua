@@ -15,45 +15,20 @@ local GasKitMenu = {}
 RenewableEnergy.GasKitMenu = GasKitMenu
 
 local GasKit, Digester, Gasifier, Needs = RenewableEnergy.GasKit, RenewableEnergy.Digester, RenewableEnergy.Gasifier, RenewableEnergy.Needs
-local Action = RenewableEnergyGasAction
-
-local function queue(playerNum, job, generator, source)
-    local character = getSpecificPlayer(playerNum)
-    if luautils.walkAdj(character, generator:getSquare(), true) then
-        ISTimedActionQueue.add(Action:new(character, job, generator, source))
-    end
-end
-
-local function disable(option, description)
-    option.notAvailable = true
-    option.toolTip = ISWorldObjectContextMenu.addToolTip()
-    option.toolTip.description = description
-end
+local queue = RenewableEnergyGasAction.queue
 
 local function addJob(menu, playerNum, label, job, generator, source)
-    local character = getSpecificPlayer(playerNum)
-    local option = menu:addOption(label, playerNum, queue, job, generator, source)
-    local blocker = GasKit.blocker(job, generator, source)
-    if blocker then
-        disable(option, getText(blocker))
-        return option
-    end
-    local needs = GasKit.needs(character, job, generator, source)
-    if #needs > 0 then
-        option.notAvailable = RenewableEnergy.firstUnmet(needs) ~= nil
-        option.toolTip = ISWorldObjectContextMenu.addToolTip()
-        option.toolTip.description = Needs.describe(needs)
-    end
+    local option = menu:addOption(label, playerNum, queue, "kit", job, generator, nil, source)
+    Needs.show(option, GasKit.needs(getSpecificPlayer(playerNum), job, generator, source), GasKit.blocker(job, generator, source))
     return option
 end
 
 local function sourceLabel(generator, source)
     local name
     if GasKit.sourceKind(source) == "gasifier" then
-        name = getText("IGUI_RenewableEnergy_Gasifier_" .. (Gasifier.tierOf(source) or "standard"))
+        name = getText("IGUI_RenewableEnergy_Gasifier_" .. Gasifier.tierOf(source))
     else
-        local summary = Digester.summaryOf(source)
-        name = getText("IGUI_RenewableEnergy_Digester_" .. (summary and summary.tier or "barrel"))
+        name = getText("IGUI_RenewableEnergy_Digester_" .. Digester.tileOf(source))
     end
     local squares = math.floor(IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY()) + 0.5)
     return getText("ContextMenu_RenewableEnergy_LineTo", name, squares)
@@ -75,7 +50,7 @@ function GasKitMenu.addOptions(playerNum, menu, generator)
         end
         local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectLine"))
         if #sources == 0 then
-            disable(connect, getText("Tooltip_RenewableEnergy_NoDigesterInReach", GasKit.REACH))
+            Needs.disable(connect, getText("Tooltip_RenewableEnergy_NoDigesterInReach", GasKit.REACH))
         else
             local submenu = ISContextMenu:getNew(menu)
             menu:addSubMenu(connect, submenu)
@@ -92,21 +67,6 @@ function GasKitMenu.addOptions(playerNum, menu, generator)
     addJob(menu, playerNum, getText("ContextMenu_RenewableEnergy_RemoveKit"), GasKit.REMOVE, generator)
 end
 
-local function findGenerator(worldobjects)
-    local seen = {}
-    for _, clicked in ipairs(worldobjects) do
-        local square = clicked:getSquare()
-        if square and not seen[square] then
-            seen[square] = true
-            local found = RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
-            if found then
-                return found
-            end
-        end
-    end
-    return nil
-end
-
 -- The kit's options go in vanilla's generator submenu, where the generator's other jobs are.
 local function generatorMenu(context)
     local option = context:getOptionFromName(getText("ContextMenu_Generator"))
@@ -114,7 +74,7 @@ local function generatorMenu(context)
 end
 
 function GasKitMenu.onFill(playerNum, context, worldobjects, test)
-    local generator = findGenerator(worldobjects)
+    local generator = Needs.findClicked(worldobjects, GasKit.isGenerator)
     if not generator then
         return
     end
@@ -130,7 +90,7 @@ function GasKitMenu.onFill(playerNum, context, worldobjects, test)
     if GasKit.hasKit(generator) then
         local take = menu:getOptionFromName(getText("ContextMenu_GeneratorTake"))
         if take then
-            disable(take, getText("Tooltip_RenewableEnergy_RemoveKitFirst"))
+            Needs.disable(take, getText("Tooltip_RenewableEnergy_RemoveKitFirst"))
         end
     end
 end

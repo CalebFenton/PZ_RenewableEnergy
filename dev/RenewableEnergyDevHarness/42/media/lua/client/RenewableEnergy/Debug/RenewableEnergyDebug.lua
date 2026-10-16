@@ -3,6 +3,7 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/UI/StatusWindow"
 require "PZHarness/TestLib"
 
@@ -34,29 +35,24 @@ Debug.ITEMS = {
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
--- The build menu's recipes, which getAllCraftRecipes (and so PZHarness.Test.learnRecipes) leaves out:
--- they belong to entity scripts (scripts/RenewableEnergy/Entities.txt).
-Debug.DIGESTER_RECIPES = {
-    "RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
-    "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
-}
-Debug.GASIFIER_RECIPES = {
-    "RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
-}
-Debug.WIND_RECIPES = {
-    "RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
-    "RenewableEnergy_AlternatorWindCharger",
-}
-Debug.ENTITY_RECIPES = {}
-for _, list in ipairs({ Debug.DIGESTER_RECIPES, Debug.GASIFIER_RECIPES, Debug.WIND_RECIPES }) do
-    for _, name in ipairs(list) do
-        table.insert(Debug.ENTITY_RECIPES, name)
+
+--- The names of the build menu's recipes (scripts/RenewableEnergy/Entities.txt), which
+--- getAllCraftRecipes (and so PZHarness.Test.learnRecipes) leaves out: every buildable recipe with
+--- the mod's recipe prefix (RenewableEnergyTestSettings.lua), as the build menu lists them.
+function Debug.buildRecipes()
+    local names, recipes = {}, getScriptManager():getAllBuildableRecipes()
+    for i = 0, recipes:size() - 1 do
+        local name = recipes:get(i):getName()
+        if PZHarness.startsWith(name, "RenewableEnergy_") then
+            table.insert(names, name)
+        end
     end
+    return names
 end
 
 local function isContainerGeneratorOrPanel(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
-        or RenewableEnergy.PowerBank.sourceKind(object) ~= nil
+        or RenewableEnergy.Sources.kindOf(object) ~= nil
 end
 
 -- Whether a test or the dev harness may put a bank or panel on `square`: free to walk on, with no
@@ -96,7 +92,7 @@ function Debug.setupPlayer(player)
     player:setPerkLevelDebug(Perks.MetalWelding, 4)
     player:setPerkLevelDebug(Perks.Woodwork, 3)
     PZHarness.Test.learnRecipes(player)
-    PZHarness.Fixtures.learnRecipes(player, Debug.ENTITY_RECIPES)
+    PZHarness.Fixtures.learnRecipes(player, Debug.buildRecipes())
     player:getInventory():AddItem("Base.Screwdriver")
     PZHarness.Test.placeWorkTable(player)
 end

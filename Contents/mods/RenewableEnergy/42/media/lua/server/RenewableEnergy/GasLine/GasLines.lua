@@ -13,8 +13,8 @@ if isClient() then return end
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Materials"
 require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/PowerBank/Loads"
 
@@ -22,11 +22,15 @@ RenewableEnergy = RenewableEnergy or {}
 local GasLines = {}
 RenewableEnergy.GasLines = GasLines
 
-local GasKit, Digester, Gasifier, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Digester, RenewableEnergy.Gasifier, RenewableEnergy.Sprites
+local GasKit, Gasifier, Sprites, Materials = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites, RenewableEnergy.Materials
 
--- Global ModData: the kitted generators by "x,y,z", so the pass finds them.
+-- Global ModData: the kitted generators by "x,y,z", so the pass finds them, each { x, y, z,
+-- source }, its line's source kept too so a gasifier's pipe can come off after the generator is
+-- gone.
 GasLines.MOD_DATA = "RenewableEnergyGasKits"
--- A pass longer than this (a save loaded after the clock jumped) counts as this long.
+-- A pass longer than this (a save loaded after the clock jumped) counts as this long. A generator
+-- runs here only while loaded; vanilla bills the time it was away to its fuel when it loads
+-- (IsoGenerator.update), which PHANTOM_FUEL covers, so the gas pays for a day of it at most.
 local LONGEST_PASS = 24
 local EPSILON = 1e-4
 -- Vanilla's generator wear: each hour running, one chance in this many of losing 1 or 2 condition
@@ -46,13 +50,10 @@ local function generatorAt(position)
     return square and RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
 end
 
--- The record of the line's source, loaded or not: a digester or a gasifier. A source has
+-- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
 -- canSupply(), supply(watts, hours), capW(), wearFactor() and afterChange().
-local function sourceOf(state)
-    local position = state.source
-    if not position then return nil end
-    local system = position.kind == "gasifier" and Gasifier.serverSystem or Digester.serverSystem
-    return system and system:getLuaObjectAt(position.x, position.y, position.z) or nil
+local function sourceOf(position)
+    return position and GasKit.SOURCES[position.kind].recordAt(position.x, position.y, position.z)
 end
 
 local function sync(generator)
@@ -61,32 +62,38 @@ local function sync(generator)
     end
 end
 
-local function isKitOverlay(name)
-    return name == Sprites.gasKit
+local isKitOverlay = Sprites.matcher(Sprites.gasKit)
+local isGeneratorPipe = Sprites.matcher(Sprites.gasifierPipeGen)
+
+-- Sets the line's source, in the generator's state and its registry entry.
+local function setSource(generator, state, source)
+    state.source = source
+    registry()[keyOf(generator)].source = source
 end
 
-local GENERATOR_PIPES = {}
-for _, name in pairs(Sprites.gasifierPipeGen) do
-    GENERATOR_PIPES[name] = true
-end
-
-local function isGeneratorPipe(name)
-    return GENERATOR_PIPES[name] == true
-end
-
--- The kit's valve on the generator's tile.
-local function showKit(generator, fitted)
-    RenewableEnergy.showOverlay(generator, isKitOverlay, fitted and Sprites.gasKit or nil)
-end
-
--- A gasifier's pipe: the generator's half toward the gasifier's side, and the gasifier's half
--- toward the generator's; nil sides take them off.
-local function showPipe(generator, gasifierSide, gasifier)
-    RenewableEnergy.showOverlay(generator, isGeneratorPipe, gasifierSide and Sprites.gasifierPipeGen[gasifierSide] or nil)
-    local record = gasifier and Gasifier.recordOf(gasifier)
+-- Takes a gasifier's pipe off its side: the gasifier's half of it, on the gasifier at `position`.
+local function unpipeGasifier(position)
+    local record = position and position.kind == "gasifier" and sourceOf(position)
     if record then
-        record.pipe = gasifierSide and Gasifier.sideOf(gasifier:getX(), gasifier:getY(), generator:getX(), generator:getY()) or nil
-        record:afterChange()
+        record:setPipe(nil)
+    end
+end
+
+-- Lays a gasifier's pipe between `generator` and `gasifier`, each half on its own tile.
+local function pipe(generator, gasifier)
+    local gx, gy, x, y = generator:getX(), generator:getY(), gasifier:getX(), gasifier:getY()
+    RenewableEnergy.showOverlay(generator, isGeneratorPipe, Sprites.gasifierPipeGen[Gasifier.sideOf(gx, gy, x, y)])
+    local record = Gasifier.recordOf(gasifier)
+    if record then
+        record:setPipe(Gasifier.sideOf(x, y, gx, gy))
+    end
+end
+
+-- Cuts the line where it ends at its source, if a gasifier's pipe, and at the generator.
+local function unpipe(generator, state)
+    if state.source and state.source.kind == "gasifier" then
+        RenewableEnergy.showOverlay(generator, isGeneratorPipe, nil)
+        unpipeGasifier(state.source)
     end
 end
 
@@ -158,13 +165,12 @@ end
 --- Runs one kitted generator for `hours`: it burns its source's gas while it runs, stalls over
 --- what the source carries until the load fits again, stops when the gas runs out.
 function GasLines.run(generator, state, hours)
-    local source = state.mode ~= "petrol" and sourceOf(state)
+    local source = state.mode ~= "petrol" and sourceOf(state.source)
     if state.source and not source and state.mode ~= "petrol" then
-        -- The source went: the line goes with it.
-        if state.source.kind == "gasifier" then
-            showPipe(generator, nil, nil)
-        end
-        state.source = nil
+        -- The source went, and the line with it: nothing comes back from it.
+        unpipe(generator, state)
+        setSource(generator, state, nil)
+        state.hoses = nil
     end
     local hasGas = source and source:canSupply()
     if generator:isActivated() and state.onGas then
@@ -200,15 +206,16 @@ function GasLines.run(generator, state, hours)
     settleFuel(generator, state, hasGas or false)
 end
 
---- Runs every kitted generator whose chunk is loaded. One that is gone from its loaded square, or
---- lost its kit, leaves the list; an unloaded one waits, and vanilla bills the time away to its
---- fuel when it loads again (IsoGenerator.update), which PHANTOM_FUEL covers.
+--- Runs every kitted generator whose chunk is loaded. One that is gone from its loaded square
+--- (destroyed; it can't be picked up), or lost its kit, leaves the list, and a gasifier's pipe to
+--- it comes off; an unloaded one waits, and vanilla bills the time away to its fuel when it loads
+--- again (IsoGenerator.update), which PHANTOM_FUEL covers.
 function GasLines.updateAll()
     local now = getGameTime():getWorldAgeHours()
     local gone = {}
-    for key, position in pairs(registry()) do
-        local loaded = getSquare(position.x, position.y, position.z) ~= nil
-        local generator = loaded and generatorAt(position)
+    for key, entry in pairs(registry()) do
+        local loaded = getSquare(entry.x, entry.y, entry.z) ~= nil
+        local generator = loaded and generatorAt(entry)
         local state = generator and GasKit.stateOf(generator)
         if loaded and not state then
             table.insert(gone, key)
@@ -220,6 +227,7 @@ function GasLines.updateAll()
         end
     end
     for _, key in ipairs(gone) do
+        unpipeGasifier(registry()[key].source)
         registry()[key] = nil
     end
 end
@@ -228,71 +236,52 @@ Events.EveryTenMinutes.Add(GasLines.updateAll)
 
 -- Jobs ------------------------------------------------------------------------------------------
 
-local function takeItems(character, fullType, count)
-    local items = character:getInventory():getSomeTypeRecurse(fullType, count)
-    for i = 0, items:size() - 1 do
-        RenewableEnergy.takeItem(character, items:get(i))
-    end
-end
-
-local function giveItems(character, fullType, count)
-    local inventory = character:getInventory()
-    for _ = 1, count do
-        local item = inventory:AddItem(fullType)
-        if item then
-            sendAddItemToContainer(inventory, item)
-        end
-    end
-end
-
 -- Cuts the line: the hoses or the pipe come back, and the generator holds only its tank.
 local function disconnect(character, generator, state)
-    if state.hoses and state.hoses > 0 then
-        giveItems(character, GasKit.HOSE, state.hoses)
+    if state.hoses then
+        RenewableEnergy.giveItems(character, GasKit.HOSE, state.hoses)
     end
     if state.source and state.source.kind == "gasifier" then
-        giveItems(character, GasKit.PIPE, 1)
-        showPipe(generator, nil, GasKit.sourceAt(state.source))
+        RenewableEnergy.giveItems(character, GasKit.PIPE)
     end
-    state.source, state.hoses = nil, nil
+    unpipe(generator, state)
+    setSource(generator, state, nil)
+    state.hoses = nil
     settleFuel(generator, state, false)
     if generator:isActivated() and state.mode ~= "petrol" then
         generator:setActivated(false)
     end
 end
 
---- Does `job` at `generator` for `character`, on the authority, once its timed action finished
---- and its needs were checked. `source` is the digester or gasifier at the far end of Connect Gas
---- Line. Returns whether it was done.
-function GasLines.perform(character, job, generator, source)
-    if GasKit.refusal(character, job, generator, source) then
+--- Does `job` at `generator` for `character`, on the authority, once its timed action finished.
+--- `source` is the digester or gasifier at the far end of Connect Gas Line (the action's `other`;
+--- no kit job takes an `item`). Returns whether it was done.
+function GasLines.perform(character, job, generator, item, source)
+    if GasKit.refusal(character, job, generator, item, source) then
         return false
     end
+    Materials.consume(character, GasKit.materials(job, generator, source))
     local modData = generator:getModData()
     local state = GasKit.stateOf(generator)
     if job == GasKit.INSTALL then
-        takeItems(character, GasKit.ITEM, 1)
         modData[GasKit.MOD_DATA] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
         registry()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
-        showKit(generator, true)
+        RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKit)
         addXp(character, Perks.Mechanics, 15)
     elseif job == GasKit.REMOVE then
         disconnect(character, generator, state)
         modData[GasKit.MOD_DATA] = nil
         registry()[keyOf(generator)] = nil
-        showKit(generator, false)
-        giveItems(character, GasKit.ITEM, 1)
+        RenewableEnergy.showOverlay(generator, isKitOverlay, nil)
+        RenewableEnergy.giveItems(character, GasKit.ITEM)
     elseif job == GasKit.CONNECT then
         local kind = GasKit.sourceKind(source)
-        state.source = { x = source:getX(), y = source:getY(), z = source:getZ(), kind = kind }
+        setSource(generator, state, { x = source:getX(), y = source:getY(), z = source:getZ(), kind = kind })
         if kind == "gasifier" then
-            takeItems(character, GasKit.PIPE, 1)
-            showPipe(generator, Gasifier.sideOf(generator:getX(), generator:getY(), source:getX(), source:getY()), source)
+            pipe(generator, source)
         else
-            local hoses = GasKit.hosesFor(generator, source)
-            takeItems(character, GasKit.HOSE, hoses)
-            state.hoses = hoses
+            state.hoses = GasKit.hosesFor(generator, source)
         end
         state.lastHour = getGameTime():getWorldAgeHours()
         GasLines.run(generator, state, 0)

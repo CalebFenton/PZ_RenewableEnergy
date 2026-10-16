@@ -109,7 +109,7 @@ handler("placePanel", function(player, args, defer)
         panel:getModData()[PowerBank.MODULES] = args.modules
     end
     if args.wired then
-        panel:getModData()[PowerBank.TREADMILL_WIRED] = true
+        panel:getModData()[RenewableEnergy.Treadmill.WIRED] = true
     end
     square:AddTileObject(panel)
     defer(function()
@@ -373,7 +373,7 @@ end)
 -- Panels ------------------------------------------------------------------------------------------
 
 -- Storms on panel records off the map: for each trial { source, hours, runs }, how many of `runs`
--- storms of `hours` cracked a fresh copy of `source` (Bank.stormCrack), and the modules of the last.
+-- storms of `hours` cracked a fresh copy of `source` (PanelSource.stormCrack), and the modules of the last.
 handler("stormCrack", function(_, args)
     local results = {}
     for i, trial in ipairs(args.trials or {}) do
@@ -383,7 +383,7 @@ handler("stormCrack", function(_, args)
             for j, module in ipairs(trial.source.modules) do
                 source.modules[j] = { type = module.type, condition = module.condition }
             end
-            if RenewableEnergy.Bank.stormCrack(source, trial.hours) then
+            if RenewableEnergy.PanelSource.stormCrack(source, trial.hours) then
                 count = count + 1
             end
         end
@@ -395,7 +395,7 @@ end)
 -- The modules the panel on the square at `args` records, and the overlays its tile shows.
 handler("panelState", function(_, args)
     local PowerBank = RenewableEnergy.PowerBank
-    local panel = PowerBank.sourceOn(squareAt(args))
+    local panel = RenewableEnergy.Sources.on(squareAt(args))
     if not panel then
         return nil, "the panel on the server"
     end

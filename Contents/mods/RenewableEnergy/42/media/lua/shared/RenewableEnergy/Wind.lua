@@ -1,16 +1,54 @@
--- Wind chargers' output: the game's wind (ClimateManager.getWindspeedKph, stronger in winter, no
--- day and night), the turbine's power curve, how high it stands and what shelters it.
+-- Wind chargers: their output from the game's wind (ClimateManager.getWindspeedKph, stronger in
+-- winter, no day and night), the turbine's power curve, how high it stands and what shelters it;
+-- and the brake and broken blades a placed charger keeps in its modData.
 --
 -- Shelter has no direction: the game's wind angle is a screen-space value for its weather effects
 -- (ClimateManager.getWindAngleDegrees), so a turbine counts what stands around it on every side.
 
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/PowerBank/Sources"
 
 RenewableEnergy = RenewableEnergy or {}
 local Wind = {}
 RenewableEnergy.Wind = Wind
 
-local Specs = RenewableEnergy.Specs
+local Specs, Sources = RenewableEnergy.Specs, RenewableEnergy.Sources
+
+-- Placed wind charger modData: its brake is on; its blades are broken.
+Wind.BRAKED = "RenewableEnergy_braked"
+Wind.BROKEN = "RenewableEnergy_bladesBroken"
+
+function Wind.isBraked(isoObject)
+    return isoObject:getModData()[Wind.BRAKED] == true
+end
+
+--- Sets a placed wind charger's brake and sends it to clients. Authority only.
+function Wind.setBraked(isoObject, braked)
+    isoObject:getModData()[Wind.BRAKED] = braked or nil
+    isoObject:transmitModData()
+end
+
+function Wind.isBroken(isoObject)
+    return isoObject:getModData()[Wind.BROKEN] == true
+end
+
+--- Marks a placed wind charger's blades broken or whole and sends it to clients. Authority only.
+function Wind.setBroken(isoObject, broken)
+    isoObject:getModData()[Wind.BROKEN] = broken or nil
+    isoObject:transmitModData()
+end
+
+--- Why the blades `item` can't go on the wind charger `isoObject` now, or nil if they can: "not
+--- broken" while its blades are whole, "no blades" when `item` (nil for none) isn't blades that
+--- fit it (Specs.wind.turbines blades).
+function Wind.bladesRefusal(isoObject, item)
+    if not Wind.isBroken(isoObject) then
+        return "not broken"
+    elseif not (item and Sources.bladesFor(Sources.kindOf(isoObject))[item:getFullType()]) then
+        return "no blades"
+    end
+    return nil
+end
 
 --- Whether a turbine of `spec` has turned its head out of a wind of `kph` (Specs.wind.turbines
 --- furlKph): only the homemade alternator does.
@@ -32,7 +70,7 @@ function Wind.watts(spec, kph, z, shelter)
         share = spec.furledShare
     end
     local height = 1 + wind.heightBonusPerLevel * math.min(math.max(z, 0), wind.maxBonusLevel)
-    return spec.ratedW * share * height * (1 - wind.shelterLoss * shelter)
+    return spec.watts * share * height * (1 - wind.shelterLoss * shelter)
 end
 
 --- Whether wind of `kph` can break a turbine of `spec` left running: never the scoop rotor; the
@@ -77,12 +115,12 @@ function Wind.shelterAt(x, y, z)
 end
 
 --- The build menu's OnCreate for every wind charger (scripts/RenewableEnergy/Entities.txt), on the
---- authority. In single player that is this client too, which fires no OnObjectAdded, so the
---- new charger starts turning here (RenewableEnergy.WindSpin); a multiplayer client gets it from
---- OnObjectAdded.
+--- authority. Single player fires no OnObjectAdded for a built object, so this fires it, as
+--- vanilla's TrapBO does: RenewableEnergy.WindSpin starts the new charger turning from it. A
+--- multiplayer client gets it from the server's AddItemToMapPacket.
 function Wind.OnCreate(params)
-    if params.thumpable and RenewableEnergy.WindSpin then
-        RenewableEnergy.WindSpin.track(params.thumpable)
+    if params.thumpable then
+        triggerEvent("OnObjectAdded", params.thumpable)
     end
 end
 

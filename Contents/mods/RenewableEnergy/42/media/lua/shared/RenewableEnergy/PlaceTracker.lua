@@ -1,4 +1,5 @@
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Sprites"
 
 -- The places of one kind of placed tile, for code that runs each loaded tile now and then.
 --
@@ -11,8 +12,8 @@ local PlaceTracker = {}
 PlaceTracker.__index = PlaceTracker
 RenewableEnergy.PlaceTracker = PlaceTracker
 
--- MapObjects keeps one function per sprite and priority, and each tracker has its own sprites.
-local LOAD_PRIORITY = 7
+-- Its own priority, apart from the systems' loaders of the same sprites (Sprites.LOAD_PRIORITY).
+local LOAD_PRIORITY = RenewableEnergy.Sprites.LOAD_PRIORITY + 1
 -- World squares lie well under this in x and y, so the key below stays exact in a double.
 local SPAN = 1e6
 

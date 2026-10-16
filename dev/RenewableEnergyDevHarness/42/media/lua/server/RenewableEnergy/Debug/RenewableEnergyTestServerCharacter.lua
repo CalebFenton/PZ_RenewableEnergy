@@ -109,9 +109,14 @@ handler("forgetRecipesUntilEnd", function(player, args, defer)
     return {}
 end)
 
--- The character's stat `args.stat` (a CharacterStat field name) as the authority has it.
-handler("characterStat", function(player, args)
-    return { value = player:getStats():get(CharacterStat[args.stat]) }
+-- The character's stats `args.stats` (CharacterStat field names) as the authority has them, in
+-- `values` by name.
+handler("characterStats", function(player, args)
+    local values, stats = {}, player:getStats()
+    for _, name in ipairs(args.stats or {}) do
+        values[name] = stats:get(CharacterStat[name])
+    end
+    return { values = values }
 end)
 
 -- Sets the character's stat `args.stat` to `args.value` on the authority, and sends it, until the

@@ -1,20 +1,21 @@
 -- The gas heater: a placed tile beside a digester that burns a little of its gas to keep it warm.
--- A lit heater shows the lit tile; the digester beside it does the burning in its own pass
--- (DigesterObject:heat), so it keeps warm while its chunk is unloaded too, and puts the heater out
--- when its gas runs out.
+-- A lit heater shows the lit tile. It warms one digester, the one digesterNear picks, which does
+-- the burning in its own pass (DigesterObject), so it keeps warm while its chunk is unloaded too,
+-- and puts the heater out when its gas runs out. Lighting and putting it out are jobs the
+-- authority does (server/RenewableEnergy/Biogas/DigesterSystem.lua).
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Materials"
 require "RenewableEnergy/Biogas/Digester"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasHeater = {}
 RenewableEnergy.GasHeater = GasHeater
 
-local Digester, Sprites = RenewableEnergy.Digester, RenewableEnergy.Sprites
+local Digester, Sprites, Materials = RenewableEnergy.Digester, RenewableEnergy.Sprites, RenewableEnergy.Materials
 
-GasHeater.ITEM = "RenewableEnergy.GasHeater"
--- What a lit heater keeps the digester beside it at, at least, and the gas it burns an hour.
+-- What a lit heater keeps its digester at, at least, and the gas it burns an hour.
 GasHeater.TEMP = 25
 GasHeater.M3_PER_HOUR = 0.1
 -- A heater warms a digester on its own square or one next to it.
@@ -23,17 +24,30 @@ GasHeater.REACH = 1
 GasHeater.LIGHT = "LightHeater"
 GasHeater.OFF = "HeaterOff"
 
+-- In-game minutes each job takes, as long as lighting a lamp.
+GasHeater.MINUTES = {
+    [GasHeater.LIGHT] = 1,
+    [GasHeater.OFF] = 1,
+}
+
+-- How each job looks (RenewableEnergyGasAction).
+GasHeater.LOOK = {
+    [GasHeater.LIGHT] = { doneSound = "CampfireLight" },
+}
+
 function GasHeater.isHeater(object)
-    local name = object and Sprites.nameOf(object)
-    return name == Sprites.gasHeater.off or name == Sprites.gasHeater.lit
+    return Sprites.kindOf(Sprites.nameOf(object)) == "gasHeater"
 end
+
+GasHeater.isTarget = GasHeater.isHeater
 
 function GasHeater.isLit(object)
     return Sprites.nameOf(object) == Sprites.gasHeater.lit
 end
 
--- The first object within REACH of x, y, z on its level that `matches`, or nil.
-local function findNear(x, y, z, matches)
+-- The first object within REACH of `object`'s square on its level that `matches`, or nil.
+local function findNear(object, matches)
+    local x, y, z = object:getX(), object:getY(), object:getZ()
     for dx = -GasHeater.REACH, GasHeater.REACH do
         for dy = -GasHeater.REACH, GasHeater.REACH do
             local found = RenewableEnergy.findObjectOn(getSquare(x + dx, y + dy, z), matches)
@@ -45,19 +59,38 @@ local function findNear(x, y, z, matches)
     return nil
 end
 
---- The digester a heater at `heater` warms, or nil.
+--- The digester `heater` warms, or nil. This alone decides which, for the warmth and the gas.
 function GasHeater.digesterNear(heater)
-    return findNear(heater:getX(), heater:getY(), heater:getZ(), Digester.isDigester)
+    return findNear(heater, Digester.isDigester)
 end
 
---- A lit heater beside the digester at x, y, z, or nil.
-function GasHeater.litHeaterNear(x, y, z)
-    return findNear(x, y, z, function(object)
-        return GasHeater.isHeater(object) and GasHeater.isLit(object)
+--- The lit heater that warms `digester`, or nil.
+function GasHeater.litHeaterFor(digester)
+    return findNear(digester, function(object)
+        if not (GasHeater.isHeater(object) and GasHeater.isLit(object)) then
+            return false
+        end
+        local warmed = GasHeater.digesterNear(object)
+        return warmed ~= nil and warmed:getX() == digester:getX() and warmed:getY() == digester:getY()
+            and warmed:getZ() == digester:getZ()
     end)
 end
 
---- The state of the heater that refuses `job`, as a translation key, or nil.
+--- What `job` takes (RenewableEnergy.Materials).
+function GasHeater.materials(job)
+    return job == GasHeater.LIGHT and { Materials.FIRE_STARTER } or {}
+end
+
+--- What `job` takes of `character`, as needs (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).
+function GasHeater.needs(character, job)
+    return Materials.needs(character, GasHeater.materials(job))
+end
+
+function GasHeater.minutesFor(job)
+    return GasHeater.MINUTES[job]
+end
+
+--- The state of `heater` that refuses `job`, as a translation key, or nil.
 function GasHeater.blocker(job, heater)
     if job == GasHeater.LIGHT then
         if GasHeater.isLit(heater) then
@@ -74,50 +107,15 @@ function GasHeater.blocker(job, heater)
     return nil
 end
 
-local function notBroken(item)
-    return not item:isBroken()
-end
-
---- What refuses `character` doing `job` at `heater`: a translation key, or nil.
+--- What refuses `character` doing `job` at `heater`: a blocker key, "short" when they lack a
+--- need, or nil.
 function GasHeater.refusal(character, job, heater)
-    if not (heater and heater:getObjectIndex() ~= -1 and GasHeater.isHeater(heater)) then
+    if not (RenewableEnergy.onSquare(heater) and GasHeater.isHeater(heater) and GasHeater.MINUTES[job]) then
         return "Tooltip_RenewableEnergy_NoHeater"
     end
-    local blocker = GasHeater.blocker(job, heater)
-    if blocker then
-        return blocker
-    end
-    if job == GasHeater.LIGHT and not character:getInventory():containsTagEvalRecurse(ItemTag.START_FIRE, notBroken) then
-        return "Tooltip_RenewableEnergy_NeedsFire"
-    end
-    return nil
-end
-
---- Lights or puts out `heater`. Authority only.
-function GasHeater.setLit(heater, lit)
-    if GasHeater.isLit(heater) == lit then return end
-    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-    heater:setSprite(getSprite(lit and Sprites.gasHeater.lit or Sprites.gasHeater.off))
-    if isServer() then
-        heater:transmitUpdatedSpriteToClients()
-    end
-end
-
---- Does `job` at `heater` for `character`, once its timed action finished. Authority only. Returns
---- whether it was done.
-function GasHeater.perform(character, job, heater)
-    if GasHeater.refusal(character, job, heater) then
-        return false
-    end
-    local lit = job == GasHeater.LIGHT
-    GasHeater.setLit(heater, lit)
-    local digester = GasHeater.digesterNear(heater)
-    local record = digester and Digester.recordOf(digester)
-    if record then
-        record.heaterLit = lit
-        record:sendSummary()
-    end
-    return true
+    return GasHeater.blocker(job, heater)
+        or (RenewableEnergy.firstUnmet(GasHeater.needs(character, job)) and "short")
+        or nil
 end
 
 return GasHeater

@@ -11,11 +11,9 @@
 require "Map/CGlobalObjectSystem"
 require "Map/CGlobalObject"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/ClientObjects"
 
-local PowerBank = RenewableEnergy.PowerBank
-
--- MapObjects keeps one function per sprite and priority.
-local LOAD_PRIORITY = 6
+local PowerBank, ClientObjects = RenewableEnergy.PowerBank, RenewableEnergy.ClientObjects
 
 local ClientBank = CGlobalObject:derive("RenewableEnergy_ClientBank")
 
@@ -38,7 +36,6 @@ function BankSystem:newLuaObject(globalObject)
 end
 
 local function adoptCopy(isoObject)
-    if not PowerBank.isBank(isoObject) then return end
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
     PowerBank.adoptContainer(isoObject:getContainer())
 end
@@ -130,25 +127,9 @@ local function releasePower(isoObject)
     end
 end
 
--- A copy that arrives with its chunk, or that the server just placed.
+ClientObjects.adopt(PowerBank.bankSprites(), PowerBank.isBank, adoptCopy, PowerBank.adoptContainer)
 if isClient() then
-    for _, name in ipairs(PowerBank.bankSprites()) do
-        MapObjects.OnLoadWithSprite(name, adoptCopy, LOAD_PRIORITY)
-    end
-    Events.OnObjectAdded.Add(adoptCopy)
     Events.OnObjectAboutToBeRemoved.Add(releasePower)
 end
-
--- A container opened in the loot window gets its filter before anything is dropped in it.
-Events.OnRefreshInventoryWindowContainers.Add(function(page, state)
-    if state ~= "buttonsAdded" then return end
-    for _, button in ipairs(page.backpacks or {}) do
-        local container = button.inventory
-        local parent = container and container:getParent()
-        if parent and PowerBank.isBank(parent) then
-            PowerBank.adoptContainer(container)
-        end
-    end
-end)
 
 return BankSystem
