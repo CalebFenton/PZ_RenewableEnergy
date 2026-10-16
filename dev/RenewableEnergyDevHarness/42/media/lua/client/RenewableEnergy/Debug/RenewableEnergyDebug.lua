@@ -31,6 +31,12 @@ Debug.ITEMS = {
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
+-- The build menu's recipes, which getAllCraftRecipes (and so PZHarness.Test.learnRecipes) leaves out:
+-- they belong to entity scripts (scripts/RenewableEnergy/Entities.txt).
+Debug.ENTITY_RECIPES = {
+    "RenewableEnergy_BarrelDigesterSteel", "RenewableEnergy_BarrelDigesterPlastic",
+    "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
+}
 
 local function isContainerGeneratorOrPanel(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
@@ -52,6 +58,7 @@ function Debug.setupPlayer(player)
     player:setPerkLevelDebug(Perks.MetalWelding, 4)
     player:setPerkLevelDebug(Perks.Woodwork, 3)
     PZHarness.Test.learnRecipes(player)
+    PZHarness.Fixtures.learnRecipes(player, Debug.ENTITY_RECIPES)
     player:getInventory():AddItem("Base.Screwdriver")
     PZHarness.Test.placeWorkTable(player)
 end

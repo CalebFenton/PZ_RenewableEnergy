@@ -70,6 +70,13 @@ handler("digesterPlace", function(player, args, defer)
     square:AddSpecialObject(thumpable)
     RenewableEnergy.DigesterSystem.OnCreate({ thumpable = thumpable })
     thumpable:transmitCompleteItemToClients()
+    defer(function() Helpers.removeObject(select(2, digesterAt(args)) or thumpable) end)
+    return {}
+end)
+
+-- Takes away, when the test ends, whatever digester the test builds at x, y, z by other means
+-- (the build menu).
+handler("trackDigester", function(player, args, defer)
     defer(function()
         local _, object = digesterAt(args)
         if object then

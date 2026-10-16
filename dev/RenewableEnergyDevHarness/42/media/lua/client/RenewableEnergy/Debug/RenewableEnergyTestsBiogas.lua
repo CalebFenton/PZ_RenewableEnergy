@@ -541,6 +541,60 @@ test("renewable_energy_biogas_clear_ashes_gives_wood_ash", {
     end,
 })
 
+-- The build menu's own path builds a working digester: the entity's recipe takes its materials
+-- and its OnCreate makes the tile a digester on the authority (ISBuildIsoEntity, ISBuildAction).
+test("renewable_energy_biogas_build_menu_builds_digester", {
+    instant = true,
+    run = function(self)
+        -- Bare: grass and the like block placing anything built (BlocksPlacement), as for vanilla's.
+        local square = (T.need(self, T.squares(self, 1, { bare = true }), "a bare outdoor square for a digester") or {})[1]
+        if not square then return end
+        local handle = at(square)
+        handle.square = square
+        T.setPerk(self, Perks.Mechanics, 1)
+        -- The scenario teaches them on this side only (RenewableEnergy.Debug.setupPlayer).
+        T.server(self, "PZHarness.learnRecipes", { names = RenewableEnergy.Debug.ENTITY_RECIPES })
+        T.give(self, "materials", {
+            { type = "Base.HandDrill" }, { type = "Base.MetalDrum" }, { type = "Base.RubberHose" }, { type = "Base.Funnel" },
+            { type = "Base.DuctTape" }, { type = "Base.Glue" }, { type = "Base.Garbagebag", count = 3 },
+        })
+        T.server(self, "trackDigester", at(square))
+        T.step(function()
+            local script = getScriptManager():getGameEntityScript("Base.RenewableEnergy_BarrelDigesterSteel")
+            local spriteConfig = script and script:getComponentScriptFor(ComponentType.SpriteConfig)
+            local infos = SpriteConfigManager.GetObjectInfoList()
+            local info
+            for i = 0, infos:size() - 1 do
+                if spriteConfig and infos:get(i):getScript() == spriteConfig then
+                    info = infos:get(i)
+                end
+            end
+            if not T.need(self, info, "the barrel digester's build menu entry") then return end
+            local player = T.player()
+            T.standNextTo(square)
+            local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
+            -- What the build panel does before the cursor can build (ISBuildPanel): the player
+            -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
+            build.player = player:getPlayerNum()
+            build.buildPanelLogic:refresh()
+            build.buildPanelLogic:autoPopulateInputs()
+            self.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
+            self.validSquare = build:isValid(square)
+            build:tryBuild(handle.x, handle.y, handle.z)
+        end)
+        readDigester(self, handle, "built")
+        T.count(self, "left", { "Base.MetalDrum", "Base.Garbagebag", "Base.HandDrill" })
+    end,
+    validate = function(self)
+        local built = self.reads.built
+        T.expect(self.canBuild and self.validSquare, "the build menu can't build a barrel digester from its materials on a bare square")
+        T.expect(built.tier == "barrel" and built.material == "steel", "the build menu built " .. tostring(built.tier))
+        T.expect(built.sprite == RenewableEnergy.Sprites.digester.barrel.steel, "the built tile is " .. tostring(built.sprite))
+        T.expect(self.counts.left["Base.MetalDrum"] == 0 and self.counts.left["Base.Garbagebag"] == 0, "building didn't use the drum and bags")
+        T.expect(self.counts.left["Base.HandDrill"] == 1, "building used up the drill")
+    end,
+})
+
 -- Right-clicking a barrel digester shows its submenu through vanilla's menu builder: its status,
 -- and its jobs greyed out with the reason while the digester or the character can't do them. The
 -- status window opens on it and shows its state.
