@@ -136,11 +136,26 @@ TILES[245] = [layer(items.gas_heater, lit=True)]
 # base of the mod's to hold out and keeps to the front corner, which the generator leaves clear.
 TILES[246] = [layer(items.generator_gas_kit)]
 
+# Gasifiers: each tier's tile, then its lit overlay. The pipe overlays on its square, one by the
+# direction of the generator they run to, fit every tier, whose filters share one outline at their
+# foot; the preview draws them over the drum's. The pipe's other half lies on the generator's
+# square with the kit, one by the direction of the gasifier it comes from.
+for offset, tier in enumerate(("primitive", "standard", "advanced")):
+    TILES[250 + offset] = [layer(items.gasifier, tier=tier)]
+    TILES[253 + offset] = [layer(items.gasifier, holdout=True, tier=tier), layer(items.gasifier, frame=False, tier=tier, lit=True)]
+for offset, side in enumerate("NESW"):
+    TILES[256 + offset] = [layer(items.gasifier, holdout=True, tier="standard"),
+                           layer(items.gasifier, frame=False, tier="standard", pipe=side)]
+    TILES[260 + offset] = [layer(items.generator_gas_pipe, side=side)]
+
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
-# working, its holder full.
+# working, its holder full, and each gasifier.
 BUILD_ICONS = {
     "BarrelDigesterSteel": [layer(items.barrel_digester, holder="bags")],
     "BarrelDigesterPlastic": [layer(items.barrel_digester, plastic=True, holder="tarp")],
     "InsulatedDigester": [layer(items.insulated_digester, level=3)],
     "BrickDome": [layer(items.dome_digester)],
+    "PrimitiveGasifier": [layer(items.gasifier, tier="primitive")],
+    "Gasifier": [layer(items.gasifier, tier="standard")],
+    "AdvancedGasifier": [layer(items.gasifier, tier="advanced")],
 }

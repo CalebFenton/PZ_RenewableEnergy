@@ -120,6 +120,9 @@ def M(name):
         # A gas flame: yellow-orange where it licks the steel, blue at the burner.
         "flame": lambda: material("RE_Flame", "#ff9a3c", roughness=0.3, grime=0.0, emission="#ff8a2a"),
         "flameblue": lambda: material("RE_FlameBlue", "#5a8cff", roughness=0.3, grime=0.0, emission="#4a7dff"),
+        # Wood tar: black-brown and wet, so it shines; the straw it soaks stays a shade lighter.
+        "tar": lambda: material("RE_Tar", "#3d2c1e", roughness=0.25, grime=0.25, scale=20, speckle=("#1f1712", 0.4)),
+        "tarstraw": lambda: material("RE_TarStraw", "#7a5a2e", roughness=0.6, grime=0.3),
     }[name]()
 
 
@@ -1607,19 +1610,33 @@ def gas_conversion_kit(col):
         box(col, "Kit_ClampScrew", M("galvanised"), (0.012, 0.016, 0.01), at=(x + 0.026, y, 0))
 
 
+# Where the kit's mixer lies on the generator's square, and how much larger than life: true to life,
+# the generator's foot hides all but a few pixels of it.
+GAS_KIT_AT = (0.35, -0.34)
+GAS_KIT_SCALE = 1.5
+
+
+def _gas_kit_ends():
+    """The mixer's two barbs as the kit overlay lays it, south-west then north-east, and the end of
+    the gas line off the south-west one, at the square's front edge."""
+    cx, cy = GAS_KIT_AT
+    end = 0.1 * GAS_KIT_SCALE / math.sqrt(2)
+    z = 0.026 * GAS_KIT_SCALE
+    return (cx - end, cy - end, z), (cx + end, cy + end, z), (cx - end + 0.04, cy - end - 0.05, 0.018)
+
+
 def generator_gas_kit(col):
     """The kit fitted to a generator, as the overlay on the generator's square shows it: the mixer
     lying across the square's front corner, clear of a generator in its middle, a hose up from its
     branch into the generator and the gas line in from the side."""
-    # Half again its size: true to life, the generator's foot hides all but a few pixels of it.
-    scale = 1.5
-    cx, cy = 0.35, -0.34
+    scale = GAS_KIT_SCALE
+    cx, cy = GAS_KIT_AT
     _mixer(col, "GenKit_Mixer", (cx, cy, 0), 45).scale = (scale, scale, scale)
-    end = 0.1 * scale / math.sqrt(2)
+    south_west, _, line_end = _gas_kit_ends()
     tube(col, "GenKit_Hose", M("black"), [(cx, cy, 0.07 * scale), (cx - 0.01, cy + 0.01, 0.12 * scale), (cx - 0.05, cy + 0.05, 0.2),
                                           (cx - 0.1, cy + 0.1, 0.24)], 0.013 * scale, 8)
-    tube(col, "GenKit_Line", M("black"), [(cx - end, cy - end, 0.026 * scale), (cx - end + 0.01, cy - end - 0.03, 0.02),
-                                          (cx - end + 0.04, cy - end - 0.05, 0.018)], 0.013 * scale, 8)
+    tube(col, "GenKit_Line", M("black"), [south_west, (south_west[0] + 0.01, south_west[1] - 0.03, 0.02), line_end],
+          0.013 * scale, 8)
 
 
 def fridge_compressor(col):
@@ -1641,6 +1658,285 @@ def fridge_compressor(col):
     for (x, y), lean in (((0.04, 0.05), (0.05, 0.07)), ((0.06, -0.02), (0.08, -0.03)), ((-0.02, 0.06), (-0.03, 0.08))):
         tube(col, "Comp_Stub", M("copper"), [(x, y, base + can + 0.04), (x + lean[0] * 0.4, y + lean[1] * 0.4, base + can + 0.09),
                                              (x + lean[0], y + lean[1], base + can + 0.11)], 0.007, 8)
+
+
+# Wood gas -----------------------------------------------------------------------------------------
+#
+# A gasifier stands on its square as a digester does: its body in the west and its filter in the
+# east, side by side as the viewer sees them, so neither hides the other. Its glow while lit and the
+# metal pipe on to a generator on the next square are overlays. The pipe leaves from under the
+# filter, which stands on legs in one place and to one outline at its foot in every tier, so one set
+# of pipe overlays fits all three.
+
+GASIFIER_AT = (-0.14, -0.04)
+GASIFIER_FILTER_AT = (0.3, 0.08)
+GASIFIER_FILTER_RADIUS = 0.15
+GASIFIER_FILTER_LEGS = 0.1
+# The side the fire's ash or air door faces, in degrees from east: the front, clear of the filter.
+GASIFIER_DOOR_ANGLE = -100
+PIPE_Z = 0.06
+PIPE_RADIUS = 0.021
+# Where the pipe leaves the gasifier's square for a generator on the next square, by the generator's
+# direction, and comes onto the generator's square, by the gasifier's. The pipes keep to the front,
+# where the kit lies on the generator's square, and pass in front of the gasifier's body; each pair
+# meets across the squares' shared edge.
+GASIFIER_PIPE_EDGES = {"N": (0.3, 0.5), "E": (0.5, -0.3), "S": (0.3, -0.5), "W": (-0.5, -0.4)}
+GENERATOR_PIPE_EDGES = {"N": (0.3, 0.5), "E": (0.5, -0.4), "S": (0.3, -0.5), "W": (-0.5, -0.3)}
+
+
+def _pipe(col, name, points):
+    """Galvanised pipe through `points`, square at each bend as a threaded elbow is."""
+    for start, end in zip(points, points[1:]):
+        tube(col, name, M("galvanised"), [start, end], PIPE_RADIUS, 10)
+    for x, y, z in points[1:-1]:
+        box(col, name + "_Elbow", M("galvanised"), (0.05, 0.05, 0.05), at=(x, y, z - 0.025), bevel=0.008)
+
+
+def _gasifier_outlet(col, name, radius, z, filter_top, clear=None):
+    """The gas pipe out of the body's side near the fire, up and over into the filter's top. It
+    leaves the body turned toward the viewer from the filter, where there is room to rise, and rises
+    clear of `clear`, the widest the body gets above the outlet (default `radius`)."""
+    fx, fy = GASIFIER_FILTER_AT
+    angle = math.degrees(math.atan2(fy - GASIFIER_AT[1], fx - GASIFIER_AT[0])) - 35
+    inside = _around(GASIFIER_AT, angle, radius - 0.01)
+    out = _around(GASIFIER_AT, angle, (clear or radius) + 0.03)
+    over = filter_top + 0.1
+    _pipe(col, name, [(*inside, z), (*out, z), (*out, over), (fx, fy, over), (fx, fy, filter_top)])
+
+
+def _facing(radius, z, out=0.0):
+    """Where on the body's side, at `radius` and `z`, the fire door's face is, and the turn that lays
+    a part's X along the side there; `out` stands it that much proud."""
+    return (*_around(GASIFIER_AT, GASIFIER_DOOR_ANGLE, radius + out), z), (0, 0, GASIFIER_DOOR_ANGLE + 90)
+
+
+def _along(point, offset):
+    """`point` moved `offset` along the body's side at the door, to the viewer's right for positive."""
+    dx, dy = _around((0, 0), GASIFIER_DOOR_ANGLE + 90, offset)
+    return point[0] + dx, point[1] + dy, point[2]
+
+
+def _disc_at(col, name, mat, at, disc):
+    """A disc of `disc` radius facing out of the body's side at the door, its back at `at`."""
+    cylinder(col, name, mat, disc, 0.004, at=at, rotate=(90, 0, GASIFIER_DOOR_ANGLE + 90), segments=12)
+
+
+def _filter_legs(col, name):
+    """Three angle-iron legs under a filter."""
+    for angle in (90, 210, 330):
+        x, y = _around(GASIFIER_FILTER_AT, angle, GASIFIER_FILTER_RADIUS - 0.03)
+        box(col, name, M("weld"), (0.025, 0.025, GASIFIER_FILTER_LEGS + 0.01), at=(x, y, 0), rotate=(0, 0, angle))
+
+
+def gasifier(col, tier="standard", frame=True, lit=False, pipe=None):
+    """A downdraft wood gas generator as the 1989 FEMA plans build one, in three tiers: "primitive"
+    the plans' own, "standard" a steel drum, "advanced" a welded body with a forged grate. `lit`
+    draws only the fire's glow at its door, `pipe` only the metal pipe from under its filter to the
+    square's edge toward a generator that way ("N", "E", "S" or "W")."""
+    if frame:
+        {"primitive": _primitive_gasifier, "standard": _drum_gasifier, "advanced": _welded_gasifier}[tier](col)
+    if lit:
+        _gasifier_glow(col, tier)
+    if pipe:
+        fx, fy = GASIFIER_FILTER_AT
+        ex, ey = GASIFIER_PIPE_EDGES[pipe]
+        points = [(fx, fy, GASIFIER_FILTER_LEGS), (fx, fy, PIPE_Z)]
+        if pipe in "EW":
+            points.append((fx, ey, PIPE_Z))
+        _pipe(col, "Gasifier_Pipe", points + [(ex, ey, PIPE_Z)])
+
+
+PRIMITIVE_POT = (0.2, 0.22)  # the cooking pot's radius and height
+PRIMITIVE_CAN = (0.24, 0.62)  # the trash can's radius at its rim and its height
+DRUM_DOOR_Z = 0.05  # the drum's ash door's foot
+WELDED = (0.27, 0.86)  # the welded body's radius and height to its shoulder
+
+
+def _primitive_gasifier(col):
+    """The FEMA unit itself: a galvanised trash can for the hopper, standing on a big steel cooking
+    pot that holds the fire, an air hole in the pot's side, the gas pipe out of it, and a galvanised
+    bucket of wood chips on two bricks for the filter."""
+    bx, by = GASIFIER_AT
+    pot_radius, pot_height = PRIMITIVE_POT
+    cylinder(col, "Prim_Pot", M("darkgrey"), pot_radius, pot_height, at=(bx, by, 0), segments=24)
+    for angle in (30, 210):
+        a, b = _around(GASIFIER_AT, angle - 12, pot_radius), _around(GASIFIER_AT, angle + 12, pot_radius)
+        c, d = _around(GASIFIER_AT, angle - 8, pot_radius + 0.035), _around(GASIFIER_AT, angle + 8, pot_radius + 0.035)
+        tube(col, "Prim_PotHandle", M("darkgrey"), [(*a, pot_height - 0.04), (*c, pot_height - 0.04), (*d, pot_height - 0.04),
+                                                    (*b, pot_height - 0.04)], 0.007, 6)
+    hole, _ = _facing(pot_radius, 0.07)
+    _disc_at(col, "Prim_AirHole", M("black"), hole, 0.04)
+    can_radius, can_height = PRIMITIVE_CAN
+    cylinder(col, "Prim_Can", M("galvanised"), can_radius * 0.94, can_height, at=(bx, by, pot_height), radius_top=can_radius,
+             segments=24)
+    for t in (0.25, 0.55, 0.85):
+        _ring(col, "Prim_CanRib", M("galvanised"), GASIFIER_AT, can_radius * (0.94 + 0.06 * t) + 0.002, pot_height + can_height * t,
+              0.008)
+    top = pot_height + can_height
+    cylinder(col, "Prim_Lid", M("galvanised"), can_radius + 0.012, 0.03, at=(bx, by, top), segments=24)
+    mound(col, "Prim_LidDome", M("galvanised"), (can_radius + 0.008, can_radius + 0.008, 0.05), at=(bx, by, top + 0.03), segments=24,
+          rings=4)
+    tube(col, "Prim_LidHandle", M("galvanised"), [(bx - 0.06, by, top + 0.07), (bx - 0.05, by, top + 0.11), (bx + 0.05, by, top + 0.11),
+                                                  (bx + 0.06, by, top + 0.07)], 0.008, 6)
+    fx, fy = GASIFIER_FILTER_AT
+    for sx in (-1, 1):
+        box(col, "Prim_Brick", M("brick"), (0.065, 0.2, GASIFIER_FILTER_LEGS), at=(fx + sx * 0.07, fy, 0), rotate=(0, 0, -40))
+    bucket = 0.3
+    radius = GASIFIER_FILTER_RADIUS
+    cylinder(col, "Prim_Bucket", M("galvanised"), radius, bucket, at=(fx, fy, GASIFIER_FILTER_LEGS), radius_top=radius + 0.02,
+             segments=20)
+    _ring(col, "Prim_BucketRib", M("galvanised"), GASIFIER_FILTER_AT, radius + 0.012, GASIFIER_FILTER_LEGS + bucket * 0.6, 0.006)
+    filter_top = GASIFIER_FILTER_LEGS + bucket + 0.02
+    cylinder(col, "Prim_BucketLid", M("galvanised"), radius + 0.025, 0.02, at=(fx, fy, filter_top - 0.02), segments=20)
+    _gasifier_outlet(col, "Prim_Pipe", pot_radius, 0.13, filter_top, clear=can_radius + 0.01)
+
+
+def _drum_gasifier(col):
+    """A steel drum scorched black about its fire, its head made a lid clamped on with a ring, an
+    ash door welded on at its foot with draft holes punched in it, and a small drum on legs for the
+    filter, a drain cock at its foot."""
+    radius, height = DRUM
+    bx, by = GASIFIER_AT
+    cylinder(col, "Drum_Body", M("rustysteel"), radius, height, at=(bx, by, 0), segments=28)
+    for z in (0, height / 3 - 0.0125, 2 * height / 3 - 0.0125):
+        cylinder(col, "Drum_Hoop", M("rustysteel"), radius + 0.008, 0.025, at=(bx, by, z), segments=28)
+    rng = random.Random(70)
+    for angle in range(-170, 40, 18):
+        _drum_patch(col, "Drum_Soot", M("charcoal"), GASIFIER_AT, radius, angle, 0.025, (0.07, rng.uniform(0.1, 0.24)))
+    cylinder(col, "Drum_Lid", M("rawsteel"), radius + 0.008, 0.02, at=(bx, by, height), segments=28)
+    _ring(col, "Drum_Clamp", M("weld"), GASIFIER_AT, radius + 0.01, height + 0.01, 0.012)
+    tube(col, "Drum_LidHandle", M("weld"), [(bx - 0.07, by, height + 0.02), (bx - 0.06, by, height + 0.07), (bx + 0.06, by, height + 0.07),
+                                            (bx + 0.07, by, height + 0.02)], 0.008, 6)
+    at, turn = _facing(radius, DRUM_DOOR_Z, 0.004)
+    box(col, "Drum_AshDoor", M("rawsteel"), (0.22, 0.008, 0.14), at=at, rotate=turn, bevel=0.002)
+    for side in (-1, 1):
+        hinge, _ = _facing(radius, DRUM_DOOR_Z + 0.055 + side * 0.04, 0.012)
+        box(col, "Drum_DoorHinge", M("weld"), (0.02, 0.02, 0.03), at=_along(hinge, -0.11), rotate=turn)
+    latch, _ = _facing(radius, DRUM_DOOR_Z + 0.06, 0.012)
+    box(col, "Drum_DoorLatch", M("weld"), (0.03, 0.012, 0.02), at=_along(latch, 0.09), rotate=turn)
+    hole, _ = _facing(radius, DRUM_DOOR_Z + 0.09, 0.008)
+    for offset in (-0.05, 0.0, 0.05):
+        _disc_at(col, "Drum_DraftHole", M("black"), _along(hole, offset), 0.014)
+    fx, fy = GASIFIER_FILTER_AT
+    _filter_legs(col, "Drum_FilterLeg")
+    filter_height = 0.45
+    cylinder(col, "Drum_Filter", M("drumpaint"), GASIFIER_FILTER_RADIUS, filter_height, at=(fx, fy, GASIFIER_FILTER_LEGS), segments=22)
+    _ring(col, "Drum_FilterHoop", M("drumpaint"), GASIFIER_FILTER_AT, GASIFIER_FILTER_RADIUS + 0.004,
+          GASIFIER_FILTER_LEGS + filter_height / 2, 0.007)
+    filter_top = GASIFIER_FILTER_LEGS + filter_height + 0.015
+    cylinder(col, "Drum_FilterLid", M("drumpaint"), GASIFIER_FILTER_RADIUS + 0.008, 0.015, at=(fx, fy, filter_top - 0.015), segments=22)
+    cock = _around(GASIFIER_FILTER_AT, -80, GASIFIER_FILTER_RADIUS + 0.02)
+    box(col, "Drum_DrainCock", M("brass"), (0.03, 0.03, 0.03), at=(*cock, GASIFIER_FILTER_LEGS + 0.02))
+    _gasifier_outlet(col, "Drum_Pipe", radius, 0.2, filter_top)
+
+
+def _welded_gasifier(col):
+    """A body welded up from sheet steel and painted with stove black: seams round it, a shoulder
+    up to a clamped hopper lid, a forged grate door at its foot, and a filter canister on legs with
+    a bolted flange lid and a gauge."""
+    radius, height = WELDED
+    bx, by = GASIFIER_AT
+    cylinder(col, "Welded_Body", M("darkgrey"), radius, height, at=(bx, by, 0), segments=28)
+    for z in (0.3, 0.6):
+        _ring(col, "Welded_Seam", M("weld"), GASIFIER_AT, radius + 0.001, z, 0.005)
+    cylinder(col, "Welded_Shoulder", M("darkgrey"), radius, 0.12, at=(bx, by, height), radius_top=0.13, segments=28)
+    _ring(col, "Welded_ShoulderSeam", M("weld"), GASIFIER_AT, radius + 0.001, height, 0.005)
+    neck = height + 0.12
+    cylinder(col, "Welded_Neck", M("rawsteel"), 0.13, 0.05, at=(bx, by, neck), segments=20)
+    cylinder(col, "Welded_Lid", M("weld"), 0.145, 0.025, at=(bx, by, neck + 0.05), segments=20)
+    box(col, "Welded_LidClamp", M("weld"), (0.03, 0.08, 0.02), at=(bx + 0.13, by, neck + 0.05), bevel=0.004)
+    tube(col, "Welded_LidHandle", M("weld"), [(bx - 0.05, by, neck + 0.075), (bx - 0.04, by, neck + 0.12), (bx + 0.04, by, neck + 0.12),
+                                              (bx + 0.05, by, neck + 0.075)], 0.008, 6)
+    at, turn = _facing(radius, 0.06, 0.002)
+    box(col, "Welded_GrateOpening", M("black"), (0.2, 0.004, 0.16), at=at, rotate=turn)
+    for z in (0.045, 0.22):
+        rail, _ = _facing(radius, z, 0.006)
+        box(col, "Welded_GrateFrame", M("weld"), (0.23, 0.012, 0.015), at=rail, rotate=turn)
+    bar, _ = _facing(radius, 0.06, 0.008)
+    for offset in (-0.105, -0.05, 0.0, 0.05, 0.105):
+        box(col, "Welded_GrateBar", M("weld"), (0.014, 0.012, 0.16), at=_along(bar, offset), rotate=turn)
+    fx, fy = GASIFIER_FILTER_AT
+    _filter_legs(col, "Welded_FilterLeg")
+    can = 0.5
+    cylinder(col, "Welded_Filter", M("rawsteel"), GASIFIER_FILTER_RADIUS, can, at=(fx, fy, GASIFIER_FILTER_LEGS), segments=22)
+    flange = GASIFIER_FILTER_LEGS + can
+    cylinder(col, "Welded_FilterFlange", M("weld"), GASIFIER_FILTER_RADIUS + 0.02, 0.022, at=(fx, fy, flange), segments=22)
+    for k in range(8):
+        bolt = _around(GASIFIER_FILTER_AT, 45 * k, GASIFIER_FILTER_RADIUS + 0.01)
+        cylinder(col, "Welded_FilterBolt", M("galvanised"), 0.007, 0.01, at=(*bolt, flange + 0.022), segments=6)
+    gauge = _around(GASIFIER_FILTER_AT, -70, GASIFIER_FILTER_RADIUS)
+    cylinder(col, "Welded_Gauge", M("white"), 0.03, 0.012, at=(*gauge, flange - 0.08), rotate=(90, 0, -70 + 90), segments=16)
+    _gasifier_outlet(col, "Welded_Pipe", radius, 0.2, flange + 0.022)
+
+
+def _gasifier_glow(col, tier):
+    """The fire showing at the door, a little proud of what it shows through, so a lit overlay drawn
+    over the gasifier's tile keeps it: the pot's air hole, the drum door's draft holes and the gap
+    under it, the welded body's grate opening behind its bars."""
+    if tier == "primitive":
+        hole, _ = _facing(PRIMITIVE_POT[0], 0.07, 0.002)
+        _disc_at(col, "Glow_AirHole", M("flame"), hole, 0.036)
+    elif tier == "standard":
+        hole, _ = _facing(DRUM[0], DRUM_DOOR_Z + 0.09, 0.011)
+        for offset in (-0.05, 0.0, 0.05):
+            _disc_at(col, "Glow_DraftHole", M("flame"), _along(hole, offset), 0.012)
+        gap, turn = _facing(DRUM[0], DRUM_DOOR_Z - 0.012, 0.004)
+        box(col, "Glow_DoorGap", M("flame"), (0.2, 0.006, 0.01), at=gap, rotate=turn)
+    else:
+        at, turn = _facing(WELDED[0], 0.065, 0.005)
+        box(col, "Glow_Grate", M("flame"), (0.19, 0.003, 0.15), at=at, rotate=turn)
+
+
+def generator_gas_pipe(col, side):
+    """The metal pipe on a generator's square from the gasifier on the square to its `side` ("N",
+    "E", "S" or "W") to the kit's mixer: into its free barb from the east, onto the end of its gas
+    line from the front, and round the generator to them from behind or the west."""
+    _, north_east, line_end = _gas_kit_ends()
+    ex, ey = GENERATOR_PIPE_EDGES[side]
+    edge = (ex, ey, PIPE_Z)
+    route = {"N": [edge, (ex, 0.42, PIPE_Z), (0.47, 0.42, PIPE_Z), (0.47, -0.19, PIPE_Z), north_east],
+             "E": [edge, north_east],
+             "S": [edge, line_end],
+             "W": [edge, (-0.45, ey, PIPE_Z), (-0.45, -0.485, PIPE_Z), (0.25, -0.485, PIPE_Z), line_end]}[side]
+    _pipe(col, "GenPipe", route)
+
+
+def tarry_packing(col):
+    """A wad of straw out of a gasifier's filter, soaked black-brown with tar, strands sticking out."""
+    rx, ry, height = 0.1, 0.08, 0.045
+    mound(col, "Tarry_Wad", M("tar"), (rx, ry, height), lumps=0.25, seed=60, segments=16, rings=5)
+    rng = random.Random(61)
+    for _ in range(16):
+        angle, reach = rng.uniform(0, 360), rng.uniform(0.5, 0.85)
+        ux, uy = _around((0, 0), angle, 1)
+        z = height * math.sqrt(1 - reach * reach) + 0.003
+        start = (ux * rx * reach, uy * ry * reach, z)
+        length = rng.uniform(0.04, 0.07)
+        end = (start[0] + ux * length, start[1] + uy * length, max(0.004, z + rng.uniform(-0.03, 0.01)))
+        beam(col, "Tarry_Strand", M("tarstraw"), start, end, (0.006, 0.002))
+
+
+PAMPHLET = (0.14, 0.215, 0.003)  # a government digest-size pamphlet
+
+
+def fema_pamphlet(col):
+    """The 1989 FEMA plans for a wood gas generator as a government office printed them: a thin
+    pamphlet, two staples in its spine, a plain white cover with a blue band and the agency's seal."""
+    width, depth, height = PAMPHLET
+    box(col, "Pamphlet_Pages", M("white"), (width - 0.003, depth - 0.003, height - 0.0008))
+    box(col, "Pamphlet_Cover", M("white"), (width, depth, 0.0008), at=(0, 0, height - 0.0008))
+    top = height + 0.0003
+    flat = (0, 0, 0)
+    box(col, "Pamphlet_Band", M("marine"), (width, 0.05, 0.0004), at=(0, depth / 2 - 0.035, height))
+    text(col, "Pamphlet_Agency", M("white"), "FEMA", 0.022, at=(0, depth / 2 - 0.045, top + 0.0002), rotate=flat)
+    for i, (line, size) in enumerate((("CONSTRUCTION OF A", 0.0085), ("SIMPLIFIED WOOD GAS", 0.0105),
+                                      ("GENERATOR", 0.0105))):
+        text(col, "Pamphlet_Title", M("ink"), line, size, at=(0, 0.025 - i * 0.016, top), rotate=flat)
+    _ring(col, "Pamphlet_Seal", M("marine"), (0, -0.05), 0.02, top, 0.002)
+    _ring(col, "Pamphlet_SealInner", M("marine"), (0, -0.05), 0.012, top, 0.0015)
+    text(col, "Pamphlet_Date", M("ink"), "MARCH 1989", 0.0065, at=(0, -0.095, top), rotate=flat)
+    for y in (-0.055, 0.055):
+        box(col, "Pamphlet_Staple", M("galvanised"), (0.002, 0.018, 0.0006), at=(-width / 2 + 0.006, y, height))
 
 
 # Vehicles -----------------------------------------------------------------------------------------
@@ -1886,6 +2182,8 @@ ITEMS = {
     "GasConversionKit": {"model": gas_conversion_kit, "icon_elevation": 45},
     "FridgeCompressor": {"model": fridge_compressor},
     "GasHeater": {"model": gas_heater},
+    "TarryPacking": {"model": tarry_packing, "icon_elevation": 35},
+    "FemaPamphlet": {"model": fema_pamphlet, "icon_elevation": 70},
 }
 
 # Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes

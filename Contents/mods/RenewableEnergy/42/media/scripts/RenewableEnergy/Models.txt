@@ -241,4 +241,16 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_GasHeater,
         scale = 1,
     }
+    model TarryPacking_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_TarryPacking,
+        texture = WorldItems/RenewableEnergy_TarryPacking,
+        scale = 1,
+    }
+    model FemaPamphlet_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_FemaPamphlet,
+        texture = WorldItems/RenewableEnergy_FemaPamphlet,
+        scale = 1,
+    }
 }

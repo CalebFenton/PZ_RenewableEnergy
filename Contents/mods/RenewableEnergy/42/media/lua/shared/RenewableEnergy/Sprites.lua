@@ -72,6 +72,15 @@ Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = t
 Sprites.gasHeater = { off = tile(244), lit = tile(245) }
 -- The gas kit fitted to a generator, drawn over the game's own generator tile in any facing.
 Sprites.gasKit = tile(246)
+-- Wood gas generators, built in place, one facing each, and the glow at each one's door while lit,
+-- drawn over its own tile.
+Sprites.gasifier = { primitive = tile(250), standard = tile(251), advanced = tile(252) }
+Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = tile(255) }
+-- The metal gas pipe from a gasifier to a generator on the next square, in two halves that meet at
+-- the squares' shared edge: `gasifierPipe` on the gasifier's tile, by the generator's direction from
+-- it, and `gasifierPipeGen` on the generator's tile with the kit, by the gasifier's direction.
+Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
+Sprites.gasifierPipeGen = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }
 
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
 Sprites.snow = {
@@ -180,6 +189,9 @@ for _, holder in pairs(Sprites.digesterHolder) do
 end
 addAll(OVERLAYS, Sprites.digesterScrubber)
 OVERLAYS[Sprites.gasKit] = true
+for _, set in ipairs({ Sprites.gasifierLit, Sprites.gasifierPipe, Sprites.gasifierPipeGen }) do
+    addAll(OVERLAYS, set)
+end
 
 --- What a placed tile is.
 ---@param spriteName string?

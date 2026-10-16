@@ -16,5 +16,8 @@
     "Plastic_Barrel_Digester": "Plastic Barrel Digester",
     "Insulated_Digester": "Insulated Digester",
     "Brick_Dome_Digester": "Brick Dome Digester",
-    "Gas_Heater": "Gas Heater"
+    "Gas_Heater": "Gas Heater",
+    "Primitive_Gasifier": "Primitive Gasifier",
+    "Gasifier": "Gasifier",
+    "Advanced_Gasifier": "Advanced Gasifier"
 }

@@ -116,6 +116,16 @@ local function digesterTiles()
     table.insert(list, { x = 9, y = 2, sprite = Sprites.gasHeater.lit })
     table.insert(list, { x = 9, y = 4, sprite = "appliances_misc_01_0", overlays = { Sprites.gasKit } })
     table.insert(list, { x = 9, y = 6, sprite = "appliances_misc_01_1", overlays = { Sprites.gasKit } })
+    -- Each gasifier, then lit, and two piped to a kitted generator: one to its east, one to its north.
+    for column, tier in ipairs({ "primitive", "standard", "advanced" }) do
+        table.insert(list, { x = column * 2 - 1, y = 10, sprite = Sprites.gasifier[tier] })
+        table.insert(list, { x = column * 2 - 1, y = 12, sprite = Sprites.gasifier[tier], overlays = { Sprites.gasifierLit[tier] } })
+    end
+    table.insert(list, { x = 7, y = 10, sprite = Sprites.gasifier.standard,
+        overlays = { Sprites.gasifierLit.standard, Sprites.gasifierPipe.E } })
+    table.insert(list, { x = 8, y = 10, sprite = "appliances_misc_01_0", overlays = { Sprites.gasKit, Sprites.gasifierPipeGen.W } })
+    table.insert(list, { x = 9, y = 12, sprite = Sprites.gasifier.advanced, overlays = { Sprites.gasifierPipe.N } })
+    table.insert(list, { x = 9, y = 11, sprite = "appliances_misc_01_0", overlays = { Sprites.gasKit, Sprites.gasifierPipeGen.S } })
     return list
 end
 
