@@ -1,11 +1,13 @@
--- The right-click menu of a digester. Feeding is the loot window's: the hopper is its container.
--- Each job queues a RenewableEnergyDigesterAction, which walks the character over and does it; an
--- option the character can't do yet stays in the menu, greyed out, saying what it needs.
+-- The right-click menus of a digester and of a gas heater. Feeding is the loot window's: the
+-- hopper is its container. Each job queues a timed action, which walks the character over and does
+-- it; an option the character can't do yet stays in the menu, greyed out, saying what it needs.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
+require "RenewableEnergy/Biogas/GasHeater"
 require "RenewableEnergy/TimedActions/RenewableEnergyDigesterAction"
+require "RenewableEnergy/TimedActions/RenewableEnergyHeaterAction"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/DigesterWindow"
 
@@ -13,7 +15,7 @@ RenewableEnergy = RenewableEnergy or {}
 local DigesterMenu = {}
 RenewableEnergy.DigesterMenu = DigesterMenu
 
-local Digester, DigesterJobs = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs
+local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
 local Needs, DigesterWindow = RenewableEnergy.Needs, RenewableEnergy.DigesterWindow
 local Action = RenewableEnergyDigesterAction
 
@@ -73,16 +75,55 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     if summary.tier == "barrel" then
         addJob(menu, character, playerNum, DigesterJobs.UPGRADE, digester, summary)
     end
+
+    local tank = DigesterJobs.tankToFill(character)
+    for _, job in ipairs({ DigesterJobs.FILL_PUMP, DigesterJobs.FILL_COMPRESSOR }) do
+        local option = addJob(menu, character, playerNum, job, digester, summary, tank)
+        local refusal = not option.notAvailable and DigesterJobs.fillRefusal(character, job, summary, tank)
+        if refusal then
+            disable(option, getText(refusal))
+        end
+    end
+
+    if not summary.scrubber then
+        addJob(menu, character, playerNum, DigesterJobs.FIT_SCRUBBER, digester, summary)
+    else
+        local charge = menu:addOption(getText("ContextMenu_RenewableEnergy_ChargeScrubber"))
+        local chargeMenu = ISContextMenu:getNew(menu)
+        menu:addSubMenu(charge, chargeMenu)
+        for _, job in ipairs({ DigesterJobs.CHARGE_WATER, DigesterJobs.CHARGE_ASH, DigesterJobs.CHARGE_LIME }) do
+            addJob(chargeMenu, character, playerNum, job, digester, summary)
+        end
+        addJob(menu, character, playerNum, DigesterJobs.REPACK_WOOL, digester, summary)
+    end
     return menu
 end
 
-local function findDigester(worldobjects)
+local function queueHeater(playerNum, job, heater)
+    local character = getSpecificPlayer(playerNum)
+    if luautils.walkAdj(character, heater:getSquare(), true) then
+        ISTimedActionQueue.add(RenewableEnergyHeaterAction:new(character, job, heater))
+    end
+end
+
+--- Adds a gas heater's option to `context`: light it, or put it out. Returns the option.
+function DigesterMenu.addHeaterOptions(playerNum, context, heater)
+    local job = GasHeater.isLit(heater) and GasHeater.OFF or GasHeater.LIGHT
+    local option = context:addOption(getText("ContextMenu_RenewableEnergy_" .. job), playerNum, queueHeater, job, heater)
+    local refusal = GasHeater.refusal(getSpecificPlayer(playerNum), job, heater)
+    if refusal then
+        disable(option, getText(refusal))
+    end
+    return option
+end
+
+local function findOn(worldobjects, matches)
     local seen = {}
     for _, clicked in ipairs(worldobjects) do
         local square = clicked:getSquare()
         if square and not seen[square] then
             seen[square] = true
-            local found = RenewableEnergy.findObjectOn(square, Digester.isDigester)
+            local found = RenewableEnergy.findObjectOn(square, matches)
             if found then
                 return found
             end
@@ -92,14 +133,20 @@ local function findDigester(worldobjects)
 end
 
 function DigesterMenu.onFill(playerNum, context, worldobjects, test)
-    local digester = findDigester(worldobjects)
-    if not digester then
+    local digester = findOn(worldobjects, Digester.isDigester)
+    local heater = findOn(worldobjects, GasHeater.isHeater)
+    if not (digester or heater) then
         return
     end
     if test then
         return ISWorldObjectContextMenu.setTest()
     end
-    DigesterMenu.addOptions(playerNum, context, digester)
+    if digester then
+        DigesterMenu.addOptions(playerNum, context, digester)
+    end
+    if heater then
+        DigesterMenu.addHeaterOptions(playerNum, context, heater)
+    end
 end
 
 Events.OnFillWorldObjectContextMenu.Add(DigesterMenu.onFill)

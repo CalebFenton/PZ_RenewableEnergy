@@ -506,6 +506,22 @@ module RenewableEnergy
         Tags = base:magazine;base:ignorezombiedensity,
     }
 
+    /* Biogas: the digesters (build menu recipes), the Gas Conversion Kit and the gas heater. */
+    item HomesteadPowerMag3
+    {
+        DisplayCategory = RecipeResource,
+        ItemType = base:literature,
+        Weight = 0.1,
+        Icon = RenewableEnergy_HomesteadPowerMag3,
+        StaticModel = Magazine,
+        WorldStaticModel = RenewableEnergy.HomesteadPowerMag3_Ground,
+        BoredomChange = -20,
+        StressChange = -15,
+        LearnedRecipes = RenewableEnergy_BarrelDigesterSteel;RenewableEnergy_BarrelDigesterPlastic;RenewableEnergy_InsulatedDigester;RenewableEnergy_BrickDome;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeGasHeater,
+        OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
+        Tags = base:magazine;base:ignorezombiedensity,
+    }
+
     /**************************** Maps **************************************/
     item CrowcallRoadMap
     {
@@ -573,9 +589,34 @@ module RenewableEnergy
         DisplayCategory = VehicleMaintenance,
         ItemType = base:normal,
         Weight = 1.5,
-        Icon = RubberHose,
-        WorldStaticModel = RubberHose,
+        Icon = RenewableEnergy_GasConversionKit,
+        WorldStaticModel = RenewableEnergy.GasConversionKit_Ground,
         Tooltip = Tooltip_RenewableEnergy_GasConversionKit,
         Tags = base:ignorezombiedensity,
+    }
+
+    /* The compressor a fridge gives when cut up; presses scrubbed biogas into propane tanks. */
+    item FridgeCompressor
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 8.0,
+        Icon = RenewableEnergy_FridgeCompressor,
+        WorldStaticModel = RenewableEnergy.FridgeCompressor_Ground,
+        Tooltip = Tooltip_RenewableEnergy_FridgeCompressor,
+        Tags = base:hasmetal;base:heavyitem;base:ignorezombiedensity,
+    }
+
+    /* Placed beside a digester, burns its gas to keep it warm (RenewableEnergy.GasHeater). */
+    item GasHeater
+    {
+        DisplayCategory = Furniture,
+        ItemType = base:moveable,
+        Weight = 6.0,
+        Icon = RenewableEnergy_GasHeater,
+        WorldStaticModel = RenewableEnergy.GasHeater_Ground,
+        WorldObjectSprite = renewable_energy_01_244,
+        Tooltip = Tooltip_RenewableEnergy_GasHeater,
+        Tags = base:hasmetal;base:ignorezombiedensity,
     }
 }

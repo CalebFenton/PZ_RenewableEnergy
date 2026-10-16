@@ -29,7 +29,7 @@ local RECIPES = {
     "RenewableEnergy_RebuildCarBattery", "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery",
     "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
     "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
-    "RenewableEnergy_MakeGasConversionKit",
+    "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater",
 }
 
 -- "RenewableEnergy.HomesteadPowerMag1" -> "homestead_power_mag1".
@@ -140,6 +140,9 @@ local MAGAZINES = {
         "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold",
         "RenewableEnergy_FireBatteryPlateMold",
     },
+    ["RenewableEnergy.HomesteadPowerMag3"] = {
+        "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater",
+    },
 }
 
 -- Which of the mod's recipes this client's character has learned; the knownRecipes handler reads
@@ -218,6 +221,44 @@ for magazine, recipes in pairs(MAGAZINES) do
         end,
     })
 end
+
+-- Homestead Power #3 also teaches the digesters, which are build-menu recipes (entity scripts)
+-- that the loop above can't see.
+test("renewable_energy_items_read_homestead_power_mag3_teaches_the_digesters", {
+    instant = true,
+    run = function(self)
+        local p = player()
+        local names = RenewableEnergy.Debug.ENTITY_RECIPES
+        PZHarness.Fixtures.forgetRecipes(p, names)
+        T.defer(self, function() PZHarness.Fixtures.learnRecipes(p, names) end)
+        T.server(self, "forgetRecipesUntilEnd", { names = names })
+        T.give(self, "magazine", { { type = "RenewableEnergy.HomesteadPowerMag3" } })
+        T.server(self, "forgetLiterature", function() return { title = self.items.magazine[1]:getModData().literatureTitle } end)
+        T.step(function()
+            local item = self.items.magazine[1]
+            p:getReadLiterature():remove(item:getModData().literatureTitle)
+            ISTimedActionQueue.add(ISReadABook:new(p, item))
+        end)
+        T.serverUntil(self, "knownRecipes", { prefix = "RenewableEnergy_" }, function(reply)
+            for _, name in ipairs(names) do
+                if not reply.known[name] then return false end
+            end
+            return true
+        end)
+        T.step(function()
+            self.client = {}
+            for _, name in ipairs(names) do
+                self.client[name] = p:getKnownRecipes():contains(name)
+            end
+        end)
+    end,
+    validate = function(self)
+        for _, name in ipairs(RenewableEnergy.Debug.ENTITY_RECIPES) do
+            expect(self.server.knownRecipes.known[name], "reading Homestead Power #3 did not teach " .. name .. " on the server")
+            expect(self.client[name], "reading Homestead Power #3 did not teach " .. name .. " on the client")
+        end
+    end,
+})
 
 -- Researching found hardware teaches exactly what to build from it: the item's own recipe
 -- (OutputMapper) and its ResearchableRecipes.

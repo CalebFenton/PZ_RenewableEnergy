@@ -370,6 +370,23 @@ Distributions.items = {
         })))))),
     },
     {
+        -- Biogas: on farms, where the manure is, and with preppers. Rarer than the second
+        -- magazine; the skills teach its recipes too.
+        fullType = "RenewableEnergy.HomesteadPowerMag3",
+        option = "LRMMisc",
+        entries = with(1, SURVIVOR_CRATES, with(0.3, SURVIVALIST_CORPSES, with(0.3, SAFEHOUSE_READING, {
+            { 3, "proc:BookstoreFarming" },
+            { 2, "proc:Homesteading" },
+            { 1.5, "proc:ToolStoreFarming" },
+            { 1, "proc:ToolCabinetFarming" },
+            { 1, "proc:BarnTools" },
+            { 1, "proc:CrateFarming" },
+            { 0.5, "proc:FarmStorage" },
+            { 1, "proc:SafehouseBookShelf" },
+            { 2, "veh:FarmerTruckBed" },
+        }))),
+    },
+    {
         fullType = "RenewableEnergy.SolarModule",
         option = "LRMSolarPanels",
         entries = with(2, SURVIVOR_CRATES, {

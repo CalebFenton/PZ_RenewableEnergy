@@ -10,11 +10,14 @@ if isClient() then return end
 
 require "Map/SGlobalObject"
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/Stink"
+require "RenewableEnergy/Biogas/GasHeater"
 
 RenewableEnergy = RenewableEnergy or {}
-local Digester, Stink = RenewableEnergy.Digester, RenewableEnergy.Stink
+local Digester, Stink, Sprites = RenewableEnergy.Digester, RenewableEnergy.Stink, RenewableEnergy.Sprites
+local GasHeater = RenewableEnergy.GasHeater
 
 local DigesterObject = SGlobalObject:derive("RenewableEnergy_Digester")
 RenewableEnergy.DigesterObject = DigesterObject
@@ -24,7 +27,8 @@ RenewableEnergy.DigesterObject = DigesterObject
 DigesterObject.SAVED_FIELDS = {
     "tier", "material", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
     "seedHours", "started", "gasHours", "sludge", "acid", "sour", "leakHours", "indoors", "inRoom",
-    "meterHours", "madePerDay", "hopper", "eaten", "lastHour",
+    "meterHours", "madePerDay", "hopper", "eaten", "lastHour", "scrubber", "scrubCO2", "scrubWool",
+    "heaterLit",
 }
 
 -- Digestion rate k (share of the undigested potential a day) by temperature, between which it runs
@@ -77,6 +81,9 @@ function DigesterObject:initNew()
     self.madePerDay = 0
     self.hopper = {}
     self.eaten = {}
+    self.scrubber = false
+    self.scrubCO2 = 0
+    self.scrubWool = 0
     self.lastHour = getGameTime():getWorldAgeHours()
 end
 
@@ -106,6 +113,8 @@ function DigesterObject:loaded(isoObject)
     Digester.adoptContainer(isoObject:getContainer())
     self:snapshotHopper(isoObject:getContainer())
     self:showHolder()
+    self:showScrubber()
+    self:showHeater()
     self:sendSummary()
 end
 
@@ -298,14 +307,17 @@ end
 -- The temperature the digester heads for, and whether it burns gas to get there.
 function DigesterObject:targetTemp(air)
     local spec = self:tierSpec()
-    if not spec.warmTo then
-        return air, false
+    local target, burning = air, false
+    if spec.warmTo then
+        target = math.max(air, GROUND_TEMP)
+        if self.started and self.gas > 0 and target < spec.warmTo then
+            target, burning = spec.warmTo, true
+        end
     end
-    local target = math.max(air, GROUND_TEMP)
-    if self.started and self.gas > 0 and target < spec.warmTo then
-        return spec.warmTo, true
+    if self.heaterLit then
+        target = math.max(target, GasHeater.TEMP)
     end
-    return target, false
+    return target, burning
 end
 
 -- The pass ------------------------------------------------------------------------------------
@@ -358,6 +370,14 @@ function DigesterObject:step(hours, air)
         self.holderCondition = math.max(0, self.holderCondition - holder.wearPerDay * hours / 24)
     end
     self.leakHours = math.max(0, self.leakHours - hours)
+    if self.heaterLit then
+        local burn = GasHeater.M3_PER_HOUR * hours
+        if self.gas >= burn then
+            self.gas = self.gas - burn
+        else
+            self.heaterLit = false
+        end
+    end
     local capacity = self:capacity()
     if self.gas > capacity then
         self.gas = capacity
@@ -378,6 +398,9 @@ function DigesterObject:update()
     local isoObject = self:getIsoObject()
     local container = isoObject and isoObject:getContainer()
     local square = isoObject and isoObject:getSquare()
+    if isoObject then
+        self.heaterLit = GasHeater.litHeaterNear(self.x, self.y, self.z) ~= nil
+    end
     local air = self:airTemp(square)
     while hours > 0 do
         local step = math.min(1, hours)
@@ -396,6 +419,8 @@ function DigesterObject:afterChange()
     self:smell()
     self:fumes()
     self:showHolder()
+    self:showScrubber()
+    self:showHeater()
     self:sendSummary()
 end
 
@@ -478,23 +503,21 @@ end
 
 -- Holder -------------------------------------------------------------------------------------
 
-function DigesterObject:showHolder()
-    local isoObject = self:getIsoObject()
-    if not isoObject then return end
-    local capacity = Digester.HOLDERS[self.holder].capacity
-    local wanted = Digester.holderOverlay(self.holder, self.gas / capacity, self:isTorn())
+-- Shows `wanted` (a sprite name, or nil for none) as the one overlay of the kind `isKind` tells on
+-- the digester's tile, and sends the tile on when that changes it.
+local function showOverlay(isoObject, isKind, wanted)
     local attached = isoObject:getAttachedAnimSprite()
     local count = attached and attached:size() or 0
     local shown
     for i = 0, count - 1 do
         local name = attached:get(i):getName()
-        if Digester.isHolderOverlay(name) then
+        if isKind(name) then
             shown = name
         end
     end
     if shown == wanted then return end
     for i = count - 1, 0, -1 do
-        if Digester.isHolderOverlay(attached:get(i):getName()) then
+        if isKind(attached:get(i):getName()) then
             isoObject:RemoveAttachedAnim(i)
         end
     end
@@ -502,6 +525,29 @@ function DigesterObject:showHolder()
         isoObject:addAttachedAnimSpriteByName(wanted)
     end
     isoObject:transmitUpdatedSpriteToClients()
+end
+
+function DigesterObject:showHolder()
+    local isoObject = self:getIsoObject()
+    if not isoObject then return end
+    local capacity = Digester.HOLDERS[self.holder].capacity
+    showOverlay(isoObject, Digester.isHolderOverlay, Digester.holderOverlay(self.holder, self.gas / capacity, self:isTorn()))
+end
+
+function DigesterObject:showScrubber()
+    local isoObject = self:getIsoObject()
+    if not isoObject then return end
+    showOverlay(isoObject, Digester.isScrubberOverlay, self.scrubber and Sprites.digesterScrubber[self.tier] or nil)
+end
+
+-- A heater beside it goes out once the digester stops feeding it: out of gas, here or while its
+-- chunk was unloaded.
+function DigesterObject:showHeater()
+    if self.heaterLit or not self:getIsoObject() then return end
+    local heater = GasHeater.litHeaterNear(self.x, self.y, self.z)
+    if heater then
+        GasHeater.setLit(heater, false)
+    end
 end
 
 -- Gas ------------------------------------------------------------------------------------------
@@ -535,6 +581,9 @@ function DigesterObject:buildSummary()
         madePerDay = round(self.madePerDay, 2),
         hopper = #self.hopper,
         stink = round(self:stinkScore(), 1),
+        scrubber = self.scrubber == true,
+        scrubCO2 = round(self.scrubCO2 or 0, 1),
+        scrubWool = round(self.scrubWool or 0, 1),
     }
 end
 

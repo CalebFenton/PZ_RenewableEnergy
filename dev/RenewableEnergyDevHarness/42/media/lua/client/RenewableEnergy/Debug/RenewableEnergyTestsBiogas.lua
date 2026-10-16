@@ -272,9 +272,13 @@ local function waitForSummary(handle, check, what)
     end, COPY_FRAMES, what)
 end
 
+-- `item`, if a function, is called when the job is queued, for an item given earlier in the queue.
 local function queueJob(self, handle, job, item)
+    T.goNextTo(self, handle.square)
     T.step(function()
-        T.standNextTo(handle.square)
+        if type(item) == "function" then
+            item = item()
+        end
         ISTimedActionQueue.add(RenewableEnergyDigesterAction:new(T.player(), job, handle.object, item))
     end)
 end
@@ -401,7 +405,7 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
         setDigester(self, handle, { sludge = 35 })
         waitForSummary(handle, function(summary) return summary.sludge == 35 end, "the summary's sludge")
         T.give(self, "bag", { { type = DigesterJobs.SANDBAG } })
-        T.step(function() queueJob(self, handle, DigesterJobs.TAKE_SLUDGE, self.items.bag[1]) end)
+        queueJob(self, handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bag[1] end)
         readDigester(self, handle, "after")
         T.count(self, "bags", { DigesterJobs.COMPOST_BAG, DigesterJobs.SANDBAG })
     end,
@@ -676,6 +680,9 @@ local function placeGenerator(self, fuel, near)
     local args = at(square)
     args.fuel = fuel
     T.server(self, "placeGenerator", args)
+    T.step(function()
+        T.defer(self, function() RenewableEnergy.Debug.releaseGeneratorPower(handle.x, handle.y, handle.z) end)
+    end)
     T.waitUntil(function()
         handle.object = RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), GasKit.isGenerator)
         return handle.object ~= nil
@@ -685,8 +692,8 @@ local function placeGenerator(self, fuel, near)
 end
 
 local function gasJob(self, generator, job, digester)
+    T.goNextTo(self, generator.square)
     T.step(function()
-        T.standNextTo(generator.square)
         ISTimedActionQueue.add(RenewableEnergyGasAction:new(T.player(), job, generator.object, digester and digester.object))
     end)
 end
@@ -862,5 +869,129 @@ test("renewable_energy_gas_kit_menu", {
         local text = ISGeneratorInfoWindow.getRichText(generator, true)
         T.expect(text:find(getText("IGUI_Generator_FuelAmount", 0), 1, true) ~= nil, "the info window doesn't show the empty tank")
         T.expect(text:find(getText("IGUI_RenewableEnergy_GasOn"), 1, true) ~= nil, "the info window doesn't say it runs on gas")
+    end,
+})
+
+-- Propane ---------------------------------------------------------------------------------------
+
+-- Queues a read of the character's propane tanks (their fraction) into self.tanks[label].
+local function readTanks(self, label)
+    T.server(self, "carried", { types = { Digester.TANK } })
+    T.step(function()
+        self.tanks = self.tanks or {}
+        self.tanks[label] = self.server.carried.items[Digester.TANK]
+    end)
+end
+
+-- A tire pump moves the digester's gas into a propane tank, but no further than a quarter full,
+-- and it is hard work.
+test("renewable_energy_biogas_tank_by_pump", {
+    instant = true,
+    run = function(self)
+        local handle = placeDigester(self, "dome")
+        if not handle then return end
+        local full = mature(45)
+        full.gas = 4
+        setDigester(self, handle, full)
+        waitForSummary(handle, function(summary) return summary.gas == 4 end, "the summary's gas")
+        T.give(self, "tools", { { type = Digester.PUMP }, { type = Digester.TANK, uses = 0 } })
+        T.step(function() self.endurance = T.player():getStats():get(CharacterStat.ENDURANCE) end)
+        queueJob(self, handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
+        readDigester(self, handle, "after")
+        readTanks(self, "after")
+        T.server(self, "characterStat", { stat = "ENDURANCE" })
+        T.step(function()
+            local tank = self.items.tools[2]
+            tank:setUsedDelta(Digester.PUMP_FILL)
+            local summary = { gas = 4, scrubCO2 = 0, scrubWool = 0 }
+            self.atLimit = DigesterJobs.fillRefusal(T.player(), DigesterJobs.FILL_PUMP, summary, tank)
+        end)
+    end,
+    validate = function(self)
+        local tank = self.tanks.after[1]
+        T.expectNear("tank after pumping 4 m³", tank.uses, 4 / Digester.M3_PER_TANK, 0.002)
+        T.expectNear("gas left", self.reads.after.gas, 0, 0.01)
+        T.expect(self.server.characterStat.value < self.endurance - 0.1, "pumping 4 m³ took no endurance")
+        T.expect(self.atLimit == "Tooltip_RenewableEnergy_PumpLimit", "a quarter-full tank still takes the pump: " .. tostring(self.atLimit))
+    end,
+})
+
+-- A scrubber, fitted and charged, lets a powered compressor fill a tank past a quarter; each m³
+-- it scrubs uses up its charge and its steel wool.
+test("renewable_energy_biogas_scrubber_and_compressor", {
+    instant = true,
+    run = function(self)
+        local handle = placeDigester(self, "dome")
+        if not handle then return end
+        local full = mature(45)
+        full.gas = 4
+        setDigester(self, handle, full)
+        -- A running generator powers the squares around it, outdoors too.
+        local generator = placeGenerator(self, 10, handle.square)
+        if not generator then return end
+        setGenerator(self, generator, { running = true })
+        T.setPerk(self, Perks.Mechanics, 1)
+        T.give(self, "scrubber", { { type = "Base.Bucket" }, { type = "Base.Pipe" }, { type = "Base.RubberHose" }, { type = "Base.SteelWool" } })
+        queueJob(self, handle, DigesterJobs.FIT_SCRUBBER)
+        T.give(self, "charge", { { type = "Base.Bucket" }, { type = "Base.Quicklime" } })
+        T.server(self, "refillFluid", function() return { id = self.items.charge[1]:getID(), liters = 5, fluid = "Water" } end)
+        queueJob(self, handle, DigesterJobs.CHARGE_LIME)
+        readDigester(self, handle, "charged")
+        T.give(self, "fill", { { type = Digester.COMPRESSOR }, { type = Digester.TANK, uses = Digester.PUMP_FILL } })
+        T.waitUntil(function()
+            local here = T.player():getCurrentSquare()
+            return here ~= nil and here:haveElectricity()
+        end, COPY_FRAMES, "power where the character stands")
+        queueJob(self, handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[2] end)
+        readDigester(self, handle, "filled")
+        readTanks(self, "filled")
+    end,
+    validate = function(self)
+        local charged, filled = self.reads.charged, self.reads.filled
+        T.expect(charged.scrubber, "the scrubber wasn't fitted")
+        T.expectNear("scrubber charge with lime", charged.scrubCO2, Digester.SCRUB_M3.lime, 0.01)
+        T.expectNear("steel wool once fitted", charged.scrubWool, Digester.WOOL_M3, 0.01)
+        T.expect(charged.overlays[#charged.overlays] == RenewableEnergy.Sprites.digesterScrubber.dome, "the dome doesn't show its scrubber")
+        T.expectNear("tank after compressing 4 m³", self.tanks.filled[1].uses, Digester.PUMP_FILL + 4 / Digester.M3_PER_TANK, 0.002)
+        T.expectNear("scrubber charge left", filled.scrubCO2, Digester.SCRUB_M3.lime - 4, 0.02)
+        T.expectNear("steel wool left", filled.scrubWool, Digester.WOOL_M3 - 4, 0.02)
+    end,
+})
+
+-- A lit gas heater beside a digester keeps it warm on its gas, and goes out when the gas does.
+test("renewable_energy_biogas_heater_warms_digester", {
+    instant = true,
+    run = function(self)
+        local handle = placeDigester(self, "barrel.steel")
+        if not handle then return end
+        local cold = mature(5)
+        cold.temp, cold.gas = 5, 0.6
+        setDigester(self, handle, cold)
+        waitForSummary(handle, function(summary) return summary.gas == 0.6 end, "the summary's gas")
+        local square = (T.need(self, T.squares(self, 1, { near = handle.square }), "a square beside the digester for a heater") or {})[1]
+        if not square then return end
+        local heater = T.placeTile(self, square, RenewableEnergy.Sprites.gasHeater.off)
+        T.give(self, "lighter", { { type = "Base.Lighter" } })
+        T.goNextTo(self, square)
+        T.step(function()
+            ISTimedActionQueue.add(RenewableEnergyHeaterAction:new(T.player(), RenewableEnergy.GasHeater.LIGHT, heater.object))
+        end)
+        runDigester(self, handle, 3, 0)
+        readDigester(self, handle, "warming")
+        runDigester(self, handle, 6, 0)
+        readDigester(self, handle, "out")
+        T.step(function() self.heaterSprite = heater.object:getSprite():getName() end)
+        T.waitUntil(function()
+            local object = RenewableEnergy.findObjectOn(square, RenewableEnergy.GasHeater.isHeater)
+            self.heaterSprite = object and object:getSprite():getName()
+            return self.heaterSprite == RenewableEnergy.Sprites.gasHeater.off
+        end, COPY_FRAMES, "this client's copy of the heater going out")
+    end,
+    validate = function(self)
+        local warming, out = self.reads.warming, self.reads.out
+        T.expect(warming.heaterLit and warming.temp > 5, "a lit heater didn't warm the digester: " .. tostring(warming.temp) .. " °C")
+        T.expectNear("gas after 3 hours of heating", warming.gas, 0.6 - 3 * RenewableEnergy.GasHeater.M3_PER_HOUR, 0.02)
+        T.expect(not out.heaterLit, "the heater kept burning with no gas")
+        T.expect(self.heaterSprite == RenewableEnergy.Sprites.gasHeater.off, "the heater still shows lit: " .. tostring(self.heaterSprite))
     end,
 })

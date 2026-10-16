@@ -3,6 +3,7 @@ require "Moveables/ISMoveableSpriteProps"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/Biogas/Digester"
 
 -- How the mod's placed objects move: what dismantling a bank gives back, where each may be
 -- placed, and what an object's modData carries into its item when picked up.
@@ -40,7 +41,9 @@ local BANK_SCRAP = {
     },
 }
 
--- After vanilla's own OnGameBoot handler, which resets the definitions before filling them.
+-- After vanilla's own OnGameBoot handler, which resets the definitions before filling them. A fridge
+-- cut up with a blowtorch also gives its compressor (vanilla's "Fridge" material), which a digester
+-- uses to fill propane tanks.
 Events.OnGameBoot.Add(function()
     local defs = ISMoveableDefinitions:getInstance()
     for material, items in pairs(BANK_SCRAP) do
@@ -49,6 +52,7 @@ Events.OnGameBoot.Add(function()
             defs.addScrapItem(material, entry[1], entry[2], entry[3], true)
         end
     end
+    defs.addScrapItem("Fridge", RenewableEnergy.Digester.COMPRESSOR, 1, 80, true)
 end)
 
 -- Placing -----------------------------------------------------------------------------------------

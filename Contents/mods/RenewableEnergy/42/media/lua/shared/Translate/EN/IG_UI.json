@@ -149,5 +149,8 @@
     "IGUI_RenewableEnergy_GasNoLine": "no gas line",
     "IGUI_RenewableEnergy_GasPetrol": "set to run on gasoline",
     "IGUI_RenewableEnergy_GasStalled": "stalled: more switched on than it can carry on gas",
-    "IGUI_RenewableEnergy_GasOut": "ran out of gas"
+    "IGUI_RenewableEnergy_GasOut": "ran out of gas",
+    "IGUI_RenewableEnergy_WaterLitres": "Water (litres)",
+    "IGUI_RenewableEnergy_DigesterScrubber": "Scrubber",
+    "IGUI_RenewableEnergy_ScrubberState": "%1 m³ left in its water, %2 m³ in its steel wool"
 }

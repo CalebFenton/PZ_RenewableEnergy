@@ -975,4 +975,29 @@ module Base
             item 1 RenewableEnergy.GasConversionKit,
         }
     }
+
+    /* A welded sheet-metal box round a burner, for keeping a digester warm through the winter. */
+    craftRecipe RenewableEnergy_MakeGasHeater
+    {
+        timedAction = Welding,
+        time = 200,
+        Tags = AnySurfaceCraft;Welding,
+        category = Metalworking,
+        NeedToBeLearn = true,
+        AutoLearnAll = MetalWelding:4;Mechanics:3,
+        SkillRequired = MetalWelding:2;Mechanics:2,
+        xpAward = MetalWelding:15;Mechanics:5,
+        inputs
+        {
+            item 1 tags[base:weldingmask] mode:keep,
+            item 2 [Base.BlowTorch],
+            item 1 [Base.SheetMetal],
+            item 1 [Base.Pipe],
+            item 1 [Base.RubberHose],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.GasHeater,
+        }
+    }
 }

@@ -45,6 +45,25 @@ Digester.HOLDER_OF_TIER = { insulated = "drum", dome = "dome" }
 -- (ISGetCompost).
 Digester.SLUDGE_PER_BAG = 10
 
+-- Propane tanks. A tank holds this much biogas when full: its propane's energy at 6 kWh a m³. Real
+-- biogas can't be pressed into a tank anywhere near that; the game lets it.
+Digester.TANK = "Base.PropaneTank"
+Digester.M3_PER_TANK = 40
+-- A tire pump fills a tank this far at most, and it is hard work: minutes and endurance per m³.
+Digester.PUMP = "Base.TirePump"
+Digester.PUMP_FILL = 0.25
+Digester.PUMP_MINUTES_PER_M3 = 15
+Digester.PUMP_ENDURANCE_PER_M3 = 0.06
+-- A fridge compressor, on power, fills a tank all the way, but only with scrubbed gas.
+Digester.COMPRESSOR = "RenewableEnergy.FridgeCompressor"
+Digester.COMPRESSOR_MINUTES_PER_M3 = 2
+-- What the scrubber's water takes out before it is spent, in m³ of gas: plain water, lye from
+-- wood ash, or lime; and what one use of steel wool takes the rotten-egg gas out of.
+Digester.SCRUB_M3 = { water = 5, ash = 15, lime = 30 }
+Digester.WOOL_M3 = 10
+-- Litres of water a scrubber charge takes.
+Digester.SCRUB_WATER = 4
+
 -- Feed ---------------------------------------------------------------------------------------
 
 -- By full type: potential (m³ before the Biogas multiplier), acid (what it adds to souring;
@@ -154,6 +173,15 @@ function Digester.isHolderOverlay(spriteName)
     return HOLDER_OVERLAYS[spriteName] == true
 end
 
+local SCRUBBER_OVERLAYS = {}
+for _, name in pairs(Sprites.digesterScrubber) do
+    SCRUBBER_OVERLAYS[name] = true
+end
+
+function Digester.isScrubberOverlay(spriteName)
+    return SCRUBBER_OVERLAYS[spriteName] == true
+end
+
 --- Every digester base tile, for MapObjects.OnLoadWithSprite.
 function Digester.sprites()
     local names = {}
@@ -197,6 +225,13 @@ end
 function Digester.recordOf(isoObject)
     local system = not isClient() and Digester.serverSystem
     return system and system:getLuaObjectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+end
+
+--- The digester's summary as this side knows it, or nil: the authority builds it from its record,
+--- which a job may have changed since the last summary went out, and has no client copy.
+function Digester.currentSummary(isoObject)
+    local record = Digester.recordOf(isoObject)
+    return record and record:buildSummary() or Digester.summaryOf(isoObject)
 end
 
 return Digester

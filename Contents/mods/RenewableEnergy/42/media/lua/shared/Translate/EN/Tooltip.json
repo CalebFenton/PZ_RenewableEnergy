@@ -70,5 +70,19 @@
     "Tooltip_RenewableEnergy_NoDigesterInReach": "No digester within %1 squares on this floor.",
     "Tooltip_RenewableEnergy_OnGasAlready": "It already runs on gas.",
     "Tooltip_RenewableEnergy_OnPetrolAlready": "It already runs on gasoline.",
-    "Tooltip_RenewableEnergy_RemoveKitFirst": "Remove the Gas Conversion Kit first."
+    "Tooltip_RenewableEnergy_RemoveKitFirst": "Remove the Gas Conversion Kit first.",
+    "Tooltip_RenewableEnergy_NeedsTank": "Needs a propane tank.",
+    "Tooltip_RenewableEnergy_NoPower": "Needs power here to run the compressor.",
+    "Tooltip_RenewableEnergy_PumpLimit": "A tire pump can't push a tank any fuller.",
+    "Tooltip_RenewableEnergy_TankFull": "The tank is full.",
+    "Tooltip_RenewableEnergy_NeedsScrubbed": "Past a quarter full, the compressor needs scrubbed gas: charge the scrubber and pack its steel wool.",
+    "Tooltip_RenewableEnergy_HasScrubber": "It already has a scrubber.",
+    "Tooltip_RenewableEnergy_NoScrubber": "Fit a scrubber first.",
+    "Tooltip_RenewableEnergy_FridgeCompressor": "Salvaged from a fridge. Plugged in where there is power, it presses scrubbed biogas into a propane tank.",
+    "Tooltip_RenewableEnergy_GasHeater": "Burns a little biogas from a digester beside it to keep the digester warm, or a cold room.",
+    "Tooltip_RenewableEnergy_NoDigesterNear": "There's no digester with gas beside it.",
+    "Tooltip_RenewableEnergy_NeedsFire": "Needs something to light it with.",
+    "Tooltip_RenewableEnergy_HeaterLit": "It's already lit.",
+    "Tooltip_RenewableEnergy_HeaterOut": "It isn't lit.",
+    "Tooltip_RenewableEnergy_NoHeater": "The heater is gone."
 }

@@ -25,9 +25,10 @@ Debug.ITEMS = {
     "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates", "RenewableEnergy.WoodenBatteryPlatePattern",
     "RenewableEnergy.BatteryPlateMoldUnfired", "RenewableEnergy.BatteryPlateMold", "RenewableEnergy.BatteryElectrolyte",
     "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
-    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2",
+    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
-    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit",
+    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.FridgeCompressor",
+    "RenewableEnergy.GasHeater",
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
@@ -50,6 +51,28 @@ function Debug.isFreeSquare(square, indoors)
     return square ~= nil and square:isFree(false) and square:getVehicleContainer() == nil
         and RenewableEnergy.PowerBank.canPlaceBank(square) == indoors and (indoors or square:isOutside())
         and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrPanel)
+end
+
+-- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos), 8
+-- squares a side.
+local CHUNK_SQUARES = 8
+
+-- Lets this multiplayer client's chunks go of the squares a test generator at x, y, z powered,
+-- before the server's undo switches it off and removes it. That switch-off can miss this client's
+-- copy: it names the generator by its place on the square and isn't ordered with the removal that
+-- follows (SyncIsoObject against RemoveItemFromSquare), and the chunks then keep its squares
+-- powered until they load again.
+function Debug.releaseGeneratorPower(x, y, z)
+    if not isClient() then return end
+    local radius, cell = SandboxVars.GeneratorTileRange, getCell()
+    for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
+        for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do
+            local chunk = cell:getChunk(wx, wy)
+            if chunk then
+                chunk:removeGeneratorPos(x, y, z)
+            end
+        end
+    end
 end
 
 -- An electrician and carpenter who knows every recipe, with a screwdriver and a table to craft at.

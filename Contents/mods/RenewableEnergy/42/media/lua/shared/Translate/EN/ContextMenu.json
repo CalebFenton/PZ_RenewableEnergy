@@ -27,5 +27,15 @@
     "ContextMenu_RenewableEnergy_LineTo": "%1 (%2 squares)",
     "ContextMenu_RenewableEnergy_DisconnectLine": "Disconnect Gas Line",
     "ContextMenu_RenewableEnergy_RunOnGas": "Run on Gas",
-    "ContextMenu_RenewableEnergy_RunOnPetrol": "Run on Gasoline"
+    "ContextMenu_RenewableEnergy_RunOnPetrol": "Run on Gasoline",
+    "ContextMenu_RenewableEnergy_FillByPump": "Fill Propane Tank (Tire Pump)",
+    "ContextMenu_RenewableEnergy_FillByCompressor": "Fill Propane Tank (Compressor)",
+    "ContextMenu_RenewableEnergy_FitScrubber": "Fit Scrubber",
+    "ContextMenu_RenewableEnergy_ChargeScrubber": "Charge Scrubber",
+    "ContextMenu_RenewableEnergy_ChargeScrubberWater": "With Water",
+    "ContextMenu_RenewableEnergy_ChargeScrubberAsh": "With Water and Wood Ash",
+    "ContextMenu_RenewableEnergy_ChargeScrubberLime": "With Water and Quicklime",
+    "ContextMenu_RenewableEnergy_RepackWool": "Repack Steel Wool",
+    "ContextMenu_RenewableEnergy_LightHeater": "Light Gas Heater",
+    "ContextMenu_RenewableEnergy_HeaterOff": "Turn Off Gas Heater"
 }

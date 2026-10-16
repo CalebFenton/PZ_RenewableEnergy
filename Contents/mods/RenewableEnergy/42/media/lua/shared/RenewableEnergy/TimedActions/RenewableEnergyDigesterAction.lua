@@ -27,18 +27,12 @@ local function withinReach(character, object)
         and math.abs(character:getZ() - square:getZ()) < 1
 end
 
--- The digester's summary as this side knows it: the authority reads its record, which a job
--- may have changed since the last summary went out.
-local function summaryOf(self)
-    local record = Digester.recordOf(self.digester)
-    return record and record:buildSummary() or Digester.summaryOf(self.digester)
-end
-
 function Action:getDuration()
     if self.character:isTimedActionInstant() then
         return 1
     end
-    return DigesterJobs.MINUTES[self.job] * RenewableEnergyAction.unitsPerMinute()
+    local summary = self.digester and Digester.currentSummary(self.digester)
+    return DigesterJobs.minutesFor(self.job, summary, self.item) * RenewableEnergyAction.unitsPerMinute()
 end
 
 function Action:isValid()
@@ -61,13 +55,13 @@ end
 
 function Action:update()
     self.character:faceThisObject(self.digester)
-    if self.job == DigesterJobs.TAKE_SLUDGE or self.job == DigesterJobs.UPGRADE then
+    if self.job == DigesterJobs.TAKE_SLUDGE or self.job == DigesterJobs.UPGRADE or self.job == DigesterJobs.FILL_PUMP then
         self.character:setMetabolicTarget(Metabolics.HeavyWork)
     end
 end
 
 function Action:start()
-    if not isClient() and DigesterJobs.refusal(self.character, self.job, summaryOf(self), self.item) then
+    if not isClient() and DigesterJobs.refusal(self.character, self.job, Digester.currentSummary(self.digester), self.item) then
         self:forceStop()
         return
     end
@@ -79,6 +73,9 @@ function Action:start()
         self.sound = self.character:playSound("Hammering")
     elseif self.job == DigesterJobs.SEW_TARP then
         self:setActionAnim("SewingCloth")
+    elseif self.job == DigesterJobs.FILL_PUMP then
+        -- Vanilla has no pump stroke; a tire pump is worked kneeling at a wheel.
+        self:setActionAnim("VehicleWorkOnTire")
     else
         self:setActionAnim("Loot")
         self.character:SetVariable("LootPosition", "Mid")

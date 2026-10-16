@@ -16,6 +16,8 @@ local TOOL_ITEMS = { WRENCH = "Base.Wrench", SCREWDRIVER = "Base.Screwdriver" }
 local function nameOf(need)
     if need.label then
         return need.label
+    elseif need.labelKey then
+        return getText(need.labelKey)
     elseif need.perk then
         return need.perk:getName()
     elseif need.tool then

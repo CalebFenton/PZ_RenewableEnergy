@@ -503,33 +503,15 @@ local function generatorState(self, square, key)
     T.step(function() self[key] = self.server.generatorState end)
 end
 
--- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos), 8
--- squares a side.
-local CHUNK_SQUARES = 8
-
 -- Queues a fuelled generator on `square` from the placeGenerator handler, running if
 -- `opts.running`, with a failsafe beside it if `opts.failsafe`; the server switches it off and
--- removes it when the test ends. On a multiplayer client that switch-off can miss this client's
--- copy: it names the generator by its place on the square and isn't ordered with the removal that
--- follows (SyncIsoObject against RemoveItemFromSquare), and the chunks here then keep its squares
--- powered until they load again. So this client lets go of those squares itself, before the
--- server's undo.
+-- removes it when the test ends, and this client lets go of its squares
+-- (RenewableEnergy.Debug.releaseGeneratorPower).
 local function placeGenerator(self, square, opts)
     local x, y, z = square:getX(), square:getY(), square:getZ()
     T.server(self, "placeGenerator", { x = x, y = y, z = z, running = opts.running, failsafe = opts.failsafe })
     T.step(function()
-        T.defer(self, function()
-            if not isClient() then return end
-            local radius, cell = SandboxVars.GeneratorTileRange, getCell()
-            for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
-                for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do
-                    local chunk = cell:getChunk(wx, wy)
-                    if chunk then
-                        chunk:removeGeneratorPos(x, y, z)
-                    end
-                end
-            end
-        end)
+        T.defer(self, function() RenewableEnergy.Debug.releaseGeneratorPower(x, y, z) end)
     end)
 end
 

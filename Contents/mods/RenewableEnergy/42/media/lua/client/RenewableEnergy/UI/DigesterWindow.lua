@@ -91,6 +91,11 @@ function DigesterWindow.rows(summary)
     add("IGUI_RenewableEnergy_DigesterHopper", tostring(summary.hopper))
     add("IGUI_RenewableEnergy_DigesterSludge", percent(summary.sludge / 100), summary.sludge >= 80 and "warn" or nil)
     add("IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= 1 and "warn" or nil)
+    if summary.scrubber then
+        add("IGUI_RenewableEnergy_DigesterScrubber", getText("IGUI_RenewableEnergy_ScrubberState",
+            string.format("%.1f", summary.scrubCO2), string.format("%.1f", summary.scrubWool)),
+            (summary.scrubCO2 <= 0 or summary.scrubWool <= 0) and "warn" or nil)
+    end
     if summary.leaking then
         add("IGUI_RenewableEnergy_DigesterLeak", getText("IGUI_RenewableEnergy_DigesterLeaking"), "warn")
     end
@@ -113,8 +118,15 @@ function DigesterWindow:prerender()
     local font = UIFont.Small
     local lineHeight = getTextManager():getFontHeight(font) + 2
     local height = self:titleBarHeight() + PAD * 2 + #rows * lineHeight
-    if self:getHeight() ~= height then
+    local labelWidth, valueWidth = 0, 0
+    for _, row in ipairs(rows) do
+        labelWidth = math.max(labelWidth, getTextManager():MeasureStringX(font, row.label))
+        valueWidth = math.max(valueWidth, getTextManager():MeasureStringX(font, row.value))
+    end
+    local width = math.max(WIDTH, PAD * 2 + labelWidth + LABEL_GAP + valueWidth)
+    if self:getHeight() ~= height or self:getWidth() ~= width then
         self:setHeight(height)
+        self:setWidth(width)
     end
     self.rowsToDraw, self.lineHeight = rows, lineHeight
     ISCollapsableWindow.prerender(self)

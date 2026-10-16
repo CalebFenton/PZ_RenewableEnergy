@@ -101,3 +101,15 @@ handler("forgetLiterature", function(player, args)
     player:getReadLiterature():remove(args.title)
     return {}
 end)
+
+-- Forgets the recipes `args.names` until the test ends, when the character knows them again.
+handler("forgetRecipesUntilEnd", function(player, args, defer)
+    PZHarness.Fixtures.forgetRecipes(player, args.names)
+    defer(function() PZHarness.Fixtures.learnRecipes(player, args.names) end)
+    return {}
+end)
+
+-- The character's stat `args.stat` (a CharacterStat field name) as the authority has it.
+handler("characterStat", function(player, args)
+    return { value = player:getStats():get(CharacterStat[args.stat]) }
+end)
