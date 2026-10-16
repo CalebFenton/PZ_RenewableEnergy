@@ -18,6 +18,7 @@ require "RenewableEnergy/Debug/RenewableEnergyDebug"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
@@ -1174,8 +1175,8 @@ local function fitGasKit(generator, source)
         table.insert(given, inventory:AddItem(GasKit.HOSE))
     end
     for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
-        if not GasLines.perform(player, job, generator, source) then
-            print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, source)))
+        if not GasLines.perform(player, job, generator, nil, source) then
+            print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, nil, source)))
         end
     end
     for _, item in ipairs(given) do
@@ -2031,7 +2032,7 @@ local function addTreadmill()
         local tiles = Sprites.treadmill[layout.facing]
         placeTile(here("rear"), tiles.rear)
         shown.treadmill = placeTile(here("console"), tiles.console)
-        shown.treadmill:getModData()[PowerBank.TREADMILL_WIRED] = true
+        shown.treadmill:getModData()[RenewableEnergy.Treadmill.WIRED] = true
         connect(box, shown.treadmill)
         perform("setBankOn", { bank = PowerBank.positionOf(box), on = true })
         return DRAW_FRAMES
@@ -2201,7 +2202,7 @@ function Promo.capture(selection, onDone)
         table.insert(data.recipes, recipeEntry(name))
     end
     -- The build menu's, which recipeNames leaves out.
-    for _, name in ipairs(RenewableEnergy.Debug.ENTITY_RECIPES) do
+    for _, name in ipairs(RenewableEnergy.Debug.buildRecipes()) do
         table.insert(data.recipes, recipeEntry(name, true))
     end
     data.strings = {

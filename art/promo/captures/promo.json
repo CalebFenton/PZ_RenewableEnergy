@@ -277,7 +277,7 @@
     {
       "name": "model_RenewableEnergy_SolarFlat",
       "box": [
-        66,
+        65,
         133,
         446,
         234
@@ -313,7 +313,7 @@
     {
       "name": "model_RenewableEnergy_SolarRackMetal",
       "box": [
-        49,
+        48,
         111,
         330,
         428
@@ -424,7 +424,7 @@
         46,
         46,
         178,
-        166
+        167
       ]
     },
     {
@@ -664,10 +664,10 @@
     {
       "name": "model_RenewableEnergy_HomemadeAlternator",
       "box": [
-        89,
-        89,
-        342,
-        256
+        88,
+        88,
+        340,
+        255
       ]
     },
     {
@@ -5455,6 +5455,294 @@
     },
     {
       "build": {
+        "icon": "icon_build_RenewableEnergy_PropellerWood",
+        "name": "Propeller Wind Charger (Wooden Blades)"
+      },
+      "id": "RenewableEnergy_PropellerWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WeldingMask",
+              "icon": "icon_Base_WeldingMask",
+              "name": "Welder Mask"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.BlowTorch",
+              "icon": "icon_Base_BlowTorch",
+              "name": "Welding Torch"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.WeldingRods",
+              "icon": "icon_Base_WeldingRods",
+              "name": "Welding Rods"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WoodenBlades",
+              "icon": "icon_RenewableEnergy_WoodenBlades",
+              "name": "Carved Wooden Blades"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.TreadmillMotor",
+              "icon": "icon_RenewableEnergy_TreadmillMotor",
+              "name": "Treadmill Motor"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.SheetMetal",
+              "icon": "icon_Base_SheetMetal",
+              "name": "Steel Sheet"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 5,
+            "name": "Welding"
+          },
+          {
+            "level": 4,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #4"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Propeller Wind Charger (Wooden Blades)",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Welding"
+        },
+        {
+          "level": 3,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "build": {
+        "icon": "icon_build_RenewableEnergy_BrickDome",
+        "name": "Brick Dome Digester"
+      },
+      "id": "RenewableEnergy_BrickDome",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MasonsTrowel",
+              "icon": "icon_Base_MasonsTrowel",
+              "name": "Mason's Trowel"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Shovel2",
+              "icon": "icon_Base_Shovel2",
+              "name": "Shovel"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 40,
+          "items": [
+            {
+              "count": 40,
+              "fullType": "Base.ClayBrick",
+              "icon": "icon_Base_ClayBrick",
+              "name": "Brick"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.BucketConcreteFull",
+              "icon": "icon_Base_BucketConcreteFull",
+              "name": "Bucket of Concrete"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": true
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.RubberHose",
+              "icon": "icon_Base_RubberHose",
+              "name": "Rubber Hose"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Pipe",
+              "icon": "icon_Base_Pipe",
+              "name": "Plastic Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 6,
+            "name": "Masonry"
+          },
+          {
+            "level": 5,
+            "name": "Agriculture"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #3"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Brick Dome Digester",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 5,
+          "name": "Masonry"
+        },
+        {
+          "level": 2,
+          "name": "Carpentry"
+        }
+      ]
+    },
+    {
+      "build": {
         "icon": "icon_build_RenewableEnergy_BarrelDigesterSteel",
         "name": "Barrel Digester (Steel Drum)"
       },
@@ -5578,151 +5866,6 @@
         "research": []
       },
       "name": "Barrel Digester (Steel Drum)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 1,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_BarrelDigesterPlastic",
-        "name": "Barrel Digester (Plastic Barrel)"
-      },
-      "id": "RenewableEnergy_BarrelDigesterPlastic",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.HandDrill",
-              "icon": "icon_Base_HandDrill",
-              "name": "Hand Drill"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Mov_OrangeBarrel",
-              "icon": "icon_Base_Mov_OrangeBarrel",
-              "name": "Orange Barrel"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Mov_DarkGreenBarrel",
-              "icon": "icon_Base_Mov_DarkGreenBarrel",
-              "name": "Dark Green Barrel"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Mov_LightGreenBarrel",
-              "icon": "icon_Base_Mov_LightGreenBarrel",
-              "name": "Light Green Barrel"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.RubberHose",
-              "icon": "icon_Base_RubberHose",
-              "name": "Rubber Hose"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Funnel",
-              "icon": "icon_Base_Funnel",
-              "name": "Funnel"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.DuctTape",
-              "icon": "icon_Base_DuctTape",
-              "name": "Duct Tape"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Glue",
-              "icon": "icon_Base_Glue",
-              "name": "Glue"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.Garbagebag",
-              "icon": "icon_Base_Garbagebag",
-              "name": "Garbage Bag"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [
-          {
-            "level": 3,
-            "name": "Agriculture"
-          },
-          {
-            "level": 3,
-            "name": "Mechanics"
-          }
-        ],
-        "autoAll": [],
-        "magazines": [
-          "Homestead Power #3"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Barrel Digester (Plastic Barrel)",
       "outputs": [],
       "skills": [
         {
@@ -5890,554 +6033,6 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_BrickDome",
-        "name": "Brick Dome Digester"
-      },
-      "id": "RenewableEnergy_BrickDome",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.MasonsTrowel",
-              "icon": "icon_Base_MasonsTrowel",
-              "name": "Mason's Trowel"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Shovel2",
-              "icon": "icon_Base_Shovel2",
-              "name": "Shovel"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 40,
-          "items": [
-            {
-              "count": 40,
-              "fullType": "Base.ClayBrick",
-              "icon": "icon_Base_ClayBrick",
-              "name": "Brick"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.BucketConcreteFull",
-              "icon": "icon_Base_BucketConcreteFull",
-              "name": "Bucket of Concrete"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": true
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.RubberHose",
-              "icon": "icon_Base_RubberHose",
-              "name": "Rubber Hose"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Pipe",
-              "icon": "icon_Base_Pipe",
-              "name": "Plastic Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 6,
-            "name": "Masonry"
-          },
-          {
-            "level": 5,
-            "name": "Agriculture"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #3"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Brick Dome Digester",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 5,
-          "name": "Masonry"
-        },
-        {
-          "level": 2,
-          "name": "Carpentry"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_PrimitiveGasifier",
-        "name": "Primitive Gasifier"
-      },
-      "id": "RenewableEnergy_PrimitiveGasifier",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Hammer",
-              "icon": "icon_Base_Hammer",
-              "name": "Claw Hammer"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Mov_BinRound",
-              "icon": "icon_Base_Mov_BinRound",
-              "name": "Round Bin"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Mov_PublicGarbageBin",
-              "icon": "icon_Base_Mov_PublicGarbageBin",
-              "name": "Public Garbage Bin"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Pot",
-              "icon": "icon_Base_Pot",
-              "name": "Cooking Pot"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Bucket",
-              "icon": "icon_Base_Bucket",
-              "name": "Bucket"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.DuctTape",
-              "icon": "icon_Base_DuctTape",
-              "name": "Duct Tape"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 3,
-            "name": "Mechanics"
-          },
-          {
-            "level": 2,
-            "name": "Welding"
-          }
-        ],
-        "magazines": [
-          "FEMA Wood Gas Generator Plans"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Primitive Gasifier",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 2,
-          "name": "Mechanics"
-        },
-        {
-          "level": 1,
-          "name": "Welding"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_Gasifier",
-        "name": "Gasifier"
-      },
-      "id": "RenewableEnergy_Gasifier",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.MetalDrum",
-              "icon": "icon_Base_MetalDrum",
-              "name": "Metal Drum"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Bucket",
-              "icon": "icon_Base_Bucket",
-              "name": "Bucket"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 5,
-            "name": "Welding"
-          },
-          {
-            "level": 4,
-            "name": "Mechanics"
-          }
-        ],
-        "magazines": [
-          "FEMA Wood Gas Generator Plans"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Gasifier",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 4,
-          "name": "Welding"
-        },
-        {
-          "level": 3,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_AdvancedGasifier",
-        "name": "Advanced Gasifier"
-      },
-      "id": "RenewableEnergy_AdvancedGasifier",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Hammer",
-              "icon": "icon_Base_Hammer",
-              "name": "Claw Hammer"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.IronBar",
-              "icon": "icon_Base_IronBar",
-              "name": "Iron Bar"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Bucket",
-              "icon": "icon_Base_Bucket",
-              "name": "Bucket"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 7,
-            "name": "Welding"
-          },
-          {
-            "level": 4,
-            "name": "Blacksmithing"
-          },
-          {
-            "level": 5,
-            "name": "Mechanics"
-          }
-        ],
-        "magazines": [
-          "FEMA Wood Gas Generator Plans"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Advanced Gasifier",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 6,
-          "name": "Welding"
-        },
-        {
-          "level": 3,
-          "name": "Blacksmithing"
-        },
-        {
-          "level": 4,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_ScoopRotor",
         "name": "Scoop Rotor Wind Charger"
       },
@@ -6583,171 +6178,6 @@
         },
         {
           "level": 2,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_PropellerWood",
-        "name": "Propeller Wind Charger (Wooden Blades)"
-      },
-      "id": "RenewableEnergy_PropellerWood",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.WoodenBlades",
-              "icon": "icon_RenewableEnergy_WoodenBlades",
-              "name": "Carved Wooden Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.TreadmillMotor",
-              "icon": "icon_RenewableEnergy_TreadmillMotor",
-              "name": "Treadmill Motor"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 5,
-            "name": "Welding"
-          },
-          {
-            "level": 4,
-            "name": "Electrical"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Propeller Wind Charger (Wooden Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 3,
-          "name": "Welding"
-        },
-        {
-          "level": 3,
           "name": "Electrical"
         }
       ]
@@ -6919,6 +6349,439 @@
     },
     {
       "build": {
+        "icon": "icon_build_RenewableEnergy_BarrelDigesterPlastic",
+        "name": "Barrel Digester (Plastic Barrel)"
+      },
+      "id": "RenewableEnergy_BarrelDigesterPlastic",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Mov_OrangeBarrel",
+              "icon": "icon_Base_Mov_OrangeBarrel",
+              "name": "Orange Barrel"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Mov_DarkGreenBarrel",
+              "icon": "icon_Base_Mov_DarkGreenBarrel",
+              "name": "Dark Green Barrel"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Mov_LightGreenBarrel",
+              "icon": "icon_Base_Mov_LightGreenBarrel",
+              "name": "Light Green Barrel"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.RubberHose",
+              "icon": "icon_Base_RubberHose",
+              "name": "Rubber Hose"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Funnel",
+              "icon": "icon_Base_Funnel",
+              "name": "Funnel"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.DuctTape",
+              "icon": "icon_Base_DuctTape",
+              "name": "Duct Tape"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Glue",
+              "icon": "icon_Base_Glue",
+              "name": "Glue"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Garbagebag",
+              "icon": "icon_Base_Garbagebag",
+              "name": "Garbage Bag"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 3,
+            "name": "Agriculture"
+          },
+          {
+            "level": 3,
+            "name": "Mechanics"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #3"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Barrel Digester (Plastic Barrel)",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Mechanics"
+        }
+      ]
+    },
+    {
+      "build": {
+        "icon": "icon_build_RenewableEnergy_AdvancedGasifier",
+        "name": "Advanced Gasifier"
+      },
+      "id": "RenewableEnergy_AdvancedGasifier",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WeldingMask",
+              "icon": "icon_Base_WeldingMask",
+              "name": "Welder Mask"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.BlowTorch",
+              "icon": "icon_Base_BlowTorch",
+              "name": "Welding Torch"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.WeldingRods",
+              "icon": "icon_Base_WeldingRods",
+              "name": "Welding Rods"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.SheetMetal",
+              "icon": "icon_Base_SheetMetal",
+              "name": "Steel Sheet"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.IronBar",
+              "icon": "icon_Base_IronBar",
+              "name": "Iron Bar"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Bucket",
+              "icon": "icon_Base_Bucket",
+              "name": "Bucket"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 7,
+            "name": "Welding"
+          },
+          {
+            "level": 4,
+            "name": "Blacksmithing"
+          },
+          {
+            "level": 5,
+            "name": "Mechanics"
+          }
+        ],
+        "magazines": [
+          "FEMA Wood Gas Generator Plans"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Advanced Gasifier",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 6,
+          "name": "Welding"
+        },
+        {
+          "level": 3,
+          "name": "Blacksmithing"
+        },
+        {
+          "level": 4,
+          "name": "Mechanics"
+        }
+      ]
+    },
+    {
+      "build": {
+        "icon": "icon_build_RenewableEnergy_PrimitiveGasifier",
+        "name": "Primitive Gasifier"
+      },
+      "id": "RenewableEnergy_PrimitiveGasifier",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Mov_BinRound",
+              "icon": "icon_Base_Mov_BinRound",
+              "name": "Round Bin"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Mov_PublicGarbageBin",
+              "icon": "icon_Base_Mov_PublicGarbageBin",
+              "name": "Public Garbage Bin"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Pot",
+              "icon": "icon_Base_Pot",
+              "name": "Cooking Pot"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Bucket",
+              "icon": "icon_Base_Bucket",
+              "name": "Bucket"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.DuctTape",
+              "icon": "icon_Base_DuctTape",
+              "name": "Duct Tape"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 3,
+            "name": "Mechanics"
+          },
+          {
+            "level": 2,
+            "name": "Welding"
+          }
+        ],
+        "magazines": [
+          "FEMA Wood Gas Generator Plans"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Primitive Gasifier",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 2,
+          "name": "Mechanics"
+        },
+        {
+          "level": 1,
+          "name": "Welding"
+        }
+      ]
+    },
+    {
+      "build": {
         "icon": "icon_build_RenewableEnergy_AlternatorWindCharger",
         "name": "Homemade Alternator Wind Charger"
       },
@@ -7079,6 +6942,143 @@
         {
           "level": 5,
           "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "build": {
+        "icon": "icon_build_RenewableEnergy_Gasifier",
+        "name": "Gasifier"
+      },
+      "id": "RenewableEnergy_Gasifier",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WeldingMask",
+              "icon": "icon_Base_WeldingMask",
+              "name": "Welder Mask"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.BlowTorch",
+              "icon": "icon_Base_BlowTorch",
+              "name": "Welding Torch"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.WeldingRods",
+              "icon": "icon_Base_WeldingRods",
+              "name": "Welding Rods"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MetalDrum",
+              "icon": "icon_Base_MetalDrum",
+              "name": "Metal Drum"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.SheetMetal",
+              "icon": "icon_Base_SheetMetal",
+              "name": "Steel Sheet"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Bucket",
+              "icon": "icon_Base_Bucket",
+              "name": "Bucket"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 5,
+            "name": "Welding"
+          },
+          {
+            "level": 4,
+            "name": "Mechanics"
+          }
+        ],
+        "magazines": [
+          "FEMA Wood Gas Generator Plans"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Gasifier",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Welding"
+        },
+        {
+          "level": 3,
+          "name": "Mechanics"
         }
       ]
     }
