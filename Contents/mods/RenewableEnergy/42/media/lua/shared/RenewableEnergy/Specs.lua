@@ -40,7 +40,7 @@ Specs.charger = "Base.CarBatteryCharger"
 -- controller adds. Every source takes slots by what it can make (`sourceSlots`, by kind).
 Specs.freeSlots = 2
 Specs.slotsPerController = 7
-Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1 }
+Specs.sourceSlots = { flat = 1, wall = 1, rack = 1, scoop = 1, treadmill = 1 }
 
 -- Wind chargers by kind (RenewableEnergy.Wind): watts at the rated speed, the wind it starts
 -- turning in and the wind it makes its rating in, in km/h. The game's wind runs
@@ -56,6 +56,16 @@ Specs.wind = {
     -- Shelter counts the squares this far around; hemmed in all round, it loses this share.
     shelterRadius = 8,
     shelterLoss = 0.7,
+}
+
+-- A treadmill wired to a bank (RenewableEnergy.Treadmill): what wiring it takes (as a bank part's,
+-- Specs.wiring), the watts a runner puts in (an hour of running is about an hour of TV), how long
+-- one run lasts, and what an hour of it costs and teaches.
+Specs.treadmill = {
+    wiring = { seconds = 90, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 2, xp = 10 },
+    watts = 75, runMinutes = 30,
+    endurancePerHour = 0.6, thirstPerHour = 0.2,
+    xpPerHour = { Fitness = 20, Sprinting = 15 },
 }
 
 -- Watts each Car Battery Charger wired into a bank puts in while grid or generator power

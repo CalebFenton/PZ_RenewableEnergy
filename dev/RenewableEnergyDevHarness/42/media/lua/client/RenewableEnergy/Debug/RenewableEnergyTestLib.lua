@@ -71,11 +71,16 @@ function T.bank(self, kind, items, opts)
     return bank
 end
 
+-- A source on the square, or a treadmill not yet wired to be one.
+local function placedOn(square)
+    return PowerBank.sourceOn(square) or PowerBank.treadmillOn(square)
+end
+
 -- Whether this client has its copy of the panel and, if it was connected, sees the bank's summary
 -- list it.
 local function panelArrived(panel, bank)
     local here = panel.position
-    return PowerBank.sourceOn(panel.square) ~= nil
+    return placedOn(panel.square) ~= nil
         and (not panel.connected or PowerBank.samePosition(PowerBank.bankOfSource(here.x, here.y, here.z), bank.position))
 end
 
@@ -84,7 +89,7 @@ end
 --- cursor places one and, when `opts.connect`, connected by the server's character to the bank
 --- handle `opts.near`. Returns its handle { square, position }; the server's answer fills in
 --- `connected` and `reason` (the refusal), and `object` is this client's copy once it has arrived,
---- connection included.
+--- connection included. Any source tile goes; a treadmill's comes wired when `opts.wired`.
 function T.panel(self, sprite, opts)
     opts = opts or {}
     local square = (T.squares(self, 1, { near = squareOf(opts.near) }) or {})[1]
@@ -94,13 +99,13 @@ function T.panel(self, sprite, opts)
     local panel = { square = square, position = positionOf(square) }
     local bank = opts.connect and opts.near
     T.server(self, "placePanel", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = sprite,
-        modules = opts.modules, bank = bank and bank.position })
+        modules = opts.modules, bank = bank and bank.position, wired = opts.wired })
     T.step(function()
         panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason
     end)
     T.waitUntil(function() return panelArrived(panel, bank) end, COPY_FRAMES)
     T.step(function()
-        panel.object = T.need(self, panelArrived(panel, bank) and PowerBank.sourceOn(square), "this client's copy of the panel")
+        panel.object = T.need(self, panelArrived(panel, bank) and placedOn(square), "this client's copy of the panel")
     end)
     return panel
 end

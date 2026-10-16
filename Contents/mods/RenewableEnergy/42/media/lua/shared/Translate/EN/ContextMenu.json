@@ -45,5 +45,7 @@
     "ContextMenu_RenewableEnergy_DrainCondensate": "Drain Condensate",
     "ContextMenu_RenewableEnergy_OntoGround": "Onto the Ground",
     "ContextMenu_RenewableEnergy_Brake": "Set the Brake",
-    "ContextMenu_RenewableEnergy_ReleaseBrake": "Release the Brake"
+    "ContextMenu_RenewableEnergy_ReleaseBrake": "Release the Brake",
+    "ContextMenu_RenewableEnergy_WireTreadmill": "Wire to a Bank",
+    "ContextMenu_RenewableEnergy_RunOnTreadmill": "Run on Treadmill"
 }

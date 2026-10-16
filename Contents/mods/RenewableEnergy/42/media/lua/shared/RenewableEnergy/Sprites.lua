@@ -85,6 +85,15 @@ Sprites.gasifierPipeGen = { N = tile(260), E = tile(261), S = tile(262), W = til
 -- (scripts SpriteModels.txt: RenewableEnergy.ScoopRotor0 to 5, the rotor turned 30 degrees a step).
 Sprites.windScoop = tile(264)
 
+-- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles in each of four facings, by the way
+-- a runner on it faces (the tiles' Facing): the console end, and the rear end the runner stands on.
+Sprites.treadmill = {
+    W = { console = "recreational_sports_01_28", rear = "recreational_sports_01_29" },
+    N = { console = "recreational_sports_01_31", rear = "recreational_sports_01_30" },
+    E = { console = "recreational_sports_01_37", rear = "recreational_sports_01_36" },
+    S = { console = "recreational_sports_01_38", rear = "recreational_sports_01_39" },
+}
+
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
 Sprites.snow = {
     flat = tile(16),
@@ -150,6 +159,11 @@ for _, mount in ipairs({ "wall", "rack" }) do
 end
 for field in pairs(Sprites.bankFill) do
     KINDS[Sprites[field]] = { field, nil, field:find("Wood$") and "wood" or "metal" }
+end
+for facing, ends in pairs(Sprites.treadmill) do
+    for part, name in pairs(ends) do
+        KINDS[name] = { "treadmill", facing, part }
+    end
 end
 
 local function addAll(set, names)

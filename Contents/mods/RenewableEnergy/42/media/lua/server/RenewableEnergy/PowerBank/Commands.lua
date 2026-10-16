@@ -65,7 +65,7 @@ function Commands.connectSource(player, args)
     local source = sourceAt(args.source)
     if not (bank and source) then return false, "no bank or source" end
     local x, y, z = source:getX(), source:getY(), source:getZ()
-    if not (source:getSquare():isOutside() and PowerBank.isInReach(bank, x, y, z)) then
+    if not (PowerBank.sourceSquareOk(source:getSquare(), PowerBank.sourceKind(source)) and PowerBank.isInReach(bank, x, y, z)) then
         return false, "out of reach"
     end
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
@@ -91,7 +91,7 @@ function Commands.connectSource(player, args)
             source:transmitModData()
             addXp(player, Perks.Electricity, Specs.connectXp * PowerBank.slotsOf(kind))
         end
-    else
+    elseif PowerBank.isPanel(kind) then
         -- Each module teaches a little the first time it is ever connected, and the record keeps
         -- that, through moves between banks and with the module when it comes off its mount.
         local modules = PowerBank.modulesOf(source, kind)
@@ -142,6 +142,34 @@ function Commands.setBrake(player, args)
     else
         PowerBank.setBraked(object, args.braked == true)
     end
+    return true
+end
+
+--- Wires the treadmill tile at `args.source` to feed a bank, from the player's wire and scrap.
+function Commands.wireTreadmill(player, args)
+    local object = isPosition(args.source) and PowerBank.treadmillOn(getSquare(args.source.x, args.source.y, args.source.z))
+    if not (player and object) then return false, "no treadmill" end
+    if PowerBank.isWiredTreadmill(object) then return false, "already wired" end
+    local short = RenewableEnergy.firstUnmet(PowerBank.treadmillNeeds(player))
+    if short then return false, short.kind end
+    local wiring = Specs.treadmill.wiring
+    consume(player, PowerBank.WIRE, wiring.wire)
+    consume(player, PowerBank.SCRAP, wiring.scrap)
+    object:getModData()[PowerBank.TREADMILL_WIRED] = true
+    object:transmitModData()
+    addXp(player, Perks.Electricity, wiring.xp)
+    return true
+end
+
+--- Banks `args.hours` of running on the wired treadmill at `args.source` with the bank it feeds,
+--- for that bank's next pass. Runs from the treadmill action's own clock on the authority.
+function Commands.runTreadmill(player, args)
+    local object = sourceAt(args.source)
+    if not (object and PowerBank.sourceKind(object) == "treadmill") then return false, "no treadmill" end
+    local bank = bankOfSource(args.source)
+    if not bank then return false, "not connected" end
+    local hours = math.max(0, math.min(tonumber(args.hours) or 0, Specs.treadmill.runMinutes / 60))
+    bank:creditRun(args.source.x, args.source.y, args.source.z, Specs.treadmill.watts * hours)
     return true
 end
 

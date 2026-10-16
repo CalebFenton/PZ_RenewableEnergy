@@ -1,7 +1,8 @@
--- Right-click menus for battery banks, the panels connected to them, garden lights and vehicles.
--- Each option queues a RenewableEnergyAction, which walks the character over and does the job,
--- except Repair Frame, which walks over and queues vanilla's fixing. Parts go into a bank and come
--- out only through Wire In and Unwire here (see RenewableEnergy/Patches.lua).
+-- Right-click menus for battery banks, the panels, wind chargers and treadmills connected to them,
+-- garden lights and vehicles. Each option queues a RenewableEnergyAction, which walks the
+-- character over and does the job, except Repair Frame, which walks over and queues vanilla's
+-- fixing, and Run on Treadmill. Parts go into a bank and come out only through Wire In and Unwire
+-- here (see RenewableEnergy/Patches.lua).
 
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
@@ -12,6 +13,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/StatusWindow"
@@ -27,8 +29,12 @@ local Format = RenewableEnergy.Format
 local Needs = RenewableEnergy.Needs
 local StatusWindow = RenewableEnergy.StatusWindow
 
---- The name of the item a placed tile is: its CustomItem, which picking it up gives back.
+--- The name of the item a placed tile is: its CustomItem, which picking it up gives back. A
+--- vanilla treadmill has none.
 function Menu.nameOf(isoObject)
+    if PowerBank.isTreadmill(isoObject) then
+        return getText("IGUI_RenewableEnergy_Treadmill")
+    end
     return getItemNameFromFullType(isoObject:getProperties():get("CustomItem"))
 end
 
@@ -235,7 +241,8 @@ function Menu.unconnectedSources(bank)
         local objects = square:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)
-            if PowerBank.sourceKind(object) and square:isOutside()
+            local kind = PowerBank.sourceKind(object)
+            if kind and PowerBank.sourceSquareOk(square, kind)
                 and PowerBank.isInReach(here, square:getX(), square:getY(), square:getZ())
                 and not connected[square:getX() .. "," .. square:getY() .. "," .. square:getZ()] then
                 table.insert(found, object)
@@ -324,7 +331,8 @@ function Menu.addSourceOptions(playerNum, context, source)
     addBrakeOption(playerNum, menu, source)
 
     local offered = 0
-    for _, bankPosition in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ())) do
+    local kind = PowerBank.sourceKind(source)
+    for _, bankPosition in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ(), kind)) do
         local bank = PowerBank.bankOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
         if bank and not PowerBank.samePosition(connected, bankPosition) then
             menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectPanel", Menu.bankLabel(bank), Format.away(here, bankPosition)),
@@ -334,8 +342,8 @@ function Menu.addSourceOptions(playerNum, context, source)
     end
     if offered == 0 and not connected then
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectToBank"))
-        local outdoors = source:getSquare():isOutside()
-        disable(option, getText(outdoors and "Tooltip_RenewableEnergy_NoBankInReach" or "Tooltip_RenewableEnergy_PanelIndoors"))
+        local placed = PowerBank.sourceSquareOk(source:getSquare(), kind)
+        disable(option, getText(placed and "Tooltip_RenewableEnergy_NoBankInReach" or "Tooltip_RenewableEnergy_PanelIndoors"))
     end
     return menu
 end
@@ -445,7 +453,7 @@ end
 -- The bank, the panel and the garden light among the clicked objects and the squares they stand
 -- on.
 local function findTargets(worldobjects)
-    local bank, source, light, seen = nil, nil, nil, {}
+    local bank, source, light, treadmill, seen = nil, nil, nil, nil, {}
     for _, clicked in ipairs(worldobjects) do
         local square = clicked:getSquare()
         if square and not seen[square] then
@@ -459,11 +467,54 @@ local function findTargets(worldobjects)
                     source = object
                 elseif not light and SolarGardenLight.isLight(object) then
                     light = object
+                elseif not treadmill and PowerBank.isTreadmill(object) then
+                    treadmill = object
                 end
             end
         end
     end
-    return bank, source, light
+    return bank, source, light, treadmill
+end
+
+-- The wired tile of the treadmill whose loose tile is `object`: a treadmill is two tiles and only
+-- one is wired. Nil when neither is. A treadmill beside it is not its other half unless both
+-- tiles put the treadmill's ends in the same places.
+local function wiredHalf(object)
+    local rear, console = PowerBank.treadmillEnds(object)
+    local square = object:getSquare()
+    local other = (square:getX() == rear.x and square:getY() == rear.y) and console or rear
+    local found = PowerBank.sourceOn(getSquare(other.x, other.y, square:getZ()))
+    if not (found and PowerBank.sourceKind(found) == "treadmill") then
+        return nil
+    end
+    local foundRear, foundConsole = PowerBank.treadmillEnds(found)
+    if PowerBank.samePosition(foundRear, rear) and PowerBank.samePosition(foundConsole, console) then
+        return found
+    end
+    return nil
+end
+
+local function queueRun(playerNum, treadmill)
+    local character = getSpecificPlayer(playerNum)
+    if luautils.walkAdj(character, treadmill:getSquare(), true) then
+        ISTimedActionQueue.add(RenewableEnergyTreadmillAction:new(character, treadmill))
+    end
+end
+
+-- Run on Treadmill, for a wired treadmill, into its menu; it runs only for a bank.
+local function addRunOption(playerNum, menu, treadmill)
+    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
+    if not Action.connectedBank(treadmill) then
+        disable(option, getText("Tooltip_RenewableEnergy_TreadmillNotConnected"))
+    end
+end
+
+-- Wire to Bank, for a treadmill neither of whose tiles is wired yet.
+function Menu.addTreadmillOptions(playerNum, context, treadmill)
+    local menu = addSubMenu(context, Menu.nameOf(treadmill))
+    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireTreadmill"), playerNum, queueSource,
+        Action.WIRE_TREADMILL, treadmill)
+    showNeeds(option, PowerBank.treadmillNeeds(getSpecificPlayer(playerNum)))
 end
 
 -- The generator vanilla would have offered its menu on had the bank not been there.
@@ -503,10 +554,13 @@ function Menu.onPreFill(playerNum, context, worldobjects, test)
 end
 
 function Menu.onFill(playerNum, context, worldobjects, test)
-    local bank, source, light = findTargets(worldobjects)
+    local bank, source, light, treadmill = findTargets(worldobjects)
+    if treadmill and not source then
+        source = wiredHalf(treadmill)
+    end
     local character = getSpecificPlayer(playerNum)
     local vehicle = not character:getVehicle() and IsoObjectPicker.Instance:PickVehicle(getMouseXScaled(), getMouseYScaled())
-    if not (bank or source or light or vehicle) then
+    if not (bank or source or light or treadmill or vehicle) then
         return
     end
     if test then
@@ -515,8 +569,15 @@ function Menu.onFill(playerNum, context, worldobjects, test)
     if bank then
         Menu.addBankOptions(playerNum, context, bank)
     end
+    local wiredTreadmill = source and PowerBank.sourceKind(source) == "treadmill"
     if source then
-        Menu.addSourceOptions(playerNum, context, source)
+        local menu = Menu.addSourceOptions(playerNum, context, source)
+        if wiredTreadmill then
+            addRunOption(playerNum, menu, source)
+        end
+    end
+    if treadmill and not wiredTreadmill then
+        Menu.addTreadmillOptions(playerNum, context, treadmill)
     end
     if light then
         Menu.addGardenLightOptions(playerNum, context, light)

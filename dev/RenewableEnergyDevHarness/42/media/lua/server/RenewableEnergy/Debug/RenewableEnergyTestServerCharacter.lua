@@ -113,3 +113,28 @@ end)
 handler("characterStat", function(player, args)
     return { value = player:getStats():get(CharacterStat[args.stat]) }
 end)
+
+-- Sets the character's stat `args.stat` to `args.value` on the authority, and sends it, until the
+-- test ends, when it is put back.
+handler("setCharacterStatUntilEnd", function(player, args, defer)
+    local stat = CharacterStat[args.stat]
+    local stats = player:getStats()
+    local function send()
+        if isServer() then
+            syncPlayerStats(player, SyncPlayerStatsPacket.getBitMaskForStat(stat))
+        end
+    end
+    local before = stats:get(stat)
+    stats:set(stat, args.value)
+    send()
+    defer(function()
+        stats:set(stat, before)
+        send()
+    end)
+    return {}
+end)
+
+-- The character's XP in the perk `args.perk` (a Perks field name) as the authority has it.
+handler("perkXp", function(player, args)
+    return { value = player:getXp():getXP(Perks[args.perk]) }
+end)

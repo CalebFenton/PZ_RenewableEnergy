@@ -35,9 +35,11 @@ PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
 PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
 -- Placed wind charger modData: its brake is on.
 PowerBank.BRAKED = "RenewableEnergy_braked"
+-- Treadmill tile modData: the tile wired to feed a bank (one of its two tiles).
+PowerBank.TREADMILL_WIRED = "RenewableEnergy_treadmillWired"
 
--- Panels by mount, and wind chargers by kind (Specs.wind.turbines).
-local SOURCE_KINDS = { flat = true, wall = true, rack = true }
+-- Panels by mount, wind chargers by kind (Specs.wind.turbines), and wired treadmills.
+local SOURCE_KINDS = { flat = true, wall = true, rack = true, treadmill = true }
 for kind in pairs(Specs.wind.turbines) do
     SOURCE_KINDS[kind] = true
 end
@@ -74,13 +76,52 @@ function PowerBank.bankOn(square)
 end
 
 --- The kind of a placed source: a panel's mount, "flat", "wall" or "rack", the way it faces and
---- what it is made of; or a wind charger's kind (Specs.wind.turbines). Nil for anything else.
+--- what it is made of; a wind charger's kind (Specs.wind.turbines); or "treadmill" and the way its
+--- runner faces, for a treadmill's tile wired to feed a bank. Nil for anything else.
 function PowerBank.sourceKind(isoObject)
     local kind, facing, material = Sprites.kindOf(Sprites.nameOf(isoObject))
-    if SOURCE_KINDS[kind] then
-        return kind, facing, material
+    if not SOURCE_KINDS[kind] then
+        return nil
     end
-    return nil
+    if kind == "treadmill" and not PowerBank.isWiredTreadmill(isoObject) then
+        return nil
+    end
+    return kind, facing, material
+end
+
+function PowerBank.isTreadmill(isoObject)
+    return Sprites.kindOf(Sprites.nameOf(isoObject)) == "treadmill"
+end
+
+function PowerBank.isWiredTreadmill(isoObject)
+    return isoObject:getModData()[PowerBank.TREADMILL_WIRED] == true
+end
+
+-- A step in each facing, in squares.
+local FACING_STEPS = { N = { 0, -1 }, S = { 0, 1 }, E = { 1, 0 }, W = { -1, 0 } }
+
+--- Where the treadmill of the tile `isoObject` has its rear end, which the runner stands on, and
+--- its console end, as { x, y } each, and the step from rear to console, the way the runner faces
+--- (Sprites.treadmill).
+function PowerBank.treadmillEnds(isoObject)
+    local _, facing, part = Sprites.kindOf(Sprites.nameOf(isoObject))
+    local step = FACING_STEPS[facing]
+    local square = isoObject:getSquare()
+    local x, y = square:getX(), square:getY()
+    if part == "console" then
+        x, y = x - step[1], y - step[2]
+    end
+    return { x = x, y = y }, { x = x + step[1], y = y + step[2] }, step
+end
+
+--- Whether a source of `kind` must stand outdoors: panels and wind chargers do, a treadmill not.
+function PowerBank.needsOutdoors(kind)
+    return kind ~= "treadmill"
+end
+
+--- Whether a source of `kind` is a panel mount (Specs.mounts), with modules.
+function PowerBank.isPanel(kind)
+    return kind ~= nil and Specs.mounts[kind] ~= nil
 end
 
 function PowerBank.isWind(kind)
@@ -109,6 +150,11 @@ end
 --- The placed panel on a square, or nil.
 function PowerBank.sourceOn(square)
     return RenewableEnergy.findObjectOn(square, isSource)
+end
+
+--- A treadmill's tile on `square`, wired or not.
+function PowerBank.treadmillOn(square)
+    return RenewableEnergy.findObjectOn(square, PowerBank.isTreadmill)
 end
 
 local function copyModule(module)
@@ -309,11 +355,8 @@ local function addNeed(needs, need)
     end
 end
 
---- What wiring a part of type `fullType` into a bank takes of `character`
---- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
---- Scrap.
-function PowerBank.wiringNeeds(character, fullType)
-    local wiring = PowerBank.wiringFor(fullType)
+-- What `wiring` (as Specs.wiring's) takes of `character`.
+local function needsOf(character, wiring)
     local inventory = character:getInventory()
     local needs = {}
     addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = wiring.skill })
@@ -321,6 +364,18 @@ function PowerBank.wiringNeeds(character, fullType)
     addNeed(needs, { kind = "wire", item = PowerBank.WIRE, have = inventory:getCountTypeRecurse(PowerBank.WIRE), need = wiring.wire })
     addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = inventory:getCountTypeRecurse(PowerBank.SCRAP), need = wiring.scrap })
     return needs
+end
+
+--- What wiring a part of type `fullType` into a bank takes of `character`
+--- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
+--- Scrap.
+function PowerBank.wiringNeeds(character, fullType)
+    return needsOf(character, PowerBank.wiringFor(fullType))
+end
+
+--- What wiring a treadmill to feed a bank takes of `character`, as wiringNeeds.
+function PowerBank.treadmillNeeds(character)
+    return needsOf(character, Specs.treadmill.wiring)
 end
 
 --- What keeps `character` from wiring `item` into the bank `bankObject` now whatever they
@@ -449,11 +504,16 @@ function PowerBank.isInReach(bank, x, y, z)
         and math.abs(z - bank.z) <= reach.levels
 end
 
---- Banks a panel on this square may be connected to.
-function PowerBank.banksInReach(x, y, z)
+--- Whether a source of `kind` may feed a bank from `square`: outdoors, unless it is a kind that
+--- works indoors (PowerBank.needsOutdoors).
+function PowerBank.sourceSquareOk(square, kind)
+    return square ~= nil and (square:isOutside() or not PowerBank.needsOutdoors(kind))
+end
+
+--- Banks a source of `kind` on this square may be connected to.
+function PowerBank.banksInReach(x, y, z, kind)
     local found = {}
-    local square = getSquare(x, y, z)
-    if not (square and square:isOutside()) then
+    if not PowerBank.sourceSquareOk(getSquare(x, y, z), kind) then
         return found
     end
     eachBank(function(bank)

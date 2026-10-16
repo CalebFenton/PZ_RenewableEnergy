@@ -98,5 +98,6 @@
     "Tooltip_RenewableEnergy_NoCondensate": "There's no condensate to drain.",
     "Tooltip_RenewableEnergy_WontTakeCondensate": "That won't take it. Drained hot, it needs metal, glass or a pot.",
     "Tooltip_RenewableEnergy_TreadmillMotor": "A treadmill's motor. Turn it and it makes power: the generator of a homemade wind charger.",
-    "Tooltip_RenewableEnergy_ScoopRotor": "Two half-drum scoops turning a treadmill motor on a short pole. Weak and slow, but it takes any wind and never needs the brake. Connect it to a bank like a panel."
+    "Tooltip_RenewableEnergy_ScoopRotor": "Two half-drum scoops turning a treadmill motor on a short pole. Weak and slow, but it takes any wind and never needs the brake. Connect it to a bank like a panel.",
+    "Tooltip_RenewableEnergy_TreadmillNotConnected": "Connect it to a bank first, or the running goes nowhere."
 }

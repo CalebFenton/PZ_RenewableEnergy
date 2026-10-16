@@ -152,6 +152,10 @@ local function powerRows(rows, status)
             Format.watts(status.windW), status.windKph))
         row(rows, getText("IGUI_RenewableEnergy_WindToday"), Format.wattHours(status.windWhToday))
     end
+    if status.runW > 0 or status.runWhToday > 0 then
+        row(rows, getText("IGUI_RenewableEnergy_TreadmillsNow"), Format.watts(status.runW))
+        row(rows, getText("IGUI_RenewableEnergy_TreadmillsToday"), Format.wattHours(status.runWhToday))
+    end
     if status.chargerW > 0 then
         row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
     end
@@ -270,12 +274,14 @@ local function batteryRows(rows, status)
     end
 end
 
+-- Panels by mount and material, and the treadmill, which has neither.
 local MOUNTS = {
     flat = "IGUI_RenewableEnergy_MountFlat",
     wallwood = "IGUI_RenewableEnergy_MountWallWood",
     wallmetal = "IGUI_RenewableEnergy_MountWallMetal",
     rackwood = "IGUI_RenewableEnergy_MountRackWood",
     rackmetal = "IGUI_RenewableEnergy_MountRackMetal",
+    treadmill = "IGUI_RenewableEnergy_Treadmill",
 }
 
 -- Wind chargers by kind.
@@ -295,20 +301,23 @@ local REASONS = {
     braked = { key = "IGUI_RenewableEnergy_ReasonBraked", fixable = true },
     calm = { key = "IGUI_RenewableEnergy_ReasonCalm" },
     sheltered = { key = "IGUI_RenewableEnergy_ReasonSheltered", fixable = true },
+    idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }
 
---- "Wooden rack, 6 tiles north-east": a panel or wind charger from Bank status `sources`, from
---- the bank at `bank`.
+--- "Wooden rack, 6 tiles north-east": a panel, wind charger or treadmill from Bank status
+--- `sources`, from the bank at `bank`.
 function StatusWindow.panelLabel(source, bank)
     local name = WIND_KINDS[source.kind] or MOUNTS[source.kind .. (source.material or "")] or MOUNTS.flat
     return getText("IGUI_RenewableEnergy_PanelWhere", getText(name), Format.away(bank, source))
 end
 
---- "45 W, 64% sun, cloudy" or "30 W, 25 km/h", and its color.
+--- "45 W, 64% sun, cloudy", "30 W, 25 km/h" or "75 W", and its color.
 function StatusWindow.panelValue(source)
     local value
     if WIND_KINDS[source.kind] then
         value = getText("IGUI_RenewableEnergy_WindOutput", Format.watts(source.watts), source.windKph)
+    elseif source.kind == "treadmill" then
+        value = Format.watts(source.watts)
     else
         value = getText("IGUI_RenewableEnergy_PanelOutput", Format.watts(source.watts), source.fullSunPct)
     end

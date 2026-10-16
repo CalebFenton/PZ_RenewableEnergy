@@ -96,7 +96,8 @@ handler("placeBank", function(_, args, defer)
     return position
 end)
 
--- RenewableEnergyTest.panel's handler. Answers whether the panel connected and the refusal.
+-- RenewableEnergyTest.panel's handler, for any source tile: a treadmill's comes wired when
+-- `args.wired`. Answers whether the source connected and the refusal.
 handler("placePanel", function(player, args, defer)
     local PowerBank = RenewableEnergy.PowerBank
     local square = squareAt(args)
@@ -107,10 +108,14 @@ handler("placePanel", function(player, args, defer)
     if args.modules then
         panel:getModData()[PowerBank.MODULES] = args.modules
     end
+    if args.wired then
+        panel:getModData()[PowerBank.TREADMILL_WIRED] = true
+    end
     square:AddTileObject(panel)
     defer(function()
         if panel:getObjectIndex() ~= -1 then
-            square:transmitRemoveItemFromSquare(panel)
+            -- Not "safely": that refuses one tile of a multi-tile object (a treadmill's) placed alone.
+            square:transmitRemoveItemFromSquare(panel, false)
         end
     end)
     if isServer() then

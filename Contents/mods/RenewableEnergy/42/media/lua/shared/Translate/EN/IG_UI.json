@@ -181,5 +181,9 @@
     "IGUI_RenewableEnergy_WindScoop": "Scoop rotor",
     "IGUI_RenewableEnergy_ReasonBraked": "braked",
     "IGUI_RenewableEnergy_ReasonCalm": "too little wind",
-    "IGUI_RenewableEnergy_ReasonSheltered": "sheltered"
+    "IGUI_RenewableEnergy_ReasonSheltered": "sheltered",
+    "IGUI_RenewableEnergy_Treadmill": "Treadmill",
+    "IGUI_RenewableEnergy_TreadmillsNow": "Treadmills now",
+    "IGUI_RenewableEnergy_TreadmillsToday": "Treadmills today",
+    "IGUI_RenewableEnergy_ReasonIdle": "nobody running"
 }

@@ -35,9 +35,13 @@ Action.BOARD_ON = "BoardOn"
 Action.BOARD_OFF = "BoardOff"
 Action.BRAKE = "Brake"
 Action.RELEASE_BRAKE = "ReleaseBrake"
+Action.WIRE_TREADMILL = "WireTreadmill"
 
 -- Jobs on the bank's wiring or a cracked panel, which need light to see by.
-local NEEDS_LIGHT = { [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true }
+local NEEDS_LIGHT = {
+    [Action.WIRE_IN] = true, [Action.UNWIRE] = true, [Action.REPAIR_PART] = true, [Action.REPAIR_PANEL] = true,
+    [Action.WIRE_TREADMILL] = true,
+}
 -- Jobs on a part already in the bank's container rather than in the character's inventory.
 local PART_IN_BANK = { [Action.UNWIRE] = true, [Action.REPAIR_PART] = true }
 
@@ -75,6 +79,10 @@ local function isGardenLight(object)
     return onSquare(object) and RenewableEnergy.SolarGardenLight.isLight(object)
 end
 
+local function isLooseTreadmill(object)
+    return onSquare(object) and PowerBank.isTreadmill(object) and not PowerBank.isWiredTreadmill(object)
+end
+
 --- The bank the panel `source` is connected to, as { x, y, z }, or nil.
 function Action.connectedBank(source)
     return PowerBank.bankOfSource(source:getX(), source:getY(), source:getZ())
@@ -83,7 +91,7 @@ end
 --- Whether the panel `source` may be connected to `bank`.
 function Action.bankInReach(source, bank)
     local here = positionOf(bank)
-    for _, reachable in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ())) do
+    for _, reachable in ipairs(PowerBank.banksInReach(source:getX(), source:getY(), source:getZ(), PowerBank.sourceKind(source))) do
         if samePosition(reachable, here) then
             return true
         end
@@ -185,6 +193,9 @@ local KEEPS = {
     [Action.RELEASE_BRAKE] = function(self)
         return isWindCharger(self.object)
     end,
+    [Action.WIRE_TREADMILL] = function(self)
+        return isLooseTreadmill(self.object)
+    end,
 }
 
 -- The rest of each job's rules: the state of its target and its bank, which a multiplayer
@@ -248,6 +259,9 @@ local CHECKS = {
     end,
     [Action.RELEASE_BRAKE] = function(self)
         return PowerBank.isBraked(self.object)
+    end,
+    [Action.WIRE_TREADMILL] = function(self)
+        return RenewableEnergy.firstUnmet(PowerBank.treadmillNeeds(self.character)) == nil
     end,
 }
 
@@ -313,6 +327,9 @@ local COMMANDS = {
     [Action.RELEASE_BRAKE] = function(self)
         return "setBrake", { source = positionOf(self.object), braked = false }
     end,
+    [Action.WIRE_TREADMILL] = function(self)
+        return "wireTreadmill", { source = positionOf(self.object) }
+    end,
 }
 
 -- In-game minutes of the jobs that skill doesn't speed up.
@@ -340,9 +357,15 @@ local function skillFactor(level)
 end
 
 -- Wiring a part in takes PowerBank.wiringFor's seconds at Electricity 0, less with skill;
--- unwiring takes half that. A part that is gone takes no time, and complete() refuses it.
+-- unwiring takes half that. A part that is gone takes no time, and complete() refuses it. A
+-- treadmill's wiring is Specs.treadmill's.
 local function wiringUnits(self)
-    local wiring = self.item and PowerBank.wiringFor(self.item:getFullType())
+    local wiring
+    if self.mode == Action.WIRE_TREADMILL then
+        wiring = RenewableEnergy.Specs.treadmill.wiring
+    else
+        wiring = self.item and PowerBank.wiringFor(self.item:getFullType())
+    end
     if not wiring then
         return 1
     end
@@ -365,7 +388,7 @@ function Action:getDuration()
             minutes = minutes / 2
         end
         return minutes * Action.unitsPerMinute()
-    elseif self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE then
+    elseif self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE or self.mode == Action.WIRE_TREADMILL then
         return wiringUnits(self)
     elseif self.mode == Action.REPAIR_PART then
         -- As vanilla's ISFixGenerator.
@@ -454,7 +477,7 @@ function Action:start()
     self.character:SetVariable("LootPosition", self.vehicle and "Mid" or "Low")
     self.character:reportEvent("EventLootItem")
     if self.mode == Action.CONNECT_SOURCE or self.mode == Action.ATTACH_MAINTAINER
-        or self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE then
+        or self.mode == Action.WIRE_IN or self.mode == Action.UNWIRE or self.mode == Action.WIRE_TREADMILL then
         self.sound = self.character:playSound("GeneratorConnect")
     elseif self.mode == Action.REPAIR_PART or self.mode == Action.REPAIR_PANEL then
         self.sound = self.character:playSound("GeneratorRepair")

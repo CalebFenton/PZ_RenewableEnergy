@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>RenewableEnergyTreadmill</m_Name>
+	<m_AnimName>Bob_Run</m_AnimName>
+	<m_BlendTime>0.30</m_BlendTime>
+	<m_SpeedScale>0.90</m_SpeedScale>
+	<m_Conditions x_name="5d3f6a52-3c51-4d8e-9a43-7f0a8c1b2e61">
+		<m_Name>PerformingAction</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_Value>RenewableEnergyTreadmill</m_Value>
+	</m_Conditions>
+	<m_SubStateBoneWeights>
+		<boneName>Dummy01</boneName>
+	</m_SubStateBoneWeights>
+	<m_SubStateBoneWeights>
+		<boneName>Translation_Data</boneName>
+	</m_SubStateBoneWeights>
+</animNode>
