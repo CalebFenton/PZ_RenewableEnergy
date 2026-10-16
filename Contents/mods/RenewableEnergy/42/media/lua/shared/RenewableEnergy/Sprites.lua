@@ -139,6 +139,7 @@ local KINDS = {
     [Sprites.crate] = { "crate" },
     [Sprites.gardenLight.off] = { "gardenLight" },
     [Sprites.gardenLight.lit] = { "gardenLight" },
+    [Sprites.windScoop] = { "scoop" },
 }
 for _, mount in ipairs({ "wall", "rack" }) do
     for material, facings in pairs(Sprites[mount]) do

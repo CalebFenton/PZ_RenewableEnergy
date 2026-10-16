@@ -89,15 +89,14 @@ test("renewable_energy_wind_power_curve", {
     end,
 })
 
--- This client draws a wind charger as its turning model.
+-- This client draws a wind charger as its turning model, once the charger is added to the map
+-- (OnObjectAdded, which the placePanel handler fires as placing does).
 test("renewable_energy_wind_charger_drawn_as_model", {
     run = function(self)
-        local square = (T.need(self, T.squares(self, 1), "a free outdoor square") or {})[1]
-        if not square then return end
-        self.tile = T.placeTile(self, square, Sprites.windScoop)
+        self.rotor = T.panel(self, Sprites.windScoop)
     end,
     validate = function(self)
-        local object = self.tile and self.tile.object
+        local object = self.rotor and self.rotor.object
         expect(object ~= nil and object:getSpriteModel() ~= nil, "the wind charger has no sprite model on this client")
     end,
 })
