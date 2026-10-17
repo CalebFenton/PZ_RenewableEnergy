@@ -370,6 +370,33 @@ test("renewable_energy_biogas_digester_temperature", {
     end,
 })
 
+-- The Biogas Multiplier scales the gas a digester makes: the same mature barrel run for the same
+-- hours makes about twice the gas with the option at 2 as at 1. Catches the option ignored, or
+-- applied to something other than the gas.
+test("renewable_energy_biogas_multiplier_scales_gas", {
+    run = function(self)
+        local handle = placeDigester(self, "barrel.MetalDrum")
+        if not handle then return end
+        local function runAt(multiplier, label)
+            T.step(function() T.setSandbox(self, "BiogasMultiplier", multiplier) end)
+            T.batch(function()
+                local state = T.matureDigester("barrel")
+                state.gas = 0
+                T.setRecord(self, handle, state)
+                T.runDigester(self, handle, 2, state.temp)
+                T.readRecord(self, handle, label)
+            end)
+        end
+        runAt(1, "single")
+        runAt(2, "double")
+    end,
+    validate = function(self)
+        local single, double = self.reads.single.gas, self.reads.double.gas
+        if not T.expect(single > 0, "a mature digester made no gas in two hours") then return end
+        T.expectNear("gas at a Biogas Multiplier of 2 over the same run at 1", double / single, 2, 0.01)
+    end,
+})
+
 -- Acid just over the limit sours it and just under doesn't; once sour it stays sour until just
 -- below the share of the limit it recovers at. Wood ash fixes it whole, baking soda a use at a time.
 test("renewable_energy_biogas_digester_sour_and_fix", {

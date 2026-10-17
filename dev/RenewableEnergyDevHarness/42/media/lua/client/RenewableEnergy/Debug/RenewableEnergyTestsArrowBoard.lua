@@ -153,7 +153,7 @@ end
 
 -- A spawned arrow board has a module on each panel, the first weathered and the second weathered
 -- or cracked, each showing the model its condition calls for, to players too; its battery box
--- holds no modules, worn deep cycle batteries at a part charge, and at most one charge
+-- holds no modules, two to four worn deep cycle batteries at a part charge, and at most one charge
 -- controller; and the trailer turns up among junkyard and traffic jam vehicles.
 test("renewable_energy_world_arrow_board_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
@@ -187,7 +187,7 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
                 expect(T.inRange(item.condition, stock.batteryCondition), "a battery in the box is at " .. item.condition .. "%")
             end
         end
-        expect(T.inRange(batteries, stock.batteries), batteries .. " batteries in the battery box")
+        expect(batteries >= 2 and batteries <= 4, batteries .. " batteries in the battery box, expected 2 to 4")
         expect(#boxItems(state, stock.battery) == batteries, "the battery box holds other batteries")
         T.expectFoundCharges(charges, "the battery box")
         local controllers = #boxItems(state, RenewableEnergy.Specs.controller)

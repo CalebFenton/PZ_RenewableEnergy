@@ -7,8 +7,11 @@ require "PZHarness/Fixtures"
 PZHarness.registerTests({
     -- Daylight, so crafting and wiring can see and panels have sun.
     hour = 10,
-    -- The perks the mod's actions and recipes read.
-    perks = { Perks.Electricity, Perks.MetalWelding, Perks.Woodwork },
+    -- The perks the mod's actions and recipes read or train: each test gets their levels back, so
+    -- XP from repeated crafts (REPEAT=n) can't level one up and fail the leak check.
+    perks = { Perks.Electricity, Perks.MetalWelding, Perks.Woodwork, Perks.Mechanics, Perks.Blacksmith,
+        Perks.Carving, Perks.Glassmaking, Perks.Masonry, Perks.Pottery, Perks.Tailoring, Perks.Fitness,
+        Perks.Sprinting },
     sandbox = "RenewableEnergy",
     recipePrefix = "RenewableEnergy_",
     isFreeSquare = function(square, indoors)

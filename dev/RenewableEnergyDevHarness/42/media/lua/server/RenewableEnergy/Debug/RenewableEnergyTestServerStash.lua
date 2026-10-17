@@ -240,31 +240,36 @@ handler("stashKnownOnStart", function(_, _, defer)
 end)
 
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
--- and every corpse list a map names exists.
+-- and turns up in vanilla's prepper crates and survivor bag; campers' glove boxes hold the trailer
+-- park's; and every loot list a map names exists.
 check("prepperMapTargets", function(expect)
-    local all = SuburbsDistributions.all
+    local D = RenewableEnergy.Distributions
+    local lists = {}
     for stashMap, added in pairs(Stash.descriptions) do
-        for _, target in ipairs(added.targets or {}) do
-            expect(all[target] ~= nil and all[target].items ~= nil, stashMap.name .. ": no loot list " .. target)
+        lists[stashMap.name] = {}
+        for _, entry in ipairs(added.loot or {}) do
+            expect(D.resolveItemList(entry[2]) ~= nil, stashMap.name .. ": no loot list " .. entry[2])
+            lists[stashMap.name][entry[2]] = true
         end
     end
-    local _, prepper = descriptionNamed("RenewableEnergy_CrowcallRoad")
+    local prepper = lists.RenewableEnergy_CrowcallRoad
     if not expect(prepper ~= nil, "no Crowcall Road stash") then
         return
     end
-    local targets = {}
-    for _, target in ipairs(prepper.targets) do
-        targets[target] = true
-    end
-    for key in pairs(all) do
+    for key in pairs(SuburbsDistributions.all) do
         if string.find(key, "^Outfit_Survivalist") or string.find(key, "^Outfit_Bandit") then
-            expect(targets[key], "the Crowcall Road map does not drop from " .. key)
+            expect(prepper["sub:all." .. key], "the Crowcall Road map does not drop from " .. key)
         end
     end
+    for _, cache in ipairs({ "sub:SurvivorCache1.SurvivorCrate", "sub:SurvivorCache2.SurvivorCrate", "sub:Bag_SurvivorBag" }) do
+        expect(prepper[cache], "the Crowcall Road map is not in " .. cache)
+    end
+    local trailerPark = lists.RenewableEnergy_DixieTrailerPark
+    expect(trailerPark ~= nil and trailerPark["veh:CamperGloveBox"], "the Dixie Trailer Park map is not in camper glove boxes")
 end)
 
--- The corpse loot at each Stash Houses option: for every stash and outfit list, how often its map
--- is listed and at what weight, against the stash's rarity.
+-- The loot at each Stash Houses option: for every stash and loot list, how often its map is listed
+-- and at what weight, against the weight the stash gives it there.
 handler("stashMapsInCorpseLoot", function(_, _, defer)
     local D = RenewableEnergy.Distributions
     local options = SandboxVars.RenewableEnergy
@@ -275,10 +280,10 @@ handler("stashMapsInCorpseLoot", function(_, _, defer)
         D.apply()
         D.apply()
         for stashMap, added in pairs(Stash.descriptions) do
-            for _, target in ipairs(added.targets or {}) do
-                local count, weight = countPairs(SuburbsDistributions.all[target].items, stashMap.item)
+            for _, entry in ipairs(added.loot or {}) do
+                local count, weight = countPairs(D.resolveItemList(entry[2]), stashMap.item)
                 table.insert(found, {
-                    mode = mode, where = stashMap.name .. " in " .. target, count = count, weight = weight, rarity = added.rarity,
+                    mode = mode, where = stashMap.name .. " in " .. entry[2], count = count, weight = weight, rarity = entry[1],
                 })
             end
         end

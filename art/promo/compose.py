@@ -176,8 +176,10 @@ GALLERY_ITEMS = [
 MOUNTS, CARE = "Panel mounts, and taking them down", "Battery care and rebuilding"
 BIOGAS, WOODGAS, WIND = (title for title, _ in RECIPE_SECTIONS[-3:])
 GALLERY_RECIPES = [
-    ("recipes-storage", "Recipes: battery boxes, racks and banks", [("Battery storage", slice(None))]),
-    ("recipes-mounts", "Recipes: building panel mounts", [(MOUNTS, slice(0, 5))]),
+    ("recipes-storage", "Recipes: battery boxes and racks", [("Battery storage", slice(0, 4))]),
+    ("recipes-mounts", "Recipes: flat and wall panel mounts", [(MOUNTS, slice(0, 3))]),
+    ("recipes-banks-racks", "Recipes: battery banks and panel racks",
+     [("Battery storage", slice(4, None)), (MOUNTS, slice(3, 5))]),
     ("recipes-unmounting-electronics", "Recipes: taking panels down, and electronics",
      [(MOUNTS, slice(5, None)), ("Electronics", slice(None))]),
     ("recipes-modules", "Recipes: modules and solar cells", [("Modules: repair, homemade, and solar cells",

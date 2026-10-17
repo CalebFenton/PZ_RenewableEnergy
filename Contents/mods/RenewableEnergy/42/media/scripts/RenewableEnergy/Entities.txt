@@ -198,7 +198,7 @@ module Base
                 item 40 [Base.ClayBrick],
                 item 4 tags[base:concrete] flags[DontRecordInput],
                 item 2 [Base.RubberHose],
-                item 1 [Base.Pipe],
+                item 1 [Base.Pipe;Base.ClayPipeSegment],
             }
         }
     }
@@ -227,10 +227,11 @@ module Base
         {
             timedAction = BuildLowNoTool,
             time = 200,
+            /* Nothing is welded, but it sits on the Welding page beside the other gasifiers. */
             category = Welding,
             NeedToBeLearn = true,
-            AutoLearnAll = Mechanics:3;MetalWelding:2,
-            SkillRequired = Mechanics:2;MetalWelding:1,
+            AutoLearnAll = Mechanics:3,
+            SkillRequired = Mechanics:2,
             xpAward = Mechanics:20,
             Tooltip = Tooltip_RenewableEnergy_PrimitiveGasifier,
             inputs

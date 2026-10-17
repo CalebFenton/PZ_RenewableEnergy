@@ -51,7 +51,7 @@ option RenewableEnergy.BatteryBankSpawn {
 }
 option RenewableEnergy.StashMode {
 	page = RenewableEnergy, translation = RenewableEnergy_StashMode,
-	type = enum, numValues = 4, default = 1,
+	type = enum, numValues = 4, default = 2,
 }
 option RenewableEnergy.LRMSolarPanels {
 	page = RenewableEnergy, translation = RenewableEnergy_LRMSolarPanels,

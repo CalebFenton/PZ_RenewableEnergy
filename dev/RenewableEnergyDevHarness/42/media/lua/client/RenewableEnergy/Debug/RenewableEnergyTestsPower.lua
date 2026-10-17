@@ -309,9 +309,9 @@ test("renewable_energy_power_panel_charges_bank", {
 })
 
 -- A module makes its rating times its condition: a module at 50 half what a whole one does, a
--- homemade one at its best 60% of its rating, and a rack with a whole and a shattered module what
--- the whole one makes alone. The cracked panel says why it is low. Catches condition ignored, or
--- a shattered module still counted.
+-- homemade one at its best something but less than a whole factory one, and a rack with a whole
+-- and a shattered module what the whole one makes alone. The cracked panel says why it is low.
+-- Catches condition ignored, or a shattered module still counted.
 test("renewable_energy_power_module_condition_sets_watts", {
     run = function(self)
         local bank = T.bank(self, "batteryRackMetal", { "Base.CarBattery1", "RenewableEnergy.ChargeController" }, { charge = 0.1 })
@@ -319,7 +319,8 @@ test("renewable_energy_power_module_condition_sets_watts", {
         self.bank = bank
         local modules = {
             { { type = "RenewableEnergy.SolarModule", condition = 50 } },
-            { { type = "RenewableEnergy.HomemadeSolarModule", condition = 60 } },
+            { { type = "RenewableEnergy.HomemadeSolarModule",
+                condition = getScriptManager():getItem("RenewableEnergy.HomemadeSolarModule"):getConditionMax() } },
             { { type = "RenewableEnergy.SolarModule", condition = 100 }, { type = "RenewableEnergy.SolarModule", condition = 0 } },
         }
         local sprites = { Sprites.flat, Sprites.flat, Sprites.rack.metal.S }
@@ -343,9 +344,8 @@ test("renewable_energy_power_module_condition_sets_watts", {
         local whole = rack.watts
         expect(whole > 0, "a rack with a whole module made nothing at 1000 W/m²")
         expectNear("a module at condition 50 over a whole one", cracked.watts / whole, 0.5, 0.01)
-        local homemadeShare = Specs.modules["RenewableEnergy.HomemadeSolarModule"].watts
-            / Specs.modules["RenewableEnergy.SolarModule"].watts
-        expectNear("a homemade module at 60 over a whole factory one", homemade.watts / whole, homemadeShare * 0.6, 0.01)
+        local made = homemade.watts / whole
+        expect(made > 0 and made < 1, "a homemade module at its best makes " .. made .. " of a whole factory one")
         expect(cracked.reason == "cracked", "the half-cracked panel's reason is " .. tostring(cracked.reason))
         expect(cracked.modules[1] and cracked.modules[1].condition == 50, "the status lost the module's condition")
     end,

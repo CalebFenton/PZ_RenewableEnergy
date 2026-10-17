@@ -95,7 +95,8 @@ test("renewable_energy_world_known_on_start_stocks_and_stays_hidden", {
 })
 
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
--- and every corpse list a map names exists.
+-- and lies in vanilla's prepper caches; campers' glove boxes hold the trailer park's; and every
+-- loot list a map names exists.
 serverCheck("renewable_energy_world_prepper_map_targets", "prepperMapTargets")
 
 -- A map item of the mod's own shows the area of its stash house, found or not: its Map id is the
@@ -116,8 +117,8 @@ test("renewable_energy_world_stash_map_items_draw_their_area", {
     end,
 })
 
--- Under the Stash Houses settings that hand out maps from corpses, every stash's map goes into its
--- outfits' corpse loot once, at its rarity; under the others none does.
+-- Under the Stash Houses settings that hand out maps, every stash's map goes into each of its loot
+-- lists once, at the weight it gives there; under the others none does.
 test("renewable_energy_world_stash_maps_in_corpse_loot", {
     run = function(self) T.server(self, "stashMapsInCorpseLoot") end,
     validate = function(self)

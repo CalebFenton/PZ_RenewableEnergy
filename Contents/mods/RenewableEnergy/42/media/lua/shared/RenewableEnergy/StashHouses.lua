@@ -14,8 +14,8 @@ RenewableEnergy.Stash = Stash
 Stash.MODE = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }
 
 -- Description (the table StashSystem reads) -> what only the mod uses: knownOnStart, the percent
--- chance that the house is stocked from the start; rarity, the map item's weight in the corpse
--- loot lists named by targets.
+-- chance that the house is stocked from the start; loot, the { weight, list } pairs of the map
+-- item, lists named as Distributions.lua names them ("sub:", "veh:").
 Stash.descriptions = {}
 
 -- The room definition that stocks a stash house (Distributions.lua) and the crate it brings.
@@ -27,28 +27,48 @@ local ANNOTATED_MAP = "Stash_AnnotedMap"
 local PENCIL = { 0.2, 0.2, 0.24 }
 local RED_MARKER = { 0.62, 0.1, 0.08 }
 
+-- { weight, list } for each list of `lists`, followed by those of `rest`.
+local function weighted(weight, lists, rest)
+    local entries = {}
+    for _, list in ipairs(lists) do
+        table.insert(entries, { weight, list })
+    end
+    for _, entry in ipairs(rest or {}) do
+        table.insert(entries, entry)
+    end
+    return entries
+end
+
 -- The corpse loot of every survivalist and bandit outfit, early, mid and late game.
-local SURVIVALISTS_AND_BANDITS = {
+local SURVIVALISTS_AND_BANDITS = {}
+for _, outfit in ipairs({
     "Outfit_Survivalist", "Outfit_Survivalist_Mid", "Outfit_Survivalist_Late",
     "Outfit_Survivalist02", "Outfit_Survivalist02_Mid", "Outfit_Survivalist02_Late",
     "Outfit_Survivalist03", "Outfit_Survivalist03_Mid", "Outfit_Survivalist03_Late",
     "Outfit_Survivalist04", "Outfit_Survivalist04_Mid", "Outfit_Survivalist04_Late",
     "Outfit_Survivalist05", "Outfit_Survivalist05_Mid", "Outfit_Survivalist05_Late",
     "Outfit_Bandit", "Outfit_Bandit_Early", "Outfit_Bandit_Mid", "Outfit_Bandit_Late",
+}) do
+    table.insert(SURVIVALISTS_AND_BANDITS, "sub:all." .. outfit)
+end
+
+-- Vanilla's prepper caches: the crates of its survivor houses and the bag survivalists carry.
+local PREPPER_CACHES = {
+    "sub:SurvivorCache1.SurvivorCrate", "sub:SurvivorCache2.SurvivorCrate", "sub:Bag_SurvivorBag",
 }
 
 -- buildingX, buildingY: a ground floor square well inside the house; StashSystem finds the
 -- building through it, and doBuildingStash only matches a building whose bounds strictly contain
 -- it. crateX, crateY, crateZ: an empty floor square in one of the house's rooms, since only
 -- containers in its rooms are stocked. map: the item that leads there. A mod item is a map of
--- just mapArea (its west, north, east and south edges) that the corpses of `mapCorpses` carry at
--- weight `mapWeight`; a vanilla town map is found wherever vanilla puts it. Marks are drawn on
+-- just mapArea (its west, north, east and south edges) found in the loot lists of `mapLoot`, as
+-- { weight, list } pairs; a vanilla town map is found wherever vanilla puts it. Marks are drawn on
 -- the map: a symbol of MapSymbolDefinitions, or note n, whose text is the translation
 -- Stash_<name>_<n>.
 local HOUSES = {
     -- A prepper's farmhouse off Crowcall Road, south of Rosewood, with a bunker under its shed.
-    -- Only survivalists and bandits carry its map and it is never stocked from the start: the
-    -- hardest house to find, and the best defended.
+    -- Survivalists and bandits carry its map, and one prepper's cache leads to another's; it is
+    -- never stocked from the start: the hardest house to find, and the best defended.
     {
         name = "RenewableEnergy_CrowcallRoad",
         map = "RenewableEnergy.CrowcallRoadMap",
@@ -57,8 +77,7 @@ local HOUSES = {
         crateX = 7985, crateY = 12341, crateZ = 0,
         barricades = 90,
         traps = "1-3",
-        mapWeight = 0.1,
-        mapCorpses = SURVIVALISTS_AND_BANDITS,
+        mapLoot = weighted(2, SURVIVALISTS_AND_BANDITS, weighted(1, PREPPER_CACHES)),
         marks = {
             { symbol = "X", x = 7984, y = 12342, color = RED_MARKER },
             { note = 1, x = 7993, y = 12331 },
@@ -69,7 +88,7 @@ local HOUSES = {
         },
     },
     -- A mobile home at the Dixie trailer park, between Muldraugh and West Point, kept going on
-    -- RV panels. Anyone may have its map, campers more often.
+    -- RV panels. Campers carry its map, in their pockets and glove boxes; any corpse rarely.
     {
         name = "RenewableEnergy_DixieTrailerPark",
         map = "RenewableEnergy.DixieTrailerParkMap",
@@ -79,8 +98,12 @@ local HOUSES = {
         zombies = 3,
         barricades = 70,
         knownOnStart = 90,
-        mapWeight = 0.6,
-        mapCorpses = { "inventoryfemale", "inventorymale", "Outfit_Camper" },
+        mapLoot = {
+            { 0.05, "sub:all.inventoryfemale" },
+            { 0.05, "sub:all.inventorymale" },
+            { 1, "sub:all.Outfit_Camper" },
+            { 1, "veh:CamperGloveBox" },
+        },
         marks = {
             { symbol = "X", x = 11714, y = 8792, color = RED_MARKER },
             { symbol = "Sun", x = 11722, y = 8784 },
@@ -174,8 +197,7 @@ Stash.mapAreas = {}
 for _, house in ipairs(HOUSES) do
     Stash.descriptions[describe(house)] = {
         knownOnStart = house.knownOnStart,
-        rarity = house.mapWeight,
-        targets = house.mapCorpses,
+        loot = house.mapLoot,
     }
     Stash.mapAreas[house.name] = house.mapArea
 end

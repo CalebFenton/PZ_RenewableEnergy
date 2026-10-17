@@ -51,7 +51,7 @@ local ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4 }
 ArrowBoard.STOCK = {
     modules = 2,
     secondCrackedChance = 0.6,
-    batteries = { min = 4, max = 6 },
+    batteries = { min = 2, max = 4 },
     battery = "RenewableEnergy.DeepCycleBattery",
     batteryCondition = { min = 0, max = 80 },
     controllerChance = 0.75,

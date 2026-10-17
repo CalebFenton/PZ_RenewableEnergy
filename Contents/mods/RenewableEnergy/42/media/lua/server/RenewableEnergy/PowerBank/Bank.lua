@@ -322,6 +322,12 @@ local function dropSource(bank, index)
         bank.charge = math.min(1, bank.charge + wh / bank.nominalWh)
         local today = TOTALS[Sources.familyOf(source.kind)].today
         bank[today] = (bank[today] or 0) + wh
+        -- Into the batteries too: the next pass's recount rereads the charge from them.
+        local isoObject = bank:getIsoObject()
+        local container = isoObject and isoObject:getContainer()
+        if container then
+            bank:writeBatteries(container, false)
+        end
     end
 end
 

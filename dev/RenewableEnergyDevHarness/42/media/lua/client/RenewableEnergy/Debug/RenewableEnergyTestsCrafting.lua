@@ -276,6 +276,14 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
             T.step(function() self.flatAward = self.server.electricityAward.gained end)
             T.server(self, "electricityAward", { xp = mounts["RenewableEnergy.SolarRackWood"].xp.Electricity / 2 })
             T.step(function() self.rackShareAward = self.server.electricityAward.gained end)
+            -- The rack's own xpAward for building the frame, given whatever the modules.
+            local frame = 0
+            for i = 0, recipes.rack:getXPAwardCount() - 1 do
+                local award = recipes.rack:getXPAward(i)
+                if award:getPerk() == Perks.Electricity then frame = frame + award:getAmount() end
+            end
+            T.server(self, "electricityAward", { xp = frame })
+            T.step(function() self.rackFrameAward = self.server.electricityAward.gained end)
         end)
     end,
     validate = function(self)
@@ -287,7 +295,8 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
         expectNear("Electricity XP from mounting a new module", xp.mounted - xp.start, self.flatAward, 0.01)
         expectNear("Electricity XP from unmounting", xp.unmounted - xp.mounted, 0, 0)
         expectNear("Electricity XP from mounting the same module again", xp.remounted - xp.unmounted, 0, 0)
-        expectNear("Electricity XP from a rack of a used and a new module", xp.rack - xp.unmountedAgain, self.rackShareAward, 0.01)
+        expectNear("Electricity XP from a rack of a used and a new module", xp.rack - xp.unmountedAgain,
+            self.rackShareAward + self.rackFrameAward, 0.01)
     end,
 })
 

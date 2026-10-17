@@ -614,21 +614,21 @@ local function removeItem(items, fullType)
     end
 end
 
--- Puts each stash's map item into the corpse loot its description targets, if the Stash Houses
+-- Puts each stash's map item into the loot lists its description names, if the Stash Houses
 -- option drops maps.
 local function applyStashMaps()
     local inLoot = Stash.mapsInLoot()
     for description, extra in pairs(Stash.descriptions) do
-        for _, target in ipairs(extra.targets or {}) do
-            local items = Distributions.resolveItemList("sub:all." .. target)
+        for _, entry in ipairs(extra.loot or {}) do
+            local items = Distributions.resolveItemList(entry[2])
             if items then
                 removeItem(items, description.item)
                 if inLoot then
                     table.insert(items, description.item)
-                    table.insert(items, extra.rarity)
+                    table.insert(items, entry[1])
                 end
             else
-                print("RenewableEnergy: no corpse loot " .. target .. " for " .. description.item .. ", skipped")
+                print("RenewableEnergy: no loot list " .. entry[2] .. " for " .. description.item .. ", skipped")
             end
         end
     end
