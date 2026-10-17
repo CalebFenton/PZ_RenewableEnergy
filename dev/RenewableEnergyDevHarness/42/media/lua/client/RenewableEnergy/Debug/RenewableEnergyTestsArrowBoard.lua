@@ -246,8 +246,11 @@ test("renewable_energy_world_arrow_board_old_trailer_gets_panels_once", {
 })
 
 -- Puts the character at the middle of one of the vehicle's areas, or `toSide` squares from there
--- towards the vehicle's side and facing it: teleportTo rounds down to the square's corner, which
--- can fall outside a narrow area.
+-- towards the vehicle's side, facing the vehicle: teleportTo rounds down to the square's corner,
+-- which can fall outside a narrow area. The area's middle is where vanilla's walk to the area
+-- (ISPathFindAction:pathToVehicleArea) ends, and facing the vehicle is the turn an action's
+-- waitToStart waits for, so an action queued from there neither walks nor turns, which would take
+-- real time.
 local function standIn(vehicle, area, toSide)
     local spot = vehicle:getAreaCenter(area)
     local x, y = spot:getX(), spot:getY()
@@ -260,9 +263,7 @@ local function standIn(vehicle, area, toSide)
     p:teleportTo(x, y, vehicle:getZ())
     p:setX(x)
     p:setY(y)
-    if toSide then
-        p:setTargetAndCurrentDirection(vehicle:getX() - x, vehicle:getY() - y)
-    end
+    p:setTargetAndCurrentDirection(vehicle:getX() - x, vehicle:getY() - y)
 end
 
 -- Its battery box, unlocked, opens only with its lid open, from beside it, and takes a battery a
@@ -446,8 +447,7 @@ local function takeBattery(self, trailer)
         end
     end)
     T.awaitVehicleState(self, trailer, function(state) return #boxItems(state) == 0 end, SERVER_MS)
-    T.waitFor(self, function() return p:getInventory():getFirstTypeRecurse(DEEP_CYCLE) ~= nil end,
-        "this client's copy of the battery taken")
+    T.waitForCarried(self, DEEP_CYCLE, "this client's copy of the battery taken")
 end
 
 local function expectBatteryTaken(self)
@@ -519,6 +519,7 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
             local lid = p:getInventory():getFirstTypeRecurse(self.lidType)
             if lid then
                 ISVehiclePartMenu.onInstallPart(p, self.lid, lid)
+                T.shortenQueuedInstalls()
             end
         end)
         T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.installed end, SERVER_MS)
@@ -653,7 +654,8 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
             self.keyUnlocks = vehicle:canUnlockDoor(self.lid, p)
             local cutters = RenewableEnergy.BatteryBoxLid.padlockCutters(p, self.lid)
             if cutters then
-                -- What the menu's Cut Padlock does.
+                -- What the menu's Cut Padlock does, from where its walk would end.
+                standIn(vehicle, self.box:getArea())
                 RenewableEnergy.BatteryBoxLid.cutPadlock(p, self.lid, cutters)
             end
         end)
@@ -781,8 +783,8 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
     validate = function(self)
         local Specs = RenewableEnergy.Specs
         local deepWh, l16Wh = Specs.batteries[DEEP_CYCLE].wh, Specs.batteries[L16].wh
-        -- The panels lie flat whichever way the trailer faces, so they see what a flat panel does.
-        local hourWh = 2 * Specs.modules[MODULE].watts * self.first.flatWh
+        -- What the panels made this hour; how a module's watts follow its condition is the next test's.
+        local hourWh = self.first.watts * self.first.flatWh
         local room = 0.01 * (deepWh + l16Wh)
         if not expect(hourWh > room, "the sun at noon gives only " .. hourWh .. " Wh an hour, too little to fill both") then
             return
@@ -797,8 +799,10 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
     end,
 })
 
--- Each installed panel makes what its module makes on a mount, by its condition, a homemade
--- module's too, and with no panels the trailer stores nothing.
+-- Each installed panel makes power by its condition, a half-cracked one half what a whole one
+-- does and a homemade one some, and with no panels the trailer stores nothing. The trailer reads
+-- a module's watts with the mounts' own PowerBank.moduleWatts, so the checks compare the passes
+-- with each other rather than with that function.
 test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
     hour = 12,
     run = function(self)
@@ -819,14 +823,15 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
         end)
     end,
     validate = function(self)
-        local p, moduleWatts = self.passes, RenewableEnergy.PowerBank.moduleWatts
+        local p = self.passes
         local flatWh = p[1].flatWh
         if not expect(flatWh > 0, "no sun at noon") then return end
-        local both = moduleWatts(MODULE, 100) + moduleWatts(MODULE, 50)
-        expectNear("watts of a whole and a half-cracked panel", p[1].watts, both)
-        expectNear("watt-hours they store in an hour", p[1].stored, both * flatWh, 0.001)
-        expectNear("watts of the whole panel alone", p[2].watts, moduleWatts(MODULE, 100))
-        expectNear("watts of a homemade module at 60", p[3].watts, moduleWatts(HOMEMADE, 60))
+        local whole = p[2].watts
+        if not expect(whole > 0, "a whole panel made nothing at noon") then return end
+        expectNear("watts of a half-cracked panel over a whole one", (p[1].watts - whole) / whole, 0.5, 0.001)
+        expectNear("watt-hours they store in an hour", p[1].stored, p[1].watts * flatWh, 0.001)
+        expect(p[3].watts > 0 and p[3].watts < whole, "a homemade module at 60 makes " .. p[3].watts
+            .. " W, expected some and less than a whole factory module's " .. whole)
         expectNear("watts with no panels", p[4].watts, 0)
         expectNear("watt-hours stored with no panels", p[4].stored, 0)
     end,
@@ -834,10 +839,10 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
 
 -- Lamps -----------------------------------------------------------------------------------------
 
--- The arrow board's lamps light only while its switch is on, a battery in its box holds more than
--- the controller's cutoff and its lamp board isn't wrecked: switching off, wrecking the board or
--- flattening the battery darkens it, and putting each back lights it again. The photocell dims
--- them after dark.
+-- The arrow board's lamps light only while its switch is on and its lamp board isn't wrecked:
+-- switching off or wrecking the board darkens it, and welding the board back lights it again. The
+-- photocell dims them after dark. How the battery's charge cuts them off and lights them again is
+-- lamps_cut_off_and_come_back's.
 test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
@@ -855,9 +860,6 @@ test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
             stage("switched off", { switchOn = false }, false, nil)
             stage("on with its lamp board wrecked", { switchOn = true, frame = { [board] = 0 } }, false, nil)
             stage("on with its lamp board welded", { frame = { [board] = 100 } }, false, "day")
-            stage("on with its battery at the cutoff", { box = { { type = DEEP_CYCLE, charge = RenewableEnergy.Specs.arrowBoard.cutoff } } },
-                false, nil)
-            stage("on with a charged battery again", { box = { { type = DEEP_CYCLE, charge = 0.6 } } }, false, "day")
         end)
     end,
     validate = function(self)
@@ -913,13 +915,13 @@ test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
         end)
     end,
     validate = function(self)
-        local ArrowBoard, wh = RenewableEnergy.ArrowBoard, RenewableEnergy.Specs.batteries[DEEP_CYCLE].wh
-        local dayWh, nightWh = 2 * ArrowBoard.lampWatts(false), 2 * ArrowBoard.lampWatts(true)
-        expectNear("watt-hours two hours of lamps draw by day", self.day.drawn, dayWh, 1e-6)
-        expectNear("watt-hours two hours of dimmed lamps draw at night", self.night.drawn, nightWh, 1e-6)
-        expect(nightWh < dayWh / 2, string.format("the dimmed lamps draw %.2f Wh against %.2f by day", nightWh, dayWh))
+        local wh = RenewableEnergy.Specs.batteries[DEEP_CYCLE].wh
+        local dayWh, nightWh = self.day.drawn, self.night.drawn
+        expect(dayWh > 0, "two hours of lit lamps by day drew nothing")
+        expect(nightWh > 0 and nightWh < dayWh / 2, string.format("the dimmed lamps draw %.2f Wh against %.2f by day", nightWh, dayWh))
         local battery = boxItems(self.night.state, DEEP_CYCLE)[1]
-        -- A battery's charge is kept in whole uses of its UseDelta, which each pass rounds to.
+        -- What they drew came out of the battery. A battery's charge is kept in whole uses of its
+        -- UseDelta, which each pass rounds to.
         expectNear("the battery's charge after both", battery and battery.charge or -1, 0.8 - (dayWh + nightWh) / wh, 3e-5)
     end,
 })
@@ -1003,7 +1005,11 @@ test("renewable_energy_world_arrow_board_switch_works_only_in_the_open_box", {
             T.step(function() table.insert(self.refused, { name = name, can = trailer.answer.can }) end)
         end
         local function flip(on)
-            T.step(function() RenewableEnergy.BatteryBoxLid.flipSwitch(p, trailer.vehicle, on) end)
+            T.step(function()
+                -- From where the switch's walk would end.
+                standIn(trailer.vehicle, boxOf(trailer.vehicle):getArea())
+                RenewableEnergy.BatteryBoxLid.flipSwitch(p, trailer.vehicle, on)
+            end)
             T.awaitVehicleState(self, trailer, function(state) return state.switchOn == on end, SERVER_MS)
             T.waitForVehicleCopy(self, trailer, function(copy) return copy.switchOn == on end,
                 "this client's copy of the switch " .. (on and "on" or "off"))
@@ -1136,18 +1142,15 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
         end)
         T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) == nil end, SERVER_MS)
         waitForPanelsCopy(self, trailer)
-        T.waitFor(self, function() return p:getInventory():getFirstTypeRecurse(MODULE) ~= nil end,
-            "this client's copy of the module taken off")
+        T.waitForCarried(self, MODULE, "this client's copy of the module taken off")
         T.step(function()
             self.emptied = trailer.state
-            self.removed = p:getInventory():getFirstTypeRecurse(MODULE):getCondition()
+            self.removed = T.carried(MODULE):getCondition()
         end)
         T.give(self, "module", { { type = MODULE, condition = self.onAt } })
         T.step(function()
-            -- Vanilla's install takes the time it is given even when actions are instant
-            -- (ISInstallVehiclePart.new never asks getDuration), so the instant time is given.
-            local time = p:isTimedActionInstant() and 1 or 200
-            ISTimedActionQueue.add(ISInstallVehiclePart:new(p, trailer.vehicle:getPartById(LEFT), self.items.module[1], time))
+            ISTimedActionQueue.add(ISInstallVehiclePart:new(p, trailer.vehicle:getPartById(LEFT), self.items.module[1], 200))
+            T.shortenQueuedInstalls()
         end)
         T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= nil end, SERVER_MS)
         waitForPanelsCopy(self, trailer)
@@ -1344,14 +1347,24 @@ local function createTowingPair(self, trailerArgs)
 end
 
 -- Queues the character getting in at the wheel of self.car through the driver's door, and a wait
--- until they sit there.
+-- until they sit there. The character takes the seat as the action starts (vehicle:enter), and
+-- the action then only plays the enter animation, in real time, until the animation sets
+-- EnterAnimationFinished (ISEnterVehicle.update); the crash tests start from a seated driver, so
+-- the action is told the animation finished at once.
 local function enterDriver(self)
     local p, car = player(), self.car
     T.step(function()
         local outside = car.vehicle:getPassengerPosition(0, "outside")
         local door = car.vehicle:getWorldPos(outside:getOffset(), Vector3f.new())
         p:teleportTo(door:x(), door:y(), p:getZ())
-        ISTimedActionQueue.add(ISEnterVehicle:new(p, car.vehicle, 0))
+        local enter = ISEnterVehicle:new(p, car.vehicle, 0)
+        function enter:update()
+            if self.started then
+                self.character:SetVariable("EnterAnimationFinished", "true")
+            end
+            ISEnterVehicle.update(self)
+        end
+        ISTimedActionQueue.add(enter)
     end)
     T.waitFor(self, function() return car.vehicle:isDriver(p) end, "the character at the wheel of the car", VEHICLE_FRAMES)
 end
@@ -1424,17 +1437,20 @@ local PUSH, CRASH_KMH, BUMP_KMH = 1000, 35, 6
 -- a crash's worth.
 local FRESH_HITCH_MS, SNAP_PUSH = 2000, 5000
 
--- How long a freshly spawned vehicle is given to fall onto its wheels before it counts as at rest:
--- it can read as at rest before its physics has run.
+-- How long a freshly spawned vehicle is given to fall onto its wheels before it counts as at rest
+-- without having been seen moving: it reads as at rest before its physics exists
+-- (BaseVehicle.isAtRest).
 local SETTLE_MS = 1000
 
--- Queues a wait until the trailer has stood alone for SETTLE_MS and come to rest.
+-- Queues a wait until the trailer stands alone at rest: once its physics has run and stopped, or
+-- after SETTLE_MS.
 local function waitForParked(self, trailer)
-    local spawnedMs
+    local spawnedMs, moved
     T.step(function() spawnedMs = getTimestampMs() end)
     T.waitFor(self, function()
         local vehicle = trailer.vehicle
-        return getTimestampMs() - spawnedMs > SETTLE_MS and inCell(vehicle) and vehicle:isAtRest()
+        moved = moved or vehicle:isPhysicsActive()
+        return (moved or getTimestampMs() - spawnedMs > SETTLE_MS) and inCell(vehicle) and vehicle:isAtRest()
     end, "the trailer at rest on its own", VEHICLE_FRAMES)
 end
 

@@ -50,7 +50,7 @@ end
 -- reaches this client after its answer, and a craft picks its inputs from this client's copies.
 local function waitForFluid(self, fullType, liters)
     T.waitFor(self, function()
-        local item = T.player():getInventory():getFirstTypeRecurse(fullType)
+        local item = T.carried(fullType)
         local fluids = item and item:getFluidContainer()
         return fluids ~= nil and math.abs(fluids:getAmount() - liters) < 0.001
     end, "this client's " .. fullType .. " holding " .. liters .. " L")
@@ -69,6 +69,7 @@ local MAKES = {
     { "RenewableEnergy_BuildBatteryBankMetal", "RenewableEnergy.BatteryBankMetal", "Base.SheetMetal" },
     { "RenewableEnergy_MakeChargeController", "RenewableEnergy.ChargeController", "Base.ElectronicsScrap" },
     { "RenewableEnergy_MakeSolarFailsafe", "RenewableEnergy.SolarFailsafe", "Base.RemoteCraftedV3" },
+    { "RenewableEnergy_WeldMetalDrum", "Base.MetalDrum", "Base.SheetMetal" },
 }
 
 -- The items one craft of `recipe` uses up: those T.recipeInputs gives for the inputs it neither
@@ -233,9 +234,8 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
             T.step(function() self.xp[key] = self.server.electricityAward.xp end)
         end
         local function craft(recipe, fullType)
-            T.waitFor(self, function() return p:getInventory():getFirstTypeRecurse(fullType) ~= nil end,
-                "this client's " .. fullType .. " to craft from")
-            T.step(function() T.startCraft(self, recipe, p:getInventory():getFirstTypeRecurse(fullType)) end)
+            T.waitForCarried(self, fullType, "this client's " .. fullType .. " to craft from")
+            T.step(function() T.startCraft(self, recipe, T.carried(fullType)) end)
         end
         -- The flat mount's wire and screws, for each time it is made.
         local fixings = {}
@@ -262,8 +262,7 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
             end
             table.insert(rack, input)
         end
-        T.waitFor(self, function() return p:getInventory():getFirstTypeRecurse(module) ~= nil end,
-            "this client's unmounted module")
+        T.waitForCarried(self, module, "this client's unmounted module")
         T.give(self, "rack", rack)
         readXp("unmountedAgain")
         craft(recipes.rack, module)
@@ -457,10 +456,9 @@ for _, chain in ipairs(REBUILDS) do
             T.give(self, "rebuild", { { type = "RenewableEnergy.BatteryPlates", count = chain.plates },
                 { type = "Base.WaterBottle" } })
             T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
-            T.waitFor(self, function() return p:getInventory():getFirstTypeRecurse(chain.case) ~= nil end,
-                "this client's " .. chain.case)
+            T.waitForCarried(self, chain.case, "this client's " .. chain.case)
             waitForFluid(self, "Base.WaterBottle", 1)
-            T.step(function() T.startCraft(self, rebuild, p:getInventory():getFirstTypeRecurse(chain.case)) end)
+            T.step(function() T.startCraft(self, rebuild, T.carried(chain.case)) end)
             readCarried(self, counted, { "Acid" })
         end,
         validate = function(self)

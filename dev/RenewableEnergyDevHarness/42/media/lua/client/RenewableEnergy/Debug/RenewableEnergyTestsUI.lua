@@ -299,6 +299,7 @@ test("renewable_energy_ui_repair_part", {
             context:hideAndChildren()
             self.offered = option ~= nil and not option.notAvailable
             if not self.offered then return end
+            T.standNextTo(bank.square)
             T.choose(option)
             T.waitFor(self, function()
                 local inverter = copyItem(bank, POWER_INVERTER)

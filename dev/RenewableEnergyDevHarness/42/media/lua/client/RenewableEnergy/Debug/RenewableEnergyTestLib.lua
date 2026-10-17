@@ -69,6 +69,18 @@ function T.waitFor(self, condition, what, maxFrames)
     T.step(function() T.need(self, condition(), what) end)
 end
 
+--- The first `fullType` this client's character carries, in any bag, or nil.
+function T.carried(fullType)
+    return T.player():getInventory():getFirstTypeRecurse(fullType)
+end
+
+--- Queues a wait until this client's character carries a `fullType` (T.waitFor): what the server
+--- gives or moves reaches this client after its answer, and what comes next reads this client's
+--- copy.
+function T.waitForCarried(self, fullType, what)
+    T.waitFor(self, function() return T.carried(fullType) ~= nil end, what)
+end
+
 -- Fixtures -------------------------------------------------------------------------------------
 
 -- This client's copy of the bank on `square` once it holds `count` items and has a summary.
