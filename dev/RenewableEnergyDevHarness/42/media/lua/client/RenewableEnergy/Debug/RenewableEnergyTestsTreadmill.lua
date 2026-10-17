@@ -10,7 +10,8 @@ local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmil
 
 local CAR_BATTERY = "Base.CarBattery1"
 local INVERTER = "RenewableEnergy.PlugInInverter"
--- A bank whose inverter carries a running treadmill.
+-- A bank big enough to power an indoor square of the test map's house: the starter box (a car
+-- battery and a plug-in inverter) leaves it unpowered there.
 local L16 = "RenewableEnergy.L16Battery"
 local INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
 -- A pass this long barely moves a bank's batteries.

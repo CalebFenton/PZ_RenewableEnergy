@@ -199,9 +199,10 @@ Specs.loads = {
     washer = { watts = 500 },
     dryer = { watts = 4000 },
     batteryCharger = { watts = 100 },
-    -- An unwired treadmill while a run is on it. Vanilla bills it nothing, so it is the 1993 watts of
-    -- a home treadmill's motor at a running pace: more than a Power Inverter carries.
-    treadmill = { watts = 700 },
+    -- An unwired treadmill while a run is on it. Vanilla has no treadmill figure, so it takes the
+    -- 0.09 vanilla gives its motor appliances (washer, dryer, stove) at `other`'s 600 W a unit:
+    -- about a TV, which any inverter carries.
+    treadmill = { watts = 54 },
     -- Anything else the engine says draws power, gas pumps included: watts per unit of
     -- IsoObject:getGeneratorPowerConsumption, so that a fridge-freezer's 0.13 comes to 80 W.
     other = { wattsPerConsumption = 600 },
