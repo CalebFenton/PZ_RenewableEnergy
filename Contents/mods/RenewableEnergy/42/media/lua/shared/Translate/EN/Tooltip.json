@@ -1,6 +1,6 @@
 {
-    "Tooltip_RenewableEnergy_SolarModule": "A 50 W solar module. Mount it flat, on a wall or on a ground rack.",
-    "Tooltip_RenewableEnergy_HomemadeSolarModule": "Salvaged cells under glass. Rated 50 W, but it never makes more than 30 W.",
+    "Tooltip_RenewableEnergy_SolarModule": "A 160 W solar module. Mount it flat, on a wall or on a ground rack.",
+    "Tooltip_RenewableEnergy_HomemadeSolarModule": "Salvaged cells under glass. Rated 160 W, but it never makes more than 96 W.",
     "Tooltip_RenewableEnergy_SolarCells": "Cells salvaged from solar gadgets. Sixteen make a homemade solar module.",
     "Tooltip_RenewableEnergy_SolarFlat": "One module lying flat, on a roof or the ground. Best in summer; snow settles on it.",
     "Tooltip_RenewableEnergy_SolarWall": "One module on an outside wall, facing south or east. Best in winter; snow slides off, and storms can't reach it.",

@@ -48,7 +48,7 @@ Bank.SAVED_FIELDS = {
 -- bank's floor.
 local BACKUP_REACH = 3
 -- Vanilla bills generators in fuel per hour per unit of power; a unit is this many watts.
-local WATTS_PER_FUEL_UNIT = Specs.loads.other.wattsPerConsumption
+local WATTS_PER_FUEL_UNIT = Specs.wattsPerFuel
 
 -- How the bank runs each family of source (RenewableEnergy.Sources): connect(player, source,
 -- isoObject, facing, material), if any, fills a newly connected source's record and teaches

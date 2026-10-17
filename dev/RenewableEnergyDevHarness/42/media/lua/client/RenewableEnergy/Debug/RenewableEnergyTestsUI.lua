@@ -705,7 +705,7 @@ test("renewable_energy_ui_window_reflects_status", {
             T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
             T.bankSet(self, bank, { on = true })
             T.bankPass(self, bank, 1000)
-            T.applyLoad(self, bank, { "television", "light", "light", "fridge" })
+            T.applyLoad(self, bank, { "television", "light", "light", "fridgeFreezer" })
         end)
         waitForLoad(self, bank)
     end,
@@ -716,7 +716,7 @@ test("renewable_energy_ui_window_reflects_status", {
         local status = T.clientStatus(self.bank)
         if not expect(status ~= nil, "the bank sent no status") then return end
         local summary = StatusWindow.summary(status)
-        local load = Specs.loads.television.watts + 2 * Specs.loads.light.watts + Specs.loads.fridge.watts
+        local load = T.applianceWatts({ "television", "light", "light", "fridgeFreezer" })
         local limit = Specs.inverters["RenewableEnergy.PlugInInverter"].watts
         expect(hasLine(summary, getText("IGUI_RenewableEnergy_Overloaded", Format.watts(load), Format.watts(limit))),
             "the window doesn't say the bank is overloaded with " .. load .. " W on " .. limit .. " W")
@@ -724,7 +724,7 @@ test("renewable_energy_ui_window_reflects_status", {
             "without its controller the slots line doesn't read 3 inputs of " .. Specs.freeSlots)
         local left, right = StatusWindow.rows(status, self.bank.position)
         local lights = rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
-        expect(lights ~= nil and lights.value == Format.watts(2 * Specs.loads.light.watts), "the window doesn't list 2 lights and their watts")
+        expect(lights ~= nil and lights.value == Format.watts(T.applianceWatts({ "light", "light" })), "the window doesn't list 2 lights and their watts")
         local charger = rowLabelled(left, getItemNameFromFullType("Base.CarBatteryCharger"))
         expect(charger ~= nil and charger.color == "bad" and charger.value == getText("IGUI_RenewableEnergy_PartBroken", "0%"),
             "a broken charger doesn't read broken (" .. tostring(charger and charger.value) .. ")")

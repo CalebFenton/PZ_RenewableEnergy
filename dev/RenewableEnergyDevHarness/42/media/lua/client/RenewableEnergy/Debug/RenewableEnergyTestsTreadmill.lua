@@ -10,8 +10,7 @@ local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmil
 
 local CAR_BATTERY = "Base.CarBattery1"
 local INVERTER = "RenewableEnergy.PlugInInverter"
--- A bank big enough to power an indoor square of the test map's house: the starter box (a car
--- battery and a plug-in inverter) leaves it unpowered there.
+-- A bank whose inverter carries whatever the test map's house has switched on, a run included.
 local L16 = "RenewableEnergy.L16Battery"
 local INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
 -- A pass this long barely moves a bank's batteries.
@@ -321,7 +320,7 @@ test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
     end,
     validate = function(self)
         local before, during, after = self.before.status, self.during.status, self.bank.state.status
-        local watts = Specs.loads.treadmill.watts
+        local watts = Specs.treadmill.drawFuel * Specs.wattsPerFuel
         T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, watts, 0.01)
         T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
             watts / Specs.inverterEfficiency, 0.01)

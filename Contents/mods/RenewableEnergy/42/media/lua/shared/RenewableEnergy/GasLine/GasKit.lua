@@ -36,12 +36,14 @@ GasKit.HOSE_SQUARES = 5
 -- Litres an empty-tanked generator on gas shows, enough for vanilla to keep it running between
 -- passes, after a long absence too.
 GasKit.PHANTOM_FUEL = 2
--- A generator carries this many watts on gas, about 60 % of a 1990s 5 kW portable: an engine
--- loses a third or more of its power on gas.
-GasKit.CAP_W = 3000
--- Gas an engine burns, m³ an hour, idling and per kilowatt it delivers: small gensets on biogas.
+-- A generator carries this many watts on gas, about 60 % of a 1990s 5 kW portable (an engine
+-- loses a third or more of its power on gas), at 3.2 times its real watts as Specs rates sources.
+GasKit.CAP_W = 9600
+-- Gas an engine burns, m³ an hour, idling and per kilowatt it delivers: small gensets on biogas
+-- burn 0.8 m³ a real kWh, and a kWh here is a real one / 3.2 (Specs rates appliances at 3.2 times
+-- their real watts), so a fridge costs the gas it really would.
 GasKit.IDLE_M3_PER_HOUR = 0.3
-GasKit.M3_PER_KWH = 0.8
+GasKit.M3_PER_KWH = 0.25
 
 --- Gas a generator delivering `watts` burns over `hours`, in m³.
 function GasKit.gasFor(watts, hours)

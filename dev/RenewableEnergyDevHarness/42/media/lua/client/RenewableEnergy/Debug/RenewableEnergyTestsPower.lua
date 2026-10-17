@@ -289,7 +289,7 @@ test("renewable_energy_power_bank_refused_outdoors", {
 -- charge, and the charge, the status and the tile's battery overlays reach this client's copies.
 test("renewable_energy_power_panel_charges_bank", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.2 })
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         self.bank = bank
@@ -421,9 +421,9 @@ test("renewable_energy_power_panel_slots", {
     end,
 })
 
--- The bank's limit is its working inverters' ratings together. A Plug-in Inverter runs a TV and
--- a lamp, or a fridge-freezer and a lamp, but not all three. A broken inverter's loss shows in this
--- client's summary.
+-- The bank's limit is its working inverters' ratings together. At vanilla's figures a Plug-in
+-- Inverter runs a fridge-freezer and a lamp, or a TV, a radio and a lamp, but not the fridge-freezer
+-- and the TV. A broken inverter's loss shows in this client's summary.
 test("renewable_energy_power_inverter_limits", {
     run = function(self)
         self.box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", PLUG_IN_INVERTER })
@@ -431,8 +431,6 @@ test("renewable_energy_power_inverter_limits", {
             { "Base.CarBattery1", "RenewableEnergy.PowerInverter", "RenewableEnergy.PowerInverter" })
         if not self.bank then return end
         T.batch(function()
-            T.server(self, "loadWatts", { sets = { { "television", "light" }, { "fridgeFreezer", "light" },
-                { "fridgeFreezer", "television", "light" } } })
             T.bankState(self, self.box)
             T.bankState(self, self.bank)
             T.step(function() self.twoInverters = self.bank.state.limitW end)
@@ -444,10 +442,10 @@ test("renewable_energy_power_inverter_limits", {
         end, "this client's summary with the broken inverter's limit")
     end,
     validate = function(self)
-        local limit, watts = self.box.state.limitW, self.server.loadWatts.watts
-        expect(watts[1] <= limit, "a Plug-in Inverter can't run a TV and a lamp")
-        expect(watts[2] <= limit, "a Plug-in Inverter can't run a fridge-freezer and a lamp")
-        expect(watts[3] > limit, "a Plug-in Inverter runs a fridge-freezer, a TV and a lamp")
+        local limit = self.box.state.limitW
+        expect(T.applianceWatts({ "fridgeFreezer", "light" }) <= limit, "a Plug-in Inverter can't run a fridge-freezer and a lamp")
+        expect(T.applianceWatts({ "television", "radio", "light" }) <= limit, "a Plug-in Inverter can't run a TV, a radio and a lamp")
+        expect(T.applianceWatts({ "fridgeFreezer", "television" }) > limit, "a Plug-in Inverter runs a fridge-freezer and a TV")
         local inverterW = Specs.inverters["RenewableEnergy.PowerInverter"].watts
         expectNear("limit of two Power Inverters", self.twoInverters, 2 * inverterW, 0)
         expectNear("limit with one of them broken", self.bank.state.limitW, inverterW, 0)
@@ -468,7 +466,7 @@ test("renewable_energy_power_overload_cuts_and_returns", {
         T.switchOn(self, bank)
         T.applyLoad(self, bank, { "television", "light" })
         T.step(function() self.fitting = bank.state.activated end)
-        T.applyLoad(self, bank, { "television", "light", "fridge" })
+        T.applyLoad(self, bank, { "television", "light", "fridgeFreezer" })
         T.step(function() self.cut = not bank.state.activated and bank.state.status end)
         T.waitFor(self, function()
             local status = T.clientStatus(bank)
@@ -479,7 +477,7 @@ test("renewable_energy_power_overload_cuts_and_returns", {
     end,
     validate = function(self)
         expect(self.fitting, "a TV and a lamp didn't run on a charged bank with a Plug-in Inverter")
-        if not expect(self.cut, "a fridge on top of them didn't cut the power") then return end
+        if not expect(self.cut, "a fridge-freezer on top of them didn't cut the power") then return end
         local status = self.cut
         expect(status.overloaded and status.state == "overloaded", "the status doesn't read overloaded (state " .. tostring(status.state) .. ")")
         expect(status.loadW > status.limitW, "the cut bank's status shows " .. tostring(status.loadW) .. " W of load on a "
@@ -630,10 +628,7 @@ test("renewable_energy_power_bank_powers_at_night", {
     validate = function(self)
         local after = self.bank.state
         expect(self.powered, "switching on a charged bank with an inverter did not power its square")
-        local loadW = 0
-        for _, name in ipairs({ "fridge", "television", "light" }) do
-            loadW = loadW + Specs.loads[name].watts
-        end
+        local loadW = T.applianceWatts({ "fridge", "television", "light" })
         expect(self.idleW > 0, "a bank that is on with nothing switched on draws nothing for its inverter")
         expect(self.drawW - self.idleW > loadW, string.format(
             "a fridge, a TV and a lamp drawing %.1f W add %.1f W to the draw, no inverter losses", loadW, self.drawW - self.idleW))
@@ -1327,10 +1322,10 @@ test("renewable_energy_power_generator_fuel_follows_battery_room", {
         expectNear("fuel the chargers burned on a full bank", burned("full"), 0, 0)
         expectNear("charger watts into a full bank", self.full.status.chargerW, 0, 0)
         -- A bank pass lasts an hour unless told otherwise. Vanilla bills a generator a unit of fuel an
-        -- hour for each Specs.loads.other.wattsPerConsumption watts, times the fuel consumption option.
+        -- hour for each Specs.wattsPerFuel watts, times the fuel consumption option.
         local roomWh = (1 - self.low) * self.room.nominalWh
         local filledWh = math.min(self.chargersW, roomWh)
-        local fuel = filledWh / Specs.loads.other.wattsPerConsumption * SandboxVars.GeneratorFuelConsumption
+        local fuel = filledWh / Specs.wattsPerFuel * SandboxVars.GeneratorFuelConsumption
         expect(self.chargersW > 0 and roomWh > 0 and fuel > 0, "the bank with room in its batteries bills no fuel")
         expectNear("fuel the chargers burned filling the room", burned("room"), fuel, fuel * 0.01)
         expectNear("the bank's charge after the chargers filled it", self.room.charge,

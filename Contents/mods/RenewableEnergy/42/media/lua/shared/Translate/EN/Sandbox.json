@@ -1,7 +1,7 @@
 {
     "Sandbox_RenewableEnergy": "Renewable Energy",
     "Sandbox_RenewableEnergy_SunlightMultiplier": "Sunlight Multiplier",
-    "Sandbox_RenewableEnergy_SunlightMultiplier_tooltip": "Multiplies what solar panels make.<br>1 is what 1993 panels really made in Kentucky: about 190 Wh a day per 50 W module on a tilted rack in an average July and 120 in December, against the 2 kWh a day a fridge-freezer uses.<br>Raise it if you'd rather not spend the game chasing panels.",
+    "Sandbox_RenewableEnergy_SunlightMultiplier_tooltip": "Multiplies what solar panels make.<br>1 is Kentucky's real sunlight: a module on a tilted rack makes about 610 Wh a day in an average July and 380 in December, against the 6.2 kWh a day a fridge-freezer uses, as many modules to a fridge as in 1993.<br>Raise it if you'd rather not spend the game chasing panels.",
     "Sandbox_RenewableEnergy_BiogasMultiplier": "Biogas Multiplier",
     "Sandbox_RenewableEnergy_BiogasMultiplier_tooltip": "Multiplies the gas digesters make from their feed.<br>1 is what a real digester makes. The game's animals drop a cow's manure about every other day where a real cow makes 30 kg a day, so 1 needs a big herd.",
     "Sandbox_RenewableEnergy_BatteryWear": "Battery Wear",

@@ -1,10 +1,10 @@
 -- What a bank powers: every switched-on appliance in its reach, in watts, an unwired treadmill
 -- while a run draws power through it, and the running generators whose reach covers the bank.
 --
--- The engine says whether an object draws power (getGeneratorPowerConsumption reads the
--- appliance's own switch, powered or not, so a bank that cut its power still sees what would
--- draw when it comes back) but its figures are fuel rates, so each kind of appliance gets its
--- 1993 wattage from Specs.loads. The reach is the engine's own for every generator: one radius
+-- The engine says whether an object draws power and how much: getGeneratorPowerConsumption reads
+-- the appliance's own switch, powered or not, so a bank that cut its power still sees what would
+-- draw when it comes back, and its figure, generator fuel an hour, comes to watts at
+-- Specs.wattsPerFuel. The reach is the engine's own for every generator: one radius
 -- from the GeneratorTileRange sandbox option and GeneratorVerticalPowerRange floors up and down
 -- (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power. A generator
 -- powers a square exactly when the square is in that reach of the generator
@@ -24,11 +24,12 @@ RenewableEnergy = RenewableEnergy or {}
 local Loads = {}
 RenewableEnergy.Loads = Loads
 
-local LOADS = RenewableEnergy.Specs.loads
+local Specs = RenewableEnergy.Specs
+local WATTS_PER_FUEL = Specs.wattsPerFuel
 local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
--- The Specs.loads kind of an object with a fridge or freezer container, as vanilla bills it: by
--- its containers alone, so a mini fridge with its ice box is a fridge-freezer.
+-- The kind of an object with a fridge or freezer container, as vanilla bills it: by its
+-- containers alone, so a mini fridge with its ice box is a fridge-freezer.
 local function fridgeKind(object)
     if object:getContainerByType("fridge") and object:getContainerByType("freezer") then
         return "fridgeFreezer"
@@ -36,42 +37,51 @@ local function fridgeKind(object)
     return "fridge"
 end
 
--- Adds to `load` each appliance `object` runs now.
-local function addAppliances(load, object)
+-- The kind the status lists `object` as (StatusWindow's LOAD_KINDS).
+local function kindOf(object)
     if instanceof(object, "IsoStove") then
-        Loads.add(load, object:isMicrowave() and "microwave" or "range")
+        return object:isMicrowave() and "microwave" or "range"
     elseif instanceof(object, "IsoLightSwitch") then
-        Loads.add(load, "light")
+        return "light"
     elseif instanceof(object, "IsoTelevision") then
-        Loads.add(load, "television")
+        return "television"
     elseif instanceof(object, "IsoRadio") then
-        Loads.add(load, "radio")
+        return "radio"
     elseif instanceof(object, "IsoCarBatteryCharger") then
-        Loads.add(load, "batteryCharger")
+        return "batteryCharger"
     elseif instanceof(object, "IsoClothingWasher") then
-        Loads.add(load, "washer")
+        return "washer"
     elseif instanceof(object, "IsoClothingDryer") then
-        Loads.add(load, "dryer")
+        return "dryer"
     elseif instanceof(object, "IsoCombinationWasherDryer") then
-        Loads.add(load, object:isModeDryer() and "dryer" or "washer")
-    elseif instanceof(object, "IsoStackedWasherDryer") then
-        if object:isWasherActivated() then Loads.add(load, "washer") end
-        if object:isDryerActivated() then Loads.add(load, "dryer") end
+        return object:isModeDryer() and "dryer" or "washer"
     elseif object:getPipedFuelAmount() <= 0 and object:getContainerByEitherType("fridge", "freezer") then
-        Loads.add(load, fridgeKind(object))
+        return fridgeKind(object)
+    end
+    return "other"
+end
+
+-- Adds to `load` each appliance `object` runs now, at vanilla's figure for it.
+local function addAppliances(load, object)
+    local watts = object:getGeneratorPowerConsumption() * WATTS_PER_FUEL
+    if instanceof(object, "IsoStackedWasherDryer") then
+        -- Vanilla bills the two halves together, the same for each.
+        local washer, dryer = object:isWasherActivated(), object:isDryerActivated()
+        local halves = (washer and 1 or 0) + (dryer and 1 or 0)
+        if washer then Loads.add(load, "washer", watts / halves) end
+        if dryer then Loads.add(load, "dryer", watts / halves) end
     else
-        Loads.add(load, "other", object:getGeneratorPowerConsumption() * LOADS.other.wattsPerConsumption)
+        Loads.add(load, kindOf(object), watts)
     end
 end
 
---- A new, empty load for Loads.add: `watts` it takes, and per Specs.loads kind its count and watts.
+--- A new, empty load for Loads.add: `watts` it takes, and per kind its count and watts.
 function Loads.new()
     return { watts = 0, kinds = {}, generators = {} }
 end
 
---- Add an appliance of Specs.loads kind `name` to `load`.
+--- Add an appliance of kind `name` (StatusWindow's LOAD_KINDS) drawing `watts` to `load`.
 function Loads.add(load, name, watts)
-    watts = watts or LOADS[name].watts
     load.watts = load.watts + watts
     local kind = load.kinds[name] or { count = 0, watts = 0 }
     kind.count = kind.count + 1
@@ -124,7 +134,7 @@ function Loads.scan(square)
             if drawsFromGenerator(object, allowExterior) then
                 addAppliances(load, object)
             elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior) then
-                Loads.add(load, "treadmill")
+                Loads.add(load, "treadmill", Specs.treadmill.drawFuel * WATTS_PER_FUEL)
             elseif isRunningGenerator(object) then
                 table.insert(load.generators, object)
             end

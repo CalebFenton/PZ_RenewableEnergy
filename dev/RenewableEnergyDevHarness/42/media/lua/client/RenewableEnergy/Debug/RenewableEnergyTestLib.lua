@@ -268,11 +268,31 @@ function T.bankPass(self, bank, light, opts)
     onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours, windKph = opts.windKph })
 end
 
---- Queues replacing the measured load of `bank` with appliances of the Specs.loads kinds
---- `names`, as if the scan had found them switched on, and letting the bank react: cut or restore
---- its power and send its status. The next pass measures the real load again.
+-- What vanilla bills a generator for an appliance of each kind the status lists, in fuel an hour
+-- (IsoGenerator's *PowerConsumption constants), for loads the tests make up.
+local APPLIANCE_FUEL = {
+    fridgeFreezer = 0.13, fridge = 0.08, light = 0.002, television = 0.03, radio = 0.01,
+    microwave = 0.09, range = 0.09, washer = 0.09, dryer = 0.09, batteryCharger = 0.05,
+}
+
+--- The watts appliances of the kinds `names` draw together, at vanilla's figures.
+function T.applianceWatts(names)
+    local watts = 0
+    for _, name in ipairs(names) do
+        watts = watts + APPLIANCE_FUEL[name] * RenewableEnergy.Specs.wattsPerFuel
+    end
+    return watts
+end
+
+--- Queues replacing the measured load of `bank` with appliances of the kinds `names`
+--- (T.applianceWatts), as if the scan had found them switched on, and letting the bank react: cut
+--- or restore its power and send its status. The next pass measures the real load again.
 function T.applyLoad(self, bank, names)
-    onBank(self, bank, "applyLoad", { names = names })
+    local appliances = {}
+    for i, name in ipairs(names) do
+        appliances[i] = { name = name, watts = T.applianceWatts({ name }) }
+    end
+    onBank(self, bank, "applyLoad", { appliances = appliances })
 end
 
 --- Queues setting fields of the server's record of `bank` (`charge`, `on`), and writing its

@@ -252,8 +252,8 @@ end)
 onBank("applyLoad", function(record, _, args)
     local Loads = RenewableEnergy.Loads
     local load = Loads.new()
-    for _, name in ipairs(args.names or {}) do
-        Loads.add(load, name)
+    for _, appliance in ipairs(args.appliances or {}) do
+        Loads.add(load, appliance.name, appliance.watts)
     end
     record.loadW, record.loadByKind = load.watts, Loads.byKind(load)
     record:checkOverload()
@@ -439,20 +439,6 @@ onBank("rebuildBank", function(_, bank, args, _, defer)
 end)
 
 -- Loads -------------------------------------------------------------------------------------------
-
--- The watts each list of Specs.loads kinds in `args.sets` takes.
-handler("loadWatts", function(_, args)
-    local Loads = RenewableEnergy.Loads
-    local watts = {}
-    for i, names in ipairs(args.sets or {}) do
-        local load = Loads.new()
-        for _, name in ipairs(names) do
-            Loads.add(load, name)
-        end
-        watts[i] = load.watts
-    end
-    return { watts = watts }
-end)
 
 -- What the load scan of the bank on the square at `args` finds: its watts and the count of each
 -- kind.

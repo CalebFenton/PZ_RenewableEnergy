@@ -1,7 +1,11 @@
 -- What each piece of the mod's power hardware is rated for, in watts and watt-hours.
 --
--- Code that needs a rating reads it here, so balancing changes only this file. The ratings
--- start from the specifications of 1993 parts.
+-- Code that needs a rating reads it here, so balancing changes only this file. Appliances draw
+-- what vanilla bills a generator for them (Specs.wattsPerFuel), which puts a fridge-freezer at
+-- about 3.2 times a real one's watts. What feeds them (modules, wind chargers, a treadmill) is
+-- rated at 3.2 times its 1993 specification, so a fridge takes the panels it really would, and
+-- inverters by what they should carry. Batteries hold their real watt-hours, which vanilla's
+-- charger ties to its generator fuel.
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs = {}
@@ -23,11 +27,15 @@ Specs.batteries = {
 -- inverters), the watts it draws itself while on, the watts its built-in charger puts into the
 -- bank from grid or generator power (0 for none), and the Electricity level wiring it in needs and
 -- the Electricity XP of the first time one is ever wired in (over Specs.wiring.inverter's).
--- The Plug-in Inverter carries a TV and one lamp, or a fridge-freezer and one lamp, but not all three.
+-- The Plug-in Inverter carries a fridge-freezer and the lights, or the TV, the radio and the lights,
+-- but not the fridge-freezer and the TV. The Power Inverter carries both, with a freezer or one of
+-- the range, the microwave, the washer and the dryer. An Inverter/Charger carries a fridge-freezer,
+-- a freezer, the TV, the lights, the washer and the microwave together; the range and the dryer as
+-- well take two.
 Specs.inverters = {
-    ["RenewableEnergy.PlugInInverter"] = { watts = 150, idle = 4, chargerWatts = 0, wiring = { skill = 0, xp = 10 } },
+    ["RenewableEnergy.PlugInInverter"] = { watts = 300, idle = 4, chargerWatts = 0, wiring = { skill = 0, xp = 10 } },
     ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wiring = { skill = 2, xp = 15 } },
-    ["RenewableEnergy.InverterCharger"] = { watts = 2500, idle = 15, chargerWatts = 1500, wiring = { skill = 4, xp = 25 } },
+    ["RenewableEnergy.InverterCharger"] = { watts = 1000, idle = 15, chargerWatts = 1500, wiring = { skill = 4, xp = 25 } },
 }
 
 -- A 1993 modified-sine inverter turns about this much of the battery's power into AC.
@@ -54,10 +62,10 @@ Specs.slotsPerController = 7
 -- `furledShare` of its rating, and breaks only in the worst.
 Specs.wind = {
     turbines = {
-        scoop = { slots = 1, watts = 150, cutInKph = 8, ratedKph = 50 },
-        propeller = { slots = 2, watts = 500, cutInKph = 10, ratedKph = 40, breakKph = 55, breakPerHour = 0.25,
+        scoop = { slots = 1, watts = 480, cutInKph = 8, ratedKph = 50 },
+        propeller = { slots = 2, watts = 1600, cutInKph = 10, ratedKph = 40, breakKph = 55, breakPerHour = 0.25,
             blades = { "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades" } },
-        alternator = { slots = 3, watts = 1000, cutInKph = 9, ratedKph = 40, furlKph = 55, furledShare = 0.3,
+        alternator = { slots = 3, watts = 3200, cutInKph = 9, ratedKph = 40, furlKph = 55, furledShare = 0.3,
             breakKph = 90, breakPerHour = 0.1, blades = { "RenewableEnergy.SteelBlades" } },
     },
     -- Each level it stands above the ground adds this share, up to maxBonusLevel.
@@ -69,20 +77,21 @@ Specs.wind = {
 }
 
 -- A treadmill (RenewableEnergy.Treadmill): what wiring it to a bank takes (as a bank part's,
--- Specs.wiring), the watts a runner then puts in (an hour of running is about an hour of TV), how
--- long one run lasts, wired or not, and what an hour of it costs and teaches. Unwired, a run draws
--- Specs.loads.treadmill instead.
+-- Specs.wiring), the watts a runner then puts in (an hour of running is about an hour of a
+-- fridge-freezer), how long one run lasts, wired or not, and what an hour of it costs and teaches.
+-- Unwired, a run draws `drawFuel` (Specs.wattsPerFuel): vanilla has no treadmill figure, so it
+-- bills one as its other motor appliances, the washer, the dryer and the stove.
 Specs.treadmill = {
     slots = 1,
     wiring = { seconds = 90, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 2, xp = 10 },
-    watts = 75, runMinutes = 30,
+    watts = 240, runMinutes = 30, drawFuel = 0.09,
     endurancePerHour = 0.6, thirstPerHour = 0.2,
     xpPerHour = { Fitness = 20, Sprinting = 15 },
 }
 
 -- Watts each Car Battery Charger wired into a bank puts in while grid or generator power
 -- reaches the bank: vanilla's charger fills a car battery in 6 hours (IsoCarBatteryCharger
--- chargeRate 1/6 an hour), so 600 Wh / 6 h, as Specs.loads.batteryCharger bills one standing alone.
+-- chargeRate 1/6 an hour), so 600 Wh / 6 h, what one standing alone draws (Specs.wattsPerFuel).
 Specs.chargerWatts = 100
 
 -- Condition each kind of bank part loses per hour while its bank powers its area, and per overload
@@ -95,11 +104,12 @@ Specs.partWear = {
 -- (as vanilla's ISFixGenerator).
 Specs.partRepair = { condition = 10, skill = 2, xp = 5 }
 
--- Solar modules by item type: rated watts at condition 100. A module makes its rating times its
--- condition / 100, so a homemade one, whose ConditionMax is lower, tops out lower.
+-- Solar modules by item type: rated watts at condition 100, 3.2 times a 1993 module's 50 W. A
+-- module makes its rating times its condition / 100, so a homemade one, whose ConditionMax is
+-- lower, tops out lower.
 Specs.modules = {
-    ["RenewableEnergy.SolarModule"] = { watts = 50 },
-    ["RenewableEnergy.HomemadeSolarModule"] = { watts = 50 },
+    ["RenewableEnergy.SolarModule"] = { watts = 160 },
+    ["RenewableEnergy.HomemadeSolarModule"] = { watts = 160 },
 }
 -- The factory-made module: what a panel holds when nothing recorded its modules, and what
 -- world spawns place.
@@ -184,28 +194,11 @@ Specs.foundCharge = { min = 0.3, max = 0.8 }
 -- How far a panel may be from the bank it is connected to, in tiles and in floors.
 Specs.sourceReach = { tiles = 20, levels = 3 }
 
--- What appliances draw while on, in watts: one figure, which the inverters must carry and the
--- batteries or a gas line pay for. Where vanilla's IsoObject:getGeneratorPowerConsumption is a real
--- average it keeps vanilla's ratio: a fridge with a freezer (0.13) 80 W, mini fridges included, and
--- a fridge or a freezer alone (0.08) 50 W. Where vanilla's figure is only a fuel token, it is the 1993 watts.
-Specs.loads = {
-    fridgeFreezer = { watts = 80 },
-    fridge = { watts = 50 },
-    light = { watts = 60 },
-    television = { watts = 65 },
-    radio = { watts = 10 },
-    microwave = { watts = 1000 },
-    range = { watts = 2000 },
-    washer = { watts = 500 },
-    dryer = { watts = 4000 },
-    batteryCharger = { watts = 100 },
-    -- An unwired treadmill while a run is on it. Vanilla has no treadmill figure, so it takes the
-    -- 0.09 vanilla gives its motor appliances (washer, dryer, stove) at `other`'s 600 W a unit:
-    -- about a TV, which any inverter carries.
-    treadmill = { watts = 54 },
-    -- Anything else the engine says draws power, gas pumps included: watts per unit of
-    -- IsoObject:getGeneratorPowerConsumption, so that a fridge-freezer's 0.13 comes to 80 W.
-    other = { wattsPerConsumption = 600 },
-}
+-- Watts per unit of what vanilla bills a generator for a switched-on appliance
+-- (IsoObject:getGeneratorPowerConsumption, fuel an hour before the GeneratorFuelConsumption
+-- option), so appliances keep vanilla's balance and follow its changes. Vanilla's car battery
+-- charger is billed 0.05 and fills a 600 Wh car battery in 6 hours: 100 W. A fridge-freezer (0.13)
+-- comes to 260 W, a stove, washer or dryer (0.09) 180 W, a TV (0.03) 60 W and a light (0.002) 4 W.
+Specs.wattsPerFuel = 2000
 
 return Specs

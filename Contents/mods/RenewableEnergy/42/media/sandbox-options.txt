@@ -1,8 +1,8 @@
 VERSION = 1,
 /*
-    Sunlight multiplier: 1 is what 1993 modules really made in Kentucky. The default puts a
-    fridge-freezer at four or five modules in an average July and about eight on racks in
-    December, so that each one you find matters.
+    Sunlight multiplier: 1 is Kentucky's real sunlight, as many modules to a fridge as in 1993.
+    The default puts a fridge-freezer at four or five modules in an average July and about eight
+    on racks in December, so that each one you find matters.
 */
 option RenewableEnergy.SunlightMultiplier {
 	page = RenewableEnergy, translation = RenewableEnergy_SunlightMultiplier,
