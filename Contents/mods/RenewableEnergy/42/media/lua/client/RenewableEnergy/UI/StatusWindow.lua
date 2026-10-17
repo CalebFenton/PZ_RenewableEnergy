@@ -193,6 +193,7 @@ local LOAD_KINDS = {
     washer = "IGUI_RenewableEnergy_LoadWasher",
     dryer = "IGUI_RenewableEnergy_LoadDryer",
     batteryCharger = "IGUI_RenewableEnergy_LoadBatteryCharger",
+    treadmill = "IGUI_RenewableEnergy_Treadmill",
     other = "IGUI_RenewableEnergy_LoadOther",
 }
 

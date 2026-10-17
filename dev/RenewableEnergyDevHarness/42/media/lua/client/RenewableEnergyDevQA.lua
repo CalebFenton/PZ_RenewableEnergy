@@ -1,9 +1,10 @@
 -- Development only. The setup of the Renewable Energy QA debug scenario
 -- (RenewableEnergyDebugScenario.lua), for playing through the mod by hand: a character nothing can
 -- see or hurt, who carries anything, knows every recipe of the mod and has every skill it reads,
--- with laid out on the ground nearby, a square to each item type, every item of the mod, enough of
--- every recipe's inputs to make each recipe once, what the menu jobs take, the crafting stations,
--- a treadmill, and a car with the arrow board trailer behind it.
+-- holding toolboxes with the small tools the mod's recipes and menu jobs take, and nearby, laid out
+-- on the ground in a group of rows for each of the mod's systems, a square to each item type: every
+-- item of the mod, enough of every recipe's other inputs to make each recipe once, what the menu
+-- jobs take, the crafting stations, a treadmill, and a car with the arrow board trailer behind it.
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 
@@ -16,36 +17,142 @@ QA.START = { x = 10469, y = 10121, z = 0 }
 local MARK = "REQA"
 -- Squares a row of the layout spans east, and the most rows it may take before giving up.
 local ROW, MAX_ROWS = 20, 60
--- The rows of open ground the whole layout takes, which the closest such lot is looked for with.
+-- The rows of open ground looked for at the layout's head; the layout runs on south past them,
+-- around whatever stands there.
 local LOT_ROWS = 20
 -- Every perk the mod reads or trains (the tests' `perks` setting) goes to this level.
 local SKILL = 10
 -- The batteries and modules among the materials come worn, so that every repair recipe takes them.
 local WORN_BATTERY, CRACKED_MODULE = 40, 30
 -- Inputs naming several items take the first listed here, else the harness's pick (T.inputItem),
--- which for a tag can differ from run to run.
-local PREFER = { "Base.EmptyJar", "Base.MetalDrum", "Base.Bucket", "Base.WaterBottle", "Base.Charcoal", "Base.HandDrill" }
+-- which for a tag can differ from run to run; so every tag input the recipes have is listed, and
+-- the layout and the toolboxes come out the same each run.
+local PREFER = {
+    "Base.EmptyJar", "Base.MetalDrum", "Base.Bucket", "Base.WaterBottle", "Base.Charcoal", "Base.HandDrill",
+    "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.SmithingHammer", "Base.Saw", "Base.KitchenKnife",
+    "Base.Pliers", "Base.Tongs", "Base.WeldingMask", "Base.Shovel", "Base.MasonsTrowel", "Base.Matches",
+    "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1",
+}
 
--- What the mod's menu jobs take, beyond its recipes, and what they work on: wiring parts into a
--- bank, repairing parts, connecting a bank, the battery charger, feeding and tending digesters,
--- fuelling and cleaning gasifiers, the gas kit and its line, the cell charger and garden lights.
+-- What the mod's menu jobs take, beyond its recipes and tools, and what they work on: wiring parts
+-- into a bank, repairing parts, connecting a bank, the battery charger, feeding and tending
+-- digesters, fuelling gasifiers, the gas kit and its line, the cell charger and garden lights.
 local JOB_ITEMS = {
     { "Base.ElectricWire", 40 }, { "Base.ElectronicsScrap", 10 }, { "Base.CarBatteryCharger", 2 },
     { "Base.CarBattery1", 1 }, { "Base.CarBattery2", 1 }, { "Base.CarBattery3", 1 }, { "Base.Generator", 1 },
-    { "Base.Wrench", 1 }, { "Base.Screwdriver", 1 }, { "Base.Hammer", 1 }, { "Base.Saw", 1 },
     { "Base.RubberHose", 10 }, { "Base.MetalPipe", 4 }, { "Base.Pipe", 2 }, { "Base.PropaneTank", 1 },
-    { "Base.TirePump", 1 }, { "Base.DuctTape", 2 },
+    { "Base.DuctTape", 2 },
     { "Base.Dung_Cow", 10 }, { "Base.Dung_Pig", 5 }, { "Base.Dung_Sheep", 5 }, { "Base.Dung_Chicken", 5 },
     { "Base.Dung_Turkey", 5 }, { "Base.Dung_Deer", 5 }, { "Base.HayTuft", 10 }, { "Base.GrassTuft", 10 },
     { "Base.CompostBag", 2 }, { "Base.Quicklime", 2 },
     { "Base.Log", 4 }, { "Base.FirewoodBundle", 4 }, { "Base.TwigsBundle", 2 }, { "Base.Twigs", 10 },
     { "Base.LargeBranch", 4 }, { "Base.Pinecone", 10 }, { "Base.Splinters", 10 }, { "Base.Charcoal", 10 },
-    { "Base.SteelWool", 4 }, { "Base.Straw2", 10 }, { "Base.Matches", 2 }, { "Base.Bellows", 1 },
-    { "Base.LargeBellows", 1 }, { "Base.Shovel", 1 }, { "Base.SnowShovel", 1 }, { "Base.Broom", 1 },
-    { "Base.Tarp", 2 }, { "Base.Garbagebag", 4 }, { "Base.EmptySandbag", 4 }, { "Base.BoltCutters", 1 },
-    { "Base.LightBulb", 4 }, { "Base.Battery", 6 }, { "Base.BakingSoda", 2 }, { "Base.Needle", 1 },
-    { "Base.Thread", 2 },
+    { "Base.SteelWool", 4 }, { "Base.Straw2", 10 }, { "Base.Matches", 2 },
+    { "Base.Tarp", 2 }, { "Base.Garbagebag", 4 }, { "Base.EmptySandbag", 4 },
+    { "Base.LightBulb", 4 }, { "Base.Battery", 6 }, { "Base.BakingSoda", 2 }, { "Base.Thread", 2 },
 }
+
+-- The tools the menu jobs take and keep, as their materials' `tool` and kept items name them: the
+-- wiring and the gas kit, sewing and upgrading a digester, filling a tank by pump, lighting a cold
+-- gasifier and cleaning out its ash, clearing snow off panels (Action.isSnowTool), and cutting the
+-- padlock off the trailer's battery box.
+local JOB_TOOLS = {
+    "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.Saw", "Base.Needle", "Base.TirePump", "Base.Bellows",
+    "Base.LargeBellows", "Base.Shovel", "Base.Broom", "Base.SnowShovel", "Base.BoltCutters",
+}
+
+-- The tools, those the recipes keep and JOB_TOOLS, go in toolboxes: vanilla's, as many as they
+-- fill. A kept item goes in only if vanilla files it as a tool (DisplayCategory Tool or
+-- ToolWeapon), so jars, gloves and knives a recipe keeps stay laid out, and only if lighter than
+-- the most a toolbox takes of one item (its MaxItemSize). The tools at that limit (the
+-- long-handled ones, the tire pump and the hand drill) stay laid out with the heavy ones, which
+-- leaves the rest two toolboxes, one for each hand: the crafting window takes items only from the
+-- bags the character holds or wears (ISInventoryPage:refreshBackpacks).
+local TOOLBOX = "Base.Toolbox"
+
+-- The layout's groups, in order, each from a row of its own. An item type goes in the group
+-- GROUP_TYPES lists it under, else in that of the longest prefix there (an entry ending in "*")
+-- it starts with, else in UNSORTED, which the summary lists. Stations has only the stations.
+local UNSORTED = "unsorted"
+local GROUPS = {
+    "solar", "wind", "treadmill", "bank", "batteries", "biogas", "woodgas", "gadgets", "vehicle", "reading",
+    "materials", UNSORTED, "stations",
+}
+local GROUP_TYPES = {
+    -- Modules, mounts, making and mending modules, and clearing snow off them.
+    solar = {
+        "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule", "RenewableEnergy.SolarCells",
+        "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWall*", "RenewableEnergy.SolarRack*",
+        "Base.GlassPanel", "Base.Epoxy", "Base.Glue", "Base.Calculator", "Base.Broom", "Base.SnowShovel",
+    },
+    -- Blades and alternators for the wind chargers.
+    wind = {
+        "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades", "RenewableEnergy.SteelBlades",
+        "RenewableEnergy.HomemadeAlternator", "Base.Speaker", "Base.NormalBrake*", "Base.OldBrake*",
+        "Base.ModernBrake*", "Base.KitchenKnife",
+    },
+    treadmill = { "RenewableEnergy.TreadmillMotor" },
+    -- Storage, and the parts wired into a bank.
+    bank = {
+        "RenewableEnergy.BatteryBox*", "RenewableEnergy.BatteryRack*", "RenewableEnergy.BatteryBank*",
+        "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger",
+        "RenewableEnergy.ChargeController", "RenewableEnergy.SolarFailsafe", "Base.CarBatteryCharger",
+        "Base.Amplifier", "Base.RemoteCraftedV3",
+    },
+    -- Batteries, and servicing, stripping, casting and rebuilding them.
+    batteries = {
+        "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery",
+        "RenewableEnergy.CarBatteryCase", "RenewableEnergy.DeepCycleBatteryCase", "RenewableEnergy.L16BatteryCase",
+        "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlate*", "RenewableEnergy.WoodenBatteryPlatePattern",
+        "RenewableEnergy.BatteryElectrolyte", "Base.CarBattery*", "Base.EmptyJar", "Base.JarCrafted",
+        "Base.ClayJarGlazed", "Base.Sandbag", "Base.Clay", "Base.LeadPipe", "Base.BakingSoda", "Base.RippedSheets",
+        "Base.Gloves_Dish",
+    },
+    -- Digesters, their feed and upkeep, filling tanks, and the gas kit, heater and generator the gas
+    -- goes to.
+    biogas = {
+        "Base.Dung_*", "Base.HayTuft", "Base.GrassTuft", "Base.CompostBag", "Base.Quicklime", "Base.Garbagebag",
+        "Base.EmptySandbag", "Base.Tarp", "Base.Thread", "Base.MetalDrum", "Base.Bucket", "Base.SteelWool",
+        "Base.Funnel", "Base.ClayBrick", "Base.BucketConcreteFull", "Base.MasonsTrowel", "Base.TirePump",
+        "Base.PropaneTank", "Base.Propane_Refill", "Base.Generator", "RenewableEnergy.FridgeCompressor",
+        "RenewableEnergy.GasConversionKit", "RenewableEnergy.GasHeater",
+    },
+    -- Gasifiers, their fuel and filter, cleaning them out, and wood vinegar.
+    woodgas = {
+        "RenewableEnergy.WoodAsh", "RenewableEnergy.TarryPacking", "Base.Log", "Base.FirewoodBundle",
+        "Base.TwigsBundle", "Base.Twigs", "Base.LargeBranch", "Base.Pinecone", "Base.Splinters", "Base.Straw2",
+        "Base.Charcoal", "Base.LargeBellows", "Base.Shovel", "Base.Mov_BinRound", "Base.Strainer",
+        "Base.NutsBolts", "Base.GardeningSprayEmpty",
+    },
+    gadgets = {
+        "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
+        "Base.LightBulb", "Base.Battery",
+    },
+    -- The arrow board trailer follows its items.
+    vehicle = { "Base.BoltCutters" },
+    reading = {
+        "RenewableEnergy.HomesteadPowerMag*", "RenewableEnergy.CrowcallRoadMap",
+        "RenewableEnergy.DixieTrailerParkMap", "RenewableEnergy.FemaPamphlet",
+    },
+    -- What every system is built from.
+    materials = {
+        "Base.Plank", "Base.Nails", "Base.Screws", "Base.ElectricWire", "Base.ElectronicsScrap",
+        "Base.SmallSheetMetal", "Base.SheetMetal", "Base.MetalBar", "Base.IronBar", "Base.MetalPipe", "Base.Pipe",
+        "Base.RubberHose", "Base.DuctTape", "Base.BlowTorch", "Base.WeldingRods", "Base.Matches",
+        "Base.WaterBottle", "Base.HandDrill",
+    },
+}
+
+local GROUP_OF, GROUP_PREFIXES = {}, {}
+for group, types in pairs(GROUP_TYPES) do
+    for _, entry in ipairs(types) do
+        if entry:sub(-1) == "*" then
+            GROUP_PREFIXES[entry:sub(1, -2)] = group
+        else
+            GROUP_OF[entry] = group
+        end
+    end
+end
 
 -- The crafting stations the recipes' tags ask for, as their entities and tiles; the forge is three
 -- tiles in a row, as its SpriteConfig's south face lays them out, east from its first.
@@ -137,9 +244,9 @@ local function modRecipes()
     return recipes
 end
 
--- What making every recipe once takes, by item type and the fluid it holds: each kept tool as many
--- as one recipe needs, everything used up as many as all of them together, and a drainable whose
--- uses a recipe counts one full item per recipe. Also the inputs no item can meet.
+-- What making every recipe once takes, by item type and the fluid it holds: `kept`, as many of a
+-- kept tool as one recipe needs, and `used`, as many of what is used up as all of them together,
+-- a drainable whose uses a recipe counts one full item per recipe. Also the inputs no item can meet.
 local function materials()
     local needs, order, unmatched = {}, {}, {}
     for _, recipe in ipairs(modRecipes()) do
@@ -161,23 +268,20 @@ local function materials()
                     local key = item:getFullName() .. (fluid and "+" .. fluid:getFluidTypeString() or "")
                     local need = needs[key]
                     if not need then
-                        need = { type = item:getFullName(), fluid = fluid, count = 0, kept = 0 }
+                        need = { type = item:getFullName(), fluid = fluid, used = 0, kept = 0 }
                         needs[key] = need
                         table.insert(order, need)
                     end
                     if input:isKeep() then
                         need.kept = math.max(need.kept, count)
                     else
-                        need.count = need.count + count
+                        need.used = need.used + count
                     end
                 else
                     table.insert(unmatched, recipe:getName() .. ": " .. input:getOriginalLine())
                 end
             end
         end
-    end
-    for _, need in ipairs(order) do
-        need.count = need.count + need.kept
     end
     table.sort(order, function(a, b)
         local ia, ib = getScriptManager():FindItem(a.type), getScriptManager():FindItem(b.type)
@@ -188,8 +292,13 @@ local function materials()
     return order, unmatched
 end
 
--- A new item of `fullType`, its fluid container filled with `fluid` if given, worn if it is a
--- battery or a module and `worn`.
+-- Whether items of `fullType` come worn when asked for worn: batteries and modules, so that every
+-- repair recipe takes them.
+local function wears(fullType)
+    return RenewableEnergy.Specs.batteries[fullType] ~= nil or RenewableEnergy.Specs.modules[fullType] ~= nil
+end
+
+-- A new item of `fullType`, its fluid container filled with `fluid` if given, worn if `worn`.
 local function newItem(fullType, fluid, worn)
     local item = instanceItem(fullType)
     if not item then
@@ -200,9 +309,9 @@ local function newItem(fullType, fluid, worn)
         container:Empty()
         container:addFluid(fluid, container:getCapacity())
     end
-    if worn and RenewableEnergy.Battery.isBattery(item) then
+    if worn and RenewableEnergy.Specs.batteries[fullType] then
         item:setCondition(WORN_BATTERY)
-    elseif worn and RenewableEnergy.Specs.modules[fullType] then
+    elseif worn then
         item:setCondition(CRACKED_MODULE)
     end
     return item
@@ -225,6 +334,77 @@ local function lay(layout, summary, fullType, count, fluid, worn)
         summary.items = summary.items + 1
     end
     summary.types = summary.types + 1
+end
+
+-- Adds to `stock` (a list of what the scenario hands out, in the order first asked for) `used`
+-- items of `fullType` that a job uses up and `kept` that one keeps, filled with `fluid` and worn if
+-- given. Asked for again alike, it adds the used and keeps the most kept.
+local function addStock(stock, fullType, used, kept, fluid, worn)
+    worn = worn and wears(fullType) or false
+    local key = fullType .. "+" .. (fluid and fluid:getFluidTypeString() or "") .. "+" .. tostring(worn)
+    local entry = stock.byKey[key]
+    if not entry then
+        entry = { type = fullType, fluid = fluid, worn = worn, used = 0, kept = 0 }
+        stock.byKey[key] = entry
+        table.insert(stock, entry)
+    end
+    entry.used = entry.used + used
+    entry.kept = math.max(entry.kept, kept)
+end
+
+-- Everything the scenario hands out: every item of the mod, what the recipes take, the batteries
+-- and modules among them worn, and what the menu jobs take.
+local function collectStock(summary)
+    local stock = { byKey = {} }
+    for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
+        addStock(stock, fullType, 1, 0)
+    end
+    local needs
+    needs, summary.unmatched = materials()
+    for _, need in ipairs(needs) do
+        addStock(stock, need.type, need.used, need.kept, need.fluid, true)
+    end
+    for _, entry in ipairs(JOB_ITEMS) do
+        addStock(stock, entry[1], entry[2], 0)
+    end
+    for _, fullType in ipairs(JOB_TOOLS) do
+        addStock(stock, fullType, 0, 1)
+    end
+    return stock
+end
+
+-- Puts the stock's small tools (TOOLBOX) in toolboxes in `player`'s inventory, starting a new one
+-- when the last has no room, and the first two in the hands. Room is counted with no character,
+-- by the toolbox's own capacity, which the Organized and Disorganized traits would change
+-- (ItemContainer.getEffectiveCapacity), so every character gets the same toolboxes. What a tool's
+-- entry has left to lay out stays in `entry.used`.
+local function packToolboxes(player, stock, summary)
+    local boxes, container = {}, nil
+    local maxSize = instanceItem(TOOLBOX):getMaxItemSize()
+    for _, entry in ipairs(stock) do
+        local script = entry.kept > 0 and PZHarness.startsWith(entry.type, "Base.") and getScriptManager():FindItem(entry.type)
+        local category = script and script:getDisplayCategory()
+        local weight = script and script:getActualWeight()
+        if (category == "Tool" or category == "ToolWeapon") and weight < maxSize then
+            for _ = 1, entry.kept do
+                if not (container and container:hasRoomFor(nil, weight)) then
+                    local box = player:getInventory():AddItem(instanceItem(TOOLBOX))
+                    table.insert(boxes, box)
+                    container = box:getItemContainer()
+                end
+                container:AddItem(newItem(entry.type))
+                summary.tools = summary.tools + 1
+            end
+            table.insert(summary.toolTypes, entry.type)
+            entry.kept = 0
+        end
+        entry.used = entry.used + entry.kept
+    end
+    summary.toolboxes = #boxes
+    player:setPrimaryHandItem(boxes[1])
+    player:setSecondaryHandItem(boxes[2])
+    -- So the inventory window shows the held toolboxes at once.
+    ISInventoryPage.dirtyUI()
 end
 
 local function placeStations(layout, summary)
@@ -284,6 +464,65 @@ local function placeTrailer(layout, summary)
     summary.trailer = true
 end
 
+-- One module shattered, for Take Apart Shattered Module.
+local function placeShattered(layout)
+    local square = nextSquare(layout)
+    if square then
+        local module = instanceItem(RenewableEnergy.Specs.factoryModule)
+        module:setCondition(0)
+        square:AddWorldInventoryItem(module, 0.5, 0.5, 0)
+    end
+end
+
+-- What each group sets after its items.
+local PLACE = { solar = placeShattered, treadmill = placeTreadmill, vehicle = placeTrailer, stations = placeStations }
+
+-- The group of an item type (GROUP_TYPES).
+local function groupOf(fullType)
+    local group, longest = GROUP_OF[fullType], 0
+    if group then
+        return group
+    end
+    for prefix, prefixGroup in pairs(GROUP_PREFIXES) do
+        if #prefix > longest and PZHarness.startsWith(fullType, prefix) then
+            group, longest = prefixGroup, #prefix
+        end
+    end
+    return group or UNSORTED
+end
+
+-- Lays out what the stock has left to lay, group by group in GROUPS' order, each group's items in
+-- the order the stock has them.
+local function layGroups(layout, stock, summary)
+    local members = {}
+    for _, group in ipairs(GROUPS) do
+        members[group] = {}
+    end
+    for _, entry in ipairs(stock) do
+        if entry.used > 0 then
+            local group = groupOf(entry.type)
+            if group == UNSORTED then
+                table.insert(summary.unsorted, entry.type)
+            end
+            table.insert(members[group], entry)
+        end
+    end
+    for _, group in ipairs(GROUPS) do
+        if #members[group] > 0 or PLACE[group] then
+            if summary.groups > 0 then
+                nextGroup(layout)
+            end
+            for _, entry in ipairs(members[group]) do
+                lay(layout, summary, entry.type, entry.used, entry.fluid, entry.worn)
+            end
+            if PLACE[group] then
+                PLACE[group](layout, summary)
+            end
+            summary.groups = summary.groups + 1
+        end
+    end
+end
+
 local function setUpCharacter(player)
     player:setGodMod(true)
     player:setInvisible(true)
@@ -303,46 +542,27 @@ end
 function QA.setup(player)
     getGameTime():setTimeOfDay(10)
     setUpCharacter(player)
-    local summary = { types = 0, items = 0, stations = 0, unknown = {}, unplaced = {}, unmatched = {} }
+    local summary = { types = 0, items = 0, groups = 0, stations = 0, tools = 0, toolboxes = 0, toolTypes = {},
+        unknown = {}, unplaced = {}, unmatched = {}, unsorted = {} }
+    local stock = collectStock(summary)
+    packToolboxes(player, stock, summary)
     local origin = layoutOrigin(player)
     if not origin then
         print(MARK .. " no open row of " .. ROW .. " squares within " .. Stage.SEARCH_RADIUS .. " squares")
         return summary
     end
     summary.lot = lotOpen(origin)
-    local layout = newLayout(origin)
     summary.origin = origin
-    for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
-        lay(layout, summary, fullType, 1)
-    end
-    nextGroup(layout)
-    local needs
-    needs, summary.unmatched = materials()
-    for _, need in ipairs(needs) do
-        lay(layout, summary, need.type, need.count, need.fluid, true)
-    end
-    -- One module shattered, for Take Apart Shattered Module.
-    local shattered = nextSquare(layout)
-    if shattered then
-        local module = instanceItem(RenewableEnergy.Specs.factoryModule)
-        module:setCondition(0)
-        shattered:AddWorldInventoryItem(module, 0.5, 0.5, 0)
-    end
-    nextGroup(layout)
-    for _, entry in ipairs(JOB_ITEMS) do
-        lay(layout, summary, entry[1], entry[2])
-    end
-    nextGroup(layout)
-    placeStations(layout, summary)
-    placeTreadmill(layout, summary)
-    placeTrailer(layout, summary)
+    layGroups(newLayout(origin), stock, summary)
     -- At the head of the layout, with a table to craft at beside it.
     PZHarness.Fixtures.teleportToMiddle(player, origin:getX(), origin:getY(), origin:getZ())
     PZHarness.Test.placeWorkTable(player)
-    print(string.format("%s laid out %d items of %d types from %d,%d (whole lot open: %s), %d stations, trailer %s",
-        MARK, summary.items, summary.types, origin:getX(), origin:getY(), tostring(summary.lot), summary.stations,
-        tostring(summary.trailer == true)))
-    for _, what in ipairs({ "unknown", "unplaced", "unmatched" }) do
+    print(string.format("%s laid out %d items of %d types in %d groups from %d,%d (whole lot open: %s), %d stations,"
+        .. " trailer %s; %d tools of %d types in %d toolboxes", MARK, summary.items, summary.types, summary.groups,
+        origin:getX(), origin:getY(), tostring(summary.lot), summary.stations, tostring(summary.trailer == true),
+        summary.tools, #summary.toolTypes, summary.toolboxes))
+    print(MARK .. " toolboxes: " .. table.concat(summary.toolTypes, ", "))
+    for _, what in ipairs({ "unknown", "unplaced", "unmatched", "unsorted" }) do
         if #summary[what] > 0 then
             print(MARK .. " " .. what .. ": " .. table.concat(summary[what], "; "))
         end

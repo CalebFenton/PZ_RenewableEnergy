@@ -1322,6 +1322,19 @@ def drum(col, name, at, look="MetalDrum", paint=None):
         _drum_patch(col, name + "_Rust", M("rust"), at, radius + (proud if on_hoop else 0), angle, z, size)
 
 
+def dropped_drum(col, look):
+    """One of the game's drums (DRUM_LOOKS) as its item, its bungs in its head. Its ground model lies
+    on its side, so a dropped drum can't pass for one standing installed. A standing drum's foot
+    is two caps in one plane, which the occlusion bake turns black, so a lying one shows a bottom
+    head of its own just below them, rimmed with a chime like its top."""
+    radius, height = DRUM
+    drum(col, "Drum", (0, 0), look)
+    for (x, y), bung in ((FEED_BUNG, 0.042), (GAS_BUNG, 0.026)):
+        cylinder(col, "Drum_Bung", M("darkgrey"), bung, 0.012, at=(x, y, height), segments=14)
+    cylinder(col, "Drum_Bottom", M(DRUM_LOOKS[look][0]), radius + 0.008, 0.004, at=(0, 0, -0.004), segments=32)
+    _ring(col, "Drum_BottomChime", M("weld"), (0, 0), radius - 0.002, -0.006, 0.011)
+
+
 def barrel_digester(col, look="MetalDrum", frame=True, holder=None, fill=3, torn=False, scrubber=False):
     """A homestead batch digester: a 55 gallon drum of slurry, any of the game's four (DRUM_LOOKS,
     by `look`), fed through a funnel taped into its big bung, the recipe's rubber hose run down
@@ -2621,12 +2634,14 @@ def _trailer_modules(col, front):
 
 # Item type -> builder of its ground model, of its icon when that shows more, the icon's camera
 # elevation in degrees when the 30 of a tile would show a flat thing edge on, and the ground
-# model's scale in Models.txt when it isn't models.WORLD_SCALE.
+# model's scale in Models.txt when it isn't models.GROUND_SCALE.
 #
-# The game draws its car battery at 0.19 x 0.13 x 0.14 m, about three quarters of a real one's
-# 0.26 x 0.17 x 0.20, so a battery built true to life lies on the ground half again as big as the
-# car battery beside it. The batteries, their cases and the plates and molds sized to fit them
-# shrink by as much; the parts stay real size for the icons and the battery storage tiles.
+# The game's car battery mesh at its model script's scale is 0.19 x 0.13 x 0.14 m, about three
+# quarters of a real one's 0.26 x 0.17 x 0.20, and the game draws it through the same 1.5 as ours
+# (models.GROUND_SCALE), a little larger than life. A battery at real size would lie on the ground
+# smaller than the car battery beside it, so the batteries, their cases and the plates and molds
+# sized to fit them take the car battery's own scale instead; the parts stay real size for the
+# icons and the battery storage tiles.
 BATTERY_GROUND_SCALE = 0.75
 ITEMS = {
     "SolarModule": {"model": solar_module, "icon_elevation": 55},
@@ -2686,6 +2701,11 @@ ITEMS = {
     "SteelBlades": {"model": steel_blades, "icon_elevation": 50},
     "HomemadeAlternator": {"model": homemade_alternator, "icon_elevation": 40},
 }
+
+# Vanilla items with no ground model of their own, which the game drops as a flat icon: the drums
+# the digesters are built from. Lua (RenewableEnergy/Drums.lua) points the items at these, and
+# they get no icon.
+GROUND_MODELS = {look: {"model": lying(dropped_drum, look=look)} for look in DRUM_LOOKS}
 
 # Vehicle -> builder of its body, and the part models cut out of it: model suffix -> (the prefixes
 # of the parts it takes, and how far they were built from where they belong). Every piece shares

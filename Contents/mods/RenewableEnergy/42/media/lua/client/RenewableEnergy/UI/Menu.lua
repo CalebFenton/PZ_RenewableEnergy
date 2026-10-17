@@ -420,19 +420,25 @@ end
 
 -- Treadmill ------------------------------------------------------------------------------------
 
--- Run on Treadmill and Unwire, for a wired treadmill, into its menu.
-local function addWiredTreadmillOptions(playerNum, menu, treadmill)
+-- Run on Treadmill, greyed saying why while it can't go (Treadmill.runRefusal).
+local function addRunOption(playerNum, menu, treadmill)
     local run = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
     Needs.refuse(run, Treadmill.runRefusal(treadmill))
+end
+
+-- Run on Treadmill and Unwire, for a wired treadmill, into its menu.
+local function addWiredTreadmillOptions(playerNum, menu, treadmill)
+    addRunOption(playerNum, menu, treadmill)
     local unwire = menu:addOption(getText("ContextMenu_RenewableEnergy_UnwireTreadmill"), playerNum, queueSource,
         Action.UNWIRE_TREADMILL, treadmill)
     Needs.refuse(unwire, lightOr(getSpecificPlayer(playerNum), Action.UNWIRE_TREADMILL))
 end
 
--- Wire to Bank, for a treadmill neither of whose tiles is wired yet.
+-- Run on Treadmill, on power, and Wire to Bank, for a treadmill neither of whose tiles is wired yet.
 function Menu.addTreadmillOptions(playerNum, context, treadmill)
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, Menu.nameOf(treadmill))
+    addRunOption(playerNum, menu, treadmill)
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireTreadmill"), playerNum, queueSource,
         Action.WIRE_TREADMILL, treadmill)
     Needs.show(option, Treadmill.needs(character), lightOr(character, Action.WIRE_TREADMILL))

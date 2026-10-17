@@ -5,9 +5,11 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
 
--- Run on Treadmill: the character runs in place on a treadmill wired to a bank, the belt turning
--- its motor. A run lasts Specs.treadmill.runMinutes and stopping early counts the share run. The
--- authority settles it: complete() a whole run, serverStop() (stop() in single player) part of one.
+-- Run on Treadmill: the character runs in place on a treadmill. On one wired to a bank the belt
+-- turns its motor, and the run banks watt-hours; on an unwired one the motor turns the belt, on
+-- power, which the run draws from start to end (Treadmill.startDrawing). A run lasts
+-- Specs.treadmill.runMinutes and stopping early counts the share run. The authority settles it:
+-- complete() a whole run, serverStop() (stop() in single player) part of one.
 -- A global, as the server finds the class by its Type (NetTimedAction.parse).
 RenewableEnergyTreadmillAction = ISBaseTimedAction:derive("RenewableEnergyTreadmillAction")
 
@@ -22,10 +24,17 @@ local GIVE_UP_ENDURANCE = 0.1
 -- with a little for drift and a client's lag. Stepping off puts them back beside it, still within.
 local REACH = 1.6
 
--- Whether the runner is on the wired treadmill.
+-- Whether the runner is on the treadmill, still wired or not as it was when the run began: an
+-- unwired one wired meanwhile would draw power while its motor fed a bank.
 local function running(self)
-    return RenewableEnergy.onSquare(self.object) and Treadmill.isWiredTile(self.object)
-        and RenewableEnergy.withinReach(self.character, self.object, REACH)
+    local object = self.object
+    if not (RenewableEnergy.onSquare(object) and RenewableEnergy.withinReach(self.character, object, REACH)) then
+        return false
+    end
+    if self.wired then
+        return Treadmill.isWiredTile(object)
+    end
+    return Treadmill.isTreadmill(object) and Treadmill.wiredHalf(object) == nil
 end
 
 local function runHours()
@@ -39,8 +48,11 @@ function Action:getDuration()
     return Specs.treadmill.runMinutes * RenewableEnergy.unitsPerMinute()
 end
 
+-- A run on an unwired treadmill stops when its power goes out. The server never calls isValid(),
+-- but the client's stop reaches it (serverStop).
 function Action:isValid()
     return running(self) and self.character:getStats():get(CharacterStat.ENDURANCE) > GIVE_UP_ENDURANCE
+        and (self.wired or Treadmill.isPowered(self.object))
 end
 
 -- How far past the middle of the rear tile, toward the console, the runner stands.
@@ -71,12 +83,31 @@ local function holdOnBelt(self)
     self.character:setLastFallSpeed(0)
 end
 
+-- The authority's start of a run on an unwired treadmill with power: its draw from here until the
+-- run settles. A bank powering it bills that draw (Loads.lua). Grid or generator power need only be
+-- there: the grid bills nothing, and vanilla burns a generator's fuel for each appliance object's
+-- own consumption (IsoGenerator.setSurroundingElectricity), which a treadmill doesn't have.
+local function startDrawing(self)
+    if not self.wired and Treadmill.isPowered(self.object) then
+        Treadmill.startDrawing(self.object, self)
+        self.drawing = true
+    end
+end
+
+function Action:serverStart()
+    startDrawing(self)
+end
+
 function Action:start()
-    -- A run on a treadmill that feeds no bank banks nothing; single player says so before it
-    -- starts, and the authority's command refuses it in multiplayer.
-    if not isClient() and Treadmill.runRefusal(self.object) then
-        self:forceStop()
-        return
+    -- A run on a wired treadmill that feeds no bank banks nothing, and an unwired one won't go
+    -- without power; single player says so before it starts. In multiplayer the authority's command
+    -- refuses the first, and settle pays nothing for the second, which never drew.
+    if not isClient() then
+        if Treadmill.runRefusal(self.object) then
+            self:forceStop()
+            return
+        end
+        startDrawing(self)
     end
     -- The runner steps onto the belt, and back off where they were when the run ends.
     self.fromX, self.fromY = self.character:getX(), self.character:getY()
@@ -105,17 +136,25 @@ local function stepOff(self)
     end
 end
 
--- The authority's side of `share` of a run: the bank's watt-hours and the runner's sweat and
--- training, none of it unless the bank takes the run. The server never calls isValid() and
+-- The authority's side of `share` of a run: the bank's watt-hours, for a wired treadmill, and the
+-- runner's sweat and training, none of it unless the bank takes the run or, unwired, the run drew
+-- power. Its draw ends first, whatever comes of it. The server never calls isValid() and
 -- NetTimedAction checks no distance, so it checks here, on every path that settles, that the runner
 -- is at the treadmill.
 local function settle(self, share)
+    local drew = self.drawing
+    Treadmill.stopDrawing(self.object, self)
+    self.drawing = nil
     local hours = runHours() * math.max(0, math.min(1, share))
     if hours <= 0 or not running(self) then
         return false
     end
     local spec, character = Specs.treadmill, self.character
-    if not PowerBank.perform(character, "runTreadmill", { source = PowerBank.positionOf(self.object), hours = hours }) then
+    if self.wired then
+        if not PowerBank.perform(character, "runTreadmill", { source = PowerBank.positionOf(self.object), hours = hours }) then
+            return false
+        end
+    elseif not drew then
         return false
     end
     local stats = character:getStats()
@@ -158,6 +197,8 @@ end
 function Action:new(character, object)
     local o = ISBaseTimedAction.new(self, character)
     o.object = object
+    -- Whether this run feeds a bank, fixed for the run; the menu hands a wired treadmill's wired tile.
+    o.wired = Treadmill.isWired(object)
     o.stopOnWalk = true
     o.stopOnRun = true
     o.maxTime = o:getDuration()

@@ -187,6 +187,24 @@ handler("placeGenerator", function(_, args, defer)
     return {}
 end)
 
+-- A wooden floor one storey above the square at `args`, as a player roofs a yard: vanilla's
+-- addFloor rechecks the roof below it (IsoCell.checkHaveRoof), which takes the square's exterior
+-- flag away. Answers whether the square below is still outdoors. Removed when the test ends.
+handler("roofOver", function(_, args, defer)
+    local above = getCell():createNewGridSquare(args.x, args.y, args.z + 1, true)
+    if not above then
+        return nil, "the square above loaded on the server"
+    end
+    local floor = above:addFloor("carpentry_02_58")
+    defer(function()
+        if floor:getObjectIndex() ~= -1 then
+            above:transmitRemoveItemFromSquare(floor)
+        end
+        getCell():checkHaveRoof(args.x, args.y)
+    end)
+    return { outside = squareAt(args):isOutside() }
+end)
+
 -- Banks ------------------------------------------------------------------------------------------
 
 -- The server's record of the bank at `args` (see stateOf).
@@ -792,4 +810,54 @@ end)
 
 handler("gadgetCharges", function(_, args)
     return gadgetCharges(args)
+end)
+
+-- Treadmill runs ----------------------------------------------------------------------------------
+
+-- The runs startTreadmillRun started and completeStartedTreadmillRun has yet to finish, by the
+-- treadmill tile's position.
+local treadmillRuns = {}
+
+local function runKey(args)
+    return args.x .. "," .. args.y .. "," .. args.z
+end
+
+-- Starts a Run on Treadmill on the treadmill tile at `args` as the server's character, the way the
+-- multiplayer server starts a client's action (serverStart), and leaves it running until
+-- completeStartedTreadmillRun or the end of the test.
+handler("startTreadmillRun", function(player, args, defer)
+    local tile = RenewableEnergy.Treadmill.on(squareAt(args))
+    if not tile then
+        return nil, "a treadmill on the server"
+    end
+    local run = RenewableEnergyTreadmillAction:new(player, tile)
+    run:serverStart()
+    local key = runKey(args)
+    treadmillRuns[key] = run
+    defer(function()
+        if treadmillRuns[key] == run then
+            treadmillRuns[key] = nil
+            RenewableEnergy.Treadmill.stopDrawing(tile, run)
+        end
+    end)
+    return {}
+end)
+
+-- Finishes the run startTreadmillRun started on the tile at `args`, the way the server finishes a
+-- client's action (complete()). Answers whether it settled, and the character's Fitness XP,
+-- endurance and thirst before and after.
+handler("completeStartedTreadmillRun", function(player, args)
+    local key = runKey(args)
+    local run = treadmillRuns[key]
+    if not run then
+        return nil, "a run startTreadmillRun started on the server"
+    end
+    treadmillRuns[key] = nil
+    local stats, xp = player:getStats(), player:getXp()
+    local reply = { xpBefore = xp:getXP(Perks.Fitness), enduranceBefore = stats:get(CharacterStat.ENDURANCE),
+        thirstBefore = stats:get(CharacterStat.THIRST) }
+    reply.done = run:complete() == true
+    reply.xpAfter, reply.enduranceAfter = xp:getXP(Perks.Fitness), stats:get(CharacterStat.ENDURANCE)
+    reply.thirstAfter = stats:get(CharacterStat.THIRST)
+    return reply
 end)

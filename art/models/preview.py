@@ -104,7 +104,7 @@ def model_sheet():
     # A vehicle shows as its body with its part models, once whole and once with every cracked
     # variant in place of the part it replaces. A sprite model shows from one side: one mesh at each
     # of its yaws, as the game spins it whole, or each spin step's mesh, then each other skin.
-    models = [("WorldItems", name, name, [name], None) for name in items.ITEMS]
+    models = [("WorldItems", name, name, [name], None) for name in {**items.ITEMS, **items.GROUND_MODELS}]
     for name, spec in items.SPRITE_MODELS.items():
         meshes, textures, _ = items.sprite_model_names(name)
         if len(meshes) == 1:

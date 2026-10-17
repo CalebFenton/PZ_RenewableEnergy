@@ -1,7 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Vanilla's treadmill as a source for a bank: dismantled for its motor, or wired to a bank and run
--- on.
+-- Vanilla's treadmill: dismantled for its motor, run on with power, or wired to a bank and run on to
+-- feed it.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
@@ -10,6 +10,11 @@ local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmil
 
 local CAR_BATTERY = "Base.CarBattery1"
 local INVERTER = "RenewableEnergy.PlugInInverter"
+-- A bank whose inverter carries a running treadmill.
+local L16 = "RenewableEnergy.L16Battery"
+local INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
+-- A pass this long barely moves a bank's batteries.
+local PASS_HOURS = 1 / 60
 
 local function treadmillOf(state)
     for _, source in ipairs(state and state.status and state.status.sources or {}) do
@@ -95,11 +100,30 @@ test("renewable_energy_treadmill_wired_to_bank", {
     end,
 })
 
--- A loose treadmill offers Wire to a Bank, greyed while the character lacks what it takes, even
--- beside a wired one. Once one tile is wired, a right-click on either tile of that treadmill
--- offers Run on Treadmill instead, greyed and saying why until it is connected to a bank.
+-- What a right-click on the treadmill tile `object` offers in its submenu: Run on Treadmill, Wire
+-- to a Bank and Unwire, each nil if not offered, else { greyed, reason }.
+local function treadmillMenu(object)
+    local menu, context = T.worldSubmenu(object, getText("IGUI_RenewableEnergy_Treadmill"))
+    local function offered(key)
+        local option = menu and menu:getOptionFromName(getText(key))
+        return option and { greyed = option.notAvailable == true, reason = option.toolTip and option.toolTip.description }
+    end
+    local seen = {
+        run = offered("ContextMenu_RenewableEnergy_RunOnTreadmill"),
+        wire = offered("ContextMenu_RenewableEnergy_WireTreadmill"),
+        unwire = offered("ContextMenu_RenewableEnergy_UnwireTreadmill"),
+    }
+    if context then context:hideAndChildren() end
+    return seen
+end
+
+-- A loose treadmill offers Run on Treadmill, greyed saying it needs power while it has none and
+-- open once it has, and Wire to a Bank either way, greyed while the character lacks what it
+-- takes, even beside a wired one. Once one tile is wired, a right-click on either tile of that
+-- treadmill offers Run greyed and saying why until it is connected to a bank, and Unwire.
 test("renewable_energy_treadmill_menu", {
     run = function(self)
+        T.setGrid(self, false)
         local wired = T.panel(self, Sprites.treadmill.S.console, { wired = true })
         if not wired then return end
         local x, y, z = wired.square:getX(), wired.square:getY(), wired.square:getZ()
@@ -107,25 +131,33 @@ test("renewable_energy_treadmill_menu", {
         self.otherTile = T.panel(self, Sprites.treadmill.S.rear, { square = getSquare(x, y - 1, z) })
         -- Another treadmill's rear tile east of it, whose console would be further east.
         self.loose = T.panel(self, Sprites.treadmill.E.rear, { square = getSquare(x + 1, y, z) })
+        local indoors = T.square(self, { indoors = true }, "a free indoor square for a treadmill")
+        if not indoors then return end
+        self.indoor = T.panel(self, Sprites.treadmill.W.rear, { square = indoors })
+        T.step(function()
+            self.unpowered = treadmillMenu(self.loose.object)
+            T.setGrid(self, true)
+        end)
+        T.step(function()
+            -- The grid powers a square in a room (ItemContainer.isObjectPowered).
+            if not T.need(self, indoors:hasGridPower() and indoors:getRoom() ~= nil, "grid power in the indoor square's room") then
+                return
+            end
+            self.powered = treadmillMenu(self.indoor.object)
+            self.wiredMenu = treadmillMenu(self.otherTile.object)
+        end)
     end,
     validate = function(self)
-        local wire = getText("ContextMenu_RenewableEnergy_WireTreadmill")
-        local run = getText("ContextMenu_RenewableEnergy_RunOnTreadmill")
-        local label = getText("IGUI_RenewableEnergy_Treadmill")
-        local menu, context = T.worldSubmenu(self.loose.object, label)
-        local option = menu and menu:getOptionFromName(wire)
-        expect(option ~= nil and option.notAvailable, "an empty-handed character isn't offered Wire to a Bank greyed out")
-        expect(menu == nil or menu:getOptionFromName(run) == nil, "a loose treadmill beside a wired one offers a run")
-        if context then context:hideAndChildren() end
-        menu, context = T.worldSubmenu(self.otherTile.object, label)
-        option = menu and menu:getOptionFromName(run)
-        expect(option ~= nil and option.notAvailable
-            and option.toolTip.description == getText("Tooltip_RenewableEnergy_TreadmillNotConnected"),
+        local loose, powered, wired = self.unpowered, self.powered, self.wiredMenu
+        expect(loose.wire ~= nil and loose.wire.greyed, "an empty-handed character isn't offered Wire to a Bank greyed out")
+        expect(loose.run ~= nil and loose.run.greyed and loose.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNoPower"),
+            "a loose treadmill without power doesn't offer Run greyed saying it needs power")
+        expect(powered.run ~= nil and not powered.run.greyed, "a loose treadmill on grid power doesn't offer Run open")
+        expect(powered.wire ~= nil, "a loose treadmill on grid power doesn't offer Wire to a Bank")
+        expect(wired.run ~= nil and wired.run.greyed and wired.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNotConnected"),
             "the unwired tile of a wired, unconnected treadmill doesn't offer Run greyed with the reason")
-        expect(menu == nil or menu:getOptionFromName(wire) == nil, "a wired treadmill offers to be wired again")
-        option = menu and menu:getOptionFromName(getText("ContextMenu_RenewableEnergy_UnwireTreadmill"))
-        expect(option ~= nil and not option.notAvailable, "a wired treadmill doesn't offer Unwire")
-        if context then context:hideAndChildren() end
+        expect(wired.wire == nil, "a wired treadmill offers to be wired again")
+        expect(wired.unwire ~= nil and not wired.unwire.greyed, "a wired treadmill doesn't offer Unwire")
     end,
 })
 
@@ -204,6 +236,124 @@ test("renewable_energy_treadmill_run_feeds_bank", {
         expect(self.server.perkXp.value > self.xpBefore, "the run taught no Fitness")
         local label = RenewableEnergy.StatusWindow.sourceLabel(after, after)
         expect(label:find(getText("IGUI_RenewableEnergy_Treadmill"), 1, true) == 1, "the window calls the treadmill " .. label)
+    end,
+})
+
+-- A bank of L-16s with an inverter-charger, switched on with the grid off, and a treadmill tile of
+-- `sprite` on an indoor square it powers, wired and connected to it if `wired`. Returns both
+-- handles once this client sees power on the treadmill's square, or nil.
+local function poweredTreadmill(self, sprite, wired)
+    T.setGrid(self, false)
+    local bank = T.bank(self, "batteryRackWood", { L16, L16, INVERTER_CHARGER })
+    local square = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a treadmill")
+    local treadmill = square and T.panel(self, sprite, { square = square, near = bank, connect = wired, wired = wired })
+    if not treadmill then return nil end
+    T.switchOn(self, bank)
+    T.waitFor(self, function() return square:haveElectricity() end, "power from the switched-on bank on the treadmill's square here")
+    return bank, treadmill
+end
+
+-- A whole run on an unwired treadmill a bank powers costs the runner endurance and thirst and trains
+-- Fitness as a run on a wired one does, and banks nothing. Catches the unwired run settling nothing,
+-- or crediting the bank it draws from.
+test("renewable_energy_treadmill_unwired_run_trains", {
+    instant = true,
+    run = function(self)
+        local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
+        if not bank then return end
+        self.bank = bank
+        T.batch(function()
+            T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
+            T.server(self, "setCharacterStatUntilEnd", { stat = "THIRST", value = 0 })
+        end)
+        T.waitFor(self, function() return T.player():getStats():get(CharacterStat.ENDURANCE) > 0.99 end,
+            "this client's copy of the rested runner")
+        T.server(self, "perkXp", { perk = "Fitness" })
+        T.step(function() self.xpBefore = self.server.perkXp.value end)
+        T.doJob(self, treadmill.square, function() return RenewableEnergyTreadmillAction:new(T.player(), treadmill.object) end)
+        T.batch(function()
+            T.server(self, "characterStats", { stats = { "ENDURANCE", "THIRST" } })
+            T.server(self, "perkXp", { perk = "Fitness" })
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS })
+        end)
+    end,
+    validate = function(self)
+        local stats = self.server.characterStats and self.server.characterStats.values
+        if expect(stats ~= nil, "no stats of the runner from the server") then
+            expect(stats.ENDURANCE < 0.99, "the run cost no endurance: " .. stats.ENDURANCE)
+            expect(stats.THIRST > 0.01, "the run made the runner no thirstier: " .. stats.THIRST)
+        end
+        expect(self.server.perkXp.value > self.xpBefore, "the run taught no Fitness")
+        T.expectNear("Wh the unwired run banked", self.bank.state.status.runWhToday, 0, 0)
+    end,
+})
+
+-- A run on an unwired treadmill a bank powers draws the treadmill's watts from that bank's
+-- batteries from the moment the authority starts it until it settles, which pays the runner's
+-- sweat and training; once the power goes out, the run can't go on. Catches a run that bills
+-- nothing, one that keeps billing after it ends, and one that runs on without power.
+test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
+    run = function(self)
+        local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
+        if not bank then return end
+        self.bank = bank
+        T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
+        T.goNextTo(self, treadmill.square)
+        T.waitFor(self, function() return T.player():getStats():get(CharacterStat.ENDURANCE) > 0.99 end,
+            "this client's copy of the rested runner")
+        T.step(function() self.goesOnPower = RenewableEnergyTreadmillAction:new(T.player(), treadmill.object):isValid() end)
+        T.batch(function()
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS })
+            T.step(function() self.before = bank.state end)
+            T.server(self, "startTreadmillRun", T.at(treadmill))
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS })
+            T.step(function() self.during = bank.state end)
+            T.server(self, "completeStartedTreadmillRun", T.at(treadmill))
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS })
+        end)
+        T.perform(self, "setBankOn", { bank = bank.position, on = false })
+        T.waitFor(self, function() return not treadmill.square:haveElectricity() end,
+            "this client's copy of the treadmill's square without power once the bank is off")
+        T.step(function()
+            self.goesWithoutPower = RenewableEnergyTreadmillAction:new(T.player(), treadmill.object):isValid()
+        end)
+    end,
+    validate = function(self)
+        local before, during, after = self.before.status, self.during.status, self.bank.state.status
+        local watts = Specs.loads.treadmill.watts
+        T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, watts, 0.01)
+        T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
+            watts / Specs.inverterEfficiency, 0.01)
+        T.expectNear("W of the bank's load after the run, against before it", after.loadW - before.loadW, 0, 0.01)
+        T.expectNear("Wh the unwired run banked", after.runWhToday, 0, 0)
+        local run = self.server.completeStartedTreadmillRun
+        expect(run.done, "the authority settled nothing of a run on a powered, unwired treadmill")
+        expect(run.enduranceAfter < run.enduranceBefore and run.thirstAfter > run.thirstBefore and run.xpAfter > run.xpBefore,
+            "the settled run cost no endurance or thirst, or taught no Fitness")
+        expect(self.goesOnPower, "a run on a powered, unwired treadmill can't go")
+        expect(not self.goesWithoutPower, "a run on an unwired treadmill goes on once its power is out")
+    end,
+})
+
+-- A run on a wired treadmill feeds its bank and draws nothing from the bank powering it. Catches a
+-- wired run billed as a load as well.
+test("renewable_energy_treadmill_wired_run_draws_nothing", {
+    run = function(self)
+        local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console, true)
+        if not bank then return end
+        self.treadmill = treadmill
+        T.goNextTo(self, treadmill.square)
+        T.batch(function()
+            T.server(self, "startTreadmillRun", T.at(treadmill))
+            T.server(self, "scanLoad", bank.position)
+            T.step(function() self.during = self.server.scanLoad end)
+            T.server(self, "completeStartedTreadmillRun", T.at(treadmill))
+        end)
+    end,
+    validate = function(self)
+        expect(self.treadmill.connected, "the bank refused the wired treadmill: " .. tostring(self.treadmill.reason))
+        expect((self.during.counts.treadmill or 0) == 0, "a run on a wired treadmill draws from the bank it feeds")
+        expect(self.server.completeStartedTreadmillRun.done, "the bank took nothing of a run on a wired, connected treadmill")
     end,
 })
 

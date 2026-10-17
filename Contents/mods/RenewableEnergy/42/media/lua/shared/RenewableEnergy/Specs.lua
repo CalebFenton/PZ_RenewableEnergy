@@ -68,9 +68,10 @@ Specs.wind = {
     shelterLoss = 0.7,
 }
 
--- A treadmill wired to a bank (RenewableEnergy.Treadmill): what wiring it takes (as a bank part's,
--- Specs.wiring), the watts a runner puts in (an hour of running is about an hour of TV), how long
--- one run lasts, and what an hour of it costs and teaches.
+-- A treadmill (RenewableEnergy.Treadmill): what wiring it to a bank takes (as a bank part's,
+-- Specs.wiring), the watts a runner then puts in (an hour of running is about an hour of TV), how
+-- long one run lasts, wired or not, and what an hour of it costs and teaches. Unwired, a run draws
+-- Specs.loads.treadmill instead.
 Specs.treadmill = {
     slots = 1,
     wiring = { seconds = 90, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 2, xp = 10 },
@@ -198,6 +199,9 @@ Specs.loads = {
     washer = { watts = 500 },
     dryer = { watts = 4000 },
     batteryCharger = { watts = 100 },
+    -- An unwired treadmill while a run is on it. Vanilla bills it nothing, so it is the 1993 watts of
+    -- a home treadmill's motor at a running pace: more than a Power Inverter carries.
+    treadmill = { watts = 700 },
     -- Anything else the engine says draws power, gas pumps included: watts per unit of
     -- IsoObject:getGeneratorPowerConsumption, so that a fridge-freezer's 0.13 comes to 80 W.
     other = { wattsPerConsumption = 600 },

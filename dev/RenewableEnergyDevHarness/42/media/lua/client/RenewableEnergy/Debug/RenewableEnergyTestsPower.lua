@@ -1420,6 +1420,35 @@ test("renewable_energy_power_reconnecting_a_panel_keeps_it", {
     end,
 })
 
+-- A panel roofed over after it was connected, by a floor built above it, is no longer outdoors:
+-- the next pass drops it and it makes nothing, as connecting it there would be refused. Catches a
+-- panel checked for being outdoors only when it is connected.
+test("renewable_energy_power_roofed_panel_makes_nothing", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not self.panel then return end
+        T.batch(function()
+            T.bankPass(self, bank, 1000)
+            T.bankState(self, bank)
+            T.step(function() self.open = bank.state end)
+            T.server(self, "roofOver", self.panel.position)
+            T.bankPass(self, bank, 1000)
+            T.bankState(self, bank)
+            T.step(function() self.roofed = bank.state end)
+        end)
+    end,
+    validate = function(self)
+        if not expectConnected(self.panel) then return end
+        expect(self.open.status.solarW > 0, "the panel in the open made nothing at 1000 W/m²")
+        expect(self.server.roofOver.outside == false, "a floor built above the panel left its square outdoors")
+        expect(self.roofed.sources == 0, "the roofed panel still feeds the bank")
+        expectNear("solar watts under the roof", self.roofed.status.solarW, 0, 0)
+        expect(self.roofed.storedWh <= self.open.storedWh, string.format(
+            "the bank gained %.2f Wh in the hour after its panel was roofed over", self.roofed.storedWh - self.open.storedWh))
+    end,
+})
+
 -- What a bank integrates over time ------------------------------------------------------------
 
 -- A command that changes what a bank makes or draws brings the bank up to now first, so the time

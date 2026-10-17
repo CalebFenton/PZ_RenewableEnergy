@@ -1,7 +1,8 @@
--- Vanilla's treadmill (Sprites.treadmill) as a source for a bank: two tiles, one of which a player
--- wires to feed a bank (Wire to a Bank), after which a run on it (RenewableEnergyTreadmillAction)
--- banks watt-hours. Unwiring it, picking it up or destroying it gives back the wire
--- (TreadmillSource.unwire). Dismantled, a treadmill gives its motor (Moveables.lua).
+-- Vanilla's treadmill (Sprites.treadmill): two tiles. Unwired, it runs on power like any treadmill:
+-- a run on it (RenewableEnergyTreadmillAction) draws its motor's watts, which a bank powering it
+-- bills (Loads.lua). A player can instead wire one of its tiles to feed a bank (Wire to a Bank),
+-- after which a run on it banks watt-hours. Unwiring it, picking it up or destroying it gives back
+-- the wire (TreadmillSource.unwire). Dismantled, a treadmill gives its motor (Moveables.lua).
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
@@ -97,13 +98,45 @@ function Treadmill.wiringRefusal(character, tile)
     return short and short.kind
 end
 
---- Why a run on the wired treadmill tile `tile` would bank nothing, or nil: it feeds no bank, as
---- this side last heard (PowerBank.connectedBank).
+--- Whether the treadmill of `tile` has power, from the grid or a generator, a bank included, as
+--- vanilla decides an appliance has (ItemContainer.isObjectPowered).
+function Treadmill.isPowered(tile)
+    return ItemContainer.isObjectPowered(tile, true)
+end
+
+--- Why a run on the treadmill tile `tile` can't go now, or nil. A wired tile feeds no bank, as this
+--- side last heard (PowerBank.connectedBank): the run would bank nothing. An unwired one has no
+--- power for its motor.
 function Treadmill.runRefusal(tile)
-    if not PowerBank.connectedBank(tile) then
-        return "Tooltip_RenewableEnergy_TreadmillNotConnected"
+    if Treadmill.isWired(tile) then
+        return not PowerBank.connectedBank(tile) and "Tooltip_RenewableEnergy_TreadmillNotConnected" or nil
+    end
+    if not Treadmill.isPowered(tile) then
+        return "Tooltip_RenewableEnergy_TreadmillNoPower"
     end
     return nil
+end
+
+-- The unwired treadmill tiles a run draws power through now, each to its run: on the authority,
+-- and in memory rather than modData, so none outlives its run in a save or travels with a
+-- treadmill picked up.
+local drawing = {}
+
+--- Marks the unwired treadmill tile `tile` as drawing power for `run` until Treadmill.stopDrawing.
+function Treadmill.startDrawing(tile, run)
+    drawing[tile] = run
+end
+
+--- Ends `run`'s draw through `tile`; another run's draw through it stays.
+function Treadmill.stopDrawing(tile, run)
+    if drawing[tile] == run then
+        drawing[tile] = nil
+    end
+end
+
+--- Whether a run draws power through `object` now (Treadmill.startDrawing). Authority only.
+function Treadmill.isDrawing(object)
+    return drawing[object] ~= nil
 end
 
 return Treadmill

@@ -1,6 +1,6 @@
-"""Bakes and exports the ground model of every item in items.ITEMS, the model of every sprite model
-in items.SPRITE_MODELS and the body of every vehicle in items.VEHICLES, and writes Models.txt and
-SpriteModels.txt.
+"""Bakes and exports the ground model of every item in items.ITEMS and items.GROUND_MODELS, the
+model of every sprite model in items.SPRITE_MODELS and the body of every vehicle in items.VEHICLES,
+and writes Models.txt and SpriteModels.txt.
 
     PYTHONHASHSEED=0 blender -b --factory-startup --python-use-system-env -P art/models/models.py
 
@@ -57,18 +57,23 @@ MODELS_TXT = os.path.join(MOD, "42/media/scripts/RenewableEnergy/Models.txt")
 PREFIX = "RenewableEnergy_"
 VEHICLE_TEXTURE_SIZE = 1024
 
-# Big flat things need more texels for their cells than a battery does.
+# Big flat things need more texels for their cells than a battery does, and a drum's side is as big.
 TEXTURE_SIZE = {name: 512 for name in ("SolarModule", "HomemadeSolarModule", "SolarFlat", "SolarWallWood", "SolarWallMetal",
                                        "SolarRackWood", "SolarRackMetal", "BatteryRackWood", "BatteryRackMetal",
-                                       "BatteryBankWood", "BatteryBankMetal")}
+                                       "BatteryBankWood", "BatteryBankMetal", *items.GROUND_MODELS)}
 DEFAULT_TEXTURE_SIZE = 256
-# Real size reads well on the ground next to most of the game's own items; an item's
-# "ground_scale" in items.ITEMS overrides it where the game draws its kind smaller (batteries).
-WORLD_SCALE = 1.0
+# The game draws a dropped item through the same camera as a sprite model, which scales everything
+# by 1.5 (ItemModelRenderer$WorldModelCamera.Begin, Core.DoPushIsoStuff with vehicle false), so a
+# ground model's scale undoes it and a mesh in metres lies at its real size, as big as the tile it
+# is installed as. An item's "ground_scale" in items.ITEMS overrides it where the game draws its
+# kind at another size (batteries).
+GROUND_SCALE = 1 / 1.5
 # A sprite model's translate is in squares and its scale undoes the 1.5 the game's model camera
 # scales everything by (IsoObjectModelDrawer.renderMain, WorldModelCamera.Begin), as vanilla's
-# doors' 0.6667 does, so a mesh in metres stands at its real size.
+# doors' 0.6667 does, so a mesh in metres stands at its real size. Its meshes' own model scripts
+# keep 1, or they would shrink twice.
 SPRITE_MODEL_SCALE = 1 / 1.5
+SPRITE_MESH_SCALE = 1.0
 # A sprite model stands taller than a person, so it needs the texels of the big flat things.
 SPRITE_MODEL_TEXTURE_SIZE = 512
 SPRITE_MODELS_TXT = os.path.join(MOD, "42/media/scripts/RenewableEnergy/SpriteModels.txt")
@@ -346,10 +351,10 @@ def models_txt(specs, sprite_models):
     lines = ["module RenewableEnergy", "{",
              "    /* Written by art/models/models.py: the ground models of the items' WorldStaticModel, then the"
              " sprite models' models. */"]
-    models = [(name + "_Ground", name, name, spec.get("ground_scale", WORLD_SCALE)) for name, spec in specs.items()]
+    models = [(name + "_Ground", name, name, spec.get("ground_scale", GROUND_SCALE)) for name, spec in specs.items()]
     for name in sprite_models:
         meshes, textures, _ = items.sprite_model_names(name)
-        models += [(mesh, mesh, textures[0], WORLD_SCALE) for mesh in meshes]
+        models += [(mesh, mesh, textures[0], SPRITE_MESH_SCALE) for mesh in meshes]
     for model, mesh, texture, scale in models:
         lines += ["    model %s" % model, "    {",
                   "        mesh = WorldItems/%s%s," % (PREFIX, mesh),
@@ -743,7 +748,8 @@ def vehicle_overlays(low, solid):
 def main():
     stage = setup()
     clear_stale((MESH_DIR, TEXTURE_DIR, VEHICLE_MESH_DIR, VEHICLE_TEXTURE_DIR))
-    for name, spec in items.ITEMS.items():
+    ground = {**items.ITEMS, **items.GROUND_MODELS}
+    for name, spec in ground.items():
         size = TEXTURE_SIZE.get(name, DEFAULT_TEXTURE_SIZE)
         low, colour, _ = build_baked(stage, spec["model"], name, size, to_ground=True)
         save_texture(os.path.join(TEXTURE_DIR, PREFIX + name + ".png"), colour)
@@ -752,7 +758,7 @@ def main():
         bpy.data.objects.remove(low)
     for name, spec in items.SPRITE_MODELS.items():
         build_sprite_model(stage, name, spec)
-    models_txt(items.ITEMS, items.SPRITE_MODELS)
+    models_txt(ground, items.SPRITE_MODELS)
     sprite_models_txt(items.SPRITE_MODELS)
     build_vehicles(stage)
 

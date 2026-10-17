@@ -1,5 +1,5 @@
--- What a bank powers: every switched-on appliance in its reach, in watts, and
--- the running generators whose reach covers the bank.
+-- What a bank powers: every switched-on appliance in its reach, in watts, an unwired treadmill
+-- while a run draws power through it, and the running generators whose reach covers the bank.
 --
 -- The engine says whether an object draws power (getGeneratorPowerConsumption reads the
 -- appliance's own switch, powered or not, so a bank that cut its power still sees what would
@@ -9,19 +9,23 @@
 -- (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power. A generator
 -- powers a square exactly when the square is in that reach of the generator
 -- (IsoGenerator.isPoweringSquare), so the same scan finds the generators powering the bank.
+--
+-- The engine knows nothing of a treadmill's draw: a run says when it draws (Treadmill.isDrawing),
+-- and it is billed on the same squares as an appliance.
 
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Treadmill"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loads = {}
 RenewableEnergy.Loads = Loads
 
 local LOADS = RenewableEnergy.Specs.loads
-local PowerBank = RenewableEnergy.PowerBank
+local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 -- The Specs.loads kind of an object with a fridge or freezer container, as vanilla bills it: by
 -- its containers alone, so a mini fridge with its ice box is a fridge-freezer.
@@ -89,20 +93,26 @@ function Loads.byKind(load)
     return list
 end
 
+-- Whether a generator here, rather than the grid, would power `object`
+-- (IsoGenerator.setSurroundingElectricity).
+local function offGrid(object, allowExterior)
+    return not ItemContainer.isObjectPowered(object, false)
+        and (allowExterior or not object:getSquare():isOutside())
+end
+
 -- Objects the engine would bill a generator here for (IsoGenerator.setSurroundingElectricity).
 local function drawsFromGenerator(object, allowExterior)
     return object:couldBePoweredByGenerator()
         and object:getGeneratorPowerConsumption() > 0
-        and not ItemContainer.isObjectPowered(object, false)
-        and (allowExterior or not object:getSquare():isOutside())
+        and offGrid(object, allowExterior)
 end
 
 local function isRunningGenerator(object)
     return instanceof(object, "IsoGenerator") and object:isActivated() and not PowerBank.isBank(object)
 end
 
---- Everything switched on within a bank's reach, and the running generators, banks aside,
---- that power the bank's square.
+--- Everything switched on within a bank's reach, treadmills that runs draw through among them, and
+--- the running generators, banks aside, that power the bank's square.
 ---@param square IsoGridSquare the bank's square
 function Loads.scan(square)
     local load = Loads.new()
@@ -113,6 +123,8 @@ function Loads.scan(square)
             local object = objects:get(i)
             if drawsFromGenerator(object, allowExterior) then
                 addAppliances(load, object)
+            elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior) then
+                Loads.add(load, "treadmill")
             elseif isRunningGenerator(object) then
                 table.insert(load.generators, object)
             end
