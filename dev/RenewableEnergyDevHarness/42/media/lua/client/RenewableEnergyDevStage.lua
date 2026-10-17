@@ -117,6 +117,24 @@ function Stage.removeTrees(x, y, z)
     end
 end
 
+--- Grass, weeds and bushes a character could pull up (as vanilla's remove-grass and building code
+--- tell them from other objects).
+function Stage.isGroundCover(object)
+    local props = object:getProperties()
+    return props ~= nil and (props:has(IsoFlagType.canBeRemoved)
+        or (props:has(IsoFlagType.vegitation) and object:getType() ~= IsoObjectType.tree))
+end
+
+--- Clears the ground cover off `square`, so what is set on it shows.
+function Stage.clearGroundCover(square)
+    local objects = square and square:getObjects()
+    for i = (objects and objects:size() or 0) - 1, 0, -1 do
+        if Stage.isGroundCover(objects:get(i)) then
+            square:RemoveTileObject(objects:get(i))
+        end
+    end
+end
+
 --- Removes every vehicle standing on a square from x1, y1 to x2, y2 on level z. Found through the
 --- squares, since the cell keeps its vehicles in a Java Set (IsoCell.getVehicles), which Lua can't walk.
 function Stage.removeVehicles(x1, y1, x2, y2, z)

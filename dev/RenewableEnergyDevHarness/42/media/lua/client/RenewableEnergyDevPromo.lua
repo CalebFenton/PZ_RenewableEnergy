@@ -552,22 +552,7 @@ local function setBankOn(bank, on)
     perform("setBankOn", { bank = PowerBank.positionOf(bank), on = on })
 end
 
--- Grass, weeds and bushes a character could pull up (as vanilla's remove-grass and building code
--- tell them from other objects). The setups clear them off their squares.
-local function isGroundCover(object)
-    local props = object:getProperties()
-    return props ~= nil and (props:has(IsoFlagType.canBeRemoved)
-        or (props:has(IsoFlagType.vegitation) and object:getType() ~= IsoObjectType.tree))
-end
-
-local function clearGroundCover(square)
-    local objects = square and square:getObjects()
-    for i = (objects and objects:size() or 0) - 1, 0, -1 do
-        if isGroundCover(objects:get(i)) then
-            square:RemoveTileObject(objects:get(i))
-        end
-    end
-end
+local isGroundCover, clearGroundCover = Stage.isGroundCover, Stage.clearGroundCover
 
 -- Outdoors on solid floor, with no vehicle, no tree unless `trees`, and nothing but the floor,
 -- ground cover and the objects `allowed` accepts. A square's walls are objects on it, so walls

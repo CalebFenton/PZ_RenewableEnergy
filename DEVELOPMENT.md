@@ -32,6 +32,7 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 `dev/run-debug-client.sh` without flags gives you these. With `-debug` in the game's Steam launch options a normal game has the debug menu, but neither the scenario nor the tests, which come with the dev mod.
 
 - The **Renewable Energy** scenario under **Scenarios** on the main menu starts a zombie-free world with a character who knows every recipe.
+- The **Renewable Energy QA** scenario beside it is for playing the mod through by hand: by a barn, a character in god mode and invisible, who carries anything and has every skill and recipe of the mod, finds one of every item of the mod, enough of every input to make each recipe once, what the menu jobs take, the crafting stations, a treadmill and the arrow board trailer laid out on the ground.
 - To run one test, open the debug menu with the bug icon, then **Dev**, **Unit Tests**, **Timed Actions**.
 - To see the loot of vanilla lists, right-click the world and choose **UI**, then **Generate Loot UI**.
 - Restart the client after changing Lua. `reloadLuaFile()`, which the debug Lua file browser uses, runs the file again but ignores its `Events.*.Add` calls (`LuaCompiler.rewriteEvents`), so the old handlers keep running.

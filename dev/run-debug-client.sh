@@ -3,7 +3,8 @@
 # dev/RenewableEnergyDevHarness and the shared harness mod (dev/harness, see its README.md).
 #
 #   dev/run-debug-client.sh          play by hand: main menu > Scenarios > Renewable Energy
-#                                    starts a test world, and Debug menu > Dev > Unit Tests >
+#                                    starts a test world, Renewable Energy QA one with everything
+#                                    of the mod laid out, and Debug menu > Dev > Unit Tests >
 #                                    Timed Actions runs the renewable_energy_* tests
 #   dev/run-debug-client.sh --test   starts the scenario, runs every renewable_energy_* test and
 #                                    quits the game. Runs unattended: ClickToStart presses "Click
