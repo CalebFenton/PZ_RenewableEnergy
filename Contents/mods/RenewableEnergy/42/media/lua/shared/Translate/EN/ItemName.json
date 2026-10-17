@@ -20,6 +20,7 @@
     "RenewableEnergy.SolarFailsafe": "Solar Failsafe",
     "RenewableEnergy.DeepCycleBattery": "Deep Cycle Marine Battery",
     "RenewableEnergy.L16Battery": "L-16 Battery",
+    "RenewableEnergy.JarBattery": "Jar Battery",
     "RenewableEnergy.CarBatteryCase": "Car Battery Case",
     "RenewableEnergy.DeepCycleBatteryCase": "Deep Cycle Battery Case",
     "RenewableEnergy.L16BatteryCase": "L-16 Battery Case",

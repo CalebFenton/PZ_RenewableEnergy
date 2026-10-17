@@ -37,19 +37,33 @@ Recipes.MOUNTS = {
     ["RenewableEnergy.SolarRackMetal"] = { kind = "rack", xp = { Electricity = 20, MetalWelding = 10 } },
 }
 
--- Repair Cracked Module: condition it adds, and the most it brings each module type to. A
--- factory module's cells stay cracked under the new glass; a homemade one is at its
--- ConditionMax.
-Recipes.MODULE_REPAIR = 30
+-- Seal Cracked Module (RenewableEnergy_RepairCrackedModule): condition it adds, and the most it
+-- brings each module type to. The caps stay below Specs.crackedBelow: sealed glass is still
+-- cracked glass.
+Recipes.MODULE_REPAIR = 20
 Recipes.MODULE_REPAIR_CAP = {
+    [Specs.factoryModule] = 55,
+    ["RenewableEnergy.HomemadeSolarModule"] = 40,
+}
+
+-- Reglaze Module sets a module below this to it: new glass, but a factory module's cells stay
+-- cracked under it; a homemade one is at its ConditionMax.
+Recipes.REGLAZE = {
     [Specs.factoryModule] = 80,
     ["RenewableEnergy.HomemadeSolarModule"] = 60,
 }
 
--- Service Battery adds a little to a tired battery; Recondition sets a better one.
+-- Service Battery adds a little to a tired battery; Recondition brings it to its repair limit.
+-- Each repair counts on vanilla's per-item repair count ("Repaired: Nx") and lowers the limit
+-- for the next, so a battery can only be repaired so often before it needs rebuilding.
 Recipes.SERVICE_REPAIR = 10
-Recipes.SERVICE_CAP = 60
-Recipes.RECONDITION_CONDITION = 85
+Recipes.REPAIR_LIMIT = 85
+Recipes.REPAIR_LIMIT_STEP = 10
+
+-- The most a repair can bring a battery repaired this many times to.
+function Recipes.repairLimit(timesRepaired)
+    return Recipes.REPAIR_LIMIT - Recipes.REPAIR_LIMIT_STEP * timesRepaired
+end
 
 local function isModule(item)
     return Specs.modules[item:getFullType()] ~= nil
@@ -114,18 +128,18 @@ end
 
 -- Solar modules ----------------------------------------------------------------------------------
 
--- OnTest of Repair Cracked Module: the module must be below what the repair brings it to.
+-- OnTest of Seal Cracked Module: the module must be below what the seal brings it to.
 function Recipes.isModuleBelowRepairCap(item, character)
     local cap = Recipes.MODULE_REPAIR_CAP[item:getFullType()]
     return cap == nil or item:getCondition() < cap
 end
 
---- What Repair Cracked Module brings the module's condition to.
+--- What Seal Cracked Module brings the module's condition to.
 function Recipes.repairedCondition(module)
     return math.min(Recipes.MODULE_REPAIR_CAP[module:getFullType()], module:getCondition() + Recipes.MODULE_REPAIR)
 end
 
--- OnCreate of Repair Cracked Module.
+-- OnCreate of Seal Cracked Module.
 function Recipes.repairModule(craftRecipeData, character)
     local module = firstInput(craftRecipeData, function(item)
         return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
@@ -134,9 +148,25 @@ function Recipes.repairModule(craftRecipeData, character)
     sendItemStats(module)
 end
 
--- Repair Cracked Panel mends a module still on the arrow board trailer the way Repair Cracked
--- Module mends one in hand. It reads the recipe's inputs, skill, time and XP from the recipe
--- itself, so the two can't drift apart; the module input is the panel.
+-- OnTest of Reglaze Module: the module must be below what new glass brings it to.
+function Recipes.isModuleBelowReglaze(item, character)
+    local reglazed = Recipes.REGLAZE[item:getFullType()]
+    return reglazed == nil or item:getCondition() < reglazed
+end
+
+-- OnCreate of Reglaze Module.
+function Recipes.reglazeModule(craftRecipeData, character)
+    local module = firstInput(craftRecipeData, function(item)
+        return Recipes.REGLAZE[item:getFullType()] ~= nil
+    end)
+    Wear.setCondition(module, Recipes.REGLAZE[module:getFullType()])
+    sendItemStats(module)
+end
+
+-- Seal Cracked Panel seals a module still on the arrow board trailer the way Seal Cracked
+-- Module seals one in hand. It reads the recipe's inputs, skill, time and XP from the recipe
+-- itself, so the two can't drift apart; the module input is the panel. Reglazing isn't offered in
+-- place: the panel comes off to be reglazed, as vanilla car glass is replaced, not repaired.
 Recipes.MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
 
 function Recipes.moduleRepairRecipe()
@@ -159,7 +189,7 @@ end
 -- The rounding CraftRecipeData.consumeInputFromItems forgives when scaled uses pay an input.
 local PAID_TOLERANCE = 1e-5
 
---- The inventory items, bags included, that pay for a Repair Cracked Panel's inputs but the
+--- The inventory items, bags included, that pay for a Seal Cracked Panel's inputs but the
 --- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
 --- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; nil when an
 --- input is missing. Second, each of those inputs as a need (RenewableEnergy.firstUnmet), `have`
@@ -202,7 +232,7 @@ function Recipes.panelRepairInputs(character)
     return complete and picks or nil, needs
 end
 
---- What Repair Cracked Panel takes of `character` (RenewableEnergy.firstUnmet): the recipe
+--- What Seal Cracked Panel takes of `character` (RenewableEnergy.firstUnmet): the recipe
 --- known, its skills, and its inputs but the module.
 function Recipes.panelRepairNeeds(character)
     local recipe = Recipes.moduleRepairRecipe()
@@ -218,7 +248,7 @@ function Recipes.panelRepairNeeds(character)
     return needs
 end
 
---- Why the character can't do Repair Cracked Panel, or nil when they can: the kind of the first
+--- Why the character can't do Seal Cracked Panel, or nil when they can: the kind of the first
 --- of panelRepairNeeds they are short of.
 function Recipes.panelRepairRefusal(character)
     local short = RenewableEnergy.firstUnmet(Recipes.panelRepairNeeds(character))
@@ -253,29 +283,40 @@ local function inputBattery(craftRecipeData)
     return firstInput(craftRecipeData, Battery.isBattery)
 end
 
+local function canRepair(item)
+    return not Battery.isBattery(item) or item:getCondition() < Recipes.repairLimit(item:getHaveBeenRepaired())
+end
+
+-- Counts the repair; syncItemFields carries the count to clients, sendItemStats the condition.
+local function countRepair(battery)
+    battery:setHaveBeenRepaired(battery:getHaveBeenRepaired() + 1)
+    battery:syncItemFields()
+    sendItemStats(battery)
+end
+
 -- OnTest of Service Battery.
 function Recipes.canServiceBattery(item, character)
-    return not Battery.isBattery(item) or item:getCondition() < Recipes.SERVICE_CAP
+    return canRepair(item)
 end
 
 -- OnCreate of Service Battery.
 function Recipes.serviceBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, math.min(Recipes.SERVICE_CAP, battery:getCondition() + Recipes.SERVICE_REPAIR))
-    sendItemStats(battery)
+    Wear.setCondition(battery, math.min(Recipes.repairLimit(battery:getHaveBeenRepaired()), battery:getCondition() + Recipes.SERVICE_REPAIR))
+    countRepair(battery)
 end
 
 -- OnTest of Recondition Battery.
 function Recipes.canReconditionBattery(item, character)
-    return not Battery.isBattery(item) or item:getCondition() < Recipes.RECONDITION_CONDITION
+    return canRepair(item)
 end
 
 -- OnCreate of Recondition Battery.
 function Recipes.reconditionBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, Recipes.RECONDITION_CONDITION)
+    Wear.setCondition(battery, Recipes.repairLimit(battery:getHaveBeenRepaired()))
     Battery.setCharge(battery, 0)
-    sendItemStats(battery)
+    countRepair(battery)
 end
 
 -- OnCreate of Strip Car Battery: the case remembers which vanilla car battery it was,

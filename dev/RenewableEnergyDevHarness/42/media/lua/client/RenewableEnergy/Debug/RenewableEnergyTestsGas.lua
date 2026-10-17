@@ -643,3 +643,25 @@ for recipe, spray in pairs({ MildewSpray = "Base.GardeningSprayMilk", AphidSpray
         counts = { [spray] = 1, ["Base.GardeningSprayEmpty"] = 0 },
     })
 end
+
+-- The build menu's own path builds a working gasifier of `tier` from its entity's recipe, which
+-- takes its materials and keeps its tools: the primitive one from a drilled strainer, its hearth
+-- lined with cement; the advanced one with its fired brick lining.
+local function buildsGasifier(tier, entity, prefer)
+    return {
+        instant = true,
+        run = function(self)
+            T.buildRecord(self, "gasifier", entity, Sprites.gasifier[tier], prefer)
+        end,
+        validate = function(self)
+            local built = self.reads.built or {}
+            T.expect(built.tier == tier, "the build menu built " .. tostring(built.tier))
+            T.expectBuilt(self, Sprites.gasifier[tier])
+        end,
+    }
+end
+
+test("renewable_energy_gas_build_primitive_gasifier", buildsGasifier("primitive", "Base.RenewableEnergy_PrimitiveGasifier",
+    { "Base.Strainer" }))
+test("renewable_energy_gas_build_gasifier", buildsGasifier("standard", "Base.RenewableEnergy_Gasifier"))
+test("renewable_energy_gas_build_advanced_gasifier", buildsGasifier("advanced", "Base.RenewableEnergy_AdvancedGasifier"))

@@ -308,6 +308,13 @@ function Menu.addBankOptions(playerNum, context, bank)
     local switch = menu:addOption(getText(on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On"), playerNum, Menu.queueBank,
         on and Action.TURN_OFF or Action.TURN_ON, bank)
     Needs.refuse(switch, PowerBank.switchRefusal(summary, not on))
+    -- As vanilla's generator menu: Disconnect only while switched off.
+    local connected = bank:isConnected()
+    if not (connected and on) then
+        local plug = menu:addOption(getText(connected and "ContextMenu_RenewableEnergy_DisconnectBank" or "ContextMenu_RenewableEnergy_ConnectBank"),
+            playerNum, Menu.queueBank, connected and Action.DISCONNECT_BANK or Action.CONNECT_BANK, bank)
+        Needs.refuse(plug, PowerBank.connectRefusal(getSpecificPlayer(playerNum), bank, summary, not connected))
+    end
 
     local sources = unconnectedSources(bank)
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
@@ -458,8 +465,8 @@ end
 
 -- Vehicle ----------------------------------------------------------------------------------------
 
---- Repair Cracked Panel for each cracked panel of an arrow board trailer that the repair can
---- mend, listing what the repair takes and greyed out when the character can't do it.
+--- Seal Cracked Panel for each cracked panel of an arrow board trailer that the seal can
+--- help, listing what the seal takes and greyed out when the character can't do it.
 function Menu.addPanelRepairOptions(playerNum, context, vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     if not ArrowBoard.isTrailer(vehicle) then

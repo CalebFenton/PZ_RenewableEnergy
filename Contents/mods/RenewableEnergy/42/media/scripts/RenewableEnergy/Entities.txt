@@ -75,8 +75,9 @@ module Base
         }
     }
 
-    /* Any of the game's four drums; its tile is the Metal Drum's, and OnCreate swaps in the tile of
-       the barrel it took (DigesterSystem.lua). */
+    /* Any of the game's four drums. The build menu builds it on the Metal Drum's tile; OnCreate
+       makes it the entity of the drum it took (DigesterSystem.lua), one per drum as vanilla's
+       Charcoal_Burner_* are: a SpriteConfig takes only its own tiles. */
     entity RenewableEnergy_BarrelDigester
     {
         component UiConfig
@@ -115,6 +116,68 @@ module Base
                 item 2 [Base.DuctTape],
                 item 1 [Base.Glue],
                 item 3 tags[base:garbagebag],
+            }
+        }
+    }
+
+    /* The barrel digester on the other drums, which only its OnCreate and the rural finds make: no
+       recipe, so the build menu lists the one above. */
+    entity RenewableEnergy_BarrelDigester_OrangeBarrel
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_BarrelDigester,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_229,
+                }
+            }
+        }
+    }
+
+    entity RenewableEnergy_BarrelDigester_DarkGreenBarrel
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_BarrelDigester,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_277,
+                }
+            }
+        }
+    }
+
+    entity RenewableEnergy_BarrelDigester_LightGreenBarrel
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_BarrelDigester,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_278,
+                }
             }
         }
     }
@@ -203,7 +266,8 @@ module Base
         }
     }
 
-    /* The FEMA unit: a round bin over a cooking-pot firebox, a bucket for its filter. */
+    /* The FEMA unit: a round bin over a drilled strainer or pot grate, bolted, its hearth lined
+       with cement, a bucket for its filter. */
     entity RenewableEnergy_PrimitiveGasifier
     {
         component UiConfig
@@ -237,11 +301,16 @@ module Base
             inputs
             {
                 item 1 tags[base:hammer] mode:keep flags[MayDegradeLight],
+                /* Drills the grate's holes and the bolt holes. */
+                item 1 tags[base:metalworkingpunch;base:drillmetal] mode:keep flags[MayDegradeLight],
                 item 1 [Base.Mov_BinRound],
-                item 1 [Base.Pot],
+                item 1 [Base.Strainer;Base.Pot],
                 item 2 [Base.MetalPipe],
-                item 1 tags[base:bucket],
-                item 2 [Base.DuctTape],
+                item 1 [Base.NutsBolts],
+                /* mode:destroy as vanilla's Bucket Maul: a plain input only drains a fluid container. */
+                item 1 tags[base:bucket] mode:destroy,
+                /* FEMA lines the hearth with cement; as vanilla's Primitive Furnace takes it. */
+                item 1 tags[base:concrete] flags[DontRecordInput],
             }
         }
     }
@@ -285,7 +354,7 @@ module Base
                 item 1 [Base.MetalDrum],
                 item 2 [Base.SheetMetal],
                 item 2 [Base.MetalPipe],
-                item 1 tags[base:bucket],
+                item 1 tags[base:bucket] mode:destroy,
             }
         }
     }
@@ -330,7 +399,9 @@ module Base
                 item 6 [Base.SheetMetal],
                 item 3 [Base.MetalPipe],
                 item 2 [Base.IronBar],
-                item 1 tags[base:bucket],
+                /* A fired brick lining keeps the charcoal fire's heat off the welded shell. */
+                item 4 [Base.ClayBrick],
+                item 1 tags[base:bucket] mode:destroy,
             }
         }
     }

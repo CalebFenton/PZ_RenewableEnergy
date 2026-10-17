@@ -111,6 +111,16 @@ function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, m
 end
 
 -- Picking up --------------------------------------------------------------------------------------
+-- A connected bank, like a connected generator, must be disconnected before it is taken
+-- (ISTakeGenerator.isValid).
+local vanillaCanPickUp = ISMoveableSpriteProps.canPickUpMoveableInternal
+function ISMoveableSpriteProps:canPickUpMoveableInternal(character, square, object, isMulti)
+    if object and RenewableEnergy.PowerBank.isBank(object) and object:isConnected() then
+        return false
+    end
+    return vanillaCanPickUp(self, character, square, object, isMulti)
+end
+
 -- Placing copies an item's modData onto the object, but picking up copies an object's back only
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
 -- conditions and a garden light its charge and bulb.

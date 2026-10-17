@@ -318,6 +318,27 @@ module RenewableEnergy
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
+    /*
+        Six 2 V glass-jar cells standing in a sand tray, wired as one 12 V battery: the farm
+        light plant's battery, made at home. Open jars spill, so it never goes in a vehicle (no
+        VehicleType).
+    */
+    item JarBattery
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:drainable,
+        Weight = 10.0,
+        Icon = RenewableEnergy_JarBattery,
+        WorldStaticModel = RenewableEnergy.JarBattery_Ground,
+        UseDelta = 0.00001,
+        UseWhileEquipped = false,
+        cantBeConsolided = true,
+        KeepOnDeplete = true,
+        ConditionMax = 100,
+        Tooltip = Tooltip_RenewableEnergy_JarBattery,
+        Tags = base:heavyitem;base:ignorezombiedensity;base:showcondition,
+    }
+
     /**************************** Battery rebuilding ************************/
     /* A stripped battery's empty case, waiting for new plates and acid. */
     item CarBatteryCase
@@ -501,7 +522,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag2_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
+        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReglazeModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_StripJarBattery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_CastBatteryPlatesFromLeadPipe;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeJarBattery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

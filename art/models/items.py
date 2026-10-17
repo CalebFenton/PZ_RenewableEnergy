@@ -88,6 +88,11 @@ def M(name):
         "clay": lambda: material("RE_Clay", "#8e8172", roughness=0.9, grime=0.2, scale=16),
         "terracotta": lambda: material("RE_Terracotta", "#b2603b", roughness=0.85, grime=0.25, scale=16),
         "hdpe": lambda: material("RE_Hdpe", "#e8e4d8", roughness=0.5, grime=0.1),
+        # A jar's green-tinged glass, opaque as the game draws its own jars, and the dark acid
+        # showing at the open mouth.
+        "jarglass": lambda: material("RE_JarGlass", "#9fbdb2", roughness=0.12, grime=0.06),
+        "acid": lambda: material("RE_Acid", "#3d4a42", roughness=0.1, grime=0.05),
+        "sand": lambda: material("RE_Sand", "#c9b48a", roughness=0.95, grime=0.2, scale=60, speckle=("#a48f64", 0.4)),
         "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
         # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is black
         # with dirt but for patches of bare grey, crusted white with sulphate and blue-green where
@@ -432,6 +437,35 @@ def l16_battery(col):
     """An L-16 6 V battery: tall, heavy, maroon, lifting handles at the ends."""
     battery(col, "L16", L16, "maroon", "battery", caps=(-0.08, 0.0, 0.08), cap_colour="black",
             label=("L-16", 0.05), handle="sides", post_height=0.035)
+
+
+def jar_battery(col):
+    """Six open glass jars, each a 2 V cell with its plates' lugs standing out of the acid, set in
+    sand in a nailed pine tray and wired in series by copper straps across their tops."""
+    width, depth, wall, tray_height = 0.36, 0.25, 0.015, 0.06
+    box(col, "JarTray_Bottom", M("pine"), (width, depth, wall), bevel=0.002)
+    for sign in (-1, 1):
+        box(col, "JarTray_Side", M("pinedark"), (width, wall, tray_height), at=(0, sign * (depth - wall) / 2, 0), bevel=0.002)
+        box(col, "JarTray_End", M("pine"), (wall, depth - 2 * wall, tray_height), at=(sign * (width - wall) / 2, 0, 0), bevel=0.002)
+    box(col, "JarTray_Sand", M("sand"), (width - 2 * wall, depth - 2 * wall, tray_height - 0.015), at=(0, 0, wall), bevel=0.004)
+    radius, height, pitch = 0.05, 0.16, 0.112
+    lugs = []
+    for row, y in enumerate((-0.055, 0.055)):
+        for i in range(3):
+            x = (i - 1) * pitch
+            cylinder(col, "Jar_Glass", M("jarglass"), radius, height, at=(x, y, wall), segments=16)
+            cylinder(col, "Jar_Acid", M("acid"), radius - 0.006, 0.002, at=(x, y, wall + height - 0.02), segments=16)
+            for sign in (-1, 1):
+                box(col, "Jar_Lug", M("lead"), (0.012, 0.012, 0.035), at=(x + sign * 0.022, y, wall + height - 0.02), bevel=0.002)
+                lugs.append((x + sign * 0.022, y))
+    top = wall + height + 0.015
+    # In series: each jar's + lug to the next jar's - lug, along the front row and back.
+    order = [lugs[1], lugs[2], lugs[3], lugs[4], lugs[5], lugs[11], lugs[10], lugs[9], lugs[8], lugs[7], lugs[6]]
+    for a, b in zip(order[::2], order[1::2]):
+        tube(col, "Jar_Strap", M("copper"), [(a[0], a[1], top), (b[0], b[1], top)], 0.004, 6)
+    for lug, colour in ((lugs[0], "red"), (order[-1], "black")):
+        tube(col, "Jar_Lead", M(colour), [(lug[0], lug[1], top), (lug[0], lug[1] - 0.02, top + 0.02),
+                                          (lug[0] - 0.05, lug[1] - 0.03, top + 0.01)], 0.004, 6)
 
 
 # How a battery in a bank or box tile looks by its type, at the one size every slot fits: case, lid,
@@ -2622,6 +2656,7 @@ ITEMS = {
     "SolarFailsafe": {"model": solar_failsafe, "icon": lambda col: solar_failsafe(col, cable=False)},
     "DeepCycleBattery": {"model": deep_cycle_battery, "ground_scale": BATTERY_GROUND_SCALE},
     "L16Battery": {"model": l16_battery, "ground_scale": BATTERY_GROUND_SCALE},
+    "JarBattery": {"model": jar_battery, "ground_scale": BATTERY_GROUND_SCALE},
     "SolarMaintainer": {"model": solar_maintainer, "icon_elevation": 40},
     "SolarCellCharger": {"model": solar_cell_charger, "icon_elevation": 45},
     "SolarGardenLight": {"model": lying(solar_garden_light), "icon": solar_garden_light},

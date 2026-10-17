@@ -82,6 +82,22 @@ function Commands.setBankOn(player, args)
     return true
 end
 
+function Commands.setBankConnected(player, args)
+    local bank = bankAt(args.bank)
+    local isoObject = bank and bank:getIsoObject()
+    if not isoObject then return false, "no bank" end
+    local connected = args.connected == true
+    local refusal = PowerBank.connectRefusal(player, isoObject, bank, connected)
+    if refusal then return false, refusal end
+    settle(bank)
+    -- setConnected syncs the generator to the clients.
+    isoObject:setConnected(connected)
+    bank.connected = connected
+    bank:powerUp()
+    bank:sendStatus()
+    return true
+end
+
 function Commands.connectSource(player, args)
     local bank = bankAt(args.bank)
     local source = sourceAt(args.source)

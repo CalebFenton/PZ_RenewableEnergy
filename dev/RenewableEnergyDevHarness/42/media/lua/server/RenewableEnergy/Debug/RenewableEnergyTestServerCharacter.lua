@@ -70,8 +70,19 @@ handler("takeItems", function(player, args)
     return { taken = #items }
 end)
 
+-- Sets vanilla's repair count of the character's items of `args.type` to `args.repaired`, as a
+-- repair does, which the clients then see too.
+handler("setRepaired", function(player, args)
+    local all = player:getInventory():getAllTypeRecurse(args.type)
+    for i = 0, all:size() - 1 do
+        all:get(i):setHaveBeenRepaired(args.repaired)
+        all:get(i):syncItemFields()
+    end
+    return { set = all:size() }
+end)
+
 -- What the character carries: for each type of `args.types` its items, bags included, { id,
--- condition, uses (the fraction left), modData }; in `fluids` the litres of each fluid of
+-- condition, uses (the fraction left), repaired (vanilla's repair count), modData }; in `fluids` the litres of each fluid of
 -- `args.fluids` (Fluid field names, or a modded fluid's name) in the fluid containers of its main inventory; and in `total`
 -- how many items its main inventory holds.
 handler("carried", function(player, args)
@@ -83,7 +94,7 @@ handler("carried", function(player, args)
         for i = 0, all:size() - 1 do
             local item = all:get(i)
             table.insert(items[fullType], { id = item:getID(), condition = item:getCondition(),
-                uses = item:getCurrentUsesFloat(), modData = item:getModData() })
+                uses = item:getCurrentUsesFloat(), repaired = item:getHaveBeenRepaired(), modData = item:getModData() })
         end
     end
     local fluids = {}

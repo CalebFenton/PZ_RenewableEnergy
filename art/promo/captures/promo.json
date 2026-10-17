@@ -106,6 +106,11 @@
       "name": "L-16 Battery"
     },
     {
+      "fullType": "RenewableEnergy.JarBattery",
+      "icon": "icon_RenewableEnergy_JarBattery",
+      "name": "Jar Battery"
+    },
+    {
       "fullType": "RenewableEnergy.CarBatteryCase",
       "icon": "icon_RenewableEnergy_CarBatteryCase",
       "name": "Car Battery Case"
@@ -405,7 +410,7 @@
       "box": [
         36,
         36,
-        138,
+        139,
         100
       ]
     },
@@ -437,11 +442,20 @@
       ]
     },
     {
+      "name": "model_RenewableEnergy_JarBattery",
+      "box": [
+        52,
+        52,
+        200,
+        161
+      ]
+    },
+    {
       "name": "model_RenewableEnergy_CarBatteryCase",
       "box": [
         38,
         38,
-        146,
+        147,
         146
       ]
     },
@@ -487,7 +501,7 @@
         19,
         19,
         73,
-        53
+        52
       ]
     },
     {
@@ -523,7 +537,7 @@
         93,
         93,
         359,
-        235
+        236
       ]
     },
     {
@@ -628,10 +642,10 @@
     {
       "name": "model_RenewableEnergy_TreadmillMotor",
       "box": [
-        53,
-        53,
-        204,
-        118
+        52,
+        52,
+        202,
+        117
       ]
     },
     {
@@ -658,7 +672,7 @@
         53,
         142,
         459,
-        192
+        193
       ]
     },
     {
@@ -684,7 +698,7 @@
       "box": [
         43,
         43,
-        120,
+        119,
         167
       ]
     }
@@ -1965,6 +1979,12 @@
               "fullType": "RenewableEnergy.L16Battery",
               "icon": "icon_RenewableEnergy_L16Battery",
               "name": "L-16 Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.JarBattery",
+              "icon": "icon_RenewableEnergy_JarBattery",
+              "name": "Jar Battery"
             }
           ],
           "keep": true,
@@ -2189,63 +2209,25 @@
           "uses": false
         },
         {
-          "count": 1,
+          "count": 2,
           "items": [
             {
-              "count": 1,
-              "fullType": "Base.GlassPanel",
-              "icon": "icon_Base_GlassPanel",
-              "name": "Glass Pane"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
+              "count": 2,
               "fullType": "Base.Epoxy",
               "icon": "icon_Base_Epoxy",
               "name": "Epoxy"
-            },
-            {
-              "count": 2,
-              "fullType": "Base.Glue",
-              "icon": "icon_Base_Glue",
-              "name": "Glue"
             }
           ],
           "keep": false,
           "tag": false,
           "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
         }
       ],
       "learn": {
         "auto": [
           {
-            "level": 5,
+            "level": 3,
             "name": "Electrical"
-          },
-          {
-            "level": 5,
-            "name": "Glassmaking"
           }
         ],
         "autoAll": [],
@@ -2255,11 +2237,11 @@
         "needed": true,
         "research": []
       },
-      "name": "Repair Cracked Module",
+      "name": "Seal Cracked Module",
       "outputs": [],
       "skills": [
         {
-          "level": 3,
+          "level": 2,
           "name": "Electrical"
         }
       ]
@@ -2321,6 +2303,140 @@
       "skills": [
         {
           "level": 1,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_StripJarBattery",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Dish",
+              "icon": "icon_Base_Gloves_Dish",
+              "name": "Rubber Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_Surgical",
+              "icon": "icon_Base_Gloves_Surgical",
+              "name": "Surgical Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGloves",
+              "icon": "icon_Base_Gloves_LeatherGloves",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBlack",
+              "icon": "icon_Base_Gloves_LeatherGlovesBlack",
+              "name": "Leather Gloves"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Gloves_LeatherGlovesBrown",
+              "icon": "icon_Base_Gloves_LeatherGlovesBrown",
+              "name": "Leather Gloves"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.JarBattery",
+              "icon": "icon_RenewableEnergy_JarBattery",
+              "name": "Jar Battery"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fills": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true,
+        "research": [
+          "Broken Glass",
+          "Jar",
+          "Worn Battery Plates"
+        ]
+      },
+      "name": "Strip Jar Battery",
+      "outputs": [
+        {
+          "count": 5,
+          "fullType": "Base.EmptyJar",
+          "icon": "icon_Base_EmptyJar",
+          "name": "Jar"
+        },
+        {
+          "count": 1,
+          "fullType": "Base.BrokenGlass",
+          "icon": "icon_Base_BrokenGlass",
+          "name": "Broken Glass"
+        },
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.WornBatteryPlates",
+          "icon": "icon_RenewableEnergy_WornBatteryPlates",
+          "name": "Worn Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
           "name": "Electrical"
         }
       ]
@@ -2531,6 +2647,12 @@
               "fullType": "RenewableEnergy.L16Battery",
               "icon": "icon_RenewableEnergy_L16Battery",
               "name": "L-16 Battery"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.JarBattery",
+              "icon": "icon_RenewableEnergy_JarBattery",
+              "name": "Jar Battery"
             }
           ],
           "keep": true,
@@ -3627,6 +3749,188 @@
       ]
     },
     {
+      "id": "RenewableEnergy_MakeJarBattery",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.EmptyJar",
+              "icon": "icon_Base_EmptyJar",
+              "name": "Jar"
+            },
+            {
+              "count": 6,
+              "fullType": "Base.JarCrafted",
+              "icon": "icon_Base_JarCrafted",
+              "name": "Jar"
+            },
+            {
+              "count": 6,
+              "fullType": "Base.ClayJarGlazed",
+              "icon": "icon_Base_ClayJarGlazed",
+              "name": "Glazed Ceramic Jar"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlates",
+              "icon": "icon_RenewableEnergy_BatteryPlates",
+              "name": "Battery Plates"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 1,
+            "name": "Acid"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryElectrolyte",
+              "icon": "icon_RenewableEnergy_BatteryElectrolyte",
+              "name": "Battery Electrolyte"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 2,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Sandbag",
+              "icon": "icon_Base_Sandbag",
+              "name": "Sack of Sand"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true,
+        "research": [
+          "Jar Battery"
+        ]
+      },
+      "name": "Make Jar Battery",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.JarBattery",
+          "icon": "icon_RenewableEnergy_JarBattery",
+          "name": "Jar Battery"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
       "id": "RenewableEnergy_MakeGasHeater",
       "inputs": [
         {
@@ -4625,6 +4929,84 @@
       ]
     },
     {
+      "id": "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
+      "inputs": [
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.LeadPipe",
+              "icon": "icon_Base_LeadPipe",
+              "name": "Lead Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 8,
+          "items": [
+            {
+              "count": 8,
+              "fullType": "Base.Charcoal",
+              "icon": "icon_Base_Charcoal",
+              "name": "Charcoal"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlateMold",
+              "icon": "icon_RenewableEnergy_BatteryPlateMold",
+              "name": "Battery Plate Mold"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 6,
+            "name": "Electrical"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true,
+        "research": [
+          "Battery Plates"
+        ]
+      },
+      "name": "Cast Battery Plates from Lead Pipe",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.BatteryPlates",
+          "icon": "icon_RenewableEnergy_BatteryPlates",
+          "name": "Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Blacksmithing"
+        }
+      ]
+    },
+    {
       "id": "RenewableEnergy_MakeSolarWallWood",
       "inputs": [
         {
@@ -5372,6 +5754,119 @@
         }
       ],
       "skills": []
+    },
+    {
+      "id": "RenewableEnergy_ReglazeModule",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SolarModule",
+              "icon": "icon_RenewableEnergy_SolarModule",
+              "name": "Solar Module"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.HomemadeSolarModule",
+              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+              "name": "Homemade Solar Module"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.GlassPanel",
+              "icon": "icon_Base_GlassPanel",
+              "name": "Glass Pane"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Epoxy",
+              "icon": "icon_Base_Epoxy",
+              "name": "Epoxy"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.Glue",
+              "icon": "icon_Base_Glue",
+              "name": "Glue"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 4,
+            "name": "Electrical"
+          },
+          {
+            "level": 1,
+            "name": "Glassmaking"
+          }
+        ],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Reglaze Module",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Electrical"
+        }
+      ]
     },
     {
       "id": "RenewableEnergy_UnmountSolarRackWood",
@@ -6453,6 +6948,20 @@
           "uses": false
         },
         {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.ClayBrick",
+              "icon": "icon_Base_ClayBrick",
+              "name": "Brick"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
           "count": 1,
           "items": [
             {
@@ -6683,6 +7192,20 @@
           "items": [
             {
               "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "Base.Mov_BinRound",
               "icon": "icon_Base_Mov_BinRound",
               "name": "Round Bin"
@@ -6695,6 +7218,12 @@
         {
           "count": 1,
           "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Strainer",
+              "icon": "icon_Base_Strainer",
+              "name": "Strainer"
+            },
             {
               "count": 1,
               "fullType": "Base.Pot",
@@ -6725,6 +7254,20 @@
           "items": [
             {
               "count": 1,
+              "fullType": "Base.NutsBolts",
+              "icon": "icon_Base_NutsBolts",
+              "name": "Nuts and Bolts"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
               "fullType": "Base.Bucket",
               "icon": "icon_Base_Bucket",
               "name": "Bucket"
@@ -6735,17 +7278,17 @@
           "uses": false
         },
         {
-          "count": 2,
+          "count": 1,
           "items": [
             {
-              "count": 2,
-              "fullType": "Base.DuctTape",
-              "icon": "icon_Base_DuctTape",
-              "name": "Duct Tape"
+              "count": 1,
+              "fullType": "Base.BucketConcreteFull",
+              "icon": "icon_Base_BucketConcreteFull",
+              "name": "Bucket of Concrete"
             }
           ],
           "keep": false,
-          "tag": false,
+          "tag": true,
           "uses": true
         }
       ],
@@ -7091,6 +7634,7 @@
       "icon_Base_BakingSoda",
       "icon_Base_BlowTorch",
       "icon_Base_BottleCrafted",
+      "icon_Base_BrokenGlass",
       "icon_Base_Bucket",
       "icon_Base_BucketConcreteFull",
       "icon_Base_Calculator",
@@ -7100,10 +7644,12 @@
       "icon_Base_Charcoal",
       "icon_Base_Clay",
       "icon_Base_ClayBrick",
+      "icon_Base_ClayJarGlazed",
       "icon_Base_ClayPipeSegment",
       "icon_Base_DuctTape",
       "icon_Base_ElectricWire",
       "icon_Base_ElectronicsScrap",
+      "icon_Base_EmptyJar",
       "icon_Base_Epoxy",
       "icon_Base_Funnel",
       "icon_Base_Garbagebag",
@@ -7121,6 +7667,7 @@
       "icon_Base_HandDrill",
       "icon_Base_HayTuft",
       "icon_Base_IronBar",
+      "icon_Base_JarCrafted",
       "icon_Base_KitchenKnife",
       "icon_Base_LeadPipe",
       "icon_Base_MasonsTrowel",
@@ -7134,6 +7681,7 @@
       "icon_Base_Mov_OrangeBarrel",
       "icon_Base_Nails",
       "icon_Base_NormalBrake1",
+      "icon_Base_NutsBolts",
       "icon_Base_Pipe",
       "icon_Base_Plank",
       "icon_Base_Pliers",
@@ -7143,6 +7691,7 @@
       "icon_Base_RemoteCraftedV3",
       "icon_Base_RippedSheets",
       "icon_Base_RubberHose",
+      "icon_Base_Sandbag",
       "icon_Base_Saw",
       "icon_Base_Screwdriver",
       "icon_Base_Screws",
@@ -7151,6 +7700,7 @@
       "icon_Base_SmallSheetMetal",
       "icon_Base_SmithingHammer",
       "icon_Base_Speaker",
+      "icon_Base_Strainer",
       "icon_Base_Straw2",
       "icon_Base_Tarp",
       "icon_Base_Tongs",
@@ -7183,6 +7733,7 @@
       "icon_RenewableEnergy_HomesteadPowerMag3",
       "icon_RenewableEnergy_HomesteadPowerMag4",
       "icon_RenewableEnergy_InverterCharger",
+      "icon_RenewableEnergy_JarBattery",
       "icon_RenewableEnergy_L16Battery",
       "icon_RenewableEnergy_L16BatteryCase",
       "icon_RenewableEnergy_PipeBlades",
@@ -7247,6 +7798,7 @@
       "model_RenewableEnergy_HomesteadPowerMag3",
       "model_RenewableEnergy_HomesteadPowerMag4",
       "model_RenewableEnergy_InverterCharger",
+      "model_RenewableEnergy_JarBattery",
       "model_RenewableEnergy_L16Battery",
       "model_RenewableEnergy_L16BatteryCase",
       "model_RenewableEnergy_PipeBlades",

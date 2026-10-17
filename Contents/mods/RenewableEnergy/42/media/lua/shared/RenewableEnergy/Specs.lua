@@ -15,13 +15,15 @@ Specs.batteries = {
     ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 80 },
     ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 1000 },
     ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1200 },
+    -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
+    ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 60 },
 }
 
 -- Inverters by item type: the watts it carries (a bank's limit is the sum over its working
 -- inverters), the watts it draws itself while on, the watts its built-in charger puts into the
 -- bank from grid or generator power (0 for none), and the Electricity level wiring it in needs and
 -- the Electricity XP of the first time one is ever wired in (over Specs.wiring.inverter's).
--- The Plug-in Inverter carries a TV and one lamp, or a mini fridge, but not a full fridge.
+-- The Plug-in Inverter carries a TV and one lamp, or a fridge-freezer and one lamp, but not all three.
 Specs.inverters = {
     ["RenewableEnergy.PlugInInverter"] = { watts = 150, idle = 4, chargerWatts = 0, wiring = { skill = 0, xp = 10 } },
     ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wiring = { skill = 2, xp = 15 } },
@@ -78,8 +80,9 @@ Specs.treadmill = {
 }
 
 -- Watts each Car Battery Charger wired into a bank puts in while grid or generator power
--- reaches the bank.
-Specs.chargerWatts = 250
+-- reaches the bank: vanilla's charger fills a car battery in 6 hours (IsoCarBatteryCharger
+-- chargeRate 1/6 an hour), so 600 Wh / 6 h, as Specs.loads.batteryCharger bills one standing alone.
+Specs.chargerWatts = 100
 
 -- Condition each kind of bank part loses per hour while its bank powers its area, and per overload
 -- that cuts the bank: about one Electronics Scrap of repairs a week per inverter.
@@ -123,7 +126,8 @@ Specs.materials = {
 Specs.storm = { windMin = 45, chancePerHour = 0.0035, crack = 30 }
 -- A module below this condition shows a cracked cover glass, on a mount and on the arrow board
 -- trailer: every cracked module found in the world, and any storm crack on a module that wasn't
--- far above it, while weathered finds and repaired modules (Repair Cracked Module's caps) show whole.
+-- far above it, while weathered finds and reglazed modules (Reglaze Module) show whole. A sealed
+-- module (Seal Cracked Module's caps) still shows cracked: the glass is.
 Specs.crackedBelow = 60
 
 -- Banks by item type. sprite is the Sprites field of its placed tile; the rest is how many of
@@ -179,13 +183,13 @@ Specs.foundCharge = { min = 0.3, max = 0.8 }
 -- How far a panel may be from the bank it is connected to, in tiles and in floors.
 Specs.sourceReach = { tiles = 20, levels = 3 }
 
--- What appliances draw while on, in watts. A compressor runs only part of the time: watts is
--- its draw while it runs, which the inverters must carry, and duty the share of the time it
--- runs, which sets the energy it takes.
+-- What appliances draw while on, in watts: one figure, which the inverters must carry and the
+-- batteries or a gas line pay for. Where vanilla's IsoObject:getGeneratorPowerConsumption is a real
+-- average it keeps vanilla's ratio: a fridge with a freezer (0.13) 80 W, mini fridges included, and
+-- a fridge or a freezer alone (0.08) 50 W. Where vanilla's figure is only a fuel token, it is the 1993 watts.
 Specs.loads = {
-    fridgeFreezer = { watts = 200, duty = 0.4 },
-    fridge = { watts = 160, duty = 0.4 },
-    miniFridge = { watts = 80, duty = 0.5 },
+    fridgeFreezer = { watts = 80 },
+    fridge = { watts = 50 },
     light = { watts = 60 },
     television = { watts = 65 },
     radio = { watts = 10 },

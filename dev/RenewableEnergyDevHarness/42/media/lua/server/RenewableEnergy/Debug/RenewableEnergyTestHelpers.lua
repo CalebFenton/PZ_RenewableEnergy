@@ -183,8 +183,8 @@ end
 
 --- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
 --- "barrel.MetalDrum", "standard") on `square`, as the build menu does (ISBuildIsoEntity:create): a
---- thumpable, then the entity's OnCreate. Sends nothing to clients. Returns the thumpable, or nil
---- and what is missing.
+--- thumpable with the tile's entity, then the entity's OnCreate. Sends nothing to clients. Returns
+--- the thumpable, or nil and what is missing.
 function Helpers.placeRecord(kind, tile, square)
     local spec = KINDS[kind]
     if not (spec and square) then
@@ -198,6 +198,7 @@ function Helpers.placeRecord(kind, tile, square)
         return nil, "the " .. kind .. " tile " .. tostring(tile)
     end
     local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
+    GameEntityFactory.CreateIsoObjectEntity(thumpable, RenewableEnergy.tileEntity(sprite), true)
     square:AddSpecialObject(thumpable)
     spec.system().OnCreate({ thumpable = thumpable })
     return thumpable

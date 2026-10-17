@@ -508,7 +508,7 @@ end
 -- rolls them (ItemPickerJava.getActualSpawnChance), so the report is exact for the lists and
 -- approximate where the game picks among them: a procedural container picks a list by
 -- weightChance, at most `max` per room, and lists forced by zone, tile or room are left out.
--- "Repaired" is after one Repair Cracked Module on every module it helps.
+-- "Repaired" is after one Seal Cracked Module on every module it helps.
 
 local MODULE = RenewableEnergy.Specs.factoryModule
 

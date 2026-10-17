@@ -109,6 +109,7 @@ end
 -- have their own line.
 local STATE_LINES = {
     outdoors = { key = "IGUI_RenewableEnergy_StateOutdoors", color = "bad" },
+    disconnected = { key = "IGUI_RenewableEnergy_StateDisconnected", color = "bad" },
     off = { key = "IGUI_RenewableEnergy_StateOff", color = "dim" },
     grid = { key = "IGUI_RenewableEnergy_StateGrid", color = "dim" },
     empty = { key = "IGUI_RenewableEnergy_StateEmpty", color = "bad" },
@@ -184,7 +185,6 @@ end
 local LOAD_KINDS = {
     fridgeFreezer = "IGUI_RenewableEnergy_LoadFridgeFreezer",
     fridge = "IGUI_RenewableEnergy_LoadFridge",
-    miniFridge = "IGUI_RenewableEnergy_LoadMiniFridge",
     light = "IGUI_RenewableEnergy_LoadLight",
     television = "IGUI_RenewableEnergy_LoadTelevision",
     radio = "IGUI_RenewableEnergy_LoadRadio",
@@ -259,12 +259,14 @@ local function partRows(rows, status)
     end
 end
 
--- The cheapest repair that helps a battery of this condition, or nil for one in perfect shape.
-local function batteryRepair(condition)
-    if condition < Recipes.SERVICE_CAP then
-        return "IGUI_RenewableEnergy_RepairService"
-    elseif condition < Recipes.RECONDITION_CONDITION then
-        return "IGUI_RenewableEnergy_RepairRecondition"
+-- The repair that makes the most of one of a battery's limited repairs, or nil for one in perfect
+-- shape: Service where its step reaches the repair limit anyway (it keeps the charge),
+-- Recondition further below it, and past the limit only a rebuild.
+local function batteryRepair(condition, repaired)
+    local limit = Recipes.repairLimit(repaired or 0)
+    if condition < limit then
+        return condition + Recipes.SERVICE_REPAIR >= limit and "IGUI_RenewableEnergy_RepairService"
+            or "IGUI_RenewableEnergy_RepairRecondition"
     elseif condition < 100 then
         return "IGUI_RenewableEnergy_RepairRebuild"
     end
@@ -273,7 +275,7 @@ end
 -- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
 local function batteryValue(battery)
     local charge, condition = Format.percent(battery.charge), Format.condition(battery.fullType, battery.condition)
-    local repair = batteryRepair(battery.condition)
+    local repair = batteryRepair(battery.condition, battery.repaired)
     if repair then
         return getText("IGUI_RenewableEnergy_BatteryValueRepair", charge, condition, getText(repair))
     end

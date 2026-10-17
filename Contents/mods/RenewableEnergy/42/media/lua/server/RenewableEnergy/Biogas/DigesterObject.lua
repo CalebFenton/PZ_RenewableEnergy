@@ -503,22 +503,23 @@ function DigesterObject:show()
 end
 
 --- Makes it the tier its Upgrade makes of it (Digester.TIERS), with that tier's new holder: its
---- tile, and the bigger hopper of the tile's ContainerCapacity, which a multiplayer client gets
---- only with the containers.
+--- tile and entity, and the bigger hopper of the tile's ContainerCapacity, which a multiplayer
+--- client gets only with the containers.
 function DigesterObject:upgrade(isoObject)
     self.tier = self:tierSpec().upgrade
     self.material = nil
     self.holder = self:tierSpec().holder
     self.holderCondition = 100
     self.gas = math.min(self.gas, self:capacity())
-    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-    isoObject:setSprite(getSprite(Sprites.digester[self.tier]))
+    RenewableEnergy.setEntityTile(isoObject, Sprites.digester[self.tier])
     local container = isoObject:getContainer()
     if container then
         container:setCapacity(tonumber(isoObject:getProperties():get("ContainerCapacity")) or container:getCapacity())
     end
     if isServer() then
         isoObject:transmitUpdatedSpriteToClients()
+        -- After the tile: a client's SpriteConfig checks its new script against the tile it shows.
+        isoObject:sendSyncEntity(nil)
         isoObject:sendObjectChange(IsoObjectChange.CONTAINERS)
     end
 end

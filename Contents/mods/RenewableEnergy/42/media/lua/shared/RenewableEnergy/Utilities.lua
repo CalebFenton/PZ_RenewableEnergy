@@ -175,6 +175,33 @@ function RenewableEnergy.showOverlay(isoObject, isKind, wanted)
     RenewableEnergy.showOverlays(isoObject, isKind, wanted and { wanted } or {})
 end
 
+--- The game entity script whose SpriteConfig names the tile `spriteName`, or nil: what an object
+--- on that tile is, found as vanilla's MORainCollectorBarrel finds it.
+function RenewableEnergy.tileEntity(spriteName)
+    local info = SpriteConfigManager.getObjectInfoFromSprite(spriteName)
+    return info and info:getScript():getParent()
+end
+
+--- Shows the entity `isoObject` as the tile `spriteName` and makes it that tile's entity
+--- (tileEntity). A SpriteConfig takes only its own entity's tiles: one left on another tile is
+--- disowned with a warning wherever the object loads, on each client and after each reload
+--- (SpriteConfig.initObjectInfo). Authority only; the caller sends the object on.
+function RenewableEnergy.setEntityTile(isoObject, spriteName)
+    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
+    isoObject:setSprite(getSprite(spriteName))
+    local script = RenewableEnergy.tileEntity(spriteName)
+    if not script or isoObject:getEntityScript() == script then return end
+    -- By type, as removing one shifts the others' indexes; CreateIsoObjectEntity wants none left.
+    local types = {}
+    for i = 0, isoObject:componentSize() - 1 do
+        table.insert(types, isoObject:getComponentForIndex(i):getComponentType())
+    end
+    for _, componentType in ipairs(types) do
+        GameEntityFactory.RemoveComponentType(isoObject, componentType)
+    end
+    GameEntityFactory.CreateIsoObjectEntity(isoObject, script, true)
+end
+
 -- A job's needs are a list of what it takes of the character, each { kind, have, need } with
 -- what it names: `perk` for a skill, `tool` (an ItemTag field) for a tool, `item` (a full type)
 -- for an item counted by type, `input` (an InputScript) for a recipe's input, `recipe` for a

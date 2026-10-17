@@ -39,9 +39,9 @@ RenewableEnergy.Bank = Bank
 -- existing saves.
 Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
-    "inverters", "chargers", "controllers", "sources", "loadW", "averageLoadW", "loadByKind", "chargeSource",
+    "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "chargeSource",
     "generator", "lastHour", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
-    "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday",
+    "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
 }
 
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
@@ -76,6 +76,7 @@ function Bank:initNew()
     self.overloaded = false
     self.indoors = true
     self.gridPowered = false
+    self.connected = false
     self.charge = 0
     self.nominalWh = 0
     self.batteries = {}
@@ -84,7 +85,6 @@ function Bank:initNew()
     self.controllers = {}
     self.sources = {}
     self.loadW = 0
-    self.averageLoadW = 0
     self.loadByKind = {}
     self.chargeSource = false
     self.generator = false
@@ -123,6 +123,8 @@ function Bank:loaded(isoObject)
     -- IsoGenerator.update would burn fuel, wear the condition and run an engine sound.
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
     self.indoors = PowerBank.canPlaceBank(isoObject:getSquare())
+    -- The truth is the generator's own connected flag; the record keeps it for while it's unloaded.
+    self.connected = isoObject:isConnected()
     self:recount()
     self:switchGenerator()
     self:sendStatus()
@@ -166,6 +168,8 @@ function Bank:recount()
             local entry = partEntry(item)
             if Battery.isBattery(item) then
                 entry.nominalWh = Battery.nominalWh(item)
+                -- The status window's repair hint depends on the repair limit.
+                entry.repaired = item:getHaveBeenRepaired()
                 nominalWh = nominalWh + entry.nominalWh
                 storedWh = storedWh + entry.nominalWh * Battery.getCharge(item)
             end
@@ -458,7 +462,6 @@ function Bank:measure()
     self.gridPowered = square:hasGridPower()
     local load = (self.on or self:chargerW() > 0) and Loads.scan(square) or Loads.new()
     self.loadW = load.watts
-    self.averageLoadW = load.averageWatts
     self.loadByKind = Loads.byKind(load)
     return load.generators
 end
@@ -499,9 +502,10 @@ function Bank:chargeFrom(generators, hours, roomWh)
     return watts
 end
 
--- Switched on, indoors, with a working inverter, and off the grid.
+-- Connected, switched on, indoors, with a working inverter, and off the grid. Banks saved before
+-- the record kept `connected` (nil) were all connected.
 local function canCarryLoad(bank)
-    return bank.on and bank.indoors and bank:limitW() > 0 and not bank.gridPowered
+    return bank.connected ~= false and bank.on and bank.indoors and bank:limitW() > 0 and not bank.gridPowered
 end
 
 --- Whether the bank would carry its load now: it can, and no backup generator does it instead.
@@ -591,7 +595,7 @@ end
 
 -- The watts the inverters take from the batteries to carry the load and run themselves.
 local function inverterDrawW(bank)
-    return bank.averageLoadW / Specs.inverterEfficiency + sumInverters(bank, "idle")
+    return bank.loadW / Specs.inverterEfficiency + sumInverters(bank, "idle")
 end
 
 --- The watts the batteries give the inverters now.
@@ -622,7 +626,7 @@ function Bank:update(hours, context)
 
     local drawW = self:drawW()
     -- While the bank is on, a running backup generator carries the load in its place.
-    local backupW = (self:shouldPower() and self:backupCarriesLoad()) and self.averageLoadW or 0
+    local backupW = (self:shouldPower() and self:backupCarriesLoad()) and self.loadW or 0
     local capacity = self.nominalWh
     local before = self.charge * capacity
     -- The chargers fill what the sources and the load leave; with no batteries there is nothing to fill.
@@ -649,7 +653,7 @@ function Bank:update(hours, context)
     for family, total in pairs(TOTALS) do
         self[total.today] = (self[total.today] or 0) + watts[family] * hours
     end
-    self.loadWhToday = self.loadWhToday + self.averageLoadW * hours * carried
+    self.loadWhToday = self.loadWhToday + self.loadW * hours * carried
     self.backupWhToday = (self.backupWhToday or 0) + backupW * hours
     self:trackCycle()
     self:newDay(container, today())
@@ -686,6 +690,7 @@ end
 function Bank:state()
     if not self.indoors then return "outdoors" end
     if self:limitW() <= 0 then return "noInverter" end
+    if self.connected == false then return "disconnected" end
     if not self.on then return "off" end
     if self.gridPowered then return "grid" end
     if self.overloaded then return "overloaded" end
@@ -743,7 +748,7 @@ function Bank:buildStatus()
     end
     local drawW = now.drawW or 0
     local batteries = partStatus(self.batteries, function(entry, part)
-        entry.fullType, entry.nominalWh, entry.charge = part.type, part.nominalWh, self.charge
+        entry.fullType, entry.nominalWh, entry.charge, entry.repaired = part.type, part.nominalWh, self.charge, part.repaired
     end)
     local chargeSource = self.chargeSource
     local chargers = partStatus(self.chargers, function(entry)

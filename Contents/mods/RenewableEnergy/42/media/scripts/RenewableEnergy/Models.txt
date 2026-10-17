@@ -127,6 +127,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_L16Battery,
         scale = 0.75,
     }
+    model JarBattery_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_JarBattery,
+        texture = WorldItems/RenewableEnergy_JarBattery,
+        scale = 0.75,
+    }
     model SolarMaintainer_Ground
     {
         mesh = WorldItems/RenewableEnergy_SolarMaintainer,

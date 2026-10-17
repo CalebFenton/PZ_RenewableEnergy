@@ -94,6 +94,14 @@ handler("placeBank", function(_, args, defer)
         end
         sendAddItemToContainer(container, item)
     end
+    -- PowerBank.place makes an installed, connected bank; a player's placed one starts unconnected.
+    if args.connected == false then
+        bank:setConnected(false)
+        local luaObject = PowerBank.serverSystem:getLuaObjectOnSquare(square)
+        if luaObject then
+            luaObject.connected = false
+        end
+    end
     local position = PowerBank.positionOf(bank)
     PowerBank.perform(nil, "refresh", { bank = position })
     if not PowerBank.serverSystem:getLuaObjectOnSquare(square) then
@@ -229,7 +237,7 @@ onBank("applyLoad", function(record, _, args)
     for _, name in ipairs(args.names or {}) do
         Loads.add(load, name)
     end
-    record.loadW, record.averageLoadW, record.loadByKind = load.watts, load.averageWatts, Loads.byKind(load)
+    record.loadW, record.loadByKind = load.watts, Loads.byKind(load)
     record:checkOverload()
     record:switchGenerator()
     record:sendStatus()
@@ -245,6 +253,10 @@ onBank("setPartCondition", function(record, bank, args)
     end
     RenewableEnergy.Wear.setCondition(item, args.condition)
     sendItemStats(item)
+    if args.repaired then
+        item:setHaveBeenRepaired(args.repaired)
+        item:syncItemFields()
+    end
     if args.recount then
         record:recount()
         record:sendStatus()

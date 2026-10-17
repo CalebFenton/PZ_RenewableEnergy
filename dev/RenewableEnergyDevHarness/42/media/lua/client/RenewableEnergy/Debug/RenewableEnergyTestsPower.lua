@@ -201,6 +201,25 @@ local function reason(self, key)
     return tostring(self[key].reason)
 end
 
+-- A jar battery is a battery like any other in a bank: it counts, it holds the bank's charge, and
+-- this client's copy shows it.
+test("renewable_energy_power_jar_battery_stores_charge", {
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", { "RenewableEnergy.JarBattery" }, { charge = 0.5 })
+        if not self.bank then return end
+        T.bankState(self, self.bank)
+        T.waitFor(self, function()
+            return math.abs(copyUses(self.bank, "RenewableEnergy.JarBattery") - 0.5) < 0.01
+        end, "this client's jar battery half charged")
+    end,
+    validate = function(self)
+        local state = self.bank.state
+        expect(state.batteries == 1, "the bank counts " .. state.batteries .. " batteries, expected the jar battery")
+        expect(state.nominalWh > 0, "a jar battery gives the bank no capacity")
+        expectNear("Wh stored at half charge", state.storedWh, state.nominalWh / 2, 0.5)
+    end,
+})
+
 -- A placed bank is a registered generator, off until switched on, whose container refuses every
 -- transfer in and out: parts go in and come out only by being wired. Other transfers still work.
 -- The filter must hold on this client's copy, where the player drags.
@@ -403,8 +422,8 @@ test("renewable_energy_power_panel_slots", {
 })
 
 -- The bank's limit is its working inverters' ratings together. A Plug-in Inverter runs a TV and
--- a lamp, or a mini fridge, but not a full fridge. A broken inverter's loss shows in this client's
--- summary.
+-- a lamp, or a fridge-freezer and a lamp, but not all three. A broken inverter's loss shows in this
+-- client's summary.
 test("renewable_energy_power_inverter_limits", {
     run = function(self)
         self.box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", PLUG_IN_INVERTER })
@@ -412,7 +431,8 @@ test("renewable_energy_power_inverter_limits", {
             { "Base.CarBattery1", "RenewableEnergy.PowerInverter", "RenewableEnergy.PowerInverter" })
         if not self.bank then return end
         T.batch(function()
-            T.server(self, "loadWatts", { sets = { { "television", "light" }, { "miniFridge" }, { "fridge" }, { "fridgeFreezer" } } })
+            T.server(self, "loadWatts", { sets = { { "television", "light" }, { "fridgeFreezer", "light" },
+                { "fridgeFreezer", "television", "light" } } })
             T.bankState(self, self.box)
             T.bankState(self, self.bank)
             T.step(function() self.twoInverters = self.bank.state.limitW end)
@@ -426,8 +446,8 @@ test("renewable_energy_power_inverter_limits", {
     validate = function(self)
         local limit, watts = self.box.state.limitW, self.server.loadWatts.watts
         expect(watts[1] <= limit, "a Plug-in Inverter can't run a TV and a lamp")
-        expect(watts[2] <= limit, "a Plug-in Inverter can't run a mini fridge")
-        expect(watts[3] > limit and watts[4] > limit, "a Plug-in Inverter runs a full fridge")
+        expect(watts[2] <= limit, "a Plug-in Inverter can't run a fridge-freezer and a lamp")
+        expect(watts[3] > limit, "a Plug-in Inverter runs a fridge-freezer, a TV and a lamp")
         local inverterW = Specs.inverters["RenewableEnergy.PowerInverter"].watts
         expectNear("limit of two Power Inverters", self.twoInverters, 2 * inverterW, 0)
         expectNear("limit with one of them broken", self.bank.state.limitW, inverterW, 0)
@@ -471,7 +491,7 @@ test("renewable_energy_power_overload_cuts_and_returns", {
 })
 
 -- The scan sees what is switched on whether or not the bank powers it, so a cut bank knows when
--- the load fits again; and it tells a mini fridge from a full one.
+-- the load fits again; and, as vanilla bills them, a mini fridge with its ice box is a fridge-freezer.
 test("renewable_energy_power_scan_sees_load_while_cut", {
     run = function(self)
         T.setGrid(self, false)
@@ -495,8 +515,8 @@ test("renewable_energy_power_scan_sees_load_while_cut", {
         local function count(load, kind)
             return load.counts[kind] or 0
         end
-        expectNear("fridge-freezers found", count(with, "fridgeFreezer") - count(without, "fridgeFreezer"), 1, 0)
-        expectNear("mini fridges found", count(with, "miniFridge") - count(without, "miniFridge"), 1, 0)
+        expectNear("fridge-freezers found, the mini fridge among them",
+            count(with, "fridgeFreezer") - count(without, "fridgeFreezer"), 2, 0)
         expect(with.watts > without.watts, "the fridges added no watts to the scan's load")
     end,
 })
@@ -610,14 +630,13 @@ test("renewable_energy_power_bank_powers_at_night", {
     validate = function(self)
         local after = self.bank.state
         expect(self.powered, "switching on a charged bank with an inverter did not power its square")
-        -- A compressor draws its watts for its duty's share of the time.
         local loadW = 0
         for _, name in ipairs({ "fridge", "television", "light" }) do
-            loadW = loadW + Specs.loads[name].watts * (Specs.loads[name].duty or 1)
+            loadW = loadW + Specs.loads[name].watts
         end
         expect(self.idleW > 0, "a bank that is on with nothing switched on draws nothing for its inverter")
         expect(self.drawW - self.idleW > loadW, string.format(
-            "a fridge, a TV and a lamp averaging %.1f W add %.1f W to the draw, no inverter losses", loadW, self.drawW - self.idleW))
+            "a fridge, a TV and a lamp drawing %.1f W add %.1f W to the draw, no inverter losses", loadW, self.drawW - self.idleW))
         expect(after.status.drawW > 0, "the night's pass drew nothing from a bank that is on")
         expectNear("Wh used in an hour", self.before - after.storedWh, after.status.drawW, 0.5)
         local charging = after.status.charging
@@ -1025,6 +1044,62 @@ test("renewable_energy_power_removed_bank_leaves_no_power", {
         expect(not square:haveElectricity(), "the removed bank's square still has power on this client")
         expect(not removed.registered, "the removed bank is still registered")
         expect(PowerBank.bankOn(square) == nil and PowerBank.summaryOf(square) == nil, "this client still has the removed bank")
+    end,
+})
+
+-- A bank a player placed starts unconnected, like a generator: charged, wired and switched on, it
+-- powers nothing, on its square or one nearby (where a gas pump would stand), and its status says
+-- it isn't connected, until it is connected; then both squares have power, on this client too.
+test("renewable_energy_power_bank_needs_connecting", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood", { "RenewableEnergy.L16Battery", INVERTER }, { connected = false })
+        if not bank then return end
+        self.bank = bank
+        self.near = T.square(self, { near = bank }, "a square near the bank")
+        if not self.near then return end
+        T.switchOn(self, bank)
+        T.bankState(self, bank)
+        T.step(function()
+            self.before = bank.state
+            self.nearBefore = self.near:haveElectricity()
+        end)
+        T.perform(self, "setBankConnected", { bank = bank.position, connected = true })
+        T.step(function() self.connected = self.server.perform end)
+        T.waitFor(self, function() return bank.square:haveElectricity() and self.near:haveElectricity() end,
+            "power on the connected bank's square and the square near it here")
+        T.bankState(self, bank)
+    end,
+    validate = function(self)
+        local before, after = self.before, self.bank.state
+        expect(before.on and not before.activated and not before.powered, "an unconnected bank that is on powered its square")
+        expect(not self.nearBefore, "an unconnected bank that is on powered a square near it")
+        expect(before.status.state == "disconnected", "the unconnected bank's status says " .. tostring(before.status.state))
+        expect(self.connected.ok, "the authority refused to connect the bank (" .. tostring(self.connected.reason) .. ")")
+        expect(after.activated and after.powered, "the connected bank doesn't power its square")
+        expect(after.status.state == "on", "the connected bank's status says " .. tostring(after.status.state))
+    end,
+})
+
+-- A bank tile a player places becomes a working bank that isn't connected yet, as a generator
+-- set down isn't.
+test("renewable_energy_power_placed_bank_starts_unconnected", {
+    instant = true,
+    run = function(self)
+        local square = T.square(self, { indoors = true }, "a free indoor square for a bank")
+        if not square then return end
+        self.square = square
+        -- A bank tile is placed with the Electrician tool, a screwdriver.
+        T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
+        T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood)
+        T.waitFor(self, function()
+            local bank = PowerBank.bankOn(square)
+            return bank ~= nil and PowerBank.summaryOf(bank) ~= nil
+        end, "this client's copy of the placed bank, working")
+    end,
+    validate = function(self)
+        local bank = PowerBank.bankOn(self.square)
+        expect(not bank:isConnected(), "a bank the player placed starts connected")
     end,
 })
 

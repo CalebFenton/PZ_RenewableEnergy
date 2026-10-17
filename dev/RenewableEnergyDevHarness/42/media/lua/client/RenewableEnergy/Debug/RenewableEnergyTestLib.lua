@@ -96,8 +96,9 @@ end
 --- Queues a working bank of Sprites field `kind` holding `items` (full types), filled straight
 --- into its container as world spawns do, its batteries charged to `opts.charge` (full by default).
 --- It stands on `opts.square`, else on a free square near `opts.near` (a handle, object or square):
---- indoors unless `opts.outdoors`. Returns its handle { square, position }; `object` is this
---- client's copy of the bank (its IsoGenerator) once it has arrived with its parts and summary.
+--- indoors unless `opts.outdoors`. It comes connected, as a world bank does, unless
+--- `opts.connected == false`, as a player's placed bank starts. Returns its handle { square, position };
+--- `object` is this client's copy of the bank (its IsoGenerator) once it has arrived with its parts and summary.
 function T.bank(self, kind, items, opts)
     opts = opts or {}
     local square = opts.square or T.square(self, { indoors = not opts.outdoors, near = opts.near },
@@ -107,11 +108,12 @@ function T.bank(self, kind, items, opts)
     end
     local bank = { square = square, position = T.at(square) }
     local count = #(items or {})
+    local connected = opts.connected ~= false
     T.server(self, "placeBank", { x = square:getX(), y = square:getY(), z = square:getZ(), kind = kind, items = items,
-        charge = opts.charge })
+        charge = opts.charge, connected = connected })
     T.waitFor(self, function()
         bank.object = bankCopy(square, count)
-        return bank.object ~= nil
+        return bank.object ~= nil and bank.object:isConnected() == connected
     end, "this client's copy of the bank, with its parts and summary")
     return bank
 end
@@ -279,10 +281,10 @@ function T.bankSet(self, bank, fields, writeBatteries)
     onBank(self, bank, "bankSet", { fields = fields, writeBatteries = writeBatteries })
 end
 
---- Queues setting the condition of the first `fullType` in `bank` on the server, and letting the
---- bank read its parts again if `recount`.
-function T.setPartCondition(self, bank, fullType, condition, recount)
-    onBank(self, bank, "setPartCondition", { type = fullType, condition = condition, recount = recount })
+--- Queues setting the condition of the first `fullType` in `bank` on the server, and its repair
+--- count if `repaired`, and letting the bank read its parts again if `recount`.
+function T.setPartCondition(self, bank, fullType, condition, recount, repaired)
+    onBank(self, bank, "setPartCondition", { type = fullType, condition = condition, recount = recount, repaired = repaired })
 end
 
 --- The summary of `bank` (a handle) as this client last received it, or nil.

@@ -117,11 +117,12 @@ local MAGAZINES = {
     ["RenewableEnergy.HomesteadPowerMag2"] = {
         "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal",
         "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
-        "RenewableEnergy_MakeHomemadeSolarModule", "RenewableEnergy_ReconditionBattery",
+        "RenewableEnergy_MakeHomemadeSolarModule", "RenewableEnergy_ReglazeModule", "RenewableEnergy_ReconditionBattery",
         "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery", "RenewableEnergy_StripL16Battery",
-        "RenewableEnergy_RecastBatteryPlates",
+        "RenewableEnergy_StripJarBattery", "RenewableEnergy_RecastBatteryPlates",
+        "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
         "RenewableEnergy_RebuildCarBattery", "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery",
-        "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold",
+        "RenewableEnergy_MakeJarBattery", "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold",
         "RenewableEnergy_FireBatteryPlateMold",
     },
     ["RenewableEnergy.HomesteadPowerMag3"] = {

@@ -23,19 +23,11 @@ RenewableEnergy.Loads = Loads
 local LOADS = RenewableEnergy.Specs.loads
 local PowerBank = RenewableEnergy.PowerBank
 
-local function isMiniFridge(object)
-    local properties = object:getProperties()
-    return properties ~= nil and properties:get("GroupName") == "Mini"
-end
-
--- The Specs.loads kind of an object with a fridge or freezer container.
+-- The Specs.loads kind of an object with a fridge or freezer container, as vanilla bills it: by
+-- its containers alone, so a mini fridge with its ice box is a fridge-freezer.
 local function fridgeKind(object)
-    if object:getContainerByType("fridge") then
-        if isMiniFridge(object) then
-            return "miniFridge"
-        elseif object:getContainerByType("freezer") then
-            return "fridgeFreezer"
-        end
+    if object:getContainerByType("fridge") and object:getContainerByType("freezer") then
+        return "fridgeFreezer"
     end
     return "fridge"
 end
@@ -68,18 +60,15 @@ local function addAppliances(load, object)
     end
 end
 
---- A new, empty load for Loads.add: `watts` the inverters must carry, `averageWatts` the energy
---- it takes, and per Specs.loads kind its count and watts.
+--- A new, empty load for Loads.add: `watts` it takes, and per Specs.loads kind its count and watts.
 function Loads.new()
-    return { watts = 0, averageWatts = 0, kinds = {}, generators = {} }
+    return { watts = 0, kinds = {}, generators = {} }
 end
 
 --- Add an appliance of Specs.loads kind `name` to `load`.
 function Loads.add(load, name, watts)
-    local spec = LOADS[name]
-    watts = watts or spec.watts
+    watts = watts or LOADS[name].watts
     load.watts = load.watts + watts
-    load.averageWatts = load.averageWatts + watts * (spec.duty or 1)
     local kind = load.kinds[name] or { count = 0, watts = 0 }
     kind.count = kind.count + 1
     kind.watts = kind.watts + watts

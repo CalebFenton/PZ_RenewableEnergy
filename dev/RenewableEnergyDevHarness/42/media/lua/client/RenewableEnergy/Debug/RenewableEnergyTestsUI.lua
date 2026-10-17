@@ -674,13 +674,15 @@ local function waitForLoad(self, bank)
 end
 
 -- The window's lines follow the bank: the overload with its load and limit, the panel slots with
--- the controller count, what draws by kind, a broken part, a battery's repair, and a panel left
--- without a controller slot when its controller goes.
+-- the controller count, what draws by kind, a broken part, a battery's repair (a rebuild once its
+-- repairs have brought its limit below its condition), and a panel left without a controller
+-- slot when its controller goes.
 test("renewable_energy_ui_window_reflects_status", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryRackWood",
-            { "Base.CarBattery1", "Base.CarBattery1", "RenewableEnergy.PlugInInverter", Specs.controller, "Base.CarBatteryCharger" },
+            { "Base.CarBattery1", "Base.CarBattery1", "RenewableEnergy.JarBattery", "RenewableEnergy.PlugInInverter",
+                Specs.controller, "Base.CarBatteryCharger" },
             { charge = 0.5 })
         if not bank then return end
         self.bank = bank
@@ -688,6 +690,8 @@ test("renewable_energy_ui_window_reflects_status", {
         T.batch(function()
             T.setPartCondition(self, bank, "Base.CarBatteryCharger", 0)
             T.setPartCondition(self, bank, "Base.CarBattery1", 70)
+            -- Two repairs behind it: its limit is 65.
+            T.setPartCondition(self, bank, "RenewableEnergy.JarBattery", 70, false, 2)
             for _ = 1, 3 do
                 if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
             end
@@ -737,6 +741,11 @@ test("renewable_energy_ui_window_reflects_status", {
             end
         end
         expect(found, "a battery at 70 condition doesn't suggest Recondition (" .. table.concat(repairs, "; ") .. ")")
+        local jar = rowLabelled(right, getItemNameFromFullType("RenewableEnergy.JarBattery"))
+        local rebuild = getText("IGUI_RenewableEnergy_BatteryValueRepair", Format.percent(status.charge), "70%",
+            getText("IGUI_RenewableEnergy_RepairRebuild"))
+        expect(jar ~= nil and jar.value == rebuild,
+            "a battery at 70 repaired twice reads " .. tostring(jar and jar.value) .. ", expected " .. rebuild)
         if not expect(#panels == 3, #panels .. " panel rows, expected 3") then return end
         local noSlot = getText("IGUI_RenewableEnergy_ReasonNoController")
         expect(panels[3].value:find(noSlot, 1, true) ~= nil and panels[3].color == "bad",
@@ -840,6 +849,122 @@ test("renewable_energy_ui_turn_on_refused_without_inverter", {
         expect(not self.bank.state.on, "the bank without an inverter is on")
         expect(not button.enable and button.tooltip == why,
             "the window's switch isn't greyed out saying there's no inverter (" .. tostring(button.tooltip) .. ")")
+    end,
+})
+
+-- Connecting a bank -------------------------------------------------------------------------
+
+-- Makes the character know vanilla's "Generator" recipe (the generator magazine's) or not, on both
+-- sides. This client's copy goes back when the test ends; the server undoes no recipe change, so the
+-- test sets the server's back itself.
+local function knowGenerator(self, known)
+    local p, names = player(), { "Generator" }
+    local function apply(learn)
+        if learn then
+            PZHarness.Fixtures.learnRecipes(p, names)
+        else
+            PZHarness.Fixtures.forgetRecipes(p, names)
+        end
+    end
+    local was = p:getKnownRecipes():contains("Generator")
+    apply(known)
+    T.defer(self, function() apply(was) end)
+    if isClient() then
+        T.server(self, known and "PZHarness.learnRecipes" or "PZHarness.forgetRecipes", { names = names })
+    end
+end
+
+-- The bank's Connect Bank option on this client, read from a fresh menu.
+local function connectBankOption(bank)
+    local context = newContext()
+    local option = optionNamed(Menu.addBankOptions(0, context, bank.object), getText("ContextMenu_RenewableEnergy_ConnectBank"))
+    context:hideAndChildren()
+    return option
+end
+
+-- Connecting a bank takes what connecting a generator does: Electricity 3 or the "Generator"
+-- recipe. At 2 without it the menu greys Connect Bank with vanilla's reason, the action won't start
+-- and the authority refuses; at 3, or at 2 knowing the recipe, the authority connects it.
+test("renewable_energy_ui_connect_bank_needs_generator_skill", {
+    run = function(self)
+        self.unskilled = T.bank(self, "batteryBoxWood", {}, { connected = false })
+        self.magazine = self.unskilled and T.bank(self, "batteryBoxWood", {}, { connected = false, near = self.unskilled })
+        if not self.magazine then return end
+        self.knewGenerator = player():getKnownRecipes():contains("Generator")
+        knowGenerator(self, false)
+        T.setPerk(self, Perks.Electricity, 2)
+        T.step(function()
+            local option = connectBankOption(self.unskilled)
+            self.greyed = option ~= nil and option.notAvailable == true
+            self.why = tooltipOf(option)
+            self.canStart = Action:new(player(), Action.CONNECT_BANK, nil, self.unskilled.object):canPerform()
+        end)
+        T.perform(self, "setBankConnected", { bank = self.unskilled.position, connected = true })
+        T.step(function() self.refused = self.server.perform end)
+        -- T.setPerk sets the level when called, so the later levels wait for their turn.
+        T.step(function() T.setPerk(self, Perks.Electricity, 3) end)
+        T.perform(self, "setBankConnected", { bank = self.unskilled.position, connected = true })
+        T.step(function() self.skilled = self.server.perform end)
+        T.step(function()
+            T.setPerk(self, Perks.Electricity, 2)
+            knowGenerator(self, true)
+        end)
+        T.perform(self, "setBankConnected", { bank = self.magazine.position, connected = true })
+        T.step(function() self.withRecipe = self.server.perform end)
+        T.step(function() knowGenerator(self, self.knewGenerator) end)
+    end,
+    validate = function(self)
+        expect(self.greyed and self.why == getText("ContextMenu_GeneratorPlugTT"),
+            "at Electricity 2 Connect Bank isn't greyed out with vanilla's reason (" .. tostring(self.why) .. ")")
+        expect(not self.canStart, "Connect Bank can start at Electricity 2 without the Generator recipe")
+        expect(not self.refused.ok and self.refused.reason == "ContextMenu_GeneratorPlugTT",
+            "the authority connected a bank at Electricity 2 without the Generator recipe (" .. tostring(self.refused.reason) .. ")")
+        expect(self.skilled.ok, "the authority refused to connect a bank at Electricity 3 (" .. tostring(self.skilled.reason) .. ")")
+        expect(self.withRecipe.ok,
+            "the authority refused to connect a bank with the Generator recipe (" .. tostring(self.withRecipe.reason) .. ")")
+    end,
+})
+
+-- Connect Bank from the menu runs the action, which connects the bank on the authority, with
+-- vanilla's sound; once the bank is off, Disconnect Bank undoes it. A connected bank can't be picked
+-- up, as a connected generator can't be taken; a disconnected one can.
+test("renewable_energy_ui_connect_and_disconnect_bank", {
+    instant = true,
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", {}, { connected = false })
+        if not self.bank then return end
+        -- A bank tile is picked up with the Electrician tool, a screwdriver.
+        T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
+        local bank = self.bank
+        local function canPickUp()
+            local object = bank.object
+            return ISMoveableSpriteProps.new(object:getSprite():getName()):canPickUpMoveable(player(), bank.square, object)
+        end
+        T.step(function()
+            local option = connectBankOption(bank)
+            self.offered = option ~= nil and not option.notAvailable
+            if not self.offered then return end
+            T.standNextTo(bank.square)
+            T.choose(option)
+            T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
+            T.step(function()
+                self.connectedPickUp = canPickUp()
+                local context = newContext()
+                local option = optionNamed(Menu.addBankOptions(0, context, bank.object), getText("ContextMenu_RenewableEnergy_DisconnectBank"))
+                context:hideAndChildren()
+                self.disconnectOffered = option ~= nil and not option.notAvailable
+                if not self.disconnectOffered then return end
+                T.choose(option)
+                T.waitFor(self, function() return not bank.object:isConnected() end, "this client's copy of the disconnected bank")
+                T.step(function() self.disconnectedPickUp = canPickUp() end)
+            end)
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.offered, "an unconnected bank's menu offers no Connect Bank") then return end
+        expect(not self.connectedPickUp, "a connected bank can be picked up")
+        if not expect(self.disconnectOffered, "a connected bank that is off offers no Disconnect Bank") then return end
+        expect(self.disconnectedPickUp, "a disconnected empty bank can't be picked up")
     end,
 })
 

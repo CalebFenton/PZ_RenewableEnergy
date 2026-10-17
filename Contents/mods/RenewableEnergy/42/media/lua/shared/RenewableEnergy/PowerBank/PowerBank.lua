@@ -301,6 +301,21 @@ function PowerBank.switchRefusal(bank, on)
     return nil
 end
 
+--- Why `character` can't connect (`connect` true) or disconnect the bank `bankObject`, whose
+--- summary or status is `bank`, or nil. Vanilla's generator rules: connecting needs Electricity 3
+--- or the "Generator" recipe (ISWorldObjectContextMenuLogic.doGeneratorMenu), and only a
+--- switched-off one disconnects.
+function PowerBank.connectRefusal(character, bankObject, bank, connect)
+    if bankObject:isConnected() == connect then
+        return connect and "already connected" or "already disconnected"
+    elseif connect and character:getPerkLevel(Perks.Electricity) < 3 and not character:isRecipeActuallyKnown("Generator") then
+        return "ContextMenu_GeneratorPlugTT"
+    elseif not connect and bank.on then
+        return "already on"
+    end
+    return nil
+end
+
 -- Banks as either side knows them ---------------------------------------------------------
 
 -- The Global Object System of this side: the server's in single player, where both exist

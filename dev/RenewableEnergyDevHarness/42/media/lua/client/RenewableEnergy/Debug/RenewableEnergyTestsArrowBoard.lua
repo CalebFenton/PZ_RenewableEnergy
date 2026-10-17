@@ -1553,10 +1553,10 @@ test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
     end,
 })
 
--- What Repair Cracked Module adds to a module's condition, and the most it brings it to.
+-- What Seal Cracked Module adds to a module's condition, and the most it brings it to.
 local REPAIR_STEP, REPAIR_CAP = RenewableEnergy.Recipes.MODULE_REPAIR, RenewableEnergy.Recipes.MODULE_REPAIR_CAP[MODULE]
 
--- Queues a Repair Cracked Panel on the trailer's left panel, as the trailer's menu queues it.
+-- Queues a Seal Cracked Panel on the trailer's left panel, as the trailer's menu queues it.
 local function repairPanel(trailer)
     T.step(function()
         ISTimedActionQueue.add(RenewableEnergyAction:new(player(), RenewableEnergyAction.REPAIR_PANEL, nil, nil, trailer.vehicle,
@@ -1564,10 +1564,10 @@ local function repairPanel(trailer)
     end)
 end
 
--- Repair Cracked Panel takes Repair Cracked Module's inputs, keeping the screwdriver, needs its
--- Electricity level and gives its XP, and mends the panel's module from `from` by that recipe's
--- step, no higher than its repair cap. A module that isn't cracked (Specs.crackedBelow) can't be
--- repaired on the panel.
+-- Seal Cracked Panel takes Seal Cracked Module's inputs, keeping the screwdriver, needs its
+-- Electricity level and gives its XP, and seals the panel's module from `from` by that recipe's
+-- step, no higher than its cap, leaving it still cracked. A module that isn't cracked
+-- (Specs.crackedBelow) can't be sealed on the panel.
 local function repairTest(name, from)
     test(name, {
         instant = true,
@@ -1580,18 +1580,17 @@ local function repairTest(name, from)
             T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.repairablePanel(trailer.vehicle, LEFT) ~= nil end)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = from } } })
             waitForPanelsCopy(self, trailer)
-            T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.Epoxy" },
-                { type = "Base.ElectricWire" } })
+            T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
             -- The XP the authority's character has before and after; a client's copy can still be
             -- getting XP the test before gave.
             T.server(self, "electricityAward", { xp = 0 })
             T.step(function()
-                self.epoxyUses = self.items.inputs[3]:getCurrentUses()
+                self.epoxyUses = self.items.inputs[2]:getCurrentUses()
                 self.xp = self.server.electricityAward.xp
             end)
             repairPanel(trailer)
             T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= from end, SERVER_MS)
-            T.count(self, "left", { "Base.Screwdriver", "Base.GlassPanel", "Base.ElectricWire", "Base.Epoxy" })
+            T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
             T.server(self, "electricityAward", { xp = 0 })
             T.step(function() self.gainedXp = self.server.electricityAward.xp - self.xp end)
             -- What the game gives this character for the recipe's xpAward, through the call
@@ -1602,24 +1601,23 @@ local function repairTest(name, from)
         validate = function(self)
             local left = self.counts.left
             local condition, to = panelCondition(self.trailer.state, LEFT), math.min(REPAIR_CAP, from + REPAIR_STEP)
-            expect(not self.wholeRepairable, "a panel at " .. RenewableEnergy.Specs.crackedBelow .. ", not cracked, can be repaired")
-            expect(condition == to, "the repair took the panel from " .. from .. " to " .. tostring(condition) .. ", expected " .. to)
-            expect(left["Base.Screwdriver"] == 1, "the repair used up the screwdriver")
-            expect(left["Base.GlassPanel"] == 0, "the repair left the glass pane")
-            expect(left["Base.ElectricWire"] == 0, "the repair left the wire")
+            expect(not self.wholeRepairable, "a panel at " .. RenewableEnergy.Specs.crackedBelow .. ", not cracked, can be sealed")
+            expect(condition == to, "the seal took the panel from " .. from .. " to " .. tostring(condition) .. ", expected " .. to)
+            expect(condition < RenewableEnergy.Specs.crackedBelow, "the sealed panel at " .. tostring(condition) .. " shows whole")
+            expect(left["Base.Screwdriver"] == 1, "the seal used up the screwdriver")
             local epoxy = player():getInventory():getFirstTypeRecurse("Base.Epoxy")
             local epoxyLeft = epoxy and epoxy:getCurrentUses() or 0
-            expect(epoxyLeft == self.epoxyUses - 1, "the epoxy went from " .. self.epoxyUses .. " uses to " .. epoxyLeft)
+            expect(epoxyLeft == self.epoxyUses - 2, "the epoxy went from " .. self.epoxyUses .. " uses to " .. epoxyLeft)
             expect(self.gainedXp > 0, "the repair gave no Electricity XP")
             expectNear("Electricity XP from the repair", self.gainedXp, self.server.electricityAward.gained, 0.01)
         end,
     })
 end
--- One short of reaching the cap, and the least cracked module there is, which the cap stops.
+-- One short of reaching the cap, and one below the cap, which the cap stops.
 repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", REPAIR_CAP - REPAIR_STEP - 1)
-repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", RenewableEnergy.Specs.crackedBelow - 1)
+repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", REPAIR_CAP - 1)
 
--- What the trailer's menu shows of Repair Cracked Panel: "offered", "greyed out" with its
+-- What the trailer's menu shows of Seal Cracked Panel: "offered", "greyed out" with its
 -- tooltip, or "missing".
 local function repairPanelOption(vehicle)
     local context = ISContextMenu.get(0, 0, 0)
@@ -1631,7 +1629,7 @@ local function repairPanelOption(vehicle)
     return shown
 end
 
--- The menu offers Repair Cracked Panel to a character with everything it needs, and greys it out
+-- The menu offers Seal Cracked Panel to a character with everything it needs, and greys it out
 -- in the dark, saying why, as the action's light rule refuses it (RenewableEnergyAction.needsLight).
 test("renewable_energy_world_arrow_board_repair_needs_light", {
     hour = 12,
@@ -1641,8 +1639,7 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
         T.setPerk(self, Perks.Electricity, 3)
         T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 35 } } })
         waitForPanelsCopy(self, trailer)
-        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.Epoxy" },
-            { type = "Base.ElectricWire" } })
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
         T.step(function() self.lit = repairPanelOption(trailer.vehicle) end)
         -- T.makeDark sets the clock when called, so it waits its turn in a step.
         T.step(function() T.makeDark(self) end)
@@ -1656,9 +1653,9 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
     end,
 })
 
--- Part-used glue adds up, as in vanilla crafting: two tubes with one use left each pay the glue
--- the repair takes, and both are used up.
-test("renewable_energy_world_arrow_board_repair_adds_up_part_used_glue", {
+-- Part-used epoxy adds up, as in vanilla crafting: two tubes with one use left each pay the two
+-- uses the seal takes, and both are used up.
+test("renewable_energy_world_arrow_board_repair_adds_up_part_used_epoxy", {
     instant = true,
     run = function(self)
         if not spawnTrailer(self) then return end
@@ -1666,23 +1663,22 @@ test("renewable_energy_world_arrow_board_repair_adds_up_part_used_glue", {
         T.setPerk(self, Perks.Electricity, 3)
         T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 35 } } })
         waitForPanelsCopy(self, trailer)
-        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.ElectricWire" },
-            { type = "Base.Glue" }, { type = "Base.Glue" } })
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Epoxy" } })
         T.step(function()
-            for i = 4, 5 do
-                local glue = self.items.inputs[i]
-                T.changeItem(self, glue, { uses = 1 / glue:getMaxUses() })
+            for i = 2, 3 do
+                local epoxy = self.items.inputs[i]
+                T.changeItem(self, epoxy, { uses = 1 / epoxy:getMaxUses() })
             end
         end)
         repairPanel(trailer)
         T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= 35 end, SERVER_MS)
-        T.count(self, "left", { "Base.Glue" })
+        T.count(self, "left", { "Base.Epoxy" })
     end,
     validate = function(self)
         expect(panelCondition(self.trailer.state, LEFT) == math.min(REPAIR_CAP, 35 + REPAIR_STEP),
-            "two part-used tubes of glue didn't pay for the repair")
-        local glue = self.counts.left["Base.Glue"]
-        expect(glue == 0, glue .. " tubes of glue left, expected both used up")
+            "two part-used tubes of epoxy didn't pay for the seal")
+        local epoxy = self.counts.left["Base.Epoxy"]
+        expect(epoxy == 0, epoxy .. " tubes of epoxy left, expected both used up")
     end,
 })
 

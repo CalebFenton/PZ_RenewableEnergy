@@ -44,6 +44,8 @@ Action.RELEASE_BRAKE = "ReleaseBrake"
 Action.WIRE_TREADMILL = "WireTreadmill"
 Action.UNWIRE_TREADMILL = "UnwireTreadmill"
 Action.REPLACE_BLADES = "ReplaceBlades"
+Action.CONNECT_BANK = "ConnectBank"
+Action.DISCONNECT_BANK = "DisconnectBank"
 
 -- What clears snow off a panel without scratching it: a broom sweeps, a snow shovel pushes.
 local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
@@ -205,6 +207,27 @@ JOBS = {
         minutes = 0.5,
         doneSound = "LightSwitch",
     },
+    -- Vanilla's ISPlugGenerator, which can't tell the bank its state changed.
+    [Action.CONNECT_BANK] = {
+        keeps = function(self) return isBank(self.bank) end,
+        check = function(self)
+            local summary = bankSummary(self)
+            return summary ~= nil and PowerBank.connectRefusal(self.character, self.bank, summary, true) == nil
+        end,
+        command = function(self) return "setBankConnected", { bank = positionOf(self.bank), connected = true } end,
+        units = 300,
+        sound = "GeneratorConnect",
+    },
+    [Action.DISCONNECT_BANK] = {
+        keeps = function(self) return isBank(self.bank) end,
+        check = function(self)
+            local summary = bankSummary(self)
+            return summary ~= nil and PowerBank.connectRefusal(self.character, self.bank, summary, false) == nil
+        end,
+        command = function(self) return "setBankConnected", { bank = positionOf(self.bank), connected = false } end,
+        units = 300,
+        sound = "GeneratorConnect",
+    },
     [Action.ATTACH_MAINTAINER] = {
         keeps = function(self)
             return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
@@ -263,7 +286,7 @@ JOBS = {
                 and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
         end,
         run = function(self) return arrowBoard().repairPanel(self.character, self.vehicle, self.partId) end,
-        -- As the crafting window times Repair Cracked Module (ISHandcraftAction).
+        -- As the crafting window times Seal Cracked Module (ISHandcraftAction).
         units = function(self) return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
         light = true,
         sound = "GeneratorRepair",

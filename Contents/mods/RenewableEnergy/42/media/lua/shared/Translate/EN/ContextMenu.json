@@ -1,5 +1,7 @@
 {
     "ContextMenu_RenewableEnergy_Status": "Status",
+    "ContextMenu_RenewableEnergy_ConnectBank": "Connect Bank",
+    "ContextMenu_RenewableEnergy_DisconnectBank": "Disconnect Bank",
     "ContextMenu_RenewableEnergy_ConnectSourcesInReach": "Connect Sources in Reach (%1)",
     "ContextMenu_RenewableEnergy_ConnectSource": "Connect to %1 (%2)",
     "ContextMenu_RenewableEnergy_ConnectToBank": "Connect to a Battery Bank",
@@ -13,7 +15,7 @@
     "ContextMenu_RenewableEnergy_Rename": "Rename",
     "ContextMenu_RenewableEnergy_AttachMaintainer": "Attach Solar Maintainer",
     "ContextMenu_RenewableEnergy_DetachMaintainer": "Detach Solar Maintainer",
-    "ContextMenu_RenewableEnergy_RepairPanel": "Repair Cracked Panel: %1 (%2%%)",
+    "ContextMenu_RenewableEnergy_RepairPanel": "Seal Cracked Panel: %1 (%2%%)",
     "ContextMenu_RenewableEnergy_RepairFrame": "Repair Frame: %1 (%2%%)",
     "ContextMenu_RenewableEnergy_DigesterStatus": "Status",
     "ContextMenu_RenewableEnergy_TakeSludge": "Take Sludge",

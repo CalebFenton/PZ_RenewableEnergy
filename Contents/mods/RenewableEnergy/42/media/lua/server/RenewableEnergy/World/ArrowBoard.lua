@@ -393,7 +393,7 @@ function ArrowBoard.panelWatts(vehicle)
     return watts
 end
 
---- The trailer's panel `partId` if it holds a module that Repair Cracked Panel can mend, else nil.
+--- The trailer's panel `partId` if it holds a module that Seal Cracked Panel can seal, else nil.
 function ArrowBoard.repairablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
@@ -403,8 +403,8 @@ function ArrowBoard.repairablePanel(vehicle, partId)
     return nil
 end
 
---- Repair Cracked Panel: Repair Cracked Module's inputs, skill, XP and effect on a module still
---- on the trailer. Authority only; returns whether it repaired.
+--- Seal Cracked Panel: Seal Cracked Module's inputs, skill, XP and effect on a module still
+--- on the trailer. Authority only; returns whether it sealed.
 function ArrowBoard.repairPanel(character, vehicle, partId)
     local Recipes = RenewableEnergy.Recipes
     local part = ArrowBoard.repairablePanel(vehicle, partId)

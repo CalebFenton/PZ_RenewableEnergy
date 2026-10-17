@@ -55,6 +55,87 @@ function T.placeRecord(self, kind, tile, opts)
     return handle
 end
 
+-- The build menu entry of `entity` (a game entity script's full name), or nil.
+local function buildEntry(entity)
+    local script = getScriptManager():getGameEntityScript(entity)
+    local spriteConfig = script and script:getComponentScriptFor(ComponentType.SpriteConfig)
+    local infos = SpriteConfigManager.GetObjectInfoList()
+    for i = 0, infos:size() - 1 do
+        if spriteConfig and infos:get(i):getScript() == spriteConfig then
+            return infos:get(i)
+        end
+    end
+    return nil
+end
+
+--- Queues building a record of `kind` from the build menu's entry of `entity` on a bare outdoor
+--- square, through the build menu's own path (ISBuildIsoEntity, ISBuildAction): the character gets
+--- the recipe's skill levels and exactly its inputs (T.recipeInputs with `prefer`), and the build
+--- waits for this client's copy of the tile `tile`. Its record lands in self.reads.built, what is
+--- left carried in self.counts.left; T.expectBuilt checks them. Returns the handle, or nil.
+function T.buildRecord(self, kind, entity, tile, prefer)
+    -- Bare: grass and the like block placing anything built (BlocksPlacement), as for vanilla's.
+    local square = T.square(self, { bare = true }, "a bare outdoor square for a " .. kind)
+    if not square then return nil end
+    local info = T.need(self, buildEntry(entity), "the build menu entry of " .. entity)
+    local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
+    if not T.need(self, recipe, "the build recipe of " .. entity) then return nil end
+    local handle = T.at(square)
+    handle.square, handle.kind = square, kind
+    for i = 0, recipe:getRequiredSkillCount() - 1 do
+        local skill = recipe:getRequiredSkill(i)
+        T.setPerk(self, skill:getPerk(), skill:getLevel())
+    end
+    local inputs, unmatched = T.recipeInputs(recipe, prefer)
+    if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return nil end
+    -- What a build should leave carried: its kept tools, and none of the items it takes whole.
+    -- A drainable it takes uses of stays part-used, so isn't counted.
+    self.expected, self.types = {}, {}
+    for i, entry in ipairs(inputs) do
+        local input = recipe:getInputs():get(i - 1)
+        if input:isKeep() then
+            self.expected[entry.type] = entry.count
+        elseif input:isItemCount() or not getScriptManager():FindItem(entry.type):isItemType(ItemType.DRAINABLE) then
+            self.expected[entry.type] = 0
+        end
+        table.insert(self.types, entry.type)
+    end
+    T.give(self, "materials", inputs)
+    T.server(self, "recordTrack", T.recordArgs(handle))
+    T.step(function()
+        local player = T.player()
+        T.standNextTo(square)
+        local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
+        -- What the build panel does before the cursor can build (ISBuildPanel): the player
+        -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
+        build.player = player:getPlayerNum()
+        build.buildPanelLogic:refresh()
+        build.buildPanelLogic:autoPopulateInputs()
+        self.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
+        self.validSquare = build:isValid(square)
+        build:tryBuild(handle.x, handle.y, handle.z)
+    end)
+    T.waitFor(self, function() return T.objectWithSprite(square, tile) ~= nil end,
+        "this client's copy of the " .. tostring(tile) .. " " .. kind)
+    T.batch(function()
+        T.readRecord(self, handle, "built")
+        T.count(self, "left", self.types)
+    end)
+    return handle
+end
+
+--- Expects T.buildRecord's build to have been possible, built its record on the tile `tile`, and
+--- taken what it takes while keeping its tools.
+function T.expectBuilt(self, tile)
+    local built = self.reads.built or {}
+    T.expect(self.canBuild and self.validSquare, "the build menu can't build it from its materials on a bare square")
+    T.expect(built.sprite == tile, "the built tile is " .. tostring(built.sprite) .. ", expected " .. tostring(tile))
+    for fullType, count in pairs(self.expected or {}) do
+        local left = self.counts.left and self.counts.left[fullType] or 0
+        T.expect(left == count, "building left " .. left .. " " .. fullType .. ", not " .. count)
+    end
+end
+
 --- Queues setting the record's saved fields `fields` as of now, and those of `ago` ({ [field] =
 --- hours }) to the world hour that many hours before the server runs it.
 function T.setRecord(self, handle, fields, ago)

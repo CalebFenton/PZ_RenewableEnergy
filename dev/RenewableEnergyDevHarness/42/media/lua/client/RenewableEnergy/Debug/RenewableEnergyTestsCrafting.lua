@@ -56,6 +56,16 @@ local function waitForFluid(self, fullType, liters)
     end, "this client's " .. fullType .. " holding " .. liters .. " L")
 end
 
+-- Queues setting the repair count of the carried `fullType` items on the authority, and a wait
+-- until this client's copy has it: the craft tests its own copy.
+local function setRepaired(self, fullType, repaired)
+    T.server(self, "setRepaired", { type = fullType, repaired = repaired })
+    T.waitFor(self, function()
+        local item = T.carried(fullType)
+        return item ~= nil and item:getHaveBeenRepaired() == repaired
+    end, "this client's " .. fullType .. " repaired " .. repaired .. "x")
+end
+
 -- Bank tiers and parts -------------------------------------------------------------------------
 
 -- Each recipe makes one item and uses up what its script takes, but the tools it keeps. A craft
@@ -302,10 +312,10 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
 
 -- Solar modules --------------------------------------------------------------------------------
 
--- Repair Cracked Module raises a module's condition by a fixed step up to a cap, lower for a
+-- Seal Cracked Module raises a module's condition by a fixed step up to a cap, lower for a
 -- homemade module, and is refused at the cap with the module untouched: a full step below it, one
--- short of the cap (clamped), and at the cap. Each row: the behaviour, the module, its condition
--- before and after, and whether the game refuses.
+-- short of the cap (clamped), and at the cap. A sealed module still shows cracked. Each row: the
+-- behaviour, the module, its condition before and after, and whether the game refuses.
 local REPAIR_CAP, REPAIR_STEP = Recipes.MODULE_REPAIR_CAP, Recipes.MODULE_REPAIR
 local MODULE_REPAIRS = {
     { "factory_adds_a_step", FACTORY, REPAIR_CAP[FACTORY] - REPAIR_STEP - 10, REPAIR_CAP[FACTORY] - 10 },
@@ -323,14 +333,58 @@ for _, entry in ipairs(MODULE_REPAIRS) do
         setup = function(self)
             T.changeItem(self, inputsOf(self, module)[1], { condition = before })
         end,
-        counts = { [module] = 1, ["Base.GlassPanel"] = refused and 1 or 0 },
+        counts = { [module] = 1 },
         after = function(self) readCarried(self, { module }) end,
         validate = function(self)
             local item = carriedFirst(self, module)
             expect(item and item.condition == after,
                 "the module is at " .. tostring(item and item.condition) .. ", expected " .. after)
+            -- The seal leaves the glass cracked, and the module showing it.
+            expect(item and item.condition < RenewableEnergy.Specs.crackedBelow, "a sealed module shows whole")
             if refused then
-                expect(self.refusal ~= nil, "the game would start the repair")
+                expect(self.refusal ~= nil, "the game would start the seal")
+            end
+        end,
+    })
+end
+
+-- Reglaze Module sets a module below what new glass brings it to, and is refused there with the
+-- module and the pane untouched; it teaches Glassmaking. Each row: the behaviour, the module, its
+-- condition before and after, and whether the game refuses.
+local REGLAZE = Recipes.REGLAZE
+local REGLAZES = {
+    { "factory_cracked_set_to_new_glass", FACTORY, 20, REGLAZE[FACTORY] },
+    { "factory_just_below_set_to_new_glass", FACTORY, REGLAZE[FACTORY] - 1, REGLAZE[FACTORY] },
+    { "factory_at_new_glass_refused", FACTORY, REGLAZE[FACTORY], REGLAZE[FACTORY], true },
+    { "homemade_cracked_set_to_new_glass", HOMEMADE, 20, REGLAZE[HOMEMADE] },
+    { "homemade_at_new_glass_refused", HOMEMADE, REGLAZE[HOMEMADE], REGLAZE[HOMEMADE], true },
+}
+for _, entry in ipairs(REGLAZES) do
+    local behavior, module, before, after, refused = entry[1], entry[2], entry[3], entry[4], entry[5]
+    craftTest(craftName("RenewableEnergy_ReglazeModule", behavior), {
+        recipe = "RenewableEnergy_ReglazeModule",
+        from = module,
+        prefer = { module },
+        setup = function(self)
+            T.changeItem(self, inputsOf(self, module)[1], { condition = before })
+            T.server(self, "perkXp", { perk = "Glassmaking" })
+            T.step(function() self.glassmakingBefore = self.server.perkXp.value end)
+        end,
+        counts = { [module] = 1, ["Base.GlassPanel"] = refused and 1 or 0 },
+        after = function(self)
+            readCarried(self, { module })
+            T.server(self, "perkXp", { perk = "Glassmaking" })
+        end,
+        validate = function(self)
+            local item = carriedFirst(self, module)
+            expect(item and item.condition == after,
+                "the module is at " .. tostring(item and item.condition) .. ", expected " .. after)
+            if refused then
+                expect(self.refusal ~= nil, "the game would start the reglaze")
+            else
+                expect(item and item.condition >= RenewableEnergy.Specs.crackedBelow, "a reglazed module shows cracked")
+                local xp = self.server and self.server.perkXp
+                expect(xp and self.glassmakingBefore and xp.value > self.glassmakingBefore, "reglazing taught no Glassmaking")
             end
         end,
     })
@@ -380,37 +434,51 @@ end
 
 -- Battery repairs ------------------------------------------------------------------------------
 
--- Each row: the recipe, the behaviour, the car battery's condition before and after, its charge
--- after, and whether the game refuses. Every battery starts at START_CHARGE. Service adds a step
--- up to its cap, clamped one short of it and refused at it; Recondition sets its condition and
--- empties the battery one short of that, and is refused at it.
+-- Each row: the recipe, the behaviour, the car battery's condition and repair count before, its
+-- condition and charge after, and whether the game refuses. Every battery starts at START_CHARGE.
+-- A repair brings a battery at most to its repair limit, 85 less 10 per earlier repair: Service
+-- adds a step and keeps the charge, Recondition sets the limit and empties the battery, and both
+-- are refused at the limit. A repair the game makes counts once, on this client's copy too.
 local CAR_BATTERY = "Base.CarBattery2"
 local START_CHARGE = 0.7
-local SERVICE_CAP, RECONDITIONED = Recipes.SERVICE_CAP, Recipes.RECONDITION_CONDITION
 local BATTERY_REPAIRS = {
-    { "RenewableEnergy_ServiceBattery", "adds_a_step", 30, 30 + Recipes.SERVICE_REPAIR, START_CHARGE },
-    { "RenewableEnergy_ServiceBattery", "below_cap_stops_at_cap", SERVICE_CAP - 1, SERVICE_CAP, START_CHARGE },
-    { "RenewableEnergy_ServiceBattery", "at_cap_refused", SERVICE_CAP, SERVICE_CAP, START_CHARGE, true },
-    { "RenewableEnergy_ReconditionBattery", "restores_and_empties", RECONDITIONED - 1, RECONDITIONED, 0 },
-    { "RenewableEnergy_ReconditionBattery", "at_its_condition_refused", RECONDITIONED, RECONDITIONED, START_CHARGE, true },
+    { "RenewableEnergy_ServiceBattery", "adds_a_step", 30, 0, 40, START_CHARGE },
+    { "RenewableEnergy_ServiceBattery", "below_limit_stops_at_limit", 80, 0, 85, START_CHARGE },
+    { "RenewableEnergy_ServiceBattery", "after_two_repairs_stops_at_65", 60, 2, 65, START_CHARGE },
+    { "RenewableEnergy_ServiceBattery", "at_limit_refused", 85, 0, 85, START_CHARGE, true },
+    { "RenewableEnergy_ReconditionBattery", "restores_and_empties", 30, 0, 85, 0 },
+    { "RenewableEnergy_ReconditionBattery", "after_two_repairs_gives_65", 30, 2, 65, 0 },
+    { "RenewableEnergy_ReconditionBattery", "at_limit_refused", 65, 2, 65, START_CHARGE, true },
+    { "RenewableEnergy_ReconditionBattery", "past_last_repair_refused", 1, 9, 1, START_CHARGE, true },
 }
 for _, entry in ipairs(BATTERY_REPAIRS) do
-    local recipe, behavior, before, after, charge, refused = entry[1], entry[2], entry[3], entry[4], entry[5], entry[6]
+    local recipe, behavior, before, repaired, after, charge, refused = entry[1], entry[2], entry[3], entry[4], entry[5],
+        entry[6], entry[7]
+    local repairedAfter = refused and repaired or repaired + 1
     craftTest(craftName(recipe, behavior), {
         recipe = recipe,
         from = CAR_BATTERY,
         prefer = { CAR_BATTERY, "RenewableEnergy.BatteryElectrolyte" },
         setup = function(self)
             T.changeItem(self, inputsOf(self, CAR_BATTERY)[1], { condition = before, uses = START_CHARGE })
+            setRepaired(self, CAR_BATTERY, repaired)
             T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte", fluid = "Water", liters = 1 })
             waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
         end,
         counts = { [CAR_BATTERY] = 1 },
-        after = function(self) readCarried(self, { CAR_BATTERY }) end,
+        after = function(self)
+            readCarried(self, { CAR_BATTERY })
+            -- The tooltip's "Repaired: Nx" reads this client's copy.
+            T.waitFor(self, function()
+                local battery = T.carried(CAR_BATTERY)
+                return battery ~= nil and battery:getHaveBeenRepaired() == repairedAfter
+            end, "this client's battery repaired " .. repairedAfter .. "x")
+        end,
         validate = function(self)
             local battery = carriedFirst(self, CAR_BATTERY)
             if not expect(battery ~= nil, "the battery is gone") then return end
             expect(battery.condition == after, "the battery is at " .. battery.condition .. ", expected " .. after)
+            expect(battery.repaired == repairedAfter, "the battery reads repaired " .. battery.repaired .. "x, expected " .. repairedAfter)
             expectNear("the battery's charge", battery.uses, charge, 0.001)
             if refused then
                 expect(self.refusal ~= nil, "the game would start the repair")
@@ -419,8 +487,9 @@ for _, entry in ipairs(BATTERY_REPAIRS) do
     })
 end
 
--- Stripping a battery and rebuilding it from its own case, with new plates in place of the
--- recast: the battery comes back new and empty, and its acid goes out and back in.
+-- Stripping a battery past its last repair and rebuilding it from its own case, with new plates in
+-- place of the recast: the battery comes back new and empty, its acid goes out and back in, and
+-- it has no repairs behind it, so a Recondition takes it to the full 85 again.
 local REBUILDS = {
     { battery = "Base.CarBattery2", case = "RenewableEnergy.CarBatteryCase", plates = 1,
       strip = "RenewableEnergy_StripCarBattery", rebuild = "RenewableEnergy_RebuildCarBattery" },
@@ -449,6 +518,7 @@ for _, chain in ipairs(REBUILDS) do
                 table.insert(given, { type = "RenewableEnergy.BatteryElectrolyte" })
             end
             T.give(self, "inputs", given)
+            setRepaired(self, chain.battery, 9)
             T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte" })
             waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 0)
             T.step(function() T.startCraft(self, strip, inputsOf(self, chain.battery)[1]) end)
@@ -469,6 +539,21 @@ for _, chain in ipairs(REBUILDS) do
             waitForFluid(self, "Base.WaterBottle", 1)
             T.step(function() T.startCraft(self, rebuild, T.carried(chain.case)) end)
             readCarried(self, counted, { "Acid" })
+            T.step(function()
+                self.rebuilt = carriedFirst(self, chain.battery)
+                self.rebuiltCarried = self.server.carried
+            end)
+            -- Worn down again, then reconditioned.
+            T.waitForCarried(self, chain.battery, "this client's rebuilt " .. chain.battery)
+            T.step(function() T.changeItem(self, T.carried(chain.battery), { condition = 30 }) end)
+            T.give(self, "recondition", { { type = "Base.BakingSoda", count = 2 } })
+            T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
+            waitForFluid(self, "Base.WaterBottle", 1)
+            T.step(function()
+                local recondition = getScriptManager():getCraftRecipe("RenewableEnergy_ReconditionBattery")
+                T.startCraft(self, recondition, T.carried(chain.battery))
+            end)
+            readCarried(self, { chain.battery })
         end,
         validate = function(self)
             local refusal = self.refusal and "; the game refused: " .. self.refusal or ""
@@ -477,15 +562,20 @@ for _, chain in ipairs(REBUILDS) do
             expect(s.batteries == 0 and s.case == 1 and s.worn == chain.plates,
                 "stripping left " .. s.batteries .. " batteries, " .. s.case .. " cases, " .. s.worn .. " worn plates" .. refusal)
             expectNear("acid poured out by stripping", s.acid, chain.plates, 0.01)
-            local carried = self.server.carried
-            local battery = carriedFirst(self, chain.battery)
+            local carried = self.rebuiltCarried
+            local battery = self.rebuilt
             if expect(battery ~= nil, "no " .. chain.battery .. " was rebuilt" .. refusal) then
                 expect(battery.condition == 100, "the rebuilt battery is at " .. battery.condition)
                 expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
+                expect(battery.repaired == 0, "the rebuilt battery reads repaired " .. battery.repaired .. "x")
             end
             expect(#carried.items[chain.case] == 0, "the case is still there")
             expect(#carried.items["RenewableEnergy.BatteryPlates"] == 0, "plates are left over")
             expectNear("acid left after rebuilding", carried.fluids.Acid, 0, 0.01)
+            local reconditioned = carriedFirst(self, chain.battery)
+            if expect(reconditioned ~= nil, "the rebuilt battery is gone" .. refusal) then
+                expect(reconditioned.condition == 85, "the rebuilt battery reconditions to " .. reconditioned.condition .. refusal)
+            end
         end,
     })
 end
@@ -549,5 +639,62 @@ craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "refuses_two_worn"), 
     counts = { [WORN] = 2, [PLATES] = 0 },
     validate = function(self)
         expect(self.refusal ~= nil, "the game would recast two worn sets of plates")
+    end,
+})
+
+-- New lead with no case: three lead pipes cast one set of plates.
+craftTest(craftName("RenewableEnergy_CastBatteryPlatesFromLeadPipe", "three_pipes_make_one"), {
+    recipe = "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
+    bench = FURNACE,
+    from = "Base.LeadPipe",
+    prefer = { "Base.Charcoal" },
+    counts = { ["Base.LeadPipe"] = 0, ["Base.Charcoal"] = 0, ["RenewableEnergy.BatteryPlateMold"] = 1, [PLATES] = 1 },
+})
+
+-- Jar batteries -------------------------------------------------------------------------------
+
+-- Six empty jars, a set of plates, a litre of acid and two of water in a sand tray: a new jar
+-- battery, empty. Acid comes from battery acid bottles, the water from a 2 L bottle.
+local JAR_BATTERY = "RenewableEnergy.JarBattery"
+craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
+    recipe = "RenewableEnergy_MakeJarBattery",
+    from = PLATES,
+    prefer = { "RenewableEnergy.BatteryElectrolyte", "Base.EmptyJar", "Base.Sandbag" },
+    setup = function(self)
+        T.give(self, "water", { { type = "Base.PopBottle" } })
+        T.server(self, "refillFluid", { type = "Base.PopBottle", fluid = "Water", liters = 2 })
+        waitForFluid(self, "Base.PopBottle", 2)
+    end,
+    counts = {
+        [JAR_BATTERY] = 1, ["Base.EmptyJar"] = 0, [PLATES] = 0, ["Base.Plank"] = 0, ["Base.Nails"] = 0,
+        ["Base.ElectricWire"] = 0,
+    },
+    after = function(self) readCarried(self, { JAR_BATTERY }, { "Acid", "Water" }) end,
+    validate = function(self)
+        local battery = carriedFirst(self, JAR_BATTERY)
+        if not expect(battery ~= nil, "no jar battery was made") then return end
+        expect(battery.condition == 100, "the new jar battery is at " .. battery.condition)
+        expectNear("the new jar battery's charge", battery.uses, 0, 0.001)
+        local fluids = self.server.carried.fluids
+        expectNear("acid left of two litres", fluids.Acid, 1, 0.01)
+        expectNear("water left of two litres", fluids.Water, 0, 0.01)
+    end,
+})
+
+-- A dead jar battery strips too: five jars whole and one cracked, its plates worn, its acid
+-- poured into an empty bottle.
+craftTest(craftName("RenewableEnergy_StripJarBattery", "dead_battery"), {
+    recipe = "RenewableEnergy_StripJarBattery",
+    from = JAR_BATTERY,
+    prefer = { "RenewableEnergy.BatteryElectrolyte", "Base.Gloves_Dish" },
+    setup = function(self)
+        T.changeItem(self, inputsOf(self, JAR_BATTERY)[1], { condition = 0 })
+        T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte" })
+        waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 0)
+    end,
+    counts = { [JAR_BATTERY] = 0, ["Base.EmptyJar"] = 5, ["Base.BrokenGlass"] = 1, [WORN] = 1 },
+    after = function(self) readCarried(self, {}, { "Acid" }) end,
+    validate = function(self)
+        expectNear("acid poured out", self.server.carried.fluids.Acid, 1, 0.01)
     end,
 })

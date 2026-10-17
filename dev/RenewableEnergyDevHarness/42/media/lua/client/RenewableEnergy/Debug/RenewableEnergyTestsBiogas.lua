@@ -586,6 +586,11 @@ test("renewable_energy_biogas_digester_upgrade", {
             local container = handle.object:getContainer()
             return container ~= nil and container:getCapacity() == self.capacity
         end, "this client's copy of the bigger hopper")
+        -- The insulated digester's entity, or each load of it logs "Invalid SpriteConfig object!".
+        T.waitFor(self, function()
+            local config = handle.object:getSpriteConfig()
+            return config ~= nil and config:isValid()
+        end, "this client's copy being the insulated digester's entity")
     end,
     validate = function(self)
         local after = self.reads.after
@@ -617,92 +622,108 @@ test("renewable_energy_biogas_clear_ashes_gives_wood_ash", {
     end,
 })
 
--- The build menu entry of `entity` (a game entity script's full name), or nil.
-local function buildEntry(entity)
-    local script = getScriptManager():getGameEntityScript(entity)
-    local spriteConfig = script and script:getComponentScriptFor(ComponentType.SpriteConfig)
-    local infos = SpriteConfigManager.GetObjectInfoList()
-    for i = 0, infos:size() - 1 do
-        if spriteConfig and infos:get(i):getScript() == spriteConfig then
-            return infos:get(i)
+local FEED = "Base.Dung_Cow"
+
+-- Whether this client's copy of the digester `object` holds the feed in its hopper.
+local function hopperHoldsFeed(object)
+    local items = object and object:getContainer():getItems()
+    for i = 0, (items and items:size() or 0) - 1 do
+        if items:get(i):getFullType() == FEED then
+            return true
         end
     end
-    return nil
+    return false
+end
+
+-- Queues, on this client's copy of the barrel digester `handle` showing the tile `tile`, what a
+-- player does with it, into self.views[label]: its status window's title, and whether its hopper
+-- took the cow dung they dragged in (the record's count, in self.reads[label]). Also whether its
+-- SpriteConfig took the tile: the game logs "Invalid SpriteConfig object!" wherever an object
+-- loads with one that didn't, and vanilla's menus get no master object for it.
+local function useDrumDigester(self, handle, tile, label)
+    T.waitFor(self, function()
+        handle.object = T.objectWithSprite(getSquare(handle.x, handle.y, handle.z), tile)
+        return handle.object ~= nil and Digester.summaryOf(handle.object) ~= nil
+    end, "this client's copy of the " .. tile .. " digester")
+    T.give(self, label, { { type = FEED, count = 1 } })
+    T.step(function()
+        local object, p = handle.object, T.player()
+        if not object then return end
+        local config = object:getSpriteConfig()
+        local window = RenewableEnergy.DigesterWindow.open(0, object)
+        window:prerender()
+        self.views[label] = { title = window.title, configValid = config ~= nil and config:isValid(),
+            master = object:getMasterObject() == object }
+        window:close()
+        T.standNextTo(getSquare(handle.x, handle.y, handle.z))
+        ISTimedActionQueue.add(ISInventoryTransferAction:new(p, self.items[label][1], p:getInventory(), object:getContainer()))
+    end)
+    T.waitFor(self, function() return hopperHoldsFeed(handle.object) end, "this client's hopper holding the dung")
+    T.readRecord(self, handle, label)
+end
+
+-- Expects useDrumDigester's `label` to have found a whole barrel digester.
+local function expectDrumDigester(self, label)
+    local view, read = self.views[label], self.reads[label]
+    if not T.expect(view ~= nil and read ~= nil, label .. ": never saw the digester") then return end
+    T.expect(view.title == getText("IGUI_RenewableEnergy_Digester_barrel"), label .. ": the status window's title is " .. tostring(view.title))
+    T.expect(view.configValid and view.master, label .. ": its SpriteConfig refused its tile")
+    T.expect(read.hopperItems == 1, label .. ": the hopper holds " .. tostring(read.hopperItems) .. " items, not the dung dragged in")
 end
 
 -- The build menu's own path builds a working digester from the barrel `barrel` (an item type): the
--- entity's recipe takes its materials, keeps its tools, and its OnCreate makes the tile a digester
--- that looks like that barrel on the authority (ISBuildIsoEntity, ISBuildAction), as this client
--- sees it.
+-- entity's recipe takes its materials, keeps its tools, and its OnCreate makes the tile the
+-- digester of that barrel on the authority, which this client sees, opens and feeds.
 local function buildsBarrelDigester(barrel)
+    local tile = Sprites.digester.barrel[barrel]
     return {
         instant = true,
         run = function(self)
-            -- Bare: grass and the like block placing anything built (BlocksPlacement), as for vanilla's.
-            local square = T.square(self, { bare = true }, "a bare outdoor square for a digester")
-            if not square then return end
-            local info = T.need(self, buildEntry("Base.RenewableEnergy_BarrelDigester"), "the barrel digester's build menu entry")
-            local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
-            if not T.need(self, recipe, "the barrel digester's build recipe") then return end
-            local handle = T.at(square)
-            handle.square, handle.kind = square, "digester"
-            for i = 0, recipe:getRequiredSkillCount() - 1 do
-                local skill = recipe:getRequiredSkill(i)
-                T.setPerk(self, skill:getPerk(), skill:getLevel())
-            end
-            local inputs, unmatched = T.recipeInputs(recipe, { "Base." .. barrel })
-            if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return end
-            -- What a build should leave carried: its kept tools, and none of the items it takes whole.
-            -- A drainable it takes uses of stays part-used, so isn't counted.
-            self.expected, self.types = {}, {}
-            for i, entry in ipairs(inputs) do
-                local input = recipe:getInputs():get(i - 1)
-                if input:isKeep() then
-                    self.expected[entry.type] = entry.count
-                elseif input:isItemCount() or not getScriptManager():FindItem(entry.type):isItemType(ItemType.DRAINABLE) then
-                    self.expected[entry.type] = 0
-                end
-                table.insert(self.types, entry.type)
-            end
-            T.give(self, "materials", inputs)
-            T.server(self, "recordTrack", T.recordArgs(handle))
-            T.step(function()
-                local player = T.player()
-                T.standNextTo(square)
-                local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
-                -- What the build panel does before the cursor can build (ISBuildPanel): the player
-                -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
-                build.player = player:getPlayerNum()
-                build.buildPanelLogic:refresh()
-                build.buildPanelLogic:autoPopulateInputs()
-                self.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
-                self.validSquare = build:isValid(square)
-                build:tryBuild(handle.x, handle.y, handle.z)
-            end)
-            local tile = Sprites.digester.barrel[barrel]
-            T.waitFor(self, function() return T.objectWithSprite(square, tile) ~= nil end,
-                "this client's copy of the " .. tostring(tile) .. " digester")
-            T.batch(function()
-                T.readRecord(self, handle, "built")
-                T.count(self, "left", self.types)
-            end)
+            self.views = {}
+            local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", tile, { "Base." .. barrel })
+            if not handle then return end
+            useDrumDigester(self, handle, tile, "fed")
         end,
         validate = function(self)
-            local built = self.reads.built
-            T.expect(self.canBuild and self.validSquare, "the build menu can't build a barrel digester from its materials on a bare square")
+            local built = self.reads.built or {}
             T.expect(built.tier == "barrel", "the build menu built " .. tostring(built.tier))
-            T.expect(built.sprite == Sprites.digester.barrel[barrel], "the built tile is " .. tostring(built.sprite))
-            for fullType, count in pairs(self.expected) do
-                local left = self.counts.left[fullType] or 0
-                T.expect(left == count, "building left " .. left .. " " .. fullType .. ", not " .. count)
-            end
+            T.expectBuilt(self, tile)
+            expectDrumDigester(self, "fed")
         end,
     }
 end
 
 test("renewable_energy_biogas_build_menu_builds_digester", buildsBarrelDigester("MetalDrum"))
--- The game's barrels are steel drums too; the digester shows the one it took.
+-- The game's barrels are steel drums too; the digester shows the one it took, and is that drum's
+-- entity.
 test("renewable_energy_biogas_build_from_orange_barrel_shows_orange", buildsBarrelDigester("Mov_OrangeBarrel"))
+test("renewable_energy_biogas_build_from_dark_green_barrel_shows_dark_green", buildsBarrelDigester("Mov_DarkGreenBarrel"))
+test("renewable_energy_biogas_build_from_light_green_barrel_shows_light_green", buildsBarrelDigester("Mov_LightGreenBarrel"))
+
+-- A digester built from a barrel loads whole from the save: its chunk unloaded and loaded again, it
+-- still opens and takes feed. Single player only, as the chunk reload test.
+test("renewable_energy_biogas_barrel_digester_reloads_whole", {
+    spOnly = "the server keeps chunks loaded after the character leaves",
+    timeoutSeconds = 120,
+    instant = true,
+    run = function(self)
+        self.views = {}
+        local tile = Sprites.digester.barrel.Mov_LightGreenBarrel
+        local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", tile, { "Base.Mov_LightGreenBarrel" })
+        if not handle then return end
+        -- Where the build left the character, filled in once it stands there.
+        local home = {}
+        T.step(function()
+            local square = T.player():getCurrentSquare()
+            home.x, home.y, home.z = square:getX(), square:getY(), square:getZ()
+        end)
+        awayAndBack(self, home, handle.x, handle.y, handle.z)
+        useDrumDigester(self, handle, tile, "reloaded")
+    end,
+    validate = function(self)
+        expectDrumDigester(self, "reloaded")
+    end,
+})
 
 -- Right-clicking a barrel digester shows its submenu through vanilla's menu builder: its status,
 -- and its jobs greyed out with the reason while the digester or the character can't do them. The

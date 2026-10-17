@@ -39,7 +39,7 @@ end
 
 local function reportModules()
     local report = RenewableEnergy.Loot.moduleReport(require "RenewableEnergyDevTownCensus")
-    print("RELootReport modules a thorough player finds, as count (watts as found / after Repair Cracked Module)")
+    print("RELootReport modules a thorough player finds, as count (watts as found / after Seal Cracked Module)")
     for _, town in ipairs(report.towns) do
         print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, vehicles %s, sites %s; total %s",
             town.name, hauled(town.listed), hauled(town.cracked), hauled(town.crates), hauled(town.vehicles),

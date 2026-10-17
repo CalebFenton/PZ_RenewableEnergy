@@ -20,9 +20,9 @@ local DigesterSystem = ObjectSystem.define({
 })
 RenewableEnergy.DigesterSystem = DigesterSystem
 
--- A barrel digester shows the barrel it was built from, though its entity has one tile. Swapped
--- before the record reads the tile, and before ISBuildIsoEntity:create sends the object, so clients
--- get it whole.
+-- A barrel digester is the entity of the barrel it was built from, which the build menu builds on
+-- the Metal Drum's. Swapped before the record reads the tile, and before ISBuildIsoEntity:create
+-- sends the object, so clients get it whole.
 local onCreate = DigesterSystem.OnCreate
 function DigesterSystem.OnCreate(params)
     local thumpable, data = params.thumpable, params.craftRecipeData
@@ -30,8 +30,7 @@ function DigesterSystem.OnCreate(params)
     for i = 0, items and items:size() - 1 or -1 do
         local tile = Sprites.digester.barrel[items:get(i):getType()]
         if tile then
-            -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-            thumpable:setSprite(getSprite(tile))
+            RenewableEnergy.setEntityTile(thumpable, tile)
             break
         end
     end
