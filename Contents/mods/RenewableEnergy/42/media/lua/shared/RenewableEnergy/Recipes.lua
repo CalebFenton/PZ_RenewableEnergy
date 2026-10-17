@@ -37,9 +37,14 @@ Recipes.MOUNTS = {
     ["RenewableEnergy.SolarRackMetal"] = { kind = "rack", xp = { Electricity = 20, MetalWelding = 10 } },
 }
 
--- Seal Cracked Module (RenewableEnergy_RepairCrackedModule): condition it adds, and the most it
--- brings each module type to. The caps stay below Specs.crackedBelow: sealed glass is still
--- cracked glass.
+-- Each patch-up repair counts on vanilla's per-item repair count ("Repaired: Nx") and lowers the
+-- most the next can bring the item to by this step, so patching runs out. Remaking it with fresh
+-- parts (Rebuild Battery, Reglaze Module) starts the count again.
+Recipes.REPAIR_LIMIT_STEP = 10
+
+-- Seal Cracked Module (RenewableEnergy_RepairCrackedModule): condition it adds, and the most a
+-- first seal brings each module type to. The caps stay below Specs.crackedBelow: sealed glass is
+-- still cracked glass.
 Recipes.MODULE_REPAIR = 20
 Recipes.MODULE_REPAIR_CAP = {
     [Specs.factoryModule] = 55,
@@ -54,15 +59,18 @@ Recipes.REGLAZE = {
 }
 
 -- Service Battery adds a little to a tired battery; Recondition brings it to its repair limit.
--- Each repair counts on vanilla's per-item repair count ("Repaired: Nx") and lowers the limit
--- for the next, so a battery can only be repaired so often before it needs rebuilding.
 Recipes.SERVICE_REPAIR = 10
 Recipes.REPAIR_LIMIT = 85
-Recipes.REPAIR_LIMIT_STEP = 10
 
 -- The most a repair can bring a battery repaired this many times to.
 function Recipes.repairLimit(timesRepaired)
     return Recipes.REPAIR_LIMIT - Recipes.REPAIR_LIMIT_STEP * timesRepaired
+end
+
+-- The most Seal Cracked Module can bring `module` to, or nil for an item that is no module.
+function Recipes.sealLimit(module)
+    local cap = Recipes.MODULE_REPAIR_CAP[module:getFullType()]
+    return cap and cap - Recipes.REPAIR_LIMIT_STEP * module:getHaveBeenRepaired()
 end
 
 local function isModule(item)
@@ -78,6 +86,17 @@ local function firstInput(craftRecipeData, matches)
         end
     end
     return nil
+end
+
+-- Sets the item's repair count; syncItemFields carries it to clients, sendItemStats the condition.
+local function setRepairs(item, count)
+    item:setHaveBeenRepaired(count)
+    item:syncItemFields()
+    sendItemStats(item)
+end
+
+local function countRepair(item)
+    setRepairs(item, item:getHaveBeenRepaired() + 1)
 end
 
 -- Panel mounts -----------------------------------------------------------------------------------
@@ -130,13 +149,13 @@ end
 
 -- OnTest of Seal Cracked Module: the module must be below what the seal brings it to.
 function Recipes.isModuleBelowRepairCap(item, character)
-    local cap = Recipes.MODULE_REPAIR_CAP[item:getFullType()]
-    return cap == nil or item:getCondition() < cap
+    local limit = Recipes.sealLimit(item)
+    return limit == nil or item:getCondition() < limit
 end
 
 --- What Seal Cracked Module brings the module's condition to.
 function Recipes.repairedCondition(module)
-    return math.min(Recipes.MODULE_REPAIR_CAP[module:getFullType()], module:getCondition() + Recipes.MODULE_REPAIR)
+    return math.min(Recipes.sealLimit(module), module:getCondition() + Recipes.MODULE_REPAIR)
 end
 
 -- OnCreate of Seal Cracked Module.
@@ -145,7 +164,7 @@ function Recipes.repairModule(craftRecipeData, character)
         return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
     end)
     Wear.setCondition(module, Recipes.repairedCondition(module))
-    sendItemStats(module)
+    countRepair(module)
 end
 
 -- OnTest of Reglaze Module: the module must be below what new glass brings it to.
@@ -154,13 +173,13 @@ function Recipes.isModuleBelowReglaze(item, character)
     return reglazed == nil or item:getCondition() < reglazed
 end
 
--- OnCreate of Reglaze Module.
+-- OnCreate of Reglaze Module: new glass, so the seals on the old no longer count.
 function Recipes.reglazeModule(craftRecipeData, character)
     local module = firstInput(craftRecipeData, function(item)
         return Recipes.REGLAZE[item:getFullType()] ~= nil
     end)
     Wear.setCondition(module, Recipes.REGLAZE[module:getFullType()])
-    sendItemStats(module)
+    setRepairs(module, 0)
 end
 
 -- Seal Cracked Panel seals a module still on the arrow board trailer the way Seal Cracked
@@ -285,13 +304,6 @@ end
 
 local function canRepair(item)
     return not Battery.isBattery(item) or item:getCondition() < Recipes.repairLimit(item:getHaveBeenRepaired())
-end
-
--- Counts the repair; syncItemFields carries the count to clients, sendItemStats the condition.
-local function countRepair(battery)
-    battery:setHaveBeenRepaired(battery:getHaveBeenRepaired() + 1)
-    battery:syncItemFields()
-    sendItemStats(battery)
 end
 
 -- OnTest of Service Battery.

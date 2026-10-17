@@ -117,7 +117,8 @@ end
 
 -- Panel mounts ---------------------------------------------------------------------------------
 
--- Expects the mount's record of its modules to hold `expected`, each type at its condition.
+-- Expects the mount's record of its modules to hold `expected`, each type at its condition and
+-- seal count.
 local function expectModules(mount, expected)
     local modules = mount and mount.modData[MODULES_KEY]
     if not expect(modules ~= nil and #modules == #expected,
@@ -129,10 +130,10 @@ local function expectModules(mount, expected)
         expected = { expected[2], expected[1] }
     end
     for i, want in ipairs(expected) do
-        local got = modules[i]
-        expect(got.type == want.type and got.condition == want.condition,
-            "module " .. i .. " is " .. tostring(got.type) .. " at " .. tostring(got.condition)
-            .. ", expected " .. want.type .. " at " .. want.condition)
+        local got, wantRepaired = modules[i], want.repaired or 0
+        expect(got.type == want.type and got.condition == want.condition and (got.repaired or 0) == wantRepaired,
+            "module " .. i .. " is " .. tostring(got.type) .. " at " .. tostring(got.condition) .. " sealed "
+            .. tostring(got.repaired) .. "x, expected " .. want.type .. " at " .. want.condition .. " sealed " .. wantRepaired .. "x")
     end
 end
 
@@ -143,10 +144,10 @@ for mount, row in pairs(Recipes.MOUNTS) do
     table.insert(MOUNTS, { mount = mount, count = RenewableEnergy.Specs.mounts[row.kind].modules, name = mount:match("%.(.+)") })
 end
 
--- Mounting records each module's type and condition, at conditions a new module doesn't have; a
--- two-module rack gets one of each type. A mount that recorded new modules instead, or only the
--- first of two, would unmount as something else than went in.
-local FACTORY_MODULE = { type = FACTORY, condition = 72 }
+-- Mounting records each module's type, condition and seals, at conditions a new module doesn't
+-- have; a two-module rack gets one of each type. A mount that recorded new modules instead, or
+-- only the first of two, would unmount as something else than went in.
+local FACTORY_MODULE = { type = FACTORY, condition = 72, repaired = 2 }
 local HOMEMADE_MODULE = { type = HOMEMADE, condition = 41 }
 for _, entry in ipairs(MOUNTS) do
     local mount, count = entry.mount, entry.count
@@ -158,6 +159,7 @@ for _, entry in ipairs(MOUNTS) do
         setup = function(self)
             local modules = inputsOf(self, FACTORY)
             T.changeItem(self, modules[1], { condition = FACTORY_MODULE.condition })
+            setRepaired(self, FACTORY, FACTORY_MODULE.repaired)
             if count == 2 then
                 -- One of the two a homemade module instead. This client must have lost the
                 -- factory one before the craft picks its inputs from its own copy.
@@ -176,9 +178,10 @@ for _, entry in ipairs(MOUNTS) do
     })
 end
 
--- Unmounting gives back each module as the type and at the condition it went in, still marked as
--- mounted and connected before if it was, and a module not so marked comes back unmarked.
-local MOUNTED_HOMEMADE = { type = HOMEMADE, condition = 41, mounted = true, connected = true }
+-- Unmounting gives back each module as the type, at the condition and with the seals it went in,
+-- still marked as mounted and connected before if it was, and a module not so marked comes back
+-- unmarked.
+local MOUNTED_HOMEMADE = { type = HOMEMADE, condition = 41, repaired = 2, mounted = true, connected = true }
 local PLAIN_FACTORY = { type = FACTORY, condition = 12 }
 for _, entry in ipairs(MOUNTS) do
     local mount, count = entry.mount, entry.count
@@ -200,12 +203,14 @@ for _, entry in ipairs(MOUNTS) do
             if expect(homemade ~= nil, "no homemade module came back") then
                 local data = homemade.modData
                 expect(homemade.condition == MOUNTED_HOMEMADE.condition, "the homemade module came back at " .. homemade.condition)
+                expect(homemade.repaired == MOUNTED_HOMEMADE.repaired, "the homemade module came back sealed " .. homemade.repaired .. "x")
                 expect(data[PowerBank.MOUNTED_ONCE] == true and data[PowerBank.CONNECTED_ONCE] == true,
                     "the homemade module came back without its mounted and connected marks")
             end
             local factory = carriedFirst(self, FACTORY)
             if count == 2 and expect(factory ~= nil, "no factory module came back") then
                 expect(factory.condition == PLAIN_FACTORY.condition, "the factory module came back at " .. factory.condition)
+                expect(factory.repaired == 0, "the factory module came back sealed " .. factory.repaired .. "x")
                 expect(factory.modData[PowerBank.MOUNTED_ONCE] ~= true, "the factory module came back marked as mounted before")
             end
         end,
@@ -312,35 +317,46 @@ test("renewable_energy_craft_mount_xp_only_for_new_modules", {
 
 -- Solar modules --------------------------------------------------------------------------------
 
--- Seal Cracked Module raises a module's condition by a fixed step up to a cap, lower for a
--- homemade module, and is refused at the cap with the module untouched: a full step below it, one
--- short of the cap (clamped), and at the cap. A sealed module still shows cracked. Each row: the
--- behaviour, the module, its condition before and after, and whether the game refuses.
-local REPAIR_CAP, REPAIR_STEP = Recipes.MODULE_REPAIR_CAP, Recipes.MODULE_REPAIR
+-- Seal Cracked Module adds 20 condition, up to 55 for a factory module and 40 for a homemade one,
+-- less 10 for each earlier seal, and is refused at that limit with the module untouched. Each seal
+-- counts once, on this client's copy too, and a sealed module still shows cracked. Each row: the
+-- behaviour, the module, its condition and seal count before, its condition after, and whether
+-- the game refuses.
 local MODULE_REPAIRS = {
-    { "factory_adds_a_step", FACTORY, REPAIR_CAP[FACTORY] - REPAIR_STEP - 10, REPAIR_CAP[FACTORY] - 10 },
-    { "factory_below_cap_stops_at_cap", FACTORY, REPAIR_CAP[FACTORY] - 1, REPAIR_CAP[FACTORY] },
-    { "factory_at_cap_refused", FACTORY, REPAIR_CAP[FACTORY], REPAIR_CAP[FACTORY], true },
-    { "homemade_below_cap_stops_at_cap", HOMEMADE, REPAIR_CAP[HOMEMADE] - 1, REPAIR_CAP[HOMEMADE] },
-    { "homemade_at_cap_refused", HOMEMADE, REPAIR_CAP[HOMEMADE], REPAIR_CAP[HOMEMADE], true },
+    { "factory_adds_a_step", FACTORY, 25, 0, 45 },
+    { "factory_below_limit_stops_at_55", FACTORY, 54, 0, 55 },
+    { "factory_at_limit_refused", FACTORY, 55, 0, 55, true },
+    { "factory_after_two_seals_stops_at_35", FACTORY, 30, 2, 35 },
+    { "factory_after_three_seals_at_25_refused", FACTORY, 25, 3, 25, true },
+    { "homemade_below_limit_stops_at_40", HOMEMADE, 39, 0, 40 },
+    { "homemade_after_one_seal_stops_at_30", HOMEMADE, 20, 1, 30 },
 }
 for _, entry in ipairs(MODULE_REPAIRS) do
-    local behavior, module, before, after, refused = entry[1], entry[2], entry[3], entry[4], entry[5]
+    local behavior, module, before, repaired, after, refused = entry[1], entry[2], entry[3], entry[4], entry[5], entry[6]
+    local repairedAfter = refused and repaired or repaired + 1
     craftTest(craftName("RenewableEnergy_RepairCrackedModule", behavior), {
         recipe = "RenewableEnergy_RepairCrackedModule",
         from = module,
         prefer = { module },
         setup = function(self)
             T.changeItem(self, inputsOf(self, module)[1], { condition = before })
+            setRepaired(self, module, repaired)
         end,
         counts = { [module] = 1 },
-        after = function(self) readCarried(self, { module }) end,
+        after = function(self)
+            readCarried(self, { module })
+            T.waitFor(self, function()
+                local item = T.carried(module)
+                return item ~= nil and item:getHaveBeenRepaired() == repairedAfter
+            end, "this client's module repaired " .. repairedAfter .. "x")
+        end,
         validate = function(self)
             local item = carriedFirst(self, module)
-            expect(item and item.condition == after,
-                "the module is at " .. tostring(item and item.condition) .. ", expected " .. after)
+            if not expect(item ~= nil, "the module is gone") then return end
+            expect(item.condition == after, "the module is at " .. item.condition .. ", expected " .. after)
+            expect(item.repaired == repairedAfter, "the module reads repaired " .. item.repaired .. "x, expected " .. repairedAfter)
             -- The seal leaves the glass cracked, and the module showing it.
-            expect(item and item.condition < RenewableEnergy.Specs.crackedBelow, "a sealed module shows whole")
+            expect(item.condition < RenewableEnergy.Specs.crackedBelow, "a sealed module shows whole")
             if refused then
                 expect(self.refusal ~= nil, "the game would start the seal")
             end
@@ -349,24 +365,30 @@ for _, entry in ipairs(MODULE_REPAIRS) do
 end
 
 -- Reglaze Module sets a module below what new glass brings it to, and is refused there with the
--- module and the pane untouched; it teaches Glassmaking. Each row: the behaviour, the module, its
--- condition before and after, and whether the game refuses.
+-- module and the pane untouched; it teaches Glassmaking, and the new glass clears the old seals.
+-- Each row: the behaviour, the module, its condition and seal count before, its condition after,
+-- and whether the game refuses.
 local REGLAZE = Recipes.REGLAZE
 local REGLAZES = {
-    { "factory_cracked_set_to_new_glass", FACTORY, 20, REGLAZE[FACTORY] },
-    { "factory_just_below_set_to_new_glass", FACTORY, REGLAZE[FACTORY] - 1, REGLAZE[FACTORY] },
-    { "factory_at_new_glass_refused", FACTORY, REGLAZE[FACTORY], REGLAZE[FACTORY], true },
-    { "homemade_cracked_set_to_new_glass", HOMEMADE, 20, REGLAZE[HOMEMADE] },
-    { "homemade_at_new_glass_refused", HOMEMADE, REGLAZE[HOMEMADE], REGLAZE[HOMEMADE], true },
+    { "factory_cracked_set_to_new_glass", FACTORY, 20, 0, REGLAZE[FACTORY] },
+    { "factory_sealed_three_times_clears_seals", FACTORY, 25, 3, REGLAZE[FACTORY] },
+    { "factory_just_below_set_to_new_glass", FACTORY, REGLAZE[FACTORY] - 1, 0, REGLAZE[FACTORY] },
+    { "factory_at_new_glass_refused", FACTORY, REGLAZE[FACTORY], 0, REGLAZE[FACTORY], true },
+    { "homemade_cracked_set_to_new_glass", HOMEMADE, 20, 0, REGLAZE[HOMEMADE] },
+    { "homemade_at_new_glass_refused", HOMEMADE, REGLAZE[HOMEMADE], 0, REGLAZE[HOMEMADE], true },
 }
 for _, entry in ipairs(REGLAZES) do
-    local behavior, module, before, after, refused = entry[1], entry[2], entry[3], entry[4], entry[5]
+    local behavior, module, before, repaired, after, refused = entry[1], entry[2], entry[3], entry[4], entry[5], entry[6]
+    local repairedAfter = refused and repaired or 0
     craftTest(craftName("RenewableEnergy_ReglazeModule", behavior), {
         recipe = "RenewableEnergy_ReglazeModule",
         from = module,
         prefer = { module },
         setup = function(self)
             T.changeItem(self, inputsOf(self, module)[1], { condition = before })
+            if repaired > 0 then
+                setRepaired(self, module, repaired)
+            end
             T.server(self, "perkXp", { perk = "Glassmaking" })
             T.step(function() self.glassmakingBefore = self.server.perkXp.value end)
         end,
@@ -377,12 +399,13 @@ for _, entry in ipairs(REGLAZES) do
         end,
         validate = function(self)
             local item = carriedFirst(self, module)
-            expect(item and item.condition == after,
-                "the module is at " .. tostring(item and item.condition) .. ", expected " .. after)
+            if not expect(item ~= nil, "the module is gone") then return end
+            expect(item.condition == after, "the module is at " .. item.condition .. ", expected " .. after)
+            expect(item.repaired == repairedAfter, "the module reads repaired " .. item.repaired .. "x, expected " .. repairedAfter)
             if refused then
                 expect(self.refusal ~= nil, "the game would start the reglaze")
             else
-                expect(item and item.condition >= RenewableEnergy.Specs.crackedBelow, "a reglazed module shows cracked")
+                expect(item.condition >= RenewableEnergy.Specs.crackedBelow, "a reglazed module shows cracked")
                 local xp = self.server and self.server.perkXp
                 expect(xp and self.glassmakingBefore and xp.value > self.glassmakingBefore, "reglazing taught no Glassmaking")
             end

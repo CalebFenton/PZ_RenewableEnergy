@@ -1553,9 +1553,6 @@ test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
     end,
 })
 
--- What Seal Cracked Module adds to a module's condition, and the most it brings it to.
-local REPAIR_STEP, REPAIR_CAP = RenewableEnergy.Recipes.MODULE_REPAIR, RenewableEnergy.Recipes.MODULE_REPAIR_CAP[MODULE]
-
 -- Queues a Seal Cracked Panel on the trailer's left panel, as the trailer's menu queues it.
 local function repairPanel(trailer)
     T.step(function()
@@ -1565,10 +1562,10 @@ local function repairPanel(trailer)
 end
 
 -- Seal Cracked Panel takes Seal Cracked Module's inputs, keeping the screwdriver, needs its
--- Electricity level and gives its XP, and seals the panel's module from `from` by that recipe's
--- step, no higher than its cap, leaving it still cracked. A module that isn't cracked
--- (Specs.crackedBelow) can't be sealed on the panel.
-local function repairTest(name, from)
+-- Electricity level and gives its XP, and seals the panel's module, sealed `repaired` times
+-- before, from `from` to `to` as that recipe would, leaving it still cracked and counting the
+-- seal. A module that isn't cracked (Specs.crackedBelow) can't be sealed on the panel.
+local function repairTest(name, from, repaired, to)
     test(name, {
         instant = true,
         run = function(self)
@@ -1578,7 +1575,7 @@ local function repairTest(name, from)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = RenewableEnergy.Specs.crackedBelow } } })
             waitForPanelsCopy(self, trailer)
             T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.repairablePanel(trailer.vehicle, LEFT) ~= nil end)
-            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = from } } })
+            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = from, repaired = repaired } } })
             waitForPanelsCopy(self, trailer)
             T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
             -- The XP the authority's character has before and after; a client's copy can still be
@@ -1600,10 +1597,12 @@ local function repairTest(name, from)
         end,
         validate = function(self)
             local left = self.counts.left
-            local condition, to = panelCondition(self.trailer.state, LEFT), math.min(REPAIR_CAP, from + REPAIR_STEP)
+            local condition = panelCondition(self.trailer.state, LEFT)
             expect(not self.wholeRepairable, "a panel at " .. RenewableEnergy.Specs.crackedBelow .. ", not cracked, can be sealed")
             expect(condition == to, "the seal took the panel from " .. from .. " to " .. tostring(condition) .. ", expected " .. to)
             expect(condition < RenewableEnergy.Specs.crackedBelow, "the sealed panel at " .. tostring(condition) .. " shows whole")
+            local sealed = self.trailer.state.panels[LEFT].repaired
+            expect(sealed == repaired + 1, "the sealed panel reads repaired " .. tostring(sealed) .. "x, expected " .. repaired + 1)
             expect(left["Base.Screwdriver"] == 1, "the seal used up the screwdriver")
             local epoxy = player():getInventory():getFirstTypeRecurse("Base.Epoxy")
             local epoxyLeft = epoxy and epoxy:getCurrentUses() or 0
@@ -1613,9 +1612,10 @@ local function repairTest(name, from)
         end,
     })
 end
--- One short of reaching the cap, and one below the cap, which the cap stops.
-repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", REPAIR_CAP - REPAIR_STEP - 1)
-repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", REPAIR_CAP - 1)
+-- Short of the limit, stopped at it, and stopped at the lower limit of a twice-sealed module.
+repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 34, 0, 54)
+repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 54, 0, 55)
+repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lower", 30, 2, 35)
 
 -- What the trailer's menu shows of Seal Cracked Panel: "offered", "greyed out" with its
 -- tooltip, or "missing".
@@ -1675,7 +1675,7 @@ test("renewable_energy_world_arrow_board_repair_adds_up_part_used_epoxy", {
         T.count(self, "left", { "Base.Epoxy" })
     end,
     validate = function(self)
-        expect(panelCondition(self.trailer.state, LEFT) == math.min(REPAIR_CAP, 35 + REPAIR_STEP),
+        expect(panelCondition(self.trailer.state, LEFT) == 55,
             "two part-used tubes of epoxy didn't pay for the seal")
         local epoxy = self.counts.left["Base.Epoxy"]
         expect(epoxy == 0, epoxy .. " tubes of epoxy left, expected both used up")

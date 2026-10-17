@@ -25,9 +25,10 @@ PowerBank.WIRE = "Base.ElectricWire"
 PowerBank.SCRAP = "Base.ElectronicsScrap"
 -- Item modData: the item was wired into a bank once, which taught its Electricity XP.
 PowerBank.WIRED_ONCE = "RenewableEnergy_wiredOnce"
--- Item and placed-object modData: the modules a panel mount holds, { { type, condition, mounted,
--- connected }, ... }. mounted and connected say the module already taught the XP of its first
--- mounting and its first connection to a bank, so moving modules around teaches nothing new.
+-- Item and placed-object modData: the modules a panel mount holds, { { type, condition, repaired,
+-- mounted, connected }, ... }. repaired is the module item's repair count (its seals; nil is 0).
+-- mounted and connected say the module already taught the XP of its first mounting and its first
+-- connection to a bank, so moving modules around teaches nothing new.
 PowerBank.MODULES = "RenewableEnergy_modules"
 -- Solar module item modData: the same two flags, while the module is off its mount. A placed wind
 -- charger keeps CONNECTED_ONCE too.
@@ -69,7 +70,8 @@ end
 function PowerBank.copyModules(modules)
     local copy = {}
     for i, module in ipairs(modules) do
-        copy[i] = { type = module.type, condition = module.condition, mounted = module.mounted, connected = module.connected }
+        copy[i] = { type = module.type, condition = module.condition, repaired = module.repaired, mounted = module.mounted,
+            connected = module.connected }
     end
     return copy
 end
@@ -88,10 +90,10 @@ function PowerBank.modulesOf(holder, mount)
     return modules
 end
 
---- The module record of a solar module item.
+--- The module record of a solar module item: its seals (vanilla's repair count) go with it.
 function PowerBank.moduleRecord(item)
     local data = item:getModData()
-    return { type = item:getFullType(), condition = item:getCondition(),
+    return { type = item:getFullType(), condition = item:getCondition(), repaired = item:getHaveBeenRepaired(),
         mounted = data[PowerBank.MOUNTED_ONCE] == true, connected = data[PowerBank.CONNECTED_ONCE] == true }
 end
 
@@ -102,8 +104,9 @@ function PowerBank.moduleWatts(fullType, condition)
     return spec and spec.watts * condition / 100 or 0
 end
 
---- Marks a solar module item with its record's flags, as it comes off a mount.
+--- Marks a solar module item with its record's seals and flags, as it comes off a mount.
 function PowerBank.markModule(item, module)
+    item:setHaveBeenRepaired(module.repaired or 0)
     local data = item:getModData()
     data[PowerBank.MOUNTED_ONCE] = module.mounted or nil
     data[PowerBank.CONNECTED_ONCE] = module.connected or nil

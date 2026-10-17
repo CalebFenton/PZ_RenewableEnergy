@@ -120,11 +120,12 @@ function Trailer.lidPose(vehicle)
         open = duration > 0 and 1 - math.min(math.max(at / duration, 0), 1) or nil }
 end
 
--- A part's installed item and its condition, or none.
+-- A part's installed item, its condition and its repair count, or none.
 local function partState(vehicle, partId)
     local part = vehicle:getPartById(partId)
     local item = part and part:getInventoryItem()
-    return { installed = item ~= nil, type = item and item:getFullType(), condition = item and part:getCondition() }
+    return { installed = item ~= nil, type = item and item:getFullType(), condition = item and part:getCondition(),
+        repaired = item and item:getHaveBeenRepaired() }
 end
 
 --- What the tests read of a vehicle on either side: each panel's module, condition and shown
@@ -199,13 +200,14 @@ onVehicle("arrowBoardStock", function(vehicle, args)
     return { stock = stock, state = Trailer.vehicleState(vehicle) }
 end)
 
--- Puts a module of spec.type at spec.condition on the panel, or takes it off for a spec without a
--- type, as the mechanics window's install does, and shows it.
+-- Puts a module of spec.type at spec.condition, repaired spec.repaired times, on the panel, or
+-- takes it off for a spec without a type, as the mechanics window's install does, and shows it.
 local function putPanel(vehicle, partId, spec)
     local part = vehicle:getPartById(partId)
     local item = spec.type and instanceItem(spec.type)
     part:setInventoryItem(item)
     if item then
+        item:setHaveBeenRepaired(spec.repaired or 0)
         part:setCondition(spec.condition)
     end
     vehicle:transmitPartItem(part)
@@ -214,7 +216,7 @@ local function putPanel(vehicle, partId, spec)
 end
 
 -- Sets up the trailer `args.id` on the authority, in this order: whole if `args.repair`; each
--- panel of `args.panels` ({ [partId] = { type, condition } }, an empty table taking the module
+-- panel of `args.panels` ({ [partId] = { type, condition, repaired } }, an empty table taking the module
 -- off); each frame part and the lamp board of `args.frame` ({ [partId] = condition }); the battery
 -- box emptied and filled with `args.box` ({ { type, charge } }) if given; the blood of
 -- `args.blood` ({ [side] = intensity }); the lid taken off or a new one put on if

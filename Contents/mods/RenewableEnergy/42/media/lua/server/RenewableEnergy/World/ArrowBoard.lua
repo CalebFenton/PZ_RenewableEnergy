@@ -413,8 +413,12 @@ function ArrowBoard.repairPanel(character, vehicle, partId)
         return false
     end
     Recipes.useInputs(inputs, character)
+    -- As vanilla's fixPart (VehicleCommands.lua): count the repair on the item, then send it.
     local item = part:getInventoryItem()
-    setPanelCondition(vehicle, part, Recipes.repairedCondition(item))
+    local condition = Recipes.repairedCondition(item)
+    item:setHaveBeenRepaired(item:getHaveBeenRepaired() + 1)
+    setPanelCondition(vehicle, part, condition)
+    vehicle:transmitPartItem(part)
     Recipes.moduleRepairRecipe():addXP(character)
     return true
 end
