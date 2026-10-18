@@ -112,8 +112,8 @@ local function makeBank(square, spriteName, index, from)
         PowerBank.adoptContainer(container)
     end
     generator:transmitCompleteItemToClients()
-    -- On a server each of these syncs the generator, which names it by its index on the
-    -- square, so they come after the clients have it.
+    -- On a server each of these syncs the generator by its index on the square; a sync can reach a
+    -- client before the generator does and be dropped there, so a client asks again ("resync").
     generator:setCondition(100)
     generator:setFuel(10)
     generator:setConnected(connected)
@@ -240,6 +240,11 @@ function BankSystem:OnClientCommand(command, player, args)
         end
     elseif command == "unwatch" then
         bank:unwatch(player)
+    elseif command == "resync" and bank:inViewOf(player) then
+        local isoObject = bank:getIsoObject()
+        if isoObject then
+            isoObject:sync()
+        end
     end
 end
 

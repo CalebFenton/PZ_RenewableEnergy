@@ -490,17 +490,18 @@ test("renewable_energy_gas_gasifier_runs_generator", {
 })
 
 -- A lit gasifier whose generator isn't running burns, in its own pass, the wood for what vanilla
--- bills a generator idling (IsoGenerator.getBasePowerConsumption, at the default
--- GeneratorFuelConsumption: the harness sets only the Lua copy of an option, which vanilla's Java
--- doesn't read), and goes out once its wood is gone.
+-- bills a generator idling (IsoGenerator.getBasePowerConsumption, which follows the
+-- GeneratorFuelConsumption option, set high here so the hours show), and goes out once its wood is
+-- gone.
 test("renewable_energy_gas_gasifier_idles_as_a_generator", {
     instant = true,
+    sandbox = { GeneratorFuelConsumption = 1 },
     run = function(self)
         local generator = T.generator(self, {})
         local idling = generator and T.placeRecord(self, "gasifier", "standard")
         local burning = idling and T.placeRecord(self, "gasifier", "standard")
         if not burning then return end
-        self.hours, self.fireKg = 30, 0.1
+        self.hours, self.fireKg = 10, 0.1
         T.batch(function()
             T.readGenerator(self, generator, "vanilla")
             T.fillRecord(self, idling, { hopper = { { type = "Base.Plank", count = 6 } } })

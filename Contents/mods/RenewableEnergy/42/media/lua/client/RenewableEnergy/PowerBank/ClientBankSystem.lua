@@ -23,6 +23,19 @@ local BankSystem = ClientObjects.define({
     adoptCopy = adoptCopy, adoptContainer = PowerBank.adoptContainer,
 })
 
+-- A bank the server places reaches a client in an ordered packet (AddItemToMapPacket) and its
+-- state after it in syncs, which are reliable but unordered (PacketTypes.SyncIsoObject), so a
+-- sync can arrive first and be dropped for naming an object the client doesn't have yet. Once this
+-- client has the bank, it asks the server for its state again.
+if isClient() then
+    Events.OnObjectAdded.Add(function(isoObject)
+        local player = getPlayer()
+        if player and PowerBank.isBank(isoObject) then
+            BankSystem.instance:sendCommand(player, "resync", { bank = PowerBank.positionOf(isoObject) })
+        end
+    end)
+end
+
 -- The banks this game's players watch, as "x,y,z" to { [player number] = true }. The server sends
 -- a bank's status only to its watchers, so once nobody here watches it, this client's copy goes
 -- rather than show stale when a window next opens.
@@ -41,7 +54,7 @@ end
 --- `player` watches the status of `bank` (single player too): the server sends it now, after a
 --- fresh look at the bank, and after every change until unwatchStatus. The status window watches
 --- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; the server
---- takes no other command from a client.
+--- takes no other command from a client but "resync".
 function PowerBank.watchStatus(player, bank)
     local position = PowerBank.positionOf(bank)
     local key = keyOf(position)

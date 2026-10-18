@@ -9,12 +9,14 @@ option RenewableEnergy.SunlightMultiplier {
 	type = double, min = 1, max = 5, default = 2.5,
 }
 /*
-    Biogas multiplier: 1 is what a real digester makes from the feed. The game drops far less
-    manure than real animals do, so the default makes a kitchen-scraps barrel worth keeping.
+    Biogas multiplier: 1 is what a real digester makes from the feed. A generator on gas burns
+    vanilla's own fuel bill (GasKit), so at 1 one cow's dung (vanilla drops one about every other
+    day) runs a fridge-freezer most of the day at the default fuel consumption, and a small herd a
+    house.
 */
 option RenewableEnergy.BiogasMultiplier {
 	page = RenewableEnergy, translation = RenewableEnergy_BiogasMultiplier,
-	type = double, min = 1, max = 10, default = 3,
+	type = double, min = 1, max = 10, default = 1,
 }
 option RenewableEnergy.ChargeFreq {
 	page = RenewableEnergy, translation = RenewableEnergy_ChargeFreq, valueTranslation = RenewableEnergy_ChargeFreq,
