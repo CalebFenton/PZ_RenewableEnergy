@@ -2,11 +2,9 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Sprites"
 local Stash = require "RenewableEnergy/StashHouses"
 
--- Stash house, world spawn, solar site and garden light tests; the arrow board's are in
--- RenewableEnergyTestsArrowBoard.lua. See RenewableEnergyTestLib.lua for how the runner works.
--- Stash houses, world spawns, sites and garden lights live on the authority, so the tests build
--- and read them through the handlers in RenewableEnergyTestServer*.lua, and check what players see
--- on this client's copies.
+-- World systems that live on the authority: stash houses (StashHouses.lua, MapDefinitions.lua),
+-- world spawns (WorldSpawns.lua, Distributions.lua), solar sites, garden lights and rural finds
+-- (World/*). Arrow boards are in RenewableEnergyTestsArrowBoard.lua.
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, player, serverCheck = T.test, T.expect, T.expectNear, T.player, T.serverCheck
@@ -203,8 +201,9 @@ test("renewable_energy_world_bank_spawns_stocked", {
     end,
 })
 
--- Banks only work indoors, so a world spawn never puts one on an outdoor square.
-test("renewable_energy_world_bank_refused_outdoors", {
+-- A room seen for the first time never puts a bank on an outdoor square: the world spawn honours
+-- the indoors-only rule that placement by a player also obeys (the bank tests cover that rule).
+test("renewable_energy_world_bank_spawn_refused_outdoors", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
@@ -212,7 +211,7 @@ test("renewable_energy_world_bank_refused_outdoors", {
     end,
     validate = function(self)
         expect(not self.server.worldBank.placed, "a bank was placed outdoors")
-        expect(not self.server.worldBank.boxOnSquare, "a battery box stands outdoors")
+        expect(not self.server.worldBank.boxOnSquare, "a bank's tile stands outdoors")
     end,
 })
 
@@ -287,8 +286,8 @@ serverCheck("renewable_energy_world_cracked_modules", "crackedModules", { sample
 -- Solar sites -----------------------------------------------------------------------------------
 
 -- A site goes down once when its chunk loads, and its spot is forgotten, so loading the chunk
--- again places nothing. Its pump's pole mount holds 1 or 2 modules at site conditions, and
--- players see it.
+-- again places nothing. Its pump's pole mount holds as many modules as its kind says, at site
+-- conditions, and players see it.
 test("renewable_energy_world_site_placed_once", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
@@ -462,10 +461,8 @@ test("renewable_energy_world_garden_lights_option_zero", {
 
 -- Rural finds --------------------------------------------------------------------------------------
 
--- RenewableEnergy.RuralFinds leaves worn installations by rural buildings. The tests roll the
--- building near the start for one find for certain (its rooms decide only which finds the world
--- rolls), see it worn on this client, mend it with the usual jobs and see it work. Rolled again, the
--- building gets nothing more: the roll is kept in the world's ModData.
+-- Each rural find test rolls the building near the start for that find for certain, mends it
+-- with the usual jobs and sees it work; rolled again, the building gets nothing more.
 
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 require "RenewableEnergy/Biogas/DigesterJobs"
@@ -579,9 +576,10 @@ test("renewable_energy_world_rural_digester", {
             "the digester was found " .. tostring(found.tier) .. ", torn " .. tostring(found.torn) .. ", sour "
             .. tostring(found.sour) .. ", started " .. tostring(found.started))
         local fed = self.reads.fed
-        -- New bags, worn only by the two hours since.
-        expect(not fed.torn and fed.holderCondition > 99, "Replace Bags didn't mend the found digester: condition "
-            .. tostring(fed.holderCondition))
+        -- New bags, worn only by the two hours since; the summary rounds the condition.
+        local wear = (Digester.HOLDERS[fed.holder].wearPerDay or 0) * 2 / 24
+        expect(not fed.torn and fed.holderCondition >= 100 - wear - 0.5,
+            "Replace Bags didn't mend the found digester: condition " .. tostring(fed.holderCondition))
         expect(fed.hopperItems == 0 and fed.potential > 0, "the re-bagged digester left " .. tostring(fed.hopperItems)
             .. " manure in its hopper, potential " .. tostring(fed.potential))
     end,
@@ -623,14 +621,11 @@ test("renewable_energy_world_rural_gasifier", {
     end,
 })
 
--- Real buildings rolled the way the world rolls them: their rooms pick the finds and each find
--- picks its own square. The barn nearest the start (west of Muldraugh) gets the wind charger and
--- the digester; the hunting shack west of Riverside the gasifier and a pamphlet in the shack; the
--- deer stand north-west of Riverside, whose one room is up on level 1, the gasifier on the ground
--- below. Each stands outdoors on the ground within reach of its building, the wind charger at
--- least two squares out. The character visits each in turn as the garden light test does, and the
--- authority puts each building back before the character moves on. `z` is a level of the
--- building's room.
+-- Real buildings rolled the way the world rolls them: their rooms pick the finds and each find its
+-- square, outdoors on the ground within RuralFinds.REACH of the building (the wind charger needs
+-- open ground around it, so at least 2 out). The barn west of Muldraugh gets the
+-- wind charger and digester; the hunting shack west of Riverside the gasifier and a pamphlet; the
+-- deer stand, whose one room is on level 1 (`z`), the gasifier on the ground.
 local RURAL_PLACES = {
     { 10469, 10121, 0, finds = { wind = true, digester = true } },
     { 7067, 8632, 0, finds = { gasifier = true }, pamphlet = true },
@@ -671,7 +666,7 @@ test("renewable_energy_world_rural_finds_real_buildings", {
                     local at = answer.found[kind]
                     if expect(at, "rolled for certain, the building at " .. where .. " got no " .. kind) then
                         expect(at.outdoors and at.z == 0, "the " .. kind .. " by " .. where .. " stands indoors at " .. at.x .. "," .. at.y)
-                        expect(at.out >= (kind == "wind" and 2 or 1) and at.out <= 4,
+                        expect(at.out >= (kind == "wind" and 2 or 1) and at.out <= answer.reach,
                             "the " .. kind .. " by " .. where .. " stands " .. at.out .. " squares out from the building")
                     end
                 end

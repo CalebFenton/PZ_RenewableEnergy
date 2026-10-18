@@ -4,14 +4,15 @@ require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/GasLine/GasKit"
 
--- Fixtures of the biogas and gas tests (RenewableEnergyTestsBiogas.lua, RenewableEnergyTestsGas.lua),
--- added to RenewableEnergyTest. Digesters and gasifiers are records of the Global Object System on
--- the authority; the server handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua) build, drive
--- and read them by kind and place. A record handle is { x, y, z, square, kind }, and `object` is
--- this client's copy of its tile once it has its summary. Reads land in self.reads[label].
+-- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas.lua,
+-- RenewableEnergyTestsGasLine.lua, RenewableEnergyTestsWoodGas.lua), added to RenewableEnergyTest.
+-- Digesters and gasifiers are records of the Global Object System on the authority; the server
+-- handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua) build, drive and read them by kind
+-- and place. A record handle is { x, y, z, square, kind }, and `object` is this client's copy of
+-- its tile once it has its summary. Reads land in self.reads[label].
 
 local T = RenewableEnergyTest
-local Digester = RenewableEnergy.Digester
+local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
 
 -- What each record kind's tile and summary are on this client.
 local KINDS = {
@@ -309,6 +310,55 @@ end
 --- Queues every kitted generator delivering `watts`, whatever it powers, until the test ends.
 function T.gasLoad(self, watts)
     T.server(self, "gasLoad", { watts = watts })
+end
+
+-- What this client's copy of a generator's kit state shows once each job is done.
+local KIT_DONE = {
+    [GasKit.INSTALL] = function(state) return state ~= nil end,
+    [GasKit.REMOVE] = function(state) return state == nil end,
+    [GasKit.CONNECT] = function(state) return state ~= nil and state.source ~= nil end,
+    [GasKit.DISCONNECT] = function(state) return state ~= nil and state.source == nil end,
+    [GasKit.TO_PETROL] = function(state) return state ~= nil and state.mode == "petrol" end,
+    [GasKit.TO_GAS] = function(state) return state ~= nil and state.mode == "gas" end,
+}
+
+--- Queues the kit job `job` at `generator` (to the record `source` for Connect Gas Line), then a
+--- wait until this client's copy shows it done, since the next job's action checks that copy.
+function T.kitJob(self, generator, job, source)
+    T.gasJob(self, "kit", generator, job, source)
+    T.waitFor(self, function() return KIT_DONE[job](GasKit.stateOf(generator.object)) end,
+        "this client's copy of the generator after " .. job)
+end
+
+--- Queues fitting the kit to `generator`, with what that takes given first.
+function T.fitKit(self, generator)
+    T.giveMaterials(self, "kit", GasKit.materials(GasKit.INSTALL))
+    T.kitJob(self, generator, GasKit.INSTALL)
+end
+
+--- Queues fitting the kit and connecting the line to the record `source`, with what each takes
+--- given first; self.line is what the line took.
+function T.fitAndConnect(self, generator, source)
+    T.fitKit(self, generator)
+    T.step(function()
+        self.line = GasKit.materials(GasKit.CONNECT, generator.object, source.object)
+        T.giveMaterials(self, "line", self.line)
+    end)
+    T.kitJob(self, generator, GasKit.CONNECT, source)
+end
+
+local SIDES = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }
+local CORNERS = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } }
+
+--- A free outdoor square beside `square`, or on one of its corners if `corner`, or nil.
+function T.squareBeside(square, corner)
+    for _, offset in ipairs(corner and CORNERS or SIDES) do
+        local found = getSquare(square:getX() + offset[1], square:getY() + offset[2], square:getZ())
+        if RenewableEnergy.Debug.isFreeSquare(found, false) then
+            return found
+        end
+    end
+    return nil
 end
 
 -- Reads ------------------------------------------------------------------------------------------

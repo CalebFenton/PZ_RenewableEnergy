@@ -1,6 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Wind chargers: a source of the bank like a panel, on the game's wind.
+-- Wind chargers (Wind.lua, PowerBank/WindSource.lua, client Wind/*): a bank source on the game's
+-- wind, with its power curve, brake, storm breakage, blades and model.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
@@ -32,7 +33,7 @@ end
 
 -- A scoop rotor wired to a bank makes power once the wind is past its cut-in speed, none at it or
 -- with its brake on, and the status says why.
-test("renewable_energy_wind_scoop_feeds_bank", {
+test("renewable_energy_wind_scoop_cut_in_and_brake", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
         if not bank then return end
@@ -45,12 +46,13 @@ test("renewable_energy_wind_scoop_feeds_bank", {
             T.bankPass(self, bank, 0, { windKph = kph })
             T.step(function() self.passes[label] = bank.state end)
         end
+        local rated = Specs.wind.turbines.scoop.ratedKph
         T.batch(function()
-            pass("windy", 30)
+            pass("windy", rated)
             pass("cut-in", cutIn)
             pass("past cut-in", cutIn + 1)
             T.perform(self, "setBrake", { source = rotor.position, braked = true })
-            pass("braked", 30)
+            pass("braked", rated)
         end)
     end,
     validate = function(self)
@@ -62,7 +64,7 @@ test("renewable_energy_wind_scoop_feeds_bank", {
         end
         local windy = read("windy")
         if windy then
-            expect(windy.watts > 0, "the scoop rotor made nothing in a 30 km/h wind")
+            expect(windy.watts > 0, "the scoop rotor made nothing at its rated speed")
             T.expectNear("the bank's wind watts", self.passes.windy.status.windW, windy.watts, 0.01)
         end
         local calm = read("cut-in")
@@ -86,7 +88,7 @@ test("renewable_energy_wind_scoop_feeds_bank", {
 -- its rating at its rated speed, more for standing higher only up to the height cap; the
 -- alternator furls from its furl speed, and only the propeller and the alternator break, from
 -- their break speed.
-test("renewable_energy_wind_power_curve", {
+test("renewable_energy_wind_power_curve_rule", {
     validate = function()
         local wind = Specs.wind
         for kind, spec in pairs(wind.turbines) do
@@ -94,8 +96,11 @@ test("renewable_energy_wind_power_curve", {
                 return Wind.watts(spec, kph, z or 0, 0)
             end
             expect(watts(spec.cutInKph) == 0, kind .. " makes power at its cut-in speed")
-            T.expectNear(kind .. " halfway to its rated speed, as an eighth of its rating",
-                watts((spec.cutInKph + spec.ratedKph) / 2), spec.watts / 8, 0.001)
+            local midway = (spec.cutInKph + spec.ratedKph) / 2
+            if not Wind.furled(spec, midway) then
+                T.expectNear(kind .. " halfway to its rated speed, as an eighth of its rating",
+                    watts(midway), spec.watts / 8, 0.001)
+            end
             expect(watts(spec.ratedKph) == spec.watts, kind .. " makes " .. watts(spec.ratedKph) .. " W at its rated speed")
             if not spec.furlKph then
                 expect(watts(spec.ratedKph * 2) == spec.watts, kind .. " makes more than its rating above its rated speed")
@@ -144,13 +149,11 @@ test("renewable_energy_wind_charger_drawn_as_model", {
     end,
 })
 
--- Propeller and homemade alternator ------------------------------------------------------------
-
 -- Left unbraked in a wind of its break speed, a propeller's blades break (certain at this storm
 -- damage rate) and it makes nothing until a spare set goes on; a km/h less, or braked, it comes
 -- through whole. The menu offers Replace Blades, greyed until the character carries blades that
 -- fit.
-test("renewable_energy_wind_propeller_storm_and_blades", {
+test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
     instant = true,
     sandbox = { StormDamage = true, StormDamageRate = 1000 },
     run = function(self)
@@ -182,7 +185,7 @@ test("renewable_energy_wind_propeller_storm_and_blades", {
         T.waitFor(self, function() return not Wind.isBroken(self.left.object) end, "this client's copy of the new blades")
         T.batch(function()
             T.server(self, "carried", { types = { "RenewableEnergy.WoodenBlades" } })
-            T.bankPass(self, bank, 0, { windKph = 30 })
+            T.bankPass(self, bank, 0, { windKph = spec.ratedKph })
             T.step(function() self.mended = bank.state end)
         end)
     end,
@@ -240,7 +243,7 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
             pass("furled", spec.furlKph)
             pass("gale", spec.breakKph)
             T.setPartCondition(self, rack, CONTROLLER, 0, true)
-            pass("no controller", 30, 1000)
+            pass("no controller", spec.furlKph - 1, 1000)
         end)
     end,
     validate = function(self)

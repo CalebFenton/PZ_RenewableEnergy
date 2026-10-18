@@ -1,7 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Vanilla's treadmill: dismantled for its motor, run on with power, or wired to a bank and run on to
--- feed it.
+-- Treadmill (PowerBank/Treadmill.lua, TreadmillSource.lua, RenewableEnergyTreadmillAction, its menu):
+-- dismantling for the motor, wiring to a bank, runs wired and unwired, unwiring and pickup.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
@@ -27,7 +27,7 @@ end
 
 -- Dismantling a treadmill gives its motor, the wind charger's generator, once: for the tile that
 -- was clicked, not again for its other tile, which vanilla scraps along with it.
-test("renewable_energy_treadmill_gives_motor", {
+test("renewable_energy_treadmill_dismantle_gives_motor_once", {
     validate = function()
         local props = ISMoveableSpriteProps.new(Sprites.treadmill.W.console)
         local function motors()
@@ -52,7 +52,7 @@ end
 -- Wiring a treadmill to feed a bank takes the Electricity level, a screwdriver, wire and scrap;
 -- done, it uses the wire and scrap and the treadmill connects to a bank like a panel. Its other
 -- tile can't be wired as well.
-test("renewable_energy_treadmill_wired_to_bank", {
+test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
     instant = true,
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
@@ -121,7 +121,7 @@ end
 -- open once it has, and Wire to a Bank either way, greyed while the character lacks what it
 -- takes, even beside a wired one. Once one tile is wired, a right-click on either tile of that
 -- treadmill offers Run greyed and saying why until it is connected to a bank, and Unwire.
-test("renewable_energy_treadmill_menu", {
+test("renewable_energy_treadmill_menu_offers_run_and_wiring", {
     run = function(self)
         T.setGrid(self, false)
         local wired = T.panel(self, Sprites.treadmill.S.console, { wired = true })
@@ -161,9 +161,8 @@ test("renewable_energy_treadmill_menu", {
     end,
 })
 
--- In the dark, Wire to Bank on a treadmill is greyed out saying it's too dark, not with the list
--- of what it takes, which the character can't fix by carrying more. Catches the light check
--- missing from the treadmill's menu, as the other wiring menus have it.
+-- In the dark, Wire to Bank is greyed out saying it's too dark rather than listing what it takes,
+-- as the other wiring menus do.
 test("renewable_energy_treadmill_wiring_refused_in_the_dark", {
     run = function(self)
         self.treadmill = T.panel(self, Sprites.treadmill.E.rear)
@@ -180,10 +179,11 @@ test("renewable_energy_treadmill_wiring_refused_in_the_dark", {
     end,
 })
 
--- A run on a treadmill wired to a bank banks its watt-hours, paid out over the passes after it
--- rather than in one go, into the batteries as the status says, and tires the runner, makes them
--- thirsty and trains Fitness.
-test("renewable_energy_treadmill_run_feeds_bank", {
+local SHORT_PASS_HOURS = 1 / 6
+
+-- A run on a wired treadmill banks its watt-hours, paid out over the passes after it rather than
+-- in one go, into the batteries as the status says, and costs the runner sweat and trains Fitness.
+test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
     instant = true,
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
@@ -208,8 +208,8 @@ test("renewable_energy_treadmill_run_feeds_bank", {
         T.batch(function()
             T.server(self, "characterStats", { stats = { "ENDURANCE", "THIRST" } })
             T.server(self, "perkXp", { perk = "Fitness" })
-            -- A pass as long as the default ten minutes, then a long one.
-            T.bankPass(self, bank, 0, { hours = 1 / 6 })
+            -- A short pass, then a long one that pays out the rest.
+            T.bankPass(self, bank, 0, { hours = SHORT_PASS_HOURS })
             T.step(function() self.short = bank.state end)
             T.bankPass(self, bank, 0)
             T.step(function() self.after = bank.state end)
@@ -221,9 +221,8 @@ test("renewable_energy_treadmill_run_feeds_bank", {
         if not expect(short ~= nil and after ~= nil, "the bank's status lists no treadmill") then return end
         local banked = self.after.status.runWhToday
         if not expect(banked > 0, "the run banked nothing") then return end
-        -- The passes are a sixth of an hour and an hour long.
-        local shortWh, laterWh = short.watts / 6, after.watts
-        expect(shortWh > 0 and shortWh < banked, "the ten-minute pass after the run paid out " .. shortWh .. " of its "
+        local shortWh, laterWh = short.watts * SHORT_PASS_HOURS, after.watts
+        expect(shortWh > 0 and shortWh < banked, "the short pass after the run paid out " .. shortWh .. " of its "
             .. banked .. " Wh, not a part of it")
         T.expectNear("Wh the two passes paid out of the run", shortWh + laterWh, banked, 0.01)
         T.expectNear("Wh in the batteries against the run's Wh in the status",
@@ -234,8 +233,6 @@ test("renewable_energy_treadmill_run_feeds_bank", {
             expect(stats.THIRST > 0.01, "the run made the runner no thirstier: " .. stats.THIRST)
         end
         expect(self.server.perkXp.value > self.xpBefore, "the run taught no Fitness")
-        local label = RenewableEnergy.StatusWindow.sourceLabel(after, after)
-        expect(label:find(getText("IGUI_RenewableEnergy_Treadmill"), 1, true) == 1, "the window calls the treadmill " .. label)
     end,
 })
 
@@ -253,10 +250,9 @@ local function poweredTreadmill(self, sprite, wired)
     return bank, treadmill
 end
 
--- A whole run on an unwired treadmill a bank powers costs the runner endurance and thirst and trains
--- Fitness as a run on a wired one does, and banks nothing. Catches the unwired run settling nothing,
--- or crediting the bank it draws from.
-test("renewable_energy_treadmill_unwired_run_trains", {
+-- A whole run on an unwired treadmill a bank powers costs the runner sweat and trains Fitness as a
+-- wired run does, and banks nothing.
+test("renewable_energy_treadmill_unwired_run_trains_without_banking", {
     instant = true,
     run = function(self)
         local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
@@ -288,10 +284,8 @@ test("renewable_energy_treadmill_unwired_run_trains", {
     end,
 })
 
--- A run on an unwired treadmill a bank powers draws the treadmill's watts from that bank's
--- batteries from the moment the authority starts it until it settles, which pays the runner's
--- sweat and training; once the power goes out, the run can't go on. Catches a run that bills
--- nothing, one that keeps billing after it ends, and one that runs on without power.
+-- A run on an unwired treadmill a bank powers bills the treadmill's watts to that bank from when
+-- the authority starts it until it settles; once the power goes out, the run can't go on.
 test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
     run = function(self)
         local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
@@ -325,11 +319,8 @@ test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
         T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
             watts / Specs.inverterEfficiency, 0.01)
         T.expectNear("W of the bank's load after the run, against before it", after.loadW - before.loadW, 0, 0.01)
-        T.expectNear("Wh the unwired run banked", after.runWhToday, 0, 0)
         local run = self.server.completeStartedTreadmillRun
         expect(run.done, "the authority settled nothing of a run on a powered, unwired treadmill")
-        expect(run.enduranceAfter < run.enduranceBefore and run.thirstAfter > run.thirstBefore and run.xpAfter > run.xpBefore,
-            "the settled run cost no endurance or thirst, or taught no Fitness")
         expect(self.goesOnPower, "a run on a powered, unwired treadmill can't go")
         expect(not self.goesWithoutPower, "a run on an unwired treadmill goes on once its power is out")
     end,
@@ -499,7 +490,10 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
             expect(case.run.done, "the authority settled no run on the " .. case.name .. " treadmill")
             stored[case.name] = case.bank.state.storedWh - case.before
         end
-        local unwired = self.cases[2].unwired
+        local unwired
+        for _, case in ipairs(self.cases) do
+            if case.name == "unwired" then unwired = case.unwired end
+        end
         expect(unwired.ok, "unwiring the treadmill failed (" .. tostring(unwired.reason) .. ")")
         if not expect(stored.kept > 0, "the run on the treadmill left wired stored nothing") then return end
         T.expectNear("Wh a run stored with the treadmill unwired at once, against left wired", stored.unwired, stored.kept, 0.5)

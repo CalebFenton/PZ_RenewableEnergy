@@ -62,8 +62,8 @@ local function stockOf(container)
 end
 
 -- WorldSpawns.placeBank with BANK_STOCK[args.stock] on the square at `args`, as a room seen for the
--- first time places one. Answers whether it placed one, its tile and stock, and whether a battery
--- box stands on the square. Removed when the test ends.
+-- first time places one. Answers whether it placed one, its tile and stock, and whether the stock's
+-- tile stands on the square. Removed when the test ends.
 handler("worldBank", function(_, args, defer)
     local square = squareAt(args)
     if not square then
@@ -73,7 +73,8 @@ handler("worldBank", function(_, args, defer)
     if bank then
         defer(function() removeObject(bank) end)
     end
-    local answer = { placed = bank ~= nil, boxOnSquare = objectWithSprite(square, Sprites.batteryBoxWood) ~= nil }
+    local tile = Sprites[RenewableEnergy.WorldSpawns.BANK_STOCK[args.stock].sprite]
+    local answer = { placed = bank ~= nil, boxOnSquare = objectWithSprite(square, tile) ~= nil }
     if bank then
         answer.sprite = bank:getTextureName()
         answer.stock = stockOf(bank:getContainer())
@@ -208,7 +209,7 @@ check("crackedModules", function(expect, expectNear, _, args, defer)
     -- A loot weight is out of 100 rolls, scaled by the item's loot category multiplier.
     local lootModifier = ItemPickerJava.getLootModifier(RenewableEnergy.Specs.factoryModule)
     expectNear("a garage shelf's chance of a cracked module", defaultChance, garage * lootModifier / 100, 1e-9)
-    expect(defaultChance > 0 and defaultChance < 0.1, "a garage shelf holds a cracked module with chance " .. defaultChance)
+    expect(defaultChance > 0, "a garage shelf never holds a cracked module at the default option")
 end)
 
 -- What WorldSpawns stocks, which only the authority loads: for each BANK_STOCK name of

@@ -36,7 +36,7 @@ local SITES_DEFAULT = 75
 RuralFinds.PAMPHLET_CHANCE = 0.5
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
 -- Squares out from a building's bounds a find may stand on, and that must be loaded first.
-local REACH = 4
+RuralFinds.REACH = 4
 -- The highest level looked at for a building's rooms: a deer stand's one room is on level 1.
 local HIGHEST = 1
 
@@ -172,7 +172,7 @@ RuralFinds.FINDS = {
     wind = {
         odds = 30,
         qualifies = function(def) return hasRoom(def, BARN) end,
-        square = function(def) return squareBy(def, REACH, inTheOpen) end,
+        square = function(def) return squareBy(def, RuralFinds.REACH, inTheOpen) end,
         -- The old farm wind charger, its wooden blades long broken and its brake set.
         place = function(square)
             return build(square, randomOf(Sprites.windPropeller.wood),
@@ -285,8 +285,9 @@ local CHUNK_SIZE = getChunkSizeInSquares()
 
 -- Whether every chunk within REACH of the building is loaded: one square per chunk tells.
 function RuralFinds.surroundingsLoaded(def)
-    local fromX, toX = math.floor((def:getX() - REACH) / CHUNK_SIZE), math.floor((def:getX2() + REACH) / CHUNK_SIZE)
-    local fromY, toY = math.floor((def:getY() - REACH) / CHUNK_SIZE), math.floor((def:getY2() + REACH) / CHUNK_SIZE)
+    local reach = RuralFinds.REACH
+    local fromX, toX = math.floor((def:getX() - reach) / CHUNK_SIZE), math.floor((def:getX2() + reach) / CHUNK_SIZE)
+    local fromY, toY = math.floor((def:getY() - reach) / CHUNK_SIZE), math.floor((def:getY2() + reach) / CHUNK_SIZE)
     for cx = fromX, toX do
         for cy = fromY, toY do
             if not getSquare(cx * CHUNK_SIZE, cy * CHUNK_SIZE, 0) then

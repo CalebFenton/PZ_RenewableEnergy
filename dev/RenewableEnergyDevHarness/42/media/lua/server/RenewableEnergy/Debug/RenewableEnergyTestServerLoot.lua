@@ -103,9 +103,6 @@ local function checkSubList(expect, where, name, stashTables)
     expect(ItemPickerJava.getItemContainer(room, container, nil, false) ~= nil, where .. ": the game has no " .. name)
 end
 
--- Every entry names an item that exists, since the game drops an unknown item silently, and sits
--- once in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
--- table or a corpse's outfit list.
 check("lootListsInUse", function(expect)
     local D = distributions(expect)
     if not D then
@@ -143,8 +140,6 @@ check("lootListsInUse", function(expect)
     end
 end)
 
--- Every list actually hands out every item it lists, through the game's own rolls. The loot
--- rarity options are at their maximum, so a few rolls are enough even for the rarest entries.
 check("lootItemsSpawn", function(expect)
     if not distributions(expect) then
         return
@@ -226,8 +221,6 @@ local function listsContainAll(list, vanilla)
     return true
 end
 
--- The utility vans keep every vanilla builder's item and get the mod's own truck bed; trailers
--- can roll a camper's.
 check("lootVehicleTables", function(expect)
     local byVehicle = VehicleDistributions[1]
     local vanillaBed = VehicleDistributions.ConstructionWorkerTruckBed
@@ -252,11 +245,7 @@ check("lootVehicleTables", function(expect)
         "the camper trailer lacks the camper's vanilla items")
 end)
 
--- Each loot rarity option scales the weights of its items in every list, the mod's own lists
--- included, for each row of `args.rows`. At 0 it takes its items out of every list rather than
--- leaving them at weight 0, because ItemPickerJava adds the zombie density bonus to every weight,
--- so they would still spawn in towns; the other options' items stay. Applying the options again,
--- as a second load does, replaces the entries instead of adding more.
+-- For each row of `args.rows`, applied twice: see renewable_energy_loot_rarity_options_scale_weights.
 check("lootRarityOptions", function(expect, expectNear, _, args, defer)
     local D = distributions(expect)
     if not D then
@@ -337,13 +326,9 @@ local function worldCrate(square, containerType, defer)
     return crate:getContainer()
 end
 
--- Batteries that loot hands out hold a part charge, once: a refill of the container, as loot
--- respawn does, leaves a battery already there alone, as it does one whose charge came from
--- anywhere else. Each container is filled the way the game fills it (ItemPickerJava.fillContainer):
--- one outside any room rolls the "all" table of its type, here one that rolls the mod's batteries,
--- and one of a corpse's type rolls the corpse lists; a bag in each holds a battery, as a looted bag
--- can. The arrow board tests cover vehicle fills, which stock the trailer's battery box. `args` is
--- a free outdoor square.
+-- Containers filled as the game fills them (ItemPickerJava.fillContainer): one outside any room
+-- rolls its type's "all" table, here the probe's, and one of a corpse's type the corpse lists; a bag
+-- in each holds a battery. Vehicle fills are the arrow board tests'. `args` is a free outdoor square.
 check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
     if not distributions(expect) then
         return
@@ -416,12 +401,9 @@ local function sampleSquares(character, wanted)
     return squares
 end
 
--- Loot respawn refills an explored, looted container that isn't an IsoThumpable by calling
--- ItemPickerJava.fillContainer(container, nil) (LootRespawn.respawnInContainer). A player's battery
--- bank is an IsoGenerator; if any room handed its container type a loot list, a bank someone took a
--- battery out of would refill with free batteries every respawn. The objects of the Sprites fields
--- `args.sprites` are built from the tiles, with the containers their properties give, as placing
--- them does, but never added to the square.
+-- Respawn calls ItemPickerJava.fillContainer(container, nil) on looted containers that aren't
+-- IsoThumpables, as a bank is not. The objects of `args.sprites` get their tiles' containers but
+-- are never added to the square.
 check("lootPlayerContainers", function(expect, _, player, args)
     local squares = sampleSquares(player, 4)
     if not expect(#squares >= 2, "no loaded room near the character") then

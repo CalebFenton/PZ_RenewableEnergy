@@ -37,7 +37,7 @@ GasKit.HOSE_SQUARES = 5
 -- passes, after a long absence too.
 GasKit.PHANTOM_FUEL = 2
 -- A generator carries this many watts on gas, against what vanilla bills (Specs.wattsPerFuel): a
--- whole house is about 1300 W and an Inverter/Charger charging off the generator 1500 W. Clean gas
+-- whole house is about 1300 W and an Inverter/Charger charging off the generator 1000 W. Clean gas
 -- carries both; a gasifier's dirty output (Gasifier.outputShare halves it) still carries the
 -- house but stalls with the bank charging; both dirty, it carries a fridge, a freezer, a TV and
 -- the lights but not the cooking or the laundry.

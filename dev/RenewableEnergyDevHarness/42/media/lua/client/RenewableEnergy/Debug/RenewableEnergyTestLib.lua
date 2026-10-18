@@ -6,6 +6,7 @@ require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/UI/StatusWindow"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (dev/harness/mod/42/media/lua/client/PZHarness/TestLib.lua explains the runner and the rules
@@ -353,6 +354,23 @@ function T.perform(self, command, args, item)
     T.server(self, "perform", { command = command, args = args, item = item })
 end
 
+--- Queues T.perform and leaves its answer in self[key].
+function T.performInto(self, key, command, args, item)
+    T.perform(self, command, args, item)
+    T.step(function() self[key] = self.server.perform end)
+end
+
+--- The charge of the first `fullType` in this client's copy of `bank`, or -1.
+function T.copyUses(bank, fullType)
+    local item = T.copyItem(bank, fullType)
+    return item and item:getCurrentUsesFloat() or -1
+end
+
+--- Checks that the panel fixture `panel` connected, saying why not.
+function T.expectConnected(panel)
+    return T.expect(panel.connected, "connecting the panel failed (" .. tostring(panel.reason) .. ")")
+end
+
 --- Queues switching `bank` on with the bank system's command, and a wait until this client's copy
 --- of its summary says it is on, whatever the bank then does.
 function T.switchOn(self, bank)
@@ -375,6 +393,79 @@ end
 --- Chooses a context menu option the way a click does.
 function T.choose(option)
     option.onSelect(option.target, option.param1, option.param2, option.param3, option.param4)
+end
+
+-- Menus and the status window -----------------------------------------------------------------
+
+function T.newContext()
+    return ISContextMenu.get(0, 0, 0)
+end
+
+function T.optionNamed(menu, name)
+    return menu and menu.getOptionFromName and menu:getOptionFromName(name)
+end
+
+function T.tooltipOf(option)
+    return option and option.toolTip and option.toolTip.description
+end
+
+--- Stands the character next to `square` so the walk vanilla's walkAdj queues first has no way to
+--- go (T.standNextTo), then makes that walk, as the menu does before an action: a multiplayer
+--- server refuses a job from afar. False, with the walk missing from the test, when it fails.
+function T.walkTo(self, square, what)
+    T.standNextTo(square)
+    return T.need(self, luautils.walkAdj(T.player(), square, true), "a walk to " .. what)
+end
+
+--- Opens the window of this client's copy of self.bank, closed again when the test ends, and
+--- queues a wait until the bank's status has come and the window has drawn it.
+function T.openWindow(self)
+    local window = RenewableEnergy.StatusWindow.open(0, self.bank.object)
+    self.window = window
+    T.defer(self, function() window:close() end)
+    T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
+end
+
+-- Crafting -------------------------------------------------------------------------------------
+
+--- The test name for `recipe` in `system`'s tests: "solar", "RenewableEnergy_TakeApartSolarCellCharger",
+--- "returns_x" -> "renewable_energy_solar_craft_take_apart_solar_cell_charger_returns_x".
+function T.craftName(system, recipe, behavior)
+    return "renewable_energy_" .. system .. "_craft_" .. T.snake((recipe:gsub("^RenewableEnergy_", "")))
+        .. (behavior and "_" .. behavior or "")
+end
+
+--- The given inputs (this client's copies, T.craftTest's self.items.inputs) of `fullType`.
+function T.inputsOf(self, fullType)
+    local found = {}
+    for _, item in ipairs(self.items.inputs or {}) do
+        if item:getFullType() == fullType then
+            table.insert(found, item)
+        end
+    end
+    return found
+end
+
+--- Queues reading the authority's copies of `types` and its litres of `fluids` into
+--- self.server.carried (see the carried handler).
+function T.readCarried(self, types, fluids)
+    T.server(self, "carried", { types = types, fluids = fluids })
+end
+
+--- The authority's first item of `fullType` from the last T.readCarried, or nil.
+function T.carriedFirst(self, fullType)
+    local items = self.server.carried and self.server.carried.items[fullType]
+    return items and items[1]
+end
+
+--- Queues setting the repair count of the carried `fullType` items on the authority, and a wait
+--- until this client's copy has it: the craft tests its own copy.
+function T.setRepaired(self, fullType, repaired)
+    T.server(self, "setRepaired", { type = fullType, repaired = repaired })
+    T.waitFor(self, function()
+        local item = T.carried(fullType)
+        return item ~= nil and item:getHaveBeenRepaired() == repaired
+    end, "this client's " .. fullType .. " repaired " .. repaired .. "x")
 end
 
 -- Data -----------------------------------------------------------------------------------------

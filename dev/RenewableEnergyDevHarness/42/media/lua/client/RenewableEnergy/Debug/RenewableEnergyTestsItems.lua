@@ -16,11 +16,8 @@ end
 
 -- Items -----------------------------------------------------------------------------------------
 
--- The inventory and the crafting window draw an item's icon, the floor its ground model, and a
--- missing ItemName.json entry shows the full type, since the scripts set no DisplayName
--- (Translator.getItemNameFromFullType). The promo and the art list the items by hand
--- (Debug.ITEMS, Debug.PART_ITEMS): a new item missing there, or a listed one renamed, would
--- silently drop out of them.
+-- Every item of the mod's shows an icon, a name and a ground model, and is listed for the promo and
+-- the art (Debug.ITEMS, Debug.PART_ITEMS), which would otherwise silently leave it out.
 test("renewable_energy_items_have_icons_names_and_ground_models", {
     validate = function()
         local listed = {}
@@ -50,7 +47,7 @@ test("renewable_energy_items_have_icons_names_and_ground_models", {
 
 -- A homemade module comes out of the box at its cap, below a factory module's, and the
 -- electrolyte bottle full of acid.
-test("renewable_energy_items_new_start_right", {
+test("renewable_energy_items_new_items_start_full", {
     validate = function()
         local module = instanceItem("RenewableEnergy.HomemadeSolarModule")
         local factoryCap = instanceItem("RenewableEnergy.SolarModule"):getConditionMax()
@@ -66,11 +63,9 @@ test("renewable_energy_items_new_start_right", {
 
 -- Recipes -------------------------------------------------------------------------------------
 
--- Every recipe of the mod's resolves by its bare name in module Base (research and the magazines
--- look it up so), and names only items that exist: a missing item makes a recipe impossible
--- without a word. Expanding "Possible Items" in the crafting window reads the icon of every item
--- an input accepts (ISCraftInventoryPanel.populate), and throws for one without. A recipe that
--- fails to load fails the craft, magazine and research tests that name it.
+-- Every recipe of the mod's resolves by its bare name in module Base, as research and the magazines
+-- look it up, and names only items that exist and have icons: the crafting window's "Possible Items"
+-- throws on one without (ISCraftInventoryPanel.populate).
 test("renewable_energy_items_recipes_load", {
     validate = function()
         local names = T.recipeNames()
@@ -105,44 +100,14 @@ test("renewable_energy_items_recipes_load", {
 
 -- Learning ------------------------------------------------------------------------------------
 
--- What each magazine teaches: its crafting recipes and its build-menu recipes (entity scripts).
 local MAGAZINES = {
-    ["RenewableEnergy.HomesteadPowerMag1"] = {
-        "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
-        "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal",
-        "RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood", "RenewableEnergy_MakeSolarWallMetal",
-        "RenewableEnergy_MakeSolarRackWood", "RenewableEnergy_MakeSolarRackMetal",
-        "RenewableEnergy_RepairCrackedModule",
-    },
-    ["RenewableEnergy.HomesteadPowerMag2"] = {
-        "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal",
-        "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe",
-        "RenewableEnergy_MakeHomemadeSolarModule", "RenewableEnergy_ReglazeModule", "RenewableEnergy_ReconditionBattery",
-        "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery", "RenewableEnergy_StripL16Battery",
-        "RenewableEnergy_StripJarBattery", "RenewableEnergy_RecastBatteryPlates",
-        "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
-        "RenewableEnergy_RebuildCarBattery", "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery",
-        "RenewableEnergy_MakeJarBattery", "RenewableEnergy_MakeBatteryPlatePattern", "RenewableEnergy_PressBatteryPlateMold",
-        "RenewableEnergy_FireBatteryPlateMold",
-    },
-    ["RenewableEnergy.HomesteadPowerMag3"] = {
-        "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater",
-        builds = {
-            "RenewableEnergy_BarrelDigester", "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
-        },
-    },
-    ["RenewableEnergy.FemaPamphlet"] = {
-        "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeVinegarMildewSpray", "RenewableEnergy_MakeVinegarAphidSpray",
-        builds = { "RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier" },
-    },
-    ["RenewableEnergy.HomesteadPowerMag4"] = {
-        "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
-        "RenewableEnergy_MakeHomemadeAlternator",
-        builds = {
-            "RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
-            "RenewableEnergy_AlternatorWindCharger",
-        },
-    },
+    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
+    "RenewableEnergy.HomesteadPowerMag4", "RenewableEnergy.FemaPamphlet",
+}
+
+local RESEARCHABLE = {
+    "RenewableEnergy.SolarModule", "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter",
+    "RenewableEnergy.InverterCharger", "RenewableEnergy.ChargeController",
 }
 
 -- Every recipe of the mod's a character can learn: the crafting recipes and the build menu's.
@@ -154,8 +119,16 @@ local function learnable()
     return names
 end
 
+local function toList(javaList)
+    local list = {}
+    for i = 0, (javaList and javaList:size() or 0) - 1 do
+        table.insert(list, javaList:get(i))
+    end
+    return list
+end
+
 -- Which of the mod's recipes this client's character has learned; the knownRecipes handler reads
--- the authority's list. A multiplayer server teaches and sends what it taught.
+-- the authority's list.
 local function knownHere()
     local known, list = {}, player():getKnownRecipes()
     for _, name in ipairs(learnable()) do
@@ -166,8 +139,8 @@ local function knownHere()
     return known
 end
 
--- Queues a wait until the authority and this client both know `recipes`, as far as a fixture's
--- wait goes, and leaves what each knows in self.known.
+-- Waits until the authority and this client both know `recipes`, and leaves what each knows in
+-- self.known.
 local function awaitKnown(self, recipes)
     local function knowsAll(known)
         for _, name in ipairs(recipes) do
@@ -186,11 +159,12 @@ end
 
 -- Expects `what` to have taught exactly `recipes` of the mod's, on both sides.
 local function expectTaught(self, what, recipes)
+    expect(#recipes > 0, what .. " teaches nothing")
     local expected = {}
     for _, name in ipairs(recipes) do
         expected[name] = true
     end
-    for side, known in pairs(self.known) do
+    for side, known in pairs(self.known or {}) do
         for _, name in ipairs(recipes) do
             expect(known[name], what .. " did not teach " .. name .. " on the " .. side)
         end
@@ -201,25 +175,23 @@ local function expectTaught(self, what, recipes)
 end
 
 -- Forgets every recipe of the mod's on both sides until the test ends, so that what a test teaches
--- is all that is known; the scenario taught them all.
+-- is all that is known.
 local function forgetAll(self, p)
     T.forgetRecipes(p)
     T.defer(self, function() T.learnRecipes(p) end)
-    -- The build menu's recipes, which T.forgetRecipes leaves out.
+    -- T.forgetRecipes leaves out the build menu's.
     local builds = Debug.buildRecipes()
     PZHarness.Fixtures.forgetRecipes(p, builds)
     T.defer(self, function() PZHarness.Fixtures.learnRecipes(p, builds) end)
     T.server(self, "forgetRecipesUntilEnd", { names = builds })
 end
 
--- Reading a magazine through the vanilla action teaches exactly its recipes, the crafting ones
--- each a recipe that has to be learned, and its build-menu recipes.
-for magazine, crafts in pairs(MAGAZINES) do
-    local recipes = {}
-    for _, list in ipairs({ crafts, crafts.builds or {} }) do
-        for _, name in ipairs(list) do
-            table.insert(recipes, name)
-        end
+-- Reading a magazine through the vanilla action teaches, on both sides, exactly the recipes its
+-- script lists, each a crafting recipe that needs learning or a build-menu recipe.
+for _, magazine in ipairs(MAGAZINES) do
+    local function recipes()
+        local script = getScriptManager():getItem(magazine)
+        return toList(script and script:getLearnedRecipes())
     end
     test("renewable_energy_items_read_" .. snakeName(magazine) .. "_teaches_its_recipes", {
         instant = true,
@@ -227,57 +199,34 @@ for magazine, crafts in pairs(MAGAZINES) do
             local p = player()
             forgetAll(self, p)
             T.give(self, "magazine", { { type = magazine } })
-            -- onCreateRecipeMagazine gives every copy a literatureTitle, and a title read within
-            -- the literature cooldown teaches nothing (ISReadABook:complete), so the title is
-            -- forgotten on both sides first, or a second run in the same world would fail.
+            -- A title read within the literature cooldown teaches nothing (ISReadABook:complete),
+            -- so a rerun in the same world forgets it first.
             T.server(self, "forgetLiterature", { type = magazine })
             T.step(function()
                 local item = self.items.magazine[1]
                 p:getReadLiterature():remove(item:getModData().literatureTitle)
                 ISTimedActionQueue.add(ISReadABook:new(p, item))
             end)
-            awaitKnown(self, recipes)
+            awaitKnown(self, recipes())
         end,
         validate = function(self)
-            for _, name in ipairs(crafts) do
-                local recipe = getScriptManager():getCraftRecipe(name)
-                expect(recipe ~= nil and recipe:needToBeLearn(), magazine .. " teaches " .. name .. ", which needs no learning")
+            local builds = {}
+            for _, name in ipairs(Debug.buildRecipes()) do
+                builds[name] = true
             end
-            expectTaught(self, "reading " .. magazine, recipes)
+            for _, name in ipairs(recipes()) do
+                local recipe = getScriptManager():getCraftRecipe(name)
+                expect(builds[name] or (recipe ~= nil and recipe:needToBeLearn()),
+                    magazine .. " teaches " .. name .. ", which is no recipe that needs learning")
+            end
+            expectTaught(self, "reading " .. magazine, recipes())
         end,
     })
 end
 
--- Cutting up a fridge with a blowtorch also gives its compressor, which a digester uses to fill
--- propane tanks.
-test("renewable_energy_items_fridge_scraps_to_compressor", {
-    validate = function()
-        local fridge = ISMoveableDefinitions:getInstance().getScrapDefinition("Fridge")
-        local found = false
-        -- Moveables.lua adds it with a static size, as vanilla adds the fridge's other scrap.
-        for _, entry in ipairs(fridge and fridge.returnItemsStatic or {}) do
-            found = found or entry.returnItem == RenewableEnergy.Digester.COMPRESSOR
-        end
-        expect(found, "scrapping a fridge doesn't list " .. tostring(RenewableEnergy.Digester.COMPRESSOR))
-    end,
-})
-
--- Researching found hardware teaches exactly what to build from it: the item's own recipe
--- (OutputMapper) and its ResearchableRecipes.
-local RESEARCH = {
-    ["RenewableEnergy.SolarModule"] = {
-        "RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood", "RenewableEnergy_MakeSolarWallMetal",
-        "RenewableEnergy_MakeSolarRackWood", "RenewableEnergy_MakeSolarRackMetal",
-    },
-    ["RenewableEnergy.PlugInInverter"] = { "RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal" },
-    ["RenewableEnergy.PowerInverter"] = { "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal" },
-    ["RenewableEnergy.InverterCharger"] = {
-        "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal", "RenewableEnergy_MakeSolarFailsafe",
-    },
-    ["RenewableEnergy.ChargeController"] = { "RenewableEnergy_MakeChargeController" },
-}
-
-for fullType, recipes in pairs(RESEARCH) do
+-- Researching found hardware teaches, on both sides, exactly what the game offers to research from
+-- it: its own recipe and its ResearchableRecipes.
+for _, fullType in ipairs(RESEARCHABLE) do
     test("renewable_energy_items_research_" .. snakeName(fullType) .. "_teaches_its_recipes", {
         instant = true,
         run = function(self)
@@ -289,11 +238,17 @@ for fullType, recipes in pairs(RESEARCH) do
                 T.setPerk(self, perk, 10)
             end
             T.give(self, "hardware", { { type = fullType } })
+            -- Filled before the waits read it, once the recipes are forgotten.
+            self.offered = {}
             T.step(function()
-                ISTimedActionQueue.add(ISResearchRecipe:new(p, self.items.hardware[1]))
+                local item = self.items.hardware[1]
+                for _, name in ipairs(toList(item:getScriptItem():getResearchableRecipes(p))) do
+                    table.insert(self.offered, name)
+                end
+                ISTimedActionQueue.add(ISResearchRecipe:new(p, item))
             end)
-            awaitKnown(self, recipes)
+            awaitKnown(self, self.offered)
         end,
-        validate = function(self) expectTaught(self, "researching " .. fullType, recipes) end,
+        validate = function(self) expectTaught(self, "researching " .. fullType, self.offered or {}) end,
     })
 end

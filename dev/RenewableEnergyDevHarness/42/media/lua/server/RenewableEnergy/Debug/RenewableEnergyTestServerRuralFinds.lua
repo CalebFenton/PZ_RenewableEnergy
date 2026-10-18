@@ -155,7 +155,8 @@ handler("ruralFindAt", function(_, args)
     local before = pamphletTotal(def)
     forget()
     local found = track(RuralFinds.roll(def, nil, true), defer, def)
-    local answer = { ready = true, qualifies = RuralFinds.findsFor(def), found = found, pamphlets = pamphletTotal(def) - before }
+    local answer = { ready = true, qualifies = RuralFinds.findsFor(def), found = found, pamphlets = pamphletTotal(def) - before,
+        reach = RuralFinds.REACH }
     for i = #undo, 1, -1 do
         undo[i]()
     end

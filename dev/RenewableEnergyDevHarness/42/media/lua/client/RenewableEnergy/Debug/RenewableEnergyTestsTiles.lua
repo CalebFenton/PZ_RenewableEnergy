@@ -5,10 +5,10 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "Moveables/ISMoveableSpriteProps"
 require "Moveables/ISMoveableDefinitions"
+require "RenewableEnergy/Biogas/Digester"
 
--- Tests of the tiles in renewable_energy.tiles and the pack, as Sprites.lua names them: their
--- pictures, overlays and properties, and placing and picking them up. See
--- RenewableEnergyTestLib.lua for how the runner works.
+-- The mod's tiles (Sprites.lua) and how its objects move (Moveables.lua, PlaceTracker.lua): pictures,
+-- overlays, tile properties, rotating, placing, picking up and scrapping.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
@@ -53,6 +53,7 @@ local function properties(spriteName)
     return sprite and sprite:getProperties()
 end
 
+-- Every tile and overlay Sprites.lua names exists and has a picture in the pack.
 test("renewable_energy_tiles_have_pictures", {
     validate = function()
         local names = { Sprites.crate }
@@ -69,6 +70,7 @@ test("renewable_energy_tiles_have_pictures", {
     end,
 })
 
+-- Each moveable item places the tile of its own kind and material.
 test("renewable_energy_tiles_moveable_items_place_their_tiles", {
     validate = function()
         for _, placed in ipairs(PLACED) do
@@ -80,6 +82,7 @@ test("renewable_energy_tiles_moveable_items_place_their_tiles", {
     end,
 })
 
+-- Sprites.kindOf names every placed tile's kind, facing and material, and no overlay's or vanilla tile's.
 test("renewable_energy_tiles_kind_of_reads_every_placed_tile", {
     validate = function()
         for _, placed in ipairs(PLACED) do
@@ -116,8 +119,8 @@ test("renewable_energy_tiles_mounts_rotate", {
     end,
 })
 
--- Every battery a bank can hold shows in its own slot, as its type, and the meter reads its
--- charge: it climbs with the charge, through every level, from its lowest empty to its highest full.
+-- Each battery in a bank shows in its own slot as its type, and the meter climbs with the charge
+-- through every level, from the lowest empty to the highest full.
 test("renewable_energy_tiles_bank_overlays", {
     validate = function()
         local levels
@@ -174,19 +177,57 @@ test("renewable_energy_tiles_bank_switch_sounds", {
     end,
 })
 
--- Scrapping a bank finishes on the server, which only has shared Lua, so the definitions for the
--- banks' tile Materials must come from shared Lua, with an Electricity check and parts back.
-test("renewable_energy_tiles_bank_scrap_definitions", {
-    validate = function()
-        local defs = ISMoveableDefinitions:getInstance()
-        for field in pairs(Sprites.bankFill) do
-            local material = "RenewableEnergy" .. field:gsub("^%l", string.upper)
-            local def = defs.getScrapDefinition(material)
-            if expect(def ~= nil and defs.isScrapDefinitionValid(material), material .. " has no valid scrap definition") then
-                expect(def.perk == Perks.Electricity, "scrapping " .. material .. " does not use Electricity")
-                expect(#def.returnItemsStatic > 0, "scrapping " .. material .. " returns nothing")
-            end
+-- What dismantling the tile `sprite` gives, at the top level of the skill its scrap definition uses,
+-- counted by item over `rolls` scraps, which vanilla rolls per item.
+local function scrapYield(sprite, rolls)
+    local counts = {}
+    local props = ISMoveableSpriteProps.new(sprite)
+    for _ = 1, rolls do
+        for _, fullType in ipairs((props:getScrapItemsList(T.player()) or {}).usable or {}) do
+            counts[fullType] = (counts[fullType] or 0) + 1
         end
+    end
+    return counts, props
+end
+
+local function scrapPerk(sprite)
+    local props = ISMoveableSpriteProps.new(sprite)
+    local def = props.material and ISMoveableDefinitions:getInstance().getScrapDefinition(props.material)
+    return def and def.perk
+end
+
+local SCRAP_ROLLS = 20
+
+-- Dismantling a bank, with Electricity, gives parts back. Its definition is in shared Lua, because
+-- scrapping completes on the server.
+test("renewable_energy_tiles_bank_scraps_to_parts", {
+    run = function(self) T.setPerk(self, Perks.Electricity, 10) end,
+    validate = function()
+        for field in pairs(Sprites.bankFill) do
+            local counts, props = scrapYield(Sprites[field], SCRAP_ROLLS)
+            expect(props.canScrap, field .. " can't be dismantled")
+            expect(scrapPerk(Sprites[field]) == Perks.Electricity, "dismantling " .. field .. " doesn't use Electricity")
+            local any = false
+            for _ in pairs(counts) do
+                any = true
+            end
+            expect(any, "dismantling " .. field .. " gives nothing")
+        end
+    end,
+})
+
+-- Cutting up a vanilla fridge also gives its compressor, which a digester needs to fill propane
+-- tanks.
+local FRIDGE = "appliances_refrigeration_01_0"
+test("renewable_energy_tiles_fridge_scraps_to_compressor", {
+    run = function(self)
+        local perk = scrapPerk(FRIDGE)
+        if perk then T.setPerk(self, perk, 10) end
+    end,
+    validate = function()
+        local counts = scrapYield(FRIDGE, SCRAP_ROLLS)
+        local compressor = RenewableEnergy.Digester.COMPRESSOR
+        expect((counts[compressor] or 0) > 0, "cutting up " .. FRIDGE .. " " .. SCRAP_ROLLS .. " times never gave " .. compressor)
     end,
 })
 
@@ -196,9 +237,7 @@ local function electrician(self)
     T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
 end
 
--- What a kind keeps in its modData from item to placed object and back: a mount each module's
--- condition and whether it was mounted or connected before, and a garden light its charge. The
--- gadget tests follow the light's bulb (renewable_energy_gadgets_garden_light_pick_up_keeps_bulb).
+-- What an item keeps in its modData from item to placed object and back.
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
     { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
@@ -221,12 +260,8 @@ local function describe(value)
     return "{" .. table.concat(parts, ", ") .. "}"
 end
 
--- Every placed tile's CustomItem names its item, so picking it up gives that item and nothing
--- else (without one the game hands back a generic Moveable). And each item's own tile, placed and
--- picked up the way a player does, comes back as the item, with a container only on the tiles that
--- hold items, and with what CARRIED says it keeps. Wall panels need a wall to hang on, and the
--- other facings are the same item's (renewable_energy_tiles_mounts_rotate turns them), so only the
--- tile an item places is placed.
+-- Placed and picked up as a player does, each item's tile comes back as that one item, with its
+-- modData (CARRIED), and has a container only if it holds items. Wall panels and banks are left out.
 test("renewable_energy_tiles_place_and_pick_up", {
     instant = true,
     run = function(self)
@@ -301,11 +336,8 @@ local function modulesAt(...)
     return modules
 end
 
--- A module below Specs.crackedBelow shows cracked glass on the mount placed with it, a rack only
--- over the cracked module's slot; one at it shows whole. Repairing the module takes the cracks
--- off, and snow already lying on a panel stays drawn over cracks added under it. The panels are
--- placed and changed on the authority (panelCracks); what is checked is what this client shows,
--- the same as the authority's.
+-- A module just below Specs.crackedBelow shows cracks over its own slot, one at it shows whole,
+-- repair clears them, and snow stays drawn over cracks added under it; this client matches.
 local CRACKED_AT, WHOLE_AT = Specs.crackedBelow - 1, Specs.crackedBelow
 local CRACKS, SNOW = Sprites.cracks, Sprites.snow
 local CRACKED = {
@@ -356,10 +388,8 @@ test("renewable_energy_tiles_cracked_modules_show", {
     end,
 })
 
--- The dev mod's remove hook takes away the tiles T.placeTile places, as it does every other
--- fixture's: the harness reads one registration on both sides. A stand-in hook notes the tile and
--- hands it on to the mod's. The check runs as an undo, since the tile goes only when the test
--- ends; a multiplayer server takes it away in its own Lua, where the stand-in isn't.
+-- The dev mod's remove hook takes away the tiles T.placeTile places. Checked in an undo, since the
+-- tile goes only when the test ends.
 test("renewable_energy_tiles_remove_hook_takes_placed_tile", {
     spOnly = "the server removes the tile in its own Lua, out of the stand-in hook's reach",
     run = function(self)
