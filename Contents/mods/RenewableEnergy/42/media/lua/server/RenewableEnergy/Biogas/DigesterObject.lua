@@ -294,7 +294,8 @@ function DigesterObject:airTemp(square)
     return temp
 end
 
--- The temperature the digester heads for, and whether it burns gas to get there.
+-- The temperature the digester heads for, and whether it burns gas to get there: a lit heater, or
+-- the dome's own burner, which a lit heater stands in for.
 function DigesterObject:targetTemp(air)
     local spec = self:tierSpec()
     local target, burning = air, false
@@ -305,7 +306,7 @@ function DigesterObject:targetTemp(air)
         end
     end
     if self.heaterLit then
-        target = math.max(target, GasHeater.TEMP)
+        target, burning = math.max(target, GasHeater.TEMP), true
     end
     return target, burning
 end
@@ -341,9 +342,6 @@ function DigesterObject:step(hours, air)
         local digested = self.potential * (1 - math.exp(-k * hours / 24))
         self.potential = self.potential - digested
         made = digested * SandboxVars.RenewableEnergy.BiogasMultiplier
-        if heating then
-            made = made * (1 - spec.heatShare)
-        end
     end
     self.gas = self.gas + made
     self.madePerDay = self.madePerDay + (made * 24 / hours - self.madePerDay) * (1 - math.exp(-hours / RATE_HOURS))
@@ -361,12 +359,15 @@ function DigesterObject:step(hours, air)
         self.holderCondition = math.max(0, self.holderCondition - holder.wearPerDay * hours / 24)
     end
     self.leakHours = math.max(0, self.leakHours - hours)
-    if self.heaterLit then
-        local burn = GasHeater.M3_PER_HOUR * hours
+    if heating then
+        -- Short of the pass's burning, a heater goes out and the dome burns what is left.
+        local burn = GasHeater.m3PerHour() * hours
         if self.gas >= burn then
             self.gas = self.gas - burn
-        else
+        elseif self.heaterLit then
             self.heaterLit = false
+        else
+            self.gas = 0
         end
     end
     local capacity = self:capacity()

@@ -43,8 +43,17 @@ GasKit.PHANTOM_FUEL = 2
 -- the lights but not the cooking or the laundry.
 GasKit.CAP_W = 3000
 -- Biogas a generator burns for each litre of petrol vanilla bills it, by energy: petrol about
--- 9.5 kWh a litre, biogas the 6 kWh a m³ Digester.M3_PER_TANK counts.
+-- 9.5 kWh a litre, biogas about 6 kWh a m³.
 GasKit.M3_PER_LITRE = 1.6
+-- Litres an hour vanilla bills an idling generator before the GeneratorFuelConsumption option
+-- (IsoGenerator's GeneratorBasePowerConsumption; only a generator's getBasePowerConsumption gives
+-- it). A fire kept going with no generator to feed, a lit gasifier's or a gas heater's, burns it.
+GasKit.IDLE_FUEL = 0.02
+
+--- Litres of petrol vanilla bills an idling generator an hour.
+function GasKit.idleLitresPerHour()
+    return GasKit.IDLE_FUEL * SandboxVars.GeneratorFuelConsumption
+end
 
 --- Whether `object` is a vanilla generator: a placed IsoGenerator that isn't one of the mod's
 --- battery banks.

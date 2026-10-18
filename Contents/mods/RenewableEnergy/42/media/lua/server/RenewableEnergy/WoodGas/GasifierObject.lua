@@ -29,10 +29,6 @@ GasifierObject.SAVED_FIELDS = {
 }
 
 local EPSILON = 1e-4
--- Litres an hour vanilla bills an idling generator before the GeneratorFuelConsumption option
--- (IsoGenerator's GeneratorBasePowerConsumption; only a generator's getBasePowerConsumption gives
--- it, and a gasifier may have none).
-local IDLE_FUEL = 0.02
 -- A step toward each side (Gasifier.sideOf), in squares.
 local SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
 
@@ -204,12 +200,12 @@ function GasifierObject:feedsRunningGenerator()
     return state ~= nil and state.onGas == true and generator:isActivated()
 end
 
---- Burns, if lit, the `hours` since it last caught up as a generator idling would: vanilla's idle
---- bill times the GeneratorFuelConsumption option, at KG_PER_LITRE, so it burns down slowly and
---- goes out when its wood is gone. While its generator runs on its gas, that bill is the line's.
+--- Burns, if lit, the `hours` since it last caught up as a generator idling would
+--- (GasKit.idleLitresPerHour) at KG_PER_LITRE, so it burns down slowly and goes out when its wood
+--- is gone. While its generator runs on its gas, that bill is the line's.
 function GasifierObject:advance(hours)
     if hours > 0 and self.lit and not self:feedsRunningGenerator() then
-        self:burn(IDLE_FUEL * SandboxVars.GeneratorFuelConsumption * Gasifier.KG_PER_LITRE * hours)
+        self:burn(GasKit.idleLitresPerHour() * Gasifier.KG_PER_LITRE * hours)
     end
 end
 

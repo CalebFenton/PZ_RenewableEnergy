@@ -10,15 +10,16 @@ local Specs = {}
 RenewableEnergy.Specs = Specs
 
 -- Batteries by item type. wh is the capacity at full condition; cyclesAt50 is how many 50%
--- discharges wear one out.
+-- discharges wear one out. Down to half its capacity: a car battery run flat every night in about
+-- two and a half months, a deep cycle drained halfway every night in about two years.
 Specs.batteries = {
-    ["Base.CarBattery1"] = { wh = 600, cyclesAt50 = 80 },
-    ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 80 },
-    ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 80 },
-    ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 1000 },
-    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1200 },
+    ["Base.CarBattery1"] = { wh = 600, cyclesAt50 = 300 },
+    ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 300 },
+    ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 300 },
+    ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 1500 },
+    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 2500 },
     -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
-    ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 60 },
+    ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 150 },
 }
 
 -- Inverters by item type: the watts it carries (a bank's limit is the sum over its working

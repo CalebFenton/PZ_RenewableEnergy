@@ -428,8 +428,9 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         local spec = Gasifier.TIERS.standard
         self.generatorSide = Gasifier.sideOf(gasifier.x, gasifier.y, generator.x, generator.y)
         self.gasifierSide = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
-        self.litres, self.dirtyCap = 0.5, GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
-        -- One tuft in the filter, so burning one item's worth of tar spends it.
+        -- Less wood than tars a packing item, so the one tuft in the filter stays clean until the
+        -- burn of one item's worth spends it.
+        self.litres, self.dirtyCap = 0.3, GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 6 } }, filter = { { type = "Base.HayTuft" } } })
         -- Lit first, so gas reaches the generator the moment the line is in.
         light(self, gasifier)
@@ -476,8 +477,9 @@ test("renewable_energy_gas_gasifier_runs_generator", {
             "the generator shows no pipe toward the gasifier")
         T.expect(running.running and running.fuel >= GasKit.PHANTOM_FUEL, "the generator didn't run on wood gas with an empty tank")
         local kg = self.litres * Gasifier.KG_PER_LITRE
-        T.expectNear("wood burned for " .. self.litres .. " L of fuel and an hour's own pass", (lit.hopperKg + lit.fireKg) - (fed.hopperKg + fed.fireKg), kg, 0.05)
-        T.expectNear("ash after that wood", fed.ash - lit.ash, kg * Gasifier.TIERS.standard.ashPerKg, 0.15)
+        local burned = (lit.hopperKg + lit.fireKg) - (fed.hopperKg + fed.fireKg)
+        T.expectNear("wood burned for " .. self.litres .. " L of fuel and an hour's own pass", burned, kg, 0.05)
+        T.expectNear("ash after that wood", fed.ash - lit.ash, burned * Gasifier.TIERS.standard.ashPerKg, 0.01)
         local over = (self.dirtyCap + 1) .. " W"
         T.expect(reads.ashNearlyFull.running, "an ash pit one short of full stalled a generator at " .. over)
         T.expect(stalled(reads.ashFull), "a full ash pit didn't stall a generator at " .. over)

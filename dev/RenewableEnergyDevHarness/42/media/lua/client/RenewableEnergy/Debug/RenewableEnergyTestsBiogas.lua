@@ -928,13 +928,16 @@ end
 -- neither warmed nor paying, and goes out when the gas does.
 test("renewable_energy_biogas_heater_warms_digester", {
     instant = true,
+    -- Ten times the default, so three hours' burning shows and the gas runs out within the run.
+    sandbox = { GeneratorFuelConsumption = 1 },
     run = function(self)
         local first = placeDigester(self, "barrel.MetalDrum")
         local square = first and T.square(self, { near = first.square }, "a square beside the digester for a heater")
         local second = square and placeDigester(self, "barrel.MetalDrum", { near = square })
         if not second then return end
         self.digesters = { first, second }
-        self.temp, self.gas = 5, Digester.HOLDERS.bags.capacity
+        -- Under five hours of a heater's burning.
+        self.temp, self.gas = 5, 0.15
         local cold = T.matureDigester("barrel")
         cold.temp, cold.gas = self.temp, self.gas
         for _, handle in ipairs(self.digesters) do
@@ -964,7 +967,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
         local other = 3 - warmed
         local warming, idle = reads["warming" .. warmed], reads["warming" .. other]
         T.expect(warming.temp > self.temp, "a lit heater didn't warm its digester: " .. tostring(warming.temp) .. " °C")
-        T.expectNear("gas after 3 hours of heating", warming.gas, self.gas - 3 * GasHeater.M3_PER_HOUR, 0.02)
+        T.expectNear("gas after 3 hours of heating", warming.gas, self.gas - 3 * GasHeater.m3PerHour(), 0.02)
         T.expect(not idle.heaterLit and idle.temp < self.temp, "the heater warmed both digesters beside it")
         T.expectNear("gas of the digester it doesn't warm", idle.gas, self.gas, 0.02)
         T.expect(not reads["out" .. warmed].heaterLit, "the heater kept burning with no gas")

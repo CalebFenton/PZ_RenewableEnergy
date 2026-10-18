@@ -85,7 +85,7 @@ function DigesterWindow:rowsOf(summary)
     end
     if summary.heaterLit then
         row(rows, "IGUI_RenewableEnergy_DigesterHeater", getText("IGUI_RenewableEnergy_HeaterBurning",
-            getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(GasHeater.M3_PER_HOUR * 24, 1))))
+            getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(GasHeater.m3PerHour() * 24, 2))))
     end
     if summary.leaking then
         row(rows, "IGUI_RenewableEnergy_DigesterLeak", getText("IGUI_RenewableEnergy_DigesterLeaking"), "warn")

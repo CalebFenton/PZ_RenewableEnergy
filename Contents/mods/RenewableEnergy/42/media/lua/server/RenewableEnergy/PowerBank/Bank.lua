@@ -198,7 +198,7 @@ function Bank:writeBatteries(container, applyPending)
             Battery.setCharge(item, self.charge)
             if applyPending then
                 for _, depth in ipairs(self.pendingDepths) do
-                    changed = Battery.wear(item, Battery.cycleWear(spec, depth) * scale) or changed
+                    changed = Battery.wear(item, Battery.cycleWear(item, depth) * scale) or changed
                 end
             end
             if changed then

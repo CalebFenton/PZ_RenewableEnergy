@@ -25,11 +25,14 @@ Gasifier.FILTER = "RenewableEnergyGasifierFilter"
 -- hopperKg: wood the hopper holds (its tile's ContainerCapacity; a whole log needs the bigger
 -- two). filterCapacity: the filter container's capacity, ten tufts of hay to a unit.
 -- tarKgPerItem: wood burned for each packing item that turns tarry. ashPerKg: percent of the ash
--- pit each kg fills. A full filter lasts about 25, 65 and 130 kg of wood.
+-- pit each kg fills. Upkeep is set by a home's usual load at the default GeneratorFuelConsumption:
+-- a fridge-freezer, the lights, a TV and a radio bill about 0.021 L an hour, 8.5 kg of wood a
+-- week. That fills the ash pit about 2.5, 1.7 and 0.85 times a week, and tars a filter about 1.7,
+-- 0.85 and 0.4 times.
 Gasifier.TIERS = {
-    primitive = { hopperKg = 8, filterCapacity = 1, tarKgPerItem = 2.5, ashPerKg = 5 },
-    standard = { hopperKg = 20, filterCapacity = 1, tarKgPerItem = 6.5, ashPerKg = 2.5 },
-    advanced = { hopperKg = 30, filterCapacity = 2, tarKgPerItem = 6.5, ashPerKg = 1.25 },
+    primitive = { hopperKg = 8, filterCapacity = 1, tarKgPerItem = 0.5, ashPerKg = 30 },
+    standard = { hopperKg = 20, filterCapacity = 1, tarKgPerItem = 1, ashPerKg = 20 },
+    advanced = { hopperKg = 30, filterCapacity = 2, tarKgPerItem = 1, ashPerKg = 10 },
 }
 
 -- Wood a generator on wood gas burns for each litre of petrol vanilla bills it: FEMA's 20 lb of
@@ -55,10 +58,11 @@ Gasifier.TARRY = "RenewableEnergy.TarryPacking"
 -- Hay and straw pack the filter, and insulate a digester's upgrade.
 Gasifier.HAY = { "Base.HayTuft", "Base.Straw2" }
 
--- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
--- how much faster tar fills the packing while it is full.
+-- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds (a
+-- home's week fills it about 1.7 times), and how much faster tar fills the packing while it is
+-- full.
 Gasifier.VINEGAR = "RenewableEnergy_WoodVinegar"
-Gasifier.CONDENSATE_PER_KG = 0.05
+Gasifier.CONDENSATE_PER_KG = 0.6
 Gasifier.CONDENSATE_MAX = 3
 Gasifier.CONDENSATE_TAR = 2
 

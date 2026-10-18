@@ -152,25 +152,29 @@ test("renewable_energy_power_sunlight_multiplier_and_snow", {
 test("renewable_energy_power_battery_wear", {
     sandbox = { BatteryWear = 100 },
     run = function(self)
-        local deepCycle = Specs.batteries["RenewableEnergy.DeepCycleBattery"]
-        self.deepAt80 = 1 / Battery.cycleWear(deepCycle, 0.8)
         local battery = T.need(self, instanceItem("Base.CarBattery1"), "a Base.CarBattery1")
-        if not battery then return end
-        local car = Specs.batteries["Base.CarBattery1"]
-        -- Four days at 50%: 1.25 points a day for a car battery's 80 cycles.
+        local worn = T.need(self, instanceItem("Base.CarBattery1"), "a Base.CarBattery1")
+        if not (battery and worn) then return end
+        -- A half-worn battery run flat gives up what a new one does at half: the same watt-hours.
+        Wear.setCondition(worn, 50)
+        self.wornFlat, self.newHalf = Battery.cycleWear(worn, 1), Battery.cycleWear(battery, 0.5)
+        self.newFlat = Battery.cycleWear(battery, 1)
+        -- Four days at 50%: wear smaller than a point adds up until it is one.
+        self.perDay = 100 / Specs.batteries["Base.CarBattery1"].cyclesAt50
         for _ = 1, 4 do
-            Battery.wear(battery, Battery.cycleWear(car, 0.5))
+            Battery.wear(battery, Battery.cycleWear(battery, 0.5))
         end
         self.condition = battery:getCondition()
-        -- A repair starts afresh: the quarter point still pending is forgotten.
-        Battery.wear(battery, Battery.cycleWear(car, 0.5) * 0.6)
+        -- A repair starts afresh: the part of a point still pending is forgotten.
+        Battery.wear(battery, Battery.cycleWear(battery, 0.5) * 0.6)
         Wear.setCondition(battery, 60)
-        Battery.wear(battery, Battery.cycleWear(car, 0.5) * 0.6)
+        Battery.wear(battery, Battery.cycleWear(battery, 0.5) * 0.6)
         self.repaired = battery:getCondition()
     end,
     validate = function(self)
-        expect(self.deepAt80 > 300 and self.deepAt80 < 450, "a deep-cycle battery lasts " .. tostring(self.deepAt80) .. " cycles at 80%")
-        expectNear("car battery condition after four 50% days", self.condition, 95, 0)
+        expectNear("wear of a half-worn battery run flat, against a new one at half", self.wornFlat, self.newHalf, 1e-9)
+        expectNear("wear of a flat night, against a half one", self.newFlat, 4 * self.newHalf, 1e-9)
+        expectNear("car battery condition after four 50% days", self.condition, 100 - math.floor(4 * self.perDay), 0)
         expectNear("condition after a repair and less than a point of wear", self.repaired, 60, 0)
     end,
 })
@@ -645,7 +649,7 @@ test("renewable_energy_power_depth_of_discharge_wears_batteries", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
         if not self.bank then return end
-        T.server(self, "cycleDay", { bank = self.bank.position, high = 1, charge = 0.5 })
+        T.server(self, "cycleDay", { bank = self.bank.position, high = 1, charge = 0.1 })
         T.waitFor(self, function()
             local battery = self.bank.object:getContainer():getFirstType("Base.CarBattery1")
             local served = stateItem(self.server.cycleDay, "Base.CarBattery1")
@@ -656,8 +660,8 @@ test("renewable_energy_power_depth_of_discharge_wears_batteries", {
         local day = self.server.cycleDay
         local battery = stateItem(day, "Base.CarBattery1")
         local copy = self.bank.object:getContainer():getFirstType("Base.CarBattery1")
-        expectNear("cycle depth", day.depthBefore, 0.5, 0.0001)
-        expectNear("car battery condition after a 50% day", battery and battery.condition, 99, 0)
+        expectNear("cycle depth", day.depthBefore, 0.9, 0.0001)
+        expectNear("car battery condition after a 90% day", battery and battery.condition, 99, 0)
         expectNear("this client's copy of the car battery's condition", copy and copy:getCondition(), 99, 0)
         expectNear("cycle depth on the new day", day.cycleDepth, 0, 0)
     end,

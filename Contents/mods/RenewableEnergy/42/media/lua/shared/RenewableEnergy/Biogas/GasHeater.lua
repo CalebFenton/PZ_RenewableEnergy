@@ -8,16 +8,26 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Materials"
 require "RenewableEnergy/Biogas/Digester"
+require "RenewableEnergy/GasLine/GasKit"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasHeater = {}
 RenewableEnergy.GasHeater = GasHeater
 
-local Digester, Sprites, Materials = RenewableEnergy.Digester, RenewableEnergy.Sprites, RenewableEnergy.Materials
+local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
+local Sprites, Materials = RenewableEnergy.Sprites, RenewableEnergy.Materials
 
--- What a lit heater keeps its digester at, at least, and the gas it burns an hour.
+-- What a lit heater keeps its digester at, at least: vanilla's lit barbecue warms its square to 25
+-- (IsoBarbecue's heat source).
 GasHeater.TEMP = 25
-GasHeater.M3_PER_HOUR = 0.1
+
+--- The gas a lit heater burns an hour: a small flame, billed as an idling generator's
+--- (GasKit.idleLitresPerHour), so it follows the GeneratorFuelConsumption option as every
+--- generator on gas does.
+function GasHeater.m3PerHour()
+    return GasKit.idleLitresPerHour() * GasKit.M3_PER_LITRE
+end
+
 -- A heater warms a digester on its own square or one next to it.
 GasHeater.REACH = 1
 

@@ -26,13 +26,14 @@ Digester.SYSTEM_NAME = "renewable_energy_digester"
 -- days: how many days its temperature takes to follow the air (a time constant).
 -- stink: its share of the stink score; the Brick Dome stays below the second smell level whatever
 -- state it is in (stinkCap).
--- warmTo, heatShare: the dome is buried and burns a share of its gas to keep at least this warm.
+-- warmTo: the dome is buried and burns its gas to keep at least this warm, as a lit gas heater
+-- does (GasHeater.m3PerHour).
 -- holder: the gas holder it is built with (HOLDERS). upgrade: the tier its Upgrade job makes of it.
 -- sealed: it never fumes indoors.
 Digester.TIERS = {
     barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", upgrade = "insulated" },
     insulated = { potentialCap = 15, days = 3, stink = 0.6, holder = "drum" },
-    dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, heatShare = 0.25, holder = "dome",
+    dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, holder = "dome",
         sealed = true },
 }
 
@@ -69,10 +70,10 @@ Digester.LEAK_HOURS = 2
 -- (ISGetCompost).
 Digester.SLUDGE_PER_BAG = 10
 
--- Propane tanks. A tank holds this much biogas when full: its propane's energy at 6 kWh a m³. Real
--- biogas can't be pressed into a tank anywhere near that; the game lets it.
+-- Propane tanks. A full tank holds the biogas for a generator's full tank: IsoGenerator's 10 L
+-- (MaximumGeneratorFuel) at GasKit.M3_PER_LITRE.
 Digester.TANK = "Base.PropaneTank"
-Digester.M3_PER_TANK = 40
+Digester.M3_PER_TANK = 16
 -- A tire pump fills a tank this far at most, and it is hard work: minutes and endurance per m³.
 Digester.PUMP = "Base.TirePump"
 Digester.PUMP_FILL = 0.25

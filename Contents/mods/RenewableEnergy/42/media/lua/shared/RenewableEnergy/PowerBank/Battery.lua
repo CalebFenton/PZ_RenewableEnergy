@@ -81,10 +81,13 @@ function Battery.emptiestIn(container, accepts)
     return emptiest
 end
 
---- Fraction of its life a battery loses to one discharge `depth` deep (0 to 1). Cycle life
---- falls with the square of the depth (SAND2004-3149), anchored at the type's cycles at 50%.
-function Battery.cycleWear(spec, depth)
-    return (depth / 0.5) ^ 2 / spec.cyclesAt50
+--- Fraction of its life `item` loses to one discharge `depth` deep (0 to 1) of what it holds now.
+--- Cycle life falls with the square of the depth (SAND2004-3149), anchored at the type's cycles
+--- at 50%. The depth counts against the battery's rated capacity, so a worn battery carrying the
+--- same load wears no faster than a new one: wear doesn't snowball as its capacity falls.
+function Battery.cycleWear(item, depth)
+    local spec = Battery.spec(item)
+    return (depth * health(item) / 0.5) ^ 2 / spec.cyclesAt50
 end
 
 --- The Battery Wear sandbox option as a factor on the wear of every discharge.
@@ -105,8 +108,7 @@ function Battery.wearAll(container, depth)
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        local spec = Battery.spec(item)
-        if spec and Battery.wear(item, Battery.cycleWear(spec, depth) * scale) then
+        if Battery.spec(item) and Battery.wear(item, Battery.cycleWear(item, depth) * scale) then
             sendItemStats(item)
         end
     end
