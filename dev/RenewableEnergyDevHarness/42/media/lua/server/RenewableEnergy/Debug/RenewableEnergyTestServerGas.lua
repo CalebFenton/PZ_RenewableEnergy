@@ -19,9 +19,10 @@ local function generatorOn(args)
     return generator
 end
 
--- The generator at x, y, z: whether it runs, its fuel, its kit's state (nil without a kit) with
--- whether a line is connected and to what kind of source, whether the gas pass lists it, its
--- overlays and its sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor).
+-- The generator at x, y, z: whether it runs, its fuel, vanilla's idle bill an hour (`idle`), its
+-- kit's state (nil without a kit) with whether a line is connected and to what kind of source,
+-- whether the gas pass lists it, its overlays and its sprite, which picks the kit's and pipe's
+-- overlays (Sprites.gasKitFor).
 handler("generatorRead", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
@@ -39,7 +40,7 @@ handler("generatorRead", function(player, args)
     end
     local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
     return {
-        running = generator:isActivated(), fuel = generator:getFuel(), state = plain,
+        running = generator:isActivated(), fuel = generator:getFuel(), idle = generator:getBasePowerConsumption(), state = plain,
         listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
         overlays = Helpers.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
     }
@@ -59,6 +60,15 @@ handler("generatorSet", function(player, args)
     return {}
 end)
 
+-- Takes `args.litres` from the fuel of the generator at x, y, z, as vanilla's hourly bill
+-- (IsoGenerator.update) and a bank charging from it (Bank:chargeFrom) take it.
+handler("generatorBurn", function(player, args)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    generator:setFuel(generator:getFuel() - args.litres)
+    return {}
+end)
+
 -- Sets the last pass of the kitted generator at x, y, z `args.hours` ago, as though that time had
 -- passed since. Answers what is missing, or nil.
 local function age(args)
@@ -70,18 +80,9 @@ local function age(args)
     return nil
 end
 
--- `args.hours` since the last pass of the generator at x, y, z, without running one: the next pass
--- or job bills them.
-handler("gasAge", function(player, args)
-    local missing = age(args)
-    if missing then return nil, missing end
-    return {}
-end)
-
--- Runs the gas pass as though `args.hours` had passed since the last of the generator at x, y, z,
--- or, without `args.hours`, from its last pass as it stands.
+-- Runs the gas pass as though `args.hours` had passed since the last of the generator at x, y, z.
 handler("gasPass", function(player, args)
-    local missing = args.hours and age(args)
+    local missing = age(args)
     if missing then return nil, missing end
     RenewableEnergy.GasLines.updateAll()
     return {}

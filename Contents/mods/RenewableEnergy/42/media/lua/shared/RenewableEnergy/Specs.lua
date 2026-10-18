@@ -1,11 +1,9 @@
 -- What each piece of the mod's power hardware is rated for, in watts and watt-hours.
 --
 -- Code that needs a rating reads it here, so balancing changes only this file. Appliances draw
--- what vanilla bills a generator for them (Specs.wattsPerFuel), which puts a fridge-freezer at
--- about 3.2 times a real one's watts. What feeds them (modules, wind chargers, a treadmill) is
--- rated at 3.2 times its 1993 specification, so a fridge takes the panels it really would, and
--- inverters by what they should carry. Batteries hold their real watt-hours, which vanilla's
--- charger ties to its generator fuel.
+-- what vanilla bills a generator for them (Specs.wattsPerFuel). Everything else is rated to play
+-- well against those draws: sources by how many of them run a fridge-freezer, inverters by what
+-- each carries, batteries from the car battery vanilla's charger fills.
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs = {}
@@ -79,8 +77,8 @@ Specs.wind = {
 -- A treadmill (RenewableEnergy.Treadmill): what wiring it to a bank takes (as a bank part's,
 -- Specs.wiring), the watts a runner then puts in (an hour of running is about an hour of a
 -- fridge-freezer), how long one run lasts, wired or not, and what an hour of it costs and teaches.
--- Unwired, a run draws `drawFuel` (Specs.wattsPerFuel): vanilla has no treadmill figure, so it
--- bills one as its other motor appliances, the washer, the dryer and the stove.
+-- Unwired, a run draws `drawFuel` (Specs.wattsPerFuel): vanilla bills nothing for a treadmill, so
+-- it bills one as its washer, dryer and stove (IsoGenerator.ClothingAppliancePowerConsumption).
 Specs.treadmill = {
     slots = 1,
     wiring = { seconds = 90, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 2, xp = 10 },
@@ -104,9 +102,10 @@ Specs.partWear = {
 -- (as vanilla's ISFixGenerator).
 Specs.partRepair = { condition = 10, skill = 2, xp = 5 }
 
--- Solar modules by item type: rated watts at condition 100, 3.2 times a 1993 module's 50 W. A
--- module makes its rating times its condition / 100, so a homemade one, whose ConditionMax is
--- lower, tops out lower.
+-- Solar modules by item type: rated watts at condition 100, so that four or five run a
+-- fridge-freezer through an average July at the default Sunlight Multiplier, about eight on racks
+-- in December. A module makes its rating times its condition / 100, so a homemade one, whose
+-- ConditionMax is lower, tops out lower.
 Specs.modules = {
     ["RenewableEnergy.SolarModule"] = { watts = 160 },
     ["RenewableEnergy.HomemadeSolarModule"] = { watts = 160 },
@@ -174,17 +173,15 @@ Specs.maintainerWatts = 10
 -- draws at night, and the radius it lights.
 Specs.gardenLight = { watts = 1, wh = 3, nightWatts = 0.5, radius = 2 }
 
--- The arrow board trailer's 15-lamp board and its controller, as Solar Technology's Silent
--- Sentinel manual measures them at 12.5 V (P/N 550-025-100, Power Consumption and Battery Level):
--- a single arrow draws dayWatts while lit by day (1.25 A) and nightWatts once the photocell dims
--- it after dark (0.5 A), the controller offWatts between flashes (0.05 A). The MUTCD (2009,
--- 6F.61) asks 25 to 40 flashes a minute, each lit at least half the time. The controller shuts
--- the lamps off below 10.7 V, which a lead-acid battery under that load reaches nearly flat:
--- below `cutoff` of a full charge in every battery. It lights them again once a battery is back
--- at `reconnect`, about the 12 V rested where its battery level reads Normal again. At night the
--- lit board lights the ground `radius` squares around it.
+-- The arrow board trailer's lamps, lit, take what vanilla's lightbar takes from a vehicle's
+-- battery with the engine off, day or night: Vehicles.Update.Lightbar charges it -0.000025 a
+-- minute, which VehicleUtils.chargeBattery applies twice, so `lampShare` of a car battery's charge
+-- an hour (VehicleBattery.CAR_BATTERY, 1.8 W). The MUTCD (2009, 6F.61) asks 25 to 40 flashes a
+-- minute, each lit at least half the time. The controller shuts the lamps off below `cutoff` of a
+-- full charge in every battery, nearly flat, and lights them again once a battery is back at
+-- `reconnect`. At night the lit board lights the ground `radius` squares around it.
 Specs.arrowBoard = {
-    dayWatts = 15.6, nightWatts = 6.25, offWatts = 0.625, flashesPerMinute = 30, onShare = 0.5,
+    lampShare = 0.003, flashesPerMinute = 30, onShare = 0.5,
     cutoff = 0.1, reconnect = 0.25, radius = 3,
 }
 

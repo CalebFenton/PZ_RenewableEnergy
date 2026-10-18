@@ -11,9 +11,9 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 | When | What you're after | What it takes |
 |---|---|---|
 | The first weeks | The TV, a lamp, a mini fridge | A battery box, two car batteries, a plug-in inverter, two panels |
-| A month or so in | The kitchen fridge | A battery rack of deep cycle batteries, a bigger inverter, a charge controller, a handful of panels |
+| A month or so in | The fridge all night | A battery rack of deep cycle batteries, a bigger inverter, a charge controller, a handful of panels |
 | Months later | The freezer, the washer, the microwave | A bank of L-16s, an inverter/charger, two charge controllers, a failsafe on the generator, a yard of panels |
-| The long haul | The electric range and the dryer | A metal bank, two inverter/chargers, four charge controllers, and every panel you can find |
+| The long haul | The whole house | A metal bank, two inverter/chargers, four charge controllers, and every panel you can find |
 
 You'll spend the game chasing panels: finding them, fixing the cracked ones, and in the end building your own.
 
@@ -75,7 +75,7 @@ Its box holds deep cycle batteries, often padlocked, and the panels come off wit
 
 ## Sandbox options
 
-- **Sunlight Multiplier**: how much power panels make. At 1 it takes a yard of panels to run one fridge, as in 1993.
+- **Sunlight Multiplier**: how much power panels make. At 1 it takes a yard of panels to run one fridge.
 - **Biogas Multiplier**: how much gas digesters make.
 - **Loot Rarity Multiplier**, one each for modules, batteries and everything else: how often the mod's items turn up.
 - **Battery Wear**: how hard deep drains wear batteries. 0 turns wear off.

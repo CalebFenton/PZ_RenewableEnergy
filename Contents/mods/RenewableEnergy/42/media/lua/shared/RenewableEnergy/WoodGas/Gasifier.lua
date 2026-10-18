@@ -25,17 +25,16 @@ Gasifier.FILTER = "RenewableEnergyGasifierFilter"
 -- hopperKg: wood the hopper holds (its tile's ContainerCapacity; a whole log needs the bigger
 -- two). filterCapacity: the filter container's capacity, ten tufts of hay to a unit.
 -- tarKgPerItem: wood burned for each packing item that turns tarry. ashPerKg: percent of the ash
--- pit each kg fills. A full filter lasts about 25, 65 and 130 kg, 15, 40 and 80 hours of running.
+-- pit each kg fills. A full filter lasts about 25, 65 and 130 kg of wood.
 Gasifier.TIERS = {
     primitive = { hopperKg = 8, filterCapacity = 1, tarKgPerItem = 2.5, ashPerKg = 5 },
     standard = { hopperKg = 20, filterCapacity = 1, tarKgPerItem = 6.5, ashPerKg = 2.5 },
     advanced = { hopperKg = 30, filterCapacity = 2, tarKgPerItem = 6.5, ashPerKg = 1.25 },
 }
 
--- Wood a lit gasifier burns an hour idling, and per kWh the generator delivers on it: about 5 lb
--- an hour at the load cap, FEMA's 20 lb of wood for a gallon of gasoline.
-Gasifier.IDLE_KG_PER_HOUR = 0.8
-Gasifier.KG_PER_KWH = 0.6
+-- Wood a generator on wood gas burns for each litre of petrol vanilla bills it: FEMA's 20 lb of
+-- wood for a gallon of gasoline.
+Gasifier.KG_PER_LITRE = 2.4
 -- Charcoal makes this share of wood's tar and ash.
 Gasifier.CHARCOAL_TAR = 0.25
 Gasifier.CHARCOAL_ASH = 0.5
@@ -57,7 +56,7 @@ Gasifier.TARRY = "RenewableEnergy.TarryPacking"
 Gasifier.HAY = { "Base.HayTuft", "Base.Straw2" }
 
 -- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
--- how much faster tar fills the packing while it is full. About a litre and a half a day's running.
+-- how much faster tar fills the packing while it is full.
 Gasifier.VINEGAR = "RenewableEnergy_WoodVinegar"
 Gasifier.CONDENSATE_PER_KG = 0.05
 Gasifier.CONDENSATE_MAX = 3

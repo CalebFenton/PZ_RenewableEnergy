@@ -1,15 +1,16 @@
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/World/ArrowBoard"
 
 -- The arrow board trailer's power (ArrowBoard.lua): its panels charge the batteries in its box,
 -- and the lamps run off them through the controller in it: lit day and night while its switch is
 -- on, the lamp board isn't beaten to nothing and a battery is above the controller's cutoff,
--- dimmed by the photocell after dark. Once every battery is down to the cutoff they stay off
--- until one is back up at the reconnect level, so a board that barely charges doesn't flicker
--- from pass to pass.
+-- drawing what vanilla's lightbar does; after dark the photocell's night only lights the ground.
+-- Once every battery is down to the cutoff they stay off until one is back up at the reconnect
+-- level, so a board that barely charges doesn't flicker from pass to pass.
 --
 -- The authority sets them in the charge pass, and at once when the switch moves, in the battery
 -- box part's modData, which the part saves and the server sends its clients (transmitPartModData).
@@ -136,7 +137,7 @@ function ArrowBoard.isSwitchedOn(vehicle)
     return box ~= nil and box:getModData()[ArrowBoard.SWITCH_KEY] == true
 end
 
---- The lamps as the authority last set them: "day", "night" (dimmed), or nil while dark.
+--- The lamps as the authority last set them: "day", "night" (lighting the ground), or nil while dark.
 function ArrowBoard.lamps(vehicle)
     local box = boxOf(vehicle)
     return box and box:getModData()[LAMPS_KEY] or nil
@@ -174,10 +175,9 @@ function ArrowBoard.rollSwitch(vehicle)
     end
 end
 
---- The lamps' average draw while they flash, in watts: full by day, dimmed at `night`.
-function ArrowBoard.lampWatts(night)
-    local spec = Specs.arrowBoard
-    return (night and spec.nightWatts or spec.dayWatts) * spec.onShare + spec.offWatts * (1 - spec.onShare)
+--- The lit lamps' draw in watts, day or night: vanilla's lightbar share of a car battery an hour.
+function ArrowBoard.lampWatts()
+    return Specs.arrowBoard.lampShare * Specs.batteries[RenewableEnergy.VehicleBattery.CAR_BATTERY].wh
 end
 
 -- Follows the box's discharge cycle, and on a new day wears its batteries by the day before's
@@ -245,7 +245,7 @@ function ArrowBoard.runLamps(vehicle, hours, night)
         return 0
     end
     local lamps = box:getModData()[LAMPS_KEY]
-    local drawn = lamps and shift(container, ArrowBoard.lampWatts(lamps == LAMPS_NIGHT) * hours, Specs.arrowBoard.cutoff, -1) or 0
+    local drawn = lamps and shift(container, ArrowBoard.lampWatts() * hours, Specs.arrowBoard.cutoff, -1) or 0
     trackCycle(box, container)
     if night == nil then
         night = isNight()
@@ -319,10 +319,10 @@ local function placeGroundLight(entry, vehicle)
 end
 
 -- OnTick, but on a dedicated server: flashes the lamps of every loaded trailer that is lit, and
--- lights the ground around those dimmed for the night.
+-- lights the ground around those lit at night.
 --
 -- Per tick: a modData read and a flag compare for each trailer this game draws, which are few,
--- and the trailer's square for one dimmed for the night. The flash follows the real clock and the
+-- and the trailer's square for one lit at night. The flash follows the real clock and the
 -- flag lights only the frame it is set in, so this runs every frame; the lamps' state comes from
 -- the authority's modData, which no event announces. Allocates nothing unless a lamppost moves.
 local function flashLamps()

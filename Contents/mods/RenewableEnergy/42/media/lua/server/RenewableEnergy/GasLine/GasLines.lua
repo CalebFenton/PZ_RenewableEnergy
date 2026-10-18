@@ -28,9 +28,10 @@ local GasKit, Gasifier, Sprites, Materials = RenewableEnergy.GasKit, RenewableEn
 -- source }, its line's source kept too so a gasifier's pipe can come off after the generator is
 -- gone.
 GasLines.MOD_DATA = "RenewableEnergyGasKits"
--- A pass longer than this (a save loaded after the clock jumped) counts as this long. A generator
--- runs here only while loaded; vanilla bills the time it was away to its fuel when it loads
--- (IsoGenerator.update), which PHANTOM_FUEL covers, so the gas pays for a day of it at most.
+-- A pass longer than this (a save loaded after the clock jumped) wears the generator on dirty gas
+-- for this long. A generator runs here only while loaded; vanilla bills the time it was away to its
+-- fuel when it loads (IsoGenerator.update), no more than it shows (PHANTOM_FUEL on an empty tank),
+-- and the next pass bills that to the gas.
 local LONGEST_PASS = 24
 local EPSILON = 1e-4
 -- Vanilla's generator wear: each hour running, one chance in this many of losing 1 or 2 condition
@@ -51,7 +52,7 @@ local function generatorAt(position)
 end
 
 -- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
--- canSupply(), supply(watts, hours), capW(), wearFactor() and afterChange(), and a piped one
+-- canSupply(), supply(litres), capW(), wearFactor() and afterChange(), and a piped one
 -- (GasKit.SOURCES) setPipe(side).
 local function sourceOf(position)
     return position and GasKit.SOURCES[position.kind].owner.recordAt(position.x, position.y, position.z)
@@ -168,9 +169,17 @@ local function wear(generator, state, factor, hours)
     end
 end
 
---- Runs one kitted generator for `hours`: it burns its source's gas while it runs, stalls over
---- what the source carries until the load fits again, stops when the gas runs out. A line whose
---- source is gone is lost with it, on petrol too: nothing comes back from it.
+-- Litres of fuel the generator lost since the last pass on gas: vanilla's hourly bill for its idle
+-- and what it powers, times the GeneratorFuelConsumption option (IsoGenerator.update), and what
+-- a bank charging from it took (Bank:chargeFrom). Read off the fuel itself, before settleFuel puts
+-- it back, so the gas pays exactly what vanilla and the bank charged, whatever they bill for.
+local function burnedSince(generator, state)
+    return state.onGas and math.max(0, (state.set or 0) - generator:getFuel()) or 0
+end
+
+--- Runs one kitted generator for `hours`: its source pays for the fuel it burned on gas, it stalls
+--- over what the source carries until the load fits again, stops when the gas runs out. A line
+--- whose source is gone is lost with it, on petrol too: nothing comes back from it.
 function GasLines.run(generator, state, hours)
     local source = sourceOf(state.source)
     if state.source and not source then
@@ -180,6 +189,15 @@ function GasLines.run(generator, state, hours)
         source = nil
     end
     local hasGas = source and source:canSupply()
+    local litres = burnedSince(generator, state)
+    if hasGas and litres > 0 then
+        hasGas = source:supply(litres)
+        source:afterChange()
+    end
+    if source and state.onGas and not hasGas and generator:isActivated() then
+        generator:setActivated(false)
+        state.outOfGas = true
+    end
     if generator:isActivated() and state.onGas then
         local watts = GasLines.loadOf(generator)
         state.watts = watts
@@ -187,14 +205,7 @@ function GasLines.run(generator, state, hours)
             generator:setActivated(false)
             state.stalled = true
         elseif source then
-            if not source:supply(watts, hours) then
-                generator:setActivated(false)
-                state.outOfGas = true
-                hasGas = false
-            else
-                wear(generator, state, source:wearFactor(), hours)
-            end
-            source:afterChange()
+            wear(generator, state, source:wearFactor(), hours)
         end
     elseif state.stalled and hasGas and not generator:isActivated() then
         local watts = GasLines.loadOf(generator)

@@ -13,6 +13,7 @@ local test, expect, expectNear, player = T.test, T.expect, T.expectNear, T.playe
 
 local MODULE, HOMEMADE = RenewableEnergy.Specs.factoryModule, "RenewableEnergy.HomemadeSolarModule"
 local DEEP_CYCLE, L16 = "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery"
+local CAR_BATTERY = RenewableEnergy.VehicleBattery.CAR_BATTERY
 
 -- Fixtures ----------------------------------------------------------------------------------------
 
@@ -840,9 +841,9 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
 -- Lamps -----------------------------------------------------------------------------------------
 
 -- The arrow board's lamps light only while its switch is on and its lamp board isn't wrecked:
--- switching off or wrecking the board darkens it, and welding the board back lights it again. The
--- photocell dims them after dark. How the battery's charge cuts them off and lights them again is
--- lamps_cut_off_and_come_back's.
+-- switching off or wrecking the board darkens it, and welding the board back lights it again.
+-- After dark the photocell sets them to night, when they light the ground too. How the battery's
+-- charge cuts them off and lights them again is lamps_cut_off_and_come_back's.
 test("renewable_energy_world_arrow_board_lamps_need_switch_charge_and_board", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
@@ -892,9 +893,11 @@ test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
     end,
 })
 
--- Lit, the lamps draw their flashing average from the box's battery for the time they run: by day
--- at full brightness, and less once the photocell dims them for the night.
-test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
+-- Lit, the lamps take a car battery in the box down as fast as vanilla's lightbar takes a car's
+-- with the engine off, by day and after dark alike: Vehicles.Update.Lightbar charges it -0.000025
+-- a minute, which VehicleUtils.chargeBattery applies twice, 0.003 of its charge an hour.
+local LIGHTBAR_SHARE_PER_HOUR = 2 * 0.000025 * 60
+test("renewable_energy_world_arrow_board_lamps_drain_a_lightbars_share", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
@@ -905,7 +908,7 @@ test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
             end
         end
         batchOnTrailer(function()
-            T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.8 } } })
+            T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = CAR_BATTERY, charge = 0.8 } } })
             -- A pass draws at the lamps' current state and only then sets it for `night`
             -- (ArrowBoard.runLamps), so a zero-hour pass sets the state the measured pass draws at.
             lamps(0, false)
@@ -915,14 +918,14 @@ test("renewable_energy_world_arrow_board_lamps_draw_less_at_night", {
         end)
     end,
     validate = function(self)
-        local wh = RenewableEnergy.Specs.batteries[DEEP_CYCLE].wh
-        local dayWh, nightWh = self.day.drawn, self.night.drawn
-        expect(dayWh > 0, "two hours of lit lamps by day drew nothing")
-        expect(nightWh > 0 and nightWh < dayWh / 2, string.format("the dimmed lamps draw %.2f Wh against %.2f by day", nightWh, dayWh))
-        local battery = boxItems(self.night.state, DEEP_CYCLE)[1]
-        -- What they drew came out of the battery. A battery's charge is kept in whole uses of its
-        -- UseDelta, which each pass rounds to.
-        expectNear("the battery's charge after both", battery and battery.charge or -1, 0.8 - (dayWh + nightWh) / wh, 3e-5)
+        -- A battery's charge is kept in whole uses of its UseDelta, which each pass rounds to.
+        local function charge(answer)
+            local battery = boxItems(answer.state, CAR_BATTERY)[1]
+            return battery and battery.charge or -1
+        end
+        local share = 2 * LIGHTBAR_SHARE_PER_HOUR
+        expectNear("the car battery's charge after two hours lit by day", charge(self.day), 0.8 - share, 2e-5)
+        expectNear("the car battery's charge after two more hours lit at night", charge(self.night), 0.8 - 2 * share, 3e-5)
     end,
 })
 

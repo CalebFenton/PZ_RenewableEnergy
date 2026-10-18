@@ -239,7 +239,7 @@ local FLASH_SETTLE_MS = 150
 local FLASH_SHOT_MS = 500
 
 -- The trailer switched on with a charged battery in its box, or none if not `lit`, its lamps set
--- as the clock's pass sets them, dimmed for the night if `night`, the clock set to midnight then.
+-- as the clock's pass sets them, lighting the ground if `night`, the clock set to midnight then.
 -- Returns a runSteps wait: at night until the lighting has settled on the dark and the board's
 -- lamppost, and for lit lamps until they are a little way into a flash.
 local function setLamps(pair, lit, night)

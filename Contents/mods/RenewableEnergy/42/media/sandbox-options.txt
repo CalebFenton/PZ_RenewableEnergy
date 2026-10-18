@@ -1,6 +1,6 @@
 VERSION = 1,
 /*
-    Sunlight multiplier: 1 is Kentucky's real sunlight, as many modules to a fridge as in 1993.
+    Sunlight multiplier: 1 is Kentucky's real sunlight on the mod's module ratings.
     The default puts a fridge-freezer at four or five modules in an average July and about eight
     on racks in December, so that each one you find matters.
 */

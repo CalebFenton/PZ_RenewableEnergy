@@ -534,7 +534,7 @@ function DigesterObject:takeGas(m3)
 end
 
 -- As the gas line's source (GasLines.run): gas below MIN_GAS is too little to run on, and a
--- generator burns GasKit.gasFor its load.
+-- generator burns GasKit.M3_PER_LITRE for each litre of petrol vanilla bills it.
 local MIN_GAS = 0.01
 
 function DigesterObject:canSupply()
@@ -549,10 +549,9 @@ function DigesterObject:wearFactor()
     return 1
 end
 
---- Gives the gas a generator delivering `watts` burns over `hours`. Returns whether there was
---- enough.
-function DigesterObject:supply(watts, hours)
-    local need = GasKit.gasFor(watts, hours)
+--- Gives the gas for `litres` of petrol the generator was billed. Returns whether there was enough.
+function DigesterObject:supply(litres)
+    local need = GasKit.M3_PER_LITRE * litres
     return self:takeGas(need) + 1e-4 >= need
 end
 

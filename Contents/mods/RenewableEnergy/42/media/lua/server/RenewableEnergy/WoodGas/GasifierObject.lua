@@ -2,8 +2,9 @@
 -- ash and tar that burning leaves, and the gas it gives the generator it is piped to.
 --
 -- The table is the gasifier's global object (RenewableEnergy.ObjectSystem), so every field in
--- SAVED_FIELDS is saved with the world. A lit gasifier burns IDLE_KG_PER_HOUR in its own pass; the
--- generator's gas line (GasLines.run) bills the load on top through supply(). The hopper and filter
+-- SAVED_FIELDS is saved with the world. While its generator runs on its gas, the generator's gas
+-- line (GasLines.run) bills it through supply() the wood for what vanilla billed the generator;
+-- otherwise a lit gasifier burns an idling generator's share in its own pass. The hopper and filter
 -- are its containers, so it only takes more wood, and tars more packing, while its chunk is
 -- loaded; while unloaded a lit gasifier burns down what is in the firebox (`fireKg`) and goes out.
 
@@ -28,6 +29,12 @@ GasifierObject.SAVED_FIELDS = {
 }
 
 local EPSILON = 1e-4
+-- Litres an hour vanilla bills an idling generator before the GeneratorFuelConsumption option
+-- (IsoGenerator's GeneratorBasePowerConsumption; only a generator's getBasePowerConsumption gives
+-- it, and a gasifier may have none).
+local IDLE_FUEL = 0.02
+-- A step toward each side (Gasifier.sideOf), in squares.
+local SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
 
 function GasifierObject:initNew()
     self.lit = false
@@ -180,19 +187,29 @@ function GasifierObject:wearFactor()
     return Gasifier.wearFactor(self:filterCounts())
 end
 
---- Burns the wood a generator delivering `watts` for `hours` takes beyond the idle burn, which
---- the gasifier's own pass bills. Returns whether it kept up.
-function GasifierObject:supply(watts, hours)
-    local kg = Gasifier.KG_PER_KWH * watts / 1000 * hours
+--- Burns the wood for `litres` of petrol vanilla billed the generator. Returns whether it kept up.
+function GasifierObject:supply(litres)
+    local kg = Gasifier.KG_PER_LITRE * litres
     return self:burn(kg) + EPSILON >= kg and self.lit
 end
 
 -- The pass --------------------------------------------------------------------------------------
 
---- Burns the idle wood of the `hours` since it last caught up, if lit.
+--- Whether the generator its pipe leads to runs on its gas, so the gas line bills all it burns.
+function GasifierObject:feedsRunningGenerator()
+    local step = self.pipe and SIDE_STEPS[self.pipe]
+    local square = step and getSquare(self.x + step[1], self.y + step[2], self.z)
+    local generator = square and RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
+    local state = generator and GasKit.stateOf(generator)
+    return state ~= nil and state.onGas == true and generator:isActivated()
+end
+
+--- Burns, if lit, the `hours` since it last caught up as a generator idling would: vanilla's idle
+--- bill times the GeneratorFuelConsumption option, at KG_PER_LITRE, so it burns down slowly and
+--- goes out when its wood is gone. While its generator runs on its gas, that bill is the line's.
 function GasifierObject:advance(hours)
-    if hours > 0 and self.lit then
-        self:burn(Gasifier.IDLE_KG_PER_HOUR * hours)
+    if hours > 0 and self.lit and not self:feedsRunningGenerator() then
+        self:burn(IDLE_FUEL * SandboxVars.GeneratorFuelConsumption * Gasifier.KG_PER_LITRE * hours)
     end
 end
 

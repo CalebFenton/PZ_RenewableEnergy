@@ -285,7 +285,7 @@ function Stage.vehiclesAtRest(pair, hitch)
     end
 end
 
---- Switches the trailer on and sets its lamps as the clock's pass sets them, dimmed for the night
+--- Switches the trailer on and sets its lamps as the clock's pass sets them, lighting the ground
 --- if `night`, after putting a battery charged to `charge` in its box if `charge` is given.
 function Stage.lightLamps(trailer, charge, night)
     local ArrowBoard = RenewableEnergy.ArrowBoard

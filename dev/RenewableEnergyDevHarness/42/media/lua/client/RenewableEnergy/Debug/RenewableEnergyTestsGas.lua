@@ -1,8 +1,9 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 
 -- Gas lines and wood gas: the Gas Conversion Kit on a vanilla generator, the line from a digester or
--- a gasifier that feeds it, and the gasifier itself. The generators' load is set through gasLoad, so
--- each test drives the line at a known number of watts.
+-- a gasifier that feeds it, and the gasifier itself. Tests take fuel from a generator through
+-- burnFuel, as vanilla's bill does, and set its load through gasLoad, so each test drives the line
+-- at a known bill and a known number of watts.
 
 local T = RenewableEnergyTest
 local test = T.test
@@ -118,14 +119,14 @@ test("renewable_energy_gas_kit_install_and_remove", {
     end,
 })
 
--- On a line from a digester with gas, an empty-tanked generator runs: it burns the digester's gas
--- for its load, its tank stays empty, and petrol poured in goes into the tank. Switched to petrol it
--- runs on its tank and leaves the gas; back on gas, when the gas runs out it stops, holding only its
--- tank. The line takes its hoses, which come back when it is cut.
+-- On a line from a digester with gas, an empty-tanked generator runs: the fuel vanilla bills it is
+-- paid in the digester's gas and put back, its tank stays empty, and petrol poured in goes into the
+-- tank. Switched to petrol it runs on its tank and leaves the gas; back on gas, when the gas runs
+-- out it stops, holding only its tank. The line takes its hoses, which come back when it is cut.
 test("renewable_energy_gas_generator_runs_on_gas", {
     instant = true,
     run = function(self)
-        self.gas, self.load, self.poured = Digester.HOLDERS.bags.capacity, 500, 3
+        self.gas, self.litres, self.poured = Digester.HOLDERS.bags.capacity, 0.25, 3
         local digester = digesterWithGas(self, "barrel.MetalDrum", self.gas)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
@@ -135,8 +136,8 @@ test("renewable_energy_gas_generator_runs_on_gas", {
         T.batch(function()
             T.readGenerator(self, generator, "connected")
             T.count(self, "connected", { GasKit.HOSE })
-            T.gasLoad(self, self.load)
             T.setGenerator(self, generator, { running = true })
+            T.burnFuel(self, generator, self.litres)
             T.gasPass(self, generator, 0.5)
             T.readGenerator(self, generator, "running")
             T.readRecord(self, digester, "fed")
@@ -173,11 +174,12 @@ test("renewable_energy_gas_generator_runs_on_gas", {
         T.expect(self.counts.connected[GasKit.HOSE] == 1,
             "the line left " .. tostring(self.counts.connected[GasKit.HOSE]) .. " of " .. (hoses + 1) .. " hoses, not 1")
         T.expect(running.running, "the generator didn't keep running on gas")
+        T.expectNear("fuel shown on gas once the pass paid what vanilla billed", running.fuel, GasKit.PHANTOM_FUEL, 0.01)
         if T.expect(running.state ~= nil, "the running generator lost its kit") then
             T.expectNear("tank while on gas", running.state.tank, 0, 0.001)
         end
         -- The digester's own pass may add a little gas meanwhile.
-        T.expectNear("gas the load burned in half an hour", self.gas - reads.fed.gas, GasKit.gasFor(self.load, 0.5), 0.02)
+        T.expectNear("gas paying for " .. self.litres .. " L of fuel", self.gas - reads.fed.gas, self.litres * GasKit.M3_PER_LITRE, 0.02)
         if T.expect(poured.state ~= nil, "the generator lost its kit after pouring") then
             T.expectNear("tank after pouring", poured.state.tank, self.poured, 0.01)
         end
@@ -190,41 +192,46 @@ test("renewable_energy_gas_generator_runs_on_gas", {
     end,
 })
 
--- A job at a kitted generator first settles the time since the last pass as it ran: switching to
--- petrol pays for the gas burned until then, and switching back to gas doesn't bill the time on
--- petrol as gas.
-test("renewable_energy_gas_job_bills_the_time_before_it", {
+-- A job at a kitted generator first settles the fuel burned since the last pass as it ran:
+-- switching to petrol pays in gas for the fuel burned on gas until then, and switching back to gas
+-- leaves the fuel burned on petrol to the tank.
+test("renewable_energy_gas_job_bills_the_fuel_before_it", {
     instant = true,
     run = function(self)
-        self.gas, self.load, self.hours = Digester.HOLDERS.bags.capacity, 500, 0.5
+        self.gas, self.tank, self.litres = Digester.HOLDERS.bags.capacity, 1, 0.2
         local digester = digesterWithGas(self, "barrel.MetalDrum", self.gas)
-        local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
+        local generator = digester and T.generator(self, { near = digester.square, fuel = self.tank })
         if not generator then return end
         fitAndConnect(self, generator, digester)
         T.batch(function()
-            T.gasLoad(self, self.load)
             T.setGenerator(self, generator, { running = true })
             T.gasPass(self, generator, 0)
             T.readRecord(self, digester, "onGas")
-            T.gasAge(self, generator, self.hours)
+            T.burnFuel(self, generator, self.litres)
         end)
         kitJob(self, generator, GasKit.TO_PETROL)
         T.batch(function()
             T.readRecord(self, digester, "onPetrol")
-            T.gasAge(self, generator, self.hours)
+            T.readGenerator(self, generator, "generatorOnPetrol")
+            T.burnFuel(self, generator, self.litres)
         end)
         kitJob(self, generator, GasKit.TO_GAS)
         T.batch(function()
-            -- A pass from the last as it stands, which the job set.
-            T.gasPass(self, generator, nil)
+            T.gasPass(self, generator, 0)
             T.readRecord(self, digester, "backOnGas")
+            T.readGenerator(self, generator, "generatorBackOnGas")
         end)
     end,
     validate = function(self)
         local reads = self.reads
-        T.expectNear("gas Run on Petrol billed for the " .. self.hours .. " hours on gas before it", reads.onGas.gas - reads.onPetrol.gas,
-            GasKit.gasFor(self.load, self.hours), 0.02)
-        T.expectNear("gas billed for the " .. self.hours .. " hours on petrol", reads.onPetrol.gas - reads.backOnGas.gas, 0, 0.02)
+        T.expectNear("gas Run on Petrol billed for the " .. self.litres .. " L burned on gas before it",
+            reads.onGas.gas - reads.onPetrol.gas, self.litres * GasKit.M3_PER_LITRE, 0.02)
+        T.expectNear("tank once on petrol", reads.generatorOnPetrol.fuel, self.tank, 0.01)
+        T.expectNear("gas billed for the " .. self.litres .. " L burned on petrol", reads.onPetrol.gas - reads.backOnGas.gas, 0, 0.02)
+        local backOnGas = reads.generatorBackOnGas
+        if T.expect(backOnGas.state ~= nil, "the generator lost its kit") then
+            T.expectNear("tank back on gas", backOnGas.state.tank, self.tank - self.litres, 0.01)
+        end
     end,
 })
 
@@ -406,9 +413,10 @@ local function light(self, gasifier)
 end
 
 -- A gasifier beside a kitted generator, piped to it and lit, runs the generator with an empty tank,
--- burning wood for the idle and for the load. A full ash pit, or a spent filter, cuts what it
--- carries to DIRTY_OUTPUT of the cap: a watt over that stalls the generator, a pit one short of full
--- doesn't, and at exactly that it runs. Out of wood, the generator stops.
+-- burning KG_PER_LITRE of wood for each litre vanilla bills the generator, and nothing more of its
+-- own while the generator runs. A full ash pit, or a spent filter, cuts what it carries to
+-- DIRTY_OUTPUT of the cap: a watt over that stalls the generator, a pit one short of full doesn't,
+-- and at exactly that it runs. Out of wood, the generator stops.
 test("renewable_energy_gas_gasifier_runs_generator", {
     instant = true,
     run = function(self)
@@ -420,7 +428,7 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         local spec = Gasifier.TIERS.standard
         self.generatorSide = Gasifier.sideOf(gasifier.x, gasifier.y, generator.x, generator.y)
         self.gasifierSide = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
-        self.load, self.dirtyCap = 2000, GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
+        self.litres, self.dirtyCap = 0.5, GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
         -- One tuft in the filter, so burning one item's worth of tar spends it.
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 6 } }, filter = { { type = "Base.HayTuft" } } })
         -- Lit first, so gas reaches the generator the moment the line is in.
@@ -429,8 +437,8 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         T.batch(function()
             T.readRecord(self, gasifier, "lit")
             T.readGenerator(self, generator, "connected")
-            T.gasLoad(self, self.load)
             T.setGenerator(self, generator, { running = true })
+            T.burnFuel(self, generator, self.litres)
             T.gasPass(self, generator, 1)
             T.ageRecord(self, gasifier, 1, "fed")
             T.readGenerator(self, generator, "running")
@@ -467,9 +475,9 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         T.expect(T.hasOverlay(connected, Sprites.gasifierPipeGenFor(connected.sprite, self.gasifierSide)),
             "the generator shows no pipe toward the gasifier")
         T.expect(running.running and running.fuel >= GasKit.PHANTOM_FUEL, "the generator didn't run on wood gas with an empty tank")
-        local kg = Gasifier.IDLE_KG_PER_HOUR + Gasifier.KG_PER_KWH * self.load / 1000
-        T.expectNear("wood burned in an hour at " .. self.load .. " W", (lit.hopperKg + lit.fireKg) - (fed.hopperKg + fed.fireKg), kg, 0.05)
-        T.expectNear("ash after that hour", fed.ash - lit.ash, kg * Gasifier.TIERS.standard.ashPerKg, 0.15)
+        local kg = self.litres * Gasifier.KG_PER_LITRE
+        T.expectNear("wood burned for " .. self.litres .. " L of fuel and an hour's own pass", (lit.hopperKg + lit.fireKg) - (fed.hopperKg + fed.fireKg), kg, 0.05)
+        T.expectNear("ash after that wood", fed.ash - lit.ash, kg * Gasifier.TIERS.standard.ashPerKg, 0.15)
         local over = (self.dirtyCap + 1) .. " W"
         T.expect(reads.ashNearlyFull.running, "an ash pit one short of full stalled a generator at " .. over)
         T.expect(stalled(reads.ashFull), "a full ash pit didn't stall a generator at " .. over)
@@ -478,6 +486,39 @@ test("renewable_energy_gas_gasifier_runs_generator", {
         T.expect(stalled(reads.filterSpent), "a spent filter didn't stall a generator at " .. over)
         T.expect(reads.dirtyRuns.running, "a spent filter didn't run a generator at " .. self.dirtyCap .. " W")
         T.expect(not reads.out.running and reads.out.state and reads.out.state.outOfGas, "out of wood, the generator kept running")
+    end,
+})
+
+-- A lit gasifier whose generator isn't running burns, in its own pass, the wood for what vanilla
+-- bills a generator idling (IsoGenerator.getBasePowerConsumption, at the default
+-- GeneratorFuelConsumption: the harness sets only the Lua copy of an option, which vanilla's Java
+-- doesn't read), and goes out once its wood is gone.
+test("renewable_energy_gas_gasifier_idles_as_a_generator", {
+    instant = true,
+    run = function(self)
+        local generator = T.generator(self, {})
+        local idling = generator and T.placeRecord(self, "gasifier", "standard")
+        local burning = idling and T.placeRecord(self, "gasifier", "standard")
+        if not burning then return end
+        self.hours, self.fireKg = 30, 0.1
+        T.batch(function()
+            T.readGenerator(self, generator, "vanilla")
+            T.fillRecord(self, idling, { hopper = { { type = "Base.Plank", count = 6 } } })
+            T.setRecord(self, idling, { lit = true })
+            T.readRecord(self, idling, "lit")
+            T.ageRecord(self, idling, self.hours, "idled")
+            T.setRecord(self, burning, { lit = true, fireKg = self.fireKg })
+            T.ageRecord(self, burning, self.hours, "burnedDown")
+        end)
+    end,
+    validate = function(self)
+        local reads = self.reads
+        local lit, idled = reads.lit, reads.idled
+        local kg = reads.vanilla.idle * Gasifier.KG_PER_LITRE * self.hours
+        T.expect(kg > self.fireKg, "the idle burn of " .. self.hours .. " hours is too small to burn the firebox down")
+        T.expectNear("wood burned idling " .. self.hours .. " hours", (lit.hopperKg + lit.fireKg) - (idled.hopperKg + idled.fireKg), kg, 0.01)
+        T.expect(idled.lit, "the gasifier went out with wood in its hopper")
+        T.expect(not reads.burnedDown.lit, "the gasifier stayed lit with its wood gone")
     end,
 })
 

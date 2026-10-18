@@ -291,16 +291,15 @@ function T.setGenerator(self, generator, fields)
     T.server(self, "generatorSet", args)
 end
 
---- Queues setting the generator's last gas pass `hours` ago without running one, so the next
---- pass or job bills them.
-function T.gasAge(self, generator, hours)
+--- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging
+--- from it take it; the next gas pass or job bills them to a line on gas.
+function T.burnFuel(self, generator, litres)
     local args = T.at(generator)
-    args.hours = hours
-    T.server(self, "gasAge", args)
+    args.litres = litres
+    T.server(self, "generatorBurn", args)
 end
 
---- Queues the gas pass, as though `hours` had passed since the generator's last, or, with `hours`
---- nil, from its last pass as it stands.
+--- Queues the gas pass, as though `hours` had passed since the generator's last.
 function T.gasPass(self, generator, hours)
     local args = T.at(generator)
     args.hours = hours
