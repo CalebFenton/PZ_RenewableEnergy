@@ -10,8 +10,8 @@ local handler = PZHarness.serverHandler
 
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
 
--- The building nearest the character within 60 squares, or nil. Any building does: the tests name
--- the finds to roll rather than relying on its rooms.
+-- The building nearest the character, or nil. Any building does: the tests name the finds to roll
+-- rather than relying on its rooms.
 local function buildingNear(character)
     local x, y = math.floor(character:getX()), math.floor(character:getY())
     for r = 0, 60 do

@@ -158,10 +158,9 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
 
 -- Panels on a bank ----------------------------------------------------------------------------
 
--- A module makes its rating times its condition: a module at 50 half what a whole one does, a
--- homemade one at its best something but less than a whole factory one, and a rack with a whole
--- and a shattered module what the whole one makes alone. The cracked panel says why it is low.
--- Catches condition ignored, or a shattered module still counted.
+-- A module makes its rating times its condition: a half-worn module half what a whole one does,
+-- a homemade one at its best less than a whole factory one, and a rack with a whole and a
+-- shattered module what the whole one makes alone. The cracked panel says why it is low.
 test("renewable_energy_solar_module_condition_sets_watts", {
     run = function(self)
         local bank = T.bank(self, "batteryRackMetal", { "Base.CarBattery1", "RenewableEnergy.ChargeController" }, { charge = 0.1 })
@@ -189,7 +188,7 @@ test("renewable_energy_solar_module_condition_sets_watts", {
         local sources = self.bank.state.status.sources
         local cracked, homemade, rack = sources[1], sources[2], sources[3]
         if not expect(cracked and homemade and rack, "the status lists fewer than three panels") then return end
-        -- The rack's whole module is the measure: same type, condition 100, same sun.
+        -- The rack's whole module is the measure: same type, same sun.
         local whole = rack.watts
         expect(whole > 0, "a rack with a whole module made nothing at 1000 W/m²")
         expectNear("a module at condition 50 over a whole one", cracked.watts / whole, 0.5, 0.01)
@@ -527,7 +526,7 @@ test("renewable_energy_solar_menu_panel_wired_to", {
     end,
 })
 
--- The option's least: the timing's tolerance still dwarfs a round trip to a local server.
+-- The option's minimum; the timing's tolerance still dwarfs a round trip to a local server.
 local CONNECT_MINUTES = 1
 -- A multiplayer server times actions in real milliseconds whatever the game speed
 -- (NetTimedAction.getDuration); in single player the action and the clock speed up alike.
@@ -541,9 +540,8 @@ local function worldMinutes()
     return getGameTime():getWorldAgeHours() * 60
 end
 
--- Connecting a panel takes the ConnectPanelMin sandbox option's in-game minutes at Electricity
--- 3, from the moment the action starts to the moment it ends, and leaves the bank listing the
--- panel, on the server and in this client's status.
+-- Connecting a panel takes the ConnectPanelMin sandbox option's in-game minutes, from the action's
+-- start to its end, and leaves the bank listing the panel, on the server and in this client's status.
 test("renewable_energy_solar_connect_panel", {
     sandbox = { ConnectPanelMin = CONNECT_MINUTES },
     run = function(self)
@@ -1097,7 +1095,7 @@ for _, entry in ipairs(TAKE_APART) do
     craftTest(craftName(recipe), { recipe = recipe, from = input, counts = counts, after = expectCells, validate = gaveCells })
 end
 
--- Only a module that makes no power comes apart: one at 0 does, one at 1 is worth more whole.
+-- Only a module that makes no power comes apart; one that still works is worth more whole.
 for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
     local behavior, condition = entry[1], entry[2]
     local refused = condition > 0

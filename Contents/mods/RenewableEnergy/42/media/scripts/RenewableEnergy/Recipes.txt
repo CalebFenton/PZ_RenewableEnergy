@@ -13,9 +13,9 @@
     battery's charge as uses.
 
     Fluids: an `item 1 [*]` line followed by `-fluid` takes that fluid from any container, and
-    one followed by `+fluid` pours it into an empty container the player keeps. Acid goes one
-    litre per container, so the litres a battery gives back when stripped are the ones it takes
-    when rebuilt, in bottles of BatteryElectrolyte or anything else that holds a litre.
+    one followed by `+fluid` pours it into an empty container the player keeps. Acid goes in
+    whole containers, so what a battery gives back when stripped is what it takes when rebuilt,
+    in bottles of BatteryElectrolyte or anything else that holds as much.
 
     Learning: NeedToBeLearn recipes come from the Homestead Power magazines, from AutoLearnAny,
     or from researching a found item (the item's output recipe, plus its ResearchableRecipes).
@@ -681,8 +681,8 @@ module Base
     }
 
     /*
-        Stripping drains the battery's acid into empty containers, a litre each, and leaves its
-        case and its worn plates. Any battery strips, a dead one too.
+        Stripping drains the battery's acid into empty containers and leaves its case and its
+        worn plates. Any battery strips, a dead one too.
     */
     craftRecipe RenewableEnergy_StripCarBattery
     {
@@ -798,7 +798,7 @@ module Base
 
     /*
         Lead melts in the simplest furnace; the mold is fired clay and lasts. Some lead burns off
-        as dross, so three worn sets cast two, or two and a lead pipe to make up the loss.
+        as dross, so fewer sets come out than go in, or a lead pipe makes up the loss.
     */
     craftRecipe RenewableEnergy_RecastBatteryPlates
     {
@@ -824,8 +824,7 @@ module Base
     }
 
     /*
-        Plates from new lead, with no case to put them in: jar batteries need none. Soft pipe
-        lead casts three pipes to one set.
+        Plates from new lead, with no case to put them in: jar batteries need none.
     */
     craftRecipe RenewableEnergy_CastBatteryPlatesFromLeadPipe
     {
@@ -851,7 +850,7 @@ module Base
 
     /*
         New plates and acid in the old case: the battery as new, and empty. A car battery comes
-        from OnCreate, as whichever of vanilla's three the case came out of.
+        from OnCreate, as whichever of vanilla's car batteries the case came out of.
     */
     craftRecipe RenewableEnergy_RebuildCarBattery
     {
@@ -941,9 +940,9 @@ module Base
     }
 
     /*
-        Six glass jars of plates and acid, stood in a sand tray and wired in series: a battery
-        with no case at all. Vanilla has a glazed clay jar but nothing makes it yet; listed so
-        crock cells work as soon as vanilla adds glazing.
+        Glass jars of plates and acid, stood in a sand tray and wired in series: a battery with
+        no case at all. Vanilla has a glazed clay jar but nothing makes it yet; listed so crock
+        cells work as soon as vanilla adds glazing.
     */
     craftRecipe RenewableEnergy_MakeJarBattery
     {
@@ -1244,7 +1243,7 @@ module Base
 
     /******************************* Wind chargers ********************************/
 
-    /* Three propeller blades carved from planks, each a long twisted airfoil. Taught by Homestead
+    /* Propeller blades carved from planks, each a long twisted airfoil. Taught by Homestead
        Power #4. */
     craftRecipe RenewableEnergy_CarveWoodenBlades
     {
@@ -1268,7 +1267,7 @@ module Base
         }
     }
 
-    /* Three blades sawn from a length of plastic pipe: a curved airfoil for free, the quick way
+    /* Blades sawn from a length of plastic pipe: a curved airfoil for free, the quick way
        to a propeller. */
     craftRecipe RenewableEnergy_CutPipeBlades
     {
@@ -1291,7 +1290,7 @@ module Base
         }
     }
 
-    /* Three steel blades hammered out of sheet steel at a forge, for the homemade alternator. */
+    /* Steel blades hammered out of sheet steel at a forge, for the homemade alternator. */
     craftRecipe RenewableEnergy_ForgeSteelBlades
     {
         timedAction = HammerMetalStanding,

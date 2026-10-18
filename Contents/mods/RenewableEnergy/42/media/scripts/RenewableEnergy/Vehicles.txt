@@ -3,7 +3,7 @@ module Base
     /* In module Base, as vanilla's vehicles are: templates and model files are looked up by bare
        name there. art/models/models.py writes the mesh and its textures; the body is built in the
        frame of vanilla's Trailer, so the numbers below are that trailer's, multiplied out by its
-       model scale of 1.82, and read in metres.
+       model scale, and read in metres.
 
        vehicle_multiuv_noreflect rather than its norandom twin: the damage shells take their hue
        from the paint, and their saturation and value as offsets from it, outside the Head, Tail,

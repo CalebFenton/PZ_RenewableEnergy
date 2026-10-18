@@ -175,7 +175,6 @@ function Commands.replaceBlades(player, args)
     return true
 end
 
--- The treadmill tile at `position`, or nil.
 local function treadmillAt(position)
     return isPosition(position) and Treadmill.on(getSquare(position.x, position.y, position.z)) or nil
 end
@@ -268,7 +267,7 @@ function Commands.unwire(player, args)
     return true
 end
 
---- Repair the inverter or controller `itemId` in the bank with one Electronics Scrap.
+--- Repair the inverter or controller `itemId` in the bank with Electronics Scrap.
 function Commands.repairPart(player, args)
     local bank = bankAt(args.bank)
     local container = bank and containerOf(bank)

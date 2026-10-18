@@ -1,13 +1,11 @@
--- What a bank powers: every switched-on appliance in its reach, in watts, an unwired treadmill
--- while a run draws power through it, and the running generators whose reach covers the bank.
+-- What a bank powers: every switched-on appliance in its reach, an unwired treadmill while a run
+-- draws power through it, and the running generators whose reach covers the bank.
 --
--- The engine says whether an object draws power and how much: getGeneratorPowerConsumption reads
--- the appliance's own switch, powered or not, so a bank that cut its power still sees what would
--- draw when it comes back, and its figure, generator fuel an hour, comes to watts at
--- Specs.wattsPerFuel. The reach is the engine's own for every generator: one radius
--- from the GeneratorTileRange sandbox option and GeneratorVerticalPowerRange floors up and down
--- (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power. A generator
--- powers a square exactly when the square is in that reach of the generator
+-- getGeneratorPowerConsumption reads the appliance's own switch, powered or not, so a bank that
+-- cut its power still sees what would draw when it comes back. Its figure is generator fuel an
+-- hour, which Specs.wattsPerFuel turns into watts. The reach is the engine's own for every
+-- generator (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power. A
+-- generator powers a square exactly when the square is in that reach
 -- (IsoGenerator.isPoweringSquare), so the same scan finds the generators powering the bank.
 --
 -- The engine knows nothing of a treadmill's draw: a run says when it draws (Treadmill.isDrawing),
@@ -75,7 +73,8 @@ local function addAppliances(load, object)
     end
 end
 
---- A new, empty load for Loads.add: `watts` it takes, and per kind its count and watts.
+--- A new, empty load: the `watts` it takes, per kind its count and watts, and the running
+--- generators found.
 function Loads.new()
     return { watts = 0, kinds = {}, generators = {} }
 end

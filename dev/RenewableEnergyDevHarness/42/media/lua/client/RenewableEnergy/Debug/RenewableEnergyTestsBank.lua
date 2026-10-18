@@ -544,8 +544,8 @@ test("renewable_energy_bank_part_wear_and_repair", {
 
 -- Chargers and generator charging --------------------------------------------------------------
 
--- With the grid off, a rack bank with two batteries, two car battery chargers and an
--- Inverter/Charger, and a square for a backup generator in reach of it; nil if either can't be had.
+-- With the grid off, a rack bank with batteries, car battery chargers and an Inverter/Charger,
+-- and a square for a backup generator in reach of it; nil if either can't be had.
 local function chargerBank(self, opts)
     T.setGrid(self, false)
     local bank = T.bank(self, "batteryRackWood",
@@ -567,7 +567,7 @@ test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
         local charge = 0.2
         local bank, backup = chargerBank(self, { charge = charge })
         if not bank then return end
-        -- For half the time the room left in the two batteries takes to fill.
+        -- For half the time the room left in the batteries takes to fill.
         self.chargersW = chargerBankWatts()
         local roomWh = (1 - charge) * 2 * Specs.batteries[CHARGED_BATTERY].wh
         self.hours = roomWh / 2 / self.chargersW
@@ -657,8 +657,8 @@ test("renewable_energy_bank_generator_fuel_follows_battery_room", {
 
 -- Failsafe -------------------------------------------------------------------------------------
 
--- The failsafe starts its generator below FailsafeStartCharge and stops it at FailsafeStopCharge:
--- off at the start charge, on a percent below it, on a percent below the stop charge, off at it.
+-- The failsafe starts its generator below FailsafeStartCharge and stops it at FailsafeStopCharge,
+-- checked a percent either side of each.
 test("renewable_energy_bank_failsafe_starts_generator", {
     sandbox = { FailsafeStartCharge = 20, FailsafeStopCharge = 80 },
     run = function(self)
@@ -1598,7 +1598,7 @@ test("renewable_energy_bank_placed_bank_starts_unconnected", {
         local square = T.square(self, { indoors = true }, "a free indoor square for a bank")
         if not square then return end
         self.square = square
-        -- A bank tile is placed with the Electrician tool, a screwdriver.
+        -- Placing a bank tile needs the Electrician tool.
         T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
         T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood)
         T.waitFor(self, function()
@@ -1640,8 +1640,8 @@ local function connectBankOption(bank)
     return option
 end
 
--- Connecting a bank takes what connecting a generator does in vanilla: Electricity 3 or the
--- "Generator" recipe, enforced by the menu, the action and the authority.
+-- Connecting a bank takes what connecting a generator does in vanilla: the Electricity level or
+-- the "Generator" recipe, enforced by the menu, the action and the authority.
 test("renewable_energy_bank_connect_needs_generator_skill", {
     run = function(self)
         self.unskilled = T.bank(self, "batteryBoxWood", {}, { connected = false })
@@ -1689,7 +1689,7 @@ test("renewable_energy_bank_connect_and_disconnect", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {}, { connected = false })
         if not self.bank then return end
-        -- A bank tile is picked up with the Electrician tool, a screwdriver.
+        -- Picking up a bank tile needs the Electrician tool.
         T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
         local bank = self.bank
         local function canPickUp()

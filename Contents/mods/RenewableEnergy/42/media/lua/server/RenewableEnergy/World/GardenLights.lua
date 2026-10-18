@@ -51,7 +51,6 @@ function GardenLights.buildingKey(def)
     return def:getX() .. "," .. def:getY()
 end
 
---- Whether the house was rolled already.
 function GardenLights.isRolled(def)
     return store()[GardenLights.buildingKey(def)] ~= nil
 end
@@ -79,7 +78,7 @@ function GardenLights.chanceFor(def)
     return GardenLights.CHANCE[GardenLights.neighbourhood(x, y)] * SandboxVars.RenewableEnergy.GardenLights / 100
 end
 
--- Finding squares ------------------------------------------------------------------------------
+-- Finding squares
 
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
@@ -152,7 +151,7 @@ local function frontSquares(def, count)
     return chosen
 end
 
--- Rolling ----------------------------------------------------------------------------------------
+-- Rolling
 
 -- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
 -- Returns how many it placed.

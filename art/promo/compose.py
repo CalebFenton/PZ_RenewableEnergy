@@ -168,10 +168,10 @@ GALLERY_GAS_WINDOW_SCALE = 1.8
 # The treadmill's room at its captured size, clear of the black past the rooms the character saw.
 GALLERY_TREADMILL_CROP = (0, 40, 1260, 650)
 # The item and recipe sheets drawn this many times the README's size: as large as the fullest page
-# allows, which keeps their smallest text at 18 and 16 pixels.
+# allows, which keeps their smallest text readable.
 ITEM_K = 1.1
 RECIPE_K = 1.33
-# The item sheet over three pictures, with how many cards to a line on each.
+# The item sheet's pictures, with how many cards to a line on each.
 GALLERY_ITEMS = [
     ("items-power", "Panels to mount, banks to fill, parts to wire in", ITEM_ROWS[:3], 7),
     ("items-batteries", "Batteries to rebuild, gadgets to take apart", ITEM_ROWS[3:5], 7),

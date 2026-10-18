@@ -1,8 +1,7 @@
 -- The mod's tile sprites by what they show, and back.
 --
--- art/models renders every tile of renewable_energy_01 from the same Blender models as the
--- item icons and ground models, and tools/make_tiles.py gives each placed tile its properties.
--- Lua names tiles only through this file, so a new layout changes nothing else.
+-- The tiles are rendered from the same models as the item icons and ground models. Lua names tiles
+-- only through this file, so a new layout changes nothing else.
 
 require "RenewableEnergy/Specs"
 
@@ -67,8 +66,8 @@ Sprites.digester = {
     dome = tile(231),
 }
 -- Their gas holders, drawn over the digester's own tile: `bags` and `tarp` beside any barrel,
--- from 1 (slack) to 3 (taut), or torn; `drum` the insulated digester's floating drum, from 1 (low)
--- to 4 (risen highest).
+-- from slack to taut, or torn; `drum` the insulated digester's floating drum, from low to risen
+-- highest.
 Sprites.digesterHolder = {
     bags = tiles(232, 3),
     bagsTorn = tile(235),
@@ -81,11 +80,8 @@ Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = t
 -- The homemade gas heater, one facing; both tiles give the heater back.
 Sprites.gasHeater = { off = tile(244), lit = tile(245) }
 -- The gas kit fitted to a generator and the generator's half of a gasifier's pipe, drawn over the
--- game's own generator tile. On each of the game's generators the kit sits on the engine's air
--- intake and the pipe comes down into it, so they are drawn per body and facing (art/models/tiles.py
--- GENERATOR_KIT_FIRST and GENERATOR_PIPE_FIRST, from 280): the red and yellow generators share a
--- body, the old open-frame one and the blue inverter have their own. `default` lies on the floor
--- at the front corner of a generator the game doesn't know, another mod's.
+-- game's own generator tile. The kit sits on each generator body's air intake, so both are drawn per
+-- body and facing; `default` lies on the floor for a generator the game doesn't know (another mod's).
 Sprites.gasKit = { default = tile(246), bySprite = {} }
 -- The pipe by the gasifier's direction from the generator.
 Sprites.gasifierPipeGen = { default = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }, bySprite = {} }
@@ -133,31 +129,27 @@ Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = 
 -- the squares' shared edge: `gasifierPipe` on the gasifier's tile, by the generator's direction from
 -- it, and the generator's half (Sprites.gasifierPipeGenFor) on the generator's tile with the kit.
 Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
--- The scoop rotor wind charger, the propeller wind charger (its blades carved from wood or cut from
--- plastic pipe), and the homemade alternator wind charger, the last two a tile per facing of the
--- rotor. In play the game draws each as a sprite model instead (Sprites.windModels).
+-- Wind charger tiles, per blade material and rotor facing where the kind has them. In play the game
+-- draws each as a sprite model instead (Sprites.windModels).
 Sprites.windScoop = tile(264)
 Sprites.windPropeller = {
     wood = { N = tile(265), E = tile(266), S = tile(267), W = tile(268) },
     pipe = { N = tile(269), E = tile(270), S = tile(271), W = tile(272) },
 }
 Sprites.windAlternator = { N = tile(273), E = tile(274), S = tile(275), W = tile(276) }
--- Each wind charger kind's sprite models (scripts SpriteModels.txt, written by art/models/items.py
--- SPRITE_MODELS): the name before the step number, which for the propeller and the alternator goes
--- on with the blade material and the way the rotor faces (Propeller<Wood|Pipe><N..W>,
--- Alternator<N..W>); `steps` models, each the rotor turned a step on, and how many steps make the
--- turn back to where it started (the scoop rotor looks the same every half turn, three blades every
--- third).
+-- Each wind charger kind's sprite models (scripts SpriteModels.txt): the name before the step
+-- number, suffixed with blade material and/or facing per the by* flags; `steps` models each turn
+-- the rotor one step, and stepsPerTurn is how many steps bring it back round (fewer for rotors that
+-- look the same after part of a turn).
 Sprites.windModels = {
     scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
     propeller = { name = "RenewableEnergy.Propeller", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
     alternator = { name = "RenewableEnergy.Alternator", byFacing = true, steps = 6, stepsPerTurn = 18 },
 }
 
--- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles in each of four facings, by the way
--- a runner on it faces: the console end, and the rear end the runner stands on. The runner faces
--- away from the tiles' Facing; the console is the tile its depth geometry (tileGeometry.txt) puts
--- the console's box on.
+-- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles per facing, keyed by the way a runner
+-- faces: away from the tiles' Facing. The console tile is the one its depth geometry
+-- (tileGeometry.txt) puts the console's box on; the runner stands on the rear.
 Sprites.treadmill = {
     W = { console = "recreational_sports_01_36", rear = "recreational_sports_01_37" },
     N = { console = "recreational_sports_01_39", rear = "recreational_sports_01_38" },
@@ -360,7 +352,7 @@ end
 
 local NO_SLOTS = {}
 
--- A mount's crack overlays by module slot. Shared: don't change it.
+-- A mount's crack overlays by module slot. May be Sprites.cracks' own list: don't change it.
 local function crackSlots(kind, facing, material)
     local slots = ofMount(Sprites.cracks, kind, facing, material)
     if type(slots) == "string" then

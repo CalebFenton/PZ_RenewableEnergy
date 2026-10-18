@@ -113,7 +113,7 @@ local function digesterTiles()
         table.insert(list, { x = 5, y = i + 3, sprite = Sprites.digester.barrel[barrel], overlays = { scrubbed[barrel], scrubber.barrel } })
     end
     -- The insulated digester with its scrubber, the dome bare and with it, then the gas heater off
-    -- and lit and the game's three generator bodies with the gas kit on their intakes.
+    -- and lit and the game's generator bodies with the gas kit on their intakes.
     table.insert(list, { x = 7, y = 1, sprite = Sprites.digester.insulated, overlays = { holder.drum[2], scrubber.insulated } })
     table.insert(list, { x = 7, y = 4, sprite = Sprites.digester.dome })
     table.insert(list, { x = 7, y = 6, sprite = Sprites.digester.dome, overlays = { scrubber.dome } })
@@ -136,8 +136,8 @@ local function digesterTiles()
     return list
 end
 
--- The scoop rotor wind charger as its sprite model at each spin step, three to a row with a square
--- between them for the rotor's swing, and once as its plain tile.
+-- The scoop rotor wind charger as its sprite model at each spin step, spaced for the rotor's swing,
+-- and once as its plain tile.
 local function windTiles()
     local list = {}
     local prefix, model = Sprites.windModelOf(Sprites.windScoop)
@@ -150,8 +150,7 @@ local function windTiles()
 end
 
 -- The propeller chargers, wooden then pipe, and the alternator charger, a row each, as their sprite
--- models facing N, E, S and W in turn, three squares apart for their rotors, each at a different
--- spin step.
+-- models facing each way in turn, spaced for their rotors, each at a different spin step.
 local function tallWindTiles()
     local list = {}
     for row, sprites in ipairs({ Sprites.windPropeller.wood, Sprites.windPropeller.pipe, Sprites.windAlternator }) do
@@ -507,8 +506,8 @@ local CRACKED_PANELS = {
     { x = 1, y = 5, sprite = Sprites.rack.wood.S, conditions = { 30, 100 } },
     { x = 3, y = 5, sprite = Sprites.rack.metal.S, conditions = { 100, 45 } },
 }
--- Lot squares x 5 to 8, y 1 to 3 stay open, east of the mounts, for a trailer with a cracked panel.
--- The character stands south-east of the mounts and south-west of the open ground, hiding neither.
+-- The squares east of the mounts stay open for a trailer with a cracked panel. The character
+-- stands south-east of the mounts and south-west of the open ground, hiding neither.
 local CRACKED_SHOT = { name = "art_cracked", x = 7, y = 7, zoomSteps = 2 }
 
 local function addCrackedShot(steps, player, lot)

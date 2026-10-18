@@ -44,7 +44,7 @@ function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
     end
     local scaled = before + (after - before) * scale
     item:setCurrentUsesFloat(scaled)
-    -- Vanilla sent the unscaled charge to clients if it showed a change at two decimals.
+    -- Vanilla may already have sent the unscaled charge; resend if the scaled one shows differently.
     if VehicleUtils.compareFloats(after, scaled, 2) then
         vehicle:transmitPartUsedDelta(part)
     end

@@ -2227,7 +2227,7 @@ ALTERNATOR_HUB = 4.3
 ALTERNATOR_BLADE = (1.0, 0.14, 0.005)
 # The rotor turned a step at a time: three blades look the same after a third of a turn.
 ROTOR_SPINS = (0, 20, 40, 60, 80, 100)
-# The radius of the 8 inch plastic pipe pipe blades are sawn from: its curve is their airfoil.
+# The radius of the plastic pipe the pipe blades are sawn from: its curve is their airfoil.
 PIPE_BLADE_CURVE = 0.1
 
 
@@ -2425,7 +2425,7 @@ FACING_YAWS = {"N": 0, "E": -90, "S": 180, "W": 90}
 # by the name after the model's; "yaws" the turns of the whole model, by the name after that;
 # "spins" the rotor's angles in degrees about the hub at height "hub", a mesh each, named by their
 # index last. A sprite model's name is the model's, the skin's, the yaw's and the spin's, so the
-# scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor0 to 5.
+# scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor and an index.
 SPRITE_MODELS = {
     "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): 30 * step for step in range(6)}},
     "Propeller": {"model": propeller_charger, "skins": {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}},
@@ -2544,8 +2544,8 @@ def _trailer_tongue(col, front):
 
 TRAILER_BOX = (0.72, 0.42, 0.34)  # width, depth and height of the battery box
 TRAILER_BOX_AT = (TRAILER_DECK_Y + TRAILER_DECK[1] / 2 + 0.3, -0.05)  # y and z of its bottom centre
-# The lid's hinge pins run along X at the back of the box's top, and the lid turns about them. Open
-# this far, it clears the panels' undersides by a centimetre and a half; much further and it meets
+# The lid's hinge pins run along X at the back of the box's top, and the lid turns about them.
+# Open TRAILER_LID_OPEN degrees, it just clears the panels' undersides; much further and it meets
 # them.
 TRAILER_LID_HINGE = (0, TRAILER_BOX_AT[0] - TRAILER_BOX[1] / 2 - 0.01, TRAILER_BOX_AT[1] + TRAILER_BOX[2])
 TRAILER_LID_OPEN = 70
@@ -2574,9 +2574,9 @@ def _trailer_battery_box(col):
 
 
 ARROW_BOARD = (1.5, 0.85, 0.09)
-# The board's 15 lamps on one grid, (across, along) from its centre: a shaft of nine across the
-# board and a head of three each side pointing left, each head lamp in a shaft lamp's column. The
-# outer head lamps clear the frame by a couple of centimetres.
+# The board's lamps on one grid, (across, along) from its centre: a shaft across the board and a
+# head each side pointing left, each head lamp in a shaft lamp's column. The outer head lamps
+# clear the frame by a couple of centimetres.
 LAMP_PITCH = (0.15, 0.105)
 ARROW_LAMPS = ([(LAMP_PITCH[0] * (4 - i), 0.0) for i in range(9)]
                + [(LAMP_PITCH[0] * (i - 4), sign * LAMP_PITCH[1] * i) for i in (1, 2, 3) for sign in (-1, 1)])

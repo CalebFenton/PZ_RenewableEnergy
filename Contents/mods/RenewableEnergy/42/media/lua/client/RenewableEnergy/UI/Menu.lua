@@ -1,9 +1,7 @@
--- Right-click menus for battery banks, the panels, wind chargers and treadmills connected to them,
--- garden lights and vehicles. Each option queues a RenewableEnergyAction, which walks the
--- character over and does the job, except Repair Frame, which walks over and queues vanilla's
--- fixing, and Run on Treadmill. Parts go into a bank and come out only through Wire In and Unwire
--- here (see RenewableEnergy/Patches.lua). An option is greyed out by the same refusal functions the
--- job's action and the authority ask (RenewableEnergy.Needs).
+-- Right-click menus for battery banks, their sources, garden lights and vehicles. Options are
+-- greyed out by the same refusal functions the job's action and the authority ask, so the menu
+-- refuses exactly what they would. Parts enter and leave a bank only through Wire In and Unwire
+-- (see RenewableEnergy/Patches.lua).
 
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
@@ -64,8 +62,6 @@ local function lightOr(character, mode, blocker)
     end
     return blocker
 end
-
--- Queueing ---------------------------------------------------------------------------------------
 
 local function queueAt(playerNum, square, mode, object, bank, item, bankName)
     local character = getSpecificPlayer(playerNum)
@@ -170,8 +166,6 @@ function Menu.askName(playerNum, bank)
     end
     return modal
 end
-
--- Bank -------------------------------------------------------------------------------------------
 
 -- "Car Battery (72%)": a wired part, told apart from its twins by its condition.
 local function partLabel(item)
@@ -327,8 +321,6 @@ function Menu.addBankOptions(playerNum, context, bank)
     return menu
 end
 
--- Source -----------------------------------------------------------------------------------------
-
 -- The entry for the source at `here` in its bank's summary.
 local function sourceSummary(bankPosition, here)
     local summary = PowerBank.getSummary(bankPosition.x, bankPosition.y, bankPosition.z)
@@ -418,8 +410,6 @@ function Menu.addSourceOptions(playerNum, context, source)
     return menu
 end
 
--- Treadmill ------------------------------------------------------------------------------------
-
 -- Run on Treadmill, greyed saying why while it can't go (Treadmill.runRefusal).
 local function addRunOption(playerNum, menu, treadmill)
     local run = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
@@ -434,7 +424,7 @@ local function addWiredTreadmillOptions(playerNum, menu, treadmill)
     Needs.refuse(unwire, lightOr(getSpecificPlayer(playerNum), Action.UNWIRE_TREADMILL))
 end
 
--- Run on Treadmill, on power, and Wire to Bank, for a treadmill neither of whose tiles is wired yet.
+-- Run on Treadmill and Wire to Bank, for a treadmill neither of whose tiles is wired yet.
 function Menu.addTreadmillOptions(playerNum, context, treadmill)
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, Menu.nameOf(treadmill))
@@ -443,8 +433,6 @@ function Menu.addTreadmillOptions(playerNum, context, treadmill)
         Action.WIRE_TREADMILL, treadmill)
     Needs.show(option, Treadmill.needs(character), lightOr(character, Action.WIRE_TREADMILL))
 end
-
--- Garden light -----------------------------------------------------------------------------------
 
 --- Remove Light Bulb for a light that has one, else Add Light Bulb with one option for each type
 --- of bulb the character carries, shown in its colour as vanilla shows a lamp's. Returns the
@@ -468,8 +456,6 @@ function Menu.addGardenLightOptions(playerNum, context, light)
     end
     return menu
 end
-
--- Vehicle ----------------------------------------------------------------------------------------
 
 --- Seal Cracked Panel for each cracked panel of an arrow board trailer that the seal can
 --- help, listing what the seal takes and greyed out when the character can't do it.
@@ -524,8 +510,6 @@ function Menu.addVehicleOptions(playerNum, context, vehicle)
             Action.ATTACH_MAINTAINER, vehicle, maintainer)
     end
 end
-
--- Filling the menu -------------------------------------------------------------------------------
 
 -- The generator vanilla would have offered its menu on had the bank not been there.
 --

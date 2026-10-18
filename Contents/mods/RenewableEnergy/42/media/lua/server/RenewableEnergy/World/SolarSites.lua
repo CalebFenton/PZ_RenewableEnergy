@@ -74,13 +74,12 @@ local function moduleCount(kind, mount)
     return RenewableEnergy.Specs.mounts[MOUNTS[mount].kind].modules
 end
 
--- Placing ------------------------------------------------------------------------------------------
+-- Placing
 
 -- What a spot (its global object's modData) puts down on its square, by its `what`. Vehicles
 -- can't safely join the world while their chunk is still loading, so a spot that `waits` is placed
--- at the next minute, its spot kept until then; its `place` returns whether the game took it, and
--- one the game refuses, with another vehicle in the way, keeps its spot and tries once more each
--- time its chunk loads.
+-- at the next minute. Its `place` returns whether the game took it; a refused spot (another
+-- vehicle in the way) is kept and retried when its chunk next loads.
 local SPOTS = {
     panel = {
         place = function(square, spot)
@@ -104,7 +103,7 @@ local SPOTS = {
     },
 }
 
--- Rolling ------------------------------------------------------------------------------------------
+-- Rolling
 
 local function addSpot(x, y, z, fields)
     if system:getObjectAt(x, y, z) then

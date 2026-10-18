@@ -525,13 +525,11 @@ handler("chargerState", function(_, args)
 end)
 
 -- Fills the solar battery charger on the square at `args` with `args.count` batteries at
--- `args.uses` (as AddItem makes them, full, if nil), sent to the clients, and charges it for
--- `args.hours` at the sun of the moment, then, if `args.pass`, runs the pass over every charger for
--- as long again. An empty battery leaves its container on its next update
--- (DrainableComboItem.update), so filling and charging happen in one call. Answers the uses added,
--- the charges after each, `full` (every battery at its whole maximum of uses, which the float
--- can't tell), the Wh kept toward the next use, and flatWh: what an hour of the sun it charged in
--- gives a flat panel per rated watt, since the live weather sets it.
+-- `args.uses` (full if nil) and charges it for `args.hours` at the sun of the moment, then, with
+-- `args.pass`, runs the pass over every charger as long again. One call, since an empty battery
+-- leaves its container on its next update (DrainableComboItem.update). Answers the uses added, the
+-- charges after, `full` (every battery at its whole maximum, which the float can't tell), the Wh
+-- kept, and flatWh: what an hour of that sun gives a flat panel per rated watt.
 handler("cellCharge", function(_, args)
     local SolarCellCharger = RenewableEnergy.SolarCellCharger
     local charger = SolarCellCharger.findOn(squareAt(args))
@@ -701,8 +699,7 @@ end)
 
 -- Vanilla's alternator charging (Vehicles.Update.Battery) for `args.minutes` with the engine
 -- running, from a battery at `args.uses`: the share of a full charge it added. The engine is
--- repaired and fuelled first, since it shuts down without fuel and stalls at random below half
--- condition, and switched off after.
+-- repaired and fuelled first, since it shuts down without fuel and stalls at random when worn.
 onCar("alternatorCharge", function(vehicle, args)
     vehicle:repair()
     local tank = vehicle:getPartById("GasTank")
@@ -723,7 +720,6 @@ end)
 
 -- The clock ---------------------------------------------------------------------------------------
 
--- The arrow board trailer's battery box.
 local function batteryBoxOf(trailer)
     local part = trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
     return part and part:getItemContainer()

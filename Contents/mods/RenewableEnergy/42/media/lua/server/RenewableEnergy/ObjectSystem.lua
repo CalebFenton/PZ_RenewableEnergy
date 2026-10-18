@@ -1,8 +1,6 @@
--- The authority's side of the features it keeps in a Global Object System (digesters, gasifiers):
--- a system per feature that saves each object's record with the world, runs every record each ten
--- minutes, loaded or not, and sends every client its summary; a base for the records; and the one
--- order every job there is done in. Each side reads them through the accessors of
--- shared/RenewableEnergy/GlobalObjects.lua.
+-- The authority's side of features kept in a Global Object System (digesters, gasifiers): a system
+-- per feature that saves each record with the world, runs every record each ten minutes loaded or
+-- not, and sends clients its summary; a base for the records; and the order every job is done in.
 
 if isClient() then return end
 
@@ -18,11 +16,9 @@ RenewableEnergy.ObjectSystem = ObjectSystem
 
 local Sprites, Fumes = RenewableEnergy.Sprites, RenewableEnergy.Fumes
 
--- A pass longer than this (a save loaded after the clock jumped) counts as this long. These objects
--- run while unloaded, so a week away is a week of digesting or burning.
+-- Cap on one pass (a save loaded after the clock jumped). These objects run while unloaded, so time
+-- away counts as digesting or burning.
 local LONGEST_PASS = 24 * 7
-
--- Records ------------------------------------------------------------------------------------------
 
 --- The base of a feature's records. A record is its global object's table, so the fields its
 --- class's SAVED_FIELDS names are saved with the world. A class defines advance(hours), what the
@@ -74,8 +70,6 @@ end
 function Object:aboutToRemoveFromSystem()
     Fumes.set(self:key(), nil, false)
 end
-
--- Systems -------------------------------------------------------------------------------------------
 
 --- Defines and registers a feature's system. `spec`: name (the class is RenewableEnergy_<name>System),
 --- kind (its tiles' Sprites kind), owner (its shared module: SYSTEM_NAME, TIERS, and the
@@ -143,11 +137,10 @@ function ObjectSystem.define(spec)
     return System
 end
 
---- Does `job` for `character` at `isoObject`, on the authority, once the timed action that does it
---- has finished: brings the record up to now, so the job works on what is there, checks the job
---- again (`Jobs.refusal`), does it (`apply(character, job, record, isoObject, with)`, which returns
---- whether it was done), then shows and tells. `owner` is the feature's shared module; `with` what
---- the job works with (RenewableEnergyGasAction). Returns whether it was done.
+--- Does `job` for `character` at `isoObject` once its timed action finished: catches the record up
+--- so the job works on what is there, rechecks it (`Jobs.refusal`), does it (`apply(character, job,
+--- record, isoObject, with)` returns whether it was done), then shows and tells. `with` is what the
+--- job works with (RenewableEnergyGasAction). Returns whether it was done.
 function ObjectSystem.perform(owner, Jobs, apply, character, job, isoObject, with)
     local record = isoObject and owner.recordOf(isoObject)
     if not record then

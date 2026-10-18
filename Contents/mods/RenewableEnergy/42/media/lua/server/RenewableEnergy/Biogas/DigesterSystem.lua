@@ -37,8 +37,6 @@ function DigesterSystem.OnCreate(params)
     onCreate(params)
 end
 
--- Jobs ------------------------------------------------------------------------------------------
-
 -- What each job does to the digester `digester` (its tile `isoObject`) beyond taking its
 -- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag or tank. Returns whether it
 -- was done.
@@ -90,7 +88,7 @@ local function upgrade(character, digester, row, isoObject)
     return true
 end
 
--- Fills the tank `item` as far as the row's fill goes.
+-- Fills `tank` as far as the row's fill goes.
 local function fill(character, digester, row, isoObject, tank)
     local plain, scrubbed, perUse = DigesterJobs.fillUses(row.fill, digester, tank)
     if plain + scrubbed <= 0 then
@@ -154,8 +152,8 @@ local function apply(character, job, digester, isoObject, item)
     return true
 end
 
---- Does `job` for `character` at the digester `isoObject`, on the authority, once the timed action
---- that does it has finished. `item` is the job's bag or tank. Returns whether it was done.
+--- Does `job` for `character` at the digester `isoObject` once its timed action finished. `item` is
+--- the job's bag or tank. Returns whether it was done.
 function DigesterSystem.perform(character, job, isoObject, item)
     return ObjectSystem.perform(Digester, DigesterJobs, apply, character, job, isoObject, item)
 end

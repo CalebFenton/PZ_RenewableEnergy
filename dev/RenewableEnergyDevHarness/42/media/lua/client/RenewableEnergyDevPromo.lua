@@ -1,15 +1,11 @@
 -- Development only; dev/run-debug-client.sh --promo runs it instead of the tests. It builds the
--- setups near the scenario start and saves the raw art that art/promo/compose.py lays out for the
--- README and the Workshop page: screenshots named promo_<shot>.png in <cachedir>/Screenshots, and
--- <cachedir>/Lua/REPromo.json, which names the regions of every screenshot and holds the item,
+-- setups near the scenario start and saves the raw art that art/promo/compose.py lays out:
+-- promo_<shot>.png screenshots, and REPromo.json naming each screenshot's regions and the item,
 -- recipe and skill names in the game's language.
--- The shots come in groups (dev/harness.conf's MODE_GROUPS_promo), and PROMO=<group>,... shoots
--- only those, building only the setups they need, so the extraction replaces only their captures.
--- Shots of anything but the world are taken twice, on black and on white (PZHarness/Capture.lua).
--- The empty floor is shot too, so that art/promo/extract.py can find each item by comparing its
--- shot with the floor's.
--- The run draws as many frames a second as it can, so its steps wait for what they need, such as
--- the lighting settling, and count frames only for drawing.
+-- PROMO=<group>,... shoots only those groups, building only the setups they need. Shots of
+-- anything but the world are taken on black and on white (PZHarness/Capture.lua), and the empty
+-- floor too, so that art/promo/extract.py can find each item by difference.
+-- The run draws frames as fast as it can, so steps wait on conditions, not frame counts.
 
 require "PZHarness/TestLib"
 local Capture = require "PZHarness/Capture"
@@ -170,7 +166,7 @@ local STUDIO = {
 -- The trailer shot, on a road: positions are (ahead, side) squares from the car, `side` towards
 -- the far side of the road from the camera, so a heading's frame runs `along` ahead and `out` to
 -- the side. Road cones taper across the lane behind the trailer, and the character stands on the
--- far side of the trailer's battery box, two squares off, where the arrow board hides none of them.
+-- far side of the trailer's battery box, where the arrow board hides none of them.
 local ROAD = {
     -- The car faces north on a north-south road, else west on an east-west one, so that the
     -- arrow board on the trailer's back faces the camera.
@@ -226,8 +222,8 @@ local POSTER = {
     -- floor is free, then outdoors.
     indoors = { { -3, -2 }, { 0, -2 }, { 3, -2 } },
     scouts = { { -4, 4 }, { 0, 8 }, { 6, 4 }, { 6, 0 } },
-    -- One in the morning, the next day (past 24 the clock rolls over): darker than the garden
-    -- lights' hour, so the lit house stands out of the street.
+    -- Past 24 the clock rolls over into the next morning: darker than the garden lights' hour, so
+    -- the lit house stands out of the street.
     hour = 25,
     -- Out far enough for the whole house and the dark around it.
     zoomOut = 3,
@@ -274,7 +270,7 @@ local R2 = {
             { "Base.Firewood", 0.7, 0.7, 200 }, { "Base.Charcoal", 0.5, 0.5, 45 },
         },
     },
-    -- The four wind chargers in a row across the screen, smallest first, every rotor facing south.
+    -- The wind chargers in a row across the screen, smallest first, every rotor facing south.
     wind = {
         open = { along = { -1, 8 }, out = { -1, 8 }, sum = 6, half = 3 },
         chargers = {
@@ -1403,8 +1399,8 @@ local function addWorld()
     end)
 end
 
--- Adds the steps that open the window `open()` returns at (100, 100) on a backdrop, wait until
--- `ready(window)` and the UI has drawn it twice more, shoot it as `name` and close it.
+-- Adds the steps that open the window `open()` returns on a backdrop, wait until `ready(window)`
+-- and the UI has drawn it again, shoot it as `name` and close it.
 local function addWindowShot(name, open, ready)
     local window
     run:add(function()
@@ -1771,8 +1767,8 @@ local function addBiogas()
     addGasWindow("digester", RenewableEnergy.DigesterWindow, "digester")
 end
 
--- The three gasifiers, two lit and piped to running generators, a step out from the closest
--- zoom, then the gasifier's window.
+-- The gasifiers, the lit ones piped to running generators, a step out from the closest zoom,
+-- then the gasifier's window.
 local function addWoodgas()
     addOutfit(true)
     run:add(function()
@@ -1800,7 +1796,7 @@ local function addWoodgas()
     addGasWindow("gasifier", RenewableEnergy.GasifierWindow, "standard")
 end
 
--- The four wind chargers turning in the breeze, a step out from the closest zoom.
+-- The wind chargers turning in the breeze, a step out from the closest zoom.
 local function addWind()
     addOutfit(true)
     run:add(function()

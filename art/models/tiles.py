@@ -135,7 +135,7 @@ TILES[249] = _overlay(items.dome_digester, (0, 0, 0), scrubber=True)
 TILES[244] = [layer(items.gas_heater)]
 TILES[245] = [layer(items.gas_heater, lit=True)]
 # The gas kit fitted to a generator: an overlay on the game's own generator tiles, so it has no
-# base of the mod's to hold out. Tile 246 lies on the floor at the front corner of a generator the
+# base of the mod's to hold out. The first lies on the floor at the front corner of a generator the
 # game doesn't know; from GENERATOR_KIT_FIRST, one sits on the air intake of each of the game's
 # generator bodies in each facing (Sprites.generatorFittings).
 GENERATOR_BODIES = ("frame", "old", "inverter")
@@ -149,8 +149,8 @@ for b, body in enumerate(GENERATOR_BODIES):
 # Gasifiers: each tier's tile, then its lit overlay. The pipe overlays on its square, one by the
 # direction of the generator they run to, rise off the filter's outlet, which is in one place in
 # every tier; the preview draws them over the drum's. The pipe's other half lies on the generator's
-# square with the kit, one by the direction of the gasifier it comes from: 260 to 263 for a
-# generator the game doesn't know, from GENERATOR_PIPE_FIRST four for each body and facing.
+# square with the kit, one by the direction of the gasifier it comes from: four for a generator the
+# game doesn't know, then from GENERATOR_PIPE_FIRST four for each body and facing.
 for offset, tier in enumerate(("primitive", "standard", "advanced")):
     TILES[250 + offset] = [layer(items.gasifier, tier=tier)]
     TILES[253 + offset] = [layer(items.gasifier, holdout=True, tier=tier), layer(items.gasifier, frame=False, tier=tier, lit=True)]

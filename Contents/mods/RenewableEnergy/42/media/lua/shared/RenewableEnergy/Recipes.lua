@@ -6,13 +6,11 @@ require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
--- Callbacks of the craftRecipes in media/scripts/RenewableEnergy/Recipes.txt. Shared, since
--- OnTest runs wherever the craft is checked, and every side looks up all of a recipe's Lua calls
--- when it sets up a craft (CraftRecipeData, "Could not find lua function"). OnCreate runs once,
--- on the authority (single player or the server), after the outputs were already sent to a
--- multiplayer client, so whatever it changes on an item is sent again: an output, which is in
--- the character's inventory, with syncItemFields (condition, uses and modData); an input, which
--- may lie in a nearby container or on the floor, with sendItemStats (condition and uses).
+-- Callbacks of the mod's craftRecipes. Shared: OnTest runs wherever the craft is checked, and every
+-- side resolves all of a recipe's Lua calls when it sets up a craft (CraftRecipeData). OnCreate runs
+-- once on the authority, after the outputs were already sent to an MP client, so item changes are
+-- re-sent: outputs (in the inventory) with syncItemFields, inputs (maybe in a nearby container or on
+-- the floor) with sendItemStats.
 --
 -- OnTest is asked about every candidate item of every input, tools included, so each one
 -- answers only for the items it is about and lets the rest through.
@@ -27,8 +25,8 @@ local CASE_BATTERY_KEY = "RenewableEnergy_batteryType"
 
 -- Panel mounts by item type: kind, the Specs.mounts row; xp, what the mount recipe teaches, by
 -- perk name, when every module in it is new to mounting. A module teaches its share only the
--- first time it is ever mounted (PowerBank.MOUNTED_ONCE), so unmounting and mounting the same
--- modules again teaches nothing.
+-- first time it is ever mounted (its record's `mounted` flag), so unmounting and mounting the
+-- same modules again teaches nothing.
 Recipes.MOUNTS = {
     ["RenewableEnergy.SolarFlat"] = { kind = "flat", xp = { Electricity = 10 } },
     ["RenewableEnergy.SolarWallWood"] = { kind = "wall", xp = { Electricity = 15, Woodwork = 5 } },
@@ -99,8 +97,6 @@ local function countRepair(item)
     setRepairs(item, item:getHaveBeenRepaired() + 1)
 end
 
--- Panel mounts -----------------------------------------------------------------------------------
-
 -- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will, and
 -- the modules new to mounting teach their share of the recipe's XP.
 function Recipes.mountModules(craftRecipeData, character)
@@ -144,8 +140,6 @@ function Recipes.unmountModules(craftRecipeData, character)
         RenewableEnergy.giveItems(character, item)
     end
 end
-
--- Solar modules ----------------------------------------------------------------------------------
 
 -- OnTest of Seal Cracked Module: the module must be below what the seal brings it to.
 function Recipes.isModuleBelowRepairCap(item, character)
@@ -296,8 +290,6 @@ function Recipes.isShatteredModule(item, character)
     return item:getFullType() ~= Specs.factoryModule or item:getCondition() <= 0
 end
 
--- Batteries --------------------------------------------------------------------------------------
-
 local function inputBattery(craftRecipeData)
     return firstInput(craftRecipeData, Battery.isBattery)
 end
@@ -345,7 +337,7 @@ local function setRebuilt(battery)
     Battery.setCharge(battery, 0)
 end
 
--- OnCreate of Rebuild Deep Cycle and L-16 Battery: like new, and empty.
+-- OnCreate of the recipes that rebuild or make a battery: like new, and empty.
 function Recipes.rebuildBattery(craftRecipeData, character)
     local battery = craftRecipeData:getFirstCreatedItem()
     setRebuilt(battery)
@@ -363,8 +355,6 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
     RenewableEnergy.giveItems(character, battery)
 end
 
--- Gadgets ----------------------------------------------------------------------------------------
-
 -- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
 function Recipes.takeApartGardenLight(craftRecipeData, character)
     local light = firstInput(craftRecipeData, function(item)
@@ -375,8 +365,6 @@ function Recipes.takeApartGardenLight(craftRecipeData, character)
         RenewableEnergy.giveItems(character, bulb)
     end
 end
-
--- Propane ----------------------------------------------------------------------------------------
 
 -- What a full lantern bottle holds, as a share of a full tank: a one-pound bottle off a twenty.
 Recipes.PROPANE_BOTTLE_SHARE = 0.05

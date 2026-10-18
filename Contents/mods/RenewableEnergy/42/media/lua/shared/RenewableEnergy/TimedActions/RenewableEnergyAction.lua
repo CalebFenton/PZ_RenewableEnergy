@@ -50,15 +50,13 @@ Action.DISCONNECT_BANK = "DisconnectBank"
 -- What clears snow off a panel without scratching it: a broom sweeps, a snow shovel pushes.
 local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
 
--- At normal speed an action advances this many units each real second, whatever the day length:
--- an in-game minute is 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
+-- Action units per real second at normal speed, whatever the day length: an in-game minute is
+-- 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
 local UNITS_PER_SECOND = 48
 
--- How far from the middle of the target's square, on each axis in squares, a character may work
--- on a bank, a source or a garden light: what luautils.walkAdj counts as already there, the square
--- getCorrectSquareForWall moves a wall's target to, and a couple more for the character's drift
--- and a multiplayer client's lag. A vehicle job gets as much past the vehicle's body, whose areas
--- the menu walks the character to (ISPathFindAction.pathToVehicleArea).
+-- How far from the middle of the target's square, on each axis, a character may work: what
+-- luautils.walkAdj and getCorrectSquareForWall leave as "there", plus slack for drift and client lag.
+-- A vehicle job measures past the vehicle's body (ISPathFindAction.pathToVehicleArea).
 local REACH = 4.6
 
 function Action.isSnowTool(item)
@@ -96,8 +94,8 @@ local function bankSummary(self)
     end
 end
 
--- The share of its full time a job takes at an Electricity level: all of it at level 3, less
--- above it and more below, in a straight line.
+-- The share of its full time a job takes at an Electricity level, falling in a straight line
+-- with skill.
 local function skillFactor(level)
     return 1 - 0.095 * (level - 3)
 end
@@ -374,7 +372,7 @@ JOBS = {
         light = true,
         sound = "GeneratorConnect",
     },
-    -- As a part comes out of a bank: half the wiring's time, no tools, the wire given back.
+    -- As a part comes out of a bank: quicker than wiring, no tools, the wire given back.
     [Action.UNWIRE_TREADMILL] = {
         keeps = function(self) return onSquare(self.object) and Treadmill.isWiredTile(self.object) end,
         command = function(self) return "unwireTreadmill", { source = positionOf(self.object) } end,

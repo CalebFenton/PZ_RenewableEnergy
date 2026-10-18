@@ -262,11 +262,10 @@ def baked_normal(obj, size, bevel=None):
 
 # The game lights a world item evenly, so faces of one colour draw as one flat patch and the
 # item's shape is lost. Like a hand-painted game texture, the bake paints the light in, as the
-# tiles are lit (render.py: from the west, a little south): tops lightest, the south side the
-# camera sees on the left a shade darker, the east side on the right darker again, every edge
-# rounded off so it catches a highlight, and each side darkening towards the ground. The faces the
-# camera sees head-on keep about their own colour, as the game crushes dark ones towards black:
-# upward faces come out about 1.3 times their colour, the south side 0.97, the east side 0.85.
+# tiles are lit (render.py: from the west, a little south): tops lightest, the south side a shade
+# darker, the east side darker again, every edge rounded off so it catches a highlight, and each
+# side darkening towards the ground. Faces seen head-on keep about their own colour, since the game
+# crushes dark ones towards black.
 SKY, SKY_TILT = 0.85, 0.15  # sky light on a side face, and how much more (less) facing up (down)
 SUN, SUN_TOWARD = 0.45, Vector((-0.85, -0.35, 1.0)).normalized()
 EDGE_RADIUS, EDGE_GLINT = 0.008, 0.6

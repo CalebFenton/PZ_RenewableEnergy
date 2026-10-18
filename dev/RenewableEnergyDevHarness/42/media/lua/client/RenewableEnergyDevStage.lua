@@ -17,8 +17,8 @@ local LOOK_AROUND = { IsoDirections.N, IsoDirections.E, IsoDirections.S, IsoDire
 -- Lighting passes a facing is held for: the main thread hands the facing to the lighting thread on
 -- its next update, the thread's next pass sees with it, and the pass after that one is back.
 local LOOK_PASSES = 3
--- The lighting thread updates the squares every few dozen milliseconds, and shows a change of
--- facing within about a tenth of a second, so lighting this long unchanged has settled.
+-- The lighting thread updates the squares many times a second and shows a change of facing within
+-- a few passes, so lighting this long unchanged has settled.
 local SETTLE_MS = 300
 -- How far around the character the lighting has to settle, in squares.
 local SETTLE_RADIUS = 15

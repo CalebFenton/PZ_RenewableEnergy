@@ -1,7 +1,6 @@
 -- The hands-on jobs at a gasifier: what each takes of the character and what refuses it. The menu
--- shows the same needs the authority checks (RenewableEnergy.firstUnmet); the authority does them
--- (server/RenewableEnergy/WoodGas/GasifierSystem.lua). Loading wood and changing the filter's
--- packing are the loot window's.
+-- shows the same needs the authority checks; GasifierSystem does them. Loading wood and changing
+-- the filter's packing are the loot window's.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
@@ -20,7 +19,7 @@ GasifierJobs.DRAIN = "DrainCondensate"
 
 -- Less than this in the drain isn't worth draining.
 local MIN_CONDENSATE = 0.1
--- Lighting takes this many minutes, and a cold start, with the bellows, COLD_LIGHT_MINUTES.
+-- Minutes to light, and to light from cold with the bellows.
 local LIGHT_MINUTES, COLD_LIGHT_MINUTES = 2, 10
 
 local BELLOWS = { item = Gasifier.BELLOWS[1], types = Gasifier.BELLOWS, keep = true }

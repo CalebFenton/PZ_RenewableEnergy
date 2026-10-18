@@ -1,10 +1,8 @@
--- Development only. The setup of the Renewable Energy QA debug scenario
--- (RenewableEnergyDebugScenario.lua), for playing through the mod by hand: a character nothing can
--- see or hurt, who carries anything, knows every recipe of the mod and has every skill it reads,
--- holding toolboxes with the small tools the mod's recipes and menu jobs take, and nearby, laid out
--- on the ground in a group of rows for each of the mod's systems, a square to each item type: every
--- item of the mod, enough of every recipe's other inputs to make each recipe once, what the menu
--- jobs take, the crafting stations, a treadmill, and a car with the arrow board trailer behind it.
+-- Development only. The setup of the Renewable Energy QA debug scenario, for playing through the
+-- mod by hand: an invisible, invulnerable character with every recipe and skill the mod reads and
+-- the small tools in toolboxes, and nearby, in rows by system, a square to each item type: the
+-- mod's items, enough inputs to make each recipe once, what the menu jobs take, the crafting
+-- stations, a treadmill, and a car towing the arrow board trailer.
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 
@@ -34,9 +32,7 @@ local PREFER = {
     "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1",
 }
 
--- What the mod's menu jobs take, beyond its recipes and tools, and what they work on: wiring parts
--- into a bank, repairing parts, connecting a bank, the battery charger, feeding and tending
--- digesters, fuelling gasifiers, the gas kit and its line, the cell charger and garden lights.
+-- What the mod's menu jobs take, beyond its recipes and tools, and what they work on.
 local JOB_ITEMS = {
     { "Base.ElectricWire", 40 }, { "Base.ElectronicsScrap", 10 }, { "Base.CarBatteryCharger", 2 },
     { "Base.CarBattery1", 1 }, { "Base.CarBattery2", 1 }, { "Base.CarBattery3", 1 }, { "Base.Generator", 1 },
@@ -52,22 +48,16 @@ local JOB_ITEMS = {
     { "Base.LightBulb", 4 }, { "Base.Battery", 6 }, { "Base.BakingSoda", 2 }, { "Base.Thread", 2 },
 }
 
--- The tools the menu jobs take and keep, as their materials' `tool` and kept items name them: the
--- wiring and the gas kit, sewing and upgrading a digester, filling a tank by pump, lighting a cold
--- gasifier and cleaning out its ash, clearing snow off panels (Action.isSnowTool), and cutting the
--- padlock off the trailer's battery box.
+-- The tools the menu jobs take and keep, as their materials' `tool` and kept items name them.
 local JOB_TOOLS = {
     "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.Saw", "Base.Needle", "Base.TirePump", "Base.Bellows",
     "Base.LargeBellows", "Base.Shovel", "Base.Broom", "Base.SnowShovel", "Base.BoltCutters",
 }
 
--- The tools, those the recipes keep and JOB_TOOLS, go in toolboxes: vanilla's, as many as they
--- fill. A kept item goes in only if vanilla files it as a tool (DisplayCategory Tool or
--- ToolWeapon), so jars, gloves and knives a recipe keeps stay laid out, and only if lighter than
--- the most a toolbox takes of one item (its MaxItemSize). The tools at that limit (the
--- long-handled ones, the tire pump and the hand drill) stay laid out with the heavy ones, which
--- leaves the rest two toolboxes, one for each hand: the crafting window takes items only from the
--- bags the character holds or wears (ISInventoryPage:refreshBackpacks).
+-- The tools, those the recipes keep and JOB_TOOLS, go in vanilla toolboxes. A kept item goes in
+-- only if vanilla files it as a tool and it fits a toolbox's MaxItemSize, which keeps the
+-- toolboxes few enough to hold: the crafting window takes items only from the bags the character
+-- holds or wears (ISInventoryPage:refreshBackpacks).
 local TOOLBOX = "Base.Toolbox"
 
 -- The layout's groups, in order, each from a row of its own. An item type goes in the group
@@ -154,8 +144,8 @@ for group, types in pairs(GROUP_TYPES) do
     end
 end
 
--- The crafting stations the recipes' tags ask for, as their entities and tiles; the forge is three
--- tiles in a row, as its SpriteConfig's south face lays them out, east from its first.
+-- The crafting stations the recipes' tags ask for, as their entities and tiles; the forge's tiles
+-- run east from its first, as its SpriteConfig's south face lays them out.
 local STATIONS = {
     { entity = "Base.Hand_Press", sprites = { "crafted_01_72" } },
     { entity = "Base.Kiln_Small", sprites = { "crafted_01_56" } },
@@ -373,7 +363,7 @@ local function collectStock(summary)
     return stock
 end
 
--- Puts the stock's small tools (TOOLBOX) in toolboxes in `player`'s inventory, starting a new one
+-- Puts the stock's small tools in TOOLBOX toolboxes in `player`'s inventory, starting a new one
 -- when the last has no room, and the first two in the hands. Room is counted with no character,
 -- by the toolbox's own capacity, which the Organized and Disorganized traits would change
 -- (ItemContainer.getEffectiveCapacity), so every character gets the same toolboxes. What a tool's

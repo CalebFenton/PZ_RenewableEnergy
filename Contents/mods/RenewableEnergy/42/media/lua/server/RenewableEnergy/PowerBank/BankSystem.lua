@@ -50,7 +50,7 @@ function BankSystem:initSystem()
 end
 
 -- Each loaded bank gets the summary the clients are sent, which isn't saved, before any client
--- connects. Saves made while the whole status was synced still hold a copy of it, which goes.
+-- connects. A status left in older saves is dropped.
 function BankSystem:initLuaObjects()
     SGlobalObjectSystem.initLuaObjects(self)
     for i = 1, self:getLuaObjectCount() do
@@ -68,10 +68,8 @@ function BankSystem:newLuaObject(globalObject)
     return Bank:new(self, globalObject)
 end
 
--- Placing and removing -------------------------------------------------------------------
-
 -- Set while makeBank takes away a working bank to rebuild it: the bank's state on the global
--- object (charge, panels, name, wear still owed) stays for the rebuilt bank to load.
+-- object stays for the rebuilt bank to load.
 local rebuilding = false
 
 --- Make a bank tile into a working bank: an IsoGenerator, the only thing that powers the
@@ -248,8 +246,6 @@ function BankSystem:OnClientCommand(command, player, args)
     end
 end
 
--- Map loading ----------------------------------------------------------------------------
-
 -- A bank's chunk loaded. Rebuild a bank tile that isn't a working bank (a placement that
 -- failed halfway, a map or stash placing the bare tile) so a reload repairs it.
 local function loadBank(isoObject)
@@ -265,13 +261,10 @@ for _, name in ipairs(PowerBank.bankSprites()) do
     MapObjects.OnLoadWithSprite(name, loadBank, Sprites.LOAD_PRIORITY)
 end
 
--- A panel's chunk loaded: its overlays were saved with it, but a save from before the mod drew
--- cracks has none.
+-- A panel's chunk loaded: its overlays are saved with it, but older saves may lack the cracks.
 for kind in pairs(RenewableEnergy.Specs.mounts) do
     MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), PanelSource.showCracks, Sprites.LOAD_PRIORITY)
 end
-
--- The charge pass ------------------------------------------------------------------------
 
 --- What every bank in this pass shares: the weather, the light on each mount averaged over
 --- the `hours` up to now (and what it would be under a clear sky), and the hours of storm

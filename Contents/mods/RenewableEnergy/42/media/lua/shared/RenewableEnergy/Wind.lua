@@ -1,10 +1,9 @@
--- Wind chargers: their output from the game's wind (ClimateManager.getWindspeedKph, stronger in
--- winter, no day and night), the turbine's power curve, how high it stands and what shelters it;
--- and the brake and broken blades a placed charger keeps in its modData, which only the authority's
--- RenewableEnergy.WindSource writes.
+-- Wind chargers: output from the game's wind (ClimateManager.getWindspeedKph, no day/night cycle),
+-- the power curve, height and shelter; plus the brake and broken-blade modData, which only the
+-- authority's RenewableEnergy.WindSource writes.
 --
--- Shelter has no direction: the game's wind angle is a screen-space value for its weather effects
--- (ClimateManager.getWindAngleDegrees), so a turbine counts what stands around it on every side.
+-- Shelter has no direction: the game's wind angle is a screen-space value for weather effects
+-- (ClimateManager.getWindAngleDegrees), so every side counts.
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Sources"
@@ -44,16 +43,14 @@ function Wind.bladesRefusal(isoObject, item)
     return nil
 end
 
---- Whether a turbine of `spec` has turned its head out of a wind of `kph` (Specs.wind.turbines
---- furlKph): only the homemade alternator does.
+--- Whether a turbine of `spec` has turned its head out of a wind of `kph` (Specs.wind.turbines furlKph).
 function Wind.furled(spec, kph)
     return spec.furlKph ~= nil and kph >= spec.furlKph
 end
 
 --- The watts a turbine of `spec` (Specs.wind.turbines) makes in a wind of `kph`, standing on level
---- `z` with `shelter` (0 open .. 1 walled in) around it: nothing below its cut-in speed, rising
---- with the cube of the speed to its rating at its rated speed, and no more above it; furled, its
---- furled share of the rating.
+--- `z` with `shelter` (0 open .. 1 walled in) around it: zero below cut-in, rising with the cube of
+--- the speed to its rating at rated speed and flat above; furled, its furled share.
 function Wind.watts(spec, kph, z, shelter)
     local wind = Specs.wind
     if kph <= spec.cutInKph then
@@ -67,14 +64,13 @@ function Wind.watts(spec, kph, z, shelter)
     return spec.watts * share * height * (1 - wind.shelterLoss * shelter)
 end
 
---- Whether wind of `kph` can break a turbine of `spec` left running: never the scoop rotor; the
---- homemade alternator, furled, only in the worst.
+--- Whether wind of `kph` can break a turbine of `spec` left running (only specs with breakKph can).
 function Wind.canBreak(spec, kph)
     return spec.breakKph ~= nil and kph >= spec.breakKph
 end
 
--- How much a square shelters a turbine on level `z`: a tree, or a wall or a building's square that
--- stands as high, blocks it; low growth and lower buildings don't.
+-- Whether a square shelters a turbine on level `z`: a tree near the ground, or a building at
+-- least as tall.
 local function blocks(square, z)
     if not square then
         return 0
@@ -108,10 +104,9 @@ function Wind.shelterAt(x, y, z)
     return count > 0 and blocked / count or 0
 end
 
---- The build menu's OnCreate for every wind charger (scripts/RenewableEnergy/Entities.txt), on the
---- authority. Single player fires no OnObjectAdded for a built object, so this fires it, as
---- vanilla's TrapBO does: RenewableEnergy.WindSpin starts the new charger turning from it. A
---- multiplayer client gets it from the server's AddItemToMapPacket.
+--- The build menu's OnCreate for every wind charger, on the authority. Single player fires no
+--- OnObjectAdded for a built object, so this fires it, as vanilla's TrapBO does, letting
+--- RenewableEnergy.WindSpin start it turning. MP clients get it from the server's AddItemToMapPacket.
 function Wind.OnCreate(params)
     if params.thumpable then
         triggerEvent("OnObjectAdded", params.thumpable)

@@ -2,7 +2,7 @@
 
 | Check | What it catches |
 | --- | --- |
-| `tile-format` | A `tiledef=` or `pack=` line in mod.info naming no file or a file number outside 100..8189, or a `.tiles` file that does not read and write back byte for byte. |
+| `tile-format` | A `tiledef=` or `pack=` line in mod.info naming no file or a file number the game rejects, or a `.tiles` file that does not read and write back byte for byte. |
 | `tile-sprite` | A tile with properties but no packed sprite. |
 | `tile-item` | A tile's `CustomItem` that is no item. |
 | `tile-name` | A tile's `GroupName CustomName` without its `Moveables.json` key. |

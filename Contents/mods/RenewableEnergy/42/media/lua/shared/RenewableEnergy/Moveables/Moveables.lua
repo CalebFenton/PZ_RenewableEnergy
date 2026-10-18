@@ -14,10 +14,9 @@ require "RenewableEnergy/Biogas/Digester"
 
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 
--- Scrapping ---------------------------------------------------------------------------------------
--- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Panels, mounts,
--- the failsafe, the cell charger and the garden light have no CanScrap: they are picked up whole
--- (their tiles' CustomItem), and mounts are unmounted by recipe, which returns the modules.
+-- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Other placed objects
+-- have no CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
+-- recipe, which returns the modules.
 
 local BANK_SCRAP = {
     RenewableEnergyBatteryBoxWood = {
@@ -42,9 +41,8 @@ local BANK_SCRAP = {
     },
 }
 
--- After vanilla's own OnGameBoot handler, which resets the definitions before filling them. A fridge
--- cut up with a blowtorch also gives its compressor (vanilla's "Fridge" material), which a digester
--- uses to fill propane tanks.
+-- Added after vanilla's own OnGameBoot handler, which resets the definitions before filling them.
+-- Scrapping a fridge also gives its compressor, which a digester uses to fill propane tanks.
 Events.OnGameBoot.Add(function()
     local defs = ISMoveableDefinitions:getInstance()
     for material, items in pairs(BANK_SCRAP) do
@@ -56,9 +54,8 @@ Events.OnGameBoot.Add(function()
     defs.addScrapItem("Fridge", RenewableEnergy.Digester.COMPRESSOR, 1, 80, true)
 end)
 
--- A treadmill (Sprites.treadmill) gives its motor when dismantled: the wind charger's generator.
--- Vanilla scraps each tile of a multi-tile object in turn (ISMoveableSpriteProps.scrapObject), so
--- the motor comes with the tile that was clicked.
+-- A dismantled treadmill gives its motor. Vanilla scraps each tile of a multi-tile object in turn
+-- (ISMoveableSpriteProps.scrapObject), so the motor comes only with the clicked tile.
 local Treadmill = RenewableEnergy.Treadmill
 
 local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
@@ -77,8 +74,6 @@ function ISMoveableSpriteProps:getScrapItemsList(character)
     end
     return items
 end
-
--- Placing -----------------------------------------------------------------------------------------
 
 --- Why the item `fullType` may not be placed on `square`: a translation key, or nil if it may.
 local function placementRefusal(fullType, square)
@@ -110,7 +105,6 @@ function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, m
     return infoTable
 end
 
--- Picking up --------------------------------------------------------------------------------------
 -- A connected bank, like a connected generator, must be disconnected before it is taken
 -- (ISTakeGenerator.isValid).
 local vanillaCanPickUp = ISMoveableSpriteProps.canPickUpMoveableInternal

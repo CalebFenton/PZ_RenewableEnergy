@@ -95,10 +95,9 @@ function RenewableEnergy.onSquare(object)
 end
 
 --- Whether `character` stands within `reach` squares on each axis of the middle of `target`'s
---- square, on its level: where the menu walked them for a job there (luautils.walkAdj), with room
---- for drift and a client's lag. A vehicle `target` gets `reach` past half its longest side, round
---- its middle, as the menu walks the character to one of its areas
---- (ISPathFindAction.pathToVehicleArea). The authority checks it before doing a job.
+--- square, on its level: where the menu walks them for a job (luautils.walkAdj), with room for drift
+--- and client lag. A vehicle `target` adds half its longest side, as the menu walks to one of its
+--- areas (ISPathFindAction.pathToVehicleArea). The authority checks it before doing a job.
 function RenewableEnergy.withinReach(character, target, reach)
     if instanceof(target, "BaseVehicle") then
         local extents = target:getScript():getExtents()

@@ -1,9 +1,8 @@
 -- How a bank runs a wired treadmill (the "treadmill" family of RenewableEnergy.Sources) on the
 -- authority, and the one writer of a treadmill tile's wiring. A run banks its watt-hours when it
--- ends (Commands.runTreadmill, credit), and the passes after it pay them out at no more than a
--- runner puts in; what is left when the treadmill leaves its bank goes in at once (Bank.lua).
--- Bank.lua calls update for each treadmill it holds; its record and status entry need nothing of
--- their own.
+-- ends (credit), and the passes after it pay them out at no more than a runner puts in; what is
+-- left when the treadmill leaves its bank goes in at once. Its record and status entry need
+-- nothing of their own, so it has no connect or status.
 
 if isClient() then return end
 

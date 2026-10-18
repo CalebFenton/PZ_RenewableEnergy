@@ -374,7 +374,7 @@ module RenewableEnergy
         Tags = base:ignorezombiedensity,
     }
 
-    /* One set of lead plates: a car battery holds one, a deep cycle two, an L-16 three. */
+    /* One set of lead plates; bigger batteries take more sets. */
     item WornBatteryPlates
     {
         DisplayCategory = Material,
@@ -620,7 +620,7 @@ module RenewableEnergy
         WorldStaticModel = CarHood,
     }
 
-    /******************************** Biogas ********************************/
+    /************************ Biogas, wood gas and wind ***********************/
 
     /*
         Ash from a gasifier's grate or a cleared campfire. Food that can't be eaten, like

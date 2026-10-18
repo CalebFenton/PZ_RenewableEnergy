@@ -49,9 +49,8 @@ local function carriedCount(self, fullType)
     return #(self.server.carried.items[fullType] or {})
 end
 
--- Wiring a treadmill to feed a bank takes the Electricity level, a screwdriver, wire and scrap;
--- done, it uses the wire and scrap and the treadmill connects to a bank like a panel. Its other
--- tile can't be wired as well.
+-- Wiring a treadmill takes the Electricity level and the parts it lists; done, it uses the
+-- parts and the treadmill connects to a bank like a panel. Its other tile can't be wired as well.
 test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
     instant = true,
     run = function(self)

@@ -623,9 +623,8 @@ test("renewable_energy_world_rural_gasifier", {
 
 -- Real buildings rolled the way the world rolls them: their rooms pick the finds and each find its
 -- square, outdoors on the ground within RuralFinds.REACH of the building (the wind charger needs
--- open ground around it, so at least 2 out). The barn west of Muldraugh gets the
--- wind charger and digester; the hunting shack west of Riverside the gasifier and a pamphlet; the
--- deer stand, whose one room is on level 1 (`z`), the gasifier on the ground.
+-- open ground around it). In order: the barn west of Muldraugh, the hunting shack west of
+-- Riverside, and the deer stand, whose one room is above ground (`z`) while its find is not.
 local RURAL_PLACES = {
     { 10469, 10121, 0, finds = { wind = true, digester = true } },
     { 7067, 8632, 0, finds = { gasifier = true }, pamphlet = true },
@@ -633,7 +632,7 @@ local RURAL_PLACES = {
 }
 
 test("renewable_energy_world_rural_finds_real_buildings", {
-    -- Three far visits and the way back, each waiting on loading.
+    -- Several far visits and the way back, each waiting on loading.
     timeoutSeconds = 180,
     run = function(self)
         T.setMultiplier(self, VISIT_SPEED)

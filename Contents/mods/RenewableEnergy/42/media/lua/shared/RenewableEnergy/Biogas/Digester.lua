@@ -1,11 +1,8 @@
--- Biogas digesters, as both sides know them: the three tiers and their gas holders, how they
--- digest, what each feed is worth, which tiles are digesters, and the summary every client keeps
--- of each one.
+-- Biogas digesters, as both sides know them: the tiers and their gas holders, how they digest, what
+-- each feed is worth, which tiles are digesters, and the summary every client keeps of each one.
 --
--- A digester is a tile the build menu places (scripts/RenewableEnergy/Entities.txt) with a
--- container that is its feed hopper. The authority keeps its state in a Global Object System
--- (server/RenewableEnergy/Biogas/DigesterSystem.lua), which runs it while its chunk is unloaded and
--- sends every client its summary.
+-- A digester is a built tile whose container is its feed hopper. The authority keeps its state in a
+-- Global Object System (DigesterSystem), which runs it while its chunk is unloaded.
 --
 -- Units: gas and the feed's potential in cubic metres of biogas, temperatures in degrees Celsius,
 -- time in game hours.
@@ -24,8 +21,7 @@ Digester.SYSTEM_NAME = "renewable_energy_digester"
 
 -- potentialCap: undigested potential it holds; feed waits in the hopper above it.
 -- days: how many days its temperature takes to follow the air (a time constant).
--- stink: its share of the stink score; the Brick Dome stays below the second smell level whatever
--- state it is in (stinkCap).
+-- stink: its share of the stink score; stinkCap: the most it stinks whatever its state.
 -- warmTo: the dome is buried and burns its gas to keep at least this warm, as a lit gas heater
 -- does (GasHeater.m3PerHour).
 -- holder: the gas holder it is built with (HOLDERS). upgrade: the tier its Upgrade job makes of it.
@@ -38,8 +34,8 @@ Digester.TIERS = {
 }
 
 -- capacity: gas the holder stores. wearPerDay: condition lost a day; a holder at none is torn,
--- holds nothing and leaks. The drum and the dome don't wear. levels: its overlays from slack to
--- full, and torn: its overlay once torn; the dome's holder is the dome itself.
+-- holds nothing and leaks. levels: its overlays from slack to full, and torn: its overlay once torn;
+-- the dome's holder is the dome itself.
 Digester.HOLDERS = {
     bags = { capacity = 0.6, wearPerDay = 1, levels = Sprites.digesterHolder.bags, torn = Sprites.digesterHolder.bagsTorn },
     tarp = { capacity = 1.0, wearPerDay = 0.25, levels = Sprites.digesterHolder.tarp, torn = Sprites.digesterHolder.tarpTorn },
@@ -55,8 +51,7 @@ Digester.ACID_LIMIT = 0.8
 Digester.ACID_RECOVER = 0.5
 
 -- Digestion rate k (share of the undigested potential a day) by temperature in °C, between which
--- it runs in straight lines: nothing at the first, the mesophilic best at 35 to 40, nothing again
--- at the last.
+-- it runs in straight lines: nothing at either end, best across the mesophilic range.
 Digester.K_BY_TEMP = { { 10, 0 }, { 15, 0.01 }, { 25, 1 / 30 }, { 35, 1 / 15 }, { 40, 1 / 15 }, { 50, 0 } }
 -- Startup counts only hours this warm, and manure's head start covers at most this share of it.
 Digester.STARTUP_MIN_TEMP = 10
@@ -70,8 +65,8 @@ Digester.LEAK_HOURS = 2
 -- (ISGetCompost).
 Digester.SLUDGE_PER_BAG = 10
 
--- Propane tanks. A full tank holds the biogas for a generator's full tank: IsoGenerator's 10 L
--- (MaximumGeneratorFuel) at GasKit.M3_PER_LITRE.
+-- Propane tanks. A full tank holds the biogas for a generator's full tank (IsoGenerator's
+-- MaximumGeneratorFuel) at GasKit.M3_PER_LITRE.
 Digester.TANK = "Base.PropaneTank"
 Digester.M3_PER_TANK = 16
 -- A tire pump fills a tank this far at most, and it is hard work: minutes and endurance per m³.
@@ -88,8 +83,6 @@ Digester.SCRUB_M3 = { water = 5, ash = 15, lime = 30 }
 Digester.WOOL_M3 = 10
 -- Litres of water a scrubber charge takes.
 Digester.SCRUB_WATER = 4
-
--- Feed ---------------------------------------------------------------------------------------
 
 -- By full type: potential (m³ before the Biogas multiplier), acid (what it adds to souring;
 -- below zero neutralises), seedHours (startup it saves: manure brings the bacteria).
@@ -110,7 +103,7 @@ local NEUTRALISERS = {
     ["Base.BakingSoda"] = -3,
     ["Base.Quicklime"] = -6,
 }
--- Food by the kilogram: meat is richer and sours twice as fast.
+-- Food by the kilogram: meat is richer and sours faster.
 local FOOD_POTENTIAL_PER_KG, FOOD_ACID_PER_KG = 0.12, 1
 local MEAT_POTENTIAL_PER_KG, MEAT_ACID_PER_KG = 0.2, 2
 local MEAT_TYPES = { Meat = true, Game = true, Beef = true, Poultry = true, Sausage = true, Fish = true, Seafood = true, Roe = true }
@@ -175,8 +168,6 @@ function Digester.feedCount(container)
     return count
 end
 
--- Tiles --------------------------------------------------------------------------------------
-
 --- The tier and, for a barrel, the material of a digester tile; nil for any other object.
 function Digester.tileOf(isoObject)
     local kind, tier, material = Sprites.kindOf(Sprites.nameOf(isoObject))
@@ -206,8 +197,6 @@ function Digester.holderOverlay(holder, fill, torn)
     end
     return levels[math.min(#levels, 1 + math.floor(fill * #levels))]
 end
-
--- Summary --------------------------------------------------------------------------------------
 
 -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
 -- copy of the hopper.

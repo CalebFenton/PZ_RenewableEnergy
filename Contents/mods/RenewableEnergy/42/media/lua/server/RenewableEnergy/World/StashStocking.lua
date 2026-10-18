@@ -48,8 +48,7 @@ function Stash.relistUnfound()
     end
 end
 
--- Stocking needs StashSystem to know the houses, which it does by the first tick of the game. The
--- handler removes itself, so it runs that one tick only.
+-- Stocking needs StashSystem to know the houses, which it does by the first tick of the game.
 local function stockOnFirstTick()
     Events.OnTick.Remove(stockOnFirstTick)
     Stash.stockFromStart()

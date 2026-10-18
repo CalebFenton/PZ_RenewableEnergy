@@ -33,8 +33,7 @@ WorldSpawns.WEATHERED = { min = 60, max = 100 }
 WorldSpawns.SITE_CRACKED_SHARE = 0.35
 
 -- Rooms that may hold a bank, the bank's stock, and one in how many of them does at the
--- Uncommon setting. A garage or shed holds a homemade battery box; a farm or a store room, a
--- rack.
+-- Uncommon setting.
 WorldSpawns.BANK_ROOMS = {
     shed = { odds = 12, stock = "shed" },
     garagestorage = { odds = 12, stock = "shed" },
@@ -43,8 +42,8 @@ WorldSpawns.BANK_ROOMS = {
     electronicsstorage = { odds = 3, stock = "electronicsStorage" },
 }
 WorldSpawns.CRATE_ROOMS = { garagestorage = 33, storageunit = 16 }
--- The odds above are multiplied by these for each Battery Bank Spawn setting (None, Very rare,
--- Rare, Uncommon). Crates follow the same setting.
+-- The odds above are multiplied by these for each Battery Bank Spawn setting. Crates follow the
+-- same setting.
 WorldSpawns.RARITY = { nil, 10, 3, 1 }
 
 local CAR_BATTERIES = {
@@ -152,7 +151,7 @@ WorldSpawns.CRATE_STOCK = {
     },
 }
 
--- Module conditions ------------------------------------------------------------------------------
+-- Module conditions
 
 --- A whole number from range.min to range.max, both included.
 function WorldSpawns.rollBetween(range)
@@ -193,7 +192,7 @@ function WorldSpawns.addModule(container, condition)
     return item
 end
 
--- Stocking ---------------------------------------------------------------------------------------
+-- Stocking
 
 --- `count` × `multiplier`, rounded up or down at random so that the average scales exactly: a
 --- rarity of 0.5 halves the items on average, even where the count is 1.
@@ -236,8 +235,8 @@ local function maybeAddPart(container, part, multiplier, slots)
     end
 end
 
---- Fills a bank's container as BANK_STOCK[stockName] says, scaled by the loot rarity options:
---- batteries at a part charge, and maybe an inverter, a controller and a charger.
+--- Fills a bank's container as BANK_STOCK[stockName] says, scaled by the loot rarity options,
+--- its batteries at a part charge.
 ---@param container ItemContainer
 ---@param stockName string a BANK_STOCK key
 function WorldSpawns.stockBank(container, stockName)
@@ -268,7 +267,7 @@ function WorldSpawns.stockCrate(container, stockName)
     end
 end
 
--- Placing ----------------------------------------------------------------------------------------
+-- Placing
 
 --- Places a bank stocked as BANK_STOCK[stockName] says, connected and switched off. Banks stand
 --- only indoors (PowerBank.canPlaceBank), so nothing is placed on another square.
@@ -335,7 +334,7 @@ function WorldSpawns.placePanel(square, spriteName, modules)
     WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES] = modules })
 end
 
--- Rooms seen for the first time -------------------------------------------------------------------
+-- Rooms seen for the first time
 
 local function oneIn(n)
     return ZombRand(n) == 0

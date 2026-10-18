@@ -1,15 +1,13 @@
 if isClient() then return end
 
 -- Generators running on gas, on the authority: the Gas Conversion Kit's jobs and the pass that
--- feeds each kitted generator from its source, a digester or a gasifier.
+-- feeds each kitted generator from its digester or gasifier.
 --
--- A generator on gas runs on vanilla's own update, which makes its sound, draws zombies, fills a
--- building with fumes, wears it and backfires as on petrol; only its fuel is managed here. Vanilla
--- stops a generator whose fuel runs out, so while gas reaches it the generator holds at least
--- PHANTOM_FUEL, and every pass puts back what vanilla burned (and what a bank charging from it
--- took): the gas paid for it. Its real tank is kept apart (`tank`) and is all it holds again once
--- gas stops, the kit comes off or the line is cut. A kitted generator can't be picked up, so the
--- fuel that isn't there never leaves with it.
+-- A generator on gas runs on vanilla's own update (sound, zombies, fumes, wear, backfire); only its
+-- fuel is managed here. Vanilla stops a generator whose fuel runs out, so while gas reaches it the
+-- generator holds at least PHANTOM_FUEL and every pass puts back what was burned, billed to the gas.
+-- Its real tank is kept apart (`tank`) and restored once gas stops, the kit comes off or the line is
+-- cut. A kitted generator can't be picked up, so the phantom fuel never leaves with it.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
@@ -24,14 +22,11 @@ RenewableEnergy.GasLines = GasLines
 
 local GasKit, Gasifier, Sprites, Materials = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites, RenewableEnergy.Materials
 
--- Global ModData: the kitted generators by "x,y,z", so the pass finds them, each { x, y, z,
--- source }, its line's source kept too so a gasifier's pipe can come off after the generator is
--- gone.
+-- Global ModData: kitted generators by "x,y,z", each { x, y, z, source }; the source is kept so a
+-- gasifier's pipe can come off after the generator is gone.
 GasLines.MOD_DATA = "RenewableEnergyGasKits"
--- A pass longer than this (a save loaded after the clock jumped) wears the generator on dirty gas
--- for this long. A generator runs here only while loaded; vanilla bills the time it was away to its
--- fuel when it loads (IsoGenerator.update), no more than it shows (PHANTOM_FUEL on an empty tank),
--- and the next pass bills that to the gas.
+-- Cap on one pass (a save loaded after the clock jumped). Time a generator spent unloaded is billed
+-- by vanilla to its fuel when it loads (IsoGenerator.update), and the next pass bills that to the gas.
 local LONGEST_PASS = 24
 local EPSILON = 1e-4
 -- Vanilla's generator wear: each hour running, one chance in this many of losing 1 or 2 condition
@@ -111,8 +106,6 @@ local function cutLine(generator, state)
     return line
 end
 
--- Load ------------------------------------------------------------------------------------------
-
 --- The watts `generator` delivers: what it powers, and the chargers of the battery banks that
 --- charge from a generator within its reach.
 function GasLines.loadOf(generator)
@@ -126,8 +119,6 @@ function GasLines.loadOf(generator)
     end
     return watts
 end
-
--- The pass -----------------------------------------------------------------------------------------
 
 -- Fuel the generator holds now: on gas, its tank or PHANTOM_FUEL, whichever is more; else its
 -- tank. A rise since the last pass on gas is petrol someone poured in, which goes into the tank.
@@ -169,10 +160,8 @@ local function wear(generator, state, factor, hours)
     end
 end
 
--- Litres of fuel the generator lost since the last pass on gas: vanilla's hourly bill for its idle
--- and what it powers, times the GeneratorFuelConsumption option (IsoGenerator.update), and what
--- a bank charging from it took (Bank:chargeFrom). Read off the fuel itself, before settleFuel puts
--- it back, so the gas pays exactly what vanilla and the bank charged, whatever they bill for.
+-- Litres the generator lost since the last pass on gas, to vanilla's burn and any bank charging from
+-- it. Read off the fuel itself, before settleFuel puts it back, so the gas pays exactly what was taken.
 local function burnedSince(generator, state)
     return state.onGas and math.max(0, (state.set or 0) - generator:getFuel()) or 0
 end
@@ -232,10 +221,8 @@ local function catchUp(generator, state)
     GasLines.run(generator, state, hours)
 end
 
---- Runs every kitted generator whose chunk is loaded. One that is gone from its loaded square
---- (destroyed; it can't be picked up), or lost its kit, leaves the list, and a gasifier's pipe to
---- it comes off; an unloaded one waits, and vanilla bills the time away to its fuel when it loads
---- again (IsoGenerator.update), which PHANTOM_FUEL covers.
+--- Runs every kitted generator whose chunk is loaded. One gone from its loaded square or without
+--- its kit leaves the list, and a gasifier's pipe to it comes off; an unloaded one waits.
 function GasLines.updateAll()
     local gone = {}
     for key, entry in pairs(registry()) do
@@ -266,8 +253,6 @@ function GasLines.cancelStall(generator)
         sync(generator)
     end
 end
-
--- Jobs ------------------------------------------------------------------------------------------
 
 -- Cuts the line, which gives back what it took, and the generator holds only its tank.
 local function disconnect(character, generator, state)
@@ -320,10 +305,9 @@ local DO = {
     end,
 }
 
---- Does `job` at `generator` for `character`, on the authority, once its timed action finished:
---- brings the generator's line up to now, so the time before counts as it was, checks the job
---- again, does it, then sends the generator's state. `source` is the digester or gasifier at the
---- far end of Connect Gas Line. Returns whether it was done.
+--- Does `job` at `generator` for `character` once its timed action finished: catches the line up
+--- first so earlier time bills at the old state, rechecks the job, does it, sends the state.
+--- `source` is the far end of Connect Gas Line. Returns whether it was done.
 function GasLines.perform(character, job, generator, source)
     local state = GasKit.stateOf(generator)
     if state then
@@ -343,8 +327,6 @@ function GasLines.perform(character, job, generator, source)
     end
     return done
 end
-
--- Picking up --------------------------------------------------------------------------------------
 
 -- Taking up a kitted generator is refused: the kit would fall off (ISTakeGenerator copies only
 -- fuel and condition to the item) and with it what the tank really holds.

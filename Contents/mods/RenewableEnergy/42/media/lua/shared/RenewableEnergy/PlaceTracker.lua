@@ -17,8 +17,7 @@ local LOAD_PRIORITY = RenewableEnergy.Sprites.LOAD_PRIORITY + 1
 -- World squares lie well under this in x and y, so the key below stays exact in a double.
 local SPAN = 1e6
 
---- The place x, y, z as one number. A key joined from strings would cost nearly twice the time
---- and six times the memory of each lookup in Kahlua.
+--- The place x, y, z as one number: string keys cost far more time and memory per lookup in Kahlua.
 function PlaceTracker.key(x, y, z)
     return (z * SPAN + y) * SPAN + x
 end

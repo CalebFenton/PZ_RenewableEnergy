@@ -1,7 +1,6 @@
 -- How a bank runs a wind charger (the "wind" family of RenewableEnergy.Sources) on the authority:
--- its output in the wind and its blades breaking in a gale. Bank.lua calls connect, update and
--- status for each wind charger it holds. The one writer of a charger's brake and broken blades,
--- on the object (Wind.BRAKED, Wind.BROKEN) and on its bank's record alike.
+-- its output in the wind and its blades breaking in a gale. The one writer of a charger's brake
+-- and broken blades, on the object and on its bank's record alike.
 
 if isClient() then return end
 

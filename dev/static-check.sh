@@ -5,5 +5,5 @@
 # lists every check), plus this mod's tile and stash house rules in dev/check. Needs a JDK's javac
 # (or JAVAC) and python3.
 #
-# CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-check).
+# CACHE overrides the cache dir.
 . "$(dirname "$0")/harness/bin/static-check.sh"

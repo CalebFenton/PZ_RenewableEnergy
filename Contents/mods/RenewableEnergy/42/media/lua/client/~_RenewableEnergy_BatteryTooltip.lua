@@ -1,8 +1,7 @@
--- Adds a battery's capacity and stored energy under its tooltip. Vanilla already shows the charge
--- and the condition as bars; watt-hours are what decide which battery goes into a bank, and a worn
--- battery holds less than its rating. Java draws the item tooltip, so the rows go in a strip drawn
--- after ISToolTipInv.render. This file is named to load after every other mod's client Lua, so it
--- wraps their versions of render rather than being replaced by them.
+-- Adds a battery's capacity and stored energy under its tooltip: watt-hours decide which battery
+-- goes into a bank, and a worn battery holds less than its rating. Java draws the tooltip, so the
+-- rows are a strip drawn after ISToolTipInv.render. Named to load after every other mod's client
+-- Lua, so it wraps their render rather than being replaced.
 
 require "ISUI/ISToolTipInv"
 require "RenewableEnergy/PowerBank/Battery"

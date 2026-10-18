@@ -51,8 +51,8 @@ function Format.cubicMetres(m3, places)
     return getText("IGUI_RenewableEnergy_CubicMetres", string.format("%." .. places .. "f", m3))
 end
 
--- "72%": an item's condition as a share of its type's ConditionMax, which is 10 for an item
--- whose script names none, such as vanilla's Car Battery Charger.
+-- "72%": an item's condition as a share of its type's ConditionMax (vanilla's default when the
+-- script names none, as for the Car Battery Charger).
 function Format.condition(fullType, condition)
     return Format.percent(condition / getScriptManager():FindItem(fullType):getConditionMax())
 end

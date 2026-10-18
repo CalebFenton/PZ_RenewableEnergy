@@ -1,8 +1,5 @@
--- Vanilla's treadmill (Sprites.treadmill): two tiles. Unwired, it runs on power like any treadmill:
--- a run on it (RenewableEnergyTreadmillAction) draws its motor's watts, which a bank powering it
--- bills (Loads.lua). A player can instead wire one of its tiles to feed a bank (Wire to a Bank),
--- after which a run on it banks watt-hours. Unwiring it, picking it up or destroying it gives back
--- the wire (TreadmillSource.unwire). Dismantled, a treadmill gives its motor (Moveables.lua).
+-- Vanilla's treadmill (Sprites.treadmill), two tiles. Unwired, a run on it draws its motor's watts
+-- like any appliance. Wired to feed a bank, a run on it banks watt-hours instead.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
@@ -17,7 +14,7 @@ local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 -- Tile modData: the tile wired to feed a bank (one of the treadmill's two tiles).
 Treadmill.WIRED = "RenewableEnergy_treadmillWired"
--- The item dismantling a treadmill gives: the wind charger's generator.
+-- The item dismantling a treadmill gives.
 Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
 
 -- A step in each facing, in squares.
@@ -89,7 +86,7 @@ end
 
 --- Why `character` can't wire the treadmill of `tile` now, or nil if they can: "already wired"
 --- when either of its tiles is, else the kind of the first of Treadmill.needs they are short of.
---- The action, the menu and the authority's command all ask it, so a treadmill is wired once.
+--- Every path that wires one asks it, so a treadmill is wired once.
 function Treadmill.wiringRefusal(character, tile)
     if Treadmill.wiredHalf(tile) then
         return "already wired"

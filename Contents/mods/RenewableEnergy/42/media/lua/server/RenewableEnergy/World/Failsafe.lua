@@ -1,15 +1,15 @@
 require "RenewableEnergy/Sprites"
 
--- The failsafe shares its square with the generator it watches. It is placed as a floor rug
--- (MoveType = FloorRug), the one kind of object allowed onto a square that already holds something
--- solid, which also files it under the generator, just above the floor. So it is moved to the end
--- of the square's objects, to draw over the generator: when it is added, and whenever its chunk
--- loads, because a square loads its objects in their saved order.
+-- The failsafe shares its square with the generator it watches. It is placed as a floor rug, the
+-- one kind of object allowed onto a square that already holds something solid, which files it
+-- under the generator. So it is moved to the end of the square's objects, to draw over the
+-- generator: when it is added, and whenever its chunk loads, because a square loads its objects
+-- in their saved order.
 --
 -- Every side does this to its own copy and nothing is sent, so that generator syncs, which name an
--- object by its index on the square (IsoGenerator.syncIsoObjectSend), agree everywhere. Moving it
--- goes through RemoveTileObject, which fires OnObjectAboutToBeRemoved and OnTileRemoved for the
--- failsafe, so their handlers must leave it alone.
+-- object by its index on the square (IsoGenerator.syncIsoObjectSend), agree everywhere.
+-- RemoveTileObject fires OnObjectAboutToBeRemoved and OnTileRemoved for the failsafe, so their
+-- handlers must leave it alone.
 
 local Sprites = RenewableEnergy.Sprites
 local FAILSAFE = Sprites.failsafe

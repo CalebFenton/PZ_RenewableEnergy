@@ -53,7 +53,7 @@ end
 
 -- Queues a wait until this client's smell moodle is at `level`, or SMELL_MS pass, then records the
 -- level in self.moodle[label] for validate. The limit is real time, not frames: a multiplayer
--- client's moodle follows the rate the server sends every two seconds, whatever the frame rate.
+-- client's moodle follows the rate the server sends, whatever the frame rate.
 local function waitForSmell(self, level, label)
     local deadline
     T.waitUntil(function()
@@ -370,7 +370,7 @@ test("renewable_energy_biogas_digester_temperature", {
     end,
 })
 
--- The Biogas Multiplier scales the gas a digester makes: the same run makes twice the gas at 2 as at 1.
+-- The Biogas Multiplier scales the gas a digester makes in proportion.
 test("renewable_energy_biogas_digester_multiplier_scales_gas", {
     run = function(self)
         local handle = placeDigester(self, "barrel.MetalDrum")
@@ -407,7 +407,7 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
             state.acid, state.sour = share * limit, sour
             T.setRecord(self, handle, state)
         end
-        -- An hour's decay takes well under 1 % of the acid, so 1 % either side stays on its side.
+        -- An hour's decay takes far less acid than the step, so each side stays on its side.
         local step = 0.01
         local recover = Digester.ACID_RECOVER
         T.batch(function()
@@ -489,7 +489,7 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
         local handle = stand and placeDigester(self, "barrel.MetalDrum", { near = stand, minDistance = 2 })
         if not handle then return end
         T.fillRecord(self, handle, { hopper = { { type = "Base.Dung_Cow", count = 4 } } })
-        -- Half an hour on the meter, so three more hours eat three.
+        -- Part of an hour already on the meter, so each whole hour away eats one item.
         T.runDigester(self, handle, 0.5, 25)
         awayAndBack(self, T.at(stand), handle.x, handle.y, handle.z, function()
             T.ageRecord(self, handle, 3, "away")
@@ -522,7 +522,7 @@ test("renewable_energy_biogas_digester_holder", {
             T.setRecord(self, handle, overfull)
             T.runDigester(self, handle, 1, 30)
             T.readRecord(self, handle, "full")
-            -- Half a day's wear left.
+            -- Less wear left than the run takes, so it tears them.
             T.setRecord(self, handle, { holderCondition = bags.wearPerDay / 2 })
             T.runDigester(self, handle, 24, 30)
             T.readRecord(self, handle, "torn")
@@ -794,7 +794,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
         if not second then return end
         self.digesters = { first, second }
         self.rate = GasHeater.m3PerHour()
-        -- Gas for between the three hours of warming and the nine of the whole run.
+        -- Gas for more than the warming hours and less than the whole run.
         self.temp, self.gas = 5, 4.5 * self.rate
         if not T.need(self, self.gas < Digester.HOLDERS.bags.capacity, "bags that hold four and a half hours of the heater's gas") then return end
         local cold = T.matureDigester("barrel")
@@ -991,7 +991,6 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
 -- bottle gains is what the tank loses. Each case's start is (tank use) → tank, bottle.
 local SHARE = RenewableEnergy.Recipes.PROPANE_BOTTLE_SHARE
 local REFILLS = {
-    -- A half tank fills a half bottle.
     propane_refill_fills_bottle = { start = function() return 0.5, 0.5 end, check = function(bottle)
         T.expectNear("bottle refilled from a half tank", bottle, 1, 0.001)
     end },
@@ -1001,7 +1000,7 @@ local REFILLS = {
     end, check = function(_, tank)
         T.expectNear("low tank after refilling", tank, 0, 0.0001)
     end },
-    -- A bottle with room for under half a tank use takes nothing.
+    -- A bottle with less room than a tank use takes nothing.
     propane_refill_skips_bottle_without_room = { start = function(use) return 0.5, 1 - use / SHARE / 4 end,
         check = function(bottle, tank, self)
             T.expectNear("nearly full bottle after refilling", bottle, self.bottleStart, 0.00001)
@@ -1101,7 +1100,6 @@ test("renewable_energy_biogas_compressor_inflates_tires_on_power", {
 
 -- Wood ash ---------------------------------------------------------------------------------------
 
--- Clearing a campfire's ashes gives wood ash.
 test("renewable_energy_biogas_clear_ashes_gives_wood_ash", {
     instant = true,
     run = function(self)

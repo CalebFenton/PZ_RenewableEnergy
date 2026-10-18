@@ -1,12 +1,11 @@
 -- The Gas Conversion Kit, as both sides know it: which generators carry one, the gas line from a
 -- digester or gasifier (its source) that feeds it, and what each job at the generator takes. The
--- authority does the jobs (server/RenewableEnergy/GasLine/GasLines.lua).
+-- authority does the jobs and runs the line (GasLines).
 --
 -- A generator's kit and line live in its modData (GasKit.MOD_DATA), which the authority sends to
--- the clients. While gas reaches it (server/RenewableEnergy/GasLine/GasLines.lua) the generator
--- runs on vanilla's own update, with its sound, zombie noise, fumes and wear, on fuel the gas pays
--- for: its tank (`tank`) stays what it was, and an empty one shows a little fuel so the game lets
--- it run (`set`, what the authority last put in).
+-- the clients. On gas the generator runs on vanilla's own update on fuel the gas pays for: its tank
+-- (`tank`) stays what it was, and an empty one shows a little fuel so the game lets it run (`set`,
+-- what the authority last put in).
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
@@ -36,11 +35,9 @@ GasKit.HOSE_SQUARES = 5
 -- Litres an empty-tanked generator on gas shows, enough for vanilla to keep it running between
 -- passes, after a long absence too.
 GasKit.PHANTOM_FUEL = 2
--- A generator carries this many watts on gas, against what vanilla bills (Specs.wattsPerFuel): a
--- whole house is about 1300 W and an Inverter/Charger charging off the generator 1000 W. Clean gas
--- carries both; a gasifier's dirty output (Gasifier.outputShare halves it) still carries the
--- house but stalls with the bank charging; both dirty, it carries a fridge, a freezer, a TV and
--- the lights but not the cooking or the laundry.
+-- A generator carries this many watts on gas, against what vanilla bills (Specs.wattsPerFuel).
+-- Sized so clean gas carries a whole house with a bank charging off the generator, while a
+-- gasifier's dirty output (Gasifier.outputShare) forces trade-offs.
 GasKit.CAP_W = 3000
 -- Biogas a generator burns for each litre of petrol vanilla bills it, by energy: petrol about
 -- 9.5 kWh a litre, biogas about 6 kWh a m³.
@@ -78,8 +75,6 @@ function GasKit.hosesFor(generator, digester)
     local distance = IsoUtils.DistanceTo(generator:getX(), generator:getY(), digester:getX(), digester:getY())
     return math.max(1, math.ceil(distance / GasKit.HOSE_SQUARES))
 end
-
--- Sources -------------------------------------------------------------------------------------
 
 -- The sources a line runs from, by their tiles' kind (Sprites.kindOf), which the line keeps as its
 -- source's `kind`:
@@ -122,11 +117,15 @@ end
 -- level and in its reach.
 local function sourceBlocker(generator, source)
     local kind = GasKit.sourceKind(source)
-    if not kind or not RenewableEnergy.onSquare(source) or source:getZ() ~= generator:getZ() then
+    if not kind then
         return "Tooltip_RenewableEnergy_DigesterOutOfReach"
     end
     local spec = GasKit.SOURCES[kind]
-    return not spec.inReach(generator, source) and spec.tooFar or nil
+    if not RenewableEnergy.onSquare(source) or source:getZ() ~= generator:getZ()
+            or not spec.inReach(generator, source) then
+        return spec.tooFar
+    end
+    return nil
 end
 
 --- The sources that may feed `generator`, nearest first.
@@ -146,8 +145,6 @@ function GasKit.sourcesNear(generator)
     end)
     return found
 end
-
--- Jobs ----------------------------------------------------------------------------------------
 
 -- Jobs at a generator.
 GasKit.INSTALL = "InstallKit"

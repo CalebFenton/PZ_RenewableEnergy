@@ -25,7 +25,7 @@ test("renewable_energy_battery_wear", {
         Wear.setCondition(worn, 50)
         self.wornFlat, self.newHalf = Battery.cycleWear(worn, 1), Battery.cycleWear(battery, 0.5)
         self.newFlat = Battery.cycleWear(battery, 1)
-        -- Days at 50% until their wear makes a point: until then the fractions are kept, not lost.
+        -- Days at half discharge until their wear makes a point: until then the fractions are kept.
         self.full = battery:getConditionMax()
         local days = math.ceil(1 / (Battery.cycleWear(battery, 0.5) * self.full))
         for _ = 1, days - 1 do
@@ -110,8 +110,7 @@ end
 local WORN, PLATES = "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates"
 local FURNACE = { "Base.Primitive_Furnace", "crafted_01_112" }
 
--- Six empty jars, a set of plates, a litre of acid and two of water in a sand tray: a new jar
--- battery, empty. Acid comes from battery acid bottles, the water from a 2 L bottle.
+-- Jars, plates, acid and water in a sand tray make a new jar battery, empty.
 local JAR_BATTERY = "RenewableEnergy.JarBattery"
 craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
     recipe = "RenewableEnergy_MakeJarBattery",
@@ -139,8 +138,8 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
     end,
 })
 
--- A dead jar battery strips too: five jars whole and one cracked, its plates worn, its acid
--- poured into an empty bottle.
+-- A dead jar battery strips too: jars whole and cracked, its plates worn, its acid poured into an
+-- empty bottle.
 craftTest(craftName("RenewableEnergy_StripJarBattery", "dead_battery"), {
     recipe = "RenewableEnergy_StripJarBattery",
     from = JAR_BATTERY,
@@ -240,7 +239,7 @@ for _, chain in ipairs(REBUILDS) do
             T.learnRecipes(p)
             T.placeWorkTable(p)
             T.setPerk(self, Perks.Electricity, 5)
-            -- One empty litre bottle per litre of acid.
+            -- Empty acid bottles to take the stripped acid.
             local given = { { type = "Base.Screwdriver" }, { type = "Base.Wrench" }, { type = "Base.Gloves_Dish" },
                 { type = chain.battery, condition = 20, uses = 0.6 } }
             for _ = 1, chain.plates do
@@ -259,7 +258,7 @@ for _, chain in ipairs(REBUILDS) do
                     acid = carried.fluids.Acid, batteries = #carried.items[chain.battery],
                 }
             end)
-            -- New plates in place of the worn, and a litre of water to top up.
+            -- New plates in place of the worn, and water to top up.
             T.server(self, "takeItems", { type = "RenewableEnergy.WornBatteryPlates" })
             T.give(self, "rebuild", { { type = "RenewableEnergy.BatteryPlates", count = chain.plates },
                 { type = "Base.WaterBottle" } })
@@ -315,8 +314,8 @@ end
 
 -- The plate mold the way vanilla makes its ingot mold: a wooden pattern at a table, pressed into
 -- clay at a hand press and fired in a kiln; the pattern and the mold last. Lead plates are
--- recast in a primitive furnace burning charcoal, and lose lead doing it: three worn sets make
--- two new ones, or two and a lead pipe do, and two worn sets alone make nothing.
+-- recast in a primitive furnace burning charcoal, and lose lead doing it, which a lead pipe can
+-- make up.
 craftTest(craftName("RenewableEnergy_MakeBatteryPlatePattern"), {
     recipe = "RenewableEnergy_MakeBatteryPlatePattern",
     from = "Base.Plank",
@@ -370,7 +369,6 @@ craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "refuses_two_worn"), 
     end,
 })
 
--- New lead with no case: three lead pipes cast one set of plates.
 craftTest(craftName("RenewableEnergy_CastBatteryPlatesFromLeadPipe", "three_pipes_make_one"), {
     recipe = "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
     bench = FURNACE,

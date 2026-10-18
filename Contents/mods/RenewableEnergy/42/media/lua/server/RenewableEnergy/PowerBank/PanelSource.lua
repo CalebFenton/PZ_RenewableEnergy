@@ -1,7 +1,6 @@
 -- How a bank runs a solar panel (the "panel" family of RenewableEnergy.Sources) on the authority:
--- its modules' watts in the sun, snow lying on it, and storms cracking its modules. Bank.lua calls
--- connect, update and status for each panel it holds. The one writer of a placed panel's module
--- record (PowerBank.MODULES) and of its crack and snow overlays.
+-- its modules' watts in the sun, snow lying on it, and storms cracking its modules. The one
+-- writer of a placed panel's module record (PowerBank.MODULES) and of its crack and snow overlays.
 
 if isClient() then return end
 
@@ -34,7 +33,6 @@ local LOW_SHARE = 0.7
 
 local CONDITION_MAX = {}
 
--- A module type's ConditionMax, from its item script.
 local function conditionMax(fullType)
     if not CONDITION_MAX[fullType] then
         local script = getScriptManager():FindItem(fullType)

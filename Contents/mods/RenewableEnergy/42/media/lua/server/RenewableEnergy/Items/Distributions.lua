@@ -11,9 +11,8 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 
--- Where the mod's items spawn, 1993 style. Distributions.items lists every entry; apply() puts
--- them into the game's loot tables in OnInitGlobalModData, scaled by the save's loot rarity
--- options, and dev/run-debug-client.sh --loot measures what each list hands out.
+-- Where the mod's items spawn, 1993 style. apply() puts Distributions.items into the game's loot
+-- tables in OnInitGlobalModData, scaled by the save's loot rarity options.
 
 RenewableEnergy = RenewableEnergy or {}
 local Distributions = {}
@@ -27,7 +26,7 @@ local Stash = RenewableEnergy.Stash
 local WorldSpawns = RenewableEnergy.WorldSpawns
 local ArrowBoard = RenewableEnergy.ArrowBoard
 
--- The mod's own lists ----------------------------------------------------------------------------
+-- The mod's own lists
 
 -- A crate of RV and cabin solar gear, which some storage rooms pick instead of their usual loot.
 -- Its RenewableEnergy items come from Distributions.items, so the rarity options scale them. The
@@ -118,7 +117,7 @@ for _, roomPick in ipairs(ROOM_PICKS) do
     end
 end
 
--- Vehicles ---------------------------------------------------------------------------------------
+-- Vehicles
 
 -- A copy of a vehicle container table, so the mod's entries go into its own table only. The junk
 -- list is shared (ClutterTables) and never changed.
@@ -144,9 +143,8 @@ local function vehicleLootWith(setName, vanillaTruckBed, truckBed)
 end
 
 -- Knox Telecommunications and Deer Valley Power vans fill like any builder's van in vanilla
--- (ConstructionWorker). Their own copies give the telephone company its battery plant gear and the
--- power company its line crew stock, on top of that. A camper trailer joins the trailers' specific
--- loot: a tow-behind RV's house battery and roof panel. Built after the merge, so the copies carry
+-- (ConstructionWorker); their own copies add battery plant and line crew stock. Camper trailers
+-- get a tow-behind RV's house battery and roof panel. Built after the merge, so the copies carry
 -- what other mods put into the vanilla tables.
 local function addOwnVehicleTables()
     local byVehicle = vehDist[1]
@@ -181,14 +179,13 @@ local function addOwnContainersToRooms()
     end
 end
 
--- What spawns where -------------------------------------------------------------------------------
+-- What spawns where
 
 --- Each entry is { weight, list } before the loot rarity option named by `option`. A list is
 --- "proc:<ProceduralDistributions list>", "proc:<list>.junk", "veh:<VehicleDistributions list>"
---- or "sub:<SuburbsDistributions path>". A weight w spawns with ⌈w × 100 × the loot rarity of the
---- item's category⌉ in 10,000 per roll (junk: w × 140, whatever the rarity). The scavenger's
---- gear is the commonest and the homestead's the rarest; modules stay a reward, mostly from kits,
---- caches and vans.
+--- or "sub:<SuburbsDistributions path>". ItemPickerJava scales a weight by the loot rarity of the
+--- item's category (junk ignores rarity). The scavenger's gear is the commonest and the
+--- homestead's the rarest; modules stay a reward, mostly from kits, caches and vans.
 
 -- Vanilla stash crates (spawnTable of most vanilla stash houses): a prepper's cache.
 local SURVIVOR_CRATES = {
@@ -222,7 +219,7 @@ local function with(weight, lists, entries)
 end
 
 Distributions.items = {
-    -- Scavenger: the first magazine, plug-in power and the solar gadgets --------------------
+    -- Scavenger: the first magazine, plug-in power and the solar gadgets
     {
         -- The magazine that starts the mod, so it turns up in ordinary homes too: a few in a
         -- town's worth of houses.
@@ -345,9 +342,9 @@ Distributions.items = {
             { 0.5, "proc:BarnTools" },
         },
     },
-    -- RV and cabin: the second magazine, modules, deep cycle batteries and their electronics -
+    -- RV and cabin: the second magazine, modules, deep cycle batteries and their electronics
     {
-        -- Half as common as the first magazine wherever both are, homes included.
+        -- Turns up wherever the first magazine does, homes included, but less often.
         fullType = "RenewableEnergy.HomesteadPowerMag2",
         option = "LRMMisc",
         entries = with(1.5, SURVIVOR_CRATES, with(0.5, SURVIVALIST_CORPSES, with(0.3, HOME_SHELVES,
@@ -375,8 +372,8 @@ Distributions.items = {
         })))))),
     },
     {
-        -- Biogas: on farms, where the manure is, and with preppers. Rarer than the second
-        -- magazine; the skills teach its recipes too.
+        -- Biogas: on farms, where the manure is, and with preppers. Rarer, since the skills teach
+        -- its recipes too.
         fullType = "RenewableEnergy.HomesteadPowerMag3",
         option = "LRMMisc",
         entries = with(1, SURVIVOR_CRATES, with(0.3, SURVIVALIST_CORPSES, with(0.3, SAFEHOUSE_READING, {
@@ -406,8 +403,8 @@ Distributions.items = {
         }))),
     },
     {
-        -- Wind and the treadmill: on farms, with electricians and in hobby shops; preppers. As
-        -- rare as the third magazine; the skills teach its recipes too.
+        -- Wind and the treadmill: on farms, with electricians and in hobby shops; preppers. Rare,
+        -- since the skills teach its recipes too.
         fullType = "RenewableEnergy.HomesteadPowerMag4",
         option = "LRMMisc",
         entries = with(1, SURVIVOR_CRATES, with(0.3, SURVIVALIST_CORPSES, with(0.3, SAFEHOUSE_READING, {
@@ -490,7 +487,7 @@ Distributions.items = {
         fullType = "RenewableEnergy.DeepCycleBattery",
         option = "LRMBatteries",
         entries = with(0.5, SURVIVOR_CRATES, {
-            -- About a tenth as common as car batteries there.
+            -- Far rarer than car batteries there.
             { 2, "proc:CarSupplyBatteries" },
             { 1, "proc:MechanicShelfElectric" },
             { 1, "proc:CrateBatteries" },
@@ -515,7 +512,7 @@ Distributions.items = {
             { 0.5, "proc:RenewableEnergySolarKit.junk" },
         },
     },
-    -- Homestead: the Inverter/Charger, L-16 batteries and battery acid ----------------------
+    -- Homestead: the Inverter/Charger, L-16 batteries and battery acid
     {
         fullType = "RenewableEnergy.InverterCharger",
         option = "LRMMisc",
@@ -558,7 +555,7 @@ Distributions.items = {
     },
 }
 
--- Applying ---------------------------------------------------------------------------------------
+-- Applying
 
 -- The items-list holder each prefix of a list reference names, by the name after the prefix.
 local LIST_HOLDERS = {
@@ -635,10 +632,10 @@ local function applyStashMaps()
 end
 
 --- Puts every entry of Distributions.items into its list, weighted by the save's sandbox options,
---- and the stash maps into corpse loot, replacing the entries an earlier call made. An option at 0
---- leaves its items out altogether: a zero weight would still spawn through the zombie density
---- bonus, which ItemPickerJava adds to the chance rather than multiplying it. ItemPickerJava reads
---- the Lua tables only when it parses them, so ItemPickerJava.Parse() has to run afterwards.
+--- and the stash maps into their lists, replacing the entries an earlier call made. An option at
+--- 0 leaves its items out altogether: a zero weight would still spawn through the zombie density
+--- bonus, which ItemPickerJava adds rather than multiplies. ItemPickerJava reads the Lua tables
+--- only when it parses them, so ItemPickerJava.Parse() has to run afterwards.
 function Distributions.apply()
     for _, spec in ipairs(Distributions.items) do
         local multiplier = SandboxVars.RenewableEnergy[spec.option]
@@ -658,7 +655,7 @@ function Distributions.apply()
     applyStashMaps()
 end
 
--- Found batteries ---------------------------------------------------------------------------------
+-- Found batteries
 
 --- Gives the mod's batteries in a freshly filled container, bags included, a part charge. A
 --- battery that already has a charge of its own is one a refill (loot respawn) found there.
@@ -675,11 +672,10 @@ function Distributions.chargeFoundBatteries(container)
     end
 end
 
--- Cracked modules ---------------------------------------------------------------------------------
+-- Cracked modules
 -- Modules whose glass broke lie around where people kept junk and spares. They are added when a
 -- container is filled rather than through the loot lists, so that they come with their cracked
--- condition and the lists' modules stay whole. Weights work like a loot list's: the chance per
--- container is weight × the item's loot category multiplier × the solar module option / 100.
+-- condition and the lists' modules stay whole. Weights scale like a loot list's.
 
 -- Rooms, and the weight of each of their shelves, boxes, crates and cabinets.
 Distributions.CRACKED_MODULE_ROOMS = {

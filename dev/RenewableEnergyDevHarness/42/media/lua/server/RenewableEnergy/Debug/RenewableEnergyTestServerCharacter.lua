@@ -82,9 +82,9 @@ handler("setRepaired", function(player, args)
 end)
 
 -- What the character carries: for each type of `args.types` its items, bags included, { id,
--- condition, uses (the fraction left), repaired (vanilla's repair count), modData }; in `fluids` the litres of each fluid of
--- `args.fluids` (Fluid field names, or a modded fluid's name) in the fluid containers of its main inventory; and in `total`
--- how many items its main inventory holds.
+-- condition, uses (the fraction left), repaired (vanilla's repair count), modData }; in `fluids`
+-- the litres of each fluid of `args.fluids` (Fluid field names, or a modded fluid's name) in the
+-- fluid containers of its main inventory; and in `total` how many items its main inventory holds.
 handler("carried", function(player, args)
     local inventory = player:getInventory()
     local items = {}

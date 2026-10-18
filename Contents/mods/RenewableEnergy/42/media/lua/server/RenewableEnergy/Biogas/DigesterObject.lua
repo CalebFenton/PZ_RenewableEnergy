@@ -1,12 +1,9 @@
--- One digester on the authority (single player or the server): what it holds, how warm it is, the
--- gas it makes and stores, its sludge and souring, and the stink and fumes that come of them.
+-- One digester on the authority: what it holds, how warm it is, the gas it makes and stores, its
+-- sludge and souring, and the stink and fumes that come of them.
 --
--- The table is the digester's global object (RenewableEnergy.ObjectSystem), so every field in
--- SAVED_FIELDS is saved with the world and the digester keeps working while its chunk is unloaded.
--- While loaded its hopper is the truth about the feed; while unloaded it eats from a snapshot of the
--- hopper (`hopper`), and what it ate (`eaten`) leaves the hopper when the chunk loads again. Its
--- heater's lit tile is the truth about the heater while loaded; `heaterLit` carries it through
--- unloaded passes.
+-- It keeps working while its chunk is unloaded. While loaded its hopper is the truth about the feed;
+-- while unloaded it eats from a snapshot (`hopper`), and what it ate (`eaten`) leaves the hopper when
+-- the chunk loads again. Likewise `heaterLit` carries the heater's lit tile through unloaded passes.
 
 if isClient() then return end
 
@@ -131,8 +128,6 @@ end
 function DigesterObject:acidLimit()
     return Digester.ACID_LIMIT * self:tierSpec().potentialCap
 end
-
--- Feed ----------------------------------------------------------------------------------------
 
 -- The hopper's feed as plain values the digester can eat from while its chunk is unloaded, in the
 -- order it eats them.
@@ -259,8 +254,6 @@ function DigesterObject:meter(hours, container)
     end
 end
 
--- Temperature ----------------------------------------------------------------------------------
-
 local function kAt(temp)
     local points = Digester.K_BY_TEMP
     if temp <= points[1][1] or temp >= points[#points][1] then
@@ -310,8 +303,6 @@ function DigesterObject:targetTemp(air)
     end
     return target, burning
 end
-
--- The pass ------------------------------------------------------------------------------------
 
 function DigesterObject:startupNeeded()
     return getSandboxOptions():getCompostHours()
@@ -415,18 +406,15 @@ function DigesterObject:afterChange()
     self:sendSummary()
 end
 
--- Stink and fumes -----------------------------------------------------------------------------
-
--- Startup stinks most at its middle, the first week or so at the default compost time; a working
--- digester settles down over its first two weeks of gas.
+-- Startup stinks most at its middle; a working digester settles down over its first weeks of gas.
 local STARTUP_STINK, STARTUP_PEAK = 1.0, 0.5
 local YOUNG_STINK, MATURE_STINK, MATURE_HOURS = 0.8, 0.4, 14 * 24
 local SLUDGE_STINK, SOUR_STINK = 0.8, 1.5
 -- A part-filled digester stinks less than a full one.
 local EMPTY_SHARE = 0.5
 
---- The stink score: under 0.2 none, then up to 1 the first smell level, up to 2 the second, and
---- the third beyond.
+--- The stink score: below the first of Digester.SMELL_SCORES none, then each score starts the
+--- next smell level.
 function DigesterObject:stinkScore()
     if not self.fed then
         return 0
@@ -466,8 +454,6 @@ end
 function DigesterObject:fuming()
     return self.indoors and not self:tierSpec().sealed and (self.sour or self.leakHours > 0)
 end
-
--- Tile -----------------------------------------------------------------------------------------
 
 local showOverlay = RenewableEnergy.showOverlay
 
@@ -525,8 +511,6 @@ function DigesterObject:upgrade(isoObject)
     end
 end
 
--- Gas ------------------------------------------------------------------------------------------
-
 --- Takes up to `m3` of gas out of the holder. Returns what it took.
 function DigesterObject:takeGas(m3)
     local taken = math.min(m3, self.gas)
@@ -534,8 +518,7 @@ function DigesterObject:takeGas(m3)
     return taken
 end
 
--- As the gas line's source (GasLines.run): gas below MIN_GAS is too little to run on, and a
--- generator burns GasKit.M3_PER_LITRE for each litre of petrol vanilla bills it.
+-- Below this the holder is too little to run a generator on.
 local MIN_GAS = 0.01
 
 function DigesterObject:canSupply()
@@ -555,8 +538,6 @@ function DigesterObject:supply(litres)
     local need = GasKit.M3_PER_LITRE * litres
     return self:takeGas(need) + 1e-4 >= need
 end
-
--- Summary --------------------------------------------------------------------------------------
 
 --- What every client keeps of the digester: what its menu checks and its status window shows,
 --- rounded so a pass that changes little sends nothing. Digester's accessors add what its hopper

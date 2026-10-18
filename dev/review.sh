@@ -27,7 +27,7 @@ pandoc "$REPO/README.md" -f gfm -t html5 --standalone --embed-resources \
 # A throwaway profile, so the run neither touches nor waits on a Chrome that is already open.
 "$CHROME" --headless --disable-gpu --no-pdf-header-footer --user-data-dir="$WORK/chrome" \
     --print-to-pdf="$WORK/page.pdf" "file://$WORK/RenewableEnergy-README.html" 2>/dev/null
-# review.css prints onto 200-inch pages; the last one is cut off below the last text or image.
+# review.css prints onto one tall page; crop it below the last text or image.
 uv run -q --with pymupdf python - "$WORK/page.pdf" "$WORK/RenewableEnergy-README.pdf" <<'EOF'
 import sys
 import pymupdf

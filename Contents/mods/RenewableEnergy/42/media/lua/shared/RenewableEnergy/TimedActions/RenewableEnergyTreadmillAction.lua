@@ -71,8 +71,8 @@ local function runSpot(self)
     return rear.x + 0.5 + step[1] * TOWARD_CONSOLE, rear.y + 0.5 + step[2] * TOWARD_CONSOLE
 end
 
--- How far the belt's top stands above the floor, in levels: the belt's box in the tiles' depth
--- geometry (tileGeometry.txt) reaches 0.17 of the 2.449 units a level stands (TileDepthTexture).
+-- How far the belt's top stands above the floor, in levels: the height of the belt's box in the
+-- tiles' depth geometry (tileGeometry.txt) over the height of a level (TileDepthTexture).
 -- A runner on the floor would have their feet drawn inside the belt.
 local BELT_HEIGHT = 0.17 / 2.449
 
@@ -83,10 +83,10 @@ local function holdOnBelt(self)
     self.character:setLastFallSpeed(0)
 end
 
--- The authority's start of a run on an unwired treadmill with power: its draw from here until the
--- run settles. A bank powering it bills that draw (Loads.lua). Grid or generator power need only be
--- there: the grid bills nothing, and vanilla burns a generator's fuel for each appliance object's
--- own consumption (IsoGenerator.setSurroundingElectricity), which a treadmill doesn't have.
+-- The authority's start of a run's draw on an unwired, powered treadmill, which a powering bank
+-- bills until the run settles. Grid and generator power need only be there: the grid bills nothing,
+-- and vanilla burns generator fuel only for an appliance's own consumption
+-- (IsoGenerator.setSurroundingElectricity), which a treadmill doesn't have.
 local function startDrawing(self)
     if not self.wired and Treadmill.isPowered(self.object) then
         Treadmill.startDrawing(self.object, self)

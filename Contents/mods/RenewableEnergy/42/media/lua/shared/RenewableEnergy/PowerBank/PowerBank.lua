@@ -2,11 +2,9 @@
 -- take, the sources connected to it, and the bank's summary and status as the server last
 -- reported them. What each kind of source is lives in RenewableEnergy.Sources.
 --
--- The server runs the banks (server/RenewableEnergy/PowerBank) and adds perform(), place() and
--- remove() to this table; the client adds watchStatus() and unwatchStatus() (client/
--- RenewableEnergy/PowerBank/ClientBankSystem.lua). Both register a Global Object System under
--- SYSTEM_NAME, which keeps each bank's state while its chunk is unloaded and copies its small
--- `summary` to every client. The whole `status` goes only to the players watching it.
+-- The server and client bank systems add their own functions to this table. Both register a Global
+-- Object System under SYSTEM_NAME, which keeps each bank's state while its chunk is unloaded and
+-- copies its small `summary` to every client; the whole `status` goes only to players watching it.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
@@ -66,7 +64,6 @@ function PowerBank.bankOn(square)
     return RenewableEnergy.findObjectOn(square, PowerBank.isBank)
 end
 
---- A fresh copy of a list of module records.
 function PowerBank.copyModules(modules)
     local copy = {}
     for i, module in ipairs(modules) do
@@ -121,8 +118,6 @@ function PowerBank.canPlaceBank(square)
     return false, "Tooltip_RenewableEnergy_BankIndoorsOnly"
 end
 
--- Parts --------------------------------------------------------------------------------------
-
 --- Every kind of bank part: its item types (each type's Specs row), the bank record field that
 --- lists the bank's parts of the kind (Bank.SAVED_FIELDS), the Specs.banks field that caps how
 --- many a bank takes, and whether Electronics Scrap repairs it.
@@ -141,8 +136,7 @@ for kind, part in pairs(PowerBank.PARTS) do
     end
 end
 
---- What kind of bank part an item type is (PowerBank.PARTS): "battery", "inverter", "charger",
---- "controller", or nil.
+--- What kind of bank part an item type is (a PowerBank.PARTS key), or nil.
 function PowerBank.partKind(fullType)
     local part = fullType and PART_TYPES[fullType]
     return part and part.kind
@@ -154,7 +148,6 @@ function PowerBank.isRepairable(fullType)
     return kind ~= nil and PowerBank.PARTS[kind].repairable == true
 end
 
---- How many parts of `kind` a bank container holds.
 local function countParts(container, kind)
     local count = 0
     local items = container:getItems()
@@ -204,9 +197,8 @@ local function addNeed(needs, need)
     end
 end
 
---- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`
---- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
---- Scrap.
+--- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`, for
+--- RenewableEnergy.firstUnmet.
 function PowerBank.jobNeeds(character, wiring)
     local inventory = character:getInventory()
     local needs = {}
@@ -218,9 +210,8 @@ function PowerBank.jobNeeds(character, wiring)
     return needs
 end
 
---- What wiring a part of type `fullType` into a bank takes of `character`
---- (RenewableEnergy.firstUnmet): the Electricity level, the tool, Electric Wire and Electronics
---- Scrap.
+--- What wiring a part of type `fullType` into a bank takes of `character`, for
+--- RenewableEnergy.firstUnmet.
 function PowerBank.wiringNeeds(character, fullType)
     return PowerBank.jobNeeds(character, PowerBank.wiringFor(fullType))
 end
@@ -251,8 +242,7 @@ function PowerBank.wiringRefusal(character, bankObject, item)
     return short and short.kind
 end
 
---- What repairing an inverter or controller takes of `character` (RenewableEnergy.firstUnmet):
---- the Electricity level and one Electronics Scrap.
+--- What repairing an inverter or controller takes of `character`, for RenewableEnergy.firstUnmet.
 function PowerBank.repairNeeds(character)
     local needs = {}
     addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = Specs.partRepair.skill })
@@ -305,9 +295,9 @@ function PowerBank.switchRefusal(bank, on)
 end
 
 --- Why `character` can't connect (`connect` true) or disconnect the bank `bankObject`, whose
---- summary or status is `bank`, or nil. Vanilla's generator rules: connecting needs Electricity 3
---- or the "Generator" recipe (ISWorldObjectContextMenuLogic.doGeneratorMenu), and only a
---- switched-off one disconnects.
+--- summary or status is `bank`, or nil. Vanilla's generator rules: connecting needs the generator
+--- Electricity level or the "Generator" recipe (ISWorldObjectContextMenuLogic.doGeneratorMenu), and
+--- only a switched-off one disconnects.
 function PowerBank.connectRefusal(character, bankObject, bank, connect)
     if bankObject:isConnected() == connect then
         return connect and "already connected" or "already disconnected"
@@ -318,8 +308,6 @@ function PowerBank.connectRefusal(character, bankObject, bank, connect)
     end
     return nil
 end
-
--- Banks as either side knows them ---------------------------------------------------------
 
 -- The Global Object System of this side: the server's in single player, where both exist
 -- and the server's is the live one.

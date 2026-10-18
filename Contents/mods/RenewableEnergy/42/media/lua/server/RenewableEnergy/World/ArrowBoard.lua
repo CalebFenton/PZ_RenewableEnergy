@@ -8,9 +8,7 @@ require "RenewableEnergy/World/WorldSpawns"
 
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
 -- trailer whose panels charge the batteries in a padlocked box on its tongue, which light an
--- arrow on its lamp board. It turns up among junkyard and traffic jam wrecks and at SolarSites'
--- road works. Distributions' OnFillContainer stocks its box when it first spawns, and
--- GadgetCharging's pass charges it and runs its lamps wherever it stands or is towed.
+-- arrow on its lamp board.
 --
 -- RenewableEnergy.ArrowBoard is spread over three files, by concern: this one has the trailer,
 -- its stock, lid, panels and frame; ArrowBoardPower.lua its charging, switch and lamps;
@@ -116,33 +114,27 @@ function ArrowBoard.spawn(square, facing)
     return vehicle and vehicle:getSquare() and vehicle or nil
 end
 
--- Lid ------------------------------------------------------------------------------------------
+-- Lid
 --
--- The box's lid is a trunk lid under vanilla's TrunkDoor id (scripts/RenewableEnergy/Vehicles.txt).
--- Vanilla lets the mechanics window take a locked trunk's lid off when the key isn't needed for it
--- (VehicleUtils.RequiredKeyNotFound), which this lid never is, so no key spawns and a padlocked
--- box opens only by force: unbolting the lid, which goes back on unlocked
--- (Vehicles.InstallComplete.Door), or Cut Padlock (ArrowBoard.cutPadlock, offered by
--- UI/BatteryBoxLid.lua), which breaks the lock so vanilla never locks it again
--- (BaseVehicle.canLockDoor).
+-- The box's lid is a trunk lid under vanilla's TrunkDoor id. Vanilla lets the mechanics window
+-- take a locked trunk's lid off when the key isn't needed (VehicleUtils.RequiredKeyNotFound),
+-- which this lid never is, so no key spawns and a padlocked box opens only by force: unbolting
+-- the lid, which goes back on unlocked (Vehicles.InstallComplete.Door), or Cut Padlock, which
+-- breaks the lock so vanilla never locks it again (BaseVehicle.canLockDoor).
 --
--- Vanilla swings a door only in the opener's game, as the action starts and before the server
--- has said whether it opened (ISOpenVehicleDoor:start); everyone else's copy keeps its held pose,
--- which BaseVehicle.updateAnimationPlayer replaces only once it ends, and it never ends. So every
--- game that draws the trailer, the opener's included, swings the lid itself when it sees the
--- door's state change (watchLids).
+-- Vanilla swings a door only in the opener's game (ISOpenVehicleDoor:start); everyone else's copy
+-- keeps its held pose forever. So every game that draws the trailer swings the lid itself when it
+-- sees the door's state change (watchLids).
 --
 -- Nothing reports a door's lock changing, and installing the lid shows all its models
--- (VehiclePart.setInventoryItem), so every side watches the lid and shows the padlock again when
--- any of that changes; the server too, since its models are what it sends its clients
--- (VehiclePartModels).
+-- (VehiclePart.setInventoryItem), so every side, the server included, watches the lid and shows
+-- the padlock again when any of that changes.
 
 ArrowBoard.LID = "TrunkDoor"
 local PADLOCK = "Padlock"
 
--- The lids of the trailers this game has loaded, by vehicle: the lid part (lid), the lid's item,
--- lock and broken lock it last showed the padlock for, and whether it last saw the lid open (nil
--- until it first looks).
+-- The lids of the trailers this game has loaded, by vehicle, with what each last showed and saw,
+-- so that watchLids notices a change.
 local lids = {}
 
 --- Whether the lid's padlock holds: the lid is on, locked, and its lock isn't cut.
@@ -191,14 +183,10 @@ end
 
 local SWINGS_LIDS = not isServer()
 
--- OnTick: shows the padlock again on each loaded trailer whose lid has come off, gone on, been
--- locked, unlocked or cut since this game last looked and, but on a dedicated server, swings each
--- lid whose door it has seen open or shut (Lid, above). A lid seen for the first time isn't
--- swung: with no swing playing, the game holds the Opened or Closed pose by the door's state.
--- playPartAnim does nothing while the lid's model isn't loaded or the lid is off.
---
--- Per tick: a few field reads on each trailer this game has loaded, which are few; nothing the
--- game fires reports a door's state or lock changing, so it must look. Allocates nothing.
+-- OnTick: shows the padlock again on each loaded trailer whose lid or lock changed since this game
+-- last looked and, except on a dedicated server, swings each lid seen opening or shutting. A lid
+-- seen for the first time isn't swung: the game already holds its pose by the door's state.
+-- Nothing the game fires reports these changes, so it must poll; allocates nothing.
 local function watchLids()
     for vehicle, entry in pairs(lids) do
         if vehicle:isRemovedFromWorld() then
@@ -222,7 +210,7 @@ end
 
 Events.OnTick.Add(watchLids)
 
--- Panels ---------------------------------------------------------------------------------------
+-- Panels
 
 local function isPanel(part)
     local id = part and part:getId()
@@ -253,10 +241,10 @@ function ArrowBoard.showPanels(vehicle)
     end
 end
 
--- The trailers stocked this tick, each { vehicle, panels = { { part, item, condition } } }: the
--- modules on their panels and the conditions they got. addVehicleDebug and the world's vehicle
--- stories set every part's condition after the parts were made (BaseVehicle.setGeneralPartCondition,
--- RandomizedWorldBase.addVehicle), over the stock ones, so the next tick puts them back.
+-- The trailers stocked this tick, with their modules and the conditions they got. addVehicleDebug
+-- and the world's vehicle stories set every part's condition after the parts were made
+-- (BaseVehicle.setGeneralPartCondition, RandomizedWorldBase.addVehicle), over the stock ones, so
+-- the next tick puts them back.
 local justStocked = {}
 
 -- Puts modules on its panels, as many as the panel rarity option gives, the second maybe cracked.
@@ -423,13 +411,12 @@ function ArrowBoard.repairPanel(character, vehicle, partId)
     return true
 end
 
--- Frame ----------------------------------------------------------------------------------------
+-- Frame
 --
 -- The frame's front and back are parts under vanilla's EngineDoor and TruckBed ids, the only ids
--- whose condition the game shows as dents on the body (scripts/RenewableEnergy/Vehicles.txt), so
--- crashes and road kills dent them with no help from here. The lamp board is one more such part
--- (ArrowBoardPower.lua), dented on its own zone. Repair Frame welds them through vanilla's fixing,
--- from the trailer's menu, since the mechanics window doesn't show them.
+-- whose condition the game shows as dents on the body, so crashes dent them with no help from
+-- here. Repair Frame welds them through vanilla's fixing, from the trailer's menu, since the
+-- mechanics window doesn't show them.
 
 -- Each frame part and the name the repair menu gives it.
 ArrowBoard.FRAME = {

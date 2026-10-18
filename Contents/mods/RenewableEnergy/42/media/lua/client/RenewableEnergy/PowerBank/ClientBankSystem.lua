@@ -1,12 +1,10 @@
--- The banks as a client sees them: the server's summary of each one, arriving through the
--- Global Object System (also in single player, where it loops back), the whole status of the
--- banks this game's players watch, and commands back.
+-- The banks as a client sees them: each one's summary through the Global Object System (looped
+-- back in single player), the full status of banks this game's players watch, and commands back.
 --
--- Bank generators and containers come to a multiplayer client as plain copies, so this
--- side does on its copy what the server does on its own: keep the generator out of the
--- cell's update, which would run a gas generator's engine sound, give the container its
--- filter, which is neither saved nor sent, and let go of the squares a running bank powered
--- when it is taken away.
+-- A multiplayer client gets plain copies of bank generators and containers, so it does on its copy
+-- what the server does: keep the generator out of the cell's update (else a gas generator's engine
+-- sound runs), give the container its unsaved, unsent filter, and release the squares a running
+-- bank powered when it is removed.
 
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/ClientObjects"
@@ -53,8 +51,8 @@ end
 
 --- `player` watches the status of `bank` (single player too): the server sends it now, after a
 --- fresh look at the bank, and after every change until unwatchStatus. The status window watches
---- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; the server
---- takes no other command from a client but "resync".
+--- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; besides
+--- watching, the server takes no command from a client but "resync".
 function PowerBank.watchStatus(player, bank)
     local position = PowerBank.positionOf(bank)
     local key = keyOf(position)
@@ -92,8 +90,7 @@ Events.OnServerCommand.Add(function(module, command, args)
     end
 end)
 
--- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos), 8
--- squares a side.
+-- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos).
 local CHUNK_SQUARES = 8
 
 -- A server sends an object's removal before it removes its own copy (GameServer.RemoveItemFromMap),

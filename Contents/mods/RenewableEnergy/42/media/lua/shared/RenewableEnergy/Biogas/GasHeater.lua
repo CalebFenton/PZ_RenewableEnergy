@@ -1,8 +1,6 @@
 -- The gas heater: a placed tile beside a digester that burns a little of its gas to keep it warm.
--- A lit heater shows the lit tile. It warms one digester, the one digesterNear picks, which does
--- the burning in its own pass (DigesterObject), so it keeps warm while its chunk is unloaded too,
--- and puts the heater out when its gas runs out. Lighting and putting it out are jobs the
--- authority does (server/RenewableEnergy/Biogas/DigesterSystem.lua).
+-- It warms the one digester digesterNear picks, which does the burning in its own pass, so it keeps
+-- warm while unloaded too and puts the heater out when its gas runs out.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
@@ -17,18 +15,17 @@ RenewableEnergy.GasHeater = GasHeater
 local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
 local Sprites, Materials = RenewableEnergy.Sprites, RenewableEnergy.Materials
 
--- What a lit heater keeps its digester at, at least: vanilla's lit barbecue warms its square to 25
--- (IsoBarbecue's heat source).
+-- What a lit heater keeps its digester at, at least: as warm as vanilla's lit barbecue keeps its
+-- square (IsoBarbecue's heat source).
 GasHeater.TEMP = 25
 
---- The gas a lit heater burns an hour: a small flame, billed as an idling generator's
---- (GasKit.idleLitresPerHour), so it follows the GeneratorFuelConsumption option as every
---- generator on gas does.
+--- The gas a lit heater burns an hour: a small flame, billed as an idling generator's so it follows
+--- the GeneratorFuelConsumption option.
 function GasHeater.m3PerHour()
     return GasKit.idleLitresPerHour() * GasKit.M3_PER_LITRE
 end
 
--- A heater warms a digester on its own square or one next to it.
+-- How many squares from its digester a heater still warms it.
 GasHeater.REACH = 1
 
 GasHeater.LIGHT = "LightHeater"

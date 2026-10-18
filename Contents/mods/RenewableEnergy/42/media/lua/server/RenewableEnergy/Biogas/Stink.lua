@@ -2,26 +2,20 @@ if isClient() then
     return
 end
 
--- Stink through the game's own corpse smell. The game smells corpses by counting them per chunk
--- (CorpseCount, which Lua can't reach); each player's update turns the count around them into the
--- noxious smell moodle and food sickness, through gas masks, traits and the corpse sandbox option,
--- and a multiplayer server sends the result to its client. The count goes up only when an
--- IsoDeadBody is added to the world and down when one is removed, and neither needs the body on a
--- square. So a source of stink keeps "ghosts": bodies made from the cell alone, placed at the
--- source's square and added to the world but never to the square. Nothing draws, loots, burns,
--- saves or rots them (IsoDeadBody.updateBodies skips a body with no visual), and no flies buzz,
--- since their sound needs a body on a square.
+-- Stink through the game's own corpse smell. The game counts corpses per chunk (CorpseCount, out of
+-- Lua's reach) and each player's update turns the count around them into the noxious smell moodle
+-- and food sickness, honouring gas masks, traits and the corpse sandbox option. The count changes
+-- only when an IsoDeadBody is added to or removed from the world, neither needing the body on a
+-- square. So a stink source keeps "ghosts": bodies added to the world but never to a square, which
+-- nothing draws, loots, burns, saves or rots (IsoDeadBody.updateBodies skips a body with no visual),
+-- and which draw no flies.
 --
--- The count is per chunk level, split by building: ghosts outdoors count for players outdoors on
--- the same level within a chunk or so, and ghosts in a building only for players in that building.
--- The first five corpses near a player do nothing; at the default corpse option the moodle reaches
--- level 2 at 15 and level 3 at 25, the game's cap, which real corpses share.
+-- Counts are per chunk level, split by building: outdoor ghosts reach players outdoors nearby, ghosts
+-- in a building only players in it.
 --
--- A chunk zeroes its counts when it unloads, with no event, and again when it loads, before
--- LoadChunk, so the ghosts of a source in a chunk that loads are added again then. Removing a
--- ghost from a count that was zeroed would take a real corpse's place (an outdoor count goes
--- below zero), so a ghost is only removed while its chunk is loaded, when LoadChunk has made the
--- record right. The ghosts last the session; whoever owns a source sets it again after a load.
+-- A chunk zeroes its counts on unload (no event) and again on load before LoadChunk, which re-adds
+-- its ghosts. Removing a ghost from a zeroed count would cancel a real corpse, so ghosts are only
+-- removed while their chunk is loaded. Ghosts last the session; owners set them again after a load.
 
 RenewableEnergy = RenewableEnergy or {}
 local Stink = {}

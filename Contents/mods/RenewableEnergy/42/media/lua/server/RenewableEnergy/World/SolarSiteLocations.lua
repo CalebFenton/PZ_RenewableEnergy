@@ -1,8 +1,8 @@
 -- The named solar sites of SolarSites.lua, by the map they are on. Places where someone in 1993
 -- would have had solar: stock tank pumps out in the pastures, farms off the grid, campers,
 -- telephone relay sheds on the hills, the power company's yard, ranger stations, and arrow
--- boards at road works and at the army's checkpoints on the roads into Louisville. Each was read
--- off the map's lotheader and lotpack files of build 42.21.
+-- boards at road works and at the army's checkpoints on the roads into Louisville. Coordinates
+-- were read off the map's lotheader and lotpack files.
 --
 -- A site lists the spots its kind (SolarSites.KINDS) may use:
 --   panels: { x, y, z, mount, facing }, mount "flat", "wallMetal", "rackMetal" or "rackWood";
@@ -101,7 +101,7 @@ return {
             },
             bank = { 6998, 6025, 0 },
         },
-        -- Road works with a solar arrow board. The one on the highway to Louisville is always there.
+        -- Road works with a solar arrow board.
         { kind = "roadWorks", name = "Road works north of Muldraugh", arrowBoard = { 10598, 9128, 0, "N" }, always = true },
         { kind = "roadWorks", name = "Road works east of Riverside", arrowBoard = { 7053, 5467, 0, "E" } },
         { kind = "roadWorks", name = "Road works in Rosewood", arrowBoard = { 8200, 11507, 0, "N" } },

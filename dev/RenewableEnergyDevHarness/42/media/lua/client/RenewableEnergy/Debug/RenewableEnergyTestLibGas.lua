@@ -264,7 +264,7 @@ function T.matureDigester(tier)
         acid = 0, sour = false, sludge = 0 }
 end
 
---- The same, soured: acid at twice its limit, so the passes that run meanwhile keep it sour.
+--- The same, soured: acid well past its limit, so the passes that run meanwhile keep it sour.
 function T.sourDigester(tier)
     local state = T.matureDigester(tier)
     state.sour, state.acid = true, 2 * Digester.ACID_LIMIT * state.potential

@@ -1,8 +1,7 @@
 VERSION = 1,
 /*
-    Sunlight multiplier: 1 is Kentucky's real sunlight on the mod's module ratings.
-    The default puts a fridge-freezer at four or five modules in an average July and about eight
-    on racks in December, so that each one you find matters.
+    Sunlight multiplier: 1 is Kentucky's real sunlight on the mod's module ratings. The default
+    keeps a fridge-freezer needing several modules, more in winter, so that each one you find matters.
 */
 option RenewableEnergy.SunlightMultiplier {
 	page = RenewableEnergy, translation = RenewableEnergy_SunlightMultiplier,
@@ -10,9 +9,8 @@ option RenewableEnergy.SunlightMultiplier {
 }
 /*
     Biogas multiplier: 1 is what a real digester makes from the feed. A generator on gas burns
-    vanilla's own fuel bill (GasKit), so at 1 one cow's dung (vanilla drops one about every other
-    day) runs a fridge-freezer most of the day at the default fuel consumption, and a small herd a
-    house.
+    vanilla's own fuel bill (GasKit), so at 1 one cow's dung runs a fridge-freezer most of the day,
+    and a small herd a house.
 */
 option RenewableEnergy.BiogasMultiplier {
 	page = RenewableEnergy, translation = RenewableEnergy_BiogasMultiplier,
@@ -67,10 +65,7 @@ option RenewableEnergy.LRMMisc {
 	page = RenewableEnergy, translation = RenewableEnergy_LRMMisc,
 	type = double, min = 0, max = 100, default = 1,
 }
-/*
-    In-game minutes to connect one source (panel, wind charger or treadmill), at Electricity 3.
-    Roughly a third of that at 10, roughly a quarter longer at 0.
-*/
+/* In-game minutes to connect one source (panel, wind charger or treadmill); Electricity skill shortens it. */
 option RenewableEnergy.ConnectPanelMin {
 	page = RenewableEnergy, translation = RenewableEnergy_ConnectPanelMin,
 	type = integer, min = 1, max = 1440, default = 10,

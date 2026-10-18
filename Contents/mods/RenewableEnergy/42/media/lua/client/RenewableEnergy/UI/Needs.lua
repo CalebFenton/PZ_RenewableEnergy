@@ -1,14 +1,10 @@
 -- The idioms every right-click menu of the mod shares: finding the clicked object, a submenu, and an
 -- option greyed out saying why.
 --
--- Vanilla explains a greyed-out option two ways. One state or tool holding it back is a plain
--- sentence (Needs.refuse), as the generator's options say. A job that takes several things lists
--- them as vanilla lists what fixing an item takes (ISInventoryPaneContextMenu, "Needs" over a line
--- per need) and the mechanics window colours it (ISVehicleMechanics.doMenuTooltip): "<what>
--- <have>/<need>" in the good colour when the character has enough and the bad colour when short
--- (Needs.show). Both take what the job's shared refusal functions return, translation keys and
--- need lists (RenewableEnergy.firstUnmet), so the menu greys an option exactly when the job's
--- action and the authority refuse it.
+-- A greyed option is explained as vanilla does: one blocker as a plain sentence (Needs.refuse), or
+-- several needs as "<what> <have>/<need>" lines coloured good or bad, as the fixing menu and the
+-- mechanics window show them (Needs.show). Both take the shared refusal functions' answers, so the
+-- menu greys an option exactly when the job's action and the authority refuse it.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "Vehicles/ISUI/ISVehicleMechanics"

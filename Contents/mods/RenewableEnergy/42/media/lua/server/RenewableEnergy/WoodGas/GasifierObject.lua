@@ -1,12 +1,10 @@
--- One gasifier on the authority (single player or the server): its fire, the wood it burns, the
--- ash and tar that burning leaves, and the gas it gives the generator it is piped to.
+-- One gasifier on the authority: its fire, the wood it burns, the ash and tar left behind, and the
+-- gas it gives the generator it is piped to.
 --
--- The table is the gasifier's global object (RenewableEnergy.ObjectSystem), so every field in
--- SAVED_FIELDS is saved with the world. While its generator runs on its gas, the generator's gas
--- line (GasLines.run) bills it through supply() the wood for what vanilla billed the generator;
--- otherwise a lit gasifier burns an idling generator's share in its own pass. The hopper and filter
--- are its containers, so it only takes more wood, and tars more packing, while its chunk is
--- loaded; while unloaded a lit gasifier burns down what is in the firebox (`fireKg`) and goes out.
+-- While its generator runs on its gas, the gas line (GasLines.run) bills it through supply();
+-- otherwise a lit gasifier burns an idling generator's share in its own pass. Hopper and filter are
+-- containers, so it only takes more wood, and tars more packing, while its chunk is loaded; while
+-- unloaded a lit gasifier burns down what is in the firebox (`fireKg`) and goes out.
 
 if isClient() then return end
 
@@ -67,8 +65,6 @@ function GasifierObject:loaded(isoObject)
     Gasifier.adoptContainers(isoObject)
     self:afterChange()
 end
-
--- Burning ------------------------------------------------------------------------------------
 
 -- Puts the next item of fuel from the hopper into the firebox. Returns whether there was one.
 function GasifierObject:stoke(hopper)
@@ -164,8 +160,6 @@ function GasifierObject:setPipe(side)
     self:afterChange()
 end
 
--- The gas line's source ------------------------------------------------------------------------
-
 function GasifierObject:filterCounts()
     local isoObject = self:getIsoObject()
     return Gasifier.filterCounts(isoObject and Gasifier.filterOf(isoObject))
@@ -189,8 +183,6 @@ function GasifierObject:supply(litres)
     return self:burn(kg) + EPSILON >= kg and self.lit
 end
 
--- The pass --------------------------------------------------------------------------------------
-
 --- Whether the generator its pipe leads to runs on its gas, so the gas line bills all it burns.
 function GasifierObject:feedsRunningGenerator()
     local step = self.pipe and SIDE_STEPS[self.pipe]
@@ -200,9 +192,8 @@ function GasifierObject:feedsRunningGenerator()
     return state ~= nil and state.onGas == true and generator:isActivated()
 end
 
---- Burns, if lit, the `hours` since it last caught up as a generator idling would
---- (GasKit.idleLitresPerHour) at KG_PER_LITRE, so it burns down slowly and goes out when its wood
---- is gone. While its generator runs on its gas, that bill is the line's.
+--- Burns, if lit, the `hours` since it last caught up as an idling generator would, so it burns
+--- down slowly and goes out when its wood is gone. While its generator runs on its gas, the line bills.
 function GasifierObject:advance(hours)
     if hours > 0 and self.lit and not self:feedsRunningGenerator() then
         self:burn(GasKit.idleLitresPerHour() * Gasifier.KG_PER_LITRE * hours)
@@ -219,8 +210,6 @@ function GasifierObject:afterChange()
     end
     self:sendSummary()
 end
-
--- Summary --------------------------------------------------------------------------------------
 
 --- What every client keeps of the gasifier: what its menu checks and its status window shows.
 --- Gasifier's accessors add what its containers hold and what follows from that.

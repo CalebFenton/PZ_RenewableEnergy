@@ -4,6 +4,5 @@
 # loads the tiles, scripts, sandbox options, shared and server Lua, and the loot tables, with the
 # sandbox options and log patterns of dev/harness.conf.
 #
-# CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-server), and TIMEOUT the
-# seconds the server may take to start (default 900).
+# CACHE overrides the cache dir, and TIMEOUT the seconds the server may take to start.
 . "$(dirname "$0")/harness/bin/validate-server.sh"

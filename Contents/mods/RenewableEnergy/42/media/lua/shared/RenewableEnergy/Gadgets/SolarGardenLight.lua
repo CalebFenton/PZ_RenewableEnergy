@@ -44,7 +44,7 @@ SolarGardenLight.COMMAND_MODULE, SolarGardenLight.LAMP_COMMAND = "RenewableEnerg
 -- gives no colour, which is white.
 local LAMP_COLOR = { r = 1.0, g = 0.8, b = 0.55 }
 
--- Drawing side: the lamp lit at each place, by place key, as { source, bulb }.
+-- Drawing side: the lamp lit at each place, by place key.
 local lamps = {}
 
 function SolarGardenLight.isLight(isoObject)
@@ -86,7 +86,7 @@ function SolarGardenLight.lampBulb(light)
     return SolarGardenLight.isLit(light) and SolarGardenLight.getBulb(light) or nil
 end
 
--- Drawing side -----------------------------------------------------------------------------------
+-- Drawing side
 
 -- The colour the lamp of `bulb` is given. The native lighting doubles a lamp's colour and clips
 -- it at 1 (LightingJNI.checkLights), so given its bulb's own colour a lamp washes out toward

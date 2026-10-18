@@ -16,7 +16,8 @@ local row = SummaryWindow.row
 -- Below this the digester makes nothing.
 local COLD_C = Digester.K_BY_TEMP[1][1]
 
---- The window's state line: the first that applies of startup, sour, cold, nothing in it, working.
+--- The window's state line: the first that applies of never fed, starting up, sour, cold, nothing
+--- left to digest, working.
 function DigesterWindow.stateText(summary)
     if not summary.fed then
         return getText("IGUI_RenewableEnergy_DigesterEmpty")

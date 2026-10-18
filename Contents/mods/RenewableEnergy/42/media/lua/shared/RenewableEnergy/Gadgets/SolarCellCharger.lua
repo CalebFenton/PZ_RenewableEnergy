@@ -17,8 +17,8 @@ local Sprites = RenewableEnergy.Sprites
 SolarCellCharger.ITEM = "RenewableEnergy.SolarCellCharger"
 SolarCellCharger.BATTERY = "Base.Battery"
 SolarCellCharger.SLOTS = 4
--- Watt-hours that fill one Base.Battery. A game figure, not a cell's: it makes a full tray take
--- one to two sunny summer days at the default sunlight.
+-- Watt-hours that fill one Base.Battery: a game figure, not a real cell's, sized so a full tray
+-- charges over a sunny day or two.
 SolarCellCharger.BATTERY_WH = 25
 
 local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"

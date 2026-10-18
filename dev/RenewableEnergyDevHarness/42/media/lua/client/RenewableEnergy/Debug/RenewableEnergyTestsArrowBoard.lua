@@ -744,7 +744,7 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
             })
             T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
             T.step(function() self.first = trailer.answer end)
-            -- 1% of room in each: both fill, and the rest of the hour is lost.
+            -- Little room in each: both fill, and the rest of the hour is lost.
             T.onVehicle(self, trailer, "setTrailer", { box = { { type = DEEP_CYCLE, charge = 0.99 }, { type = L16, charge = 0.99 } } })
             T.onVehicle(self, trailer, "arrowBoardCharge", { hours = 1 })
             T.step(function() self.second = trailer.answer end)
@@ -864,7 +864,7 @@ test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
 })
 
 -- Lit, by day or night, the lamps drain a car battery at vanilla's engine-off lightbar rate:
--- Vehicles.Update.Lightbar's -0.000025 a minute, applied twice by VehicleUtils.chargeBattery.
+-- Vehicles.Update.Lightbar's drain a minute, applied twice by VehicleUtils.chargeBattery.
 local LIGHTBAR_SHARE_PER_HOUR = 2 * 0.000025 * 60
 test("renewable_energy_world_arrow_board_lamps_drain_a_lightbars_share", {
     run = function(self)
@@ -1066,7 +1066,7 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
 })
 
 -- Found trailers are switched on at STOCK.switchedOnChance: the share over many rolls lands within
--- six standard deviations of it.
+-- a few standard deviations of it.
 local SWITCH_ROLLS = 4000
 test("renewable_energy_world_arrow_board_found_switch_follows_its_chance", {
     run = function(self)
@@ -1161,7 +1161,7 @@ end
 
 -- A panel's skills are recommendations, as for any vanilla part: one level short of one, the panel
 -- still comes off and goes on, the mechanics window offers Uninstall, and only the odds fall, by
--- vanilla's 20 plus 15 a missing level (VehicleUtils.calculateInstallationSuccess), shown in the
+-- vanilla's rule (VehicleUtils.calculateInstallationSuccess), shown in the
 -- tooltip; with every skill met the job can't fail. One test per case: T.setPerk holds a level for
 -- the whole test.
 local SKILL_CASES = {
@@ -1380,8 +1380,8 @@ local function attachTrailer(self)
         ISTimedActionQueue.add(ISAttachTrailerToVehicle:new(p, car.vehicle, trailer.vehicle, "trailer", "trailer"))
     end)
     -- The action hitches as it starts, so the hitch is older than its time since this. A test that
-    -- tows runs instantly: at its real length the action would take two seconds, as long as the
-    -- game spares a fresh hitch from snapping.
+    -- tows runs instantly: at its real length the action would take as long as the game spares a
+    -- fresh hitch from snapping.
     T.step(function() self.hitchedAt = getTimestampMs() end)
     -- The hitch pulls the trailer in over the next physics steps.
     T.waitUntil(function()
@@ -1416,8 +1416,8 @@ end
 -- A push each frame, small enough that a frame adds only a few km/h, and the speeds a crash's jolt
 -- and a bump's stop pushing at. The game applies a push for the frame's length of physics time
 -- (BaseVehicle.applyAccumulatedImpulsesFromHitObjectsToPhysics), so one push gives a different
--- speed at each frame rate; pushing up to a measured speed doesn't. Even at 60 frames a second
--- the crash's push takes well under the watcher's quarter second.
+-- speed at each frame rate; pushing up to a measured speed doesn't. Even at a low frame rate the
+-- crash's push ends well within the watcher's window.
 local PUSH, CRASH_KMH, BUMP_KMH = 1000, 35, 6
 
 -- How long, in real milliseconds, a hitch holds whatever jolts it (Bullet.onVehicleConstraintImpulse),
@@ -1758,9 +1758,8 @@ test("renewable_energy_world_arrow_board_towed_by_car", {
     end,
 })
 
--- Unhitched and left on its own, it comes to rest on its wheels and coupler, as vanilla's Trailer
--- does (up vector dot 0.989, about 8.5 degrees nose down). Without its physics shapes it rests on
--- the chassis box's front edge at 0.897.
+-- Unhitched and left on its own, it comes to rest on its wheels and coupler, nose slightly down, as
+-- vanilla's Trailer does. Without its physics shapes it tips onto the chassis box's front edge.
 test("renewable_energy_world_arrow_board_stands_alone", {
     spOnly = "a dedicated server runs no vehicle physics and a client only those it drives, tows or bumps, so nothing settles a trailer left alone",
     run = function(self)

@@ -1,13 +1,13 @@
--- Gives the game's four drums, which the barrel digesters are built from, a ground model. Vanilla's
--- scripts give these moveables only an icon and a tile, so a dropped drum lies on the floor as its
--- flat icon; with a WorldStaticModel the floor draws the model instead (ItemModelRenderer.itemHasModel).
--- art/models builds each drum lying on its side, so a dropped one can't pass for one installed.
+-- Gives the vanilla drums the barrel digesters are built from a ground model. Vanilla gives these
+-- moveables only an icon and a tile, so a dropped drum lies flat as its icon; a WorldStaticModel
+-- makes the floor draw the model (ItemModelRenderer.itemHasModel). The models lie on their side so a
+-- dropped drum can't pass for an installed one.
 --
--- Shared: a dedicated server loads no client Lua, and both sides should hold the same scripts. The
--- game loads the scripts before the Lua on every boot and mod reload, then fires OnGameBoot
--- (Core.ResetLua, GameServer). An item reads its script's model whenever it is drawn
--- (InventoryItem.getWorldStaticItem), so drums already on the floor change too. The model is named
--- with its module: the script's own names were resolved before Lua ran (Item.resolveModelScripts).
+-- Shared because a dedicated server loads no client Lua and both sides should hold the same scripts.
+-- Scripts load before Lua on every boot and reload, then OnGameBoot fires (Core.ResetLua,
+-- GameServer); items read the model whenever drawn, so drums already on the floor change too. The
+-- model is module-qualified because script names were resolved before Lua ran
+-- (Item.resolveModelScripts).
 
 require "RenewableEnergy/Sprites"
 

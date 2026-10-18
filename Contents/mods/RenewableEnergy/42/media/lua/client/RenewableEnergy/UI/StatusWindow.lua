@@ -1,8 +1,6 @@
--- The battery bank's status window. It draws the status the server sends to the players watching
--- the bank, which it does while the window is open, so it reads the same in single player and
--- multiplayer. Clicking a source's row highlights that source in the world. Its Turn On/Off and
--- Rename buttons queue the menu's jobs (RenewableEnergy.Menu), which requires this file for its
--- Status option, so they look Menu up when clicked.
+-- The battery bank's status window. It draws the status the server sends to the bank's watchers,
+-- so it reads the same in single player and multiplayer. Menu requires this file, so the buttons
+-- look Menu up when clicked.
 
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
@@ -62,7 +60,6 @@ end
 -- drawProgressBar takes its color as a table; this one is refilled on every draw.
 local barColor = { r = 0, g = 0, b = 0, a = 1 }
 
--- Summary -------------------------------------------------------------------------------------
 -- The lines across the top, each { text = text, color = name }.
 
 local function chargingLine(status)
@@ -125,7 +122,6 @@ function StatusWindow.summary(status)
     return lines
 end
 
--- Rows ----------------------------------------------------------------------------------------
 -- A row is { header = text }, { label = text, value = text, color = name, source = entry },
 -- { bar = 0..1 } or { gap = true }. They are built from the status alone, so the tests can check
 -- them for any bank.
@@ -369,8 +365,6 @@ function StatusWindow.rows(status, bank)
     return left, right
 end
 
--- Layout --------------------------------------------------------------------------------------
-
 local function lineHeight()
     return getTextManager():getFontHeight(UIFont.Small)
 end
@@ -435,8 +429,6 @@ local function fit(rows, height)
     return kept
 end
 
--- Window --------------------------------------------------------------------------------------
-
 local function addButton(self, title, onClick)
     local button = ISButton:new(PAD, 0, 100, math.floor(lineHeight() * 1.5), title, self, onClick)
     button:initialise()
@@ -497,8 +489,6 @@ function StatusWindow:setStatus(status)
     self:setWidth(math.max(PAD + left.width + COLUMN_GAP + right.width + PAD, PAD + summary.width + PAD))
     self:setHeight(buttonY + self.switchButton:getHeight() + PAD)
 end
-
--- Highlighting a source -------------------------------------------------------------------------
 
 function StatusWindow:clearHighlight()
     local highlight = self.highlight

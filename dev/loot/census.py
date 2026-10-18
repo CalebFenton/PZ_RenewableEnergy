@@ -20,8 +20,8 @@ map. It reads the files IsoMetaGrid and IsoLot read:
 - <map>/objects.lua: the map zones; a ParkingStall zone's name is its VehicleZoneDistribution.
 - *.tiles: each tile's properties; a container tile has a "container" property naming its type.
 
-Vehicle stalls are counted as IsoChunk.AddVehicles_OnZone lays them out: a stall every 3 squares
-across and 5 along a zone facing north or south, 5 across and 3 along one facing east or west.
+Vehicle stalls are counted as IsoChunk.AddVehicles_OnZone lays them out, with the spacing across
+and along a zone depending on which way it faces.
 Traffic jam zones (trafficjam<n|s|e|w>, and the rtrafficjam ones each chunk rolls for) are laid
 out by IsoChunk.AddVehicles_TrafficJam_*, closer together; their counts are the expected number
 of cars' slots, whether or not a car takes each.
@@ -232,8 +232,8 @@ def jam_slots_along(start, length, first, step, jitter):
 
 
 def jam_slots(facing, x, y, w, h):
-    """IsoChunk.AddVehicles_TrafficJam_*: rows 3 squares apart across the road, cars about 6
-    along it."""
+    """Slots in a traffic jam zone, spaced as IsoChunk.AddVehicles_TrafficJam_* lays them: rows
+    across the road, cars along it."""
     if facing in ("n", "s"):
         return jam_slots_along(x, w, 1, 3, False) * jam_slots_along(y, h, 3, 6, True)
     return jam_slots_along(y, h, 1, 3, False) * jam_slots_along(x, w, 3, 6, False)

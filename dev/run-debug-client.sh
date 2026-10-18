@@ -18,8 +18,8 @@
 #                                    files, instead of starting the game again. A change outside the
 #                                    test files (Debug/RenewableEnergyTest*.lua in the dev mod)
 #                                    restarts the game. While it waits it shows and logs "RETest
-#                                    IDLE"; it quits after 30 minutes without a run, or when
-#                                    another run needs the game.
+#                                    IDLE"; it quits after a long idle spell, or when another run
+#                                    needs the game.
 #   dev/run-debug-client.sh --test --mp [--stay]
 #                                    the same tests in multiplayer: a dedicated server and a client
 #                                    that joins it as the admin (dev/harness/docs/multiplayer.md);
@@ -44,10 +44,8 @@
 #                                    town and per solar site, and the arrow boards per map (a few
 #                                    minutes)
 #
-# CACHE overrides the cache dir (default: $TMPDIR/pz-renewable-energy-client), JAVAC the compiler for
-# ClickToStart.java (default: javac from PATH; any JDK from 8 on works), TIMEOUT the seconds a
-# harness run may take (default 300 per round for --test, 1200 for the other modes), TESTS, a
-# comma-separated list of test name prefixes, limits --test to those tests (e.g.
-# TESTS=renewable_energy_loot_), and PROMO, a comma-separated list of groups, limits --promo to
-# those groups.
+# CACHE overrides the cache dir, JAVAC the compiler for ClickToStart.java (default: javac from
+# PATH), TIMEOUT the seconds a harness run may take, TESTS, a comma-separated list of test name
+# prefixes, limits --test to those tests (e.g. TESTS=renewable_energy_loot_), and PROMO, a
+# comma-separated list of groups, limits --promo to those groups.
 . "$(dirname "$0")/harness/bin/run-client.sh"

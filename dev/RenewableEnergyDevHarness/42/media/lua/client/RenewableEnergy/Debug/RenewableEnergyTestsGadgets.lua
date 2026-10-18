@@ -143,8 +143,7 @@ test("renewable_energy_gadgets_maintainer_charge", {
             end
         end
         -- The pass runs the maintainer for as long as the noon row, right after it, so it adds what
-        -- that hour added. The light can still move a little between the two calls, hence a
-        -- fiftieth of that hour's Wh.
+        -- that hour added; the light can still move a little between the two calls.
         local pass, capacityWh = self.server.chargeVehicles, charged.capacityWh
         expectNear("Wh the vehicle pass gave the maintained car", (pass.after - pass.before) * capacityWh, charged.wh, charged.wh / 50)
     end,
@@ -381,7 +380,7 @@ end
 local VEHICLE_HOURS = {
     { behavior = "headlight_drain_scales_with_capacity", vehicle = CAR, handler = "headlightDrain", uses = 0.8,
         change = "drop", none = "the headlight didn't drain the car battery" },
-    -- Vanilla's lightbar drain is small; ten hours make it measurable.
+    -- Vanilla's lightbar drain is small; a long run makes it measurable.
     { behavior = "lightbar_drain_scales_with_capacity", vehicle = "Base.CarLightsPolice", handler = "lightbarDrain",
         uses = 0.8, minutes = 600, change = "drop", none = "the lightbar didn't drain the car battery" },
     { behavior = "alternator_charge_scales_with_capacity", vehicle = CAR, handler = "alternatorCharge", uses = 0.2,

@@ -208,7 +208,7 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
 })
 
 -- Input slots: a battery box's free slots take a panel and a scoop rotor and refuse the homemade
--- alternator, which takes three. On a rack with a controller the alternator makes its curve's
+-- alternator, which takes more. On a rack with a controller the alternator makes its curve's
 -- watts a km/h below its furl speed, turns out of the wind at it, making its furled share, and
 -- breaks, furled, at its break speed. With the controller worn out the alternator no longer fits
 -- the slots left, but a panel connected after it still does.

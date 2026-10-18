@@ -1,14 +1,12 @@
 -- Measures how often the mod's items spawn, with the game's own loot rolls on scratch containers
--- that never enter the world, and how world banks and crates are stocked: for tuning
--- Distributions.lua and WorldSpawns.lua, the README's hints and the loot tests. Shared Lua so
--- the loot tests can roll on a multiplayer server, whose loot tables alone hold the mod's entries.
+-- that never enter the world, and how world banks and crates are stocked. Shared Lua so the loot
+-- tests can roll on a multiplayer server, whose loot tables alone hold the mod's entries.
 -- dev/run-debug-client.sh --loot prints Loot.report() and Loot.moduleReport(). Debug mode only.
 --
--- The report rolls copies of the lists that hold only the mod's items: each entry rolls on its
--- own, so the chances are the same without creating the vanilla items, and rolling the whole
--- lists thousands of times runs the client out of memory. It leaves out that a container the
--- vanilla items have already filled stops rolling, so the real chances are a little lower in
--- lists of heavy items.
+-- The report rolls copies of the lists with only the mod's items: each entry rolls on its own,
+-- so the chances are the same, and rolling the whole lists thousands of times runs the client out
+-- of memory. It ignores that a container filled by vanilla items stops rolling, so real chances
+-- are a little lower in lists of heavy items.
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"

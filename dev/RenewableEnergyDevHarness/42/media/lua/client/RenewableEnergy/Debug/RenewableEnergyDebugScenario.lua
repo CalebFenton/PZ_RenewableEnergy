@@ -3,8 +3,7 @@ local QA = require "RenewableEnergyDevQA"
 
 -- Listed in the SCENARIOS panel on the main menu when the game runs with -debug
 -- (DebugScenarios.lua), and started by every dev harness mode, whose world has no zombies
--- (PZHarness Runner). Starts in the morning with an electrician and carpenter who knows every
--- recipe, a screwdriver and a table to craft at.
+-- (PZHarness Runner). Starts in the morning with the character Debug.setupPlayer makes.
 debugScenarios = debugScenarios or {}
 
 debugScenarios.RenewableEnergyScenario = {

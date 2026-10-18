@@ -1,10 +1,9 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Fixtures of the world, trailer, tile and loot tests, added to RenewableEnergyTest. What they build
--- and read lives on the authority, so they go through the dev mod's server handlers in
--- server/RenewableEnergy/Debug/RenewableEnergyTestServer*.lua, which single player runs in this
--- game. Those files load after client Lua, on a multiplayer client as well, so the trailer
--- readers are required when a test runs.
+-- Fixtures of the world, trailer, tile and loot tests. What they build and read lives on the
+-- authority, so they go through the dev mod's server handlers (RenewableEnergyTestServer*.lua).
+-- Those load after client Lua, even on a multiplayer client, so the trailer readers are required
+-- when a test runs.
 
 local T = RenewableEnergyTest
 
@@ -30,14 +29,11 @@ function T.serverCheck(testName, name, args, sandbox)
 end
 
 -- Vehicles ----------------------------------------------------------------------------------------
--- A vehicle is a T.placeVehicle handle, spawned by the authority, which the trailer server file's
--- Trailer.spawnVehicle (the `spawnVehicle` setting) spawns as the world does when `args.stocked`,
--- and whole when `args.repair`. The handlers find it by T.vehicleArgs (RenewableEnergyTestLib.lua).
+-- A vehicle is a T.placeVehicle handle, spawned by the authority through Trailer.spawnVehicle,
+-- stocked as the world spawns it when `args.stocked` and whole when `args.repair`.
 
---- Queues the server handler `name` on the vehicle with `args` (a table, or a function returning
---- one when the call goes out) and leaves its answer in vehicle.answer and, if it holds one, the
---- server's state of the vehicle (see Trailer.vehicleState in RenewableEnergyTestServerTrailer.lua)
---- in vehicle.state.
+--- Queues the server handler `name` on the vehicle with `args` (a table, or a function called
+--- when the call goes out); leaves its answer in vehicle.answer and any state in vehicle.state.
 function T.onVehicle(self, vehicle, name, args)
     local function allArgs()
         local all = T.vehicleArgs(vehicle)
@@ -59,9 +55,8 @@ function T.vehicleState(self, vehicle)
     T.onVehicle(self, vehicle, "vehicleState")
 end
 
---- Queues reading the server's state of the vehicle again and again until `done(state)` holds or
---- `ms` real milliseconds pass, for what a client's action or command changes there later; leaves
---- the last state read in vehicle.state.
+--- Queues reading the server's state of the vehicle until `done(state)` holds or `ms` real
+--- milliseconds pass, for what a client's action changes there later.
 function T.awaitVehicleState(self, vehicle, done, ms)
     T.serverUntil(self, "vehicleState", function() return T.vehicleArgs(vehicle) end,
         function(reply) return done(reply.state) end, ms)
@@ -78,9 +73,8 @@ function T.lidPose(vehicle)
     return trailer().lidPose(vehicle.vehicle)
 end
 
---- Queues a wait, as long as a fixture's, until this side's copy of the vehicle matches
---- `matches(state)`, its state as T.copyState reads it; fails the test as missing `what` if it
---- never does.
+--- Queues a wait until this side's copy of the vehicle matches `matches(state)`; fails the test
+--- as missing `what` if it never does.
 function T.waitForVehicleCopy(self, vehicle, matches, what)
     T.waitFor(self, function() return vehicle.vehicle ~= nil and matches(T.copyState(vehicle)) end, what)
 end

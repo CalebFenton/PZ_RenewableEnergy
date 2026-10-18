@@ -1,13 +1,12 @@
 -- One battery bank on the authority (single player or the server): its batteries, inverters,
--- chargers, controllers, sources (panels, wind chargers and treadmills, each family run by its
--- <Family>Source.lua) and backup generator, and the energy that moves between them each pass.
+-- chargers, controllers, sources and backup generator, and the energy that moves between them
+-- each pass.
 --
--- The table is the bank's global object (SGlobalObject), so every field named in
--- SAVED_FIELDS is saved with the world and kept while the chunk is unloaded. While loaded,
--- the container is the truth about what the bank holds and each battery's own charge is
--- the truth about the charge; while unloaded, the snapshot in `batteries` and `charge`
--- carries on and is written back into the batteries when the chunk loads, and so is the wear
--- the parts took meanwhile.
+-- The table is the bank's global object (SGlobalObject), so every field in SAVED_FIELDS is saved
+-- with the world and kept while the chunk is unloaded. While loaded, the container is the truth
+-- about the parts and each battery's charge is the truth about the charge; while unloaded, the
+-- snapshot in `batteries` and `charge` carries on, and it and the wear taken meanwhile are
+-- written back into the parts when the chunk loads.
 
 if isClient() then return end
 
@@ -59,8 +58,8 @@ local FAMILY = {
     wind = RenewableEnergy.WindSource,
     treadmill = RenewableEnergy.TreadmillSource,
 }
--- Each family's watts now in the status, and its watt-hours today, saved; solarWhToday is Release
--- 1's and keeps its name.
+-- Each family's watts now in the status, and its watt-hours today, saved; solarWhToday keeps its
+-- older name because saves hold it.
 local TOTALS = {
     panel = { now = "solarW", today = "solarWhToday" },
     wind = { now = "windW", today = "windWhToday" },
@@ -143,8 +142,6 @@ function Bank:spec()
     return Specs.banks[self.bankType]
 end
 
--- Parts ----------------------------------------------------------------------------------
-
 local function partEntry(item)
     return { id = item:getID(), type = item:getFullType(), condition = item:getCondition() }
 end
@@ -192,8 +189,7 @@ function Bank:writeBatteries(container, applyPending)
         local item = items:get(i)
         local spec = Battery.spec(item)
         if spec and item:getCondition() > 0 then
-            -- As the arrow board and the maintainer do: clients hear of the charge once it shows
-            -- at two decimals.
+            -- Clients hear of the charge only once it changes at two decimals.
             local changed = VehicleUtils.compareFloats(Battery.getCharge(item), self.charge, 2)
             Battery.setCharge(item, self.charge)
             if applyPending then
@@ -294,8 +290,6 @@ function Bank:applyPendingPartWear(container)
     self.pendingPartWear = { hours = 0, overloads = 0 }
 end
 
--- Sources ---------------------------------------------------------------------------------
-
 function Bank:findSource(x, y, z)
     for i, source in ipairs(self.sources) do
         if source.x == x and source.y == y and source.z == z then
@@ -377,8 +371,6 @@ function Bank:updateSources(hours, context)
     return watts
 end
 
--- Backup generator -----------------------------------------------------------------------
-
 local function isFailsafe(object)
     return Sprites.nameOf(object) == Sprites.failsafe
 end
@@ -447,8 +439,6 @@ function Bank:backupCarriesLoad()
     return self.generator and self.generator.running
 end
 
--- Load, chargers and power ----------------------------------------------------------------
-
 --- Measure what the bank powers, and what powers the bank's square besides it. Unloaded, the
 --- last measurement stands, until the grid shuts down. A bank that is off and has no charger
 --- needs neither, and skips the scan of its whole reach. Returns the running generators that
@@ -502,8 +492,8 @@ function Bank:chargeFrom(generators, hours, roomWh)
     return watts
 end
 
--- Connected, switched on, indoors, with a working inverter, and off the grid. Banks saved before
--- the record kept `connected` (nil) were all connected.
+-- Connected, switched on, indoors, with a working inverter, and off the grid. `connected` is nil
+-- on banks saved before it was recorded, and those were all connected.
 local function canCarryLoad(bank)
     return bank.connected ~= false and bank.on and bank.indoors and bank:limitW() > 0 and not bank.gridPowered
 end
@@ -559,8 +549,6 @@ function Bank:powerUp()
     self:checkOverload()
     self:switchGenerator()
 end
-
--- Charge ---------------------------------------------------------------------------------
 
 -- The deepest the bank has been drawn down from its highest point today.
 function Bank:trackCycle()
@@ -683,8 +671,6 @@ function Bank:showBatteries()
     end
     RenewableEnergy.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(self:spec().sprite, types, self.charge))
 end
-
--- Status ---------------------------------------------------------------------------------
 
 --- What the bank is doing, for the status window.
 function Bank:state()

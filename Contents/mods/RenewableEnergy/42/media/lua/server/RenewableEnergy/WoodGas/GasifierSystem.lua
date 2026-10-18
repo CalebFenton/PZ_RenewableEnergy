@@ -19,8 +19,6 @@ local GasifierSystem = ObjectSystem.define({
 })
 RenewableEnergy.GasifierSystem = GasifierSystem
 
--- Jobs ------------------------------------------------------------------------------------------
-
 -- What each job does to the gasifier `gasifier` (its tile `isoObject`). `item` is the container
 -- Drain Condensate fills, nil for the ground. Returns whether it was done.
 local DO = {
@@ -62,9 +60,8 @@ local function apply(character, job, gasifier, isoObject, item)
     return true
 end
 
---- Does `job` for `character` at the gasifier `isoObject`, on the authority, once the timed action
---- that does it has finished. `item` is the container Drain Condensate fills. Returns whether it
---- was done.
+--- Does `job` for `character` at the gasifier `isoObject` once its timed action finished. `item` is
+--- the container Drain Condensate fills. Returns whether it was done.
 function GasifierSystem.perform(character, job, isoObject, item)
     return ObjectSystem.perform(Gasifier, GasifierJobs, apply, character, job, isoObject, item)
 end

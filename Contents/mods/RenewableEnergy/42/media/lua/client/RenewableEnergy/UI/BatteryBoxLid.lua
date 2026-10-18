@@ -38,8 +38,6 @@ local function lidText(key)
     return getText(TEXTS[key])
 end
 
--- Cut Padlock --------------------------------------------------------------------------------------
-
 -- An item with the bolt cutters tag, to name where a player has none.
 BatteryBoxLid.CUTTERS = "Base.BoltCutters"
 
@@ -65,8 +63,6 @@ function BatteryBoxLid.cutPadlock(character, lid, cutters)
     ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), cutters, true, twoHands)
     ISTimedActionQueue.add(Action:new(character, Action.CUT_PADLOCK, nil, nil, vehicle, cutters))
 end
-
--- Switch -------------------------------------------------------------------------------------------
 
 --- Walks to the box and flips the lamps' switch inside it to `on`.
 function BatteryBoxLid.flipSwitch(character, vehicle, on)
@@ -95,16 +91,12 @@ local function addSwitchSlice(menu, character)
     end
 end
 
--- Radial menu --------------------------------------------------------------------------------------
-
 local vanillaShowRadialMenuOutside = ISVehicleMenu.showRadialMenuOutside
 
--- Renames the lid's Open and Close, adds the lamps' switch, and adds Cut Padlock beside them at a
--- padlock that holds: one that cuts it for a player carrying bolt cutters, else one that only says
--- what cutting takes and does nothing, as vanilla's radial says what hotwiring takes
--- (ISVehicleMenu.showRadialMenu). The menu joins the UI only on the next UI update
--- (UIManager.AddUI), so whether vanilla built it here shows only in what it was before: shown,
--- which the call hides, or the character in a vehicle, which builds nothing.
+-- Renames the lid's Open and Close, adds the lamps' switch, and adds Cut Padlock at a padlock that
+-- holds (greyed, saying what it takes, without bolt cutters). The menu joins the UI only on the next
+-- update (UIManager.AddUI), so whether vanilla built it shows only in its prior state: shown, which
+-- the call hides, or the character in a vehicle, which builds nothing.
 function ISVehicleMenu.showRadialMenuOutside(playerObj)
     local menu = getPlayerRadialMenu(playerObj:getPlayerNum())
     local wasShown = menu:isReallyVisible()
@@ -132,8 +124,6 @@ function ISVehicleMenu.showRadialMenuOutside(playerObj)
         menu:addSlice(getText("IGUI_RenewableEnergy_CutPadlockNeeds", script:getDisplayName()), script:getNormalTexture(), nil)
     end
 end
-
--- Joypad prompt and loot window ------------------------------------------------------------------
 
 local vanillaTestInteractButtonAction = ISButtonPrompt.testInteractButtonAction
 
@@ -174,8 +164,6 @@ function CloseTrunk:handleJoypadContextMenu(context)
     end
 end
 
--- Mechanics window ---------------------------------------------------------------------------------
---
 -- Only the part list names the lid: the window's overlay, whose tooltip would too, draws only
 -- vehicles ISCarMechanicsOverlay lists, and no other part of the trailer names the lid among the
 -- parts it needs on or off.
@@ -195,8 +183,6 @@ function ISVehicleMechanics:initParts()
     end
 end
 
--- Locked box ---------------------------------------------------------------------------------------
-
 local vanillaUnlockStop = ISUnlockVehicleDoor.stop
 
 -- Opening a locked trunk tries its lock first (ISVehicleMenu.onOpenDoor, Vehicles.Use.TrunkDoor),
@@ -210,8 +196,6 @@ function ISUnlockVehicleDoor:stop()
         HaloTextHelper.addBadText(self.character, getText("IGUI_RenewableEnergy_BoxLocked"))
     end
 end
-
--- Loot window --------------------------------------------------------------------------------------
 
 local vanillaSelectContainer = ISOpenVehicleDoor.selectContainerInLootWindow
 

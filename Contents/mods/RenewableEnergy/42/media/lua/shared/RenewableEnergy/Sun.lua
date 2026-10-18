@@ -1,8 +1,6 @@
--- Sunlight on a solar panel: where the sun is, how much of it the weather lets through, and
--- what a panel on each mount makes of it.
---
--- The pure functions take every input as an argument, so the tests can integrate a whole
--- year without moving the game clock.
+-- Sunlight on a solar panel: where the sun is, how much the weather lets through, and what a
+-- panel on each mount makes of it. The pure functions take every input as an argument so tests
+-- can integrate a whole year without moving the game clock.
 
 require "RenewableEnergy/Specs"
 
@@ -13,14 +11,13 @@ RenewableEnergy.Sun = Sun
 local Specs = RenewableEnergy.Specs
 local rad, sin, cos, tan, acos, max, min = math.rad, math.sin, math.cos, math.tan, math.acos, math.max, math.min
 
--- Clear-sky light, in W/m², on a horizontal surface at a sun overhead, and how much it thins as
--- the sun drops (a fit to clear-sky models that stands in for air mass). Panels are rated at it.
+-- Clear-sky light on a horizontal surface with the sun overhead (panels are rated at it), and an
+-- exponent fit to clear-sky models that stands in for air mass.
 Sun.FULL_SUN = 1000
 local FULL_SUN = Sun.FULL_SUN
 local AIR_MASS_EXPONENT = 1.15
--- The share of clear-sky light that comes from the whole sky rather than the sun's disc.
--- With the cloud weighting below it puts a year's flat and south-wall output against a
--- rack's where Louisville's measured insolation does (the dev mod's power tests check).
+-- Share of clear-sky light from the whole sky rather than the sun's disc; tuned with the cloud
+-- weighting so flat, wall and rack yearly output compare as measured insolation does.
 local CLEAR_DIFFUSE = 0.15
 -- The share of the light that full cloud, fog or rain stops. What gets through cloud is all diffuse.
 local CLOUD_LOSS = 0.75
@@ -109,8 +106,6 @@ function Sun.wattsFrom(ratedWatts, irradiance, snow)
         * SandboxVars.RenewableEnergy.SunlightMultiplier * (1 - (snow or 0))
     return max(0, watts)
 end
-
--- Game clock and weather ------------------------------------------------------------------
 
 --- The weather the panels see now.
 function Sun.weatherNow()

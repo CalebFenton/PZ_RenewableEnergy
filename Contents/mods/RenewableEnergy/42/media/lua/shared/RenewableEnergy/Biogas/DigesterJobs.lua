@@ -1,6 +1,5 @@
 -- The hands-on jobs at a digester: what each takes of the character and what refuses it. The menu
--- shows the same needs the authority checks, so they can't disagree (RenewableEnergy.firstUnmet);
--- the authority does them (server/RenewableEnergy/Biogas/DigesterSystem.lua).
+-- shows the same needs the authority checks, so they can't disagree; DigesterSystem does them.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
@@ -271,7 +270,7 @@ function DigesterJobs.needs(character, job)
 end
 
 --- The state of the digester that refuses `job`, as a translation key, or nil. `summary` is the
---- digester's (Digester.summaryOf).
+--- digester's (Digester.currentSummary).
 function DigesterJobs.blocker(job, summary)
     return DigesterJobs.JOBS[job].blocker(summary)
 end

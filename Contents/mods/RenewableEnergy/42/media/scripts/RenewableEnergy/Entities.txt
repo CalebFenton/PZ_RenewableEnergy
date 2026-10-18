@@ -1,10 +1,8 @@
 /*
     What the build menu builds: the biogas digesters, the wood gas gasifiers and the wind chargers.
-    A digester or gasifier tile becomes one through OnCreate
-    (server/RenewableEnergy/Biogas/DigesterSystem.lua, server/RenewableEnergy/WoodGas/GasifierSystem.lua);
-    a wind charger is a plain tile a bank connects to like a panel. In module Base with the mod's
-    prefix, as the craftRecipes are (DEVELOPMENT.md, Scripts). A DisplayName is looked up, without
-    its spaces, in Recipes.json.
+    A digester or gasifier tile becomes one through OnCreate (its server system); a wind charger
+    is a plain tile a bank connects to like a panel. In module Base with the mod's prefix, as the
+    craftRecipes are. A DisplayName is looked up, without its spaces, in Recipes.json.
 
     The digesters are taught by Homestead Power #3, the gasifiers by the FEMA pamphlet, the wind
     chargers by Homestead Power #4, or all are learned with the skills below.
@@ -75,7 +73,7 @@ module Base
         }
     }
 
-    /* Any of the game's four drums. The build menu builds it on the Metal Drum's tile; OnCreate
+    /* Any of the game's drums. The build menu builds it on the Metal Drum's tile; OnCreate
        makes it the entity of the drum it took (DigesterSystem.lua), one per drum as vanilla's
        Charcoal_Burner_* are: a SpriteConfig takes only its own tiles. */
     entity RenewableEnergy_BarrelDigester

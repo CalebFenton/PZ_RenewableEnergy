@@ -56,8 +56,8 @@ function Sources.slotRefusal(kind, freeSlots)
     return nil
 end
 
---- Whether snow lies on a source of `kind` until someone sweeps it off (Specs.mounts holdsSnow,
---- shedsSnow): a flat panel's.
+--- Whether snow lies on a source of `kind` until someone sweeps it off (Specs.mounts holdsSnow
+--- without shedsSnow).
 function Sources.sweepable(kind)
     local entry = kind and KINDS[kind]
     return entry ~= nil and entry.spec.holdsSnow == true and not entry.spec.shedsSnow

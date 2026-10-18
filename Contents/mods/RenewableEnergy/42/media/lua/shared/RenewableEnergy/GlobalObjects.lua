@@ -1,7 +1,6 @@
--- What every side reads of a feature the authority keeps in a Global Object System (digesters,
--- gasifiers): its summary, which the server sends every client, and on the authority its record.
--- The systems themselves are server/RenewableEnergy/ObjectSystem.lua and
--- client/RenewableEnergy/ClientObjects.lua, which set owner.serverSystem and owner.clientSystem.
+-- What every side reads of a feature the authority keeps in a Global Object System: its summary,
+-- which the server sends every client, and on the authority its record. The server and client
+-- object systems set owner.serverSystem and owner.clientSystem.
 
 require "RenewableEnergy/Utilities"
 

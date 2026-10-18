@@ -13,12 +13,11 @@ require "RenewableEnergy/World/WorldSpawns"
 require "RandomizedWorldContent/StoryTable_Initialization"
 
 -- Worn homestead installations left by rural buildings: an old wind charger by a barn, a barrel
--- digester by a barn, stable or chicken coop, a primitive gasifier by a hunting shack. Each is
--- built the way the build menu builds it, then put in states the mod already has (broken blades,
--- torn bags, a sour digester, a tarred filter and full ash pit), so the player repairs it with the
--- existing jobs. Each qualifying building is rolled once, as GardenLights rolls houses: the first
--- time its chunk loads, once the squares around it are loaded, kept in global ModData. The odds
--- follow the Solar Sites option (0 turns them off).
+-- digester by livestock buildings, a primitive gasifier by a hunting shack. Each is built the way
+-- the build menu builds it, then put in worn states the mod already has, so the player repairs it
+-- with the existing jobs. Each qualifying building is rolled once, as GardenLights rolls houses:
+-- the first time its chunk loads, once the squares around it are loaded, kept in global ModData.
+-- The odds follow the Solar Sites option (0 turns them off).
 --
 -- Also adds RE's books and gadgets to vanilla's barn and survivalist camp story clutter.
 
@@ -66,7 +65,7 @@ local function hasRoom(def, names)
     return false
 end
 
--- Squares --------------------------------------------------------------------------------------
+-- Squares
 
 local function isStreet(square)
     local name = Sprites.nameOf(square:getFloor()) or ""
@@ -109,7 +108,7 @@ local function squareBy(def, reach, fits)
     return #found > 0 and found[ZombRand(#found) + 1] or nil
 end
 
--- Building -----------------------------------------------------------------------------------------
+-- Building
 
 -- Builds the entity of the tile `sprite` (RenewableEnergy.tileEntity) as ISBuildIsoEntity:create
 -- does: a thumpable with its entity's components on the square, then the entity's OnCreate.
@@ -160,7 +159,7 @@ local function leavePamphlet(def)
     return false
 end
 
--- Finds --------------------------------------------------------------------------------------------
+-- Finds
 
 local BARN = { barn = true }
 -- "stable" is the map's name; vanilla's RBBarn checks "stables".
@@ -186,7 +185,7 @@ RuralFinds.FINDS = {
         odds = 30,
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
         square = function(def) return squareBy(def, 1) end,
-        -- Any of the four drums, as the build menu takes any; bags torn, gone cold and sour.
+        -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
         place = function(square)
             local System = RenewableEnergy.DigesterSystem
             return build(square, randomOf(Sprites.digester.barrel), System.OnCreate,
@@ -279,7 +278,7 @@ function RuralFinds.roll(def, kinds, always)
     return placed
 end
 
--- Loading ----------------------------------------------------------------------------------------
+-- Loading
 
 local CHUNK_SIZE = getChunkSizeInSquares()
 
@@ -339,11 +338,11 @@ local function rollLoaded()
     end
 end
 
--- Story clutter ------------------------------------------------------------------------------------
+-- Story clutter
 
 -- Vanilla's barns and survivalist camps dress themselves from these lists (StoryClutter), refilled
--- by StoryClutter.Init when its file loads; added through vanilla's own adder, which skips an item
--- the Remove Story Loot option blacklists.
+-- by StoryClutter.Init when its file loads; added through vanilla's own adder
+-- (StoryTables.addItemToClutterTable).
 RuralFinds.CLUTTER = {
     getSurvivalistCampsiteClutter = { "RenewableEnergy.FemaPamphlet", "RenewableEnergy.SolarCellCharger" },
     getBarnClutter = { "RenewableEnergy.HomesteadPowerMag3", "RenewableEnergy.HomesteadPowerMag4" },

@@ -1,11 +1,10 @@
--- Wood gas gasifiers, as both sides know them: the three tiers, what burns in them, what packs
--- their filter, which tiles are gasifiers, and the summary every client keeps of each one.
+-- Wood gas gasifiers, as both sides know them: the tiers, what burns in them, what packs their
+-- filter, which tiles are gasifiers, and the summary every client keeps of each one.
 --
--- A gasifier is a tile the build menu places (scripts/RenewableEnergy/Entities.txt) beside a
--- generator carrying the Gas Conversion Kit. Its tile container is the fuel hopper and a second
--- container on the same object is the filter. The authority keeps its state in a Global Object
--- System (server/RenewableEnergy/WoodGas/GasifierSystem.lua) and sends every client its summary.
--- The generator it feeds draws on it through the gas line (server/RenewableEnergy/GasLine).
+-- A gasifier is a built tile beside a generator carrying the Gas Conversion Kit. Its tile container
+-- is the fuel hopper and a second container on the same object is the filter. The authority keeps
+-- its state in a Global Object System (GasifierSystem) and the generator draws on it through the gas
+-- line (GasLines).
 --
 -- Units: fuel in kilograms (an item's weight), time in game hours.
 
@@ -22,13 +21,10 @@ Gasifier.SYSTEM_NAME = "renewable_energy_gasifier"
 Gasifier.CONTAINER = "RenewableEnergyGasifier"
 Gasifier.FILTER = "RenewableEnergyGasifierFilter"
 
--- hopperKg: wood the hopper holds (its tile's ContainerCapacity; a whole log needs the bigger
--- two). filterCapacity: the filter container's capacity, ten tufts of hay to a unit.
--- tarKgPerItem: wood burned for each packing item that turns tarry. ashPerKg: percent of the ash
--- pit each kg fills. Upkeep is set by a home's usual load at the default GeneratorFuelConsumption:
--- a fridge-freezer, the lights, a TV and a radio bill about 0.021 L an hour, 8.5 kg of wood a
--- week. That fills the ash pit about 2.5, 1.7 and 0.85 times a week, and tars a filter about 1.7,
--- 0.85 and 0.4 times.
+-- hopperKg: wood the hopper holds (the tile's ContainerCapacity). filterCapacity: the filter
+-- container's capacity. tarKgPerItem: wood burned for each packing item that turns tarry. ashPerKg:
+-- percent of the ash pit each kg fills. Tuned so a home's usual load fills the ash pit and tars a
+-- filter around once a week, more often on the cruder tiers.
 Gasifier.TIERS = {
     primitive = { hopperKg = 8, filterCapacity = 1, tarKgPerItem = 0.5, ashPerKg = 30 },
     standard = { hopperKg = 20, filterCapacity = 1, tarKgPerItem = 1, ashPerKg = 20 },
@@ -58,9 +54,8 @@ Gasifier.TARRY = "RenewableEnergy.TarryPacking"
 -- Hay and straw pack the filter, and insulate a digester's upgrade.
 Gasifier.HAY = { "Base.HayTuft", "Base.Straw2" }
 
--- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds (a
--- home's week fills it about 1.7 times), and how much faster tar fills the packing while it is
--- full.
+-- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
+-- how much faster tar fills the packing while it is full.
 Gasifier.VINEGAR = "RenewableEnergy_WoodVinegar"
 Gasifier.CONDENSATE_PER_KG = 0.6
 Gasifier.CONDENSATE_MAX = 3
@@ -78,7 +73,6 @@ function Gasifier.takesCondensate(item, lit)
         or item:hasTag(ItemTag.GLASS_BOTTLE) or item:hasTag(ItemTag.COOKABLE)
 end
 
--- What packs the filter.
 local PACKING = {
     [Gasifier.HAY[1]] = true,
     [Gasifier.HAY[2]] = true,
@@ -180,7 +174,7 @@ function Gasifier.hopperKg(container)
 end
 
 --- What it carries, as a share of what a generator carries on gas, with `ash` percent in its pit
---- and `clean` packing left in its filter: a full pit or a spent filter halves it.
+--- and `clean` packing left in its filter: a full pit and a spent filter each cut it.
 function Gasifier.outputShare(ash, clean)
     local share = 1
     if ash >= Gasifier.ASH_FULL then
@@ -206,8 +200,6 @@ function Gasifier.isCold(lit, outSince)
     return not lit and (outSince == nil or getGameTime():getWorldAgeHours() - outSince > Gasifier.COLD_HOURS)
 end
 
--- Tiles --------------------------------------------------------------------------------------
-
 --- The tier of a gasifier tile, or nil for any other object.
 function Gasifier.tierOf(isoObject)
     local kind, tier = Sprites.kindOf(Sprites.nameOf(isoObject))
@@ -230,8 +222,6 @@ function Gasifier.sideOf(x, y, tx, ty)
     if tx == x - 1 and ty == y then return "W" end
     return nil
 end
-
--- Summary --------------------------------------------------------------------------------------
 
 -- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
 -- containers and the clock: `hopperKg` (the hopper and the firebox), the filter's `clean` and

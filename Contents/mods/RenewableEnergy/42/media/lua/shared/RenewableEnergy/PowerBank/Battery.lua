@@ -35,9 +35,8 @@ function Battery.nominalWh(item)
     return spec and spec.wh * health(item) or 0
 end
 
--- Item modData key: the battery has a charge of its own (found, crafted, or charged and drained
--- in a bank), so a refill of its container, as loot respawn does, must leave it alone. The key
--- keeps its old name so that batteries in existing saves stay marked.
+-- Item modData key: the battery has a charge of its own (found, crafted, or used in a bank), so a
+-- container refill such as loot respawn must leave it alone. The legacy name keeps saves marked.
 local HAS_CHARGE = "RenewableEnergy_found"
 
 function Battery.getCharge(item)
@@ -64,8 +63,8 @@ function Battery.setFoundCharge(item)
 end
 
 --- The item in `container` with the lowest charge that isn't full, of those `accepts(item)`
---- takes, or nil. Any drainable item will do, a vanilla cell as well as a bank battery. Full is
---- counted in whole uses: a full Base.Battery's 142 uses of 0.007 read 0.994 as a float.
+--- takes, or nil. Any drainable will do, vanilla cells included. Full is counted in whole uses,
+--- since float uses of a full drainable can read just under 1.
 function Battery.emptiestIn(container, accepts)
     local emptiest, lowest
     local items = container:getItems()

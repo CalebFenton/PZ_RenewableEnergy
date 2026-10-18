@@ -65,8 +65,7 @@ function Debug.isFreeSquare(square, indoors)
         and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrPanel)
 end
 
--- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos), 8
--- squares a side.
+-- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos).
 local CHUNK_SQUARES = 8
 
 -- Lets this multiplayer client's chunks go of the squares a test generator at x, y, z powered,
@@ -87,7 +86,8 @@ function Debug.releaseGeneratorPower(x, y, z)
     end
 end
 
--- An electrician and carpenter who knows every recipe, with a screwdriver and a table to craft at.
+-- A character with the electrical and building skills the mod gates on, every recipe, a
+-- screwdriver and a table to craft at.
 function Debug.setupPlayer(player)
     player:setPerkLevelDebug(Perks.Electricity, 8)
     player:setPerkLevelDebug(Perks.MetalWelding, 4)

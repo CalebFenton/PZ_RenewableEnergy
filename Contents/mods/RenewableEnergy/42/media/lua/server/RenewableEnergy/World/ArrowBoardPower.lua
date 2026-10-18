@@ -5,27 +5,23 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/World/ArrowBoard"
 
--- The arrow board trailer's power (ArrowBoard.lua): its panels charge the batteries in its box,
--- and the lamps run off them through the controller in it: lit day and night while its switch is
--- on, the lamp board isn't beaten to nothing and a battery is above the controller's cutoff,
--- drawing what vanilla's lightbar does; after dark the photocell's night only lights the ground.
--- Once every battery is down to the cutoff they stay off until one is back up at the reconnect
--- level, so a board that barely charges doesn't flicker from pass to pass.
+-- The arrow board trailer's power: its panels charge the batteries in its box, and the lamps run
+-- off them through the controller: lit while the switch is on, the lamp board isn't wrecked and a
+-- battery is above the controller's cutoff; after dark they also light the ground. Once every
+-- battery hits the cutoff the lamps stay off until one reaches the reconnect level, so a board
+-- that barely charges doesn't flicker from pass to pass.
 --
--- The authority sets them in the charge pass, and at once when the switch moves, in the battery
--- box part's modData, which the part saves and the server sends its clients (transmitPartModData).
--- Every game that draws the trailer flashes them itself, by the real clock, through the vehicle's
--- windowLightsOn flag, which nothing else sets or sends and which lights the board's zone of the
--- lamps texture each frame it is set (Vehicles.txt). After dark it also gives the board a steady
--- lamppost, since moving a lamppost relights the cell, too dear to do every flash.
+-- The authority sets the lamps' state in the battery box part's modData, which the part saves and
+-- the server sends its clients (transmitPartModData). Every game that draws the trailer flashes
+-- them itself by the real clock, through the vehicle's windowLightsOn flag, which nothing else
+-- sets and which lights the board's zone of the lamps texture. After dark the board also gets a
+-- steady lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
 local ArrowBoard = RenewableEnergy.ArrowBoard
 local Specs = RenewableEnergy.Specs
 
--- Battery box part modData: the switch (true on), the lamps as the authority last set them
--- (LAMPS_DAY or LAMPS_NIGHT, nil while dark), and whether the controller has cut them off for flat
--- batteries. The box's discharge cycle of the day, as a bank tracks its own (Bank:trackCycle): the
--- day, the highest charge that day and the deepest discharge from it.
+-- Battery box part modData. The box tracks its discharge cycle of the day as a bank tracks its
+-- own (Bank:trackCycle).
 ArrowBoard.SWITCH_KEY = "RenewableEnergy_switchOn"
 local LAMPS_KEY, CUT_OFF_KEY = "RenewableEnergy_lamps", "RenewableEnergy_cutOff"
 local CYCLE_DAY, CYCLE_HIGH, CYCLE_DEPTH = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
@@ -38,7 +34,7 @@ local function boxOf(vehicle)
     return vehicle:getPartById(ArrowBoard.BATTERY_BOX)
 end
 
--- Batteries -------------------------------------------------------------------------------------
+-- Batteries
 
 -- A battery in the box that can still hold a charge.
 local function holdsCharge(item)
@@ -107,7 +103,7 @@ local function fullestOver(container, charge)
     return most
 end
 
--- Charging -------------------------------------------------------------------------------------
+-- Charging
 
 --- Adds `hours` of its panels' output under `sky` (Sun.skyNow, now if nil) to the batteries in
 --- its battery box, the emptiest first, so that a mixed set fills evenly. The panels count as
@@ -129,9 +125,8 @@ function ArrowBoard.charge(vehicle, hours, sky)
     return shift(container, wh, 1, 1)
 end
 
--- Switch and lamps ------------------------------------------------------------------------------
+-- Switch and lamps
 
---- Whether the controller's switch is on.
 function ArrowBoard.isSwitchedOn(vehicle)
     local box = boxOf(vehicle)
     return box ~= nil and box:getModData()[ArrowBoard.SWITCH_KEY] == true
@@ -282,7 +277,7 @@ function ArrowBoard.update(vehicle, hours, sky)
     return stored
 end
 
--- Flashing -------------------------------------------------------------------------------------
+-- Flashing
 
 --- Whether the flashing lamps are lit at real time `ms`, and how many milliseconds they have been
 --- lit or dark.
@@ -296,8 +291,7 @@ function ArrowBoard.flashPhase(ms)
     return false, into - litFor
 end
 
--- Every loaded trailer this game draws, by vehicle: its battery box part, and while it lights the
--- ground its lamppost and that lamppost's square (x, y, z).
+-- Every loaded trailer this game draws, by vehicle, with its ground lamppost while it has one.
 local boards = {}
 
 local function removeGroundLight(entry)
@@ -318,13 +312,10 @@ local function placeGroundLight(entry, vehicle)
     entry.x, entry.y, entry.z = x, y, z
 end
 
--- OnTick, but on a dedicated server: flashes the lamps of every loaded trailer that is lit, and
--- lights the ground around those lit at night.
---
--- Per tick: a modData read and a flag compare for each trailer this game draws, which are few,
--- and the trailer's square for one lit at night. The flash follows the real clock and the
--- flag lights only the frame it is set in, so this runs every frame; the lamps' state comes from
--- the authority's modData, which no event announces. Allocates nothing unless a lamppost moves.
+-- OnTick, except on a dedicated server: flashes the lamps of every loaded trailer that is lit, and
+-- lights the ground around those lit at night. Runs every frame because the flag lights only the
+-- frame it is set in, and no event announces the authority's modData changing. Allocates nothing
+-- unless a lamppost moves.
 local function flashLamps()
     local flashLit = ArrowBoard.flashPhase(getTimestampMs())
     for vehicle, entry in pairs(boards) do

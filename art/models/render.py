@@ -129,7 +129,7 @@ def render(path, width, height):
 def tile_camera(camera):
     direction = view_direction()
     up = direction.to_track_quat("-Z", "Y") @ Vector((0, 1, 0))
-    # The picture's centre is 96 pixels above the floor centre.
+    # The picture's centre stands above the floor centre, as on the game's own tiles.
     aim(camera, direction, up * ((TILE_H / 2 - 32) / PIXELS_PER_METRE), TILE_W / PIXELS_PER_METRE)
 
 
