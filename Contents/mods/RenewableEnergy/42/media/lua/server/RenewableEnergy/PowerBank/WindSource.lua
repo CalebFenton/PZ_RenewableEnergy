@@ -69,8 +69,8 @@ end
 --- The charger's output over the pass, and why it makes nothing or little: braked, broken, calm,
 --- furled or sheltered. Its brake is the object's while it is loaded (setBraked sets both); its
 --- broken blades are the record's, which a gale may break while the object is unloaded, and go to
---- the object when it is loaded. Its shelter is counted again then, since the trees and buildings
---- around it change.
+--- the object when it is loaded. Its shelter is counted again then, since trees, buildings and
+--- walls around it change.
 function WindSource.update(source, object, inSlot, hours, context)
     if object then
         source.braked = Wind.isBraked(object)

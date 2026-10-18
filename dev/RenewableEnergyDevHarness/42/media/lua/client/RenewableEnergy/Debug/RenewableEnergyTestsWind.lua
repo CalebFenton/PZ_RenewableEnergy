@@ -84,6 +84,50 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
     end,
 })
 
+-- Solid walls built around a wind charger shelter it like trees and buildings do: a ring of
+-- player walls raises its shelter and cuts its output.
+local WALL = "walls_exterior_wooden_01_24"
+
+test("renewable_energy_wind_walls_shelter", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        if not bank then return end
+        local rotor = T.panel(self, Sprites.windScoop, { near = bank, connect = true })
+        if not rotor then return end
+        self.rotor = rotor
+        self.passes = {}
+        local rated = Specs.wind.turbines.scoop.ratedKph
+        local function pass(label)
+            T.bankPass(self, bank, 0, { windKph = rated })
+            T.step(function() self.passes[label] = sourceAt(bank.state, rotor.position) end)
+        end
+        pass("open")
+        -- In a step, so the walls go up after the open pass: placeTile acts when it is called.
+        T.step(function()
+            local p = rotor.position
+            for dx = -1, 1 do
+                for dy = -1, 1 do
+                    local square = getSquare(p.x + dx, p.y + dy, p.z)
+                    if (dx ~= 0 or dy ~= 0) and square then
+                        T.placeTile(self, square, WALL)
+                    end
+                end
+            end
+        end)
+        pass("walled")
+    end,
+    validate = function(self)
+        expect(self.rotor.connected, "the bank refused the scoop rotor: " .. tostring(self.rotor.reason))
+        local open, walled = self.passes.open, self.passes.walled
+        expect(open ~= nil and walled ~= nil, "the bank's status lists no scoop rotor")
+        if not (open and walled) then return end
+        expect(walled.shelterPct > open.shelterPct,
+            "walls around it left its shelter at " .. walled.shelterPct .. "% (open: " .. open.shelterPct .. "%)")
+        expect(walled.watts < open.watts,
+            "walled in it made " .. walled.watts .. " W, open " .. open.watts .. " W")
+    end,
+})
+
 -- Each charger's power curve: nothing at its cut-in speed, the cube of the wind on the way up,
 -- its rating at its rated speed, more for standing higher only up to the height cap; the
 -- alternator furls from its furl speed, and only the propeller and the alternator break, from
