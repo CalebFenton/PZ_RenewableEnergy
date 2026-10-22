@@ -9,7 +9,7 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Materials"
+require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -19,7 +19,7 @@ local GasKit = {}
 RenewableEnergy.GasKit = GasKit
 
 local Digester, Gasifier, PowerBank = RenewableEnergy.Digester, RenewableEnergy.Gasifier, RenewableEnergy.PowerBank
-local Sprites, Materials = RenewableEnergy.Sprites, RenewableEnergy.Materials
+local Sprites = RenewableEnergy.Sprites
 
 GasKit.MOD_DATA = "RenewableEnergy_gas"
 GasKit.ITEM = "RenewableEnergy.GasConversionKit"
@@ -162,7 +162,8 @@ local SPANNER_ANIM, SPANNER_SOUND = "VehicleWorkOnMid", "GeneratorRepair"
 
 -- A blocker of a job on the kit: none fitted refuses it, else `blocker(state, generator, source)`.
 local function withKit(blocker)
-    return function(state, generator, source)
+    return function(generator, source)
+        local state = GasKit.stateOf(generator)
         if not state then
             return "Tooltip_RenewableEnergy_NoKit"
         end
@@ -180,14 +181,15 @@ local function switchTo(mode, already)
     }
 end
 
--- Every job, by name, as DigesterJobs.JOBS has them: minutes; blocker(state, generator, source),
--- with `state` nil without a kit; materials, or a function(generator, source) of them; xp; how it
--- looks. `mode`: the fuel the job switches to.
+-- Every job, by name, as GasJobs.define has them, read against the generator itself; `source` is
+-- Connect Gas Line's other end, nil for the other jobs. minutes; blocker(generator, source);
+-- materials, or a function(generator, source) of them; xp; how it looks. `mode`: the fuel the job
+-- switches to.
 GasKit.JOBS = {
     [GasKit.INSTALL] = {
         minutes = 30, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
-        blocker = function(state)
-            return state and "Tooltip_RenewableEnergy_HasKit" or nil
+        blocker = function(generator)
+            return GasKit.hasKit(generator) and "Tooltip_RenewableEnergy_HasKit" or nil
         end,
         materials = { { perk = "Mechanics", need = 2 }, WRENCH, { item = GasKit.ITEM, need = 1 } },
         xp = { perk = "Mechanics", amount = 15 },
@@ -227,38 +229,11 @@ GasKit.JOBS = {
     [GasKit.TO_PETROL] = switchTo("petrol", "Tooltip_RenewableEnergy_OnPetrolAlready"),
 }
 
---- What `job` takes (RenewableEnergy.Materials). `source` is Connect Gas Line's other end.
-function GasKit.materials(job, generator, source)
-    local materials = GasKit.JOBS[job].materials
-    if type(materials) == "function" then
-        return materials(generator, source)
-    end
-    return materials or {}
-end
-
---- What `job` takes of `character` (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).
-function GasKit.needs(character, job, generator, source)
-    return Materials.needs(character, GasKit.materials(job, generator, source))
-end
-
---- The state of the generator (or the line's source) that refuses `job`, as a translation key,
---- or nil.
-function GasKit.blocker(job, generator, source)
-    if not (GasKit.isGenerator(generator) and RenewableEnergy.onSquare(generator)) then
-        return "Tooltip_RenewableEnergy_NoGenerator"
-    end
-    return GasKit.JOBS[job].blocker(GasKit.stateOf(generator), generator, source)
-end
-
---- What refuses `character` doing `job` at `generator`: a blocker key, "short" when they lack a
---- need, or nil. `source` is Connect Gas Line's other end, nil for the other jobs.
-function GasKit.refusal(character, job, generator, source)
-    if not GasKit.JOBS[job] then
-        return "Tooltip_RenewableEnergy_NoGenerator"
-    end
-    return GasKit.blocker(job, generator, source)
-        or (RenewableEnergy.firstUnmet(GasKit.needs(character, job, generator, source)) and "short")
-        or nil
-end
+RenewableEnergy.GasJobs.define(GasKit, {
+    subjectOf = function(generator)
+        return GasKit.isGenerator(generator) and RenewableEnergy.onSquare(generator) and generator or nil
+    end,
+    missing = "Tooltip_RenewableEnergy_NoGenerator",
+})
 
 return GasKit

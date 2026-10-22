@@ -1,8 +1,9 @@
--- The hands-on jobs at a digester: what each takes of the character and what refuses it. The menu
--- shows the same needs the authority checks, so they can't disagree; DigesterSystem does them.
+-- The hands-on jobs at a digester: what each takes of the character and what refuses it
+-- (RenewableEnergy.GasJobs). The menu shows the same needs the authority checks, so they can't
+-- disagree; DigesterSystem does them.
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
+require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 
@@ -10,7 +11,7 @@ RenewableEnergy = RenewableEnergy or {}
 local DigesterJobs = {}
 RenewableEnergy.DigesterJobs = DigesterJobs
 
-local Digester, Gasifier, Materials = RenewableEnergy.Digester, RenewableEnergy.Gasifier, RenewableEnergy.Materials
+local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
 
 DigesterJobs.TAKE_SLUDGE = "TakeSludge"
 DigesterJobs.VENT = "VentGas"
@@ -139,15 +140,12 @@ local function fillJob(fields)
     return fields
 end
 
--- Every job, by name:
+-- Every job, by name, as GasJobs.define has them, read against the digester's summary
+-- (Digester.currentSummary); the item `with` is the bag or tank it fills:
 -- - minutes: the in-game minutes it takes, or a function(digester, item) of them.
--- - blocker(summary): the state of the digester that refuses it, as a translation key, or nil.
---   hideBlocked: the menu leaves it out, rather than greyed, while its blocker refuses it, as it
---   belongs to another state of the digester.
--- - check(character, summary, item), if any: what refuses the item the character brings, the bag
---   or tank it fills.
--- - materials: what it takes of the character beyond that (RenewableEnergy.Materials).
--- - xp: what it gives on the authority. holder, charge, fill: what it does there.
+-- - blocker(summary); hideBlocked for a job of another state of the digester; check(character,
+--   summary, item); materials, what it takes of the character beyond the item; xp.
+-- - holder, charge, fill: what it does on the authority.
 -- - How it looks (RenewableEnergyGasAction): anim and LootPosition `position`, else "Loot"; heavy,
 --   heavy work; sound while it runs. Vanilla has no pump stroke; a tire pump is worked kneeling at
 --   a wheel. The rest are reached into at waist height.
@@ -259,41 +257,8 @@ DigesterJobs.JOBS = {
     },
 }
 
---- What `job` takes (RenewableEnergy.Materials).
-function DigesterJobs.materials(job)
-    return DigesterJobs.JOBS[job].materials or {}
-end
-
---- What `job` takes of `character`, as needs (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).
-function DigesterJobs.needs(character, job)
-    return Materials.needs(character, DigesterJobs.materials(job))
-end
-
---- The state of the digester that refuses `job`, as a translation key, or nil. `summary` is the
---- digester's (Digester.currentSummary).
-function DigesterJobs.blocker(job, summary)
-    return DigesterJobs.JOBS[job].blocker(summary)
-end
-
---- What refuses the bag or tank `item` that `character` brings to `job` at a digester whose summary
---- is `summary`, as a translation key, or nil.
-function DigesterJobs.check(character, job, summary, item)
-    local check = DigesterJobs.JOBS[job].check
-    return check and check(character, summary, item) or nil
-end
-
---- What refuses `character` doing `job` at `digester` as this side knows it now: a translation
---- key, "short" when they lack a need, or nil. `item` is the bag a Take Sludge fills or the tank a
---- fill fills.
-function DigesterJobs.refusal(character, job, digester, item)
-    local summary = Digester.currentSummary(digester)
-    if not (summary and DigesterJobs.JOBS[job]) then
-        return "Tooltip_RenewableEnergy_NoDigester"
-    end
-    return DigesterJobs.blocker(job, summary)
-        or DigesterJobs.check(character, job, summary, item)
-        or (RenewableEnergy.firstUnmet(DigesterJobs.needs(character, job)) and "short")
-        or nil
-end
+RenewableEnergy.GasJobs.define(DigesterJobs, {
+    subjectOf = Digester.currentSummary, missing = "Tooltip_RenewableEnergy_NoDigester",
+})
 
 return DigesterJobs

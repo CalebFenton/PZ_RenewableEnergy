@@ -1,9 +1,10 @@
--- The hands-on jobs at a gasifier: what each takes of the character and what refuses it. The menu
--- shows the same needs the authority checks; GasifierSystem does them. Loading wood and changing
--- the filter's packing are the loot window's.
+-- The hands-on jobs at a gasifier: what each takes of the character and what refuses it
+-- (RenewableEnergy.GasJobs). The menu shows the same needs the authority checks; GasifierSystem
+-- does them. Loading wood and changing the filter's packing are the loot window's.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
+require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/WoodGas/Gasifier"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -24,10 +25,11 @@ local LIGHT_MINUTES, COLD_LIGHT_MINUTES = 2, 10
 
 local BELLOWS = { item = Gasifier.BELLOWS[1], types = Gasifier.BELLOWS, keep = true }
 
--- Every job, by name, as DigesterJobs.JOBS has them: minutes, or a function(gasifier, item) of
--- them; blocker(summary); check(character, summary, item); materials, or a function(summary) of
--- them; how it looks. Clean Out Ash digs with the shovel in hand (`shovel`), as vanilla's Clear
--- Ashes does.
+-- Every job, by name, as GasJobs.define has them, read against the gasifier's summary
+-- (Gasifier.currentSummary); the item `with` is the container Drain Condensate fills, or nil to
+-- drain it onto the ground. minutes, or a function(gasifier, item) of them; blocker(summary);
+-- check(character, summary, item); materials, or a function(summary) of them; how it looks. Clean
+-- Out Ash digs with the shovel in hand (`shovel`), as vanilla's Clear Ashes does.
 GasifierJobs.JOBS = {
     [GasifierJobs.LIGHT] = {
         minutes = function(gasifier)
@@ -77,39 +79,8 @@ GasifierJobs.JOBS = {
     },
 }
 
---- What `job` takes (RenewableEnergy.Materials) at a gasifier whose summary is `summary`.
-function GasifierJobs.materials(job, summary)
-    local materials = GasifierJobs.JOBS[job].materials
-    if type(materials) == "function" then
-        return materials(summary)
-    end
-    return materials or {}
-end
-
---- What `job` takes of `character` (RenewableEnergy.firstUnmet, RenewableEnergy.Needs) at a
---- gasifier whose summary is `summary`.
-function GasifierJobs.needs(character, job, summary)
-    return Materials.needs(character, GasifierJobs.materials(job, summary))
-end
-
---- The state of the gasifier that refuses `job`, as a translation key, or nil.
-function GasifierJobs.blocker(job, summary)
-    return GasifierJobs.JOBS[job].blocker(summary)
-end
-
---- What refuses `character` doing `job` at `gasifier` as this side knows it now: a translation
---- key, "short" when they lack a need, or nil. `item` is the container Drain Condensate fills, or
---- nil to drain it onto the ground.
-function GasifierJobs.refusal(character, job, gasifier, item)
-    local summary = Gasifier.currentSummary(gasifier)
-    local row = GasifierJobs.JOBS[job]
-    if not (summary and row) then
-        return "Tooltip_RenewableEnergy_NoGasifier"
-    end
-    return row.blocker(summary)
-        or (row.check and row.check(character, summary, item))
-        or (RenewableEnergy.firstUnmet(GasifierJobs.needs(character, job, summary)) and "short")
-        or nil
-end
+RenewableEnergy.GasJobs.define(GasifierJobs, {
+    subjectOf = Gasifier.currentSummary, missing = "Tooltip_RenewableEnergy_NoGasifier",
+})
 
 return GasifierJobs
