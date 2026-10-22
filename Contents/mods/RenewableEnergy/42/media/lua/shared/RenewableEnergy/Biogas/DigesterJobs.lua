@@ -70,7 +70,7 @@ end
 -- The whole uses of `tank` that make `share` of it. A tank holds whole uses, read back as a float
 -- that may fall a hair short (InventoryItem.getCurrentUsesFloat), so fills count in uses.
 local function usesAt(tank, share)
-    return RenewableEnergy.round(share / tank:getUseDelta())
+    return round(share / tank:getUseDelta())
 end
 
 --- The uses of `tank` a fill (a fill job's row.fill) would add now from a digester whose summary

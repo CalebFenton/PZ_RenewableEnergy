@@ -106,7 +106,7 @@ end
 --- The charger's part of its status entry: its brake, blades and shelter.
 function WindSource.status(entry, source)
     entry.braked, entry.broken = source.braked == true, source.broken == true
-    entry.shelterPct = RenewableEnergy.round(100 * (source.shelter or 0))
+    entry.shelterPct = round(100 * (source.shelter or 0))
 end
 
 return WindSource

@@ -431,7 +431,7 @@ local function runFailsafe(generator, wanted, charge)
     local gas = RenewableEnergy.GasKit.stateOf(generator)
     -- The charge comes back from whole battery uses (DrainableComboItem.getCurrentUsesFloat), a
     -- hair off the percent it was set to, so it is compared to two places.
-    local percent = RenewableEnergy.round(charge * 100, 2)
+    local percent = round(charge * 100, 2)
     local wantsOff = not wanted or percent >= options.FailsafeStopCharge
     if generator:isActivated() then
         if wantsOff then

@@ -476,4 +476,44 @@ for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
     end
 end
 
+-- How far the character goes for a chunk to unload, and the longest that and its loading again
+-- may take, in ticks.
+local AWAY = 600
+local CHUNK_FRAMES = 6000
+
+--- Queues a trip that unloads the chunk of the square at x, y, z and loads it again: the
+--- character goes AWAY squares east of `home` ({ x, y, z }) and back. `whileAway()`, if given, is
+--- queued while the chunk is unloaded. A trip that doesn't unload the chunk, or brings it back
+--- without LoadChunk (from a cache, with its state), misses its fixture.
+function T.awayAndBack(self, home, x, y, z, whileAway)
+    local p = T.player()
+    -- A teleport from inside a timed action doesn't stick, so OnTick makes it.
+    local target
+    T.onTick(self, function()
+        if target then
+            p:teleportTo(target[1], target[2], target[3])
+            target = nil
+        end
+    end)
+    T.defer(self, function() p:teleportTo(home.x + 0.5, home.y + 0.5, home.z) end)
+    local loads = 0
+    local function onLoadChunk(chunk)
+        local origin = chunk:getGridSquare(0, 0, 0)
+        local dx, dy = origin and x - origin:getX(), origin and y - origin:getY()
+        if origin and dx >= 0 and dx < 8 and dy >= 0 and dy < 8 then
+            loads = loads + 1
+        end
+    end
+    Events.LoadChunk.Add(onLoadChunk)
+    T.defer(self, function() Events.LoadChunk.Remove(onLoadChunk) end)
+    T.step(function() target = { home.x + AWAY + 0.5, home.y + 0.5, 0 } end)
+    T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the source's chunk unloaded", CHUNK_FRAMES)
+    if whileAway then
+        whileAway()
+    end
+    T.step(function() target = { home.x + 0.5, home.y + 0.5, home.z } end)
+    T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the source's chunk loaded again", CHUNK_FRAMES)
+    T.step(function() T.need(self, loads > 0, "the source's chunk loaded again through LoadChunk") end)
+end
+
 return T

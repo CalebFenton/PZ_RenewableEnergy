@@ -56,12 +56,6 @@ function RenewableEnergy.hasWorkingTool(character, tag)
     return character:getInventory():containsTagEvalRecurse(tag, RenewableEnergy.notBroken)
 end
 
---- `value` rounded to `places` decimal places (default 0).
-function RenewableEnergy.round(value, places)
-    local scale = 10 ^ (places or 0)
-    return math.floor(value * scale + 0.5) / scale
-end
-
 --- Whether two values are the same, tables by what they hold, at any depth. Summaries compare
 --- so, to send only what changed.
 function RenewableEnergy.sameValue(a, b)

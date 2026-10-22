@@ -543,7 +543,6 @@ end
 --- rounded so a pass that changes little sends nothing. Digester's accessors add what its hopper
 --- holds.
 function DigesterObject:buildSummary()
-    local round = RenewableEnergy.round
     local spec = self:tierSpec()
     return {
         tier = self.tier, material = self.material, holder = self.holder,

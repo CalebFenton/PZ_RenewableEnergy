@@ -214,7 +214,6 @@ end
 --- What every client keeps of the gasifier: what its menu checks and its status window shows.
 --- Gasifier's accessors add what its containers hold and what follows from that.
 function GasifierObject:buildSummary()
-    local round = RenewableEnergy.round
     return {
         tier = self.tier, lit = self.lit == true, outSince = self.outSince,
         fireKg = round(self.fireKg, 1),

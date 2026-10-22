@@ -222,7 +222,7 @@ function PanelSource.update(source, object, inSlot, hours, context)
     local clearLight = context.clearIrradiance(source.kind, source.facing)
     local now, best = moduleWatts(source)
     source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
-    source.fullSunPct = RenewableEnergy.round(100 * light * (1 - source.snow) / Sun.FULL_SUN)
+    source.fullSunPct = round(100 * light * (1 - source.snow) / Sun.FULL_SUN)
     source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)
 end
 
