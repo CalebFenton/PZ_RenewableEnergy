@@ -33,6 +33,9 @@ PowerBank.MODULES = "RenewableEnergy_modules"
 PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
 PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
 
+-- The longest name a bank takes.
+PowerBank.NAME_LENGTH = 32
+
 -- Placed bank sprite to its Specs.banks row, and to the item it is.
 local BANKS_BY_SPRITE = {}
 for fullType, bank in pairs(Specs.banks) do

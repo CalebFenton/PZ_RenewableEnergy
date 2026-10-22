@@ -30,9 +30,6 @@ local isPosition, bankAt = PowerBank.isPosition, BankSystem.bankAt
 local Commands = {}
 RenewableEnergy.Commands = Commands
 
--- Longest name a bank takes.
-local NAME_LENGTH = 32
-
 local function sourceAt(position)
     return isPosition(position) and Sources.on(getSquare(position.x, position.y, position.z)) or nil
 end
@@ -288,7 +285,7 @@ end
 function Commands.rename(player, args)
     local bank = bankAt(args.bank)
     if not (bank and type(args.name) == "string") then return false, "no bank" end
-    local name = args.name:gsub("^%s+", ""):gsub("%s+$", ""):sub(1, NAME_LENGTH)
+    local name = args.name:gsub("^%s+", ""):gsub("%s+$", ""):sub(1, PowerBank.NAME_LENGTH)
     bank.name = name ~= "" and name or nil
     bank:sendStatus()
     return true

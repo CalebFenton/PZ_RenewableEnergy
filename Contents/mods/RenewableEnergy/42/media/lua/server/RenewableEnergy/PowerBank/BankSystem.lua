@@ -317,26 +317,32 @@ local function passHours(bank)
     return math.min(LONGEST_PASS, now - (bank.lastHour or now)), now
 end
 
---- Bring one bank up to now. `contexts`, optional, keeps each span's pass context for the
---- next bank.
-function BankSystem.updateBank(bank, contexts)
-    contexts = contexts or {}
+--- A pass context for each span of hours, worked out once and shared by every bank that runs
+--- that span: banks placed at different times run different spans.
+function BankSystem.sharedContexts()
+    local contexts = {}
+    return function(hours)
+        local key = string.format("%.4f", hours)
+        contexts[key] = contexts[key] or BankSystem.passContext(hours)
+        return contexts[key]
+    end
+end
+
+--- Bring one bank up to now. `contextFor(hours)`, optional, gives the pass context for the span
+--- (BankSystem.passContext unless given).
+function BankSystem.updateBank(bank, contextFor)
     local hours, now = passHours(bank)
     bank.lastHour = now
     if hours > 0 then
-        -- Banks placed at different times run different spans; each span's light is worked
-        -- out once.
-        local key = string.format("%.4f", hours)
-        contexts[key] = contexts[key] or BankSystem.passContext(hours)
-        bank:update(hours, contexts[key])
+        bank:update(hours, (contextFor or BankSystem.passContext)(hours))
     end
 end
 
 function BankSystem.updateAll()
     local self = BankSystem.instance
-    local contexts = {}
+    local contextFor = BankSystem.sharedContexts()
     for i = 1, self:getLuaObjectCount() do
-        BankSystem.updateBank(self:getLuaObjectByIndex(i), contexts)
+        BankSystem.updateBank(self:getLuaObjectByIndex(i), contextFor)
     end
     -- Banks that came on or went off change what each generator nearby pays.
     RenewableEnergy.Payers.billGenerators()
