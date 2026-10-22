@@ -529,9 +529,10 @@ end
 --- What the chargers charge from, saved as `chargeSource`: "grid", the place (placeOf) of the
 --- nearest running generator other than a bank whose reach covers the bank, which burns fuel for
 --- them, or false. Returns the watts they put in over the pass's `hours`: no more than `roomWh`,
---- what the batteries can still take after the sun and the load, and from a generator no more
---- than its fuel pays for, which is all the fuel it burns. Unloaded, only the grid carries on: the
---- generator and its fuel are out of reach.
+--- what the batteries can still take after the sun and the load, from a generator on gas no more
+--- than the line leaves them (GasLines.chargerLimitW), and from a generator no more than its fuel
+--- pays for, which is all the fuel it burns. Unloaded, only the grid carries on: the generator and
+--- its fuel are out of reach.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
     if self:getSquare() then
@@ -544,6 +545,9 @@ function Bank:chargeFrom(generators, hours, roomWh)
         return 0
     end
     local watts = math.min(self:chargerW(), roomWh / hours)
+    if generator then
+        watts = math.min(watts, RenewableEnergy.GasLines.chargerLimitW(generator, self) or watts)
+    end
     local fuelPerWh = SandboxVars.GeneratorFuelConsumption / WATTS_PER_FUEL_UNIT
     if generator and fuelPerWh > 0 then
         local fuel = generator:getFuel()

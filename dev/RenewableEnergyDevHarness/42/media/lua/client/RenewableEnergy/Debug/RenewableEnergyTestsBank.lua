@@ -747,8 +747,8 @@ test("renewable_energy_bank_generator_fuel_follows_battery_room", {
 
 -- A gas line counts the chargers of a bank charging from its generator into what the generator
 -- delivers (GasLines.loadOf), and still does once the world is saved and loaded again, which keeps
--- only a bank's saved fields: otherwise a generator stalled on that load restarts on load, to
--- stall again at the bank's next pass.
+-- only a bank's saved fields: otherwise, until the bank's next pass, the line would give the share
+-- of its cap the bank draws to the other banks charging from it.
 test("renewable_energy_bank_charging_generator_kept_through_save", {
     run = function(self)
         local bank, backup = chargerBank(self, { charge = 0.2 })

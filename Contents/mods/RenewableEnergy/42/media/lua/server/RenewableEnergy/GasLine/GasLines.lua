@@ -122,19 +122,76 @@ local function stop(generator)
     end
 end
 
---- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and the chargers
---- of the battery banks that charge from it.
-function GasLines.loadOf(generator)
-    local load = RenewableEnergy.Payers.loadOf(generator)
-    local watts = load.watts + load.backedW
+-- The watts the line carries to the generator whose kit state is `state`: its source's cap, or the
+-- kit's while the source is out of reach. Nil off gas, where nothing caps what it delivers.
+local function capOf(state)
+    if not (state and state.onGas) then
+        return nil
+    end
+    local source = sourceOf(state.source)
+    return source and source:capW() or GasKit.CAP_W
+end
+
+-- The banks whose chargers charge from `generator`, in the order they share what it can give:
+-- nearest first, the lower place on a tie, as Payers picks who pays for an appliance.
+local function chargingBanks(generator)
+    local list = {}
+    local gx, gy, gz = generator:getX(), generator:getY(), generator:getZ()
     local banks = RenewableEnergy.PowerBank.serverSystem
     for i = 1, (banks and banks:getLuaObjectCount() or 0) do
         local bank = banks:getLuaObjectByIndex(i)
         if bank:chargesFrom(generator) then
-            watts = watts + bank:chargerW()
+            local dx, dy, dz = bank.x - gx, bank.y - gy, bank.z - gz
+            table.insert(list, { bank = bank, distance = dx * dx + dy * dy + dz * dz,
+                key = RenewableEnergy.PlaceTracker.key(bank.x, bank.y, bank.z) })
         end
     end
+    table.sort(list, function(a, b)
+        return a.distance < b.distance or (a.distance == b.distance and a.key < b.key)
+    end)
+    return list
+end
+
+-- What `generator` powers (its share of what it reaches, Payers.loadOf), and the watts each bank
+-- charging from it draws, by bank: its chargers' rating, but on gas no more than the cap leaves
+-- after what it powers and the banks before it (chargingBanks), as an inverter-charger turns down
+-- to what its generator can give. So chargers alone never take a line past its cap.
+local function split(generator)
+    local load = RenewableEnergy.Payers.loadOf(generator)
+    local powered = load.watts + load.backedW
+    local cap = capOf(GasKit.stateOf(generator))
+    local left = cap and math.max(0, cap - powered)
+    local shares = {}
+    for _, entry in ipairs(chargingBanks(generator)) do
+        local watts = entry.bank:chargerW()
+        if left then
+            watts = math.min(watts, left)
+            left = left - watts
+        end
+        shares[entry.bank] = watts
+    end
+    return powered, shares
+end
+
+--- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and what the
+--- chargers of the battery banks that charge from it draw (split).
+function GasLines.loadOf(generator)
+    local watts, shares = split(generator)
+    for _, share in pairs(shares) do
+        watts = watts + share
+    end
     return watts
+end
+
+--- The most watts `bank`'s chargers draw from `generator`: its share of what the line's cap
+--- leaves (split), nothing once the generator's own load takes it all. Nil when the generator
+--- isn't on gas, so nothing but the chargers' rating limits them.
+function GasLines.chargerLimitW(generator, bank)
+    if not capOf(GasKit.stateOf(generator)) then
+        return nil
+    end
+    local _, shares = split(generator)
+    return shares[bank] or 0
 end
 
 -- Fuel the generator holds now: on gas, its tank or PHANTOM_FUEL, whichever is more; else its
@@ -261,7 +318,7 @@ function GasLines.run(generator, state, hours)
     if generator:isActivated() and state.onGas then
         local watts = GasLines.loadOf(generator)
         state.watts = watts
-        if watts > (source and source:capW() or GasKit.CAP_W) then
+        if watts > capOf(state) then
             stop(generator)
             state.stalled = true
         elseif source then
