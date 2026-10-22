@@ -14,7 +14,7 @@ local VehicleBattery = RenewableEnergy.VehicleBattery
 
 SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 
--- Battery part modData: { condition } of the attached maintainer.
+-- Battery part modData: set while a maintainer is attached.
 SolarMaintainer.ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"
 
 --- The vehicle's Battery part, which holds the maintainer's mark, or nil.

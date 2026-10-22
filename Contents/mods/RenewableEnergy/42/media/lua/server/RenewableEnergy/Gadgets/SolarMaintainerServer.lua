@@ -22,20 +22,19 @@ function SolarMaintainer.attach(character, vehicle, item)
     end
     RenewableEnergy.takeItem(character, item)
     local part = SolarMaintainer.batteryPart(vehicle)
-    part:getModData()[ATTACHED_KEY] = { condition = item:getCondition() }
+    part:getModData()[ATTACHED_KEY] = true
     vehicle:transmitPartModData(part)
     return true
 end
 
---- Unclips the maintainer and gives it to the character, with the condition it went on with.
---- Returns whether it did.
+--- Unclips the maintainer and gives it to the character. Returns whether it did. Nothing wears a
+--- maintainer, so a new one is the one that went on; any mark counts, older saves' tables too.
 function SolarMaintainer.detach(character, vehicle)
     if not SolarMaintainer.isAttached(vehicle) then
         return false
     end
     local part = SolarMaintainer.batteryPart(vehicle)
     local item = instanceItem(SolarMaintainer.ITEM)
-    item:setCondition(part:getModData()[ATTACHED_KEY].condition)
     part:getModData()[ATTACHED_KEY] = nil
     vehicle:transmitPartModData(part)
     RenewableEnergy.giveItems(character, item)

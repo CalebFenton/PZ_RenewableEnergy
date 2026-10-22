@@ -663,6 +663,15 @@ end)
 
 -- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
 -- vehicle's battery charge before and after.
+-- Marks a maintainer attached the way older saves did, with the condition it went on with. A back
+-- door: no code writes that shape any more, and detach must still take it.
+onCar("oldMaintainerMark", function(vehicle, args)
+    local part = batteryOf(vehicle)
+    part:getModData()[RenewableEnergy.SolarMaintainer.ATTACHED_KEY] = { condition = args.condition }
+    vehicle:transmitPartModData(part)
+    return vehicleState(vehicle)
+end)
+
 onCar("chargeVehicles", function(vehicle, args)
     local _, battery = batteryOf(vehicle)
     local before = battery:getCurrentUsesFloat()

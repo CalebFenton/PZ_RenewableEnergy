@@ -753,3 +753,43 @@ test("renewable_energy_gadgets_garden_light_refused_indoors", {
         expect(self.outdoors, "a garden light can't be placed outdoors")
     end,
 })
+
+-- Detaching gives back a whole maintainer, whether the menu attached it or an older save holds it
+-- in the mark that carried its condition.
+test("renewable_energy_gadgets_maintainer_detach_round_trip", {
+    instant = true,
+    run = function(self)
+        local car = T.placeVehicle(self, CAR, { battery = CAR_BATTERY, charge = 0.5 })
+        if not car then return end
+        T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })
+        chooseMaintainerOption(self, car, true, "freshAttachOffered")
+        chooseMaintainerOption(self, car, false, "freshDetachOffered")
+        carState(self, car, "freshDetached")
+        T.server(self, "oldMaintainerMark", function() return { vehicle = T.vehicleArgs(car), condition = 1 } end)
+        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end,
+            "this client's car with the older save's maintainer mark")
+        chooseMaintainerOption(self, car, false, "oldDetachOffered")
+        carState(self, car, "oldDetached")
+        T.count(self, "carried", { SolarMaintainer.ITEM })
+        T.step(function()
+            self.conditions = {}
+            local items = T.player():getInventory():getAllTypeRecurse(SolarMaintainer.ITEM)
+            for i = 0, items:size() - 1 do
+                table.insert(self.conditions, items:get(i):getCondition())
+            end
+        end)
+    end,
+    validate = function(self)
+        local whole = instanceItem(SolarMaintainer.ITEM):getConditionMax()
+        expect(self.freshAttachOffered and self.freshDetachOffered, "the car's menu did not offer attach and detach")
+        if not expect(self.freshDetached and self.oldDetached, "detaching never finished") then return end
+        expect(not self.freshDetached.attached, "the attached maintainer did not detach on the server")
+        expect(self.oldDetachOffered and not self.oldDetached.attached, "an older save's maintainer did not detach")
+        expect(self.counts.carried[SolarMaintainer.ITEM] == 2, "detaching both gave back "
+            .. tostring(self.counts.carried[SolarMaintainer.ITEM]) .. " maintainers, expected 2")
+        for _, condition in ipairs(self.conditions or {}) do
+            expect(condition == whole, "a detached maintainer came back at condition " .. condition
+                .. ", expected " .. whole)
+        end
+    end,
+})
