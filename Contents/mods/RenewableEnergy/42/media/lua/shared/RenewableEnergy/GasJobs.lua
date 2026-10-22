@@ -1,7 +1,9 @@
 -- The hands-on jobs at a digester, its gas heater, a gasifier and a generator's Gas Conversion Kit,
 -- which RenewableEnergyGasAction does: what refuses one and what it takes, the same on every side,
--- so a menu greys out exactly what the authority refuses. Each feature's job module holds its table
--- of jobs and how to read its target, and GasJobs.define gives it the rest.
+-- so a menu greys out exactly what the authority refuses, and how the authority does one. Each
+-- feature's job module holds its table of jobs and how to read its target, and GasJobs.define gives
+-- it the rest; each feature's authority side says what its jobs do there, and GasJobs.perform does
+-- them all in the same order.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
@@ -70,6 +72,38 @@ function GasJobs.define(Jobs, spec)
         end
         return refusalAt(Jobs, character, job, subject, with)
     end
+end
+
+--- Does `job` of the job module `Jobs` for `character` at `target`, with `with` what it works
+--- with (RenewableEnergyGasAction), on the authority once its timed action finished. `site` is the
+--- feature's side of its jobs there:
+--- - open(target, with): brings what the jobs work on up to now and returns it, the `place`; nil
+---   when there is none yet, as a generator's kit state before the kit.
+--- - act(character, job, place, row, target, with): does the job, beyond what it takes and gives;
+---   returns true when it was done.
+--- - tell(place, target, done): shows and sends what changed.
+--- In this order: catch up, so the time before counts at the old state; recheck the job as the
+--- authority knows it now; read what it takes before doing it, since doing it can change that
+--- (lighting a cold gasifier warms it, and a warm one takes no bellows); do it; only once it was
+--- done take what it takes and give its row's XP, so a job not done costs and teaches nothing;
+--- tell, done or not, since catching up changed it too. Returns whether it was done.
+function GasJobs.perform(Jobs, site, character, job, target, with)
+    local place = site.open(target, with)
+    local row = Jobs.JOBS[job]
+    local subject = row and Jobs.subjectOf(target)
+    local done = false
+    if subject and not refusalAt(Jobs, character, job, subject, with) then
+        local materials = Jobs.materials(job, subject, with)
+        done = site.act(character, job, place, row, target, with) == true
+        if done then
+            Materials.consume(character, materials)
+            if row.xp then
+                addXp(character, Perks[row.xp.perk], row.xp.amount)
+            end
+        end
+    end
+    site.tell(place, target, done)
+    return done
 end
 
 return GasJobs

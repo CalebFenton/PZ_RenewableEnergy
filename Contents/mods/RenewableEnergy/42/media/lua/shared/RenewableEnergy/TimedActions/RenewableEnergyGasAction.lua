@@ -1,5 +1,6 @@
 require "TimedActions/ISBaseTimedAction"
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/GasHeater"
@@ -15,32 +16,37 @@ RenewableEnergyGasAction = ISBaseTimedAction:derive("RenewableEnergyGasAction")
 
 local Action = RenewableEnergyGasAction
 
--- Each feature: isTarget(object), the tiles it works at; jobs, its job module, which has
--- JOBS[job] (minutes and how the job looks) and refusal(character, job, object, with); and
--- perform(character, job, object, with), which does the job on the authority, looked up when a
--- job completes, since server files load after shared ones.
+-- Each feature: isTarget(object), the tiles it works at; jobs, its job module
+-- (RenewableEnergy.GasJobs), which has JOBS[job] (minutes and how the job looks) and
+-- refusal(character, job, object, with); and site(), its side of the jobs on the authority
+-- (GasJobs.perform), looked up when a job completes, since server files load after shared ones.
 local FEATURES = {
     digester = {
         isTarget = RenewableEnergy.Digester.isDigester,
         jobs = RenewableEnergy.DigesterJobs,
-        perform = function(...) return RenewableEnergy.DigesterSystem.perform(...) end,
+        site = function() return RenewableEnergy.DigesterSystem.jobSite end,
     },
     heater = {
         isTarget = RenewableEnergy.GasHeater.isHeater,
         jobs = RenewableEnergy.GasHeater,
-        perform = function(...) return RenewableEnergy.DigesterSystem.performHeater(...) end,
+        site = function() return RenewableEnergy.DigesterSystem.heaterSite end,
     },
     gasifier = {
         isTarget = RenewableEnergy.Gasifier.isGasifier,
         jobs = RenewableEnergy.GasifierJobs,
-        perform = function(...) return RenewableEnergy.GasifierSystem.perform(...) end,
+        site = function() return RenewableEnergy.GasifierSystem.jobSite end,
     },
     kit = {
         isTarget = RenewableEnergy.GasKit.isGenerator,
         jobs = RenewableEnergy.GasKit,
-        perform = function(...) return RenewableEnergy.GasLines.perform(...) end,
+        site = function() return RenewableEnergy.GasLines.jobSite end,
     },
 }
+
+--- The job module of `feature`, a key of FEATURES.
+function Action.jobsOf(feature)
+    return FEATURES[feature].jobs
+end
 
 -- How far from the middle of the object's square, on each axis in squares, the character may work
 -- at it: what luautils.walkAdj counts as there, and a little for drift and a client's lag.
@@ -148,7 +154,8 @@ function Action:complete()
     if not RenewableEnergy.onSquare(self.object) or (isServer() and not RenewableEnergy.withinReach(self.character, self.object, REACH)) then
         return false
     end
-    return FEATURES[self.feature].perform(self.character, self.job, self.object, self.with)
+    local feature = FEATURES[self.feature]
+    return RenewableEnergy.GasJobs.perform(feature.jobs, feature.site(), self.character, self.job, self.object, self.with)
 end
 
 -- Parameter names match the fields: the multiplayer server rebuilds the action by passing them to

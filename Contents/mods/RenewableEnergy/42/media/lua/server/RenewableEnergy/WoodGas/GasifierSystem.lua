@@ -4,25 +4,24 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
 require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 local GasifierObject = require "RenewableEnergy/WoodGas/GasifierObject"
 
 RenewableEnergy = RenewableEnergy or {}
-local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
-local Materials, ObjectSystem = RenewableEnergy.Materials, RenewableEnergy.ObjectSystem
+local Gasifier, GasifierJobs, ObjectSystem = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs, RenewableEnergy.ObjectSystem
 
 local GasifierSystem = ObjectSystem.define({
     name = "Gasifier", kind = "gasifier", owner = Gasifier, Object = GasifierObject, isObject = Gasifier.isGasifier,
 })
 RenewableEnergy.GasifierSystem = GasifierSystem
 
--- What each job does to the gasifier `gasifier` (its tile `isoObject`). `item` is the container
--- Drain Condensate fills, nil for the ground. Returns whether it was done.
+-- What each job does to the gasifier `gasifier` (its tile `isoObject`) beyond taking its
+-- materials, by its row of GasifierJobs.JOBS. `item` is the container Drain Condensate fills, nil
+-- for the ground. Returns whether it was done.
 local DO = {
-    [GasifierJobs.LIGHT] = function(character, gasifier, isoObject)
+    [GasifierJobs.LIGHT] = function(character, gasifier, row, isoObject)
         return gasifier:light(isoObject)
     end,
     [GasifierJobs.PUT_OUT] = function(character, gasifier)
@@ -36,7 +35,7 @@ local DO = {
         return true
     end,
     -- Into `item` as much of the condensate as it takes, or all of it onto the ground.
-    [GasifierJobs.DRAIN] = function(character, gasifier, isoObject, item)
+    [GasifierJobs.DRAIN] = function(character, gasifier, row, isoObject, item)
         if item then
             local fluid = item:getFluidContainer()
             local litres = math.min(gasifier.condensate, fluid:getFreeCapacity())
@@ -50,20 +49,8 @@ local DO = {
     end,
 }
 
-local function apply(character, job, gasifier, isoObject, item)
-    -- Read before the job: lighting makes it warm.
-    local materials = GasifierJobs.materials(job, Gasifier.currentSummary(isoObject))
-    if not DO[job](character, gasifier, isoObject, item) then
-        return false
-    end
-    Materials.consume(character, materials)
-    return true
-end
-
---- Does `job` for `character` at the gasifier `isoObject` once its timed action finished. `item` is
---- the container Drain Condensate fills. Returns whether it was done.
-function GasifierSystem.perform(character, job, isoObject, item)
-    return ObjectSystem.perform(Gasifier, GasifierJobs, apply, character, job, isoObject, item)
-end
+--- The authority's side of the jobs at a gasifier (GasJobs.perform), whose `with` is the container
+--- Drain Condensate fills.
+GasifierSystem.jobSite = ObjectSystem.jobSite(Gasifier, DO)
 
 return GasifierSystem

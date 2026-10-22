@@ -1072,9 +1072,9 @@ local function placeGasifier(square, tier, lit)
 end
 
 -- Fits the gas kit to `generator` and runs its line to `source`, a digester or a gasifier, by
--- the jobs a player does (GasLines.perform), the character holding what they take meanwhile.
+-- the jobs a player does (GasJobs.perform), the character holding what they take meanwhile.
 local function fitGasKit(generator, source)
-    local GasKit, GasLines = RenewableEnergy.GasKit, RenewableEnergy.GasLines
+    local GasKit, GasJobs, site = RenewableEnergy.GasKit, RenewableEnergy.GasJobs, RenewableEnergy.GasLines.jobSite
     local player = getPlayer()
     local inventory = player:getInventory()
     local restore = PZHarness.Fixtures.setPerk(player, Perks.Mechanics, 2)
@@ -1083,7 +1083,7 @@ local function fitGasKit(generator, source)
         table.insert(given, inventory:AddItem(GasKit.HOSE))
     end
     for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
-        if not GasLines.perform(player, job, generator, source) then
+        if not GasJobs.perform(GasKit, site, player, job, generator, source) then
             print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, source)))
         end
     end

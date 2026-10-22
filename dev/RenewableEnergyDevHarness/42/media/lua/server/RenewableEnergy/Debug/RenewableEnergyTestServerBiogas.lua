@@ -192,6 +192,21 @@ handler("digesterRun", function(player, args)
     return {}
 end)
 
+-- Has the job `args.job` of the job module RenewableEnergy[args.module] (DigesterJobs, GasHeater,
+-- ...) give `args.amount` XP of the perk `args.perk` once done, until the test ends: for a job
+-- whose row names none, to see whether its feature gives what its row says.
+handler("gasJobXp", function(player, args, defer)
+    local Jobs = RenewableEnergy[args.module]
+    local row = Jobs and Jobs.JOBS and Jobs.JOBS[args.job]
+    if not row then
+        return nil, "the job " .. tostring(args.job) .. " of " .. tostring(args.module)
+    end
+    local was = row.xp
+    row.xp = { perk = args.perk, amount = args.amount }
+    defer(function() row.xp = was end)
+    return {}
+end)
+
 -- Propane --------------------------------------------------------------------------------------
 
 -- Drops an `args.type` holding `args.uses` (its share of full) on the floor of the square at x, y,

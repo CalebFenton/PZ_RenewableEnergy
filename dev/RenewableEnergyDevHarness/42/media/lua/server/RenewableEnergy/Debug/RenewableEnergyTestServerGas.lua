@@ -125,6 +125,31 @@ handler("gasActionFrom", function(player, args)
     return { built = action ~= nil }
 end)
 
+-- Does the kit job `args.job` at the generator at x, y, z for the character as the authority does
+-- the one a client's action asks for once it ends: the action's complete(). Answers whether it was
+-- done; a client's own action that the server turns down stops its whole queue.
+handler("kitJobComplete", function(player, args)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    local action = RenewableEnergyGasAction:new(player, "kit", args.job, generator)
+    return { done = action:complete() }
+end)
+
+-- Has the kit job `args.job` not get done on the authority until the test ends, as a job whose
+-- work fails there: its site's act (GasJobs.perform) answers false and changes nothing.
+handler("kitJobNotDone", function(player, args, defer)
+    local site = RenewableEnergy.GasLines.jobSite
+    local act = site.act
+    site.act = function(character, job, ...)
+        if job == args.job then
+            return false
+        end
+        return act(character, job, ...)
+    end
+    defer(function() site.act = act end)
+    return {}
+end)
+
 -- Sets the last pass of the kitted generator at x, y, z `args.hours` ago, as though that time had
 -- passed since. Answers what is missing, or nil.
 local function age(args)

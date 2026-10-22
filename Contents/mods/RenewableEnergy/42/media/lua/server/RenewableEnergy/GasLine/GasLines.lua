@@ -11,7 +11,6 @@ if isClient() then return end
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Materials"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/PowerBank/Loads"
@@ -21,7 +20,7 @@ RenewableEnergy = RenewableEnergy or {}
 local GasLines = {}
 RenewableEnergy.GasLines = GasLines
 
-local GasKit, Gasifier, Sprites, Materials = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites, RenewableEnergy.Materials
+local GasKit, Gasifier, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites
 local Fumes = RenewableEnergy.Fumes
 
 -- Global ModData: kitted generators by "x,y,z", each { x, y, z, source }; the source is kept so a
@@ -341,22 +340,24 @@ local function disconnect(character, generator, state)
 end
 
 -- What each job does at `generator` (its kit state `state`, nil before Install) beyond taking its
--- materials, by its row of GasKit.JOBS; `source` is Connect's.
+-- materials, by its row of GasKit.JOBS; `source` is Connect's. Returns whether it was done.
 local DO = {
-    [GasKit.INSTALL] = function(character, generator)
+    [GasKit.INSTALL] = function(character, state, row, generator)
         generator:getModData()[GasKit.MOD_DATA] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
         registry()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
         RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
+        return true
     end,
-    [GasKit.REMOVE] = function(character, generator, state)
+    [GasKit.REMOVE] = function(character, state, row, generator)
         disconnect(character, generator, state)
         generator:getModData()[GasKit.MOD_DATA] = nil
         registry()[keyOf(generator)] = nil
         RenewableEnergy.showOverlay(generator, isKitOverlay, nil)
         RenewableEnergy.giveItems(character, GasKit.ITEM)
+        return true
     end,
-    [GasKit.CONNECT] = function(character, generator, state, source)
+    [GasKit.CONNECT] = function(character, state, row, generator, source)
         local kind = GasKit.sourceKind(source)
         local spec = GasKit.SOURCES[kind]
         local line = spec.line(generator, source)
@@ -366,47 +367,52 @@ local DO = {
             pipe(generator, source)
         end
         GasLines.run(generator, state, 0)
+        return true
     end,
-    [GasKit.DISCONNECT] = disconnect,
-    [GasKit.TO_GAS] = function(character, generator, state, source, row)
+    [GasKit.DISCONNECT] = function(character, state, row, generator)
+        disconnect(character, generator, state)
+        return true
+    end,
+    [GasKit.TO_GAS] = function(character, state, row, generator)
         state.mode = row.mode
         GasLines.run(generator, state, 0)
+        return true
     end,
-    [GasKit.TO_PETROL] = function(character, generator, state, source, row)
+    [GasKit.TO_PETROL] = function(character, state, row, generator)
         state.mode = row.mode
         forgetGas(state)
         settleFuel(generator, state, false)
+        return true
     end,
 }
 
---- Does `job` at `generator` for `character` once its timed action finished: catches the line up
---- first so earlier time bills at the old state, rechecks the job, does it, sends the state.
---- `source` is the far end of Connect Gas Line. Returns whether it was done.
-function GasLines.perform(character, job, generator, source)
-    local state = GasKit.stateOf(generator)
-    if state then
-        catchUp(generator, state)
-    end
-    local done = not GasKit.refusal(character, job, generator, source)
-    if done then
-        local row = GasKit.JOBS[job]
-        Materials.consume(character, GasKit.materials(job, generator, source))
-        DO[job](character, generator, state, source, row)
-        if row.xp then
-            addXp(character, Perks[row.xp.perk], row.xp.amount)
+--- The authority's side of the jobs at a generator (GasJobs.perform), whose `with` is the far end
+--- of Connect Gas Line. They work on its kit state, the line caught up first so the time before
+--- bills at the old state; the state goes to the clients when a job was done or there was one to
+--- catch up.
+GasLines.jobSite = {
+    open = function(generator)
+        local state = GasKit.stateOf(generator)
+        if state then
+            catchUp(generator, state)
         end
-    end
-    if done or state then
-        sync(generator)
-    end
-    return done
-end
+        return state
+    end,
+    act = function(character, job, state, row, generator, source)
+        return DO[job](character, state, row, generator, source)
+    end,
+    tell = function(state, generator, done)
+        if done or state then
+            sync(generator)
+        end
+    end,
+}
 
 --- Fits the kit to `generator` and runs its line to `source`, as Install Kit and Connect Gas Line
 --- do, for a generator the world places rather than a player (SolarSites): nobody pays for them.
 function GasLines.fit(generator, source)
-    DO[GasKit.INSTALL](nil, generator)
-    DO[GasKit.CONNECT](nil, generator, GasKit.stateOf(generator), source)
+    DO[GasKit.INSTALL](nil, nil, GasKit.JOBS[GasKit.INSTALL], generator)
+    DO[GasKit.CONNECT](nil, GasKit.stateOf(generator), GasKit.JOBS[GasKit.CONNECT], generator, source)
     sync(generator)
 end
 

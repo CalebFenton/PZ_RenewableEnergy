@@ -1,6 +1,7 @@
 -- The authority's side of features kept in a Global Object System (digesters, gasifiers): a system
 -- per feature that saves each record with the world, runs every record each ten minutes loaded or
--- not, and sends clients its summary; a base for the records; and the order every job is done in.
+-- not, and sends clients its summary; a base for the records; and their side of the jobs players
+-- do at them (GasJobs.perform).
 
 if isClient() then return end
 
@@ -36,17 +37,17 @@ function Object:tierSpec()
     return self.luaSystem.owner.TIERS[self.tier]
 end
 
---- The game hours since the record last caught up, now caught up.
-function Object:elapsedHours()
+--- Brings the record up to now: what the game hours since it last caught up did to it.
+function Object:catchUp()
     local now = getGameTime():getWorldAgeHours()
     local hours = math.min(LONGEST_PASS, now - (self.lastHour or now))
     self.lastHour = now
-    return hours
+    self:advance(hours)
 end
 
 --- Brings the record up to now, then shows and tells what changed.
 function Object:update()
-    self:advance(self:elapsedHours())
+    self:catchUp()
     self:afterChange()
 end
 
@@ -137,20 +138,28 @@ function ObjectSystem.define(spec)
     return System
 end
 
---- Does `job` for `character` at `isoObject` once its timed action finished: catches the record up
---- so the job works on what is there, rechecks it (`Jobs.refusal`), does it (`apply(character, job,
---- record, isoObject, with)` returns whether it was done), then shows and tells. `with` is what the
---- job works with (RenewableEnergyGasAction). Returns whether it was done.
-function ObjectSystem.perform(owner, Jobs, apply, character, job, isoObject, with)
-    local record = isoObject and owner.recordOf(isoObject)
-    if not record then
-        return false
-    end
-    record:advance(record:elapsedHours())
-    local done = not Jobs.refusal(character, job, isoObject, with)
-        and apply(character, job, record, isoObject, with)
-    record:afterChange()
-    return done == true
+--- The authority's side of the jobs at a feature's tiles (a site of GasJobs.perform), whose
+--- records are `owner`'s: each job works on the record of the tile worked at, brought up to now
+--- first, and `DO[job](character, record, row, isoObject, with)` does it, returning whether it was
+--- done. A tile without a record has nothing for a job to work on.
+function ObjectSystem.jobSite(owner, DO)
+    return {
+        open = function(isoObject)
+            local record = owner.recordOf(isoObject)
+            if record then
+                record:catchUp()
+            end
+            return record
+        end,
+        act = function(character, job, record, row, isoObject, with)
+            return record ~= nil and DO[job](character, record, row, isoObject, with)
+        end,
+        tell = function(record)
+            if record then
+                record:afterChange()
+            end
+        end,
+    }
 end
 
 return ObjectSystem

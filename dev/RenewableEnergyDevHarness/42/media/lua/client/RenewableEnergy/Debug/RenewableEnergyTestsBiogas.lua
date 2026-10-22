@@ -831,6 +831,34 @@ test("renewable_energy_biogas_heater_out_when_digester_gone", {
     end,
 })
 
+-- A heater's job gives the XP its row names once done, as every gas job does: its rows set their
+-- XP as the digester's do. No row of the heater names any, so the test gives Light Heater one.
+test("renewable_energy_biogas_heater_job_gives_its_xp", {
+    instant = true,
+    run = function(self)
+        local digester = placeDigester(self, "barrel.MetalDrum")
+        local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
+        if not square then return end
+        local fed = T.matureDigester("barrel")
+        fed.gas = Digester.HOLDERS.bags.capacity
+        T.setRecord(self, digester, fed)
+        T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
+        local heater = T.placeTile(self, square, Sprites.gasHeater.off)
+        T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+        T.batch(function()
+            T.server(self, "gasJobXp", { module = "GasHeater", job = GasHeater.LIGHT, perk = "Electricity", amount = 10 })
+            T.read(self, "perkXp", { perk = "Electricity" }, "before")
+        end)
+        T.gasJob(self, "heater", heater, GasHeater.LIGHT)
+        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit end, "this client's copy of the heater lit")
+        T.read(self, "perkXp", { perk = "Electricity" }, "after")
+    end,
+    validate = function(self)
+        local before, after = self.reads.before.value, self.reads.after.value
+        T.expect(after > before, "lighting the heater gave no Electricity XP, though its row names some: " .. before .. " before, " .. after .. " after")
+    end,
+})
+
 -- Propane ----------------------------------------------------------------------------------------
 
 -- Queues a read of the character's propane tanks (their fraction) into self.reads[label].
