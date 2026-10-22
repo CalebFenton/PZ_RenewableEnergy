@@ -376,24 +376,23 @@ local function isFailsafe(object)
     return Sprites.nameOf(object) == Sprites.failsafe
 end
 
---- The nearest plugged-in generator, one with a failsafe on its square first.
-function Bank:findGenerator()
-    local best, bestFailsafe, bestDistance
-    for x = self.x - BACKUP_REACH, self.x + BACKUP_REACH do
-        for y = self.y - BACKUP_REACH, self.y + BACKUP_REACH do
-            local square = getSquare(x, y, self.z)
+-- Every plugged-in generator within backup reach on the bank's floor, banks aside, nearest first:
+-- { generator, failsafe }, `failsafe` whether one stands on its square.
+local function generatorsInReach(bank)
+    local found = {}
+    for x = bank.x - BACKUP_REACH, bank.x + BACKUP_REACH do
+        for y = bank.y - BACKUP_REACH, bank.y + BACKUP_REACH do
+            local square = getSquare(x, y, bank.z)
             local generator = square and square:getGenerator()
             if generator and generator:isConnected() and not PowerBank.isBank(generator) then
                 Payers.track(generator)
-                local failsafe = RenewableEnergy.findObjectOn(square, isFailsafe) ~= nil
-                local distance = IsoUtils.DistanceToSquared(x, y, self.x, self.y)
-                if not best or (failsafe and not bestFailsafe) or (failsafe == bestFailsafe and distance < bestDistance) then
-                    best, bestFailsafe, bestDistance = generator, failsafe, distance
-                end
+                table.insert(found, { generator = generator, failsafe = RenewableEnergy.findObjectOn(square, isFailsafe) ~= nil,
+                    distance = IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) })
             end
         end
     end
-    return best, bestFailsafe
+    table.sort(found, function(a, b) return a.distance < b.distance end)
+    return found
 end
 
 -- The bank a failsafe answers to: the nearest bank with its generator in backup reach, the lower
@@ -446,26 +445,32 @@ local function runFailsafe(generator, wanted, charge)
     end
 end
 
---- The backup generator's state after the failsafe acted. The failsafe runs the generator only
---- for the bank it answers to, and only while that bank has batteries and could carry its load:
---- a bank that is off, disconnected, on the grid or without a working inverter stops it. While
---- the bank is unloaded, the generator's last known state holds.
+--- Run every failsafe that answers to the bank (failsafeBank), and record the backup generator the
+--- status shows, which carries the load while it runs: one the bank runs, a running one first,
+--- else one with a failsafe, else the nearest. The failsafe runs a generator only while the bank
+--- has batteries and could carry its load: a bank that is off, disconnected, on the grid or
+--- without a working inverter stops it. While the bank is unloaded, the last known state holds.
 function Bank:updateGenerator()
     if not self:getSquare() then return end
-    local generator, failsafe = self:findGenerator()
-    if not generator then
-        self.generator = false
-        return
-    end
-    local controls = failsafe and failsafeBank(generator) == self
     local armed = canCarryLoad(self) and self.nominalWh > 0
-    if controls then
-        runFailsafe(generator, armed, self.charge)
+    local shown, shownRank
+    for _, found in ipairs(generatorsInReach(self)) do
+        local generator = found.generator
+        local controls = found.failsafe and failsafeBank(generator) == self
+        if controls then
+            runFailsafe(generator, armed, self.charge)
+        end
+        local running = generator:isActivated()
+        local rank = (controls and 4 or 0) + (controls and running and 2 or 0) + (found.failsafe and 1 or 0)
+        -- Nearest first, so of two alike the nearer stays.
+        if not shown or rank > shownRank then
+            shown, shownRank = {
+                x = generator:getX(), y = generator:getY(), z = generator:getZ(),
+                running = running, failsafe = found.failsafe, controls = controls, armed = armed,
+            }, rank
+        end
     end
-    self.generator = {
-        x = generator:getX(), y = generator:getY(), z = generator:getZ(),
-        running = generator:isActivated(), failsafe = failsafe, controls = controls, armed = armed,
-    }
+    self.generator = shown or false
 end
 
 function Bank:backupCarriesLoad()
