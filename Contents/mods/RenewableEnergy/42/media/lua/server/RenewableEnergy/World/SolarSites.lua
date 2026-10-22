@@ -4,7 +4,9 @@ end
 
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/World/WorldSpawns"
+require "RenewableEnergy/World/BuildingWatch"
 require "RenewableEnergy/World/GardenLights"
 require "RenewableEnergy/World/ArrowBoard"
 require "RenewableEnergy/World/RuralFinds"
@@ -15,15 +17,18 @@ local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
 -- The named sites (SolarSiteLocations.lua): solar, and the homestead power of wind farms, dairy
 -- farms and preppers. A world rolls each site once, by its name, against the Solar Sites option,
 -- picks which of its spots the site uses, and keeps each of them as a global object, which the
--- game saves and hands back when its chunk first loads (SGlobalObjects.chunkLoaded). The object
--- goes down then, stocked, and the spot is forgotten, so nothing is ever placed twice. A site
--- added to the list later is rolled the first time a world that lacks it loads.
+-- game saves and hands back when its chunk loads (SGlobalObjects.chunkLoaded). The object goes
+-- down then, stocked, and the spot is forgotten, so nothing is ever placed twice. A spot whose
+-- square no longer takes what it places, such as a tree grown or a player's things there, is kept
+-- and tried again each time its chunk loads. A site added to the list later is rolled the first
+-- time a world that lacks it loads.
 
 RenewableEnergy = RenewableEnergy or {}
 local SolarSites = {}
 RenewableEnergy.SolarSites = SolarSites
 
 local WorldSpawns, RuralFinds = RenewableEnergy.WorldSpawns, RenewableEnergy.RuralFinds
+local BuildingWatch, PowerBank = RenewableEnergy.BuildingWatch, RenewableEnergy.PowerBank
 
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 
@@ -52,8 +57,11 @@ SolarSites.KINDS = {
 SolarSites.GENERATOR = { condition = { min = 25, max = 50 }, fuel = { min = 0.5, max = 2 } }
 
 -- Every site a world rolled while all sites were rolled at once. Such a world saved `rolled` as
--- true, and these are the sites it stands for.
-local ROLLED_AT_ONCE = {
+-- true, and these are the sites it stands for. A world that saved `rolled` as true before the
+-- Louisville checkpoints were listed is read the same way, so it counts them rolled and never
+-- gets them; only development saves are like that. Each name must stay a site's name: a renamed
+-- site would be rolled again in these worlds.
+SolarSites.ROLLED_AT_ONCE = {
     "Pasture north of Rosewood", "Pasture south-east of Rosewood", "Pasture west of Muldraugh",
     "Pasture north-west of Muldraugh", "Pasture west of West Point", "Pasture by Valley Station",
     "Pasture by Brandenburg", "Farm south of Riverside", "Farm east of Rosewood", "Barn west of West Point",
@@ -124,26 +132,54 @@ local function placeGenerator(square)
     return generator
 end
 
+-- A free floor square in a room, where a bank or a crate stands; nil if the square is one, else why
+-- not.
+local function notFreeIndoors(square)
+    if not (PowerBank.canPlaceBank(square) and square:isFree(false)) then
+        return "no free floor indoors"
+    end
+end
+
 -- What a spot (its global object's modData) puts down on its square, by its `what`. A spot that
 -- `waits` is placed at the next minute once `ready(square, spot)`, if given, says all it needs is
 -- loaded: vehicles can't safely join the world while their chunk is still loading, and a line's
--- two ends may lie in different chunks. Its `place` returns whether the game took it; a refused
--- spot (another vehicle in the way) is kept and retried when its chunk next loads.
+-- two ends may lie in different chunks. `refuses(square, spot)`, if given, says why what stands
+-- on its squares now keeps it out, or nil; on open ground that is RuralFinds' rule, indoors a free
+-- floor. A mount on a roof or a wall goes where the map gives it. Its `place` returns whether the
+-- game took it. A refused spot is kept and retried when its chunk next loads.
 local SPOTS = {
     panel = {
+        refuses = function(square, spot)
+            if MOUNTS[spot.mount].kind == "rack" and not RuralFinds.canStand(square) then
+                return "no open ground for a rack"
+            end
+        end,
         place = function(square, spot)
             local modules = WorldSpawns.siteModules(moduleCount(spot.siteKind, spot.mount))
             WorldSpawns.placePanel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
+            return true
         end,
     },
-    bank = { place = function(square, spot) WorldSpawns.placeBank(square, spot.stock) end },
-    crate = { place = function(square, spot) WorldSpawns.placeCrate(square, spot.stock) end },
+    bank = {
+        refuses = notFreeIndoors,
+        place = function(square, spot) return WorldSpawns.placeBank(square, spot.stock) ~= nil end,
+    },
+    crate = {
+        refuses = notFreeIndoors,
+        place = function(square, spot)
+            WorldSpawns.placeCrate(square, spot.stock)
+            return true
+        end,
+    },
+    -- The promise is saved with the house's garden light rolls, so it outlives a quit before the
+    -- house's surroundings load, and the house's one roll keeps it.
     gardenLights = {
         place = function(square)
             local building = square:getBuilding()
             if building then
-                RenewableEnergy.GardenLights.queue(building:getDef(), true)
+                RenewableEnergy.GardenLights.promise(building:getDef())
             end
+            return true
         end,
     },
     arrowBoard = {
@@ -154,9 +190,15 @@ local SPOTS = {
     windCharger = {
         waits = true,
         ready = function(_, spot) return farEnd(spot) ~= nil end,
+        refuses = function(square, spot)
+            if not RuralFinds.canPlace("wind", square) then
+                return "no open ground for a wind charger"
+            end
+            return notFreeIndoors(farEnd(spot))
+        end,
         place = function(square, spot)
             local bankSquare = farEnd(spot)
-            RuralFinds.FINDS.wind.place(square)
+            RuralFinds.placeAt("wind", square)
             if WorldSpawns.placeBank(bankSquare, spot.stock) then
                 local ok, why = RenewableEnergy.Commands.connectSource(nil,
                     { bank = positionOf(bankSquare), source = positionOf(square) })
@@ -171,8 +213,16 @@ local SPOTS = {
     gasLine = {
         waits = true,
         ready = function(_, spot) return farEnd(spot) ~= nil end,
+        refuses = function(square, spot)
+            if not RuralFinds.canPlace(spot.source, square) then
+                return "no open ground for a " .. spot.source
+            end
+            if not RuralFinds.canStand(farEnd(spot)) then
+                return "no open ground for the generator"
+            end
+        end,
         place = function(square, spot)
-            local source = RuralFinds.FINDS[spot.source].place(square)
+            local source = RuralFinds.placeAt(spot.source, square)
             RenewableEnergy.GasLines.fit(placeGenerator(farEnd(spot)), source)
             return true
         end,
@@ -182,7 +232,7 @@ local SPOTS = {
         waits = true,
         ready = function(square)
             local building = square:getBuilding()
-            return building == nil or RuralFinds.surroundingsLoaded(building:getDef())
+            return building == nil or BuildingWatch.surroundingsLoaded(building:getDef())
         end,
         place = function(square)
             local building = square:getBuilding()
@@ -193,6 +243,19 @@ local SPOTS = {
         end,
     },
 }
+
+-- Places the spot on its square and forgets it, unless what stands there now refuses it or the
+-- game doesn't take it; a refused spot says why in the log.
+local function placeSpot(object, square, spot)
+    local kind = SPOTS[spot.what]
+    local why = kind.refuses and kind.refuses(square, spot)
+    if why then
+        print("RenewableEnergy: the " .. spot.what .. " spot at " .. square:getX() .. "," .. square:getY() .. ","
+            .. square:getZ() .. " waits: " .. why)
+    elseif kind.place(square, spot) then
+        system:removeObject(object)
+    end
+end
 
 -- Rolling
 
@@ -218,7 +281,10 @@ local function pickSome(list, count)
     return picked
 end
 
---- Keeps the spots a site uses as global objects, to be placed when their chunks load.
+--- Keeps the spots a site uses as global objects, to be placed when their chunks load. A find
+--- counts as the find of the buildings it stands by, and a wind charger also of the building its
+--- bank stands in, from now on (RuralFinds.claim), since their own roll can come before the spot
+--- is placed.
 function SolarSites.addSite(site)
     local kind = SolarSites.KINDS[site.kind]
     if kind.panels then
@@ -243,11 +309,14 @@ function SolarSites.addSite(site)
     if kind.wind then
         local at, bank = site.windCharger, site.bank
         addSpot(at[1], at[2], at[3], { what = "windCharger", stock = kind.wind, toX = bank[1], toY = bank[2], toZ = bank[3] })
+        RuralFinds.claim("wind", at[1], at[2])
+        RuralFinds.claim("wind", bank[1], bank[2])
     end
     if kind.gas then
         local at, generator = site[kind.gas], site.generator
         addSpot(at[1], at[2], at[3],
             { what = "gasLine", source = kind.gas, toX = generator[1], toY = generator[2], toZ = generator[3] })
+        RuralFinds.claim(kind.gas, at[1], at[2])
     end
     if kind.pamphlet then
         addSpot(site.house[1], site.house[2], 0, { what = "pamphlet" })
@@ -260,7 +329,7 @@ local function rolledSites()
     if type(modData.rolled) ~= "table" then
         local rolled = {}
         if modData.rolled == true then
-            for _, name in ipairs(ROLLED_AT_ONCE) do
+            for _, name in ipairs(SolarSites.ROLLED_AT_ONCE) do
                 rolled[name] = true
             end
         end
@@ -287,9 +356,9 @@ end
 -- The spots that wait for the next minute, each { x, y, z, spot }.
 local waiting = {}
 
---- Places each waiting spot that is ready. One whose square has unloaded leaves the queue until
---- its chunk loads again.
-function SolarSites.placeWaiting()
+-- Places each waiting spot that is ready. One whose square has unloaded leaves the queue until
+-- its chunk loads again.
+local function placeWaiting()
     for i = #waiting, 1, -1 do
         local entry = waiting[i]
         local object = system:getObjectAt(entry.x, entry.y, entry.z)
@@ -299,34 +368,27 @@ function SolarSites.placeWaiting()
             table.remove(waiting, i)
         elseif not kind.ready or kind.ready(square, entry.spot) then
             table.remove(waiting, i)
-            if kind.place(square, entry.spot) then
-                system:removeObject(object)
-            end
+            placeSpot(object, square, entry.spot)
         end
     end
 end
 
---- Places and forgets every spot in the chunk. Called by SGlobalObjectSystem.chunkLoaded for a
---- chunk that holds spots.
-function SolarSites.placeChunk(wx, wy)
+-- Places and forgets every spot in the chunk that needn't wait.
+local function placeChunk(wx, wy)
     local objects = system:getObjectsInChunk(wx, wy)
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
         local x, y, z = object:getX(), object:getY(), object:getZ()
-        -- A copy: removeObject, which comes before placing, wipes the object's modData
-        -- (GlobalObject.Reset).
+        -- A copy: removeObject wipes the object's modData (GlobalObject.Reset).
         local spot = {}
         for key, value in pairs(object:getModData()) do
             spot[key] = value
         end
+        local square = getSquare(x, y, z)
         if SPOTS[spot.what].waits then
             table.insert(waiting, { x = x, y = y, z = z, spot = spot })
-        else
-            system:removeObject(object)
-            local square = getSquare(x, y, z)
-            if square then
-                SPOTS[spot.what].place(square, spot)
-            end
+        elseif square then
+            placeSpot(object, square, spot)
         end
     end
     system:finishedWithList(objects)
@@ -340,7 +402,7 @@ end
 
 -- Called by SGlobalObjectSystem.chunkLoaded with the system's modData as self.
 local function onChunkLoaded(_self, wx, wy)
-    SolarSites.placeChunk(wx, wy)
+    placeChunk(wx, wy)
 end
 
 -- SGlobalObjectSystem throws for a system without this; the spots concern only the server.
@@ -359,6 +421,6 @@ local function onSGlobalObjectSystemInit()
 end
 
 Events.OnSGlobalObjectSystemInit.Add(onSGlobalObjectSystemInit)
-Events.EveryOneMinute.Add(SolarSites.placeWaiting)
+Events.EveryOneMinute.Add(placeWaiting)
 
 return SolarSites
