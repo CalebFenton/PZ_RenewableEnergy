@@ -153,9 +153,11 @@ local function chargingBanks(generator)
 end
 
 -- What `generator` powers (its share of what it reaches, Payers.loadOf), and the watts each bank
--- charging from it draws, by bank: its chargers' rating, but on gas no more than the cap leaves
--- after what it powers and the banks before it (chargingBanks), as an inverter-charger turns down
--- to what its generator can give. So chargers alone never take a line past its cap.
+-- charging from it draws, by bank: what its chargers would take at its last pass (Bank.chargeFrom's
+-- `chargeWantW`, nothing for a full bank), but on gas no more than the cap leaves after what it
+-- powers and the banks before it (chargingBanks), as an inverter-charger turns down to what its
+-- generator can give. So chargers alone never take a line past its cap, and a full bank holds
+-- none of it back from the banks behind it.
 local function split(generator)
     local load = RenewableEnergy.Payers.loadOf(generator)
     local powered = load.watts + load.backedW
@@ -163,7 +165,7 @@ local function split(generator)
     local left = cap and math.max(0, cap - powered)
     local shares = {}
     for _, entry in ipairs(chargingBanks(generator)) do
-        local watts = entry.bank:chargerW()
+        local watts = entry.bank.chargeWantW or 0
         if left then
             watts = math.min(watts, left)
             left = left - watts

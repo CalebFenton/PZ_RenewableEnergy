@@ -39,7 +39,7 @@ RenewableEnergy.Bank = Bank
 -- existing saves.
 Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
-    "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "chargeSource",
+    "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "chargeSource", "chargeWantW",
     "generator", "lastHour", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
     "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
 }
@@ -528,11 +528,12 @@ end
 
 --- What the chargers charge from, saved as `chargeSource`: "grid", the place (placeOf) of the
 --- nearest running generator other than a bank whose reach covers the bank, which burns fuel for
---- them, or false. Returns the watts they put in over the pass's `hours`: no more than `roomWh`,
---- what the batteries can still take after the sun and the load, from a generator on gas no more
---- than the line leaves them (GasLines.chargerLimitW), and from a generator no more than its fuel
---- pays for, which is all the fuel it burns. Unloaded, only the grid carries on: the generator and
---- its fuel are out of reach.
+--- them, or false. Records as `chargeWantW` what they would take this pass: their watts, but no
+--- more than `roomWh`, what the batteries can still take after the sun and the load, fills over the
+--- pass's `hours`. A gas line shares its cap by those wants (GasLines.chargerLimitW), so it is saved
+--- with the source. Returns the watts they put in: the want, from a generator on gas no more than
+--- the line leaves them, and from a generator no more than its fuel pays for, which is all the
+--- fuel it burns. Unloaded, only the grid carries on: the generator and its fuel are out of reach.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
     if self:getSquare() then
@@ -541,10 +542,12 @@ function Bank:chargeFrom(generators, hours, roomWh)
     elseif self.chargeSource ~= "grid" then
         self.chargeSource = false
     end
-    if not self.chargeSource or hours <= 0 or roomWh <= 0 then
+    local charging = self.chargeSource and hours > 0 and roomWh > 0
+    self.chargeWantW = charging and math.min(self:chargerW(), roomWh / hours) or 0
+    if not charging then
         return 0
     end
-    local watts = math.min(self:chargerW(), roomWh / hours)
+    local watts = self.chargeWantW
     if generator then
         watts = math.min(watts, RenewableEnergy.GasLines.chargerLimitW(generator, self) or watts)
     end
