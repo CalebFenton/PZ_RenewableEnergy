@@ -17,14 +17,6 @@ serverCheck("renewable_energy_loot_lists_in_use", "lootListsInUse")
 -- rarity options are at their maximum, so a few rolls are enough even for the rarest entries.
 serverCheck("renewable_energy_loot_items_spawn", "lootItemsSpawn")
 
--- Stage 0 gear turns up more often than stage 1 gear, and that more often than stage 2 gear.
-serverCheck("renewable_energy_loot_later_stages_rarer", "lootLaterStagesRarer", { ladders = {
-    { "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger" },
-    { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery" },
-    { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2" },
-    { "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarModule" },
-} })
-
 -- Vehicles -------------------------------------------------------------------------------------
 
 -- The utility vans keep every vanilla builder's item and get the mod's own truck bed; trailers

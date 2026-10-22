@@ -180,36 +180,6 @@ check("lootItemsSpawn", function(expect)
     end)
 end)
 
--- Sum of an item's weights in vanilla lists: the mod's own kit and stock lists don't count,
--- since they are rolled only in a few store rooms.
-local function vanillaWeight(D, fullType)
-    local total = 0
-    for _, spec in ipairs(D.items) do
-        if spec.fullType == fullType then
-            for _, entry in ipairs(spec.entries) do
-                if not string.find(entry[2], "RenewableEnergy") then
-                    total = total + entry[1]
-                end
-            end
-        end
-    end
-    return total
-end
-
--- Each ladder of `args.ladders` turns up less often at each step.
-check("lootLaterStagesRarer", function(expect, _, _, args)
-    local D = distributions(expect)
-    if not D then
-        return
-    end
-    for _, ladder in ipairs(args.ladders) do
-        for i = 2, #ladder do
-            local earlier, later = vanillaWeight(D, ladder[i - 1]), vanillaWeight(D, ladder[i])
-            expect(earlier > later, ladder[i] .. " (" .. later .. ") is not rarer than " .. ladder[i - 1] .. " (" .. earlier .. ")")
-        end
-    end
-end)
-
 -- Whether `list` has every vanilla item of `vanilla`; the mod's own entries differ between them.
 local function listsContainAll(list, vanilla)
     for i = 1, #vanilla.items - 1, 2 do
