@@ -9,6 +9,13 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local handler = PZHarness.serverHandler
 local overlaysOf, squareAt, vehicleAt = Helpers.overlaysOf, Helpers.squareAt, Helpers.vehicleAt
 
+-- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll gives `args.rolls` until
+-- the test ends (Helpers.forceRolls).
+handler("forceRoll", function(_, args, defer)
+    Helpers.forceRolls(defer, args.rolls)
+    return {}
+end)
+
 -- The server's record of the bank at `position`, and its tile.
 local function recordAt(position)
     local record = position and RenewableEnergy.PowerBank.serverSystem:getLuaObjectAt(position.x, position.y, position.z)

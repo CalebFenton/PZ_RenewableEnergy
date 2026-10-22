@@ -64,6 +64,29 @@ function Helpers.saveOptions(defer, names, reapply)
     end)
 end
 
+-- The game's roll, kept while a test sets its own; and the rolls tests set, so that setting one
+-- over another still keeps the game's.
+local gameRoll
+local setRolls = setmetatable({}, { __mode = "k" })
+
+--- Sets what Chance.roll gives until the test ends: `rolls` a number, every roll; or a list, the
+--- next rolls in order, and an error once they run out, so a draw the test didn't expect shows.
+--- Returns the function that puts the game's roll back; Helpers.deferOnce says when it runs.
+function Helpers.forceRolls(defer, rolls)
+    local Chance = RenewableEnergy.Chance
+    if not setRolls[Chance.roll] then
+        gameRoll = Chance.roll
+    end
+    local next = 0
+    local roll = type(rolls) == "number" and function() return rolls end or function()
+        next = next + 1
+        return rolls[next] or error("a roll past the " .. #rolls .. " the test set")
+    end
+    setRolls[roll] = true
+    Chance.roll = roll
+    return Helpers.deferOnce(defer, function() Chance.roll = gameRoll end)
+end
+
 --- The square at `args` ({ x, y, z }), or nil when there is none or it isn't loaded here.
 function Helpers.squareAt(args)
     return args and args.x and getSquare(args.x, args.y, args.z)

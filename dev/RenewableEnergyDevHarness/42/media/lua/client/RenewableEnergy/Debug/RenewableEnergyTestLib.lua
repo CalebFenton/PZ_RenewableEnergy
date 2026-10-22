@@ -63,6 +63,13 @@ function T.waitFor(self, condition, what, maxFrames)
     T.step(function() T.need(self, condition(), what) end)
 end
 
+--- Queues setting the authority's Chance.roll until the test ends: `rolls` a number, every roll;
+--- or a list, the next rolls in order, failing the call that draws one more. So a test checks
+--- either side of a chance (Chance.hit) in one try each.
+function T.forceRoll(self, rolls)
+    T.server(self, "forceRoll", { rolls = rolls })
+end
+
 --- The first `fullType` this client's character carries, in any bag, or nil.
 function T.carried(fullType)
     return T.player():getInventory():getFirstTypeRecurse(fullType)
