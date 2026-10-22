@@ -106,14 +106,16 @@ local function cutLine(generator, state)
     return line
 end
 
---- The watts `generator` delivers: what it powers, and the chargers of the battery banks that
---- charge from a generator within its reach.
+--- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and the chargers
+--- of the battery banks that charge from it.
 function GasLines.loadOf(generator)
-    local watts = RenewableEnergy.Loads.scan(generator:getSquare()).watts
+    local load = RenewableEnergy.Payers.loadOf(generator)
+    local watts = load.watts + load.backedW
+    local key = RenewableEnergy.PlaceTracker.key(generator:getX(), generator:getY(), generator:getZ())
     local banks = RenewableEnergy.PowerBank.serverSystem
     for i = 1, (banks and banks:getLuaObjectCount() or 0) do
         local bank = banks:getLuaObjectByIndex(i)
-        if bank.chargeSource == "generator" and RenewableEnergy.inGeneratorReach(generator, bank.x, bank.y, bank.z) then
+        if bank.chargeSource == "generator" and bank.chargingFrom == key then
             watts = watts + bank:chargerW()
         end
     end

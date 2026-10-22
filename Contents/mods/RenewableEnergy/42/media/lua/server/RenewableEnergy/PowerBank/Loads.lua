@@ -1,5 +1,6 @@
--- What a bank powers: every switched-on appliance in its reach, an unwired treadmill while a run
--- draws power through it, and the running generators whose reach covers the bank.
+-- What a source pays for: every switched-on appliance in its reach that no running source is
+-- nearer to (RenewableEnergy.Payers), an unwired treadmill while a run draws power through it,
+-- and the running generators whose reach covers the source.
 --
 -- getGeneratorPowerConsumption reads the appliance's own switch, powered or not, so a bank that
 -- cut its power still sees what would draw when it comes back. Its figure is generator fuel an
@@ -17,6 +18,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
+require "RenewableEnergy/PowerBank/Payers"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loads = {}
@@ -24,7 +26,7 @@ RenewableEnergy.Loads = Loads
 
 local Specs = RenewableEnergy.Specs
 local WATTS_PER_FUEL = Specs.wattsPerFuel
-local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
+local PowerBank, Treadmill, Payers = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill, RenewableEnergy.Payers
 
 -- The kind of an object with a fridge or freezer container, as vanilla bills it: by its
 -- containers alone, so a mini fridge with its ice box is a fridge-freezer.
@@ -73,10 +75,10 @@ local function addAppliances(load, object)
     end
 end
 
---- A new, empty load: the `watts` it takes, per kind its count and watts, and the running
---- generators found.
+--- A new, empty load: the `watts` it takes, per kind its count and watts, the running generators
+--- found, and `othersFuel`, vanilla's bill for the appliances in reach that others pay for.
 function Loads.new()
-    return { watts = 0, kinds = {}, generators = {} }
+    return { watts = 0, kinds = {}, generators = {}, othersFuel = 0 }
 end
 
 --- Add an appliance of kind `name` (StatusWindow's LOAD_KINDS) drawing `watts` to `load`.
@@ -120,21 +122,32 @@ local function isRunningGenerator(object)
     return instanceof(object, "IsoGenerator") and object:isActivated() and not PowerBank.isBank(object)
 end
 
---- Everything switched on within a bank's reach, treadmills that runs draw through among them, and
---- the running generators, banks aside, that power the bank's square.
----@param square IsoGridSquare the bank's square
-function Loads.scan(square)
+--- What `payer` (a Payers source on `square`) pays for among `sources` (Payers.running), and the
+--- running generators, banks aside, that power its square.
+---@param square IsoGridSquare the payer's square
+function Loads.scan(square, payer, sources)
     local load = Loads.new()
     local allowExterior = SandboxVars.AllowExteriorGenerator
+    local sharers = Payers.sharers(payer, sources)
+    local function pays(object)
+        return #sharers == 1 or Payers.payerAt(sharers, object:getX(), object:getY(), object:getZ()) == payer
+    end
     RenewableEnergy.eachSquareInGeneratorReach(square, function(scanned)
         local objects = scanned:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)
             if drawsFromGenerator(object, allowExterior) then
-                addAppliances(load, object)
+                if pays(object) then
+                    addAppliances(load, object)
+                else
+                    load.othersFuel = load.othersFuel + object:getGeneratorPowerConsumption()
+                end
             elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior) then
-                Loads.add(load, "treadmill", Specs.treadmill.drawFuel * WATTS_PER_FUEL)
+                if pays(object) then
+                    Loads.add(load, "treadmill", Specs.treadmill.drawFuel * WATTS_PER_FUEL)
+                end
             elseif isRunningGenerator(object) then
+                Payers.track(object)
                 table.insert(load.generators, object)
             end
         end

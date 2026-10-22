@@ -20,10 +20,10 @@ local function generatorOn(args)
     return generator
 end
 
--- The generator at x, y, z: whether it runs, its fuel, vanilla's idle bill an hour (`idle`), its
--- kit's state (nil without a kit) with whether a line is connected and to what kind of source,
--- whether the gas pass lists it, its overlays and its sprite, which picks the kit's and pipe's
--- overlays (Sprites.gasKitFor).
+-- The generator at x, y, z: whether it runs, its fuel, vanilla's idle bill an hour (`idle`) and its
+-- whole bill an hour (`bill`), its kit's state (nil without a kit) with whether a line is connected
+-- and to what kind of source, whether the gas pass lists it, its overlays and its sprite, which
+-- picks the kit's and pipe's overlays (Sprites.gasKitFor).
 handler("generatorRead", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
@@ -41,14 +41,16 @@ handler("generatorRead", function(player, args)
     end
     local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
     return {
-        running = generator:isActivated(), fuel = generator:getFuel(), idle = generator:getBasePowerConsumption(), state = plain,
+        running = generator:isActivated(), fuel = generator:getFuel(), idle = generator:getBasePowerConsumption(),
+        bill = generator:getTotalPowerUsing(), state = plain,
         listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
         overlays = Helpers.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
     }
 end)
 
 -- Pours `args.pour` litres into the generator at x, y, z, as a player pouring petrol does (onto
--- whatever it shows), and switches it on or off (`args.running`), as a player does.
+-- whatever it shows), switches it on or off (`args.running`), as a player does, and has vanilla
+-- rebuild the bills of the generators reaching it (`args.rebuild`).
 handler("generatorSet", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
@@ -56,7 +58,11 @@ handler("generatorSet", function(player, args)
         generator:setFuel(math.min(generator:getMaxFuel(), generator:getFuel() + args.pour))
     end
     if args.running ~= nil then
-        generator:setActivated(args.running)
+        ISActivateGenerator.complete({ generator = generator, activate = args.running })
+    end
+    if args.rebuild then
+        -- What an appliance switching in its reach does: the generators reaching it rebuild their bill.
+        IsoGenerator.updateGenerator(generator:getSquare())
     end
     return {}
 end)
@@ -67,6 +73,12 @@ handler("generatorBurn", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
     generator:setFuel(generator:getFuel() - args.litres)
+    return {}
+end)
+
+-- Bills every running generator its share, as the ten-minute pass does (Payers.billGenerators).
+handler("billGenerators", function()
+    RenewableEnergy.Payers.billGenerators()
     return {}
 end)
 

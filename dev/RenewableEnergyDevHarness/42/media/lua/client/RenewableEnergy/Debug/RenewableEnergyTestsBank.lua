@@ -724,6 +724,155 @@ test("renewable_energy_bank_backup_load_kept_apart", {
     end,
 })
 
+-- Sharing a reach ------------------------------------------------------------------------------
+
+local function distanceSquared(a, b)
+    return IsoUtils.DistanceToSquared(a:getX(), a:getY(), b:getX(), b:getY())
+end
+
+-- A free square for a source that reaches `fridge` and lies farther from it than `nearer`.
+local function fartherSquare(self, fridge, nearer, opts)
+    local square = T.square(self, { indoors = opts.indoors, near = fridge, minDistance = opts.minDistance },
+        "a free square for a second source")
+    return T.need(self, square and distanceSquared(square, fridge) > distanceSquared(nearer, fridge)
+        and distanceSquared(square, fridge) <= SandboxVars.GeneratorTileRange ^ 2 and square,
+        "a square for a second source farther from the fridge than the first, in its reach")
+end
+
+-- What a fridge adds: to a bank's load in watts, and to a generator's bill in fuel an hour. The
+-- tests' area has appliances of its own, so each test reads what one fridge it places adds.
+local function fridgeW()
+    return T.applianceWatts({ "fridgeFreezer" })
+end
+
+local function fridgeFuel()
+    return fridgeW() / Specs.wattsPerFuel * SandboxVars.GeneratorFuelConsumption
+end
+
+-- Banks that carry the area's own appliances besides the fridges.
+local SHARING_PARTS = { CHARGED_BATTERY, CHARGED_BATTERY, INVERTER }
+
+local function passBoth(self, near, far, key)
+    T.batch(function()
+        T.bankPass(self, near, 0, { hours = 0.01 })
+        T.bankPass(self, far, 0, { hours = 0.01 })
+        T.step(function()
+            self[key] = { near = near.state.status.loadW, far = far.state.status.loadW,
+                ran = near.state.activated and far.state.activated }
+        end)
+    end)
+end
+
+-- Two switched-on banks reach a fridge: the nearer pays for it, and the other once the nearer stops.
+test("renewable_energy_bank_nearest_bank_pays_shared_appliance", {
+    run = function(self)
+        T.setGrid(self, false)
+        local near = T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1 })
+        local fridges = near and T.need(self, T.squares(self, 2, { indoors = true, near = near.square }), "two free indoor squares for fridges")
+        local farSquare = fridges and fartherSquare(self, fridges[1], near.square, { indoors = true, minDistance = 4 })
+        if not (farSquare and T.need(self, distanceSquared(farSquare, fridges[2]) > distanceSquared(near.square, fridges[2]),
+            "a square for the second bank farther from both fridges")) then return end
+        local far = T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1, square = farSquare })
+        if not far then return end
+        T.switchOn(self, near)
+        T.switchOn(self, far)
+        passBoth(self, near, far, "before")
+        T.step(function() T.placeTile(self, fridges[1], MINI_FRIDGE) end)
+        passBoth(self, near, far, "shared")
+        T.perform(self, "setBankOn", { bank = near.position, on = false })
+        T.bankPass(self, far, 0, { hours = 0.01 })
+        T.step(function() self.farAlone = far.state.status.loadW end)
+        T.step(function() T.placeTile(self, fridges[2], MINI_FRIDGE) end)
+        T.bankPass(self, far, 0, { hours = 0.01 })
+        T.step(function() self.farAloneWithFridge = far.state.status.loadW end)
+    end,
+    validate = function(self)
+        if not expect(self.before.ran and self.shared.ran, "a bank wasn't powering its squares while both were on") then return end
+        expectNear("watts the fridge added to the nearer bank", self.shared.near - self.before.near, fridgeW(), 0.01)
+        expectNear("watts the fridge added to the farther bank", self.shared.far - self.before.far, 0, 0.01)
+        expectNear("watts a fridge added to the farther bank once the nearer stopped",
+            self.farAloneWithFridge - self.farAlone, fridgeW(), 0.01)
+    end,
+})
+
+-- Two running generators reach a fridge: the nearer one's bill counts it and the farther one's
+-- doesn't, also after vanilla rebuilds both bills.
+test("renewable_energy_bank_nearest_generator_pays_shared_appliance", {
+    run = function(self)
+        T.setGrid(self, false)
+        local fridge = T.square(self, { indoors = true }, "a free indoor square for a fridge")
+        local nearSquare = fridge and T.square(self, { near = fridge }, "a free outdoor square for a generator")
+        local farSquare = nearSquare and fartherSquare(self, fridge, nearSquare, { minDistance = 6 })
+        if not farSquare then return end
+        local near = T.generator(self, { square = nearSquare, running = true })
+        local far = T.generator(self, { square = farSquare, running = true })
+        local function read(key)
+            T.readGenerator(self, near, "near" .. key)
+            T.readGenerator(self, far, "far" .. key)
+        end
+        T.server(self, "billGenerators", {})
+        read("Before")
+        T.step(function() T.placeTile(self, fridge, MINI_FRIDGE) end)
+        T.server(self, "billGenerators", {})
+        read("Shared")
+        T.setGenerator(self, near, { rebuild = true })
+        T.wait(10)
+        read("Rebuilt")
+    end,
+    validate = function(self)
+        local reads = self.reads
+        for _, when in ipairs({ "Shared", "Rebuilt" }) do
+            local after = when == "Shared" and "" or " after vanilla rebuilt the bills"
+            expectNear("fuel the fridge added to the nearer generator's bill" .. after,
+                reads["near" .. when].bill - reads.nearBefore.bill, fridgeFuel(), 0.0001)
+            expectNear("fuel the fridge added to the farther generator's bill" .. after,
+                reads["far" .. when].bill - reads.farBefore.bill, 0, 0.0001)
+        end
+    end,
+})
+
+-- A running generator and a switched-on bank reach a fridge nearer the bank: the bank pays for it,
+-- and once the bank is off the generator pays for one.
+test("renewable_energy_bank_and_generator_nearest_pays", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1 })
+        local fridges = bank and T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
+        local generatorSquare = fridges and fartherSquare(self, fridges[1], bank.square, { minDistance = 6 })
+        -- Out of the bank's backup reach, where it would carry the bank's load instead.
+        if not (generatorSquare and T.need(self, distanceSquared(generatorSquare, bank.square) > 18,
+            "a square for the generator out of the bank's backup reach")) then return end
+        T.switchOn(self, bank)
+        local generator = T.generator(self, { square = generatorSquare, running = true })
+        local function pass(key)
+            T.batch(function()
+                T.bankPass(self, bank, 0, { hours = 0.01 })
+                T.step(function() self[key] = { bankW = bank.state.status.loadW, ran = bank.state.activated } end)
+                T.server(self, "billGenerators", {})
+                T.readGenerator(self, generator, key)
+            end)
+        end
+        pass("before")
+        T.step(function() T.placeTile(self, fridges[1], MINI_FRIDGE) end)
+        pass("shared")
+        T.perform(self, "setBankOn", { bank = bank.position, on = false })
+        T.readGenerator(self, generator, "alone")
+        T.step(function() T.placeTile(self, fridges[2], MINI_FRIDGE) end)
+        T.setGenerator(self, generator, { rebuild = true })
+        T.wait(10)
+        T.readGenerator(self, generator, "aloneWithFridge")
+    end,
+    validate = function(self)
+        local reads = self.reads
+        if not expect(self.before.ran and self.shared.ran, "the bank wasn't powering its squares while on") then return end
+        expectNear("watts the fridge added to the bank", self.shared.bankW - self.before.bankW, fridgeW(), 0.01)
+        expectNear("fuel the fridge added to the generator's bill while the bank ran",
+            reads.shared.bill - reads.before.bill, 0, 0.0001)
+        expectNear("fuel a fridge added to the generator's bill once the bank was off",
+            reads.aloneWithFridge.bill - reads.alone.bill, fridgeFuel(), 0.0001)
+    end,
+})
+
 -- Commands and permissions ---------------------------------------------------------------------
 
 -- A command from a timed action's complete() survives forged arguments and changes nothing for

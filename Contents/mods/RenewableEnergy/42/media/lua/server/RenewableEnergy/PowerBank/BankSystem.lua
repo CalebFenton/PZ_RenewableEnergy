@@ -338,6 +338,8 @@ function BankSystem.updateAll()
     for i = 1, self:getLuaObjectCount() do
         BankSystem.updateBank(self:getLuaObjectByIndex(i), contexts)
     end
+    -- Banks that came on or went off change what each generator nearby pays.
+    RenewableEnergy.Payers.billGenerators()
 end
 
 SGlobalObjectSystem.RegisterSystemClass(BankSystem)

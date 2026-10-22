@@ -149,7 +149,8 @@ handler("placePanel", function(player, args, defer)
 end)
 
 -- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
--- unless given), running if `args.running`, with a failsafe tile beside it if `args.failsafe`.
+-- unless given), started as a player starts one if `args.running`, with a failsafe tile beside it
+-- if `args.failsafe`.
 -- Removed, switched off first, when the test ends.
 handler("placeGenerator", function(_, args, defer)
     local square = squareAt(args)
@@ -182,7 +183,7 @@ handler("placeGenerator", function(_, args, defer)
         end
     end
     if args.running then
-        generator:setActivated(true)
+        ISActivateGenerator.complete({ generator = generator, activate = true })
     end
     return {}
 end)
@@ -440,14 +441,16 @@ end)
 
 -- Loads -------------------------------------------------------------------------------------------
 
--- What the load scan of the bank on the square at `args` finds: its watts and the count of each
--- kind.
+-- What the load scan of the bank on the square at `args` finds, as the payer there: its watts and
+-- the count of each kind.
 handler("scanLoad", function(_, args)
     local square = squareAt(args)
     if not square then
         return nil, "the bank's square loaded on the server"
     end
-    local load = RenewableEnergy.Loads.scan(square)
+    local Payers = RenewableEnergy.Payers
+    local payer = { x = args.x, y = args.y, z = args.z, key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z) }
+    local load = RenewableEnergy.Loads.scan(square, payer, Payers.running())
     local counts = {}
     for name, kind in pairs(load.kinds) do
         counts[name] = kind.count

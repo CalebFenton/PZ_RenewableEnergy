@@ -25,6 +25,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/GasLine/GasLines"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
+local Payers = RenewableEnergy.Payers
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
@@ -383,6 +384,7 @@ function Bank:findGenerator()
             local square = getSquare(x, y, self.z)
             local generator = square and square:getGenerator()
             if generator and generator:isConnected() and not PowerBank.isBank(generator) then
+                Payers.track(generator)
                 local failsafe = RenewableEnergy.findObjectOn(square, isFailsafe) ~= nil
                 local distance = IsoUtils.DistanceToSquared(x, y, self.x, self.y)
                 if not best or (failsafe and not bestFailsafe) or (failsafe == bestFailsafe and distance < bestDistance) then
@@ -439,7 +441,7 @@ function Bank:backupCarriesLoad()
     return self.generator and self.generator.running
 end
 
---- Measure what the bank powers, and what powers the bank's square besides it. Unloaded, the
+--- Measure what the bank pays for, and what powers the bank's square besides it. Unloaded, the
 --- last measurement stands, until the grid shuts down. A bank that is off and has no charger
 --- needs neither, and skips the scan of its whole reach. Returns the running generators that
 --- reach the bank.
@@ -450,35 +452,44 @@ function Bank:measure()
         return {}
     end
     self.gridPowered = square:hasGridPower()
-    local load = (self.on or self:chargerW() > 0) and Loads.scan(square) or Loads.new()
+    local load = (self.on or self:chargerW() > 0) and Loads.scan(square, Payers.ofBank(self), Payers.running())
+        or Loads.new()
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)
     return load.generators
 end
 
-local function fueled(generators)
+-- The nearest of `generators` with fuel to `bank`.
+local function fueled(bank, generators)
+    local best, bestDistance
     for _, generator in ipairs(generators) do
         if generator:getFuel() > 0 then
-            return generator
+            local dx, dy, dz = generator:getX() - bank.x, generator:getY() - bank.y, generator:getZ() - bank.z
+            local distance = dx * dx + dy * dy + dz * dz
+            if not best or distance < bestDistance then
+                best, bestDistance = generator, distance
+            end
         end
     end
-    return nil
+    return best
 end
 
---- What the chargers charge from: "grid", "generator" (a running generator other than a bank
---- whose reach covers the bank, which burns fuel for them), or false. Returns the watts they
---- put in over the pass's `hours`: no more than `roomWh`, what the batteries can still take
---- after the sun and the load, and from a generator no more than its fuel pays for, which is
---- all the fuel it burns. Unloaded, only the grid carries on: the generator and its fuel are
---- out of reach.
+--- What the chargers charge from: "grid", "generator" (the nearest running generator other than a
+--- bank whose reach covers the bank, which burns fuel for them; `chargingFrom` is its place), or
+--- false. Returns the watts they put in over the pass's `hours`: no more than `roomWh`, what the
+--- batteries can still take after the sun and the load, and from a generator no more than its
+--- fuel pays for, which is all the fuel it burns. Unloaded, only the grid carries on: the
+--- generator and its fuel are out of reach.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
     if self:getSquare() then
-        generator = not self.gridPowered and fueled(generators)
+        generator = not self.gridPowered and fueled(self, generators)
         self.chargeSource = (self.gridPowered and "grid") or (generator and "generator") or false
     elseif self.chargeSource == "generator" then
         self.chargeSource = false
     end
+    self.chargingFrom = generator and RenewableEnergy.PlaceTracker.key(generator:getX(), generator:getY(), generator:getZ())
+        or nil
     if not self.chargeSource or hours <= 0 or roomWh <= 0 then
         return 0
     end
@@ -534,6 +545,8 @@ function Bank:switchGenerator()
         if building and building:isToxic() ~= wasToxic then
             building:setToxic(wasToxic)
         end
+        -- The generators sharing its reach pay for more or less now.
+        Payers.billGenerators()
     elseif run then
         -- Chunks that loaded in reach since the last pass get their power here, which
         -- IsoGenerator.update does for generators it still processes.

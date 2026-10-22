@@ -285,10 +285,11 @@ function T.readGenerator(self, generator, label)
     T.read(self, "generatorRead", T.at(generator), label)
 end
 
---- Queues pouring `fields.pour` litres into the generator and switching it (`fields.running`).
+--- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and
+--- having vanilla rebuild the bills of the generators reaching it (`fields.rebuild`).
 function T.setGenerator(self, generator, fields)
     local args = T.at(generator)
-    args.pour, args.running = fields.pour, fields.running
+    args.pour, args.running, args.rebuild = fields.pour, fields.running, fields.rebuild
     T.server(self, "generatorSet", args)
 end
 

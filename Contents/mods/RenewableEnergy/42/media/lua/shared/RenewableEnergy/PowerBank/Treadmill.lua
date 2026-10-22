@@ -136,4 +136,11 @@ function Treadmill.isDrawing(object)
     return drawing[object] ~= nil
 end
 
+--- Calls `fn(tile)` for each tile a run draws power through now. Authority only.
+function Treadmill.eachDrawing(fn)
+    for tile in pairs(drawing) do
+        fn(tile)
+    end
+end
+
 return Treadmill

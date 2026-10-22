@@ -208,6 +208,8 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 - Squares stay powered after a running generator is removed, until `setSurroundingElectricity()` runs on it switched off (`IsoChunk.isGeneratorPoweringSquare`). Switch it off before it leaves the square.
 - `IsoGenerator.isPoweringSquare` reads static copies of the GeneratorTileRange and GeneratorVerticalPowerRange options that only constructing a generator sets (`IsoGenerator.java:107-113`), so before the first generator, or after the options change, they are stale; read `SandboxVars` instead.
 - `IsoGenerator.update()` is what acts on `chunkLoaded`'s request to repower squares in newly loaded chunks; a generator taken out of the cell's process list has to call `setSurroundingElectricity()` itself.
+- Every running generator bills itself for every powered appliance in its reach, whatever else reaches it (`setSurroundingElectricity`). `setTotalPowerUsing` sticks only until that rebuilds the bill, which any appliance switching in reach (`IsoGenerator.updateGenerator`) or chunk loading nearby (`chunkLoaded`) sets off; `update()` burns the bill at the hour, before it rebuilds.
+- A generator dropped from the hands (`IsoGridSquare.AddWorldInventoryItem`) fires no Lua event. A player starting one runs `ISActivateGenerator:complete`.
 - `setConnected`, `setCondition` and `setFuel` sync on the server. Call them after `transmitCompleteItemToClients()`, because a sync names the object by its index on the square.
 - An overlay changed with `addAttachedAnimSpriteByName` reaches clients only through `transmitUpdatedSpriteToClients()`.
 - Vanilla's generator context menu shows on any `IsoGenerator`, so hide it on banks: its **Take Generator** would hand back a `Base.Generator`.
