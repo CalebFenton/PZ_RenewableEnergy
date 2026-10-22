@@ -182,9 +182,9 @@ function Helpers.recordAt(args)
 end
 
 --- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
---- "barrel.MetalDrum", "standard") on `square`, as the build menu does (ISBuildIsoEntity:create): a
---- thumpable with the tile's entity, then the entity's OnCreate. Sends nothing to clients. Returns
---- the thumpable, or nil and what is missing.
+--- "barrel.MetalDrum", "standard") on `square` as the build menu does, through the builder rural
+--- finds use (RuralFinds.build), which sends it to the clients. Returns the thumpable, or nil and
+--- what is missing.
 function Helpers.placeRecord(kind, tile, square)
     local spec = KINDS[kind]
     if not (spec and square) then
@@ -197,11 +197,7 @@ function Helpers.placeRecord(kind, tile, square)
     if type(sprite) ~= "string" then
         return nil, "the " .. kind .. " tile " .. tostring(tile)
     end
-    local thumpable = IsoThumpable.new(getCell(), square, sprite, false, nil)
-    GameEntityFactory.CreateIsoObjectEntity(thumpable, RenewableEnergy.tileEntity(sprite), true)
-    square:AddSpecialObject(thumpable)
-    spec.system().OnCreate({ thumpable = thumpable })
-    return thumpable
+    return RenewableEnergy.RuralFinds.build(square, sprite, spec.system().OnCreate)
 end
 
 --- The record of kind `kind` as plain values: its saved fields, its kind's extras and, while its
