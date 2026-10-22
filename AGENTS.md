@@ -16,10 +16,8 @@
 
 ## STOP
 
-- Debug and test code under `Contents/`: it is published. Put it in the dev mod.
 - Hand edits to generated files; the next run overwrites them. `art/models/make.sh` builds every model, icon and tile from `art/models/items.py` (parts), `art/models/tiles.py` (tile layout), `tools/make_tiles.py` (tile properties) and `art/models/mod_icon.py` (mod list icon); edit those, never the models, textures, tiles, depth maps, `renewable_energy.tiles`, `renewable_energy.pack` or `42/renewable_energy_icon.png`. Edit `art/promo/compose.py` and `dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevPromo.lua`, never the images they produce, `42/poster.png` and `preview.png` among them.
 - Hand edits to `workshop.txt`'s description: `dev/workshop-txt.sh` writes it from `README.md`.
-- New `CLAUDE.md` files: the `AGENTS.md` files hold the agent instructions.
 
 ## Read when needed
 
