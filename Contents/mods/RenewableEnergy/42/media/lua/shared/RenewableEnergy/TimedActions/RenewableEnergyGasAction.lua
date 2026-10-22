@@ -155,8 +155,13 @@ end
 -- new() in order (NetTimedAction). `feature` is a key of FEATURES and `job` one of its jobs;
 -- `object` the tile worked at; `with` what the job works with, if anything: the inventory item it
 -- fills or uses (a bag, a tank, a drain container), or a second world object (Connect Gas Line's
--- source).
+-- source). Returns nil for a feature or job there is none of: those come from the client, every
+-- later step looks them up, and the server turns down a request whose new() gives no action
+-- (NetTimedActionPacket.processServer).
 function Action:new(character, feature, job, object, with)
+    if not (FEATURES[feature] and rowOf(feature, job)) then
+        return nil
+    end
     local o = ISBaseTimedAction.new(self, character)
     o.feature = feature
     o.job = job

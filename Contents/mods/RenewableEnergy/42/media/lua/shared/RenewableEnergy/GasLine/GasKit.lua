@@ -32,8 +32,9 @@ GasKit.PIPE = "Base.MetalPipe"
 GasKit.REACH = 20
 GasKit.HOSE_SQUARES = 5
 
--- Litres an empty-tanked generator on gas shows, enough for vanilla to keep it running between
--- passes, after a long absence too.
+-- Litres an empty-tanked generator on gas shows, so vanilla starts it and bills it from them. A bill
+-- that takes them all (a long absence, a high GeneratorFuelConsumption) stops it; the next pass
+-- bills those hours to the gas and starts it again (GasLines.run).
 GasKit.PHANTOM_FUEL = 2
 -- A generator carries this many watts on gas, against what vanilla bills (Specs.wattsPerFuel).
 -- Sized so clean gas carries a whole house with a bank charging off the generator, while a
@@ -60,7 +61,8 @@ end
 
 --- The generator's gas state, or nil without a kit: { kit, source = { x, y, z, kind } or nil,
 --- line = { item, count } (what the line took) or nil, mode = "gas" or "petrol", tank, set, onGas,
---- watts, stalled, outOfGas }.
+--- watts, stalled, outOfGas, and while it runs on gas billedHour and billLitres, vanilla's last bill
+--- as the gas line sees it (GasLines.run) }.
 function GasKit.stateOf(generator)
     local state = GasKit.isGenerator(generator) and generator:getModData()[GasKit.MOD_DATA]
     return state and state.kit and state or nil

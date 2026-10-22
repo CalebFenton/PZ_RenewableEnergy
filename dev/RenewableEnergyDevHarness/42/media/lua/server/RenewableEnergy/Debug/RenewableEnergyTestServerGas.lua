@@ -20,10 +20,11 @@ local function generatorOn(args)
     return generator
 end
 
--- The generator at x, y, z: whether it runs, its fuel, vanilla's idle bill an hour (`idle`) and its
--- whole bill an hour (`bill`), its kit's state (nil without a kit) with whether a line is connected
--- and to what kind of source, whether the gas pass lists it, its overlays and its sprite, which
--- picks the kit's and pipe's overlays (Sprites.gasKitFor).
+-- The generator at x, y, z: whether it runs, its fuel and condition, vanilla's idle bill an hour
+-- (`idle`) and its whole bill an hour (`bill`), its kit's state (nil without a kit) with whether a
+-- line is connected and to what kind of source, whether the gas pass lists it, its overlays and its
+-- sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor), whether its building is
+-- toxic, and the world hour on the server as it was read (`hours`).
 handler("generatorRead", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
@@ -40,11 +41,13 @@ handler("generatorRead", function(player, args)
         plain.sourceKind = state.source and state.source.kind
     end
     local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
+    local building = generator:getSquare():getBuilding()
     return {
         running = generator:isActivated(), fuel = generator:getFuel(), idle = generator:getBasePowerConsumption(),
-        bill = generator:getTotalPowerUsing(), state = plain,
+        bill = generator:getTotalPowerUsing(), condition = generator:getCondition(), state = plain,
         listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
         overlays = Helpers.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
+        toxic = building ~= nil and building:isToxic(), hours = getGameTime():getWorldAgeHours(),
     }
 end)
 
@@ -76,10 +79,50 @@ handler("generatorBurn", function(player, args)
     return {}
 end)
 
+-- Takes away, when the test ends, whatever generator stands at x, y, z then: one whose chunk
+-- unloaded and loaded meanwhile is a new copy, which the generator fixture's own removal misses.
+handler("generatorTrack", function(player, args, defer)
+    defer(function()
+        local generator = generatorOn(args)
+        if generator then
+            -- Squares stay powered by a running generator that leaves them.
+            if generator:isActivated() then
+                generator:setActivated(false)
+            end
+            generator:getSquare():transmitRemoveItemFromSquare(generator)
+        end
+    end)
+    return {}
+end)
+
 -- Bills every running generator its share, as the ten-minute pass does (Payers.billGenerators).
 handler("billGenerators", function()
     RenewableEnergy.Payers.billGenerators()
     return {}
+end)
+
+-- Sets the wear chance of the item script of the generator at x, y, z to one in `args.oneIn` an
+-- hour it runs (its ConditionLowerChanceOneIn), until the test ends: at one in one every hour's
+-- roll comes up, so what a pass wears is certain.
+handler("generatorWearChance", function(player, args, defer)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    local item = getScriptManager():getItem(generator:getGeneratorItemType())
+    if not item then return nil, "the item script of the generator at " .. args.x .. "," .. args.y end
+    local was = item:getConditionLowerChance()
+    item:setConditionLowerChance(args.oneIn)
+    defer(function() item:setConditionLowerChance(was) end)
+    return {}
+end)
+
+-- Builds the gas action of `args.feature` and `args.job` at the generator at x, y, z as the server
+-- builds the one a client asks for (NetTimedAction.parse calls the class's new, the class first).
+-- Answers whether that gave an action.
+handler("gasActionFrom", function(player, args)
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    local action = RenewableEnergyGasAction.new(RenewableEnergyGasAction, player, args.feature, args.job, generator)
+    return { built = action ~= nil }
 end)
 
 -- Sets the last pass of the kitted generator at x, y, z `args.hours` ago, as though that time had

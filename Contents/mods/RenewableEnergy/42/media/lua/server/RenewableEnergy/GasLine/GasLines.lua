@@ -15,12 +15,14 @@ require "RenewableEnergy/Materials"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/PowerBank/Loads"
+require "RenewableEnergy/Fumes"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasLines = {}
 RenewableEnergy.GasLines = GasLines
 
 local GasKit, Gasifier, Sprites, Materials = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites, RenewableEnergy.Materials
+local Fumes = RenewableEnergy.Fumes
 
 -- Global ModData: kitted generators by "x,y,z", each { x, y, z, source }; the source is kept so a
 -- gasifier's pipe can come off after the generator is gone.
@@ -29,9 +31,8 @@ GasLines.MOD_DATA = "RenewableEnergyGasKits"
 -- by vanilla to its fuel when it loads (IsoGenerator.update), and the next pass bills that to the gas.
 local LONGEST_PASS = 24
 local EPSILON = 1e-4
--- Vanilla's generator wear: each hour running, one chance in this many of losing 1 or 2 condition
--- (IsoGenerator.update, the item's ConditionLowerChanceOneIn). Dirty gas adds chances on top.
-local WEAR_ONE_IN = 30
+-- Vanilla's wear chance for a generator whose item script it can't find (IsoGenerator.update).
+local NO_SCRIPT_ONE_IN = 30
 
 local function keyOf(object)
     return object:getX() .. "," .. object:getY() .. "," .. object:getZ()
@@ -91,6 +92,14 @@ local function pipe(generator, source)
     end
 end
 
+-- Forgets what the line last measured and why it stopped, once nothing runs on its gas to say it of:
+-- the line is cut, or the generator switched to petrol.
+local function forgetGas(state)
+    state.stalled = false
+    state.outOfGas = false
+    state.watts = nil
+end
+
 -- Cuts the line, a pipe at both ends, and forgets what it was waiting for. Returns what the line
 -- took ({ item, count }), or nil.
 local function cutLine(generator, state)
@@ -101,9 +110,17 @@ local function cutLine(generator, state)
     local line = state.line
     setSource(generator, state, nil)
     state.line = nil
-    state.stalled = false
-    state.outOfGas = false
+    forgetGas(state)
     return line
+end
+
+-- Stops the running generator. Vanilla clears its building's toxicity as it stops one indoors
+-- (IsoGenerator.setActivated), whatever else fumes there, so the mod's own fumes go back at once.
+local function stop(generator)
+    if generator:isActivated() then
+        generator:setActivated(false)
+        Fumes.restore(generator:getSquare():getBuilding())
+    end
 end
 
 --- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and the chargers
@@ -146,6 +163,13 @@ local function settleFuel(generator, state, onGas)
     state.onGas = onGas
 end
 
+-- Vanilla's generator wear: each hour running, one chance in this many of losing 1 or 2 condition
+-- (IsoGenerator.update, the generator item's ConditionLowerChanceOneIn).
+local function wearOneIn(generator)
+    local item = getScriptManager():getItem(generator:getGeneratorItemType())
+    return item and item:getConditionLowerChance() or NO_SCRIPT_ONE_IN
+end
+
 -- Dirty gas (`factor` times vanilla's wear) wears a running generator more over `hours`, rolled
 -- as vanilla rolls its own, once an hour.
 local function wear(generator, state, factor, hours)
@@ -156,7 +180,7 @@ local function wear(generator, state, factor, hours)
     state.wearHours = (state.wearHours or 0) + hours
     while state.wearHours >= 1 do
         state.wearHours = state.wearHours - 1
-        if ZombRandFloat(0, 1) < (factor - 1) / WEAR_ONE_IN then
+        if ZombRandFloat(0, 1) < (factor - 1) / wearOneIn(generator) then
             generator:setCondition(generator:getCondition() - ZombRand(1, 3))
         end
     end
@@ -168,9 +192,49 @@ local function burnedSince(generator, state)
     return state.onGas and math.max(0, (state.set or 0) - generator:getFuel()) or 0
 end
 
+-- Litres an hour vanilla bills the running generator (IsoGenerator.update): getTotalPowerUsing is
+-- its bill for what it powers with the GeneratorFuelConsumption option already applied.
+local function hourlyLitres(generator)
+    return generator:getTotalPowerUsing()
+end
+
+-- Whether vanilla stopped the generator for fuel: its hourly bill took all it showed. Every pass on
+-- gas leaves at least PHANTOM_FUEL, and neither a stall nor a player switching it off empties it,
+-- so on gas only that bill does, an hour's, or every hour of a long absence at once when its chunk
+-- loads (IsoGenerator.update). One worn out by the same bill stays stopped.
+local function stoppedForFuel(generator, state)
+    return state.onGas and not state.stalled and not generator:isActivated() and generator:getFuel() <= EPSILON
+        and generator:getCondition() > 0
+end
+
+-- Litres the generator would have burned through the bill that stopped it: an hour's bill for each
+-- whole hour since its last, as vanilla bills them, at its bill when a pass last saw it run. Before
+-- any pass saw it run, the pass's `hours` at its bill now.
+local function dryBill(generator, state, hours)
+    if not state.billedHour then
+        return hours * hourlyLitres(generator)
+    end
+    return (math.floor(getGameTime():getWorldAgeHours()) - state.billedHour) * state.billLitres
+end
+
+-- Keeps track of vanilla's last bill of the generator running on gas, which Lua can't read: fuel
+-- taken since the last pass (vanilla's bill, or a bank charging from it) means this hour's came,
+-- and a pass that comes between a new hour and vanilla's bill of it keeps the last.
+local function trackBill(generator, state, litres)
+    if generator:isActivated() and state.onGas then
+        if not state.billedHour or litres > 0 then
+            state.billedHour = math.floor(getGameTime():getWorldAgeHours())
+        end
+        state.billLitres = hourlyLitres(generator)
+    else
+        state.billedHour, state.billLitres = nil, nil
+    end
+end
+
 --- Runs one kitted generator for `hours`: its source pays for the fuel it burned on gas, it stalls
---- over what the source carries until the load fits again, stops when the gas runs out. A line
---- whose source is gone is lost with it, on petrol too: nothing comes back from it.
+--- over what the source carries until the load fits again, stops when the gas runs out. Stopped by
+--- vanilla for fuel while on gas, it ran those hours on gas: the source pays for them and it starts
+--- again. A line whose source is gone is lost with it, on petrol too: nothing comes back from it.
 function GasLines.run(generator, state, hours)
     local source = sourceOf(state.source)
     if state.source and not source then
@@ -181,19 +245,26 @@ function GasLines.run(generator, state, hours)
     end
     local hasGas = source and source:canSupply()
     local litres = burnedSince(generator, state)
+    local ranDry = stoppedForFuel(generator, state)
+    if ranDry then
+        litres = math.max(litres, dryBill(generator, state, hours))
+    end
     if hasGas and litres > 0 then
         hasGas = source:supply(litres)
         source:afterChange()
     end
-    if source and state.onGas and not hasGas and generator:isActivated() then
-        generator:setActivated(false)
+    if ranDry and hasGas then
+        generator:setActivated(true)
+    end
+    if source and state.onGas and not hasGas and (ranDry or generator:isActivated()) then
+        stop(generator)
         state.outOfGas = true
     end
     if generator:isActivated() and state.onGas then
         local watts = GasLines.loadOf(generator)
         state.watts = watts
         if watts > (source and source:capW() or GasKit.CAP_W) then
-            generator:setActivated(false)
+            stop(generator)
             state.stalled = true
         elseif source then
             wear(generator, state, source:wearFactor(), hours)
@@ -213,6 +284,7 @@ function GasLines.run(generator, state, hours)
         state.watts = nil
     end
     settleFuel(generator, state, hasGas or false)
+    trackBill(generator, state, litres)
 end
 
 -- Runs `generator` for the time since it last ran, at most LONGEST_PASS.
@@ -263,8 +335,8 @@ local function disconnect(character, generator, state)
         RenewableEnergy.giveItems(character, line.item, line.count)
     end
     settleFuel(generator, state, false)
-    if generator:isActivated() and state.mode ~= "petrol" then
-        generator:setActivated(false)
+    if state.mode ~= "petrol" then
+        stop(generator)
     end
 end
 
@@ -302,7 +374,7 @@ local DO = {
     end,
     [GasKit.TO_PETROL] = function(character, generator, state, source, row)
         state.mode = row.mode
-        state.stalled = false
+        forgetGas(state)
         settleFuel(generator, state, false)
     end,
 }

@@ -1,10 +1,14 @@
 -- Buildings the mod's objects fill with fumes (a sour digester, a lit gasifier), on the authority.
 --
--- Toxicity belongs to the whole building, isn't saved, and any vanilla generator there sets it
--- again within the hour while it runs. So each source says every pass whether it fumes, the
--- building is toxic while any does, and it is cleared only when the last one stops.
+-- Toxicity belongs to the whole building and isn't saved. Vanilla writes it too: a generator sets
+-- it as it starts indoors and clears it as it stops (IsoGenerator.setActivated), and while it runs
+-- sets it again each hour (IsoGenerator.update). So each source says every pass whether it fumes,
+-- the building is toxic while any does, and it is cleared only when the last one stops with no
+-- generator running inside.
 
 if isClient() then return end
+
+require "RenewableEnergy/PowerBank/Payers"
 
 RenewableEnergy = RenewableEnergy or {}
 local Fumes = {}
@@ -24,6 +28,19 @@ local function stillFumed(building)
     return false
 end
 
+-- Whether a generator runs inside `building`, which vanilla keeps toxic itself.
+local function generatorRunsIn(building)
+    local id = building:getID()
+    for _, source in ipairs(RenewableEnergy.Payers.running()) do
+        local square = source.generator and source.generator:getSquare()
+        local inside = square and not square:has(IsoFlagType.exterior) and square:getBuilding()
+        if inside and inside:getID() == id then
+            return true
+        end
+    end
+    return false
+end
+
 --- Says whether the source `key` fumes now, in `building`. A source that stops needs no building;
 --- one outdoors, or whose building isn't loaded, doesn't start.
 function Fumes.set(key, building, isFuming)
@@ -35,9 +52,17 @@ function Fumes.set(key, building, isFuming)
         end
     elseif not isFuming and was then
         fuming[key] = nil
-        if not stillFumed(was) then
+        if not stillFumed(was) and not generatorRunsIn(was) then
             was:setToxic(false)
         end
+    end
+end
+
+--- Makes `building` toxic again if a source still fumes in it, after vanilla cleared it as a
+--- generator there stopped. Nothing for nil, outdoors.
+function Fumes.restore(building)
+    if building and not building:isToxic() and stillFumed(building) then
+        building:setToxic(true)
     end
 end
 
