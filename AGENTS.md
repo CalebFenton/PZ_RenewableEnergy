@@ -3,8 +3,9 @@
 ## Commands
 
 - After every change: `dev/static-check.sh`. It compiles every Lua file with the game's compiler and cross-checks scripts, translations, textures and API names in seconds. After a change to `Contents/`, also run `dev/validate-server.sh`.
-- While you iterate: `dev/run-debug-client.sh --test --changed --stay`, adding `--mp` when the change touches what the server does or sends.
-- Before committing: `dev/run-debug-client.sh --test` and `dev/run-debug-client.sh --test --mp`.
+- In-game tests cost about 25 seconds a run before any test starts (60 with `--mp`), so batch them: make a batch of changes, committing each logical change on its own, then run `dev/run-debug-client.sh --test --changed` once, adding `--mp` when the batch touches what the server does or sends. Don't run the game after each edit.
+- Before pushing or merging a batch: `dev/run-debug-client.sh --test` and `dev/run-debug-client.sh --test --mp`.
+- A failed test's report lists the batch's changed files that reach it and the commits that changed them; rerun just that test (`TESTS=<name>`) at those commits to find the one that broke it. When agents work in parallel, they don't run the game; whoever merges their work runs the batch.
 
 ## Rules
 
