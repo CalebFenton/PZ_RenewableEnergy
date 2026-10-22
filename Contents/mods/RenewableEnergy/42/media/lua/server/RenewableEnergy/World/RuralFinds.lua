@@ -10,14 +10,16 @@ require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/Biogas/DigesterSystem"
 require "RenewableEnergy/WoodGas/GasifierSystem"
 require "RenewableEnergy/World/WorldSpawns"
+require "RenewableEnergy/World/BuildingWatch"
 require "RandomizedWorldContent/StoryTable_Initialization"
 
 -- Worn homestead installations left by rural buildings: an old wind charger by a barn, a barrel
 -- digester by livestock buildings, a primitive gasifier by a hunting shack. Each is built the way
 -- the build menu builds it, then put in worn states the mod already has, so the player repairs it
 -- with the existing jobs. Each qualifying building is rolled once, as GardenLights rolls houses:
--- the first time its chunk loads, once the squares around it are loaded, kept in global ModData.
--- The odds follow the Solar Sites option (0 turns them off).
+-- when its chunk first loads and the squares around it with it (BuildingWatch), kept in global
+-- ModData. The odds follow the Solar Sites option (0 turns them off). A solar site's find counts
+-- as the find of the buildings it stands by, so they aren't rolled for a second one.
 --
 -- Also adds RE's books and gadgets to vanilla's barn and survivalist camp story clutter.
 
@@ -26,6 +28,7 @@ local RuralFinds = {}
 RenewableEnergy.RuralFinds = RuralFinds
 
 local Sprites, Wind, Gasifier = RenewableEnergy.Sprites, RenewableEnergy.Wind, RenewableEnergy.Gasifier
+local BuildingWatch = RenewableEnergy.BuildingWatch
 
 -- Global ModData: by building key, the finds each rolled building got ({ [kind] = true }).
 RuralFinds.MOD_DATA = "RenewableEnergyRuralFinds"
@@ -34,25 +37,16 @@ local SITES_DEFAULT = 75
 -- Chance the hunting shack also holds a FEMA pamphlet.
 RuralFinds.PAMPHLET_CHANCE = 0.5
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
--- Squares out from a building's bounds a find may stand on, and that must be loaded first.
-RuralFinds.REACH = 4
--- The highest level looked at for a building's rooms: a deer stand's one room is on level 1.
+-- The highest level looked at for a building's containers: a deer stand's one room is on level 1.
 local HIGHEST = 1
-
--- Building key -> the building waiting for its surroundings to load.
-local pending = {}
 
 local function store()
     return ModData.getOrCreate(RuralFinds.MOD_DATA)
 end
 
-function RuralFinds.buildingKey(def)
-    return def:getX() .. "," .. def:getY()
-end
-
 --- The finds a building has, or nil if it was never rolled.
 function RuralFinds.rolled(def)
-    return store()[RuralFinds.buildingKey(def)]
+    return store()[BuildingWatch.key(def)]
 end
 
 local function hasRoom(def, names)
@@ -67,16 +61,11 @@ end
 
 -- Squares
 
-local function isStreet(square)
-    local name = Sprites.nameOf(square:getFloor()) or ""
-    return string.find(name, "^floors_exterior_street") ~= nil or string.find(name, "^blends_street") ~= nil
-end
-
--- Open ground outdoors with nothing on it: off the road, not in water or a tree.
-local function canStand(square)
+--- Open ground outdoors with nothing on it: off the road, not in water or a tree.
+function RuralFinds.canStand(square)
     return square ~= nil and square:getZ() == 0 and square:getBuilding() == nil and square:isOutside()
         and square:hasFloor() and square:isFree(false) and not square:HasTree()
-        and not square:getProperties():has(IsoFlagType.water) and not isStreet(square)
+        and not square:getProperties():has(IsoFlagType.water) and not BuildingWatch.isStreet(square)
         and square:getSpecialObjects():size() == 0
 end
 
@@ -94,36 +83,25 @@ local function inTheOpen(square)
     return true
 end
 
--- A random square within `reach` of the building's bounds that `fits`, or nil.
-local function squareBy(def, reach, fits)
-    local found = {}
-    for x = def:getX() - reach, def:getX2() + reach - 1 do
-        for y = def:getY() - reach, def:getY2() + reach - 1 do
-            local square = getSquare(x, y, 0)
-            if canStand(square) and (not fits or fits(square)) then
-                table.insert(found, square)
-            end
-        end
-    end
-    return #found > 0 and found[ZombRand(#found) + 1] or nil
-end
-
 -- Building
 
--- Builds the entity of the tile `sprite` (RenewableEnergy.tileEntity) as ISBuildIsoEntity:create
--- does: a thumpable with its entity's components on the square, then the entity's OnCreate.
--- `wear(thumpable)` sets its worn state before the clients get it.
-local function build(square, sprite, onCreate, wear)
+--- Builds the entity of the tile `sprite` (RenewableEnergy.tileEntity) as ISBuildIsoEntity:create
+--- does: a thumpable with its entity's components on the square, then the entity's OnCreate, and
+--- sends it to the clients. `wear(thumpable)`, if given, sets its worn state before they get it.
+function RuralFinds.build(square, sprite, onCreate, wear)
     local thumpable = IsoThumpable.new(square:getCell(), square, sprite, false, nil)
     GameEntityFactory.CreateIsoObjectEntity(thumpable, RenewableEnergy.tileEntity(sprite), true)
     square:AddSpecialObject(thumpable)
     thumpable:setExplored(true)
     onCreate({ thumpable = thumpable })
-    wear(thumpable)
+    if wear then
+        wear(thumpable)
+    end
     square:RecalcAllWithNeighbours(true)
     thumpable:transmitCompleteItemToClients()
     return thumpable
 end
+local build = RuralFinds.build
 
 local function randomOf(entries)
     local list = {}
@@ -171,12 +149,14 @@ local LIVESTOCK = {
 }
 
 --- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), whether a
---- building `qualifies`, where it stands, and `place(square, def)`, which builds it worn.
+--- building `qualifies`, how many squares out from the building it stands (`reach`) on open ground
+--- that also `fits`, if given, and `place(square, def)`, which builds it worn.
 RuralFinds.FINDS = {
     wind = {
         odds = 15,
         qualifies = function(def) return hasRoom(def, FARM) end,
-        square = function(def) return squareBy(def, RuralFinds.REACH, inTheOpen) end,
+        reach = BuildingWatch.REACH,
+        fits = inTheOpen,
         -- The old farm wind charger, its wooden blades long broken and its brake set.
         place = function(square)
             return build(square, randomOf(Sprites.windPropeller.wood),
@@ -189,7 +169,7 @@ RuralFinds.FINDS = {
     digester = {
         odds = 20,
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
-        square = function(def) return squareBy(def, 1) end,
+        reach = 1,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
         place = function(square)
             local System = RenewableEnergy.DigesterSystem
@@ -215,7 +195,7 @@ RuralFinds.FINDS = {
             end
             return rooms:size() > 0
         end,
-        square = function(def) return squareBy(def, 1) end,
+        reach = 1,
         -- Put away dirty: its filter packing all tarred and its ash pit full.
         place = function(square, def)
             local System = RenewableEnergy.GasifierSystem
@@ -242,6 +222,31 @@ RuralFinds.FINDS = {
 }
 local KINDS = { "wind", "digester", "gasifier" }
 
+--- Whether the find `kind` may stand on the square: open ground that fits it.
+function RuralFinds.canPlace(kind, square)
+    local find = RuralFinds.FINDS[kind]
+    return RuralFinds.canStand(square) and (not find.fits or find.fits(square))
+end
+
+-- How far outside the building's bounds the square at x, y is, in squares (0 inside).
+local function outside(def, x, y)
+    return math.max(def:getX() - x, x - (def:getX2() - 1), def:getY() - y, y - (def:getY2() - 1), 0)
+end
+
+-- A random square the find `kind` may stand on within its reach of the building, or nil.
+local function squareFor(def, kind)
+    local found, reach = {}, RuralFinds.FINDS[kind].reach
+    for x = def:getX() - reach, def:getX2() + reach - 1 do
+        for y = def:getY() - reach, def:getY2() + reach - 1 do
+            local square = getSquare(x, y, 0)
+            if RuralFinds.canPlace(kind, square) then
+                table.insert(found, square)
+            end
+        end
+    end
+    return #found > 0 and found[ZombRand(#found) + 1] or nil
+end
+
 --- The chance a qualifying building has the find `kind`, with the Solar Sites option.
 function RuralFinds.chanceFor(kind)
     return SandboxVars.RenewableEnergy.SolarSites / SITES_DEFAULT / RuralFinds.FINDS[kind].odds
@@ -258,23 +263,21 @@ function RuralFinds.findsFor(def)
     return kinds
 end
 
---- Rolls a building once for each find it qualifies for (or for `kinds`, which tests use), at its
---- chance or for certain when `always`. Returns the placed objects by kind; a building rolled
---- before gets none.
+--- Rolls a building once for each find it qualifies for, at its chance. Tests that are about the
+--- find rather than its odds name the `kinds` and make them certain with `always`. Returns the
+--- placed objects by kind; a building rolled before gets none.
 function RuralFinds.roll(def, kinds, always)
-    local key = RuralFinds.buildingKey(def)
+    local key = BuildingWatch.key(def)
     local rolled = store()
-    pending[key] = nil
     if rolled[key] ~= nil then
         return {}
     end
     local found, placed = {}, {}
     for _, kind in ipairs(kinds or RuralFinds.findsFor(def)) do
-        local find = RuralFinds.FINDS[kind]
         if always or ZombRandFloat(0, 1) < RuralFinds.chanceFor(kind) then
-            local square = find.square(def)
+            local square = squareFor(def, kind)
             if square then
-                placed[kind] = find.place(square, def)
+                placed[kind] = RuralFinds.FINDS[kind].place(square, def)
                 found[kind] = true
             end
         end
@@ -283,65 +286,40 @@ function RuralFinds.roll(def, kinds, always)
     return placed
 end
 
+--- Counts a find of `kind` at x, y as the find of every building it stands by (within
+--- BuildingWatch.REACH) that could have one, so none of them is rolled for another. Reads the
+--- map, so the buildings needn't be loaded. A building rolled before keeps its finds and gains
+--- this one.
+function RuralFinds.claim(kind, x, y)
+    local find, rolled, reach = RuralFinds.FINDS[kind], store(), BuildingWatch.REACH
+    local buildings = ArrayList.new()
+    getWorld():getMetaGrid():getBuildingsIntersecting(x - reach, y - reach, 2 * reach + 1, 2 * reach + 1, buildings)
+    for i = 0, buildings:size() - 1 do
+        local def = buildings:get(i)
+        if outside(def, x, y) <= reach and find.qualifies(def) then
+            local key = BuildingWatch.key(def)
+            rolled[key] = rolled[key] or {}
+            rolled[key][kind] = true
+        end
+    end
+end
+
+--- Builds the find `kind` on the square, worn, as a building's roll would, if it may stand there.
+--- Returns it, or nil and why not.
+function RuralFinds.placeAt(kind, square)
+    if not RuralFinds.canPlace(kind, square) then
+        return nil, "no open ground for a " .. kind
+    end
+    return RuralFinds.FINDS[kind].place(square)
+end
+
 -- Loading
 
-local CHUNK_SIZE = getChunkSizeInSquares()
-
--- Whether every chunk within REACH of the building is loaded: one square per chunk tells.
-function RuralFinds.surroundingsLoaded(def)
-    local reach = RuralFinds.REACH
-    local fromX, toX = math.floor((def:getX() - reach) / CHUNK_SIZE), math.floor((def:getX2() + reach) / CHUNK_SIZE)
-    local fromY, toY = math.floor((def:getY() - reach) / CHUNK_SIZE), math.floor((def:getY2() + reach) / CHUNK_SIZE)
-    for cx = fromX, toX do
-        for cy = fromY, toY do
-            if not getSquare(cx * CHUNK_SIZE, cy * CHUNK_SIZE, 0) then
-                return false
-            end
-        end
-    end
-    return true
-end
-
-local function onLoadChunk(chunk)
-    if SandboxVars.RenewableEnergy.SolarSites <= 0 then
-        return
-    end
-    local seen, rolled = {}, store()
-    for z = 0, HIGHEST do
-        for x = 0, CHUNK_SIZE - 1 do
-            for y = 0, CHUNK_SIZE - 1 do
-                local square = chunk:getGridSquare(x, y, z)
-                local building = square and square:getBuilding()
-                local def = building and building:getDef()
-                if def and not seen[def] then
-                    seen[def] = true
-                    local key = RuralFinds.buildingKey(def)
-                    if rolled[key] == nil and not pending[key] and #RuralFinds.findsFor(def) > 0 then
-                        pending[key] = { def = def, x = square:getX(), y = square:getY() }
-                    end
-                end
-            end
-        end
-    end
-end
-
--- A building whose chunk unloaded leaves the queue until it loads again.
-local function rollLoaded()
-    local ready, gone = {}, {}
-    for key, entry in pairs(pending) do
-        if not getSquare(entry.x, entry.y, 0) then
-            table.insert(gone, key)
-        elseif RuralFinds.surroundingsLoaded(entry.def) then
-            table.insert(ready, entry.def)
-        end
-    end
-    for _, key in ipairs(gone) do
-        pending[key] = nil
-    end
-    for _, def in ipairs(ready) do
-        RuralFinds.roll(def)
-    end
-end
+-- With the option at 0 no building is rolled, so turning it up later still finds them unrolled.
+BuildingWatch.watch(function(def)
+    return SandboxVars.RenewableEnergy.SolarSites > 0 and store()[BuildingWatch.key(def)] == nil
+        and #RuralFinds.findsFor(def) > 0
+end, function(def) RuralFinds.roll(def) end)
 
 -- Story clutter
 
@@ -369,9 +347,6 @@ local function addClutter()
     end
 end
 
-Events.LoadChunk.Add(onLoadChunk)
--- A minute is soon enough: buildings load at the edge of the loaded area, out of sight.
-Events.EveryOneMinute.Add(rollLoaded)
 -- After vanilla's StoryClutter.Init, which clears the lists, and before any story is dressed.
 Events.OnLoadedMapZones.Add(addClutter)
 

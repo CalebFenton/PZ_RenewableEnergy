@@ -60,7 +60,7 @@ end
 -- leaves one until then.
 local function buildingToRoll(def, defer, pamphlet)
     local RuralFinds = RenewableEnergy.RuralFinds
-    local store, key = ModData.getOrCreate(RuralFinds.MOD_DATA), RuralFinds.buildingKey(def)
+    local store, key = ModData.getOrCreate(RuralFinds.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
     local roll = store[key]
     local pamphlets = pamphletsIn(def)
     local chance = RuralFinds.PAMPHLET_CHANCE
@@ -127,17 +127,36 @@ handler("ruralFind", function(player, args, defer)
     local again = track(RuralFinds.roll(def, { args.kind }, true), defer, def)
     local rolled = RuralFinds.rolled(def)
     if not found[args.kind] then
-        return nil, "a square for the " .. args.kind .. " by the building at " .. RuralFinds.buildingKey(def)
+        return nil, "a square for the " .. args.kind .. " by the building at " .. RenewableEnergy.BuildingWatch.key(def)
     end
     return { at = found[args.kind], kept = rolled ~= nil and rolled[args.kind] == true, again = countKeys(again),
         pamphlets = pamphlets }
 end)
 
--- The building at x, y of the map, once its surroundings are loaded here, rolled the way the world
--- rolls it (its rooms pick the finds, the finds pick their squares) with its roll forgotten and
--- every chance made certain. Answers { ready = false } until loaded, then the finds its rooms
--- qualify it for, where each placed find stands and how many pamphlets it left. Everything is put
--- back before it answers, while the building is still loaded: the test moves on from it.
+-- The finds of each kind standing within BuildingWatch.REACH of the building, by kind.
+local function findsAround(def)
+    local finds = { wind = RenewableEnergy.Wind.isCharger, digester = RenewableEnergy.Digester.isDigester,
+        gasifier = RenewableEnergy.Gasifier.isGasifier }
+    local reach, counts = RenewableEnergy.BuildingWatch.REACH, {}
+    for kind, isFind in pairs(finds) do
+        counts[kind] = 0
+        for x = def:getX() - reach, def:getX2() + reach - 1 do
+            for y = def:getY() - reach, def:getY2() + reach - 1 do
+                if RenewableEnergy.findObjectOn(getSquare(x, y, 0), isFind) then
+                    counts[kind] = counts[kind] + 1
+                end
+            end
+        end
+    end
+    return counts
+end
+
+-- The building at x, y of the map: { ready = false, why } until the world has rolled it, which it
+-- does once the building's surroundings have loaded here. Then the finds the world's roll gave it
+-- and those standing by it, and, rolled again with its roll forgotten and every chance made
+-- certain, so that every find it qualifies for gets a square, the finds its rooms qualify it for,
+-- where each placed find stands and how many pamphlets it left. Everything that second roll did is
+-- put back before it answers, while the building is still loaded: the test moves on from it.
 handler("ruralFindAt", function(_, args)
     local RuralFinds = RenewableEnergy.RuralFinds
     local square = getSquare(args.x, args.y, args.z or 0)
@@ -146,17 +165,23 @@ handler("ruralFindAt", function(_, args)
         return { ready = false, why = square and "no building at the square" or "the square not loaded" }
     end
     local def = building:getDef()
-    if not RuralFinds.surroundingsLoaded(def) then
-        return { ready = false, why = "the squares around building " .. RuralFinds.buildingKey(def) .. " not loaded" }
+    local worldRoll = RuralFinds.rolled(def)
+    if not worldRoll then
+        return { ready = false, why = "the world never rolled the building at " .. RenewableEnergy.BuildingWatch.key(def) }
     end
+    local world = {}
+    for kind in pairs(worldRoll) do
+        table.insert(world, kind)
+    end
+    local standing = findsAround(def)
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
     local _, forget = buildingToRoll(def, defer, true)
     local before = pamphletTotal(def)
     forget()
     local found = track(RuralFinds.roll(def, nil, true), defer, def)
-    local answer = { ready = true, qualifies = RuralFinds.findsFor(def), found = found, pamphlets = pamphletTotal(def) - before,
-        reach = RuralFinds.REACH }
+    local answer = { ready = true, world = world, standing = standing, qualifies = RuralFinds.findsFor(def), found = found,
+        pamphlets = pamphletTotal(def) - before, reach = RenewableEnergy.BuildingWatch.REACH }
     for i = #undo, 1, -1 do
         undo[i]()
     end

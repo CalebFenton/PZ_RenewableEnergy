@@ -6,14 +6,14 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/World/WorldSpawns"
+require "RenewableEnergy/World/BuildingWatch"
 
--- Solar garden lights along the front paths of houses. Each house is rolled once, the first
--- time its chunk loads, so the lights differ between playthroughs and a house never gets them
--- twice. How likely a house is to have them depends on its neighbourhood: the map zones that
--- vanilla's loot reads (ItemPickerJava forceForZones matches a zone's type or name).
---
--- A house is rolled once the squares around it are loaded, which the chunk that brought it in
--- doesn't promise, so the houses its chunks bring in wait in `pending` until then.
+-- Solar garden lights along the front paths of houses. Each house is rolled once, when its
+-- chunk first loads and its surroundings with it (BuildingWatch), so the lights differ between
+-- playthroughs and a house never gets them twice. How likely a house is to have them depends on
+-- its neighbourhood: the map zones that vanilla's loot reads (ItemPickerJava forceForZones
+-- matches a zone's type or name). A solar site promises its house lights, which the house then
+-- gets for certain when it is rolled.
 
 RenewableEnergy = RenewableEnergy or {}
 local GardenLights = {}
@@ -22,9 +22,13 @@ RenewableEnergy.GardenLights = GardenLights
 local Sprites = RenewableEnergy.Sprites
 local WorldSpawns = RenewableEnergy.WorldSpawns
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
+local BuildingWatch = RenewableEnergy.BuildingWatch
 
--- Global ModData: the lights each rolled house got, by building key.
+-- Global ModData, by building key: the number of lights a rolled house got, or PROMISED for a
+-- house a solar site promised lights that isn't rolled yet. Saved, so a promise outlives a quit
+-- before the house's surroundings load.
 GardenLights.MOD_DATA = "RenewableEnergyGardenLights"
+GardenLights.PROMISED = true
 
 -- Chance a house has lights, by neighbourhood, before the Garden Lights option. Farms count as
 -- ordinary: B42's map marks most farmhouses as town, so a farm zone can't pick them out.
@@ -35,24 +39,24 @@ GardenLights.COUNT = { min = 2, max = 6 }
 local RICH = { Rich = true, StreetRich = true }
 local POOR = { Poor = true, StreetPoor = true, TrailerPark = true }
 
--- Squares out from a house's bounds that a light may stand on, and that must be loaded first.
-local REACH = 4
 -- How far down the path from a door the lights go.
 local PATH_LENGTH = 4
-
--- Building key -> the queue() entry of a house waiting for its surroundings to load.
-local pending = {}
 
 local function store()
     return ModData.getOrCreate(GardenLights.MOD_DATA)
 end
 
-function GardenLights.buildingKey(def)
-    return def:getX() .. "," .. def:getY()
+function GardenLights.isRolled(def)
+    return type(store()[BuildingWatch.key(def)]) == "number"
 end
 
-function GardenLights.isRolled(def)
-    return store()[GardenLights.buildingKey(def)] ~= nil
+--- Promises the house lights: when it is rolled, it gets them for certain. A house already
+--- rolled keeps what its roll gave.
+function GardenLights.promise(def)
+    local rolled, key = store(), BuildingWatch.key(def)
+    if rolled[key] == nil then
+        rolled[key] = GardenLights.PROMISED
+    end
 end
 
 --- The neighbourhood at a square: "rich", "poor" or "ordinary".
@@ -82,16 +86,11 @@ end
 
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
-local function isStreet(square)
-    local name = Sprites.nameOf(square:getFloor()) or ""
-    return string.find(name, "^floors_exterior_street") ~= nil or string.find(name, "^blends_street") ~= nil
-end
-
 -- Where a light may stand: open ground outdoors, off the road, not in water or a tree.
 local function canStand(square)
     return square ~= nil and SolarGardenLight.canPlaceOn(square) and square:getRoom() == nil
         and square:hasFloor() and square:isFree(false) and not square:HasTree()
-        and not square:getProperties():has(IsoFlagType.water) and not isStreet(square)
+        and not square:getProperties():has(IsoFlagType.water) and not BuildingWatch.isStreet(square)
         and SolarGardenLight.findOn(square) == nil
 end
 
@@ -165,96 +164,26 @@ local function place(def)
     return #squares
 end
 
---- Rolls a house once: with its chance, or for certain when `always`, it gets lights. Returns
---- how many it got; a house rolled before gets none.
-function GardenLights.roll(def, always)
-    local key = GardenLights.buildingKey(def)
+--- Rolls a house once: with its chance, or for certain when it was promised lights, it gets them.
+--- Returns how many it got; a house rolled before gets none.
+function GardenLights.roll(def)
+    local key = BuildingWatch.key(def)
     local rolled = store()
-    if rolled[key] ~= nil then
+    if GardenLights.isRolled(def) then
         return 0
     end
     local placed = 0
-    if always or ZombRandFloat(0, 1) < GardenLights.chanceFor(def) then
+    if rolled[key] == GardenLights.PROMISED or ZombRandFloat(0, 1) < GardenLights.chanceFor(def) then
         placed = place(def)
     end
     rolled[key] = placed
-    pending[key] = nil
     return placed
 end
 
-local CHUNK_SIZE = getChunkSizeInSquares()
-
--- Whether every chunk that the house's REACH touches is loaded: one square per chunk tells. The
--- loaded area around several players needn't be a rectangle, so each chunk is checked.
-local function surroundingsLoaded(def)
-    local fromX, toX = math.floor((def:getX() - REACH) / CHUNK_SIZE), math.floor((def:getX2() + REACH) / CHUNK_SIZE)
-    local fromY, toY = math.floor((def:getY() - REACH) / CHUNK_SIZE), math.floor((def:getY2() + REACH) / CHUNK_SIZE)
-    for cx = fromX, toX do
-        for cy = fromY, toY do
-            if not getSquare(cx * CHUNK_SIZE, cy * CHUNK_SIZE, 0) then
-                return false
-            end
-        end
-    end
-    return true
-end
-
---- Rolls the house once its surroundings load, for certain when `always`. `x`, `y` is a square of
---- the house in the chunk that brought it in: once that chunk unloads, the house leaves the queue
---- until the chunk loads again and brings it back. A house that is certain stays, since nothing
---- would bring back its certainty; there are only as many as there are solar sites.
-function GardenLights.queue(def, always, x, y)
-    local key = GardenLights.buildingKey(def)
-    if store()[key] == nil then
-        pending[key] = { def = def, always = always, x = not always and x or nil, y = y }
-    end
-end
-
-local function onLoadChunk(chunk)
-    -- A house covers many of the chunk's squares; each is looked at once.
-    local seen = {}
-    for x = 0, CHUNK_SIZE - 1 do
-        for y = 0, CHUNK_SIZE - 1 do
-            local square = chunk:getGridSquare(x, y, 0)
-            local building = square and square:getBuilding()
-            local def = building and building:getDef()
-            if def and not seen[def] then
-                seen[def] = true
-                if def:isResidential() and not pending[GardenLights.buildingKey(def)] then
-                    GardenLights.queue(def, false, square:getX(), square:getY())
-                end
-            end
-        end
-    end
-end
-
--- Rolling a house and its chunk unloading both remove it from `pending`, so the houses are
--- collected first.
-local function rollLoaded()
-    local ready, gone
-    for key, entry in pairs(pending) do
-        if entry.x and not getSquare(entry.x, entry.y, 0) then
-            gone = gone or {}
-            table.insert(gone, key)
-        elseif surroundingsLoaded(entry.def) then
-            ready = ready or {}
-            table.insert(ready, entry)
-        end
-    end
-    if gone then
-        for _, key in ipairs(gone) do
-            pending[key] = nil
-        end
-    end
-    if ready then
-        for _, entry in ipairs(ready) do
-            GardenLights.roll(entry.def, entry.always)
-        end
-    end
-end
-
-Events.LoadChunk.Add(onLoadChunk)
--- A minute is soon enough: houses load at the edge of the loaded area, out of sight.
-Events.EveryOneMinute.Add(rollLoaded)
+-- Houses, and whatever a solar site promised lights, that haven't been rolled.
+BuildingWatch.watch(function(def)
+    local roll = store()[BuildingWatch.key(def)]
+    return roll == GardenLights.PROMISED or (roll == nil and def:isResidential())
+end, GardenLights.roll)
 
 return GardenLights

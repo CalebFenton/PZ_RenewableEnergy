@@ -18,9 +18,9 @@ local LOOT_SAMPLES = 10000
 -- panels and banks the tests build. The spawn tests place their banks with WorldSpawns.placeBank.
 local NO_ROOM_BANKS = 1
 -- Garden Lights at 0. A house is rolled for lights on the game minute after its surroundings load
--- (GardenLights.rollLoaded), so one at the edge of the area the tests use can grow lights during a
--- test; at 0 it is still rolled, without lights. The garden light tests roll with `always` or set
--- the option themselves.
+-- (BuildingWatch), so one at the edge of the area the tests use can grow lights during a test; at
+-- 0 it is still rolled, without lights. The garden light tests promise a house its lights as a
+-- solar site does, or set the option themselves.
 local NO_HOUSE_LIGHTS = 0
 
 local function share(fraction)
