@@ -103,6 +103,27 @@ local function checkSubList(expect, where, name, stashTables)
     expect(ItemPickerJava.getItemContainer(room, container, nil, false) ~= nil, where .. ": the game has no " .. name)
 end
 
+-- ItemPickerJava.tryAddItemToContainer hands out nothing for an unknown item or one heavier than
+-- the container holds, and getActualSpawnChance nothing at a loot multiplier of 0. An obsolete,
+-- disabled or debug-only script never loads (ScriptBucket), so it is no item either. The loot
+-- multipliers are the default settings', as Loot.withMeasureOptions sets them.
+local function checkHandedOut(expect, spec, capacity)
+    local option = getSandboxOptions():getOptionByName("RenewableEnergy." .. spec.option)
+    if expect(option ~= nil, spec.fullType .. ": no sandbox option " .. tostring(spec.option)) then
+        local multiplier = option:getDefaultValue()
+        for _, entry in ipairs(spec.entries) do
+            expect(entry[1] * multiplier > 0, spec.fullType .. " in " .. entry[2] .. " has no weight at the default options")
+        end
+    end
+    local script = getScriptManager():FindItem(spec.fullType)
+    if expect(script ~= nil, spec.fullType .. " is no item") then
+        expect(ItemPickerJava.getLootModifier(spec.fullType) > 0,
+            spec.fullType .. "'s loot category is off at the default loot settings")
+        local weight = script:getActualWeight() * script:getCount()
+        expect(weight <= capacity, spec.fullType .. " weighs " .. weight .. ", more than a crate's " .. capacity)
+    end
+end
+
 check("lootListsInUse", function(expect)
     local D = distributions(expect)
     if not D then
@@ -111,8 +132,13 @@ check("lootListsInUse", function(expect)
     local procUsers = procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
+    local capacity = ItemContainer.new("crate", nil, nil):getCapacity()
+    RenewableEnergy.Loot.withMeasureOptions(function()
+        for _, spec in ipairs(D.items) do
+            checkHandedOut(expect, spec, capacity)
+        end
+    end)
     for _, spec in ipairs(D.items) do
-        expect(getScriptManager():FindItem(spec.fullType) ~= nil, spec.fullType .. " is no item")
         for _, entry in ipairs(spec.entries) do
             local reference = entry[2]
             local where = spec.fullType .. " in " .. reference
@@ -138,46 +164,6 @@ check("lootListsInUse", function(expect)
             end
         end
     end
-end)
-
-check("lootItemsSpawn", function(expect)
-    if not distributions(expect) then
-        return
-    end
-    local Loot = RenewableEnergy.Loot
-    local targets = Loot.targets()
-    Loot.withMeasureOptions(function()
-        local function build()
-            return Loot.tablesFor(targets, false)
-        end
-        Loot.withLoot(100, build, function(parsed)
-            local container = Loot.newContainer(nil)
-            for i, target in ipairs(targets) do
-                local list = parsed["t" .. i]
-                if expect(list ~= nil, target.reference .. ": the game didn't parse it") then
-                    local missing, remaining = {}, 0
-                    for fullType in pairs(target.items) do
-                        missing[fullType] = true
-                        remaining = remaining + 1
-                    end
-                    for _ = 1, 200 do
-                        for fullType in pairs(Loot.rollOnce(list, container)) do
-                            if missing[fullType] then
-                                missing[fullType] = nil
-                                remaining = remaining - 1
-                            end
-                        end
-                        if remaining == 0 then
-                            break
-                        end
-                    end
-                    for fullType in pairs(missing) do
-                        expect(false, fullType .. " never spawned from " .. target.reference)
-                    end
-                end
-            end
-        end)
-    end)
 end)
 
 -- Whether `list` has every vanilla item of `vanilla`; the mod's own entries differ between them.
@@ -347,55 +333,46 @@ check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
     end
 end)
 
--- Up to `wanted` loaded squares near the character in rooms that have a loot distribution, one per
--- room type, and one square outside any room.
-local function sampleSquares(character, wanted)
-    local squares, roomNames = {}, {}
-    local cell = getCell()
-    local px, py = math.floor(character:getX()), math.floor(character:getY())
-    for dx = -60, 60 do
-        for dy = -60, 60 do
-            local square = cell:getGridSquare(px + dx, py + dy, 0)
-            local room = square and square:getRoom()
-            local name = room and room:getName()
-            if name and not roomNames[name] and #squares < wanted and SuburbsDistributions[name] then
-                roomNames[name] = true
-                table.insert(squares, square)
-            end
-        end
-    end
-    local outside = RenewableEnergy.Loot.squareOutsideRooms(character)
-    if outside then
-        table.insert(squares, outside)
-    end
-    return squares
-end
+-- Rooms whose own "all" table vanilla rolls into every container in them
+-- (ItemPickerJava.fillContainerTypeInternal), a player's too; the mod can't leave a player's
+-- containers out of it without taking the room's loot away.
+local VANILLA_ALL_ROOMS = { sodatruck = true }
 
 -- Respawn calls ItemPickerJava.fillContainer(container, nil) on looted containers that aren't
--- IsoThumpables, as a bank is not. The objects of `args.sprites` get their tiles' containers but
--- are never added to the square.
-check("lootPlayerContainers", function(expect, _, player, args)
-    local squares = sampleSquares(player, 4)
-    if not expect(#squares >= 2, "no loaded room near the character") then
+-- IsoThumpables, as a bank is not. That rolls the room's "all" table, then its table for the
+-- container's type, and fires OnFillContainer; outside any room, or in a room with no
+-- distribution, it uses SuburbsDistributions.all. The stash spawn table fills its crate on purpose,
+-- and a stash house is the only place that uses it. `args.sprites` are the tiles a player builds.
+check("lootPlayerContainers", function(expect, _, _, args)
+    local D = distributions(expect)
+    if not D then
         return
     end
-    for _, square in ipairs(squares) do
-        local room = square:getRoom()
-        local where = room and room:getName() or "outside"
-        for _, field in ipairs(args.sprites) do
-            local sprite = Sprites[field]
-            local object = IsoObject.new(square, sprite, field)
-            object:createContainersFromSpriteProperties()
-            local container = object:getContainer()
-            if expect(container ~= nil, sprite .. " gives no container") then
-                container:setExplored(true)
-                container:setHasBeenLooted(true)
-                for _ = 1, 20 do
-                    ItemPickerJava.fillContainer(container, nil)
+    local Stash = RenewableEnergy.Stash
+    local own = {}
+    for _, containerType in ipairs(D.OWN_CONTAINER_TYPES) do
+        own[containerType] = true
+        expect(not D.CRACKED_MODULE_CONTAINERS[containerType], containerType .. " gets cracked modules")
+    end
+    for _, field in ipairs(args.sprites) do
+        local containerType = getSprite(Sprites[field]):getProperties():get("container")
+        expect(own[containerType], field .. "'s container " .. tostring(containerType) .. " is not one of the mod's own")
+    end
+    for roomName, room in pairs(SuburbsDistributions) do
+        if type(room) == "table" and (room.rolls == nil or roomName == "all") then
+            local all = room.all
+            expect(VANILLA_ALL_ROOMS[roomName] or all == nil or (not all.procedural and #(all.items or {}) == 0),
+                roomName .. "'s all table fills a player's containers")
+            for _, containerType in ipairs(D.OWN_CONTAINER_TYPES) do
+                local where = roomName .. "." .. containerType
+                local containerTable = room[containerType]
+                local stashCrate = roomName == Stash.SPAWN_TABLE and containerType == Stash.CRATE_TYPE
+                if not stashCrate and expect(containerTable ~= nil, where .. " is missing, so the room's other table fills it") then
+                    expect(not containerTable.procedural and #(containerTable.items or {}) == 0 and containerTable.junk == nil,
+                        where .. " has loot")
+                    expect(ItemPickerJava.getItemContainer(roomName, containerType, nil, false) ~= nil,
+                        where .. ": the game didn't parse it")
                 end
-                local count = container:getItems():size()
-                expect(count == 0, "respawn put " .. count .. " items into a " .. container:getType() .. " in " .. where)
-                container:removeAllItems()
             end
         end
     end

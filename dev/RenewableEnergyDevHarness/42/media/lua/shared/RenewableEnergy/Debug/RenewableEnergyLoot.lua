@@ -254,16 +254,13 @@ function Loot.withLoot(lrm, build, fn)
     end, function() ItemPickerJava.Parse() end)
 end
 
---- One table per target of Loot.targets(), keyed "t<index>": the list itself, or
---- with `modOnly` a copy of it with only the mod's items.
-function Loot.tablesFor(targets, modOnly)
+--- One table per target of Loot.targets(), keyed "t<index>": a copy of the list with only the
+--- mod's items.
+function Loot.tablesFor(targets)
     local tables = {}
     for i, target in ipairs(targets) do
         local lootTable = RenewableEnergy.Distributions.resolveTable(target.reference)
-        if lootTable and modOnly then
-            lootTable = modItemsOnly(lootTable)
-        end
-        tables["t" .. i] = lootTable
+        tables["t" .. i] = lootTable and modItemsOnly(lootTable)
     end
     return tables
 end
@@ -375,12 +372,6 @@ local function rollFill(list)
     end
 end
 
---- Rolls `list` (a parsed table) into an emptied `container` once and returns the mod's items it
---- got: fullType -> count.
-function Loot.rollOnce(list, container)
-    return Loot.fillOnce(rollFill(list), container)
-end
-
 -- Fills `container` `samples` times. Returns fullType -> { share = fraction of samples holding
 -- at least one, perContainer = mean count in those }.
 local function sample(fill, samples, container, everything)
@@ -459,7 +450,7 @@ function Loot.report(samples)
         table.insert(targets, { reference = STASH_CRATE, items = {} })
         local function build()
             local containers, lists = roomContainersModOnly()
-            for key, lootTable in pairs(Loot.tablesFor(targets, true)) do
+            for key, lootTable in pairs(Loot.tablesFor(targets)) do
                 containers[key] = lootTable
             end
             return containers, lists

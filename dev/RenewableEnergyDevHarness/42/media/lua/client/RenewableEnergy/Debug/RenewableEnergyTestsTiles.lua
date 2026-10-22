@@ -177,41 +177,39 @@ test("renewable_energy_tiles_bank_switch_sounds", {
     end,
 })
 
--- What dismantling the tile `sprite` gives, at the top level of the skill its scrap definition uses,
--- counted by item over `rolls` scraps, which vanilla rolls per item.
-local function scrapYield(sprite, rolls)
-    local counts = {}
-    local props = ISMoveableSpriteProps.new(sprite)
-    for _ = 1, rolls do
-        for _, fullType in ipairs((props:getScrapItemsList(T.player()) or {}).usable or {}) do
-            counts[fullType] = (counts[fullType] or 0) + 1
-        end
+-- The scrap definition entries ISMoveableSpriteProps:getScrapItemsList rolls for a material: its
+-- static-size list, or the other when that is empty.
+local function scrapEntries(material)
+    local def = ISMoveableDefinitions:getInstance().getScrapDefinition(material)
+    if not def then
+        return nil
     end
-    return counts, props
+    local static = def.returnItemsStatic or {}
+    return def, #static > 0 and static or (def.returnItems or {})
 end
 
-local function scrapPerk(sprite)
-    local props = ISMoveableSpriteProps.new(sprite)
-    local def = props.material and ISMoveableDefinitions:getInstance().getScrapDefinition(props.material)
-    return def and def.perk
+-- An entry the scrap rolls can give: a real item, at least one of it, at a chance above 0.
+local function expectGivable(where, entry)
+    expect(getScriptManager():FindItem(entry.returnItem) ~= nil, where .. " gives " .. tostring(entry.returnItem) .. ", no item")
+    expect((entry.maxAmount or 0) >= 1, where .. " gives no " .. tostring(entry.returnItem))
+    expect((entry.chancePerRoll or 0) > 0, where .. " never gives " .. tostring(entry.returnItem))
 end
-
-local SCRAP_ROLLS = 20
 
 -- Dismantling a bank, with Electricity, gives parts back. Its definition is in shared Lua, because
 -- scrapping completes on the server.
 test("renewable_energy_tiles_bank_scraps_to_parts", {
-    run = function(self) T.setPerk(self, Perks.Electricity, 10) end,
     validate = function()
         for field in pairs(Sprites.bankFill) do
-            local counts, props = scrapYield(Sprites[field], SCRAP_ROLLS)
+            local props = ISMoveableSpriteProps.new(Sprites[field])
             expect(props.canScrap, field .. " can't be dismantled")
-            expect(scrapPerk(Sprites[field]) == Perks.Electricity, "dismantling " .. field .. " doesn't use Electricity")
-            local any = false
-            for _ in pairs(counts) do
-                any = true
+            local def, entries = scrapEntries(props.material)
+            if expect(def ~= nil, field .. "'s material " .. tostring(props.material) .. " has no scrap definition") then
+                expect(def.perk == Perks.Electricity, "dismantling " .. field .. " doesn't use Electricity")
+                expect(#entries > 0, "dismantling " .. field .. " gives nothing")
+                for _, entry in ipairs(entries) do
+                    expectGivable("dismantling " .. field, entry)
+                end
             end
-            expect(any, "dismantling " .. field .. " gives nothing")
         end
     end,
 })
@@ -220,14 +218,21 @@ test("renewable_energy_tiles_bank_scraps_to_parts", {
 -- tanks.
 local FRIDGE = "appliances_refrigeration_01_0"
 test("renewable_energy_tiles_fridge_scraps_to_compressor", {
-    run = function(self)
-        local perk = scrapPerk(FRIDGE)
-        if perk then T.setPerk(self, perk, 10) end
-    end,
     validate = function()
-        local counts = scrapYield(FRIDGE, SCRAP_ROLLS)
+        local props = ISMoveableSpriteProps.new(FRIDGE)
+        expect(props.material == "Fridge" or props.material2 == "Fridge" or props.material3 == "Fridge",
+            FRIDGE .. " isn't cut up as a Fridge")
+        local _, entries = scrapEntries("Fridge")
         local compressor = RenewableEnergy.Digester.COMPRESSOR
-        expect((counts[compressor] or 0) > 0, "cutting up " .. FRIDGE .. " " .. SCRAP_ROLLS .. " times never gave " .. compressor)
+        local found
+        for _, entry in ipairs(entries or {}) do
+            if entry.returnItem == compressor then
+                found = entry
+            end
+        end
+        if expect(found ~= nil, "cutting up a Fridge doesn't give " .. compressor) then
+            expectGivable("cutting up a Fridge", found)
+        end
     end,
 })
 
