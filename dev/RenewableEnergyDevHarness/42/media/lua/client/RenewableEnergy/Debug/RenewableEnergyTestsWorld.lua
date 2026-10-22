@@ -218,18 +218,19 @@ test("renewable_energy_world_bank_spawn_refused_outdoors", {
 -- Bank tiers whose tile is a battery box, which has no slot for a charge controller.
 local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
 
--- Over many banks, each part turns up about as often as BANK_STOCK says, and a battery box never
--- comes with a charge controller.
-serverCheck("renewable_energy_world_bank_stock_rates", "bankStockRates", { samples = 2000, boxTiles = BOX_TILES },
-    { LRMBatteries = 1, LRMMisc = 1 })
+-- Each part turns up when the roll comes in under its chance × the misc loot option, in a farm
+-- storage rack, which has a slot for every part; and a battery box never comes with a charge
+-- controller.
+serverCheck("renewable_energy_world_bank_stock_parts", "bankStockParts", { stock = "farmStorage", boxTiles = BOX_TILES })
 
--- With the battery and misc loot options at 0, world banks spawn empty.
+-- With the battery and misc loot options at 0, world banks spawn empty, even with the lowest roll
+-- there is.
 test("renewable_energy_world_bank_stock_option_zero", {
     sandbox = { LRMBatteries = 0, LRMMisc = 0 },
-    run = function(self) T.server(self, "bankStockCount", { times = 20 }) end,
+    run = function(self) T.server(self, "bankStockCount", { stock = "electronicsStorage", roll = 0 }) end,
     validate = function(self)
         local items = self.server.bankStockCount.items
-        expect(items == 0, items .. " items in banks with the options at 0")
+        expect(items == 0, items .. " items in a bank with the options at 0")
     end,
 })
 
@@ -278,10 +279,9 @@ test("renewable_energy_world_crate_spawns_stocked", {
 
 -- Cracked modules -------------------------------------------------------------------------------
 
--- Farm storage shelves get cracked modules, at cracked conditions, and a bedroom's furniture
--- none. At the highest option every farm storage shelf gets one, so that nothing is left to
--- chance; at the default the chance is small but there.
-serverCheck("renewable_energy_world_cracked_modules", "crackedModules", { samples = 200 }, { LRMSolarPanels = 100 })
+-- Farm storage shelves get cracked modules, at cracked conditions, at a chance that follows the
+-- Solar Panels loot option, and a bedroom's furniture none.
+serverCheck("renewable_energy_world_cracked_modules", "crackedModules")
 
 -- Solar sites -----------------------------------------------------------------------------------
 -- The site tests arm a site's spots on the authority as the world does when it rolls the site in
@@ -541,17 +541,17 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
     end,
 })
 
--- At 0 the Garden Lights option leaves every house without lights: the house near the start, rolled
--- again and again the way the world rolls it, never gets one. At the option's default an ordinary
--- street's chance would almost surely have given it some over this many rolls.
+-- At 0 the Garden Lights option leaves every house without lights: the house near the start has
+-- chance 0, and rolled with the lowest roll there is it gets none, and stays rolled.
 test("renewable_energy_world_garden_lights_option_zero", {
     sandbox = { GardenLights = 0 },
-    run = function(self) T.server(self, "gardenLightsRolls", { rolls = 60 }) end,
+    run = function(self) T.server(self, "gardenLightsRoll", { roll = 0 }) end,
     validate = function(self)
-        local answer = self.server.gardenLightsRolls
+        local answer = self.server.gardenLightsRoll
         expect(answer.chance == 0, "houses get lights with chance " .. answer.chance .. " with the option at 0")
         expect(answer.placed == 0 and #answer.lights == 0,
-            "with the option at 0 the rolls placed " .. answer.placed .. " lights, and " .. #answer.lights .. " stand around the house")
+            "with the option at 0 the roll placed " .. answer.placed .. " lights, and " .. #answer.lights .. " stand around the house")
+        expect(answer.rolled, "the house's roll wasn't kept")
     end,
 })
 
@@ -973,17 +973,17 @@ test("renewable_energy_world_rural_finds_real_buildings", {
     end,
 })
 
--- At 0 the Solar Sites option leaves rural buildings without finds: the building near the start,
--- rolled for every find again and again the way the world rolls it, never gets one.
+-- At 0 the Solar Sites option leaves rural buildings without finds: every find has chance 0, and
+-- the building near the start, rolled for every find with the lowest roll there is, gets none.
 test("renewable_energy_world_rural_finds_option_zero", {
     sandbox = { SolarSites = 0 },
-    run = function(self) T.server(self, "ruralFindsRolls", { rolls = 60 }) end,
+    run = function(self) T.server(self, "ruralFindsRoll", { roll = 0 }) end,
     validate = function(self)
-        local answer = self.server.ruralFindsRolls
+        local answer = self.server.ruralFindsRoll
         for kind, chance in pairs(answer.chances) do
             expect(chance == 0, "the " .. kind .. " has chance " .. chance .. " with the option at 0")
         end
-        expect(answer.placed == 0, "with the option at 0 the rolls placed " .. answer.placed .. " finds")
+        expect(answer.placed == 0, "with the option at 0 the roll placed " .. answer.placed .. " finds")
     end,
 })
 

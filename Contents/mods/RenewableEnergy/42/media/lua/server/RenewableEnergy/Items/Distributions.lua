@@ -2,6 +2,7 @@ require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/StashHouses"
 require "RenewableEnergy/World/WorldSpawns"
@@ -25,6 +26,7 @@ local Battery, Specs = RenewableEnergy.Battery, RenewableEnergy.Specs
 local Stash = RenewableEnergy.Stash
 local WorldSpawns = RenewableEnergy.WorldSpawns
 local ArrowBoard = RenewableEnergy.ArrowBoard
+local Chance = RenewableEnergy.Chance
 
 -- The mod's own lists
 
@@ -716,7 +718,7 @@ end
 --- Maybe adds a cracked module to a freshly filled container, if its room or vehicle keeps them.
 function Distributions.addCrackedModules(roomName, containerType, container)
     local weight = crackedModuleWeight(roomName, containerType, container)
-    if weight > 0 and ZombRandFloat(0, 1) < Distributions.crackedModuleChance(weight) then
+    if weight > 0 and Chance.hit(Distributions.crackedModuleChance(weight)) then
         WorldSpawns.addModule(container, WorldSpawns.crackedCondition())
     end
 end

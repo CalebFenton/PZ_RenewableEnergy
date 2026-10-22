@@ -4,6 +4,7 @@ end
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/BuildingWatch"
@@ -23,6 +24,7 @@ local Sprites = RenewableEnergy.Sprites
 local WorldSpawns = RenewableEnergy.WorldSpawns
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local BuildingWatch = RenewableEnergy.BuildingWatch
+local Chance = RenewableEnergy.Chance
 
 -- Global ModData, by building key: the number of lights a rolled house got, or PROMISED for a
 -- house a solar site promised lights that isn't rolled yet. Saved, so a promise outlives a quit
@@ -173,7 +175,7 @@ function GardenLights.roll(def)
         return 0
     end
     local placed = 0
-    if rolled[key] == GardenLights.PROMISED or ZombRandFloat(0, 1) < GardenLights.chanceFor(def) then
+    if rolled[key] == GardenLights.PROMISED or Chance.hit(GardenLights.chanceFor(def)) then
         placed = place(def)
     end
     rolled[key] = placed
