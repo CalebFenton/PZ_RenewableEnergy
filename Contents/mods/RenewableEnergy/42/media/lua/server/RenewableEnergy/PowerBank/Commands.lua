@@ -285,7 +285,9 @@ end
 function Commands.rename(player, args)
     local bank = bankAt(args.bank)
     if not (bank and type(args.name) == "string") then return false, "no bank" end
-    local name = args.name:gsub("^%s+", ""):gsub("%s+$", ""):sub(1, PowerBank.NAME_LENGTH)
+    local name = args.name:gsub("^%s+", ""):gsub("%s+$", "")
+    local refusal = PowerBank.nameRefusal(name)
+    if refusal then return false, refusal end
     bank.name = name ~= "" and name or nil
     bank:sendStatus()
     return true

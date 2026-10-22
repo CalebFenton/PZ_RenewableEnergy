@@ -74,7 +74,7 @@
     "IGUI_RenewableEnergy_Storage": "Storage",
     "IGUI_RenewableEnergy_Stored": "Stored",
     "IGUI_RenewableEnergy_Capacity": "Capacity",
-    "IGUI_RenewableEnergy_NoBatteries": "No batteries",
+    "IGUI_RenewableEnergy_NoBatteries": "No working batteries",
     "IGUI_RenewableEnergy_CycleDepth": "Cycle depth today",
     "IGUI_RenewableEnergy_Parts": "Parts",
     "IGUI_RenewableEnergy_NoParts": "Nothing wired in",

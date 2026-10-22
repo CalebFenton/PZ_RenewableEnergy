@@ -101,16 +101,20 @@ function Battery.wear(item, fraction)
 end
 
 --- Wears every battery in `container` by one discharge `depth` deep (Battery.cycleWear, scaled by
---- the Battery Wear option) and sends those whose condition changed. Authority only.
+--- the Battery Wear option) and sends those whose condition changed. Returns them as a set, for a
+--- caller that sends the same batteries for another change. Authority only.
 function Battery.wearAll(container, depth)
     local scale = Battery.wearScale()
+    local sent = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if Battery.spec(item) and Battery.wear(item, Battery.cycleWear(item, depth) * scale) then
             sendItemStats(item)
+            sent[item] = true
         end
     end
+    return sent
 end
 
 return Battery

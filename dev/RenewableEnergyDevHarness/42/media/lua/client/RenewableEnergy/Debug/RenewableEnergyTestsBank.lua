@@ -404,6 +404,12 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
         local button = self.window.switchButton
         expect(not button.enable and button.tooltip == getText(key),
             "the window's switch isn't greyed out saying there are no batteries (" .. tostring(button.tooltip) .. ")")
+        local noBatteries = getText("IGUI_RenewableEnergy_NoBatteries")
+        local says = false
+        for _, line in ipairs(StatusWindow.summary(self.dead.state.status)) do
+            says = says or line.text == noBatteries
+        end
+        expect(says, "the window of the bank whose only battery is dead doesn't say it has no working batteries")
     end,
 })
 
