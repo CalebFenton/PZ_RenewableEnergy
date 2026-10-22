@@ -3,6 +3,7 @@ if isClient() then
 end
 
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/Biogas/Digester"
@@ -28,14 +29,14 @@ local RuralFinds = {}
 RenewableEnergy.RuralFinds = RuralFinds
 
 local Sprites, Wind, Gasifier = RenewableEnergy.Sprites, RenewableEnergy.Wind, RenewableEnergy.Gasifier
-local BuildingWatch = RenewableEnergy.BuildingWatch
+local BuildingWatch, Chance = RenewableEnergy.BuildingWatch, RenewableEnergy.Chance
 
 -- Global ModData: by building key, the finds each rolled building got ({ [kind] = true }).
 RuralFinds.MOD_DATA = "RenewableEnergyRuralFinds"
 -- The Solar Sites percentage at which each find's odds are 1 in `odds`.
 local SITES_DEFAULT = 75
 -- Chance the hunting shack also holds a FEMA pamphlet.
-RuralFinds.PAMPHLET_CHANCE = 0.5
+local PAMPHLET_CHANCE = 0.5
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
 -- The highest level looked at for a building's containers: a deer stand's one room is on level 1.
 local HIGHEST = 1
@@ -213,7 +214,7 @@ RuralFinds.FINDS = {
                     gasifier.ash = Gasifier.ASH_FULL
                     gasifier:afterChange()
                 end)
-            if def and ZombRandFloat(0, 1) < RuralFinds.PAMPHLET_CHANCE then
+            if def and Chance.hit(PAMPHLET_CHANCE) then
                 RuralFinds.leavePamphlet(def)
             end
             return thumpable
@@ -274,7 +275,7 @@ function RuralFinds.roll(def, kinds, always)
     end
     local found, placed = {}, {}
     for _, kind in ipairs(kinds or RuralFinds.findsFor(def)) do
-        if always or ZombRandFloat(0, 1) < RuralFinds.chanceFor(kind) then
+        if always or Chance.hit(RuralFinds.chanceFor(kind)) then
             local square = squareFor(def, kind)
             if square then
                 placed[kind] = RuralFinds.FINDS[kind].place(square, def)

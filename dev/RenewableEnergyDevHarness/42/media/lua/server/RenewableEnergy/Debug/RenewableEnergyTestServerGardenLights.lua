@@ -166,19 +166,19 @@ handler("gardenLightsClearHouse", function(_, args)
     return {}
 end)
 
--- The house near the character rolled `args.rolls` times the way the world rolls it, its roll
--- forgotten before each, at the save's options. Answers its chance, how many lights the rolls
--- gave, and the new lights around it.
-handler("gardenLightsRolls", function(player, args, defer)
+-- The house near the character, its roll forgotten, rolled once the way the world rolls it at the
+-- save's options, the roll set to `args.roll`. Answers its chance, how many lights the roll gave,
+-- whether the roll was kept, and the new lights around it.
+handler("gardenLightsRoll", function(player, args, defer)
     local GardenLights = RenewableEnergy.GardenLights
     local def, before, forget = houseToRoll(player, defer)
     if not def then
         return nil, "a house near the character on the server"
     end
-    local placed = 0
-    for _ = 1, args.rolls do
-        forget()
-        placed = placed + GardenLights.roll(def)
-    end
-    return { chance = GardenLights.chanceFor(def), placed = placed, lights = newLights(def, before, defer) }
+    forget()
+    local restoreRoll = Helpers.forceRolls(defer, { args.roll })
+    local placed = GardenLights.roll(def)
+    restoreRoll()
+    return { chance = GardenLights.chanceFor(def), placed = placed, rolled = GardenLights.isRolled(def),
+        lights = newLights(def, before, defer) }
 end)

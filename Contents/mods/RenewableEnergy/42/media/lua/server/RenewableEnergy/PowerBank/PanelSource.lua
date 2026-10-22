@@ -5,6 +5,7 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
@@ -12,7 +13,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 
 RenewableEnergy = RenewableEnergy or {}
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
+local Chance, Specs, Sprites, Sun = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
 
 local PanelSource = {}
@@ -132,22 +133,31 @@ function PanelSource.stormHours(hours)
     return storming and hours or 0
 end
 
+--- The chance that `stormHours` of thunderstorm crack a module of `source` (anything with a mount
+--- kind and material), at the StormDamage options.
+function PanelSource.stormChance(source, stormHours)
+    local options = SandboxVars.RenewableEnergy
+    if not options.StormDamage or stormHours <= 0 then
+        return 0
+    end
+    local perHour = Specs.storm.chancePerHour * stormFactor(source.kind, source.material) * options.StormDamageRate / 100
+    return 1 - (1 - math.min(1, perHour)) ^ stormHours
+end
+
 --- A thunderstorm may crack one of a panel's modules (`source`, anything with a mount kind,
 --- material and module records). Returns whether it did.
 function PanelSource.stormCrack(source, stormHours)
-    local options = SandboxVars.RenewableEnergy
-    if not options.StormDamage or stormHours <= 0 then
+    local chance = PanelSource.stormChance(source, stormHours)
+    if chance <= 0 then
         return false
     end
-    local perHour = Specs.storm.chancePerHour * stormFactor(source.kind, source.material) * options.StormDamageRate / 100
-    local chance = 1 - (1 - math.min(1, perHour)) ^ stormHours
     local whole = {}
     for _, module in ipairs(source.modules) do
         if module.condition > 0 then
             table.insert(whole, module)
         end
     end
-    if #whole == 0 or ZombRandFloat(0, 1) >= chance then
+    if #whole == 0 or not Chance.hit(chance) then
         return false
     end
     local module = whole[ZombRand(#whole) + 1]

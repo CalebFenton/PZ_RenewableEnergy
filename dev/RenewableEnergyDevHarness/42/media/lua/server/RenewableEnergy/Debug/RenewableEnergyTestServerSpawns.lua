@@ -82,68 +82,88 @@ handler("worldBank", function(_, args, defer)
     return answer
 end)
 
--- Stock names whose part rates bankStockRates measures: one battery box, one rack.
-local RATE_STOCKS = { shed = true, farmStorage = true }
--- How many binomial standard errors a measured share may stray from its chance: wide enough that
--- a correct stock fails about once in tens of thousands of runs, narrow enough at the test's
--- sample count to catch a chance retuned by a few points.
-local RATE_SIGMAS = 4
+-- The parts a bank may hold besides batteries, as PowerBank.partKind names them.
+local PARTS = { "inverter", "controller", "charger" }
+-- How far under a chance a roll still comes in under it.
+local UNDER = 1e-9
 
--- Over many banks, each part turns up about as often as BANK_STOCK says, and a battery box never
--- comes with a charge controller.
-check("bankStockRates", function(expect, expectNear, _, args, defer)
-    local WorldSpawns, Loot = RenewableEnergy.WorldSpawns, RenewableEnergy.Loot
-    local container = Loot.newContainer(nil)
-    local samples = args.samples
-    -- Found batteries are sent to the clients that see them, and a server can't send an item of a
-    -- container that isn't in the world; the parts' rates don't depend on the batteries.
-    local options = SandboxVars.RenewableEnergy
-    local restoreOptions = saveOptions(defer, { "LRMBatteries" })
-    options.LRMBatteries = 0
-    local function partCounts(stockName)
-        local found = { inverter = 0, controller = 0, charger = 0 }
-        local function stock(c) WorldSpawns.stockBank(c, stockName) end
-        for _ = 1, samples do
-            -- fillOnce takes the items off the cell's processed list, which thousands of banks in
-            -- one frame would otherwise swamp.
-            for fullType, count in pairs(Loot.fillOnce(stock, container, true)) do
-                local kind = RenewableEnergy.PowerBank.partKind(fullType)
-                if found[kind] then
-                    found[kind] = found[kind] + count
-                end
-            end
+-- What BANK_STOCK[stockName] puts in an emptied `container` with every roll at `roll`: how many of
+-- each of PARTS.
+local function bankPartsAt(container, stockName, roll, defer)
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local restoreRoll = Helpers.forceRolls(defer, roll)
+    local found = { inverter = 0, controller = 0, charger = 0 }
+    local function stock(c) WorldSpawns.stockBank(c, stockName) end
+    for fullType, count in pairs(RenewableEnergy.Loot.fillOnce(stock, container, true)) do
+        local kind = RenewableEnergy.PowerBank.partKind(fullType)
+        if found[kind] then
+            found[kind] = found[kind] + count
         end
-        return found
     end
+    restoreRoll()
+    return found
+end
+
+-- Every stock's parts are of their line's kind, each at a chance; the bank `args.stock` holds a
+-- part when the roll comes in under its chance × the misc loot option and not at it, so neither a
+-- part's chance nor the option goes astray; and a battery box (a tile of `args.boxTiles`), which has
+-- no slot for a charge controller, never gets one, even from a stock that lists one.
+check("bankStockParts", function(expect, _, _, args, defer)
+    local WorldSpawns, PowerBank = RenewableEnergy.WorldSpawns, RenewableEnergy.PowerBank
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
-        local isBox = args.boxTiles[stock.sprite]
-        if RATE_STOCKS[stockName] or isBox then
-            local found = partCounts(stockName)
-            if RATE_STOCKS[stockName] then
-                for kind, count in pairs(found) do
-                    local part = stock[kind]
-                    local chance = part and math.min(1, part.chance * options.LRMMisc) or 0
-                    if part then
-                        expect(part.chance > 0 and part.chance <= 1, stockName .. " banks hold a " .. kind .. " with chance " .. part.chance)
-                    end
-                    local tolerance = RATE_SIGMAS * math.sqrt(chance * (1 - chance) / samples) + 1e-9
-                    expectNear(stockName .. " share holding a " .. kind, count / samples, chance, tolerance)
+        for _, kind in ipairs(PARTS) do
+            local part = stock[kind]
+            if part then
+                expect(part.chance > 0 and part.chance <= 1, stockName .. " banks hold a " .. kind .. " with chance " .. part.chance)
+                for _, entry in ipairs(part.types) do
+                    expect(PowerBank.partKind(entry[1]) == kind, stockName .. "'s " .. kind .. " line holds a " .. entry[1])
                 end
-            end
-            if isBox then
-                expect(found.controller == 0, found.controller .. " of " .. samples .. " " .. stockName .. " battery boxes hold a charge controller")
             end
         end
     end
+    local container = RenewableEnergy.Loot.newContainer(nil)
+    -- Found batteries are sent to the clients that see them, and a server can't send an item of a
+    -- container that isn't in the world; the parts don't depend on the batteries.
+    local options = SandboxVars.RenewableEnergy
+    local restoreOptions = saveOptions(defer, { "LRMBatteries", "LRMMisc" })
+    options.LRMBatteries = 0
+    local stock = WorldSpawns.BANK_STOCK[args.stock]
+    for _, multiplier in ipairs({ 1, 2 }) do
+        options.LRMMisc = multiplier
+        for _, kind in ipairs(PARTS) do
+            if expect(stock[kind], args.stock .. " banks list no " .. kind) then
+                local edge = stock[kind].chance * multiplier
+                local under = bankPartsAt(container, args.stock, edge - UNDER, defer)[kind]
+                local at = bankPartsAt(container, args.stock, edge, defer)[kind]
+                expect(under == 1 and at == 0, string.format("at misc option %s a %s bank holds %d %s with a roll just under %s and %d at it",
+                    multiplier, args.stock, under, kind, edge, at))
+            end
+        end
+    end
+    -- args.stock's batteries and a certain controller, on each box tile and on args.stock's rack.
+    options.LRMMisc = 1
+    local name = "renewableEnergyTestSlots"
+    defer(function() WorldSpawns.BANK_STOCK[name] = nil end)
+    local sprites = { [stock.sprite] = false }
+    for sprite in pairs(args.boxTiles) do
+        sprites[sprite] = true
+    end
+    for sprite, isBox in pairs(sprites) do
+        WorldSpawns.BANK_STOCK[name] = { sprite = sprite, batteries = stock.batteries,
+            controller = { chance = 1, types = { { RenewableEnergy.Specs.controller, 1 } } } }
+        local controllers = bankPartsAt(container, name, 0, defer).controller
+        expect(controllers == (isBox and 0 or 1), "a " .. sprite .. " bank listing a certain controller holds " .. controllers)
+    end
+    WorldSpawns.BANK_STOCK[name] = nil
     restoreOptions()
 end)
 
--- How many items `args.times` electronics storage banks get at the save's options.
-handler("bankStockCount", function(_, args)
+-- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
+handler("bankStockCount", function(_, args, defer)
     local container = ItemContainer.new("crate", nil, nil)
-    for _ = 1, args.times do
-        RenewableEnergy.WorldSpawns.stockBank(container, "electronicsStorage")
-    end
+    local restoreRoll = Helpers.forceRolls(defer, args.roll)
+    RenewableEnergy.WorldSpawns.stockBank(container, args.stock)
+    restoreRoll()
     local count = container:getItems():size()
     container:removeAllItems()
     return { items = count }
@@ -176,40 +196,43 @@ local function expectConditionRanges(expect)
     expect(WorldSpawns.CRACKED.max < WorldSpawns.WEATHERED.min, "cracked and weathered conditions overlap")
 end
 
--- Farm storage shelves get cracked modules, at cracked conditions, and a bedroom's furniture none,
--- at the save's Solar Panels loot option; at the option's default a garage shelf's chance is the
--- room's weight at the module's loot multiplier, small but there.
-check("crackedModules", function(expect, expectNear, _, args, defer)
+-- Farm storage shelves get a cracked module, at a cracked condition, when the roll comes in under
+-- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
+-- follows the Solar Panels loot option, and at the option's default a garage shelf's is small but
+-- there.
+check("crackedModules", function(expect, _, _, _, defer)
     local Distributions = RenewableEnergy.Distributions
     local container = ItemContainer.new("crate", nil, nil)
-    for _ = 1, args.samples do
-        Distributions.addCrackedModules("farmstorage", "metal_shelves", container)
+    local function modulesAt(roomName, containerType, roll)
+        local restoreRoll = Helpers.forceRolls(defer, { roll })
+        Distributions.addCrackedModules(roomName, containerType, container)
+        restoreRoll()
+        local conditions = moduleConditions(container)
+        container:removeAllItems()
+        return conditions
     end
-    local conditions = moduleConditions(container)
-    container:removeAllItems()
-    for _ = 1, args.samples do
-        Distributions.addCrackedModules("bedroom", "wardrobe", container)
-        Distributions.addCrackedModules("garage", "fridge", container)
-    end
-    local elsewhere = container:getItems():size()
-    container:removeAllItems()
+    local options = SandboxVars.RenewableEnergy
     local restoreOptions = saveOptions(defer, { "LRMSolarPanels" })
-    SandboxVars.RenewableEnergy.LRMSolarPanels = 1
-    local garage = Distributions.CRACKED_MODULE_ROOMS.garage
-    local defaultChance = Distributions.crackedModuleChance(garage)
-    restoreOptions()
-    expectConditionRanges(expect)
-    expect(#conditions == args.samples, #conditions .. " cracked modules on " .. args.samples .. " farm storage shelves")
-    for _, condition in ipairs(conditions) do
-        if not expect(inRange(condition, RenewableEnergy.WorldSpawns.CRACKED), "a cracked module is at condition " .. condition) then
-            break
-        end
+    options.LRMSolarPanels = 1
+    local rooms = Distributions.CRACKED_MODULE_ROOMS
+    local chance = Distributions.crackedModuleChance(rooms.farmstorage)
+    expect(Distributions.crackedModuleChance(rooms.garage) > 0, "a garage shelf never holds a cracked module at the default option")
+    local under, at = modulesAt("farmstorage", "metal_shelves", chance - UNDER), modulesAt("farmstorage", "metal_shelves", chance)
+    expect(#under == 1 and #at == 0, string.format("a farm storage shelf got %d cracked modules with a roll just under its chance %s and %d at it",
+        #under, chance, #at))
+    if under[1] then
+        expect(inRange(under[1], RenewableEnergy.WorldSpawns.CRACKED), "a cracked module is at condition " .. under[1])
     end
-    expect(elsewhere == 0, elsewhere .. " modules in bedrooms and garage fridges")
-    -- A loot weight is out of 100 rolls, scaled by the item's loot category multiplier.
-    local lootModifier = ItemPickerJava.getLootModifier(RenewableEnergy.Specs.factoryModule)
-    expectNear("a garage shelf's chance of a cracked module", defaultChance, garage * lootModifier / 100, 1e-9)
-    expect(defaultChance > 0, "a garage shelf never holds a cracked module at the default option")
+    local elsewhere = #modulesAt("bedroom", "wardrobe", 0) + #modulesAt("garage", "fridge", 0)
+    expect(elsewhere == 0, elsewhere .. " modules in a bedroom wardrobe and a garage fridge")
+    options.LRMSolarPanels = 2
+    local doubled = Distributions.crackedModuleChance(rooms.farmstorage)
+    options.LRMSolarPanels = 0
+    local none = Distributions.crackedModuleChance(rooms.farmstorage)
+    restoreOptions()
+    expect(math.abs(doubled - 2 * chance) < 1e-12 and none == 0,
+        "a farm storage shelf's chance is " .. chance .. ", " .. doubled .. " at twice the option and " .. none .. " at 0")
+    expectConditionRanges(expect)
 end)
 
 -- What WorldSpawns stocks, which only the authority loads: for each BANK_STOCK name of

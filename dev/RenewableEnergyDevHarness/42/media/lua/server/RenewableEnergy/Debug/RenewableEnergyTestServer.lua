@@ -503,22 +503,37 @@ end)
 
 -- Panels ------------------------------------------------------------------------------------------
 
--- Storms on panel records off the map: for each trial { source, hours, runs }, how many of `runs`
--- storms of `hours` cracked a fresh copy of `source` (PanelSource.stormCrack), and the modules of the last.
-handler("stormCrack", function(_, args)
+-- A panel record off the map, as `args` lists it ({ kind, material, modules }).
+local function panelRecord(args)
+    local source = { kind = args.kind, material = args.material, modules = {} }
+    for i, module in ipairs(args.modules or {}) do
+        source.modules[i] = { type = module.type, condition = module.condition }
+    end
+    return source
+end
+
+-- PanelSource.stormChance for each trial { source, hours }, at the save's storm options.
+handler("stormChances", function(_, args)
+    local chances = {}
+    for i, trial in ipairs(args.trials) do
+        chances[i] = RenewableEnergy.PanelSource.stormChance(panelRecord(trial.source), trial.hours)
+    end
+    return { chances = chances }
+end)
+
+-- A storm (PanelSource.stormCrack) on a panel record off the map for each trial { source, hours,
+-- roll }, or with `under` in place of roll, a roll that far under the trial's own stormChance;
+-- worked out here, so the roll is exactly the chance the crack compares it with. The one roll is
+-- all a storm may draw. Answers whether each cracked and the modules after.
+handler("stormCrack", function(_, args, defer)
+    local PanelSource = RenewableEnergy.PanelSource
     local results = {}
-    for i, trial in ipairs(args.trials or {}) do
-        local count, source = 0, nil
-        for _ = 1, trial.runs or 1 do
-            source = { kind = trial.source.kind, material = trial.source.material, modules = {} }
-            for j, module in ipairs(trial.source.modules) do
-                source.modules[j] = { type = module.type, condition = module.condition }
-            end
-            if RenewableEnergy.PanelSource.stormCrack(source, trial.hours) then
-                count = count + 1
-            end
-        end
-        results[i] = { cracks = count, modules = source and source.modules or {} }
+    for i, trial in ipairs(args.trials) do
+        local source = panelRecord(trial.source)
+        local roll = trial.roll or PanelSource.stormChance(source, trial.hours) - trial.under
+        local restore = Helpers.forceRolls(defer, { roll })
+        results[i] = { cracked = PanelSource.stormCrack(source, trial.hours), modules = source.modules }
+        restore()
     end
     return { results = results }
 end)

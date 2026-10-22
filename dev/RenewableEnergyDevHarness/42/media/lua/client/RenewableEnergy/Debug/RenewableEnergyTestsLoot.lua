@@ -10,12 +10,9 @@ local test, serverCheck = T.test, T.serverCheck
 
 -- Every entry names an item that exists, since the game drops an unknown item silently, and sits
 -- once in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
--- table or a corpse's outfit list.
+-- table or a corpse's outfit list. The game hands each item out: not obsolete, light enough for a
+-- crate, and with a weight and loot multiplier above 0 at the default settings.
 serverCheck("renewable_energy_loot_lists_in_use", "lootListsInUse")
-
--- Every list actually hands out every item it lists, through the game's own rolls. The loot
--- rarity options are at their maximum, so a few rolls are enough even for the rarest entries.
-serverCheck("renewable_energy_loot_items_spawn", "lootItemsSpawn")
 
 -- Vehicles -------------------------------------------------------------------------------------
 
@@ -49,7 +46,8 @@ test("renewable_energy_loot_found_batteries_part_charged", {
 -- Containers the player owns -----------------------------------------------------------------------
 
 -- Loot respawn (LootRespawn.respawnInContainer) never refills a player's bank, charger or crate
--- with free items, in any room near the character.
+-- with free items: every room's table for the tiles' container types is empty, and they get no
+-- cracked modules.
 serverCheck("renewable_energy_loot_player_containers_not_refilled", "lootPlayerContainers", { sprites = {
     "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood", "batteryBankMetal",
     "cellCharger", "crate",

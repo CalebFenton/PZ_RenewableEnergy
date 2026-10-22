@@ -130,12 +130,11 @@ end
 
 --- What the tests read of a vehicle on either side: each panel's module, condition and shown
 --- models, the frame's parts and the lamp board, the blood on each side, what the battery box
---- holds, the lid, the switch, the lamps, the towing car's id, the colour and where the vehicle is.
+--- holds, the lid, the switch, the lamps and the colour.
 function Trailer.vehicleState(vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local state = {
-        id = vehicle:getId(), x = vehicle:getX(), y = vehicle:getY(), panels = {}, frame = {}, blood = {},
-        towedBy = vehicle:getVehicleTowedBy() and vehicle:getVehicleTowedBy():getId() or nil,
+        id = vehicle:getId(), panels = {}, frame = {}, blood = {},
         colorSat = vehicle:getColorSaturation(), colorVal = vehicle:getColorValue(),
     }
     if not ArrowBoard.isTrailer(vehicle) then
@@ -302,24 +301,27 @@ onVehicle("arrowBoardCanSwitch", function(vehicle, args)
     return { can = RenewableEnergy.ArrowBoard.canSwitch(vehicle, args.on), state = Trailer.vehicleState(vehicle) }
 end)
 
--- Rolls the trailer's switch as stocking does `args.rolls` times, from no switch each time, then
--- puts its own back. Answers how many rolls came out on.
+-- Rolls the trailer's switch as stocking does for each trial { was, roll }: the switch at `was`
+-- (nil for none yet), and the one roll it may draw `roll`, or "under"/"at" for just under or at
+-- STOCK.switchedOnChance, worked out here so the roll is exactly the chance. Then puts its own
+-- switch back. Answers whether each came out on.
 onVehicle("arrowBoardSwitchRolls", function(vehicle, args, _, defer)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local modData = box:getModData()
-    local key = ArrowBoard.SWITCH_KEY
-    local own, on = modData[key], 0
+    local key, chance = ArrowBoard.SWITCH_KEY, ArrowBoard.STOCK.switchedOnChance
+    local own, on = modData[key], {}
     local restore = deferOnce(defer, function()
         modData[key] = own
         vehicle:transmitPartModData(box)
     end)
-    for _ = 1, args.rolls do
-        modData[key] = nil
+    for i, trial in ipairs(args.trials) do
+        modData[key] = trial.was
+        local roll = trial.roll == "under" and chance - 1e-9 or trial.roll == "at" and chance or trial.roll
+        local restoreRoll = Helpers.forceRolls(defer, { roll })
         ArrowBoard.rollSwitch(vehicle)
-        if ArrowBoard.isSwitchedOn(vehicle) then
-            on = on + 1
-        end
+        restoreRoll()
+        on[i] = ArrowBoard.isSwitchedOn(vehicle)
     end
     restore()
     return { on = on }

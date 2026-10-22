@@ -4,13 +4,14 @@
 
 if isClient() then return end
 
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 
 RenewableEnergy = RenewableEnergy or {}
-local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
+local Chance, Specs, Wind = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.Wind
 local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
 
 local WindSource = {}
@@ -42,16 +43,23 @@ function WindSource.setBroken(isoObject, broken, source)
     end
 end
 
---- Whether a wind charger left running through `hours` of a wind of `kph` breaks its blades, at
---- its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage options.
-local function breaks(source, kph, hours)
+--- The chance that a wind charger left running through `hours` of a wind of `kph` breaks its
+--- blades, at its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage
+--- options: none while braked or broken already.
+function WindSource.breakChance(source, kph, hours)
     local options = SandboxVars.RenewableEnergy
     local spec = Specs.wind.turbines[source.kind]
     if not options.StormDamage or hours <= 0 or source.braked or source.broken or not Wind.canBreak(spec, kph) then
-        return false
+        return 0
     end
     local perHour = spec.breakPerHour * options.StormDamageRate / 100
-    return ZombRandFloat(0, 1) < 1 - (1 - math.min(1, perHour)) ^ hours
+    return 1 - (1 - math.min(1, perHour)) ^ hours
+end
+
+-- No roll when the blades can't break, so a test's set rolls go only to chances that can come up.
+local function breaks(source, kph, hours)
+    local chance = WindSource.breakChance(source, kph, hours)
+    return chance > 0 and Chance.hit(chance)
 end
 
 --- A newly connected wind charger's record: its brake and blades as the object has them, and its

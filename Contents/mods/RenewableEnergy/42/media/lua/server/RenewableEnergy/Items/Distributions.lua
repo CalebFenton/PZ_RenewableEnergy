@@ -2,6 +2,7 @@ require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/StashHouses"
 require "RenewableEnergy/World/WorldSpawns"
@@ -25,6 +26,7 @@ local Battery, Specs = RenewableEnergy.Battery, RenewableEnergy.Specs
 local Stash = RenewableEnergy.Stash
 local WorldSpawns = RenewableEnergy.WorldSpawns
 local ArrowBoard = RenewableEnergy.ArrowBoard
+local Chance = RenewableEnergy.Chance
 
 -- The mod's own lists
 
@@ -60,12 +62,12 @@ procLists.RenewableEnergyBatteryStock = {
 -- types is what a player's own bank, charger or crate would be refilled with. Empty tables refill
 -- nothing. addOwnContainersToRooms gives every room these, since a room's own "other" table comes
 -- before "all" (ItemPickerJava.fillContainer).
-local OWN_CONTAINER_TYPES = {
+Distributions.OWN_CONTAINER_TYPES = {
     "RenewableEnergyBatteryBoxWood", "RenewableEnergyBatteryBoxMetal", "RenewableEnergyBatteryRackWood",
     "RenewableEnergyBatteryRackMetal", "RenewableEnergyBatteryBankWood", "RenewableEnergyBatteryBankMetal",
     "RenewableEnergyCellCharger", Stash.CRATE_TYPE,
 }
-for _, containerType in ipairs(OWN_CONTAINER_TYPES) do
+for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
     subDist.all[containerType] = { rolls = 0, items = {} }
 end
 
@@ -172,7 +174,7 @@ local function addOwnContainersToRooms()
     local all = subDist.all
     for roomName, room in pairs(subDist) do
         if roomName ~= "all" and type(room) == "table" and room.rolls == nil then
-            for _, containerType in ipairs(OWN_CONTAINER_TYPES) do
+            for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
                 room[containerType] = room[containerType] or all[containerType]
             end
         end
@@ -716,7 +718,7 @@ end
 --- Maybe adds a cracked module to a freshly filled container, if its room or vehicle keeps them.
 function Distributions.addCrackedModules(roomName, containerType, container)
     local weight = crackedModuleWeight(roomName, containerType, container)
-    if weight > 0 and ZombRandFloat(0, 1) < Distributions.crackedModuleChance(weight) then
+    if weight > 0 and Chance.hit(Distributions.crackedModuleChance(weight)) then
         WorldSpawns.addModule(container, WorldSpawns.crackedCondition())
     end
 end

@@ -5,6 +5,7 @@ end
 require "Moveables/ISMoveableSpriteProps"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -24,6 +25,7 @@ local Sprites = RenewableEnergy.Sprites
 local Specs = RenewableEnergy.Specs
 local PowerBank = RenewableEnergy.PowerBank
 local Battery = RenewableEnergy.Battery
+local Chance = RenewableEnergy.Chance
 local MODULE = Specs.factoryModule
 
 -- Module conditions. A cracked module lies in a garage with a broken cover glass; a weathered
@@ -175,7 +177,7 @@ end
 
 -- A site module's condition: cracked or weathered.
 local function siteModuleCondition()
-    if ZombRandFloat(0, 1) < WorldSpawns.SITE_CRACKED_SHARE then
+    if Chance.hit(WorldSpawns.SITE_CRACKED_SHARE) then
         return WorldSpawns.crackedCondition()
     end
     return WorldSpawns.weatheredCondition()
@@ -206,7 +208,7 @@ end
 function WorldSpawns.scaled(count, multiplier)
     local expected = count * multiplier
     local whole = math.floor(expected)
-    return ZombRandFloat(0, 1) < expected - whole and whole + 1 or whole
+    return Chance.hit(expected - whole) and whole + 1 or whole
 end
 
 local function pickByWeight(types)
@@ -214,7 +216,7 @@ local function pickByWeight(types)
     for _, entry in ipairs(types) do
         total = total + entry[2]
     end
-    local roll = ZombRandFloat(0, total)
+    local roll = Chance.roll() * total
     for _, entry in ipairs(types) do
         roll = roll - entry[2]
         if roll < 0 then
@@ -237,7 +239,7 @@ end
 
 -- Adds one of `part`'s types with its chance × `multiplier`, if the bank has a slot for it.
 local function maybeAddPart(container, part, multiplier, slots)
-    if part and slots > 0 and ZombRandFloat(0, 1) < part.chance * multiplier then
+    if part and slots > 0 and Chance.hit(part.chance * multiplier) then
         addFound(container, pickByWeight(part.types))
     end
 end
