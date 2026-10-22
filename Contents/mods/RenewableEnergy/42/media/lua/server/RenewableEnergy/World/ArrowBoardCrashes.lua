@@ -17,6 +17,7 @@ local ArrowBoard = RenewableEnergy.ArrowBoard
 -- short, half a second or more later, so a jolt is a new crash only after `quietMs` without one.
 -- `unhitchedMs` and `unhitchedSquares` cover a crash that snaps the hitch (above).
 local CRASH = { kmh = 20, ms = 250, quietMs = 2000, unhitchedMs = 1000, unhitchedSquares = 8 }
+ArrowBoard.CRASH = CRASH
 local LIMIT_SQ = (CRASH.kmh / 3.6) ^ 2
 
 -- The client command a driver sends when the trailer they tow crashes.
@@ -34,11 +35,16 @@ local CLIENT = isClient()
 -- A dedicated server runs no vehicle physics (BaseVehicle.createPhysics), so it watches nothing.
 local WATCHES = not isServer()
 
+--- A new watch's velocity record, for ArrowBoard.sampleCrash.
+function ArrowBoard.newCrashWatch()
+    return { ms = {}, x = {}, y = {}, head = 1, count = 0, joltedAt = -math.huge }
+end
+
 --- Watches the trailer's crashes from now until it leaves the world, in a game that runs vehicle
 --- physics. Called from its panels' part `init`.
 function ArrowBoard.watchCrashes(vehicle)
     if WATCHES and not watched[vehicle] then
-        watched[vehicle] = { ms = {}, x = {}, y = {}, head = 1, count = 0, joltedAt = -math.huge }
+        watched[vehicle] = ArrowBoard.newCrashWatch()
     end
 end
 
@@ -71,18 +77,17 @@ local function record(entry, now, x, y)
     entry.ms[slot], entry.x[slot], entry.y[slot] = now, x, y
 end
 
--- Records the trailer's velocity now and returns whether a new crash began: the velocity changed
--- by a crash's worth within CRASH.ms, CRASH.quietMs after the last jolt. A trailer at rest
--- (BaseVehicle.isAtRest) keeps one still sample, which is all a crash into it needs to be seen,
--- so a parked trailer costs no scan.
-local function sampleCrash(vehicle, entry, now)
-    if vehicle:isAtRest() then
+--- Records in `entry` (ArrowBoard.newCrashWatch) the trailer's ground velocity `x`, `y` in m/s at
+--- real time `now` in ms, or that it is `atRest` (BaseVehicle.isAtRest), and returns whether a new
+--- crash began: the velocity changed by a crash's worth within CRASH.ms, CRASH.quietMs after the
+--- last jolt. A trailer at rest keeps one still sample, which is all a crash into it needs to be
+--- seen, so a parked trailer costs no scan.
+function ArrowBoard.sampleCrash(entry, now, x, y, atRest)
+    if atRest then
         entry.head, entry.count = 1, 0
         record(entry, now, 0, 0)
         return false
     end
-    vehicle:getLinearVelocity(velocity)
-    local x, y = velocity:x(), velocity:z()
     local ms, xs, ys = entry.ms, entry.x, entry.y
     while entry.count > 0 and now - ms[entry.head] > CRASH.ms do
         entry.head = entry.head % SAMPLE_SLOTS + 1
@@ -104,6 +109,15 @@ local function sampleCrash(vehicle, entry, now)
     local newCrash = now - entry.joltedAt >= CRASH.quietMs
     entry.joltedAt = now
     return newCrash
+end
+
+-- The physics' x and z are the ground's.
+local function sampleCrash(vehicle, entry, now)
+    if vehicle:isAtRest() then
+        return ArrowBoard.sampleCrash(entry, now, 0, 0, true)
+    end
+    vehicle:getLinearVelocity(velocity)
+    return ArrowBoard.sampleCrash(entry, now, velocity:x(), velocity:z(), false)
 end
 
 local cell

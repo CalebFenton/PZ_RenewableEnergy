@@ -1413,18 +1413,6 @@ local function towingPair(self, opts)
     attachTrailer(self)
 end
 
--- A push each frame, small enough that a frame adds only a few km/h, and the speeds a crash's jolt
--- and a bump's stop pushing at. The game applies a push for the frame's length of physics time
--- (BaseVehicle.applyAccumulatedImpulsesFromHitObjectsToPhysics), so one push gives a different
--- speed at each frame rate; pushing up to a measured speed doesn't. Even at a low frame rate the
--- crash's push ends well within the watcher's window.
-local PUSH, CRASH_KMH, BUMP_KMH = 1000, 35, 6
-
--- How long, in real milliseconds, a hitch holds whatever jolts it (Bullet.onVehicleConstraintImpulse),
--- and a push that snaps an older hitch in its first frames, well before the trailer has sped up by
--- a crash's worth.
-local FRESH_HITCH_MS, SNAP_PUSH = 2000, 5000
-
 -- How long a freshly spawned vehicle is given to fall onto its wheels before it counts as at rest
 -- without having been seen moving: it reads as at rest before its physics exists
 -- (BaseVehicle.isAtRest).
@@ -1442,88 +1430,113 @@ local function waitForParked(self, trailer)
     end, "the trailer at rest on its own", VEHICLE_FRAMES)
 end
 
--- The game cracks the panels of a trailer jolted as hard as a crash, and leaves them be after a
--- bump: the side that runs the trailer's physics watches its velocity, which is the client of the
--- player driving the car that tows it, and asks the server to crack them (in single player it
--- cracks them itself, parked trailers too). The jolt is a push on the trailer: `how` "towed" while
--- it is hitched to the character's car, soon enough after hitching that the hitch holds; "snap"
--- late enough that the jolt snaps the hitch, which the watcher then follows for a moment longer;
--- "parked" while it stands alone at rest, as a car running into it jolts it. `cracks` says
--- whether the jolt cracks the panels, by Specs.storm.crack each.
-local function crashTest(name, targetKmh, cracks, how)
-    local before = 90
-    local towed, snap = how ~= "parked", how == "snap"
-    test(name, {
-        instant = true,
-        spOnly = not towed and "a multiplayer client runs no physics for a trailer it doesn't tow, so it watches no parked one" or nil,
-        run = function(self)
-            local setup = { box = {}, panels = modulesOnBothPanels(before) }
-            if towed then
-                towingPair(self, { drive = true, trailer = setup })
-            elseif spawnTrailer(self, { repair = true }) then
-                T.onVehicle(self, self.trailer, "setTrailer", setup)
-                waitForParked(self, self.trailer)
-            end
-            if not self.trailer then return end
-            local trailer = self.trailer
-            if snap then
-                T.waitUntil(function() return getTimestampMs() - self.hitchedAt > FRESH_HITCH_MS end, VEHICLE_FRAMES)
-            end
-            self.peak = 0
-            -- Until the car has stopped, so that the next test doesn't begin with the character at
-            -- the wheel of a moving car, and the trailer too while hitched or parked, so that a
-            -- crack a bump caused would show; a trailer the jolt set loose coasts on for a while. A
-            -- pair rolling at a crash's speed takes longer to stop than one settling on its hitch.
-            T.waitUntil(function()
-                local vehicle = trailer.vehicle
-                local speed = math.abs(vehicle:getCurrentSpeedKmHour())
-                if not self.pushed then
-                    if speed >= targetKmh then
-                        self.pushed = true
-                    else
-                        vehicle:applyImpulseGeneric(vehicle:getX(), vehicle:getY(), vehicle:getZ(), 0, -1, 0, snap and SNAP_PUSH or PUSH)
-                    end
+-- The crash watcher (ArrowBoard.sampleCrash), fed a frame at a time the velocities a trailer would
+-- show, tells a crash from what isn't one: a speed change of a crash's worth within the window is
+-- one, into a parked trailer, at speed, sideways too; a bump, or braking spread past the window,
+-- isn't; a jolt soon after one, as the hitch brings a trailer up short, is the same crash, and
+-- one after the quiet time a new one.
+test("renewable_energy_world_arrow_board_crash_watch_tells_crashes", {
+    instant = true,
+    validate = function()
+        local ArrowBoard = RenewableEnergy.ArrowBoard
+        local crash = ArrowBoard.CRASH
+        local crashMs, frame = crash.kmh / 3.6, 16
+        local cruise, stopped = { 0, -30 / 3.6 }, { 0, 0 }
+        -- Feeds `ground` velocities in m/s ({ x, y }, or "rest") one frame apart into a new watch;
+        -- answers the frames that began a new crash, joined with commas.
+        local function crashes(ground)
+            local watch, found = ArrowBoard.newCrashWatch(), {}
+            for i, v in ipairs(ground) do
+                local atRest = v == "rest"
+                if ArrowBoard.sampleCrash(watch, i * frame, atRest and 0 or v[1], atRest and 0 or v[2], atRest) then
+                    table.insert(found, i)
                 end
-                self.peak = math.max(self.peak, speed)
-                if towed and not self.snapSpeed and vehicle:getVehicleTowedBy() == nil then
-                    self.snapSpeed = speed
-                    self.hitchAgeMs = getTimestampMs() - self.hitchedAt
-                end
-                return self.pushed and (not towed or self.car.vehicle:isAtRest()) and (self.snapSpeed ~= nil or vehicle:isAtRest())
-            end, 2 * VEHICLE_FRAMES)
-            T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= before end,
-                cracks and SERVER_MS or 0)
-        end,
-        validate = function(self)
-            local state = self.trailer.state
-            local expected = cracks and before - RenewableEnergy.Specs.storm.crack or before
-            if not expect(self.pushed, string.format("the push never got the trailer to %d km/h, only %.1f", targetKmh, self.peak)) then
-                return
             end
-            if snap then
-                expect(self.snapSpeed ~= nil, string.format("the jolt to %.1f km/h left the trailer hitched", self.peak))
-            elseif towed then
-                expect(self.snapSpeed == nil, string.format("the jolt snapped a hitch over %s ms old at %s km/h",
-                    tostring(self.hitchAgeMs), tostring(self.snapSpeed)))
+            return table.concat(found, ",")
+        end
+        -- `list` with `frames` more frames at velocity `v`.
+        local function hold(list, v, frames)
+            for _ = 1, frames do
+                table.insert(list, v)
             end
-            expect(panelCondition(state, LEFT) == expected and panelCondition(state, RIGHT) == expected,
-                string.format("a jolt to %.1f km/h%s left the panels at %s and %s", self.peak,
-                    self.snapSpeed and string.format(", snapping the hitch at %.1f,", self.snapSpeed) or "",
-                    tostring(panelCondition(state, LEFT)), tostring(panelCondition(state, RIGHT))))
-        end,
-    })
-end
-crashTest("renewable_energy_world_arrow_board_crash_cracks_panels", CRASH_KMH, true, "towed")
-crashTest("renewable_energy_world_arrow_board_bump_leaves_panels", BUMP_KMH, false, "towed")
-crashTest("renewable_energy_world_arrow_board_crash_snapping_the_hitch_cracks_panels", CRASH_KMH, true, "snap")
-crashTest("renewable_energy_world_arrow_board_crash_cracks_parked_panels", CRASH_KMH, true, "parked")
-crashTest("renewable_energy_world_arrow_board_bump_leaves_parked_panels", BUMP_KMH, false, "parked")
+            return list
+        end
+        local function cruising(after)
+            local list = hold({}, cruise, 5)
+            table.insert(list, after)
+            return list
+        end
+
+        expect(crashes({ "rest", { 0, -1.01 * crashMs } }) == "2", "a crash's jolt into a parked trailer went unseen")
+        expect(crashes({ "rest", { 0, -0.99 * crashMs } }) == "", "a jolt just short of a crash's into a parked trailer cracked it")
+        expect(crashes(cruising(stopped)) == "6", "stopping dead from 30 km/h went unseen")
+        expect(crashes(cruising({ 1.01 * crashMs, cruise[2] })) == "6", "a crash's jolt sideways went unseen")
+        expect(crashes(cruising({ 0, cruise[2] + 6 / 3.6 })) == "", "a bump of 6 km/h cracked the panels")
+        -- Off 30 km/h over twice the window, the window sees half the speed shed.
+        local braking, frames = {}, math.ceil(2 * crash.ms / frame)
+        for i = 0, frames do
+            table.insert(braking, { 0, cruise[2] * (1 - i / frames) })
+        end
+        expect(crashes(braking) == "", "braking to a stop over " .. frames * frame .. " ms cracked the panels")
+
+        -- Stopped dead, thrown forward on the hitch 600 ms later, then stopped dead again once
+        -- the throw has been out of the window for the quiet time.
+        local hits = hold(cruising(stopped), stopped, math.floor(600 / frame))
+        table.insert(hits, { 0, -1.01 * crashMs })
+        local rebound = #hits
+        hold(hits, { 0, -1.01 * crashMs }, math.ceil((crash.ms + crash.quietMs) / frame))
+        table.insert(hits, stopped)
+        local seen = crashes(hits)
+        expect(seen == "6," .. #hits, string.format("a crash, its rebound at frame %d and a crash at frame %d began crashes at frames %s",
+            rebound, #hits, seen))
+    end,
+})
+
+-- A multiplayer client asks the server to crack the panels of the trailer behind the car its
+-- player drives; the authority's handler takes the command in single player too. From the driver,
+-- a crash cracks them by Specs.storm.crack, the same crash reported again within the quiet time
+-- cracks nothing more, and a crash that snapped the hitch counts while the trailer is close behind.
+test("renewable_energy_world_arrow_board_crash_command_from_the_driver", {
+    instant = true,
+    run = function(self)
+        towingPair(self, { drive = true, trailer = { box = {}, panels = modulesOnBothPanels(90) } })
+        if not self.trailer then return end
+        local trailer = self.trailer
+        -- The command and a state request go out in order, so the state is read after the
+        -- command was handled.
+        local function crashed(key)
+            T.step(function()
+                sendClientCommand(player(), "RenewableEnergyArrowBoard", "crashed", { vehicle = trailer.id, car = self.car.id })
+            end)
+            T.vehicleState(self, trailer)
+            T.step(function() self[key] = trailer.state end)
+        end
+        crashed("once")
+        -- The authority took the first crash before its state came back.
+        T.step(function() self.firstMs = getTimestampMs() end)
+        crashed("again")
+        T.step(function() sendClientCommand(player(), "vehicle", "detachTrailer", { vehicle = self.car.id }) end)
+        T.waitFor(self, function() return trailer.vehicle:getVehicleTowedBy() == nil end, "the trailer unhitched", VEHICLE_FRAMES)
+        T.waitFor(self, function() return getTimestampMs() - self.firstMs > RenewableEnergy.ArrowBoard.CRASH.quietMs end,
+            "the quiet time after the first crash", VEHICLE_FRAMES)
+        crashed("snapped")
+    end,
+    validate = function(self)
+        local crack = RenewableEnergy.Specs.storm.crack
+        for _, case in ipairs({ { "once", 90 - crack, "a crash from the driver" }, { "again", 90 - crack, "the crash reported twice" },
+            { "snapped", 90 - 2 * crack, "a later crash that snapped the hitch" } }) do
+            local state = self[case[1]]
+            expect(panelCondition(state, LEFT) == case[2] and panelCondition(state, RIGHT) == case[2], string.format(
+                "%s left the panels at %s and %s, expected %d", case[3], tostring(panelCondition(state, LEFT)),
+                tostring(panelCondition(state, RIGHT)), case[2]))
+        end
+    end,
+})
 
 -- The server takes a crash only from the player driving the car that tows the trailer: anyone
 -- else's crash command, here the character's while standing beside the hitched pair, cracks
 -- nothing.
 test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
-    mpOnly = "single player cracks the panels where it watches the trailer; only a multiplayer client sends the crash command",
     instant = true,
     run = function(self)
         towingPair(self, { trailer = { panels = { [LEFT] = { type = MODULE, condition = 90 } } } })
@@ -1703,8 +1716,8 @@ test("renewable_energy_world_arrow_board_repair_adds_up_part_used_epoxy", {
 })
 
 -- The car is pushed whenever it rolls slower than this, in squares a second, until the trailer
--- has followed it TOW_SQUARES. Pushed every frame, it would speed off the open strip, and a crash
--- snaps a hitch older than FRESH_HITCH_MS (Bullet.onVehicleConstraintImpulse).
+-- has followed it TOW_SQUARES. Pushed every frame, it would speed off the open strip, and a jolt
+-- snaps a hitch over two seconds old (Bullet.onVehicleConstraintImpulse).
 local PUSH_SPEED = 5
 local TOW_SQUARES = 2
 -- A car with nobody at the wheel holds its brakes, so each push has to beat them.
