@@ -32,8 +32,10 @@ local function setLit(light, lit, bulbChanged)
     end
 end
 
--- Runs a light for `hours` under `sky`; `bulbChanged` says its bulb has just changed, so that its
--- lamp's colour reaches the clients even if it stays lit.
+-- Runs a light for `hours` under `sky` (Sun.skyNow): by day its cell charges the battery, and after
+-- sunset its bulb draws on it until it is empty; a light without a bulb draws nothing.
+-- `bulbChanged` says its bulb has just changed, so that its lamp's colour reaches the clients even
+-- if it stays lit.
 local function run(light, hours, sky, bulbChanged)
     local spec = Specs.gardenLight
     local night = sky.up <= 0
@@ -45,16 +47,7 @@ local function run(light, hours, sky, bulbChanged)
         charge = math.max(0, charge - spec.nightWatts * hours)
     end
     light:getModData()[SolarGardenLight.CHARGE_KEY] = charge
-    local lit = night and bulb and charge > 0
-    setLit(light, lit, bulbChanged)
-    return lit
-end
-
---- Runs a light for `hours` at the sun of the moment: by day its cell charges the battery, and
---- after sunset its bulb draws on it until it is empty. A light without a bulb draws nothing.
---- `sky` is Sun.skyNow(), worked out here if nil. Returns whether the light is lit.
-function SolarGardenLight.update(light, hours, sky)
-    return run(light, hours, sky or Sun.skyNow(), false)
+    setLit(light, night and bulb and charge > 0, bulbChanged)
 end
 
 -- Puts `bulb` (nil for none) in the light, tells the clients, and lights or darkens it at once.

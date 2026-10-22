@@ -51,6 +51,7 @@
     "Tooltip_RenewableEnergy_NoBankInReach": "No battery bank within reach.",
     "Tooltip_RenewableEnergy_SourceIndoors": "It has to be outdoors.",
     "Tooltip_RenewableEnergy_NoInverter": "The bank has no working inverter.",
+    "Tooltip_RenewableEnergy_NoBatteries": "The bank has no working batteries.",
     "Tooltip_RenewableEnergy_NoSourcesInReach": "No unconnected sources within reach.",
     "Tooltip_RenewableEnergy_BarrelDigester": "A drum of rotting scraps and manure that makes gas once it gets going, into garbage bags. Small, stinks the most, and stops in the cold.",
     "Tooltip_RenewableEnergy_InsulatedDigester": "A drum boxed in straw and planks under a floating gas drum. Bigger, works into the fall, smells less.",

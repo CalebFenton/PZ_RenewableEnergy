@@ -245,11 +245,21 @@ function T.bankState(self, bank)
     T.step(function() bank.state = self.server.bankState end)
 end
 
---- Queues a pass of `opts.hours` of `bank` on the server, with the weather fixed clear: `light`
---- W/m² on every mount, no snow, `opts.stormHours` of storm and a wind of `opts.windKph`.
+--- Queues the bank system's own pass of `bank` over the last `opts.hours` (1 if nil) on the
+--- server, with the sky the test sets: `light` W/m² on every mount, snow falling if
+--- `opts.snowing`, else clear, at `opts.airC` °C (mild if nil), `opts.stormHours` of storm and a
+--- wind of `opts.windKph`. Runs a bank whose chunk is unloaded too.
 function T.bankPass(self, bank, light, opts)
     opts = opts or {}
-    onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours, windKph = opts.windKph })
+    T.server(self, "bankPass", { bank = bank.position, light = light, hours = opts.hours, stormHours = opts.stormHours,
+        windKph = opts.windKph, snowing = opts.snowing, airC = opts.airC })
+    T.step(function() bank.state = self.server.bankPass end)
+end
+
+--- Queues a snowfall on `bank`'s panels on the server: its pass over the last `hours` (1 if nil)
+--- of a frosty night with snow falling, which settles on every mount that holds snow.
+function T.snowfall(self, bank, hours)
+    T.bankPass(self, bank, 0, { hours = hours or 1, snowing = true, airC = -10 })
 end
 
 -- Vanilla's generator fuel an hour for each appliance kind the status lists (IsoGenerator's
@@ -268,9 +278,9 @@ function T.applianceWatts(names)
     return watts
 end
 
---- Queues replacing the measured load of `bank` with appliances of the kinds `names`, as if the
---- scan had found them switched on, and letting the bank cut or restore its power and send its
---- status. The next pass measures the real load again.
+--- Queues replacing the measured load of `bank` with appliances of the kinds `names`, and letting
+--- the bank cut or restore its power and send its status. For the window tests, which are about
+--- how a load of given kinds shows; a pass measures the real load again.
 function T.applyLoad(self, bank, names)
     local appliances = {}
     for i, name in ipairs(names) do
@@ -279,10 +289,10 @@ function T.applyLoad(self, bank, names)
     onBank(self, bank, "applyLoad", { appliances = appliances })
 end
 
---- Queues setting fields of the server's record of `bank`, and writing its charge into its
---- batteries if `writeBatteries`.
-function T.bankSet(self, bank, fields, writeBatteries)
-    onBank(self, bank, "bankSet", { fields = fields, writeBatteries = writeBatteries })
+--- Queues charging every battery in `bank` to `charge` on the server, as the batteries carry their
+--- charge, and the bank reading them again.
+function T.setCharge(self, bank, charge)
+    onBank(self, bank, "setCharge", { charge = charge })
 end
 
 --- Queues setting the condition of the first `fullType` in `bank` on the server, and its repair

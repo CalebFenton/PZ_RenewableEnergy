@@ -209,7 +209,7 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
         local spec = Specs.wind.turbines.propeller
         T.batch(function()
             T.perform(self, "setBrake", { source = self.braked.position, braked = true })
-            T.bankPass(self, bank, 0, { windKph = spec.breakKph - 1, hours = 60 })
+            T.bankPass(self, bank, 0, { windKph = spec.breakKph - 1, hours = 24 })
             T.step(function() self.belowBreak = bank.state end)
             T.bankPass(self, bank, 0, { windKph = spec.breakKph })
             T.step(function() self.storm = bank.state end)

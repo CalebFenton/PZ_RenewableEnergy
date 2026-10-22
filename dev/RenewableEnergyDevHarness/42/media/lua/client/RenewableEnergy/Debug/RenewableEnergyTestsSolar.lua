@@ -396,7 +396,8 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
             T.step(function() self[key].state = bank.state end)
         end
         T.batch(function()
-            T.server(self, "setSnow", { bank = bank.position, source = panel.position, snow = 0.8 })
+            T.snowfall(self, bank)
+            T.step(function() self.snowed = snowOn(bank.state, panel) end)
             tryAgain("again")
             self.second = T.panel(self, Sprites.flat, { near = bank, connect = true })
             if not self.second then return end
@@ -406,15 +407,86 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
     validate = function(self)
         if not expect(self.panel.connected and self.second.connected, "connecting the panels failed ("
             .. tostring(self.panel.reason) .. ", " .. tostring(self.second.reason) .. ")") then return end
+        if not expect((self.snowed or 0) > 0, "a night of snowfall left no snow on the panel") then return end
         for _, case in ipairs({ { self.again, 1, "a bank" }, { self.full, 2, "a full bank" } }) do
             local reply, panels, what = case[1], case[2], case[3]
             expect(reply.state.sources == panels, "connecting a panel to " .. what .. " it feeds left "
                 .. reply.state.sources .. " panels")
             -- Connecting brings the bank up to now first, which may melt a trace of it.
-            expectNear("snow on a panel connected again to " .. what .. " it feeds", snowOn(reply.state, self.panel) or -1, 0.8, 0.01)
+            expectNear("snow on a panel connected again to " .. what .. " it feeds", snowOn(reply.state, self.panel) or -1,
+                self.snowed, 0.01)
         end
         expect(self.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
             "a full bank turned its own panel away for want of a slot")
+    end,
+})
+
+-- Whether this client's copy of the panel handle `panel` draws snow on its tile.
+local function showsSnow(panel)
+    local attached = panel.object:getAttachedAnimSprite()
+    for i = 0, (attached and attached:size() or 0) - 1 do
+        if Sprites.isSnow(attached:get(i):getName()) then
+            return true
+        end
+    end
+    return false
+end
+
+-- The status entry of `panel` in a bank state, or an empty one when the status doesn't list it.
+local function entryOf(state, panel)
+    for _, source in ipairs(state.status.sources) do
+        if PowerBank.samePosition(source, panel.position) then
+            return source
+        end
+    end
+    return {}
+end
+
+-- Snow falling on a frosty night settles on a flat panel and a rack, and this client's copies of
+-- them show it. In the sun it takes its share of what a panel makes, beside a panel swept clean;
+-- the sun melts it, the rack's tilt sheds it faster, and mild air takes the rest.
+test("renewable_energy_solar_snow_settles_dims_and_melts", {
+    run = function(self)
+        local bank = T.bank(self, "batteryRackWood", { "Base.CarBattery1", Specs.controller }, { charge = 0.2 })
+        self.flat = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        self.rack = self.flat and T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
+        self.clean = self.rack and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not self.clean then return end
+        self.bank = bank
+        T.batch(function()
+            T.snowfall(self, bank, 2)
+            T.step(function() self.night = bank.state end)
+            T.perform(self, "clearSnow", { source = self.clean.position })
+        end)
+        T.waitFor(self, function() return showsSnow(self.flat) and showsSnow(self.rack) end,
+            "this client's copies of the snowy panels showing snow")
+        T.step(function() self.cleanShowed = showsSnow(self.clean) end)
+        T.bankPass(self, bank, Sun.FULL_SUN, { airC = -10 })
+        T.step(function() self.sunny = bank.state end)
+        T.waitFor(self, function() return showsSnow(self.flat) and not showsSnow(self.rack) end,
+            "this client's copy of the rack showing its snow shed")
+        T.bankPass(self, bank, Sun.FULL_SUN, { hours = 10 })
+        T.waitFor(self, function() return not showsSnow(self.flat) end, "this client's copy of the flat panel thawed")
+    end,
+    validate = function(self)
+        local connected = self.flat.connected and self.rack.connected and self.clean.connected
+        if not expect(connected, "connecting the panels failed") then return end
+        local flat, rack = entryOf(self.night, self.flat), entryOf(self.night, self.rack)
+        expect((flat.snow or 0) > 0 and rack.snow == flat.snow, string.format(
+            "a frosty night of snowfall left %s on the flat panel and %s on the rack", tostring(flat.snow), tostring(rack.snow)))
+        expect(not self.cleanShowed, "this client's copy of the swept panel still shows snow")
+        flat, rack = entryOf(self.sunny, self.flat), entryOf(self.sunny, self.rack)
+        local clean = entryOf(self.sunny, self.clean)
+        if not expect((clean.watts or 0) > 0, "the swept panel made nothing in full sun") then return end
+        -- Snow covers its share of the panel, and that share of the sun goes nowhere.
+        expectNear("the snowy flat panel's watts against the swept one's", flat.watts / clean.watts, 1 - flat.snow, 1e-6)
+        expectNear("the snowy flat panel's share of full sun", flat.fullSunPct, round(100 * (1 - flat.snow)), 0)
+        expect(flat.snow > 0 and flat.snow < entryOf(self.night, self.flat).snow,
+            "an hour of full sun took the flat panel's snow from " .. entryOf(self.night, self.flat).snow .. " to " .. flat.snow)
+        expect(rack.snow < flat.snow, "the rack, which sheds snow, kept " .. rack.snow .. " against the flat panel's " .. flat.snow)
+        local thawed = entryOf(self.bank.state, self.flat)
+        expectNear("snow on the flat panel after a mild sunny day", thawed.snow, 0, 0)
+        expectNear("the thawed panel's share of full sun", thawed.fullSunPct, 100, 0)
     end,
 })
 
@@ -629,7 +701,7 @@ test("renewable_energy_solar_clear_snow_requirements", {
         self.flat = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
         self.wall = self.flat and T.panel(self, Sprites.wall.wood.E)
         if not self.wall then return end
-        T.server(self, "setSnow", { bank = self.bank.position, source = self.flat.position, snow = 0.8 })
+        T.snowfall(self, self.bank)
         T.waitFor(self, function()
             local summary = T.clientSummary(self.bank)
             return summary ~= nil and summary.sources[1] ~= nil and summary.sources[1].snowy == true
