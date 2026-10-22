@@ -289,9 +289,19 @@ function WorldSpawns.placeBank(square, stockName)
         print("RenewableEnergy: no bank at " .. square:getX() .. "," .. square:getY() .. "," .. square:getZ() .. ", which is not indoors")
         return nil
     end
-    local bank = PowerBank.place(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], -1)
+    return WorldSpawns.placeBankWith(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], function(container)
+        WorldSpawns.stockBank(container, stockName)
+    end)
+end
+
+--- Places a connected, switched-off bank of tile `spriteName` (a bank's Sprites field value) on
+--- `square`, its container filled by `fill(container)` and sent to the clients, wherever the
+--- square is: placeBank decides where a world bank may stand.
+---@return IsoGenerator
+function WorldSpawns.placeBankWith(square, spriteName, fill)
+    local bank = PowerBank.place(square, spriteName, -1)
     local container = bank:getContainer()
-    WorldSpawns.stockBank(container, stockName)
+    fill(container)
     -- PowerBank.place sent the bank to the clients while it was empty.
     local items = container:getItems()
     for i = 0, items:size() - 1 do

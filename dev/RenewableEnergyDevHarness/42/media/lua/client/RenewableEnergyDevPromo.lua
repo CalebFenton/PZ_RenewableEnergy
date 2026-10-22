@@ -1615,12 +1615,7 @@ local function addGardenLights()
     run:add(function()
         -- Lit now, rather than at the next minute's pass. Their light shows while the character
         -- looks around.
-        for _, spot in ipairs(WALK.lights) do
-            local light = SolarGardenLight.findOn(at(walk, spot))
-            if light then
-                SolarGardenLight.update(light, 0)
-            end
-        end
+        SolarGardenLight.updateAll(0)
     end)
     goTo(squaresAt(walk, { WALK.scout, WALK.player }), 0)
     run:addOpaque("gardenlights", function()

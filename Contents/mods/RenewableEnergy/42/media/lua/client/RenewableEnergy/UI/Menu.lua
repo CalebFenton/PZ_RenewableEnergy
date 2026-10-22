@@ -160,6 +160,7 @@ function Menu.askName(playerNum, bank)
     local modal = ISTextBox:new(0, 0, 280, 180, getText("IGUI_RenewableEnergy_NameThisBank"), summary and summary.name or "",
         nil, onNameEntered, playerNum, playerNum, bank)
     modal:initialise()
+    modal.entry:setMaxTextLength(PowerBank.NAME_LENGTH)
     modal:addToUIManager()
     if JoypadState.players[playerNum + 1] then
         setJoypadFocus(playerNum, modal)

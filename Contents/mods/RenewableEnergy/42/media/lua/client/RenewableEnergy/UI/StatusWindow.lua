@@ -63,7 +63,7 @@ local barColor = { r = 0, g = 0, b = 0, a = 1 }
 -- The lines across the top, each { text = text, color = name }.
 
 local function chargingLine(status)
-    if #status.batteries == 0 then
+    if status.capacityWh <= 0 then
         return { text = getText("IGUI_RenewableEnergy_NoBatteries"), color = "bad" }
     end
     local watts, hours = status.charging.watts, status.charging.hours
@@ -102,8 +102,8 @@ local function inputSlotsLine(status)
     return { text = text, color = slots.used > slots.total and "bad" or nil }
 end
 
--- Why a bank that has an inverter isn't carrying its load; overloads and missing inverters
--- have their own line.
+-- Why a bank that has an inverter and batteries isn't carrying its load; overloads and missing
+-- inverters or batteries have their own line.
 local STATE_LINES = {
     outdoors = { key = "IGUI_RenewableEnergy_StateOutdoors", color = "bad" },
     disconnected = { key = "IGUI_RenewableEnergy_StateDisconnected", color = "bad" },

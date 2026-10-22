@@ -448,8 +448,8 @@ local function lampShines(square, fullType)
     return lamp ~= nil and sameColour(shownColour(lamp), bulbColour(fullType))
 end
 
--- Queues running the light on the server for `hours`, from `charge` Wh if given, and a wait until
--- this client's tile and lamp match the server's answer.
+-- Queues running the light on the server through the gadget pass for `hours` of the clock, from
+-- `charge` Wh if given, and a wait until this client's tile and lamp match the server's answer.
 local function runLight(self, light, charge, hours)
     T.server(self, "gardenLightUpdate", { x = light.x, y = light.y, z = light.z,
         charge = charge, hours = hours })
@@ -483,8 +483,8 @@ local GARDEN_LIGHT_HOURS = {
     { what = "with a little more than the night draws", hour = MIDNIGHT, charge = NIGHT_WH + 0.01, hours = NIGHT_HOURS,
         lit = true, after = 0.01 },
     { what = "with just what the night draws", hour = MIDNIGHT, charge = NIGHT_WH, hours = NIGHT_HOURS, lit = false, after = 0 },
-    { what = "empty at noon", hour = NOON, charge = 0, hours = 2, lit = false, low = 0, high = Specs.gardenLight.wh },
-    { what = "nearly full at noon", hour = NOON, charge = Specs.gardenLight.wh - 0.01, hours = 2, lit = false,
+    { what = "empty at noon", hour = NOON, charge = 0, hours = 1, lit = false, low = 0, high = Specs.gardenLight.wh },
+    { what = "nearly full at noon", hour = NOON, charge = Specs.gardenLight.wh - 0.01, hours = 1, lit = false,
         after = Specs.gardenLight.wh },
 }
 

@@ -185,9 +185,8 @@ local SHORT_PASS_HOURS = 1 / 6
 test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER }, { charge = 0.5 })
         if not bank then return end
-        T.bankSet(self, bank, { charge = 0.5 }, true)
         local treadmill = T.panel(self, Sprites.treadmill.N.console, { near = bank, connect = true, wired = true })
         if not treadmill then return end
         self.treadmill = treadmill

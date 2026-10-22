@@ -50,29 +50,47 @@ test("renewable_energy_battery_wear", {
     end,
 })
 
--- A day's deepest discharge wears the batteries when the day turns, on this client's copies too.
+-- A day's deepest discharge wears the batteries at the bank's first pass of the next day, on this
+-- client's copies too: a car battery charged full, run down to a tenth, then a pass across
+-- midnight.
 test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
     sandbox = { BatteryWear = 100 },
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
-        if not self.bank then return end
-        T.server(self, "cycleDay", { bank = self.bank.position, high = 1, charge = 0.1 })
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
+        if not bank then return end
+        self.bank = bank
+        T.step(function() T.setTime(self, 23.5) end)
+        T.batch(function()
+            T.bankPass(self, bank, 0, { hours = 0.1 })
+            T.setCharge(self, bank, 0.1)
+            T.bankPass(self, bank, 0, { hours = 0.1 })
+            T.step(function() self.evening = bank.state end)
+        end)
+        -- Past midnight: the clock's next step turns the day (GameTime.update).
+        T.step(function() T.setTime(self, 24.01) end)
+        T.serverUntil(self, "bankState", bank.position, function(state)
+            return state ~= nil and state.calendarDay ~= self.evening.calendarDay
+        end)
+        T.bankPass(self, bank, 0, { hours = 0.1 })
         T.waitFor(self, function()
-            local battery = self.bank.object:getContainer():getFirstType("Base.CarBattery1")
-            local served = stateItem(self.server.cycleDay, "Base.CarBattery1")
+            local battery = T.copyItem(bank, "Base.CarBattery1")
+            local served = stateItem(bank.state, "Base.CarBattery1")
             return battery ~= nil and served ~= nil and battery:getCondition() == served.condition
         end, "this client's copy of the worn battery")
     end,
     validate = function(self)
-        local day = self.server.cycleDay
-        local battery = stateItem(day, "Base.CarBattery1")
-        local copy = self.bank.object:getContainer():getFirstType("Base.CarBattery1")
-        local new = instanceItem("Base.CarBattery1")
-        local worn = new:getConditionMax() - math.floor(Battery.cycleWear(new, 0.9) * new:getConditionMax())
-        expectNear("cycle depth", day.depthBefore, 0.9, 0.0001)
-        expectNear("car battery condition after a 90% day", battery and battery.condition, worn, 0)
-        expectNear("this client's copy of the car battery's condition", copy and copy:getCondition(), worn, 0)
-        expectNear("cycle depth on the new day", day.cycleDepth, 0, 0)
+        local evening, morning = self.evening, self.bank.state
+        expect(morning.calendarDay ~= evening.calendarDay, "the day never turned")
+        -- The charge comes back from whole battery uses, a hair off the tenth it was set to.
+        expectNear("the evening's cycle depth", evening.cycleDepth, 0.9, 0.01)
+        -- A discharge costs a new battery (depth / 0.5)² over its type's half-depth cycles of its
+        -- condition (SAND2004-3149): a car battery's 300 at 90% gives 3.24 / 300 of its 100, 1.08
+        -- points, one of them whole.
+        local battery = stateItem(morning, "Base.CarBattery1")
+        expectNear("car battery condition after a 90% day", battery and battery.condition, 99, 0)
+        local copy = T.copyItem(self.bank, "Base.CarBattery1")
+        expectNear("this client's copy of the car battery's condition", copy and copy:getCondition(), 99, 0)
+        expectNear("cycle depth on the new day", morning.cycleDepth, 0, 0)
     end,
 })
 

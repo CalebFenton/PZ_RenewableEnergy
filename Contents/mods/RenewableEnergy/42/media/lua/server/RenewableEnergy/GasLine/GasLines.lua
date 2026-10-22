@@ -111,11 +111,10 @@ end
 function GasLines.loadOf(generator)
     local load = RenewableEnergy.Payers.loadOf(generator)
     local watts = load.watts + load.backedW
-    local key = RenewableEnergy.PlaceTracker.key(generator:getX(), generator:getY(), generator:getZ())
     local banks = RenewableEnergy.PowerBank.serverSystem
     for i = 1, (banks and banks:getLuaObjectCount() or 0) do
         local bank = banks:getLuaObjectByIndex(i)
-        if bank.chargeSource == "generator" and bank.chargingFrom == key then
+        if bank:chargesFrom(generator) then
             watts = watts + bank:chargerW()
         end
     end

@@ -33,6 +33,9 @@ PowerBank.MODULES = "RenewableEnergy_modules"
 PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
 PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
 
+-- The longest name a bank takes.
+PowerBank.NAME_LENGTH = 32
+
 -- Placed bank sprite to its Specs.banks row, and to the item it is.
 local BANKS_BY_SPRITE = {}
 for fullType, bank in pairs(Specs.banks) do
@@ -284,12 +287,26 @@ function PowerBank.unwireBlocker(bankObject, item)
 end
 
 --- Why the bank whose summary or status is `bank` can't be switched `on` (true) or off now, or
---- nil: "already on" or "already off", or, switching on, no working inverter to carry a load.
+--- nil: "already on" or "already off", or, switching on, no working inverter to carry a load or
+--- no battery capacity to carry it from.
 function PowerBank.switchRefusal(bank, on)
     if bank.on == on then
         return on and "already on" or "already off"
     elseif on and (bank.limitW or 0) <= 0 then
         return "Tooltip_RenewableEnergy_NoInverter"
+    elseif on and (bank.capacityWh or 0) <= 0 then
+        return "Tooltip_RenewableEnergy_NoBatteries"
+    end
+    return nil
+end
+
+--- Why `name` can't name a bank, or nil: a name is one line of at most NAME_LENGTH characters,
+--- which the rename box holds it to.
+function PowerBank.nameRefusal(name)
+    if #name > PowerBank.NAME_LENGTH then
+        return "name too long"
+    elseif name:find("%c") then
+        return "name not one line"
     end
     return nil
 end
