@@ -293,6 +293,9 @@ local KEPT_LOADED = "the server keeps chunks loaded after the character leaves"
 local SETTLE_MINUTES = 2
 -- The longest a wait on the game clock may take, in frames; the test's time limit comes first.
 local CLOCK_FRAMES = 1000000
+-- Spots go down, and houses are rolled, on the game minute after their chunks load; a faster
+-- clock brings that minute sooner.
+local VISIT_SPEED = 10
 
 local function waitGameMinutes(self, minutes)
     local till
@@ -320,6 +323,7 @@ test("renewable_energy_world_site_placed_once", {
     spOnly = KEPT_LOADED,
     timeoutSeconds = 240,
     run = function(self)
+        T.setMultiplier(self, VISIT_SPEED)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
         local home, at = T.at(player():getSquare()), T.at(square)
@@ -351,6 +355,7 @@ test("renewable_energy_world_site_waits_for_a_free_square", {
     timeoutSeconds = 240,
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
+        T.setMultiplier(self, VISIT_SPEED)
         local bank = T.square(self, { indoors = true }, "a free indoor square for the bank")
         if not bank then return end
         local home = T.at(player():getSquare())
@@ -443,9 +448,6 @@ test("renewable_energy_world_garden_lights_once_per_house", {
 local VISIT_FRAMES = 6000
 -- How long the server is given to roll the house at a place once this client has loaded it.
 local ROLL_MS = 60000
--- Houses are rolled on the game minute after their surroundings load; a faster clock brings that
--- minute sooner.
-local VISIT_SPEED = 10
 -- How far around the start the squares must be loaded again before the next test: as far as
 -- T.squares looks for free squares.
 local HOME_RADIUS = 30
@@ -622,6 +624,7 @@ test("renewable_energy_world_sites_placed_on_visit", {
     timeoutSeconds = 600,
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
+        T.setMultiplier(self, VISIT_SPEED)
         local names = {}
         for i, place in ipairs(VISITED_SITES) do
             names[i] = place[1]
@@ -713,6 +716,7 @@ test("renewable_energy_world_site_garden_lights_promised", {
     spOnly = "a multiplayer server loads chunks of its own around a character, not this client's area",
     timeoutSeconds = 300,
     run = function(self)
+        T.setMultiplier(self, VISIT_SPEED)
         local name, x, y = PROMISED_HOUSE[1], PROMISED_HOUSE[2], PROMISED_HOUSE[3]
         self.start = startVisits(self)
         T.server(self, "gardenLightsForgetHouse", { x = x, y = y })
