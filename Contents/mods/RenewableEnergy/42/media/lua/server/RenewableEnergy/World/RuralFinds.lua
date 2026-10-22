@@ -134,10 +134,10 @@ local function randomOf(entries)
     return list[ZombRand(#list) + 1]
 end
 
--- A pamphlet in a container of the building, if it has one. An unexplored container keeps it: its
--- loot is rolled on first look (ItemPickerJava.fillContainer, RequestItemsForContainerPacket),
--- which only adds items.
-local function leavePamphlet(def)
+--- Leaves a pamphlet in a container of the building, if it has one; returns whether it did. An
+--- unexplored container keeps it: its loot is rolled on first look (ItemPickerJava.fillContainer,
+--- RequestItemsForContainerPacket), which only adds items.
+function RuralFinds.leavePamphlet(def)
     for z = 0, HIGHEST do
         for x = def:getX(), def:getX2() - 1 do
             for y = def:getY(), def:getY2() - 1 do
@@ -161,16 +161,21 @@ end
 
 -- Finds
 
-local BARN = { barn = true }
--- "stable" is the map's name; vanilla's RBBarn checks "stables".
-local LIVESTOCK = { barn = true, stable = true, stables = true, chickencoop = true }
+-- Farm outbuildings a wind charger would have powered: barns, and the hay and farm storage
+-- sheds that stand without one.
+local FARM = { barn = true, farmstorage = true, haystorage = true }
+-- "stable" is the map's name; vanilla's RBBarn checks "stables". The map has no cattle pen
+-- rooms: its cattle stand at the sale barn.
+local LIVESTOCK = {
+    barn = true, stable = true, stables = true, chickencoop = true, pigsty = true, cattleauction = true,
+}
 
 --- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), whether a
 --- building `qualifies`, where it stands, and `place(square, def)`, which builds it worn.
 RuralFinds.FINDS = {
     wind = {
-        odds = 30,
-        qualifies = function(def) return hasRoom(def, BARN) end,
+        odds = 15,
+        qualifies = function(def) return hasRoom(def, FARM) end,
         square = function(def) return squareBy(def, RuralFinds.REACH, inTheOpen) end,
         -- The old farm wind charger, its wooden blades long broken and its brake set.
         place = function(square)
@@ -182,7 +187,7 @@ RuralFinds.FINDS = {
         end,
     },
     digester = {
-        odds = 30,
+        odds = 20,
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
         square = function(def) return squareBy(def, 1) end,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
@@ -229,7 +234,7 @@ RuralFinds.FINDS = {
                     gasifier:afterChange()
                 end)
             if def and ZombRandFloat(0, 1) < RuralFinds.PAMPHLET_CHANCE then
-                leavePamphlet(def)
+                RuralFinds.leavePamphlet(def)
             end
             return thumpable
         end,

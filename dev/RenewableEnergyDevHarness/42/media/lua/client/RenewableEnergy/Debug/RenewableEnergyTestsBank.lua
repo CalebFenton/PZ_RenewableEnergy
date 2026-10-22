@@ -695,6 +695,105 @@ test("renewable_energy_bank_failsafe_starts_generator", {
     end,
 })
 
+local function distanceSquared(a, b)
+    return IsoUtils.DistanceToSquared(a:getX(), a:getY(), b:getX(), b:getY())
+end
+
+-- The charge just under the failsafe's start.
+local function belowFailsafeStart()
+    return SandboxVars.RenewableEnergy.FailsafeStartCharge / 100 - 0.05
+end
+
+-- What the status window's Failsafe row reads for the bank status `status`, or nil without one.
+local function failsafeRow(status)
+    local label = getText("IGUI_RenewableEnergy_Failsafe")
+    for _, rows in ipairs({ StatusWindow.rows(status) }) do
+        for _, r in ipairs(rows) do
+            if r.label == label then return r.value end
+        end
+    end
+end
+
+local function failsafeRange()
+    local options = SandboxVars.RenewableEnergy
+    return getText("IGUI_RenewableEnergy_FailsafeRange", options.FailsafeStartCharge, options.FailsafeStopCharge)
+end
+
+-- A switched-on bank that can't carry its load, its only inverter broken, leaves its failsafe
+-- generator stopped however low it runs, and the status says the failsafe is idle; repaired, the
+-- bank has it started.
+test("renewable_energy_bank_failsafe_waits_for_a_working_bank", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", PLUG_IN_INVERTER })
+        local backup = bank and backupSquare(self, bank.square, 3)
+        if not backup then return end
+        local function lowPass(key)
+            T.bankSet(self, bank, { charge = belowFailsafeStart() }, true)
+            T.bankPass(self, bank, 0, { hours = 0.01 })
+            T.step(function() self[key .. "Status"] = bank.state.status end)
+            generatorState(self, backup, key)
+        end
+        T.batch(function()
+            T.generator(self, { square = backup, failsafe = true })
+            T.bankSet(self, bank, { on = true })
+            T.setPartCondition(self, bank, PLUG_IN_INVERTER, 0, true)
+            lowPass("broken")
+            T.setPartCondition(self, bank, PLUG_IN_INVERTER, 100, true)
+            lowPass("repaired")
+        end)
+    end,
+    validate = function(self)
+        expect(not self.broken.running, "the failsafe started its generator for a bank with a broken inverter")
+        local idle = getText("IGUI_RenewableEnergy_FailsafeIdle")
+        expect(failsafeRow(self.brokenStatus) == idle, "the status reads " .. tostring(failsafeRow(self.brokenStatus))
+            .. " for the failsafe of a bank with a broken inverter, not " .. idle)
+        expect(self.repaired.running, "the failsafe didn't start its generator once the inverter was repaired")
+        expect(failsafeRow(self.repairedStatus) == failsafeRange(), "the status reads "
+            .. tostring(failsafeRow(self.repairedStatus)) .. " for the failsafe of a working bank, not " .. failsafeRange())
+    end,
+})
+
+-- Two banks have one failsafe generator in backup reach: it answers to the nearer, so the farther,
+-- run low, doesn't start it while the nearer is full, and its status says another bank runs it.
+test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
+    run = function(self)
+        T.setGrid(self, false)
+        local parts = { "Base.CarBattery1", PLUG_IN_INVERTER }
+        local first = T.bank(self, "batteryBoxWood", parts)
+        local backup = first and backupSquare(self, first.square, 3)
+        local otherSquare = backup and T.square(self, { indoors = true, near = backup }, "a free indoor square for a second bank")
+        if not otherSquare then return end
+        local dx, dy = otherSquare:getX() - backup:getX(), otherSquare:getY() - backup:getY()
+        local dFirst, dOther = distanceSquared(first.square, backup), distanceSquared(otherSquare, backup)
+        if not T.need(self, math.abs(dx) <= 3 and math.abs(dy) <= 3 and dFirst ~= dOther,
+            "a second bank square in the generator's backup reach, nearer or farther than the first") then return end
+        local second = T.bank(self, "batteryBoxWood", parts, { square = otherSquare })
+        if not second then return end
+        local near, far = first, second
+        if dOther < dFirst then near, far = second, first end
+        T.batch(function()
+            T.generator(self, { square = backup, failsafe = true })
+            T.bankSet(self, near, { on = true, charge = 1 }, true)
+            T.bankSet(self, far, { on = true, charge = belowFailsafeStart() }, true)
+            T.bankPass(self, near, 0, { hours = 0.01 })
+            T.bankPass(self, far, 0, { hours = 0.01 })
+            T.step(function()
+                self.nearStatus, self.farStatus = near.state.status, far.state.status
+            end)
+            generatorState(self, backup, "after")
+        end)
+    end,
+    validate = function(self)
+        expect(not self.after.running, "the farther bank started the failsafe generator the nearer bank keeps stopped")
+        local other = getText("IGUI_RenewableEnergy_FailsafeOtherBank")
+        expect(failsafeRow(self.nearStatus) == failsafeRange(), "the nearer bank's status reads "
+            .. tostring(failsafeRow(self.nearStatus)) .. " for the failsafe, not " .. failsafeRange())
+        expect(failsafeRow(self.farStatus) == other, "the farther bank's status reads "
+            .. tostring(failsafeRow(self.farStatus)) .. " for the failsafe, not " .. other)
+    end,
+})
+
 -- While a backup generator carries a switched-on bank's load, the bank's day figure counts none of
 -- it, the generator's share is kept apart, and the batteries keep their charge.
 test("renewable_energy_bank_backup_load_kept_apart", {
@@ -725,10 +824,6 @@ test("renewable_energy_bank_backup_load_kept_apart", {
 })
 
 -- Sharing a reach ------------------------------------------------------------------------------
-
-local function distanceSquared(a, b)
-    return IsoUtils.DistanceToSquared(a:getX(), a:getY(), b:getX(), b:getY())
-end
 
 -- A free square for a source that reaches `fridge` and lies farther from it than `nearer`.
 local function fartherSquare(self, fridge, nearer, opts)

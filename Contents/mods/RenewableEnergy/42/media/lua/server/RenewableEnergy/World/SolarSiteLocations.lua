@@ -1,17 +1,24 @@
--- The named solar sites of SolarSites.lua, by the map they are on. Places where someone in 1993
--- would have had solar: stock tank pumps out in the pastures, farms off the grid, campers,
--- telephone relay sheds on the hills, the power company's yard, ranger stations, and arrow
--- boards at road works and at the army's checkpoints on the roads into Louisville. Coordinates
--- were read off the map's lotheader and lotpack files.
+-- The named sites of SolarSites.lua, by the map they are on. Places where someone in 1993 would
+-- have had solar: stock tank pumps out in the pastures, farms off the grid, campers, telephone
+-- relay sheds on the hills, the power company's yard, ranger stations, and arrow boards at road
+-- works and at the army's checkpoints on the roads into Louisville. And the homestead power of the
+-- countryside, left worn: old farm wind chargers, a dairy's biogas, a prepper's wood gas.
+-- Coordinates were read off the map's lotheader and lotpack files.
 --
 -- A site lists the spots its kind (SolarSites.KINDS) may use:
 --   panels: { x, y, z, mount, facing }, mount "flat", "wallMetal", "rackMetal" or "rackWood";
 --     flats on a flat roof, wall panels on the outside of a south wall, racks on open ground;
 --   bank and crate: { x, y, z }, an empty floor square of a room;
---   house: { x, y }, a square of the building that gets garden lights along its front;
---   arrowBoard: { x, y, z, facing }, the middle of a road lane, facing along the road.
+--   house: { x, y }, a square of the building that gets garden lights along its front, or whose
+--     containers hide a pamphlet;
+--   arrowBoard: { x, y, z, facing }, the middle of a road lane, facing along the road;
+--   windCharger: { x, y, z }, open ground with nothing around it, within Specs.sourceReach of the
+--     bank it is wired to;
+--   digester, gasifier and generator: { x, y, z }, open ground; the generator within GasKit.REACH
+--     of a digester, beside a gasifier.
 -- A site with `always` skips the Solar Sites roll, so that every world has a few things a
--- player can count on finding; the option at 0 still leaves it out.
+-- player can count on finding; the option at 0 still leaves it out. A site's name is how a world
+-- remembers rolling it: a renamed site is rolled again.
 return {
     ["Muldraugh, KY"] = {
         -- Stock tank pumps: a pole mount by the big metal water tank of a pasture.
@@ -22,6 +29,9 @@ return {
         { kind = "stockTank", name = "Pasture west of West Point", panels = { { 10023, 7384, 0, "rackMetal", "S" } } },
         { kind = "stockTank", name = "Pasture by Valley Station", panels = { { 13551, 5010, 0, "rackMetal", "S" } } },
         { kind = "stockTank", name = "Pasture by Brandenburg", panels = { { 1264, 7322, 0, "rackMetal", "S" } } },
+        { kind = "stockTank", name = "Pasture north-west of Ekron", panels = { { 562, 9629, 0, "rackMetal", "S" } } },
+        { kind = "stockTank", name = "Pasture south of Echo Creek", panels = { { 3721, 11285, 0, "rackMetal", "S" } } },
+        { kind = "stockTank", name = "Pasture south-east of Fallas Lake", panels = { { 7456, 8466, 0, "rackMetal", "S" } } },
         -- Farms: flat panels on the house's flat roof, the battery box inside.
         {
             kind = "farmRoof", name = "Farm south of Riverside",
@@ -60,6 +70,10 @@ return {
         {
             kind = "camper", name = "Camp Fitzgerald cabin",
             panels = { { 13857, 6642, 1, "flat" }, { 13858, 6644, 1, "flat" } }, bank = { 13864, 6645, 0 },
+        },
+        {
+            kind = "camper", name = "Trailer in the woods north of March Ridge",
+            panels = { { 10345, 12404, 1, "flat" }, { 10348, 12405, 1, "flat" } }, bank = { 10345, 12405, 0 },
         },
         -- Knox Telecommunications relay sheds at the radio masts on the hills.
         {
@@ -111,5 +125,16 @@ return {
         { kind = "checkpoint", name = "Checkpoint on the highway south of Louisville", arrowBoard = { 12519, 4628, 0, "N" }, always = true },
         { kind = "checkpoint", name = "Checkpoint on the road south-east of Louisville", arrowBoard = { 13425, 4117, 0, "N" } },
         { kind = "checkpoint", name = "Checkpoint on the road east of Louisville", arrowBoard = { 14534, 4068, 0, "N" } },
+        -- Farm wind chargers out in the field, wired to a rack of batteries in the barn's store room.
+        { kind = "windFarm", name = "Farm south-east of Echo Creek", windCharger = { 3742, 11120, 0 }, bank = { 3753, 11116, 0 }, always = true },
+        { kind = "windFarm", name = "Farm west of Ekron", windCharger = { 252, 9808, 0 }, bank = { 250, 9820, 0 } },
+        -- A dairy's barrel digester by the cow barn, piped to the generator beside it.
+        { kind = "homestead", name = "Dairy farm south of Ekron", digester = { 886, 10372, 0 }, generator = { 886, 10377, 0 } },
+        -- A survivalist's cabin at the edge of the woods, ham radio and sickroom inside, its
+        -- gasifier piped to the generator by the door.
+        {
+            kind = "prepper", name = "Survivalist cabin north of Echo Creek",
+            gasifier = { 3380, 9686, 0 }, generator = { 3379, 9686, 0 }, house = { 3372, 9684 },
+        },
     },
 }

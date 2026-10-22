@@ -55,12 +55,13 @@ local function breaks(source, kph, hours)
 end
 
 --- A newly connected wind charger's record: its brake and blades as the object has them, and its
---- shelter. A charger teaches its wiring the first time it is ever connected.
+--- shelter. A charger teaches its wiring the first time a player connects it; the world wires a
+--- site's charger with no player (SolarSites), which leaves the lesson to the one who rewires it.
 function WindSource.connect(player, source, isoObject)
     source.braked = Wind.isBraked(isoObject)
     source.broken = Wind.isBroken(isoObject)
     source.shelter = Wind.shelterAt(source.x, source.y, source.z)
-    if not isoObject:getModData()[PowerBank.CONNECTED_ONCE] then
+    if player and not isoObject:getModData()[PowerBank.CONNECTED_ONCE] then
         setFlag(isoObject, PowerBank.CONNECTED_ONCE, true)
         addXp(player, Perks.Electricity, Specs.connectXp * Sources.slotsOf(source.kind))
     end

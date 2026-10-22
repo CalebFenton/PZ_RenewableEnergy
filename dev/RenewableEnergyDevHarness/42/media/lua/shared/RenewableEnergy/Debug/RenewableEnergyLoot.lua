@@ -781,7 +781,7 @@ local function vehiclesHaul(stalls, kinds)
 end
 
 local function siteSpot(site)
-    local spot = (site.panels and site.panels[1]) or site.bank or site.arrowBoard
+    local spot = (site.panels and site.panels[1]) or site.bank or site.arrowBoard or site.generator
     return spot[1], spot[2]
 end
 

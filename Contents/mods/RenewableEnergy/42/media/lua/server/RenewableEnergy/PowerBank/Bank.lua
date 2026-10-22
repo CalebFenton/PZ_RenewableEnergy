@@ -396,16 +396,43 @@ function Bank:findGenerator()
     return best, bestFailsafe
 end
 
+-- The bank a failsafe answers to: the nearest bank with its generator in backup reach, the lower
+-- place on a tie. A relay is wired to one bank, so two banks beside it never switch it against
+-- each other.
+local function failsafeBank(generator)
+    local best, bestDistance, bestKey
+    local gx, gy, gz = generator:getX(), generator:getY(), generator:getZ()
+    local banks = PowerBank.serverSystem
+    for i = 1, banks:getLuaObjectCount() do
+        local bank = banks:getLuaObjectByIndex(i)
+        local dx, dy = bank.x - gx, bank.y - gy
+        if bank.z == gz and math.abs(dx) <= BACKUP_REACH and math.abs(dy) <= BACKUP_REACH then
+            local distance = dx * dx + dy * dy
+            local key = RenewableEnergy.PlaceTracker.key(bank.x, bank.y, bank.z)
+            if not best or distance < bestDistance or (distance == bestDistance and key < bestKey) then
+                best, bestDistance, bestKey = bank, distance, key
+            end
+        end
+    end
+    return best
+end
+
+-- Connected, switched on, indoors, with a working inverter, and off the grid. `connected` is nil
+-- on banks saved before it was recorded, and those were all connected.
+local function canCarryLoad(bank)
+    return bank.connected ~= false and bank.on and bank.indoors and bank:limitW() > 0 and not bank.gridPowered
+end
+
 --- Start or stop a backup generator with a failsafe by the charge, as a generator
 --- auto-start relay does. A generator stalled on gas starts again by itself once its load fits
 --- (GasLines), so the relay leaves it be, and only calls that off when it would stop it.
-local function runFailsafe(generator, on, charge)
+local function runFailsafe(generator, wanted, charge)
     local options = SandboxVars.RenewableEnergy
     local gas = RenewableEnergy.GasKit.stateOf(generator)
     -- The charge comes back from whole battery uses (DrainableComboItem.getCurrentUsesFloat), a
     -- hair off the percent it was set to, so it is compared to two places.
     local percent = RenewableEnergy.round(charge * 100, 2)
-    local wantsOff = not on or percent >= options.FailsafeStopCharge
+    local wantsOff = not wanted or percent >= options.FailsafeStopCharge
     if generator:isActivated() then
         if wantsOff then
             generator:setActivated(false)
@@ -414,13 +441,15 @@ local function runFailsafe(generator, on, charge)
         if wantsOff then
             RenewableEnergy.GasLines.cancelStall(generator)
         end
-    elseif on and percent < options.FailsafeStartCharge and generator:getFuel() > 0 and generator:getCondition() > 20 then
+    elseif wanted and percent < options.FailsafeStartCharge and generator:getFuel() > 0 and generator:getCondition() > 20 then
         generator:setActivated(true)
     end
 end
 
---- The backup generator's state after the failsafe acted. While the bank is unloaded, the
---- generator's last known state holds.
+--- The backup generator's state after the failsafe acted. The failsafe runs the generator only
+--- for the bank it answers to, and only while that bank has batteries and could carry its load:
+--- a bank that is off, disconnected, on the grid or without a working inverter stops it. While
+--- the bank is unloaded, the generator's last known state holds.
 function Bank:updateGenerator()
     if not self:getSquare() then return end
     local generator, failsafe = self:findGenerator()
@@ -428,12 +457,14 @@ function Bank:updateGenerator()
         self.generator = false
         return
     end
-    if failsafe then
-        runFailsafe(generator, self.on, self.charge)
+    local controls = failsafe and failsafeBank(generator) == self
+    local armed = canCarryLoad(self) and self.nominalWh > 0
+    if controls then
+        runFailsafe(generator, armed, self.charge)
     end
     self.generator = {
         x = generator:getX(), y = generator:getY(), z = generator:getZ(),
-        running = generator:isActivated(), failsafe = failsafe,
+        running = generator:isActivated(), failsafe = failsafe, controls = controls, armed = armed,
     }
 end
 
@@ -501,12 +532,6 @@ function Bank:chargeFrom(generators, hours, roomWh)
         generator:setFuel(math.max(0, fuel - watts * hours * fuelPerWh))
     end
     return watts
-end
-
--- Connected, switched on, indoors, with a working inverter, and off the grid. `connected` is nil
--- on banks saved before it was recorded, and those were all connected.
-local function canCarryLoad(bank)
-    return bank.connected ~= false and bank.on and bank.indoors and bank:limitW() > 0 and not bank.gridPowered
 end
 
 --- Whether the bank would carry its load now: it can, and no backup generator does it instead.
@@ -780,7 +805,7 @@ function Bank:buildStatus()
         sources = self:sourceStatus(),
         generator = self.generator and {
             x = self.generator.x, y = self.generator.y, z = self.generator.z, running = self.generator.running,
-            failsafe = self.generator.failsafe,
+            failsafe = self.generator.failsafe, controls = self.generator.controls, armed = self.generator.armed,
         } or nil,
     }
     for _, total in pairs(TOTALS) do

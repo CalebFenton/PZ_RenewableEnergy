@@ -330,6 +330,14 @@ function GasLines.perform(character, job, generator, source)
     return done
 end
 
+--- Fits the kit to `generator` and runs its line to `source`, as Install Kit and Connect Gas Line
+--- do, for a generator the world places rather than a player (SolarSites): nobody pays for them.
+function GasLines.fit(generator, source)
+    DO[GasKit.INSTALL](nil, generator)
+    DO[GasKit.CONNECT](nil, generator, GasKit.stateOf(generator), source)
+    sync(generator)
+end
+
 -- Taking up a kitted generator is refused: the kit would fall off (ISTakeGenerator copies only
 -- fuel and condition to the item) and with it what the tank really holds.
 require "TimedActions/ISTakeGenerator"

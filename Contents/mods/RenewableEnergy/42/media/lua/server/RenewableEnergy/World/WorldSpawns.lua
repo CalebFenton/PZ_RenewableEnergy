@@ -62,8 +62,9 @@ end
 
 -- What a bank holds when it appears, by stock name: its tile (a Sprites field); batteries, a
 -- count from min to max of types picked by weight, era batteries of the kind someone in 1993
--- would have wired to it; and for each other part the chance of one and its type by weight.
--- Chargers are vanilla's Car Battery Charger, which kept many a cabin battery topped up.
+-- would have wired to it, worn to a condition from `condition`'s min to max where it gives one;
+-- and for each other part the chance of one and its type by weight. Chargers are vanilla's Car
+-- Battery Charger, which kept many a cabin battery topped up.
 WorldSpawns.BANK_STOCK = {
     shed = {
         sprite = "batteryBoxWood",
@@ -125,6 +126,12 @@ WorldSpawns.BANK_STOCK = {
         inverter = { chance = 1, types = { { "RenewableEnergy.InverterCharger", 1 } } },
         controller = { chance = 1, types = { { Specs.controller, 1 } } },
         charger = { chance = 0.5, types = { { Specs.charger, 1 } } },
+    },
+    -- A wind farm's rack, its batteries tired from years on an old wind charger.
+    windFarm = {
+        sprite = "batteryRackWood",
+        batteries = { min = 2, max = 4, condition = { min = 35, max = 65 }, types = { { "RenewableEnergy.DeepCycleBattery", 1 } } },
+        inverter = { chance = 0.6, types = { { "RenewableEnergy.PlugInInverter", 2 }, { "RenewableEnergy.PowerInverter", 1 } } },
     },
 }
 
@@ -245,7 +252,10 @@ function WorldSpawns.stockBank(container, stockName)
     local options = SandboxVars.RenewableEnergy
     local batteries = WorldSpawns.scaled(WorldSpawns.rollBetween(stock.batteries), options.LRMBatteries)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
-        addFound(container, pickByWeight(stock.batteries.types))
+        local item = addFound(container, pickByWeight(stock.batteries.types))
+        if item and stock.batteries.condition then
+            RenewableEnergy.Wear.setCondition(item, WorldSpawns.rollBetween(stock.batteries.condition))
+        end
     end
     maybeAddPart(container, stock.inverter, options.LRMMisc, spec.maxInverters)
     maybeAddPart(container, stock.controller, options.LRMMisc, spec.maxControllers)

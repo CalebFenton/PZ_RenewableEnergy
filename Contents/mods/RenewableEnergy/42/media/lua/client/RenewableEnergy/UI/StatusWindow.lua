@@ -169,6 +169,18 @@ local function powerRows(rows, status)
         row(rows, getText("IGUI_RenewableEnergy_Generator"),
             getText(running and "IGUI_RenewableEnergy_GeneratorRunning" or "IGUI_RenewableEnergy_GeneratorStopped"),
             not running and "dim" or nil)
+        local generator = status.generator
+        if generator.failsafe then
+            local options = SandboxVars.RenewableEnergy
+            if not generator.controls then
+                row(rows, getText("IGUI_RenewableEnergy_Failsafe"), getText("IGUI_RenewableEnergy_FailsafeOtherBank"), "dim")
+            elseif not generator.armed then
+                row(rows, getText("IGUI_RenewableEnergy_Failsafe"), getText("IGUI_RenewableEnergy_FailsafeIdle"), "dim")
+            else
+                row(rows, getText("IGUI_RenewableEnergy_Failsafe"), getText("IGUI_RenewableEnergy_FailsafeRange",
+                    options.FailsafeStartCharge, options.FailsafeStopCharge))
+            end
+        end
     end
     row(rows, getText("IGUI_RenewableEnergy_UsedToday"), Format.wattHours(status.loadWhToday))
     -- What the backup generator ran in the bank's place, kept apart so the bank's own figure

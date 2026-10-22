@@ -273,10 +273,44 @@ end)
 -- Site kinds that are an arrow board on the road and nothing else.
 local ARROW_BOARD_KINDS = { roadWorks = true, checkpoint = true }
 
+-- A homestead kind's spots make sense on the map: its find and generator outdoors, its wind
+-- charger within reach of its bank in a room, its generator beside a gasifier or within a
+-- digester's hose reach on the same level, its pamphlet's house a building.
+local function expectHomesteadSpots(expect, metaGrid, site, kind)
+    local function outdoors(field)
+        local spot = site[field]
+        return expect(spot ~= nil, site.name .. " has no " .. field .. " spot")
+            and expect(metaGrid:getRoomAt(spot[1], spot[2], spot[3]) == nil, site.name .. "'s " .. field .. " is indoors")
+    end
+    if kind.wind and outdoors("windCharger") then
+        local at, bank = site.windCharger, site.bank
+        if expect(bank ~= nil and metaGrid:getRoomAt(bank[1], bank[2], bank[3]) ~= nil, site.name .. "'s bank is in no room") then
+            expect(RenewableEnergy.PowerBank.isInReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
+                site.name .. "'s wind charger is out of its bank's reach")
+        end
+    end
+    if kind.gas and outdoors(kind.gas) and outdoors("generator") then
+        local source, generator = site[kind.gas], site.generator
+        local sameLevel = source[3] == generator[3]
+        if kind.gas == "gasifier" then
+            expect(sameLevel and RenewableEnergy.Gasifier.sideOf(generator[1], generator[2], source[1], source[2]) ~= nil,
+                site.name .. "'s generator isn't beside its gasifier")
+        else
+            expect(sameLevel and IsoUtils.DistanceTo(generator[1], generator[2], source[1], source[2]) <= RenewableEnergy.GasKit.REACH,
+                site.name .. "'s generator is out of its " .. kind.gas .. "'s reach")
+        end
+    end
+    if kind.pamphlet then
+        expect(site.house ~= nil and metaGrid:getRoomAt(site.house[1], site.house[2], 0) ~= nil,
+            site.name .. "'s pamphlet is in no building")
+    end
+end
+
 -- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
 -- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
--- outdoors with a facing; each site has a unique name, a known kind, and the spots its
--- kind uses, as many panel spots as the kind may place.
+-- outdoors with a facing, homestead installations as expectHomesteadSpots says; each site has a
+-- unique name, a known kind, and the spots its kind uses, as many panel spots as the kind may
+-- place.
 check("sitesPlacedSensibly", function(expect)
     local SolarSites = RenewableEnergy.SolarSites
     local metaGrid = getWorld():getMetaGrid()
@@ -324,6 +358,367 @@ check("sitesPlacedSensibly", function(expect)
                 expect(metaGrid:getRoomAt(spot[1], spot[2], spot[3]) == nil and IsoDirections[spot[4]] ~= nil,
                     site.name .. "'s arrow board is indoors or faces nowhere")
             end
+            expectHomesteadSpots(expect, metaGrid, site, kind)
         end
     end
+end)
+
+local PAMPHLET = "RenewableEnergy.FemaPamphlet"
+
+-- The pamphlets in each container of the building's lowest two levels, where
+-- RuralFinds.leavePamphlet looks.
+local function pamphletsIn(def)
+    local found = {}
+    for z = 0, 1 do
+        for x = def:getX(), def:getX2() - 1 do
+            for y = def:getY(), def:getY2() - 1 do
+                local square = getSquare(x, y, z)
+                local objects = square and square:getObjects()
+                for i = 0, (objects and objects:size() or 0) - 1 do
+                    local container = objects:get(i):getContainer()
+                    if container then
+                        found[container] = container:getCountType(PAMPHLET)
+                    end
+                end
+            end
+        end
+    end
+    return found
+end
+
+-- Takes out the pamphlets the building's containers gained since `before` (pamphletsIn), and
+-- answers how many that was.
+local function takeNewPamphlets(def, before)
+    local taken = 0
+    for container, count in pairs(pamphletsIn(def)) do
+        for _ = (before[container] or 0) + 1, count do
+            local item = container:getFirstType(PAMPHLET)
+            container:Remove(item)
+            sendRemoveItemFromContainer(container, item)
+            taken = taken + 1
+        end
+    end
+    return taken
+end
+
+-- Forgets the site spot at x, y, z, if one waits there.
+local function forgetSpot(x, y, z)
+    local system = SGlobalObjects.getSystemByName(RenewableEnergy.SolarSites.SYSTEM_NAME)
+    local object = system:getObjectAt(x, y, z)
+    if object then
+        system:removeObject(object)
+    end
+end
+
+local function chunkOf(square)
+    return math.floor(square:getX() / 8), math.floor(square:getY() / 8)
+end
+
+-- Removes whatever a homestead site put on `square` when the test ends: its find, its bank or
+-- its generator, switched off first and out of the gas pass's list.
+local function clearSquare(square, defer)
+    defer(function()
+        local objects = square:getObjects()
+        for i = objects:size() - 1, 0, -1 do
+            local object = objects:get(i)
+            if RenewableEnergy.GasKit.isGenerator(object) then
+                if object:isActivated() then
+                    object:setActivated(false)
+                end
+                ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[square:getX() .. "," .. square:getY() .. "," .. square:getZ()] = nil
+                square:transmitRemoveItemFromSquare(object)
+            elseif RenewableEnergy.PowerBank.isBank(object) or Sprites.kindOf(Sprites.nameOf(object)) then
+                removeObject(object)
+            end
+        end
+    end)
+end
+
+-- The kitted generator on `square` against the line it should have to the `kind` source at
+-- `source`: plugged in, off, run down and low on petrol as SolarSites.GENERATOR says, on gas with
+-- its line connected and listed for the gas pass, its kit drawn on it. Answers the generator.
+local function expectKittedGenerator(expect, expectNear, square, source, kind)
+    local GasKit, SolarSites = RenewableEnergy.GasKit, RenewableEnergy.SolarSites
+    local generator = RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
+    if not expect(generator ~= nil, "no generator at the site's far end") then
+        return nil
+    end
+    local spec = SolarSites.GENERATOR
+    expect(generator:isConnected() and not generator:isActivated(), "the generator is found plugged in "
+        .. tostring(generator:isConnected()) .. ", running " .. tostring(generator:isActivated()))
+    expect(inRange(generator:getCondition(), spec.condition), "the generator is at condition " .. generator:getCondition())
+    local fuel = generator:getFuel()
+    expect(fuel >= spec.fuel.min - 0.01 and fuel <= spec.fuel.max + 0.01, "the generator holds " .. fuel .. " litres")
+    local state = GasKit.stateOf(generator)
+    if expect(state ~= nil, "the generator has no gas kit") then
+        local line = state.source
+        expect(state.mode == "gas" and line ~= nil and line.kind == kind and line.x == source:getX() and line.y == source:getY()
+            and line.z == source:getZ(), "the generator's line doesn't run to the " .. kind)
+        expectNear("the generator's tank as the kit keeps it", state.tank or -1, fuel, 0.01)
+    end
+    local key = square:getX() .. "," .. square:getY() .. "," .. square:getZ()
+    expect(ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil, "the gas pass doesn't list the generator")
+    local overlays = Helpers.overlaysOf(generator)
+    local kit = Sprites.gasKitFor(Sprites.nameOf(generator))
+    local hasKit = false
+    for _, overlay in ipairs(overlays) do
+        hasKit = hasKit or overlay == kit
+    end
+    expect(hasKit, "the generator doesn't show its kit")
+    return generator, state, overlays
+end
+
+-- What each homestead kind left, checked once placed: `at` is its find's square, `far` its bank's or
+-- generator's, `def` the house of a pamphlet. Each answers nothing; it records what is wrong.
+local KIND_CHECKS = {
+    -- The wind charger braked with its blades broken, wired to a rack of tired batteries.
+    windFarm = function(expect, _, at, far)
+        local Wind, PowerBank, WorldSpawns = RenewableEnergy.Wind, RenewableEnergy.PowerBank, RenewableEnergy.WorldSpawns
+        local charger = RenewableEnergy.findObjectOn(at, Wind.isCharger)
+        local bank = PowerBank.bankOn(far)
+        if not (expect(charger ~= nil, "no wind charger on the site's square") and expect(bank ~= nil, "no bank on the site's bank square")) then
+            return
+        end
+        expect(Sprites.kindOf(Sprites.nameOf(charger)) == "propeller", "the wind charger is a " .. tostring(Sprites.kindOf(Sprites.nameOf(charger))))
+        expect(Wind.isBroken(charger) and Wind.isBraked(charger), "the wind charger is found broken " .. tostring(Wind.isBroken(charger))
+            .. ", braked " .. tostring(Wind.isBraked(charger)))
+        local stock = WorldSpawns.BANK_STOCK.windFarm
+        expect(Sprites.nameOf(bank) == Sprites[stock.sprite], "the bank stands on " .. tostring(Sprites.nameOf(bank)))
+        expect(bank:isConnected(), "the bank isn't plugged in")
+        local wired = PowerBank.bankOfSource(at:getX(), at:getY(), at:getZ())
+        expect(wired ~= nil and PowerBank.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
+            "the wind charger isn't wired to the site's bank")
+        local batteries, items = 0, bank:getContainer():getItems()
+        for i = 0, items:size() - 1 do
+            local item = items:get(i)
+            if RenewableEnergy.Battery.isBattery(item) then
+                batteries = batteries + 1
+                expect(item:getFullType() == "RenewableEnergy.DeepCycleBattery" and inRange(item:getCondition(), stock.batteries.condition),
+                    "the bank holds a " .. item:getFullType() .. " at condition " .. item:getCondition())
+            end
+        end
+        expect(inRange(batteries, stock.batteries), batteries .. " batteries in the bank")
+    end,
+    -- The barrel digester cold, torn and sour, piped to the generator.
+    homestead = function(expect, expectNear, at, far)
+        local digester, object = Helpers.recordAt({ kind = "digester", x = at:getX(), y = at:getY(), z = at:getZ() })
+        if not expect(digester ~= nil, "no digester on the site's square") then
+            return
+        end
+        expect(digester.sour and digester:isTorn(), "the digester is found sour " .. tostring(digester.sour) .. ", torn "
+            .. tostring(digester:isTorn()))
+        local generator, state = expectKittedGenerator(expect, expectNear, far, object, "digester")
+        if state and state.line then
+            local GasKit = RenewableEnergy.GasKit
+            expect(state.line.item == GasKit.HOSE and state.line.count == GasKit.hosesFor(generator, object),
+                "the line took " .. tostring(state.line.count) .. " " .. tostring(state.line.item))
+        end
+    end,
+    -- The primitive gasifier with a full ash pit and its packing all tarred, piped to the
+    -- generator beside it; a pamphlet in the house.
+    prepper = function(expect, expectNear, at, far, pamphlets)
+        local Gasifier = RenewableEnergy.Gasifier
+        local gasifier, object = Helpers.recordAt({ kind = "gasifier", x = at:getX(), y = at:getY(), z = at:getZ() })
+        if not expect(gasifier ~= nil, "no gasifier on the site's square") then
+            return
+        end
+        local clean, tarry = Gasifier.filterCounts(Gasifier.filterOf(object))
+        expect(Sprites.nameOf(object) == Sprites.gasifier.primitive and gasifier.ash == Gasifier.ASH_FULL and clean == 0 and tarry > 0,
+            "the gasifier is found " .. tostring(Sprites.nameOf(object)) .. ", ash " .. tostring(gasifier.ash) .. ", "
+            .. clean .. " clean and " .. tarry .. " tarry packing")
+        local side = Gasifier.sideOf(at:getX(), at:getY(), far:getX(), far:getY())
+        expect(gasifier.pipe == side, "the gasifier's pipe runs " .. tostring(gasifier.pipe) .. ", not " .. tostring(side))
+        local generator, state, overlays = expectKittedGenerator(expect, expectNear, far, object, "gasifier")
+        if generator then
+            local pipe = Sprites.gasifierPipeGenFor(Sprites.nameOf(generator), Gasifier.sideOf(far:getX(), far:getY(), at:getX(), at:getY()))
+            local piped = false
+            for _, overlay in ipairs(overlays) do
+                piped = piped or overlay == pipe
+            end
+            expect(piped, "the generator doesn't show its half of the pipe")
+            expect(state.line and state.line.item == RenewableEnergy.GasKit.PIPE and state.line.count == 1,
+                "the line took " .. tostring(state.line and state.line.count) .. " " .. tostring(state.line and state.line.item))
+        end
+        expect(pamphlets == 1, "the house got " .. tostring(pamphlets) .. " pamphlets, not 1")
+    end,
+}
+
+-- A homestead site of kind `args.kind` goes down once, when its chunks load, worn as RuralFinds
+-- leaves its finds and connected as a player would leave it: its find on the square at `args.at`,
+-- its bank or generator on the one at `args.far`, and a pamphlet in the house at `args.house`.
+-- Its spot is then forgotten, and loading the chunks again places nothing. What it placed is
+-- removed when the test ends.
+check("siteKindPlaced", function(expect, expectNear, _, args, defer)
+    local SolarSites = RenewableEnergy.SolarSites
+    local kind = SolarSites.KINDS[args.kind]
+    local at, far = squareAt(args.at), squareAt(args.far)
+    if not (kind and at and far) then
+        return "a homestead kind " .. tostring(args.kind) .. " and its squares loaded on the server"
+    end
+    local site = { kind = args.kind, name = "test " .. args.kind }
+    local ends = { at:getX(), at:getY(), at:getZ() }
+    local farEnds = { far:getX(), far:getY(), far:getZ() }
+    if kind.wind then
+        site.windCharger, site.bank = ends, farEnds
+    else
+        site[kind.gas], site.generator = ends, farEnds
+    end
+    local house = args.house and squareAt(args.house)
+    local building = house and house:getBuilding()
+    local def, before = building and building:getDef(), nil
+    if kind.pamphlet then
+        if not def then
+            return "a building at the pamphlet's square"
+        end
+        site.house = { house:getX(), house:getY() }
+        before = pamphletsIn(def)
+        defer(function() takeNewPamphlets(def, before) end)
+        defer(function() forgetSpot(house:getX(), house:getY(), 0) end)
+    end
+    clearSquare(at, defer)
+    clearSquare(far, defer)
+    defer(function() forgetSpot(at:getX(), at:getY(), at:getZ()) end)
+    SolarSites.addSite(site)
+    local waiting = SolarSites.spotAt(at:getX(), at:getY(), at:getZ()) ~= nil
+    local function loadChunks()
+        SolarSites.placeChunk(chunkOf(at))
+        if house then
+            SolarSites.placeChunk(chunkOf(house))
+        end
+        SolarSites.placeWaiting()
+    end
+    loadChunks()
+    expect(waiting, "the site kept no spot to place")
+    expect(SolarSites.spotAt(at:getX(), at:getY(), at:getZ()) == nil, "the site's spot was not forgotten once placed")
+    local objects = at:getObjects():size() + far:getObjects():size()
+    loadChunks()
+    local addedAgain = at:getObjects():size() + far:getObjects():size() - objects
+    expect(addedAgain == 0, "loading the chunks again added " .. addedAgain .. " objects to the site")
+    local pamphlets = def and takeNewPamphlets(def, before)
+    KIND_CHECKS[args.kind](expect, expectNear, at, far, pamphlets)
+end)
+
+-- A world saved while every site was rolled at once (`rolled` true) rolls a site added since,
+-- once, and none of the sites it rolled then; a site the world has rolled is never rolled again,
+-- `always` or not; and the option at 0 keeps a new `always` site out while marking it rolled. The
+-- sites are stock tank pumps whose spots wait on the outdoor squares `args.squares`; their spots
+-- and the world's rolls are put back when the test ends.
+check("siteRolledOnce", function(expect, _, _, args, defer)
+    local SolarSites = RenewableEnergy.SolarSites
+    local modData = SGlobalObjects.getSystemByName(SolarSites.SYSTEM_NAME):getModData()
+    local saved = modData.rolled
+    defer(function() modData.rolled = saved end)
+    local sites = {}
+    -- One of the sites a world rolled at once, and two added since.
+    for i, name in ipairs({ "Pasture north of Rosewood", "test site added later", "test site added with the option at 0" }) do
+        local square = args.squares[i]
+        sites[i] = { kind = "stockTank", name = name, always = true, panels = { { square.x, square.y, square.z, "rackMetal", "S" } } }
+        defer(function() forgetSpot(square.x, square.y, square.z) end)
+    end
+    local function waits(i)
+        local square = args.squares[i]
+        return SolarSites.spotAt(square.x, square.y, square.z) ~= nil
+    end
+    modData.rolled = true
+    SolarSites.rollNew({ sites[1], sites[2] })
+    expect(not waits(1), "a world that rolled every site at once rolled " .. sites[1].name .. " again")
+    expect(waits(2), "a world that rolled every site at once never rolled a site added since")
+    local rolled = modData.rolled
+    expect(type(rolled) == "table" and rolled[sites[1].name] and rolled[sites[2].name],
+        "the world doesn't remember the sites it rolled")
+    forgetSpot(args.squares[2].x, args.squares[2].y, args.squares[2].z)
+    SolarSites.rollNew({ sites[1], sites[2] })
+    expect(not waits(2), "a site the world had rolled was rolled again")
+    local restore = saveOptions(defer, { "SolarSites" })
+    SandboxVars.RenewableEnergy.SolarSites = 0
+    SolarSites.rollNew({ sites[3] })
+    restore()
+    expect(not waits(3), "with the option at 0 a new always site was rolled in")
+    expect(modData.rolled[sites[3].name], "with the option at 0 a new site wasn't marked rolled")
+end)
+
+-- Whether `square` holds what a site places: a tile of the mod's or a generator.
+local function holdsSiteObject(square)
+    return RenewableEnergy.findObjectOn(square, function(object)
+        return RenewableEnergy.GasKit.isGenerator(object) or Sprites.kindOf(Sprites.nameOf(object)) ~= nil
+    end) ~= nil
+end
+
+-- Open ground with nothing on it, as RuralFinds puts its finds on.
+local function isOpenGround(square)
+    return square:getZ() == 0 and square:getBuilding() == nil and square:isOutside() and square:hasFloor()
+        and not square:HasTree() and not square:getProperties():has(IsoFlagType.water)
+        and square:isFree(false) and square:getSpecialObjects():size() == 0
+end
+
+-- No building, tree or wall within a square of `square`, as a wind charger wants.
+local function inTheOpen(square)
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            local near = getSquare(square:getX() + dx, square:getY() + dy, 0)
+            if not near or near:getBuilding() or near:HasTree() or near:getWall(true) or near:getWall(false) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- What a site's square must be, by the kind of spot.
+local SQUARE_NEEDS = {
+    ground = { what = "free open ground", fits = isOpenGround },
+    open = { what = "free open ground with nothing around it", fits = function(square) return isOpenGround(square) and inTheOpen(square) end },
+    room = { what = "a free floor square indoors", fits = function(square)
+        return RenewableEnergy.PowerBank.canPlaceBank(square) and square:isFree(false)
+    end },
+    roof = { what = "a free flat roof", fits = function(square)
+        return square:isOutside() and square:hasFloor() and square:isFree(false)
+    end },
+    building = { what = "a building", fits = function(square) return square:getBuilding() ~= nil end },
+}
+
+-- Each square the site `site` uses, as { x, y, z, need }, need a SQUARE_NEEDS key.
+local function siteSquares(site)
+    local squares = {}
+    for _, panel in ipairs(site.panels or {}) do
+        table.insert(squares, { panel[1], panel[2], panel[3], need = panel[3] > 0 and "roof" or "ground" })
+    end
+    for field, need in pairs({ bank = "room", crate = "room", windCharger = "open", digester = "ground", gasifier = "ground", generator = "ground" }) do
+        local spot = site[field]
+        if spot then
+            table.insert(squares, { spot[1], spot[2], spot[3], need = need })
+        end
+    end
+    if site.house then
+        table.insert(squares, { site.house[1], site.house[2], 0, need = "building" })
+    end
+    return squares
+end
+
+-- The squares of the site named `args.name`, in the world as loaded here: { ready = false, why }
+-- until every one has loaded, then each square that isn't what its spot needs, as text. A square
+-- already holding what a site places passes, since the world may have placed the site meanwhile.
+handler("siteSquaresAt", function(_, args)
+    local found
+    for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
+        if site.name == args.name then
+            found = site
+        end
+    end
+    if not found then
+        return nil, "a site named " .. tostring(args.name)
+    end
+    local wrong = {}
+    for _, spot in ipairs(siteSquares(found)) do
+        local square = getSquare(spot[1], spot[2], spot[3])
+        local where = spot[1] .. "," .. spot[2] .. "," .. spot[3]
+        if not square then
+            return { ready = false, why = where .. " not loaded" }
+        end
+        local need = SQUARE_NEEDS[spot.need]
+        if not (need.fits(square) or (spot.need ~= "building" and holdsSiteObject(square))) then
+            table.insert(wrong, where .. " is not " .. need.what)
+        end
+    end
+    return { ready = true, wrong = wrong }
 end)

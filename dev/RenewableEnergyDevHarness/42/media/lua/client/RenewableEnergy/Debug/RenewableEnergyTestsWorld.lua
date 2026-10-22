@@ -301,8 +301,81 @@ test("renewable_energy_world_site_placed_once", {
 
 -- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
 -- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
--- outdoors with a facing; each site has a unique name, a known kind, and the spots its kind uses.
+-- outdoors with a facing, a wind charger within reach of its bank, a generator within reach of its
+-- gas source; each site has a unique name, a known kind, and the spots its kind uses.
 serverCheck("renewable_energy_world_sites_placed_sensibly", "sitesPlacedSensibly")
+
+-- Queues a homestead site of `kind` on the squares `at` (its find) and `far` (its bank or
+-- generator), with `house` a square of the house a pamphlet goes to, and a wait for this client's
+-- copies of the find (`isFind`) and of what stands at the far end (`isFar`). The authority places
+-- it as a chunk load does, checks it, and removes it when the test ends.
+local function placeHomestead(self, kind, squares, isFind, isFar)
+    local at, far, house = squares.at, squares.far, squares.house
+    T.server(self, "siteKindPlaced", { kind = kind, at = T.at(at), far = T.at(far), house = house and T.at(house) })
+    T.waitFor(self, function()
+        return RenewableEnergy.findObjectOn(at, isFind) ~= nil and RenewableEnergy.findObjectOn(far, isFar) ~= nil
+    end, "this client's copies of the " .. kind .. "'s objects")
+end
+
+-- A copy of a generator that carries the gas kit.
+local function isKittedGenerator(object)
+    return RenewableEnergy.GasKit.hasKit(object)
+end
+
+-- A wind farm goes down once: the old propeller charger braked with its blades broken, wired to a
+-- plugged-in rack of tired deep-cycle batteries, as many as its stock says.
+test("renewable_energy_world_site_wind_farm", {
+    sandbox = { LRMBatteries = 1, LRMMisc = 1 },
+    run = function(self)
+        local bank = T.square(self, { indoors = true }, "a free indoor square for the bank")
+        local charger = bank and T.square(self, { near = bank }, "a free outdoor square for the wind charger")
+        if not charger then return end
+        placeHomestead(self, "windFarm", { at = charger, far = bank }, RenewableEnergy.Wind.isCharger, RenewableEnergy.PowerBank.isBank)
+    end,
+    validate = function(self) T.expectNoFailures(self.server.siteKindPlaced) end,
+})
+
+-- A dairy goes down once: the barrel digester torn, cold and sour, its hose run to a plugged-in
+-- generator with the gas kit, run down, low on petrol and off.
+test("renewable_energy_world_site_homestead", {
+    run = function(self)
+        local generator = T.square(self, nil, "a free outdoor square for the generator")
+        local digester = generator and T.square(self, { near = generator }, "a free outdoor square for the digester")
+        if not digester then return end
+        placeHomestead(self, "homestead", { at = digester, far = generator }, RenewableEnergy.Digester.isDigester, isKittedGenerator)
+    end,
+    validate = function(self) T.expectNoFailures(self.server.siteKindPlaced) end,
+})
+
+-- A prepper's place goes down once: the primitive gasifier dirty, its pipe run to the kitted
+-- generator beside it, and a FEMA pamphlet in a container of the house.
+test("renewable_energy_world_site_prepper", {
+    run = function(self)
+        local generator = T.square(self, nil, "a free outdoor square for the generator")
+        local gasifier = generator and T.need(self, T.squareBeside(generator), "a free outdoor square beside the generator")
+        local house = gasifier and T.square(self, { indoors = true }, "a free square in a house")
+        if not house then return end
+        placeHomestead(self, "prepper", { at = gasifier, far = generator, house = house }, RenewableEnergy.Gasifier.isGasifier,
+            isKittedGenerator)
+    end,
+    validate = function(self) T.expectNoFailures(self.server.siteKindPlaced) end,
+})
+
+-- A world rolls each site once by its name: a world saved while every site was rolled at once
+-- gets a site added since, once, and never those it rolled then; the option at 0 still keeps a new
+-- site out.
+test("renewable_energy_world_site_rolled_once", {
+    run = function(self)
+        local squares = T.need(self, T.squares(self, 3), "free outdoor squares for the sites' spots")
+        if not squares then return end
+        local at = {}
+        for i, square in ipairs(squares) do
+            at[i] = T.at(square)
+        end
+        T.server(self, "siteRolledOnce", { squares = at })
+    end,
+    validate = function(self) T.expectNoFailures(self.server.siteRolledOnce) end,
+})
 
 -- Garden lights ---------------------------------------------------------------------------------
 
@@ -456,6 +529,53 @@ test("renewable_energy_world_garden_lights_option_zero", {
         expect(answer.chance == 0, "houses get lights with chance " .. answer.chance .. " with the option at 0")
         expect(answer.placed == 0 and #answer.lights == 0,
             "with the option at 0 the rolls placed " .. answer.placed .. " lights, and " .. #answer.lights .. " stand around the house")
+    end,
+})
+
+-- Solar sites on the map -----------------------------------------------------------------------
+
+-- The homestead sites and the outlying towns' solar sites, each with a square of it to go to.
+local VISITED_SITES = {
+    { "Farm south-east of Echo Creek", 3742, 11120 },
+    { "Farm west of Ekron", 252, 9808 },
+    { "Dairy farm south of Ekron", 886, 10377 },
+    { "Survivalist cabin north of Echo Creek", 3379, 9686 },
+    { "Pasture north-west of Ekron", 562, 9629 },
+    { "Pasture south of Echo Creek", 3721, 11285 },
+    { "Pasture south-east of Fallas Lake", 7456, 8466 },
+    { "Trailer in the woods north of March Ridge", 10345, 12405 },
+}
+
+-- The squares the map files gave these sites are what their spots need in the world as it loads,
+-- trees and plants the game grows there included: open ground for a find, a generator, a rack
+-- or a wind charger (open all round), a free indoor floor for a bank, a free flat roof for a
+-- panel, a building for a house. The character visits each site in turn and comes back once the
+-- start has loaded again.
+test("renewable_energy_world_site_squares_free", {
+    -- Many far visits and the way back, each waiting on loading.
+    timeoutSeconds = 420,
+    run = function(self)
+        self.start, self.answers = startVisits(self), {}
+        for i, place in ipairs(VISITED_SITES) do
+            local name, x, y = place[1], place[2], place[3]
+            T.step(function() self.teleportTo(x + 0.5, y + 0.5, 0) end)
+            T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, name .. " loaded on this client", VISIT_FRAMES)
+            T.serverUntil(self, "siteSquaresAt", { name = name }, function(at)
+                self.answers[i] = at
+                return at.ready
+            end, ROLL_MS)
+        end
+        returnHome(self, self.start)
+    end,
+    validate = function(self)
+        for i, place in ipairs(VISITED_SITES) do
+            local answer = self.answers[i]
+            if expect(answer and answer.ready, place[1] .. " never loaded on the server: " .. tostring(answer and answer.why)) then
+                for _, wrong in ipairs(answer.wrong) do
+                    expect(false, place[1] .. ": " .. wrong)
+                end
+            end
+        end
     end,
 })
 
@@ -624,16 +744,19 @@ test("renewable_energy_world_rural_gasifier", {
 -- Real buildings rolled the way the world rolls them: their rooms pick the finds and each find its
 -- square, outdoors on the ground within RuralFinds.REACH of the building (the wind charger needs
 -- open ground around it). In order: the barn west of Muldraugh, the hunting shack west of
--- Riverside, and the deer stand, whose one room is above ground (`z`) while its find is not.
+-- Riverside, the deer stand, whose one room is above ground (`z`) while its find is not, a farm
+-- storage shed without a barn, and a pigsty.
 local RURAL_PLACES = {
     { 10469, 10121, 0, finds = { wind = true, digester = true } },
     { 7067, 8632, 0, finds = { gasifier = true }, pamphlet = true },
     { 7917, 8176, 1, finds = { gasifier = true } },
+    { 7350, 8519, 0, finds = { wind = true } },
+    { 6605, 8894, 0, finds = { digester = true } },
 }
 
 test("renewable_energy_world_rural_finds_real_buildings", {
     -- Several far visits and the way back, each waiting on loading.
-    timeoutSeconds = 180,
+    timeoutSeconds = 240,
     run = function(self)
         T.setMultiplier(self, VISIT_SPEED)
         self.start = startVisits(self)
