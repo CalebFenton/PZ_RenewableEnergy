@@ -288,11 +288,17 @@ function T.readGenerator(self, generator, label)
 end
 
 --- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and
---- having vanilla rebuild the bills of the generators reaching it (`fields.rebuild`).
+--- having vanilla rebuild the bills of the generators reaching it (`fields.rebuild`), then waits
+--- until they have: vanilla rebuilds in the generators' next update, and a multiplayer server runs
+--- those on a clock of its own, which no count of this client's ticks keeps pace with; the shares
+--- set after a rebuild (Payers' OnTick) stand then too.
 function T.setGenerator(self, generator, fields)
     local args = T.at(generator)
     args.pour, args.running, args.rebuild = fields.pour, fields.running, fields.rebuild
     T.server(self, "generatorSet", args)
+    if fields.rebuild then
+        T.serverUntil(self, "worldFrame", {}, function(now) return now.frame > self.server.generatorSet.frame end)
+    end
 end
 
 --- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging
