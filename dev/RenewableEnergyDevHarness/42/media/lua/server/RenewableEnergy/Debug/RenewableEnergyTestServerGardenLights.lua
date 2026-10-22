@@ -9,7 +9,7 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local handler = PZHarness.serverHandler
 local removeObject = Helpers.removeObject
 
--- Squares out from a house's bounds searched for its lights: past GardenLights' local REACH, the
+-- Squares out from a house's bounds searched for its lights: the end of a path from a door, the
 -- farthest out a light may stand.
 local LIGHT_MARGIN = 5
 
@@ -55,7 +55,7 @@ local function houseToRoll(player, defer)
         return nil
     end
     local GardenLights = RenewableEnergy.GardenLights
-    local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), GardenLights.buildingKey(def)
+    local store, key = ModData.getOrCreate(GardenLights.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
     local roll = store[key]
     defer(function() store[key] = roll end)
     return def, lightsAround(def), function() store[key] = nil end
@@ -79,9 +79,9 @@ local function newLights(def, before, defer)
     return lights
 end
 
--- The house near the character is rolled for garden lights twice, after its first roll is
--- forgotten: the first roll is certain. Answers how many lights each roll gave, whether the roll
--- was kept, and the new lights.
+-- The house near the character, its roll forgotten and promised lights as a solar site promises
+-- them, is rolled for garden lights twice. Answers how many lights each roll gave, whether the
+-- roll was kept, and the new lights.
 handler("gardenLightsOnce", function(player, _, defer)
     local GardenLights = RenewableEnergy.GardenLights
     local def, before, forget = houseToRoll(player, defer)
@@ -89,9 +89,10 @@ handler("gardenLightsOnce", function(player, _, defer)
         return nil, "a house near the character on the server"
     end
     forget()
-    local first = GardenLights.roll(def, true)
+    GardenLights.promise(def)
+    local first = GardenLights.roll(def)
     local rolled = GardenLights.isRolled(def)
-    local second = GardenLights.roll(def, true)
+    local second = GardenLights.roll(def)
     return { first = first, rolled = rolled, second = second, lights = newLights(def, before, defer),
         count = GardenLights.COUNT, wh = RenewableEnergy.Specs.gardenLight.wh }
 end)
@@ -104,10 +105,65 @@ handler("gardenLightsAt", function(_, args)
     local def = loaded and houseNear(args.x, args.y, args.radius)
     return {
         loaded = loaded,
-        house = def and GardenLights.buildingKey(def) or nil,
+        house = def and RenewableEnergy.BuildingWatch.key(def) or nil,
         rolled = def and GardenLights.isRolled(def) or false,
         neighbourhood = GardenLights.neighbourhood(args.x, args.y),
     }
+end)
+
+-- The building of the map at x, y, loaded or not.
+local function buildingAt(args)
+    return getWorld():getMetaGrid():getBuildingAt(args.x, args.y)
+end
+
+-- The house at x, y of the map, its roll forgotten until the test ends, so that a solar site can
+-- promise it lights. Answers its bounds, x2 and y2 past its last squares, and how far around it
+-- must load before it is rolled.
+handler("gardenLightsForgetHouse", function(_, args, defer)
+    local def = buildingAt(args)
+    if not def then
+        return nil, "a building at " .. args.x .. "," .. args.y
+    end
+    local store, key = ModData.getOrCreate(RenewableEnergy.GardenLights.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
+    local roll = store[key]
+    defer(function() store[key] = roll end)
+    store[key] = nil
+    return { x = def:getX(), y = def:getY(), x2 = def:getX2(), y2 = def:getY2(), reach = RenewableEnergy.BuildingWatch.REACH }
+end)
+
+-- The house at x, y of the map: whether its square there is loaded here and every chunk around it
+-- that it waits for, whether its garden light roll holds a solar site's promise or a roll, how
+-- many lights its roll placed, and how many stand around it.
+handler("gardenLightsHouse", function(_, args)
+    local GardenLights = RenewableEnergy.GardenLights
+    local def = buildingAt(args)
+    if not def then
+        return nil, "a building at " .. args.x .. "," .. args.y
+    end
+    local roll = ModData.getOrCreate(GardenLights.MOD_DATA)[RenewableEnergy.BuildingWatch.key(def)]
+    local lights = 0
+    for _ in pairs(lightsAround(def)) do
+        lights = lights + 1
+    end
+    return {
+        loaded = getSquare(args.x, args.y, 0) ~= nil, surroundings = RenewableEnergy.BuildingWatch.surroundingsLoaded(def),
+        promised = roll == GardenLights.PROMISED, rolled = GardenLights.isRolled(def), lights = lights,
+        placed = GardenLights.isRolled(def) and roll or 0,
+        count = GardenLights.COUNT,
+    }
+end)
+
+-- Takes away the garden lights around the house at x, y of the map, while it is loaded: the test
+-- moves on.
+handler("gardenLightsClearHouse", function(_, args)
+    local def = buildingAt(args)
+    if not def then
+        return nil, "a building at " .. args.x .. "," .. args.y
+    end
+    for _, light in pairs(lightsAround(def)) do
+        removeObject(light)
+    end
+    return {}
 end)
 
 -- The house near the character rolled `args.rolls` times the way the world rolls it, its roll
@@ -122,7 +178,7 @@ handler("gardenLightsRolls", function(player, args, defer)
     local placed = 0
     for _ = 1, args.rolls do
         forget()
-        placed = placed + GardenLights.roll(def, false)
+        placed = placed + GardenLights.roll(def)
     end
     return { chance = GardenLights.chanceFor(def), placed = placed, lights = newLights(def, before, defer) }
 end)

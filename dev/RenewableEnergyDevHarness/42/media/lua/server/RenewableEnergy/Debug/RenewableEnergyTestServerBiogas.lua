@@ -76,7 +76,6 @@ end)
 handler("recordPlace", function(player, args, defer)
     local thumpable, missing = Helpers.placeRecord(args.kind, args.tile, Helpers.squareAt(args))
     if not thumpable then return nil, missing end
-    thumpable:transmitCompleteItemToClients()
     defer(function() Helpers.removeObject(select(2, Helpers.recordAt(args)) or thumpable) end)
     return {}
 end)
