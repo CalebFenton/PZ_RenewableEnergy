@@ -2,7 +2,8 @@
 __pycache__/
 *.pyc
 .agent/
-# The harness's log of runs and their timings, and what failed last for --failed
+# The harness's logs of runs and of each test's time, and what failed last for --failed
 # (dev/harness/docs/running.md).
 dev/.runs.log
+dev/.runs-tests.log
 dev/.runs-failed
