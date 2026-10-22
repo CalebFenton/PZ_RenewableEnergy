@@ -742,7 +742,8 @@ local function heaterSprite(square)
 end
 
 -- A lit gas heater keeps one digester beside it warm on that digester's gas, the other beside it
--- neither warmed nor paying, and goes out when the gas does.
+-- neither warmed nor paying, and goes out when the gas does. Each digester's own pass finds the
+-- heater as its tile shows and the air as its square has it.
 test("renewable_energy_biogas_heater_warms_digester", {
     instant = true,
     -- A heavier burn, so hours of it stand out from the digester's own gas.
@@ -774,6 +775,9 @@ test("renewable_energy_biogas_heater_warms_digester", {
                 T.readRecord(self, handle, "warming" .. i)
             end
             for i, handle in ipairs(self.digesters) do
+                T.ageRecord(self, handle, 1, "aged" .. i)
+            end
+            for i, handle in ipairs(self.digesters) do
                 T.runDigester(self, handle, 6, 0)
                 T.readRecord(self, handle, "out" .. i)
             end
@@ -792,6 +796,17 @@ test("renewable_energy_biogas_heater_warms_digester", {
         T.expect(not idle.heaterLit and idle.temp < self.temp, "the heater warmed both digesters beside it")
         T.expectNear("gas of the digester it doesn't warm", idle.gas, self.gas, self.rate)
         T.expect(not reads["out" .. warmed].heaterLit, "the heater kept burning with no gas")
+        -- Over an hour's pass a digester's temperature closes on its target by the share its tier's
+        -- days give (DigesterObject:step).
+        local function expectPass(i, target, what)
+            local before, aged = reads["warming" .. i], reads["aged" .. i]
+            local share = 1 - math.exp(-1 / (Digester.TIERS.barrel.days * 24))
+            T.expectNear(what, aged.temp, before.temp + (target - before.temp) * share, 0.001)
+        end
+        local aged, agedOther = reads["aged" .. warmed], reads["aged" .. other]
+        T.expect(aged.heaterLit and not agedOther.heaterLit, "the digesters' own passes didn't find the heater its tile shows lit")
+        expectPass(warmed, math.max(aged.air, GasHeater.TEMP), "temperature of the heated digester after its own pass")
+        expectPass(other, agedOther.air, "temperature of the other digester after its own pass, in its square's air")
     end,
 })
 

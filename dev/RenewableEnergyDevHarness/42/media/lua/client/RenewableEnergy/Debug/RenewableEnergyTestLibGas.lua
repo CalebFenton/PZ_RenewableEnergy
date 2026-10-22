@@ -14,11 +14,12 @@ require "RenewableEnergy/GasLine/GasKit"
 local T = RenewableEnergyTest
 local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
 
--- What each record kind's tile and summary are on this client.
-local KINDS = {
-    digester = { owner = RenewableEnergy.Digester, isObject = RenewableEnergy.Digester.isDigester },
-    gasifier = { owner = RenewableEnergy.Gasifier, isObject = RenewableEnergy.Gasifier.isGasifier },
-}
+-- What a record kind's tile and summary are on this client: the server helper's RECORD_KINDS, whose
+-- owner and tile test are shared code. The helper loads after client Lua, so it is required here.
+local function kindOf(handle)
+    local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+    return Helpers.RECORD_KINDS[handle.kind]
+end
 
 --- The server handlers' args for the record `handle`, with `extra`'s fields added.
 function T.recordArgs(handle, extra)
@@ -32,7 +33,7 @@ end
 
 --- This client's copy of the record `handle`'s tile, or nil.
 function T.recordObject(handle)
-    return RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), KINDS[handle.kind].isObject)
+    return RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), kindOf(handle).isObject)
 end
 
 --- Queues a record of `kind` ("digester", "gasifier") on the Sprites[kind] tile `tile` (a dotted
@@ -47,7 +48,7 @@ function T.placeRecord(self, kind, tile, opts)
     local handle = T.at(square)
     handle.square, handle.kind = square, kind
     T.server(self, "recordPlace", T.recordArgs(handle, { tile = tile }))
-    local owner = KINDS[kind].owner
+    local owner = kindOf(handle).owner()
     T.waitFor(self, function()
         local object = T.recordObject(handle)
         handle.object = object and owner.summaryOf(object) and object or nil
@@ -178,7 +179,7 @@ end
 
 --- The record's summary as this client has it, or nil.
 function T.recordSummary(handle)
-    return handle.object and KINDS[handle.kind].owner.summaryOf(handle.object)
+    return handle.object and kindOf(handle).owner().summaryOf(handle.object)
 end
 
 --- Queues a wait until this client's summary of the record satisfies `check(summary)`; missing

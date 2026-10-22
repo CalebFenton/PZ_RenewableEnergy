@@ -93,12 +93,24 @@ handler("recordTrack", function(player, args, defer)
     return {}
 end)
 
--- Sets the record's fields `args.fields` (its SAVED_FIELDS) as of now, and each field of
--- `args.ago` ({ [field] = hours }) to the world hour that many hours before now, then shows and
--- sends what changed.
+-- Sets the record's fields `args.fields` as of now, and each field of `args.ago` ({ [field] =
+-- hours }) to the world hour that many hours before now, then shows and sends what changed. Each
+-- must be one of its SAVED_FIELDS, the record's state: a misspelled one would sit beside the field
+-- the code reads, and change nothing.
 handler("recordSet", function(player, args)
     local record, _, missing = Helpers.recordAt(args)
     if not record then return nil, missing end
+    local saved = {}
+    for _, field in ipairs(Helpers.RECORD_KINDS[args.kind].object().SAVED_FIELDS) do
+        saved[field] = true
+    end
+    for _, fields in ipairs({ args.fields or {}, args.ago or {} }) do
+        for key in pairs(fields) do
+            if not saved[key] then
+                return nil, "a saved field " .. tostring(key) .. " of a " .. args.kind
+            end
+        end
+    end
     local now = getGameTime():getWorldAgeHours()
     for key, value in pairs(args.fields or {}) do
         record[key] = value
