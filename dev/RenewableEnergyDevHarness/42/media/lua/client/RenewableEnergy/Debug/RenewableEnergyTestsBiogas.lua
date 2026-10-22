@@ -1058,6 +1058,41 @@ test("renewable_energy_biogas_compressor_inflates_tires_on_power", {
     end,
 })
 
+-- Inflate Tire with the compressor goes by where the character stands, as its offer does: plugged in
+-- within a generator's reach, the character inflates a car standing out of it.
+test("renewable_energy_biogas_compressor_inflates_tire_out_of_reach", {
+    run = function(self)
+        T.setGrid(self, false)
+        T.give(self, "compressor", { { type = Digester.COMPRESSOR } })
+        local generator = T.generator(self, { near = T.player():getCurrentSquare(), fuel = 10, running = true })
+        local square = generator and T.square(self, { near = generator.square, minDistance = SandboxVars.GeneratorTileRange + 6,
+            bare = true }, "open ground out of the generator's reach for a car")
+        local car = square and T.placeVehicle(self, "Base.CarNormal", { square = square })
+        if not car then return end
+        waitForPower(self)
+        T.step(function()
+            local player = T.player()
+            self.offered = ISVehicleMechanics:getTirePump(player)
+            self.carPowered = car.vehicle:getSquare():haveElectricity()
+            ISVehiclePartMenu.onInflateTire(player, car.vehicle:getPartById("TireFrontLeft"))
+            local queue = ISTimedActionQueue.getTimedActionQueue(player).queue
+            for _, action in ipairs(queue) do
+                if action.Type == "ISInflateTire" then
+                    self.inflate = action.item
+                end
+            end
+            -- Only what the click queued: walking to the car isn't what this is about.
+            ISTimedActionQueue.clear(player)
+        end)
+    end,
+    validate = function(self)
+        T.expect(not self.carPowered, "the car stands where the generator reaches, so this tests nothing")
+        T.expect(self.offered and self.offered:getFullType() == Digester.COMPRESSOR, "the compressor isn't offered as a tire pump")
+        T.expect(self.inflate and self.inflate:getFullType() == Digester.COMPRESSOR,
+            "Inflate Tire with the compressor offered queued no inflating with it")
+    end,
+})
+
 -- Wood ash ---------------------------------------------------------------------------------------
 
 test("renewable_energy_biogas_clear_ashes_gives_wood_ash", {

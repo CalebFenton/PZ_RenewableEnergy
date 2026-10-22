@@ -8,7 +8,10 @@ require "RenewableEnergy/Biogas/Digester"
 
 local Digester = RenewableEnergy.Digester
 
-local function poweredCompressor(player, square)
+-- The compressor `player` carries, if it can be plugged in where they stand, else nil. The offer
+-- and the click both ask this, so the click does what the offer promised.
+local function compressorFor(player)
+    local square = player:getCurrentSquare()
     if square and square:haveElectricity() then
         return player:getInventory():getFirstTypeRecurse(Digester.COMPRESSOR)
     end
@@ -17,19 +20,18 @@ end
 
 local getTirePump = ISVehicleMechanics.getTirePump
 function ISVehicleMechanics:getTirePump(player)
-    return getTirePump(self, player) or poweredCompressor(player, player:getCurrentSquare())
+    return getTirePump(self, player) or compressorFor(player)
 end
 
 -- Vanilla's option equips and uses a TirePump only, so with none this queues the same with the
 -- compressor.
 local onInflateTire = ISVehiclePartMenu.onInflateTire
 function ISVehiclePartMenu.onInflateTire(playerObj, part)
-    local vehicle = part:getVehicle()
-    local compressor = not playerObj:getInventory():contains("TirePump", true)
-        and poweredCompressor(playerObj, vehicle:getSquare())
+    local compressor = not playerObj:getInventory():contains("TirePump", true) and compressorFor(playerObj)
     if not compressor then
         return onInflateTire(playerObj, part)
     end
+    local vehicle = part:getVehicle()
     if playerObj:getVehicle() then
         ISVehicleMenu.onExit(playerObj)
     end
