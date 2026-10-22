@@ -3,11 +3,12 @@ if isClient() then
 end
 
 require "RenewableEnergy/StashHouses"
+require "RenewableEnergy/Chance"
 
 -- The authority's part of the stash houses (shared StashHouses.lua): stocking some from the start
 -- and listing them again in older saves. A multiplayer client keeps no stash state.
 
-local Stash = RenewableEnergy.Stash
+local Stash, Chance = RenewableEnergy.Stash, RenewableEnergy.Chance
 
 --- Stocks each house that rolls its knownOnStart chance. StashSystem.prepareBuildingStash also
 --- records the stash as a map already read, and the world map draws every such entry as a found
@@ -15,7 +16,7 @@ local Stash = RenewableEnergy.Stash
 function Stash.stockFromStart()
     local alreadyRead = StashSystem.getAlreadyReadMap()
     for description, extra in pairs(Stash.descriptions) do
-        if extra.knownOnStart and ZombRand(100) < extra.knownOnStart then
+        if extra.knownOnStart and Chance.hit(extra.knownOnStart / 100) then
             StashSystem.prepareBuildingStash(description.name)
             alreadyRead:remove(description.name)
         end

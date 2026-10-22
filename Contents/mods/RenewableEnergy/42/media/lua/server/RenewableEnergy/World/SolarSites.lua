@@ -2,6 +2,7 @@ if isClient() then
     return
 end
 
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -29,6 +30,7 @@ RenewableEnergy.SolarSites = SolarSites
 
 local WorldSpawns, RuralFinds = RenewableEnergy.WorldSpawns, RenewableEnergy.RuralFinds
 local BuildingWatch, PowerBank = RenewableEnergy.BuildingWatch, RenewableEnergy.PowerBank
+local Chance = RenewableEnergy.Chance
 
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 
@@ -346,7 +348,7 @@ function SolarSites.rollNew(sites)
     for _, site in ipairs(sites or SolarSites.sites()) do
         if not rolled[site.name] then
             rolled[site.name] = true
-            if chance > 0 and (site.always or ZombRand(100) < chance) then
+            if chance > 0 and (site.always or Chance.hit(chance / 100)) then
                 SolarSites.addSite(site)
             end
         end

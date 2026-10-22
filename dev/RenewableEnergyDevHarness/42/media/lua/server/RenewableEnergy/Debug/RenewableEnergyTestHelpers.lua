@@ -71,7 +71,9 @@ local setRolls = setmetatable({}, { __mode = "k" })
 
 --- Sets what Chance.roll gives until the test ends: `rolls` a number, every roll; or a list, the
 --- next rolls in order, and an error once they run out, so a draw the test didn't expect shows.
---- Returns the function that puts the game's roll back; Helpers.deferOnce says when it runs.
+--- The error puts the game's roll back first, so the draws after it, a pass's or a tick's, roll
+--- as usual. Returns the function that puts the game's roll back; Helpers.deferOnce says when it
+--- runs.
 function Helpers.forceRolls(defer, rolls)
     local Chance = RenewableEnergy.Chance
     if not setRolls[Chance.roll] then
@@ -80,7 +82,11 @@ function Helpers.forceRolls(defer, rolls)
     local next = 0
     local roll = type(rolls) == "number" and function() return rolls end or function()
         next = next + 1
-        return rolls[next] or error("a roll past the " .. #rolls .. " the test set")
+        if rolls[next] == nil then
+            Chance.roll = gameRoll
+            error("a roll past the " .. #rolls .. " the test set")
+        end
+        return rolls[next]
     end
     setRolls[roll] = true
     Chance.roll = roll

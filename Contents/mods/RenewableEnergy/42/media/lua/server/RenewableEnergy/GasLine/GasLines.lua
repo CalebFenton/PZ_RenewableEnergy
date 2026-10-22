@@ -15,13 +15,14 @@ require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/PowerBank/Loads"
 require "RenewableEnergy/Fumes"
+require "RenewableEnergy/Chance"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasLines = {}
 RenewableEnergy.GasLines = GasLines
 
 local GasKit, Gasifier, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites
-local Fumes = RenewableEnergy.Fumes
+local Fumes, Chance = RenewableEnergy.Fumes, RenewableEnergy.Chance
 
 -- Global ModData: kitted generators by "x,y,z", each { x, y, z, source }; the source is kept so a
 -- gasifier's pipe can come off after the generator is gone.
@@ -237,7 +238,7 @@ local function wear(generator, state, factor, hours)
     state.wearHours = (state.wearHours or 0) + hours
     while state.wearHours >= 1 do
         state.wearHours = state.wearHours - 1
-        if ZombRandFloat(0, 1) < (factor - 1) / wearOneIn(generator) then
+        if Chance.hit((factor - 1) / wearOneIn(generator)) then
             generator:setCondition(generator:getCondition() - ZombRand(1, 3))
         end
     end
