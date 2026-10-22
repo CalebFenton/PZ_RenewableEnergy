@@ -5,15 +5,14 @@ require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISGeneratorInfoWindow"
 require "TimedActions/ISTakeGenerator"
 require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
 require "RenewableEnergy/UI/Needs"
+require "RenewableEnergy/UI/GasJobMenu"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasKitMenu = {}
 RenewableEnergy.GasKitMenu = GasKitMenu
 
-local GasKit, Needs = RenewableEnergy.GasKit, RenewableEnergy.Needs
-local queue = RenewableEnergyGasAction.queue
+local GasKit, Needs, GasJobMenu = RenewableEnergy.GasKit, RenewableEnergy.Needs, RenewableEnergy.GasJobMenu
 
 local function sourceLabel(generator, source)
     local spec = GasKit.SOURCES[GasKit.sourceKind(source)]
@@ -21,16 +20,9 @@ local function sourceLabel(generator, source)
     return getText("ContextMenu_RenewableEnergy_LineTo", getText(spec.nameKey .. spec.tierOf(source)), squares)
 end
 
--- Adds the option for `job` (to `source`, for Connect Gas Line), greyed out with what refuses it;
--- one that belongs to the other fuel (hideBlocked) is left out.
+-- Adds the option for `job` (to `source`, for Connect Gas Line, named for it) (GasJobMenu.add).
 local function addJob(menu, playerNum, job, generator, source)
-    local blocker = GasKit.blocker(job, generator, source)
-    if blocker and GasKit.JOBS[job].hideBlocked then
-        return
-    end
-    local label = source and sourceLabel(generator, source) or getText("ContextMenu_RenewableEnergy_" .. job)
-    local option = menu:addOption(label, playerNum, queue, "kit", job, generator, source)
-    Needs.show(option, GasKit.needs(getSpecificPlayer(playerNum), job, generator, source), blocker)
+    GasJobMenu.add(menu, playerNum, "kit", job, generator, source, source and sourceLabel(generator, source))
 end
 
 --- Adds the kit's options for `generator` to `menu`.
