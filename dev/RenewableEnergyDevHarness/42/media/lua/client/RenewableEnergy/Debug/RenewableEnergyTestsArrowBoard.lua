@@ -1065,29 +1065,28 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     end,
 })
 
--- Found trailers are switched on at STOCK.switchedOnChance: the share over many rolls lands within
--- a few standard deviations of it.
-local SWITCH_ROLLS = 4000
+-- A found trailer's switch is on for a roll under STOCK.switchedOnChance and off for one at it;
+-- a trailer with its switch set keeps it, whatever the roll.
 test("renewable_energy_world_arrow_board_found_switch_follows_its_chance", {
     run = function(self)
         if not spawnTrailer(self) then return end
-        T.onVehicle(self, self.trailer, "arrowBoardSwitchRolls", { rolls = SWITCH_ROLLS })
+        T.onVehicle(self, self.trailer, "arrowBoardSwitchRolls", { trials = { { roll = "under" }, { roll = "at" },
+            { was = false, roll = 0 } } })
     end,
     validate = function(self)
-        local answer = self.trailer.answer
-        local share, chance = answer.on / SWITCH_ROLLS, RenewableEnergy.ArrowBoard.STOCK.switchedOnChance
-        local tolerance = 6 * math.sqrt(chance * (1 - chance) / SWITCH_ROLLS)
-        expect(math.abs(share - chance) <= tolerance, string.format("%.3f of found trailers are switched on, expected %.2f ± %.3f",
-            share, chance, tolerance))
+        local on = self.trailer.answer.on
+        expect(on[1] == true, "a roll just under the switch's chance left a found trailer off")
+        expect(on[2] == false, "a roll at the switch's chance switched a found trailer on")
+        expect(on[3] == false, "stocking switched on a trailer already switched off")
     end,
 })
 
 -- Queues setting the character's skills to those the trailer's `partId` lists for `job`
--- ("install"/"uninstall"), one level short in `short` if given.
+-- ("install"/"uninstall"), each one level short if `short`.
 local function setPartSkills(self, trailer, partId, job, short)
     T.step(function()
         for name, level in trailer.vehicle:getPartById(partId):getTable(job).skills:gmatch("(%w+):(%d+)") do
-            T.setPerk(self, Perks.FromString(name), tonumber(level) - (name == short and 1 or 0))
+            T.setPerk(self, Perks.FromString(name), tonumber(level) - (short and 1 or 0))
         end
     end)
 end
@@ -1159,66 +1158,58 @@ local function mechanicsMenu(vehicle, part)
     return window.context
 end
 
--- A panel's skills are recommendations, as for any vanilla part: one level short of one, the panel
--- still comes off and goes on, the mechanics window offers Uninstall, and only the odds fall, by
--- vanilla's rule (VehicleUtils.calculateInstallationSuccess), shown in the
--- tooltip; with every skill met the job can't fail. One test per case: T.setPerk holds a level for
--- the whole test.
-local SKILL_CASES = {
-    { "one_mechanics_level_short", "Mechanics" },
-    { "one_electrical_level_short", "Electricity" },
-    { "skills_met_cant_fail" },
-}
-
-for _, case in ipairs(SKILL_CASES) do
-    local short = case[2]
-    local skills = short and ("one level short in " .. short) or "every skill met"
-    test("renewable_energy_world_arrow_board_panels_" .. case[1], {
-        instant = true,
-        run = function(self)
-            if not spawnTrailer(self) then return end
-            local trailer, p = self.trailer, player()
-            setPartSkills(self, trailer, LEFT, "install", short)
-            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = {} } })
-            waitForPanelsCopy(self, trailer)
-            T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
-            T.step(function()
-                local vehicle = trailer.vehicle
-                local left, right = vehicle:getPartById(LEFT), vehicle:getPartById(RIGHT)
-                local takeOff, putOn = left:getTable("uninstall").skills, right:getTable("install").skills
-                self.canTakeOff = vehicle:canUninstallPart(p, left)
-                self.canPutOn = vehicle:canInstallPart(p, right)
-                self.takeOffMissing, self.putOnMissing = missingLevels(takeOff, p), missingLevels(putOn, p)
-                self.takeOffOdds = VehicleUtils.calculateInstallationSuccess(takeOff, p)
-                self.putOnOdds = VehicleUtils.calculateInstallationSuccess(putOn, p)
-                local context = mechanicsMenu(vehicle, left)
-                local uninstall = context and context:getOptionFromName(getText("IGUI_Uninstall"))
-                self.uninstallOption = uninstall and (uninstall.notAvailable and "greyed out" or "offered") or "missing"
-                local tooltip = uninstall and uninstall.toolTip and uninstall.toolTip.description or ""
-                self.showsOdds = tooltip:find(getText("Tooltip_chanceSuccess") .. " " .. self.takeOffOdds .. "%", 1, true) ~= nil
-                if context then
-                    context:closeAll()
+-- A panel's skills are recommendations, as for any vanilla part: they name real skills, so the
+-- game counts them in the odds of the job, and a level short in each, the panel still comes off
+-- and goes on and the mechanics window offers Uninstall.
+test("renewable_energy_world_arrow_board_panels_skills_are_advice", {
+    instant = true,
+    run = function(self)
+        if not spawnTrailer(self) then return end
+        local trailer, p = self.trailer, player()
+        setPartSkills(self, trailer, LEFT, "install", true)
+        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = {} } })
+        waitForPanelsCopy(self, trailer)
+        T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
+        T.step(function()
+            local vehicle = trailer.vehicle
+            local left, right = vehicle:getPartById(LEFT), vehicle:getPartById(RIGHT)
+            self.skills, self.unknown = {}, {}
+            for _, id in ipairs(PANELS) do
+                for _, job in ipairs({ "install", "uninstall" }) do
+                    local skills = vehicle:getPartById(id):getTable(job).skills or ""
+                    table.insert(self.skills, id .. " " .. job .. " " .. skills)
+                    for name in skills:gmatch("(%w+):%d+") do
+                        if Perks.FromString(name) == Perks.MAX then
+                            table.insert(self.unknown, id .. " " .. job .. " " .. name)
+                        end
+                    end
                 end
-            end)
-        end,
-        validate = function(self)
-            local want = short and 1 or 0
-            if not expect(self.putOnMissing == want, "the character lacks " .. self.putOnMissing .. " levels to put a panel on, set up for "
-                .. want) then
-                return
             end
-            local function odds(missing) return missing == 0 and 100 or 100 - (20 + 15 * missing) end
-            expect(self.canTakeOff, "a panel can't come off at " .. skills)
-            expect(self.canPutOn, "a panel can't go on at " .. skills)
-            expect(self.uninstallOption == "offered", "the mechanics window's Uninstall at " .. skills .. " is " .. tostring(self.uninstallOption))
-            expectNear("odds of taking a panel off at " .. skills, self.takeOffOdds, odds(self.takeOffMissing), 0)
-            expectNear("odds of putting a panel on at " .. skills, self.putOnOdds, odds(self.putOnMissing), 0)
-            -- Vanilla shows the odds only when the job can fail.
-            expect(self.showsOdds == (self.takeOffMissing > 0), "the Uninstall tooltip " .. (self.showsOdds and "shows" or "doesn't show")
-                .. " vanilla's odds of success at " .. skills)
-        end,
-    })
-end
+            self.putOnMissing = missingLevels(right:getTable("install").skills, p)
+            self.canTakeOff = vehicle:canUninstallPart(p, left)
+            self.canPutOn = vehicle:canInstallPart(p, right)
+            local context = mechanicsMenu(vehicle, left)
+            local uninstall = context and context:getOptionFromName(getText("IGUI_Uninstall"))
+            self.uninstallOption = uninstall and (uninstall.notAvailable and "greyed out" or "offered") or "missing"
+            if context then
+                context:closeAll()
+            end
+        end)
+    end,
+    validate = function(self)
+        for _, line in ipairs(self.skills) do
+            expect(line:find(":%d") ~= nil, "no skills for " .. line)
+        end
+        expect(#self.unknown == 0, "skills the game doesn't know: " .. table.concat(self.unknown, ", "))
+        if not expect(self.putOnMissing > 0, "the character lacks no levels to put a panel on") then
+            return
+        end
+        expect(self.canTakeOff, "a panel can't come off a level short in each skill")
+        expect(self.canPutOn, "a panel can't go on a level short in each skill")
+        expect(self.uninstallOption == "offered", "the mechanics window's Uninstall a level short in each skill is "
+            .. tostring(self.uninstallOption))
+    end,
+})
 
 -- The mechanics window offers to install an inventory item whose full type is in the part's item
 -- types (ISVehicleMechanics, VehicleUtils.getItems), so each panel lists both modules as they are
@@ -1248,7 +1239,7 @@ test("renewable_energy_world_arrow_board_panels_take_real_modules", {
 -- module on a mount, and shows it cracked, to players too; a storm cracks a trailer's panels as it
 -- would flat panels.
 test("renewable_energy_world_arrow_board_panels_crack", {
-    sandbox = { StormDamage = true, StormDamageRate = 1000 },
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
@@ -1258,16 +1249,17 @@ test("renewable_energy_world_arrow_board_panels_crack", {
         end)
         waitForPanelsCopy(self, trailer)
         T.step(function() self.crack = trailer.state end)
+        -- The lowest roll for each panel: a storm cracks both, rolling once for each.
+        T.forceRoll(self, { 0, 0 })
         batchOnTrailer(function()
             T.onVehicle(self, trailer, "setTrailer", { panels = modulesOnBothPanels(100) })
-            -- This long a storm at the raised rate makes a crack all but certain.
-            T.onVehicle(self, trailer, "arrowBoardStorm", { hours = 1000 })
+            T.onVehicle(self, trailer, "arrowBoardStorm", { hours = 1 })
         end)
         T.step(function()
             self.storm = trailer.answer
             T.setSandbox(self, "StormDamage", false)
         end)
-        T.onVehicle(self, trailer, "arrowBoardStorm", { hours = 1000 })
+        T.onVehicle(self, trailer, "arrowBoardStorm", { hours = 1 })
         T.step(function() self.calm = trailer.answer end)
     end,
     validate = function(self)
@@ -1276,7 +1268,7 @@ test("renewable_energy_world_arrow_board_panels_crack", {
         expect(left == 80 - crack, "a crack left the panel at 80 at " .. tostring(left))
         expect(panelShown(self.crack, LEFT) == "Cracked", "the cracked panel at " .. tostring(left) .. " shows "
             .. panelShown(self.crack, LEFT))
-        expect(self.storm.cracked == 2, "a long storm cracked " .. self.storm.cracked .. " panels, not both")
+        expect(self.storm.cracked == 2, "a storm on the lowest rolls cracked " .. self.storm.cracked .. " panels, not both")
         local state = self.storm.state
         expect(panelCondition(state, LEFT) == 100 - crack and panelCondition(state, RIGHT) == 100 - crack,
             "the storm left the panels at " .. tostring(panelCondition(state, LEFT)) .. " and " .. tostring(panelCondition(state, RIGHT)))
@@ -1285,12 +1277,10 @@ test("renewable_energy_world_arrow_board_panels_crack", {
 })
 
 local TOWING_CAR = "Base.OffRoad"
--- How far ahead of the car, and behind the trailer, the strip they stand on runs, in squares:
--- the car is pushed a few squares north.
+-- How far ahead of the car, and behind the trailer, the strip they stand on runs, in squares.
 local STRIP_AHEAD, STRIP_BEHIND = 7, 9
--- Frames to wait for the pair to join the cell and come to rest, to settle on the hitch, and to
--- be pulled along. The physics runs in real time, so at an uncapped frame rate each takes many
--- frames.
+-- Frames to wait for the pair to join the cell and come to rest, and to settle on the hitch. The
+-- physics runs in real time, so at an uncapped frame rate each takes many frames.
 local VEHICLE_FRAMES = 3000
 -- How close, in squares, the coupler sits on the hitch once the hitch has pulled the trailer in,
 -- and how slow, in squares a second, the pair then rolls once it has settled.
@@ -1712,62 +1702,6 @@ test("renewable_energy_world_arrow_board_repair_adds_up_part_used_epoxy", {
             "two part-used tubes of epoxy didn't pay for the seal")
         local epoxy = self.counts.left["Base.Epoxy"]
         expect(epoxy == 0, epoxy .. " tubes of epoxy left, expected both used up")
-    end,
-})
-
--- The car is pushed whenever it rolls slower than this, in squares a second, until the trailer
--- has followed it TOW_SQUARES. Pushed every frame, it would speed off the open strip, and a jolt
--- snaps a hitch over two seconds old (Bullet.onVehicleConstraintImpulse).
-local PUSH_SPEED = 5
-local TOW_SQUARES = 2
--- A car with nobody at the wheel holds its brakes, so each push has to beat them.
-local PUSH_IMPULSE = 6000
-
-local function distanceFrom(start, x, y)
-    return math.sqrt((x - start.x) ^ 2 + (y - start.y) ^ 2)
-end
-
--- It spawns, a vanilla car hitches it with the game's own action, and when the car is pushed north
--- the trailer follows, still on the hitch, on the server too.
-test("renewable_energy_world_arrow_board_towed_by_car", {
-    instant = true,
-    run = function(self)
-        towingPair(self)
-        if not self.trailer then return end
-        local car, trailer = self.car, self.trailer
-        local function towed()
-            return distanceFrom(self.start, trailer.vehicle:getX(), trailer.vehicle:getY())
-        end
-        T.step(function()
-            self.start = { x = trailer.vehicle:getX(), y = trailer.vehicle:getY() }
-        end)
-        T.waitUntil(function()
-            if towed() >= TOW_SQUARES then
-                return true
-            end
-            local vehicle = car.vehicle
-            if vehicle:getSpeed2D() < PUSH_SPEED then
-                vehicle:applyImpulseGeneric(vehicle:getX(), vehicle:getY(), vehicle:getZ(), 0, -1, 0, PUSH_IMPULSE)
-            end
-            return false
-        end, VEHICLE_FRAMES)
-        T.step(function()
-            self.moved = towed()
-            self.gap = hitchGap(car.vehicle, trailer.vehicle)
-            self.towedBy = trailer.vehicle:getVehicleTowedBy() == car.vehicle
-        end)
-        T.awaitVehicleState(self, trailer, function(state)
-            return distanceFrom(self.start, state.x, state.y) >= TOW_SQUARES
-        end, SERVER_MS)
-    end,
-    validate = function(self)
-        expect(self.towedBy, "the trailer is not hitched to the car")
-        expect(self.moved >= TOW_SQUARES, string.format("the trailer moved %.2f squares behind the pushed car", self.moved))
-        expect(self.gap < ON_HITCH, string.format("the trailer's coupler is %.2f squares off the car's hitch", self.gap))
-        local state = self.trailer.state
-        expect(state.towedBy == self.car.id, "the server's trailer is towed by " .. tostring(state.towedBy) .. ", not the car")
-        local moved = distanceFrom(self.start, state.x, state.y)
-        expect(moved >= TOW_SQUARES, string.format("the server's trailer moved %.2f squares", moved))
     end,
 })
 

@@ -1,5 +1,6 @@
 require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/PowerBank/Wear"
@@ -25,7 +26,7 @@ RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
 RenewableEnergy.ArrowBoard = ArrowBoard
 
-local Specs = RenewableEnergy.Specs
+local Chance, Specs = RenewableEnergy.Chance, RenewableEnergy.Specs
 
 -- Script name without its module, as VehicleDistributions and OnFillContainer name it.
 local VEHICLE = "RenewableEnergyArrowBoardTrailer"
@@ -88,7 +89,7 @@ function ArrowBoard.stockBatteryBox(container)
             RenewableEnergy.Wear.setCondition(battery, WorldSpawns.rollBetween(stock.batteryCondition))
         end
     end
-    if ZombRandFloat(0, 1) < stock.controllerChance * options.LRMMisc then
+    if Chance.hit(stock.controllerChance * options.LRMMisc) then
         container:AddItem(Specs.controller)
     end
 end
@@ -155,7 +156,7 @@ function ArrowBoard.createLid(vehicle, part)
     VehicleUtils.createPartInventoryItem(part)
     local door = part:getDoor()
     door:setOpen(false)
-    door:setLocked(not SandboxVars.VehicleEasyUse and ZombRandFloat(0, 1) < ArrowBoard.STOCK.lockedChance)
+    door:setLocked(not SandboxVars.VehicleEasyUse and Chance.hit(ArrowBoard.STOCK.lockedChance))
     door:setLockBroken(false)
 end
 
@@ -262,7 +263,7 @@ local function stockPanels(vehicle)
     for i, id in ipairs(ArrowBoard.PANELS) do
         local part = vehicle:getPartById(id)
         if part and i <= count and not part:getInventoryItem() then
-            local cracked = i == 2 and ZombRandFloat(0, 1) < stock.secondCrackedChance
+            local cracked = i == 2 and Chance.hit(stock.secondCrackedChance)
             local item = instanceItem(Specs.factoryModule)
             RenewableEnergy.Wear.setCondition(item, cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
             part:setInventoryItem(item)

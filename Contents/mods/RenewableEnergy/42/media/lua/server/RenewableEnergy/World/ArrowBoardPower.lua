@@ -1,3 +1,4 @@
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
@@ -18,7 +19,7 @@ require "RenewableEnergy/World/ArrowBoard"
 -- steady lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
 local ArrowBoard = RenewableEnergy.ArrowBoard
-local Specs = RenewableEnergy.Specs
+local Chance, Specs = RenewableEnergy.Chance, RenewableEnergy.Specs
 
 -- Battery box part modData. The box tracks its discharge cycle of the day as a bank tracks its
 -- own (Bank:trackCycle).
@@ -165,7 +166,7 @@ function ArrowBoard.rollSwitch(vehicle)
     local box = vehicle and boxOf(vehicle)
     local modData = box and box:getModData()
     if modData and modData[ArrowBoard.SWITCH_KEY] == nil then
-        modData[ArrowBoard.SWITCH_KEY] = ZombRandFloat(0, 1) < ArrowBoard.STOCK.switchedOnChance
+        modData[ArrowBoard.SWITCH_KEY] = Chance.hit(ArrowBoard.STOCK.switchedOnChance)
         vehicle:transmitPartModData(box)
     end
 end
