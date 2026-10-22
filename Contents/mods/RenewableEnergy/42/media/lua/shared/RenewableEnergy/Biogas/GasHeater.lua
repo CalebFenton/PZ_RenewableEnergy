@@ -5,6 +5,7 @@
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Materials"
+require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/GasLine/GasKit"
 
@@ -70,8 +71,8 @@ function GasHeater.litHeaterFor(digester)
     end)
 end
 
--- Every job, by name, as DigesterJobs.JOBS has them: minutes, as long as lighting a lamp;
--- blocker(heater); materials; doneSound. `lit`: how it leaves the heater.
+-- Every job, by name, as GasJobs.define has them, read against the heater itself: minutes, as long
+-- as lighting a lamp; blocker(heater); materials; doneSound. `lit`: how it leaves the heater.
 GasHeater.JOBS = {
     [GasHeater.LIGHT] = {
         minutes = 1, lit = true, doneSound = "CampfireLight",
@@ -93,30 +94,11 @@ GasHeater.JOBS = {
     },
 }
 
---- What `job` takes (RenewableEnergy.Materials).
-function GasHeater.materials(job)
-    return GasHeater.JOBS[job].materials or {}
-end
-
---- What `job` takes of `character`, as needs (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).
-function GasHeater.needs(character, job)
-    return Materials.needs(character, GasHeater.materials(job))
-end
-
---- The state of `heater` that refuses `job`, as a translation key, or nil.
-function GasHeater.blocker(job, heater)
-    return GasHeater.JOBS[job].blocker(heater)
-end
-
---- What refuses `character` doing `job` at `heater`: a blocker key, "short" when they lack a
---- need, or nil.
-function GasHeater.refusal(character, job, heater)
-    if not (RenewableEnergy.onSquare(heater) and GasHeater.isHeater(heater) and GasHeater.JOBS[job]) then
-        return "Tooltip_RenewableEnergy_NoHeater"
-    end
-    return GasHeater.blocker(job, heater)
-        or (RenewableEnergy.firstUnmet(GasHeater.needs(character, job)) and "short")
-        or nil
-end
+RenewableEnergy.GasJobs.define(GasHeater, {
+    subjectOf = function(heater)
+        return RenewableEnergy.onSquare(heater) and GasHeater.isHeater(heater) and heater or nil
+    end,
+    missing = "Tooltip_RenewableEnergy_NoHeater",
+})
 
 return GasHeater

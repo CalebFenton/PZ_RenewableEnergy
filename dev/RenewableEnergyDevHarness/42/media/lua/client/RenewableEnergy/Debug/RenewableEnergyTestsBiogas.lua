@@ -742,7 +742,8 @@ local function heaterSprite(square)
 end
 
 -- A lit gas heater keeps one digester beside it warm on that digester's gas, the other beside it
--- neither warmed nor paying, and goes out when the gas does.
+-- neither warmed nor paying, and goes out when the gas does. Each digester's own pass finds the
+-- heater as its tile shows and the air as its square has it.
 test("renewable_energy_biogas_heater_warms_digester", {
     instant = true,
     -- A heavier burn, so hours of it stand out from the digester's own gas.
@@ -774,6 +775,9 @@ test("renewable_energy_biogas_heater_warms_digester", {
                 T.readRecord(self, handle, "warming" .. i)
             end
             for i, handle in ipairs(self.digesters) do
+                T.ageRecord(self, handle, 1, "aged" .. i)
+            end
+            for i, handle in ipairs(self.digesters) do
                 T.runDigester(self, handle, 6, 0)
                 T.readRecord(self, handle, "out" .. i)
             end
@@ -792,6 +796,17 @@ test("renewable_energy_biogas_heater_warms_digester", {
         T.expect(not idle.heaterLit and idle.temp < self.temp, "the heater warmed both digesters beside it")
         T.expectNear("gas of the digester it doesn't warm", idle.gas, self.gas, self.rate)
         T.expect(not reads["out" .. warmed].heaterLit, "the heater kept burning with no gas")
+        -- Over an hour's pass a digester's temperature closes on its target by the share its tier's
+        -- days give (DigesterObject:step).
+        local function expectPass(i, target, what)
+            local before, aged = reads["warming" .. i], reads["aged" .. i]
+            local share = 1 - math.exp(-1 / (Digester.TIERS.barrel.days * 24))
+            T.expectNear(what, aged.temp, before.temp + (target - before.temp) * share, 0.001)
+        end
+        local aged, agedOther = reads["aged" .. warmed], reads["aged" .. other]
+        T.expect(aged.heaterLit and not agedOther.heaterLit, "the digesters' own passes didn't find the heater its tile shows lit")
+        expectPass(warmed, math.max(aged.air, GasHeater.TEMP), "temperature of the heated digester after its own pass")
+        expectPass(other, agedOther.air, "temperature of the other digester after its own pass, in its square's air")
     end,
 })
 
@@ -813,6 +828,34 @@ test("renewable_energy_biogas_heater_out_when_digester_gone", {
         T.removeRecord(self, digester)
         T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off end,
             "the heater going out on this client once its digester was gone")
+    end,
+})
+
+-- A heater's job gives the XP its row names once done, as every gas job does: its rows set their
+-- XP as the digester's do. No row of the heater names any, so the test gives Light Heater one.
+test("renewable_energy_biogas_heater_job_gives_its_xp", {
+    instant = true,
+    run = function(self)
+        local digester = placeDigester(self, "barrel.MetalDrum")
+        local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
+        if not square then return end
+        local fed = T.matureDigester("barrel")
+        fed.gas = Digester.HOLDERS.bags.capacity
+        T.setRecord(self, digester, fed)
+        T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
+        local heater = T.placeTile(self, square, Sprites.gasHeater.off)
+        T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+        T.batch(function()
+            T.server(self, "gasJobXp", { module = "GasHeater", job = GasHeater.LIGHT, perk = "Electricity", amount = 10 })
+            T.read(self, "perkXp", { perk = "Electricity" }, "before")
+        end)
+        T.gasJob(self, "heater", heater, GasHeater.LIGHT)
+        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit end, "this client's copy of the heater lit")
+        T.read(self, "perkXp", { perk = "Electricity" }, "after")
+    end,
+    validate = function(self)
+        local before, after = self.reads.before.value, self.reads.after.value
+        T.expect(after > before, "lighting the heater gave no Electricity XP, though its row names some: " .. before .. " before, " .. after .. " after")
     end,
 })
 
@@ -1055,6 +1098,41 @@ test("renewable_energy_biogas_compressor_inflates_tires_on_power", {
     validate = function(self)
         T.expect(self.unpowered == nil, "a compressor with no power counts as a tire pump")
         T.expect(self.powered and self.powered:getFullType() == Digester.COMPRESSOR, "a powered compressor doesn't count as a tire pump")
+    end,
+})
+
+-- Inflate Tire with the compressor goes by where the character stands, as its offer does: plugged in
+-- within a generator's reach, the character inflates a car standing out of it.
+test("renewable_energy_biogas_compressor_inflates_tire_out_of_reach", {
+    run = function(self)
+        T.setGrid(self, false)
+        T.give(self, "compressor", { { type = Digester.COMPRESSOR } })
+        local generator = T.generator(self, { near = T.player():getCurrentSquare(), fuel = 10, running = true })
+        local square = generator and T.square(self, { near = generator.square, minDistance = SandboxVars.GeneratorTileRange + 6,
+            bare = true }, "open ground out of the generator's reach for a car")
+        local car = square and T.placeVehicle(self, "Base.CarNormal", { square = square })
+        if not car then return end
+        waitForPower(self)
+        T.step(function()
+            local player = T.player()
+            self.offered = ISVehicleMechanics:getTirePump(player)
+            self.carPowered = car.vehicle:getSquare():haveElectricity()
+            ISVehiclePartMenu.onInflateTire(player, car.vehicle:getPartById("TireFrontLeft"))
+            local queue = ISTimedActionQueue.getTimedActionQueue(player).queue
+            for _, action in ipairs(queue) do
+                if action.Type == "ISInflateTire" then
+                    self.inflate = action.item
+                end
+            end
+            -- Only what the click queued: walking to the car isn't what this is about.
+            ISTimedActionQueue.clear(player)
+        end)
+    end,
+    validate = function(self)
+        T.expect(not self.carPowered, "the car stands where the generator reaches, so this tests nothing")
+        T.expect(self.offered and self.offered:getFullType() == Digester.COMPRESSOR, "the compressor isn't offered as a tire pump")
+        T.expect(self.inflate and self.inflate:getFullType() == Digester.COMPRESSOR,
+            "Inflate Tire with the compressor offered queued no inflating with it")
     end,
 })
 

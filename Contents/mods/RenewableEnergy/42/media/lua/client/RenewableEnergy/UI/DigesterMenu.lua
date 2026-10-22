@@ -8,8 +8,8 @@ require "RenewableEnergy/ClientObjects"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/GasHeater"
-require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
 require "RenewableEnergy/UI/Needs"
+require "RenewableEnergy/UI/GasJobMenu"
 require "RenewableEnergy/UI/DigesterWindow"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -17,8 +17,7 @@ local DigesterMenu = {}
 RenewableEnergy.DigesterMenu = DigesterMenu
 
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local Needs, DigesterWindow = RenewableEnergy.Needs, RenewableEnergy.DigesterWindow
-local queue = RenewableEnergyGasAction.queue
+local Needs, DigesterWindow, GasJobMenu = RenewableEnergy.Needs, RenewableEnergy.DigesterWindow, RenewableEnergy.GasJobMenu
 
 RenewableEnergy.ClientObjects.define({
     name = "Digester", sprites = RenewableEnergy.Sprites.namesOf("digester"), owner = Digester, isObject = Digester.isDigester,
@@ -28,17 +27,9 @@ RenewableEnergy.ClientObjects.define({
     adoptContainer = Digester.adoptContainer,
 })
 
--- Adds the option for `job`, with `item` the bag or tank it fills: greyed out with the digester's
--- reason when its state refuses it, with the needs listed when the character lacks any, or with
--- what is wrong with the item. A job for another state of the digester (hideBlocked) is left out.
-local function addJob(menu, character, playerNum, job, digester, summary, item)
-    local blocker = DigesterJobs.blocker(job, summary)
-    if blocker and DigesterJobs.JOBS[job].hideBlocked then
-        return
-    end
-    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_" .. job), playerNum, queue, "digester", job, digester, item)
-    Needs.show(option, DigesterJobs.needs(character, job), blocker)
-    Needs.refuse(option, not option.notAvailable and DigesterJobs.check(character, job, summary, item))
+-- Adds the option for `job`, with `item` the bag or tank it fills (GasJobMenu.add).
+local function addJob(menu, playerNum, job, digester, item)
+    GasJobMenu.add(menu, playerNum, "digester", job, digester, item)
 end
 
 --- Adds the digester's submenu to `context`. Returns the submenu, or nil before this client has
@@ -50,31 +41,29 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     local menu = Needs.addSubMenu(context, getText("IGUI_RenewableEnergy_Digester_" .. summary.tier))
     menu:addOption(getText("ContextMenu_RenewableEnergy_DigesterStatus"), playerNum, DigesterWindow.open, digester)
 
-    addJob(menu, character, playerNum, DigesterJobs.TAKE_SLUDGE, digester, summary, DigesterJobs.sludgeBag(character))
+    addJob(menu, playerNum, DigesterJobs.TAKE_SLUDGE, digester, DigesterJobs.sludgeBag(character))
     for _, job in ipairs({ DigesterJobs.VENT, DigesterJobs.REPLACE_BAGS, DigesterJobs.SEW_TARP, DigesterJobs.UPGRADE }) do
-        addJob(menu, character, playerNum, job, digester, summary)
+        addJob(menu, playerNum, job, digester)
     end
     local tank = DigesterJobs.tankToFill(character)
     for _, job in ipairs({ DigesterJobs.FILL_PUMP, DigesterJobs.FILL_COMPRESSOR }) do
-        addJob(menu, character, playerNum, job, digester, summary, tank)
+        addJob(menu, playerNum, job, digester, tank)
     end
-    addJob(menu, character, playerNum, DigesterJobs.FIT_SCRUBBER, digester, summary)
+    addJob(menu, playerNum, DigesterJobs.FIT_SCRUBBER, digester)
     if summary.scrubber then
         local chargeMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_ChargeScrubber"))
         for _, job in ipairs({ DigesterJobs.CHARGE_WATER, DigesterJobs.CHARGE_ASH, DigesterJobs.CHARGE_LIME }) do
-            addJob(chargeMenu, character, playerNum, job, digester, summary)
+            addJob(chargeMenu, playerNum, job, digester)
         end
     end
-    addJob(menu, character, playerNum, DigesterJobs.REPACK_WOOL, digester, summary)
+    addJob(menu, playerNum, DigesterJobs.REPACK_WOOL, digester)
     return menu
 end
 
 --- Adds a gas heater's option to `context`: light it, or put it out. Returns the option.
 function DigesterMenu.addHeaterOptions(playerNum, context, heater)
     local job = GasHeater.isLit(heater) and GasHeater.OFF or GasHeater.LIGHT
-    local option = context:addOption(getText("ContextMenu_RenewableEnergy_" .. job), playerNum, queue, "heater", job, heater)
-    Needs.show(option, GasHeater.needs(getSpecificPlayer(playerNum), job), GasHeater.blocker(job, heater))
-    return option
+    return GasJobMenu.add(context, playerNum, "heater", job, heater)
 end
 
 function DigesterMenu.onFill(playerNum, context, worldobjects, test)

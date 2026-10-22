@@ -14,11 +14,12 @@ require "RenewableEnergy/GasLine/GasKit"
 local T = RenewableEnergyTest
 local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
 
--- What each record kind's tile and summary are on this client.
-local KINDS = {
-    digester = { owner = RenewableEnergy.Digester, isObject = RenewableEnergy.Digester.isDigester },
-    gasifier = { owner = RenewableEnergy.Gasifier, isObject = RenewableEnergy.Gasifier.isGasifier },
-}
+-- What a record kind's tile and summary are on this client: the server helper's RECORD_KINDS, whose
+-- owner and tile test are shared code. The helper loads after client Lua, so it is required here.
+local function kindOf(handle)
+    local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+    return Helpers.RECORD_KINDS[handle.kind]
+end
 
 --- The server handlers' args for the record `handle`, with `extra`'s fields added.
 function T.recordArgs(handle, extra)
@@ -32,7 +33,7 @@ end
 
 --- This client's copy of the record `handle`'s tile, or nil.
 function T.recordObject(handle)
-    return RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), KINDS[handle.kind].isObject)
+    return RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), kindOf(handle).isObject)
 end
 
 --- Queues a record of `kind` ("digester", "gasifier") on the Sprites[kind] tile `tile` (a dotted
@@ -47,7 +48,7 @@ function T.placeRecord(self, kind, tile, opts)
     local handle = T.at(square)
     handle.square, handle.kind = square, kind
     T.server(self, "recordPlace", T.recordArgs(handle, { tile = tile }))
-    local owner = KINDS[kind].owner
+    local owner = kindOf(handle).owner()
     T.waitFor(self, function()
         local object = T.recordObject(handle)
         handle.object = object and owner.summaryOf(object) and object or nil
@@ -178,7 +179,7 @@ end
 
 --- The record's summary as this client has it, or nil.
 function T.recordSummary(handle)
-    return handle.object and KINDS[handle.kind].owner.summaryOf(handle.object)
+    return handle.object and kindOf(handle).owner().summaryOf(handle.object)
 end
 
 --- Queues a wait until this client's summary of the record satisfies `check(summary)`; missing
@@ -280,7 +281,8 @@ end
 -- Generators -----------------------------------------------------------------------------------
 
 --- Queues a read of the generator `generator` (a T.generator handle) into self.reads[label]:
---- running, fuel, its kit's state, whether the gas pass lists it, its overlays.
+--- running, fuel, condition, its bill, its kit's state, whether the gas pass lists it, its
+--- overlays, its building's toxicity, the world hour.
 function T.readGenerator(self, generator, label)
     T.read(self, "generatorRead", T.at(generator), label)
 end
@@ -294,7 +296,8 @@ function T.setGenerator(self, generator, fields)
 end
 
 --- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging
---- from it take it; the next gas pass or job bills them to a line on gas.
+--- from it take it, but at once and with no pass running; the next gas pass or job bills them to a
+--- line on gas.
 function T.burnFuel(self, generator, litres)
     local args = T.at(generator)
     args.litres = litres
@@ -306,6 +309,44 @@ function T.gasPass(self, generator, hours)
     local args = T.at(generator)
     args.hours = hours
     T.server(self, "gasPass", args)
+end
+
+--- Queues a gas pass, then reads of the generator and of the record `source` feeding it into
+--- self.reads[label] and self.reads[label .. "Source"].
+function T.readBill(self, generator, source, label)
+    T.batch(function()
+        T.gasPass(self, generator, 0)
+        T.readGenerator(self, generator, label)
+        T.readRecord(self, source, label .. "Source")
+    end)
+end
+
+--- Queues moving the clock on `hours`, so vanilla bills a running generator for each whole hour
+--- that passes (IsoGenerator.update).
+function T.jumpClock(self, hours)
+    T.step(function() T.setTime(self, getGameTime():getTimeOfDay() + hours) end)
+end
+
+-- How long vanilla may take to bill a generator after the clock moved, in ms: it bills in the
+-- generator's next update.
+local BILL_MS = 5000
+
+--- Queues a wait until vanilla has billed the generator since the read `label` (T.readBill): its
+--- fuel fell, or a gas pass since saw it fall.
+function T.waitForBill(self, generator, label)
+    T.serverUntil(self, "generatorRead", T.at(generator), function(read)
+        local before = self.reads[label]
+        local billed, was = read.state and read.state.billedHour, before.state and before.state.billedHour
+        return read.fuel < before.fuel - 0.0001 or (billed ~= nil and was ~= nil and billed > was)
+    end, BILL_MS)
+end
+
+--- The litres vanilla bills the generator between the reads `before` and `after` (T.readBill),
+--- had it the fuel: its bill an hour (`bill`, the GeneratorFuelConsumption option applied) for
+--- each whole world hour between them (IsoGenerator.update). Also returns those hours.
+function T.vanillaBill(self, before, after)
+    local hours = math.floor(self.reads[after].hours) - math.floor(self.reads[before].hours)
+    return hours * self.reads[before].bill, hours
 end
 
 --- Queues every kitted generator delivering `watts`, whatever it powers, until the test ends.

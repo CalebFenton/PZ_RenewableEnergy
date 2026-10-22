@@ -124,7 +124,7 @@ end
 -- The kinds of Global Object System record the tests build and drive (RenewableEnergyTestLibGas.lua):
 -- the shared module that owns the tile and which tiles are its, the server object and system, the
 -- containers by the names the tests use, and what a read adds to the saved fields, from the record
--- and, while loaded, its tile.
+-- and, while loaded, its tile: a digester's adds the air its square has now (`air`).
 local KINDS = {
     digester = {
         owner = function() return RenewableEnergy.Digester end,
@@ -142,6 +142,7 @@ local KINDS = {
             if object then
                 state.containerCapacity = object:getContainer():getCapacity()
                 state.hopperItems = object:getContainer():getItems():size()
+                state.air = getClimateManager():getAirTemperatureForSquare(object:getSquare())
             end
         end,
     },

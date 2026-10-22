@@ -4,7 +4,6 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
 require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
@@ -13,7 +12,7 @@ local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local Materials, ObjectSystem, Sprites = RenewableEnergy.Materials, RenewableEnergy.ObjectSystem, RenewableEnergy.Sprites
+local ObjectSystem, Sprites = RenewableEnergy.ObjectSystem, RenewableEnergy.Sprites
 
 local DigesterSystem = ObjectSystem.define({
     name = "Digester", kind = "digester", owner = Digester, Object = DigesterObject, isObject = Digester.isDigester,
@@ -140,47 +139,35 @@ local DO = {
     [DigesterJobs.REPACK_WOOL] = repackWool,
 }
 
-local function apply(character, job, digester, isoObject, item)
-    local row = DigesterJobs.JOBS[job]
-    if not DO[job](character, digester, row, isoObject, item) then
-        return false
-    end
-    Materials.consume(character, DigesterJobs.materials(job))
-    if row.xp then
-        addXp(character, Perks[row.xp.perk], row.xp.amount)
-    end
-    return true
-end
+--- The authority's side of the jobs at a digester (GasJobs.perform), whose `with` is the job's bag
+--- or tank.
+DigesterSystem.jobSite = ObjectSystem.jobSite(Digester, DO)
 
---- Does `job` for `character` at the digester `isoObject` once its timed action finished. `item` is
---- the job's bag or tank. Returns whether it was done.
-function DigesterSystem.perform(character, job, isoObject, item)
-    return ObjectSystem.perform(Digester, DigesterJobs, apply, character, job, isoObject, item)
-end
-
---- Lights or puts out the gas heater `heater` for `character`, as DigesterSystem.perform does a
---- digester's job. Its digester is brought up to now first, so the time before counts at the
---- heater's old state. Returns whether it was done.
-function DigesterSystem.performHeater(character, job, heater)
-    local digester = GasHeater.digesterNear(heater)
-    local record = digester and Digester.recordOf(digester)
-    if record then
-        record:advance(record:elapsedHours())
-    end
-    local done = not GasHeater.refusal(character, job, heater)
-    if done then
-        Materials.consume(character, GasHeater.materials(job))
-        local lit = GasHeater.JOBS[job].lit
+--- The authority's side of the jobs at a gas heater (GasJobs.perform), which light it or put it
+--- out. They work on the record of the digester it warms, if any, brought up to now first, so the
+--- time before counts at the heater's old state.
+DigesterSystem.heaterSite = {
+    open = function(heater)
+        local digester = GasHeater.digesterNear(heater)
+        local record = digester and Digester.recordOf(digester)
         if record then
-            record:setHeaterLit(heater, lit)
-        else
-            DigesterObject.showHeaterLit(heater, lit)
+            record:catchUp()
         end
-    end
-    if record then
-        record:afterChange()
-    end
-    return done
-end
+        return record
+    end,
+    act = function(character, job, record, row, heater)
+        if record then
+            record:setHeaterLit(heater, row.lit)
+        else
+            DigesterObject.showHeaterLit(heater, row.lit)
+        end
+        return true
+    end,
+    tell = function(record)
+        if record then
+            record:afterChange()
+        end
+    end,
+}
 
 return DigesterSystem

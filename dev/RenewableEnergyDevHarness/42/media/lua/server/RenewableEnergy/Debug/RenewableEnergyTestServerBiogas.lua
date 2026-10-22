@@ -93,12 +93,24 @@ handler("recordTrack", function(player, args, defer)
     return {}
 end)
 
--- Sets the record's fields `args.fields` (its SAVED_FIELDS) as of now, and each field of
--- `args.ago` ({ [field] = hours }) to the world hour that many hours before now, then shows and
--- sends what changed.
+-- Sets the record's fields `args.fields` as of now, and each field of `args.ago` ({ [field] =
+-- hours }) to the world hour that many hours before now, then shows and sends what changed. Each
+-- must be one of its SAVED_FIELDS, the record's state: a misspelled one would sit beside the field
+-- the code reads, and change nothing.
 handler("recordSet", function(player, args)
     local record, _, missing = Helpers.recordAt(args)
     if not record then return nil, missing end
+    local saved = {}
+    for _, field in ipairs(Helpers.RECORD_KINDS[args.kind].object().SAVED_FIELDS) do
+        saved[field] = true
+    end
+    for _, fields in ipairs({ args.fields or {}, args.ago or {} }) do
+        for key in pairs(fields) do
+            if not saved[key] then
+                return nil, "a saved field " .. tostring(key) .. " of a " .. args.kind
+            end
+        end
+    end
     local now = getGameTime():getWorldAgeHours()
     for key, value in pairs(args.fields or {}) do
         record[key] = value
@@ -177,6 +189,21 @@ handler("digesterRun", function(player, args)
     record:run(args.hours, object:getContainer(), args.air)
     record.lastHour = getGameTime():getWorldAgeHours()
     record:afterChange()
+    return {}
+end)
+
+-- Has the job `args.job` of the job module RenewableEnergy[args.module] (DigesterJobs, GasHeater,
+-- ...) give `args.amount` XP of the perk `args.perk` once done, until the test ends: for a job
+-- whose row names none, to see whether its feature gives what its row says.
+handler("gasJobXp", function(player, args, defer)
+    local Jobs = RenewableEnergy[args.module]
+    local row = Jobs and Jobs.JOBS and Jobs.JOBS[args.job]
+    if not row then
+        return nil, "the job " .. tostring(args.job) .. " of " .. tostring(args.module)
+    end
+    local was = row.xp
+    row.xp = { perk = args.perk, amount = args.amount }
+    defer(function() row.xp = was end)
     return {}
 end)
 
