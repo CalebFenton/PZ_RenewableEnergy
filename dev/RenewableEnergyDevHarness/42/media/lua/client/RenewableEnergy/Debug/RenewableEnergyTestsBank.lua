@@ -1092,7 +1092,6 @@ test("renewable_energy_bank_nearest_generator_pays_shared_appliance", {
         T.server(self, "billGenerators", {})
         read("Shared")
         T.setGenerator(self, near, { rebuild = true })
-        T.wait(10)
         read("Rebuilt")
     end,
     validate = function(self)
@@ -1135,7 +1134,6 @@ test("renewable_energy_bank_and_generator_nearest_pays", {
         T.readGenerator(self, generator, "alone")
         T.step(function() T.placeTile(self, fridges[2], MINI_FRIDGE) end)
         T.setGenerator(self, generator, { rebuild = true })
-        T.wait(10)
         T.readGenerator(self, generator, "aloneWithFridge")
     end,
     validate = function(self)

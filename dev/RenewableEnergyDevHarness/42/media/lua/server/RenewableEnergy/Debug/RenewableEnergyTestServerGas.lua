@@ -53,7 +53,8 @@ end)
 
 -- Pours `args.pour` litres into the generator at x, y, z, as a player pouring petrol does (onto
 -- whatever it shows), switches it on or off (`args.running`), as a player does, and has vanilla
--- rebuild the bills of the generators reaching it (`args.rebuild`).
+-- rebuild the bills of the generators reaching it (`args.rebuild`). Answers the world update count
+-- it acted at (`frame`, see worldFrame).
 handler("generatorSet", function(player, args)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end
@@ -64,10 +65,19 @@ handler("generatorSet", function(player, args)
         ISActivateGenerator.complete({ generator = generator, activate = args.running })
     end
     if args.rebuild then
-        -- What an appliance switching in its reach does: the generators reaching it rebuild their bill.
+        -- What an appliance switching in its reach does: the generators reaching it rebuild their bill
+        -- in their next update (IsoGenerator.update).
         IsoGenerator.updateGenerator(generator:getSquare())
     end
-    return {}
+    return { frame = getWorld():getFrameNo() }
+end)
+
+-- The world updates the authority has run (`frame`). A server serves commands between its updates
+-- (GameServer.main), and single player within one, after the objects' (IsoCell.update), so once
+-- the count passes an earlier answer's, every generator has had an update since that answer, and
+-- a step queued after the wait for it comes after that update's OnTick too.
+handler("worldFrame", function()
+    return { frame = getWorld():getFrameNo() }
 end)
 
 -- Takes `args.litres` from the fuel of the generator at x, y, z, as vanilla's hourly bill
