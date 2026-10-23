@@ -9,13 +9,13 @@ RenewableEnergy.Specs = Specs
 -- Batteries by item type. wh is capacity at full condition; cyclesAt50 is how many discharges of
 -- half the new capacity use up a battery's condition (Battery.cycleWear), so one carrying such a
 -- load every night is at half capacity after cyclesAt50 / 2 nights: a car battery in about five
--- months, a deep cycle in a year, an L-16 in under two. A long game outlives a bank or two.
+-- months, a deep cycle in a year, an L-16 in about two. A long game outlives a bank or two.
 Specs.batteries = {
     ["Base.CarBattery1"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 300 },
     ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 750 },
-    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1250 },
+    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500 },
     -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
     ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 150 },
 }
