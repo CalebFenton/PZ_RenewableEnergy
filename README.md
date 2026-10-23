@@ -1,5 +1,7 @@
 # ![Renewable Energy](art/promo/images/banner.png)
 
+*Work in progress: still being balanced and updated. Feedback is welcome in the comments.*
+
 Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels, wind chargers, a treadmill, a bank of batteries, and a generator that runs on manure gas or wood. You start with a car battery in a wooden box, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
 
 **Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress.
