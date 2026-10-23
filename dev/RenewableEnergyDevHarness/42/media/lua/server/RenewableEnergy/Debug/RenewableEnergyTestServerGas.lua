@@ -108,8 +108,7 @@ handler("billGenerators", function()
 end)
 
 -- Sets the wear chance of the item script of the generator at x, y, z to one in `args.oneIn` an
--- hour it runs (its ConditionLowerChanceOneIn), until the test ends: at one in one every hour's
--- roll comes up, so what a pass wears is certain.
+-- hour it runs (its ConditionLowerChanceOneIn) until the test ends.
 handler("generatorWearChance", function(player, args, defer)
     local generator, missing = generatorOn(args)
     if not generator then return nil, missing end

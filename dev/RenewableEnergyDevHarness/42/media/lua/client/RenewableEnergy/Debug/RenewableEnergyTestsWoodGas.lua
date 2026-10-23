@@ -3,7 +3,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 -- Wood gas: the gasifier, built from the build menu, burning wood for the generator it is piped to
 -- or idling, leaving ash, tar and condensate, and the jobs at it (WoodGas/Gasifier.lua,
 -- WoodGas/GasifierJobs.lua, WoodGas/GasifierObject.lua, WoodGas/GasifierSystem.lua,
--- UI/GasifierMenu.lua), and the sprays its wood vinegar makes.
+-- UI/GasifierMenu.lua).
 
 local T = RenewableEnergyTest
 local test = T.test
@@ -32,10 +32,6 @@ local function light(self, gasifier)
         T.giveMaterials(self, "light", GasifierJobs.materials(GasifierJobs.LIGHT, T.recordSummary(gasifier)))
     end)
     T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
-end
-
-local function stalled(read)
-    return not read.running and read.state ~= nil and read.state.stalled
 end
 
 -- Building ----------------------------------------------------------------------------------------
@@ -164,10 +160,10 @@ test("renewable_energy_woodgas_full_ash_or_spent_filter_cuts_output", {
         local reads = self.reads
         local over = (self.dirtyCap + 1) .. " W"
         T.expect(reads.ashNearlyFull.running, "an ash pit one short of full stalled a generator at " .. over)
-        T.expect(stalled(reads.ashFull), "a full ash pit didn't stall a generator at " .. over)
+        T.expect(T.isStalled(reads.ashFull), "a full ash pit didn't stall a generator at " .. over)
         T.expect(reads.ashCleared.running, "the generator didn't start again once the ash was cleared")
         T.expect(reads.spent.clean == 0, "the filter still has " .. tostring(reads.spent.clean) .. " clean packing")
-        T.expect(stalled(reads.filterSpent), "a spent filter didn't stall a generator at " .. over)
+        T.expect(T.isStalled(reads.filterSpent), "a spent filter didn't stall a generator at " .. over)
         T.expect(reads.dirtyRuns.running, "a spent filter didn't run a generator at " .. self.dirtyCap .. " W")
     end,
 })
@@ -217,7 +213,7 @@ test("renewable_energy_woodgas_gasifier_idles_as_a_generator", {
         T.expect(not reads.off.running and reads.off.state ~= nil and reads.off.state.connected,
             "the gasifier's generator isn't connected and switched off")
         T.expectNear("wood burned idling " .. self.hours .. " hours piped to a generator switched off", wood(lit) - wood(idledOff), kg, 0.01)
-        T.expect(stalled(reads.stalled), "a load past the line's cap didn't stall the generator")
+        T.expect(T.isStalled(reads.stalled), "a load past the line's cap didn't stall the generator")
         T.expectNear("wood burned idling " .. self.hours .. " hours piped to a stalled generator",
             wood(idledOff) - wood(idledStalled), kg, 0.01)
         T.expect(idledStalled.lit, "the gasifier went out with wood in its hopper")
@@ -421,7 +417,7 @@ test("renewable_energy_woodgas_drain_condensate", {
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.DRAIN, function() return self.items.containers[2] end)
         T.batch(function()
             T.readRecord(self, gasifier, "drained")
-            T.server(self, "carried", { fluids = { Gasifier.VINEGAR } })
+            T.readCarried(self, {}, { Gasifier.VINEGAR })
         end)
     end,
     validate = function(self)
@@ -429,28 +425,7 @@ test("renewable_energy_woodgas_drain_condensate", {
         T.expect(self.potHot == nil, "a pot won't take the condensate hot: " .. tostring(self.potHot))
         T.expect(self.coldBottle, "a plastic bottle won't take it cold")
         local poured = math.min(self.condensate, instanceItem("Base.Pot"):getFluidContainer():getCapacity())
-        T.expectNear("wood vinegar carried", self.server.carried.fluids[Gasifier.VINEGAR], poured, 0.01)
+        T.expectNear("wood vinegar carried", T.carriedLitres(self, Gasifier.VINEGAR), poured, 0.01)
         T.expectNear("condensate left", self.reads.drained.condensate, self.condensate - poured, 0.01)
     end,
 })
-
--- Wood vinegar cut with water makes the game's own mildew and aphid sprays.
-for recipe, spray in pairs({ MildewSpray = "Base.GardeningSprayMilk", AphidSpray = "Base.GardeningSprayAphids" }) do
-    T.craftTest("renewable_energy_woodgas_vinegar_" .. T.snake(recipe), {
-        recipe = "RenewableEnergy_MakeVinegar" .. recipe,
-        from = "Base.GardeningSprayEmpty",
-        -- The fluid inputs' containers, in order, full of vinegar and water.
-        setup = function(self)
-            local fluids = { Gasifier.VINEGAR, "Water" }
-            local index = 1
-            for _, item in ipairs(self.items.inputs or {}) do
-                local container = item:getFluidContainer()
-                if container and fluids[index] then
-                    T.server(self, "refillFluid", { id = item:getID(), fluid = fluids[index], liters = container:getCapacity() })
-                    index = index + 1
-                end
-            end
-        end,
-        counts = { [spray] = 1, ["Base.GardeningSprayEmpty"] = 0 },
-    })
-end

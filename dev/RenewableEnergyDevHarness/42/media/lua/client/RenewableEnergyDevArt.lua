@@ -272,7 +272,8 @@ local HITCHED_STATES = {
         name = "art_trailer_brake",
         set = function(pair)
             -- A towed trailer's brake lights follow its car's, which need charge in the car's battery.
-            local battery = pair.car:getBattery() and pair.car:getBattery():getInventoryItem()
+            local part = RenewableEnergy.VehicleBattery.partOf(pair.car)
+            local battery = part and part:getInventoryItem()
             if battery then
                 battery:setCurrentUsesFloat(1)
             end
@@ -346,22 +347,10 @@ local function isOpen(square)
         and square:getVehicleContainer() == nil
 end
 
-local function lotFits(cornerX, cornerY, z)
-    local cell = getCell()
-    for x = cornerX, cornerX + AREA.w - 1 do
-        for y = cornerY, cornerY + AREA.h - 1 do
-            if not isOpen(cell:getGridSquare(x, y, z)) then
-                return false
-            end
-        end
-    end
-    return true
-end
-
 -- The north-west corner of the closest open lot that takes the whole stage.
 local function findLot(player)
     local corner = Stage.closestSquare(player, function(square)
-        return lotFits(square:getX(), square:getY(), square:getZ())
+        return Stage.isAreaOpen(square, AREA.w, AREA.h, isOpen)
     end)
     return corner and { x = corner:getX(), y = corner:getY(), z = corner:getZ() }
 end

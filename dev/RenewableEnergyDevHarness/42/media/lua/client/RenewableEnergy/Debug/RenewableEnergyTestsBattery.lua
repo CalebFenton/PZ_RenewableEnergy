@@ -84,10 +84,8 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         expect(morning.calendarDay ~= evening.calendarDay, "the day never turned")
         -- The charge comes back from whole battery uses, a hair off the tenth it was set to.
         expectNear("the evening's cycle depth", evening.cycleDepth, 0.9, 0.01)
-        -- Battery.cycleWear's share of a new battery's condition for that depth, in whole points.
-        local new = instanceItem("Base.CarBattery1")
-        local max = new:getConditionMax()
-        local expected = max - math.floor(Battery.cycleWear(new, evening.cycleDepth) * max)
+        local max = instanceItem("Base.CarBattery1"):getConditionMax()
+        local expected = T.conditionAfterDischarge("Base.CarBattery1", evening.cycleDepth)
         if not expect(expected < max, "a " .. evening.cycleDepth .. " deep day wears a car battery less than a point,"
             .. " so its wear can't show") then return end
         local battery = stateItem(morning, "Base.CarBattery1")
@@ -282,3 +280,29 @@ for _, chain in ipairs(REBUILDS) do
         end,
     })
 end
+
+-- A car battery case with no record of the battery it came out of rebuilds into the plain car
+-- battery, VehicleBattery.CAR_BATTERY.
+test(craftName("RenewableEnergy_RebuildCarBattery", "from_a_case_with_no_record"), {
+    instant = true,
+    run = function(self)
+        local rebuild = T.need(self, getScriptManager():getCraftRecipe("RenewableEnergy_RebuildCarBattery"),
+            "the recipe RenewableEnergy_RebuildCarBattery")
+        if not rebuild then return end
+        local p = player()
+        T.learnRecipes(p)
+        T.placeWorkTable(p)
+        T.setPerk(self, Perks.Electricity, 5)
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "RenewableEnergy.CarBatteryCase" }, { type = PLATES },
+            { type = "RenewableEnergy.BatteryElectrolyte" }, { type = "Base.WaterBottle" } })
+        T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
+        waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
+        waitForFluid(self, "Base.WaterBottle", 1)
+        T.step(function() T.startCraft(self, rebuild, T.carried("RenewableEnergy.CarBatteryCase")) end)
+        T.readCarried(self, { RenewableEnergy.VehicleBattery.CAR_BATTERY })
+    end,
+    validate = function(self)
+        local carBattery = RenewableEnergy.VehicleBattery.CAR_BATTERY
+        expect(T.carriedFirst(self, carBattery) ~= nil, "a case with no record rebuilt no " .. carBattery)
+    end,
+})

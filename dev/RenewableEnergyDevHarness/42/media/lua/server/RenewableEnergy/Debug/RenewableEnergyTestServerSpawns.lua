@@ -984,3 +984,63 @@ handler("siteClear", function(_, args)
     end
     return {}
 end)
+
+-- The objects on `square` other than items lying on it, as a set.
+local function objectsOn(square)
+    local found, objects = {}, square:getObjects()
+    for i = 0, objects:size() - 1 do
+        if not instanceof(objects:get(i), "IsoWorldInventoryObject") then
+            found[objects:get(i)] = true
+        end
+    end
+    return found
+end
+
+-- Fires OnSeeNewRoom, as the game does for a room seen for the first time (IsoCell.ProcessSpottedRooms),
+-- for each trial { room, setting, roll, edge }: a room named `room` whose free squares are all the
+-- square at `args`, Battery Bank Spawn at `setting`, and every roll at `roll`, a number, or "under"
+-- or "at" one in BANK_ROOMS odds (`edge` "bank") or CRATE_ROOMS odds (`edge` "crate") × the
+-- setting's RARITY. Answers, for each, the tiles it placed on the square and the modules it laid
+-- around it, all removed before the next.
+handler("seenRoom", function(_, args, defer)
+    local square = squareAt(args)
+    if not square then
+        return nil, "an indoor square loaded on the server"
+    end
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local restoreOptions = saveOptions(defer, { "BatteryBankSpawn" })
+    local results = {}
+    for i, trial in ipairs(args.trials) do
+        SandboxVars.RenewableEnergy.BatteryBankSpawn = trial.setting
+        local room = { getName = function() return trial.room end, getRandomFreeSquare = function() return square end }
+        local roll = trial.roll
+        if trial.edge then
+            local odds = trial.edge == "bank" and WorldSpawns.BANK_ROOMS[trial.room].odds or WorldSpawns.CRATE_ROOMS[trial.room]
+            local chance = 1 / (odds * WorldSpawns.RARITY[trial.setting])
+            roll = trial.roll == "under" and chance - UNDER or chance
+        end
+        local objectsBefore, itemsBefore = objectsOn(square), itemsAround(square)
+        local restoreRoll = Helpers.forceRolls(defer, roll)
+        triggerEvent("OnSeeNewRoom", room)
+        restoreRoll()
+        local result, placed = { tiles = {}, modules = 0 }, {}
+        for object in pairs(objectsOn(square)) do
+            if not objectsBefore[object] then
+                table.insert(result.tiles, object:getTextureName())
+                table.insert(placed, object)
+            end
+        end
+        for object in pairs(itemsAround(square)) do
+            if not itemsBefore[object] then
+                result.modules = result.modules + (object:getItem():getFullType() == MODULE and 1 or 0)
+                table.insert(placed, object)
+            end
+        end
+        for _, object in ipairs(placed) do
+            removePlaced(object)
+        end
+        results[i] = result
+    end
+    restoreOptions()
+    return { results = results }
+end)

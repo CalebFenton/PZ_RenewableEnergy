@@ -1102,23 +1102,30 @@ end
 
 -- Yardsticks ------------------------------------------------------------------------------------
 
--- A guessed mix of clear, broken and overcast days, the same as the solar tests' yearTotals.
-local WEATHER_MIX = {
+--- A guessed mix of clear, broken and overcast days: { share, weather } rows, the weather as
+--- Sun.planeIrradiance takes it.
+Loot.WEATHER_MIX = {
     { 0.4, { cloud = 0, fog = 0, rain = 0, snowing = false, groundSnow = 0 } },
     { 0.3, { cloud = 0.5, fog = 0, rain = 0, snowing = false, groundSnow = 0 } },
     { 0.3, { cloud = 1, fog = 0, rain = 0, snowing = false, groundSnow = 0 } },
 }
-local CLEAR_ONLY = { { 1, WEATHER_MIX[1][2] } }
+local CLEAR_ONLY = { { 1, Loot.WEATHER_MIX[1][2] } }
 -- The 15th of July and of December, as days of the year.
 local MONTH_DAYS = { july = 196, december = 349 }
-local MOUNTS = { flat = { "flat" }, rack = { "rack", "S" }, wall = { "wall", "S" } }
+--- The mounts the light is measured on, by name: Sun.planeIrradiance's kind and facing.
+Loot.SOUTH_MOUNTS = { flat = { "flat" }, rack = { "rack", "S" }, wall = { "wall", "S" } }
 
 -- Vanilla's generator fuel an hour for each appliance kind (IsoGenerator's *PowerConsumption
--- constants), which a bank bills at Specs.wattsPerFuel.
-Loot.APPLIANCE_FUEL = {
+-- constants).
+local APPLIANCE_FUEL = {
     fridgeFreezer = 0.13, fridge = 0.08, light = 0.002, television = 0.03, radio = 0.01,
     microwave = 0.09, range = 0.09, washer = 0.09, dryer = 0.09, batteryCharger = 0.05,
 }
+
+--- The watts an appliance of the kind `name` (an APPLIANCE_FUEL key) draws as a bank bills it.
+function Loot.applianceWatts(name)
+    return RenewableEnergy.Specs.wattsFromFuel(APPLIANCE_FUEL[name])
+end
 
 -- Watt-hours a factory module at full condition on `mount` banks over the day `dayOfYear` under
 -- `mix`, in half-hour steps, at the save's Sunlight Multiplier.
@@ -1166,17 +1173,16 @@ end
 --- capacity under a nightly load of half and of a quarter its new capacity (nil with wear off);
 --- `batteryWear`, the Battery Wear option they assume.
 function Loot.yardsticks()
-    local Specs = RenewableEnergy.Specs
     local moduleWh = {}
     for month, day in pairs(MONTH_DAYS) do
         moduleWh[month] = {}
-        for name, mount in pairs(MOUNTS) do
-            moduleWh[month][name] = { average = moduleDayWh(day, mount, WEATHER_MIX), clear = moduleDayWh(day, mount, CLEAR_ONLY) }
+        for name, mount in pairs(Loot.SOUTH_MOUNTS) do
+            moduleWh[month][name] = { average = moduleDayWh(day, mount, Loot.WEATHER_MIX), clear = moduleDayWh(day, mount, CLEAR_ONLY) }
         end
     end
     local applianceW = {}
-    for name, fuel in pairs(Loot.APPLIANCE_FUEL) do
-        applianceW[name] = Specs.wattsFromFuel(fuel)
+    for name in pairs(APPLIANCE_FUEL) do
+        applianceW[name] = Loot.applianceWatts(name)
     end
     local batteryLife = {}
     for _, fullType in ipairs(LIFE_BATTERIES) do

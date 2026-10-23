@@ -46,7 +46,8 @@ test("renewable_energy_items_have_ground_models_and_debug_listing", {
 
 -- Every recipe of the mod's resolves by its bare name in module Base, as research and the magazines
 -- look it up, and names only items that exist and have icons: the crafting window's "Possible Items"
--- throws on one without (ISCraftInventoryPanel.populate).
+-- throws on one without (ISCraftInventoryPanel.populate). Each fluid input fits a fluid: an unknown
+-- fluid name fails only as the game resolves the scripts (InputScript.OnPostWorldDictionaryInit).
 test("renewable_energy_items_recipes_load", {
     validate = function()
         local names = T.recipeNames()
@@ -65,6 +66,8 @@ test("renewable_energy_items_recipes_load", {
                             local item = possible:get(j)
                             expect(item:getNormalTexture() ~= nil, name .. " accepts " .. item:getFullName() .. ", which has no icon")
                         end
+                    elseif input:getResourceType() == ResourceType.Fluid then
+                        expect(input:getPossibleInputFluids():size() > 0, name .. ": no fluid fits " .. input:getOriginalLine())
                     end
                 end
                 local outputs = recipe:getOutputs()

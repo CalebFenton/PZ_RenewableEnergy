@@ -220,8 +220,7 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
         T.waitFor(self, function() return Wind.isBroken(self.left.object) end, "this client's copy of the broken blades")
         T.step(function()
             local menu, context = T.worldSubmenu(self.left.object, RenewableEnergy.Menu.nameOf(self.left.object))
-            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
-            self.emptyHanded = option ~= nil and option.notAvailable == true
+            self.emptyHanded = T.optionState(T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReplaceBlades"))).greyed
             if context then context:hideAndChildren() end
         end)
         T.give(self, "blades", { { type = WOODEN_BLADES } })
@@ -331,5 +330,86 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
             expect(panel.reason ~= "noController" and panel.watts > 0,
                 "a panel after the alternator lost its slot too: " .. panel.watts .. " W, " .. tostring(panel.reason))
         end
+    end,
+})
+
+-- Blades fit only the turbine kinds Specs.wind.turbines lists them for: steel blades are refused
+-- on a broken wooden propeller, which takes wooden or pipe blades, and with only steel blades
+-- carried Replace Blades is greyed out naming the ones that fit.
+test("renewable_energy_wind_blades_refused_for_the_wrong_turbine", {
+    run = function(self)
+        self.charger = T.panel(self, Sprites.windPropeller.wood.S)
+        if not self.charger then return end
+        T.holdLight(self)
+        T.give(self, "blades", { { type = "RenewableEnergy.SteelBlades" } })
+        T.step(function()
+            -- Broken on this client's copy only: Replace Blades is the menu's to offer.
+            local modData = self.charger.object:getModData()
+            modData[Wind.BROKEN] = true
+            T.defer(self, function() modData[Wind.BROKEN] = nil end)
+        end)
+    end,
+    validate = function(self)
+        local object, steel = self.charger.object, self.items.blades[1]
+        expect(Wind.bladesRefusal(object, steel) == "no blades",
+            "steel blades on a wooden propeller are refused for " .. tostring(Wind.bladesRefusal(object, steel)))
+        expect(Wind.bladesRefusal(object, instanceItem(WOODEN_BLADES)) == nil, "wooden blades on a wooden propeller are refused")
+        local menu, context = T.worldSubmenu(object, RenewableEnergy.Menu.nameOf(object))
+        local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
+        local names = { getItemNameFromFullType("RenewableEnergy.PipeBlades"), getItemNameFromFullType(WOODEN_BLADES) }
+        table.sort(names)
+        local wanted = getText("Tooltip_RenewableEnergy_NeedBlades", table.concat(names, ", "))
+        expect(option ~= nil and option.notAvailable and T.tooltipOf(option) == wanted,
+            "with steel blades Replace Blades reads '" .. tostring(T.tooltipOf(option)) .. "', expected greyed with '" .. wanted .. "'")
+        if context then context:hideAndChildren() end
+    end,
+})
+
+-- A charger losing more than SHELTERED_LOSS (30%) of its unsheltered watts to shelter gives
+-- "sheltered" as its reason, and one losing less gives none: a ring of walls beside it costs about
+-- 6%, walls filling the squares out to 5 about 43% (WindSource's shelter weights, worked by hand).
+test("renewable_energy_wind_sheltered_reason", {
+    run = function(self)
+        local bank, rotor = scoopOnBank(self)
+        if not bank then return end
+        self.passes = {}
+        local rated = Specs.wind.turbines.scoop.ratedKph
+        local function wallsOut(from, to)
+            T.step(function()
+                local p = rotor.position
+                T.batch(function()
+                    for dx = -5, 5 do
+                        for dy = -5, 5 do
+                            local distance = math.sqrt(dx * dx + dy * dy)
+                            local square = getSquare(p.x + dx, p.y + dy, p.z)
+                            if distance > from and distance <= to and square then
+                                T.placeTile(self, square, WALL)
+                            end
+                        end
+                    end
+                end)
+            end)
+        end
+        local function pass(label)
+            T.bankPass(self, bank, 0, { windKph = rated })
+            T.step(function() self.passes[label] = sourceAt(bank.state, rotor.position) end)
+        end
+        wallsOut(0, 1.5)
+        pass("ring")
+        wallsOut(1.5, 5)
+        pass("walled")
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.rotor) then return end
+        local spec = Specs.wind.turbines.scoop
+        for _, label in ipairs({ "ring", "walled" }) do
+            local source = self.passes[label]
+            if not expect(source ~= nil, "after the " .. label .. " pass the bank's status lists no scoop rotor") then return end
+            local loss = 1 - source.watts / Wind.watts(spec, spec.ratedKph, source.z, 0)
+            expect((source.reason == "sheltered") == (loss > 0.3), string.format(
+                "%s, losing %.0f%% of its watts to shelter, it reads %s", label, 100 * loss, tostring(source.reason)))
+        end
+        local walled = self.passes.walled
+        expect(walled.reason == "sheltered", "walled in out to 5 squares it reads " .. tostring(walled.reason))
     end,
 })

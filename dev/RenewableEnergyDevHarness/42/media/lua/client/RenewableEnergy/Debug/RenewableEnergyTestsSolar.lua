@@ -7,7 +7,6 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
@@ -23,7 +22,6 @@ local Action = RenewableEnergyAction
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local PowerBank, Sources, Recipes = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Recipes
 local Format, Menu = RenewableEnergy.Format, RenewableEnergy.Menu
-local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local MODULES_KEY = PowerBank.MODULES
 local CAR_BATTERY = "Base.CarBattery1"
 local FACTORY, HOMEMADE = "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule"
@@ -40,11 +38,11 @@ local function cloudy(cloud)
     return { cloud = cloud, fog = 0, rain = 0, snowing = false, groundSnow = 0 }
 end
 
--- Light on each mount summed over a year (or the given months), under a guessed mix of clear,
--- broken and overcast days. One day a week at half-hour steps keeps it cheap.
+-- Light on each mount summed over a year (or the given months), under the yardsticks' guessed mix
+-- of clear, broken and overcast days (Loot.WEATHER_MIX). One day a week at half-hour steps keeps
+-- it cheap.
 local function yearTotals(months)
-    local mix = { { 0.4, cloudy(0) }, { 0.3, cloudy(0.5) }, { 0.3, cloudy(1) } }
-    local mounts = { flat = { "flat" }, rack = { "rack", "S" }, wall = { "wall", "S" } }
+    local Loot = RenewableEnergy.Loot
     local totals = { flat = 0, rack = 0, wall = 0 }
     local dayStep, step = 7, 0.5
     for day = 1, 365, dayStep do
@@ -52,8 +50,8 @@ local function yearTotals(months)
         if not months or months[month] then
             for hour = -12, 12 - step, step do
                 local sun = Sun.position(day, hour, LATITUDE)
-                for name, mount in pairs(mounts) do
-                    for _, part in ipairs(mix) do
+                for name, mount in pairs(Loot.SOUTH_MOUNTS) do
+                    for _, part in ipairs(Loot.WEATHER_MIX) do
                         totals[name] = totals[name] + part[1] * Sun.planeIrradiance(sun, mount[1], mount[2], part[2]) * step * dayStep
                     end
                 end
@@ -167,9 +165,9 @@ test("renewable_energy_solar_module_condition_sets_watts", {
         if not bank then return end
         self.bank = bank
         local modules = {
-            { { type = FACTORY, condition = 50 } },
+            T.factoryModules(50),
             { { type = HOMEMADE, condition = getScriptManager():getItem(HOMEMADE):getConditionMax() } },
-            { { type = FACTORY, condition = 100 }, { type = FACTORY, condition = 0 } },
+            T.factoryModules(100, 0),
         }
         local sprites = { Sprites.flat, Sprites.flat, Sprites.rack.metal.S }
         self.panels = {}
@@ -250,10 +248,6 @@ test("renewable_energy_solar_panel_slots", {
     end,
 })
 
-local function freshModule(condition)
-    return { { type = FACTORY, condition = condition } }
-end
-
 -- The condition the panel object `panel` records for its first module, or nil.
 local function recordedCondition(panel)
     local modules = panel and panel:getModData()[MODULES_KEY]
@@ -268,7 +262,7 @@ local STORM_MOUNTS = {
 -- A storm trial on a panel of `mount` (STORM_MOUNTS) with one module at `condition`.
 local function stormTrial(mount, hours, condition, roll)
     local source = STORM_MOUNTS[mount]
-    return { source = { kind = source.kind, material = source.material, modules = freshModule(condition or 100) },
+    return { source = { kind = source.kind, material = source.material, modules = T.factoryModules(condition or 100) },
         hours = hours, roll = roll }
 end
 
@@ -348,7 +342,7 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
         -- Half a crack above the cracked look, so a crack takes it below.
         local whole = Specs.crackedBelow + math.floor(Specs.storm.crack / 2)
         self.crackedTo = whole - Specs.storm.crack
-        local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(whole), connect = true })
+        local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole), connect = true })
         if not panel then return end
         self.panel = panel
         T.step(function() self.before = T.overlays(panel.object) end)
@@ -380,10 +374,10 @@ test("renewable_energy_solar_storms_crack_loose_panels", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.5 })
-        local connected = bank and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100), connect = true })
-        local outdoors = connected and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100) })
+        local connected = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(100), connect = true })
+        local outdoors = connected and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(100) })
         local indoorSquare = outdoors and T.square(self, { indoors = true, near = bank }, "a free indoor square for a panel")
-        local indoors = indoorSquare and T.panel(self, Sprites.flat, { square = indoorSquare, modules = freshModule(100) })
+        local indoors = indoorSquare and T.panel(self, Sprites.flat, { square = indoorSquare, modules = T.factoryModules(100) })
         if not indoors then return end
         self.connected = connected
         local panels = { connected.position, outdoors.position, indoors.position }
@@ -594,11 +588,6 @@ local function hasEnabledOption(menu)
     return false
 end
 
--- Whether the context menu option `option` (nil when not offered) shows, is greyed out, and why.
-local function optionState(option)
-    return { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable == true, reason = T.tooltipOf(option) }
-end
-
 -- A panel offers to connect only to a bank in reach: with none, the option is there but
 -- unavailable and says why; with one, the option connects to it.
 test("renewable_energy_solar_menu_panel_connect", {
@@ -611,7 +600,7 @@ test("renewable_energy_solar_menu_panel_connect", {
             local context = T.newContext()
             local submenu = Menu.addSourceOptions(0, context, panel)
             local option = T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectToBank"))
-            self.alone = optionState(option)
+            self.alone = T.optionState(option)
             self.alone.enabled = hasEnabledOption(submenu)
             context:hideAndChildren()
         end)
@@ -620,7 +609,7 @@ test("renewable_energy_solar_menu_panel_connect", {
     validate = function(self)
         local panel, alone = self.panel.object, self.alone
         if expect(self.banksBefore == 0, "a bank left by an earlier test is in reach of the panel") then
-            expect(alone.offered and alone.unavailable, "a panel with no bank in reach shows no unavailable connect option")
+            expect(alone.shown and alone.greyed, "a panel with no bank in reach shows no unavailable connect option")
             expect(alone.reason == getText("Tooltip_RenewableEnergy_NoBankInReach"),
                 "the unavailable connect option says " .. tostring(alone.reason))
             expect(not alone.enabled, "a panel with no bank in reach offers something to do")
@@ -759,7 +748,7 @@ local function clearSnowOption(panel)
     local context = T.newContext()
     local option = T.optionNamed(Menu.addSourceOptions(0, context, panel.object), getText("ContextMenu_RenewableEnergy_ClearSnow"))
     context:hideAndChildren()
-    return optionState(option)
+    return T.optionState(option)
 end
 
 -- A snowy flat panel offers Clear Snow, greyed out saying why until the character carries a broom
@@ -781,10 +770,10 @@ test("renewable_energy_solar_clear_snow_requirements", {
         T.step(function() self.withTool = clearSnowOption(self.flat) end)
     end,
     validate = function(self)
-        expect(self.withoutTool.unavailable and self.withoutTool.reason == getText("Tooltip_RenewableEnergy_NeedSnowTool"),
+        expect(self.withoutTool.greyed and self.withoutTool.reason == getText("Tooltip_RenewableEnergy_NeedSnowTool"),
             "with no broom or shovel, Clear Snow on a snowy panel isn't greyed out saying why ("
-            .. tostring(self.withoutTool.offered) .. ", " .. tostring(self.withoutTool.reason) .. ")")
-        expect(self.withTool.offered and not self.withTool.unavailable,
+            .. tostring(self.withoutTool.shown) .. ", " .. tostring(self.withoutTool.reason) .. ")")
+        expect(self.withTool.shown and not self.withTool.greyed,
             "carrying a broom, Clear Snow isn't offered on a snowy panel (" .. tostring(self.withTool.reason) .. ")")
         local p = player()
         local broom, shovel, hammer = self.items.tools[1], self.items.tools[2], self.items.tools[3]
@@ -824,8 +813,8 @@ local function connectOptions(bank, panel, loose)
     local bankMenu = Menu.addBankOptions(0, context, bank.object)
     local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
     local options = {
-        all = optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
-        one = optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank.object),
+        all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
+        one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank.object),
             Format.away(panel.position, bank.position)))),
     }
     context:hideAndChildren()
@@ -866,11 +855,11 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
     validate = function(self)
         local why = getText("Tooltip_RenewableEnergy_NoInputSlot")
         for name, option in pairs(self.full) do
-            expect(option.unavailable and option.reason == why, "with every slot taken, the " .. name
+            expect(option.greyed and option.reason == why, "with every slot taken, the " .. name
                 .. " connect option isn't greyed out saying there's no slot (" .. tostring(option.reason) .. ")")
         end
         for name, option in pairs(self.freed) do
-            expect(option.offered and not option.unavailable, "with a slot free, the " .. name
+            expect(option.shown and not option.greyed, "with a slot free, the " .. name
                 .. " connect option isn't offered (" .. tostring(option.reason) .. ")")
         end
     end,
@@ -1027,8 +1016,8 @@ test("renewable_energy_solar_mount_xp_only_for_new_modules", {
         T.setPerk(self, Perks.Woodwork, 4)
         self.xp = {}
         local function readXp(key)
-            T.server(self, "electricityAward", { xp = 0 })
-            T.step(function() self.xp[key] = self.server.electricityAward.xp end)
+            T.server(self, "perkXp", { perk = "Electricity" })
+            T.step(function() self.xp[key] = self.server.perkXp.value end)
         end
         local function craft(recipe, fullType)
             T.waitForCarried(self, fullType, "this client's " .. fullType .. " to craft from")
@@ -1202,13 +1191,6 @@ for _, entry in ipairs(REGLAZES) do
     })
 end
 
--- A garden light with no bulb recorded, as a new one is, gives back the plain bulb.
-craftTest(craftName("RenewableEnergy_TakeApartSolarGardenLight"), {
-    recipe = "RenewableEnergy_TakeApartSolarGardenLight",
-    from = SolarGardenLight.ITEM,
-    counts = { [SolarGardenLight.ITEM] = 0, [SolarGardenLight.PLAIN_BULB] = 1 },
-})
-
 -- Only a module that makes no power comes apart; one that still works is worth more whole.
 for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
     local behavior, condition = entry[1], entry[2]
@@ -1227,3 +1209,52 @@ for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
         end,
     })
 end
+
+-- Storm damage over hours at the Storm Damage options (Chance.stormDamage), worked by hand: 10% an
+-- hour is 10% in one hour and 1 - 0.9² = 19% in two; at a rate of 200 it is 20% an hour, so 36% in
+-- two, and 60% an hour doubles past certain, which stays certain; no hours, or Storm Damage off,
+-- is no chance.
+test("renewable_energy_solar_storms_chance_by_hours_and_rate", {
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
+    run = function(self)
+        local stormDamage = RenewableEnergy.Chance.stormDamage
+        T.step(function()
+            self.normal = { stormDamage(0.1, 1), stormDamage(0.1, 2), stormDamage(0.1, 0) }
+            T.setSandbox(self, "StormDamageRate", 200)
+        end)
+        T.step(function()
+            self.doubled = { stormDamage(0.1, 2), stormDamage(0.6, 1) }
+            T.setSandbox(self, "StormDamage", false)
+        end)
+        T.step(function() self.off = stormDamage(0.1, 2) end)
+    end,
+    validate = function(self)
+        expectNear("10% an hour over an hour", self.normal[1], 0.1, 1e-9)
+        expectNear("10% an hour over two hours", self.normal[2], 0.19, 1e-9)
+        expectNear("10% an hour over no hours", self.normal[3], 0, 0)
+        expectNear("10% an hour over two hours at rate 200", self.doubled[1], 0.36, 1e-9)
+        expectNear("60% an hour over an hour at rate 200", self.doubled[2], 1, 1e-9)
+        expectNear("10% an hour over two hours with Storm Damage off", self.off, 0, 0)
+    end,
+})
+
+-- A connect job takes ConnectPanelMin minutes at Electricity 3, and 9.5% of that less for each
+-- level above and more for each below: 12.85 minutes of 10 at level 0, 3.35 at level 10.
+test("renewable_energy_solar_connect_time_by_electricity", {
+    sandbox = { ConnectPanelMin = 10 },
+    run = function(self)
+        self.minutes = {}
+        T.step(function()
+            for _, level in ipairs({ 0, 3, 10 }) do
+                T.setPerk(self, Perks.Electricity, level)
+                local units = Action:new(player(), Action.CONNECT_SOURCE, nil, nil):units()
+                self.minutes[level] = units / RenewableEnergy.unitsPerMinute()
+            end
+        end)
+    end,
+    validate = function(self)
+        expectNear("connect minutes at Electricity 3", self.minutes[3], 10, 1e-6)
+        expectNear("connect minutes at Electricity 0", self.minutes[0], 12.85, 1e-6)
+        expectNear("connect minutes at Electricity 10", self.minutes[10], 3.35, 1e-6)
+    end,
+})

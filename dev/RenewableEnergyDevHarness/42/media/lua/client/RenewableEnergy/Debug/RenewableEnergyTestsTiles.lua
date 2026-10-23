@@ -299,7 +299,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                     T.pickUpAsPlayer(self, handle, placed.sprite)
                     T.readCarried(self, { placed.item })
                     T.step(function()
-                        local items = self.server.carried.items[placed.item]
+                        local items = T.carriedItems(self, placed.item)
                         result.removed = T.objectWithSprite(square, placed.sprite) == nil
                         result.returned, result.items = #items, self.server.carried.total
                         result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
@@ -332,33 +332,26 @@ test("renewable_energy_tiles_place_and_pick_up", {
     end,
 })
 
-local function modulesAt(...)
-    local modules = {}
-    for i, condition in ipairs({ ... }) do
-        modules[i] = { type = "RenewableEnergy.SolarModule", condition = condition }
-    end
-    return modules
-end
-
 -- A module just below Specs.crackedBelow shows cracks over its own slot, one at it shows whole,
 -- repair clears them, and snow stays drawn over cracks added under it; this client matches.
 local CRACKED_AT, WHOLE_AT = Specs.crackedBelow - 1, Specs.crackedBelow
 local CRACKS, SNOW = Sprites.cracks, Sprites.snow
 local CRACKED = {
-    { name = "flatCracked", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), shows = CRACKS.flat,
+    { name = "flatCracked", sprite = Sprites.flat, modules = T.factoryModules(CRACKED_AT), shows = CRACKS.flat,
         what = "a flat panel just below the crack" },
-    { name = "flatWhole", sprite = Sprites.flat, modules = modulesAt(WHOLE_AT), shows = "", what = "a flat panel at the crack" },
-    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = modulesAt(100, CRACKED_AT), shows = CRACKS.rack.metal.W[2],
+    { name = "flatWhole", sprite = Sprites.flat, modules = T.factoryModules(WHOLE_AT), shows = "", what = "a flat panel at the crack" },
+    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = T.factoryModules(100, CRACKED_AT), shows = CRACKS.rack.metal.W[2],
         what = "a metal rack facing west with its upper module cracked" },
-    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = modulesAt(0, CRACKED_AT),
+    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = T.factoryModules(0, CRACKED_AT),
         shows = CRACKS.rack.wood.E[1] .. "," .. CRACKS.rack.wood.E[2], what = "a wooden rack facing east with both modules cracked" },
     -- A wall panel needs a wall to be placed against, so this one is a bare tile.
-    { name = "wall", sprite = Sprites.wall.wood.E, modules = modulesAt(CRACKED_AT), shows = CRACKS.wall.wood.E,
+    { name = "wall", sprite = Sprites.wall.wood.E, modules = T.factoryModules(CRACKED_AT), shows = CRACKS.wall.wood.E,
         what = "a cracked wooden wall panel facing east" },
-    { name = "repaired", sprite = Sprites.flat, modules = modulesAt(CRACKED_AT), change = { modules = modulesAt(WHOLE_AT) },
-        shows = "", what = "a cracked flat panel repaired to the crack" },
-    { name = "snowed", sprite = Sprites.flat, modules = modulesAt(100), change = { modules = modulesAt(CRACKED_AT), snow = true },
-        shows = CRACKS.flat .. "," .. SNOW.flat, what = "a snowed-on flat panel cracked under the snow" },
+    { name = "repaired", sprite = Sprites.flat, modules = T.factoryModules(CRACKED_AT),
+        change = { modules = T.factoryModules(WHOLE_AT) }, shows = "", what = "a cracked flat panel repaired to the crack" },
+    { name = "snowed", sprite = Sprites.flat, modules = T.factoryModules(100),
+        change = { modules = T.factoryModules(CRACKED_AT), snow = true }, shows = CRACKS.flat .. "," .. SNOW.flat,
+        what = "a snowed-on flat panel cracked under the snow" },
 }
 
 test("renewable_energy_tiles_cracked_modules_show", {

@@ -27,7 +27,7 @@ local STEPS_TO_CLOSEST = 8
 local TOWING_CAR = "Base.OffRoad"
 -- How far behind its car a trailer spawns, clear of it while both settle onto their wheels; the
 -- hitch then moves it up to the tow bar.
-local TRAILER_GAP = 5
+Stage.TRAILER_GAP = 5
 local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
 
 -- How many squares around the character it has seen, and the sum of their light levels: together
@@ -37,18 +37,12 @@ local function lightingState(player)
     if not here then
         return nil, nil
     end
-    local cell, x, y, z = getCell(), here:getX(), here:getY(), here:getZ()
     local playerNum = player:getPlayerNum()
     local seen, light = 0, 0
-    for dx = -SETTLE_RADIUS, SETTLE_RADIUS do
-        for dy = -SETTLE_RADIUS, SETTLE_RADIUS do
-            local square = cell:getGridSquare(x + dx, y + dy, z)
-            if square then
-                seen = seen + (square:isSeen(playerNum) and 1 or 0)
-                light = light + math.floor(square:getLightLevel(playerNum) * 100)
-            end
-        end
-    end
+    RenewableEnergy.eachSquareAround(here:getX(), here:getY(), here:getZ(), SETTLE_RADIUS, function(square)
+        seen = seen + (square:isSeen(playerNum) and 1 or 0)
+        light = light + math.floor(square:getLightLevel(playerNum) * 100)
+    end)
     return seen, light
 end
 
@@ -103,18 +97,32 @@ function Stage.closestSquare(player, accepts)
     return best
 end
 
---- Removes every tree within TREE_RADIUS of x, y on level z.
-function Stage.removeTrees(x, y, z)
-    local cell = getCell()
-    for dx = -TREE_RADIUS, TREE_RADIUS do
-        for dy = -TREE_RADIUS, TREE_RADIUS do
-            local square = cell:getGridSquare(x + dx, y + dy, z)
-            local tree = square and square:getTree()
-            if tree then
-                square:RemoveTileObject(tree)
+--- Whether `accepts(square)` holds for every square of the `w` by `h` rectangle whose north-west
+--- corner is `corner`, on its level. `accepts` is passed nil for a square not loaded; a nil
+--- `corner` is not open.
+function Stage.isAreaOpen(corner, w, h, accepts)
+    if not corner then
+        return false
+    end
+    local cell, x, y, z = getCell(), corner:getX(), corner:getY(), corner:getZ()
+    for dy = 0, h - 1 do
+        for dx = 0, w - 1 do
+            if not accepts(cell:getGridSquare(x + dx, y + dy, z)) then
+                return false
             end
         end
     end
+    return true
+end
+
+--- Removes every tree within TREE_RADIUS of x, y on level z.
+function Stage.removeTrees(x, y, z)
+    RenewableEnergy.eachSquareAround(x, y, z, TREE_RADIUS, function(square)
+        local tree = square:getTree()
+        if tree then
+            square:RemoveTileObject(tree)
+        end
+    end)
 end
 
 --- Grass, weeds and bushes a character could pull up (as vanilla's remove-grass and building code
@@ -216,8 +224,8 @@ end
 --- vehiclesAtRest before hitching them.
 function Stage.spawnTrailer(square, facing)
     local behind = BEHIND[facing]
-    local trailerSquare = getCell():getGridSquare(square:getX() + behind[1] * TRAILER_GAP,
-        square:getY() + behind[2] * TRAILER_GAP, square:getZ())
+    local trailerSquare = getCell():getGridSquare(square:getX() + behind[1] * Stage.TRAILER_GAP,
+        square:getY() + behind[2] * Stage.TRAILER_GAP, square:getZ())
     local pair = {
         car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
         -- The tests' spawn, which keeps a whole trailer's panels whole past stocking.

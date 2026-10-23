@@ -420,4 +420,10 @@ function T.hasOverlay(read, name)
     return false
 end
 
+--- Whether a generator read (T.readGenerator) shows it stopped by its gas line: off, with its
+--- kit's state saying stalled.
+function T.isStalled(read)
+    return not read.running and read.state ~= nil and read.state.stalled == true
+end
+
 return T

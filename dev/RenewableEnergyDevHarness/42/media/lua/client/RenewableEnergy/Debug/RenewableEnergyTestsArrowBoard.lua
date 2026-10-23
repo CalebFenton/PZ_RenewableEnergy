@@ -1432,16 +1432,16 @@ local function repairTest(name, repaired, fromBelowCap)
             waitForPanelsCopy(self, trailer)
             T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
             -- Read the authority's XP: a client's copy may still be getting the last test's.
-            T.server(self, "electricityAward", { xp = 0 })
+            T.server(self, "perkXp", { perk = "Electricity" })
             T.step(function()
                 self.epoxyUses = self.items.inputs[2]:getCurrentUses()
-                self.xp = self.server.electricityAward.xp
+                self.xp = self.server.perkXp.value
             end)
             repairPanel(trailer)
             T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= self.from end, SERVER_MS)
             T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
-            T.server(self, "electricityAward", { xp = 0 })
-            T.step(function() self.gainedXp = self.server.electricityAward.xp - self.xp end)
+            T.server(self, "perkXp", { perk = "Electricity" })
+            T.step(function() self.gainedXp = self.server.perkXp.value - self.xp end)
             -- What CraftRecipe.addXP gives this character for the recipe's xpAward.
             T.server(self, "electricityAward", { xp = RenewableEnergy.Recipes.moduleRepairRecipe():getXPAward(0):getAmount() })
             waitForPanelsCopy(self, trailer)
@@ -1470,14 +1470,11 @@ repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 0,
 repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 0, function(cap) return cap - 1 end)
 repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lower", 2, function(cap) return cap - 1 end)
 
--- What the trailer's menu shows of Seal Cracked Panel: "offered", "greyed out" with its
--- tooltip, or "missing".
+-- What the trailer's menu shows of Seal Cracked Panel (T.optionState).
 local function repairPanelOption(vehicle)
-    local context = ISContextMenu.get(0, 0, 0)
+    local context = T.newContext()
     RenewableEnergy.Menu.addPanelRepairOptions(0, context, vehicle)
-    local option = context.options[1]
-    local shown = { state = option and (option.notAvailable and "greyed out" or "offered") or "missing",
-        tooltip = option and option.toolTip and option.toolTip.description or "" }
+    local shown = T.optionState(context.options[1])
     context:closeAll()
     return shown
 end
@@ -1500,10 +1497,10 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
         T.step(function() self.dark = repairPanelOption(trailer.vehicle) end)
     end,
     validate = function(self)
-        expect(self.lit.state == "offered", "in daylight with every input the repair is " .. self.lit.state)
-        expect(self.dark.state == "greyed out", "in the dark the repair is " .. self.dark.state)
-        expect(self.dark.tooltip:find(getText("Tooltip_RenewableEnergy_TooDark"), 1, true) ~= nil,
-            "in the dark the repair's tooltip says '" .. self.dark.tooltip .. "'")
+        expect(self.lit.shown and not self.lit.greyed, "in daylight with every input the repair isn't offered")
+        expect(self.dark.greyed, "in the dark the repair isn't greyed out")
+        expect(tostring(self.dark.reason):find(getText("Tooltip_RenewableEnergy_TooDark"), 1, true) ~= nil,
+            "in the dark the repair's tooltip says '" .. tostring(self.dark.reason) .. "'")
     end,
 })
 
@@ -1584,11 +1581,11 @@ test("renewable_energy_world_arrow_board_frame_welds", {
         self.labels = {}
         -- The frame's options, and the first fix under each.
         local function frameOptions()
-            local context = ISContextMenu.get(0, 0, 0)
+            local context = T.newContext()
             RenewableEnergy.Menu.addFrameRepairOptions(0, context, trailer.vehicle)
             local found = {}
             for _, option in ipairs(context.options) do
-                local submenu = option.subOption and context:getSubMenu(option.subOption)
+                local submenu = T.subMenu(context, option)
                 table.insert(found, { name = option.name, fix = submenu and submenu.options[1] })
             end
             return found
@@ -1632,5 +1629,103 @@ test("renewable_energy_world_arrow_board_frame_welds", {
         local left = self.counts.left["Base.SheetMetal"]
         expect(left < 3, "welding took none of the 3 sheet metal")
         expect(self.afterRepair == 0, "a whole frame offers " .. tostring(self.afterRepair) .. " repairs")
+    end,
+})
+
+-- A new trailer's lid is padlocked on a roll just under STOCK.lockedChance and not on one at it,
+-- whatever it was before; with the game's Easy Use option it is left unlocked even on the lowest roll.
+test("renewable_energy_world_arrow_board_lid_lock_roll", {
+    run = function(self)
+        if not spawnTrailer(self, { repair = true }) then return end
+        T.onVehicle(self, self.trailer, "arrowBoardLidRolls", { trials = {
+            { was = false, roll = "under" }, { was = true, roll = "at" }, { was = true, roll = 0, easyUse = true },
+        } })
+    end,
+    validate = function(self)
+        local locked = self.trailer.answer.locked
+        expect(locked[1] == true, "a roll just under the locked chance left the lid unlocked")
+        expect(locked[2] == false, "a roll at the locked chance left the lid locked")
+        expect(locked[3] == false, "with Easy Use the lowest roll left the lid locked")
+    end,
+})
+
+-- A new trailer's second panel gets a cracked module on a roll just under STOCK.secondCrackedChance
+-- and a weathered one at it; the first panel's is weathered either way.
+test("renewable_energy_world_arrow_board_second_panel_cracked_roll", {
+    run = function(self)
+        if not spawnTrailer(self, { repair = true }) then return end
+        T.onVehicle(self, self.trailer, "arrowBoardPanelStockRolls", { rolls = { "under", "at" } })
+    end,
+    validate = function(self)
+        local answer = self.trailer.answer
+        local under, at = answer.stocked[1], answer.stocked[2]
+        for label, stocked in pairs({ ["just under the chance"] = under, ["at the chance"] = at }) do
+            expect(T.inRange(stocked[LEFT], answer.weathered), "on a roll " .. label .. " the left module is at " .. tostring(stocked[LEFT]))
+        end
+        expect(T.inRange(under[RIGHT], answer.cracked), "on a roll just under the chance the right module is at " .. tostring(under[RIGHT]))
+        expect(T.inRange(at[RIGHT], answer.weathered), "on a roll at the chance the right module is at " .. tostring(at[RIGHT]))
+    end,
+})
+
+-- A found battery box holds a charge controller on a roll just under STOCK.controllerChance × the
+-- Misc loot option and none at it: 0.75 at an option of 1, 0.375 at 0.5.
+test("renewable_energy_world_arrow_board_box_controller_roll", {
+    run = function(self)
+        T.server(self, "arrowBoardControllerRolls", { trials = {
+            { misc = 1, roll = "under" }, { misc = 1, roll = "at" }, { misc = 0.5, roll = "under" }, { misc = 0.5, roll = "at" },
+        } })
+    end,
+    validate = function(self)
+        local controllers = self.server.arrowBoardControllerRolls.controllers
+        for i, misc in ipairs({ 1, 1, 0.5, 0.5 }) do
+            local wanted = i % 2 == 1 and 1 or 0
+            expect(controllers[i] == wanted, string.format("at Misc %s a roll %s the chance gave %d controllers, expected %d",
+                misc, wanted == 1 and "just under" or "at", controllers[i], wanted))
+        end
+    end,
+})
+
+-- The box's discharge cycle is the calendar day's: a pass just after midnight, half an hour after
+-- the evening's, finishes the day and wears its battery by the day's depth, run flat from full;
+-- the evening's passes wear nothing.
+test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
+    sandbox = { BatteryWear = 100 },
+    run = function(self)
+        local trailer = spawnTrailer(self, { repair = true })
+        if not trailer then return end
+        local function lampsArgs()
+            local args = T.vehicleArgs(trailer)
+            args.hours, args.night = 0, true
+            return args
+        end
+        T.step(function() T.setTime(self, 23.5) end)
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = CAR_BATTERY, charge = 1 } } })
+            T.onVehicle(self, trailer, "arrowBoardLamps", lampsArgs)
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = CAR_BATTERY, charge = 0 } } })
+            T.onVehicle(self, trailer, "arrowBoardLamps", lampsArgs)
+            T.step(function() self.evening = trailer.state end)
+        end)
+        T.step(function()
+            self.full = instanceItem(CAR_BATTERY):getConditionMax()
+            T.setTime(self, 24.01)
+        end)
+        T.serverUntil(self, "arrowBoardLamps", lampsArgs, function(reply)
+            local battery = boxItems(reply.state, CAR_BATTERY)[1]
+            return battery ~= nil and battery.condition < self.full
+        end, SERVER_MS)
+        T.step(function() trailer.state = self.server.arrowBoardLamps.state end)
+    end,
+    validate = function(self)
+        local new = instanceItem(CAR_BATTERY)
+        local full = new:getConditionMax()
+        local expected = full - math.floor(RenewableEnergy.Battery.cycleWear(new, 1) * full)
+        if not expect(expected < full, "a flat day wears a car battery less than a point, so its wear can't show") then return end
+        local evening = boxItems(self.evening, CAR_BATTERY)[1]
+        expect(evening ~= nil and evening.condition == full, "the evening's passes left the battery at "
+            .. tostring(evening and evening.condition))
+        local morning = boxItems(self.trailer.state, CAR_BATTERY)[1]
+        expect(morning ~= nil and morning.condition == expected, "after midnight the battery is at "
+            .. tostring(morning and morning.condition) .. ", expected " .. expected)
     end,
 })

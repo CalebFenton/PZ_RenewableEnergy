@@ -110,9 +110,7 @@ test("renewable_energy_gasline_kit_menu", {
         self.generator = generator
         T.step(function()
             local submenu, context = T.worldSubmenu(generator.object, getText("ContextMenu_Generator"))
-            local install = submenu and submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_InstallKit"))
-            self.installShown = install ~= nil
-            self.installGreyed = install ~= nil and install.notAvailable == true
+            self.install = T.optionState(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_InstallKit")))
             if context then
                 context:hideAndChildren()
             end
@@ -124,7 +122,7 @@ test("renewable_energy_gasline_kit_menu", {
         end, "this client's copy of the generator on gas")
     end,
     validate = function(self)
-        T.expect(self.installShown and self.installGreyed, "without a kit and wrench, Install isn't offered greyed out")
+        T.expect(self.install.greyed, "without a kit and wrench, Install isn't offered greyed out")
         local generator = self.generator.object
         local submenu, context = T.worldSubmenu(generator, getText("ContextMenu_Generator"))
         if T.expect(submenu ~= nil, "a kitted generator has no generator submenu") then
@@ -412,9 +410,9 @@ test("renewable_energy_gasline_generator_stalls_over_cap", {
         local reads = self.reads
         local atCap, over, fits = reads.atCap, reads.over, reads.fits
         T.expect(atCap.running and atCap.state ~= nil and not atCap.state.stalled, "the generator stalled at exactly its cap")
-        T.expect(not over.running and over.state ~= nil and over.state.stalled, "a watt over its cap didn't stall it")
+        T.expect(T.isStalled(over), "a watt over its cap didn't stall it")
         T.expect(fits.running and fits.state ~= nil and not fits.state.stalled, "the generator didn't start again once the load fit")
-        T.expect(reads.stalled.state ~= nil and reads.stalled.state.stalled, "a watt over its cap didn't stall it again")
+        T.expect(T.isStalled(reads.stalled), "a watt over its cap didn't stall it again")
         T.expect(reads.cut.state ~= nil and not reads.cut.state.stalled, "cutting the line left the generator stalled")
         T.expect(not reads.reconnected.running, "a new line started a generator stalled on the line before")
     end,
@@ -560,7 +558,7 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
         if not T.expect(overloaded ~= nil and overloaded.state ~= nil, "no read of the generator past its cap") then return end
         T.expect((overloaded.state.watts or 0) > GasKit.CAP_W,
             "the fridges make a load of " .. tostring(overloaded.state.watts) .. " W, not past the cap")
-        T.expect(not overloaded.running and overloaded.state.stalled, "fridges past the cap didn't stall the generator")
+        T.expect(T.isStalled(overloaded), "fridges past the cap didn't stall the generator")
         for i, bank in ipairs(self.banks) do
             T.expectNear("bank " .. i .. "'s charge with the cap taken", self.drawn.overloaded[bank].watts or -1, 0, 0)
         end
@@ -762,8 +760,7 @@ test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
     validate = function(self)
         local reads = self.reads
         T.expect(reads.gasifierOut.toxic, "the building cleared with a generator running inside once the gasifier went out")
-        local stalled = reads.stalled
-        T.expect(not stalled.running and stalled.state ~= nil and stalled.state.stalled, "the generator didn't stall, so this tests nothing")
-        T.expect(stalled.toxic, "the building cleared as the gas line stopped its generator, with a sour digester inside")
+        T.expect(T.isStalled(reads.stalled), "the generator didn't stall, so this tests nothing")
+        T.expect(reads.stalled.toxic, "the building cleared as the gas line stopped its generator, with a sour digester inside")
     end,
 })

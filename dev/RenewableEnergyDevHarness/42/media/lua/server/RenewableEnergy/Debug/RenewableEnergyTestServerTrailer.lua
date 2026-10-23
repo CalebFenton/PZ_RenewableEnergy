@@ -383,29 +383,6 @@ onVehicle("arrowBoardOldFrame", function(vehicle, args)
     return { state = Trailer.vehicleState(vehicle), forcedSat = script:getForcedSat(), forcedVal = script:getForcedVal() }
 end)
 
--- The game's own crash damage on the vehicle: `args.amount`, to the front if `args.front`.
--- Answers its state.
-onVehicle("vehicleCrash", function(vehicle, args)
-    vehicle:crash(args.amount, args.front)
-    return { state = Trailer.vehicleState(vehicle) }
-end)
-
--- The item types each panel takes, then the left panel emptied and the trailer repaired. Answers
--- the types and the trailer's state.
-onVehicle("arrowBoardRepairAll", function(vehicle)
-    local types = {}
-    for _, id in ipairs(RenewableEnergy.ArrowBoard.PANELS) do
-        local list = vehicle:getPartById(id):getItemType()
-        types[id] = {}
-        for i = 0, list:size() - 1 do
-            table.insert(types[id], list:get(i))
-        end
-    end
-    putPanel(vehicle, RenewableEnergy.ArrowBoard.PANELS[1], {})
-    vehicle:repair()
-    return { types = types, state = Trailer.vehicleState(vehicle) }
-end)
-
 -- Turns the car `args.car` and the trailer `args.trailer` (each RenewableEnergyTest.vehicleArgs) square to
 -- `args.facing` and puts the trailer's coupler on the car's tow bar
 -- (PZHarness.Fixtures.lineUpTrailer), on the authority, which sends the clients their new places.
@@ -422,6 +399,95 @@ end)
 -- test can show what a key holder could do to its lid.
 onVehicle("arrowBoardKey", function(vehicle, _, player)
     return { given = { PZHarness.giveItem(player, vehicle:createVehicleKey()) } }
+end)
+
+-- `roll` as a trial gives it: "under" or "at" for just under or at `chance`, worked out here so the
+-- roll is exactly the chance, else the number itself.
+local function trialRoll(roll, chance)
+    return roll == "under" and chance - Helpers.UNDER or roll == "at" and chance or roll
+end
+
+-- Makes the trailer's lid as its part `create` does (ArrowBoard.createLid) for each trial
+-- { was, roll, easyUse }: the lid locked or not as `was`, every roll at `roll` (trialRoll of
+-- STOCK.lockedChance) and the game's VehicleEasyUse option at `easyUse`. Then puts the lid and the
+-- option back. Answers whether each left the lid locked.
+onVehicle("arrowBoardLidRolls", function(vehicle, args, _, defer)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local lid = vehicle:getPartById(ArrowBoard.LID)
+    local door = lid:getDoor()
+    local wasOpen, wasLocked, wasBroken, easyUse = door:isOpen(), door:isLocked(), door:isLockBroken(), SandboxVars.VehicleEasyUse
+    local restore = deferOnce(defer, function()
+        SandboxVars.VehicleEasyUse = easyUse
+        door:setOpen(wasOpen)
+        door:setLocked(wasLocked)
+        door:setLockBroken(wasBroken)
+        vehicle:transmitPartDoor(lid)
+    end)
+    local locked = {}
+    for i, trial in ipairs(args.trials) do
+        door:setLocked(trial.was)
+        SandboxVars.VehicleEasyUse = trial.easyUse == true
+        local restoreRoll = Helpers.forceRolls(defer, trialRoll(trial.roll, ArrowBoard.STOCK.lockedChance))
+        ArrowBoard.createLid(vehicle, lid)
+        restoreRoll()
+        locked[i] = door:isLocked()
+    end
+    restore()
+    return { locked = locked }
+end)
+
+-- Stocks the trailer's panels afresh, as its panels' part `create` does on a new trailer, for each
+-- of `args.rolls` (trialRoll of STOCK.secondCrackedChance), every roll at it, with the Solar Panels
+-- loot option at 1. Answers each panel's condition after each stocking, and WorldSpawns' cracked
+-- and weathered ranges.
+onVehicle("arrowBoardPanelStockRolls", function(vehicle, args, _, defer)
+    local ArrowBoard, WorldSpawns = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns
+    local restoreOptions = Helpers.saveOptions(defer, { "LRMSolarPanels" })
+    SandboxVars.RenewableEnergy.LRMSolarPanels = 1
+    local stocked = {}
+    for i, roll in ipairs(args.rolls) do
+        for _, id in ipairs(ArrowBoard.PANELS) do
+            putPanel(vehicle, id, {})
+        end
+        vehicle:getModData()[ArrowBoard.PANELS_STOCKED] = nil
+        local restoreRoll = Helpers.forceRolls(defer, trialRoll(roll, ArrowBoard.STOCK.secondCrackedChance))
+        ArrowBoard.createPanel(vehicle, vehicle:getPartById(ArrowBoard.PANELS[1]))
+        restoreRoll()
+        stocked[i] = {}
+        for _, id in ipairs(ArrowBoard.PANELS) do
+            stocked[i][id] = partState(vehicle, id).condition
+        end
+    end
+    restoreOptions()
+    return { stocked = stocked, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }
+end)
+
+-- Stocks a scratch battery box (ArrowBoard.stockBatteryBox) for each trial { misc, roll }: the
+-- Batteries loot option at 0, so no battery draws a roll, the Misc option at `misc`, and every
+-- roll at `roll` (trialRoll of STOCK.controllerChance × misc). Answers how many charge controllers
+-- each got.
+handler("arrowBoardControllerRolls", function(_, args, defer)
+    local ArrowBoard, options = RenewableEnergy.ArrowBoard, SandboxVars.RenewableEnergy
+    local controller = RenewableEnergy.Specs.controller
+    local restoreOptions = Helpers.saveOptions(defer, { "LRMBatteries", "LRMMisc" })
+    options.LRMBatteries = 0
+    local container, controllers = ItemContainer.new("crate", nil, nil), {}
+    for i, trial in ipairs(args.trials) do
+        options.LRMMisc = trial.misc
+        local restoreRoll = Helpers.forceRolls(defer, trialRoll(trial.roll, ArrowBoard.STOCK.controllerChance * trial.misc))
+        ArrowBoard.stockBatteryBox(container)
+        restoreRoll()
+        local items = container:getItems()
+        controllers[i] = 0
+        for j = 0, items:size() - 1 do
+            if items:get(j):getFullType() == controller then
+                controllers[i] = controllers[i] + 1
+            end
+        end
+        container:removeAllItems()
+    end
+    restoreOptions()
+    return { controllers = controllers }
 end)
 
 return Trailer

@@ -550,16 +550,15 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
         T.gasJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[2] end)
         T.batch(function()
             T.readRecord(self, handle, "second")
-            T.server(self, "carried", { types = { DigesterJobs.COMPOST_BAG, DigesterJobs.SANDBAG } })
+            T.readCarried(self, { DigesterJobs.COMPOST_BAG, DigesterJobs.SANDBAG })
         end)
     end,
     validate = function(self)
         T.expect(self.noBag == "Tooltip_RenewableEnergy_NeedsSandbag", "Take Sludge with no bag: " .. tostring(self.noBag))
         T.expectNear("sludge left after a full bag", self.reads.first.sludge, self.full - Digester.SLUDGE_PER_BAG, 0.001)
         T.expectNear("sludge left after a part bag", self.reads.second.sludge, 0, 0.001)
-        local items = self.server.carried.items
-        local bags = items[DigesterJobs.COMPOST_BAG]
-        T.expect(#items[DigesterJobs.SANDBAG] == 0 and #bags == 2, "the sandbags didn't become compost bags")
+        local bags = T.carriedItems(self, DigesterJobs.COMPOST_BAG)
+        T.expect(#T.carriedItems(self, DigesterJobs.SANDBAG) == 0 and #bags == 2, "the sandbags didn't become compost bags")
         if #bags == 2 then
             local fullest, other = math.max(bags[1].uses, bags[2].uses), math.min(bags[1].uses, bags[2].uses)
             T.expectNear("the first bag", fullest, 1, 0.001)
@@ -879,15 +878,6 @@ test("renewable_energy_biogas_heater_job_gives_its_xp", {
 
 -- Propane ----------------------------------------------------------------------------------------
 
--- Queues a read of the character's propane tanks (their fraction) into self.reads[label].
-local function readTanks(self, label)
-    T.server(self, "carried", { types = { Digester.TANK } })
-    T.step(function()
-        self.reads = self.reads or {}
-        self.reads[label] = self.server.carried.items[Digester.TANK]
-    end)
-end
-
 -- Queues a wait until this client has power where the character stands.
 local function waitForPower(self)
     T.waitFor(self, function()
@@ -920,12 +910,12 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
             T.readRecord(self, handle, "after")
             T.server(self, "characterStats", { stats = { "ENDURANCE" } })
         end)
-        readTanks(self, "tanks")
+        T.readCarried(self, { Digester.TANK })
         T.waitFor(self, function() return self.items.tools[2]:getCurrentUsesFloat() >= Digester.PUMP_FILL - 0.001 end,
             "this client's copy of the pumped tank")
     end,
     validate = function(self)
-        local tank = self.reads.tanks[1]
+        local tank = T.carriedFirst(self, Digester.TANK)
         if T.expect(tank ~= nil, "the tank is gone") then
             T.expectNear("tank after pumping", tank.uses, Digester.PUMP_FILL, 0.001)
         end
@@ -991,7 +981,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.waitForSummary(self, handle, function(summary) return summary.scrubCO2 > 0 end, "this client's summary of the charged scrubber")
         T.gasJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[2] end)
         T.readRecord(self, handle, "filled")
-        readTanks(self, "tanks")
+        T.readCarried(self, { Digester.TANK })
     end,
     validate = function(self)
         local charged, filled = self.reads.charged, self.reads.filled
@@ -1002,7 +992,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.expectNear("scrubber charge with lime", charged.scrubCO2, Digester.SCRUB_M3.lime, 0.01)
         T.expectNear("steel wool once fitted", charged.scrubWool, Digester.WOOL_M3, 0.01)
         T.expect(T.hasOverlay(charged, Sprites.digesterScrubber.dome), "the dome doesn't show its scrubber")
-        T.expectNear("tank after compressing " .. self.gas .. " m³", self.reads.tanks[1].uses, Digester.PUMP_FILL + self.gas / Digester.M3_PER_TANK, 0.002)
+        T.expectNear("tank after compressing " .. self.gas .. " m³", T.carriedFirst(self, Digester.TANK).uses, Digester.PUMP_FILL + self.gas / Digester.M3_PER_TANK, 0.002)
         T.expectNear("scrubber charge left", filled.scrubCO2, Digester.SCRUB_M3.lime - self.gas, 0.02)
         T.expectNear("steel wool left", filled.scrubWool, Digester.WOOL_M3 - self.gas, 0.02)
     end,
@@ -1045,12 +1035,11 @@ for name, case in pairs(REFILLS) do
         end,
         counts = { ["Base.Propane_Refill"] = 1, [Digester.TANK] = 1 },
         after = function(self)
-            readTanks(self, "tanks")
-            T.server(self, "carried", { types = { "Base.Propane_Refill" } })
+            T.readCarried(self, { Digester.TANK, "Base.Propane_Refill" })
         end,
         validate = function(self)
-            local bottle = self.server.carried.items["Base.Propane_Refill"][1].uses
-            local tank = self.reads.tanks[1].uses
+            local bottle = T.carriedFirst(self, "Base.Propane_Refill").uses
+            local tank = T.carriedFirst(self, Digester.TANK).uses
             T.expectNear("propane the bottle gained, in tanks, against what the tank lost",
                 (bottle - self.bottleStart) * SHARE, self.tankStart - tank, 0.0001)
             case.check(bottle, tank, self)

@@ -26,19 +26,16 @@ local function westConsole(self, rear)
 end
 
 -- Queues the Electricity level wiring a treadmill takes and its parts, the scrap `sets` times
--- over, with a screwdriver.
+-- over, with a screwdriver, which wiring uses up once this client has them.
 local function giveWiringParts(self, sets)
     local wiring = Specs.treadmill.wiring
     T.setPerk(self, Perks.Electricity, wiring.skill)
-    T.give(self, "parts", { { type = PowerBank.WIRE, count = wiring.wire }, { type = PowerBank.SCRAP, count = sets * wiring.scrap },
-        { type = "Base.Screwdriver" } })
-    -- Wiring uses the parts up; the step holds it until this client has them, which the give
-    -- waits for.
-    T.step(function() end)
+    T.giveBeforeCalls(self, "parts", { { type = PowerBank.WIRE, count = wiring.wire },
+        { type = PowerBank.SCRAP, count = sets * wiring.scrap }, { type = "Base.Screwdriver" } })
 end
 
 local function carriedCount(self, fullType)
-    return #(self.server.carried.items[fullType] or {})
+    return #T.carriedItems(self, fullType)
 end
 
 -- Queues reading the wire and scrap the authority's character carries into self[key].
@@ -130,12 +127,11 @@ test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
 })
 
 -- What a right-click on the treadmill tile `object` offers in its submenu: Run on Treadmill, Wire
--- to a Bank and Unwire, each nil if not offered, else { greyed, reason }.
+-- to a Bank and Unwire, each as T.optionState.
 local function treadmillMenu(object)
     local menu, context = T.worldSubmenu(object, getText("IGUI_RenewableEnergy_Treadmill"))
     local function offered(key)
-        local option = T.optionNamed(menu, getText(key))
-        return option and { greyed = option.notAvailable == true, reason = T.tooltipOf(option) }
+        return T.optionState(T.optionNamed(menu, getText(key)))
     end
     local seen = {
         run = offered("ContextMenu_RenewableEnergy_RunOnTreadmill"),
@@ -179,18 +175,18 @@ test("renewable_energy_treadmill_menu_offers_run_and_wiring", {
     end,
     validate = function(self)
         local loose, powered, wired = self.unpowered, self.powered, self.wiredMenu
-        expect(loose.wire ~= nil and loose.wire.greyed, "an empty-handed character isn't offered Wire to a Bank greyed out")
-        expect(loose.run ~= nil and loose.run.greyed and loose.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNoPower"),
+        expect(loose.wire.greyed, "an empty-handed character isn't offered Wire to a Bank greyed out")
+        expect(loose.run.greyed and loose.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNoPower"),
             "a loose treadmill without power doesn't offer Run greyed saying it needs power")
-        expect(powered.run ~= nil and not powered.run.greyed, "a loose treadmill on grid power doesn't offer Run open")
-        expect(powered.wire ~= nil, "a loose treadmill on grid power doesn't offer Wire to a Bank")
-        expect(wired.run ~= nil and wired.run.greyed and wired.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNotConnected"),
+        expect(powered.run.shown and not powered.run.greyed, "a loose treadmill on grid power doesn't offer Run open")
+        expect(powered.wire.shown, "a loose treadmill on grid power doesn't offer Wire to a Bank")
+        expect(wired.run.greyed and wired.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNotConnected"),
             "the unwired tile of a wired, unconnected treadmill doesn't offer Run greyed with the reason")
-        expect(wired.wire == nil, "a wired treadmill offers to be wired again")
+        expect(not wired.wire.shown, "a wired treadmill offers to be wired again")
         local screwdriver = ISVehicleMechanics.bhs .. getItemNameFromFullType("Base.Screwdriver")
-        expect(wired.unwire ~= nil and wired.unwire.greyed and (wired.unwire.reason or ""):find(screwdriver, 1, true) ~= nil,
+        expect(wired.unwire.greyed and (wired.unwire.reason or ""):find(screwdriver, 1, true) ~= nil,
             "a wired treadmill doesn't offer Unwire greyed with the screwdriver marked short ("
-            .. tostring(wired.unwire and wired.unwire.reason) .. ")")
+            .. tostring(wired.unwire.reason) .. ")")
     end,
 })
 
@@ -204,8 +200,8 @@ test("renewable_energy_treadmill_wiring_refused_in_the_dark", {
     validate = function(self)
         if not expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands") then return end
         local wire = treadmillMenu(self.treadmill.object).wire
-        expect(wire ~= nil and wire.greyed and wire.reason == getText("Tooltip_RenewableEnergy_TooDark"),
-            "Wire to a Bank in the dark isn't greyed out saying it's too dark (" .. tostring(wire and wire.reason) .. ")")
+        expect(wire.greyed and wire.reason == getText("Tooltip_RenewableEnergy_TooDark"),
+            "Wire to a Bank in the dark isn't greyed out saying it's too dark (" .. tostring(wire.reason) .. ")")
     end,
 })
 

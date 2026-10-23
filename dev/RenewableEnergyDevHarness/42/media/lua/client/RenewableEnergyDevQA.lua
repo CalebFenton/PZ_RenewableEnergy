@@ -160,24 +160,11 @@ local function isOpen(square)
 end
 
 local function rowOpen(square, length)
-    if not square then
-        return false
-    end
-    for dx = 0, length - 1 do
-        if not isOpen(getCell():getGridSquare(square:getX() + dx, square:getY(), square:getZ())) then
-            return false
-        end
-    end
-    return true
+    return Stage.isAreaOpen(square, length, 1, isOpen)
 end
 
 local function lotOpen(square)
-    for dy = 0, LOT_ROWS - 1 do
-        if not rowOpen(getCell():getGridSquare(square:getX(), square:getY() + dy, square:getZ()), ROW) then
-            return false
-        end
-    end
-    return true
+    return Stage.isAreaOpen(square, ROW, LOT_ROWS, isOpen)
 end
 
 -- The layout's north-west corner: the closest whose whole lot is open, else the closest open row,

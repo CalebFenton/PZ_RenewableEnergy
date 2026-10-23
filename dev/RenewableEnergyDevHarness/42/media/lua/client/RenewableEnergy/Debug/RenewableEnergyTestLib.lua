@@ -1,5 +1,6 @@
 require "PZHarness/TestLib"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
@@ -82,6 +83,14 @@ function T.waitForCarried(self, fullType, what)
     T.waitFor(self, function() return T.carried(fullType) ~= nil end, what)
 end
 
+--- Queues T.give, then an empty step: a T.server call with table args goes out ahead of T.give's
+--- wait for this client's copies (sendAhead), so without the step a later call, or an action that
+--- uses the items up, could run on the server before they arrive here.
+function T.giveBeforeCalls(self, name, items)
+    T.give(self, name, items)
+    T.step(function() end)
+end
+
 -- Fixtures -------------------------------------------------------------------------------------
 
 -- This client's copy of the bank on `square` once it holds `count` items and has a summary.
@@ -156,6 +165,16 @@ function T.panel(self, sprite, opts)
         return panel.object ~= nil
     end, "this client's copy of the panel")
     return panel
+end
+
+--- A panel's `modules` (T.panel's opts.modules): a factory module (RenewableEnergy.SolarModule)
+--- at each condition given, in mount order.
+function T.factoryModules(...)
+    local modules = {}
+    for i, condition in ipairs({ ... }) do
+        modules[i] = { type = "RenewableEnergy.SolarModule", condition = condition }
+    end
+    return modules
 end
 
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
@@ -284,11 +303,11 @@ function T.snowfall(self, bank, hours)
 end
 
 --- The watts appliances of the kinds `names` draw together, at vanilla's figures
---- (RenewableEnergy.Loot.APPLIANCE_FUEL).
+--- (RenewableEnergy.Loot.applianceWatts).
 function T.applianceWatts(names)
     local watts = 0
     for _, name in ipairs(names) do
-        watts = watts + RenewableEnergy.Specs.wattsFromFuel(RenewableEnergy.Loot.APPLIANCE_FUEL[name])
+        watts = watts + RenewableEnergy.Loot.applianceWatts(name)
     end
     return watts
 end
@@ -314,6 +333,14 @@ end
 --- count if `repaired`, and letting the bank read its parts again if `recount`.
 function T.setPartCondition(self, bank, fullType, condition, recount, repaired)
     onBank(self, bank, "setPartCondition", { type = fullType, condition = condition, recount = recount, repaired = repaired })
+end
+
+--- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at a
+--- Battery Wear of 100: Battery.cycleWear's fraction of its ConditionMax, in whole points.
+function T.conditionAfterDischarge(fullType, depth)
+    local battery = instanceItem(fullType)
+    local max = battery:getConditionMax()
+    return max - math.floor(RenewableEnergy.Battery.cycleWear(battery, depth) * max)
 end
 
 --- The summary of `bank` (a handle) as this client last received it, or nil.
@@ -433,6 +460,14 @@ function T.tooltipOf(option)
     return option and option.toolTip and option.toolTip.description
 end
 
+--- What a context menu option (nil when not offered) shows: { shown, greyed, reason }.
+function T.optionState(option)
+    if not option then
+        return { shown = false, greyed = false }
+    end
+    return { shown = true, greyed = option.notAvailable == true, reason = T.tooltipOf(option) }
+end
+
 --- Stands the character next to `square` so vanilla's walkAdj has nowhere to go, then makes that
 --- walk, as the menu does before an action: a multiplayer server refuses a job from afar.
 function T.walkTo(self, square, what)
@@ -472,15 +507,24 @@ function T.inputsOf(self, fullType)
 end
 
 --- Queues reading the authority's copies of `types` and its litres of `fluids` into
---- self.server.carried (see the carried handler).
+--- self.server.carried (see the carried handler), whose `total` counts its main inventory.
 function T.readCarried(self, types, fluids)
     T.server(self, "carried", { types = types, fluids = fluids })
 end
 
+--- The authority's items of `fullType` from the last T.readCarried, in a list, empty if none.
+function T.carriedItems(self, fullType)
+    return self.server.carried and self.server.carried.items[fullType] or {}
+end
+
 --- The authority's first item of `fullType` from the last T.readCarried, or nil.
 function T.carriedFirst(self, fullType)
-    local items = self.server.carried and self.server.carried.items[fullType]
-    return items and items[1]
+    return T.carriedItems(self, fullType)[1]
+end
+
+--- The authority's litres of `fluid` from the last T.readCarried, or nil.
+function T.carriedLitres(self, fluid)
+    return self.server.carried and self.server.carried.fluids[fluid]
 end
 
 --- Queues setting the repair count of the carried `fullType` items on the authority, and a wait
@@ -533,20 +577,26 @@ local CHUNK_FRAMES = 6000
 -- (IsoChunkMap.hotSaveFrequency).
 local AWAY_MS = 2000
 
---- Queues a trip that unloads the chunk of the square at x, y, z and loads it again: the
---- character goes AWAY squares east of `home` ({ x, y, z }) and back. `whileAway()`, if given, is
---- queued while the chunk is unloaded. A trip that doesn't unload the chunk, or brings it back
---- without LoadChunk (from a cache, with its state), misses its fixture.
-function T.awayAndBack(self, home, x, y, z, whileAway)
-    local p = T.player()
-    -- A teleport from inside a timed action doesn't stick, so OnTick makes it.
-    local target
+--- Lets `self` move the character until the test ends: returns teleport(x, y, z), which asks for
+--- the move, made on the next tick, as a teleport from inside a timed action doesn't stick.
+function T.teleporter(self)
+    local p, target = T.player(), nil
     T.onTick(self, function()
         if target then
             p:teleportTo(target[1], target[2], target[3])
             target = nil
         end
     end)
+    return function(x, y, z) target = { x, y, z } end
+end
+
+--- Queues a trip that unloads the chunk of the square at x, y, z and loads it again: the
+--- character goes AWAY squares east of `home` ({ x, y, z }) and back. `whileAway()`, if given, is
+--- queued while the chunk is unloaded. A trip that doesn't unload the chunk, or brings it back
+--- without LoadChunk (from a cache, with its state), misses its fixture.
+function T.awayAndBack(self, home, x, y, z, whileAway)
+    local p = T.player()
+    local teleport = T.teleporter(self)
     -- `home` may be filled in by a queued step that a failed test never reached.
     T.defer(self, function()
         if home.x then
@@ -563,7 +613,7 @@ function T.awayAndBack(self, home, x, y, z, whileAway)
     end
     Events.LoadChunk.Add(onLoadChunk)
     T.defer(self, function() Events.LoadChunk.Remove(onLoadChunk) end)
-    T.step(function() target = { home.x + AWAY + 0.5, home.y + 0.5, 0 } end)
+    T.step(function() teleport(home.x + AWAY + 0.5, home.y + 0.5, 0) end)
     T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the fixture's chunk unloaded", CHUNK_FRAMES)
     local awaySince
     T.waitFor(self, function()
@@ -573,7 +623,7 @@ function T.awayAndBack(self, home, x, y, z, whileAway)
     if whileAway then
         whileAway()
     end
-    T.step(function() target = { home.x + 0.5, home.y + 0.5, home.z } end)
+    T.step(function() teleport(home.x + 0.5, home.y + 0.5, home.z) end)
     T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the fixture's chunk loaded again", CHUNK_FRAMES)
     T.step(function() T.need(self, loads > 0, "the fixture's chunk loaded again through LoadChunk") end)
 end

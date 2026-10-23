@@ -550,9 +550,8 @@ local function loadedAround(x, y, z, radius)
     return getSquare(x + radius, y + radius, z) ~= nil
 end
 
--- Lets visits move the character: a teleport from inside a timed action doesn't stick, so OnTick
--- makes the move that self.teleportTo(x, y, z) asks for. Puts the character back at the start
--- when the test ends, should a visit leave them elsewhere.
+-- Lets visits move the character through self.teleportTo(x, y, z) (T.teleporter). Puts the
+-- character back at the start when the test ends, should a visit leave them elsewhere.
 local function startVisits(self)
     local p = player()
     local start = { x = p:getX(), y = p:getY(), z = p:getZ() }
@@ -561,14 +560,7 @@ local function startVisits(self)
             p:teleportTo(start.x, start.y, start.z)
         end
     end)
-    local target
-    T.onTick(self, function()
-        if target then
-            p:teleportTo(target[1], target[2], target[3])
-            target = nil
-        end
-    end)
-    function self.teleportTo(x, y, z) target = { x, y, z } end
+    self.teleportTo = T.teleporter(self)
     return start
 end
 
@@ -1069,3 +1061,45 @@ test("renewable_energy_world_rural_finds_option_zero", {
 
 -- Vanilla's barns and survivalist camps are dressed with the mod's magazines, pamphlet and charger.
 serverCheck("renewable_energy_world_rural_clutter", "ruralClutter")
+
+-- A room seen for the first time gets a bank of its room's stock (a shed's or garage's a wooden
+-- battery box, a farm storeroom's a wooden rack) on a roll just under one in its odds × the Battery
+-- Bank Spawn setting's rarity and none at it, and none at all at None or in a room not listed. A
+-- garage gets a crate of solar gear on a roll just under its crate odds and none at it, while its
+-- likelier bank comes up either way.
+local SEEN_ROOMS = {
+    { trial = { room = "shed", setting = 3, edge = "bank", roll = "under" }, bank = "batteryBoxWood" },
+    { trial = { room = "shed", setting = 3, edge = "bank", roll = "at" } },
+    { trial = { room = "shed", setting = 1, roll = 0 } },
+    { trial = { room = "farmstorage", setting = 4, roll = 0 }, bank = "batteryRackWood" },
+    { trial = { room = "kitchen", setting = 4, roll = 0 } },
+    { trial = { room = "garagestorage", setting = 2, edge = "crate", roll = "under" }, bank = "batteryBoxWood", crate = true },
+    { trial = { room = "garagestorage", setting = 2, edge = "crate", roll = "at" }, bank = "batteryBoxWood" },
+}
+
+test("renewable_energy_world_bank_rooms_seen_first_time", {
+    sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
+    run = function(self)
+        local square = T.square(self, { indoors = true }, "a free indoor square")
+        if not square then return end
+        local trials = {}
+        for i, entry in ipairs(SEEN_ROOMS) do
+            trials[i] = entry.trial
+        end
+        T.server(self, "seenRoom", { x = square:getX(), y = square:getY(), z = square:getZ(), trials = trials })
+    end,
+    validate = function(self)
+        for i, entry in ipairs(SEEN_ROOMS) do
+            local trial, tiles = entry.trial, self.server.seenRoom.results[i].tiles
+            local wanted = {}
+            if entry.bank then table.insert(wanted, Sprites[entry.bank]) end
+            if entry.crate then table.insert(wanted, Sprites.crate) end
+            table.sort(wanted)
+            table.sort(tiles)
+            expect(table.concat(tiles, ",") == table.concat(wanted, ","), string.format(
+                "a %s seen at setting %d with roll %s placed '%s', expected '%s'", trial.room, trial.setting,
+                tostring(trial.roll) .. (trial.edge and " " .. trial.edge .. " odds" or ""), table.concat(tiles, ","),
+                table.concat(wanted, ",")))
+        end
+    end,
+})

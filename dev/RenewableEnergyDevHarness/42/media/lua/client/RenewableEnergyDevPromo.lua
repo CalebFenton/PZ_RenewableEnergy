@@ -173,7 +173,8 @@ local ROAD = {
     -- The open road the setup needs: room on the near side keeps hedges and fences there from
     -- hiding the car.
     open = { along = { -11, 3 }, out = { -3, 3 } },
-    trailer = { -5, 0 },
+    -- Where Stage.spawnTrailer puts the trailer.
+    trailer = { -Stage.TRAILER_GAP, 0 },
     cones = { { -8, 1 }, { -9, 0 }, { -10, -1 } },
     cone = "street_decoration_01_26",
     player = { -3, 3 },
@@ -947,8 +948,7 @@ local function quietNeighbourhood(homesteadSquare, stage0Square)
                 local object = objects:get(i)
                 if instanceof(object, "IsoLightSwitch") then
                     lights = lights + (switchLight(object, false) and 1 or 0)
-                elseif bankSquare == stage0Square and object:getPipedFuelAmount() <= 0
-                    and object:getContainerByEitherType("fridge", "freezer") then
+                elseif bankSquare == stage0Square and object:getContainerByEitherType("fridge", "freezer") then
                     square:RemoveTileObject(object)
                     fridges = fridges + 1
                 end
@@ -963,19 +963,16 @@ end
 local function silenceRadios(origins)
     local silenced = 0
     for _, origin in ipairs(origins) do
-        for x = origin:getX() - QUIET_RADIUS, origin:getX() + QUIET_RADIUS do
-            for y = origin:getY() - QUIET_RADIUS, origin:getY() + QUIET_RADIUS do
-                local square = getCell():getGridSquare(x, y, origin:getZ())
-                local objects = square and square:getObjects()
-                for i = 0, (objects and objects:size() or 0) - 1 do
-                    local object = objects:get(i)
-                    if instanceof(object, "IsoWaveSignal") and object:getDeviceData():getIsTurnedOn() then
-                        object:getDeviceData():setIsTurnedOn(false)
-                        silenced = silenced + 1
-                    end
+        RenewableEnergy.eachSquareAround(origin:getX(), origin:getY(), origin:getZ(), QUIET_RADIUS, function(square)
+            local objects = square:getObjects()
+            for i = 0, objects:size() - 1 do
+                local object = objects:get(i)
+                if instanceof(object, "IsoWaveSignal") and object:getDeviceData():getIsTurnedOn() then
+                    object:getDeviceData():setIsTurnedOn(false)
+                    silenced = silenced + 1
                 end
             end
-        end
+        end)
     end
     print("REPromo switched off " .. silenced .. " radios and televisions")
 end

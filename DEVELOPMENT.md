@@ -55,6 +55,8 @@ The harness docs (`dev/harness/docs/`) cover the runner, the fixtures and the se
 - `IsoCell.getVehicles()` is a Java `Set`, which Lua can neither index nor walk. Find vehicles through the squares they stand on, with `square:getVehicleContainer()`.
 - A hard knock on a hitched pair, such as a crash, snaps the hitch unless it was made in the last two seconds (`Bullet.onVehicleConstraintImpulse`), so a test that pushes a hitched pair keeps it on open ground rather than relying on how soon the knock comes.
 - `teleportTo` a square that isn't loaded, called from a timed action's `update`, doesn't stick: the character stays put. Teleport from an `Events.OnTick` handler and keep a `RenewableEnergyTest.waitUntil` on the queue until it is done.
+- A vehicle a test removed can come back, with its key, when a later test unloads its chunk and loads it again straight away: seen in about half of a session's runs with a car removed one test before a chunk-reload trip. Staying away two seconds before going back stopped it (`T.awayAndBack`); the cause wasn't pinned down, and the game hot-saves loaded chunks every second (`IsoChunkMap.hotSaveFrequency`).
+- `tooDarkToRead()` is false while either hand holds a lit light, or an attached item emits one (`IsoPlayer.tooDarkToRead`); otherwise it reads the square's light level, so indoors the tests' daylight hour can still be too dark for a job that needs light. `T.holdLight` puts a lit flashlight in the off hand.
 
 ## Ground truth
 

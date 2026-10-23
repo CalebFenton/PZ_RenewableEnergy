@@ -312,10 +312,6 @@ local function partMenu(vehicle, part)
     return window.context
 end
 
-local function subMenuOf(context, option)
-    return option and option.subOption and context:getSubMenu(option.subOption)
-end
-
 -- The mechanics menu of an empty battery slot installs a carried deep cycle battery. A real-time
 -- action: an instant one fails vanilla's isValid on a multiplayer client when the server's slot
 -- change arrives. Uninstalling is vanilla's alone (ISUninstallVehiclePart takes any item).
@@ -332,9 +328,9 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
             local context = partMenu(car.vehicle, VehicleBattery.partOf(car.vehicle))
             T.defer(self, function() context:closeAll() end)
             local installOption = context:getOptionFromName(getText("IGUI_Install"))
-            local install = subMenuOf(context, installOption)
+            local install = T.subMenu(context, installOption)
             local deepCycleOption = install and install:getOptionFromName(getItemName(VehicleBattery.ITEM))
-            local deepCycle = subMenuOf(context, deepCycleOption)
+            local deepCycle = T.subMenu(context, deepCycleOption)
             local pick = deepCycle and deepCycle.options[1]
             self.offered = pick ~= nil
             if not pick then
@@ -564,7 +560,7 @@ local RED, GREEN = "Base.LightBulbRed", "Base.LightBulbGreen"
 local function bulbMenu(light)
     local context = T.newContext()
     local menu = RenewableEnergy.Menu.addGardenLightOptions(0, context, light.object)
-    return context, subMenuOf(context, menu:getOptionFromName(getText("ContextMenu_AddLightbulb"))),
+    return context, T.subMenu(context, menu:getOptionFromName(getText("ContextMenu_AddLightbulb"))),
         menu:getOptionFromName(getText("ContextMenu_RemoveLightbulb"))
 end
 
@@ -720,9 +716,9 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
         runLight(self, light, LIT_WH, NIGHT_HOURS)
         T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green")
         T.pickUpAsPlayer(self, light, Sprites.gardenLight.lit)
-        T.server(self, "carried", { types = { SolarGardenLight.ITEM } })
+        T.readCarried(self, { SolarGardenLight.ITEM })
         T.step(function()
-            local item = self.server.carried.items[SolarGardenLight.ITEM][1]
+            local item = T.carriedFirst(self, SolarGardenLight.ITEM)
             self.carriedBulb = item and item.modData[SolarGardenLight.BULB_KEY]
         end)
         placeCarriedLight(self, light)
