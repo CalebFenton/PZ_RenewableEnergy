@@ -588,13 +588,26 @@ test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
     end,
 })
 
--- In the dark nothing can be wired in or out: the menu greys them out and the action, the rule
--- since a server can't tell whether a remote player stands in the dark, won't start.
+-- In the dark nothing can be wired in or out, no bank or source connected and no blades replaced:
+-- the menu greys them out saying so, and the action, the rule since a server can't tell whether a
+-- remote player stands in the dark, won't start.
 test("renewable_energy_bank_wiring_refused_in_the_dark", {
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", POWER_INVERTER })
+        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", POWER_INVERTER }, { connected = false })
         if not self.bank then return end
-        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE } })
+        self.panel = T.panel(self, Sprites.flat, { near = self.bank })
+        self.charger = self.panel and T.panel(self, Sprites.windPropeller.wood.S, { near = self.bank })
+        if not self.charger then return end
+        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE },
+            { type = "RenewableEnergy.WoodenBlades" } })
+        T.step(function()
+            -- Broken on this client's copy only: Replace Blades is the menu's to offer.
+            local modData, broken = self.charger.object:getModData(), RenewableEnergy.Wind.BROKEN
+            modData[broken] = true
+            T.defer(self, function() modData[broken] = nil end)
+            -- Beside the panel, so its Connect action is refused for the dark rather than the distance.
+            T.standNextTo(self.panel.square)
+        end)
         T.makeDark(self)
     end,
     validate = function(self)
@@ -612,8 +625,23 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
             allDark = allDark and option.notAvailable and T.tooltipOf(option) == dark
         end
         expect(allDark, "a part can be unwired in the dark")
+        local bankMenu = Menu.addBankOptions(0, context, bank)
+        local sourceMenu = Menu.addSourceOptions(0, context, self.panel.object)
+        local chargerMenu = Menu.addSourceOptions(0, context, self.charger.object)
+        local refused = {
+            ["Connect Bank"] = T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectBank")),
+            ["Connect Sources in Reach"] = T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", 2)),
+            ["the panel's Connect"] = T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
+                Menu.bankLabel(bank), Format.away(self.panel.position, self.bank.position))),
+            ["Replace Blades"] = T.optionNamed(chargerMenu, getText("ContextMenu_RenewableEnergy_ReplaceBlades")),
+        }
+        for name, option in pairs(refused) do
+            expect(option ~= nil and option.notAvailable and T.tooltipOf(option) == dark,
+                name .. " isn't offered greyed out saying it's too dark (" .. tostring(T.tooltipOf(option)) .. ")")
+        end
         context:hideAndChildren()
         expect(not Action:new(p, Action.WIRE_IN, nil, bank, nil, battery):isValid(), "the Wire In action runs in the dark")
+        expect(not Action:new(p, Action.CONNECT_SOURCE, self.panel.object, bank):isValid(), "the Connect action runs in the dark")
     end,
 })
 

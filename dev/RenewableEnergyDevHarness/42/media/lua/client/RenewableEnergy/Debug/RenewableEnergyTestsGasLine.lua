@@ -135,6 +135,34 @@ test("renewable_energy_gasline_kit_menu", {
     end,
 })
 
+-- In the dark the kit can't be fitted: the menu greys Install out saying so, and the action, the
+-- rule since a server can't tell whether a remote player stands in the dark, won't start.
+test("renewable_energy_gasline_kit_refused_in_the_dark", {
+    run = function(self)
+        local generator = T.generator(self, {})
+        if not generator then return end
+        self.generator = generator
+        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" } })
+        T.setPerk(self, Perks.Mechanics, 2)
+        T.step(function() T.standNextTo(generator.square) end)
+        T.makeDark(self)
+    end,
+    validate = function(self)
+        local p = T.player()
+        if not T.expect(p:tooDarkToRead(), "midnight with the grid off isn't dark where the character stands") then return end
+        local generator = self.generator.object
+        local submenu, context = T.worldSubmenu(generator, getText("ContextMenu_Generator"))
+        local install = submenu and submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_InstallKit"))
+        local reason = T.tooltipOf(install)
+        T.expect(install ~= nil and install.notAvailable and reason == getText("Tooltip_RenewableEnergy_TooDark"),
+            "Install isn't offered greyed out saying it's too dark (" .. tostring(reason) .. ")")
+        if context then
+            context:hideAndChildren()
+        end
+        T.expect(not RenewableEnergyGasAction:new(p, "kit", GasKit.INSTALL, generator):isValid(), "the Install action runs in the dark")
+    end,
+})
+
 -- Running on gas ----------------------------------------------------------------------------------
 
 -- On a digester's line an empty-tanked generator runs: the gas pays for what vanilla bills it as the
