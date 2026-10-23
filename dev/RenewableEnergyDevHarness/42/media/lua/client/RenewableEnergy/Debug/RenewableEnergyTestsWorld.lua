@@ -234,38 +234,42 @@ test("renewable_energy_world_bank_stock_option_zero", {
     end,
 })
 
--- A world bank's batteries come used: at the lowest rolls a used battery's condition is its mean
--- less its half width, at middling ones the mean, and at the highest no better than new.
-test("renewable_energy_world_bank_batteries_used", {
+-- How each wear profile wears a battery, and its duds.
+serverCheck("renewable_energy_world_battery_wear", "batteryWear")
+
+-- A placed bank's batteries are worn as its stock says, so a farm storeroom's come more worn than
+-- an electronics store's: at middling rolls every battery is at its stock's profile's mean.
+local WORN_STOCKS = { "farmStorage", "electronicsStorage" }
+test("renewable_energy_world_bank_batteries_worn_by_stock", {
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
-        local rolls = { { "low", 0 }, { "middle", 0.5 }, { "high", 1 - 1e-9 } }
-        local squares = T.need(self, T.squares(self, #rolls, { indoors = true }), "free indoor squares for banks")
+        local squares = T.need(self, T.squares(self, #WORN_STOCKS, { indoors = true }), "free indoor squares for banks")
         if not squares then return end
         self.banks = {}
         T.batch(function()
-            for i, entry in ipairs(rolls) do
+            for i, stockName in ipairs(WORN_STOCKS) do
                 local square = squares[i]
-                T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "farmStorage", roll = entry[2] })
+                T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = stockName, roll = 0.5 })
                 T.step(function()
-                    self.banks[entry[1]] = self.server.worldBank
-                    T.need(self, self.server.worldBank.placed, "a farm storage bank rolled " .. entry[1])
+                    self.banks[stockName] = self.server.worldBank
+                    T.need(self, self.server.worldBank.placed, "a " .. stockName .. " bank")
                 end)
             end
-            T.server(self, "worldSpawnStock", { names = {} })
+            T.server(self, "worldSpawnStock", { names = WORN_STOCKS })
         end)
     end,
     validate = function(self)
-        local used = self.server.worldSpawnStock.usedBattery
-        local expected = { low = used.mean - used.halfWidth, middle = used.mean, high = math.min(100, used.mean + used.halfWidth) }
-        for name, condition in pairs(expected) do
-            local conditions = self.banks[name].stock.batteryConditions
+        local answer = self.server.worldSpawnStock
+        for _, stockName in ipairs(WORN_STOCKS) do
+            local wearName = answer.banks[stockName].wear
+            local condition = answer.batteryWear[wearName].mean
+            local conditions = self.banks[stockName].stock.batteryConditions
             local wrong = {}
             for _, found in ipairs(conditions) do
                 if found ~= condition then table.insert(wrong, found) end
             end
-            expect(#conditions > 0 and #wrong == 0, string.format("at %s rolls, %d batteries and conditions %s besides %d",
-                name, #conditions, table.concat(wrong, ", "), condition))
+            expect(#conditions > 0 and #wrong == 0, string.format("a %s bank holds %d batteries, of which %s aren't at its %s profile's %d",
+                stockName, #conditions, table.concat(wrong, ", "), wearName, condition))
         end
     end,
 })

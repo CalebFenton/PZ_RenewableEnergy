@@ -164,6 +164,50 @@ check("bankStockParts", function(expect, _, _, args, defer)
     restoreOptions()
 end)
 
+-- Every stock's batteries name a wear profile. Each profile wears a found battery to its mean less
+-- its half width at the lowest rolls, its mean at middling ones, and no better than new at the
+-- highest, unrepaired; with a dud chance, a roll just under it makes a dud, at the dud's lowest
+-- and highest condition by the next roll, with the dud's repairs, and a roll at it doesn't.
+check("batteryWear", function(expect, _, _, _, defer)
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local dud = WorldSpawns.DUD
+    for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
+        expect(WorldSpawns.BATTERY_WEAR[stock.batteries.wear] ~= nil, stockName .. " batteries wear as " .. tostring(stock.batteries.wear))
+    end
+    local function worn(name, rolls)
+        local item = instanceItem("RenewableEnergy.DeepCycleBattery")
+        local restoreRoll = Helpers.forceRolls(defer, rolls)
+        WorldSpawns.wearFoundBattery(item, name)
+        restoreRoll()
+        return { condition = item:getCondition(), repairs = item:getHaveBeenRepaired() }
+    end
+    local TOP = 1 - UNDER
+    for name, wear in pairs(WorldSpawns.BATTERY_WEAR) do
+        -- A profile with duds rolls for one first; at the chance, it isn't one.
+        local first = wear.dud and { wear.dud } or {}
+        local cases = {
+            { roll = 0, condition = wear.mean - wear.halfWidth },
+            { roll = 0.5, condition = wear.mean },
+            { roll = TOP, condition = math.min(100, wear.mean + wear.halfWidth) },
+        }
+        for _, case in ipairs(cases) do
+            local rolls = { unpack(first) }
+            for _ = 1, 3 do table.insert(rolls, case.roll) end
+            local got = worn(name, rolls)
+            expect(got.condition == case.condition and got.repairs == 0, string.format("%s at rolls of %s wears a battery to %d with %d repairs, not %d",
+                name, case.roll, got.condition, got.repairs, case.condition))
+        end
+        if wear.dud then
+            for _, case in ipairs({ { roll = 0, condition = dud.min }, { roll = TOP, condition = dud.max } }) do
+                local got = worn(name, { wear.dud - UNDER, case.roll })
+                expect(got.condition == case.condition and got.repairs == dud.repairs, string.format(
+                    "a %s dud at a roll of %s has condition %d and %d repairs, not %d and %d",
+                    name, case.roll, got.condition, got.repairs, case.condition, dud.repairs))
+            end
+        end
+    end
+end)
+
 -- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
 handler("bankStockCount", function(_, args, defer)
     local container = ItemContainer.new("crate", nil, nil)
@@ -242,15 +286,16 @@ check("crackedModules", function(expect, _, _, _, defer)
 end)
 
 -- What WorldSpawns stocks, which only the authority loads: for each BANK_STOCK name of
--- `args.names` its tile (a Sprites field) and battery count range; the module conditions of
--- crates; a used battery's condition; and for the CRATE_STOCK name `args.crate`, if given, each
--- item's count range.
+-- `args.names` its tile (a Sprites field), battery count range and wear profile; the module
+-- conditions of crates; the battery wear profiles; and for the CRATE_STOCK name `args.crate`, if
+-- given, each item's count range.
 handler("worldSpawnStock", function(_, args)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local banks = {}
     for _, name in ipairs(args.names) do
         local stock = WorldSpawns.BANK_STOCK[name]
-        banks[name] = { sprite = stock.sprite, batteries = { min = stock.batteries.min, max = stock.batteries.max } }
+        banks[name] = { sprite = stock.sprite, batteries = { min = stock.batteries.min, max = stock.batteries.max },
+            wear = stock.batteries.wear }
     end
     local crate
     if args.crate then
@@ -260,7 +305,7 @@ handler("worldSpawnStock", function(_, args)
         end
     end
     return { banks = banks, crate = crate, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED,
-        usedBattery = WorldSpawns.USED_BATTERY }
+        batteryWear = WorldSpawns.BATTERY_WEAR }
 end)
 
 -- Solar sites -----------------------------------------------------------------------------------
@@ -531,12 +576,14 @@ local SPOT_CHECKS = {
         local wired = PowerBank.bankOfSource(at:getX(), at:getY(), at:getZ())
         expect(wired ~= nil and PowerBank.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
             "the wind charger isn't wired to the site's bank")
+        local wear = WorldSpawns.BATTERY_WEAR[stock.batteries.wear]
+        local range = { min = wear.mean - wear.halfWidth, max = math.min(100, wear.mean + wear.halfWidth) }
         local batteries, items = 0, bank:getContainer():getItems()
         for i = 0, items:size() - 1 do
             local item = items:get(i)
             if RenewableEnergy.Battery.isBattery(item) then
                 batteries = batteries + 1
-                expect(item:getFullType() == "RenewableEnergy.DeepCycleBattery" and inRange(item:getCondition(), stock.batteries.condition),
+                expect(item:getFullType() == "RenewableEnergy.DeepCycleBattery" and inRange(item:getCondition(), range),
                     "the bank holds a " .. item:getFullType() .. " at condition " .. item:getCondition())
             end
         end
