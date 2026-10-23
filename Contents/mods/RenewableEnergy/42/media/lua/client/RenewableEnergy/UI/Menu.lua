@@ -84,6 +84,13 @@ local function queuePart(playerNum, mode, bank, item)
     queueAt(playerNum, bank:getSquare(), mode, nil, bank, item)
 end
 
+-- One Unwire per item, queued in order: each is its own job, refused or not on its own.
+local function queueParts(playerNum, mode, bank, items)
+    for _, item in ipairs(items) do
+        queuePart(playerNum, mode, bank, item)
+    end
+end
+
 local function queueConnectAll(playerNum, bank, sources)
     for _, source in ipairs(sources) do
         queueSource(playerNum, Action.CONNECT_SOURCE, source, bank)
@@ -227,7 +234,13 @@ function Menu.addWireInOptions(playerNum, menu, bank)
     return submenu
 end
 
---- Unwire: one option for each part in the bank. Returns the submenu, or nil for an empty bank.
+local function isBattery(fullType)
+    return PowerBank.partKind(fullType) == "battery"
+end
+
+--- Unwire: one option for each part in the bank, led by All Batteries when it holds more than
+--- one. What doesn't fit in the character's inventory lands at their feet (RenewableEnergy.giveItems).
+--- Returns the submenu, or nil for an empty bank.
 function Menu.addUnwireOptions(playerNum, menu, bank)
     local parts = wiredParts(bank, PowerBank.partKind)
     if #parts == 0 then
@@ -235,6 +248,12 @@ function Menu.addUnwireOptions(playerNum, menu, bank)
     end
     local character = getSpecificPlayer(playerNum)
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Unwire"))
+    local batteries = wiredParts(bank, isBattery)
+    if #batteries > 1 then
+        local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_UnwireAllBatteries", #batteries), playerNum,
+            queueParts, Action.UNWIRE, bank, batteries)
+        Needs.refuse(all, lightOr(character, Action.UNWIRE))
+    end
     for _, item in ipairs(parts) do
         local option = submenu:addOption(partLabel(item), playerNum, queuePart, Action.UNWIRE, bank, item)
         Needs.refuse(option, lightOr(character, Action.UNWIRE, PowerBank.unwireBlocker(bank, item)))

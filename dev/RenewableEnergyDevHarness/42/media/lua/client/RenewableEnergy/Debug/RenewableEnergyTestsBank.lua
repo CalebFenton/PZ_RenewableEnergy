@@ -1829,6 +1829,49 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
     end,
 })
 
+-- Unwire's All Batteries takes out every battery and leaves the inverter wired; with room left for
+-- one battery, the other lands at the character's feet, past the inventory's capacity.
+test("renewable_energy_bank_menu_unwire_all_batteries", {
+    instant = true,
+    run = function(self)
+        local p = player()
+        local bank = T.bank(self, "batteryBoxWood", { CHARGED_BATTERY, CHARGED_BATTERY, PLUG_IN_INVERTER }, { outdoors = true })
+        if not bank then return end
+        self.bank = bank
+        T.watch(self, bank)
+        -- One-kilogram stones up to room for one and a half batteries: one fits, the second doesn't.
+        local inventory = p:getInventory()
+        local batteryKg = getScriptManager():FindItem(CHARGED_BATTERY):getActualWeight()
+        local room = inventory:getEffectiveCapacity(p) - inventory:getCapacityWeight()
+        T.give(self, "filler", { { type = "Base.Stone2", count = math.floor(room - 1.5 * batteryKg) } })
+        T.step(function()
+            local context = T.newContext()
+            local all = T.optionNamed(Menu.addUnwireOptions(0, context, bank.object),
+                getText("ContextMenu_RenewableEnergy_UnwireAllBatteries", 2))
+            context:hideAndChildren()
+            self.offered = all ~= nil and not all.notAvailable
+            if not self.offered then return end
+            T.choose(all)
+            T.waitFor(self, function()
+                local status = T.clientStatus(bank)
+                return status ~= nil and #status.batteries == 0
+            end, "this client's status of the bank with no battery left")
+            T.bankState(self, bank)
+            T.count(self, "carried", { CHARGED_BATTERY })
+            T.count(self, "carriedOrDropped", { CHARGED_BATTERY }, { dropped = true })
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.offered, "a bank with two batteries doesn't offer Unwire > All Batteries") then return end
+        local state = self.bank.state
+        expect(stateItem(state, CHARGED_BATTERY) == nil, "a battery is still wired in")
+        expect(stateItem(state, PLUG_IN_INVERTER) ~= nil, "All Batteries unwired the inverter too")
+        local carried, total = self.counts.carried[CHARGED_BATTERY], self.counts.carriedOrDropped[CHARGED_BATTERY]
+        expect(carried == 1 and total == 2, "with room for one battery, " .. tostring(carried) .. " went into the inventory and "
+            .. tostring(total - carried) .. " onto the floor")
+    end,
+})
+
 -- Renaming goes through the bank, shows in its menu and window, and an empty name gives the
 -- tier's name back.
 test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {

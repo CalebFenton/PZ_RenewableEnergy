@@ -435,6 +435,18 @@ test("renewable_energy_biogas_digester_hopper_meters", {
         end
         T.expect(allowed("Base.Dung_Cow") and allowed(RenewableEnergy.Gasifier.WOOD_ASH), "this client's hopper refuses manure or wood ash")
         T.expect(not allowed("Base.Apple") and not allowed("Base.Hammer"), "this client's hopper takes a fresh apple or a hammer")
+        -- Every animal's dung, not only the farm animals the feed table names.
+        local dung, refused = 0, {}
+        local scripts = getScriptManager():getAllItems()
+        for i = 0, scripts:size() - 1 do
+            local fullType = scripts:get(i):getFullName()
+            if fullType:find("^Base%.Dung_") then
+                dung = dung + 1
+                if not allowed(fullType) then table.insert(refused, fullType) end
+            end
+        end
+        T.expect(dung > 0 and #refused == 0, "of " .. dung .. " kinds of dung, this client's hopper refuses "
+            .. table.concat(refused, ", "))
     end,
 })
 

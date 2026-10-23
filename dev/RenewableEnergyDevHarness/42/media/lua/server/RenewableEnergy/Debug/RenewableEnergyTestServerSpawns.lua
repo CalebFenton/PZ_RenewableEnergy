@@ -26,16 +26,18 @@ local function isSiteCondition(condition)
     return inRange(condition, WorldSpawns.CRACKED) or inRange(condition, WorldSpawns.WEATHERED)
 end
 
-local function batteryCharges(container)
-    local charges = {}
+-- The batteries' charges and conditions, in container order.
+local function batteryStats(container)
+    local charges, conditions = {}, {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if RenewableEnergy.Battery.isBattery(item) then
             table.insert(charges, RenewableEnergy.Battery.getCharge(item))
+            table.insert(conditions, item:getCondition())
         end
     end
-    return charges
+    return charges, conditions
 end
 
 local function moduleConditions(container)
@@ -52,24 +54,28 @@ end
 
 -- World spawns -----------------------------------------------------------------------------------
 
--- What a world spawn left in `container`: its batteries' charges, its modules' conditions and how
--- many items it holds.
+-- What a world spawn left in `container`: its batteries' charges and conditions, its modules'
+-- conditions and how many items it holds.
 local function stockOf(container)
+    local charges, conditions = batteryStats(container)
     return {
-        charges = batteryCharges(container), modules = moduleConditions(container),
+        charges = charges, batteryConditions = conditions, modules = moduleConditions(container),
         items = container:getItems():size(), explored = container:isExplored(),
     }
 end
 
 -- WorldSpawns.placeBank with BANK_STOCK[args.stock] on the square at `args`, as a room seen for the
--- first time places one. Answers whether it placed one, its tile and stock, and whether the stock's
--- tile stands on the square. Removed when the test ends.
+-- first time places one, with every Chance roll at `args.roll` if given. Answers whether it placed
+-- one, its tile and stock, and whether the stock's tile stands on the square. Removed when the test
+-- ends.
 handler("worldBank", function(_, args, defer)
     local square = squareAt(args)
     if not square then
         return nil, "the bank's square loaded on the server"
     end
+    local restoreRoll = args.roll and Helpers.forceRolls(defer, args.roll)
     local bank = RenewableEnergy.WorldSpawns.placeBank(square, args.stock)
+    if restoreRoll then restoreRoll() end
     if bank then
         defer(function() removeObject(bank) end)
     end
@@ -237,7 +243,8 @@ end)
 
 -- What WorldSpawns stocks, which only the authority loads: for each BANK_STOCK name of
 -- `args.names` its tile (a Sprites field) and battery count range; the module conditions of
--- crates; and for the CRATE_STOCK name `args.crate`, if given, each item's count range.
+-- crates; a used battery's condition; and for the CRATE_STOCK name `args.crate`, if given, each
+-- item's count range.
 handler("worldSpawnStock", function(_, args)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local banks = {}
@@ -252,7 +259,8 @@ handler("worldSpawnStock", function(_, args)
             crate[line[1]] = { min = line[2], max = line[3] }
         end
     end
-    return { banks = banks, crate = crate, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }
+    return { banks = banks, crate = crate, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED,
+        usedBattery = WorldSpawns.USED_BATTERY }
 end)
 
 -- Solar sites -----------------------------------------------------------------------------------

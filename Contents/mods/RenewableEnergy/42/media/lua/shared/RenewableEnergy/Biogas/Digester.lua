@@ -86,7 +86,9 @@ Digester.SCRUB_WATER = 4
 
 -- By full type: potential (m³ before the Biogas multiplier), acid (what it adds to souring;
 -- below zero neutralises), seedHours (startup it saves: manure brings the bacteria).
--- Manure stands for an animal's day of it, since the game drops about one item every other day.
+-- Manure stands for an animal's day of it, as the game drops one item about every other day for
+-- cows and pigs, every third for the rest (AnimalData.checkPoop), so the values follow what each
+-- animal makes in a day. Hens drop none inside a hutch.
 local FEEDS = {
     ["Base.Dung_Cow"] = { potential = 1.0, acid = -1.5, seedHours = 24 },
     ["Base.Dung_Pig"] = { potential = 0.3, acid = -1.0, seedHours = 12 },

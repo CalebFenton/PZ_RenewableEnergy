@@ -234,6 +234,42 @@ test("renewable_energy_world_bank_stock_option_zero", {
     end,
 })
 
+-- A world bank's batteries come used: at the lowest rolls a used battery's condition is its mean
+-- less its half width, at middling ones the mean, and at the highest no better than new.
+test("renewable_energy_world_bank_batteries_used", {
+    sandbox = { LRMBatteries = 1, LRMMisc = 1 },
+    run = function(self)
+        local rolls = { { "low", 0 }, { "middle", 0.5 }, { "high", 1 - 1e-9 } }
+        local squares = T.need(self, T.squares(self, #rolls, { indoors = true }), "free indoor squares for banks")
+        if not squares then return end
+        self.banks = {}
+        T.batch(function()
+            for i, entry in ipairs(rolls) do
+                local square = squares[i]
+                T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "farmStorage", roll = entry[2] })
+                T.step(function()
+                    self.banks[entry[1]] = self.server.worldBank
+                    T.need(self, self.server.worldBank.placed, "a farm storage bank rolled " .. entry[1])
+                end)
+            end
+            T.server(self, "worldSpawnStock", { names = {} })
+        end)
+    end,
+    validate = function(self)
+        local used = self.server.worldSpawnStock.usedBattery
+        local expected = { low = used.mean - used.halfWidth, middle = used.mean, high = math.min(100, used.mean + used.halfWidth) }
+        for name, condition in pairs(expected) do
+            local conditions = self.banks[name].stock.batteryConditions
+            local wrong = {}
+            for _, found in ipairs(conditions) do
+                if found ~= condition then table.insert(wrong, found) end
+            end
+            expect(#conditions > 0 and #wrong == 0, string.format("at %s rolls, %d batteries and conditions %s besides %d",
+                name, #conditions, table.concat(wrong, ", "), condition))
+        end
+    end,
+})
+
 -- The item count from which vanilla's container overlays show a container full rather than
 -- holding a few items (ContainerOverlays.updateContainerOverlaySprite).
 local FEW_ITEMS = 7

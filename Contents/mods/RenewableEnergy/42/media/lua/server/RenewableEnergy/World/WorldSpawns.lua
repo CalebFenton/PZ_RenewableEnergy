@@ -33,6 +33,10 @@ local MODULE = Specs.factoryModule
 WorldSpawns.CRACKED = { min = 20, max = 50 }
 WorldSpawns.WEATHERED = { min = 60, max = 100 }
 WorldSpawns.SITE_CRACKED_SHARE = 0.35
+-- A battery someone used before it was left: condition about `mean`, give or take a third of
+-- `halfWidth`, never further off than `halfWidth`, and no better than new. Most show wear; a few
+-- are as good as new.
+WorldSpawns.USED_BATTERY = { mean = 80, halfWidth = 30 }
 
 -- Rooms that may hold a bank, the bank's stock, and one in how many of them does at the
 -- Uncommon setting.
@@ -64,9 +68,11 @@ end
 
 -- What a bank holds when it appears, by stock name: its tile (a Sprites field); batteries, a
 -- count from min to max of types picked by weight, era batteries of the kind someone in 1993
--- would have wired to it, worn to a condition from `condition`'s min to max where it gives one;
--- and for each other part the chance of one and its type by weight. Chargers are vanilla's Car
--- Battery Charger, which kept many a cabin battery topped up.
+-- would have wired to it, used (USED_BATTERY) or worn to a condition from `condition`'s min to max
+-- where it gives one; and for each other part the chance of one and its type by weight. Chargers
+-- are vanilla's Car Battery Charger, which kept many a cabin battery topped up.
+-- Counts are set so that one lucky find gives a good start, not a finished house: a rack about
+-- what a player would wire in a month or so in, the power yard's bank the most, from a long trip.
 WorldSpawns.BANK_STOCK = {
     shed = {
         sprite = "batteryBoxWood",
@@ -82,14 +88,14 @@ WorldSpawns.BANK_STOCK = {
     },
     farmStorage = {
         sprite = "batteryRackWood",
-        batteries = { min = 2, max = 6, types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 9 } }) },
+        batteries = { min = 3, max = 5, types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 21 } }) },
         inverter = { chance = 0.5, types = { { "RenewableEnergy.PowerInverter", 1 } } },
         controller = { chance = 0.3, types = { { Specs.controller, 1 } } },
         charger = { chance = 0.4, types = { { Specs.charger, 1 } } },
     },
     electronicsStorage = {
         sprite = "batteryRackMetal",
-        batteries = { min = 2, max = 8, types = {
+        batteries = { min = 4, max = 6, types = {
             { "RenewableEnergy.DeepCycleBattery", 7 }, { "RenewableEnergy.L16Battery", 2 },
         } },
         inverter = { chance = 0.5, types = {
@@ -118,13 +124,13 @@ WorldSpawns.BANK_STOCK = {
     },
     relay = {
         sprite = "batteryRackMetal",
-        batteries = { min = 4, max = 8, types = { { "RenewableEnergy.L16Battery", 1 } } },
+        batteries = { min = 4, max = 6, types = { { "RenewableEnergy.L16Battery", 1 } } },
         inverter = { chance = 1, types = { { "RenewableEnergy.InverterCharger", 1 } } },
         controller = { chance = 0.5, types = { { Specs.controller, 1 } } },
     },
     powerYard = {
         sprite = "batteryBankMetal",
-        batteries = { min = 6, max = 12, types = { { "RenewableEnergy.L16Battery", 1 } } },
+        batteries = { min = 6, max = 8, types = { { "RenewableEnergy.L16Battery", 1 } } },
         inverter = { chance = 1, types = { { "RenewableEnergy.InverterCharger", 1 } } },
         controller = { chance = 1, types = { { Specs.controller, 1 } } },
         charger = { chance = 0.5, types = { { Specs.charger, 1 } } },
@@ -226,12 +232,21 @@ local function pickByWeight(types)
     return types[#types][1]
 end
 
+--- A used battery's condition (USED_BATTERY): the mean of three rolls, which bunches them
+--- around the middle like a bell curve that has no tails past halfWidth.
+function WorldSpawns.usedBatteryCondition()
+    local used = WorldSpawns.USED_BATTERY
+    local spread = (Chance.roll() + Chance.roll() + Chance.roll()) / 3 * 2 - 1
+    return math.min(100, used.mean + used.halfWidth * spread)
+end
+
 local function addFound(container, fullType)
     if fullType == MODULE then
         return WorldSpawns.addModule(container, siteModuleCondition())
     end
     local item = container:AddItem(fullType)
     if item and Battery.isBattery(item) then
+        RenewableEnergy.Wear.setCondition(item, item:getConditionMax() * WorldSpawns.usedBatteryCondition() / 100)
         Battery.setFoundCharge(item)
     end
     return item

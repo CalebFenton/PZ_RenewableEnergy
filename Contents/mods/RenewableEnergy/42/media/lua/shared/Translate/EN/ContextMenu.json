@@ -10,6 +10,7 @@
     "ContextMenu_RenewableEnergy_WiredTo": "Connected to: %1, %2",
     "ContextMenu_RenewableEnergy_WireIn": "Wire In",
     "ContextMenu_RenewableEnergy_Unwire": "Unwire",
+    "ContextMenu_RenewableEnergy_UnwireAllBatteries": "All Batteries (%1)",
     "ContextMenu_RenewableEnergy_Repair": "Repair with Scrap",
     "ContextMenu_RenewableEnergy_PartCondition": "%1 (%2)",
     "ContextMenu_RenewableEnergy_Rename": "Rename",
