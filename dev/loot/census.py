@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Counts what a thorough player could search in the TOWNS of the Build 42 map, and in the whole
 map: every room, every container tile by the room it stands in, and every vehicle stall by its
-vehicle zone, and the whole map's vehicle stalls. Writes them to
+vehicle zone. Writes them to
 dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevTownCensus.lua, which the
 --loot report multiplies by each container's, room's and vehicle's expected modules and batteries.
 
@@ -322,7 +322,6 @@ def main():
     out = ["-- Written by dev/loot/census.py from the game's map; rerun it rather than edit this file.",
            "-- towns: each town's bounds, its rooms by name, its container tiles by room name and",
            "-- container type, and its vehicle stalls by vehicle zone; the last is the whole map.",
-           "-- mapVehicleStalls: the whole map's.",
            "return {",
            "    towns = {"]
     for town in TOWNS + [whole_map(folder)]:
@@ -337,9 +336,6 @@ def main():
             out.append(lua_table(counts, 16))
             out.append("            },")
         out.append("        },")
-    out.append("    },")
-    out.append("    mapVehicleStalls = {")
-    out.append(lua_table(vehicle_stalls(zones, ("map", 0, 0, 1 << 20, 1 << 20)), 8))
     out.append("    },")
     out.append("}")
     with open(OUT, "w") as f:

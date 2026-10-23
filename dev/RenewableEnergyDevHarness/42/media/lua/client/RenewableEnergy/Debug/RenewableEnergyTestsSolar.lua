@@ -316,8 +316,7 @@ test("renewable_energy_solar_storms_crack_by_mount", {
 test("renewable_energy_solar_storms_crack_under_the_chance", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        local under, at = stormTrial("flat", 20), stormTrial("flat", 20)
-        under.under, at.under = 1e-9, 0
+        local under, at = stormTrial("flat", 20, 100, "under"), stormTrial("flat", 20, 100, "at")
         -- Less than a crack left, so a crack would take it below 0.
         T.server(self, "stormCrack", { trials = { under, at, stormTrial("flat", 20, math.floor(Specs.storm.crack / 2), 0),
             stormTrial("wall", 20, 100, 0) } })

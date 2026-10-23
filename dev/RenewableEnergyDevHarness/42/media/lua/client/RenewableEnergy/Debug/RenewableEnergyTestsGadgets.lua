@@ -275,7 +275,7 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
         local noon, midnight, full = self.rows.noon, self.rows.midnight, self.rows.full
         if not expect(noon and midnight and full, "the chargers never all charged") then return end
         local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
-        local useWh = useDelta * SolarCellCharger.BATTERY_WH
+        local useWh = useDelta * Specs.cellChargerBatteryWh
         local most = fullSunWh(Specs.cellChargerWatts, CELL_HOURS)
         expect(noon.added > 0 and noon.added * useWh <= most, CELL_HOURS .. " hours of noon sun added " .. noon.added
             .. " uses of " .. useWh .. " Wh, expected more than 0 and at most " .. most .. " Wh")
@@ -329,7 +329,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
         T.give(self, "battery", { { type = VehicleBattery.ITEM } })
         T.step(function()
             mechanicsCheat(self)
-            local context = partMenu(car.vehicle, car.vehicle:getPartById(VehicleBattery.PART))
+            local context = partMenu(car.vehicle, VehicleBattery.partOf(car.vehicle))
             T.defer(self, function() context:closeAll() end)
             local installOption = context:getOptionFromName(getText("IGUI_Install"))
             local install = subMenuOf(context, installOption)

@@ -139,6 +139,47 @@ function Helpers.count(entries)
     return n
 end
 
+--- How far under a chance a roll still comes in under it.
+Helpers.UNDER = 1e-9
+
+--- Whether `value` lies in `range` ({ min, max }), both ends included.
+function Helpers.inRange(value, range)
+    return value >= range.min and value <= range.max
+end
+
+--- Takes `count` (default all) items of `fullType` (default any type) out of `container` and
+--- tells the clients.
+function Helpers.emptyContainer(container, fullType, count)
+    local items, taken = container:getItems(), 0
+    for i = items:size() - 1, 0, -1 do
+        if count and taken >= count then
+            return
+        end
+        local item = items:get(i)
+        if not fullType or item:getFullType() == fullType then
+            container:Remove(item)
+            sendRemoveItemFromContainer(container, item)
+            taken = taken + 1
+        end
+    end
+end
+
+--- The def of the building nearest x, y on the ground level, within `radius` squares, that
+--- `accept(def)`, if given, takes; nil if there is none.
+function Helpers.buildingNear(x, y, radius, accept)
+    for r = 0, radius do
+        for sx, sy in PZHarness.Fixtures.ring(x, y, r) do
+            local square = getSquare(sx, sy, 0)
+            local building = square and square:getBuilding()
+            local def = building and building:getDef()
+            if def and (not accept or accept(def)) then
+                return def
+            end
+        end
+    end
+    return nil
+end
+
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
 
 --- How many pamphlets each container holds on the levels of the building `def` that

@@ -3,6 +3,7 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/ClientBankSystem"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/UI/StatusWindow"
 require "PZHarness/TestLib"
@@ -70,25 +71,14 @@ function Debug.isFreeSquare(square, indoors)
         and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrSource)
 end
 
--- A generator's position is listed in every chunk its reach touches
--- (IsoGenerator.setSurroundingElectricity, IsoChunk.addGeneratorPos).
-local CHUNK_SQUARES = getChunkSizeInSquares()
-
 -- Lets this multiplayer client's chunks go of the squares a test generator at x, y, z powered,
 -- before the server's undo switches it off and removes it. That switch-off can miss this client's
 -- copy: it names the generator by its place on the square and isn't ordered with the removal that
 -- follows (SyncIsoObject against RemoveItemFromSquare), and the chunks then keep its squares
 -- powered until they load again.
 function Debug.releaseGeneratorPower(x, y, z)
-    if not isClient() then return end
-    local radius, cell = SandboxVars.GeneratorTileRange, getCell()
-    for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
-        for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do
-            local chunk = cell:getChunk(wx, wy)
-            if chunk then
-                chunk:removeGeneratorPos(x, y, z)
-            end
-        end
+    if isClient() then
+        RenewableEnergy.PowerBank.releaseGeneratorPower(x, y, z)
     end
 end
 

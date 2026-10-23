@@ -984,12 +984,13 @@ end
 -- on `otherBank`. They draw on the bank, which is the only power with the grid off.
 local function switchOnLights(square, otherBank)
     local building = square:getBuilding()
+    local bankX, bankY, bankZ = otherBank:getX(), otherBank:getY(), otherBank:getZ()
     local switched = 0
     for radius = 0, LIGHT_SEARCH do
         for x, y in PZHarness.Fixtures.ring(square:getX(), square:getY(), radius) do
             local near = getCell():getGridSquare(x, y, square:getZ())
             local objects = near and building and near:getBuilding() == building
-                and not RenewableEnergy.inGeneratorReach(otherBank, x, y, square:getZ()) and near:getObjects()
+                and not RenewableEnergy.inGeneratorReach(bankX, bankY, bankZ, x, y, square:getZ()) and near:getObjects()
             for i = 0, (objects and objects:size() or 0) - 1 do
                 local object = objects:get(i)
                 if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and switchLight(object, true) then

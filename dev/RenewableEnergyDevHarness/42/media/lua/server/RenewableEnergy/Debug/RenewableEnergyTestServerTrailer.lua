@@ -236,12 +236,7 @@ onVehicle("setTrailer", function(vehicle, args)
     end
     if args.box then
         local container = vehicle:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
-        local items = container:getItems()
-        for i = items:size() - 1, 0, -1 do
-            local item = items:get(i)
-            container:Remove(item)
-            sendRemoveItemFromContainer(container, item)
-        end
+        Helpers.emptyContainer(container)
         for _, spec in ipairs(args.box) do
             local item = container:AddItem(spec.type)
             if spec.charge then
@@ -316,7 +311,7 @@ onVehicle("arrowBoardSwitchRolls", function(vehicle, args, _, defer)
     end)
     for i, trial in ipairs(args.trials) do
         modData[key] = trial.was
-        local roll = trial.roll == "under" and chance - 1e-9 or trial.roll == "at" and chance or trial.roll
+        local roll = trial.roll == "under" and chance - Helpers.UNDER or trial.roll == "at" and chance or trial.roll
         local restoreRoll = Helpers.forceRolls(defer, { roll })
         ArrowBoard.rollSwitch(vehicle)
         restoreRoll()

@@ -744,6 +744,8 @@ test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
         local gasifier = T.placeRecord(self, "gasifier", "primitive", { square = squares[1] })
         local generator = gasifier and T.generator(self, { square = squares[2], fuel = 0 })
         if not generator then return end
+        -- Fitting the kit needs light, and indoors the daylight doesn't reach.
+        T.holdLight(self)
         T.fitAndConnect(self, generator, digester)
         T.batch(function()
             T.setRecord(self, gasifier, { lit = true, fireKg = Gasifier.TIERS.primitive.hopperKg })

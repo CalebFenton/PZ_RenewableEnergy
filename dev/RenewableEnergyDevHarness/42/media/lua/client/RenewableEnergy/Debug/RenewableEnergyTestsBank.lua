@@ -32,9 +32,6 @@ local PLUG_IN_INVERTER = "RenewableEnergy.PlugInInverter"
 local INVERTER = "RenewableEnergy.InverterCharger"
 local POWER_INVERTER = "RenewableEnergy.PowerInverter"
 local CAR_BATTERY, L16, JAR = "Base.CarBattery1", "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery"
--- Bank.lua's BACKUP_REACH: a bank takes a generator within this many squares on either axis as its
--- backup.
-local BACKUP_REACH = 3
 
 -- `base` and then as many `kind` appliances as a bank limited to `limitW` carries, with `over` one
 -- more. Sums as the load does, so "carries" holds at the boundary.
@@ -72,7 +69,8 @@ local function distanceSquared(a, b)
 end
 
 local function inBackupReach(a, b)
-    return math.abs(a:getX() - b:getX()) <= BACKUP_REACH and math.abs(a:getY() - b:getY()) <= BACKUP_REACH
+    local reach = Specs.backupReach
+    return math.abs(a:getX() - b:getX()) <= reach and math.abs(a:getY() - b:getY()) <= reach
 end
 
 -- What a fridge adds to a bank's load. The tests' area has appliances of its own, so each test
@@ -81,10 +79,9 @@ local function fridgeW()
     return T.applianceWatts({ "fridgeFreezer" })
 end
 
--- The fuel an hour vanilla bills a generator for `watts`: a unit for each Specs.wattsPerFuel,
--- times the fuel consumption option.
+-- The fuel an hour vanilla bills a generator for `watts` at the fuel consumption option.
 local function fuelPerHour(watts)
-    return watts / Specs.wattsPerFuel * SandboxVars.GeneratorFuelConsumption
+    return Specs.fuelFromWatts(watts) * SandboxVars.GeneratorFuelConsumption
 end
 
 -- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at a Battery
@@ -571,7 +568,7 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
     validate = function(self)
         expect(reason(self, "hammer") == "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in (" .. reason(self, "hammer") .. ")")
         expect(reason(self, "noTool") == "tool", "a battery was wired in without a screwdriver (" .. reason(self, "noTool") .. ")")
-        expect(reason(self, "noWire") == "wire", "a battery was wired in without wire (" .. reason(self, "noWire") .. ")")
+        expect(reason(self, "noWire") == "item", "a battery was wired in without wire (" .. reason(self, "noWire") .. ")")
         expect(self.wired.ok, "wiring a battery in with a screwdriver and wire failed (" .. reason(self, "wired") .. ")")
         expect(self.wired.xpAfter > self.wired.xpBefore, "the first wiring gave no Electricity XP")
         expectNear("wire left after wiring a battery in", self.counts.wired[PowerBank.WIRE], 0, 0)
@@ -755,7 +752,7 @@ test("renewable_energy_bank_part_wear_and_repair", {
         expect(self.repaired.ok, "repairing a worn inverter with scrap failed (" .. reason(self, "repaired") .. ")")
         expectNear("condition after one scrap", self.repairedCondition, 50 + Specs.partRepair.condition, 0)
         expectNear("scrap left", self.counts.scrap[PowerBank.SCRAP], 0, 0)
-        expect(reason(self, "noScrap") == "scrap", "a part was repaired without scrap (" .. reason(self, "noScrap") .. ")")
+        expect(reason(self, "noScrap") == "item", "a part was repaired without scrap (" .. reason(self, "noScrap") .. ")")
         expect(reason(self, "whole") == "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair (" .. reason(self, "whole") .. ")")
         local broken = self.bank.state
         expect(broken.on, "the bank was switched off before its inverter broke")
@@ -910,7 +907,7 @@ test("renewable_energy_bank_failsafe_starts_generator", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
-        local backup = bank and backupSquare(self, bank.square, BACKUP_REACH)
+        local backup = bank and backupSquare(self, bank.square, Specs.backupReach)
         if not backup then return end
         local start, stop = SandboxVars.RenewableEnergy.FailsafeStartCharge / 100, SandboxVars.RenewableEnergy.FailsafeStopCharge / 100
         -- The failsafe acts on the charge before the pass's own drain, which the next setCharge undoes.
@@ -966,7 +963,7 @@ test("renewable_energy_bank_failsafe_waits_for_a_working_bank", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
-        local backup = bank and backupSquare(self, bank.square, BACKUP_REACH)
+        local backup = bank and backupSquare(self, bank.square, Specs.backupReach)
         if not backup then return end
         local function lowPass(key)
             T.setCharge(self, bank, belowFailsafeStart())
@@ -1001,7 +998,7 @@ test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
         T.setGrid(self, false)
         local parts = { CAR_BATTERY, PLUG_IN_INVERTER }
         local first = T.bank(self, "batteryBoxWood", parts)
-        local backup = first and backupSquare(self, first.square, BACKUP_REACH)
+        local backup = first and backupSquare(self, first.square, Specs.backupReach)
         local otherSquare = backup and T.square(self, { indoors = true, near = backup }, "a free indoor square for a second bank")
         if not otherSquare then return end
         local dFirst, dOther = distanceSquared(first.square, backup), distanceSquared(otherSquare, backup)
@@ -1106,7 +1103,7 @@ test("renewable_energy_bank_backup_load_kept_apart", {
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
-        local backup = fridge and backupSquare(self, bank.square, BACKUP_REACH)
+        local backup = fridge and backupSquare(self, bank.square, Specs.backupReach)
         if not backup then return end
         T.placeTile(self, fridge, MINI_FRIDGE)
         T.generator(self, { square = backup, running = true })

@@ -12,13 +12,10 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
 local objectWithSprite = PZHarness.Fixtures.objectWithSprite
 local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
+local inRange, UNDER = Helpers.inRange, Helpers.UNDER
 local Sprites = RenewableEnergy.Sprites
 
 local MODULE = RenewableEnergy.Specs.factoryModule
-
-local function inRange(value, range)
-    return value >= range.min and value <= range.max
-end
 
 -- Whether a module's condition is one a site, crate or arrow board gives: cracked or weathered.
 local function isSiteCondition(condition)
@@ -129,8 +126,6 @@ end)
 
 -- The parts a bank may hold besides batteries, as PowerBank.partKind names them.
 local PARTS = { "inverter", "controller", "charger" }
--- How far under a chance a roll still comes in under it.
-local UNDER = 1e-9
 
 -- What BANK_STOCK[stockName] puts in an emptied `container` with every roll at `roll`: how many of
 -- each of PARTS.
@@ -293,7 +288,8 @@ check("crackedModules", function(expect, _, _, _, defer)
     local Distributions = RenewableEnergy.Distributions
     local container = RenewableEnergy.Loot.newContainer(nil)
     local function modulesAt(roomName, containerType, roll)
-        local restoreRoll = Helpers.forceRolls(defer, { roll })
+        -- The chance's roll, then the cracked condition's, at the middle of its range.
+        local restoreRoll = Helpers.forceRolls(defer, { roll, 0.5 })
         Distributions.addCrackedModules(roomName, containerType, container)
         restoreRoll()
         local conditions = moduleConditions(container)
@@ -391,17 +387,11 @@ local function spotSquares(site)
     return squares
 end
 
--- The buildings within BuildingWatch.REACH of x, y that could have the find `kind`, by key.
+-- The buildings by x, y that could have the find `kind` (RuralFinds.buildingsBy), added to `found`
+-- by key.
 local function buildingsOfFind(kind, x, y, found)
-    local qualifies, reach = RenewableEnergy.RuralFinds.FINDS[kind].qualifies, RenewableEnergy.BuildingWatch.REACH
-    local buildings = ArrayList.new()
-    getWorld():getMetaGrid():getBuildingsIntersecting(x - reach, y - reach, 2 * reach + 1, 2 * reach + 1, buildings)
-    for i = 0, buildings:size() - 1 do
-        local def = buildings:get(i)
-        local out = math.max(def:getX() - x, x - (def:getX2() - 1), def:getY() - y, y - (def:getY2() - 1), 0)
-        if out <= reach and qualifies(def) then
-            found[RenewableEnergy.BuildingWatch.key(def)] = def
-        end
+    for _, def in ipairs(RenewableEnergy.RuralFinds.buildingsBy(kind, x, y)) do
+        found[RenewableEnergy.BuildingWatch.key(def)] = def
     end
     return found
 end
@@ -461,19 +451,15 @@ end
 
 -- Takes out every pamphlet of the building's containers.
 local function takePamphlets(def)
-    for container, count in pairs(Helpers.pamphletsIn(def)) do
-        for _ = 1, count do
-            local item = container:getFirstType(PAMPHLET)
-            container:Remove(item)
-            sendRemoveItemFromContainer(container, item)
-        end
+    for container in pairs(Helpers.pamphletsIn(def)) do
+        Helpers.emptyContainer(container, PAMPHLET)
     end
 end
 
 -- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
 local function isSiteObject(object)
-    return RenewableEnergy.GasKit.isGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
-        or Sprites.kindOf(Sprites.nameOf(object)) ~= nil
+    return RenewableEnergy.isGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
+        or Sprites.kindOfObject(object) ~= nil
 end
 
 -- Removes what a site put on `square`, a generator out of the gas pass's list too.
@@ -482,8 +468,8 @@ local function clearSquare(square)
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
         if isSiteObject(object) then
-            if RenewableEnergy.GasKit.isGenerator(object) then
-                ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[square:getX() .. "," .. square:getY() .. "," .. square:getZ()] = nil
+            if RenewableEnergy.isGenerator(object) then
+                RenewableEnergy.GasLines.unlist(object)
             end
             removePlaced(object)
         end
@@ -511,7 +497,7 @@ end
 -- its line connected and listed for the gas pass, its kit drawn on it. Answers the generator.
 local function expectKittedGenerator(expect, expectNear, square, source, kind)
     local GasKit, SolarSites = RenewableEnergy.GasKit, RenewableEnergy.SolarSites
-    local generator = RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
+    local generator = RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
     if not expect(generator ~= nil, "no generator at the site's far end") then
         return nil
     end
@@ -528,8 +514,7 @@ local function expectKittedGenerator(expect, expectNear, square, source, kind)
             and line.z == source:getZ(), "the generator's line doesn't run to the " .. kind)
         expectNear("the generator's tank as the kit keeps it", state.tank or -1, fuel, 0.01)
     end
-    local key = square:getX() .. "," .. square:getY() .. "," .. square:getZ()
-    expect(ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil, "the gas pass doesn't list the generator")
+    expect(RenewableEnergy.GasLines.isListed(generator), "the gas pass doesn't list the generator")
     local overlays = Helpers.overlaysOf(generator)
     local kit = Sprites.gasKitFor(Sprites.nameOf(generator))
     local hasKit = false
@@ -579,7 +564,7 @@ local SPOT_CHECKS = {
         if not (expect(charger ~= nil, "no wind charger on the site's square") and expect(bank ~= nil, "no bank on the site's bank square")) then
             return
         end
-        expect(Sprites.kindOf(Sprites.nameOf(charger)) == "propeller", "the wind charger is a " .. tostring(Sprites.kindOf(Sprites.nameOf(charger))))
+        expect(Sprites.kindOfObject(charger) == "propeller", "the wind charger is a " .. tostring(Sprites.kindOfObject(charger)))
         expect(Wind.isBroken(charger) and Wind.isBraked(charger), "the wind charger is found broken " .. tostring(Wind.isBroken(charger))
             .. ", braked " .. tostring(Wind.isBraked(charger)))
         local stock = WorldSpawns.BANK_STOCK[spot.stock]
@@ -967,14 +952,13 @@ check("siteVisited", function(expect, expectNear, _, args)
     if not kind then
         return
     end
-    local finds = { wind = RenewableEnergy.Wind.isCharger, digester = RenewableEnergy.Digester.isDigester,
-        gasifier = RenewableEnergy.Gasifier.isGasifier }
+    local isFind = RenewableEnergy.RuralFinds.FINDS[kind].is
     local reach = RenewableEnergy.BuildingWatch.REACH
     for key, def in pairs(defs) do
         local others = 0
         for x = def:getX() - reach, def:getX2() + reach - 1 do
             for y = def:getY() - reach, def:getY2() + reach - 1 do
-                if not (x == at[1] and y == at[2]) and RenewableEnergy.findObjectOn(getSquare(x, y, 0), finds[kind]) then
+                if not (x == at[1] and y == at[2]) and RenewableEnergy.findObjectOn(getSquare(x, y, 0), isFind) then
                     others = others + 1
                 end
             end

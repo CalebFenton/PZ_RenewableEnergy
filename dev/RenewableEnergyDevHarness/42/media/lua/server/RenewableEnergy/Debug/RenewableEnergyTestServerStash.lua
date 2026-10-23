@@ -16,12 +16,6 @@ local deferOnce = Helpers.deferOnce
 local countPairs = PZHarness.Fixtures.countPairs
 local Sprites = RenewableEnergy.Sprites
 
--- The building of the stash's building square on the map, loaded or not, or nil.
-local function stashBuilding(stashMap)
-    local room = getWorld():getMetaGrid():getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
-    return room and room:getBuilding()
-end
-
 -- StashSystem gives up without an error when the stash building isn't a building, prepares only a
 -- building whose bounds strictly contain the building square (doBuildingStash), and stocks the
 -- crate only if its square is in a room of that building, so a wrong coordinate is an empty house.
@@ -30,7 +24,7 @@ check("stashHousesResolve", function(expect)
     local metaGrid = getWorld():getMetaGrid()
     for stashMap in pairs(Stash.descriptions) do
         local x, y = stashMap.buildingX, stashMap.buildingY
-        local building = stashBuilding(stashMap)
+        local building = Stash.buildingOf(stashMap)
         local spawnTable = SuburbsDistributions[stashMap.spawnTable]
         if expect(building ~= nil, stashMap.name .. ": no building at its building coordinates") then
             expect(building:getX() < x and x < building:getX2() and building:getY() < y and y < building:getY2(),
@@ -124,7 +118,7 @@ handler("stashRelist", function(_, args, defer)
     local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
     local houses = {}
     for stashMap in pairs(Stash.descriptions) do
-        local building = stashBuilding(stashMap)
+        local building = Stash.buildingOf(stashMap)
         if not building then
             return nil, "the building of " .. stashMap.name
         end
@@ -206,7 +200,7 @@ handler("stashKnownOnStart", function(_, _, defer)
     restoreRoll()
     local houses = {}
     for stashMap, extra in pairs(Stash.descriptions) do
-        local building = stashBuilding(stashMap)
+        local building = Stash.buildingOf(stashMap)
         houses[stashMap.name] = {
             queued = building ~= nil and StashSystem.isStashBuilding(building),
             read = alreadyRead:contains(stashMap.name),

@@ -198,6 +198,13 @@ function T.doJob(self, square, makeAction)
     end)
 end
 
+--- Queues a lit flashlight in the character's secondary hand: light to work by indoors, where the
+--- tests' daylight hour doesn't reach. A light in hand is never too dark (IsoPlayer.tooDarkToRead).
+function T.holdLight(self)
+    T.give(self, "light", { { type = "Base.Torch", equip = "secondary" } })
+    T.step(function() self.items.light[1]:setActivated(true) end)
+end
+
 --- The submenu `option` opens in `context`, or nil.
 function T.subMenu(context, option)
     return option and option.subOption and context:getSubMenu(option.subOption)
@@ -221,7 +228,7 @@ end
 
 --- The battery in this client's copy of the vehicle of a T.placeVehicle handle, or nil.
 function T.vehicleBattery(vehicle)
-    local part = vehicle.vehicle and vehicle.vehicle:getPartById(RenewableEnergy.VehicleBattery.PART)
+    local part = RenewableEnergy.VehicleBattery.partOf(vehicle.vehicle)
     return part and part:getInventoryItem()
 end
 
@@ -281,7 +288,7 @@ end
 function T.applianceWatts(names)
     local watts = 0
     for _, name in ipairs(names) do
-        watts = watts + RenewableEnergy.Loot.APPLIANCE_FUEL[name] * RenewableEnergy.Specs.wattsPerFuel
+        watts = watts + RenewableEnergy.Specs.wattsFromFuel(RenewableEnergy.Loot.APPLIANCE_FUEL[name])
     end
     return watts
 end

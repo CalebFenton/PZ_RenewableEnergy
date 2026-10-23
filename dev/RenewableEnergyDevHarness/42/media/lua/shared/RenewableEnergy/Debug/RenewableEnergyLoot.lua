@@ -581,15 +581,16 @@ local function expectedInItems(list, fullType, weightFactor, multiplier)
     return total
 end
 
--- Expected count of `fullType` in one fill of a loot table, junk included. Junk rolls at a loot
--- multiplier of 1 (ItemPickerJava.getLootModifier).
+-- Expected count of `fullType` in one fill of a loot table, junk included, at the loot multipliers
+-- ItemPickerJava.getLootModifier gives an entry and a junk entry.
 local function expectedIn(lootTable, fullType)
     if type(lootTable) ~= "table" then
         return 0
     end
     local total = expectedInItems(lootTable, fullType, 1, ItemPickerJava.getLootModifier(fullType))
     if lootTable.junk then
-        total = total + expectedInItems(lootTable.junk, fullType, JUNK_WEIGHT_MULTIPLIER, 1)
+        total = total + expectedInItems(lootTable.junk, fullType, JUNK_WEIGHT_MULTIPLIER,
+            ItemPickerJava.getLootModifier(fullType, true))
     end
     return total
 end
@@ -674,8 +675,8 @@ local function roomsHaul(town, kinds)
         local rooms = math.max(1, town.rooms[roomName] or 0)
         for containerType, count in pairs(byType) do
             listed = listed + expectedInContainers(roomName, containerType, count, rooms, MODULE)
-            local weight = Distributions.CRACKED_MODULE_CONTAINERS[containerType] and Distributions.CRACKED_MODULE_ROOMS[roomName]
-            if weight then
+            local weight = Distributions.crackedModuleRoomWeight(roomName, containerType)
+            if weight > 0 then
                 cracked = cracked + count * Distributions.crackedModuleChance(weight)
             end
         end
@@ -695,10 +696,11 @@ local function roomsHaul(town, kinds)
     }
 end
 
+-- An arrow board's modules: as many as the panel rarity option gives, one a panel at most.
 local function arrowBoardHaul(kinds)
-    local stock = RenewableEnergy.ArrowBoard.STOCK
+    local ArrowBoard = RenewableEnergy.ArrowBoard
     local total = emptyHaul()
-    local modules = stock.modules * SandboxVars.RenewableEnergy.LRMSolarPanels
+    local modules = math.min(#ArrowBoard.PANELS, ArrowBoard.STOCK.modules * SandboxVars.RenewableEnergy.LRMSolarPanels)
     addHaul(total, kinds.weathered, math.min(1, modules))
     addHaul(total, kinds.secondOnArrowBoard, math.max(0, modules - 1))
     return total
@@ -784,8 +786,27 @@ local function zoneVehicles(zoneName)
     return result
 end
 
-local function vehiclesHaul(stalls, kinds)
+-- The cracked modules one vehicle of the script holds in the vehicle zone `zoneName`: each of its
+-- containers that BaseVehicle.randomizeContainers fills rolls Distributions.addCrackedModules
+-- once. A part counts as a container when the script's loot names it, which leaves out its doors.
+local function vehicleCrackedModules(script, zoneName)
     local Distributions = RenewableEnergy.Distributions
+    local distribution = VehicleDistributions[1][(string.gsub(script, "^Base%.", ""))]
+    local vehicleScript = getScriptManager():getVehicle(script)
+    if not (distribution and distribution.Normal and vehicleScript) then
+        return 0
+    end
+    local total = 0
+    for i = 0, vehicleScript:getPartCount() - 1 do
+        local partId = vehicleScript:getPart(i):getId()
+        if distribution.Normal[partId] then
+            total = total + Distributions.crackedModuleChance(Distributions.crackedModuleVehicleWeight(zoneName, partId))
+        end
+    end
+    return total
+end
+
+local function vehiclesHaul(stalls, kinds)
     local arrowBoard = RenewableEnergy.ArrowBoard.SCRIPT
     local total, arrowBoards = emptyHaul(), 0
     local cache = {}
@@ -798,9 +819,7 @@ local function vehiclesHaul(stalls, kinds)
             else
                 cache[script] = cache[script] or vehicleExpected(script, MODULE)
                 addHaul(total, kinds.intact, vehicles * cache[script])
-                if zoneName == "junkyard" then
-                    addHaul(total, kinds.cracked, vehicles * Distributions.crackedModuleChance(Distributions.CRACKED_MODULE_JUNKYARD))
-                end
+                addHaul(total, kinds.cracked, vehicles * vehicleCrackedModules(script, zoneName))
             end
         end
     end
@@ -821,7 +840,7 @@ local function siteHaul(site, kinds)
         local placedPanels = (kind.panels.min + math.min(kind.panels.max, #site.panels)) / 2
         local moduleSum = 0
         for _, panel in ipairs(site.panels) do
-            local mount = RenewableEnergy.Sprites.kindOf(SolarSites.mountSprite(panel[4], panel[5]))
+            local mount = SolarSites.mountKind(panel[4])
             moduleSum = moduleSum + (kind.modules and midpoint(kind.modules) or RenewableEnergy.Specs.mounts[mount].modules)
         end
         addHaul(total, kinds.site, placedPanels * moduleSum / #site.panels)
@@ -839,24 +858,20 @@ local function inTown(town, x, y)
     return x >= town.x1 and x <= town.x2 and y >= town.y1 and y <= town.y2
 end
 
--- The chance a world places the site, as SolarSites.rollNew rolls it: the Solar Sites option at 0
--- leaves out `always` sites too.
-local function siteChance(site)
-    local chance = SandboxVars.RenewableEnergy.SolarSites / 100
-    return chance > 0 and site.always and 1 or chance
-end
-
 local function buildModuleReport(census)
+    local SolarSites = RenewableEnergy.SolarSites
     local kinds = moduleKinds()
     local report = { towns = {}, sites = {} }
-    for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
+    for _, site in ipairs(SolarSites.sites()) do
         table.insert(report.sites, { name = site.name, kind = site.kind, haul = siteHaul(site, kinds), site = site,
-            chance = siteChance(site) })
+            chance = SolarSites.siteChance(site) })
     end
+    -- The census's last town is the whole map.
+    local zoneBoards = 0
     for _, town in ipairs(census.towns) do
         local row = roomsHaul(town, kinds)
         row.name = town.name
-        row.vehicles = vehiclesHaul(town.vehicleStalls, kinds)
+        row.vehicles, zoneBoards = vehiclesHaul(town.vehicleStalls, kinds)
         row.sites = emptyHaul()
         for _, entry in ipairs(report.sites) do
             if inTown(town, siteSpot(entry.site)) then
@@ -869,7 +884,6 @@ local function buildModuleReport(census)
         end
         table.insert(report.towns, row)
     end
-    local _, zoneBoards = vehiclesHaul(census.mapVehicleStalls, kinds)
     local siteBoards = 0
     for _, entry in ipairs(report.sites) do
         if entry.site.arrowBoard then
@@ -921,8 +935,7 @@ end
 local WEAR_GRID = 20
 
 -- The mean share of full condition the BATTERY_WEAR profile `wearName` leaves a battery, duds
--- included: WorldSpawns.wearFoundBattery's three rolls averaged over a grid of midpoints, each
--- capped at new as it caps them.
+-- included: WorldSpawns.foundBatteryPercent averaged over a grid of midpoints of its three rolls.
 local function wearShare(wearName)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local wear, dud = WorldSpawns.BATTERY_WEAR[wearName], WorldSpawns.DUD
@@ -930,8 +943,8 @@ local function wearShare(wearName)
     for a = 0, WEAR_GRID - 1 do
         for b = 0, WEAR_GRID - 1 do
             for c = 0, WEAR_GRID - 1 do
-                local spread = (a + b + c + 1.5) / WEAR_GRID / 3 * 2 - 1
-                sum = sum + math.min(100, wear.mean + wear.halfWidth * spread)
+                sum = sum + WorldSpawns.foundBatteryPercent(wear, (a + 0.5) / WEAR_GRID, (b + 0.5) / WEAR_GRID,
+                    (c + 0.5) / WEAR_GRID)
             end
         end
     end
@@ -1047,8 +1060,9 @@ end
 
 local function buildBatteryReport(census)
     local sites = {}
-    for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
-        table.insert(sites, { site = site, haul = siteBatteries(site), chance = siteChance(site) })
+    local SolarSites = RenewableEnergy.SolarSites
+    for _, site in ipairs(SolarSites.sites()) do
+        table.insert(sites, { site = site, haul = siteBatteries(site), chance = SolarSites.siteChance(site) })
     end
     local report = { towns = {} }
     for _, town in ipairs(census.towns) do
@@ -1162,7 +1176,7 @@ function Loot.yardsticks()
     end
     local applianceW = {}
     for name, fuel in pairs(Loot.APPLIANCE_FUEL) do
-        applianceW[name] = fuel * Specs.wattsPerFuel
+        applianceW[name] = Specs.wattsFromFuel(fuel)
     end
     local batteryLife = {}
     for _, fullType in ipairs(LIFE_BATTERIES) do

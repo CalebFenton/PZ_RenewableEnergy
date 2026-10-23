@@ -1102,8 +1102,9 @@ test("renewable_energy_world_arrow_board_panels_crack", {
         end)
         waitForPanelsCopy(self, trailer)
         T.step(function() self.crack = trailer.state end)
-        -- The lowest roll for each panel: a storm cracks both, rolling once for each.
-        T.forceRoll(self, { 0, 0 })
+        -- The lowest rolls for each panel: a storm cracks both, rolling for each crack and for the
+        -- module it cracks.
+        T.forceRoll(self, { 0, 0, 0, 0 })
         batchOnTrailer(function()
             T.onVehicle(self, trailer, "setTrailer", { panels = modulesOnBothPanels(100) })
             T.onVehicle(self, trailer, "arrowBoardStorm", { hours = 1 })

@@ -14,7 +14,7 @@ local handler = PZHarness.serverHandler
 
 local function generatorOn(args)
     local square = Helpers.squareAt(args)
-    local generator = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.GasKit.isGenerator)
+    local generator = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
     if not generator then
         return nil, "a generator at " .. tostring(args.x) .. "," .. tostring(args.y)
     end
@@ -41,12 +41,11 @@ handler("generatorRead", function(player, args)
         plain.connected = state.source ~= nil
         plain.sourceKind = state.source and state.source.kind
     end
-    local key = generator:getX() .. "," .. generator:getY() .. "," .. generator:getZ()
     local building = generator:getSquare():getBuilding()
     return {
         running = generator:isActivated(), fuel = generator:getFuel(), idle = generator:getBasePowerConsumption(),
         bill = generator:getTotalPowerUsing(), condition = generator:getCondition(), state = plain,
-        listed = ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[key] ~= nil,
+        listed = RenewableEnergy.GasLines.isListed(generator),
         overlays = Helpers.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
         toxic = building ~= nil and building:isToxic(), hours = getGameTime():getWorldAgeHours(),
     }

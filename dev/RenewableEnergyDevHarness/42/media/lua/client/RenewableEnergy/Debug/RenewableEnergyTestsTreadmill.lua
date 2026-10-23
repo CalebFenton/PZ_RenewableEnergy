@@ -319,7 +319,7 @@ test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
     end,
     validate = function(self)
         local before, during, after = self.before.status, self.during.status, self.bank.state.status
-        local watts = Specs.treadmill.drawFuel * Specs.wattsPerFuel
+        local watts = Specs.wattsFromFuel(Specs.treadmill.drawFuel)
         T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, watts, 0.01)
         T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
             watts / Specs.inverterEfficiency, 0.01)

@@ -9,30 +9,16 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local handler = PZHarness.serverHandler
 local removePlaced = PZHarness.Fixtures.removePlaced
 
--- Squares out from a house's bounds searched for its lights: the end of a path from a door, the
--- farthest out a light may stand.
-local LIGHT_MARGIN = 5
-
--- The house nearest the square within `radius`, or nil.
-local function houseNear(x, y, radius)
-    for r = 0, radius do
-        for sx, sy in PZHarness.Fixtures.ring(x, y, r) do
-            local square = getSquare(sx, sy, 0)
-            local building = square and square:getBuilding()
-            if building and building:getDef():isResidential() then
-                return building:getDef()
-            end
-        end
-    end
-    return nil
+local function isHouse(def)
+    return def:isResidential()
 end
 
--- The garden lights around a house, by square key.
+-- The garden lights within GardenLights.REACH of a house, by square key.
 local function lightsAround(def)
     local found = {}
-    local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    for x = def:getX() - LIGHT_MARGIN, def:getX2() + LIGHT_MARGIN do
-        for y = def:getY() - LIGHT_MARGIN, def:getY2() + LIGHT_MARGIN do
+    local SolarGardenLight, reach = RenewableEnergy.SolarGardenLight, RenewableEnergy.GardenLights.REACH
+    for x = def:getX() - reach, def:getX2() + reach do
+        for y = def:getY() - reach, def:getY2() + reach do
             local light = SolarGardenLight.findOn(getSquare(x, y, 0))
             if light then
                 found[x .. "," .. y] = light
@@ -54,7 +40,7 @@ end
 -- The house near the character, with its roll forgotten (its chunk loading rolled it), and its
 -- lights as they stood before. Nil without a house.
 local function houseToRoll(player, defer)
-    local def = houseNear(math.floor(player:getX()), math.floor(player:getY()), 60)
+    local def = Helpers.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60, isHouse)
     if not def then
         return nil
     end
@@ -73,7 +59,7 @@ local function newLights(def, before, defer)
             table.insert(lights, {
                 x = square:getX(), y = square:getY(), z = square:getZ(),
                 outdoors = square:isOutside() and square:getRoom() == nil and square:getZ() == 0,
-                charge = RenewableEnergy.SolarGardenLight.getCharge(light),
+                charge = RenewableEnergy.SolarGardenLight.getChargeWh(light),
             })
         end
     end
@@ -102,7 +88,7 @@ end)
 handler("gardenLightsAt", function(_, args)
     local GardenLights = RenewableEnergy.GardenLights
     local loaded = getSquare(args.x, args.y, 0) ~= nil
-    local def = loaded and houseNear(args.x, args.y, args.radius)
+    local def = loaded and Helpers.buildingNear(args.x, args.y, args.radius, isHouse)
     return {
         loaded = loaded,
         house = def and RenewableEnergy.BuildingWatch.key(def) or nil,
@@ -125,7 +111,7 @@ handler("gardenLightsForgetHouse", function(_, args, defer)
         return nil, "a building at " .. args.x .. "," .. args.y
     end
     forgetRoll(def, defer)
-    return { x = def:getX(), y = def:getY(), x2 = def:getX2(), y2 = def:getY2(), reach = RenewableEnergy.BuildingWatch.REACH }
+    return { x = def:getX(), y = def:getY(), x2 = def:getX2(), y2 = def:getY2(), reach = RenewableEnergy.GardenLights.REACH }
 end)
 
 -- The house at x, y of the map: whether its square there is loaded here and every chunk around it
@@ -140,7 +126,8 @@ handler("gardenLightsHouse", function(_, args)
     local roll = ModData.getOrCreate(GardenLights.MOD_DATA)[RenewableEnergy.BuildingWatch.key(def)]
     local rolled = GardenLights.isRolled(def)
     return {
-        loaded = getSquare(args.x, args.y, 0) ~= nil, surroundings = RenewableEnergy.BuildingWatch.surroundingsLoaded(def),
+        loaded = getSquare(args.x, args.y, 0) ~= nil,
+        surroundings = RenewableEnergy.BuildingWatch.surroundingsLoaded(def, GardenLights.REACH),
         promised = roll == GardenLights.PROMISED, rolled = rolled, lights = Helpers.count(lightsAround(def)),
         placed = rolled and roll or 0,
         count = GardenLights.COUNT,

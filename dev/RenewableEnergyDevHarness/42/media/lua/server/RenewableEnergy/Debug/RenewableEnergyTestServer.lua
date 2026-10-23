@@ -511,16 +511,20 @@ handler("stormChances", function(_, args)
 end)
 
 -- A storm (PanelSource.stormCrack) on a panel record off the map for each trial { source, hours,
--- roll }, or with `under` in place of roll, a roll that far under the trial's own stormChance;
--- worked out here, so the roll is exactly the chance the crack compares it with. The one roll is
--- all a storm may draw. Answers whether each cracked and the modules after.
+-- roll }, roll a number, or "under" or "at" for a roll just under or at the trial's own
+-- stormChance; worked out here, so the roll is exactly the chance the crack compares it with. A
+-- storm draws that roll and, when it cracks, one more to pick the module (the first, at 0).
+-- Answers whether each cracked and the modules after.
 handler("stormCrack", function(_, args, defer)
     local PanelSource = RenewableEnergy.PanelSource
     local results = {}
     for i, trial in ipairs(args.trials) do
         local source = panelRecord(trial.source)
-        local roll = trial.roll or PanelSource.stormChance(source, trial.hours) - trial.under
-        local restore = Helpers.forceRolls(defer, { roll })
+        local roll = trial.roll
+        if roll == "under" or roll == "at" then
+            roll = PanelSource.stormChance(source, trial.hours) - (roll == "under" and Helpers.UNDER or 0)
+        end
+        local restore = Helpers.forceRolls(defer, { roll, 0 })
         results[i] = { cracked = PanelSource.stormCrack(source, trial.hours), modules = source.modules }
         restore()
     end
@@ -632,7 +636,7 @@ handler("gardenLightUpdate", function(_, args)
     end
     time:setTimeOfDay(time:getTimeOfDay() + args.hours)
     GadgetCharging.update()
-    return { lit = SolarGardenLight.isLit(light), sprite = light:getTextureName(), charge = SolarGardenLight.getCharge(light) }
+    return { lit = SolarGardenLight.isLit(light), sprite = light:getTextureName(), charge = SolarGardenLight.getChargeWh(light) }
 end)
 
 -- Swaps the bulb of the garden light on the square at `args` for a new `args.bulb` in one go, so
@@ -654,7 +658,7 @@ end)
 -- Vehicles ----------------------------------------------------------------------------------------
 
 local function batteryOf(vehicle)
-    local part = vehicle:getPartById(RenewableEnergy.VehicleBattery.PART)
+    local part = RenewableEnergy.VehicleBattery.partOf(vehicle)
     return part, part and part:getInventoryItem()
 end
 
@@ -810,7 +814,7 @@ local function gadgetCharges(args)
     end
     local cellWh = storedWh(charger)
     for _, uses in ipairs(usesOf(charger:getContainer())) do
-        cellWh = cellWh + uses * SolarCellCharger.BATTERY_WH
+        cellWh = cellWh + uses * RenewableEnergy.Specs.cellChargerBatteryWh
     end
     local function whIn(battery)
         return Battery.getCharge(battery) * Battery.nominalWh(battery)
@@ -821,7 +825,7 @@ local function gadgetCharges(args)
         bank = record.charge * record.nominalWh,
         bankPassAge = record.lastHour, age = getGameTime():getWorldAgeHours(),
         car = whIn(carBattery), charger = cellWh,
-        light = RenewableEnergy.SolarGardenLight.getCharge(light),
+        light = RenewableEnergy.SolarGardenLight.getChargeWh(light),
         trailer = boxed:size() > 0 and whIn(boxed:get(0)) or -1,
         trailerWatts = RenewableEnergy.ArrowBoard.panelWatts(trailer),
     }

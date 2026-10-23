@@ -667,7 +667,7 @@ local function siteCopiesArrived(spots)
         return RenewableEnergy.findObjectOn(getSquare(x, y, z), matches) ~= nil
     end
     local function isMount(object)
-        local kind = Sprites.kindOf(Sprites.nameOf(object))
+        local kind = Sprites.kindOfObject(object)
         return kind == "flat" or kind == "wall" or kind == "rack"
     end
     local function isSource(object)
