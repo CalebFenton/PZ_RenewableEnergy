@@ -16,12 +16,10 @@ local deferOnce = Helpers.deferOnce
 local countPairs = PZHarness.Fixtures.countPairs
 local Sprites = RenewableEnergy.Sprites
 
-local function stashCount()
-    local count = 0
-    for _ in pairs(Stash.descriptions) do
-        count = count + 1
-    end
-    return count
+-- The building of the stash's building square on the map, loaded or not, or nil.
+local function stashBuilding(stashMap)
+    local room = getWorld():getMetaGrid():getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
+    return room and room:getBuilding()
 end
 
 -- StashSystem gives up without an error when the stash building isn't a building, prepares only a
@@ -32,8 +30,7 @@ check("stashHousesResolve", function(expect)
     local metaGrid = getWorld():getMetaGrid()
     for stashMap in pairs(Stash.descriptions) do
         local x, y = stashMap.buildingX, stashMap.buildingY
-        local room = metaGrid:getRoomAt(x, y, 0)
-        local building = room and room:getBuilding()
+        local building = stashBuilding(stashMap)
         local spawnTable = SuburbsDistributions[stashMap.spawnTable]
         if expect(building ~= nil, stashMap.name .. ": no building at its building coordinates") then
             expect(building:getX() < x and x < building:getX2() and building:getY() < y and y < building:getY2(),
@@ -83,7 +80,7 @@ handler("stashRegister", function(_, _, defer)
         results[mode] = { registered = registered, count = count }
     end
     restoreOptions()
-    return { results = results, houses = stashCount() }
+    return { results = results, houses = Helpers.count(Stash.descriptions) }
 end)
 
 -- The engine's own load and annotate path, which a found map takes, on a fresh copy of each stash
@@ -124,12 +121,10 @@ end
 -- Puts each house through Stash.relistUnfound in every case of `args.cases` ({ visited, read }),
 -- then back as it was. Answers { name, case, relisted } for each, in order.
 handler("stashRelist", function(_, args, defer)
-    local metaGrid = getWorld():getMetaGrid()
     local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
     local houses = {}
     for stashMap in pairs(Stash.descriptions) do
-        local room = metaGrid:getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
-        local building = room and room:getBuilding()
+        local building = stashBuilding(stashMap)
         if not building then
             return nil, "the building of " .. stashMap.name
         end
@@ -175,27 +170,15 @@ handler("stashRelist", function(_, args, defer)
     return { results = results }
 end)
 
-local function descriptionNamed(name)
-    for stashMap, added in pairs(Stash.descriptions) do
-        if stashMap.name == name then
-            return stashMap, added
-        end
-    end
-    return nil
-end
-
--- Stash.stockFromStart with the engine handed the houses, every knownOnStart chance made certain
--- and StashSystem's possible list, which isStashBuilding also reads, emptied of them, so that what
--- it reports afterwards is the stocking queue alone. Answers by house whether it was queued for
--- stocking, marked as read, and has a chance at all; then puts everything back.
+-- Stash.stockFromStart with the engine handed the houses, every roll at 0 so that each house with
+-- a knownOnStart chance is stocked, and StashSystem's possible list, which isStashBuilding also
+-- reads, emptied of them, so that what it reports afterwards is the stocking queue alone. Answers
+-- by house whether it was queued for stocking, marked as read, and has a chance at all; then puts
+-- everything back.
 handler("stashKnownOnStart", function(_, _, defer)
-    local all, possible = StashSystem.getAllStashes(), StashSystem.getPossibleStashes()
-    local alreadyRead = StashSystem.getAlreadyReadMap()
-    local added, chances, read = {}, {}, {}
+    local all, alreadyRead = StashSystem.getAllStashes(), StashSystem.getAlreadyReadMap()
+    local added, read = {}, {}
     local restore = deferOnce(defer, function()
-        for extra, chance in pairs(chances) do
-            extra.knownOnStart = chance
-        end
         for _, engineStash in ipairs(added) do
             all:remove(engineStash)
         end
@@ -208,7 +191,7 @@ handler("stashKnownOnStart", function(_, _, defer)
         end
         Stash.relistUnfound()
     end)
-    for stashMap, extra in pairs(Stash.descriptions) do
+    for stashMap in pairs(Stash.descriptions) do
         read[stashMap.name] = alreadyRead:contains(stashMap.name)
         if not StashSystem.getStash(stashMap.name) then
             local engineStash = EngineStash.new(stashMap.name)
@@ -216,23 +199,18 @@ handler("stashKnownOnStart", function(_, _, defer)
             all:add(engineStash)
             table.insert(added, engineStash)
         end
-        chances[extra] = extra.knownOnStart
-        extra.knownOnStart = extra.knownOnStart and 100
+        removePossibleStash(stashMap.name)
     end
-    for i = possible:size() - 1, 0, -1 do
-        if descriptionNamed(possible:get(i):getName()) then
-            possible:remove(possible:get(i))
-        end
-    end
+    local restoreRoll = Helpers.forceRolls(defer, 0)
     Stash.stockFromStart()
-    local metaGrid = getWorld():getMetaGrid()
+    restoreRoll()
     local houses = {}
     for stashMap, extra in pairs(Stash.descriptions) do
-        local room = metaGrid:getRoomAt(stashMap.buildingX, stashMap.buildingY, 0)
+        local building = stashBuilding(stashMap)
         houses[stashMap.name] = {
-            queued = room ~= nil and StashSystem.isStashBuilding(room:getBuilding()),
+            queued = building ~= nil and StashSystem.isStashBuilding(building),
             read = alreadyRead:contains(stashMap.name),
-            hasChance = chances[extra] ~= nil,
+            hasChance = (extra.knownOnStart or 0) > 0,
         }
     end
     restore()

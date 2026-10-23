@@ -20,6 +20,16 @@ local function digesterWithGas(self, tile, gas, opts)
     return digester
 end
 
+-- A generator holding `fuel` litres beside a digesterWithGas, kitted and on a line to it: the
+-- generator's handle and the digester's, or nil.
+local function generatorOnDigester(self, tile, gas, fuel)
+    local digester = digesterWithGas(self, tile, gas)
+    local generator = digester and T.generator(self, { near = digester.square, fuel = fuel })
+    if not generator then return nil end
+    T.fitAndConnect(self, generator, digester)
+    return generator, digester
+end
+
 -- What the clock tests that run a generator dry have vanilla bill it, in shares of the fuel it shows
 -- on gas: past that, so vanilla stops it, and little enough past for a dome's gas to pay.
 local DRY_BILL = 1.1
@@ -262,10 +272,8 @@ test("renewable_energy_gasline_generator_runs_on_past_vanilla_stop", {
     instant = true,
     run = function(self)
         self.hours = 2
-        local digester = digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity)
-        local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
+        local generator, digester = generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
         if not generator then return end
-        T.fitAndConnect(self, generator, digester)
         T.setGenerator(self, generator, { running = true })
         T.readGenerator(self, generator, "bill")
         billDryOver(self, "bill", self.hours)
@@ -338,10 +346,8 @@ test("renewable_energy_gasline_job_bills_the_fuel_before_it", {
     run = function(self)
         self.gas, self.tank = Digester.HOLDERS.bags.capacity, 1
         self.litres = self.tank / 5
-        local digester = digesterWithGas(self, "barrel.MetalDrum", self.gas)
-        local generator = digester and T.generator(self, { near = digester.square, fuel = self.tank })
+        local generator, digester = generatorOnDigester(self, "barrel.MetalDrum", self.gas, self.tank)
         if not generator then return end
-        T.fitAndConnect(self, generator, digester)
         T.batch(function()
             T.setGenerator(self, generator, { running = true })
             T.gasPass(self, generator, 0)
@@ -381,10 +387,8 @@ test("renewable_energy_gasline_job_bills_the_fuel_before_it", {
 test("renewable_energy_gasline_generator_stalls_over_cap", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity)
-        local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
+        local generator, digester = generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
         if not generator then return end
-        T.fitAndConnect(self, generator, digester)
         T.batch(function()
             T.setGenerator(self, generator, { running = true })
             for _, case in ipairs({ { "atCap", GasKit.CAP_W }, { "over", GasKit.CAP_W + 1 }, { "fits", GasKit.CAP_W },
@@ -417,7 +421,7 @@ test("renewable_energy_gasline_generator_stalls_over_cap", {
 })
 
 -- The test's bank handles `banks` in the order a generator on gas shares its cap between them:
--- nearest first, the lower place on a tie (GasLines.chargerLimitW).
+-- nearest first, the lower place on a tie (GasLines.lua's chargingBanks).
 local function shareOrder(generator, banks)
     local order = {}
     for _, bank in ipairs(banks) do
@@ -457,12 +461,10 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
     instant = true,
     run = function(self)
         T.setGrid(self, false)
-        local digester = digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity)
-        local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
+        local generator = generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
         local fridge = generator and T.square(self, { indoors = true, near = generator.square }, "a free indoor square for a fridge")
         if not fridge then return end
         self.generator = generator
-        T.fitAndConnect(self, generator, digester)
         T.setGenerator(self, generator, { running = true })
         T.step(function() T.placeTile(self, fridge, MINI_FRIDGE) end)
         T.batch(function()

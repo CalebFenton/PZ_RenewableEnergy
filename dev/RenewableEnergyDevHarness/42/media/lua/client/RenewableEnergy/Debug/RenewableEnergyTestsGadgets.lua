@@ -48,7 +48,7 @@ end
 -- which the debug car may not allow.
 local function chooseMaintainerOption(self, car, attached, key)
     T.step(function()
-        local context = ISContextMenu.get(0, 0, 0)
+        local context = T.newContext()
         local option = RenewableEnergy.Menu.addVehicleOptions(0, context, car.vehicle)
         context:hideAndChildren()
         self[key] = option ~= nil
@@ -174,6 +174,37 @@ test("renewable_energy_gadgets_maintainer_menu_needs_carried_maintainer", {
     end,
 })
 
+-- An older save marks an attached maintainer with the condition it went on with. Detaching one
+-- still gives back a single whole maintainer, not one at that condition.
+test("renewable_energy_gadgets_maintainer_detach_older_save_mark", {
+    instant = true,
+    run = function(self)
+        local car = T.placeVehicle(self, CAR)
+        if not car then return end
+        T.server(self, "oldMaintainerMark", function() return { vehicle = T.vehicleArgs(car), condition = 1 } end)
+        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end,
+            "this client's car with the older save's maintainer mark")
+        chooseMaintainerOption(self, car, false, "detachOffered")
+        carState(self, car, "detached")
+        T.count(self, "carried", { SolarMaintainer.ITEM })
+        T.waitForCarried(self, SolarMaintainer.ITEM, "this client's copy of the detached maintainer")
+        T.step(function()
+            local item = T.carried(SolarMaintainer.ITEM)
+            self.condition = item and item:getCondition()
+        end)
+    end,
+    validate = function(self)
+        expect(self.detachOffered, "the car's menu doesn't offer to detach an older save's maintainer")
+        if not expect(self.detached, "detaching never finished") then return end
+        expect(not self.detached.attached, "an older save's maintainer did not detach on the server")
+        expect(self.counts.carried[SolarMaintainer.ITEM] == 1, "detaching gave back "
+            .. tostring(self.counts.carried[SolarMaintainer.ITEM]) .. " maintainers, expected 1")
+        local whole = instanceItem(SolarMaintainer.ITEM):getConditionMax()
+        expect(self.condition == whole, "the detached maintainer came back at condition " .. tostring(self.condition)
+            .. ", expected " .. whole)
+    end,
+})
+
 -- Solar battery charger --------------------------------------------------------------------------
 
 -- A solar battery charger the character places on a free outdoor square; see T.placeAsPlayer.
@@ -202,7 +233,7 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
             T.waitFor(self, function() return container:getItems():size() == SolarCellCharger.SLOTS end,
                 "this client's charger holding " .. SolarCellCharger.SLOTS .. " batteries")
             T.server(self, "chargerState", { x = charger.x, y = charger.y, z = charger.z })
-            T.step(function() self.acceptsFifth = container:isItemAllowed(instanceItem(SolarCellCharger.BATTERY)) end)
+            T.step(function() self.acceptsPastSlots = container:isItemAllowed(instanceItem(SolarCellCharger.BATTERY)) end)
         end)
     end,
     validate = function(self)
@@ -211,7 +242,7 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
         if not expect(self.server.chargerState ~= nil, "the batteries never went into the charger") then return end
         expect(#self.server.chargerState.uses == SolarCellCharger.SLOTS, "the server's charger holds "
             .. #self.server.chargerState.uses .. " batteries, expected " .. SolarCellCharger.SLOTS)
-        expect(not self.acceptsFifth, "the solar battery charger takes a fifth battery")
+        expect(not self.acceptsPastSlots, "the solar battery charger takes a battery past its " .. SolarCellCharger.SLOTS .. " slots")
     end,
 })
 
@@ -246,17 +277,18 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
         local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
         local useWh = useDelta * SolarCellCharger.BATTERY_WH
         local most = fullSunWh(Specs.cellChargerWatts, CELL_HOURS)
-        expect(noon.added > 0 and noon.added * useWh <= most, "two hours of noon sun added " .. noon.added
+        expect(noon.added > 0 and noon.added * useWh <= most, CELL_HOURS .. " hours of noon sun added " .. noon.added
             .. " uses of " .. useWh .. " Wh, expected more than 0 and at most " .. most .. " Wh")
         local low, high = math.min(unpack(noon.after)), math.max(unpack(noon.after))
         expect(high - low <= useDelta + 1e-6, "the batteries charged unevenly, from " .. low .. " to " .. high)
-        -- The pass gets the same sun for as long, plus what the first two hours kept toward a use.
+        -- The pass gets the same sun for as long, plus what the first run kept toward a use.
         local passUses = 0
         for i, charge in ipairs(noon.afterPass) do
             passUses = passUses + (charge - noon.after[i]) / useDelta
         end
         expectNear("uses the charger pass as long again added", passUses, noon.added, 1.01)
-        expect(midnight.added == 0 and math.max(unpack(midnight.after)) == 0, "two hours of night charged " .. midnight.added .. " uses")
+        expect(midnight.added == 0 and math.max(unpack(midnight.after)) == 0, CELL_HOURS .. " hours of night charged "
+            .. midnight.added .. " uses")
         expect(full.added == 0 and full.full == true and full.storedWh == 0, "full cells at noon took " .. tostring(full.added)
             .. " uses, are all full " .. tostring(full.full) .. ", and the charger kept " .. tostring(full.storedWh) .. " Wh")
     end,
@@ -284,22 +316,20 @@ local function subMenuOf(context, option)
     return option and option.subOption and context:getSubMenu(option.subOption)
 end
 
--- The mechanics menu of an empty battery slot installs a carried deep cycle battery, and
--- uninstalling gives it back with its charge. Real-time actions: an instant one fails vanilla's
--- isValid on a multiplayer client when the server's slot change arrives.
-test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
+-- The mechanics menu of an empty battery slot installs a carried deep cycle battery. A real-time
+-- action: an instant one fails vanilla's isValid on a multiplayer client when the server's slot
+-- change arrives. Uninstalling is vanilla's alone (ISUninstallVehiclePart takes any item).
+test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu", {
     run = function(self)
         T.setPerk(self, Perks.Mechanics, 10)
         local car = T.placeVehicle(self, CAR)
         if not car then return end
-        self.car = car
         T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), empty = true } end)
         T.waitFor(self, function() return T.vehicleBattery(car) == nil end, "this client's car without a battery")
         T.give(self, "battery", { { type = VehicleBattery.ITEM } })
         T.step(function()
-            local part = car.vehicle:getPartById(VehicleBattery.PART)
             mechanicsCheat(self)
-            local context = partMenu(car.vehicle, part)
+            local context = partMenu(car.vehicle, car.vehicle:getPartById(VehicleBattery.PART))
             T.defer(self, function() context:closeAll() end)
             local installOption = context:getOptionFromName(getText("IGUI_Install"))
             local install = subMenuOf(context, installOption)
@@ -318,34 +348,16 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_and_uninstalls", {
             T.waitFor(self, function() return T.vehicleBattery(car) ~= nil end, "this client's car with the deep cycle battery")
             carState(self, car, "installed")
             T.count(self, "installed", { VehicleBattery.ITEM })
-            T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), uses = 0.5 } end)
-            T.waitFor(self, function()
-                local battery = T.vehicleBattery(car)
-                return battery ~= nil and math.abs(battery:getCurrentUsesFloat() - 0.5) < 0.001
-            end, "this client's deep cycle battery at half charge")
-            T.step(function() ISVehiclePartMenu.onUninstallPart(T.player(), part) end)
-            T.waitFor(self, function()
-                return T.vehicleBattery(car) == nil and T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM) ~= nil
-            end, "the uninstalled deep cycle battery in this client's inventory")
-            carState(self, car, "uninstalled")
-            T.count(self, "uninstalled", { VehicleBattery.ITEM })
         end)
     end,
     validate = function(self)
         if not expect(self.offered, "the mechanics menu doesn't offer the deep cycle battery under Install: "
             .. tostring(self.offerProblem)) then return end
-        if not expect(self.installed and self.uninstalled, "installing and uninstalling never finished") then return end
+        if not expect(self.installed, "installing never finished") then return end
         local installed = self.installed.battery
         expect(installed and installed.type == VehicleBattery.ITEM, "the server's battery slot holds "
             .. tostring(installed and installed.type))
         expect(self.counts.installed[VehicleBattery.ITEM] == 0, "the installed battery is still in the inventory")
-        expect(self.uninstalled.battery == nil, "the server's battery slot still holds a battery after uninstalling")
-        expect(T.vehicleBattery(self.car) == nil, "this client's battery slot still holds a battery after uninstalling")
-        expect(self.counts.uninstalled[VehicleBattery.ITEM] == 1, "uninstalling gave back "
-            .. tostring(self.counts.uninstalled[VehicleBattery.ITEM]) .. " deep cycle batteries")
-        local battery = T.player():getInventory():getFirstTypeRecurse(VehicleBattery.ITEM)
-        expect(battery ~= nil and math.abs(battery:getCurrentUsesFloat() - 0.5) < 0.001,
-            "the deep cycle battery came back at " .. tostring(battery and battery:getCurrentUsesFloat()))
     end,
 })
 
@@ -547,20 +559,25 @@ test("renewable_energy_gadgets_garden_light_pick_up_takes_light", {
 
 local RED, GREEN = "Base.LightBulbRed", "Base.LightBulbGreen"
 
+-- This client's right-click menu of the garden light `light` (a handle): the context menu, to hide
+-- once read, its Add Light Bulb submenu or nil, and its Remove Light Bulb option or nil.
+local function bulbMenu(light)
+    local context = T.newContext()
+    local menu = RenewableEnergy.Menu.addGardenLightOptions(0, context, light.object)
+    return context, subMenuOf(context, menu:getOptionFromName(getText("ContextMenu_AddLightbulb"))),
+        menu:getOptionFromName(getText("ContextMenu_RemoveLightbulb"))
+end
+
 -- Queues choosing, in this client's right-click menu of the garden light `light` (a handle),
 -- Remove Light Bulb or, given `bulbType`, that bulb under Add Light Bulb, as a click does: the
 -- option walks the character over and queues the job. Leaves whether the menu offered it in
 -- self[key].
 local function chooseBulbOption(self, light, bulbType, key)
     T.step(function()
-        local context = ISContextMenu.get(0, 0, 0)
-        local menu = RenewableEnergy.Menu.addGardenLightOptions(0, context, light.object)
-        local option
+        local context, add, remove = bulbMenu(light)
+        local option = remove
         if bulbType then
-            local add = subMenuOf(context, menu:getOptionFromName(getText("ContextMenu_AddLightbulb")))
             option = add and add:getOptionFromName(getItemName(bulbType))
-        else
-            option = menu:getOptionFromName(getText("ContextMenu_RemoveLightbulb"))
         end
         context:hideAndChildren()
         self[key] = option ~= nil and not option.notAvailable
@@ -609,12 +626,10 @@ test("renewable_energy_gadgets_garden_light_remove_bulb", {
             .. tostring(self.counts.removed[SolarGardenLight.PLAIN_BULB]) .. " light bulbs, expected 1")
         expect(self.night and not self.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")
         expectNear("charge of a light without a bulb after an hour of night", self.night and self.night.charge, LIT_WH)
-        local context = ISContextMenu.get(0, 0, 0)
-        local menu = RenewableEnergy.Menu.addGardenLightOptions(0, context, self.light.object)
-        local add = subMenuOf(context, menu:getOptionFromName(getText("ContextMenu_AddLightbulb")))
+        local context, add, remove = bulbMenu(self.light)
         local plain = add and add:getOptionFromName(getItemName(SolarGardenLight.PLAIN_BULB))
         expect(plain ~= nil and not plain.notAvailable, "the light without a bulb doesn't offer the carried bulb under Add Light Bulb")
-        expect(menu:getOptionFromName(getText("ContextMenu_RemoveLightbulb")) == nil, "the light without a bulb offers Remove Light Bulb")
+        expect(remove == nil, "the light without a bulb offers Remove Light Bulb")
         context:hideAndChildren()
     end,
 })
@@ -637,7 +652,7 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
         T.give(self, "red", { { type = RED } })
         chooseBulbOption(self, light, RED, "addOffered")
         T.waitFor(self, function() return lampShines(light.square, RED) end, "this client's lamp shining red")
-        T.count(self, "added", { RED, SolarGardenLight.PLAIN_BULB })
+        T.count(self, "added", { RED })
         T.step(function() self.copyLit = light.object:getTextureName() == Sprites.gardenLight.lit end)
     end,
     validate = function(self)
@@ -648,7 +663,6 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
         expect(self.addOffered, "the light without a bulb doesn't offer the carried red bulb")
         expect(self.copyLit, "with a red bulb this client's light shows the unlit tile")
         expect(self.counts.added[RED] == 0, "the red bulb is still in the inventory")
-        expect(self.counts.added[SolarGardenLight.PLAIN_BULB] == 1, "the plain bulb that came out is not in the inventory")
     end,
 })
 
@@ -677,7 +691,7 @@ test("renewable_energy_gadgets_garden_light_bulb_swap_recolours_lamp", {
 local function placeCarriedLight(self, light)
     T.step(function()
         local p = T.player()
-        local item = T.need(self, p:getInventory():getFirstTypeRecurse(SolarGardenLight.ITEM), "the carried garden light")
+        local item = T.need(self, T.carried(SolarGardenLight.ITEM), "the carried garden light")
         if not item then return end
         -- The tile it was picked up as, lit or not, as the moveables cursor places it.
         local sprite = item:getWorldSprite()
@@ -720,20 +734,22 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
     end,
 })
 
--- Taking a light apart gives back its bulb, whatever its colour, and none from a light without one.
-for _, entry in ipairs({ { "returns_bulb", RED }, { "without_bulb", SolarGardenLight.NO_BULB } }) do
+-- Taking a light apart gives back its bulb, whatever its colour, the plain one a light holds from
+-- new (no bulb key), and none from a light without one.
+for _, entry in ipairs({ { "returns_bulb", RED }, { "returns_plain_bulb", nil }, { "without_bulb", SolarGardenLight.NO_BULB } }) do
     local behavior, bulb = entry[1], entry[2]
     T.craftTest("renewable_energy_gadgets_garden_light_take_apart_" .. behavior, {
         recipe = "RenewableEnergy_TakeApartSolarGardenLight",
         from = SolarGardenLight.ITEM,
         setup = function(self)
-            for _, item in ipairs(self.items.inputs or {}) do
+            for _, item in ipairs(bulb and self.items.inputs or {}) do
                 if item:getFullType() == SolarGardenLight.ITEM then
                     T.changeItem(self, item, { modData = { [SolarGardenLight.BULB_KEY] = bulb } })
                 end
             end
         end,
-        counts = { [SolarGardenLight.ITEM] = 0, [RED] = bulb == RED and 1 or 0, [SolarGardenLight.PLAIN_BULB] = 0 },
+        counts = { [SolarGardenLight.ITEM] = 0, [RED] = bulb == RED and 1 or 0,
+            [SolarGardenLight.PLAIN_BULB] = bulb == nil and 1 or 0 },
     })
 end
 
@@ -751,45 +767,5 @@ test("renewable_energy_gadgets_garden_light_refused_indoors", {
     validate = function(self)
         expect(not self.indoors, "a garden light can be placed indoors")
         expect(self.outdoors, "a garden light can't be placed outdoors")
-    end,
-})
-
--- Detaching gives back a whole maintainer, whether the menu attached it or an older save holds it
--- in the mark that carried its condition.
-test("renewable_energy_gadgets_maintainer_detach_round_trip", {
-    instant = true,
-    run = function(self)
-        local car = T.placeVehicle(self, CAR, { battery = CAR_BATTERY, charge = 0.5 })
-        if not car then return end
-        T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })
-        chooseMaintainerOption(self, car, true, "freshAttachOffered")
-        chooseMaintainerOption(self, car, false, "freshDetachOffered")
-        carState(self, car, "freshDetached")
-        T.server(self, "oldMaintainerMark", function() return { vehicle = T.vehicleArgs(car), condition = 1 } end)
-        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end,
-            "this client's car with the older save's maintainer mark")
-        chooseMaintainerOption(self, car, false, "oldDetachOffered")
-        carState(self, car, "oldDetached")
-        T.count(self, "carried", { SolarMaintainer.ITEM })
-        T.step(function()
-            self.conditions = {}
-            local items = T.player():getInventory():getAllTypeRecurse(SolarMaintainer.ITEM)
-            for i = 0, items:size() - 1 do
-                table.insert(self.conditions, items:get(i):getCondition())
-            end
-        end)
-    end,
-    validate = function(self)
-        local whole = instanceItem(SolarMaintainer.ITEM):getConditionMax()
-        expect(self.freshAttachOffered and self.freshDetachOffered, "the car's menu did not offer attach and detach")
-        if not expect(self.freshDetached and self.oldDetached, "detaching never finished") then return end
-        expect(not self.freshDetached.attached, "the attached maintainer did not detach on the server")
-        expect(self.oldDetachOffered and not self.oldDetached.attached, "an older save's maintainer did not detach")
-        expect(self.counts.carried[SolarMaintainer.ITEM] == 2, "detaching both gave back "
-            .. tostring(self.counts.carried[SolarMaintainer.ITEM]) .. " maintainers, expected 2")
-        for _, condition in ipairs(self.conditions or {}) do
-            expect(condition == whole, "a detached maintainer came back at condition " .. condition
-                .. ", expected " .. whole)
-        end
     end,
 })

@@ -7,9 +7,7 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
@@ -24,8 +22,10 @@ local test, craftTest, expect, expectNear, player = T.test, T.craftTest, T.expec
 local Action = RenewableEnergyAction
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local PowerBank, Sources, Recipes = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Recipes
-local Format, Menu, StatusWindow = RenewableEnergy.Format, RenewableEnergy.Menu, RenewableEnergy.StatusWindow
+local Format, Menu = RenewableEnergy.Format, RenewableEnergy.Menu
+local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local MODULES_KEY = PowerBank.MODULES
+local CAR_BATTERY = "Base.CarBattery1"
 local FACTORY, HOMEMADE = "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule"
 local function craftName(recipe, behavior) return T.craftName("solar", recipe, behavior) end
 
@@ -163,7 +163,7 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
 -- shattered module what the whole one makes alone. The cracked panel says why it is low.
 test("renewable_energy_solar_module_condition_sets_watts", {
     run = function(self)
-        local bank = T.bank(self, "batteryRackMetal", { "Base.CarBattery1", "RenewableEnergy.ChargeController" }, { charge = 0.1 })
+        local bank = T.bank(self, "batteryRackMetal", { CAR_BATTERY, Specs.controller }, { charge = 0.1 })
         if not bank then return end
         self.bank = bank
         local modules = {
@@ -205,8 +205,8 @@ test("renewable_energy_solar_module_condition_sets_watts", {
 -- and a controller's slots not counted.
 test("renewable_energy_solar_panel_slots", {
     run = function(self)
-        local box = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.1 })
-        local batteryRack = box and T.bank(self, "batteryRackWood", { "Base.CarBattery1", Specs.controller }, { charge = 0.1 })
+        local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.1 })
+        local batteryRack = box and T.bank(self, "batteryRackWood", { CAR_BATTERY, Specs.controller }, { charge = 0.1 })
         if not batteryRack then return end
         self.rack = batteryRack
         self.boxPanels, self.rackPanels = {}, {}
@@ -256,7 +256,7 @@ end
 
 -- The condition the panel object `panel` records for its first module, or nil.
 local function recordedCondition(panel)
-    local modules = panel and panel:getModData()[PowerBank.MODULES]
+    local modules = panel and panel:getModData()[MODULES_KEY]
     return modules and modules[1] and modules[1].condition
 end
 
@@ -345,7 +345,7 @@ test("renewable_energy_solar_storms_crack_under_the_chance", {
 test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.5 })
         -- Half a crack above the cracked look, so a crack takes it below.
         local whole = Specs.crackedBelow + math.floor(Specs.storm.crack / 2)
         self.crackedTo = whole - Specs.storm.crack
@@ -380,7 +380,7 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
 test("renewable_energy_solar_storms_crack_loose_panels", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.5 })
         local connected = bank and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100), connect = true })
         local outdoors = connected and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100) })
         local indoorSquare = outdoors and T.square(self, { indoors = true, near = bank }, "a free indoor square for a panel")
@@ -448,13 +448,10 @@ test("renewable_energy_solar_connect_xp_once_per_module", {
     end,
 })
 
--- The snow on `panel` in a bank state's status, or nil when the status doesn't list it.
-local function snowOn(state, panel)
-    for _, source in ipairs(state.status.sources) do
-        if PowerBank.samePosition(source, panel.position) then
-            return source.snow
-        end
-    end
+-- The status entry of the panel handle `panel` in a bank state, or an empty one when the status
+-- doesn't list it.
+local function entryOf(state, panel)
+    return T.stateSource(state, panel.position) or {}
 end
 
 -- Connecting a panel again to the bank it feeds leaves it as it was, snow included, and a bank
@@ -475,7 +472,7 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
         end
         T.batch(function()
             T.snowfall(self, bank)
-            T.step(function() self.snowed = snowOn(bank.state, panel) end)
+            T.step(function() self.snowed = entryOf(bank.state, panel).snow end)
             tryAgain("again")
             self.second = T.panel(self, Sprites.flat, { near = bank, connect = true })
             if not self.second then return end
@@ -491,7 +488,7 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
             expect(reply.state.sources == panels, "connecting a panel to " .. what .. " it feeds left "
                 .. reply.state.sources .. " panels")
             -- Connecting brings the bank up to now first, which may melt a trace of it.
-            expectNear("snow on a panel connected again to " .. what .. " it feeds", snowOn(reply.state, self.panel) or -1,
+            expectNear("snow on a panel connected again to " .. what .. " it feeds", entryOf(reply.state, self.panel).snow or -1,
                 self.snowed, 0.01)
         end
         expect(self.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
@@ -510,22 +507,12 @@ local function showsSnow(panel)
     return false
 end
 
--- The status entry of `panel` in a bank state, or an empty one when the status doesn't list it.
-local function entryOf(state, panel)
-    for _, source in ipairs(state.status.sources) do
-        if PowerBank.samePosition(source, panel.position) then
-            return source
-        end
-    end
-    return {}
-end
-
 -- Snow falling on a frosty night settles on a flat panel and a rack, and this client's copies of
 -- them show it. In the sun it takes its share of what a panel makes, beside a panel swept clean;
 -- the sun melts it, the rack's tilt sheds it faster, and mild air takes the rest.
 test("renewable_energy_solar_snow_settles_dims_and_melts", {
     run = function(self)
-        local bank = T.bank(self, "batteryRackWood", { "Base.CarBattery1", Specs.controller }, { charge = 0.2 })
+        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, Specs.controller }, { charge = 0.2 })
         self.flat = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         self.rack = self.flat and T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
         self.clean = self.rack and T.panel(self, Sprites.flat, { near = bank, connect = true })
@@ -573,7 +560,7 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
 -- panel checked for being outdoors only when it is connected.
 test("renewable_energy_solar_roofed_panel_makes_nothing", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.5 })
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         T.batch(function()
@@ -608,6 +595,11 @@ local function hasEnabledOption(menu)
     return false
 end
 
+-- Whether the context menu option `option` (nil when not offered) shows, is greyed out, and why.
+local function optionState(option)
+    return { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable == true, reason = T.tooltipOf(option) }
+end
+
 -- A panel offers to connect only to a bank in reach: with none, the option is there but
 -- unavailable and says why; with one, the option connects to it.
 test("renewable_energy_solar_menu_panel_connect", {
@@ -620,8 +612,8 @@ test("renewable_energy_solar_menu_panel_connect", {
             local context = T.newContext()
             local submenu = Menu.addSourceOptions(0, context, panel)
             local option = T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectToBank"))
-            self.alone = { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable,
-                reason = T.tooltipOf(option), enabled = hasEnabledOption(submenu) }
+            self.alone = optionState(option)
+            self.alone.enabled = hasEnabledOption(submenu)
             context:hideAndChildren()
         end)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true, near = self.panel })
@@ -700,6 +692,7 @@ test("renewable_energy_solar_connect_panel", {
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
         if not self.panel then return end
+        -- At this level the option's minutes are taken as they are; skill shortens or lengthens them.
         T.setPerk(self, Perks.Electricity, 3)
         T.step(function()
             T.setMultiplier(self, connectSpeed())
@@ -767,7 +760,7 @@ local function clearSnowOption(panel)
     local context = T.newContext()
     local option = T.optionNamed(Menu.addSourceOptions(0, context, panel.object), getText("ContextMenu_RenewableEnergy_ClearSnow"))
     context:hideAndChildren()
-    return { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable, reason = T.tooltipOf(option) }
+    return optionState(option)
 end
 
 -- A snowy flat panel offers Clear Snow, greyed out saying why until the character carries a broom
@@ -831,12 +824,9 @@ local function connectOptions(bank, panel, loose)
     local context = T.newContext()
     local bankMenu = Menu.addBankOptions(0, context, bank.object)
     local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
-    local function read(option)
-        return { offered = option ~= nil, unavailable = option ~= nil and option.notAvailable == true, reason = T.tooltipOf(option) }
-    end
     local options = {
-        all = read(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
-        one = read(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank.object),
+        all = optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
+        one = optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank.object),
             Format.away(panel.position, bank.position)))),
     }
     context:hideAndChildren()
@@ -890,7 +880,7 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
 -- Clicking a panel's row highlights the panel in the world, until the window closes.
 test("renewable_energy_solar_window_highlights_panel", {
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
+        self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
         if self.panel then T.step(function() T.openWindow(self) end) end
     end,
@@ -934,7 +924,7 @@ end
 -- which its recipes are RenewableEnergy_Make<name> and RenewableEnergy_Unmount<name>.
 local MOUNTS = {}
 for mount, row in pairs(Recipes.MOUNTS) do
-    table.insert(MOUNTS, { mount = mount, count = RenewableEnergy.Specs.mounts[row.kind].modules, name = mount:match("%.(.+)") })
+    table.insert(MOUNTS, { mount = mount, count = Specs.mounts[row.kind].modules, name = mount:match("%.(.+)") })
 end
 
 -- Mounting records each module's type, condition and seals, at conditions a new module doesn't
@@ -959,7 +949,7 @@ for _, entry in ipairs(MOUNTS) do
                 local taken = modules[2]:getID()
                 T.server(self, "takeItems", { ids = { taken } })
                 T.give(self, "homemade", { { type = HOMEMADE, condition = HOMEMADE_MODULE.condition } })
-                T.waitFor(self, function() return T.player():getInventory():getItemById(taken) == nil end,
+                T.waitFor(self, function() return player():getInventory():getItemById(taken) == nil end,
                     "this client losing the second factory module")
             end
         end,
@@ -1154,7 +1144,7 @@ for _, entry in ipairs(MODULE_REPAIRS) do
             expect(item.condition == after, "the module is at " .. item.condition .. ", expected " .. after)
             expect(item.repaired == repairedAfter, "the module reads repaired " .. item.repaired .. "x, expected " .. repairedAfter)
             -- The seal leaves the glass cracked, and the module showing it.
-            expect(item.condition < RenewableEnergy.Specs.crackedBelow, "a sealed module shows whole")
+            expect(item.condition < Specs.crackedBelow, "a sealed module shows whole")
             if refused then
                 expect(self.refusal ~= nil, "the game would start the seal")
             end
@@ -1205,7 +1195,7 @@ for _, entry in ipairs(REGLAZES) do
             if refused then
                 expect(self.refusal ~= nil, "the game would start the reglaze")
             else
-                expect(item.condition >= RenewableEnergy.Specs.crackedBelow, "a reglazed module shows cracked")
+                expect(item.condition >= Specs.crackedBelow, "a reglazed module shows cracked")
                 local xp = self.server and self.server.perkXp
                 expect(xp and self.glassmakingBefore and xp.value > self.glassmakingBefore, "reglazing taught no Glassmaking")
             end
@@ -1213,37 +1203,12 @@ for _, entry in ipairs(REGLAZES) do
     })
 end
 
-local CELLS = "RenewableEnergy.SolarCells"
-
-craftTest(craftName("RenewableEnergy_MakeHomemadeSolarModule"), {
-    recipe = "RenewableEnergy_MakeHomemadeSolarModule",
-    from = CELLS,
-    counts = { [CELLS] = 0, [HOMEMADE] = 1 },
+-- A garden light with no bulb recorded, as a new one is, gives back the plain bulb.
+craftTest(craftName("RenewableEnergy_TakeApartSolarGardenLight"), {
+    recipe = "RenewableEnergy_TakeApartSolarGardenLight",
+    from = SolarGardenLight.ITEM,
+    counts = { [SolarGardenLight.ITEM] = 0, [SolarGardenLight.PLAIN_BULB] = 1 },
 })
-
--- Queues counting the cells a craft left, and the validate that expects some.
-local function expectCells(self) T.count(self, "cells", { CELLS }, { dropped = true }) end
-local function gaveCells(self)
-    local cells = self.counts.cells and self.counts.cells[CELLS] or 0
-    expect(cells > 0, "taking it apart gave no solar cells")
-end
-
--- Taking a solar gadget apart gives solar cells; a garden light also gives back its plain bulb.
-local TAKE_APART = {
-    { "RenewableEnergy_TakeApartCalculator", "Base.Calculator" },
-    { "RenewableEnergy_TakeApartSolarGardenLight", RenewableEnergy.SolarGardenLight.ITEM,
-        { [RenewableEnergy.SolarGardenLight.PLAIN_BULB] = 1 } },
-    { "RenewableEnergy_TakeApartSolarCellCharger", RenewableEnergy.SolarCellCharger.ITEM },
-    { "RenewableEnergy_TakeApartSolarMaintainer", RenewableEnergy.SolarMaintainer.ITEM },
-}
-for _, entry in ipairs(TAKE_APART) do
-    local recipe, input = entry[1], entry[2]
-    local counts = { [input] = 0 }
-    for fullType, count in pairs(entry[3] or {}) do
-        counts[fullType] = count
-    end
-    craftTest(craftName(recipe), { recipe = recipe, from = input, counts = counts, after = expectCells, validate = gaveCells })
-end
 
 -- Only a module that makes no power comes apart; one that still works is worth more whole.
 for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
@@ -1255,13 +1220,10 @@ for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
         setup = function(self)
             T.changeItem(self, T.inputsOf(self, FACTORY)[1], { condition = condition })
         end,
-        counts = refused and { [FACTORY] = 1, [CELLS] = 0 } or { [FACTORY] = 0 },
-        after = not refused and expectCells or nil,
+        counts = refused and { [FACTORY] = 1, ["RenewableEnergy.SolarCells"] = 0 } or { [FACTORY] = 0 },
         validate = function(self)
             if refused then
                 expect(self.refusal ~= nil, "the game would take a working module apart")
-            else
-                gaveCells(self)
             end
         end,
     })

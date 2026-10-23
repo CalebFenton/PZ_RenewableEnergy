@@ -11,7 +11,7 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
 local objectWithSprite = PZHarness.Fixtures.objectWithSprite
-local squareAt, removeObject = Helpers.squareAt, Helpers.removeObject
+local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
 local Sprites = RenewableEnergy.Sprites
 
 local MODULE = RenewableEnergy.Specs.factoryModule
@@ -77,7 +77,7 @@ handler("worldBank", function(_, args, defer)
     local bank = RenewableEnergy.WorldSpawns.placeBank(square, args.stock)
     if restoreRoll then restoreRoll() end
     if bank then
-        defer(function() removeObject(bank) end)
+        defer(function() removePlaced(bank) end)
     end
     local tile = Sprites[RenewableEnergy.WorldSpawns.BANK_STOCK[args.stock].sprite]
     local answer = { placed = bank ~= nil, boxOnSquare = objectWithSprite(square, tile) ~= nil }
@@ -121,12 +121,7 @@ handler("bankModulesBeside", function(_, args, defer)
         if not before[object] and object:getItem():getFullType() == MODULE then
             table.insert(answer.conditions, object:getItem():getCondition())
             answer.inRoom = answer.inRoom and near:getRoom() == square:getRoom()
-            defer(function()
-                if isServer() then
-                    near:transmitRemoveItemFromSquare(object)
-                end
-                near:removeWorldObject(object)
-            end)
+            defer(function() removePlaced(object) end)
         end
     end
     return answer
@@ -254,7 +249,7 @@ end)
 
 -- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
 handler("bankStockCount", function(_, args, defer)
-    local container = ItemContainer.new("crate", nil, nil)
+    local container = RenewableEnergy.Loot.newContainer(nil)
     local restoreRoll = Helpers.forceRolls(defer, args.roll)
     RenewableEnergy.WorldSpawns.stockBank(container, args.stock)
     restoreRoll()
@@ -271,7 +266,7 @@ handler("worldCrate", function(_, args, defer)
         return nil, "the crate's square loaded on the server"
     end
     local crate = RenewableEnergy.WorldSpawns.placeCrate(square, args.stock)
-    defer(function() removeObject(crate) end)
+    defer(function() removePlaced(crate) end)
     local container, overlay = crate:getContainer(), crate:getOverlaySprite()
     if not container then
         return nil, "the crate's container"
@@ -296,7 +291,7 @@ end
 -- there.
 check("crackedModules", function(expect, _, _, _, defer)
     local Distributions = RenewableEnergy.Distributions
-    local container = ItemContainer.new("crate", nil, nil)
+    local container = RenewableEnergy.Loot.newContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         local restoreRoll = Helpers.forceRolls(defer, { roll })
         Distributions.addCrackedModules(roomName, containerType, container)
@@ -464,38 +459,9 @@ local function armSite(site, defer)
     return spots
 end
 
--- The pamphlets in each container of the building's lowest two levels, where
--- RuralFinds.leavePamphlet looks.
-local function pamphletsIn(def)
-    local found = {}
-    for z = 0, 1 do
-        for x = def:getX(), def:getX2() - 1 do
-            for y = def:getY(), def:getY2() - 1 do
-                local square = getSquare(x, y, z)
-                local objects = square and square:getObjects()
-                for i = 0, (objects and objects:size() or 0) - 1 do
-                    local container = objects:get(i):getContainer()
-                    if container then
-                        found[container] = container:getCountType(PAMPHLET)
-                    end
-                end
-            end
-        end
-    end
-    return found
-end
-
-local function pamphletTotal(def)
-    local total = 0
-    for _, count in pairs(pamphletsIn(def)) do
-        total = total + count
-    end
-    return total
-end
-
 -- Takes out every pamphlet of the building's containers.
 local function takePamphlets(def)
-    for container, count in pairs(pamphletsIn(def)) do
+    for container, count in pairs(Helpers.pamphletsIn(def)) do
         for _ = 1, count do
             local item = container:getFirstType(PAMPHLET)
             container:Remove(item)
@@ -504,20 +470,22 @@ local function takePamphlets(def)
     end
 end
 
--- Removes what a site put on `square`: its find, its bank, its mount or its generator, switched
--- off first and out of the gas pass's list.
+-- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
+local function isSiteObject(object)
+    return RenewableEnergy.GasKit.isGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
+        or Sprites.kindOf(Sprites.nameOf(object)) ~= nil
+end
+
+-- Removes what a site put on `square`, a generator out of the gas pass's list too.
 local function clearSquare(square)
     local objects = square:getObjects()
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
-        if RenewableEnergy.GasKit.isGenerator(object) then
-            if object:isActivated() then
-                object:setActivated(false)
+        if isSiteObject(object) then
+            if RenewableEnergy.GasKit.isGenerator(object) then
+                ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[square:getX() .. "," .. square:getY() .. "," .. square:getZ()] = nil
             end
-            ModData.getOrCreate(RenewableEnergy.GasLines.MOD_DATA)[square:getX() .. "," .. square:getY() .. "," .. square:getZ()] = nil
-            square:transmitRemoveItemFromSquare(object)
-        elseif RenewableEnergy.PowerBank.isBank(object) or Sprites.kindOf(Sprites.nameOf(object)) then
-            removeObject(object)
+            removePlaced(object)
         end
     end
 end
@@ -672,7 +640,7 @@ local SPOT_CHECKS = {
     end,
     pamphlet = function(expect, _, square)
         local building = square:getBuilding()
-        expect(building ~= nil and pamphletTotal(building:getDef()) >= 1, "no pamphlet in the house's containers")
+        expect(building ~= nil and Helpers.pamphletTotal(building:getDef()) >= 1, "no pamphlet in the house's containers")
     end,
     -- The house promised its lights, or rolled for them already.
     gardenLights = function(expect, _, square)
@@ -701,12 +669,6 @@ local function checkSpots(expect, expectNear, spots)
     end
 end
 
--- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
-local function isSiteObject(object)
-    return RenewableEnergy.GasKit.isGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
-        or Sprites.kindOf(Sprites.nameOf(object)) ~= nil
-end
-
 -- How many objects stand on the squares, and how many of them a site places.
 local function objectsOn(squares)
     local count, placed = 0, 0
@@ -722,6 +684,17 @@ local function objectsOn(squares)
     return count, placed
 end
 
+-- How many of the armed spots still wait.
+local function waitingSpots(spots)
+    local waiting = 0
+    for _, spot in ipairs(spots) do
+        if RenewableEnergy.SolarSites.spotAt(spot.x, spot.y, spot.z) then
+            waiting = waiting + 1
+        end
+    end
+    return waiting
+end
+
 -- How many of the armed spots `args.spots` still wait, and how many objects stand on their
 -- squares and far ends, loaded here, and of them what a site places.
 handler("siteSpots", function(_, args)
@@ -729,14 +702,8 @@ handler("siteSpots", function(_, args)
     if not squares then
         return nil, notLoaded
     end
-    local waiting = 0
-    for _, spot in ipairs(args.spots) do
-        if RenewableEnergy.SolarSites.spotAt(spot.x, spot.y, spot.z) then
-            waiting = waiting + 1
-        end
-    end
     local objects, placed = objectsOn(squares)
-    return { waiting = waiting, objects = objects, placed = placed }
+    return { waiting = waitingSpots(args.spots), objects = objects, placed = placed }
 end)
 
 -- Open ground a wind charger may stand on (RuralFinds.canPlace) within reach of the bank's
@@ -782,7 +749,7 @@ handler("siteArm", function(_, args, defer)
                 clearSquare(now)
                 local blocker = objectWithSprite(now, PZHarness.Fixtures.WORK_TABLE_SPRITE)
                 if blocker and args.block then
-                    removeObject(blocker)
+                    removePlaced(blocker)
                 end
             end
         end)
@@ -804,7 +771,7 @@ handler("siteUnblock", function(_, args)
     if not blocker then
         return nil, "the work table on the site's square"
     end
-    removeObject(blocker)
+    removePlaced(blocker)
     return {}
 end)
 
@@ -986,13 +953,7 @@ handler("siteVisit", function(_, args)
     if not squares then
         return { ready = false, why = notLoaded }
     end
-    local waiting = 0
-    for _, spot in ipairs(args.spots) do
-        if RenewableEnergy.SolarSites.spotAt(spot.x, spot.y, spot.z) then
-            waiting = waiting + 1
-        end
-    end
-    return { ready = true, waiting = waiting }
+    return { ready = true, waiting = waitingSpots(args.spots) }
 end)
 
 -- The site named `args.name` was placed by the world as its armed spots `args.spots` say, and no

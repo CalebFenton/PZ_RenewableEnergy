@@ -79,14 +79,14 @@ function Helpers.forceRolls(defer, rolls)
     if not setRolls[Chance.roll] then
         gameRoll = Chance.roll
     end
-    local next = 0
+    local drawn = 0
     local roll = type(rolls) == "number" and function() return rolls end or function()
-        next = next + 1
-        if rolls[next] == nil then
+        drawn = drawn + 1
+        if rolls[drawn] == nil then
             Chance.roll = gameRoll
             error("a roll past the " .. #rolls .. " the test set")
         end
-        return rolls[next]
+        return rolls[drawn]
     end
     setRolls[roll] = true
     Chance.roll = roll
@@ -107,18 +107,6 @@ function Helpers.vehicleAt(args)
         return nil, "vehicle " .. tostring(args and args.id) .. " on the server"
     end
     return vehicle
-end
-
---- Removes a tile object the way the game does, so the mod's removal handlers run.
-function Helpers.removeObject(object)
-    if object:getObjectIndex() == -1 then
-        return
-    end
-    if RenewableEnergy.PowerBank.isBank(object) then
-        RenewableEnergy.PowerBank.remove(object)
-    else
-        object:getSquare():transmitRemoveItemFromSquare(object)
-    end
 end
 
 --- The names of the overlays an object's tile shows, in drawing order.
@@ -142,12 +130,45 @@ function Helpers.plainFields(source, keys)
     return fields
 end
 
-local function count(entries)
+--- How many keys `entries` holds; 0 for nil.
+function Helpers.count(entries)
     local n = 0
     for _ in pairs(entries or {}) do
         n = n + 1
     end
     return n
+end
+
+local PAMPHLET = "RenewableEnergy.FemaPamphlet"
+
+--- How many pamphlets each container holds on the levels of the building `def` that
+--- RuralFinds.leavePamphlet fills: { [container] = count }.
+function Helpers.pamphletsIn(def)
+    local found = {}
+    for z = 0, RenewableEnergy.BuildingWatch.HIGHEST_LEVEL do
+        for x = def:getX(), def:getX2() - 1 do
+            for y = def:getY(), def:getY2() - 1 do
+                local square = getSquare(x, y, z)
+                local objects = square and square:getObjects()
+                for i = 0, (objects and objects:size() or 0) - 1 do
+                    local container = objects:get(i):getContainer()
+                    if container then
+                        found[container] = container:getCountType(PAMPHLET)
+                    end
+                end
+            end
+        end
+    end
+    return found
+end
+
+--- The pamphlets in all of Helpers.pamphletsIn's containers together.
+function Helpers.pamphletTotal(def)
+    local total = 0
+    for _, count in pairs(Helpers.pamphletsIn(def)) do
+        total = total + count
+    end
+    return total
 end
 
 -- The kinds of Global Object System record the tests build and drive (RenewableEnergyTestLibGas.lua):
@@ -166,7 +187,7 @@ local KINDS = {
             state.torn = record:isTorn()
             state.acidLimit = record:acidLimit()
             state.ghosts = RenewableEnergy.Stink.counted(record:key())
-            state.eaten = count(record.eaten)
+            state.eaten = Helpers.count(record.eaten)
             state.snapshot = #record.hopper
             if object then
                 state.containerCapacity = object:getContainer():getCapacity()

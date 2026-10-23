@@ -31,11 +31,6 @@ function T.recordArgs(handle, extra)
     return args
 end
 
---- This client's copy of the record `handle`'s tile, or nil.
-function T.recordObject(handle)
-    return RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), kindOf(handle).isObject)
-end
-
 --- Queues a record of `kind` ("digester", "gasifier") on the Sprites[kind] tile `tile` (a dotted
 --- path: "barrel.MetalDrum", "standard"), built as the build menu builds it on `opts.square`, else on
 --- a free square (outdoors unless `opts.indoors`) near `opts.near`, at least `opts.minDistance`
@@ -48,9 +43,10 @@ function T.placeRecord(self, kind, tile, opts)
     local handle = T.at(square)
     handle.square, handle.kind = square, kind
     T.server(self, "recordPlace", T.recordArgs(handle, { tile = tile }))
-    local owner = kindOf(handle).owner()
+    local spec = kindOf(handle)
+    local owner = spec.owner()
     T.waitFor(self, function()
-        local object = T.recordObject(handle)
+        local object = RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), spec.isObject)
         handle.object = object and owner.summaryOf(object) and object or nil
         return handle.object ~= nil
     end, "this client's copy of the " .. kind)
@@ -61,9 +57,12 @@ end
 local function buildEntry(entity)
     local script = getScriptManager():getGameEntityScript(entity)
     local spriteConfig = script and script:getComponentScriptFor(ComponentType.SpriteConfig)
+    if not spriteConfig then
+        return nil
+    end
     local infos = SpriteConfigManager.GetObjectInfoList()
     for i = 0, infos:size() - 1 do
-        if spriteConfig and infos:get(i):getScript() == spriteConfig then
+        if infos:get(i):getScript() == spriteConfig then
             return infos:get(i)
         end
     end
@@ -287,11 +286,11 @@ function T.readGenerator(self, generator, label)
     T.read(self, "generatorRead", T.at(generator), label)
 end
 
---- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and
---- having vanilla rebuild the bills of the generators reaching it (`fields.rebuild`), then waits
---- until they have: vanilla rebuilds in the generators' next update, and a multiplayer server runs
---- those on a clock of its own, which no count of this client's ticks keeps pace with; the shares
---- set after a rebuild (Payers' OnTick) stand then too.
+--- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and,
+--- with `fields.rebuild`, having vanilla rebuild the bills of the generators reaching it. A rebuild
+--- happens in the generators' next update, which a multiplayer server runs on its own clock, so the
+--- wait is for a later server frame rather than a count of this client's ticks; the shares Payers
+--- sets after a rebuild stand by then too.
 function T.setGenerator(self, generator, fields)
     local args = T.at(generator)
     args.pour, args.running, args.rebuild = fields.pour, fields.running, fields.rebuild

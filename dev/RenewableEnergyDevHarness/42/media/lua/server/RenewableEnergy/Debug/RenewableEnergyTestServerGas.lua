@@ -5,6 +5,7 @@
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
@@ -95,11 +96,7 @@ handler("generatorTrack", function(player, args, defer)
     defer(function()
         local generator = generatorOn(args)
         if generator then
-            -- Squares stay powered by a running generator that leaves them.
-            if generator:isActivated() then
-                generator:setActivated(false)
-            end
-            generator:getSquare():transmitRemoveItemFromSquare(generator)
+            PZHarness.Fixtures.removePlaced(generator)
         end
     end)
     return {}
@@ -160,21 +157,14 @@ handler("kitJobNotDone", function(player, args, defer)
     return {}
 end)
 
--- Sets the last pass of the kitted generator at x, y, z `args.hours` ago, as though that time had
--- passed since. Answers what is missing, or nil.
-local function age(args)
-    local generator, missing = generatorOn(args)
-    if not generator then return missing end
-    local state = RenewableEnergy.GasKit.stateOf(generator)
-    if not state then return "a kit on the generator at " .. args.x .. "," .. args.y end
-    state.lastHour = getGameTime():getWorldAgeHours() - args.hours
-    return nil
-end
-
--- Runs the gas pass as though `args.hours` had passed since the last of the generator at x, y, z.
+-- Runs the gas pass as though `args.hours` had passed since the last of the kitted generator at
+-- x, y, z.
 handler("gasPass", function(player, args)
-    local missing = age(args)
-    if missing then return nil, missing end
+    local generator, missing = generatorOn(args)
+    if not generator then return nil, missing end
+    local state = RenewableEnergy.GasKit.stateOf(generator)
+    if not state then return nil, "a kit on the generator at " .. args.x .. "," .. args.y end
+    state.lastHour = getGameTime():getWorldAgeHours() - args.hours
     RenewableEnergy.GasLines.updateAll()
     return {}
 end)

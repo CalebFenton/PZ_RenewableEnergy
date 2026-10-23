@@ -1,7 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 
--- The mod's loot (Distributions.lua, WorldSpawns.lua): its tables live only where loot is rolled, so
--- the checks run there (RenewableEnergyTestServerLoot.lua).
+-- The mod's loot (Distributions.lua, WorldSpawns.lua): its tables live only where loot is rolled,
+-- so the checks run there (RenewableEnergyTestServerLoot.lua).
 
 local T = RenewableEnergyTest
 local test, serverCheck = T.test, T.serverCheck
@@ -43,7 +43,7 @@ test("renewable_energy_loot_found_batteries_part_charged", {
     validate = function(self) T.expectNoFailures(self.server.lootFoundBatteries) end,
 })
 
--- Containers the player owns -----------------------------------------------------------------------
+-- Containers the player owns --------------------------------------------------------------------
 
 -- Loot respawn (LootRespawn.respawnInContainer) never refills a player's bank, charger or crate
 -- with free items: every room's table for the tiles' container types is empty, and they get no

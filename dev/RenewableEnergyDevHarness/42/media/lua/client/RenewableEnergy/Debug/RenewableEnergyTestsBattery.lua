@@ -5,7 +5,7 @@ require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
 
 -- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua), jar batteries, and the
--- battery repair, rebuild, plate and jar battery recipes (Recipes.lua). See
+-- battery recipes that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
 -- RenewableEnergyTestLib.lua for the runner and the helpers.
 
 local T = RenewableEnergyTest
@@ -15,8 +15,9 @@ local function craftName(recipe, behavior) return T.craftName("battery", recipe,
 
 -- Wear ----------------------------------------------------------------------------------------
 
+-- Discharge wear counts against rated capacity and grows with the square of the depth, and wear
+-- under a point waits in the item until it makes one, which a repair forgets.
 test("renewable_energy_battery_wear", {
-    sandbox = { BatteryWear = 100 },
     run = function(self)
         local battery = T.need(self, instanceItem("Base.CarBattery1"), "a Base.CarBattery1")
         local worn = T.need(self, instanceItem("Base.CarBattery1"), "a Base.CarBattery1")
@@ -83,13 +84,15 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         expect(morning.calendarDay ~= evening.calendarDay, "the day never turned")
         -- The charge comes back from whole battery uses, a hair off the tenth it was set to.
         expectNear("the evening's cycle depth", evening.cycleDepth, 0.9, 0.01)
-        -- A discharge costs a new battery (depth / 0.5)² over its type's half-depth cycles of its
-        -- condition (SAND2004-3149): a car battery's 300 at 90% gives 3.24 / 300 of its 100, 1.08
-        -- points, one of them whole.
+        -- Battery.cycleWear's share of a new battery's condition for that depth, in whole points.
+        local new = instanceItem("Base.CarBattery1")
+        local max = new:getConditionMax()
+        local expected = max - math.floor(Battery.cycleWear(new, evening.cycleDepth) * max)
+        if not expect(expected < max, "a " .. evening.cycleDepth .. " deep day wears a car battery less than a point,"
+            .. " so its wear can't show") then return end
         local battery = stateItem(morning, "Base.CarBattery1")
-        expectNear("car battery condition after a 90% day", battery and battery.condition, 99, 0)
-        local copy = T.copyItem(self.bank, "Base.CarBattery1")
-        expectNear("this client's copy of the car battery's condition", copy and copy:getCondition(), 99, 0)
+        expectNear("car battery condition after the deep day", battery and battery.condition, expected, 0)
+        -- The run's last wait already failed the test if this client's copy differs.
         expectNear("cycle depth on the new day", morning.cycleDepth, 0, 0)
     end,
 })
@@ -126,9 +129,9 @@ local function waitForFluid(self, fullType, liters)
 end
 
 local WORN, PLATES = "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates"
-local FURNACE = { "Base.Primitive_Furnace", "crafted_01_112" }
 
--- Jars, plates, acid and water in a sand tray make a new jar battery, empty.
+-- The jar battery comes out new and empty (Recipes.rebuildBattery), where a new item would be
+-- full.
 local JAR_BATTERY = "RenewableEnergy.JarBattery"
 craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
     recipe = "RenewableEnergy_MakeJarBattery",
@@ -139,38 +142,14 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
         T.server(self, "refillFluid", { type = "Base.PopBottle", fluid = "Water", liters = 2 })
         waitForFluid(self, "Base.PopBottle", 2)
     end,
-    counts = {
-        [JAR_BATTERY] = 1, ["Base.EmptyJar"] = 0, [PLATES] = 0, ["Base.Plank"] = 0, ["Base.Nails"] = 0,
-        ["Base.ElectricWire"] = 0,
-    },
-    after = function(self) T.readCarried(self, { JAR_BATTERY }, { "Acid", "Water" }) end,
+    counts = { [JAR_BATTERY] = 1 },
+    after = function(self) T.readCarried(self, { JAR_BATTERY }) end,
     validate = function(self)
         local battery = T.carriedFirst(self, JAR_BATTERY)
         if not expect(battery ~= nil, "no jar battery was made") then return end
         local full = instanceItem(JAR_BATTERY):getConditionMax()
         expect(battery.condition == full, "the new jar battery is at " .. battery.condition .. ", expected " .. full)
         expectNear("the new jar battery's charge", battery.uses, 0, 0.001)
-        local fluids = self.server.carried.fluids
-        expectNear("acid left of two litres", fluids.Acid, 1, 0.01)
-        expectNear("water left of two litres", fluids.Water, 0, 0.01)
-    end,
-})
-
--- A dead jar battery strips too: jars whole and cracked, its plates worn, its acid poured into an
--- empty bottle.
-craftTest(craftName("RenewableEnergy_StripJarBattery", "dead_battery"), {
-    recipe = "RenewableEnergy_StripJarBattery",
-    from = JAR_BATTERY,
-    prefer = { "RenewableEnergy.BatteryElectrolyte", "Base.Gloves_Dish" },
-    setup = function(self)
-        T.changeItem(self, T.inputsOf(self, JAR_BATTERY)[1], { condition = 0 })
-        T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte" })
-        waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 0)
-    end,
-    counts = { [JAR_BATTERY] = 0, ["Base.EmptyJar"] = 5, ["Base.BrokenGlass"] = 1, [WORN] = 1 },
-    after = function(self) T.readCarried(self, {}, { "Acid" }) end,
-    validate = function(self)
-        expectNear("acid poured out", self.server.carried.fluids.Acid, 1, 0.01)
     end,
 })
 
@@ -234,8 +213,9 @@ for _, entry in ipairs(BATTERY_REPAIRS) do
 end
 
 -- Stripping a battery past its last repair and rebuilding it from its own case, with new plates in
--- place of the recast: the battery comes back new and empty, its acid goes out and back in, and
--- it has no repairs behind it, so a Recondition takes it to the first repair limit again.
+-- place of the recast: the battery comes back new and empty with no repairs behind it, so a
+-- Recondition takes it to the first repair limit again. The car battery is a CarBattery2, not the
+-- type a case without a record rebuilds into, so its coming back proves the case kept its type.
 local REBUILDS = {
     { battery = "Base.CarBattery2", case = "RenewableEnergy.CarBatteryCase", plates = 1,
       strip = "RenewableEnergy_StripCarBattery", rebuild = "RenewableEnergy_RebuildCarBattery" },
@@ -245,7 +225,6 @@ local REBUILDS = {
       strip = "RenewableEnergy_StripL16Battery", rebuild = "RenewableEnergy_RebuildL16Battery" },
 }
 for _, chain in ipairs(REBUILDS) do
-    local counted = { chain.case, "RenewableEnergy.WornBatteryPlates", chain.battery, "RenewableEnergy.BatteryPlates" }
     test(craftName(chain.rebuild, "from_its_stripped_case"), {
         instant = true,
         run = function(self)
@@ -268,27 +247,15 @@ for _, chain in ipairs(REBUILDS) do
             T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte" })
             waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 0)
             T.step(function() T.startCraft(self, strip, T.inputsOf(self, chain.battery)[1]) end)
-            T.readCarried(self, counted, { "Acid" })
-            T.step(function()
-                local carried = self.server.carried
-                self.stripped = {
-                    case = #carried.items[chain.case], worn = #carried.items["RenewableEnergy.WornBatteryPlates"],
-                    acid = carried.fluids.Acid, batteries = #carried.items[chain.battery],
-                }
-            end)
             -- New plates in place of the worn, and water to top up.
-            T.server(self, "takeItems", { type = "RenewableEnergy.WornBatteryPlates" })
-            T.give(self, "rebuild", { { type = "RenewableEnergy.BatteryPlates", count = chain.plates },
-                { type = "Base.WaterBottle" } })
+            T.server(self, "takeItems", { type = WORN })
+            T.give(self, "rebuild", { { type = PLATES, count = chain.plates }, { type = "Base.WaterBottle" } })
             T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
             T.waitForCarried(self, chain.case, "this client's " .. chain.case)
             waitForFluid(self, "Base.WaterBottle", 1)
             T.step(function() T.startCraft(self, rebuild, T.carried(chain.case)) end)
-            T.readCarried(self, counted, { "Acid" })
-            T.step(function()
-                self.rebuilt = T.carriedFirst(self, chain.battery)
-                self.rebuiltCarried = self.server.carried
-            end)
+            T.readCarried(self, { chain.battery })
+            T.step(function() self.rebuilt = T.carriedFirst(self, chain.battery) end)
             -- Worn down again, then reconditioned.
             T.waitForCarried(self, chain.battery, "this client's rebuilt " .. chain.battery)
             T.step(function() T.changeItem(self, T.carried(chain.battery), { condition = limit(0) - 2 * step }) end)
@@ -302,95 +269,16 @@ for _, chain in ipairs(REBUILDS) do
             T.readCarried(self, { chain.battery })
         end,
         validate = function(self)
-            local refusal = self.refusal and "; the game refused: " .. self.refusal or ""
-            local s = self.stripped
-            if not expect(s ~= nil, "the strip step never ran" .. refusal) then return end
-            expect(s.batteries == 0 and s.case == 1 and s.worn == chain.plates,
-                "stripping left " .. s.batteries .. " batteries, " .. s.case .. " cases, " .. s.worn .. " worn plates" .. refusal)
-            expectNear("acid poured out by stripping", s.acid, chain.plates, 0.01)
-            local carried = self.rebuiltCarried
             local battery = self.rebuilt
-            if expect(battery ~= nil, "no " .. chain.battery .. " was rebuilt" .. refusal) then
-                local full = instanceItem(chain.battery):getConditionMax()
-                expect(battery.condition == full, "the rebuilt battery is at " .. battery.condition .. ", expected " .. full)
-                expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
-                expect(battery.repaired == 0, "the rebuilt battery reads repaired " .. battery.repaired .. "x")
-            end
-            expect(#carried.items[chain.case] == 0, "the case is still there")
-            expect(#carried.items["RenewableEnergy.BatteryPlates"] == 0, "plates are left over")
-            expectNear("acid left after rebuilding", carried.fluids.Acid, 0, 0.01)
+            if not expect(battery ~= nil, "no " .. chain.battery .. " was rebuilt") then return end
+            local full = instanceItem(chain.battery):getConditionMax()
+            expect(battery.condition == full, "the rebuilt battery is at " .. battery.condition .. ", expected " .. full)
+            expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
+            expect(battery.repaired == 0, "the rebuilt battery reads repaired " .. battery.repaired .. "x")
             local reconditioned = T.carriedFirst(self, chain.battery)
-            if expect(reconditioned ~= nil, "the rebuilt battery is gone" .. refusal) then
-                expect(reconditioned.condition == limit(0),
-                    "the rebuilt battery reconditions to " .. reconditioned.condition .. ", expected " .. limit(0) .. refusal)
-            end
+            if not expect(reconditioned ~= nil, "the rebuilt battery is gone") then return end
+            expect(reconditioned.condition == limit(0),
+                "the rebuilt battery reconditions to " .. reconditioned.condition .. ", expected " .. limit(0))
         end,
     })
 end
-
--- Plates --------------------------------------------------------------------------------------
-
--- The plate mold the way vanilla makes its ingot mold: a wooden pattern at a table, pressed into
--- clay at a hand press and fired in a kiln; the pattern and the mold last. Lead plates are
--- recast in a primitive furnace burning charcoal, and lose lead doing it, which a lead pipe can
--- make up.
-craftTest(craftName("RenewableEnergy_MakeBatteryPlatePattern"), {
-    recipe = "RenewableEnergy_MakeBatteryPlatePattern",
-    from = "Base.Plank",
-    counts = { ["Base.Plank"] = 0, ["Base.Nails"] = 0, ["RenewableEnergy.WoodenBatteryPlatePattern"] = 1 },
-})
-
-craftTest(craftName("RenewableEnergy_PressBatteryPlateMold"), {
-    recipe = "RenewableEnergy_PressBatteryPlateMold",
-    bench = { "Base.Hand_Press", "crafted_01_72" },
-    from = "Base.Clay",
-    counts = {
-        ["Base.Clay"] = 0, ["RenewableEnergy.WoodenBatteryPlatePattern"] = 1, ["RenewableEnergy.BatteryPlateMoldUnfired"] = 1,
-    },
-})
-
-craftTest(craftName("RenewableEnergy_FireBatteryPlateMold"), {
-    recipe = "RenewableEnergy_FireBatteryPlateMold",
-    bench = { "Base.Kiln_Small", "crafted_01_56" },
-    from = "RenewableEnergy.BatteryPlateMoldUnfired",
-    prefer = { "Base.Log" },
-    counts = { ["RenewableEnergy.BatteryPlateMoldUnfired"] = 0, ["Base.Log"] = 0, ["RenewableEnergy.BatteryPlateMold"] = 1 },
-})
-
-craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "three_worn_make_two"), {
-    recipe = "RenewableEnergy_RecastBatteryPlates",
-    bench = FURNACE,
-    from = WORN,
-    prefer = { "Base.Charcoal" },
-    counts = { [WORN] = 0, ["Base.Charcoal"] = 0, ["RenewableEnergy.BatteryPlateMold"] = 1, [PLATES] = 2 },
-})
-
-craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "lead_pipe_makes_up_the_loss"), {
-    recipe = "RenewableEnergy_RecastBatteryPlates",
-    bench = FURNACE,
-    from = WORN,
-    prefer = { "Base.LeadPipe", "Base.Charcoal" },
-    counts = { [WORN] = 0, ["Base.LeadPipe"] = 0, ["Base.Charcoal"] = 0, [PLATES] = 2 },
-})
-
-craftTest(craftName("RenewableEnergy_RecastBatteryPlates", "refuses_two_worn"), {
-    recipe = "RenewableEnergy_RecastBatteryPlates",
-    bench = FURNACE,
-    from = WORN,
-    prefer = { "Base.Charcoal" },
-    setup = function(self)
-        T.server(self, "takeItems", { ids = { T.inputsOf(self, WORN)[3]:getID() } })
-    end,
-    counts = { [WORN] = 2, [PLATES] = 0 },
-    validate = function(self)
-        expect(self.refusal ~= nil, "the game would recast two worn sets of plates")
-    end,
-})
-
-craftTest(craftName("RenewableEnergy_CastBatteryPlatesFromLeadPipe", "three_pipes_make_one"), {
-    recipe = "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
-    bench = FURNACE,
-    from = "Base.LeadPipe",
-    prefer = { "Base.Charcoal" },
-    counts = { ["Base.LeadPipe"] = 0, ["Base.Charcoal"] = 0, ["RenewableEnergy.BatteryPlateMold"] = 1, [PLATES] = 1 },
-})

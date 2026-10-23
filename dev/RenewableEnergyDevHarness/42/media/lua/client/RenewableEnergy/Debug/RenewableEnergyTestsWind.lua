@@ -6,66 +6,54 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
 local Specs, Sprites, Wind = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Wind
-local PowerBank = RenewableEnergy.PowerBank
+local sourceAt = T.stateSource
 
 local CAR_BATTERY = "Base.CarBattery1"
 local INVERTER = "RenewableEnergy.PlugInInverter"
 local CONTROLLER = "RenewableEnergy.ChargeController"
+local WOODEN_BLADES = "RenewableEnergy.WoodenBlades"
 
-local function sourceOf(state, kind)
-    for _, source in ipairs(state and state.status and state.status.sources or {}) do
-        if source.kind == kind then
-            return source
-        end
-    end
-    return nil
-end
-
--- The status entry of the source at `position` in a bank state.
-local function sourceAt(state, position)
-    for _, source in ipairs(state and state.status and state.status.sources or {}) do
-        if PowerBank.samePosition(source, position) then
-            return source
-        end
-    end
-    return nil
+-- A battery box and a scoop rotor connected to it, the rotor's handle also in self.rotor; nil
+-- when either is missing.
+local function scoopOnBank(self)
+    local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+    self.rotor = bank and T.panel(self, Sprites.windScoop, { near = bank, connect = true })
+    if not self.rotor then return nil end
+    return bank, self.rotor
 end
 
 -- A scoop rotor wired to a bank makes power once the wind is past its cut-in speed, none at it or
 -- with its brake on, and the status says why.
 test("renewable_energy_wind_scoop_cut_in_and_brake", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank, rotor = scoopOnBank(self)
         if not bank then return end
-        local rotor = T.panel(self, Sprites.windScoop, { near = bank, connect = true })
-        if not rotor then return end
-        self.rotor = rotor
         self.passes = {}
-        local cutIn = Specs.wind.turbines.scoop.cutInKph
+        local spec = Specs.wind.turbines.scoop
         local function pass(label, kph)
             T.bankPass(self, bank, 0, { windKph = kph })
-            T.step(function() self.passes[label] = bank.state end)
+            T.step(function() self.passes[label] = sourceAt(bank.state, rotor.position) end)
         end
-        local rated = Specs.wind.turbines.scoop.ratedKph
         T.batch(function()
-            pass("windy", rated)
-            pass("cut-in", cutIn)
-            pass("past cut-in", cutIn + 1)
+            pass("windy", spec.ratedKph)
+            T.step(function() self.windyBankW = bank.state.status.windW end)
+            pass("cut-in", spec.cutInKph)
+            pass("past cut-in", spec.cutInKph + 1)
             T.perform(self, "setBrake", { source = rotor.position, braked = true })
-            pass("braked", rated)
+            pass("braked", spec.ratedKph)
         end)
     end,
     validate = function(self)
-        expect(self.rotor.connected, "the bank refused the scoop rotor: " .. tostring(self.rotor.reason))
+        if not T.expectConnected(self.rotor) then return end
         local function read(label)
-            local source = sourceOf(self.passes[label], "scoop")
+            local source = self.passes[label]
             expect(source ~= nil, "after the " .. label .. " pass the bank's status lists no scoop rotor")
             return source
         end
         local windy = read("windy")
         if windy then
             expect(windy.watts > 0, "the scoop rotor made nothing at its rated speed")
-            T.expectNear("the bank's wind watts", self.passes.windy.status.windW, windy.watts, 0.01)
+            T.expectNear("the bank's wind watts", self.windyBankW, windy.watts, 0.01)
         end
         local calm = read("cut-in")
         if calm then
@@ -90,11 +78,8 @@ local WALL = "walls_exterior_wooden_01_24"
 
 test("renewable_energy_wind_walls_shelter", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank, rotor = scoopOnBank(self)
         if not bank then return end
-        local rotor = T.panel(self, Sprites.windScoop, { near = bank, connect = true })
-        if not rotor then return end
-        self.rotor = rotor
         self.passes = {}
         local rated = Specs.wind.turbines.scoop.ratedKph
         local function pass(label)
@@ -117,10 +102,9 @@ test("renewable_energy_wind_walls_shelter", {
         pass("walled")
     end,
     validate = function(self)
-        expect(self.rotor.connected, "the bank refused the scoop rotor: " .. tostring(self.rotor.reason))
+        if not T.expectConnected(self.rotor) then return end
         local open, walled = self.passes.open, self.passes.walled
-        expect(open ~= nil and walled ~= nil, "the bank's status lists no scoop rotor")
-        if not (open and walled) then return end
+        if not expect(open ~= nil and walled ~= nil, "the bank's status lists no scoop rotor") then return end
         expect(walled.shelterPct > open.shelterPct,
             "walls around it left its shelter at " .. walled.shelterPct .. "% (open: " .. open.shelterPct .. "%)")
         expect(walled.watts < open.watts,
@@ -193,13 +177,14 @@ test("renewable_energy_wind_charger_drawn_as_model", {
     end,
 })
 
--- Left unbraked in a wind of its break speed, a propeller's blades break (certain at this storm
--- damage rate) and it makes nothing until a spare set goes on; a km/h less, or braked, it comes
+-- Left unbraked through an hour of its break speed, a propeller's blades break on a roll under
+-- the hour's chance, not on one at it, and it makes nothing until a spare set goes on. A km/h
+-- below its break speed or with Storm Damage off, even on the lowest roll, or braked, it comes
 -- through whole. The menu offers Replace Blades, greyed until the character carries blades that
 -- fit.
 test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
     instant = true,
-    sandbox = { StormDamage = true, StormDamageRate = 1000 },
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
         if not bank then return end
@@ -207,45 +192,67 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
         self.braked = T.panel(self, Sprites.windPropeller.pipe.S, { near = bank, connect = true })
         if not (self.left and self.braked) then return end
         local spec = Specs.wind.turbines.propeller
+        T.perform(self, "setBrake", { source = self.braked.position, braked = true })
+        T.forceRoll(self, 0)
+        T.bankPass(self, bank, 0, { windKph = spec.breakKph - 1 })
+        T.step(function()
+            self.belowBreak = bank.state
+            T.setSandbox(self, "StormDamage", false)
+        end)
+        T.bankPass(self, bank, 0, { windKph = spec.breakKph })
+        T.step(function()
+            self.stormOff = bank.state
+            T.setSandbox(self, "StormDamage", true)
+        end)
+        -- An hour's chance at a Storm Damage Rate of 100 is the spec's breakPerHour. Each list
+        -- holds one roll, for the unbraked propeller: a draw for the braked one fails the pass.
         T.batch(function()
-            T.perform(self, "setBrake", { source = self.braked.position, braked = true })
-            T.bankPass(self, bank, 0, { windKph = spec.breakKph - 1, hours = 24 })
-            T.step(function() self.belowBreak = bank.state end)
+            T.forceRoll(self, { spec.breakPerHour })
+            T.bankPass(self, bank, 0, { windKph = spec.breakKph })
+            T.step(function() self.atChance = bank.state end)
+            T.forceRoll(self, { spec.breakPerHour - 1e-9 })
             T.bankPass(self, bank, 0, { windKph = spec.breakKph })
             T.step(function() self.storm = bank.state end)
+            -- Every later roll misses, so whatever else draws one while the test goes on neither
+            -- runs past the list nor comes up.
+            T.forceRoll(self, 1 - 1e-9)
         end)
         T.waitFor(self, function() return Wind.isBroken(self.left.object) end, "this client's copy of the broken blades")
         T.step(function()
             local menu, context = T.worldSubmenu(self.left.object, RenewableEnergy.Menu.nameOf(self.left.object))
-            local option = menu and menu:getOptionFromName(getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
+            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
             self.emptyHanded = option ~= nil and option.notAvailable == true
             if context then context:hideAndChildren() end
         end)
-        T.give(self, "blades", { { type = "RenewableEnergy.WoodenBlades" } })
+        T.give(self, "blades", { { type = WOODEN_BLADES } })
         T.doJob(self, self.left.square, function()
             return RenewableEnergyAction:new(T.player(), RenewableEnergyAction.REPLACE_BLADES, self.left.object,
                 nil, nil, self.items.blades[1])
         end)
         T.waitFor(self, function() return not Wind.isBroken(self.left.object) end, "this client's copy of the new blades")
         T.batch(function()
-            T.server(self, "carried", { types = { "RenewableEnergy.WoodenBlades" } })
+            T.readCarried(self, { WOODEN_BLADES })
             T.bankPass(self, bank, 0, { windKph = spec.ratedKph })
             T.step(function() self.mended = bank.state end)
         end)
     end,
     validate = function(self)
-        expect(self.left.connected and self.braked.connected, "the bank refused a propeller")
-        local whole = sourceAt(self.belowBreak, self.left.position)
-        if expect(whole ~= nil, "the bank's status lists no propeller") then
-            expect(not whole.broken, "a km/h below its break speed it broke")
+        if not (T.expectConnected(self.left) and T.expectConnected(self.braked)) then return end
+        for key, what in pairs({ belowBreak = "a km/h below its break speed", stormOff = "with Storm Damage off",
+            atChance = "on a roll at the hour's chance" }) do
+            local whole = sourceAt(self[key], self.left.position)
+            if expect(whole ~= nil, "the bank's status lists no propeller") then
+                expect(not whole.broken, what .. " it broke")
+            end
         end
         local left, braked = sourceAt(self.storm, self.left.position), sourceAt(self.storm, self.braked.position)
         if not expect(left and braked, "after the storm the bank's status lists no propellers") then return end
         expect(left.broken and left.watts == 0 and left.reason == "broken",
-            "unbraked at its break speed it reads broken " .. tostring(left.broken) .. ", " .. left.watts .. " W, " .. tostring(left.reason))
+            "unbraked, a roll under the chance left it broken " .. tostring(left.broken) .. ", " .. left.watts .. " W, "
+            .. tostring(left.reason))
         expect(not braked.broken, "the braked propeller broke")
         expect(self.emptyHanded == true, "with no blades carried, Replace Blades isn't offered greyed out")
-        expect(#(self.server.carried.items["RenewableEnergy.WoodenBlades"] or {}) == 0, "replacing the blades left them in the inventory")
+        expect(T.carriedFirst(self, WOODEN_BLADES) == nil, "replacing the blades left them in the inventory")
         local mended = sourceAt(self.mended, self.left.position)
         expect(mended ~= nil and not mended.broken and mended.watts > 0, "with new blades it still makes nothing")
     end,
@@ -254,11 +261,11 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
 -- Input slots: a battery box's free slots take a panel and a scoop rotor and refuse the homemade
 -- alternator, which takes more. On a rack with a controller the alternator makes its curve's
 -- watts a km/h below its furl speed, turns out of the wind at it, making its furled share, and
--- breaks, furled, at its break speed. With the controller worn out the alternator no longer fits
--- the slots left, but a panel connected after it still does.
+-- breaks, furled, at its break speed on a roll under its chance. With the controller worn out the
+-- alternator no longer fits the slots left, but a panel connected after it still does.
 test("renewable_energy_wind_alternator_slots_and_furling", {
     instant = true,
-    sandbox = { StormDamage = true, StormDamageRate = 1000 },
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
         if not box then return end
@@ -285,6 +292,8 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
         T.batch(function()
             pass("below furl", spec.furlKph - 1)
             pass("furled", spec.furlKph)
+            -- The one roll the gale draws; the passes after it are below the break speed.
+            T.forceRoll(self, { 0 })
             pass("gale", spec.breakKph)
             T.setPartCondition(self, rack, CONTROLLER, 0, true)
             pass("no controller", spec.furlKph - 1, 1000)
@@ -298,7 +307,7 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
         if expect(slots ~= nil, "no state of the battery box") then
             expect(slots.used == 2 and slots.total == Specs.freeSlots, "input slots read " .. slots.used .. " of " .. slots.total)
         end
-        expect(self.alternator.connected, "a rack with a controller refused the alternator: " .. tostring(self.alternator.reason))
+        if not T.expectConnected(self.alternator) then return end
         local function read(label, handle)
             local source = sourceAt(self.passes[label], handle.position)
             expect(source ~= nil, "after the " .. label .. " pass the rack's status doesn't list the source")

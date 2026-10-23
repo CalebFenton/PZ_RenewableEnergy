@@ -70,7 +70,8 @@ test("renewable_energy_tiles_have_pictures", {
     end,
 })
 
--- Each moveable item places the tile of its own kind and material.
+-- Each moveable item places the tile of its own kind and material, and each tile picks up as its
+-- item (CustomItem).
 test("renewable_energy_tiles_moveable_items_place_their_tiles", {
     validate = function()
         for _, placed in ipairs(PLACED) do
@@ -78,6 +79,9 @@ test("renewable_energy_tiles_moveable_items_place_their_tiles", {
             local kind, _, material = Sprites.kindOf(script and script:getWorldObjectSprite())
             expect(kind == placed.kind and material == placed.material, string.format("%s places a %s %s tile, expected %s %s",
                 placed.item, tostring(material), tostring(kind), tostring(placed.material), placed.kind))
+            local props = properties(placed.sprite)
+            local customItem = props and props:get("CustomItem")
+            expect(customItem == placed.item, placed.sprite .. " gives " .. tostring(customItem) .. ", expected " .. placed.item)
         end
     end,
 })
@@ -293,7 +297,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                         T.step(function() result.placedData = describe(self.server.objectModData.value) end)
                     end
                     T.pickUpAsPlayer(self, handle, placed.sprite)
-                    T.server(self, "carried", { types = { placed.item } })
+                    T.readCarried(self, { placed.item })
                     T.step(function()
                         local items = self.server.carried.items[placed.item]
                         result.removed = T.objectWithSprite(square, placed.sprite) == nil
@@ -306,11 +310,6 @@ test("renewable_energy_tiles_place_and_pick_up", {
         end)
     end,
     validate = function(self)
-        for _, placed in ipairs(PLACED) do
-            local props = properties(placed.sprite)
-            local customItem = props and props:get("CustomItem")
-            expect(customItem == placed.item, placed.sprite .. " gives " .. tostring(customItem) .. ", expected " .. placed.item)
-        end
         expect(#self.results > 0, "no item places one of the tiles")
         local kept = {}
         for _, r in ipairs(self.results) do

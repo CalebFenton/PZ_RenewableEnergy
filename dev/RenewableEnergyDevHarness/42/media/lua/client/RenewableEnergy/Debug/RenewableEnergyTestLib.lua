@@ -109,8 +109,9 @@ function T.bank(self, kind, items, opts)
     local bank = { square = square, position = T.at(square) }
     local count = #(items or {})
     local connected = opts.connected ~= false
-    T.server(self, "placeBank", { x = square:getX(), y = square:getY(), z = square:getZ(), kind = kind, items = items,
-        charge = opts.charge, connected = connected })
+    local args = T.at(square)
+    args.kind, args.items, args.charge, args.connected = kind, items, opts.charge, connected
+    T.server(self, "placeBank", args)
     T.waitFor(self, function()
         bank.object = bankCopy(square, count)
         return bank.object ~= nil and bank.object:isConnected() == connected
@@ -131,11 +132,11 @@ local function panelArrived(panel, bank)
         and (not panel.connected or PowerBank.samePosition(PowerBank.bankOfSource(here.x, here.y, here.z), bank.position))
 end
 
---- Queues a panel tile of `sprite` on `opts.square`, else outdoors near `opts.near`, holding
---- `opts.modules` ({ { type, condition } }), placed as the moveables cursor places one and, when
---- `opts.connect`, connected by the server's character to the bank handle `opts.near`. The handle
---- gets `connected` and `reason` (the refusal) from the server. A treadmill comes wired when
---- `opts.wired`.
+--- Queues a source tile of `sprite` (a panel mount, a wind charger, a treadmill) on
+--- `opts.square`, else outdoors near `opts.near`, a mount holding `opts.modules` ({ { type,
+--- condition } }) and placed as the moveables cursor places one. When `opts.connect`, the server's
+--- character connects it to the bank handle `opts.near`; the handle gets `connected` and `reason`
+--- (the refusal) from the server. A treadmill comes wired when `opts.wired`.
 function T.panel(self, sprite, opts)
     opts = opts or {}
     local square = opts.square or T.square(self, { near = opts.near }, "a free outdoor square for a panel")
@@ -144,8 +145,9 @@ function T.panel(self, sprite, opts)
     end
     local panel = { square = square, position = T.at(square) }
     local bank = opts.connect and opts.near
-    T.server(self, "placePanel", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = sprite,
-        modules = opts.modules, bank = bank and bank.position, wired = opts.wired })
+    local args = T.at(square)
+    args.sprite, args.modules, args.bank, args.wired = sprite, opts.modules, bank and bank.position, opts.wired
+    T.server(self, "placePanel", args)
     T.step(function()
         panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason
     end)
@@ -196,6 +198,11 @@ function T.doJob(self, square, makeAction)
     end)
 end
 
+--- The submenu `option` opens in `context`, or nil.
+function T.subMenu(context, option)
+    return option and option.subOption and context:getSubMenu(option.subOption)
+end
+
 --- The submenu labelled `label` that vanilla's right-click menu (ISWorldObjectContextMenu.createMenu)
 --- builds for `object`, and the context menu, to hide once read.
 function T.worldSubmenu(object, label)
@@ -203,8 +210,7 @@ function T.worldSubmenu(object, label)
     if type(context) ~= "table" then
         return nil, nil
     end
-    local option = context:getOptionFromName(label)
-    return option and option.subOption and context:getSubMenu(option.subOption), context
+    return T.subMenu(context, context:getOptionFromName(label)), context
 end
 
 --- The server handlers' name for a T.placeVehicle handle's vehicle. Call it once the server has
@@ -334,9 +340,35 @@ function T.stateItem(state, fullType)
     end
 end
 
+-- The first entry of a bank state's status sources that `matches`, or nil.
+local function stateSource(state, matches)
+    for _, source in ipairs(state and state.status and state.status.sources or {}) do
+        if matches(source) then
+            return source
+        end
+    end
+    return nil
+end
+
+--- The status entry of the source at `position` in a bank state, or nil.
+function T.stateSource(state, position)
+    return stateSource(state, function(source) return PowerBank.samePosition(source, position) end)
+end
+
+--- The status entry of the first source of `kind` in a bank state, or nil.
+function T.stateSourceOfKind(state, kind)
+    return stateSource(state, function(source) return source.kind == kind end)
+end
+
 --- The first `fullType` in this client's copy of `bank` (a handle), or nil.
 function T.copyItem(bank, fullType)
     return bank.object:getContainer():getFirstType(fullType)
+end
+
+--- The charge of the first `fullType` in this client's copy of `bank`, or -1.
+function T.copyUses(bank, fullType)
+    local item = T.copyItem(bank, fullType)
+    return item and item:getCurrentUsesFloat() or -1
 end
 
 --- Queues the bank system's command `command` on the authority as the server's character, the way
@@ -351,12 +383,6 @@ end
 function T.performInto(self, key, command, args, item)
     T.perform(self, command, args, item)
     T.step(function() self[key] = self.server.perform end)
-end
-
---- The charge of the first `fullType` in this client's copy of `bank`, or -1.
-function T.copyUses(bank, fullType)
-    local item = T.copyItem(bank, fullType)
-    return item and item:getCurrentUsesFloat() or -1
 end
 
 --- Checks that the panel fixture `panel` connected, saying why not.
@@ -494,6 +520,11 @@ end
 -- may take, in ticks.
 local AWAY = 600
 local CHUNK_FRAMES = 6000
+-- How long the character stays away once the chunk has unloaded, in real milliseconds. Back at
+-- once, a chunk has been seen to load with a vehicle a test had removed before the trip, as an
+-- earlier save of it held it; the game hot-saves loaded chunks every second
+-- (IsoChunkMap.hotSaveFrequency).
+local AWAY_MS = 2000
 
 --- Queues a trip that unloads the chunk of the square at x, y, z and loads it again: the
 --- character goes AWAY squares east of `home` ({ x, y, z }) and back. `whileAway()`, if given, is
@@ -509,7 +540,12 @@ function T.awayAndBack(self, home, x, y, z, whileAway)
             target = nil
         end
     end)
-    T.defer(self, function() p:teleportTo(home.x + 0.5, home.y + 0.5, home.z) end)
+    -- `home` may be filled in by a queued step that a failed test never reached.
+    T.defer(self, function()
+        if home.x then
+            p:teleportTo(home.x + 0.5, home.y + 0.5, home.z)
+        end
+    end)
     local loads = 0
     local function onLoadChunk(chunk)
         local origin = chunk:getGridSquare(0, 0, 0)
@@ -521,13 +557,18 @@ function T.awayAndBack(self, home, x, y, z, whileAway)
     Events.LoadChunk.Add(onLoadChunk)
     T.defer(self, function() Events.LoadChunk.Remove(onLoadChunk) end)
     T.step(function() target = { home.x + AWAY + 0.5, home.y + 0.5, 0 } end)
-    T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the source's chunk unloaded", CHUNK_FRAMES)
+    T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the fixture's chunk unloaded", CHUNK_FRAMES)
+    local awaySince
+    T.waitFor(self, function()
+        awaySince = awaySince or getTimestampMs()
+        return getTimestampMs() - awaySince >= AWAY_MS
+    end, "a stay away from the fixture's chunk", CHUNK_FRAMES)
     if whileAway then
         whileAway()
     end
     T.step(function() target = { home.x + 0.5, home.y + 0.5, home.z } end)
-    T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the source's chunk loaded again", CHUNK_FRAMES)
-    T.step(function() T.need(self, loads > 0, "the source's chunk loaded again through LoadChunk") end)
+    T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the fixture's chunk loaded again", CHUNK_FRAMES)
+    T.step(function() T.need(self, loads > 0, "the fixture's chunk loaded again through LoadChunk") end)
 end
 
 return T

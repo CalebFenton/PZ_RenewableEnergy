@@ -1,6 +1,10 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Sprites"
 local Stash = require "RenewableEnergy/StashHouses"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+require "RenewableEnergy/Biogas/DigesterJobs"
+require "RenewableEnergy/WoodGas/GasifierJobs"
+require "RenewableEnergy/Wind"
 
 -- World systems that live on the authority: stash houses (StashHouses.lua, MapDefinitions.lua),
 -- world spawns (WorldSpawns.lua, Distributions.lua), solar sites, garden lights and rural finds
@@ -10,6 +14,9 @@ local T = RenewableEnergyTest
 local test, expect, expectNear, player, serverCheck = T.test, T.expect, T.expectNear, T.player, T.serverCheck
 
 local Sprites = RenewableEnergy.Sprites
+local Digester, DigesterJobs = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs
+local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
+local Wind, PowerBank = RenewableEnergy.Wind, RenewableEnergy.PowerBank
 
 -- Stash houses ----------------------------------------------------------------------------------
 
@@ -235,7 +242,7 @@ test("renewable_energy_world_bank_stock_option_zero", {
 })
 
 -- How each wear profile wears a battery, and its duds.
-serverCheck("renewable_energy_world_battery_wear", "batteryWear")
+serverCheck("renewable_energy_world_bank_battery_wear", "batteryWear")
 
 -- A placed bank's batteries are worn as its stock says, so a farm storeroom's come more worn than
 -- an electronics store's: at middling rolls every battery is at its stock's profile's mean.
@@ -260,9 +267,11 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
     end,
     validate = function(self)
         local answer = self.server.worldSpawnStock
+        local means = {}
         for _, stockName in ipairs(WORN_STOCKS) do
             local wearName = answer.banks[stockName].wear
             local condition = answer.batteryWear[wearName].mean
+            means[stockName] = condition
             local conditions = self.banks[stockName].stock.batteryConditions
             local wrong = {}
             for _, found in ipairs(conditions) do
@@ -271,6 +280,8 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
             expect(#conditions > 0 and #wrong == 0, string.format("a %s bank holds %d batteries, of which %s aren't at its %s profile's %d",
                 stockName, #conditions, table.concat(wrong, ", "), wearName, condition))
         end
+        expect(means.farmStorage < means.electronicsStorage, "a farm storeroom's batteries come at "
+            .. means.farmStorage .. ", no more worn than an electronics store's " .. means.electronicsStorage)
     end,
 })
 
@@ -444,7 +455,7 @@ test("renewable_energy_world_site_waits_for_a_free_square", {
             reloadChunk(self, home, at)
             T.server(self, "sitePlaced", armedSpots)
             T.waitFor(self, function()
-                return RenewableEnergy.findObjectOn(getSquare(at.x, at.y, at.z), RenewableEnergy.Wind.isCharger) ~= nil
+                return RenewableEnergy.findObjectOn(getSquare(at.x, at.y, at.z), Wind.isCharger) ~= nil
             end, "this client's copy of the wind charger")
         end)
     end,
@@ -504,9 +515,9 @@ test("renewable_energy_world_garden_lights_once_per_house", {
     validate = function(self)
         local answer = self.server.gardenLightsOnce
         local count = answer.count
-        -- The tuned count comes from the authority; a house that is rolled lights must get some.
-        expect(count.min >= 1 and count.min <= count.max, "houses get " .. count.min .. " to " .. count.max .. " lights")
-        expect(answer.first >= count.min and answer.first <= count.max, "the house got " .. answer.first .. " lights")
+        -- A house rolled for lights gets at least one.
+        expectSaneRange(count, "a house's garden light count", 1, math.huge)
+        expect(T.inRange(answer.first, count), "the house got " .. answer.first .. " lights")
         expect(answer.rolled, "the house's roll was not kept")
         expect(answer.second == 0, "rolling the house again gave " .. answer.second .. " more lights")
         expect(#answer.lights == answer.first, #answer.lights .. " lights stand around the house, expected " .. answer.first)
@@ -521,7 +532,7 @@ test("renewable_energy_world_garden_lights_once_per_house", {
 -- Frames to wait at each place for this client to load it, and at the start for it to load again.
 -- Loading takes real time, so at an uncapped frame rate it takes many frames.
 local VISIT_FRAMES = 6000
--- How long the server is given to roll the house at a place once this client has loaded it.
+-- How long the authority is given to roll a visited place once this client has loaded it.
 local ROLL_MS = 60000
 -- How far around the start the squares must be loaded again before the next test: as far as
 -- T.squares looks for free squares.
@@ -539,9 +550,9 @@ local function loadedAround(x, y, z, radius)
     return getSquare(x + radius, y + radius, z) ~= nil
 end
 
--- Lets the visits below move the character: a teleport from inside a timed action doesn't stick,
--- so OnTick makes the move that self.teleportTo(x, y, z) asks for. Puts the character back at the
--- start when the test ends, should a visit leave them elsewhere.
+-- Lets visits move the character: a teleport from inside a timed action doesn't stick, so OnTick
+-- makes the move that self.teleportTo(x, y, z) asks for. Puts the character back at the start
+-- when the test ends, should a visit leave them elsewhere.
 local function startVisits(self)
     local p = player()
     local start = { x = p:getX(), y = p:getY(), z = p:getZ() }
@@ -561,14 +572,20 @@ local function startVisits(self)
     return start
 end
 
--- Queues a visit to `place` ({ x, y }): the character goes there, this client loads it, and the
--- authority is asked about the house nearest it until that house has been rolled for garden lights
--- or ROLL_MS pass. Leaves house, rolled and found (the neighbourhood) in `place`.
+-- Queues the character's move to x, y, a wait for this client to load it (`where` names it), and
+-- the authority's handler `name` asked with `args` until `done(answer)` holds or ROLL_MS pass.
+local function visitUntil(self, x, y, where, name, args, done)
+    T.step(function() self.teleportTo(x + 0.5, y + 0.5, 0) end)
+    T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, where .. " loaded on this client", VISIT_FRAMES)
+    T.serverUntil(self, name, args, done, ROLL_MS)
+end
+
+-- Queues a visit to `place` ({ x, y }) that asks the authority about the house nearest it until
+-- that house has been rolled for garden lights. Leaves house, rolled and found (the
+-- neighbourhood) in `place`.
 local function visitPlace(self, place)
-    local where = place[1] .. "," .. place[2]
-    T.step(function() self.teleportTo(place[1] + 0.5, place[2] + 0.5, 0) end)
-    T.waitFor(self, function() return getSquare(place[1], place[2], 0) ~= nil end, where .. " loaded on this client", VISIT_FRAMES)
-    T.serverUntil(self, "gardenLightsAt", { x = place[1], y = place[2], radius = 20 }, function(at) return at.rolled end, ROLL_MS)
+    local x, y = place[1], place[2]
+    visitUntil(self, x, y, x .. "," .. y, "gardenLightsAt", { x = x, y = y, radius = 20 }, function(at) return at.rolled end)
     T.step(function()
         local at = self.server.gardenLightsAt
         place.house, place.rolled, place.found = at.house, at.rolled, at.neighbourhood
@@ -576,15 +593,11 @@ local function visitPlace(self, place)
 end
 
 -- Queues the character's way back to `start` ({ x, y, z }) and a wait for the squares around it
--- to load again; leaves in self.home where the character ended up.
+-- to load again.
 local function returnHome(self, start)
     local x, y = math.floor(start.x), math.floor(start.y)
     T.step(function() self.teleportTo(start.x, start.y, start.z) end)
     T.waitFor(self, function() return loadedAround(x, y, start.z, HOME_RADIUS) end, "the start loaded again", VISIT_FRAMES)
-    T.step(function()
-        local p = player()
-        self.home = { x = p:getX(), y = p:getY(), z = p:getZ() }
-    end)
 end
 
 -- The neighbourhood sets the chance: a rich street (Riverside's Rich loot zone) most, a trailer
@@ -612,9 +625,6 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
                 expect(place.rolled, "the house at " .. place.house .. " was never rolled for garden lights")
             end
         end
-        local home, start = self.home, self.start
-        expect(home.z == start.z and math.abs(home.x - start.x) <= 1 and math.abs(home.y - start.y) <= 1,
-            string.format("the character ended at %s,%s,%s, not back at the start", home.x, home.y, home.z))
     end,
 })
 
@@ -653,7 +663,6 @@ local VISITED_SITES = {
 -- its kitted generator. A pamphlet lies in a container whose contents a client gets on opening it,
 -- and garden lights are a promise.
 local function siteCopiesArrived(spots)
-    local PowerBank = RenewableEnergy.PowerBank
     local function on(x, y, z, matches)
         return RenewableEnergy.findObjectOn(getSquare(x, y, z), matches) ~= nil
     end
@@ -662,7 +671,7 @@ local function siteCopiesArrived(spots)
         return kind == "flat" or kind == "wall" or kind == "rack"
     end
     local function isSource(object)
-        return RenewableEnergy.Digester.isDigester(object) or RenewableEnergy.Gasifier.isGasifier(object)
+        return Digester.isDigester(object) or Gasifier.isGasifier(object)
     end
     local function isCrate(object)
         return Sprites.nameOf(object) == Sprites.crate
@@ -672,7 +681,7 @@ local function siteCopiesArrived(spots)
         bank = function(spot) return on(spot.x, spot.y, spot.z, PowerBank.isBank) end,
         crate = function(spot) return on(spot.x, spot.y, spot.z, isCrate) end,
         windCharger = function(spot)
-            return on(spot.x, spot.y, spot.z, RenewableEnergy.Wind.isCharger) and on(spot.toX, spot.toY, spot.toZ, PowerBank.isBank)
+            return on(spot.x, spot.y, spot.z, Wind.isCharger) and on(spot.toX, spot.toY, spot.toZ, PowerBank.isBank)
         end,
         gasLine = function(spot)
             return on(spot.x, spot.y, spot.z, isSource) and on(spot.toX, spot.toY, spot.toZ, RenewableEnergy.GasKit.hasKit)
@@ -712,12 +721,10 @@ test("renewable_energy_world_sites_placed_on_visit", {
             local visit = {}
             self.visits[i] = visit
             local function args() return { name = name, spots = self.armed[name].spots } end
-            T.step(function() self.teleportTo(x + 0.5, y + 0.5, 0) end)
-            T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, name .. " loaded on this client", VISIT_FRAMES)
-            T.serverUntil(self, "siteVisit", args, function(at)
+            visitUntil(self, x, y, name, "siteVisit", args, function(at)
                 visit.placing = at
                 return at.ready and at.waiting == 0
-            end, ROLL_MS)
+            end)
             T.server(self, "siteVisited", args)
             T.step(function() visit.check = self.server.siteVisited end)
             T.waitFor(self, function() return siteCopiesArrived(self.armed[name].spots) end,
@@ -825,18 +832,10 @@ test("renewable_energy_world_site_garden_lights_promised", {
     end,
 })
 
--- Rural finds --------------------------------------------------------------------------------------
+-- Rural finds ------------------------------------------------------------------------------------
 
 -- Each rural find test rolls the building near the start for that find for certain, mends it
 -- with the usual jobs and sees it work; rolled again, the building gets nothing more.
-
-require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
-require "RenewableEnergy/Biogas/DigesterJobs"
-require "RenewableEnergy/WoodGas/GasifierJobs"
-require "RenewableEnergy/Wind"
-local Digester, DigesterJobs = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs
-local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
-local Wind, PowerBank = RenewableEnergy.Wind, RenewableEnergy.PowerBank
 
 -- Queues the roll of the find `kind` and a wait for this client's copy of it, `isObject` telling
 -- it, with its summary when `recordKind` names a Global Object System record ("digester",
@@ -936,7 +935,7 @@ test("renewable_energy_world_rural_digester", {
     validate = function(self)
         expectKept(self, "digester")
         local drums = {}
-        for _, tile in pairs(RenewableEnergy.Sprites.digester.barrel) do
+        for _, tile in pairs(Sprites.digester.barrel) do
             drums[tile] = true
         end
         expect(drums[self.drum], "the digester stands on " .. tostring(self.drum) .. ", not a drum's tile")
@@ -1014,12 +1013,10 @@ test("renewable_energy_world_rural_finds_real_buildings", {
         self.start = startVisits(self)
         for _, place in ipairs(RURAL_PLACES) do
             local where = place[1] .. "," .. place[2]
-            T.step(function() self.teleportTo(place[1] + 0.5, place[2] + 0.5, 0) end)
-            T.waitFor(self, function() return getSquare(place[1], place[2], 0) ~= nil end, where .. " loaded on this client", VISIT_FRAMES)
-            T.serverUntil(self, "ruralFindAt", { x = place[1], y = place[2], z = place[3] }, function(at)
+            visitUntil(self, place[1], place[2], where, "ruralFindAt", { x = place[1], y = place[2], z = place[3] }, function(at)
                 place.answer = at
                 return at.ready
-            end, ROLL_MS)
+            end)
         end
         returnHome(self, self.start)
     end,

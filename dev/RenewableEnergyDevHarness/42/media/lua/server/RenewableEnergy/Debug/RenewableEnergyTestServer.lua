@@ -39,10 +39,6 @@ local function stateOf(record)
         table.insert(items, { type = item:getFullType(), id = item:getID(), condition = item:getCondition(),
             uses = item:getCurrentUsesFloat() })
     end
-    local watchers = 0
-    for _ in pairs(record.watchers or {}) do
-        watchers = watchers + 1
-    end
     return {
         on = record.on == true, name = record.name or "", charge = record.charge,
         lastHour = record.lastHour, age = getGameTime():getWorldAgeHours(), calendarDay = getGameTime():getDay(),
@@ -51,7 +47,7 @@ local function stateOf(record)
         cycleDepth = record.cycleDepth, limitW = record:limitW(), drawW = record:drawW(),
         sources = #record.sources, batteries = #record.batteries,
         activated = bank ~= nil and bank:isActivated(), powered = square ~= nil and square:haveElectricity(),
-        items = items, overlays = overlaysOf(bank), status = record:buildStatus(), watchers = watchers,
+        items = items, overlays = overlaysOf(bank), status = record:buildStatus(), watchers = Helpers.count(record.watchers),
     }
 end
 
@@ -159,34 +155,21 @@ end)
 
 -- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
 -- unless given), started as a player starts one if `args.running`, with a failsafe tile beside it
--- if `args.failsafe`.
--- Removed, switched off first, when the test ends.
+-- if `args.failsafe`. Both are removed when the test ends.
 handler("placeGenerator", function(_, args, defer)
     local square = squareAt(args)
     if not square then
         return nil, "the generator's square loaded on the server"
     end
     local generator = IsoGenerator.new(instanceItem("Base.Generator"), square:getCell(), square)
-    defer(function()
-        if generator:getObjectIndex() ~= -1 then
-            -- Squares stay powered by a running generator that leaves them.
-            if generator:isActivated() then
-                generator:setActivated(false)
-            end
-            square:transmitRemoveItemFromSquare(generator)
-        end
-    end)
+    defer(function() PZHarness.Fixtures.removePlaced(generator) end)
     generator:setConnected(true)
     generator:setFuel(args.fuel or 10)
     generator:setCondition(100)
     if args.failsafe then
         local failsafe = IsoObject.new(square, RenewableEnergy.Sprites.failsafe, "RenewableEnergy")
         square:AddTileObject(failsafe)
-        defer(function()
-            if failsafe:getObjectIndex() ~= -1 then
-                square:transmitRemoveItemFromSquare(failsafe)
-            end
-        end)
+        defer(function() PZHarness.Fixtures.removePlaced(failsafe) end)
         if isServer() then
             failsafe:transmitCompleteItemToClients()
         end
@@ -207,9 +190,7 @@ handler("roofOver", function(_, args, defer)
     end
     local floor = above:addFloor("carpentry_02_58")
     defer(function()
-        if floor:getObjectIndex() ~= -1 then
-            above:transmitRemoveItemFromSquare(floor)
-        end
+        PZHarness.Fixtures.removePlaced(floor)
         getCell():checkHaveRoof(args.x, args.y)
     end)
     return { outside = squareAt(args):isOutside() }
@@ -406,19 +387,27 @@ onBank("completeRename", function(_, bank, args, player)
     return { done = Action:new(player, Action.RENAME, nil, bank, nil, nil, args.name):complete() == true }
 end)
 
--- Finishes a whole Run on Treadmill on the wired treadmill tile at `args` as the server's
--- character, the way the server finishes a client's action (complete()). Answers whether it
--- settled, and the character's Fitness XP and endurance before and after.
+-- Completes the treadmill action `run` as the server finishes a client's action (complete()).
+-- Answers whether it settled, and the character's Fitness XP, endurance and thirst before and
+-- after.
+local function completeRun(player, run)
+    local stats, xp = player:getStats(), player:getXp()
+    local reply = { xpBefore = xp:getXP(Perks.Fitness), enduranceBefore = stats:get(CharacterStat.ENDURANCE),
+        thirstBefore = stats:get(CharacterStat.THIRST) }
+    reply.done = run:complete() == true
+    reply.xpAfter, reply.enduranceAfter = xp:getXP(Perks.Fitness), stats:get(CharacterStat.ENDURANCE)
+    reply.thirstAfter = stats:get(CharacterStat.THIRST)
+    return reply
+end
+
+-- A whole Run on Treadmill on the wired treadmill tile at `args` as the server's character
+-- (completeRun).
 handler("completeTreadmillRun", function(player, args)
     local tile = RenewableEnergy.findObjectOn(squareAt(args), RenewableEnergy.Treadmill.isWiredTile)
     if not tile then
         return nil, "a wired treadmill on the server"
     end
-    local stats, xp = player:getStats(), player:getXp()
-    local reply = { xpBefore = xp:getXP(Perks.Fitness), enduranceBefore = stats:get(CharacterStat.ENDURANCE) }
-    reply.done = RenewableEnergyTreadmillAction:new(player, tile):complete() == true
-    reply.xpAfter, reply.enduranceAfter = xp:getXP(Perks.Fitness), stats:get(CharacterStat.ENDURANCE)
-    return reply
+    return completeRun(player, RenewableEnergyTreadmillAction:new(player, tile))
 end)
 
 -- Takes the tile of `args.sprite` on the square at `args` away, as a player picking it up does,
@@ -428,7 +417,7 @@ handler("removeTile", function(_, args)
     if not object then
         return nil, "a " .. tostring(args.sprite) .. " on the server"
     end
-    Helpers.removeObject(object)
+    PZHarness.Fixtures.removePlaced(object)
     return {}
 end)
 
@@ -730,10 +719,8 @@ onCar("maintainerCharge", function(vehicle, args)
         flatWh = RenewableEnergy.Sun.panelWatts(1, "flat") }
 end)
 
--- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
--- vehicle's battery charge before and after.
--- Marks a maintainer attached the way older saves did, with the condition it went on with. A back
--- door: no code writes that shape any more, and detach must still take it.
+-- Marks a maintainer attached in the shape older saves hold, with the condition it went on with,
+-- which no code writes but detach must still take.
 onCar("oldMaintainerMark", function(vehicle, args)
     local part = batteryOf(vehicle)
     part:getModData()[RenewableEnergy.SolarMaintainer.ATTACHED_KEY] = { condition = args.condition }
@@ -741,6 +728,8 @@ onCar("oldMaintainerMark", function(vehicle, args)
     return vehicleState(vehicle)
 end)
 
+-- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
+-- vehicle's battery charge before and after.
 onCar("chargeVehicles", function(vehicle, args)
     local _, battery = batteryOf(vehicle)
     local before = battery:getCurrentUsesFloat()
@@ -881,10 +870,6 @@ end)
 -- treadmill tile's position.
 local treadmillRuns = {}
 
-local function runKey(args)
-    return args.x .. "," .. args.y .. "," .. args.z
-end
-
 -- Starts a Run on Treadmill on the treadmill tile at `args` as the server's character, the way the
 -- multiplayer server starts a client's action (serverStart), and leaves it running until
 -- completeStartedTreadmillRun or the end of the test.
@@ -895,7 +880,7 @@ handler("startTreadmillRun", function(player, args, defer)
     end
     local run = RenewableEnergyTreadmillAction:new(player, tile)
     run:serverStart()
-    local key = runKey(args)
+    local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
     treadmillRuns[key] = run
     defer(function()
         if treadmillRuns[key] == run then
@@ -906,21 +891,13 @@ handler("startTreadmillRun", function(player, args, defer)
     return {}
 end)
 
--- Finishes the run startTreadmillRun started on the tile at `args`, the way the server finishes a
--- client's action (complete()). Answers whether it settled, and the character's Fitness XP,
--- endurance and thirst before and after.
+-- Finishes the run startTreadmillRun started on the tile at `args` (completeRun).
 handler("completeStartedTreadmillRun", function(player, args)
-    local key = runKey(args)
+    local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
     local run = treadmillRuns[key]
     if not run then
         return nil, "a run startTreadmillRun started on the server"
     end
     treadmillRuns[key] = nil
-    local stats, xp = player:getStats(), player:getXp()
-    local reply = { xpBefore = xp:getXP(Perks.Fitness), enduranceBefore = stats:get(CharacterStat.ENDURANCE),
-        thirstBefore = stats:get(CharacterStat.THIRST) }
-    reply.done = run:complete() == true
-    reply.xpAfter, reply.enduranceAfter = xp:getXP(Perks.Fitness), stats:get(CharacterStat.ENDURANCE)
-    reply.thirstAfter = stats:get(CharacterStat.THIRST)
-    return reply
+    return completeRun(player, run)
 end)

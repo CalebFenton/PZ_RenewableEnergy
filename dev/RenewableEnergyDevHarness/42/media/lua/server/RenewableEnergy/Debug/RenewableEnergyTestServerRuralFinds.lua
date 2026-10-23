@@ -26,45 +26,15 @@ local function buildingNear(character)
     return nil
 end
 
--- The containers of the building's lowest two levels (where RuralFinds leaves a pamphlet) and how
--- many pamphlets each holds.
-local function pamphletsIn(def)
-    local found = {}
-    for z = 0, 1 do
-        for x = def:getX(), def:getX2() - 1 do
-            for y = def:getY(), def:getY2() - 1 do
-                local square = getSquare(x, y, z)
-                local objects = square and square:getObjects()
-                for i = 0, (objects and objects:size() or 0) - 1 do
-                    local container = objects:get(i):getContainer()
-                    if container then
-                        found[container] = container:getCountType(PAMPHLET)
-                    end
-                end
-            end
-        end
-    end
-    return found
-end
-
-local function pamphletTotal(def)
-    local total = 0
-    for _, count in pairs(pamphletsIn(def)) do
-        total = total + count
-    end
-    return total
-end
-
--- The building `def` with its roll forgotten, put back when the test ends along with anything the
--- test's rolls placed: the finds and the gasifier's pamphlet.
-local function buildingToRoll(def, defer)
-    local RuralFinds = RenewableEnergy.RuralFinds
-    local store, key = ModData.getOrCreate(RuralFinds.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
+-- Forgets the building's rural find roll so that it can be rolled again, and when the test ends
+-- puts the roll back and takes out the pamphlets the test's rolls left (the gasifier's).
+local function forgetRoll(def, defer)
+    local store, key = ModData.getOrCreate(RenewableEnergy.RuralFinds.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
     local roll = store[key]
-    local pamphlets = pamphletsIn(def)
+    local pamphlets = Helpers.pamphletsIn(def)
     defer(function()
         store[key] = roll
-        for container in pairs(pamphletsIn(def)) do
+        for container in pairs(Helpers.pamphletsIn(def)) do
             for _ = (pamphlets[container] or 0) + 1, container:getCountType(PAMPHLET) do
                 local item = container:getFirstType(PAMPHLET)
                 container:Remove(item)
@@ -72,7 +42,7 @@ local function buildingToRoll(def, defer)
             end
         end
     end)
-    return def, function() store[key] = nil end
+    store[key] = nil
 end
 
 -- How far outside the building's bounds the square is, in squares (0 inside).
@@ -82,11 +52,12 @@ local function outside(def, x, y)
     return math.max(dx, dy)
 end
 
--- Where each placed find stands; each is taken away when the test ends.
+-- Where each placed find stands, and with `def` how far out from it; each is taken away when the
+-- test ends.
 local function track(placed, defer, def)
     local positions = {}
     for kind, object in pairs(placed) do
-        defer(function() Helpers.removeObject(object) end)
+        defer(function() PZHarness.Fixtures.removePlaced(object) end)
         local square = object:getSquare()
         local x, y = square:getX(), square:getY()
         positions[kind] = { x = x, y = y, z = square:getZ(), outdoors = square:isOutside() and square:getBuilding() == nil,
@@ -95,38 +66,23 @@ local function track(placed, defer, def)
     return positions
 end
 
-local function countKeys(entries)
-    local n = 0
-    for _ in pairs(entries) do
-        n = n + 1
-    end
-    return n
-end
-
 -- The building near the character, its roll forgotten, is rolled for certain for the find
--- `args.kind`, then rolled again. Answers where the find stands, whether the roll was kept, how
--- many finds the second roll placed, and how many pamphlets the roll left in the building, the
--- gasifier's chance of one made certain.
+-- `args.kind`, then rolled again. Answers where the find stands, whether the roll was kept and how
+-- many finds the second roll placed.
 handler("ruralFind", function(player, args, defer)
     local RuralFinds = RenewableEnergy.RuralFinds
-    local near = buildingNear(player)
-    if not near then
+    local def = buildingNear(player)
+    if not def then
         return nil, "a building near the character on the server"
     end
-    local def, forget = buildingToRoll(near, defer)
-    local before = pamphletTotal(def)
-    forget()
-    local restoreRoll = Helpers.forceRolls(defer, 0)
+    forgetRoll(def, defer)
     local found = track(RuralFinds.roll(def, { args.kind }, true), defer, def)
-    restoreRoll()
-    local pamphlets = pamphletTotal(def) - before
     local again = track(RuralFinds.roll(def, { args.kind }, true), defer, def)
     local rolled = RuralFinds.rolled(def)
     if not found[args.kind] then
         return nil, "a square for the " .. args.kind .. " by the building at " .. RenewableEnergy.BuildingWatch.key(def)
     end
-    return { at = found[args.kind], kept = rolled ~= nil and rolled[args.kind] == true, again = countKeys(again),
-        pamphlets = pamphlets }
+    return { at = found[args.kind], kept = rolled ~= nil and rolled[args.kind] == true, again = Helpers.count(again) }
 end)
 
 -- The finds of each kind standing within BuildingWatch.REACH of the building, by kind.
@@ -172,14 +128,13 @@ handler("ruralFindAt", function(_, args)
     local standing = findsAround(def)
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
-    local _, forget = buildingToRoll(def, defer)
-    local before = pamphletTotal(def)
-    forget()
+    forgetRoll(def, defer)
+    local before = Helpers.pamphletTotal(def)
     local restoreRoll = Helpers.forceRolls(defer, 0)
     local found = track(RuralFinds.roll(def, nil, true), defer, def)
     restoreRoll()
     local answer = { ready = true, world = world, standing = standing, qualifies = RuralFinds.findsFor(def), found = found,
-        pamphlets = pamphletTotal(def) - before, reach = RenewableEnergy.BuildingWatch.REACH }
+        pamphlets = Helpers.pamphletTotal(def) - before, reach = RenewableEnergy.BuildingWatch.REACH }
     for i = #undo, 1, -1 do
         undo[i]()
     end
@@ -191,19 +146,18 @@ end)
 -- placed.
 handler("ruralFindsRoll", function(player, args, defer)
     local RuralFinds = RenewableEnergy.RuralFinds
-    local near = buildingNear(player)
-    if not near then
+    local def = buildingNear(player)
+    if not def then
         return nil, "a building near the character on the server"
     end
-    local def, forget = buildingToRoll(near, defer)
+    forgetRoll(def, defer)
     local kinds, chances = {}, {}
     for kind in pairs(RuralFinds.FINDS) do
         table.insert(kinds, kind)
         chances[kind] = RuralFinds.chanceFor(kind)
     end
-    forget()
     local restoreRoll = Helpers.forceRolls(defer, args.roll)
-    local placed = countKeys(track(RuralFinds.roll(def, kinds, false), defer))
+    local placed = Helpers.count(track(RuralFinds.roll(def, kinds, false), defer))
     restoreRoll()
     return { chances = chances, placed = placed }
 end)

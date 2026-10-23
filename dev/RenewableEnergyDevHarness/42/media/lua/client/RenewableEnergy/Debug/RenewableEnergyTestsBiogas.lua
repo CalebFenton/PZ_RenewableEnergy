@@ -11,12 +11,24 @@ local test = T.test
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
 local Sprites = RenewableEnergy.Sprites
 
+local FEED = "Base.Dung_Cow"
+
 -- How long the smell may take to settle, in real milliseconds: a server sync and then some. Only a
 -- failing test waits this long.
 local SMELL_MS = 8000
 
 local function standOn(square)
     PZHarness.Fixtures.teleportToMiddle(T.player(), square:getX(), square:getY(), square:getZ())
+end
+
+-- Stands the character on a free outdoor square and answers it and another a few squares off for
+-- a source, or nil.
+local function standNearSource(self)
+    local stand = T.square(self, nil, "a free outdoor square to stand on")
+    local source = stand and T.square(self, { near = stand, minDistance = 3 }, "a free outdoor square for the source")
+    if not source then return nil end
+    standOn(stand)
+    return stand, source
 end
 
 -- Queues setting the stink of a source on `square` to `count` corpses.
@@ -76,10 +88,8 @@ end
 test("renewable_energy_biogas_stink_outdoors", {
     run = function(self)
         self.smell, self.moodle = {}, {}
-        local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local source = stand and T.square(self, { near = stand, minDistance = 3 }, "a free outdoor square for the source")
+        local _, source = standNearSource(self)
         if not source then return end
-        standOn(stand)
         withLevels(self, source, function(levels)
             for i, count in ipairs(levels) do
                 stink(self, source, count - 1)
@@ -140,14 +150,11 @@ test("renewable_energy_biogas_stink_indoors", {
 -- no higher than an earlier test's fading smell left it.
 test("renewable_energy_biogas_stink_gas_mask", {
     run = function(self)
-        local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local source = stand and T.square(self, { near = stand, minDistance = 3 }, "a free outdoor square for the source")
+        local _, source = standNearSource(self)
         if not source then return end
-        standOn(stand)
         T.give(self, "mask", { { type = "Base.Hat_GasMask", worn = true } })
         withLevels(self, source, function(levels)
-            T.server(self, "stinkRead", T.at(source))
-            T.step(function() self.before = self.server.stinkRead end)
+            self.before = self.server.stinkRead
             stink(self, source, levels[#levels])
             -- The filter drains only while the mask keeps corpse smell out (getCorpseSicknessDefense).
             T.serverUntil(self, "stinkRead", T.at(source), function(read) return read.mask ~= nil and read.mask < 1 end, SMELL_MS)
@@ -169,10 +176,8 @@ test("renewable_energy_biogas_stink_chunk_reload", {
     timeoutSeconds = 120,
     run = function(self)
         self.moodle = {}
-        local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local source = stand and T.square(self, { near = stand, minDistance = 3 }, "a free outdoor square for the source")
+        local stand, source = standNearSource(self)
         if not source then return end
-        standOn(stand)
         withLevels(self, source, function(levels)
             stink(self, source, levels[#levels])
             waitForSmell(self, #levels, "before")
@@ -408,13 +413,13 @@ test("renewable_energy_biogas_digester_hopper_meters", {
         local handle = placeDigester(self, "barrel.MetalDrum")
         if not handle then return end
         self.digester = handle
-        self.cow = Digester.feedOf(instanceItem("Base.Dung_Cow"))
+        self.cow = Digester.feedOf(instanceItem(FEED))
         self.fits = math.floor(Digester.TIERS.barrel.potentialCap / self.cow.potential + 1e-6)
         -- More than fits, run first for an hour less than eating what fits takes.
         self.count, self.firstHours = self.fits + 2, self.fits - 1
         self.left = self.count - self.fits
         T.batch(function()
-            T.fillRecord(self, handle, { hopper = { { type = "Base.Dung_Cow", count = self.count } } })
+            T.fillRecord(self, handle, { hopper = { { type = FEED, count = self.count } } })
             T.runDigester(self, handle, self.firstHours, 25)
             T.readRecord(self, handle, "metered")
             T.runDigester(self, handle, self.count, 25)
@@ -433,7 +438,7 @@ test("renewable_energy_biogas_digester_hopper_meters", {
         local function allowed(fullType)
             return container:isItemAllowed(instanceItem(fullType))
         end
-        T.expect(allowed("Base.Dung_Cow") and allowed(RenewableEnergy.Gasifier.WOOD_ASH), "this client's hopper refuses manure or wood ash")
+        T.expect(allowed(FEED) and allowed(RenewableEnergy.Gasifier.WOOD_ASH), "this client's hopper refuses manure or wood ash")
         T.expect(not allowed("Base.Apple") and not allowed("Base.Hammer"), "this client's hopper takes a fresh apple or a hammer")
         -- Every animal's dung, not only the farm animals the feed table names.
         local dung, refused = 0, {}
@@ -460,7 +465,7 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
         local stand = T.square(self, nil, "a free outdoor square to stand on")
         local handle = stand and placeDigester(self, "barrel.MetalDrum", { near = stand, minDistance = 2 })
         if not handle then return end
-        T.fillRecord(self, handle, { hopper = { { type = "Base.Dung_Cow", count = 4 } } })
+        T.fillRecord(self, handle, { hopper = { { type = FEED, count = 4 } } })
         -- Part of an hour already on the meter, so each whole hour away eats one item.
         T.runDigester(self, handle, 0.5, 25)
         T.awayAndBack(self, T.at(stand), handle.x, handle.y, handle.z, function()
@@ -470,7 +475,7 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
     end,
     validate = function(self)
         local away, back = self.reads.away, self.reads.back
-        local cow = Digester.feedOf(instanceItem("Base.Dung_Cow"))
+        local cow = Digester.feedOf(instanceItem(FEED))
         T.expect(not away.loaded, "the digester's tile stayed loaded")
         T.expect(away.eaten == 3 and away.snapshot == 1, "unloaded, it ate " .. away.eaten .. " and left " .. away.snapshot)
         T.expectNear("potential eaten while unloaded", away.potential, 3 * cow.potential, 0.001)
@@ -577,7 +582,7 @@ test("renewable_energy_biogas_digester_upgrade", {
         -- At its cap, so it eats nothing from the hopper meanwhile.
         T.batch(function()
             T.setRecord(self, handle, T.matureDigester("barrel"))
-            T.fillRecord(self, handle, { hopper = { { type = "Base.Dung_Cow", count = self.dung } } })
+            T.fillRecord(self, handle, { hopper = { { type = FEED, count = self.dung } } })
         end)
         T.giveMaterials(self, "materials", self.upgrade)
         T.gasJob(self, "digester", handle, DigesterJobs.UPGRADE)
@@ -605,8 +610,6 @@ test("renewable_energy_biogas_digester_upgrade", {
         T.expectMaterialsUsed(self, "left", self.upgrade, "Upgrade")
     end,
 })
-
-local FEED = "Base.Dung_Cow"
 
 -- Whether this client's copy of the digester `object` holds the feed in its hopper.
 local function hopperHoldsFeed(object)
@@ -755,6 +758,21 @@ local function heaterSprite(square)
     return heater and heater:getSprite():getName()
 end
 
+-- A barrel digester with full bags and an unlit gas heater beside it, with what lighting takes
+-- given: the digester's handle, the heater's and the heater's square, or nil.
+local function fedDigesterAndHeater(self)
+    local digester = placeDigester(self, "barrel.MetalDrum")
+    local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
+    if not square then return nil end
+    local fed = T.matureDigester("barrel")
+    fed.gas = Digester.HOLDERS.bags.capacity
+    T.setRecord(self, digester, fed)
+    T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
+    local heater = T.placeTile(self, square, Sprites.gasHeater.off)
+    T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+    return digester, heater, square
+end
+
 -- A lit gas heater keeps one digester beside it warm on that digester's gas, the other beside it
 -- neither warmed nor paying, and goes out when the gas does. Each digester's own pass finds the
 -- heater as its tile shows and the air as its square has it.
@@ -828,15 +846,8 @@ test("renewable_energy_biogas_heater_warms_digester", {
 test("renewable_energy_biogas_heater_out_when_digester_gone", {
     instant = true,
     run = function(self)
-        local digester = placeDigester(self, "barrel.MetalDrum")
-        local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
-        if not square then return end
-        local fed = T.matureDigester("barrel")
-        fed.gas = Digester.HOLDERS.bags.capacity
-        T.setRecord(self, digester, fed)
-        T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
-        local heater = T.placeTile(self, square, Sprites.gasHeater.off)
-        T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+        local digester, heater, square = fedDigesterAndHeater(self)
+        if not digester then return end
         T.gasJob(self, "heater", heater, GasHeater.LIGHT)
         T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit end, "this client's copy of the heater lit")
         T.removeRecord(self, digester)
@@ -845,20 +856,13 @@ test("renewable_energy_biogas_heater_out_when_digester_gone", {
     end,
 })
 
--- A heater's job gives the XP its row names once done, as every gas job does: its rows set their
--- XP as the digester's do. No row of the heater names any, so the test gives Light Heater one.
+-- A heater's job gives the XP its row names, once done, through the gas jobs' shared XP path. No
+-- heater row names any, so the test gives Light Heater some.
 test("renewable_energy_biogas_heater_job_gives_its_xp", {
     instant = true,
     run = function(self)
-        local digester = placeDigester(self, "barrel.MetalDrum")
-        local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
-        if not square then return end
-        local fed = T.matureDigester("barrel")
-        fed.gas = Digester.HOLDERS.bags.capacity
-        T.setRecord(self, digester, fed)
-        T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
-        local heater = T.placeTile(self, square, Sprites.gasHeater.off)
-        T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+        local digester, heater, square = fedDigesterAndHeater(self)
+        if not digester then return end
         T.batch(function()
             T.server(self, "gasJobXp", { module = "GasHeater", job = GasHeater.LIGHT, perk = "Electricity", amount = 10 })
             T.read(self, "perkXp", { perk = "Electricity" }, "before")
@@ -1099,30 +1103,18 @@ test("renewable_energy_biogas_propane_refill_from_floor_tank", {
     end,
 })
 
--- The mechanics window offers Inflate Tire with a compressor only where it can be plugged in.
-test("renewable_energy_biogas_compressor_inflates_tires_on_power", {
+-- The mechanics window counts a compressor as a tire pump only where the character stands with
+-- power, as its offer of Inflate Tire does; plugged in within a generator's reach, the character
+-- inflates a car standing out of it.
+test("renewable_energy_biogas_compressor_inflates_tires_where_plugged_in", {
     run = function(self)
         T.setGrid(self, false)
         T.give(self, "compressor", { { type = Digester.COMPRESSOR } })
         T.step(function() self.unpowered = ISVehicleMechanics:getTirePump(T.player()) end)
-        if not T.generator(self, { near = T.player():getCurrentSquare(), fuel = 10, running = true }) then return end
-        waitForPower(self)
-        T.step(function() self.powered = ISVehicleMechanics:getTirePump(T.player()) end)
-    end,
-    validate = function(self)
-        T.expect(self.unpowered == nil, "a compressor with no power counts as a tire pump")
-        T.expect(self.powered and self.powered:getFullType() == Digester.COMPRESSOR, "a powered compressor doesn't count as a tire pump")
-    end,
-})
-
--- Inflate Tire with the compressor goes by where the character stands, as its offer does: plugged in
--- within a generator's reach, the character inflates a car standing out of it.
-test("renewable_energy_biogas_compressor_inflates_tire_out_of_reach", {
-    run = function(self)
-        T.setGrid(self, false)
-        T.give(self, "compressor", { { type = Digester.COMPRESSOR } })
         local generator = T.generator(self, { near = T.player():getCurrentSquare(), fuel = 10, running = true })
-        local square = generator and T.square(self, { near = generator.square, minDistance = SandboxVars.GeneratorTileRange + 6,
+        -- Just out of the generator's reach: a car near the edge of the loaded area can be saved
+        -- with its chunk and come back after the test removed it.
+        local square = generator and T.square(self, { near = generator.square, minDistance = SandboxVars.GeneratorTileRange + 2,
             bare = true }, "open ground out of the generator's reach for a car")
         local car = square and T.placeVehicle(self, "Base.CarNormal", { square = square })
         if not car then return end
@@ -1143,8 +1135,9 @@ test("renewable_energy_biogas_compressor_inflates_tire_out_of_reach", {
         end)
     end,
     validate = function(self)
+        T.expect(self.unpowered == nil, "a compressor with no power counts as a tire pump")
         T.expect(not self.carPowered, "the car stands where the generator reaches, so this tests nothing")
-        T.expect(self.offered and self.offered:getFullType() == Digester.COMPRESSOR, "the compressor isn't offered as a tire pump")
+        T.expect(self.offered and self.offered:getFullType() == Digester.COMPRESSOR, "a powered compressor doesn't count as a tire pump")
         T.expect(self.inflate and self.inflate:getFullType() == Digester.COMPRESSOR,
             "Inflate Tire with the compressor offered queued no inflating with it")
     end,

@@ -1,13 +1,14 @@
 -- The authority's half of the biogas tests: the stink, the digesters, propane on the floor, and the
 -- Global Object System records both digesters and gasifiers are (Helpers.recordAt), which the wood
--- gas tests drive too.
--- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
+-- gas tests drive too. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
+local removePlaced = PZHarness.Fixtures.removePlaced
 
 -- Stink ------------------------------------------------------------------------------------------
 
@@ -25,7 +26,7 @@ end)
 -- what is left of the filter of a worn gas mask, if any; and the corpse counts at which the game's
 -- smell levels start (Stink.LEVEL_CORPSES), which a multiplayer client's Lua doesn't have.
 handler("stinkRead", function(player, args)
-    local square = getSquare(args.x, args.y, args.z)
+    local square = Helpers.squareAt(args)
     local mask
     local worn = player:getWornItems()
     for i = 0, worn:size() - 1 do
@@ -76,7 +77,7 @@ end)
 handler("recordPlace", function(player, args, defer)
     local thumpable, missing = Helpers.placeRecord(args.kind, args.tile, Helpers.squareAt(args))
     if not thumpable then return nil, missing end
-    defer(function() Helpers.removeObject(select(2, Helpers.recordAt(args)) or thumpable) end)
+    defer(function() removePlaced(select(2, Helpers.recordAt(args)) or thumpable) end)
     return {}
 end)
 
@@ -86,7 +87,7 @@ handler("recordTrack", function(player, args, defer)
     defer(function()
         local _, object = Helpers.recordAt(args)
         if object then
-            Helpers.removeObject(object)
+            removePlaced(object)
         end
     end)
     return {}
@@ -174,7 +175,7 @@ end)
 handler("recordRemove", function(player, args)
     local _, object, missing = Helpers.recordAt(args)
     if not object then return nil, missing end
-    Helpers.removeObject(object)
+    removePlaced(object)
     return {}
 end)
 
@@ -222,8 +223,8 @@ handler("floorItem", function(player, args, defer)
     square:AddWorldInventoryItem(item, 0.5, 0.5, 0)
     defer(function()
         local world = item:getWorldItem()
-        if world and world:getSquare() then
-            world:getSquare():transmitRemoveItemFromSquare(world)
+        if world then
+            removePlaced(world)
         end
     end)
     return {}

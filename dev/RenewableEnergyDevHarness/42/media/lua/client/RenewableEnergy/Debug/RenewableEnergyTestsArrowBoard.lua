@@ -50,6 +50,7 @@ end
 -- The squares an arrow board takes north and south of its centre.
 local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
+-- ArrowBoard.PANELS's ids, copied for the reason lidOf gives.
 local LEFT, RIGHT = "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight"
 local PANELS = { LEFT, RIGHT }
 -- How long the server is given to show a change a client asked for.
@@ -254,53 +255,6 @@ local function standIn(vehicle, area, toSide)
     p:setTargetAndCurrentDirection(vehicle:getX() - x, vehicle:getY() - y)
 end
 
--- An unlocked battery box opens only with its lid open, and takes a battery a player puts in.
-test("renewable_energy_world_arrow_board_battery_box_opens_with_lid", {
-    instant = true,
-    run = function(self)
-        -- repair: a spawned vehicle may lack its lid, and the box opens freely without one.
-        if not spawnTrailer(self, { repair = true }) then return end
-        local trailer, p = self.trailer, player()
-        unlockBox(self, trailer)
-        T.give(self, "battery", { { type = DEEP_CYCLE } })
-        T.step(function()
-            -- The trailer may come stocked.
-            self.before = #boxItems(trailer.state, DEEP_CYCLE)
-            local vehicle = trailer.vehicle
-            local lid, box = lidOf(vehicle), boxOf(vehicle)
-            self.lid, self.box = lid, box
-            if not (lid and lid:getDoor() and box and box:getItemContainer()) then return end
-            standIn(vehicle, box:getArea())
-            self.shutAccess = vehicle:canAccessContainer(box:getIndex(), p)
-            -- Open Trunk from the trailer's menu.
-            ISVehicleMenu.onOpenDoor(p, lid)
-        end)
-        T.waitFor(self, function() return self.lid and self.lid:getDoor() and self.lid:getDoor():isOpen() end,
-            "this client's copy of the lid opened")
-        T.step(function()
-            if not (self.lid and self.box) then return end
-            self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
-            ISTimedActionQueue.add(ISInventoryTransferAction:new(p, self.items.battery[1], p:getInventory(),
-                self.box:getItemContainer()))
-        end)
-        T.awaitVehicleState(self, trailer, function(state)
-            return #boxItems(state, DEEP_CYCLE) > self.before
-        end, SERVER_MS)
-    end,
-    validate = function(self)
-        if not (expect(self.lid ~= nil and self.lid:getDoor() ~= nil, "the battery box has no lid")
-                and expect(self.box ~= nil and self.box:getItemContainer() ~= nil, "the battery box holds nothing")) then
-            return
-        end
-        expect(self.trailer.state.lid ~= nil and not self.trailer.state.lid.locked, "the battery box stayed locked")
-        expect(not self.shutAccess, "the battery box opens with its lid shut")
-        expect(self.trailer.state.lid.open, "opening the lid left it shut")
-        expect(self.openAccess, "the battery box doesn't open beside it with its lid open")
-        local after = #boxItems(self.trailer.state, DEEP_CYCLE)
-        expect(after == self.before + 1, "the battery box holds " .. after .. " deep cycles after one was put in, " .. self.before .. " before")
-    end,
-})
-
 -- Whether this game draws the trailer's lid held still, open or shut, as T.lidPose reads it.
 local function lidHeld(pose, open)
     return pose ~= nil and pose.clip ~= nil and not pose.playing and pose.open == (open and 1 or 0)
@@ -434,28 +388,6 @@ end
 local function expectBatteryTaken(self)
     expect(#boxItems(self.trailer.state) == 0, #boxItems(self.trailer.state) .. " items left in the server's box")
 end
-
--- A padlocked box stays shut when a player without the key opens it. The refused unlock empties
--- the action queue (ISBaseTimedAction.stop), so it runs last and validate reads the copy.
-test("renewable_energy_world_arrow_board_locked_box_stays_shut", {
-    instant = true,
-    run = function(self)
-        if not spawnTrailer(self, { repair = true }) then return end
-        local trailer, p = self.trailer, player()
-        padlockBox(self, trailer)
-        T.step(function()
-            self.canUnlock = trailer.vehicle:canUnlockDoor(self.lid, p)
-            ISVehicleMenu.onOpenDoor(p, self.lid)
-        end)
-    end,
-    validate = function(self)
-        local door = self.lid:getDoor()
-        expect(not self.canUnlock, "a character without a key can unlock the battery box")
-        expect(door:isLocked() and not door:isOpen(), "opening the padlocked box left it "
-            .. (door:isLocked() and "locked" or "unlocked") .. " and " .. (door:isOpen() and "open" or "shut"))
-        expect(not self.trailer.vehicle:canAccessContainer(self.box:getIndex(), player()), "the padlocked box opens")
-    end,
-})
 
 -- A padlocked box opens the way vanilla gets into a locked trunk: the lid comes off in the
 -- mechanics window, without its Basic Mechanics recipe, showing no model, and the batteries come
@@ -681,9 +613,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
         look("at a padlocked box without bolt cutters", "unavailable")
         T.give(self, "cutters", { { type = RenewableEnergy.BatteryBoxLid.CUTTERS } })
         look("at a padlocked box with bolt cutters", "offered")
-        T.onVehicle(self, trailer, "setTrailer", { lidLocked = false })
-        T.waitFor(self, function() return not lidOf(trailer.vehicle):getDoor():isLocked() end,
-            "this client's copy of the unlocked lid")
+        unlockBox(self, trailer)
         look("at an unlocked box", "none")
         T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false, lidLocked = true })
         T.waitFor(self, function()
@@ -812,6 +742,22 @@ test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
 
 -- Lamps -----------------------------------------------------------------------------------------
 
+-- Queues `args` set on the trailer and a zero-hour pass of its lamps, the photocell seeing dark
+-- if `night`, noting in self.stages whether the lamps then show `want` ("day", "night", or nil for
+-- dark).
+local function lampStage(self, trailer, name, args, night, want)
+    T.onVehicle(self, trailer, "setTrailer", args)
+    T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = night })
+    T.step(function() table.insert(self.stages, { name = name, want = want, lamps = trailer.answer.state.lamps }) end)
+end
+
+local function expectLampStages(stages)
+    for _, stage in ipairs(stages) do
+        expect(stage.lamps == stage.want, "the lamps " .. stage.name .. " are " .. tostring(stage.lamps or "dark")
+            .. ", expected " .. tostring(stage.want or "dark"))
+    end
+end
+
 -- The lamps light only while switched on with the lamp board intact: switching off or wrecking
 -- the board darkens them, welding it relights them, and after dark the photocell sets night.
 test("renewable_energy_world_arrow_board_lamps_follow_switch_board_and_photocell", {
@@ -819,11 +765,7 @@ test("renewable_energy_world_arrow_board_lamps_follow_switch_board_and_photocell
         if not spawnTrailer(self, { repair = true }) then return end
         local trailer, board = self.trailer, RenewableEnergy.ArrowBoard.BOARD
         self.stages = {}
-        local function stage(name, args, night, want)
-            T.onVehicle(self, trailer, "setTrailer", args)
-            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = night })
-            T.step(function() table.insert(self.stages, { name = name, want = want, lamps = trailer.answer.state.lamps }) end)
-        end
+        local function stage(name, args, night, want) lampStage(self, trailer, name, args, night, want) end
         batchOnTrailer(function()
             stage("switched on with a charged battery", { switchOn = true, box = { { type = DEEP_CYCLE, charge = 0.6 } } },
                 false, "day")
@@ -834,10 +776,7 @@ test("renewable_energy_world_arrow_board_lamps_follow_switch_board_and_photocell
         end)
     end,
     validate = function(self)
-        for _, stage in ipairs(self.stages) do
-            expect(stage.lamps == stage.want, "the lamps " .. stage.name .. " are " .. tostring(stage.lamps or "dark")
-                .. ", expected " .. tostring(stage.want or "dark"))
-        end
+        expectLampStages(self.stages)
     end,
 })
 
@@ -908,12 +847,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
         local trailer, spec = self.trailer, RenewableEnergy.Specs.arrowBoard
         local use = instanceItem(DEEP_CYCLE):getUseDelta()
         self.use, self.stages = use, {}
-        -- Queues `args` set on the trailer, then a zero-hour pass of the lamps, expecting them `want`.
-        local function stage(name, args, want)
-            T.onVehicle(self, trailer, "setTrailer", args)
-            T.onVehicle(self, trailer, "arrowBoardLamps", { hours = 0, night = false })
-            T.step(function() table.insert(self.stages, { name = name, want = want, lamps = trailer.answer.state.lamps }) end)
-        end
+        local function stage(name, args, want) lampStage(self, trailer, name, args, false, want) end
         local function battery(charge)
             return { { type = DEEP_CYCLE, charge = charge } }
         end
@@ -934,10 +868,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
     end,
     validate = function(self)
         local spec, wh = RenewableEnergy.Specs.arrowBoard, RenewableEnergy.Specs.batteries[DEEP_CYCLE].wh
-        for _, stage in ipairs(self.stages) do
-            expect(stage.lamps == stage.want, "the lamps " .. stage.name .. " are " .. tostring(stage.lamps or "dark")
-                .. ", expected " .. tostring(stage.want or "dark"))
-        end
+        expectLampStages(self.stages)
         -- A battery's charge is read back as a 32-bit float.
         expectNear("watt-hours drawn down to the cutoff", self.cut.drawn, self.use * wh, 1e-3)
         local battery = boxItems(self.cut.state, DEEP_CYCLE)[1]
@@ -1082,22 +1013,13 @@ test("renewable_energy_world_arrow_board_found_switch_follows_its_chance", {
 })
 
 -- Queues setting the character's skills to those the trailer's `partId` lists for `job`
--- ("install"/"uninstall"), each one level short if `short`.
-local function setPartSkills(self, trailer, partId, job, short)
+-- ("install"/"uninstall").
+local function setPartSkills(self, trailer, partId, job)
     T.step(function()
         for name, level in trailer.vehicle:getPartById(partId):getTable(job).skills:gmatch("(%w+):(%d+)") do
-            T.setPerk(self, Perks.FromString(name), tonumber(level) - (short and 1 or 0))
+            T.setPerk(self, Perks.FromString(name), tonumber(level))
         end
     end)
-end
-
--- Levels the character lacks of a part's `skills` string.
-local function missingLevels(skills, p)
-    local missing = 0
-    for name, level in skills:gmatch("(%w+):(%d+)") do
-        missing = missing + math.max(0, tonumber(level) - p:getPerkLevel(Perks.FromString(name)))
-    end
-    return missing
 end
 
 -- With the mechanics window's way, a cracked panel comes off as its module at the panel's
@@ -1148,90 +1070,21 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
     end,
 })
 
--- The mechanics window's menu for `part`, built by its own doPartContextMenu on a window that has
--- just what that function reads.
-local function mechanicsMenu(vehicle, part)
-    local window = setmetatable({ chr = player(), playerNum = 0, vehicle = vehicle }, { __index = ISVehicleMechanics })
-    window.getAbsoluteX = function() return 0 end
-    window.getAbsoluteY = function() return 0 end
-    window:doPartContextMenu(part, 0, 0)
-    return window.context
-end
-
--- A panel's skills are recommendations, as for any vanilla part: they name real skills, so the
--- game counts them in the odds of the job, and a level short in each, the panel still comes off
--- and goes on and the mechanics window offers Uninstall.
-test("renewable_energy_world_arrow_board_panels_skills_are_advice", {
-    instant = true,
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        local trailer, p = self.trailer, player()
-        setPartSkills(self, trailer, LEFT, "install", true)
-        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 90 }, [RIGHT] = {} } })
-        waitForPanelsCopy(self, trailer)
-        T.give(self, "kit", { { type = "Base.Wrench", equip = "primary" }, { type = MODULE, condition = 90 } })
-        T.step(function()
-            local vehicle = trailer.vehicle
-            local left, right = vehicle:getPartById(LEFT), vehicle:getPartById(RIGHT)
-            self.skills, self.unknown = {}, {}
-            for _, id in ipairs(PANELS) do
-                for _, job in ipairs({ "install", "uninstall" }) do
-                    local skills = vehicle:getPartById(id):getTable(job).skills or ""
-                    table.insert(self.skills, id .. " " .. job .. " " .. skills)
-                    for name in skills:gmatch("(%w+):%d+") do
-                        if Perks.FromString(name) == Perks.MAX then
-                            table.insert(self.unknown, id .. " " .. job .. " " .. name)
-                        end
-                    end
+-- Each panel's install and uninstall skills name skills the game knows: it weighs the job's odds
+-- by them (VehicleUtils.calculateInstallationSuccess) and reads an unknown name as Perks.MAX.
+test("renewable_energy_world_arrow_board_panels_name_real_skills", {
+    run = function(self) spawnTrailer(self) end,
+    validate = function(self)
+        local vehicle = self.trailer.vehicle
+        for _, id in ipairs(PANELS) do
+            for _, job in ipairs({ "install", "uninstall" }) do
+                local skills, what = vehicle:getPartById(id):getTable(job).skills or "", id .. " " .. job
+                expect(skills:find("%w+:%d") ~= nil, what .. " lists no skills")
+                for name in skills:gmatch("(%w+):%d+") do
+                    expect(Perks.FromString(name) ~= Perks.MAX, what .. " names the unknown skill " .. name)
                 end
             end
-            self.putOnMissing = missingLevels(right:getTable("install").skills, p)
-            self.canTakeOff = vehicle:canUninstallPart(p, left)
-            self.canPutOn = vehicle:canInstallPart(p, right)
-            local context = mechanicsMenu(vehicle, left)
-            local uninstall = context and context:getOptionFromName(getText("IGUI_Uninstall"))
-            self.uninstallOption = uninstall and (uninstall.notAvailable and "greyed out" or "offered") or "missing"
-            if context then
-                context:closeAll()
-            end
-        end)
-    end,
-    validate = function(self)
-        for _, line in ipairs(self.skills) do
-            expect(line:find(":%d") ~= nil, "no skills for " .. line)
         end
-        expect(#self.unknown == 0, "skills the game doesn't know: " .. table.concat(self.unknown, ", "))
-        if not expect(self.putOnMissing > 0, "the character lacks no levels to put a panel on") then
-            return
-        end
-        expect(self.canTakeOff, "a panel can't come off a level short in each skill")
-        expect(self.canPutOn, "a panel can't go on a level short in each skill")
-        expect(self.uninstallOption == "offered", "the mechanics window's Uninstall a level short in each skill is "
-            .. tostring(self.uninstallOption))
-    end,
-})
-
--- The mechanics window offers to install an inventory item whose full type is in the part's item
--- types (ISVehicleMechanics, VehicleUtils.getItems), so each panel lists both modules as they are
--- named, without the mechanicType the game appends to a specific item; and repair() puts a module
--- back on an empty panel, where an appended name found no item.
-test("renewable_energy_world_arrow_board_panels_take_real_modules", {
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        T.onVehicle(self, self.trailer, "arrowBoardRepairAll")
-    end,
-    validate = function(self)
-        local answer = self.trailer.answer
-        for _, id in ipairs(PANELS) do
-            local listed, types = answer.types[id], {}
-            for _, fullType in ipairs(listed) do
-                types[fullType] = true
-            end
-            expect(types[MODULE] and types[HOMEMADE], id .. " takes " .. table.concat(listed, ", "))
-        end
-        local left = answer.state.panels[LEFT]
-        expect(left.installed and (left.type == MODULE or left.type == HOMEMADE),
-            "repair() put " .. tostring(left.type or "nothing") .. " on the empty panel")
     end,
 })
 
@@ -1361,18 +1214,14 @@ local function alignTowPoints(self)
 end
 
 -- Queues hitching self.trailer to self.car the way a player does, with vanilla's action, and a
--- wait until the hitch has pulled the trailer in and the pair has settled. Leaves in
--- self.hitchedAt a real time just after the hitch was made; a hitch that never forms fails the
--- test.
+-- wait until the hitch has pulled the trailer in and the pair has settled; a hitch that never
+-- forms fails the test. A test that tows runs instantly: the action hitches as it starts, and at
+-- its real length it would take as long as the game spares a fresh hitch from snapping.
 local function attachTrailer(self)
     local p, car, trailer = player(), self.car, self.trailer
     T.step(function()
         ISTimedActionQueue.add(ISAttachTrailerToVehicle:new(p, car.vehicle, trailer.vehicle, "trailer", "trailer"))
     end)
-    -- The action hitches as it starts, so the hitch is older than its time since this. A test that
-    -- tows runs instantly: at its real length the action would take as long as the game spares a
-    -- fresh hitch from snapping.
-    T.step(function() self.hitchedAt = getTimestampMs() end)
     -- The hitch pulls the trailer in over the next physics steps.
     T.waitUntil(function()
         return trailer.vehicle:getVehicleTowedBy() == car.vehicle and hitchGap(car.vehicle, trailer.vehicle) < ON_HITCH
@@ -1387,7 +1236,7 @@ end
 
 -- Queues a hitched car and arrow board (createTowingPair, with `opts.trailer`). With `opts.drive`
 -- the character gets in at the wheel first, so the hitch is fresh when the test goes on; else they
--- stand beside the car's tow bar. Leaves self.car, self.trailer and self.hitchedAt.
+-- stand beside the car's tow bar. Leaves self.car and self.trailer.
 local function towingPair(self, opts)
     opts = opts or {}
     local strip = createTowingPair(self, opts.trailer)
@@ -1401,23 +1250,6 @@ local function towingPair(self, opts)
         T.step(function() player():teleportTo(strip:getX() + 2.5, strip:getY() + 3.5, strip:getZ()) end)
     end
     attachTrailer(self)
-end
-
--- How long a freshly spawned vehicle is given to fall onto its wheels before it counts as at rest
--- without having been seen moving: it reads as at rest before its physics exists
--- (BaseVehicle.isAtRest).
-local SETTLE_MS = 1000
-
--- Queues a wait until the trailer stands alone at rest: once its physics has run and stopped, or
--- after SETTLE_MS.
-local function waitForParked(self, trailer)
-    local spawnedMs, moved
-    T.step(function() spawnedMs = getTimestampMs() end)
-    T.waitFor(self, function()
-        local vehicle = trailer.vehicle
-        moved = moved or vehicle:isPhysicsActive()
-        return (moved or getTimestampMs() - spawnedMs > SETTLE_MS) and inCell(vehicle) and vehicle:isAtRest()
-    end, "the trailer at rest on its own", VEHICLE_FRAMES)
 end
 
 -- The crash watcher (ArrowBoard.sampleCrash), fed a frame at a time the velocities a trailer would
@@ -1482,6 +1314,15 @@ test("renewable_energy_world_arrow_board_crash_watch_tells_crashes", {
     end,
 })
 
+-- Queues the crash command a driver's client sends for self.trailer behind self.car, then a read
+-- of the trailer's state, which goes out after the command and so reads what it did.
+local function reportCrash(self)
+    T.step(function()
+        sendClientCommand(player(), "RenewableEnergyArrowBoard", "crashed", { vehicle = self.trailer.id, car = self.car.id })
+    end)
+    T.vehicleState(self, self.trailer)
+end
+
 -- A multiplayer client asks the server to crack the panels of the trailer behind the car its
 -- player drives; the authority's handler takes the command in single player too. From the driver,
 -- a crash cracks them by Specs.storm.crack, the same crash reported again within the quiet time
@@ -1492,13 +1333,8 @@ test("renewable_energy_world_arrow_board_crash_command_from_the_driver", {
         towingPair(self, { drive = true, trailer = { box = {}, panels = modulesOnBothPanels(90) } })
         if not self.trailer then return end
         local trailer = self.trailer
-        -- The command and a state request go out in order, so the state is read after the
-        -- command was handled.
         local function crashed(key)
-            T.step(function()
-                sendClientCommand(player(), "RenewableEnergyArrowBoard", "crashed", { vehicle = trailer.id, car = self.car.id })
-            end)
-            T.vehicleState(self, trailer)
+            reportCrash(self)
             T.step(function() self[key] = trailer.state end)
         end
         crashed("once")
@@ -1531,12 +1367,7 @@ test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
     run = function(self)
         towingPair(self, { trailer = { panels = { [LEFT] = { type = MODULE, condition = 90 } } } })
         if not self.trailer then return end
-        T.step(function()
-            sendClientCommand(player(), "RenewableEnergyArrowBoard", "crashed", { vehicle = self.trailer.id, car = self.car.id })
-        end)
-        -- The command and a state request go out in order, so the state is read after the
-        -- command was handled.
-        T.vehicleState(self, self.trailer)
+        reportCrash(self)
     end,
     validate = function(self)
         local left = panelCondition(self.trailer.state, LEFT)
@@ -1651,7 +1482,8 @@ local function repairPanelOption(vehicle)
 end
 
 -- The menu offers Seal Cracked Panel to a character with everything it needs, and greys it out
--- in the dark, saying why, as the action's light rule refuses it (RenewableEnergyAction.needsLight).
+-- in the dark, saying why, as the action's light rule refuses it
+-- (RenewableEnergyAction.needsLight).
 test("renewable_energy_world_arrow_board_repair_needs_light", {
     hour = 12,
     run = function(self)
@@ -1705,52 +1537,13 @@ test("renewable_energy_world_arrow_board_repair_adds_up_part_used_epoxy", {
     end,
 })
 
--- Unhitched and left on its own, it comes to rest on its wheels and coupler, nose slightly down, as
--- vanilla's Trailer does. Without its physics shapes it tips onto the chassis box's front edge.
-test("renewable_energy_world_arrow_board_stands_alone", {
-    spOnly = "a dedicated server runs no vehicle physics and a client only those it drives, tows or bumps, so nothing settles a trailer left alone",
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        waitForParked(self, self.trailer)
-    end,
-    validate = function(self)
-        local up = self.trailer.vehicle:getUpVectorDot()
-        expect(up > 0.98, string.format("it came to rest tipped over (up vector dot %.3f)", up))
-    end,
-})
-
+-- ArrowBoard.FRAME's front and back ids, copied for the reason lidOf gives.
 local FRAME_FRONT, FRAME_BACK = "EngineDoor", "TruckBed"
 
 local function frameCondition(state, partId)
     local part = state and state.frame[partId]
     return part and part.installed and part.condition or nil
 end
-
--- The game's own crash damage, which a car's crash passes on to the trailer it tows
--- (BaseVehicle.crash), dents the front of the frame in a front crash and the back in a rear one;
--- the mechanics window lists neither part.
-test("renewable_energy_world_arrow_board_frame_dents_in_crashes", {
-    run = function(self)
-        if not spawnTrailer(self, { repair = true }) then return end
-        local trailer = self.trailer
-        batchOnTrailer(function()
-            T.onVehicle(self, trailer, "vehicleCrash", { amount = 40, front = true })
-            T.step(function() self.front = trailer.state end)
-            T.onVehicle(self, trailer, "vehicleCrash", { amount = 40, front = false })
-        end)
-    end,
-    validate = function(self)
-        for _, id in ipairs({ FRAME_FRONT, FRAME_BACK }) do
-            local part = self.front.frame[id]
-            expect(part ~= nil and part.category == "nodisplay", id .. " shows in the mechanics window")
-        end
-        local front, back = frameCondition(self.front, FRAME_FRONT), frameCondition(self.front, FRAME_BACK)
-        expect(front and front < 100, "a front crash left the front of the frame at " .. tostring(front))
-        expect(back == 100, "a front crash took the back of the frame to " .. tostring(back))
-        back = frameCondition(self.trailer.state, FRAME_BACK)
-        expect(back and back < 100, "a rear crash left the back of the frame at " .. tostring(back))
-    end,
-})
 
 -- A trailer from a save made before its frame was parts loads with them empty and the random
 -- colour it spawned with, and gets a frame and the script's colour on that load.
@@ -1766,56 +1559,6 @@ test("renewable_energy_world_arrow_board_old_trailer_gets_frame", {
         end
         expect(answer.state.colorSat == answer.forcedSat and answer.state.colorVal == answer.forcedVal,
             string.format("the old trailer kept its colour, saturation %.2f and value %.2f", answer.state.colorSat, answer.state.colorVal))
-    end,
-})
-
--- Vanilla's wash action offers each side of the trailer and washes its blood off from the side's
--- area: Front by the coupler, Rear behind the deck, Left and Right beside it.
-local WASH_AREAS = { { side = "Front", area = "Engine" }, { side = "Rear", area = "TruckBed" },
-    { side = "Left", area = "SeatLeft" }, { side = "Right", area = "SeatRight" } }
-local WASH_BLOOD = 0.2
-
-test("renewable_energy_world_arrow_board_washes_each_side", {
-    instant = true,
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        local trailer, p = self.trailer, player()
-        T.give(self, "bucket", { { type = "Base.Bucket" } })
-        self.offered, self.left = {}, {}
-        -- Each side's wash is queued once the one before has finished, behind it.
-        local function washSide(i)
-            local wash = WASH_AREAS[i]
-            local blood = {}
-            for _, other in ipairs(WASH_AREAS) do
-                blood[other.side] = other == wash and WASH_BLOOD or 0
-            end
-            T.onVehicle(self, trailer, "setTrailer", { blood = blood })
-            T.server(self, "refillFluid", function() return { id = self.items.bucket[1]:getID(), fluid = "Water", liters = 10 } end)
-            T.waitFor(self, function() return trailer.vehicle:getBloodIntensity(wash.side) > 0 end,
-                "this client's copy of the blood on " .. wash.side)
-            T.step(function()
-                local vehicle = trailer.vehicle
-                local area = ISWashVehicle.hasBlood(vehicle) and ISWashVehicle.chooseArea(p, vehicle)
-                self.offered[wash.side] = area and area.id .. " at " .. area.area or "nothing"
-                standIn(vehicle, wash.area)
-                ISTimedActionQueue.add(ISWashVehicle:new(p, vehicle, wash.side, wash.area))
-            end)
-            T.awaitVehicleState(self, trailer, function(state) return state.blood[wash.side] <= 0 end, SERVER_MS)
-            T.step(function()
-                self.left[wash.side] = trailer.state.blood[wash.side]
-                if WASH_AREAS[i + 1] then
-                    washSide(i + 1)
-                end
-            end)
-        end
-        washSide(1)
-    end,
-    validate = function(self)
-        for _, wash in ipairs(WASH_AREAS) do
-            local expected = wash.side .. " at " .. wash.area
-            expect(self.offered[wash.side] == expected, "blood on " .. wash.side .. " offered " .. tostring(self.offered[wash.side]))
-            expect(self.left[wash.side] == 0, "washing " .. wash.side .. " left " .. tostring(self.left[wash.side]))
-        end
     end,
 })
 

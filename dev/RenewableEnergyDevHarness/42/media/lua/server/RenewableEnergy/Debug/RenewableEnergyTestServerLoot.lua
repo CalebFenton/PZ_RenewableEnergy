@@ -9,7 +9,7 @@ require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local check, saveOptions, countPairs = Helpers.check, Helpers.saveOptions, PZHarness.Fixtures.countPairs
-local squareAt, removeObject = Helpers.squareAt, Helpers.removeObject
+local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
 local Sprites = RenewableEnergy.Sprites
 
 local function distributions(expect)
@@ -269,16 +269,16 @@ local function modBatteries(container, found)
     return found
 end
 
--- A crate of container type `containerType` on the square, in the world, so that the game can send
--- its items' charges to the clients that see it. Removed when the test ends.
-local function worldCrate(square, containerType, defer)
+-- A container of type `containerType` on a crate tile on the square, in the world, so that the game
+-- can send its items' charges to the clients that see it. Removed when the test ends.
+local function containerInWorld(square, containerType, defer)
     local crate = IsoObject.new(square, "carpentry_01_16", "RenewableEnergyTest")
     crate:setContainer(ItemContainer.new(containerType, square, crate))
     square:AddTileObject(crate)
     if isServer() then
         crate:transmitCompleteItemToClients()
     end
-    defer(function() removeObject(crate) end)
+    defer(function() removePlaced(crate) end)
     return crate:getContainer()
 end
 
@@ -304,7 +304,7 @@ check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
         ItemPickerJava.Parse()
     end)
     for _, fill in ipairs({ { type = PROBE_CONTAINER, what = "a room's crate", rolled = true }, { type = "inventorymale", what = "a corpse" } }) do
-        local container = worldCrate(square, fill.type, defer)
+        local container = containerInWorld(square, fill.type, defer)
         local bag = container:AddItem("Base.Bag_DuffelBag")
         bag:getInventory():AddItem("RenewableEnergy.DeepCycleBattery")
         ItemPickerJava.fillContainer(container, nil)

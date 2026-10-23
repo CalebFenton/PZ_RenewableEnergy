@@ -36,9 +36,8 @@ Debug.ITEMS = {
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
 
---- The names of the build menu's recipes (scripts/RenewableEnergy/Entities.txt), which
---- getAllCraftRecipes (and so PZHarness.Test.learnRecipes) leaves out: every buildable recipe with
---- the mod's recipe prefix (RenewableEnergyTestSettings.lua), as the build menu lists them.
+--- The names of the mod's build menu recipes (scripts/RenewableEnergy/Entities.txt), which
+--- getAllCraftRecipes, and so PZHarness.Test.learnRecipes, leaves out.
 function Debug.buildRecipes()
     local names, recipes = {}, getScriptManager():getAllBuildableRecipes()
     local prefix = PZHarness.testSettings.recipePrefix
@@ -51,22 +50,29 @@ function Debug.buildRecipes()
     return names
 end
 
-local function isContainerGeneratorOrPanel(object)
+--- Teaches `player` every recipe of the mod, the build menu's included.
+function Debug.learnRecipes(player)
+    PZHarness.Test.learnRecipes(player)
+    PZHarness.Fixtures.learnRecipes(player, Debug.buildRecipes())
+end
+
+local function isContainerGeneratorOrSource(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
         or RenewableEnergy.Sources.kindOf(object) ~= nil
 end
 
 -- Whether a test or the dev harness may put a bank or panel on `square`: free to walk on, with no
--- vehicle, container, generator or panel there, and indoors where a bank may stand if `indoors`,
--- else outdoors.
+-- vehicle, container, generator or placed source (panel, wind charger, wired treadmill) there, and
+-- indoors where a bank may stand if `indoors`, else outdoors.
 function Debug.isFreeSquare(square, indoors)
     return square ~= nil and square:isFree(false) and square:getVehicleContainer() == nil
         and RenewableEnergy.PowerBank.canPlaceBank(square) == indoors and (indoors or square:isOutside())
-        and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrPanel)
+        and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrSource)
 end
 
--- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos).
-local CHUNK_SQUARES = 8
+-- A generator's position is listed in every chunk its reach touches
+-- (IsoGenerator.setSurroundingElectricity, IsoChunk.addGeneratorPos).
+local CHUNK_SQUARES = getChunkSizeInSquares()
 
 -- Lets this multiplayer client's chunks go of the squares a test generator at x, y, z powered,
 -- before the server's undo switches it off and removes it. That switch-off can miss this client's
@@ -92,8 +98,7 @@ function Debug.setupPlayer(player)
     player:setPerkLevelDebug(Perks.Electricity, 8)
     player:setPerkLevelDebug(Perks.MetalWelding, 4)
     player:setPerkLevelDebug(Perks.Woodwork, 3)
-    PZHarness.Test.learnRecipes(player)
-    PZHarness.Fixtures.learnRecipes(player, Debug.buildRecipes())
+    Debug.learnRecipes(player)
     player:getInventory():AddItem("Base.Screwdriver")
     PZHarness.Test.placeWorkTable(player)
 end

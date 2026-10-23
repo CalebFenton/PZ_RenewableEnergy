@@ -6,8 +6,8 @@ require "PZHarness/ServerHandlers"
 
 local handler = PZHarness.serverHandler
 
--- What the game gives the character for an Electricity award of `args.xp`, through the call
--- CraftRecipe.addXP makes, and its Electricity XP after.
+-- What the game gives the character for an Electricity award of `args.xp`, through the AddXP call
+-- CraftRecipe.addXP makes outside a server, and its Electricity XP after.
 handler("electricityAward", function(player, args)
     local xp = player:getXp()
     local before = xp:getXP(Perks.Electricity)

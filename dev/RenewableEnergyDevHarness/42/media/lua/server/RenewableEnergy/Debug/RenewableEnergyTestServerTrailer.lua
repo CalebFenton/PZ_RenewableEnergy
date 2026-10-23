@@ -6,22 +6,21 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
+local vehicleAt, deferOnce = Helpers.vehicleAt, Helpers.deferOnce
 
 local Trailer = {}
-
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
-local vehicleAt, deferOnce = Helpers.vehicleAt, Helpers.deferOnce
 
 -- The conditions the panels of trailers spawned with `args.recordStock` got as they were stocked,
 -- by vehicle id: { [partId] = condition }.
 local stockedPanels = {}
 
--- Spawns `script` with the harness's plain addVehicleDebug, an arrow board's stocked panels
--- getting the condition `roll(stockRoll)` returns for each, stockRoll being the roll stocking makes.
--- Stocking rolls the left panel first. No caller hands it a defer, so a pcall puts the conditions
--- back before an error goes on.
+-- Spawns `script` as the harness does (addVehicleDebug), an arrow board's stocked panels getting
+-- the condition `roll(stockRoll)` returns for each, stockRoll being the roll stocking makes, in
+-- ArrowBoard.PANELS order. No caller hands it a defer, so a pcall puts the rolls back before an
+-- error goes on.
 local function spawnStocking(script, square, facing, roll)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local weathered, cracked = WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition
@@ -89,8 +88,8 @@ local function partModels(vehicle, partId)
     return found
 end
 
---- The models a part of `vehicle` shows, sorted and joined with commas.
-function Trailer.shownModels(vehicle, partId)
+-- The models a part of `vehicle` shows, sorted and joined with commas.
+local function shownModels(vehicle, partId)
     local shown = {}
     for _, info in ipairs(partModels(vehicle, partId)) do
         table.insert(shown, fieldValue(info, "scriptModel"):getId())
@@ -142,7 +141,7 @@ function Trailer.vehicleState(vehicle)
     end
     for _, id in ipairs(ArrowBoard.PANELS) do
         state.panels[id] = partState(vehicle, id)
-        state.panels[id].shown = Trailer.shownModels(vehicle, id)
+        state.panels[id].shown = shownModels(vehicle, id)
     end
     for _, frame in ipairs(ArrowBoard.FRAME) do
         state.frame[frame.id] = partState(vehicle, frame.id)
@@ -167,7 +166,7 @@ function Trailer.vehicleState(vehicle)
     if door then
         state.lid = { open = door:isOpen(), locked = door:isLocked(), lockBroken = door:isLockBroken(),
             installed = lid:getInventoryItem() ~= nil,
-            shown = Trailer.shownModels(vehicle, ArrowBoard.LID) }
+            shown = shownModels(vehicle, ArrowBoard.LID) }
     end
     state.switchOn = ArrowBoard.isSwitchedOn(vehicle)
     state.lamps = ArrowBoard.lamps(vehicle)

@@ -11,6 +11,10 @@ local test = T.test
 local GasKit, Materials, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Materials, RenewableEnergy.Sprites
 local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
 
+-- A hopper load of wood, and a filter of clean packing.
+local WOOD = { { type = "Base.Plank", count = 6 } }
+local PACKING = { { type = "Base.HayTuft" } }
+
 -- An empty-tanked generator and a gasifier of `tier` beside it, or nil.
 local function gasifierBeside(self, tier)
     local generator = T.generator(self, { fuel = 0 })
@@ -75,7 +79,7 @@ test("renewable_energy_woodgas_gasifier_runs_generator", {
         self.generatorSide = Gasifier.sideOf(gasifier.x, gasifier.y, generator.x, generator.y)
         self.gasifierSide = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
         self.hours = 10
-        T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 6 } }, filter = { { type = "Base.HayTuft" } } })
+        T.fillRecord(self, gasifier, { hopper = WOOD, filter = PACKING })
         -- Lit first, so gas reaches the generator the moment the line is in.
         light(self, gasifier)
         T.fitAndConnect(self, generator, gasifier)
@@ -133,7 +137,7 @@ test("renewable_energy_woodgas_full_ash_or_spent_filter_cuts_output", {
         local generator, gasifier = gasifierBeside(self, "standard")
         if not gasifier then return end
         self.dirtyCap = GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
-        T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 6 } }, filter = { { type = "Base.HayTuft" } } })
+        T.fillRecord(self, gasifier, { hopper = WOOD, filter = PACKING })
         T.setRecord(self, gasifier, { lit = true })
         T.fitAndConnect(self, generator, gasifier)
         T.batch(function()
@@ -180,7 +184,7 @@ test("renewable_energy_woodgas_gasifier_idles_as_a_generator", {
         local burning = idling and T.placeRecord(self, "gasifier", "standard")
         if not burning then return end
         self.hours = 10
-        T.fillRecord(self, idling, { hopper = { { type = "Base.Plank", count = 6 } } })
+        T.fillRecord(self, idling, { hopper = WOOD })
         T.setRecord(self, idling, { lit = true })
         T.fitAndConnect(self, generator, idling)
         T.batch(function()
@@ -221,35 +225,44 @@ test("renewable_energy_woodgas_gasifier_idles_as_a_generator", {
     end,
 })
 
--- Gas through a filter with no clean packing wears the generator it runs faster than clean gas does:
--- its wear factor times vanilla's own chance, which the generator's item script gives
--- (ConditionLowerChanceOneIn, IsoGenerator.update). The test sets that chance to every hour, so the
--- wear a pass adds is certain rather than rolled.
+-- Gas through a filter with no clean packing wears the generator it runs beyond vanilla's own wear:
+-- each hour, a chance of its wear factor less one times vanilla's chance, which the generator's
+-- item script gives (ConditionLowerChanceOneIn, IsoGenerator.update). The rolls are set either side
+-- of that chance; clean gas wears nothing extra even on a roll every chance takes.
 test("renewable_energy_woodgas_dirty_gas_wears_generator", {
     instant = true,
     run = function(self)
         self.hours = 10
+        -- Vanilla's chance, set so the dirty one lies well inside 0 to 1.
+        local oneIn = 2 * Gasifier.WEAR_DIRTY
+        self.chance = (Gasifier.WEAR_DIRTY - 1) / oneIn
         local dirtyGenerator, dirty = gasifierBeside(self, "standard")
         if not dirty then return end
         local cleanGenerator, clean = gasifierBeside(self, "standard")
         if not clean then return end
-        self.lines = { { name = "dirty", generator = dirtyGenerator, gasifier = dirty, filter = {} },
-            { name = "clean", generator = cleanGenerator, gasifier = clean, filter = { { type = "Base.HayTuft" } } } }
-        for _, line in ipairs(self.lines) do
-            T.fillRecord(self, line.gasifier, { hopper = { { type = "Base.Plank", count = 6 } }, filter = line.filter })
+        local lines = { { name = "dirty", generator = dirtyGenerator, gasifier = dirty, filter = {} },
+            { name = "clean", generator = cleanGenerator, gasifier = clean, filter = PACKING } }
+        for _, line in ipairs(lines) do
+            T.fillRecord(self, line.gasifier, { hopper = WOOD, filter = line.filter })
             T.setRecord(self, line.gasifier, { lit = true })
             T.fitAndConnect(self, line.generator, line.gasifier)
         end
         local args = T.at(dirtyGenerator)
-        args.oneIn = 1
+        args.oneIn = oneIn
         T.server(self, "generatorWearChance", args)
+        local passes = { { "dirtyHit", dirtyGenerator, self.chance - 0.01 }, { "dirtyMiss", dirtyGenerator, self.chance + 0.01 },
+            { "clean", cleanGenerator, 0 } }
         T.batch(function()
-            for _, line in ipairs(self.lines) do
+            for _, line in ipairs(lines) do
                 T.setGenerator(self, line.generator, { running = true })
                 T.readRecord(self, line.gasifier, line.name .. "Gasifier")
-                T.readGenerator(self, line.generator, line.name .. "Before")
-                T.gasPass(self, line.generator, self.hours)
-                T.readGenerator(self, line.generator, line.name .. "After")
+            end
+            for _, pass in ipairs(passes) do
+                local label, generator, roll = pass[1], pass[2], pass[3]
+                T.forceRoll(self, roll)
+                T.readGenerator(self, generator, label .. "Before")
+                T.gasPass(self, generator, self.hours)
+                T.readGenerator(self, generator, label .. "After")
             end
         end)
     end,
@@ -258,16 +271,16 @@ test("renewable_energy_woodgas_dirty_gas_wears_generator", {
         local dirtyWear, cleanWear = reads.dirtyGasifier.summary.wear, reads.cleanGasifier.summary.wear
         T.expect(dirtyWear == Gasifier.WEAR_DIRTY and cleanWear == 1,
             "the gasifiers' wear factors are " .. tostring(dirtyWear) .. " and " .. tostring(cleanWear))
-        for _, name in ipairs({ "dirty", "clean" }) do
-            T.expect(reads[name .. "After"].running, "the generator on " .. name .. " gas stalled or stopped")
-        end
-        local function lost(name)
-            return reads[name .. "Before"].condition - reads[name .. "After"].condition
+        local function lost(label)
+            T.expect(reads[label .. "After"].running, "the generator of the " .. label .. " pass stalled or stopped")
+            return reads[label .. "Before"].condition - reads[label .. "After"].condition
         end
         -- Each hour that wears takes one or two condition (IsoGenerator.update).
-        T.expect(lost("dirty") >= self.hours and lost("dirty") <= 2 * self.hours,
-            "dirty gas wore the generator " .. lost("dirty") .. " condition over " .. self.hours .. " hours, its every hour coming up")
-        T.expect(lost("clean") == 0, "clean gas wore the generator " .. lost("clean") .. " condition beyond vanilla's own wear")
+        local hit, miss, clean = lost("dirtyHit"), lost("dirtyMiss"), lost("clean")
+        T.expect(hit >= self.hours and hit <= 2 * self.hours, "dirty gas rolling under its chance of " .. self.chance
+            .. " wore the generator " .. hit .. " condition over " .. self.hours .. " hours")
+        T.expect(miss == 0, "dirty gas rolling over its chance of " .. self.chance .. " wore the generator " .. miss .. " condition")
+        T.expect(clean == 0, "clean gas wore the generator " .. clean .. " condition beyond vanilla's own wear")
     end,
 })
 

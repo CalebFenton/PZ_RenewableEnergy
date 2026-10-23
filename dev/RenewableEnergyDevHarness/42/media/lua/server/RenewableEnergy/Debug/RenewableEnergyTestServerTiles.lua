@@ -16,7 +16,7 @@ local Sprites = RenewableEnergy.Sprites
 -- modules replaced by `change.modules` and, with `change.snow`, snow laid on it first; then its
 -- cracks shown as the mod shows them. Answers its overlays in drawing order.
 handler("panelCracks", function(_, args)
-    local PowerBank = RenewableEnergy.PowerBank
+    local PanelSource = RenewableEnergy.PanelSource
     local panel = objectWithSprite(squareAt(args), args.sprite)
     if not panel then
         return nil, "the panel " .. tostring(args.sprite) .. " on the server"
@@ -26,12 +26,9 @@ handler("panelCracks", function(_, args)
         if change.snow then
             panel:addAttachedAnimSpriteByName(Sprites.snow.flat)
         end
-        panel:getModData()[PowerBank.MODULES] = change.modules
-        if isServer() then
-            panel:transmitModData()
-        end
+        PanelSource.writeModules(panel, change.modules)
     end
-    RenewableEnergy.PanelSource.showCracks(panel)
+    PanelSource.showCracks(panel)
     return { overlays = overlaysOf(panel) }
 end)
 
