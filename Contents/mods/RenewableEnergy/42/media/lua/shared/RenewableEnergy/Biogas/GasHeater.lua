@@ -37,7 +37,7 @@ function GasHeater.isHeater(object)
 end
 
 function GasHeater.isLit(object)
-    return Sprites.nameOf(object) == Sprites.gasHeater.lit
+    return select(3, Sprites.kindOfObject(object)) == "lit"
 end
 
 -- The first object within REACH of `object`'s square on its level that `matches`, or nil.

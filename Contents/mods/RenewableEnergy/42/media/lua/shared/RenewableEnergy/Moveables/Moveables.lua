@@ -1,6 +1,7 @@
 require "Moveables/ISMoveableDefinitions"
 require "Moveables/ISMoveableSpriteProps"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
@@ -14,6 +15,7 @@ require "RenewableEnergy/Biogas/Digester"
 
 local Specs, PowerBank = RenewableEnergy.Specs, RenewableEnergy.PowerBank
 local Treadmill, SolarGardenLight = RenewableEnergy.Treadmill, RenewableEnergy.SolarGardenLight
+local Sprites = RenewableEnergy.Sprites
 
 -- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Other placed objects
 -- have no CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
@@ -132,12 +134,13 @@ function ISMoveableSpriteProps:pickUpMoveableInternal(character, square, object,
     return item
 end
 
--- Copies the keys before vanilla adds the item to the inventory and sends it to the client.
+-- Copies the keys before vanilla adds the item to the inventory and sends it to the client. A fixed
+-- tile (Sprites.fixedTiles) picks up as its turnable twin, so its item places as one.
 local vanillaInstanceItem = ISMoveableSpriteProps.instanceItem
 function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
     local from = pickingUp
     pickingUp = nil
-    local item = vanillaInstanceItem(self, spriteNameOverride)
+    local item = vanillaInstanceItem(self, spriteNameOverride or (self.spriteName and Sprites.fixedTiles[self.spriteName]))
     if item and from and from:hasModData() then
         local fromData, to = from:getModData(), item:getModData()
         for _, key in ipairs(CARRIED_KEYS) do
@@ -145,4 +148,10 @@ function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
         end
     end
     return item
+end
+
+-- An item in a save may carry a fixed tile (Sprites.fixedTiles); it goes down as the turnable twin.
+local vanillaPlace = ISMoveableSpriteProps.placeMoveableInternal
+function ISMoveableSpriteProps:placeMoveableInternal(character, square, item, spriteName)
+    return vanillaPlace(self, character, square, item, Sprites.turnable(spriteName))
 end

@@ -63,8 +63,8 @@ end
 
 -- WorldSpawns.placeBank with BANK_STOCK[args.stock] on the square at `args`, as a room seen for the
 -- first time places one, with every Chance roll at `args.roll` if given. Answers whether it placed
--- one, its tile and stock, and whether the stock's tile stands on the square. Removed when the test
--- ends.
+-- one, its tile and stock, and whether the stock's tile, in any facing, stands on the square.
+-- Removed when the test ends.
 handler("worldBank", function(_, args, defer)
     local square = squareAt(args)
     if not square then
@@ -76,8 +76,9 @@ handler("worldBank", function(_, args, defer)
     if bank then
         defer(function() removePlaced(bank) end)
     end
-    local tile = Sprites[RenewableEnergy.WorldSpawns.BANK_STOCK[args.stock].sprite]
-    local answer = { placed = bank ~= nil, boxOnSquare = objectWithSprite(square, tile) ~= nil }
+    local kind = RenewableEnergy.WorldSpawns.BANK_STOCK[args.stock].sprite
+    local onSquare = RenewableEnergy.findObjectOn(square, function(object) return Sprites.kindOfObject(object) == kind end)
+    local answer = { placed = bank ~= nil, boxOnSquare = onSquare ~= nil }
     if bank then
         answer.sprite = bank:getTextureName()
         answer.stock = stockOf(bank:getContainer())
@@ -240,6 +241,81 @@ check("batteryWear", function(expect, _, _, _, defer)
             end
         end
     end
+end)
+
+-- PART_WEAR wears every inverter and the charge controller, not the battery charger: to its mean
+-- less its half width at the lowest rolls, its mean at middling ones and no better than new at the
+-- highest; a roll just under its dud chance makes a dud, at PART_DUD's lowest and highest condition
+-- by the next roll, worse than any working find, and a roll at it doesn't. Each worn part is marked
+-- as having a condition of its own. With every roll middling, the parts of a bank's stock, a
+-- crate's and an arrow board's battery box come at the mean, marked.
+check("partWear", function(expect, _, _, _, defer)
+    local WorldSpawns, Specs, Wear = RenewableEnergy.WorldSpawns, RenewableEnergy.Specs, RenewableEnergy.Wear
+    local wear, dud = WorldSpawns.PART_WEAR, WorldSpawns.PART_DUD
+    expect(dud.min >= 0 and dud.min <= dud.max and dud.max < wear.mean - wear.halfWidth,
+        "a part dud's condition " .. dud.min .. " to " .. dud.max .. " overlaps a found part's from " .. wear.mean - wear.halfWidth)
+    local types = { Specs.controller }
+    for fullType in pairs(Specs.inverters) do
+        table.insert(types, fullType)
+    end
+    for _, fullType in ipairs(types) do
+        expect(WorldSpawns.isWornPart(fullType), fullType .. " isn't worn when found")
+    end
+    expect(not WorldSpawns.isWornPart(Specs.charger), Specs.charger .. " is worn when found")
+    local function worn(fullType, rolls)
+        local item = instanceItem(fullType)
+        local restoreRoll = Helpers.forceRolls(defer, rolls)
+        WorldSpawns.wearFoundPart(item)
+        restoreRoll()
+        return item:getCondition(), Wear.hasOwnCondition(item)
+    end
+    local TOP = 1 - UNDER
+    for _, fullType in ipairs(types) do
+        for _, case in ipairs({
+            { roll = 0, condition = wear.mean - wear.halfWidth },
+            { roll = 0.5, condition = wear.mean },
+            { roll = TOP, condition = math.min(100, wear.mean + wear.halfWidth) },
+        }) do
+            local condition, marked = worn(fullType, { wear.dud, case.roll, case.roll, case.roll })
+            expect(condition == case.condition and marked, string.format("a found %s at rolls of %s has condition %d, marked %s, not %d",
+                fullType, case.roll, condition, tostring(marked), case.condition))
+        end
+        for _, case in ipairs({ { roll = 0, condition = dud.min }, { roll = TOP, condition = dud.max } }) do
+            local condition, marked = worn(fullType, { wear.dud - UNDER, case.roll })
+            expect(condition == case.condition and marked, string.format("a %s dud at a roll of %s has condition %d, marked %s, not %d",
+                fullType, case.roll, condition, tostring(marked), case.condition))
+        end
+    end
+    -- Found batteries are sent to the clients that see them, which a scratch container can't be, so
+    -- the Batteries option keeps them out; the parts don't depend on them.
+    local options = SandboxVars.RenewableEnergy
+    local restoreOptions = saveOptions(defer, { "LRMBatteries", "LRMMisc" })
+    options.LRMBatteries, options.LRMMisc = 0, 1
+    local container = RenewableEnergy.Loot.newContainer(nil)
+    local fills = {
+        ["the powerYard bank"] = function(c) WorldSpawns.stockBank(c, "powerYard") end,
+        ["the kit crate"] = function(c) WorldSpawns.stockCrate(c, "kit") end,
+        ["an arrow board's battery box"] = function(c) RenewableEnergy.ArrowBoard.stockBatteryBox(c) end,
+    }
+    for what, fill in pairs(fills) do
+        container:removeAllItems()
+        local restoreRoll = Helpers.forceRolls(defer, 0.5)
+        fill(container)
+        restoreRoll()
+        local parts, items = 0, container:getItems()
+        for i = 0, items:size() - 1 do
+            local item = items:get(i)
+            if WorldSpawns.isWornPart(item:getFullType()) then
+                parts = parts + 1
+                expect(item:getCondition() == wear.mean and Wear.hasOwnCondition(item), string.format(
+                    "%s's %s has condition %d, marked %s, not %d", what, item:getFullType(), item:getCondition(),
+                    tostring(Wear.hasOwnCondition(item)), wear.mean))
+            end
+        end
+        expect(parts > 0, what .. " holds no part at middling rolls")
+    end
+    container:removeAllItems()
+    restoreOptions()
 end)
 
 -- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
@@ -551,7 +627,7 @@ local SPOT_CHECKS = {
     bank = function(expect, _, square, spot)
         local bank = RenewableEnergy.PowerBank.bankOn(square)
         local stock = RenewableEnergy.WorldSpawns.BANK_STOCK[spot.stock]
-        expect(bank ~= nil and Sprites.nameOf(bank) == Sprites[stock.sprite], "no " .. spot.stock .. " bank on the bank spot")
+        expect(bank ~= nil and Sprites.kindOfObject(bank) == stock.sprite, "no " .. spot.stock .. " bank on the bank spot")
     end,
     crate = function(expect, _, square)
         expect(objectWithSprite(square, Sprites.crate) ~= nil, "no crate on the crate spot")
@@ -568,7 +644,7 @@ local SPOT_CHECKS = {
         expect(Wind.isBroken(charger) and Wind.isBraked(charger), "the wind charger is found broken " .. tostring(Wind.isBroken(charger))
             .. ", braked " .. tostring(Wind.isBraked(charger)))
         local stock = WorldSpawns.BANK_STOCK[spot.stock]
-        expect(Sprites.nameOf(bank) == Sprites[stock.sprite], "the bank stands on " .. tostring(Sprites.nameOf(bank)))
+        expect(Sprites.kindOfObject(bank) == stock.sprite, "the bank stands on " .. tostring(Sprites.nameOf(bank)))
         expect(bank:isConnected(), "the bank isn't plugged in")
         local wired = PowerBank.bankOfSource(at:getX(), at:getY(), at:getZ())
         expect(wired ~= nil and PowerBank.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),

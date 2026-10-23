@@ -147,8 +147,25 @@ local FAMILY_ROWS = {
         todayKey = "IGUI_RenewableEnergy_TreadmillsToday" },
 }
 
+-- Grid power reaching the bank, whatever state the bank is in, and whether its chargers fill the
+-- batteries from it: without a charger the grid charges nothing.
+local function gridRow(rows, status)
+    if not status.gridPowered then
+        return
+    end
+    local label = getText("IGUI_RenewableEnergy_Grid")
+    if status.chargerMaxW <= 0 then
+        row(rows, label, getText("IGUI_RenewableEnergy_GridNoCharger"), "dim")
+    elseif status.chargeSource == "grid" and status.chargerW > 0 then
+        row(rows, label, getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)), "good")
+    else
+        row(rows, label, getText("IGUI_RenewableEnergy_GridOn"))
+    end
+end
+
 local function powerRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Power")
+    gridRow(rows, status)
     if status.sunElevation > 0 then
         row(rows, getText("IGUI_RenewableEnergy_Sunlight"), Format.percent(status.irradiance / Sun.FULL_SUN))
     else
@@ -160,7 +177,7 @@ local function powerRows(rows, status)
             row(rows, getText(family.todayKey), Format.wattHours(status[family.today]))
         end
     end
-    if status.chargerW > 0 then
+    if status.chargerW > 0 and status.chargeSource ~= "grid" then
         row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
     end
     local generator = status.generator

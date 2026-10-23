@@ -196,7 +196,7 @@ test("renewable_energy_world_bank_spawns_stocked", {
             local stock = stocks[bank.stockName]
             local what = "the " .. bank.stockName .. " bank"
             local count = #bank.stock.charges
-            expect(bank.sprite == Sprites[stock.sprite], what .. " has the wrong tile")
+            expect(Sprites.kindOf(bank.sprite) == stock.sprite, what .. " has the wrong tile")
             expect(bank.stock.explored, what .. " is not explored")
             local copy = copyOf(bank.square, bank.sprite)
             expect(copy ~= nil and copy:isConnected(), what .. " isn't connected on this client")
@@ -222,6 +222,65 @@ test("renewable_energy_world_bank_spawn_refused_outdoors", {
     end,
 })
 
+-- Vanilla brick walls: one on a square's north edge, one on its west edge.
+local WALL_NORTH, WALL_WEST = "walls_exterior_house_01_1", "walls_exterior_house_01_0"
+-- Where a test wall goes for a bank square, and the facing that puts the bank's back to it: the
+-- wall tile, and the square it stands on as a step from the bank's.
+local BACKS = {
+    { wall = WALL_NORTH, dx = 0, dy = 0, facing = "S" },
+    { wall = WALL_WEST, dx = 0, dy = 0, facing = "E" },
+    { wall = WALL_NORTH, dx = 0, dy = 1, facing = "N" },
+    { wall = WALL_WEST, dx = 1, dy = 0, facing = "W" },
+}
+
+-- Whether `square` has no wall on any edge.
+local function unwalled(square)
+    for _, step in ipairs({ { 0, -1 }, { -1, 0 }, { 0, 1 }, { 1, 0 } }) do
+        local beside = getSquare(square:getX() + step[1], square:getY() + step[2], square:getZ())
+        if not beside or square:isWallTo(beside) then
+            return false
+        end
+    end
+    return true
+end
+
+-- A world bank stands with its back to the wall of its square, on whichever edge the wall is, as
+-- furniture does.
+test("renewable_energy_world_bank_backs_onto_wall", {
+    run = function(self)
+        local free = T.need(self, T.squares(self, 24, { indoors = true }), "free indoor squares for banks") or {}
+        -- Squares with no wall of their own, none beside another, so no test wall stands at
+        -- another's edge.
+        local picked = {}
+        for _, square in ipairs(free) do
+            local apart = unwalled(square)
+            for _, other in ipairs(picked) do
+                apart = apart and math.max(math.abs(other:getX() - square:getX()), math.abs(other:getY() - square:getY())) > 1
+            end
+            if apart and #picked < #BACKS then
+                table.insert(picked, square)
+            end
+        end
+        if not T.need(self, #picked == #BACKS and picked, #BACKS .. " unwalled indoor squares apart") then return end
+        self.placed = {}
+        for i, back in ipairs(BACKS) do
+            local square = picked[i]
+            T.placeTile(self, getSquare(square:getX() + back.dx, square:getY() + back.dy, square:getZ()), back.wall)
+            T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "shed" })
+            T.step(function() self.placed[i] = self.server.worldBank.sprite end)
+        end
+    end,
+    validate = function(self)
+        for i, back in ipairs(BACKS) do
+            local sprite = self.placed[i]
+            local kind, facing = Sprites.kindOf(sprite)
+            expect(kind == "batteryBoxWood" and facing == back.facing, "the bank with a wall on the "
+                .. ({ S = "north", E = "west", N = "south", W = "east" })[back.facing] .. " edge stands as "
+                .. tostring(sprite) .. ", facing " .. tostring(facing) .. ", not " .. back.facing)
+        end
+    end,
+})
+
 -- Bank tiers whose tile is a battery box, which has no slot for a charge controller.
 local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
 
@@ -243,6 +302,10 @@ test("renewable_energy_world_bank_stock_option_zero", {
 
 -- How each wear profile wears a battery, and its duds.
 serverCheck("renewable_energy_world_bank_battery_wear", "batteryWear")
+
+-- How found inverters and controllers wear, their duds, and that banks, crates and the arrow
+-- board's battery box hand them out worn.
+serverCheck("renewable_energy_world_part_wear", "partWear")
 
 -- A placed bank's batteries are worn as its stock says, so a farm storeroom's come more worn than
 -- an electronics store's: at middling rolls every battery is at its stock's profile's mean.
@@ -1090,10 +1153,14 @@ test("renewable_energy_world_bank_rooms_seen_first_time", {
     end,
     validate = function(self)
         for i, entry in ipairs(SEEN_ROOMS) do
-            local trial, tiles = entry.trial, self.server.seenRoom.results[i].tiles
+            local trial, tiles = entry.trial, {}
+            -- By kind: a bank stands in whichever facing puts its back to a wall.
+            for _, tile in ipairs(self.server.seenRoom.results[i].tiles) do
+                table.insert(tiles, Sprites.kindOf(tile) or tile)
+            end
             local wanted = {}
-            if entry.bank then table.insert(wanted, Sprites[entry.bank]) end
-            if entry.crate then table.insert(wanted, Sprites.crate) end
+            if entry.bank then table.insert(wanted, entry.bank) end
+            if entry.crate then table.insert(wanted, "crate") end
             table.sort(wanted)
             table.sort(tiles)
             expect(table.concat(tiles, ",") == table.concat(wanted, ","), string.format(

@@ -659,21 +659,45 @@ function Distributions.apply()
     applyStashMaps()
 end
 
--- Found batteries
+-- Found items
 
---- Gives the mod's batteries in a freshly filled container, bags included, a part charge. A
---- battery that already has a charge of its own is one a refill (loot respawn) found there.
----@param container ItemContainer
-function Distributions.chargeFoundBatteries(container)
+local OWN_CONTAINER = {}
+for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
+    OWN_CONTAINER[containerType] = true
+end
+
+-- An inverter or controller as loot rolls it: with no condition of its own. Its condition may be
+-- anything: the game rolls a uniform one for 40% of the tools it puts outside shops
+-- (ItemPickerJava.doRollItemInternal, randomizeGeneralCondition), which PART_WEAR replaces.
+local function isFreshPart(item)
+    return WorldSpawns.isWornPart(item:getFullType()) and not RenewableEnergy.Wear.hasOwnCondition(item)
+end
+
+local function readyItems(container, wearParts)
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item:IsInventoryContainer() then
-            Distributions.chargeFoundBatteries(item:getInventory())
-        elseif item:getModule() == "RenewableEnergy" and Battery.isBattery(item) and not Battery.hasCharge(item) then
-            Battery.setFoundCharge(item)
+            readyItems(item:getInventory(), wearParts)
+        elseif item:getModule() == "RenewableEnergy" then
+            if Battery.isBattery(item) and not Battery.hasCharge(item) then
+                Battery.setFoundCharge(item)
+            elseif wearParts and isFreshPart(item) then
+                WorldSpawns.wearFoundPart(item)
+            end
         end
     end
+end
+
+--- Readies the mod's items in a freshly filled container, bags included: batteries get a part
+--- charge, inverters and controllers their wear (WorldSpawns.wearFoundPart). A refill (loot
+--- respawn) fires this again over what players left there, so it passes over a battery that has
+--- a charge of its own and a part that has a condition of its own. The mod's own containers, banks
+--- among them, roll no loot, so no part in one is worn, marked or not. The game sends the filled
+--- items after this (RequestItemsForContainerPacket, LootRespawn), condition included.
+---@param container ItemContainer
+function Distributions.readyFoundItems(container)
+    readyItems(container, not OWN_CONTAINER[container:getType()])
 end
 
 -- Cracked modules
@@ -742,7 +766,7 @@ local function onFillContainer(roomName, containerType, container)
     if instanceof(container, "ItemContainer") then
         Distributions.addCrackedModules(roomName, containerType, container)
         ArrowBoard.stockIfBatteryBox(roomName, container)
-        Distributions.chargeFoundBatteries(container)
+        Distributions.readyFoundItems(container)
     end
 end
 

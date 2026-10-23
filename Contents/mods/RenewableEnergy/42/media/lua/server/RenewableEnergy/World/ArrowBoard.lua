@@ -44,7 +44,7 @@ ArrowBoard.BOARD = "WindshieldRear"
 local ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4 }
 
 -- What a found trailer comes with. Its batteries are worn by years on the road, and
--- Distributions.chargeFoundBatteries charges them. Crews padlocked these boxes because batteries
+-- Distributions.readyFoundItems charges them. Crews padlocked these boxes because batteries
 -- are what thieves take from a work zone, so more are locked than vanilla's trunks, and left the
 -- boards running where they stood, so most are switched on.
 ArrowBoard.STOCK = {
@@ -90,7 +90,10 @@ function ArrowBoard.stockBatteryBox(container)
         end
     end
     if Chance.hit(stock.controllerChance * options.LRMMisc) then
-        container:AddItem(Specs.controller)
+        local controller = container:AddItem(Specs.controller)
+        if controller then
+            WorldSpawns.wearFoundPart(controller)
+        end
     end
 end
 

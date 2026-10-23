@@ -333,6 +333,78 @@ check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
     end
 end)
 
+-- A container type that "all" rolls an inverter and a controller into for certain, as
+-- PROBE_CONTAINER does batteries.
+local PART_PROBE_CONTAINER = "RenewableEnergyTestParts"
+local PART_PROBE_LOOT = { rolls = 2, items = { "RenewableEnergy.PlugInInverter", 1000, "RenewableEnergy.ChargeController", 1000 } }
+
+-- The mod's inverters and controllers in the container, bags included.
+local function modParts(container, found)
+    found = found or {}
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if item:IsInventoryContainer() then
+            modParts(item:getInventory(), found)
+        elseif RenewableEnergy.WorldSpawns.isWornPart(item:getFullType()) then
+            table.insert(found, item)
+        end
+    end
+    return found
+end
+
+-- With every Chance roll middling, inverters and controllers a fill hands out, and one already in
+-- a bag in the container, come at PART_WEAR's mean and marked, whatever condition the game rolled
+-- them. A refill leaves alone a found part that came out as new and a crafted controller (its
+-- recipe's OnCreate); and a fill of a bank's container type wears no part in it, marked or not.
+-- `args` is a free outdoor square.
+check("lootFoundParts", function(expect, _, _, args, defer)
+    if not distributions(expect) then
+        return
+    end
+    local square = squareAt(args)
+    if not square or square:getRoom() then
+        return "an outdoor square loaded on the server"
+    end
+    local WorldSpawns, Wear = RenewableEnergy.WorldSpawns, RenewableEnergy.Wear
+    local mean = WorldSpawns.PART_WEAR.mean
+    SuburbsDistributions.all[PART_PROBE_CONTAINER] = PART_PROBE_LOOT
+    ItemPickerJava.Parse()
+    defer(function()
+        SuburbsDistributions.all[PART_PROBE_CONTAINER] = nil
+        ItemPickerJava.Parse()
+    end)
+    local restoreRoll = Helpers.forceRolls(defer, 0.5)
+    local container = containerInWorld(square, PART_PROBE_CONTAINER, defer)
+    container:AddItem("Base.Bag_DuffelBag"):getInventory():AddItem("RenewableEnergy.PowerInverter")
+    ItemPickerJava.fillContainer(container, nil)
+    local found = modParts(container)
+    -- The bag's inverter and, from the probe table, at least one rolled.
+    expect(#found >= 2, #found .. " parts in the container after a fill")
+    for _, part in ipairs(found) do
+        expect(part:getCondition() == mean and Wear.hasOwnCondition(part), string.format(
+            "a found %s has condition %d, marked %s, not %d and marked", part:getFullType(), part:getCondition(),
+            tostring(Wear.hasOwnCondition(part)), mean))
+    end
+    local asNew = found[1]
+    if asNew then
+        Wear.setCondition(asNew, asNew:getConditionMax())
+    end
+    local crafted = container:AddItem(RenewableEnergy.Specs.controller)
+    RenewableEnergy.Recipes.makeChargeController({ getFirstCreatedItem = function() return crafted end })
+    ItemPickerJava.fillContainer(container, nil)
+    if asNew then
+        expect(asNew:getCondition() == asNew:getConditionMax(), "a found part as good as new has condition " .. asNew:getCondition() .. " after a refill")
+    end
+    expect(crafted:getCondition() == crafted:getConditionMax(), "a crafted controller has condition " .. crafted:getCondition() .. " after a refill")
+    local bank = containerInWorld(square, "RenewableEnergyBatteryBoxWood", defer)
+    local installed = bank:AddItem("RenewableEnergy.PlugInInverter")
+    ItemPickerJava.fillContainer(bank, nil)
+    restoreRoll()
+    expect(installed:getCondition() == installed:getConditionMax() and not Wear.hasOwnCondition(installed),
+        "an unmarked inverter in a bank has condition " .. installed:getCondition() .. " after a fill")
+end)
+
 -- Rooms whose own "all" table vanilla rolls into every container in them
 -- (ItemPickerJava.fillContainerTypeInternal), a player's too; the mod can't leave a player's
 -- containers out of it without taking the room's loot away.
@@ -342,7 +414,8 @@ local VANILLA_ALL_ROOMS = { sodatruck = true }
 -- IsoThumpables, as a bank is not. That rolls the room's "all" table, then its table for the
 -- container's type, and fires OnFillContainer; outside any room, or in a room with no
 -- distribution, it uses SuburbsDistributions.all. The stash spawn table fills its crate on purpose,
--- and a stash house is the only place that uses it. `args.sprites` are the tiles a player builds.
+-- and a stash house is the only place that uses it. `args.sprites` are the Sprites fields of the
+-- tiles a player builds, a bank's in every facing.
 check("lootPlayerContainers", function(expect, _, _, args)
     local D = distributions(expect)
     if not D then
@@ -355,8 +428,11 @@ check("lootPlayerContainers", function(expect, _, _, args)
         expect(not D.CRACKED_MODULE_CONTAINERS[containerType], containerType .. " gets cracked modules")
     end
     for _, field in ipairs(args.sprites) do
-        local containerType = getSprite(Sprites[field]):getProperties():get("container")
-        expect(own[containerType], field .. "'s container " .. tostring(containerType) .. " is not one of the mod's own")
+        local tiles = Sprites[field]
+        for _, tile in pairs(type(tiles) == "table" and tiles or { tiles }) do
+            local containerType = getSprite(tile):getProperties():get("container")
+            expect(own[containerType], tile .. "'s container " .. tostring(containerType) .. " is not one of the mod's own")
+        end
     end
     for roomName, room in pairs(SuburbsDistributions) do
         if type(room) == "table" and (room.rolls == nil or roomName == "all") then

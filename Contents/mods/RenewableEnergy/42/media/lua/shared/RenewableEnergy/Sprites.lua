@@ -12,16 +12,19 @@ local Sprites = {}
 RenewableEnergy.Sprites = Sprites
 
 local TILESET = "renewable_energy_01"
+-- The overlays of the banks' E, N and W tiles, which the first tileset can't also hold: a tileset
+-- holds 512 tiles (IsoWorld.LoadTileDefinitions).
+local TURNED_TILESET = "renewable_energy_02"
 
-local function tile(index)
-    return TILESET .. "_" .. index
+local function tile(index, tileset)
+    return (tileset or TILESET) .. "_" .. index
 end
 
 -- `count` tiles numbered from `first`, in order.
-local function tiles(first, count)
+local function tiles(first, count, tileset)
     local list = {}
     for i = 1, count do
-        list[i] = tile(first + i - 1)
+        list[i] = tile(first + i - 1, tileset)
     end
     return list
 end
@@ -45,13 +48,16 @@ Sprites.crate = tile(11)
 Sprites.crateOverlays = { full = tile(12), closed = tile(13) }
 Sprites.gardenLight = { off = tile(14), lit = tile(15) }
 
--- Banks, one tile per tier and material. Specs.banks[itemType].sprite names the field.
-Sprites.batteryBoxWood = tile(8)
-Sprites.batteryBoxMetal = tile(23)
-Sprites.batteryRackWood = tile(32)
-Sprites.batteryRackMetal = tile(33)
-Sprites.batteryBankWood = tile(34)
-Sprites.batteryBankMetal = tile(9)
+-- Banks, one tile per tier, material and facing. Specs.banks[itemType].sprite names the field. The
+-- placing cursor finds a facing's tile by its number in the same tileset, at most 96 away
+-- (ISMoveableSpriteProps.getFaces, IsoWorld.SetCustomPropertyValues), so each bank's four follow
+-- one another.
+Sprites.batteryBoxWood = { S = tile(340), E = tile(341), N = tile(342), W = tile(343) }
+Sprites.batteryBoxMetal = { S = tile(344), E = tile(345), N = tile(346), W = tile(347) }
+Sprites.batteryRackWood = { S = tile(348), E = tile(349), N = tile(350), W = tile(351) }
+Sprites.batteryRackMetal = { S = tile(352), E = tile(353), N = tile(354), W = tile(355) }
+Sprites.batteryBankWood = { S = tile(356), E = tile(357), N = tile(358), W = tile(359) }
+Sprites.batteryBankMetal = { S = tile(360), E = tile(361), N = tile(362), W = tile(363) }
 
 -- Biogas digesters, built in place, one facing each. A barrel digester looks like the barrel it was
 -- built from, so its tiles are keyed by that item's type (DigesterSystem.OnCreate).
@@ -77,8 +83,27 @@ Sprites.digesterHolder = {
 }
 -- The scrubber fitted to each digester, drawn over the digester's own tile.
 Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = tile(249) }
--- The homemade gas heater, one facing; both tiles give the heater back.
-Sprites.gasHeater = { off = tile(244), lit = tile(245) }
+-- The homemade gas heater, off and lit, by facing; every tile gives the heater back.
+Sprites.gasHeater = {
+    off = { S = tile(364), E = tile(365), N = tile(366), W = tile(367) },
+    lit = { S = tile(368), E = tile(369), N = tile(370), W = tile(371) },
+}
+-- The S tiles a save's banks and heaters may stand on, each to its turnable twin, which looks the
+-- same. No numbers within 96 of them are free for other facings, so they don't turn; they work as
+-- their twin, and pick up and place as it (Moveables.lua).
+Sprites.fixedTiles = {
+    [tile(8)] = Sprites.batteryBoxWood.S, [tile(23)] = Sprites.batteryBoxMetal.S,
+    [tile(32)] = Sprites.batteryRackWood.S, [tile(33)] = Sprites.batteryRackMetal.S,
+    [tile(34)] = Sprites.batteryBankWood.S, [tile(9)] = Sprites.batteryBankMetal.S,
+    [tile(244)] = Sprites.gasHeater.off.S, [tile(245)] = Sprites.gasHeater.lit.S,
+}
+
+--- The tile a placed `spriteName` turns as: its turnable twin for one of Sprites.fixedTiles, else
+--- itself.
+function Sprites.turnable(spriteName)
+    return Sprites.fixedTiles[spriteName] or spriteName
+end
+
 -- The gas kit fitted to a generator and the generator's half of a gasifier's pipe, drawn over the
 -- game's own generator tile. The kit sits on each generator body's air intake, so both are drawn per
 -- body and facing; `default` lies on the floor for a generator the game doesn't know (another mod's).
@@ -180,23 +205,46 @@ Sprites.cracks = {
     },
 }
 
--- Each bank tile's overlays: `batteries[look][n]` shows a battery of that look in slot n, linked
--- to the one before it, and `meter[level]` its charge meter lit from 1 (empty) to the last level
--- (full). A bank draws one battery overlay per battery it holds, in slot order, then its meter.
+-- Each bank tile's overlays, by the bank's Sprites field and facing: `batteries[look][n]` shows a
+-- battery of that look in slot n, linked to the one before it, and `meter[level]` its charge meter
+-- lit from 1 (empty) to the last level (full). A bank draws one battery overlay per battery it
+-- holds, in slot order, then its meter. The meter is on the bank's front, so facing N or W, away
+-- from the camera, a bank shows none and has no `meter`.
 Sprites.bankFill = {
-    batteryBoxWood = { batteries = { car = tiles(36, 2), deepCycle = tiles(136, 2), l16 = tiles(182, 2) },
-        meter = tiles(48, 5) },
-    batteryBoxMetal = { batteries = { car = tiles(38, 2), deepCycle = tiles(138, 2), l16 = tiles(184, 2) },
-        meter = tiles(53, 5) },
-    batteryRackWood = { batteries = { car = tiles(73, 6), deepCycle = tiles(140, 6), l16 = tiles(186, 6) },
-        meter = tiles(58, 5) },
-    batteryRackMetal = { batteries = { car = tiles(79, 8), deepCycle = tiles(146, 8), l16 = tiles(192, 8) },
-        meter = tiles(63, 5) },
-    batteryBankWood = { batteries = { car = tiles(87, 12), deepCycle = tiles(154, 12), l16 = tiles(200, 12) },
-        meter = tiles(68, 5) },
-    batteryBankMetal = { batteries = { car = tiles(99, 16), deepCycle = tiles(166, 16), l16 = tiles(212, 16) },
-        meter = tiles(40, 5) },
+    batteryBoxWood = { S = { batteries = { car = tiles(36, 2), deepCycle = tiles(136, 2), l16 = tiles(182, 2) },
+        meter = tiles(48, 5) } },
+    batteryBoxMetal = { S = { batteries = { car = tiles(38, 2), deepCycle = tiles(138, 2), l16 = tiles(184, 2) },
+        meter = tiles(53, 5) } },
+    batteryRackWood = { S = { batteries = { car = tiles(73, 6), deepCycle = tiles(140, 6), l16 = tiles(186, 6) },
+        meter = tiles(58, 5) } },
+    batteryRackMetal = { S = { batteries = { car = tiles(79, 8), deepCycle = tiles(146, 8), l16 = tiles(192, 8) },
+        meter = tiles(63, 5) } },
+    batteryBankWood = { S = { batteries = { car = tiles(87, 12), deepCycle = tiles(154, 12), l16 = tiles(200, 12) },
+        meter = tiles(68, 5) } },
+    batteryBankMetal = { S = { batteries = { car = tiles(99, 16), deepCycle = tiles(166, 16), l16 = tiles(212, 16) },
+        meter = tiles(40, 5) } },
 }
+-- The other facings' overlays fill TURNED_TILESET from 0, facing by facing, bank by bank in this
+-- order (art/models/tiles.py's STORAGE_TILES): each look's batteries by slot, then the meter if any.
+do
+    local BANK_ORDER = { "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood",
+        "batteryBankMetal" }
+    local nextTile = 0
+    local function take(count)
+        local list = tiles(nextTile, count, TURNED_TILESET)
+        nextTile = nextTile + count
+        return list
+    end
+    for _, facing in ipairs({ "E", "N", "W" }) do
+        for _, field in ipairs(BANK_ORDER) do
+            local south = Sprites.bankFill[field].S
+            local slots = #south.batteries.car
+            local fill = { batteries = { car = take(slots), deepCycle = take(slots), l16 = take(slots) } }
+            fill.meter = facing == "E" and take(#south.meter) or nil
+            Sprites.bankFill[field][facing] = fill
+        end
+    end
+end
 -- The look a battery's overlay draws it with, by item type: any other battery is drawn as a car
 -- battery.
 local BATTERY_LOOKS = { ["RenewableEnergy.DeepCycleBattery"] = "deepCycle", ["RenewableEnergy.L16Battery"] = "l16" }
@@ -213,8 +261,6 @@ local KINDS = {
     [Sprites.gardenLight.off] = { "gardenLight" },
     [Sprites.gardenLight.lit] = { "gardenLight" },
     [Sprites.windScoop] = { "scoop" },
-    [Sprites.gasHeater.off] = { "gasHeater" },
-    [Sprites.gasHeater.lit] = { "gasHeater" },
     [Sprites.digester.insulated] = { "digester", "insulated" },
     [Sprites.digester.dome] = { "digester", "dome" },
 }
@@ -228,8 +274,18 @@ for _, mount in ipairs({ "wall", "rack" }) do
         end
     end
 end
-for field in pairs(Sprites.bankFill) do
-    KINDS[Sprites[field]] = { field, nil, field:find("Wood$") and "wood" or "metal" }
+for field, facings in pairs(Sprites.bankFill) do
+    for facing in pairs(facings) do
+        KINDS[Sprites[field][facing]] = { field, facing, field:find("Wood$") and "wood" or "metal" }
+    end
+end
+for state, facings in pairs(Sprites.gasHeater) do
+    for facing, name in pairs(facings) do
+        KINDS[name] = { "gasHeater", facing, state }
+    end
+end
+for fixed, twin in pairs(Sprites.fixedTiles) do
+    KINDS[fixed] = KINDS[twin]
 end
 for facing, ends in pairs(Sprites.treadmill) do
     for part, name in pairs(ends) do
@@ -275,8 +331,8 @@ end
 --- What a placed tile is.
 ---@param spriteName string?
 ---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
----@return string? facing "S", "E", "N" or "W" for walls, racks, propellers, alternators and treadmills; a digester's or gasifier's tier
----@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood" or "pipe" for propellers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"
+---@return string? facing "S", "E", "N" or "W" for walls, racks, banks, gas heaters, propellers, alternators and treadmills; a digester's or gasifier's tier
+---@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood" or "pipe" for propellers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
 function Sprites.kindOf(spriteName)
     local entry = spriteName and KINDS[spriteName]
     if not entry then
@@ -409,14 +465,15 @@ local function batteryLook(fullType)
 end
 
 --- The overlays a bank's tile shows for its batteries and charge, in drawing order: each battery
---- in its slot, as many as the tile has slots, then the meter. A bank without batteries shows
---- none: its meter has nothing to read.
----@param bankSpriteField string the bank's Sprites field, such as "batteryRackWood"
+--- in its slot, as many as the tile has slots, then the meter where the tile shows it. A bank
+--- without batteries shows none: its meter has nothing to read.
+---@param bankSprite string? the bank's placed tile, such as Sprites.batteryRackWood.E
 ---@param batteryTypes string[] the item types of the batteries it holds, in slot order
 ---@param chargeFraction number stored over capacity, 0 to 1
 ---@return string[]
-function Sprites.bankOverlays(bankSpriteField, batteryTypes, chargeFraction)
-    local fill = Sprites.bankFill[bankSpriteField]
+function Sprites.bankOverlays(bankSprite, batteryTypes, chargeFraction)
+    local field, facing = Sprites.kindOf(bankSprite)
+    local fill = field and Sprites.bankFill[field] and Sprites.bankFill[field][facing]
     if not fill or #batteryTypes == 0 then
         return {}
     end
@@ -424,7 +481,9 @@ function Sprites.bankOverlays(bankSpriteField, batteryTypes, chargeFraction)
     for slot = 1, math.min(#batteryTypes, #fill.batteries.car) do
         shown[slot] = fill.batteries[batteryLook(batteryTypes[slot])][slot]
     end
-    table.insert(shown, fill.meter[Sprites.meterLevel(chargeFraction)])
+    if fill.meter then
+        table.insert(shown, fill.meter[Sprites.meterLevel(chargeFraction)])
+    end
     return shown
 end
 

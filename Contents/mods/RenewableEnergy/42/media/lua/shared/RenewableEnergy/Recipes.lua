@@ -354,6 +354,14 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
     RenewableEnergy.giveItems(character, battery)
 end
 
+-- OnCreate of Make Charge Controller: a new controller has a condition of its own, so a loot
+-- refill of the container it is kept in doesn't wear it as if found (Distributions.readyFoundItems).
+function Recipes.makeChargeController(craftRecipeData, character)
+    local controller = craftRecipeData:getFirstCreatedItem()
+    Wear.markOwnCondition(controller)
+    controller:syncItemFields()
+end
+
 -- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
 function Recipes.takeApartGardenLight(craftRecipeData, character)
     local light = firstInput(craftRecipeData, function(item)

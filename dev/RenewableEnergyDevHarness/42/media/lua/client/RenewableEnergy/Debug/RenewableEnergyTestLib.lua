@@ -104,10 +104,10 @@ local function bankCopy(square, count)
 end
 
 --- Queues a working bank of Sprites field `kind` holding `items` (full types), filled straight
---- into its container as world spawns do, its batteries charged to `opts.charge`. It stands on
---- `opts.square`, else near `opts.near`, indoors unless `opts.outdoors`. It comes connected, as a
---- world bank does, unless `opts.connected == false`, as a player's placed bank starts. Returns
---- its handle { square, position, object }.
+--- into its container as world spawns do, its batteries charged to `opts.charge`. It faces
+--- `opts.facing` (S if nil) and stands on `opts.square`, else near `opts.near`, indoors unless
+--- `opts.outdoors`. It comes connected, as a world bank does, unless `opts.connected == false`, as
+--- a player's placed bank starts. Returns its handle { square, position, object }.
 function T.bank(self, kind, items, opts)
     opts = opts or {}
     local square = opts.square or T.square(self, { indoors = not opts.outdoors, near = opts.near },
@@ -119,7 +119,7 @@ function T.bank(self, kind, items, opts)
     local count = #(items or {})
     local connected = opts.connected ~= false
     local args = T.at(square)
-    args.kind, args.items, args.charge, args.connected = kind, items, opts.charge, connected
+    args.kind, args.facing, args.items, args.charge, args.connected = kind, opts.facing, items, opts.charge, connected
     T.server(self, "placeBank", args)
     T.waitFor(self, function()
         bank.object = bankCopy(square, count)
@@ -562,8 +562,20 @@ for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
     end
     for _, tier in ipairs({ "Box", "Rack", "Bank" }) do
         local field = "battery" .. tier .. suffix
-        table.insert(T.PLACED_TILES, { sprite = Sprites[field], item = "RenewableEnergy.Battery" .. tier .. suffix,
-            kind = field, material = material, container = true })
+        for facing, sprite in pairs(Sprites[field]) do
+            table.insert(T.PLACED_TILES, { sprite = sprite, item = "RenewableEnergy.Battery" .. tier .. suffix,
+                kind = field, facing = facing, material = material, container = true })
+        end
+    end
+end
+-- The fixed tiles a save's banks may stand on (Sprites.fixedTiles), each as its turnable twin.
+for fixed, twin in pairs(Sprites.fixedTiles) do
+    for _, placed in ipairs(T.PLACED_TILES) do
+        if placed.sprite == twin then
+            table.insert(T.PLACED_TILES, { sprite = fixed, item = placed.item, kind = placed.kind, facing = placed.facing,
+                material = placed.material, container = placed.container })
+            break
+        end
     end
 end
 

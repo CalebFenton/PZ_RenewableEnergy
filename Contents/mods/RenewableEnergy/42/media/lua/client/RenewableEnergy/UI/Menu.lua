@@ -368,11 +368,13 @@ function Menu.addBankOptions(playerNum, context, bank)
             PowerBank.connectRefusal(character, bank, summary, not connected)))
     end
 
+    -- Sources go only on a connected bank. The generator's flag, which Connect Bank above reads
+    -- too, rather than the summary, so the two options never disagree (Sources.bankRefusal).
     local sources = Sources.sourcesInReach(PowerBank.positionOf(bank))
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
         queueConnectAll, bank, sources)
     Needs.refuse(connect, #sources == 0 and "Tooltip_RenewableEnergy_NoSourcesInReach"
-        or lightOr(character, Action.CONNECT_SOURCE, slotsRefusal(sources, summary.freeSlots)))
+        or lightOr(character, Action.CONNECT_SOURCE, Sources.bankRefusal(connected) or slotsRefusal(sources, summary.freeSlots)))
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)
@@ -463,7 +465,8 @@ function Menu.addSourceOptions(playerNum, context, source)
             local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank),
                 Format.away(here, bankPosition)), playerNum, queueSource, Action.CONNECT_SOURCE, source, bank)
             local summary = PowerBank.summaryOf(bank)
-            Needs.refuse(option, lightOr(character, Action.CONNECT_SOURCE, summary and Sources.slotRefusal(kind, summary.freeSlots)))
+            Needs.refuse(option, lightOr(character, Action.CONNECT_SOURCE, Sources.bankRefusal(bank:isConnected())
+                or summary and Sources.slotRefusal(kind, summary.freeSlots)))
             offered = true
         end
     end
@@ -490,7 +493,7 @@ local function addWiredTreadmillOptions(playerNum, menu, treadmill)
     Needs.show(unwire, Treadmill.unwiringNeeds(character), lightOr(character, Action.UNWIRE_TREADMILL))
 end
 
--- Run on Treadmill and Wire to Bank, for a treadmill neither of whose tiles is wired yet.
+-- Run on Treadmill and Wire the Motor, for a treadmill neither of whose tiles is wired yet.
 function Menu.addTreadmillOptions(playerNum, context, treadmill)
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, Menu.nameOf(treadmill))

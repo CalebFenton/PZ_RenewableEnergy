@@ -34,4 +34,16 @@ function Wear.setCondition(item, condition)
     item:setCondition(math.max(0, math.min(item:getConditionMax(), math.floor(condition))))
 end
 
+-- Item modData: the inverter or controller has a condition of its own (found and worn, or
+-- crafted), so a container refill such as loot respawn must not wear it as if just found.
+local OWN_CONDITION = "RenewableEnergy_ownCondition"
+
+function Wear.markOwnCondition(item)
+    item:getModData()[OWN_CONDITION] = true
+end
+
+function Wear.hasOwnCondition(item)
+    return item:getModData()[OWN_CONDITION] == true
+end
+
 return Wear

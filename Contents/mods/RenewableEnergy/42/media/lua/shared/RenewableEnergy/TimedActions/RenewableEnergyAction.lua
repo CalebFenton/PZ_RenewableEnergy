@@ -205,7 +205,10 @@ end
 JOBS = {
     [Action.CONNECT_SOURCE] = {
         keeps = function(self) return isSource(self.object) and isBank(self.bank) end,
-        check = function(self) return Sources.connectRefusal(self.object, positionOf(self.bank)) == nil end,
+        check = function(self)
+            return Sources.connectRefusal(self.object, positionOf(self.bank)) == nil
+                and Sources.bankRefusal(self.bank:isConnected()) == nil
+        end,
         command = function(self)
             return "connectSource", { bank = positionOf(self.bank), source = positionOf(self.object) }
         end,

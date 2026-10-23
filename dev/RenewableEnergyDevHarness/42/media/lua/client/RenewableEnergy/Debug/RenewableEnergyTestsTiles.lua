@@ -39,11 +39,13 @@ local function overlays()
             add(slots)
         end
     end
-    for _, fill in pairs(Sprites.bankFill) do
-        for _, slots in pairs(fill.batteries) do
-            add(slots)
+    for _, facings in pairs(Sprites.bankFill) do
+        for _, fill in pairs(facings) do
+            for _, slots in pairs(fill.batteries) do
+                add(slots)
+            end
+            add(fill.meter or {})
         end
-        add(fill.meter)
     end
     return all
 end
@@ -104,49 +106,132 @@ test("renewable_energy_tiles_kind_of_reads_every_placed_tile", {
     end,
 })
 
+-- Whether each tile of `set`, a tile name by facing, turns to every other of the set with the
+-- placing cursor.
+local function expectTurns(set, what)
+    for facing, name in pairs(set) do
+        local faces = ISMoveableSpriteProps.new(name):getFaces()
+        for otherFacing, otherName in pairs(set) do
+            expect(faces[otherFacing] == otherName, string.format("%s (%s %s) turns %s to %s, expected %s",
+                name, what, facing, otherFacing, tostring(faces[otherFacing]), otherName))
+        end
+    end
+end
+
 -- The placing cursor turns a rack through all four facings and a wall panel between its two,
 -- without turning wood into metal.
 test("renewable_energy_tiles_mounts_rotate", {
     validate = function()
         for _, mount in ipairs({ "rack", "wall" }) do
             for _, material in ipairs(MATERIALS) do
-                local set = Sprites[mount][material]
-                for facing, name in pairs(set) do
-                    local faces = ISMoveableSpriteProps.new(name):getFaces()
-                    for otherFacing, otherName in pairs(set) do
-                        expect(faces[otherFacing] == otherName, string.format("%s (%s %s) turns %s to %s, expected %s",
-                            name, material, facing, otherFacing, tostring(faces[otherFacing]), otherName))
-                    end
-                end
+                expectTurns(Sprites[mount][material], material .. " " .. mount)
             end
         end
     end,
 })
 
+-- The placing cursor turns every bank and the gas heater through all four facings, as the game's
+-- furniture, each staying the same bank, and a lit heater lit. Every heater tile is a heater that
+-- picks up as its item, and says which way it faces and whether it is lit.
+test("renewable_energy_tiles_banks_and_heater_rotate", {
+    validate = function()
+        for field in pairs(Sprites.bankFill) do
+            expectTurns(Sprites[field], field)
+        end
+        for state, set in pairs(Sprites.gasHeater) do
+            expectTurns(set, state .. " gas heater")
+            for facing, name in pairs(set) do
+                local kind, kindFacing, kindState = Sprites.kindOf(name)
+                expect(kind == "gasHeater" and kindFacing == facing and kindState == state, string.format(
+                    "kindOf(%s) is %s %s %s, expected gasHeater %s %s", name, tostring(kind), tostring(kindFacing),
+                    tostring(kindState), facing, state))
+                local props = properties(name)
+                expect(props ~= nil and props:get("CustomItem") == "RenewableEnergy.GasHeater", name .. " doesn't give the heater")
+                expect(getTexture(name) ~= nil, name .. " has no picture in the pack")
+            end
+        end
+    end,
+})
+
+-- A fixed tile a save's bank or heater may stand on (Sprites.fixedTiles) is what its turnable twin
+-- is, shows the same overlays, gives the same item and picks up as an item that places the twin;
+-- an item that still carries the fixed tile places the twin too.
+test("renewable_energy_tiles_fixed_tiles_work_as_their_twins", {
+    spOnly = "it places with the moveables code on this client, which is the authority only in single player",
+    run = function(self)
+        local square = T.square(self, { indoors = true }, "a free indoor square for a heater")
+        if not square then return end
+        local fixed
+        for name, twin in pairs(Sprites.fixedTiles) do
+            fixed = twin == Sprites.gasHeater.off.S and name or fixed
+        end
+        ISMoveableSpriteProps.new(fixed):placeMoveableInternal(T.player(), square, instanceItem("RenewableEnergy.GasHeater"), fixed)
+        self.twin, self.fixed = T.objectWithSprite(square, Sprites.gasHeater.off.S), T.objectWithSprite(square, fixed)
+        for _, placed in ipairs({ self.twin, self.fixed }) do
+            T.track(self, placed)
+        end
+    end,
+    validate = function(self)
+        expect(self.twin ~= nil and self.fixed == nil, "an item carrying the fixed heater tile placed "
+            .. (self.fixed and "the fixed tile" or "no heater"))
+        local batteries = { "RenewableEnergy.L16Battery" }
+        for fixed, twin in pairs(Sprites.fixedTiles) do
+            local kind, facing, variant = Sprites.kindOf(fixed)
+            local twinKind, twinFacing, twinVariant = Sprites.kindOf(twin)
+            expect(kind ~= nil and kind == twinKind and facing == "S" and twinFacing == "S" and variant == twinVariant,
+                string.format("kindOf(%s) is %s %s %s, its twin %s's %s %s %s", fixed, tostring(kind), tostring(facing),
+                    tostring(variant), twin, tostring(twinKind), tostring(twinFacing), tostring(twinVariant)))
+            expect(PowerBank.bankOfSprite(fixed) == PowerBank.bankOfSprite(twin), fixed .. " is another bank than " .. twin)
+            local shown, twinShown = Sprites.bankOverlays(fixed, batteries, 0.5), Sprites.bankOverlays(twin, batteries, 0.5)
+            expect(table.concat(shown, ",") == table.concat(twinShown, ","), fixed .. " shows " .. table.concat(shown, ",")
+                .. ", its twin " .. table.concat(twinShown, ","))
+            local item = ISMoveableSpriteProps.new(fixed):instanceItem()
+            expect(item ~= nil and item:getFullType() == properties(twin):get("CustomItem") and item:getWorldSprite() == twin,
+                fixed .. " picks up as " .. tostring(item and item:getFullType()) .. " placing "
+                    .. tostring(item and item:getWorldSprite()) .. ", expected its twin " .. twin)
+        end
+    end,
+})
+
 -- Each battery in a bank shows in its own slot as its type, and the meter climbs with the charge
--- through every level, from the lowest empty to the highest full.
+-- through every level, from the lowest empty to the highest full. A bank's tile in every facing is
+-- that bank, and shows that facing's overlays; facing N or W, away from the camera, its meter
+-- shows none.
 test("renewable_energy_tiles_bank_overlays", {
     validate = function()
         local levels
+        local L16, DEEP_CYCLE = "RenewableEnergy.L16Battery", "RenewableEnergy.DeepCycleBattery"
         for itemType, bank in pairs(Specs.banks) do
-            local fill = Sprites.bankFill[bank.sprite]
-            if expect(fill ~= nil, itemType .. " has no battery overlays") then
-                levels = #fill.meter
-                for look, slots in pairs(fill.batteries) do
-                    expect(#slots == bank.maxBatteries, string.format("%s shows up to %d %s batteries but holds %d",
-                        itemType, #slots, look, bank.maxBatteries))
+            local cars = {}
+            for i = 1, bank.maxBatteries + 1 do
+                cars[i] = "Base.CarBattery1"
+            end
+            for _, facing in ipairs({ "S", "E", "N", "W" }) do
+                local tile = Sprites[bank.sprite][facing]
+                local what = itemType .. " facing " .. facing
+                local found = PowerBank.bankOfSprite(tile)
+                expect(found ~= nil and found.fullType == itemType and found.spec == bank,
+                    tostring(tile) .. " is not the " .. what)
+                local fill = Sprites.bankFill[bank.sprite][facing]
+                if expect(fill ~= nil, what .. " has no battery overlays") then
+                    local meter = fill.meter
+                    expect((meter ~= nil) == (facing == "S" or facing == "E"),
+                        what .. (meter and " shows a meter it hides" or " shows no meter"))
+                    levels = levels or (meter and #meter)
+                    for look, slots in pairs(fill.batteries) do
+                        expect(#slots == bank.maxBatteries, string.format("%s shows up to %d %s batteries but holds %d",
+                            what, #slots, look, bank.maxBatteries))
+                    end
+                    local shown = meter and 1 or 0
+                    local full = Sprites.bankOverlays(tile, cars, 1)
+                    expect(#full == bank.maxBatteries + shown and full[bank.maxBatteries] == fill.batteries.car[bank.maxBatteries]
+                        and (not meter or full[#full] == meter[#meter]), "an overfull " .. what .. " shows " .. table.concat(full, ", "))
+                    local mixed = Sprites.bankOverlays(tile, { L16, DEEP_CYCLE }, 0)
+                    expect(#mixed == 2 + shown and mixed[1] == fill.batteries.l16[1] and mixed[2] == fill.batteries.deepCycle[2]
+                        and (not meter or mixed[3] == meter[1]), "an empty L-16 and deep-cycle in " .. what .. " show "
+                        .. table.concat(mixed, ", "))
+                    expect(#Sprites.bankOverlays(tile, {}, 1) == 0, "an empty " .. what .. " shows overlays")
                 end
-                local cars = {}
-                for i = 1, bank.maxBatteries + 1 do
-                    cars[i] = "Base.CarBattery1"
-                end
-                local full = Sprites.bankOverlays(bank.sprite, cars, 1)
-                expect(#full == bank.maxBatteries + 1 and full[bank.maxBatteries] == fill.batteries.car[bank.maxBatteries]
-                    and full[#full] == fill.meter[levels], "an overfull " .. itemType .. " shows " .. table.concat(full, ", "))
-                local mixed = Sprites.bankOverlays(bank.sprite, { "RenewableEnergy.L16Battery", "RenewableEnergy.DeepCycleBattery" }, 0)
-                expect(#mixed == 3 and mixed[1] == fill.batteries.l16[1] and mixed[2] == fill.batteries.deepCycle[2]
-                    and mixed[3] == fill.meter[1], "an empty L-16 and deep-cycle in " .. itemType .. " show " .. table.concat(mixed, ", "))
-                expect(#Sprites.bankOverlays(bank.sprite, {}, 1) == 0, "an empty " .. itemType .. " shows overlays")
             end
         end
         if not levels then return end
@@ -165,16 +250,18 @@ test("renewable_energy_tiles_bank_overlays", {
     end,
 })
 
--- Every bank tile switches with a click, not a gas generator's pull-start and shutdown: the
--- generator plays its tile's GeneratorSound prefix + Starting or Stopping.
+-- Every bank tile, in every facing, switches with a click, not a gas generator's pull-start and
+-- shutdown: the generator plays its tile's GeneratorSound prefix + Starting or Stopping.
 test("renewable_energy_tiles_bank_switch_sounds", {
     validate = function()
         for field in pairs(Sprites.bankFill) do
-            local props = properties(Sprites[field])
-            local prefix = props and props:get("GeneratorSound")
-            if expect(prefix ~= nil, field .. " has no GeneratorSound and plays the gas generator's") then
-                for _, suffix in ipairs({ "Starting", "Stopping" }) do
-                    expect(GameSounds.isKnownSound(prefix .. suffix), field .. "'s sound " .. prefix .. suffix .. " is not defined")
+            for _, tile in pairs(Sprites[field]) do
+                local props = properties(tile)
+                local prefix = props and props:get("GeneratorSound")
+                if expect(prefix ~= nil, tile .. " has no GeneratorSound and plays the gas generator's") then
+                    for _, suffix in ipairs({ "Starting", "Stopping" }) do
+                        expect(GameSounds.isKnownSound(prefix .. suffix), tile .. "'s sound " .. prefix .. suffix .. " is not defined")
+                    end
                 end
             end
         end
@@ -199,19 +286,22 @@ local function expectGivable(where, entry)
     expect((entry.chancePerRoll or 0) > 0, where .. " never gives " .. tostring(entry.returnItem))
 end
 
--- Dismantling a bank, with Electricity, gives parts back. Its definition is in shared Lua, because
--- scrapping completes on the server.
+-- Dismantling a bank, in any facing, with Electricity, gives parts back. Its definition is in
+-- shared Lua, because scrapping completes on the server.
 test("renewable_energy_tiles_bank_scraps_to_parts", {
     validate = function()
         for field in pairs(Sprites.bankFill) do
-            local props = ISMoveableSpriteProps.new(Sprites[field])
-            expect(props.canScrap, field .. " can't be dismantled")
-            local def, entries = scrapEntries(props.material)
-            if expect(def ~= nil, field .. "'s material " .. tostring(props.material) .. " has no scrap definition") then
-                expect(def.perk == Perks.Electricity, "dismantling " .. field .. " doesn't use Electricity")
-                expect(#entries > 0, "dismantling " .. field .. " gives nothing")
-                for _, entry in ipairs(entries) do
-                    expectGivable("dismantling " .. field, entry)
+            for facing, tile in pairs(Sprites[field]) do
+                local what = field .. " facing " .. facing
+                local props = ISMoveableSpriteProps.new(tile)
+                expect(props.canScrap, what .. " can't be dismantled")
+                local def, entries = scrapEntries(props.material)
+                if expect(def ~= nil, what .. "'s material " .. tostring(props.material) .. " has no scrap definition") then
+                    expect(def.perk == Perks.Electricity, "dismantling " .. what .. " doesn't use Electricity")
+                    expect(#entries > 0, "dismantling " .. what .. " gives nothing")
+                    for _, entry in ipairs(entries) do
+                        expectGivable("dismantling " .. what, entry)
+                    end
                 end
             end
         end
@@ -328,6 +418,93 @@ test("renewable_energy_tiles_place_and_pick_up", {
         end
         for fullType in pairs(CARRIED) do
             expect(kept[fullType], fullType .. " places no tile of its own, so nothing checked what it keeps")
+        end
+    end,
+})
+
+-- Queues placing a new `itemType` on `square` as the moveables cursor does once turned to
+-- `facing`: the action names the item's own tile and the facing, and places that facing's tile
+-- (ISMoveablesAction.new). T.placeAsPlayer can't, since it names the tile it places as the item's.
+local function placeTurned(self, square, itemType, facing)
+    local key = "turned" .. facing
+    T.give(self, key, { { type = itemType } })
+    T.step(function()
+        local p, item = T.player(), self.items[key][1]
+        local sprite = item:getWorldSprite()
+        T.standNextTo(square)
+        if T.need(self, ISMoveableSpriteProps.new(sprite):walkToAndEquip(p, square, "place", sprite), "a way to place a " .. itemType) then
+            ISTimedActionQueue.add(ISMoveablesAction:new(p, square, "place", sprite, nil, facing, item, nil))
+        end
+    end)
+end
+
+-- Placed by a player in each facing the cursor turns it to, a bank stands in that facing as a
+-- working bank, and picks up as its one item again.
+test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
+    instant = true,
+    run = function(self)
+        local squares = T.need(self, T.squares(self, 3, { indoors = true }), "three free indoor squares for banks")
+        if not squares then return end
+        electrician(self)
+        self.results = {}
+        local item = "RenewableEnergy.BatteryRackWood"
+        for i, facing in ipairs({ "E", "N", "W" }) do
+            local square, tile = squares[i], Sprites.batteryRackWood[facing]
+            local result = { facing = facing }
+            table.insert(self.results, result)
+            placeTurned(self, square, item, facing)
+            T.waitFor(self, function()
+                local bank = PowerBank.bankOn(square)
+                return bank ~= nil and Sprites.nameOf(bank) == tile and PowerBank.summaryOf(bank) ~= nil
+            end, "this client's copy of the bank placed facing " .. facing .. ", working")
+            -- Taken away when the test ends if the pick-up leaves it.
+            T.server(self, "PZHarness.trackPlaced", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = tile })
+            T.pickUpAsPlayer(self, square, tile)
+            T.readCarried(self, { item })
+            T.step(function()
+                result.removed = T.objectWithSprite(square, tile) == nil
+                result.returned, result.items = #T.carriedItems(self, item), self.server.carried.total
+            end)
+            T.server(self, "takeItems", { type = item })
+        end
+    end,
+    validate = function(self)
+        expect(#self.results == 3, "placed " .. #self.results .. " of the three banks")
+        for _, r in ipairs(self.results) do
+            local what = "the bank facing " .. r.facing
+            expect(r.removed, what .. " was not picked up")
+            -- The screwdriver stays.
+            expect(r.returned == 1 and r.items == 2,
+                what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them its own")
+        end
+    end,
+})
+
+-- A bank turned to face E or W shows its batteries, and facing E its meter, with that facing's
+-- overlays, on the authority and on this client.
+local L16 = "RenewableEnergy.L16Battery"
+test("renewable_energy_tiles_turned_banks_show_their_overlays", {
+    run = function(self)
+        self.banks = {}
+        for _, facing in ipairs({ "E", "W" }) do
+            local bank = T.bank(self, "batteryRackWood", { L16, L16 }, { charge = 0.5, facing = facing, near = self.banks[1] })
+            if not bank then return end
+            bank.facing = facing
+            table.insert(self.banks, bank)
+            T.bankState(self, bank)
+            T.waitFor(self, function()
+                return bank.state ~= nil and T.overlays(bank.object) == table.concat(bank.state.overlays, ",")
+            end, "this client's copy of the overlays of the bank facing " .. facing)
+        end
+    end,
+    validate = function(self)
+        for _, bank in ipairs(self.banks) do
+            local tile = Sprites.batteryRackWood[bank.facing]
+            local expected = Sprites.bankOverlays(tile, { L16, L16 }, bank.state.charge)
+            local shown = table.concat(bank.state.overlays, ",")
+            expect(Sprites.nameOf(bank.object) == tile, "the bank facing " .. bank.facing .. " stands as " .. tostring(Sprites.nameOf(bank.object)))
+            expect(#expected == (bank.facing == "E" and 3 or 2) and shown == table.concat(expected, ","),
+                "the bank facing " .. bank.facing .. " shows " .. shown .. ", expected " .. table.concat(expected, ","))
         end
     end,
 })

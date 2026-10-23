@@ -53,6 +53,11 @@ WorldSpawns.BATTERY_WEAR = {
 -- leave its repair limit too low for reconditioning to pay. Stripped, it still gives a whole
 -- battery's case, plates and acid for a rebuild.
 WorldSpawns.DUD = { min = 5, max = 20, repairs = 5 }
+-- Found inverters and charge controllers, worn as a BATTERY_WEAR profile: solid-state boxes seldom
+-- wear out on a shelf, so they come at about 85 and never below 70, but one in twenty is a dud.
+WorldSpawns.PART_WEAR = { mean = 85, halfWidth = 15, dud = 0.05 }
+-- A part dud: broken (0) or a scrap's repair from it (Specs.partRepair), so it needs mending first.
+WorldSpawns.PART_DUD = { min = 0, max = 10 }
 
 -- Rooms that may hold a bank, the bank's stock, and one in how many of them does at the
 -- Uncommon setting. Garages are many, so theirs is rarer: a battery box in every few streets
@@ -249,16 +254,21 @@ local function pickByWeight(types)
     return types[#types][1]
 end
 
---- The condition, in percent of new, that the BATTERY_WEAR profile `wear` gives a found battery
---- that isn't a dud, from three rolls (each 0 up to 1): their mean bunches it around the profile's
---- mean like a bell curve with no tails past halfWidth, and it is no better than new.
-function WorldSpawns.foundBatteryPercent(wear, roll1, roll2, roll3)
+--- The condition, in percent of new, that the wear profile `wear` (a BATTERY_WEAR profile or
+--- PART_WEAR) gives a found item that isn't a dud, from three rolls (each 0 up to 1): their mean
+--- bunches it around the profile's mean like a bell curve with no tails past halfWidth, and it is
+--- no better than new.
+function WorldSpawns.foundPercent(wear, roll1, roll2, roll3)
     local spread = (roll1 + roll2 + roll3) / 3 * 2 - 1
     return math.min(100, wear.mean + wear.halfWidth * spread)
 end
 
+local function setPercent(item, percent)
+    RenewableEnergy.Wear.setCondition(item, math.floor(item:getConditionMax() * percent / 100 + 0.5))
+end
+
 --- Wears the found battery `item` as the BATTERY_WEAR profile `wearName` says: a dud at DUD's
---- condition with its repairs, or at WorldSpawns.foundBatteryPercent. Sends nothing.
+--- condition with its repairs, or at WorldSpawns.foundPercent. Sends nothing.
 function WorldSpawns.wearFoundBattery(item, wearName)
     local wear = WorldSpawns.BATTERY_WEAR[wearName]
     local percent
@@ -267,13 +277,31 @@ function WorldSpawns.wearFoundBattery(item, wearName)
         percent = Chance.between(dud.min, dud.max)
         item:setHaveBeenRepaired(dud.repairs)
     else
-        percent = WorldSpawns.foundBatteryPercent(wear, Chance.roll(), Chance.roll(), Chance.roll())
+        percent = WorldSpawns.foundPercent(wear, Chance.roll(), Chance.roll(), Chance.roll())
     end
-    RenewableEnergy.Wear.setCondition(item, math.floor(item:getConditionMax() * percent / 100 + 0.5))
+    setPercent(item, percent)
+end
+
+--- Whether `fullType` is a part PART_WEAR wears: an inverter or a charge controller.
+function WorldSpawns.isWornPart(fullType)
+    return Specs.inverters[fullType] ~= nil or fullType == Specs.controller
+end
+
+--- Wears the found inverter or controller `item` as PART_WEAR says, a dud at PART_DUD's
+--- condition, and marks it as having a condition of its own. Sends nothing.
+function WorldSpawns.wearFoundPart(item)
+    local wear = WorldSpawns.PART_WEAR
+    if Chance.hit(wear.dud) then
+        local dud = WorldSpawns.PART_DUD
+        setPercent(item, Chance.between(dud.min, dud.max))
+    else
+        setPercent(item, WorldSpawns.foundPercent(wear, Chance.roll(), Chance.roll(), Chance.roll()))
+    end
+    RenewableEnergy.Wear.markOwnCondition(item)
 end
 
 -- Adds a found `fullType` to the container; a battery is worn as the BATTERY_WEAR profile
--- `wearName` says and given a part charge.
+-- `wearName` says and given a part charge, an inverter or controller worn as PART_WEAR says.
 local function addFound(container, fullType, wearName)
     if fullType == MODULE then
         return WorldSpawns.addModule(container, siteModuleCondition())
@@ -282,6 +310,8 @@ local function addFound(container, fullType, wearName)
     if item and Battery.isBattery(item) then
         WorldSpawns.wearFoundBattery(item, wearName)
         Battery.setFoundCharge(item)
+    elseif item and WorldSpawns.isWornPart(fullType) then
+        WorldSpawns.wearFoundPart(item)
     end
     return item
 end
@@ -299,7 +329,7 @@ end
 ---@param stockName string a BANK_STOCK key
 function WorldSpawns.stockBank(container, stockName)
     local stock = WorldSpawns.BANK_STOCK[stockName]
-    local spec = PowerBank.bankOfSprite(Sprites[stock.sprite]).spec
+    local spec = PowerBank.bankOfSprite(Sprites[stock.sprite].S).spec
     local options = SandboxVars.RenewableEnergy
     local batteries = WorldSpawns.scaled(Chance.between(stock.batteries.min, stock.batteries.max), options.LRMBatteries)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
@@ -327,8 +357,26 @@ end
 
 -- Placing
 
---- Places a bank stocked as BANK_STOCK[stockName] says, connected and switched off. Banks stand
---- only indoors (PowerBank.canPlaceBank), so nothing is placed on another square.
+-- A world bank stands with its back to a wall of its square, as furniture does: each facing, and
+-- the step from the square across its back edge. S, the facing a bank takes with no wall, first.
+local BACK_TO_WALL = { { "S", 0, -1 }, { "E", -1, 0 }, { "N", 0, 1 }, { "W", 1, 0 } }
+
+--- The facing that puts a bank on `square` with its back to a wall, or S with no wall around it.
+---@param square IsoGridSquare
+---@return string facing "S", "E", "N" or "W"
+function WorldSpawns.bankFacing(square)
+    for _, back in ipairs(BACK_TO_WALL) do
+        local behind = getCell():getGridSquare(square:getX() + back[2], square:getY() + back[3], square:getZ())
+        if behind and square:isWallTo(behind) then
+            return back[1]
+        end
+    end
+    return "S"
+end
+
+--- Places a bank stocked as BANK_STOCK[stockName] says, connected and switched off, its back to a
+--- wall (bankFacing). Banks stand only indoors (PowerBank.canPlaceBank), so nothing is placed on
+--- another square.
 ---@param square IsoGridSquare
 ---@param stockName string a BANK_STOCK key
 ---@return IsoGenerator?
@@ -337,12 +385,13 @@ function WorldSpawns.placeBank(square, stockName)
         print("RenewableEnergy: no bank at " .. square:getX() .. "," .. square:getY() .. "," .. square:getZ() .. ", which is not indoors")
         return nil
     end
-    return WorldSpawns.placeBankWith(square, Sprites[WorldSpawns.BANK_STOCK[stockName].sprite], function(container)
+    local sprite = Sprites[WorldSpawns.BANK_STOCK[stockName].sprite][WorldSpawns.bankFacing(square)]
+    return WorldSpawns.placeBankWith(square, sprite, function(container)
         WorldSpawns.stockBank(container, stockName)
     end)
 end
 
---- Places a connected, switched-off bank of tile `spriteName` (a bank's Sprites field value) on
+--- Places a connected, switched-off bank of tile `spriteName` (a bank's tile in one facing) on
 --- `square`, its container filled by `fill(container)` and sent to the clients, wherever the
 --- square is: placeBank decides where a world bank may stand.
 ---@return IsoGenerator

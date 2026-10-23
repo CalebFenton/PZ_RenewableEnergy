@@ -42,9 +42,9 @@ local TILES = {
     { x = 0, y = 7, sprite = Sprites.flat }, { x = 1, y = 7, sprite = Sprites.failsafe },
     { x = 2, y = 7, sprite = Sprites.cellCharger }, { x = 3, y = 7, sprite = Sprites.crate },
     { x = 5, y = 7, sprite = Sprites.gardenLight.off }, { x = 6, y = 7, sprite = Sprites.gardenLight.lit },
-    { x = 0, y = 9, sprite = Sprites.batteryBoxWood }, { x = 1, y = 9, sprite = Sprites.batteryBoxMetal },
-    { x = 3, y = 9, sprite = Sprites.batteryRackWood }, { x = 4, y = 9, sprite = Sprites.batteryRackMetal },
-    { x = 6, y = 9, sprite = Sprites.batteryBankWood }, { x = 7, y = 9, sprite = Sprites.batteryBankMetal },
+    { x = 0, y = 9, sprite = Sprites.batteryBoxWood.S }, { x = 1, y = 9, sprite = Sprites.batteryBoxMetal.S },
+    { x = 3, y = 9, sprite = Sprites.batteryRackWood.S }, { x = 4, y = 9, sprite = Sprites.batteryRackMetal.S },
+    { x = 6, y = 9, sprite = Sprites.batteryBankWood.S }, { x = 7, y = 9, sprite = Sprites.batteryBankMetal.S },
     { x = 0, y = 11, sprite = Sprites.flat, overlays = { Sprites.snow.flat } },
     { x = 0, y = 12, sprite = Sprites.crate, overlays = { Sprites.crateOverlays.full } },
     { x = 1, y = 12, sprite = Sprites.crate, overlays = { Sprites.crateOverlays.closed } },
@@ -63,27 +63,34 @@ local FILL_TIERS = { "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "ba
 -- The batteries the fill tiles hold, in turn, so every look shows in every slot.
 local FILL_BATTERIES = { "Base.CarBattery1", "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery" }
 
--- Every bank tile, of every tier, with 1 to all of its batteries, its meter cycling through every
--- level; one with fewer batteries than meter levels repeats its full count. The batteries' types
--- take turns, starting one further on each tile. Low tiers come first, at the back, so the tall
--- banks in front hide none of them.
-local function fillTiles()
+-- Every bank tile facing `facing`, of every tier, with 1 to all of its batteries, its meter cycling
+-- through every level; one with fewer batteries than meter levels repeats its full count. The
+-- batteries' types take turns, starting one further on each tile. Low tiers come first, at the
+-- back, so the tall banks in front hide none of them. Then the gas heater facing that way, off and
+-- lit.
+local function fillTiles(facing)
     local fill, x, y = {}, 0, 0
+    local function add(sprite, overlays)
+        table.insert(fill, { x = x, y = y, sprite = sprite, overlays = overlays })
+        x = x + 1
+        if x >= AREA.w then
+            x, y = 0, y + 2
+        end
+    end
     for _, field in ipairs(FILL_TIERS) do
-        local capacity = #Sprites.bankFill[field].batteries.car
+        local tile = Sprites[field][facing]
+        local capacity = #Sprites.bankFill[field][facing].batteries.car
         for i = 1, math.max(capacity, #METER_CHARGES) do
             local charge = METER_CHARGES[(i - 1) % #METER_CHARGES + 1]
             local types = {}
             for slot = 1, math.min(i, capacity) do
                 types[slot] = FILL_BATTERIES[(i + slot - 2) % #FILL_BATTERIES + 1]
             end
-            table.insert(fill, { x = x, y = y, sprite = Sprites[field], overlays = Sprites.bankOverlays(field, types, charge) })
-            x = x + 1
-            if x >= AREA.w then
-                x, y = 0, y + 2
-            end
+            add(tile, Sprites.bankOverlays(tile, types, charge))
         end
     end
+    add(Sprites.gasHeater.off[facing])
+    add(Sprites.gasHeater.lit[facing])
     return fill
 end
 
@@ -118,8 +125,8 @@ local function digesterTiles()
     table.insert(list, { x = 7, y = 1, sprite = Sprites.digester.insulated, overlays = { holder.drum[2], scrubber.insulated } })
     table.insert(list, { x = 7, y = 4, sprite = Sprites.digester.dome })
     table.insert(list, { x = 7, y = 6, sprite = Sprites.digester.dome, overlays = { scrubber.dome } })
-    table.insert(list, { x = 9, y = 0, sprite = Sprites.gasHeater.off })
-    table.insert(list, { x = 9, y = 2, sprite = Sprites.gasHeater.lit })
+    table.insert(list, { x = 9, y = 0, sprite = Sprites.gasHeater.off.S })
+    table.insert(list, { x = 9, y = 2, sprite = Sprites.gasHeater.lit.S })
     for i, generator in ipairs({ "appliances_misc_01_0", "appliances_misc_01_5", "appliances_misc_01_12" }) do
         table.insert(list, { x = 9, y = 2 + i * 2, sprite = generator, overlays = { Sprites.gasKitFor(generator) } })
     end
@@ -169,7 +176,13 @@ local SHOTS = {
     tiles = { name = "art_tiles", x = 2, y = 1, zoomSteps = 3 },
     overlays = { name = "art_overlays", x = 4, y = 10, zoomSteps = 2 },
     items = { name = "art_items", x = 4, y = 5, zoomSteps = 1 },
-    fill = { name = "art_fill", x = 6, y = 12, zoomSteps = 3 },
+    -- A shot of the bank fill tiles (fillTiles) for each facing.
+    fill = {
+        S = { name = "art_fill", x = 6, y = 12, zoomSteps = 3 },
+        E = { name = "art_fill_e", x = 6, y = 12, zoomSteps = 3 },
+        N = { name = "art_fill_n", x = 6, y = 12, zoomSteps = 3 },
+        W = { name = "art_fill_w", x = 6, y = 12, zoomSteps = 3 },
+    },
     trailer = { name = "art_trailer", x = 8, y = 7, zoomSteps = 2 },
     trailerFront = { name = "art_trailer_front", x = 3, y = 6, zoomSteps = 2 },
     digesters = { name = "art_digesters", x = 5, y = 8, zoomSteps = 2 },
@@ -562,11 +575,13 @@ local function addTileAndItemShots(steps, player, lot)
         iconSheet:removeFromUIManager()
         return 1
     end)
-    table.insert(steps, function()
-        clearLot(lot)
-        placeTiles(lot, fillTiles())
-    end)
-    addShot(steps, player, lot, SHOTS.fill)
+    for _, facing in ipairs({ "S", "E", "N", "W" }) do
+        table.insert(steps, function()
+            clearLot(lot)
+            placeTiles(lot, fillTiles(facing))
+        end)
+        addShot(steps, player, lot, SHOTS.fill[facing])
+    end
     table.insert(steps, function()
         clearLot(lot)
         placeTiles(lot, digesterTiles())

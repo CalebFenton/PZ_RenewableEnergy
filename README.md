@@ -51,7 +51,7 @@ Build them on the **Welding** page. A scoop rotor turns in any breeze and never 
 
 ![A survivor running on a treadmill wired to a battery box in a garage](art/promo/images/treadmill.png)
 
-No sun, no wind? **Wire to a Bank** and **Run on Treadmill**: half an hour banks about what a fridge-freezer draws in that time, at the cost of endurance. Taken apart, it gives up the motor wind chargers are built around.
+No sun, no wind? **Wire the Motor**, connect the treadmill to a bank, and **Run on Treadmill**: half an hour banks about what a fridge-freezer draws in that time, at the cost of endurance. Taken apart, it gives up the motor wind chargers are built around.
 
 ## Biogas
 

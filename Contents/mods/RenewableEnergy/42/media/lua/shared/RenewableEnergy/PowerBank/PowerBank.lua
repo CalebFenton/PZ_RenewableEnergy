@@ -37,10 +37,16 @@ PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
 -- The longest name a bank takes.
 PowerBank.NAME_LENGTH = 32
 
--- Placed bank sprite to its Specs.banks row, and to the item it is.
+-- Placed bank sprite, in any facing or fixed (Sprites.fixedTiles), to its Specs.banks row and the
+-- item it is.
 local BANKS_BY_SPRITE = {}
 for fullType, bank in pairs(Specs.banks) do
-    BANKS_BY_SPRITE[Sprites[bank.sprite]] = { fullType = fullType, spec = bank }
+    for _, name in pairs(Sprites[bank.sprite]) do
+        BANKS_BY_SPRITE[name] = { fullType = fullType, spec = bank }
+    end
+end
+for fixed, twin in pairs(Sprites.fixedTiles) do
+    BANKS_BY_SPRITE[fixed] = BANKS_BY_SPRITE[twin]
 end
 
 --- Every placed bank tile's sprite name.

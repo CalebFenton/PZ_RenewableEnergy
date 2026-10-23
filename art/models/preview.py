@@ -4,7 +4,8 @@
 
 - models.png: every exported ground model and vehicle body (FBX plus its baked texture) from two
   sides, and every sprite model from one side at each of its yaw steps.
-- tiles.png: every tile at four times its size on a floor diamond, overlays drawn over their base.
+- tiles.png, tiles_02.png: every tile of renewable_energy_01 and renewable_energy_02 at four times
+  its size on a floor diamond, overlays drawn over their base.
 - icons.png: every icon at four times its size.
 - build_icons.png: every build-menu icon at four times its size.
 
@@ -62,21 +63,21 @@ def floor_diamond(width, height):
     return cell
 
 
-def tile_sheet():
-    path = os.path.join(REPO, "tools/tiles/renewable_energy_01_%d.png")
+def tile_sheet(tileset, out):
+    path = os.path.join(REPO, "tools/tiles/%s_%d.png")
     cells = []
-    for index, layers in sorted(tiles.TILES.items()):
+    for index, layers in sorted(tiles.TILESETS[tileset].items()):
         cell = floor_diamond(128, 256)
         # An overlay is drawn over the tile it belongs to: the one its holdout layers render.
         if layers[0]["holdout"]:
-            base = next(i for i, other in tiles.TILES.items()
+            base = next((name, i) for name, others in tiles.TILESETS.items() for i, other in others.items()
                         if len(other) == 1 and other[0]["build"] is layers[0]["build"]
                         and other[0]["turn"] == layers[0]["turn"] and other[0]["at"] == layers[0]["at"]
                         and other[0]["options"] == layers[0]["options"])
             over(cell, kit.load_pixels(path % base), 0, 0)
-        over(cell, kit.load_pixels(path % index), 0, 0)
+        over(cell, kit.load_pixels(path % (tileset, index)), 0, 0)
         cells.append(enlarge(cell, 2))
-    kit.save_pixels(os.path.join(OUT, "tiles.png"), grid(cells, 8, 256, 512))
+    kit.save_pixels(os.path.join(OUT, out), grid(cells, 8, 256, 512))
 
 
 def icon_sheet():
@@ -162,7 +163,8 @@ def model_sheet():
 def main():
     os.makedirs(OUT, exist_ok=True)
     model_sheet()
-    tile_sheet()
+    tile_sheet("renewable_energy_01", "tiles.png")
+    tile_sheet("renewable_energy_02", "tiles_02.png")
     icon_sheet()
     print("previews:", OUT)
 

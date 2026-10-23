@@ -454,10 +454,11 @@ end
 
 local showOverlay = RenewableEnergy.showOverlay
 
---- Lights or puts out `heater`, by its tile.
+--- Lights or puts out `heater`, by its tile in the facing it stands.
 function DigesterObject.showHeaterLit(heater, lit)
     if GasHeater.isLit(heater) == lit then return end
-    RenewableEnergy.showTile(heater, lit and Sprites.gasHeater.lit or Sprites.gasHeater.off)
+    local _, facing = Sprites.kindOfObject(heater)
+    RenewableEnergy.showTile(heater, Sprites.gasHeater[lit and "lit" or "off"][facing])
 end
 
 --- Lights or puts out `heater`, the one that warms this digester (GasHeater.digesterNear).

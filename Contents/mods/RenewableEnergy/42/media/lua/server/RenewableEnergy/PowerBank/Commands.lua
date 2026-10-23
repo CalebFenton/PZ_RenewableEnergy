@@ -107,7 +107,7 @@ function Commands.connectSource(player, args)
     if not (bank and source) then return false, "no bank or source" end
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
     -- snow and all.
-    local refusal = Sources.connectRefusal(source, bank)
+    local refusal = Sources.connectRefusal(source, bank) or Sources.bankRefusal(bank.connected)
     if refusal then return false, refusal end
     -- The container is the truth about the controllers, whatever filled it since the last pass.
     bank:recount()

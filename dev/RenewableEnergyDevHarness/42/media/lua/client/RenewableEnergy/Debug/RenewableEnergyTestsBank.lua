@@ -2188,6 +2188,43 @@ test("renewable_energy_bank_window_empty_bank_lists_whats_missing", {
     end,
 })
 
+-- Grid power reaching a bank shows whatever the bank's state, with whether its chargers fill the
+-- batteries from it, and goes once the grid is off.
+test("renewable_energy_bank_window_shows_grid_power", {
+    run = function(self)
+        T.setGrid(self, true)
+        local bare = T.bank(self, "batteryBoxWood", { CAR_BATTERY })
+        local charging = bare and T.bank(self, "batteryRackWood", { CAR_BATTERY, Specs.charger }, { charge = 0.5 })
+        if not charging then return end
+        self.at = bare.position
+        T.batch(function()
+            T.bankPass(self, bare, 0)
+            T.bankPass(self, charging, 0, { hours = 1 })
+            T.step(function() self.bareStatus, self.chargingStatus = bare.state.status, charging.state.status end)
+        end)
+        T.step(function() T.setGrid(self, false) end)
+        T.batch(function()
+            T.bankPass(self, charging, 0)
+            T.step(function() self.offStatus = charging.state.status end)
+        end)
+    end,
+    validate = function(self)
+        local label = getText("IGUI_RenewableEnergy_Grid")
+        local function gridRow(status)
+            return status and rowLabelled((StatusWindow.rows(status, self.at)), label)
+        end
+        local bare = gridRow(self.bareStatus)
+        expect(bare ~= nil and bare.value == getText("IGUI_RenewableEnergy_GridNoCharger"),
+            "a bank without an inverter or a charger on the grid reads " .. tostring(bare and bare.value))
+        local status = self.chargingStatus
+        local charging = gridRow(status)
+        expect(status ~= nil and status.chargerW > 0 and charging ~= nil
+            and charging.value == getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)),
+            "a bank charging from the grid reads " .. tostring(charging and charging.value))
+        expect(self.offStatus ~= nil and gridRow(self.offStatus) == nil, "the grid row stays once the grid is off")
+    end,
+})
+
 -- Queues a wait until this client's status of `bank` has the load the server's last answer gave.
 local function waitForLoad(self, bank)
     T.waitFor(self, function()
@@ -2394,7 +2431,7 @@ test("renewable_energy_bank_placed_bank_starts_unconnected", {
         self.square = square
         -- Placing a bank tile needs the Electrician tool.
         T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
-        T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood)
+        T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood.S)
         T.waitFor(self, function()
             local bank = PowerBank.bankOn(square)
             return bank ~= nil and PowerBank.summaryOf(bank) ~= nil
@@ -2514,5 +2551,137 @@ test("renewable_energy_bank_connect_and_disconnect", {
         expect(not self.connectedPickUp, "a connected bank can be picked up")
         if not expect(self.disconnectOffered, "a connected bank that is off offers no Disconnect Bank") then return end
         expect(self.disconnectedPickUp, "a disconnected empty bank can't be picked up")
+    end,
+})
+
+local Sources = RenewableEnergy.Sources
+
+-- The panel's Connect to `bank` (`one`) and the bank's Connect Sources in Reach (`all`), read from
+-- fresh menus, as T.optionState.
+local function connectOptions(bank, panel)
+    local context = T.newContext()
+    local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
+    local bankMenu = Menu.addBankOptions(0, context, bank.object)
+    local options = {
+        one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
+            Menu.bankLabel(bank.object), Format.away(panel.position, bank.position)))),
+        all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach",
+            #Sources.sourcesInReach(bank.position)))),
+    }
+    context:hideAndChildren()
+    return options
+end
+
+local function canConnect(panel, bank)
+    return Action:new(player(), Action.CONNECT_SOURCE, panel.object, bank.object):canPerform()
+end
+
+-- A source connects only to a bank that is connected itself. An unconnected bank in reach is still
+-- listed, greyed saying why, as is its Connect Sources in Reach; the action won't start and the
+-- authority refuses. Once the bank is connected all of them take the panel, and disconnecting the
+-- bank afterwards leaves the panel on it.
+test("renewable_energy_bank_sources_need_a_connected_bank", {
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER }, { connected = false })
+        self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
+        if not self.panel then return end
+        local bank, panel = self.bank, self.panel
+        local args = { bank = bank.position, source = panel.position }
+        -- Light to work by indoors, and the level Connect Bank takes.
+        T.holdLight(self)
+        T.setPerk(self, Perks.Electricity, 3)
+        T.step(function()
+            self.unconnected = connectOptions(bank, panel)
+            self.unconnectedAction = canConnect(panel, bank)
+        end)
+        T.performInto(self, "refused", "connectSource", args)
+        T.performInto(self, "bankConnected", "setBankConnected", { bank = bank.position, connected = true })
+        T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
+        T.step(function()
+            self.connected = connectOptions(bank, panel)
+            self.connectedAction = canConnect(panel, bank)
+        end)
+        T.performInto(self, "accepted", "connectSource", args)
+        T.performInto(self, "bankDisconnected", "setBankConnected", { bank = bank.position, connected = false })
+        T.bankState(self, bank)
+    end,
+    validate = function(self)
+        local key = "Tooltip_RenewableEnergy_BankNotConnected"
+        local before, after = self.unconnected, self.connected
+        for name, option in pairs({ ["the panel's Connect"] = before.one, ["Connect Sources in Reach"] = before.all }) do
+            expect(option.shown and option.greyed and option.reason == getText(key),
+                name .. " isn't offered greyed out saying the bank isn't connected (" .. tostring(option.reason) .. ")")
+        end
+        expect(not self.unconnectedAction, "the Connect action starts for a bank that isn't connected")
+        expect(not self.refused.ok and self.refused.reason == key,
+            "the authority connected a panel to a bank that isn't connected (" .. reason(self, "refused") .. ")")
+        if not expect(self.bankConnected.ok, "the authority refused to connect the bank (" .. reason(self, "bankConnected") .. ")") then
+            return
+        end
+        for name, option in pairs({ ["the panel's Connect"] = after.one, ["Connect Sources in Reach"] = after.all }) do
+            expect(option.shown and not option.greyed, name .. " isn't open for a connected bank (" .. tostring(option.reason) .. ")")
+        end
+        expect(self.connectedAction, "the Connect action doesn't start for a connected bank")
+        expect(self.accepted.ok, "the authority refused a panel on a connected bank (" .. reason(self, "accepted") .. ")")
+        expect(self.bankDisconnected.ok, "the authority refused to disconnect the bank (" .. reason(self, "bankDisconnected") .. ")")
+        expect(T.stateSource(self.bank.state, self.panel.position) ~= nil, "disconnecting the bank dropped its panel")
+    end,
+})
+
+-- A battery box and a battery rack in reach of a panel are both offered to it: greyed while they
+-- aren't connected, open once they are. A panel already on one of them names that one as what it
+-- is connected to instead of offering it again.
+test("renewable_energy_bank_box_and_rack_both_offered", {
+    run = function(self)
+        self.box = T.bank(self, "batteryBoxWood", {}, { connected = false })
+        self.rack = self.box and T.bank(self, "batteryRackWood", {}, { connected = false, near = self.box })
+        self.panel = self.rack and T.panel(self, Sprites.rack.wood.S, { near = self.box })
+        if not self.panel then return end
+        local box, rack, panel = self.box, self.rack, self.panel
+        T.holdLight(self)
+        T.setPerk(self, Perks.Electricity, 3)
+        T.step(function()
+            local here = panel.position
+            if not T.need(self, PowerBank.isInReach(box.position, here.x, here.y, here.z)
+                and PowerBank.isInReach(rack.position, here.x, here.y, here.z), "the box and the rack in reach of the panel") then
+                return
+            end
+            self.unconnected = { box = connectOptions(box, panel).one, rack = connectOptions(rack, panel).one }
+        end)
+        T.performInto(self, "boxConnected", "setBankConnected", { bank = box.position, connected = true })
+        T.performInto(self, "rackConnected", "setBankConnected", { bank = rack.position, connected = true })
+        T.waitFor(self, function() return box.object:isConnected() and rack.object:isConnected() end,
+            "this client's copies of the connected box and rack")
+        T.step(function()
+            self.connected = { box = connectOptions(box, panel).one, rack = connectOptions(rack, panel).one }
+        end)
+        T.performInto(self, "onBox", "connectSource", { bank = box.position, source = panel.position })
+        T.waitFor(self, function() return PowerBank.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
+            "this client's summary of the box listing the panel")
+        T.step(function()
+            -- Each fresh context reuses the player's one context menu, so read this one first.
+            local context = T.newContext()
+            local menu = Menu.addSourceOptions(0, context, panel.object)
+            local wiredTo = T.optionState(T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_WiredTo",
+                Format.bankName(PowerBank.summaryOf(box.object)), Format.away(panel.position, box.position))))
+            context:hideAndChildren()
+            self.wired = { wiredTo = wiredTo, box = connectOptions(box, panel).one, rack = connectOptions(rack, panel).one }
+        end)
+    end,
+    validate = function(self)
+        local notConnected = getText("Tooltip_RenewableEnergy_BankNotConnected")
+        for name, option in pairs(self.unconnected) do
+            expect(option.shown and option.greyed and option.reason == notConnected,
+                "the unconnected " .. name .. " isn't offered greyed out saying it isn't connected (" .. tostring(option.reason) .. ")")
+        end
+        expect(self.boxConnected.ok and self.rackConnected.ok, "the authority refused to connect the box or the rack")
+        for name, option in pairs(self.connected) do
+            expect(option.shown and not option.greyed, "the connected " .. name .. " isn't offered open (" .. tostring(option.reason) .. ")")
+        end
+        expect(self.onBox.ok, "the authority refused the panel on the box (" .. reason(self, "onBox") .. ")")
+        local wired = self.wired
+        expect(wired.wiredTo.shown, "a panel on the box doesn't say it is connected to the box")
+        expect(not wired.box.shown, "a panel on the box offers to connect to the box again")
+        expect(wired.rack.shown and not wired.rack.greyed, "a panel on the box isn't offered the rack")
     end,
 })

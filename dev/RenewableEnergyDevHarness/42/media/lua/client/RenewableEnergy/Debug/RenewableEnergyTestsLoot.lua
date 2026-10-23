@@ -43,6 +43,17 @@ test("renewable_energy_loot_found_batteries_part_charged", {
     validate = function(self) T.expectNoFailures(self.server.lootFoundBatteries) end,
 })
 
+-- Inverters and controllers that rooms hand out come worn, once: a later refill leaves a found or
+-- crafted part already there alone, and a bank's parts are never worn by a fill.
+test("renewable_energy_loot_found_parts_worn", {
+    run = function(self)
+        local square = T.square(self, nil, "a free outdoor square")
+        if not square then return end
+        T.server(self, "lootFoundParts", { x = square:getX(), y = square:getY(), z = square:getZ() })
+    end,
+    validate = function(self) T.expectNoFailures(self.server.lootFoundParts) end,
+})
+
 -- Containers the player owns --------------------------------------------------------------------
 
 -- Loot respawn (LootRespawn.respawnInContainer) never refills a player's bank, charger or crate

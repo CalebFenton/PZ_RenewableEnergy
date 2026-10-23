@@ -757,9 +757,10 @@ local function heaterSprite(square)
     return heater and heater:getSprite():getName()
 end
 
--- A barrel digester with full bags and an unlit gas heater beside it, with what lighting takes
--- given: the digester's handle, the heater's and the heater's square, or nil.
-local function fedDigesterAndHeater(self)
+-- A barrel digester with full bags and an unlit gas heater facing `facing` (S if nil) beside it,
+-- with what lighting takes given: the digester's handle, the heater's and the heater's square, or
+-- nil.
+local function fedDigesterAndHeater(self, facing)
     local digester = placeDigester(self, "barrel.MetalDrum")
     local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
     if not square then return nil end
@@ -767,7 +768,7 @@ local function fedDigesterAndHeater(self)
     fed.gas = Digester.HOLDERS.bags.capacity
     T.setRecord(self, digester, fed)
     T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
-    local heater = T.placeTile(self, square, Sprites.gasHeater.off)
+    local heater = T.placeTile(self, square, Sprites.gasHeater.off[facing or "S"])
     T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
     return digester, heater, square
 end
@@ -797,7 +798,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
             T.waitForSummary(self, handle, function(summary) return math.abs(summary.gas - self.gas) <= 0.005 end,
                 "this client's summary of the gas")
         end
-        local heater = T.placeTile(self, square, Sprites.gasHeater.off)
+        local heater = T.placeTile(self, square, Sprites.gasHeater.off.S)
         T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
         T.gasJob(self, "heater", heater, GasHeater.LIGHT)
         T.batch(function()
@@ -813,7 +814,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
                 T.readRecord(self, handle, "out" .. i)
             end
         end)
-        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off end,
+        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off.S end,
             "the heater going out on this client once its gas ran out")
     end,
     validate = function(self)
@@ -841,16 +842,17 @@ test("renewable_energy_biogas_heater_warms_digester", {
     end,
 })
 
--- A lit gas heater goes out, on this client too, when the digester it burns from is taken away.
+-- A lit gas heater goes out, on this client too, when the digester it burns from is taken away;
+-- turned to face W, it stays facing W as it lights and goes out.
 test("renewable_energy_biogas_heater_out_when_digester_gone", {
     instant = true,
     run = function(self)
-        local digester, heater, square = fedDigesterAndHeater(self)
+        local digester, heater, square = fedDigesterAndHeater(self, "W")
         if not digester then return end
         T.gasJob(self, "heater", heater, GasHeater.LIGHT)
-        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit end, "this client's copy of the heater lit")
+        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit.W end, "this client's copy of the heater lit")
         T.removeRecord(self, digester)
-        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off end,
+        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off.W end,
             "the heater going out on this client once its digester was gone")
     end,
 })
@@ -867,7 +869,7 @@ test("renewable_energy_biogas_heater_job_gives_its_xp", {
             T.read(self, "perkXp", { perk = "Electricity" }, "before")
         end)
         T.gasJob(self, "heater", heater, GasHeater.LIGHT)
-        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit end, "this client's copy of the heater lit")
+        T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit.S end, "this client's copy of the heater lit")
         T.read(self, "perkXp", { perk = "Electricity" }, "after")
     end,
     validate = function(self)

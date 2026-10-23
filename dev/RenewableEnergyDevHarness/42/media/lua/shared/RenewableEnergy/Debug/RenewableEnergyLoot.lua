@@ -438,7 +438,7 @@ local function worldStock()
     end
     add("Arrow board battery box", "world:arrowBoard", function(container)
         RenewableEnergy.ArrowBoard.stockBatteryBox(container)
-        RenewableEnergy.Distributions.chargeFoundBatteries(container)
+        RenewableEnergy.Distributions.readyFoundItems(container)
     end)
     return stocks
 end
@@ -935,7 +935,7 @@ end
 local WEAR_GRID = 20
 
 -- The mean share of full condition the BATTERY_WEAR profile `wearName` leaves a battery, duds
--- included: WorldSpawns.foundBatteryPercent averaged over a grid of midpoints of its three rolls.
+-- included: WorldSpawns.foundPercent averaged over a grid of midpoints of its three rolls.
 local function wearShare(wearName)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local wear, dud = WorldSpawns.BATTERY_WEAR[wearName], WorldSpawns.DUD
@@ -943,7 +943,7 @@ local function wearShare(wearName)
     for a = 0, WEAR_GRID - 1 do
         for b = 0, WEAR_GRID - 1 do
             for c = 0, WEAR_GRID - 1 do
-                sum = sum + WorldSpawns.foundBatteryPercent(wear, (a + 0.5) / WEAR_GRID, (b + 0.5) / WEAR_GRID,
+                sum = sum + WorldSpawns.foundPercent(wear, (a + 0.5) / WEAR_GRID, (b + 0.5) / WEAR_GRID,
                     (c + 0.5) / WEAR_GRID)
             end
         end
@@ -956,7 +956,7 @@ end
 local function stockBatteries(stockName)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local stock = WorldSpawns.BANK_STOCK[stockName]
-    local cap = RenewableEnergy.PowerBank.bankOfSprite(RenewableEnergy.Sprites[stock.sprite]).spec.maxBatteries
+    local cap = RenewableEnergy.PowerBank.bankOfSprite(RenewableEnergy.Sprites[stock.sprite].S).spec.maxBatteries
     local counts, count = 0, 0
     for rolled = stock.batteries.min, stock.batteries.max do
         count = count + math.min(cap, rolled * SandboxVars.RenewableEnergy.LRMBatteries)

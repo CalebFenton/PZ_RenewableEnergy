@@ -56,6 +56,17 @@ function Sources.slotRefusal(kind, freeSlots)
     return nil
 end
 
+--- Why no source may be connected to a bank whose connected flag is `connected` (the bank's own
+--- Connect Bank, as a generator's), or nil. A client passes its copy of the generator's flag,
+--- which IsoGenerator.setConnected syncs; the authority its record's, nil on banks saved before
+--- it was kept, all of them connected. Sources already on a bank stay when it is disconnected.
+function Sources.bankRefusal(connected)
+    if connected == false then
+        return "Tooltip_RenewableEnergy_BankNotConnected"
+    end
+    return nil
+end
+
 --- Whether snow lies on a source of `kind` until someone sweeps it off (Specs.mounts holdsSnow
 --- without shedsSnow).
 function Sources.sweepable(kind)

@@ -6,7 +6,7 @@ models in items.py.
 Tiles go to tools/tiles as whole 128 x 256 cells, which tools/pack_textures.py trims and packs.
 Icons go to tools/textures as Item_RenewableEnergy_<Item>.png, 32 x 32 like the game's own, and
 the build-menu icons of tiles.BUILD_ICONS as RenewableEnergy_Build_<Name>.png, 48 x 48 like the
-game's Build_ icons in UI2.pack. The depth map goes to common/media/depthmaps.
+game's Build_ icons in UI2.pack. Each tileset's depth map goes to common/media/depthmaps.
 
 The projection is the game's (TileDepthTexture, TileGeometryUtils): an orthographic camera 30
 degrees above the horizon looking north-west, a tile floor 128 x 64 pixels, so 64 * sqrt(2)
@@ -32,8 +32,7 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 MEDIA = os.path.join(REPO, "Contents/mods/RenewableEnergy/common/media")
 TILE_DIR = os.path.join(REPO, "tools/tiles")
 ICON_DIR = os.path.join(REPO, "tools/textures")
-DEPTH_FILE = os.path.join(MEDIA, "depthmaps/DEPTH_renewable_energy_01.png")
-TILESET = "renewable_energy_01"
+DEPTH_FILE = os.path.join(MEDIA, "depthmaps/DEPTH_%s.png")
 SCRATCH = os.path.join(tempfile.gettempdir(), "renewable-energy-render")
 
 TILE_W, TILE_H = 128, 256
@@ -177,25 +176,26 @@ def render_tiles(camera, stage):
     for stale in os.listdir(TILE_DIR):
         if stale.endswith(".png"):
             os.remove(os.path.join(TILE_DIR, stale))
-    rows = max(tiles.TILES) // COLUMNS + 1
-    atlas = np.zeros((rows * TILE_H, COLUMNS * TILE_W, 4), dtype=np.float32)
     tile_camera(camera)
-    for index, layers in sorted(tiles.TILES.items()):
-        kit.clear(stage)
-        build(stage, layers)
-        # Saved from the pixels: the render's own file carries the date and its timings.
-        raw = os.path.join(SCRATCH, "tile.png")
-        render(raw, TILE_W, TILE_H)
-        pixels = kit.load_pixels(raw)
-        kit.save_pixels(os.path.join(TILE_DIR, "%s_%d.png" % (TILESET, index)), pixels)
-        depth = depth_map(camera, pixels[..., 3])
-        cell = atlas[index // COLUMNS * TILE_H:(index // COLUMNS + 1) * TILE_H,
-                     index % COLUMNS * TILE_W:(index % COLUMNS + 1) * TILE_W]
-        covered = depth >= 0
-        cell[covered, :3] = np.maximum(depth[covered], 1 / 255)[:, None]
-        cell[covered, 3] = 1
-        print("tile %d: %d layers, %d pixels" % (index, len(layers), int(covered.sum())))
-    kit.save_pixels(DEPTH_FILE, atlas)
+    for tileset, tileset_tiles in tiles.TILESETS.items():
+        rows = max(tileset_tiles) // COLUMNS + 1
+        atlas = np.zeros((rows * TILE_H, COLUMNS * TILE_W, 4), dtype=np.float32)
+        for index, layers in sorted(tileset_tiles.items()):
+            kit.clear(stage)
+            build(stage, layers)
+            # Saved from the pixels: the render's own file carries the date and its timings.
+            raw = os.path.join(SCRATCH, "tile.png")
+            render(raw, TILE_W, TILE_H)
+            pixels = kit.load_pixels(raw)
+            kit.save_pixels(os.path.join(TILE_DIR, "%s_%d.png" % (tileset, index)), pixels)
+            depth = depth_map(camera, pixels[..., 3])
+            cell = atlas[index // COLUMNS * TILE_H:(index // COLUMNS + 1) * TILE_H,
+                         index % COLUMNS * TILE_W:(index % COLUMNS + 1) * TILE_W]
+            covered = depth >= 0
+            cell[covered, :3] = np.maximum(depth[covered], 1 / 255)[:, None]
+            cell[covered, 3] = 1
+            print("tile %s_%d: %d layers, %d pixels" % (tileset, index, len(layers), int(covered.sum())))
+        kit.save_pixels(DEPTH_FILE % tileset, atlas)
 
 
 # Icons --------------------------------------------------------------------------------------------

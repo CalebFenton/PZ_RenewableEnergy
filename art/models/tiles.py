@@ -1,4 +1,4 @@
-"""What each tile of renewable_energy_01 shows, built from the item builders.
+"""What each tile of renewable_energy_01 and renewable_energy_02 shows, built from the item builders.
 
 The index of each entry is the tile's number, which Lua reads through
 media/lua/shared/RenewableEnergy/Sprites.lua and tools/make_tiles.py gives properties; keep the
@@ -17,6 +17,13 @@ def layer(build, holdout=False, at=(0, 0, 0), turn=0, scale=1, **options):
 
 # Turning an object whose front faces south (-Y) to face each direction.
 FACING_TURN = {"S": 0, "E": 90, "N": 180, "W": -90}
+
+
+def _turned(at, facing):
+    """`at` turned about the square's centre as FACING_TURN turns an object to face `facing`."""
+    x, y, z = at
+    return {"S": (x, y, z), "E": (-y, x, z), "N": (-x, -y, z), "W": (y, -x, z)}[facing]
+
 
 # A wall panel's bottom edge, above the floor.
 WALL_PANEL_HEIGHT = 1.1
@@ -43,16 +50,17 @@ def _rack(material, facing, snow=False, cracks=None):
     return [layer(items.solar_rack, material=material, turn=turn)]
 
 
-def _overlay(build, at, **options):
-    return [layer(build, holdout=True, at=at), layer(build, frame=False, at=at, **options)]
+def _overlay(build, at, turn=0, **options):
+    return [layer(build, holdout=True, at=at, turn=turn), layer(build, frame=False, at=at, turn=turn, **options)]
 
 
-def _battery_overlay(build, at, slot, look):
+def _battery_overlay(build, at, turn, slot, look):
     """The battery in `slot` (from 0) as `look`, and its link to the one before. A bank draws its
     batteries' overlays in slot order, so this one keeps out from behind the storage and the
-    batteries in the slots before it, and draws over any in front of it."""
-    return [layer(build, holdout=True, at=at), layer(build, holdout=True, frame=False, batteries=slot, at=at),
-            layer(build, frame=False, slot=slot, look=look, at=at)]
+    batteries in the slots before it, and draws over any in front of it. That holds in every
+    facing: a battery behind an earlier one is cut where that one hides it."""
+    return [layer(build, holdout=True, at=at, turn=turn), layer(build, holdout=True, frame=False, batteries=slot, at=at, turn=turn),
+            layer(build, frame=False, slot=slot, look=look, at=at, turn=turn)]
 
 
 TILES = {
@@ -102,14 +110,48 @@ STORAGE_CAPACITY = {"BatteryBoxWood": 2, "BatteryBoxMetal": 2, "BatteryRackWood"
 # centre, which leaves a box's propped lid and a rack's back brace just short of the edge.
 STORAGE_NORTH = {"BatteryBoxWood": 0.18, "BatteryBoxMetal": 0.18, "BatteryRackWood": 0.22, "BatteryRackMetal": 0.22,
                  "BatteryBankWood": 0.22, "BatteryBankMetal": 0.22}
+
+
+def _storage(item, facing):
+    """A storage's tile facing `facing`, its battery overlays by look, each a list by slot, and its
+    meter overlays by level."""
+    build, at, turn = items.STORAGE[item], _turned((0, STORAGE_NORTH[item], 0), facing), FACING_TURN[facing]
+    batteries = {look: [_battery_overlay(build, at, turn, slot, look) for slot in range(STORAGE_CAPACITY[item])]
+                 for look in items.BANK_BATTERY_LOOKS}
+    return [layer(build, at=at, turn=turn)], batteries, [_overlay(build, at, turn, meter_level=level) for level in range(1, 6)]
+
+
 for item, base, first_batteries, first_meter in STORAGE_TILES:
-    build, at = items.STORAGE[item], (0, STORAGE_NORTH[item], 0)
-    TILES[base] = [layer(build, at=at)]
+    TILES[base], batteries, meter = _storage(item, "S")
     for look, first_battery in zip(items.BANK_BATTERY_LOOKS, first_batteries):
-        for slot in range(STORAGE_CAPACITY[item]):
-            TILES[first_battery + slot] = _battery_overlay(build, at, slot, look)
-    for level in range(1, 6):
-        TILES[first_meter + level - 1] = _overlay(build, at, meter_level=level)
+        for slot, overlay in enumerate(batteries[look]):
+            TILES[first_battery + slot] = overlay
+    for level, overlay in enumerate(meter):
+        TILES[first_meter + level] = overlay
+
+# The storage in all four facings, which the placing cursor turns it through as it does the game's
+# furniture. The cursor finds a facing's tile by its number in the same tileset, at most 96 away
+# (ISMoveableSpriteProps.getFaces, IsoWorld.SetCustomPropertyValues), and the tiles above, which a
+# save's storage stands on, have no free numbers that near. So each storage, in STORAGE_TILES'
+# order, has four tiles in FACINGS' order from TURNED_STORAGE_FIRST, its S one drawn as the tile
+# above and taking its overlays. The other facings' overlays fill renewable_energy_02 facing by
+# facing, storage by storage: each look's batteries by slot, then the meter where it shows. The
+# meter is on the storage's front, which the camera, from the south-east, sees only facing S or E;
+# facing N or W the storage hides every LED.
+FACINGS = "SENW"
+METER_FACINGS = "SE"
+TURNED_STORAGE_FIRST = 340
+TILES_02 = {}
+for f, facing in enumerate(FACINGS):
+    for i, (item, *_) in enumerate(STORAGE_TILES):
+        TILES[TURNED_STORAGE_FIRST + len(FACINGS) * i + f], batteries, meter = _storage(item, facing)
+        if facing == "S":
+            continue
+        for look in items.BANK_BATTERY_LOOKS:
+            for overlay in batteries[look]:
+                TILES_02[len(TILES_02)] = overlay
+        for overlay in meter if facing in METER_FACINGS else ():
+            TILES_02[len(TILES_02)] = overlay
 
 # Biogas digesters: a base tile each, then their gas holders' overlays. The barrel digester has a tile
 # for each of the game's drums it may be built from (Sprites.digester.barrel); its holder overlays fit
@@ -131,9 +173,15 @@ TILES[247] = _overlay(items.barrel_digester, (0, 0, 0), scrubber=True)
 TILES[248] = _overlay(items.insulated_digester, (0, 0, 0), scrubber=True)
 TILES[249] = _overlay(items.dome_digester, (0, 0, 0), scrubber=True)
 
-# The gas heater, off and lit, one facing.
+# The gas heater, off and lit, as a save's heaters stand; then, for the placing cursor to turn it
+# as it turns the storage, off in each of FACINGS from TURNED_HEATER_FIRST, then lit in each.
 TILES[244] = [layer(items.gas_heater)]
 TILES[245] = [layer(items.gas_heater, lit=True)]
+TURNED_HEATER_FIRST = TURNED_STORAGE_FIRST + len(FACINGS) * len(STORAGE_TILES)
+for s, lit in enumerate((False, True)):
+    for f, facing in enumerate(FACINGS):
+        TILES[TURNED_HEATER_FIRST + len(FACINGS) * s + f] = [layer(items.gas_heater, lit=lit, turn=FACING_TURN[facing])]
+
 # The gas kit fitted to a generator: an overlay on the game's own generator tiles, so it has no
 # base of the mod's to hold out. The first lies on the floor at the front corner of a generator the
 # game doesn't know; from GENERATOR_KIT_FIRST, one sits on the air intake of each of the game's
@@ -176,6 +224,9 @@ for first, build, scale, options in ((265, items.propeller_charger, WIND_TILE_SC
                                      (273, items.alternator_charger, WIND_TILE_SCALE["Alternator"], {})):
     for offset, facing in enumerate("NESW"):
         TILES[first + offset] = [layer(build, turn=FACING_TURN[facing], scale=scale, **options)]
+
+# Each tileset's tiles by number.
+TILESETS = {"renewable_energy_01": TILES, "renewable_energy_02": TILES_02}
 
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
 # working, its holder full, each gasifier and each wind charger.

@@ -1055,6 +1055,7 @@ module Base
         AutoLearnAny = Electricity:8,
         SkillRequired = Electricity:5,
         xpAward = Electricity:50,
+        OnCreate = RenewableEnergy.Recipes.makeChargeController,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],

@@ -619,7 +619,7 @@ function Bank:showBatteries()
     for i = #self.batteries, 1, -1 do
         table.insert(types, self.batteries[i].type)
     end
-    RenewableEnergy.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(self:spec().sprite, types, self.charge))
+    RenewableEnergy.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(Sprites.nameOf(isoObject), types, self.charge))
 end
 
 return Bank

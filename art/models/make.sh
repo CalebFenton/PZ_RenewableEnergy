@@ -4,7 +4,7 @@
 #
 #   models.py    ground and sprite models and their baked textures (common/media/models_X and
 #                textures/WorldItems), scripts/RenewableEnergy/Models.txt and SpriteModels.txt
-#   render.py    tile sprites (tools/tiles), their depth map (common/media/depthmaps), the
+#   render.py    tile sprites (tools/tiles), their depth maps (common/media/depthmaps), the
 #                32 x 32 item icons and the 48 x 48 build-menu icons (tools/textures)
 #   mod_icon.py  the mod list icon, drawn pixel by pixel with Pillow (the poster and the Workshop
 #                preview.png are in-game shots that art/promo/compose.py lays out)

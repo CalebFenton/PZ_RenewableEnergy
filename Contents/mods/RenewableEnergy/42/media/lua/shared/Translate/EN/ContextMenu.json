@@ -49,8 +49,8 @@
     "ContextMenu_RenewableEnergy_OntoGround": "Onto the Ground",
     "ContextMenu_RenewableEnergy_Brake": "Set the Brake",
     "ContextMenu_RenewableEnergy_ReleaseBrake": "Release the Brake",
-    "ContextMenu_RenewableEnergy_WireTreadmill": "Wire to a Bank",
+    "ContextMenu_RenewableEnergy_WireTreadmill": "Wire the Motor",
     "ContextMenu_RenewableEnergy_RunOnTreadmill": "Run on Treadmill",
-    "ContextMenu_RenewableEnergy_UnwireTreadmill": "Unwire from the Bank",
+    "ContextMenu_RenewableEnergy_UnwireTreadmill": "Unwire the Motor",
     "ContextMenu_RenewableEnergy_ReplaceBlades": "Replace Blades"
 }

@@ -136,7 +136,7 @@ module RenewableEnergy
         Weight = 6.0,
         Icon = RenewableEnergy_BatteryBoxWood,
         WorldStaticModel = RenewableEnergy.BatteryBoxWood_Ground,
-        WorldObjectSprite = renewable_energy_01_8,
+        WorldObjectSprite = renewable_energy_01_340,
         Tooltip = Tooltip_RenewableEnergy_BatteryBox,
         Tags = base:ignorezombiedensity,
     }
@@ -148,7 +148,7 @@ module RenewableEnergy
         Weight = 5.0,
         Icon = RenewableEnergy_BatteryBoxMetal,
         WorldStaticModel = RenewableEnergy.BatteryBoxMetal_Ground,
-        WorldObjectSprite = renewable_energy_01_23,
+        WorldObjectSprite = renewable_energy_01_344,
         Tooltip = Tooltip_RenewableEnergy_BatteryBox,
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
@@ -160,7 +160,7 @@ module RenewableEnergy
         Weight = 12.0,
         Icon = RenewableEnergy_BatteryRackWood,
         WorldStaticModel = RenewableEnergy.BatteryRackWood_Ground,
-        WorldObjectSprite = renewable_energy_01_32,
+        WorldObjectSprite = renewable_energy_01_348,
         Tooltip = Tooltip_RenewableEnergy_BatteryRackWood,
         Tags = base:heavyitem;base:ignorezombiedensity,
     }
@@ -172,7 +172,7 @@ module RenewableEnergy
         Weight = 14.0,
         Icon = RenewableEnergy_BatteryRackMetal,
         WorldStaticModel = RenewableEnergy.BatteryRackMetal_Ground,
-        WorldObjectSprite = renewable_energy_01_33,
+        WorldObjectSprite = renewable_energy_01_352,
         Tooltip = Tooltip_RenewableEnergy_BatteryRackMetal,
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
@@ -184,7 +184,7 @@ module RenewableEnergy
         Weight = 20.0,
         Icon = RenewableEnergy_BatteryBankWood,
         WorldStaticModel = RenewableEnergy.BatteryBankWood_Ground,
-        WorldObjectSprite = renewable_energy_01_34,
+        WorldObjectSprite = renewable_energy_01_356,
         Tooltip = Tooltip_RenewableEnergy_BatteryBankWood,
         Tags = base:heavyitem;base:ignorezombiedensity,
     }
@@ -196,7 +196,7 @@ module RenewableEnergy
         Weight = 25.0,
         Icon = RenewableEnergy_BatteryBankMetal,
         WorldStaticModel = RenewableEnergy.BatteryBankMetal_Ground,
-        WorldObjectSprite = renewable_energy_01_9,
+        WorldObjectSprite = renewable_energy_01_360,
         Tooltip = Tooltip_RenewableEnergy_BatteryBankMetal,
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
@@ -748,7 +748,7 @@ module RenewableEnergy
         Weight = 6.0,
         Icon = RenewableEnergy_GasHeater,
         WorldStaticModel = RenewableEnergy.GasHeater_Ground,
-        WorldObjectSprite = renewable_energy_01_244,
+        WorldObjectSprite = renewable_energy_01_364,
         Tooltip = Tooltip_RenewableEnergy_GasHeater,
         Tags = base:hasmetal;base:ignorezombiedensity,
     }

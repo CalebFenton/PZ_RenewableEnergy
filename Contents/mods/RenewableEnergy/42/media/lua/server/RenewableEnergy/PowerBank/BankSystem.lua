@@ -125,8 +125,8 @@ local function makeBank(square, spriteName, index, from)
     return generator
 end
 
---- A working bank of tile `spriteName` (a bank's Sprites field value) at `index` on the
---- square, or on top when `index` is nil or negative. Authority only.
+--- A working bank of tile `spriteName` (a bank's tile in any facing) at `index` on the square, or
+--- on top when `index` is nil or negative. Authority only.
 function PowerBank.place(square, spriteName, index)
     local top = square:getObjects():size()
     return makeBank(square, spriteName, (index and index >= 0) and index or top, nil)
