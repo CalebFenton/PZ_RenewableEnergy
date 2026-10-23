@@ -1,92 +1,93 @@
 # ![Renewable Energy](art/promo/images/banner.png)
 
-Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels and batteries, a wind charger, a manure digester, a wood gas generator. You start with a car battery in a wooden box and an inverter that plugs into a lighter socket, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
+Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels, wind chargers, a treadmill, a bank of batteries, and a generator that runs on manure gas or wood. You start with a car battery in a wooden box, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
 
 **Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress.
 
 ## How it plays
 
-![A first wooden battery box by a window with two panels outside, next to a homestead with wall panels, ground racks and a generator](art/promo/images/setup.png)
+![A first battery box by a window with two panels outside, next to a homestead with wall panels, ground racks, a propeller wind charger, and a digester feeding the generator](art/promo/images/setup.png)
 
 | When | What you're after | What it takes |
 |---|---|---|
-| The first weeks | The TV, a lamp, a mini fridge | A battery box, two car batteries, a plug-in inverter, two panels |
-| A month or so in | The fridge all night | A battery rack of deep cycle batteries, a bigger inverter, a charge controller, a handful of panels |
-| Months later | The freezer, the washer, the microwave | A bank of L-16s, an inverter/charger, two charge controllers, a failsafe on the generator, a yard of panels |
-| The long haul | The whole house | A metal bank, two inverter/chargers, four charge controllers, and every panel you can find |
-
-You'll spend the game chasing panels: finding them, fixing the cracked ones, and in the end building your own.
+| The first weeks | The TV and the lights, and a mini fridge while the sun's up | A battery box, two car batteries, a plug-in inverter, two panels or a treadmill |
+| A month or so in | The kitchen fridge through the night | A battery rack of deep cycles, a bigger inverter, a charge controller, a handful of panels, a scoop rotor |
+| Months later | The freezer, the washer, and a backup that needs no gasoline | A bank of L-16s, an inverter/charger, two controllers, a propeller wind charger, a generator with a failsafe on digester or wood gas |
+| The long haul | The whole house, all winter | A metal bank, two inverter/chargers, four controllers, every panel you can find, homemade wind chargers on the high ground, a brick dome digester |
 
 ## Everything you can find or build
 
-![Every item's model lying on the ground with its inventory icon: panels, battery storage, parts, batteries and gadgets](art/promo/images/items.png)
+![Every item's model lying on the ground with its inventory icon: panels, battery storage, parts, batteries, the gas and wind parts, gadgets and magazines](art/promo/images/items.png)
 
-- **Batteries wear** with every deep drain: a deep cycle kept above half lasts years, a car battery run down every day is done in months. Service it with water and a rag or baking soda, or rebuild it: strip the plates, recast them at a furnace, and put it back together.
-- **Panels follow the sun.** Flat panels make the most in summer and lose most of it by December, wall panels do best in winter, and ground racks over the year. Snow piles up on flat panels until you sweep it off, and thunderstorms crack modules now and then.
-- **The generator stays the backup.** Plug it in beside the bank and, with a charger wired in, it fills the batteries while it runs; a **Solar Failsafe** starts it when they run low and stops it when they're full.
-- **Small gadgets** work without a bank: a maintainer that trickle-charges a parked car's battery, a charger for flashlight batteries, and garden lights. Some houses still have a row along the front walk:
+- **Banks** hold the batteries and what you wire into them: inverters, charge controllers, a charger and a **Solar Failsafe** that starts the generator when they run low.
+- **Batteries wear** with every deep drain. Service and recondition them, each repair bringing them back less far, then strip and rebuild them with plates you cast yourself.
+- **Panels follow the sun**: flat ones for summer, wall panels for winter, ground racks for the year. Storms crack modules; seal them with epoxy or reglaze them.
+- **Wind chargers, treadmills, digesters and gasifiers** fill in when the sun won't.
+- **Small gadgets** need no bank: a maintainer for a parked car's battery, a charger for flashlight batteries, and garden lights.
 
 ![Solar garden lights glowing at night along a house's front walk](art/promo/images/gardenlights.png)
 
 ## Getting started
 
-![A metal battery bank, its right-click menu with Wire In open, and its status window listing the load, batteries, parts and panels](art/promo/images/bank.png)
+![The homestead's battery bank, its right-click menu with Wire In open, and its status window listing the load, batteries, parts, panels and the wind charger](art/promo/images/bank.png)
 
-1. **Build a bank.** Craft a battery box, right-click it and **Place Object** indoors.
-2. **Wire in the parts.** Right-click the bank and **Wire In** batteries and an inverter. It tells you what you're missing.
-3. **Mount the panels.** Craft a module into a flat or wall panel, or two onto a ground rack, and place it outside.
-4. **Connect them.** Right-click the bank and **Connect Sources in Reach**.
-5. **Turn it on.** Right-click the bank and **Turn On**. **Status** shows what it's doing, down to why each panel isn't at full sun.
+1. Craft a battery box and **Place Object** indoors.
+2. Right-click it and **Wire In** batteries and an inverter.
+3. **Connect Bank**, like a generator: Electricity 3, or the generator magazine.
+4. Put up a panel outside, then **Connect Sources in Reach**.
+5. **Turn On**. **Status** shows what it's doing, and why each source isn't at full output.
 
-If what's switched on draws more than the inverters carry, the power cuts out until you switch something off. The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town.
-
-## Biogas
-
-Manure and kitchen scraps make gas, given warmth and patience. Build a digester from the **Farming** page of the build menu, from a barrel under garbage bags up to a buried brick dome that keeps itself warm, and feed it manure, scraps and grass.
-
-- **It's alive.** Below about 10 °C it stops, too much food sours it until you add wood ash, baking soda or quicklime, and its sludge comes out as compost. A **Gas Heater** keeps it going through the winter.
-- **It stinks.** A fresh or sour digester draws zombies, and one indoors can poison the house. The brick dome is the quiet one.
-- **Run the generator on it** with a **Gas Conversion Kit** and a hose: a lighter load, but no gasoline, ever.
-- **Bottle it.** A tire pump fills a propane tank a quarter of the way; a scrubber and a fridge's compressor fill it. The tank refills lantern bottles, and the compressor inflates tires.
-
-## Wood gas
-
-FEMA's 1989 plans run a generator on wood: build a **gasifier** (**Welding** page) beside a generator with the kit and pipe it in. Keep the hopper full and light it, with bellows once it's gone cold. Shovel out the ash, change the filter's packing as tar soaks it, and drain the condensate: wood vinegar, for mildew and aphid spray. Charcoal burns cleanest. Lit indoors, it poisons the house.
+The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town. Switch on more than the inverters carry and the power cuts out until you switch something off.
 
 ## Wind
 
-A **wind charger** (**Welding** page) feeds the bank like a panel: a scoop rotor from a cut drum, a propeller on a pipe mast, or steel blades on a brake-hub alternator. Open, high ground helps, and winter blows hardest, when panels are weakest. Brake the propeller before a storm or its blades break. A treadmill wired to the bank turns running into power; dismantled, it gives up its motor.
+![A scoop rotor, wooden and pipe-blade propellers and a homemade alternator wind charger turning on open ground](art/promo/images/wind.png)
+
+Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks; a propeller makes real power, but **Set the Brake** before a gale or you'll be replacing blades; a homemade alternator on a two-storey mast turns itself out of the wind. Trees and buildings steal wind; upper floors give more.
+
+## Treadmills
+
+![A survivor running on a treadmill wired to a battery box in a garage](art/promo/images/treadmill.png)
+
+No sun, no wind? **Wire to a Bank** and **Run on Treadmill**: half an hour banks about what a fridge-freezer draws in that time, at the cost of endurance. Taken apart, it gives up the motor wind chargers are built around.
+
+## Biogas
+
+![A steel drum and an orange barrel digester, an insulated digester and a brick dome feeding a kitted generator, a gas heater by the first, and the brick dome's status window](art/promo/images/biogas.png)
+
+Feed a digester manure and scraps, keep it above 10 °C, and it makes gas. Overfeed it and it sours until you add wood ash or baking soda; indoors, it can poison the house, and it stinks. **Install Gas Conversion Kit** on a generator, **Connect Gas Line** with a rubber hose for every five squares, and **Run on Gas**: its tank stays as it was. A tire pump or a fridge compressor bottles the gas for propane tanks.
+
+## Wood gas
+
+![Three gasifiers, two of them lit and piped to kitted generators, wood and charcoal to hand, and the gasifier's status window](art/promo/images/woodgas.png)
+
+FEMA's 1989 plans run an engine on wood: a gasifier from a trash can, a steel drum or welded sheet metal, right beside a kitted generator. Fill it with wood or charcoal and light it, clean out the ash, change the filter packing before the tar gets through, and keep it outdoors.
 
 ## Crafting
 
-Most recipes need a table and enough light, and a battery rebuild a furnace, a hand press and a kiln too. You learn them from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. The inverters, the maintainer and the battery charger can't be crafted: you'll have to find them.
-
-Every recipe's inputs, skills and tools are on [one sheet](art/promo/images/recipes.png).
+Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. Inverters, the maintainer and the battery charger can't be crafted. Every recipe is on [one sheet](art/promo/images/recipes.png).
 
 ## Where to look
 
-Think about who had this stuff in 1993: people with campers and boats, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common and good ones aren't; the biggest batteries and inverters are rare. Some places come already set up, from a stock tank pump in a pasture to a power company yard.
+Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, and now and then a barn or a hunting shack has something out back, never in working order.
 
-The easiest start is on the road. Road crews and army checkpoints left solar arrow boards behind, still flashing:
+The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
 
 ![The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a car](art/promo/images/trailer.png)
 
-Its box holds deep cycle batteries, often padlocked, and the panels come off with a wrench. Strip it where it stands, or tow it home.
-
 ## Sandbox options
 
-- **Sunlight Multiplier**: how much power panels make. At 1 it takes a yard of panels to run one fridge.
-- **Biogas Multiplier**: how much gas digesters make.
-- **Loot Rarity Multiplier**, one each for modules, batteries and everything else: how often the mod's items turn up.
-- **Battery Wear**: how hard deep drains wear batteries. 0 turns wear off.
-- **Stash Houses**: adds houses stocked with solar gear, and maps that lead to them. Set it before you start.
+- **Sunlight Multiplier**: how much power panels make.
+- **Loot Rarity Multiplier**, for modules, batteries and the rest.
+- **Battery Wear** and **Storm Damage**: 0 and off for an easier game.
 
-The rest, from storm damage to solar sites, are on the **Renewable Energy** page.
+The rest are on the **Renewable Energy** page.
 
 ## Questions
 
-- **Can I add it to my save?** Yes. Loot and stocked rooms turn up where you haven't been yet; solar sites and garden lights appear anywhere.
-- **Can I remove it from a save?** Not cleanly: what it built into your world goes with it.
+- **Can I add it to my save?** Yes. Loot turns up where you haven't been yet; solar sites and garden lights anywhere.
+- **Can I remove it?** Not cleanly: what it built into your world goes with it.
+- **How does it all work, and where do I look?** The [player's guide](docs/player-guide.md) explains every mechanic and hints where the gear is.
 
 ## Credits
 

@@ -1,4 +1,4 @@
-# Renewable Energy: a player's overview
+# Renewable Energy: player's guide
 
 How the mod's systems work, for players who want more than the Workshop page tells them, and where to start looking for the gear. Figures are rounded and assume the default sandbox settings. The tooltips and status windows in game show the exact ones.
 
