@@ -480,42 +480,6 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
     end,
 })
 
--- An item that still carries a fixed bank tile (Sprites.fixedTiles), from a save before banks
--- turned, turns with the placing cursor as its twin does, and stands in the facing it was turned to.
-test("renewable_energy_tiles_fixed_tile_items_turn", {
-    instant = true,
-    spOnly = "the item's tile is set on this client, which owns the item only in single player",
-    run = function(self)
-        local square = T.square(self, { indoors = true }, "a free indoor square for a bank")
-        if not square then return end
-        electrician(self)
-        local twin = Sprites.batteryRackWood
-        for name, turnable in pairs(Sprites.fixedTiles) do
-            self.fixed = turnable == twin.S and name or self.fixed
-        end
-        T.give(self, "rack", { { type = "RenewableEnergy.BatteryRackWood" } })
-        T.step(function()
-            local p, item, fixed = T.player(), self.items.rack[1], self.fixed
-            item:setWorldSprite(fixed)
-            self.faces = ISMoveableSpriteProps.new(fixed):getFaces()
-            T.standNextTo(square)
-            if T.need(self, ISMoveableSpriteProps.new(fixed):walkToAndEquip(p, square, "place", fixed), "a way to place the rack") then
-                ISTimedActionQueue.add(ISMoveablesAction:new(p, square, "place", fixed, nil, "E", item, nil))
-            end
-        end)
-        T.waitFor(self, function() return PowerBank.bankOn(square) ~= nil end, "the rack placed facing E")
-        T.step(function() self.placed = Sprites.nameOf(PowerBank.bankOn(square)) end)
-        T.server(self, "PZHarness.trackPlaced", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = twin.E })
-    end,
-    validate = function(self)
-        local twin = Sprites.batteryRackWood
-        local faces = self.faces or {}
-        expect(faces.S == self.fixed and faces.E == twin.E and faces.N == twin.N and faces.W == twin.W, string.format(
-            "%s turns S %s, E %s, N %s, W %s", tostring(self.fixed), tostring(faces.S), tostring(faces.E), tostring(faces.N), tostring(faces.W)))
-        expect(self.placed == twin.E, "the rack turned to E stands as " .. tostring(self.placed) .. ", expected " .. twin.E)
-    end,
-})
-
 -- A bank turned to face E or W shows its batteries, and facing E its meter, with that facing's
 -- overlays, on the authority and on this client.
 local L16 = "RenewableEnergy.L16Battery"

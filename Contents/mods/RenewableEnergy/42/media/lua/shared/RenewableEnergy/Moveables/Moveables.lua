@@ -134,8 +134,8 @@ function ISMoveableSpriteProps:pickUpMoveableInternal(character, square, object,
     return item
 end
 
--- Copies the keys before vanilla adds the item to the inventory and sends it to the client. A fixed
--- tile (Sprites.fixedTiles) picks up as its turnable twin, so its item places as one.
+-- Copies the keys before vanilla adds the item to the inventory and sends it to the client. Save
+-- compatibility: a fixed tile (Sprites.fixedTiles) picks up as its turnable twin, so its item turns.
 local vanillaInstanceItem = ISMoveableSpriteProps.instanceItem
 function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
     local from = pickingUp
@@ -150,27 +150,9 @@ function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
     return item
 end
 
--- An item in a save may carry a fixed tile (Sprites.fixedTiles); it goes down as the turnable twin.
+-- Save compatibility: an item may still carry a fixed tile (Sprites.fixedTiles). The cursor offers
+-- it only facing S, and it goes down as the turnable twin.
 local vanillaPlace = ISMoveableSpriteProps.placeMoveableInternal
 function ISMoveableSpriteProps:placeMoveableInternal(character, square, item, spriteName)
     return vanillaPlace(self, character, square, item, Sprites.turnable(spriteName))
-end
-
--- Such an item turns with the placing cursor as its twin does. The cursor and ISMoveablesAction
--- read the facings from the item's own tile (ISMoveableSpriteProps.hasFaces, getFaces), which has
--- none, so it offers the twin's other facings, its own tile standing for south.
-local vanillaHasFaces = ISMoveableSpriteProps.hasFaces
-function ISMoveableSpriteProps:hasFaces()
-    return (self.spriteName and Sprites.fixedTiles[self.spriteName] ~= nil) or vanillaHasFaces(self)
-end
-
-local vanillaGetFaces = ISMoveableSpriteProps.getFaces
-function ISMoveableSpriteProps:getFaces()
-    local twin = self.spriteName and Sprites.fixedTiles[self.spriteName]
-    if not twin then
-        return vanillaGetFaces(self)
-    end
-    local faces = ISMoveableSpriteProps.new(twin):getFaces()
-    faces.S = self.spriteName
-    return faces
 end

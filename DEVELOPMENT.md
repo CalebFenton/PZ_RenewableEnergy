@@ -302,6 +302,12 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 - The in-game Workshop screen uploads `Contents/` and `preview.png`; the other files at the repository root aren't uploaded. `dev/harness/docs/workshop-page.md` has the Workshop's limits.
 - Steam shows the preview as small as about 196 pixels. In the game's mod list, `mod.info`'s `icon=` is drawn about 22 pixels square (the small font's height plus a little; `ModListBox`) and 28 in the load order, through `getTexture`, which loads it with linear filtering and no mipmaps, so a picture larger than about twice that size is sampled past its thin lines. `mod.info` takes one `category=`, which the mod list's filter matches exactly; the first `poster=` is the main poster.
 
+## Save compatibility
+
+Code kept only so older saves load, to delete once they needn't:
+
+- `Sprites.fixedTiles` and everything that reads it (`Sprites.turnable`, the `KINDS` copy in `Sprites.lua`, `PowerBank.lua`'s bank sprites, the `instanceItem` and `placeMoveableInternal` wraps in `Moveables.lua`, `RenewableEnergyTestsTiles.lua`'s fixed-tile test and `RenewableEnergyTestLib.lua`'s list), and the old tiles in the tileset: renewable_energy_01_8, 9, 23, 32, 33, 34, 244 and 245. Banks and heaters placed before they turned (commit 811e5f6) stand on those tiles. The engine finds a tile's other facings at most 96 tile numbers away (`IsoWorld.SetCustomPropertyValues`), and none are free near them, so they can't turn; the code treats them as their turnable twins.
+
 ## Release checklist
 
 1. `dev/static-check.sh`, `dev/validate-server.sh` and `dev/run-debug-client.sh --test` must pass.

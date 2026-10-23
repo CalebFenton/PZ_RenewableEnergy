@@ -88,9 +88,11 @@ Sprites.gasHeater = {
     off = { S = tile(364), E = tile(365), N = tile(366), W = tile(367) },
     lit = { S = tile(368), E = tile(369), N = tile(370), W = tile(371) },
 }
--- The S tiles a save's banks and heaters may stand on, each to its turnable twin, which looks the
--- same. No numbers within 96 of them are free for other facings, so they don't turn; they work as
--- their twin, and pick up and place as it (Moveables.lua).
+-- Save compatibility: the S tiles banks and heaters stood on before they turned (commit 811e5f6),
+-- each to its turnable twin, which looks the same. No numbers within 96 of them are free for other
+-- facings, so they don't turn; they work as their twin, pick up as it (Moveables.lua), and an item
+-- still carrying one places it facing S. Remove this table, its uses and the old tiles once saves
+-- from before then needn't load (DEVELOPMENT.md, Save compatibility).
 Sprites.fixedTiles = {
     [tile(8)] = Sprites.batteryBoxWood.S, [tile(23)] = Sprites.batteryBoxMetal.S,
     [tile(32)] = Sprites.batteryRackWood.S, [tile(33)] = Sprites.batteryRackMetal.S,

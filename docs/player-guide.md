@@ -146,6 +146,7 @@ How the mod's systems work, for players who want more than the Workshop page tel
 | Mechanic | How it works |
 |---|---|
 | Picking up | Panels keep their modules and garden lights keep their charge. A bank must be disconnected and emptied before you can pick it up; a sledgehammer dumps what's in it on the floor. A picked-up treadmill forgets its wiring. A kitted generator can't be picked up. |
+| Banks from an older version | A box, rack, bank or gas heater from before they could turn works as before but won't turn. One standing in your world turns once you pick it up and place it again. One you were carrying places facing south only: place it, pick it up, and from then on it turns. |
 | Adding to a save | Loot and stocked rooms turn up only in containers and rooms nobody has opened or seen yet. Solar sites, rural finds and garden lights appear anywhere, explored or not. |
 | Removing from a save | What the mod built into your world goes with it. |
 
