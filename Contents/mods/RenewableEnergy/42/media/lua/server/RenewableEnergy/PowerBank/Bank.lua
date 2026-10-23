@@ -428,10 +428,12 @@ end
 --- nearest fueled running generator whose reach covers the bank, or false. Saves as `chargeWantW`
 --- their watts, capped so they fill no more than `roomWh` over `hours`: a gas line splits its
 --- cap by these wants (GasLines.chargerLimitW), so it must outlive the pass. Returns the watts put
---- in: the want, capped by the gas line and by the generator's fuel, which it burns. Unloaded, only
---- the grid carries on, until it shuts down.
+--- in: the want, capped by the gas line. A generator bills them with what it powers
+--- (Payers.billGenerators), so its fuel pays for them at its hour, and its window shows them.
+--- Unloaded, only the grid carries on, until it shuts down.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
+    local wasSource, wasWantW = self.chargeSource, self.chargeWantW
     if self:getSquare() then
         generator = not self.gridPowered and fueled(self, generators)
         self.chargeSource = (self.gridPowered and "grid") or (generator and placeOf(generator)) or false
@@ -440,18 +442,15 @@ function Bank:chargeFrom(generators, hours, roomWh)
     end
     local charging = self.chargeSource and hours > 0 and roomWh > 0
     self.chargeWantW = charging and math.min(self:chargerW(), roomWh / hours) or 0
+    if self.chargeSource ~= wasSource or math.abs(self.chargeWantW - (wasWantW or 0)) > 0.01 then
+        Payers.billGenerators()
+    end
     if not charging then
         return 0
     end
     local watts = self.chargeWantW
     if generator then
         watts = math.min(watts, RenewableEnergy.GasLines.chargerLimitW(generator, self) or watts)
-    end
-    local fuelPerWh = Specs.fuelFromWatts(1) * SandboxVars.GeneratorFuelConsumption
-    if generator and fuelPerWh > 0 then
-        local fuel = generator:getFuel()
-        watts = math.min(watts, fuel / fuelPerWh / hours)
-        generator:setFuel(math.max(0, fuel - watts * hours * fuelPerWh))
     end
     return watts
 end

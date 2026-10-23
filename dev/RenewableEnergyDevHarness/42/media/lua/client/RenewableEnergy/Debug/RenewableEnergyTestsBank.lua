@@ -755,13 +755,14 @@ local function chargerBankWatts()
 end
 
 -- Chargers charge only from the grid or a running generator other than the bank itself, at their
--- full watts while the batteries have room, and burn no generator fuel on the grid.
+-- full watts while the batteries have room, saying so in the status window.
 test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)
         local charge = 0.2
         local bank, backup = chargerBank(self, { charge = charge })
         if not bank then return end
+        self.at = bank.position
         -- For half the time the room left in the batteries takes to fill.
         self.chargersW = chargerBankWatts()
         local roomWh = (1 - charge) * 2 * Specs.batteries[CAR_BATTERY].wh
@@ -775,32 +776,34 @@ test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
             T.bankPass(self, bank, 0, { hours = self.hours })
             T.step(function()
                 local status = bank.state.status
-                self.fromGenerator = status.chargerW
+                self.generatorStatus = status
                 self.generatorSource = status.chargers[1] and status.chargers[1].charging
             end)
-            T.readGenerator(self, backup, "fuelAfter")
         end)
         T.step(function() T.setGrid(self, true) end)
         T.batch(function()
             T.bankPass(self, bank, 0)
             T.step(function() self.fromGrid, self.gridPowered = bank.state.status.chargeSource, bank.state.activated end)
-            T.readGenerator(self, backup, "fuelOnGrid")
         end)
     end,
     validate = function(self)
         expectNear("charger watts with no grid or generator" .. (self.ownPower and " while the bank powers itself" or ""), self.alone, 0, 0)
         expect(self.chargersW > 0, "the bank's chargers are rated for no watts")
-        expectNear("charger watts from a running generator", self.fromGenerator, self.chargersW, 0)
+        local status = self.generatorStatus
+        expectNear("charger watts from a running generator", status.chargerW, self.chargersW, 0)
         expect(self.generatorSource == "generator", "a charger says it charges from " .. tostring(self.generatorSource))
+        local shown = rowLabelled((StatusWindow.rows(status, self.at)), getText("IGUI_RenewableEnergy_GeneratorPower"))
+        expect(shown ~= nil and shown.value == getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)),
+            "a bank charging from a generator reads " .. tostring(shown and shown.value))
         expect(self.fromGrid == "grid", "with the grid on the chargers charge from " .. tostring(self.fromGrid))
-        expectNear("fuel the chargers burned on grid power", self.reads.fuelAfter.fuel - self.reads.fuelOnGrid.fuel, 0, 0)
         expect(not self.gridPowered, "the bank ran its own generator while the grid powered its square")
     end,
 })
 
--- A running generator bills the chargers only for what the batteries take: nothing for a full bank
--- or one without batteries, the room's fuel for one with room.
-test("renewable_energy_bank_generator_fuel_follows_battery_room", {
+-- A running generator's bill, which vanilla burns at the hour and its window shows, counts the
+-- chargers charging from it for what the batteries take: nothing for a full bank or one without
+-- batteries, the room's watts for one with room, also after vanilla rebuilds the bill.
+test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)
         local bank, backup = chargerBank(self)
@@ -809,42 +812,41 @@ test("renewable_energy_bank_generator_fuel_follows_battery_room", {
         self.chargersW = chargerBankWatts()
         self.low = 0.2
         local function pass(key)
-            T.readGenerator(self, backup, key .. "Before")
             T.bankPass(self, bank, 0)
             T.step(function() self[key] = bank.state end)
-            T.readGenerator(self, backup, key .. "After")
+            T.readGenerator(self, backup, key)
         end
         -- The bank stays out: its copy waits for every part, and the batteries leave.
         T.batch(function()
-            T.generator(self, { square = backup, running = true })
+            local generator = T.generator(self, { square = backup, running = true })
             pass("full")
             T.setCharge(self, bank, self.low)
             pass("room")
+            T.setGenerator(self, generator, { rebuild = true })
+            T.readGenerator(self, backup, "rebuilt")
             T.server(self, "removePart", { bank = bank.position, type = CAR_BATTERY })
             T.server(self, "removePart", { bank = bank.position, type = CAR_BATTERY })
             pass("empty")
         end)
     end,
     validate = function(self)
-        local function burned(key)
-            return self.reads[key .. "Before"].fuel - self.reads[key .. "After"].fuel
-        end
+        local reads = self.reads
         for _, key in ipairs({ "full", "room", "empty" }) do
             local source = self[key].status.chargeSource
             expect(source == "generator", "the " .. key .. " bank's chargers charge from " .. tostring(source))
         end
-        expectNear("fuel the chargers burned on a full bank", burned("full"), 0, 0)
         expectNear("charger watts into a full bank", self.full.status.chargerW, 0, 0)
-        -- A bank pass lasts an hour unless told otherwise, so the Wh filled are the watts billed.
+        -- A bank pass lasts an hour unless told otherwise, so the room's Wh are the watts it takes.
         local roomWh = (1 - self.low) * self.room.nominalWh
-        local filledWh = math.min(self.chargersW, roomWh)
-        local fuel = fuelPerHour(filledWh)
-        expect(self.chargersW > 0 and roomWh > 0 and fuel > 0, "the bank with room in its batteries bills no fuel")
-        expectNear("fuel the chargers burned filling the room", burned("room"), fuel, fuel * 0.01)
+        local filledW = math.min(self.chargersW, roomWh)
+        expect(self.chargersW > 0 and roomWh > 0, "the bank has no chargers or no room in its batteries")
+        expectNear("fuel an hour the chargers added to the generator's bill", reads.room.bill - reads.full.bill,
+            fuelPerHour(filledW), 0.0001)
+        expectNear("the generator's bill after vanilla rebuilt it", reads.rebuilt.bill, reads.room.bill, 0.0001)
         expectNear("the bank's charge after the chargers filled it", self.room.charge,
-            self.low + filledWh / self.room.nominalWh, 0.0001)
+            self.low + filledW / self.room.nominalWh, 0.0001)
         expect(self.empty.batteries == 0, "the bank still holds " .. self.empty.batteries .. " batteries")
-        expectNear("fuel the chargers burned on a bank without batteries", burned("empty"), 0, 0)
+        expectNear("fuel an hour a bank without batteries left on the generator's bill", reads.empty.bill - reads.full.bill, 0, 0.0001)
         expectNear("charger watts into a bank without batteries", self.empty.status.chargerW, 0, 0)
     end,
 })
@@ -1201,11 +1203,12 @@ test("renewable_energy_bank_nearest_generator_pays_shared_appliance", {
 })
 
 -- A running generator and a switched-on bank reach a fridge nearer the bank: the bank pays for it,
--- and once the bank is off the generator pays for one.
+-- and once the bank is off the generator pays for one. The bank has no charger, which would refill
+-- it from the generator on its bill.
 test("renewable_energy_bank_and_generator_nearest_pays", {
     run = function(self)
         T.setGrid(self, false)
-        local bank = T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1 })
+        local bank = T.bank(self, "batteryBankWood", { CAR_BATTERY, CAR_BATTERY, POWER_INVERTER, POWER_INVERTER }, { charge = 1 })
         local fridges = bank and T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
         local generatorSquare = fridges and fartherSquare(self, fridges[1], bank.square, { minDistance = 6 })
         -- Out of the bank's backup reach, where it would carry the bank's load instead.

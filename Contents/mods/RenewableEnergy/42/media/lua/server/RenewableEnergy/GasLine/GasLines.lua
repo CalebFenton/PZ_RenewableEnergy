@@ -175,14 +175,33 @@ local function split(generator)
     return powered, shares
 end
 
---- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and what the
---- chargers of the battery banks that charge from it draw (split).
-function GasLines.loadOf(generator)
-    local watts, shares = split(generator)
+local function total(shares)
+    local watts = 0
     for _, share in pairs(shares) do
         watts = watts + share
     end
     return watts
+end
+
+--- The watts the chargers of the battery banks that charge from `generator` draw: their wants,
+--- and on gas their shares of what the cap leaves (split).
+function GasLines.chargingW(generator)
+    if capOf(GasKit.stateOf(generator)) then
+        local _, shares = split(generator)
+        return total(shares)
+    end
+    local watts = 0
+    for _, bank in ipairs(chargingBanks(generator)) do
+        watts = watts + (bank.chargeWantW or 0)
+    end
+    return watts
+end
+
+--- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and what the
+--- chargers of the battery banks that charge from it draw (split).
+function GasLines.loadOf(generator)
+    local watts, shares = split(generator)
+    return watts + total(shares)
 end
 
 --- The most watts `bank`'s chargers draw from `generator`: its share of what the line's cap
@@ -243,8 +262,9 @@ local function wear(generator, state, factor, hours)
     end
 end
 
--- Litres the generator lost since the last pass on gas, to vanilla's burn and any bank charging from
--- it. Read off the fuel itself, before settleFuel puts it back, so the gas pays exactly what was taken.
+-- Litres the generator lost since the last pass on gas, to vanilla's burn, which bills the banks
+-- charging from it too (Payers). Read off the fuel itself, before settleFuel puts it back, so the
+-- gas pays exactly what was taken.
 local function burnedSince(generator, state)
     return state.onGas and math.max(0, (state.set or 0) - generator:getFuel()) or 0
 end
@@ -275,8 +295,8 @@ local function dryBill(generator, state, hours)
 end
 
 -- Keeps track of vanilla's last bill of the generator running on gas, which Lua can't read: fuel
--- taken since the last pass (vanilla's bill, or a bank charging from it) means this hour's came,
--- and a pass that comes between a new hour and vanilla's bill of it keeps the last.
+-- taken since the last pass means this hour's came, and a pass that comes between a new hour and
+-- vanilla's bill of it keeps the last.
 local function trackBill(generator, state, litres)
     if generator:isActivated() and state.onGas then
         if not state.billedHour or litres > 0 then

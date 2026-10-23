@@ -47,7 +47,7 @@
     "IGUI_RenewableEnergy_Night": "Night",
     "IGUI_RenewableEnergy_PanelsNow": "Panels now",
     "IGUI_RenewableEnergy_PanelsToday": "Panels today",
-    "IGUI_RenewableEnergy_ChargersNow": "Chargers now",
+    "IGUI_RenewableEnergy_GeneratorPower": "Generator power",
     "IGUI_RenewableEnergy_Grid": "Grid power",
     "IGUI_RenewableEnergy_GridCharging": "On, charging %1",
     "IGUI_RenewableEnergy_GridOn": "On",

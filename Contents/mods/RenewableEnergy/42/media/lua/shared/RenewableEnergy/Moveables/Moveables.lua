@@ -155,3 +155,22 @@ local vanillaPlace = ISMoveableSpriteProps.placeMoveableInternal
 function ISMoveableSpriteProps:placeMoveableInternal(character, square, item, spriteName)
     return vanillaPlace(self, character, square, item, Sprites.turnable(spriteName))
 end
+
+-- Such an item turns with the placing cursor as its twin does. The cursor and ISMoveablesAction
+-- read the facings from the item's own tile (ISMoveableSpriteProps.hasFaces, getFaces), which has
+-- none, so it offers the twin's other facings, its own tile standing for south.
+local vanillaHasFaces = ISMoveableSpriteProps.hasFaces
+function ISMoveableSpriteProps:hasFaces()
+    return (self.spriteName and Sprites.fixedTiles[self.spriteName] ~= nil) or vanillaHasFaces(self)
+end
+
+local vanillaGetFaces = ISMoveableSpriteProps.getFaces
+function ISMoveableSpriteProps:getFaces()
+    local twin = self.spriteName and Sprites.fixedTiles[self.spriteName]
+    if not twin then
+        return vanillaGetFaces(self)
+    end
+    local faces = ISMoveableSpriteProps.new(twin):getFaces()
+    faces.S = self.spriteName
+    return faces
+end

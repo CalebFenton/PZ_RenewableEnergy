@@ -8,8 +8,9 @@
 -- (Loads.scan). A generator's bill is vanilla's totalPowerUsing, which the engine rebuilds
 -- whenever anything in its reach switches (IsoGenerator.setSurroundingElectricity) and burns at
 -- the hour (IsoGenerator.update); so its share is set after each rebuild, before the next hour.
--- A generator also pays for an unwired treadmill it powers, which vanilla doesn't know of, and
--- for the load of each bank it backs up (Bank.backupCarriesLoad).
+-- A generator also pays for an unwired treadmill it powers, which vanilla doesn't know of, for the
+-- load of each bank it backs up (Bank.backupCarriesLoad), and for the chargers of each bank that
+-- charges from it (GasLines.chargingW).
 
 if isClient() then return end
 
@@ -162,7 +163,8 @@ local function bill(generator, payers, consumption)
     local payer = ofGenerator(generator)
     local shared = #Payers.sharers(payer, payers) > 1
     local backed = backedW(payer)
-    if not shared and backed == 0 and not treadmillInReach(payer) then
+    local charging = RenewableEnergy.GasLines.chargingW(generator)
+    if not shared and backed == 0 and charging == 0 and not treadmillInReach(payer) then
         if billed[payer.key] then unbill(payer.key) end
         return
     end
@@ -174,8 +176,8 @@ local function bill(generator, payers, consumption)
     entry.generator = generator
     entry.baseFuel = generator:getBasePowerConsumption() / consumption
     entry.othersFuel = load.othersFuel
-    entry.extraFuel = Specs.fuelFromWatts(treadmillW + backed)
-    setBill(entry, entry.baseFuel + Specs.fuelFromWatts(load.watts + backed))
+    entry.extraFuel = Specs.fuelFromWatts(treadmillW + backed + charging)
+    setBill(entry, entry.baseFuel + Specs.fuelFromWatts(load.watts + backed + charging))
 end
 
 --- Bill every running generator its share. Each one's rebuilds until the next call keep it

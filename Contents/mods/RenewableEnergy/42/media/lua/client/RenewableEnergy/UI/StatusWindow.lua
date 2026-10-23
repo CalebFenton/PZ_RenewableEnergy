@@ -177,8 +177,10 @@ local function powerRows(rows, status)
             row(rows, getText(family.todayKey), Format.wattHours(status[family.today]))
         end
     end
-    if status.chargerW > 0 and status.chargeSource ~= "grid" then
-        row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
+    -- A generator the chargers fill from, as the grid row says it of the grid; it bills them.
+    if status.chargeSource == "generator" and status.chargerW > 0 then
+        row(rows, getText("IGUI_RenewableEnergy_GeneratorPower"), getText("IGUI_RenewableEnergy_GridCharging",
+            Format.watts(status.chargerW)), "good")
     end
     local generator = status.generator
     if generator then

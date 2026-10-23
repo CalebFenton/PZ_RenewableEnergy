@@ -1500,37 +1500,6 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
     end,
 })
 
--- Part-used epoxy adds up, as in vanilla crafting: two tubes holding the seal's uses between them
--- pay for it and are both used up.
-test("renewable_energy_world_arrow_board_repair_adds_up_part_used_epoxy", {
-    instant = true,
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        local trailer, needed = self.trailer, sealEpoxyUses()
-        self.from = sealCap(0) - 1
-        if not T.need(self, needed >= 2 or nil, "a seal taking at least two uses of epoxy, to split") then return end
-        setSealSkills(self)
-        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.from } } })
-        waitForPanelsCopy(self, trailer)
-        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Epoxy" } })
-        T.step(function()
-            for i, uses in ipairs({ needed - 1, 1 }) do
-                local epoxy = self.items.inputs[i + 1]
-                T.changeItem(self, epoxy, { uses = uses / epoxy:getMaxUses() })
-            end
-        end)
-        repairPanel(trailer)
-        T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= self.from end, SERVER_MS)
-        T.count(self, "left", { "Base.Epoxy" })
-    end,
-    validate = function(self)
-        expect(panelCondition(self.trailer.state, LEFT) == sealCap(0),
-            "two part-used tubes of epoxy didn't pay for the seal")
-        local epoxy = self.counts.left["Base.Epoxy"]
-        expect(epoxy == 0, epoxy .. " tubes of epoxy left, expected both used up")
-    end,
-})
-
 -- ArrowBoard.FRAME's front and back ids, copied for the reason lidOf gives.
 local FRAME_FRONT, FRAME_BACK = "EngineDoor", "TruckBed"
 

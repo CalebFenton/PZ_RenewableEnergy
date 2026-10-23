@@ -462,7 +462,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
             /* Epoxy only: vanilla's white glue isn't waterproof. */
-            item 2 [Base.Epoxy],
+            item 1 [Base.Epoxy],
         }
         outputs
         {
