@@ -274,6 +274,41 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
     end,
 })
 
+-- A battery box a garage or storage unit spawns may have the panel that charged it beside it: with
+-- the rolls just under its stock's module chance, as many modules as the stock says lie on the
+-- floor next to the bank, in its room, at a site module's condition (weathered, as that roll also
+-- misses the cracked share); with the rolls at the chance, none.
+test("renewable_energy_world_bank_modules_beside", {
+    sandbox = { LRMSolarPanels = 1 },
+    run = function(self)
+        local squares = T.need(self, T.squares(self, 2, { indoors = true }), "free indoor squares for banks")
+        if not squares then return end
+        T.server(self, "worldSpawnStock", { names = { "shed" } })
+        T.step(function()
+            local chance = self.server.worldSpawnStock.banks.shed.modules.chance
+            self.cases = {}
+            for i, roll in ipairs({ chance - 1e-9, chance }) do
+                local square = squares[i]
+                T.server(self, "bankModulesBeside", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "shed", roll = roll })
+                T.step(function() self.cases[i] = self.server.bankModulesBeside end)
+            end
+        end)
+    end,
+    validate = function(self)
+        local answer = self.server.worldSpawnStock
+        local spec, weathered = answer.banks.shed.modules, answer.weathered
+        local under, at = self.cases[1], self.cases[2]
+        local found = #under.conditions
+        expect(under.laid == found and T.inRange(found, spec), string.format("under the chance it laid %d and %d lie by the bank, expected %d to %d",
+            under.laid, found, spec.min, spec.max))
+        expect(under.inRoom, "a module lies outside the bank's room")
+        for _, condition in ipairs(under.conditions) do
+            expect(T.inRange(condition, weathered), "a module beside the bank is at condition " .. condition)
+        end
+        expect(at.laid == 0 and #at.conditions == 0, "at the chance " .. #at.conditions .. " modules lie by the bank")
+    end,
+})
+
 -- The item count from which vanilla's container overlays show a container full rather than
 -- holding a few items (ContainerOverlays.updateContainerOverlaySprite).
 local FEW_ITEMS = 7

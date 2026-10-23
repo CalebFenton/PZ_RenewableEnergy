@@ -182,9 +182,11 @@ Think about who had this gear in 1993, and how far they'd have hauled it. Rarity
 
 The named places are rolled once per world, so not all of them will be there, and batteries found in them hold part of a charge. Sandbox: Solar Sites, Battery Bank Spawn, Stash Houses.
 
+Folks put their panels where the sun is, which is usually up on the roof, and few of those roofs come with stairs. Bring what you need to build your own way up.
+
 | What | Where | What you'll find |
 |---|---|---|
-| Stocked storerooms | Sheds, garages, storage units, farm storerooms and electronics store backrooms, the first time anyone sees them | A battery box or rack with a few batteries, sometimes an inverter; in garages and storage units, now and then a crate of RV solar gear |
+| Stocked storerooms | Sheds, garages, storage units, farm storerooms and electronics store backrooms, the first time anyone sees them | A battery box or rack with a few batteries, sometimes an inverter; a box in a shed, garage or storage unit often has a panel or two lying beside it; in garages and storage units, now and then a crate of RV solar gear |
 | Stock tank pumps | Pastures across the farm country | A rack of panels by a water tank |
 | Off-grid farms | A few farms around Riverside, Rosewood and West Point | Panels on the roof, a battery box inside, garden lights |
 | Campers | Trailer parks, a summer camp, a trailer in the woods | A panel or two on the roof and a box with a deep cycle |

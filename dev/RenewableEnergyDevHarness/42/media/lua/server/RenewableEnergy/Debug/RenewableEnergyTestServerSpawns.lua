@@ -88,6 +88,50 @@ handler("worldBank", function(_, args, defer)
     return answer
 end)
 
+-- The world items lying on the square at `square` and the squares around it, each to its square.
+local function itemsAround(square)
+    local found = {}
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            local near = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
+            local objects = near and near:getWorldObjects()
+            for i = 0, (objects and objects:size() or 0) - 1 do
+                found[objects:get(i)] = near
+            end
+        end
+    end
+    return found
+end
+
+-- WorldSpawns.layModulesBeside for a BANK_STOCK[args.stock] bank on the square at `args`, with
+-- every Chance roll at `args.roll`. Answers how many it laid and, of the modules that have come to
+-- lie on the square and around it, their conditions and whether each lies in the square's room.
+-- Removed when the test ends.
+handler("bankModulesBeside", function(_, args, defer)
+    local square = squareAt(args)
+    if not square then
+        return nil, "the bank's square loaded on the server"
+    end
+    local before = itemsAround(square)
+    local restoreRoll = Helpers.forceRolls(defer, args.roll)
+    local laid = RenewableEnergy.WorldSpawns.layModulesBeside(square, args.stock)
+    restoreRoll()
+    local answer = { laid = laid, conditions = {}, inRoom = true }
+    for object, near in pairs(itemsAround(square)) do
+        if not before[object] and object:getItem():getFullType() == MODULE then
+            table.insert(answer.conditions, object:getItem():getCondition())
+            answer.inRoom = answer.inRoom and near:getRoom() == square:getRoom()
+            defer(function()
+                if isServer() then
+                    near:transmitRemoveItemFromSquare(object)
+                end
+                near:removeWorldObject(object)
+            end)
+        end
+    end
+    return answer
+end)
+
 -- The parts a bank may hold besides batteries, as PowerBank.partKind names them.
 local PARTS = { "inverter", "controller", "charger" }
 -- How far under a chance a roll still comes in under it.
@@ -295,7 +339,7 @@ handler("worldSpawnStock", function(_, args)
     for _, name in ipairs(args.names) do
         local stock = WorldSpawns.BANK_STOCK[name]
         banks[name] = { sprite = stock.sprite, batteries = { min = stock.batteries.min, max = stock.batteries.max },
-            wear = stock.batteries.wear }
+            wear = stock.batteries.wear, modules = stock.modules }
     end
     local crate
     if args.crate then

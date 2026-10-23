@@ -64,7 +64,7 @@ description=[h2]Crafting[/h2]
 description=Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. Inverters, the maintainer and the battery charger can't be crafted. Every recipe is on [url=https://raw.githubusercontent.com/CalebFenton/PZ_RenewableEnergy/master/art/promo/images/recipes.png]one sheet[/url].
 description=
 description=[h2]Where to look[/h2]
-description=Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, and now and then a barn or a hunting shack has something out back, never in working order.
+description=Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually up on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, never in working order.
 description=
 description=The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
 description=

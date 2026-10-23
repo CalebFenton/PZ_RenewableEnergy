@@ -37,9 +37,9 @@ local function reportModules(census)
     local report = RenewableEnergy.Loot.moduleReport(census)
     print("RELootReport modules a thorough player finds, as count (watts as found / after Seal Cracked Module)")
     for _, town in ipairs(report.towns) do
-        print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, vehicles %s, sites %s; total %s",
-            town.name, hauled(town.listed), hauled(town.cracked), hauled(town.crates), hauled(town.vehicles),
-            hauled(town.sites), hauled(town.total)))
+        print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, beside world banks %s, vehicles %s, sites %s; total %s",
+            town.name, hauled(town.listed), hauled(town.cracked), hauled(town.crates), hauled(town.besideBanks),
+            hauled(town.vehicles), hauled(town.sites), hauled(town.total)))
     end
     for _, site in ipairs(report.sites) do
         print(string.format("RELootReport modules at site %s (%s): %s when placed, %.0f%% of worlds", site.name, site.kind,

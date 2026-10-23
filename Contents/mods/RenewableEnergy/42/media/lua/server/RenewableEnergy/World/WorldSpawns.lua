@@ -54,10 +54,11 @@ WorldSpawns.BATTERY_WEAR = {
 WorldSpawns.DUD = { min = 5, max = 20, repairs = 5 }
 
 -- Rooms that may hold a bank, the bank's stock, and one in how many of them does at the
--- Uncommon setting.
+-- Uncommon setting. Garages are many, so theirs is rarer: a battery box in every few streets
+-- reads as a bank on every corner.
 WorldSpawns.BANK_ROOMS = {
     shed = { odds = 12, stock = "shed" },
-    garagestorage = { odds = 12, stock = "shed" },
+    garagestorage = { odds = 24, stock = "shed" },
     storageunit = { odds = 12, stock = "storageUnit" },
     farmstorage = { odds = 8, stock = "farmStorage" },
     electronicsstorage = { odds = 3, stock = "electronicsStorage" },
@@ -85,7 +86,9 @@ end
 -- count from min to max of types picked by weight, era batteries of the kind someone in 1993
 -- would have wired to it, as used as their `wear` (a BATTERY_WEAR profile) says; and for each
 -- other part the chance of one and its type by weight. Chargers are vanilla's Car Battery Charger,
--- which kept many a cabin battery topped up.
+-- which kept many a cabin battery topped up. `modules`, for a bank a room spawns, is the chance of
+-- min to max factory modules lying beside it, at a site module's condition: the RV owner's box and
+-- the panel that charged it, so a battery box seldom stands with nothing to charge it.
 -- Counts are set so that one lucky find gives a good start, not a finished house: a rack about
 -- what a player would wire in a month or so in, the power yard's bank the most, from a long trip.
 WorldSpawns.BANK_STOCK = {
@@ -94,12 +97,14 @@ WorldSpawns.BANK_STOCK = {
         batteries = { min = 1, max = 2, wear = "worn", types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 2 } }) },
         inverter = { chance = 0.4, types = { { "RenewableEnergy.PlugInInverter", 1 } } },
         charger = { chance = 0.3, types = { { Specs.charger, 1 } } },
+        modules = { chance = 0.6, min = 1, max = 2 },
     },
     storageUnit = {
         sprite = "batteryBoxMetal",
         batteries = { min = 1, max = 2, wear = "used", types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 3 } }) },
         inverter = { chance = 0.4, types = { { "RenewableEnergy.PlugInInverter", 2 }, { "RenewableEnergy.PowerInverter", 1 } } },
         charger = { chance = 0.3, types = { { Specs.charger, 1 } } },
+        modules = { chance = 0.6, min = 1, max = 2 },
     },
     farmStorage = {
         sprite = "batteryRackWood",
@@ -417,6 +422,35 @@ local function indoorSquare(room)
     return nil
 end
 
+--- Lays the modules BANK_STOCK[stockName] puts beside a bank a room spawned on `square`, if its
+--- chance comes up: each on the floor of a free square of the bank's room next to it, or at the
+--- bank's foot. Returns how many it laid.
+---@param square IsoGridSquare
+---@param stockName string a BANK_STOCK key
+function WorldSpawns.layModulesBeside(square, stockName)
+    local spec = WorldSpawns.BANK_STOCK[stockName].modules
+    if not (spec and Chance.hit(spec.chance)) then
+        return 0
+    end
+    local room, beside = square:getRoom(), {}
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            local near = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
+            if near and near ~= square and near:getRoom() == room and near:isFree(false) then
+                table.insert(beside, near)
+            end
+        end
+    end
+    local count = WorldSpawns.scaled(WorldSpawns.rollBetween(spec), SandboxVars.RenewableEnergy.LRMSolarPanels)
+    for i = 1, count do
+        local item = instanceItem(MODULE)
+        RenewableEnergy.Wear.setCondition(item, siteModuleCondition())
+        local floor = beside[(i - 1) % math.max(1, #beside) + 1] or square
+        floor:AddWorldInventoryItem(item, ZombRandFloat(0.2, 0.8), ZombRandFloat(0.2, 0.8), 0)
+    end
+    return count
+end
+
 local function onSeeNewRoom(room)
     local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
     if not rarity then
@@ -426,8 +460,8 @@ local function onSeeNewRoom(room)
     local bank = WorldSpawns.BANK_ROOMS[name]
     if bank and oneIn(bank.odds * rarity) then
         local square = indoorSquare(room)
-        if square then
-            WorldSpawns.placeBank(square, bank.stock)
+        if square and WorldSpawns.placeBank(square, bank.stock) then
+            WorldSpawns.layModulesBeside(square, bank.stock)
         end
     end
     local crateOdds = WorldSpawns.CRATE_ROOMS[name]

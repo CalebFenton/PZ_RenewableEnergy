@@ -633,10 +633,11 @@ local function crateModules(name)
     return modules
 end
 
--- What the rooms of a town hold: list modules (whole), cracked modules and world crates.
+-- What the rooms of a town hold: list modules (whole), cracked modules, world crates, and the
+-- modules beside the world banks that lay them (WorldSpawns.layModulesBeside).
 local function roomsHaul(town, kinds)
     local Distributions, WorldSpawns = RenewableEnergy.Distributions, RenewableEnergy.WorldSpawns
-    local listed, cracked, crates = 0, 0, 0
+    local listed, cracked, crates, besideBanks = 0, 0, 0, 0
     for roomName, byType in pairs(town.containers) do
         local rooms = math.max(1, town.rooms[roomName] or 0)
         for containerType, count in pairs(byType) do
@@ -654,11 +655,19 @@ local function roomsHaul(town, kinds)
         for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
             crates = crates + (town.rooms[roomName] or 0) / (odds * rarity) * kitModules
         end
+        for roomName, bank in pairs(WorldSpawns.BANK_ROOMS) do
+            local spec = WorldSpawns.BANK_STOCK[bank.stock].modules
+            if spec then
+                besideBanks = besideBanks + (town.rooms[roomName] or 0) / (bank.odds * rarity) * spec.chance
+                    * (spec.min + spec.max) / 2 * SandboxVars.RenewableEnergy.LRMSolarPanels
+            end
+        end
     end
     return {
         listed = haul(listed, kinds.intact.condition, kinds.intact.repaired),
         cracked = haul(cracked, kinds.cracked.condition, kinds.cracked.repaired),
         crates = haul(crates, kinds.site.condition, kinds.site.repaired),
+        besideBanks = haul(besideBanks, kinds.site.condition, kinds.site.repaired),
     }
 end
 
@@ -825,7 +834,7 @@ local function buildModuleReport(census)
             end
         end
         row.total = emptyHaul()
-        for _, part in ipairs({ row.listed, row.cracked, row.crates, row.vehicles, row.sites }) do
+        for _, part in ipairs({ row.listed, row.cracked, row.crates, row.besideBanks, row.vehicles, row.sites }) do
             addHaul(row.total, part)
         end
         table.insert(report.towns, row)
@@ -841,7 +850,7 @@ local function buildModuleReport(census)
     return report
 end
 
---- The module report: for each town of the census, { name, listed, cracked, crates, vehicles,
+--- The module report: for each town of the census, { name, listed, cracked, crates, besideBanks, vehicles,
 --- sites, total } hauls ({ count, condition, repaired }, condition summed over the modules);
 --- `sites`, each { name, kind, haul, chance }, the haul once placed; `arrowBoards`, the expected
 --- number on the map, { zones, sites }. At the default loot settings and loot rarity
