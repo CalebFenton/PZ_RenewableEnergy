@@ -119,7 +119,7 @@ end
 local function stop(generator)
     if generator:isActivated() then
         generator:setActivated(false)
-        Fumes.restore(generator:getSquare():getBuilding())
+        Fumes.restore(Fumes.buildingOf(generator:getSquare()))
     end
 end
 

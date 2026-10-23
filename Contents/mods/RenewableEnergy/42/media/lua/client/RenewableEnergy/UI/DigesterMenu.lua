@@ -1,7 +1,5 @@
 -- The right-click menus of a digester and of a gas heater, and the client's digester system.
--- Feeding is the loot window's: the hopper is its container. Each job queues a timed action, which
--- walks the character over and does it; an option the character can't do yet stays in the menu,
--- greyed out, saying what it needs.
+-- Feeding is the loot window's: the hopper is its container. The jobs' options are GasJobMenu's.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/ClientObjects"

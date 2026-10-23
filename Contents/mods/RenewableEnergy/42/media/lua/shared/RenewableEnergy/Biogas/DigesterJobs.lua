@@ -1,6 +1,5 @@
 -- The hands-on jobs at a digester: what each takes of the character and what refuses it
--- (RenewableEnergy.GasJobs). The menu shows the same needs the authority checks, so they can't
--- disagree; DigesterSystem does them.
+-- (RenewableEnergy.GasJobs). DigesterSystem does them.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/GasJobs"
@@ -104,11 +103,11 @@ local function noScrubber(summary)
     return not summary.scrubber and "Tooltip_RenewableEnergy_NoScrubber" or nil
 end
 
--- The row of a job that fills a propane tank, the job's item, from the holder: `fields` and what
--- every fill has. `fields.fill`: limit, the share of a full tank it stops at, and `full`, the key
--- that says so; scrubbed, whether it takes scrubbed gas beyond the pump's share; power, whether it
--- needs the square powered; minutesPerM3, its minutes per m³ moved, when that is more than
--- `baseMinutes`; endurancePerM3, what it costs the character.
+-- Completes the row of a job that fills the propane tank `with` from the holder. `fields.fill`:
+-- limit, the share of a full tank it stops at, and `full`, the key that says it got there;
+-- scrubbed, it takes scrubbed gas beyond the pump's share; power, it needs the square powered;
+-- minutesPerM3, its minutes per m³ moved, at least `fields.baseMinutes` in all; endurancePerM3,
+-- what each m³ costs the character.
 local function fillJob(fields)
     local fill = fields.fill
     fields.blocker = noGas
@@ -140,15 +139,10 @@ local function fillJob(fields)
     return fields
 end
 
--- Every job, by name, as GasJobs.define has them, read against the digester's summary
--- (Digester.currentSummary); the item `with` is the bag or tank it fills:
--- - minutes: the in-game minutes it takes, or a function(digester, item) of them.
--- - blocker(summary); hideBlocked for a job of another state of the digester; check(character,
---   summary, item); materials, what it takes of the character beyond the item; xp.
--- - holder, charge, fill: what it does on the authority.
--- - How it looks (RenewableEnergyGasAction): anim and LootPosition `position`, else "Loot"; heavy,
---   heavy work; sound while it runs. Vanilla has no pump stroke; a tire pump is worked kneeling at
---   a wheel. The rest are reached into at waist height.
+-- Every job, by name (GasJobs.define), read against the digester's summary
+-- (Digester.currentSummary), with `with` the bag or tank it fills, which its materials leave out.
+-- holder, charge and fill say what it does on the authority. Vanilla has no pump stroke; a tire
+-- pump is worked kneeling at a wheel. The rest are reached into at waist height.
 DigesterJobs.JOBS = {
     [DigesterJobs.TAKE_SLUDGE] = {
         minutes = 10, position = "Mid", heavy = true,

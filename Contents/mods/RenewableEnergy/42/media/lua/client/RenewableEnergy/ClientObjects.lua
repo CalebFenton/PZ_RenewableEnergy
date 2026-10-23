@@ -14,12 +14,12 @@ RenewableEnergy.ClientObjects = ClientObjects
 
 local Sprites = RenewableEnergy.Sprites
 
---- Has this client set up its copies of the tiles of `sprites` (names) that `isObject` tells:
---- `adoptCopy(isoObject)` on a multiplayer client's copy that arrives with its chunk or that the
---- server just placed (single player sets up the authority's own), and
---- `adoptContainer(container)` on each of their containers opened in the loot window, before
---- anything is dropped in it, on every side.
-function ClientObjects.adopt(sprites, isObject, adoptCopy, adoptContainer)
+-- Has this client set up its copies of the tiles of `sprites` (names) that `isObject` tells:
+-- `adoptCopy(isoObject)` on a multiplayer client's copy that arrives with its chunk or that the
+-- server just placed (single player sets up the authority's own), and
+-- `adoptContainer(container)` on each of their containers opened in the loot window, before
+-- anything is dropped in it, on every side.
+local function adoptTiles(sprites, isObject, adoptCopy, adoptContainer)
     if isClient() then
         local function adopt(isoObject)
             if isObject(isoObject) then
@@ -46,8 +46,8 @@ end
 --- Defines and registers the client system of a feature the authority keeps in a Global Object
 --- System of the same `spec.name`: `owner` (its shared module, with SYSTEM_NAME; it gets
 --- clientSystem, for GlobalObjects' accessors) and `isObject`, and adopts the copies of its tiles,
---- whose sprite names are `spec.sprites` (ClientObjects.adopt), with `spec.adoptCopy` and
---- `spec.adoptContainer`. Returns the system class.
+--- whose sprite names are `spec.sprites`, with `spec.adoptCopy` and `spec.adoptContainer`.
+--- Returns the system class.
 function ClientObjects.define(spec)
     local ClientObject = CGlobalObject:derive("RenewableEnergy_Client" .. spec.name)
     local System = CGlobalObjectSystem:derive("RenewableEnergy_Client" .. spec.name .. "System")
@@ -73,7 +73,7 @@ function ClientObjects.define(spec)
     end
 
     CGlobalObjectSystem.RegisterSystemClass(System)
-    ClientObjects.adopt(spec.sprites, spec.isObject, spec.adoptCopy, spec.adoptContainer)
+    adoptTiles(spec.sprites, spec.isObject, spec.adoptCopy, spec.adoptContainer)
     return System
 end
 

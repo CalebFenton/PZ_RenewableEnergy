@@ -91,8 +91,7 @@ function Treadmill.wiringRefusal(character, tile)
     if Treadmill.wiredHalf(tile) then
         return "already wired"
     end
-    local short = RenewableEnergy.firstUnmet(Treadmill.needs(character))
-    return short and short.kind
+    return RenewableEnergy.unmetKind(Treadmill.needs(character))
 end
 
 --- What unwiring a treadmill takes of `character` (RenewableEnergy.firstUnmet): the tools wiring
@@ -107,8 +106,7 @@ function Treadmill.unwiringRefusal(character, tile)
     if not Treadmill.isWiredTile(tile) then
         return "not wired"
     end
-    local short = RenewableEnergy.firstUnmet(Treadmill.unwiringNeeds(character))
-    return short and short.kind
+    return RenewableEnergy.unmetKind(Treadmill.unwiringNeeds(character))
 end
 
 --- Whether the treadmill of `tile` has power, from the grid or a generator, a bank included, as
@@ -117,9 +115,9 @@ function Treadmill.isPowered(tile)
     return ItemContainer.isObjectPowered(tile, true)
 end
 
---- Why a run on the treadmill tile `tile` can't go now, or nil. A wired tile feeds no bank, as this
---- side last heard (PowerBank.connectedBank): the run would bank nothing. An unwired one has no
---- power for its motor.
+--- Why a run on the treadmill tile `tile` can't go now, or nil: a wired tile that feeds no bank, as
+--- this side last heard (PowerBank.connectedBank), would bank nothing; an unwired one needs power
+--- for its motor.
 function Treadmill.runRefusal(tile)
     if Treadmill.isWired(tile) then
         return not PowerBank.connectedBank(tile) and "Tooltip_RenewableEnergy_TreadmillNotConnected" or nil

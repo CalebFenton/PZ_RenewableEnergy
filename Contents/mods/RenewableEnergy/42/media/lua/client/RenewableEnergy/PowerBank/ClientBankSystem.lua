@@ -6,10 +6,12 @@
 -- sound runs), give the container its unsaved, unsent filter, and release the squares a running
 -- bank powered when it is removed.
 
+require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/ClientObjects"
 
-local PowerBank, ClientObjects = RenewableEnergy.PowerBank, RenewableEnergy.ClientObjects
+local PowerBank, ClientObjects, PlaceTracker = RenewableEnergy.PowerBank, RenewableEnergy.ClientObjects,
+    RenewableEnergy.PlaceTracker
 
 local function adoptCopy(isoObject)
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
@@ -34,13 +36,13 @@ if isClient() then
     end)
 end
 
--- The banks this game's players watch, as "x,y,z" to { [player number] = true }. The server sends
--- a bank's status only to its watchers, so once nobody here watches it, this client's copy goes
--- rather than show stale when a window next opens.
+-- The banks this game's players watch, by place (PlaceTracker.key), to { [player number] = true }.
+-- The server sends a bank's status only to its watchers, so once nobody here watches it, this
+-- client's copy goes rather than show stale when a window next opens.
 local watching = {}
 
 local function keyOf(position)
-    return position.x .. "," .. position.y .. "," .. position.z
+    return PlaceTracker.key(position.x, position.y, position.z)
 end
 
 -- This client's copy of the bank at `position`.

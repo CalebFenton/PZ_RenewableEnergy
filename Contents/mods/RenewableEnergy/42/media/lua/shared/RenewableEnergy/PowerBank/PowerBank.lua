@@ -263,8 +263,7 @@ function PowerBank.wiringRefusal(character, bankObject, item)
     if blocker then
         return blocker
     end
-    local short = RenewableEnergy.firstUnmet(PowerBank.wiringNeeds(character, item:getFullType()))
-    return short and short.kind
+    return RenewableEnergy.unmetKind(PowerBank.wiringNeeds(character, item:getFullType()))
 end
 
 --- What repairing an inverter or controller takes of `character`, for RenewableEnergy.firstUnmet.
@@ -293,8 +292,7 @@ function PowerBank.repairRefusal(character, item)
     if blocker then
         return blocker
     end
-    local short = RenewableEnergy.firstUnmet(PowerBank.repairNeeds(character))
-    return short and short.kind
+    return RenewableEnergy.unmetKind(PowerBank.repairNeeds(character))
 end
 
 --- What keeps anyone from unwiring `item` from the bank `bankObject` now whatever they carry, as a
@@ -316,8 +314,7 @@ function PowerBank.unwireRefusal(character, bankObject, item)
     if blocker then
         return blocker
     end
-    local short = RenewableEnergy.firstUnmet(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
-    return short and short.kind
+    return RenewableEnergy.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
 end
 
 --- Why the bank whose summary or status is `bank` can't be switched `on` (true) or off now, or

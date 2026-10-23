@@ -305,9 +305,9 @@ function Sprites.nameOf(isoObject)
     return sprite and sprite:getName()
 end
 
---- Whether a sprite is a snow overlay of Sprites.snow.
+--- Whether a sprite is a snow overlay.
 Sprites.isSnow = Sprites.matcher(Sprites.snow)
---- Whether a sprite is one of the overlays above, which are never placed on their own.
+--- Whether a sprite is one of the overlays drawn over a tile, which are never placed on their own.
 Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.crateOverlays, Sprites.bankFill,
     Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.gasKit, Sprites.gasifierLit, Sprites.gasifierPipe,
     Sprites.gasifierPipeGen)

@@ -180,10 +180,10 @@ end
 -- Module seals one in hand. It reads the recipe's inputs, skill, time and XP from the recipe
 -- itself, so the two can't drift apart; the module input is the panel. Reglazing isn't offered in
 -- place: the panel comes off to be reglazed, as vanilla car glass is replaced, not repaired.
-Recipes.MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
+local MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
 
 function Recipes.moduleRepairRecipe()
-    return getScriptManager():getCraftRecipe(Recipes.MODULE_REPAIR_RECIPE)
+    return getScriptManager():getCraftRecipe(MODULE_REPAIR_RECIPE)
 end
 
 -- As CraftRecipeData.processKeepInputItem wears kept tools: the factor for each MayDegrade flag.
@@ -219,7 +219,7 @@ function Recipes.panelRepairInputs(character)
             local amount = input:getIntAmount()
             local needed = amount
             local candidates = inventory:getAllEvalRecurse(function(item)
-                return not taken[item] and not item:isBroken() and input:containsItem(item:getScriptItem())
+                return not taken[item] and RenewableEnergy.notBroken(item) and input:containsItem(item:getScriptItem())
             end)
             for j = 0, candidates:size() - 1 do
                 if needed <= PAID_TOLERANCE then break end
@@ -264,8 +264,7 @@ end
 --- Why the character can't do Seal Cracked Panel, or nil when they can: the kind of the first
 --- of panelRepairNeeds they are short of.
 function Recipes.panelRepairRefusal(character)
-    local short = RenewableEnergy.firstUnmet(Recipes.panelRepairNeeds(character))
-    return short and short.kind
+    return RenewableEnergy.unmetKind(Recipes.panelRepairNeeds(character))
 end
 
 --- Uses up what Recipes.panelRepairInputs picked; tools are kept and may wear as the recipe's

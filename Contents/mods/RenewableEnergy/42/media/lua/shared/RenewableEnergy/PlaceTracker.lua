@@ -13,8 +13,9 @@ PlaceTracker.__index = PlaceTracker
 RenewableEnergy.PlaceTracker = PlaceTracker
 
 -- Its own priority, apart from the systems' loaders of the same sprites (Sprites.LOAD_PRIORITY).
+-- Every tracker shares it, so no two trackers may take the same sprite.
 local LOAD_PRIORITY = RenewableEnergy.Sprites.LOAD_PRIORITY + 1
--- World squares lie well under this in x and y, so the key below stays exact in a double.
+-- World squares lie well under this in x and y, so a place key stays unique and exact in a double.
 local SPAN = 1e6
 
 --- The place x, y, z as one number: string keys cost far more time and memory per lookup in Kahlua.

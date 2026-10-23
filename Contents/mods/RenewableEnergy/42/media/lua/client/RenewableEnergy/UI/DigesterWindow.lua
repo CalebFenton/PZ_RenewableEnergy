@@ -16,9 +16,9 @@ local row = SummaryWindow.row
 -- Below this the digester makes nothing.
 local COLD_C = Digester.K_BY_TEMP[1][1]
 
---- The window's state line: the first that applies of never fed, starting up, sour, cold, nothing
---- left to digest, working.
-function DigesterWindow.stateText(summary)
+-- The state row: the first that applies of never fed, starting up, sour, cold, nothing left to
+-- digest, working.
+local function stateText(summary)
     if not summary.fed then
         return getText("IGUI_RenewableEnergy_DigesterEmpty")
     elseif not summary.started then
@@ -70,7 +70,7 @@ end
 --- The rows the window shows for `summary`: { label, value, color }.
 function DigesterWindow:rowsOf(summary)
     local rows = {}
-    row(rows, "IGUI_RenewableEnergy_DigesterState", DigesterWindow.stateText(summary), (summary.sour or not summary.started) and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_DigesterState", stateText(summary), (summary.sour or not summary.started) and "warn" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterTemp", Format.temperature(summary.temp), summary.temp < COLD_C and "warn" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterGas", Format.cubicMetres(summary.gas, 2) .. " / " .. Format.cubicMetres(summary.capacity, 2))
     row(rows, "IGUI_RenewableEnergy_DigesterMaking", getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(summary.madePerDay, 2)))

@@ -1,6 +1,6 @@
 -- The hands-on jobs at a gasifier: what each takes of the character and what refuses it
--- (RenewableEnergy.GasJobs). The menu shows the same needs the authority checks; GasifierSystem
--- does them. Loading wood and changing the filter's packing are the loot window's.
+-- (RenewableEnergy.GasJobs). GasifierSystem does them. Loading wood and changing the filter's
+-- packing are the loot window's.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
@@ -25,11 +25,9 @@ local LIGHT_MINUTES, COLD_LIGHT_MINUTES = 2, 10
 
 local BELLOWS = { item = Gasifier.BELLOWS[1], types = Gasifier.BELLOWS, keep = true }
 
--- Every job, by name, as GasJobs.define has them, read against the gasifier's summary
--- (Gasifier.currentSummary); the item `with` is the container Drain Condensate fills, or nil to
--- drain it onto the ground. minutes, or a function(gasifier, item) of them; blocker(summary);
--- check(character, summary, item); materials, or a function(summary) of them; how it looks. Clean
--- Out Ash digs with the shovel in hand (`shovel`), as vanilla's Clear Ashes does.
+-- Every job, by name (GasJobs.define), read against the gasifier's summary
+-- (Gasifier.currentSummary); `with` is the container Drain Condensate fills, or nil to drain it
+-- onto the ground. Clean Out Ash digs with the shovel in hand, as vanilla's Clear Ashes does.
 GasifierJobs.JOBS = {
     [GasifierJobs.LIGHT] = {
         minutes = function(gasifier)

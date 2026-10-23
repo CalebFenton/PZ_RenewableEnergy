@@ -12,7 +12,8 @@ require "RenewableEnergy/Biogas/Digester"
 -- Shared, not client: picking up, placing and scrapping complete on the server
 -- (ISMoveablesAction:complete), and a dedicated server never loads client Lua.
 
-local SolarGardenLight = RenewableEnergy.SolarGardenLight
+local Specs, PowerBank = RenewableEnergy.Specs, RenewableEnergy.PowerBank
+local Treadmill, SolarGardenLight = RenewableEnergy.Treadmill, RenewableEnergy.SolarGardenLight
 
 -- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Other placed objects
 -- have no CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
@@ -56,8 +57,6 @@ end)
 
 -- A dismantled treadmill gives its motor. Vanilla scraps each tile of a multi-tile object in turn
 -- (ISMoveableSpriteProps.scrapObject), so the motor comes only with the clicked tile.
-local Treadmill = RenewableEnergy.Treadmill
-
 local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
 function ISMoveableSpriteProps:scrapObjectInternal(character, scrapDef, square, object, ...)
     self.scrappingMainTile = object == self.object
@@ -77,8 +76,8 @@ end
 
 --- Why the item `fullType` may not be placed on `square`: a translation key, or nil if it may.
 local function placementRefusal(fullType, square)
-    if RenewableEnergy.Specs.banks[fullType] then
-        local allowed, reason = RenewableEnergy.PowerBank.canPlaceBank(square)
+    if Specs.banks[fullType] then
+        local allowed, reason = PowerBank.canPlaceBank(square)
         return not allowed and reason or nil
     elseif fullType == SolarGardenLight.ITEM and not SolarGardenLight.canPlaceOn(square) then
         return "Tooltip_RenewableEnergy_GardenLightOutdoors"
@@ -109,7 +108,7 @@ end
 -- (ISTakeGenerator.isValid).
 local vanillaCanPickUp = ISMoveableSpriteProps.canPickUpMoveableInternal
 function ISMoveableSpriteProps:canPickUpMoveableInternal(character, square, object, isMulti)
-    if object and RenewableEnergy.PowerBank.isBank(object) and object:isConnected() then
+    if object and PowerBank.isBank(object) and object:isConnected() then
         return false
     end
     return vanillaCanPickUp(self, character, square, object, isMulti)
@@ -119,7 +118,7 @@ end
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
 -- conditions and a garden light its charge and bulb.
 
-local CARRIED_KEYS = { RenewableEnergy.PowerBank.MODULES, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
+local CARRIED_KEYS = { PowerBank.MODULES, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
 
 -- The object being picked up, until vanilla makes its item. Each pick-up makes one item, which
 -- takes it, so an error in vanilla's pick-up can't leave it for an unrelated item later.

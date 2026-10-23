@@ -38,8 +38,6 @@ local SITES_DEFAULT = 75
 -- Chance the hunting shack also holds a FEMA pamphlet.
 local PAMPHLET_CHANCE = 0.5
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
--- The highest level looked at for a building's containers: a deer stand's one room is on level 1.
-local HIGHEST = 1
 
 local function store()
     return ModData.getOrCreate(RuralFinds.MOD_DATA)
@@ -62,12 +60,9 @@ end
 
 -- Squares
 
---- Open ground outdoors with nothing on it: off the road, not in water or a tree.
+--- Open ground (BuildingWatch.isOpenGround) with nothing standing on it.
 function RuralFinds.canStand(square)
-    return square ~= nil and square:getZ() == 0 and square:getBuilding() == nil and square:isOutside()
-        and square:hasFloor() and square:isFree(false) and not square:HasTree()
-        and not square:getProperties():has(IsoFlagType.water) and not BuildingWatch.isStreet(square)
-        and square:getSpecialObjects():size() == 0
+    return BuildingWatch.isOpenGround(square) and square:getSpecialObjects():size() == 0
 end
 
 -- Nothing stands within a square of it but open ground: no wall, building or tree, as a turbine
@@ -117,7 +112,7 @@ end
 --- unexplored container keeps it: its loot is rolled on first look (ItemPickerJava.fillContainer,
 --- RequestItemsForContainerPacket), which only adds items.
 function RuralFinds.leavePamphlet(def)
-    for z = 0, HIGHEST do
+    for z = 0, BuildingWatch.HIGHEST_LEVEL do
         for x = def:getX(), def:getX2() - 1 do
             for y = def:getY(), def:getY2() - 1 do
                 local square = getSquare(x, y, z)

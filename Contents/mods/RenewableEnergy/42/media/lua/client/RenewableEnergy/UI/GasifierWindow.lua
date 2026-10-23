@@ -15,7 +15,7 @@ local row = SummaryWindow.row
 -- The ash pit warns from here.
 local ASH_WARN = 80
 
-function GasifierWindow.stateText(summary)
+local function stateText(summary)
     if summary.lit then
         return getText("IGUI_RenewableEnergy_GasifierLit")
     elseif summary.cold then
@@ -35,7 +35,7 @@ end
 --- The rows the window shows for `summary`: { label, value, color }.
 function GasifierWindow:rowsOf(summary)
     local rows = {}
-    row(rows, "IGUI_RenewableEnergy_GasifierState", GasifierWindow.stateText(summary))
+    row(rows, "IGUI_RenewableEnergy_GasifierState", stateText(summary))
     row(rows, "IGUI_RenewableEnergy_GasifierWood", string.format("%.1f kg", summary.hopperKg), summary.hopperKg <= 0 and "warn" or nil)
     row(rows, "IGUI_RenewableEnergy_GasifierAsh", Format.percent(summary.ash / 100), summary.ash >= ASH_WARN and "warn" or nil)
     row(rows, "IGUI_RenewableEnergy_GasifierFilter", getText("IGUI_RenewableEnergy_FilterState", summary.clean, summary.tarry),

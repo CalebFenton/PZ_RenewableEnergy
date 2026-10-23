@@ -43,7 +43,7 @@ Digester.HOLDERS = {
     dome = { capacity = 4.0 },
 }
 
--- The stink score at which each smell level starts (DigesterObject.corpsesFor, the status window).
+-- The stink score at which each smell level starts.
 Digester.SMELL_SCORES = { 0.2, 1, 2 }
 -- The souring buffer: a digester sours with more acid than ACID_LIMIT per unit of potentialCap, and
 -- recovers below ACID_RECOVER of that limit.
@@ -112,19 +112,15 @@ local MEAT_TYPES = { Meat = true, Game = true, Beef = true, Poultry = true, Saus
 -- Dung of the other animals (mice, rats) is worth a little.
 local OTHER_DUNG = { potential = 0.01, acid = 0 }
 
-function Digester.isNeutraliser(item)
-    return NEUTRALISERS[item:getFullType()] ~= nil
-end
-
 --- What one hourly meter takes of `item` into the digester: { potential, acid, seedHours,
---- whole }, where whole is false for a drainable neutraliser, of which one use goes in at a time.
---- Nil when the digester doesn't take it: the composter's food (rotten, or tagged compostable)
---- and the neutralisers.
+--- whole, neutraliser }, where whole is false for a drainable neutraliser, of which one use goes in
+--- at a time. Nil for what the digester doesn't take; it takes manure, grass and hay, the
+--- composter's food (rotten, or tagged compostable) and the neutralisers.
 function Digester.feedOf(item)
     local fullType = item:getFullType()
     local neutraliser = NEUTRALISERS[fullType]
     if neutraliser then
-        return { potential = 0, acid = neutraliser, whole = not instanceof(item, "DrainableComboItem") }
+        return { potential = 0, acid = neutraliser, whole = not instanceof(item, "DrainableComboItem"), neutraliser = true }
     end
     local known = FEEDS[fullType]
     if known then
@@ -158,8 +154,8 @@ function Digester.adoptContainer(container)
     end
 end
 
---- How many feeds wait in the hopper `container`.
-function Digester.feedCount(container)
+-- How many feeds wait in the hopper `container`.
+local function feedCount(container)
     local count = 0
     local items = container and container:getItems()
     for i = 0, (items and items:size() or 0) - 1 do
@@ -170,13 +166,10 @@ function Digester.feedCount(container)
     return count
 end
 
---- The tier and, for a barrel, the material of a digester tile; nil for any other object.
+--- The tier of a digester tile, or nil for any other object.
 function Digester.tileOf(isoObject)
-    local kind, tier, material = Sprites.kindOf(Sprites.nameOf(isoObject))
-    if kind ~= "digester" then
-        return nil
-    end
-    return tier, material
+    local kind, tier = Sprites.kindOf(Sprites.nameOf(isoObject))
+    return kind == "digester" and tier or nil
 end
 
 function Digester.isDigester(isoObject)
@@ -203,7 +196,7 @@ end
 -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
 -- copy of the hopper.
 RenewableEnergy.GlobalObjects.addAccessors(Digester, function(summary, isoObject)
-    summary.hopper = Digester.feedCount(isoObject:getContainer())
+    summary.hopper = feedCount(isoObject:getContainer())
 end)
 
 return Digester

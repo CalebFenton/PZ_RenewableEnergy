@@ -18,7 +18,7 @@ RenewableEnergy.WindSpin = WindSpin
 local START_TPS, TPS_PER_KPH, MAX_TPS = 0.3, 0.04, 2
 
 -- Wind charger objects this client has, and how far round each one is, in steps; and how many.
-local turbines, tracked = {}, 0
+local chargers, tracked = {}, 0
 
 -- Each sprite model prefix's model names by step + 1, so a step builds no string.
 local MODEL_NAMES = {}
@@ -38,12 +38,12 @@ end
 --- Starts turning `object` if it is a wind charger: as its chunk loads, or as it is added to the
 --- map (OnObjectAdded, which Wind.OnCreate fires for a charger built in single player).
 function WindSpin.track(object)
-    if turbines[object] then return end
+    if chargers[object] then return end
     local name = Sprites.nameOf(object)
     local prefix, model = Sprites.windModelOf(name)
     if not prefix then return end
     local names = modelNames(prefix, model)
-    turbines[object] = { spec = Specs.wind.turbines[Sprites.kindOf(name)], model = model, names = names, phase = 0, shown = 0 }
+    chargers[object] = { spec = Specs.wind.turbines[Sprites.kindOf(name)], model = model, names = names, phase = 0, shown = 0 }
     tracked = tracked + 1
     object:setSpriteModelName(names[1])
     object:setAnimating(true)
@@ -66,9 +66,9 @@ local function spin()
     lastMs = now
     if seconds <= 0 or tracked == 0 or isGamePaused() then return end
     local kph = getClimateManager():getWindspeedKph()
-    for object, state in pairs(turbines) do
+    for object, state in pairs(chargers) do
         if not RenewableEnergy.onSquare(object) then
-            turbines[object] = nil
+            chargers[object] = nil
             tracked = tracked - 1
         else
             local turns = turnsPerSecond(state.spec, kph)

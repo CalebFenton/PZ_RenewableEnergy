@@ -52,6 +52,9 @@ end
 -- at it: what luautils.walkAdj counts as there, and a little for drift and a client's lag.
 local REACH = 2.6
 
+-- A job's row (its JOBS entry) says how the job looks: `anim`, else the "Loot" reach; LootPosition
+-- `position`; `shovel`, dug with the shovel in hand; `heavy`, heavy work; `sound` while it runs and
+-- `doneSound` once done.
 local function rowOf(feature, job)
     return FEATURES[feature].jobs.JOBS[job]
 end

@@ -32,6 +32,7 @@ local SNOW_SHOWN = 0.5
 -- reason in the status.
 local LOW_SHARE = 0.7
 
+-- Item ConditionMax by full type, read once from the item scripts.
 local CONDITION_MAX = {}
 
 local function conditionMax(fullType)
@@ -42,8 +43,8 @@ local function conditionMax(fullType)
     return CONDITION_MAX[fullType]
 end
 
---- The watts a panel's modules are rated for as they are now, and at their best.
-local function moduleWatts(source)
+-- The watts a panel's modules are rated for as they are now, and at their best.
+local function ratedWatts(source)
     local now, best = 0, 0
     for _, module in ipairs(source.modules) do
         now = now + PowerBank.moduleWatts(module.type, module.condition)
@@ -119,7 +120,7 @@ function PanelSource.clearSnow(source, object)
     end
 end
 
---- How likely a storm is to crack a module of a mount, relative to Specs.storm.chancePerHour.
+-- How likely a storm is to crack a module of a mount, relative to Specs.storm.chancePerHour.
 local function stormFactor(mount, material)
     local materialSpec = material and Specs.materials[material]
     return Specs.mounts[mount].stormFactor * (materialSpec and materialSpec.stormFactor or 1)
@@ -230,7 +231,7 @@ function PanelSource.update(source, object, inSlot, hours, context)
     end
     local light = context.irradiance(source.kind, source.facing)
     local clearLight = context.clearIrradiance(source.kind, source.facing)
-    local now, best = moduleWatts(source)
+    local now, best = ratedWatts(source)
     source.watts = inSlot and Sun.wattsFrom(now, light, source.snow) or 0
     source.fullSunPct = round(100 * light * (1 - source.snow) / Sun.FULL_SUN)
     source.reason = lowReason(source, inSlot, light, clearLight, best > 0 and now / best or 0, context)

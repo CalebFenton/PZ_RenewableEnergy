@@ -109,7 +109,7 @@ function Battery.wearAll(container, depth)
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        if Battery.spec(item) and Battery.wear(item, Battery.cycleWear(item, depth) * scale) then
+        if Battery.isBattery(item) and Battery.wear(item, Battery.cycleWear(item, depth) * scale) then
             sendItemStats(item)
             sent[item] = true
         end

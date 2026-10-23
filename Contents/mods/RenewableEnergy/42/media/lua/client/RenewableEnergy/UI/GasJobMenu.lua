@@ -1,5 +1,5 @@
--- The option for a job of RenewableEnergyGasAction in a right-click menu, as every gas feature's menu
--- adds it (DigesterMenu, GasifierMenu, GasKitMenu).
+-- The option for a job of RenewableEnergyGasAction in a right-click menu, the same for every gas
+-- feature.
 
 require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
 require "RenewableEnergy/UI/Needs"
@@ -27,9 +27,7 @@ function GasJobMenu.add(menu, playerNum, feature, job, target, with, label)
         return nil
     end
     local character = getSpecificPlayer(playerNum)
-    if not blocker and Jobs.needsLight(job) and character:tooDarkToRead() then
-        blocker = "Tooltip_RenewableEnergy_TooDark"
-    end
+    blocker = blocker or Needs.tooDark(character, Jobs.needsLight(job))
     local option = menu:addOption(label or getText("ContextMenu_RenewableEnergy_" .. job), playerNum,
         RenewableEnergyGasAction.queue, feature, job, target, with)
     Needs.show(option, Jobs.needs(character, job, subject, with), blocker)

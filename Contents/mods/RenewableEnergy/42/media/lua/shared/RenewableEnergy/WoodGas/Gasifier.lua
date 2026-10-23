@@ -194,9 +194,9 @@ function Gasifier.wearFactor(clean, tarry)
     return 1 + (Gasifier.WEAR_DIRTY - 1) * tarry / (clean + tarry)
 end
 
---- Whether lighting it takes bellows: out long enough to have gone cold (since the world hour
---- `outSince`), or never lit.
-function Gasifier.isCold(lit, outSince)
+-- Whether lighting it takes bellows: out long enough to have gone cold (since the world hour
+-- `outSince`), or never lit.
+local function isCold(lit, outSince)
     return not lit and (outSince == nil or getGameTime():getWorldAgeHours() - outSince > Gasifier.COLD_HOURS)
 end
 
@@ -213,14 +213,24 @@ end
 Gasifier.isLitOverlay = Sprites.matcher(Sprites.gasifierLit)
 Gasifier.isPipeOverlay = Sprites.matcher(Sprites.gasifierPipe)
 
+-- A step toward each side, in squares.
+local SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
+
 --- The side of (x, y) that (tx, ty), a square next to it, is on: "N", "E", "S" or "W", or nil if
 --- it isn't one of the four beside it.
 function Gasifier.sideOf(x, y, tx, ty)
-    if tx == x and ty == y - 1 then return "N" end
-    if tx == x + 1 and ty == y then return "E" end
-    if tx == x and ty == y + 1 then return "S" end
-    if tx == x - 1 and ty == y then return "W" end
+    for side, step in pairs(SIDE_STEPS) do
+        if tx == x + step[1] and ty == y + step[2] then
+            return side
+        end
+    end
     return nil
+end
+
+--- The square on `side` (Gasifier.sideOf) of (x, y, z), or nil when it isn't loaded.
+function Gasifier.squareOnSide(x, y, z, side)
+    local step = SIDE_STEPS[side]
+    return getSquare(x + step[1], y + step[2], z)
 end
 
 -- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
@@ -232,7 +242,7 @@ RenewableEnergy.GlobalObjects.addAccessors(Gasifier, function(summary, isoObject
     summary.clean, summary.tarry = clean, tarry
     summary.output = Gasifier.outputShare(summary.ash, clean)
     summary.wear = Gasifier.wearFactor(clean, tarry)
-    summary.cold = Gasifier.isCold(summary.lit, summary.outSince)
+    summary.cold = isCold(summary.lit, summary.outSince)
 end)
 
 return Gasifier

@@ -1,4 +1,4 @@
--- Ratings for the mod's power hardware, in watts and watt-hours; balancing changes only this file.
+-- Ratings for the mod's power hardware, in watts and watt-hours, and its wear and repair figures.
 -- Appliances draw what vanilla bills a generator for them (Specs.wattsPerFuel); everything else is
 -- rated against those draws.
 
@@ -165,7 +165,8 @@ Specs.arrowBoard = {
 -- Batteries found in the world hold this fraction of a charge.
 Specs.foundCharge = { min = 0.3, max = 0.8 }
 
--- How far a panel may be from the bank it is connected to, in tiles and in floors.
+-- How far a source (panel, wind charger, treadmill) may be from the bank it is connected to: a
+-- radius in tiles, and floors up or down.
 Specs.sourceReach = { tiles = 20, levels = 3 }
 
 -- Watts per unit of vanilla's generator bill for a switched-on appliance

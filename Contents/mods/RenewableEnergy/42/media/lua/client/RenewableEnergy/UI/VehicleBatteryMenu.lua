@@ -46,7 +46,7 @@ local vanillaDoPartContextMenu = ISVehicleMechanics.doPartContextMenu
 function ISVehicleMechanics:doPartContextMenu(part, x, y)
     vanillaDoPartContextMenu(self, part, x, y)
     -- Vanilla returns before building a menu while the game is paused or the character sits in
-    -- the vehicle; self.context is then the last menu, closed.
+    -- the vehicle (unless debug or an admin); self.context is then the last menu, closed.
     if self.context and self.context:getIsVisible() then
         addInstallOptions(self, part)
     end

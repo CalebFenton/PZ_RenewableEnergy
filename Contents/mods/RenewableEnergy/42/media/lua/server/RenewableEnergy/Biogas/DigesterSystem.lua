@@ -36,10 +36,6 @@ function DigesterSystem.OnCreate(params)
     onCreate(params)
 end
 
--- What each job does to the digester `digester` (its tile `isoObject`) beyond taking its
--- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag or tank. Returns whether it
--- was done.
-
 -- Take Sludge, as vanilla's ISGetCompost fills compost bags from a composter: into the part-filled
 -- compost bag `item`, or a new one for the empty sandbag `item`.
 local function takeSludge(character, digester, row, isoObject, item)
@@ -51,7 +47,7 @@ local function takeSludge(character, digester, row, isoObject, item)
             return false
         end
         item:setCurrentUses(item:getCurrentUses() + uses)
-        syncItemFields(character, item)
+        item:syncItemFields()
     else
         local bag = instanceItem(DigesterJobs.COMPOST_BAG)
         uses = math.min(uses, bag:getMaxUses())
@@ -94,7 +90,7 @@ local function fill(character, digester, row, isoObject, tank)
         return false
     end
     tank:setCurrentUses(tank:getCurrentUses() + plain + scrubbed)
-    syncItemFields(character, tank)
+    tank:syncItemFields()
     local m3 = (plain + scrubbed) * perUse
     digester.gas = math.max(0, digester.gas - m3)
     if scrubbed > 0 then
@@ -124,6 +120,9 @@ local function repackWool(character, digester)
     return true
 end
 
+-- What each job does to the digester `digester` (its tile `isoObject`) beyond taking its
+-- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag or tank. Returns whether it
+-- was done.
 local DO = {
     [DigesterJobs.TAKE_SLUDGE] = takeSludge,
     [DigesterJobs.VENT] = vent,
@@ -149,11 +148,7 @@ DigesterSystem.jobSite = ObjectSystem.jobSite(Digester, DO)
 DigesterSystem.heaterSite = {
     open = function(heater)
         local digester = GasHeater.digesterNear(heater)
-        local record = digester and Digester.recordOf(digester)
-        if record then
-            record:catchUp()
-        end
-        return record
+        return digester and DigesterSystem.jobSite.open(digester) or nil
     end,
     act = function(character, job, record, row, heater)
         if record then
@@ -163,11 +158,7 @@ DigesterSystem.heaterSite = {
         end
         return true
     end,
-    tell = function(record)
-        if record then
-            record:afterChange()
-        end
-    end,
+    tell = DigesterSystem.jobSite.tell,
 }
 
 return DigesterSystem

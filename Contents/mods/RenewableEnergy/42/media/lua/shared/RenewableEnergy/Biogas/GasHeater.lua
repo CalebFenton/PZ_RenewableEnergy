@@ -71,8 +71,8 @@ function GasHeater.litHeaterFor(digester)
     end)
 end
 
--- Every job, by name, as GasJobs.define has them, read against the heater itself: minutes, as long
--- as lighting a lamp; blocker(heater); materials; doneSound. `lit`: how it leaves the heater.
+-- Every job, by name (GasJobs.define), read against the heater itself. `lit`: how it leaves the
+-- heater.
 GasHeater.JOBS = {
     [GasHeater.LIGHT] = {
         minutes = 1, lit = true, doneSound = "CampfireLight",

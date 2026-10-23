@@ -14,10 +14,11 @@ RenewableEnergy.GasKitMenu = GasKitMenu
 
 local GasKit, Needs, GasJobMenu = RenewableEnergy.GasKit, RenewableEnergy.Needs, RenewableEnergy.GasJobMenu
 
+-- "Barrel Digester (6 squares)": a source Connect Gas Line can run to, by its name and distance.
 local function sourceLabel(generator, source)
     local spec = GasKit.SOURCES[GasKit.sourceKind(source)]
-    local squares = math.floor(IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY()) + 0.5)
-    return getText("ContextMenu_RenewableEnergy_LineTo", getText(spec.nameKey .. spec.tierOf(source)), squares)
+    return getText("ContextMenu_RenewableEnergy_LineTo", getText(spec.nameKey .. spec.tierOf(source)),
+        round(GasKit.lineLength(generator, source)))
 end
 
 -- Adds the option for `job` (to `source`, for Connect Gas Line, named for it) (GasJobMenu.add).

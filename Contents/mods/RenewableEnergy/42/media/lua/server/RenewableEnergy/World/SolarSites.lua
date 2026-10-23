@@ -58,11 +58,9 @@ SolarSites.KINDS = {
 -- its tank, in litres.
 SolarSites.GENERATOR = { condition = { min = 25, max = 50 }, fuel = { min = 0.5, max = 2 } }
 
--- Every site a world rolled while all sites were rolled at once. Such a world saved `rolled` as
--- true, and these are the sites it stands for. A world that saved `rolled` as true before the
--- Louisville checkpoints were listed is read the same way, so it counts them rolled and never
--- gets them; only development saves are like that. Each name must stay a site's name: a renamed
--- site would be rolled again in these worlds.
+-- The sites a world that saved `rolled` as true stands for: it rolled every site at once. A
+-- development save from before the Louisville checkpoints were listed counts them rolled too, and
+-- never gets them. Each name must stay a site's name: a renamed site would be rolled again there.
 SolarSites.ROLLED_AT_ONCE = {
     "Pasture north of Rosewood", "Pasture south-east of Rosewood", "Pasture west of Muldraugh",
     "Pasture north-west of Muldraugh", "Pasture west of West Point", "Pasture by Valley Station",
@@ -75,7 +73,7 @@ SolarSites.ROLLED_AT_ONCE = {
     "Checkpoint on the road south-east of Louisville", "Checkpoint on the road east of Louisville",
 }
 
--- A mount of SolarSiteLocations to its tile, its kind and its material.
+-- A mount of SolarSiteLocations to its kind (a Sprites and Specs.mounts key) and its material.
 local MOUNTS = {
     flat = { kind = "flat" },
     wallMetal = { kind = "wall", material = "metal" },
@@ -113,10 +111,6 @@ local function moduleCount(kind, mount)
 end
 
 -- Placing
-
-local function positionOf(square)
-    return { x = square:getX(), y = square:getY(), z = square:getZ() }
-end
 
 -- The square at the far end of a spot's line (`toX`, `toY`, `toZ`), or nil while it isn't loaded.
 local function farEnd(spot)
@@ -203,7 +197,7 @@ local SPOTS = {
             RuralFinds.placeAt("wind", square)
             if WorldSpawns.placeBank(bankSquare, spot.stock) then
                 local ok, why = RenewableEnergy.Commands.connectSource(nil,
-                    { bank = positionOf(bankSquare), source = positionOf(square) })
+                    { bank = PowerBank.positionOf(bankSquare), source = PowerBank.positionOf(square) })
                 if not ok then
                     print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. tostring(why))
                 end

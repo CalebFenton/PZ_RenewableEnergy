@@ -171,8 +171,8 @@ function ArrowBoard.rollSwitch(vehicle)
     end
 end
 
---- The lit lamps' draw in watts, day or night: vanilla's lightbar share of a car battery an hour.
-function ArrowBoard.lampWatts()
+-- The lit lamps' draw in watts, day or night: vanilla's lightbar share of a car battery an hour.
+local function lampWatts()
     return Specs.arrowBoard.lampShare * Specs.batteries[RenewableEnergy.VehicleBattery.CAR_BATTERY].wh
 end
 
@@ -226,9 +226,10 @@ local function setLamps(vehicle, box, night)
     end
 end
 
--- Whether the photocell sees dark: the sun below the horizon, when a garden light comes on too.
-local function isNight()
-    return RenewableEnergy.Sun.positionNow().up <= 0
+-- Whether the photocell sees dark under `sky` (Sun.skyNow or Sun.positionNow, now if nil): the sun
+-- below the horizon, when a garden light comes on too.
+local function isNight(sky)
+    return (sky or RenewableEnergy.Sun.positionNow()).up <= 0
 end
 
 --- `hours` of the lamps as they were lit, drawn from the box, then the lamps set again for the
@@ -241,7 +242,7 @@ function ArrowBoard.runLamps(vehicle, hours, night)
         return 0
     end
     local lamps = box:getModData()[LAMPS_KEY]
-    local drawn = lamps and shift(container, ArrowBoard.lampWatts() * hours, Specs.arrowBoard.cutoff, -1) or 0
+    local drawn = lamps and shift(container, lampWatts() * hours, Specs.arrowBoard.cutoff, -1) or 0
     trackCycle(box, container)
     if night == nil then
         night = isNight()
@@ -274,7 +275,7 @@ function ArrowBoard.update(vehicle, hours, sky)
     ArrowBoard.stormCrack(vehicle, RenewableEnergy.PanelSource.stormHours(hours))
     ArrowBoard.showPanels(vehicle)
     local stored = ArrowBoard.charge(vehicle, hours, sky)
-    ArrowBoard.runLamps(vehicle, hours, sky.up <= 0)
+    ArrowBoard.runLamps(vehicle, hours, isNight(sky))
     return stored
 end
 

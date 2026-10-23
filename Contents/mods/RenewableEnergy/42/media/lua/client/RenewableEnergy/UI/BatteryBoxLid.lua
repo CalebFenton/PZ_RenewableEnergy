@@ -94,9 +94,9 @@ end
 local vanillaShowRadialMenuOutside = ISVehicleMenu.showRadialMenuOutside
 
 -- Renames the lid's Open and Close, adds the lamps' switch, and adds Cut Padlock at a padlock that
--- holds (greyed, saying what it takes, without bolt cutters). The menu joins the UI only on the next
--- update (UIManager.AddUI), so whether vanilla built it shows only in its prior state: shown, which
--- the call hides, or the character in a vehicle, which builds nothing.
+-- holds (without bolt cutters, a slice that does nothing and names them). The menu joins the UI
+-- only on the next update (UIManager.AddUI), so whether vanilla built it shows only in its prior
+-- state: shown, which the call hides, or the character in a vehicle, which builds nothing.
 function ISVehicleMenu.showRadialMenuOutside(playerObj)
     local menu = getPlayerRadialMenu(playerObj:getPlayerNum())
     local wasShown = menu:isReallyVisible()

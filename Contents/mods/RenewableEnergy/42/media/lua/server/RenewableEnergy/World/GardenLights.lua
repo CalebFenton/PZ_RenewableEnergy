@@ -88,11 +88,9 @@ end
 
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
--- Where a light may stand: open ground outdoors, off the road, not in water or a tree.
+-- Where a light may stand: open ground (BuildingWatch.isOpenGround) without a light on it.
 local function canStand(square)
-    return square ~= nil and SolarGardenLight.canPlaceOn(square) and square:getRoom() == nil
-        and square:hasFloor() and square:isFree(false) and not square:HasTree()
-        and not square:getProperties():has(IsoFlagType.water) and not BuildingWatch.isStreet(square)
+    return SolarGardenLight.canPlaceOn(square) and BuildingWatch.isOpenGround(square)
         and SolarGardenLight.findOn(square) == nil
 end
 

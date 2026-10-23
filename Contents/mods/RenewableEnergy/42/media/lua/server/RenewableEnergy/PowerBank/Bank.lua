@@ -12,6 +12,7 @@ if isClient() then return end
 
 require "Map/SGlobalObject"
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
@@ -22,15 +23,16 @@ require "RenewableEnergy/PowerBank/TreadmillSource"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/GasLine/GasLines"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
-local Payers = RenewableEnergy.Payers
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local Battery, Wear, PowerBank, Sources = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank,
     RenewableEnergy.Sources
+local Payers, PlaceTracker = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker
 
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
 RenewableEnergy.Bank = Bank
@@ -47,8 +49,7 @@ Bank.SAVED_FIELDS = {
 -- A backup generator a failsafe can start is one plugged in within this many tiles on the
 -- bank's floor.
 local BACKUP_REACH = 3
--- Vanilla bills generators in fuel per hour per unit of power; a unit is this many watts.
-local WATTS_PER_FUEL_UNIT = Specs.wattsPerFuel
+local WATTS_PER_FUEL = Specs.wattsPerFuel
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
 -- (IsoGenerator.update), so a relay, which nobody stands by, never starts one that worn.
 local FIRE_CONDITION = 20
@@ -69,6 +70,14 @@ local TOTALS = {
     wind = { now = "windW", today = "windWhToday" },
     treadmill = { now = "runW", today = "runWhToday" },
 }
+
+local function resetToday(bank)
+    for _, total in pairs(TOTALS) do
+        bank[total.today] = 0
+    end
+    bank.loadWhToday = 0
+    bank.backupWhToday = 0
+end
 
 function Bank:new(luaSystem, globalObject)
     return SGlobalObject.new(self, luaSystem, globalObject)
@@ -95,11 +104,7 @@ function Bank:initNew()
     self.cycleDepth = 0
     self.pendingDepths = {}
     self.pendingPartWear = { hours = 0, overloads = 0 }
-    for _, total in pairs(TOTALS) do
-        self[total.today] = 0
-    end
-    self.loadWhToday = 0
-    self.backupWhToday = 0
+    resetToday(self)
     self.empty = false
     self.lastHour = getGameTime():getWorldAgeHours()
 end
@@ -146,6 +151,12 @@ function Bank:spec()
     return Specs.banks[self.bankType]
 end
 
+--- The bank's container, or nil while its chunk is unloaded.
+function Bank:container()
+    local isoObject = self:getIsoObject()
+    return isoObject and isoObject:getContainer()
+end
+
 local function partEntry(item)
     return { id = item:getID(), type = item:getFullType(), condition = item:getCondition() }
 end
@@ -153,8 +164,7 @@ end
 --- Read what the container holds into the bank's snapshot. Does nothing without one: a
 --- bank whose container hasn't arrived isn't a bank holding nothing.
 function Bank:recount()
-    local isoObject = self:getIsoObject()
-    local container = isoObject and isoObject:getContainer()
+    local container = self:container()
     if not container then return end
     local parts = {}
     for kind in pairs(PowerBank.PARTS) do
@@ -185,13 +195,14 @@ function Bank:recount()
 end
 
 --- Put the bank's charge into every battery it holds: the batteries are wired in parallel,
---- so they share one state of charge. Pending wear from days spent unloaded lands too.
+--- so they share one state of charge. With `applyPending`, the battery wear the bank took while
+--- unloaded lands too.
 function Bank:writeBatteries(container, applyPending)
     local charged = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        if Battery.spec(item) and item:getCondition() > 0 then
+        if Battery.isBattery(item) and item:getCondition() > 0 then
             -- Clients hear of the charge only once it changes at two decimals.
             if VehicleUtils.compareFloats(Battery.getCharge(item), self.charge, 2) then
                 table.insert(charged, item)
@@ -330,8 +341,7 @@ local function dropSource(bank, index)
         local today = TOTALS[Sources.familyOf(source.kind)].today
         bank[today] = (bank[today] or 0) + wh
         -- Into the batteries too: the next pass's recount rereads the charge from them.
-        local isoObject = bank:getIsoObject()
-        local container = isoObject and isoObject:getContainer()
+        local container = bank:container()
         if container then
             bank:writeBatteries(container, false)
         end
@@ -385,7 +395,7 @@ local function isFailsafe(object)
 end
 
 -- Every plugged-in generator within backup reach on the bank's floor, banks aside, nearest first:
--- { generator, failsafe }, `failsafe` whether one stands on its square.
+-- { generator, failsafe, distance }, `failsafe` whether one stands on its square.
 local function generatorsInReach(bank)
     local found = {}
     for x = bank.x - BACKUP_REACH, bank.x + BACKUP_REACH do
@@ -415,7 +425,7 @@ local function failsafeBank(generator)
         local dx, dy = bank.x - gx, bank.y - gy
         if bank.z == gz and math.abs(dx) <= BACKUP_REACH and math.abs(dy) <= BACKUP_REACH then
             local distance = dx * dx + dy * dy
-            local key = RenewableEnergy.PlaceTracker.key(bank.x, bank.y, bank.z)
+            local key = PlaceTracker.key(bank.x, bank.y, bank.z)
             if not best or distance < bestDistance or (distance == bestDistance and key < bestKey) then
                 best, bestDistance, bestKey = bank, distance, key
             end
@@ -432,9 +442,9 @@ local function canCarryLoad(bank)
         and not bank.gridPowered
 end
 
---- Start or stop a backup generator with a failsafe by the charge, as a generator
---- auto-start relay does. A generator stalled on gas starts again by itself once its load fits
---- (GasLines), so the relay leaves it be, and only calls that off when it would stop it.
+-- Start or stop a backup generator with a failsafe by the charge, as a generator auto-start relay
+-- does. A generator stalled on gas starts again by itself once its load fits (GasLines), so the
+-- relay leaves it be, and only calls that off when it would stop it.
 local function runFailsafe(generator, wanted, charge)
     local options = SandboxVars.RenewableEnergy
     local gas = RenewableEnergy.GasKit.stateOf(generator)
@@ -488,12 +498,10 @@ function Bank:backupCarriesLoad()
     return self.generator and self.generator.running
 end
 
---- Measure what the bank pays for, and what powers the bank's square besides it. The load counts
---- what is switched on in its reach whether or not the grid powers it now: on the grid the bank
---- carries none of it, but shows it, and a bank unloaded when the grid goes carries what was on.
---- Unloaded, the last measurement stands, until the grid shuts down. A bank that is off and has no
---- charger needs neither, and skips the scan of its whole reach. Returns the running generators
---- that reach the bank.
+--- Measure what the bank pays for, and whether the grid powers its square. The load counts what is
+--- switched on in its reach even while the grid powers it, so a bank unloaded when the grid goes
+--- carries what was on. Unloaded, the last measurement stands until the grid shuts down. A bank
+--- that is off with no charger skips the scan. Returns the running generators that reach the bank.
 function Bank:measure()
     local square = self:getSquare()
     if not square then
@@ -525,18 +533,15 @@ end
 
 -- The place of `generator`, as chargeSource names a charging generator.
 local function placeOf(generator)
-    return RenewableEnergy.PlaceTracker.key(generator:getX(), generator:getY(), generator:getZ())
+    return PlaceTracker.key(generator:getX(), generator:getY(), generator:getZ())
 end
 
 --- What the chargers charge from, saved as `chargeSource`: "grid", the place (placeOf) of the
---- nearest running generator other than a bank whose reach covers the bank, which burns fuel for
---- them, or false. Records as `chargeWantW` what they would take this pass: their watts, but no
---- more than `roomWh`, what the batteries can still take after the sun and the load, fills over the
---- pass's `hours`. A gas line shares its cap by those wants (GasLines.chargerLimitW), so it is saved
---- with the source. Returns the watts they put in: the want, from a generator on gas no more than
---- the line leaves them, and from a generator no more than its fuel pays for, which is all the
---- fuel it burns. Unloaded, only the grid carries on, until it shuts down: the generator and its
---- fuel are out of reach.
+--- nearest fueled running generator whose reach covers the bank, or false. Saves as `chargeWantW`
+--- their watts, capped so they fill no more than `roomWh` over `hours`: a gas line splits its
+--- cap by these wants (GasLines.chargerLimitW), so it must outlive the pass. Returns the watts put
+--- in: the want, capped by the gas line and by the generator's fuel, which it burns. Unloaded, only
+--- the grid carries on, until it shuts down.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
     if self:getSquare() then
@@ -554,7 +559,7 @@ function Bank:chargeFrom(generators, hours, roomWh)
     if generator then
         watts = math.min(watts, RenewableEnergy.GasLines.chargerLimitW(generator, self) or watts)
     end
-    local fuelPerWh = SandboxVars.GeneratorFuelConsumption / WATTS_PER_FUEL_UNIT
+    local fuelPerWh = SandboxVars.GeneratorFuelConsumption / WATTS_PER_FUEL
     if generator and fuelPerWh > 0 then
         local fuel = generator:getFuel()
         watts = math.min(watts, fuel / fuelPerWh / hours)
@@ -640,11 +645,7 @@ function Bank:newDay(container, day)
         end
         self.cycleHigh = self.charge
         self.cycleDepth = 0
-        for _, total in pairs(TOTALS) do
-            self[total.today] = 0
-        end
-        self.loadWhToday = 0
-        self.backupWhToday = 0
+        resetToday(self)
     end
     self.day = day
 end
@@ -670,8 +671,7 @@ end
 --- One pass: `hours` of sun, load and charging up to now.
 ---@param context table see BankSystem.passContext
 function Bank:update(hours, context)
-    local isoObject = self:getIsoObject()
-    local container = isoObject and isoObject:getContainer()
+    local container = self:container()
     self:recount()
 
     local watts = self:updateSources(hours, context)
@@ -815,19 +815,19 @@ function Bank:buildStatus()
     local chargers = partStatus(self.chargers, function(entry)
         entry.charging = entry.working and (now.chargerW or 0) > 0 and chargeSource or nil
     end)
-    local generator = self:getIsoObject()
+    local isoObject = self:getIsoObject()
     local status = {
         kind = self:spec().sprite,
         bankType = self.bankType,
         name = self.name,
         on = self.on,
         state = self:state(),
-        powered = generator ~= nil and generator:isActivated() or (generator == nil and self:shouldPower()),
+        powered = isoObject ~= nil and isoObject:isActivated() or (isoObject == nil and self:shouldPower()),
         hour = getGameTime():getWorldAgeHours(),
         sunElevation = now.elevation or 0,
         irradiance = now.irradiance or 0,
         windKph = now.windKph or 0,
-        chargerW = now.chargerW or 0, chargeSource = chargeSource or nil, inW = inW,
+        chargerW = now.chargerW or 0, chargeSource = chargeSource, inW = inW,
         loadWhToday = self.loadWhToday, backupWhToday = self.backupWhToday or 0,
         loadW = self.loadW, drawW = drawW, limitW = self:limitW(), overloaded = self.overloaded,
         loadByKind = self.loadByKind,

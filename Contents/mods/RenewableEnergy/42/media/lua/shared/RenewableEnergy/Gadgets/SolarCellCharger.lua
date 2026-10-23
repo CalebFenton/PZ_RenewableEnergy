@@ -21,10 +21,12 @@ SolarCellCharger.SLOTS = 4
 -- charges over a sunny day or two.
 SolarCellCharger.BATTERY_WH = 25
 
+-- The container's filter. The game finds it by this path (ItemContainer.getAcceptItemFunction),
+-- so acceptItem must stay reachable from the global table.
 local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"
 
 function SolarCellCharger.isCharger(isoObject)
-    return isoObject ~= nil and Sprites.kindOf(Sprites.nameOf(isoObject)) == "cellCharger"
+    return Sprites.kindOf(Sprites.nameOf(isoObject)) == "cellCharger"
 end
 
 --- Whether `item` is a cell the charger takes.

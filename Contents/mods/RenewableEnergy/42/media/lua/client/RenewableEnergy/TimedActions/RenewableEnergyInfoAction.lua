@@ -11,14 +11,15 @@ local InfoAction = ISBaseTimedAction:derive("RenewableEnergyInfoAction")
 RenewableEnergy.InfoAction = InfoAction
 
 -- How far from the object, in squares on each axis, its window stays open: vanilla closes a
--- trailer's or a hutch's animal window past 4 (ISVehicleAnimalUI, ISAnimalUI).
+-- trailer's or a hutch's animal window past 4 squares (ISVehicleAnimalUI, ISAnimalUI).
 local WINDOW_REACH = 4
 
---- Whether `playerNum`'s character is still close enough to `object` for its window: within
---- WINDOW_REACH on its level.
+--- Whether `object`'s window stays open for `playerNum`: the object still on its square and their
+--- living character within WINDOW_REACH of it on its level.
 function InfoAction.inReach(playerNum, object)
     local character = getSpecificPlayer(playerNum)
-    return character ~= nil and not character:isDead() and RenewableEnergy.withinReach(character, object, WINDOW_REACH)
+    return RenewableEnergy.onSquare(object) and character ~= nil and not character:isDead()
+        and RenewableEnergy.withinReach(character, object, WINDOW_REACH)
 end
 
 function InfoAction:isValid()
@@ -32,7 +33,7 @@ end
 
 function InfoAction:perform()
     self.open(self.character:getPlayerNum(), self.object)
-    -- Needed to remove it from the queue and start the next.
+    -- Removes the action from the queue and starts the next.
     ISBaseTimedAction.perform(self)
 end
 

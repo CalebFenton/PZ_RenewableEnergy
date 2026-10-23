@@ -1,20 +1,21 @@
--- The battery bank's status window. It draws the status the server sends to the bank's watchers,
--- so it reads the same in single player and multiplayer. Menu requires this file, so the buttons
--- look Menu up when clicked.
+-- The battery bank's status window, one per local player (ObjectWindow). It draws the status the
+-- server sends to the bank's watchers, so it reads the same in single player and multiplayer. Menu
+-- requires this file, so the buttons look Menu up when clicked.
 
-require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
 require "RenewableEnergy/UI/Format"
+require "RenewableEnergy/UI/ObjectWindow"
 
 RenewableEnergy = RenewableEnergy or {}
-local StatusWindow = ISCollapsableWindow:derive("RenewableEnergyStatusWindow")
+local ObjectWindow = RenewableEnergy.ObjectWindow
+local StatusWindow = ObjectWindow:derive("RenewableEnergyStatusWindow")
 RenewableEnergy.StatusWindow = StatusWindow
+StatusWindow.windows = {}
 
 local Format = RenewableEnergy.Format
 local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
@@ -32,9 +33,6 @@ local BUTTON_GAP = 8
 local MORE_LINE = 1
 -- How long a clicked source stays highlighted, in real milliseconds.
 local HIGHLIGHT_MS = 5000
-
--- One window per local player.
-local windows = {}
 
 local COLORS = {
     text = { r = 1, g = 1, b = 1 },
@@ -165,12 +163,11 @@ local function powerRows(rows, status)
     if status.chargerW > 0 then
         row(rows, getText("IGUI_RenewableEnergy_ChargersNow"), Format.watts(status.chargerW))
     end
-    if status.generator then
-        local running = status.generator.running
+    local generator = status.generator
+    if generator then
         row(rows, getText("IGUI_RenewableEnergy_Generator"),
-            getText(running and "IGUI_RenewableEnergy_GeneratorRunning" or "IGUI_RenewableEnergy_GeneratorStopped"),
-            not running and "dim" or nil)
-        local generator = status.generator
+            getText(generator.running and "IGUI_RenewableEnergy_GeneratorRunning" or "IGUI_RenewableEnergy_GeneratorStopped"),
+            not generator.running and "dim" or nil)
         if generator.failsafe then
             local options = SandboxVars.RenewableEnergy
             if not generator.controls then
@@ -330,9 +327,8 @@ local REASONS = {
     idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }
 
---- "Wooden rack, 6 tiles north-east": a source from Bank status `sources`, from the bank at
---- `bank`.
-function StatusWindow.sourceLabel(source, bank)
+-- "Wooden rack, 6 tiles north-east": a source from Bank status `sources`, from the bank at `bank`.
+local function sourceLabel(source, bank)
     local name = SOURCE_NAMES[source.kind .. (source.material or "")]
     return getText("IGUI_RenewableEnergy_SourceWhere", getText(name), Format.away(bank, source))
 end
@@ -362,7 +358,7 @@ local function sourceRows(rows, status, bank)
     header(rows, "IGUI_RenewableEnergy_Sources", #status.sources)
     for _, source in ipairs(status.sources) do
         local value, colorName = sourceValue(source, status)
-        table.insert(rows, { label = StatusWindow.sourceLabel(source, bank), value = value, color = colorName, source = source })
+        table.insert(rows, { label = sourceLabel(source, bank), value = value, color = colorName, source = source })
     end
 end
 
@@ -462,11 +458,11 @@ function StatusWindow:createChildren()
 end
 
 function StatusWindow:onSwitch()
-    RenewableEnergy.Menu.queueBank(self.playerNum, self.status.on and Action.TURN_OFF or Action.TURN_ON, self.bank)
+    RenewableEnergy.Menu.queueBank(self.playerNum, self.status.on and Action.TURN_OFF or Action.TURN_ON, self.object)
 end
 
 function StatusWindow:onRename()
-    RenewableEnergy.Menu.askName(self.playerNum, self.bank)
+    RenewableEnergy.Menu.askName(self.playerNum, self.object)
 end
 
 -- Rebuilds the rows and the layout when a new snapshot arrives.
@@ -477,7 +473,7 @@ function StatusWindow:setStatus(status)
         self.left, self.right = { { label = getText("IGUI_RenewableEnergy_Waiting"), value = "", color = "dim" } }, {}
     else
         self.summaryLines = StatusWindow.summary(status)
-        self.left, self.right = StatusWindow.rows(status, PowerBank.positionOf(self.bank))
+        self.left, self.right = StatusWindow.rows(status, PowerBank.positionOf(self.object))
     end
     self.title = status and Format.bankName(status) or getText("IGUI_RenewableEnergy_StatusTitle")
     local summary = measureSummary(self.summaryLines)
@@ -549,21 +545,15 @@ function StatusWindow:onMouseDown(x, y)
     return ISCollapsableWindow.onMouseDown(self, x, y)
 end
 
-function StatusWindow:prerender()
-    -- Picked up or destroyed, or the character walked away (as vanilla's animal windows close).
-    if not (RenewableEnergy.onSquare(self.bank) and RenewableEnergy.InfoAction.inReach(self.playerNum, self.bank)) then
-        self:close()
-        return
-    end
+function StatusWindow:refresh()
     if self.highlight and getTimestampMs() >= self.highlight.untilMs then
         self:clearHighlight()
     end
     -- Every snapshot is a new table (Bank:sendStatus, ClientBankSystem's OnServerCommand).
-    local status = PowerBank.statusOf(self.bank)
+    local status = PowerBank.statusOf(self.object)
     if status ~= self.status or not self.left then
         self:setStatus(status)
     end
-    ISCollapsableWindow.prerender(self)
 end
 
 local function isHighlighted(self, r)
@@ -618,49 +608,24 @@ end
 
 function StatusWindow:close()
     self:clearHighlight()
-    self:removeFromUIManager()
-    windows[self.playerNum] = nil
-    PowerBank.unwatchStatus(getSpecificPlayer(self.playerNum), self.bank)
-    if JoypadState.players[self.playerNum + 1] then
-        setPrevFocusForPlayer(self.playerNum)
-    end
-end
-
-function StatusWindow:onJoypadDown(button)
-    if button == Joypad.BButton then
-        self:close()
-    end
+    ObjectWindow.close(self)
+    PowerBank.unwatchStatus(getSpecificPlayer(self.playerNum), self.object)
 end
 
 function StatusWindow:new(x, y, playerNum, bank)
-    local o = ISCollapsableWindow.new(self, x, y, 400, 300)
+    local o = ObjectWindow.new(self, x, y, 400, 300, playerNum, bank)
     o.title = getText("IGUI_RenewableEnergy_StatusTitle")
-    o.playerNum = playerNum
-    o.bank = bank
     o.summaryLines = {}
     -- Nearly opaque: vanilla's translucent window lets the text of windows behind show through the rows.
     o.backgroundColor = { r = 0, g = 0, b = 0, a = 0.95 }
-    o:setResizable(false)
     return o
 end
 
---- Opens the status window of `bank` (the bank's IsoGenerator) for a local player, replacing
+--- Opens the status window of `bank` (the bank's IsoGenerator) for a local player, in place of
 --- the one already open, and watches the bank's status until it closes.
 function StatusWindow.open(playerNum, bank)
-    local open = windows[playerNum]
-    local x, y = getPlayerScreenLeft(playerNum) + 100, getPlayerScreenTop(playerNum) + 100
-    if open then
-        x, y = open:getX(), open:getY()
-        open:close()
-    end
-    local window = StatusWindow:new(x, y, playerNum, bank)
-    window:initialise()
-    window:addToUIManager()
-    windows[playerNum] = window
+    local window = StatusWindow:openOn(playerNum, bank)
     PowerBank.watchStatus(getSpecificPlayer(playerNum), bank)
-    if JoypadState.players[playerNum + 1] then
-        setJoypadFocus(playerNum, window)
-    end
     return window
 end
 

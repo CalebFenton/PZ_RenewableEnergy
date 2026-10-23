@@ -34,10 +34,9 @@ function SolarMaintainer.detach(character, vehicle)
         return false
     end
     local part = SolarMaintainer.batteryPart(vehicle)
-    local item = instanceItem(SolarMaintainer.ITEM)
     part:getModData()[ATTACHED_KEY] = nil
     vehicle:transmitPartModData(part)
-    RenewableEnergy.giveItems(character, item)
+    RenewableEnergy.giveItems(character, SolarMaintainer.ITEM)
     return true
 end
 
@@ -45,8 +44,8 @@ end
 --- battery. The panel lies flat on the dashboard or roof, so a vehicle under a roof gets no sun.
 --- Returns the watt-hours it added.
 function SolarMaintainer.charge(vehicle, hours, sky)
-    local part = SolarMaintainer.batteryPart(vehicle)
-    local battery = part and part:getModData()[ATTACHED_KEY] ~= nil and part:getInventoryItem()
+    local part = SolarMaintainer.isAttached(vehicle) and SolarMaintainer.batteryPart(vehicle)
+    local battery = part and part:getInventoryItem()
     if not battery then
         return 0
     end

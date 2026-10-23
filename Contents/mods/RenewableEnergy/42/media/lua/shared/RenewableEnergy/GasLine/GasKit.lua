@@ -72,10 +72,14 @@ function GasKit.hasKit(generator)
     return GasKit.stateOf(generator) ~= nil
 end
 
---- Rubber hoses a line from `generator` to `digester` takes.
-function GasKit.hosesFor(generator, digester)
-    local distance = IsoUtils.DistanceTo(generator:getX(), generator:getY(), digester:getX(), digester:getY())
-    return math.max(1, math.ceil(distance / GasKit.HOSE_SQUARES))
+--- Squares from `generator` to `source` across their level: what a line's reach and hoses go by.
+function GasKit.lineLength(generator, source)
+    return IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY())
+end
+
+--- Rubber hoses a line from `generator` to the digester `source` takes.
+function GasKit.hosesFor(generator, source)
+    return math.max(1, math.ceil(GasKit.lineLength(generator, source) / GasKit.HOSE_SQUARES))
 end
 
 -- The sources a line runs from, by their tiles' kind (Sprites.kindOf), which the line keeps as its
@@ -89,7 +93,7 @@ GasKit.SOURCES = {
     digester = {
         owner = Digester, nameKey = "IGUI_RenewableEnergy_Digester_", tierOf = Digester.tileOf,
         inReach = function(generator, source)
-            return IsoUtils.DistanceTo(generator:getX(), generator:getY(), source:getX(), source:getY()) <= GasKit.REACH
+            return GasKit.lineLength(generator, source) <= GasKit.REACH
         end,
         tooFar = "Tooltip_RenewableEnergy_DigesterOutOfReach",
         line = function(generator, source)
@@ -143,7 +147,7 @@ function GasKit.sourcesNear(generator)
         end
     end
     table.sort(found, function(a, b)
-        return IsoUtils.DistanceTo(gx, gy, a:getX(), a:getY()) < IsoUtils.DistanceTo(gx, gy, b:getX(), b:getY())
+        return GasKit.lineLength(generator, a) < GasKit.lineLength(generator, b)
     end)
     return found
 end
@@ -182,10 +186,8 @@ local function switchTo(mode, already)
     }
 end
 
--- Every job, by name, as GasJobs.define has them, read against the generator itself; `source` is
--- Connect Gas Line's other end, nil for the other jobs. minutes; blocker(generator, source);
--- materials, or a function(generator, source) of them; xp; light; how it looks. `mode`: the fuel
--- the job switches to.
+-- Every job, by name (GasJobs.define), read against the generator itself; `with` is Connect Gas
+-- Line's source, nil for the other jobs. `mode`: the fuel the job switches to.
 GasKit.JOBS = {
     [GasKit.INSTALL] = {
         minutes = 30, anim = SPANNER_ANIM, sound = SPANNER_SOUND, light = true,

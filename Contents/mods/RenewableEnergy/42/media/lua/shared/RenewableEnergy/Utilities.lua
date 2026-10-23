@@ -168,6 +168,20 @@ function RenewableEnergy.showOverlay(isoObject, isKind, wanted)
     RenewableEnergy.showOverlays(isoObject, isKind, wanted and { wanted } or {})
 end
 
+-- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
+local function setTileSprite(isoObject, spriteName)
+    isoObject:setSprite(getSprite(spriteName))
+end
+
+--- Shows `isoObject` as the tile `spriteName` and, on a server, sends the tile to the clients.
+--- Authority only.
+function RenewableEnergy.showTile(isoObject, spriteName)
+    setTileSprite(isoObject, spriteName)
+    if isServer() then
+        isoObject:transmitUpdatedSpriteToClients()
+    end
+end
+
 --- The game entity script whose SpriteConfig names the tile `spriteName`, or nil: what an object
 --- on that tile is, found as vanilla's MORainCollectorBarrel finds it.
 function RenewableEnergy.tileEntity(spriteName)
@@ -180,8 +194,7 @@ end
 --- disowned with a warning wherever the object loads, on each client and after each reload
 --- (SpriteConfig.initObjectInfo). Authority only; the caller sends the object on.
 function RenewableEnergy.setEntityTile(isoObject, spriteName)
-    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-    isoObject:setSprite(getSprite(spriteName))
+    setTileSprite(isoObject, spriteName)
     local script = RenewableEnergy.tileEntity(spriteName)
     if not script or isoObject:getEntityScript() == script then return end
     -- By type, as removing one shifts the others' indexes; CreateIsoObjectEntity wants none left.
@@ -195,11 +208,12 @@ function RenewableEnergy.setEntityTile(isoObject, spriteName)
     GameEntityFactory.CreateIsoObjectEntity(isoObject, script, true)
 end
 
--- A job's needs are a list of what it takes of the character, each { kind, have, need } with
--- what it names: `perk` for a skill, `tool` (an ItemTag field) for a tool, `item` (a full type)
--- for an item counted by type, `input` (an InputScript) for a recipe's input, `recipe` for a
--- recipe to know (have 1 when known). The same list refuses the job and tells the menu what it
--- lacks, so the two can't disagree.
+-- A job's needs are a list of what it takes of the character, each { kind, have, need } and the
+-- field naming it: `perk` (a Perk) for a skill, `tool` (an ItemTag name) for a tool, `item` (a full
+-- type) for items counted by type, `input` (an InputScript) for a recipe's input, `recipe` for a
+-- recipe to know (have 1 when known); `label` (text) or `labelKey` (a translation key) names it
+-- instead. The same list refuses the job and tells the menu what it lacks, so the two can't
+-- disagree.
 
 --- The first of `needs` the character is short of, or nil when they have them all.
 function RenewableEnergy.firstUnmet(needs)
@@ -209,6 +223,13 @@ function RenewableEnergy.firstUnmet(needs)
         end
     end
     return nil
+end
+
+--- The kind of the first of `needs` the character is short of, or nil when they have them all:
+--- the refusal a job's needs give.
+function RenewableEnergy.unmetKind(needs)
+    local short = RenewableEnergy.firstUnmet(needs)
+    return short and short.kind
 end
 
 return RenewableEnergy

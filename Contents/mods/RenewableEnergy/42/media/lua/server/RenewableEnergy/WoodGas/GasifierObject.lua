@@ -11,11 +11,13 @@ if isClient() then return end
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/ObjectSystem"
+require "RenewableEnergy/Fumes"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier, GasKit, Sprites = RenewableEnergy.Gasifier, RenewableEnergy.GasKit, RenewableEnergy.Sprites
+local Fumes = RenewableEnergy.Fumes
 
 local GasifierObject = RenewableEnergy.ObjectSystem.Object:derive("RenewableEnergy_Gasifier")
 RenewableEnergy.GasifierObject = GasifierObject
@@ -27,8 +29,6 @@ GasifierObject.SAVED_FIELDS = {
 }
 
 local EPSILON = 1e-4
--- A step toward each side (Gasifier.sideOf), in squares.
-local SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
 
 function GasifierObject:initNew()
     self.lit = false
@@ -61,7 +61,7 @@ end
 
 function GasifierObject:loaded(isoObject)
     local square = isoObject:getSquare()
-    self.indoors = square:getBuilding() ~= nil and not square:isOutside()
+    self.indoors = Fumes.buildingOf(square) ~= nil
     Gasifier.adoptContainers(isoObject)
     self:afterChange()
 end
@@ -185,15 +185,15 @@ end
 
 --- Whether the generator its pipe leads to runs on its gas, so the gas line bills all it burns.
 function GasifierObject:feedsRunningGenerator()
-    local step = self.pipe and SIDE_STEPS[self.pipe]
-    local square = step and getSquare(self.x + step[1], self.y + step[2], self.z)
-    local generator = square and RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
+    local square = self.pipe and Gasifier.squareOnSide(self.x, self.y, self.z, self.pipe)
+    local generator = RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
     local state = generator and GasKit.stateOf(generator)
     return state ~= nil and state.onGas == true and generator:isActivated()
 end
 
 --- Burns, if lit, the `hours` since it last caught up as an idling generator would, so it burns
---- down slowly and goes out when its wood is gone. While its generator runs on its gas, the line bills.
+--- down slowly and goes out when its wood is gone. While its generator runs on its gas, the line
+--- bills instead.
 function GasifierObject:advance(hours)
     if hours > 0 and self.lit and not self:feedsRunningGenerator() then
         self:burn(GasKit.idleLitresPerHour() * Gasifier.KG_PER_LITRE * hours)

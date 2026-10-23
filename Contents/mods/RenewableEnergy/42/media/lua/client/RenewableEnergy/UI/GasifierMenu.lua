@@ -1,7 +1,6 @@
 -- A gasifier's right-click menu, and the client's gasifier system. Loading wood and changing the
--- filter's packing are the loot window's: the hopper and the filter are its containers. Each job
--- queues a timed action, which walks the character over and does it; one the character can't do
--- yet stays greyed out, saying what it needs.
+-- filter's packing are the loot window's: the hopper and the filter are its containers. The jobs'
+-- options are GasJobMenu's.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/ClientObjects"

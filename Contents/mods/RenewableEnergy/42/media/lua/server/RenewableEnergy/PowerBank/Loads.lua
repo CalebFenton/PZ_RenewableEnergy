@@ -1,6 +1,6 @@
--- What a source pays for: every switched-on appliance in its reach that no running source is
--- nearer to (RenewableEnergy.Payers), an unwired treadmill while a run draws power through it,
--- and the running generators whose reach covers the source.
+-- What a payer (RenewableEnergy.Payers) pays for: every switched-on appliance in its reach that no
+-- running payer is nearer to, an unwired treadmill while a run draws power through it, and the
+-- running generators whose reach covers the payer.
 --
 -- getGeneratorPowerConsumption reads the appliance's own switch, powered or not, so a bank that
 -- cut its power still sees what would draw when it comes back. Its figure is generator fuel an
@@ -123,14 +123,14 @@ local function isRunningGenerator(object)
     return instanceof(object, "IsoGenerator") and object:isActivated() and not PowerBank.isBank(object)
 end
 
---- What `payer` (a Payers source on `square`) pays for among `sources` (Payers.running), and the
+--- What `payer`, on `square`, pays for among `payers` (Payers.running), and the
 --- running generators, banks aside, that power its square. With `gridGone`, what is switched on
 --- in its reach whether or not the grid powers it now.
 ---@param square IsoGridSquare the payer's square
-function Loads.scan(square, payer, sources, gridGone)
+function Loads.scan(square, payer, payers, gridGone)
     local load = Loads.new()
     local allowExterior = SandboxVars.AllowExteriorGenerator
-    local sharers = Payers.sharers(payer, sources)
+    local sharers = Payers.sharers(payer, payers)
     local function pays(object)
         return #sharers == 1 or Payers.payerAt(sharers, object:getX(), object:getY(), object:getZ()) == payer
     end

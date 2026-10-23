@@ -58,15 +58,19 @@ end
 -- "Too dark" for a job that needs light to see by (RenewableEnergyAction.needsLight) while the
 -- character stands in the dark, else `blocker`.
 local function lightOr(character, mode, blocker)
-    if Action.needsLight(mode) and character:tooDarkToRead() then
-        return "Tooltip_RenewableEnergy_TooDark"
-    end
-    return blocker
+    return Needs.tooDark(character, Action.needsLight(mode)) or blocker
+end
+
+-- Queues a local player's walk to beside `square` and returns their character, or returns nil
+-- when no square beside it can be reached (luautils.walkAdj).
+local function walkedTo(playerNum, square)
+    local character = getSpecificPlayer(playerNum)
+    return luautils.walkAdj(character, square, true) and character or nil
 end
 
 local function queueAt(playerNum, square, mode, object, bank, item, bankName)
-    local character = getSpecificPlayer(playerNum)
-    if luautils.walkAdj(character, square, true) then
+    local character = walkedTo(playerNum, square)
+    if character then
         ISTimedActionQueue.add(Action:new(character, mode, object, bank, nil, item, bankName))
     end
 end
@@ -76,7 +80,7 @@ local function queueSource(playerNum, mode, source, bank)
 end
 
 --- Walks a local player over to `bank` and queues the job `mode` there; `bankName` is Rename's new
---- name. The status window's buttons queue through here too.
+--- name.
 function Menu.queueBank(playerNum, mode, bank, bankName)
     queueAt(playerNum, bank:getSquare(), mode, nil, bank, nil, bankName)
 end
@@ -99,8 +103,8 @@ local function queueConnectAll(playerNum, bank, sources)
 end
 
 local function queueClearSnow(playerNum, source)
-    local character = getSpecificPlayer(playerNum)
-    if not luautils.walkAdj(character, source:getSquare(), true) then
+    local character = walkedTo(playerNum, source:getSquare())
+    if not character then
         return
     end
     local tool = ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), Action.isSnowTool, true)
@@ -112,8 +116,8 @@ local function queueBlades(playerNum, source, blades)
 end
 
 local function queueBulb(playerNum, mode, light, bulb)
-    local character = getSpecificPlayer(playerNum)
-    if not luautils.walkAdj(character, light:getSquare(), true) then
+    local character = walkedTo(playerNum, light:getSquare())
+    if not character then
         return
     end
     if bulb then
@@ -149,8 +153,8 @@ local function queueFixFrame(item, playerNum, fixingNum, fixerNum, part)
 end
 
 local function queueRun(playerNum, treadmill)
-    local character = getSpecificPlayer(playerNum)
-    if luautils.walkAdj(character, treadmill:getSquare(), true) then
+    local character = walkedTo(playerNum, treadmill:getSquare())
+    if character then
         ISTimedActionQueue.add(RenewableEnergyTreadmillAction:new(character, treadmill))
     end
 end
@@ -176,10 +180,13 @@ function Menu.askName(playerNum, bank)
     return modal
 end
 
+local function conditionOf(item)
+    return item:getCondition() / item:getConditionMax()
+end
+
 -- "Car Battery (72%)": a wired part, told apart from its twins by its condition.
 local function partLabel(item)
-    return getText("ContextMenu_RenewableEnergy_PartCondition", item:getDisplayName(),
-        Format.percent(item:getCondition() / item:getConditionMax()))
+    return getText("ContextMenu_RenewableEnergy_PartCondition", item:getDisplayName(), Format.percent(conditionOf(item)))
 end
 
 local function isPart(item)
@@ -197,22 +204,6 @@ local function wiredParts(bank, matches)
         end
     end
     return parts
-end
-
--- One item of each type the character carries for which `matches(item)` holds, bags included, in
--- inventory order.
-local function oneOfEachType(character, matches)
-    local found, seen = {}, {}
-    local items = character:getInventory():getAllEvalRecurse(matches)
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        local fullType = item:getFullType()
-        if not seen[fullType] then
-            seen[fullType] = true
-            table.insert(found, item)
-        end
-    end
-    return found
 end
 
 -- Every item the character carries for which `matches(item)` holds, bags included, grouped by
@@ -234,10 +225,6 @@ end
 
 local function isBattery(fullType)
     return PowerBank.partKind(fullType) == "battery"
-end
-
-local function conditionOf(item)
-    return item:getCondition() / item:getConditionMax()
 end
 
 -- The carried batteries All Batteries wires in: as many as the bank has room for, best condition
@@ -385,6 +372,7 @@ local function slotsRefusal(sources, freeSlots)
 end
 
 function Menu.addBankOptions(playerNum, context, bank)
+    local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, Menu.bankLabel(bank))
     menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, bank, StatusWindow.open)
 
@@ -402,7 +390,6 @@ function Menu.addBankOptions(playerNum, context, bank)
     if not (connected and on) then
         local plug = menu:addOption(getText(connected and "ContextMenu_RenewableEnergy_DisconnectBank" or "ContextMenu_RenewableEnergy_ConnectBank"),
             playerNum, Menu.queueBank, connected and Action.DISCONNECT_BANK or Action.CONNECT_BANK, bank)
-        local character = getSpecificPlayer(playerNum)
         Needs.refuse(plug, lightOr(character, Action.CONNECT_BANK,
             PowerBank.connectRefusal(character, bank, summary, not connected)))
     end
@@ -411,7 +398,7 @@ function Menu.addBankOptions(playerNum, context, bank)
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
         queueConnectAll, bank, sources)
     Needs.refuse(connect, #sources == 0 and "Tooltip_RenewableEnergy_NoSourcesInReach"
-        or lightOr(getSpecificPlayer(playerNum), Action.CONNECT_SOURCE, slotsRefusal(sources, summary.freeSlots)))
+        or lightOr(character, Action.CONNECT_SOURCE, slotsRefusal(sources, summary.freeSlots)))
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)
@@ -548,13 +535,14 @@ function Menu.addGardenLightOptions(playerNum, context, light)
         menu:addOption(getText("ContextMenu_RemoveLightbulb"), playerNum, queueBulb, Action.REMOVE_BULB, light)
         return menu
     end
-    local bulbs = oneOfEachType(getSpecificPlayer(playerNum), SolarGardenLight.isBulb)
-    if #bulbs == 0 then
+    local bulbTypes = carriedByType(getSpecificPlayer(playerNum), SolarGardenLight.isBulb)
+    if #bulbTypes == 0 then
         Needs.refuse(menu:addOption(getText("ContextMenu_AddLightbulb")), "ContextMenu_AddLightbulb_RequiresBulb")
         return menu
     end
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_AddLightbulb"))
-    for _, bulb in ipairs(bulbs) do
+    for _, group in ipairs(bulbTypes) do
+        local bulb = group.items[1]
         local option = submenu:addOption(bulb:getDisplayName(), playerNum, queueBulb, Action.ADD_BULB, light, bulb)
         option.iconTexture = bulb:getTex()
         option.color = { r = bulb:getColorRed(), g = bulb:getColorGreen(), b = bulb:getColorBlue() }

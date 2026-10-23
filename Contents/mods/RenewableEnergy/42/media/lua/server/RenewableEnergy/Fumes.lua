@@ -18,6 +18,12 @@ RenewableEnergy.Fumes = Fumes
 -- is gone when its record is removed after its chunk loads.
 local fuming = {}
 
+--- The building whose air an object on `square` fumes, or nil outdoors: vanilla's own test for a
+--- generator's fumes (IsoGenerator.setActivated), so a square open to the sky in a building isn't.
+function Fumes.buildingOf(square)
+    return not square:isOutside() and square:getBuilding() or nil
+end
+
 local function stillFumed(building)
     local id = building:getID()
     for _, other in pairs(fuming) do
@@ -33,7 +39,7 @@ local function generatorRunsIn(building)
     local id = building:getID()
     for _, source in ipairs(RenewableEnergy.Payers.running()) do
         local square = source.generator and source.generator:getSquare()
-        local inside = square and not square:has(IsoFlagType.exterior) and square:getBuilding()
+        local inside = square and Fumes.buildingOf(square)
         if inside and inside:getID() == id then
             return true
         end

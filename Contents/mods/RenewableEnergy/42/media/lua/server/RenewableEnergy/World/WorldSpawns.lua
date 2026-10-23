@@ -84,13 +84,10 @@ end
 
 -- What a bank holds when it appears, by stock name: its tile (a Sprites field); batteries, a
 -- count from min to max of types picked by weight, era batteries of the kind someone in 1993
--- would have wired to it, as used as their `wear` (a BATTERY_WEAR profile) says; and for each
--- other part the chance of one and its type by weight. Chargers are vanilla's Car Battery Charger,
--- which kept many a cabin battery topped up. `modules`, for a bank a room spawns, is the chance of
--- min to max factory modules lying beside it, at a site module's condition: the RV owner's box and
--- the panel that charged it, so a battery box seldom stands with nothing to charge it.
--- Counts are set so that one lucky find gives a good start, not a finished house: a rack about
--- what a player would wire in a month or so in, the power yard's bank the most, from a long trip.
+-- would have wired to it, worn as their `wear` (a BATTERY_WEAR profile) says; and for each other
+-- part the chance of one and its type by weight. `modules`, for a bank a room spawns, is the
+-- chance of min to max factory modules lying beside it (layModulesBeside), so that a battery box
+-- seldom stands with nothing to charge it. One lucky find gives a good start, not a finished house.
 WorldSpawns.BANK_STOCK = {
     shed = {
         sprite = "batteryBoxWood",
@@ -406,7 +403,7 @@ end
 -- Rooms seen for the first time
 
 local function oneIn(n)
-    return ZombRand(n) == 0
+    return Chance.hit(1 / n)
 end
 
 local INDOOR_TRIES = 10

@@ -26,7 +26,7 @@ local REACH = 1.6
 
 -- Whether the runner is on the treadmill, still wired or not as it was when the run began: an
 -- unwired one wired meanwhile would draw power while its motor fed a bank.
-local function running(self)
+local function isOnTreadmill(self)
     local object = self.object
     if not (RenewableEnergy.onSquare(object) and RenewableEnergy.withinReach(self.character, object, REACH)) then
         return false
@@ -51,7 +51,7 @@ end
 -- A run on an unwired treadmill stops when its power goes out. The server never calls isValid(),
 -- but the client's stop reaches it (serverStop).
 function Action:isValid()
-    return running(self) and self.character:getStats():get(CharacterStat.ENDURANCE) > GIVE_UP_ENDURANCE
+    return isOnTreadmill(self) and self.character:getStats():get(CharacterStat.ENDURANCE) > GIVE_UP_ENDURANCE
         and (self.wired or Treadmill.isPowered(self.object))
 end
 
@@ -146,7 +146,7 @@ local function settle(self, share)
     Treadmill.stopDrawing(self.object, self)
     self.drawing = nil
     local hours = runHours() * math.max(0, math.min(1, share))
-    if hours <= 0 or not running(self) then
+    if hours <= 0 or not isOnTreadmill(self) then
         return false
     end
     local spec, character = Specs.treadmill, self.character

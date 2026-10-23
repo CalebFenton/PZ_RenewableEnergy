@@ -1,6 +1,6 @@
 -- Wind chargers: output from the game's wind (ClimateManager.getWindspeedKph, no day/night cycle),
--- the power curve, height and shelter; plus the brake and broken-blade modData, which only the
--- authority's RenewableEnergy.WindSource writes.
+-- the power curve, height and shelter; plus the brake and broken-blade modData, written only on
+-- the authority (RenewableEnergy.WindSource).
 --
 -- Shelter has no direction: the game's wind angle is a screen-space value for weather effects
 -- (ClimateManager.getWindAngleDegrees), so every side counts.

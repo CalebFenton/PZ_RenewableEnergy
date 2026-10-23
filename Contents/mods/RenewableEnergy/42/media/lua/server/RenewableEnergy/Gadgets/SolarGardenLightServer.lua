@@ -18,11 +18,7 @@ local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, Rene
 local function setLit(light, lit, bulbChanged)
     local changed = SolarGardenLight.isLit(light) ~= lit
     if changed then
-        -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-        light:setSprite(getSprite(lit and Sprites.gardenLight.lit or Sprites.gardenLight.off))
-        if isServer() then
-            light:transmitUpdatedSpriteToClients()
-        end
+        RenewableEnergy.showTile(light, lit and Sprites.gardenLight.lit or Sprites.gardenLight.off)
     end
     -- Also when the tile stays lit, since its bulb may have changed.
     SolarGardenLight.syncLamp(light)
@@ -39,15 +35,15 @@ end
 local function run(light, hours, sky, bulbChanged)
     local spec = Specs.gardenLight
     local night = sky.up <= 0
-    local bulb = SolarGardenLight.getBulb(light) ~= nil
+    local hasBulb = SolarGardenLight.getBulb(light) ~= nil
     local charge = SolarGardenLight.getCharge(light)
     if not night then
         charge = math.min(spec.wh, charge + Sun.squareWatts(light:getSquare(), spec.watts, sky) * hours)
-    elseif bulb then
+    elseif hasBulb then
         charge = math.max(0, charge - spec.nightWatts * hours)
     end
     light:getModData()[SolarGardenLight.CHARGE_KEY] = charge
-    setLit(light, night and bulb and charge > 0, bulbChanged)
+    setLit(light, night and hasBulb and charge > 0, bulbChanged)
 end
 
 -- Puts `bulb` (nil for none) in the light, tells the clients, and lights or darkens it at once.

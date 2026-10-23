@@ -4,12 +4,11 @@ end
 
 require "RenewableEnergy/Sprites"
 
--- Rolls buildings once their surroundings load: the one way GardenLights and RuralFinds roll the
--- buildings a chunk brings in, and SolarSites' house spots wait for a whole house. A chunk that
+-- Rolls buildings once their surroundings load, and judges the ground around them. A chunk that
 -- loads brings in parts of buildings, not their surroundings, so a building waits until every
 -- chunk within REACH of it is loaded. The rules:
 --
--- - Each chunk that loads offers its buildings, on its lowest levels, to every watcher once; a
+-- - Each chunk that loads offers its buildings, up to HIGHEST_LEVEL, to every watcher once; a
 --   building the watcher `wants` waits in that watcher's queue, with a square of it in that chunk.
 -- - Each game minute, a building whose square has unloaded leaves the queue: its chunk brings it
 --   back when it loads again. A building whose surroundings are loaded leaves the queue and is
@@ -25,8 +24,8 @@ local Sprites = RenewableEnergy.Sprites
 
 -- Squares out from a building's bounds that a roll may place on, and that must be loaded first.
 BuildingWatch.REACH = 4
--- The highest level a chunk is scanned for buildings at: a deer stand's one room is on level 1.
-local HIGHEST = 1
+-- The highest level a building is looked at on: a deer stand's one room is on level 1.
+BuildingWatch.HIGHEST_LEVEL = 1
 
 local CHUNK_SIZE = getChunkSizeInSquares()
 
@@ -38,10 +37,18 @@ function BuildingWatch.key(def)
     return def:getX() .. "," .. def:getY()
 end
 
---- Whether the square's floor is a street's.
-function BuildingWatch.isStreet(square)
+-- No square flag marks a road; vanilla tells one by its floor tile too (BaseVehicle.isDoingOffroad).
+local function isStreet(square)
     local name = Sprites.nameOf(square:getFloor()) or ""
     return string.find(name, "^floors_exterior_street") ~= nil or string.find(name, "^blends_street") ~= nil
+end
+
+--- Whether something the mod puts by a building may stand on the square: outdoor ground level
+--- with a floor, nothing solid on it, off the road, not in water or a tree.
+function BuildingWatch.isOpenGround(square)
+    return square ~= nil and square:getZ() == 0 and square:getRoom() == nil and square:isOutside()
+        and square:hasFloor() and square:isFree(false) and not square:HasTree()
+        and not square:getProperties():has(IsoFlagType.water) and not isStreet(square)
 end
 
 --- Whether every chunk within REACH of the building is loaded: one square per chunk tells. The
@@ -69,7 +76,7 @@ end
 local function onLoadChunk(chunk)
     -- A building covers many of the chunk's squares; each is offered once.
     local seen = {}
-    for z = 0, HIGHEST do
+    for z = 0, BuildingWatch.HIGHEST_LEVEL do
         for x = 0, CHUNK_SIZE - 1 do
             for y = 0, CHUNK_SIZE - 1 do
                 local square = chunk:getGridSquare(x, y, z)

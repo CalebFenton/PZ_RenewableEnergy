@@ -4,10 +4,9 @@
 -- dropped drum can't pass for an installed one.
 --
 -- Shared because a dedicated server loads no client Lua and both sides should hold the same scripts.
--- Scripts load before Lua on every boot and reload, then OnGameBoot fires (Core.ResetLua,
--- GameServer); items read the model whenever drawn, so drums already on the floor change too. The
--- model is module-qualified because script names were resolved before Lua ran
--- (Item.resolveModelScripts).
+-- OnGameBoot fires after the scripts load, on every boot and Lua reload (Core.ResetLua), and items
+-- read the model whenever drawn, so drums already on the floor change too. The model is
+-- module-qualified because script names were resolved before Lua ran (Item.resolveModelScripts).
 
 require "RenewableEnergy/Sprites"
 

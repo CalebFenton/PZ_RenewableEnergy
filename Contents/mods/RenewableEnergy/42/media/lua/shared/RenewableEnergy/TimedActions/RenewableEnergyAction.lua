@@ -121,6 +121,8 @@ local function connectMinutes(self)
     return SandboxVars.RenewableEnergy.ConnectPanelMin * skillFactor(electricity(self))
 end
 
+-- ArrowBoard is server code (server/RenewableEnergy/World/ArrowBoard.lua): it loads after the
+-- shared files, and not at all on a multiplayer client, so it is looked up when a job asks.
 local function arrowBoard()
     return RenewableEnergy.ArrowBoard
 end
@@ -137,6 +139,60 @@ local function holdsItem(self)
     return self.character:getInventory():containsRecursive(self.item)
 end
 
+-- Turn On and Turn Off: the bank's switch set to `on`.
+local function bankSwitchJob(on)
+    return {
+        keeps = function(self) return isBank(self.bank) end,
+        check = function(self)
+            local summary = bankSummary(self)
+            return summary ~= nil and PowerBank.switchRefusal(summary, on) == nil
+        end,
+        command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = on } end,
+        minutes = 0.5,
+        doneSound = "LightSwitch",
+    }
+end
+
+-- Connect and Disconnect the bank to the house's wiring, as vanilla's ISPlugGenerator, which can't
+-- tell the bank its state changed. Unlike vanilla's, it needs light: it is wiring at the house's
+-- panel, as wiring a part in is.
+local function bankConnectJob(connected)
+    return {
+        keeps = function(self) return isBank(self.bank) end,
+        check = function(self)
+            local summary = bankSummary(self)
+            return summary ~= nil and PowerBank.connectRefusal(self.character, self.bank, summary, connected) == nil
+        end,
+        command = function(self)
+            return "setBankConnected", { bank = positionOf(self.bank), connected = connected }
+        end,
+        units = 300,
+        light = true,
+        sound = "GeneratorConnect",
+    }
+end
+
+-- The arrow board's switch set to `on`.
+local function boardSwitchJob(on)
+    return {
+        keeps = function(self) return inWorld(self.vehicle) end,
+        check = function(self) return arrowBoard() ~= nil and arrowBoard().canSwitch(self.vehicle, on) end,
+        run = function(self) return arrowBoard().setSwitch(self.vehicle, on) end,
+        minutes = 0.5,
+        doneSound = "LightSwitch",
+    }
+end
+
+-- A wind charger's brake, a lever or pin at the foot of the mast, set to `braked`.
+local function brakeJob(braked)
+    return {
+        keeps = function(self) return isWindCharger(self.object) end,
+        check = function(self) return Wind.isBraked(self.object) ~= braked end,
+        command = function(self) return "setBrake", { source = positionOf(self.object), braked = braked } end,
+        minutes = 1,
+    }
+end
+
 -- Every job, by mode:
 -- - keeps(self): what the job needs from moment to moment, cheap enough for isValid to ask every
 --   tick: its target still in the world and its item still where the job needs it. These are what
@@ -151,6 +207,7 @@ end
 --   length in action units.
 -- - light: it needs light to see by. partInBank: its item is in the bank's container rather than
 --   the character's inventory. sound: what it sounds like while it runs; doneSound: when it ends.
+--   metabolics: the exertion it keeps the character at.
 -- - begin(self), if any, starts its animation in place of the crouch over the target.
 JOBS = {
     [Action.CONNECT_SOURCE] = {
@@ -187,50 +244,10 @@ JOBS = {
             end
         end,
     },
-    [Action.TURN_ON] = {
-        keeps = function(self) return isBank(self.bank) end,
-        check = function(self)
-            local summary = bankSummary(self)
-            return summary ~= nil and PowerBank.switchRefusal(summary, true) == nil
-        end,
-        command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = true } end,
-        minutes = 0.5,
-        doneSound = "LightSwitch",
-    },
-    [Action.TURN_OFF] = {
-        keeps = function(self) return isBank(self.bank) end,
-        check = function(self)
-            local summary = bankSummary(self)
-            return summary ~= nil and PowerBank.switchRefusal(summary, false) == nil
-        end,
-        command = function(self) return "setBankOn", { bank = positionOf(self.bank), on = false } end,
-        minutes = 0.5,
-        doneSound = "LightSwitch",
-    },
-    -- Vanilla's ISPlugGenerator, which can't tell the bank its state changed. Unlike vanilla's, it
-    -- needs light: it is wiring at the house's panel, as wiring a part in is.
-    [Action.CONNECT_BANK] = {
-        keeps = function(self) return isBank(self.bank) end,
-        check = function(self)
-            local summary = bankSummary(self)
-            return summary ~= nil and PowerBank.connectRefusal(self.character, self.bank, summary, true) == nil
-        end,
-        command = function(self) return "setBankConnected", { bank = positionOf(self.bank), connected = true } end,
-        units = 300,
-        light = true,
-        sound = "GeneratorConnect",
-    },
-    [Action.DISCONNECT_BANK] = {
-        keeps = function(self) return isBank(self.bank) end,
-        check = function(self)
-            local summary = bankSummary(self)
-            return summary ~= nil and PowerBank.connectRefusal(self.character, self.bank, summary, false) == nil
-        end,
-        command = function(self) return "setBankConnected", { bank = positionOf(self.bank), connected = false } end,
-        units = 300,
-        light = true,
-        sound = "GeneratorConnect",
-    },
+    [Action.TURN_ON] = bankSwitchJob(true),
+    [Action.TURN_OFF] = bankSwitchJob(false),
+    [Action.CONNECT_BANK] = bankConnectJob(true),
+    [Action.DISCONNECT_BANK] = bankConnectJob(false),
     [Action.ATTACH_MAINTAINER] = {
         keeps = function(self)
             return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
@@ -340,33 +357,10 @@ JOBS = {
         -- (OpenWindowState).
         doneSound = "BreakLockOnWindow",
     },
-    [Action.BOARD_ON] = {
-        keeps = function(self) return inWorld(self.vehicle) end,
-        check = function(self) return arrowBoard() ~= nil and arrowBoard().canSwitch(self.vehicle, true) end,
-        run = function(self) return arrowBoard().setSwitch(self.vehicle, true) end,
-        minutes = 0.5,
-        doneSound = "LightSwitch",
-    },
-    [Action.BOARD_OFF] = {
-        keeps = function(self) return inWorld(self.vehicle) end,
-        check = function(self) return arrowBoard() ~= nil and arrowBoard().canSwitch(self.vehicle, false) end,
-        run = function(self) return arrowBoard().setSwitch(self.vehicle, false) end,
-        minutes = 0.5,
-        doneSound = "LightSwitch",
-    },
-    -- A lever or pin at the foot of the mast.
-    [Action.BRAKE] = {
-        keeps = function(self) return isWindCharger(self.object) end,
-        check = function(self) return not Wind.isBraked(self.object) end,
-        command = function(self) return "setBrake", { source = positionOf(self.object), braked = true } end,
-        minutes = 1,
-    },
-    [Action.RELEASE_BRAKE] = {
-        keeps = function(self) return isWindCharger(self.object) end,
-        check = function(self) return Wind.isBraked(self.object) end,
-        command = function(self) return "setBrake", { source = positionOf(self.object), braked = false } end,
-        minutes = 1,
-    },
+    [Action.BOARD_ON] = boardSwitchJob(true),
+    [Action.BOARD_OFF] = boardSwitchJob(false),
+    [Action.BRAKE] = brakeJob(true),
+    [Action.RELEASE_BRAKE] = brakeJob(false),
     -- Either tile of a treadmill wired by someone else meanwhile ends the job, so it is wired once.
     [Action.WIRE_TREADMILL] = {
         keeps = function(self)
@@ -505,17 +499,19 @@ function Action:start()
     end
 end
 
-function Action:stop()
+local function stopSound(self)
     if self.sound then
         self.character:stopOrTriggerSound(self.sound)
     end
+end
+
+function Action:stop()
+    stopSound(self)
     ISBaseTimedAction.stop(self)
 end
 
 function Action:perform()
-    if self.sound then
-        self.character:stopOrTriggerSound(self.sound)
-    end
+    stopSound(self)
     local doneSound = JOBS[self.mode].doneSound
     if doneSound then
         self.character:playSound(doneSound)

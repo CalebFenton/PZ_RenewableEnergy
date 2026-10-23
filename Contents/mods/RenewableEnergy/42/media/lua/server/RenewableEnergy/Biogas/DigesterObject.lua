@@ -10,6 +10,7 @@ if isClient() then return end
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/ObjectSystem"
+require "RenewableEnergy/Fumes"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/Stink"
 require "RenewableEnergy/Biogas/GasHeater"
@@ -17,7 +18,7 @@ require "RenewableEnergy/GasLine/GasKit"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, Stink, Sprites = RenewableEnergy.Digester, RenewableEnergy.Stink, RenewableEnergy.Sprites
-local GasHeater, GasKit = RenewableEnergy.GasHeater, RenewableEnergy.GasKit
+local GasHeater, GasKit, Fumes = RenewableEnergy.GasHeater, RenewableEnergy.GasKit, RenewableEnergy.Fumes
 
 local DigesterObject = RenewableEnergy.ObjectSystem.Object:derive("RenewableEnergy_Digester")
 RenewableEnergy.DigesterObject = DigesterObject
@@ -25,7 +26,7 @@ RenewableEnergy.DigesterObject = DigesterObject
 -- The fields the Global Object System saves with the world; a field renamed here is lost from
 -- existing saves.
 DigesterObject.SAVED_FIELDS = {
-    "tier", "material", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
+    "tier", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
     "seedHours", "started", "gasHours", "sludge", "acid", "sour", "leakHours", "indoors", "inRoom",
     "meterHours", "madePerDay", "hopper", "eaten", "lastHour", "scrubber", "scrubCO2", "scrubWool",
     "heaterLit",
@@ -76,7 +77,7 @@ end
 --- An object the system has not seen: a digester just built.
 function DigesterObject:stateFromIsoObject(isoObject)
     self:initNew()
-    self.tier, self.material = Digester.tileOf(isoObject)
+    self.tier = Digester.tileOf(isoObject)
     self.holder = self:tierSpec().holder
     self.temp = getClimateManager():getAirTemperatureForSquare(isoObject:getSquare())
     self:loaded(isoObject)
@@ -93,7 +94,7 @@ end
 
 function DigesterObject:loaded(isoObject)
     local square = isoObject:getSquare()
-    self.indoors = square:getBuilding() ~= nil and not square:isOutside()
+    self.indoors = Fumes.buildingOf(square) ~= nil
     self.inRoom = square:isInARoom()
     Digester.adoptContainer(isoObject:getContainer())
     self:snapshotHopper(isoObject:getContainer())
@@ -139,7 +140,6 @@ function DigesterObject:snapshotHopper(container)
         local feed = Digester.feedOf(item)
         if feed then
             feed.id = item:getID()
-            feed.neutraliser = Digester.isNeutraliser(item)
             feed.uses = not feed.whole and item:getCurrentUses() or nil
             table.insert(hopper, feed)
         end
@@ -184,7 +184,6 @@ function DigesterObject:feedFromContainer(container)
         local item = list:get(i)
         local feed = Digester.feedOf(item)
         if feed then
-            feed.neutraliser = Digester.isNeutraliser(item)
             table.insert(items, item)
             table.insert(entries, feed)
         end
@@ -460,11 +459,7 @@ local showOverlay = RenewableEnergy.showOverlay
 --- Lights or puts out `heater`, by its tile.
 function DigesterObject.showHeaterLit(heater, lit)
     if GasHeater.isLit(heater) == lit then return end
-    -- The tile's own sprite, with its properties; setSprite(name) would make a bare texture.
-    heater:setSprite(getSprite(lit and Sprites.gasHeater.lit or Sprites.gasHeater.off))
-    if isServer() then
-        heater:transmitUpdatedSpriteToClients()
-    end
+    RenewableEnergy.showTile(heater, lit and Sprites.gasHeater.lit or Sprites.gasHeater.off)
 end
 
 --- Lights or puts out `heater`, the one that warms this digester (GasHeater.digesterNear).
@@ -494,7 +489,6 @@ end
 --- client gets only with the containers.
 function DigesterObject:upgrade(isoObject)
     self.tier = self:tierSpec().upgrade
-    self.material = nil
     self.holder = self:tierSpec().holder
     self.holderCondition = 100
     self.gas = math.min(self.gas, self:capacity())
@@ -545,7 +539,7 @@ end
 function DigesterObject:buildSummary()
     local spec = self:tierSpec()
     return {
-        tier = self.tier, material = self.material, holder = self.holder,
+        tier = self.tier, holder = self.holder,
         holderCondition = round(self.holderCondition), torn = self:isTorn(),
         gas = round(self.gas, 2), capacity = self:capacity(),
         temp = round(self.temp),

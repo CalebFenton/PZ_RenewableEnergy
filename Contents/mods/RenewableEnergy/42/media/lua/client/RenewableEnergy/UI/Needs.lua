@@ -53,6 +53,16 @@ function Needs.refuse(option, key, ...)
     setTooltip(option, getText(key, ...))
 end
 
+--- "Too dark" as a translation key when the job needs light to see by (`needsLight`) and
+--- `character` stands in the dark, else nil. Only the player's own side can tell
+--- (IsoPlayer.tooDarkToRead is false for a remote player), so the menu checks it, not a refusal.
+function Needs.tooDark(character, needsLight)
+    if needsLight and character:tooDarkToRead() then
+        return "Tooltip_RenewableEnergy_TooDark"
+    end
+    return nil
+end
+
 --- An option whose job takes several things (skill, tools, materials) lists them all with have and
 --- need, so the character sees everything they lack at once, and is greyed out while any is short.
 --- A `blocker` (a translation key) that no amount of carrying fixes replaces the list with its

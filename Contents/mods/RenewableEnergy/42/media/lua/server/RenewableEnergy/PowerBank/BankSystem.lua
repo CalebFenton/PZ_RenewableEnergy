@@ -168,10 +168,7 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
         local found = PowerBank.bankOfSource(x, y, z)
         local bank = found and self:getLuaObjectAt(found.x, found.y, found.z)
         if bank then
-            -- What the source made up to now counts.
-            BankSystem.updateBank(bank)
-            bank:removeSource(x, y, z)
-            bank:sendStatus()
+            BankSystem.dropSource(bank, x, y, z)
         end
         -- A wired treadmill picked up or destroyed leaves its wire on the floor; the item it
         -- becomes doesn't keep the wiring (ISMoveableSpriteProps keeps a plain tile's movableData
@@ -194,10 +191,6 @@ function ISDestroyStuffAction:complete()
     end
     return destroyComplete(self)
 end
-
--- Clients only watch a bank's status, which the status window does while it is open. Every job
--- that changes a bank comes as a RenewableEnergyAction, whose complete() checks the character is
--- at it, so a forged command packet can't reach a bank from afar.
 
 -- Real milliseconds a player waits between refreshes of one bank, since each refresh makes the
 -- bank look at its container again and sends its status to everyone watching it.
@@ -225,6 +218,9 @@ local function mayRefresh(bank, player)
     return true
 end
 
+-- A client sends only "watch", "unwatch" and "resync". Every job that changes a bank comes as a
+-- RenewableEnergyAction, whose complete() checks the character is at it, so a forged command
+-- packet can't reach a bank from afar.
 function BankSystem:OnClientCommand(command, player, args)
     local bank = player and type(args) == "table" and BankSystem.bankAt(args.bank)
     if not bank then return end
@@ -317,9 +313,9 @@ local function passHours(bank)
     return math.min(LONGEST_PASS, now - (bank.lastHour or now)), now
 end
 
---- A pass context for each span of hours, worked out once and shared by every bank that runs
---- that span: banks placed at different times run different spans.
-function BankSystem.sharedContexts()
+-- A pass context for each span of hours, worked out once and shared by every bank that runs
+-- that span: banks placed at different times run different spans.
+local function sharedContexts()
     local contexts = {}
     return function(hours)
         local key = string.format("%.4f", hours)
@@ -338,9 +334,17 @@ function BankSystem.updateBank(bank, contextFor)
     end
 end
 
+--- Brings `bank` up to now, so what the source at x, y, z made counts, then takes the source off
+--- the bank and sends its status.
+function BankSystem.dropSource(bank, x, y, z)
+    BankSystem.updateBank(bank)
+    bank:removeSource(x, y, z)
+    bank:sendStatus()
+end
+
 function BankSystem.updateAll()
     local self = BankSystem.instance
-    local contextFor = BankSystem.sharedContexts()
+    local contextFor = sharedContexts()
     for i = 1, self:getLuaObjectCount() do
         BankSystem.updateBank(self:getLuaObjectByIndex(i), contextFor)
     end

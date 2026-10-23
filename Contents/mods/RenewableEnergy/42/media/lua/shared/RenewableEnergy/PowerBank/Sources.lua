@@ -64,7 +64,7 @@ function Sources.sweepable(kind)
 end
 
 --- The blade items that make a wind charger of `kind` whole again, as a set of full types; empty
---- for a kind that never breaks. Shared: don't change it.
+--- for a kind that never breaks. The set is shared: callers must not change it.
 function Sources.bladesFor(kind)
     local entry = kind and KINDS[kind]
     return entry and entry.blades or NO_BLADES

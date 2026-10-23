@@ -9,7 +9,7 @@ require "RenewableEnergy/Sprites"
 -- The authority (single player or the server) keeps each light's charge and bulb in its modData
 -- and swaps its tile between unlit and lit (server/RenewableEnergy/Gadgets/SolarGardenLightServer.lua).
 -- Light sources exist only where the game draws, so every client, and single player, gives each
--- lit tile it sees a lamp of its own, in its bulb's colour (here). A server tells its clients
+-- lit tile it sees a lamp of its own, in its bulb's colour (this file). A server tells its clients
 -- when a light's lamp changes, so they draw it at once.
 RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
@@ -30,9 +30,9 @@ SolarGardenLight.PLAIN_BULB = "Base.LightBulb"
 SolarGardenLight.NO_BULB = "none"
 
 -- Vanilla's bulbs, the plain one and the coloured ones, whose scripts give their colour.
-SolarGardenLight.BULBS = {}
+local BULBS = {}
 for _, colour in ipairs({ "", "Red", "Green", "Blue", "Yellow", "Cyan", "Magenta", "Orange", "Pink", "Purple" }) do
-    SolarGardenLight.BULBS[SolarGardenLight.PLAIN_BULB .. colour] = true
+    BULBS[SolarGardenLight.PLAIN_BULB .. colour] = true
 end
 
 -- The server's word to its clients that a light's lamp changed, with { x, y, z, bulb }: the tile
@@ -69,7 +69,7 @@ function SolarGardenLight.getCharge(light)
 end
 
 function SolarGardenLight.isBulb(item)
-    return item ~= nil and SolarGardenLight.BULBS[item:getFullType()] == true
+    return item ~= nil and BULBS[item:getFullType()] == true
 end
 
 --- The full type of the bulb in `holder`, a placed light or its item, or nil if it has none.

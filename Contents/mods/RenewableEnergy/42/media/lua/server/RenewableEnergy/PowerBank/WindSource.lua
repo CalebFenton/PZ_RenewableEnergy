@@ -1,6 +1,6 @@
 -- How a bank runs a wind charger (the "wind" family of RenewableEnergy.Sources) on the authority:
--- its output in the wind and its blades breaking in a gale. The one writer of a charger's brake
--- and broken blades, on the object and on its bank's record alike.
+-- its output in the wind and its blades breaking in a gale. Sets a charger's brake and broken
+-- blades on the object and on its bank's record alike.
 
 if isClient() then return end
 
@@ -43,10 +43,10 @@ function WindSource.setBroken(isoObject, broken, source)
     end
 end
 
---- The chance that a wind charger left running through `hours` of a wind of `kph` breaks its
---- blades, at its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage
---- options: none while braked or broken already.
-function WindSource.breakChance(source, kph, hours)
+-- The chance that a wind charger left running through `hours` of a wind of `kph` breaks its
+-- blades, at its kind's chance (Specs.wind.turbines breakPerHour) scaled by the StormDamage
+-- options: none while braked or broken already.
+local function breakChance(source, kph, hours)
     local options = SandboxVars.RenewableEnergy
     local spec = Specs.wind.turbines[source.kind]
     if not options.StormDamage or hours <= 0 or source.braked or source.broken or not Wind.canBreak(spec, kph) then
@@ -58,7 +58,7 @@ end
 
 -- No roll when the blades can't break, so a test's set rolls go only to chances that can come up.
 local function breaks(source, kph, hours)
-    local chance = WindSource.breakChance(source, kph, hours)
+    local chance = breakChance(source, kph, hours)
     return chance > 0 and Chance.hit(chance)
 end
 
@@ -89,7 +89,7 @@ function WindSource.update(source, object, inSlot, hours, context)
         source.broken = true
     end
     if object and Wind.isBroken(object) ~= (source.broken == true) then
-        setFlag(object, Wind.BROKEN, source.broken)
+        WindSource.setBroken(object, source.broken == true, source)
     end
     local spec = Specs.wind.turbines[source.kind]
     local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0)
