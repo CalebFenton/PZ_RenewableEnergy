@@ -167,6 +167,42 @@ test("renewable_energy_bank_powers_at_night", {
     end,
 })
 
+-- While the grid still powers its square, a bank that is on stands by: its generator stays off and
+-- its batteries carry nothing, so through a night they don't drain or wear, and its inverter/charger
+-- fills them from the grid. Once the grid goes, the next pass takes over the load.
+test("renewable_energy_bank_stands_by_on_the_grid", {
+    run = function(self)
+        T.setGrid(self, true)
+        local bank = T.bank(self, "batteryRackWood", { "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", INVERTER },
+            { charge = 0.5 })
+        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
+        if not fridge then return end
+        self.bank = bank
+        T.step(function() T.need(self, bank.square:hasGridPower(), "grid power on the bank's square") end)
+        T.switchOn(self, bank)
+        T.step(function() T.placeTile(self, fridge, MINI_FRIDGE) end)
+        T.bankPass(self, bank, 0, { hours = 12 })
+        T.step(function()
+            self.onGrid = bank.state
+            T.setGrid(self, false)
+        end)
+        T.bankPass(self, bank, 0)
+        T.step(function() self.offGrid = bank.state end)
+    end,
+    validate = function(self)
+        local onGrid, offGrid = self.onGrid, self.offGrid
+        expect(onGrid.status.state == "grid", "a switched-on bank on the grid reads " .. tostring(onGrid.status.state))
+        expect(not onGrid.activated, "the bank ran its own generator while the grid powered its square")
+        expectNear("the bank's draw on the grid", onGrid.drawW, 0, 0)
+        expectNear("the bank's deepest drop after a night on the grid", onGrid.cycleDepth, 0, 0)
+        expect(onGrid.status.chargeSource == "grid" and onGrid.charge > 0.5, string.format(
+            "on the grid the chargers charge from %s and the bank's charge went from 0.5 to %.3f", tostring(onGrid.status.chargeSource), onGrid.charge))
+        expect(offGrid.activated and offGrid.drawW > 0, string.format("with the grid gone the bank reads %s, powers %s and draws %.1f W for a load of %.1f W",
+            tostring(offGrid.status.state), tostring(offGrid.activated), offGrid.drawW, offGrid.status.loadW))
+        expect(offGrid.charge < onGrid.charge, "with the grid gone the bank's charge didn't fall")
+    end,
+})
+
 -- The scan sees what is switched on whether or not the bank powers it, so a cut bank knows when
 -- the load fits again; and, as vanilla bills them, a mini fridge with its ice box is a fridge-freezer.
 test("renewable_energy_bank_scan_sees_load_while_cut", {
