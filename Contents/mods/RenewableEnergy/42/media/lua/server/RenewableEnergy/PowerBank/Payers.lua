@@ -20,15 +20,13 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/GasLine/GasKit"
 
 RenewableEnergy = RenewableEnergy or {}
 local Payers = {}
 RenewableEnergy.Payers = Payers
 
-local PlaceTracker, PowerBank, Treadmill, GasKit = RenewableEnergy.PlaceTracker, RenewableEnergy.PowerBank,
-    RenewableEnergy.Treadmill, RenewableEnergy.GasKit
-local WATTS_PER_FUEL = RenewableEnergy.Specs.wattsPerFuel
+local PlaceTracker, PowerBank, Treadmill, Specs = RenewableEnergy.PlaceTracker, RenewableEnergy.PowerBank,
+    RenewableEnergy.Treadmill, RenewableEnergy.Specs
 local EPSILON = 1e-6
 
 local function generatorSprites()
@@ -42,7 +40,7 @@ end
 -- Generators found as their chunk loads, as a player starts one (ISActivateGenerator.complete), and
 -- as a bank comes on one in its reach. A generator dropped from the hands fires no event, so it is
 -- found once started.
-local generators = PlaceTracker.new({ sprites = generatorSprites(), matches = GasKit.isGenerator })
+local generators = PlaceTracker.new({ sprites = generatorSprites(), matches = RenewableEnergy.isGenerator })
 
 --- Track `generator`, found running some other way.
 function Payers.track(generator)
@@ -80,25 +78,21 @@ function Payers.running()
             table.insert(list, ofGenerator(generator))
         end
     end)
-    local banks = PowerBank.serverSystem
-    for i = 1, (banks and banks:getLuaObjectCount() or 0) do
-        local bank = banks:getLuaObjectByIndex(i)
+    PowerBank.eachBank(function(bank)
         if bankRuns(bank) then
             table.insert(list, Payers.ofBank(bank))
         end
-    end
+    end)
     return list
 end
 
 local function reaches(payer, x, y, z)
-    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
-    local dx, dy = x - payer.x, y - payer.y
-    return math.abs(z - payer.z) <= levels and dx * dx + dy * dy <= radius * radius
+    return RenewableEnergy.inGeneratorReach(payer.x, payer.y, payer.z, x, y, z)
 end
 
 --- `payer` and the payers in `payers` that reach any square it does: those it may share with.
 function Payers.sharers(payer, payers)
-    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
+    local radius, levels = RenewableEnergy.generatorReach()
     local span = 2 * radius
     local list = { payer }
     for _, other in ipairs(payers) do
@@ -112,30 +106,18 @@ end
 
 --- The payer among `sharers` that pays for an appliance at x, y, z: the nearest that reaches it.
 function Payers.payerAt(sharers, x, y, z)
-    local best, bestDistance
-    for _, sharer in ipairs(sharers) do
-        if reaches(sharer, x, y, z) then
-            local dx, dy, dz = x - sharer.x, y - sharer.y, z - sharer.z
-            local distance = dx * dx + dy * dy + dz * dz
-            if not best or distance < bestDistance or (distance == bestDistance and sharer.key < best.key) then
-                best, bestDistance = sharer, distance
-            end
-        end
-    end
-    return best
+    return PlaceTracker.nearest(sharers, x, y, z, nil, function(sharer) return reaches(sharer, x, y, z) end)
 end
 
 -- Watts of the loads of the banks the generator `payer` carries as their backup.
 local function backedW(payer)
     local watts = 0
-    local banks = PowerBank.serverSystem
-    for i = 1, (banks and banks:getLuaObjectCount() or 0) do
-        local bank = banks:getLuaObjectByIndex(i)
+    PowerBank.eachBank(function(bank)
         local backup = bank.generator
         if backup and backup.running and PowerBank.samePosition(backup, payer) and bank:shouldPower() then
             watts = watts + bank.loadW
         end
-    end
+    end)
     return watts
 end
 
@@ -192,8 +174,8 @@ local function bill(generator, payers, consumption)
     entry.generator = generator
     entry.baseFuel = generator:getBasePowerConsumption() / consumption
     entry.othersFuel = load.othersFuel
-    entry.extraFuel = (treadmillW + backed) / WATTS_PER_FUEL
-    setBill(entry, entry.baseFuel + (load.watts + backed) / WATTS_PER_FUEL)
+    entry.extraFuel = Specs.fuelFromWatts(treadmillW + backed)
+    setBill(entry, entry.baseFuel + Specs.fuelFromWatts(load.watts + backed))
 end
 
 --- Bill every running generator its share. Each one's rebuilds until the next call keep it
@@ -236,7 +218,7 @@ end
 local vanillaComplete = ISActivateGenerator.complete
 function ISActivateGenerator:complete()
     local result = vanillaComplete(self)
-    if GasKit.isGenerator(self.generator) then
+    if RenewableEnergy.isGenerator(self.generator) then
         Payers.track(self.generator)
         Payers.billGenerators()
     end
@@ -244,6 +226,5 @@ function ISActivateGenerator:complete()
 end
 
 Events.OnTick.Add(keepShares)
-Events.EveryTenMinutes.Add(Payers.billGenerators)
 
 return Payers

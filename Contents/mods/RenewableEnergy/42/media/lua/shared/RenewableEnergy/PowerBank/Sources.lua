@@ -73,7 +73,7 @@ end
 --- The kind of a placed source (Sprites.kindOf), the way it faces and what it is made of; nil for
 --- anything else, a treadmill's tile included until it is wired to feed a bank.
 function Sources.kindOf(isoObject)
-    local kind, facing, material = Sprites.kindOf(Sprites.nameOf(isoObject))
+    local kind, facing, material = Sprites.kindOfObject(isoObject)
     local entry = kind and KINDS[kind]
     if not entry or (entry.isPlaced and not entry.isPlaced(isoObject)) then
         return nil
@@ -122,6 +122,22 @@ function Sources.connectRefusal(isoObject, bank)
         return "already connected"
     end
     return nil
+end
+
+--- The loaded sources the bank at `bank` ({ x, y, z }) could take now (Sources.connectRefusal),
+--- those connected to another bank included.
+function Sources.sourcesInReach(bank)
+    local reach = Specs.sourceReach
+    local found = {}
+    for z = bank.z - reach.levels, bank.z + reach.levels do
+        RenewableEnergy.eachSquareAround(bank.x, bank.y, z, reach.tiles, function(square)
+            local source = Sources.on(square)
+            if source and not Sources.connectRefusal(source, bank) then
+                table.insert(found, source)
+            end
+        end)
+    end
+    return found
 end
 
 return Sources

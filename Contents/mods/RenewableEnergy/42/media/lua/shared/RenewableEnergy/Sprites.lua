@@ -305,6 +305,11 @@ function Sprites.nameOf(isoObject)
     return sprite and sprite:getName()
 end
 
+--- What a placed object is, by its tile (Sprites.kindOf); nil for anything else.
+function Sprites.kindOfObject(isoObject)
+    return Sprites.kindOf(Sprites.nameOf(isoObject))
+end
+
 --- Whether a sprite is a snow overlay.
 Sprites.isSnow = Sprites.matcher(Sprites.snow)
 --- Whether a sprite is one of the overlays drawn over a tile, which are never placed on their own.

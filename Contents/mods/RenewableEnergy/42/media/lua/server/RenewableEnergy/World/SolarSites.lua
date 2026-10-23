@@ -95,6 +95,11 @@ function SolarSites.sites()
     return sites
 end
 
+--- The kind of a SolarSiteLocations mount: a Sprites and Specs.mounts key.
+function SolarSites.mountKind(mount)
+    return MOUNTS[mount].kind
+end
+
 --- The tile of a SolarSiteLocations mount facing `facing`.
 function SolarSites.mountSprite(mount, facing)
     local spec = MOUNTS[mount]
@@ -105,9 +110,9 @@ end
 local function moduleCount(kind, mount)
     local range = SolarSites.KINDS[kind].modules
     if range then
-        return WorldSpawns.rollBetween(range)
+        return Chance.between(range.min, range.max)
     end
-    return RenewableEnergy.Specs.mounts[MOUNTS[mount].kind].modules
+    return RenewableEnergy.Specs.mounts[SolarSites.mountKind(mount)].modules
 end
 
 -- Placing
@@ -123,8 +128,8 @@ local function placeGenerator(square)
     -- On a server the new generator goes to the clients at once, and each setter after that syncs.
     local generator = IsoGenerator.new(instanceItem("Base.Generator"), square:getCell(), square)
     generator:setConnected(true)
-    generator:setCondition(WorldSpawns.rollBetween(spec.condition))
-    generator:setFuel(spec.fuel.min + (spec.fuel.max - spec.fuel.min) * ZombRandFloat(0, 1))
+    generator:setCondition(Chance.between(spec.condition.min, spec.condition.max))
+    generator:setFuel(Chance.within(spec.fuel.min, spec.fuel.max))
     return generator
 end
 
@@ -272,7 +277,7 @@ local function pickSome(list, count)
         left[i] = entry
     end
     for _ = 1, math.min(count, #left) do
-        table.insert(picked, table.remove(left, ZombRand(#left) + 1))
+        table.insert(picked, table.remove(left, Chance.between(1, #left)))
     end
     return picked
 end
@@ -284,7 +289,7 @@ end
 function SolarSites.addSite(site)
     local kind = SolarSites.KINDS[site.kind]
     if kind.panels then
-        local count = WorldSpawns.rollBetween(kind.panels)
+        local count = Chance.between(kind.panels.min, kind.panels.max)
         for _, panel in ipairs(pickSome(site.panels, count)) do
             addSpot(panel[1], panel[2], panel[3], { what = "panel", siteKind = site.kind, mount = panel[4], facing = panel[5] })
         end
@@ -334,15 +339,21 @@ local function rolledSites()
     return modData.rolled
 end
 
---- Rolls each of `sites` (the world's, if not given) that the world hasn't rolled yet, and keeps
---- it rolled whether or not it came up. The option at 0 leaves out `always` sites too.
+--- The chance the world places the site when it rolls it: the Solar Sites option, or certain for
+--- an `always` site; the option at 0 leaves out `always` sites too.
+function SolarSites.siteChance(site)
+    local chance = SandboxVars.RenewableEnergy.SolarSites / 100
+    return (chance > 0 and site.always) and 1 or chance
+end
+
+--- Rolls each of `sites` (the world's, if not given) that the world hasn't rolled yet, at its
+--- SolarSites.siteChance, and keeps it rolled whether or not it came up.
 function SolarSites.rollNew(sites)
     local rolled = rolledSites()
-    local chance = SandboxVars.RenewableEnergy.SolarSites
     for _, site in ipairs(sites or SolarSites.sites()) do
         if not rolled[site.name] then
             rolled[site.name] = true
-            if chance > 0 and (site.always or Chance.hit(chance / 100)) then
+            if Chance.hit(SolarSites.siteChance(site)) then
                 SolarSites.addSite(site)
             end
         end

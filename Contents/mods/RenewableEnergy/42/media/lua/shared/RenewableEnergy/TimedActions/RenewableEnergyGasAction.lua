@@ -1,5 +1,6 @@
-require "TimedActions/ISBaseTimedAction"
+require "Util/BuildingHelper"
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/TimedActions/JobAction"
 require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
@@ -8,11 +9,10 @@ require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
 
--- Every hands-on job at a digester, gas heater, gasifier or a generator's Gas Conversion Kit. In
--- multiplayer the client runs start() and perform() and the server rebuilds the action from new()'s
--- parameters and runs complete(), which does the job; single player runs both. A global, as the
--- server finds the class by its Type (NetTimedAction.parse).
-RenewableEnergyGasAction = ISBaseTimedAction:derive("RenewableEnergyGasAction")
+-- Every hands-on job at a digester, gas heater, gasifier or a generator's Gas Conversion Kit
+-- (RenewableEnergy.JobAction); the authority's complete() does the job. A global, as the server
+-- finds the class by its Type (NetTimedAction.parse).
+RenewableEnergyGasAction = RenewableEnergy.JobAction:derive("RenewableEnergyGasAction")
 
 local Action = RenewableEnergyGasAction
 
@@ -37,7 +37,7 @@ local FEATURES = {
         site = function() return RenewableEnergy.GasifierSystem.jobSite end,
     },
     kit = {
-        isTarget = RenewableEnergy.GasKit.isGenerator,
+        isTarget = RenewableEnergy.isGenerator,
         jobs = RenewableEnergy.GasKit,
         site = function() return RenewableEnergy.GasLines.jobSite end,
     },
@@ -50,7 +50,7 @@ end
 
 -- How far from the middle of the object's square, on each axis in squares, the character may work
 -- at it: what luautils.walkAdj counts as there, and a little for drift and a client's lag.
-local REACH = 2.6
+Action.REACH = 2.6
 
 -- A job's row (its JOBS entry) says how the job looks: `anim`, else the "Loot" reach; LootPosition
 -- `position`; `shovel`, dug with the shovel in hand; `heavy`, heavy work; `sound` while it runs and
@@ -64,59 +64,48 @@ local function isItem(with)
     return with ~= nil and instanceof(with, "InventoryItem")
 end
 
-function Action:getDuration()
-    if self.character:isTimedActionInstant() then
-        return 1
-    end
-    local minutes = rowOf(self.feature, self.job).minutes
+function Action:row()
+    return rowOf(self.feature, self.job)
+end
+
+function Action:units()
+    local minutes = self:row().minutes
     if type(minutes) == "function" then
         minutes = minutes(self.object, self.with)
     end
     return minutes * RenewableEnergy.unitsPerMinute()
 end
 
-function Action:isValid()
-    -- Past here the item may already be gone: complete() can sync the item it used before the
-    -- server's word that the action is done arrives.
-    if self.action and self.action:getJobDelta() >= 0.9 then
-        return true
-    end
+function Action:target()
+    return self.object
+end
+
+function Action:keeps()
     if not (RenewableEnergy.onSquare(self.object) and FEATURES[self.feature].isTarget(self.object)) then
         return false
     end
-    if isItem(self.with) and not self.character:getInventory():containsRecursive(self.with) then
-        return false
-    end
-    -- The server can't tell whether a remote player stands in the dark
-    -- (IsoPlayer.tooDarkToRead), so the player's own side checks the light.
-    if FEATURES[self.feature].jobs.needsLight(self.job) and self.character:tooDarkToRead() then
-        HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
-        return false
-    end
-    return RenewableEnergy.withinReach(self.character, self.object, REACH)
+    return not isItem(self.with) or self.character:getInventory():containsRecursive(self.with)
 end
 
-function Action:waitToStart()
-    self.character:faceThisObject(self.object)
-    return self.character:shouldBeTurning()
+function Action:canPerform()
+    return not FEATURES[self.feature].jobs.refusal(self.character, self.job, self.object, self.with)
 end
 
 function Action:update()
     self.character:faceThisObject(self.object)
-    if rowOf(self.feature, self.job).heavy then
+    if self:row().heavy then
         self.character:setMetabolicTarget(Metabolics.HeavyWork)
     end
 end
 
-function Action:start()
-    if not isClient() and FEATURES[self.feature].jobs.refusal(self.character, self.job, self.object, self.with) then
-        self:forceStop()
-        return
-    end
-    if isClient() and isItem(self.with) then
+function Action:findItems()
+    if isItem(self.with) then
         self.with = self.character:getInventory():getItemWithIDRecursiv(self.with:getID())
     end
-    local row = rowOf(self.feature, self.job)
+end
+
+function Action:startJob()
+    local row = self:row()
     local shovel = row.shovel and self.character:getPrimaryHandItem()
     if shovel then
         self:setActionAnim(BuildingHelper.getShovelAnim(shovel))
@@ -136,31 +125,9 @@ function Action:start()
     end
 end
 
-function Action:stopSound()
-    if self.sound then
-        self.character:stopOrTriggerSound(self.sound)
-    end
-end
-
-function Action:stop()
-    self:stopSound()
-    ISBaseTimedAction.stop(self)
-end
-
-function Action:perform()
-    self:stopSound()
-    local doneSound = rowOf(self.feature, self.job).doneSound
-    if doneSound then
-        self.character:playSound(doneSound)
-    end
-    ISInventoryPage.renderDirty = true
-    ISBaseTimedAction.perform(self)
-end
-
--- The server never calls isValid(), so the performer checks the job again; this checks that the
--- character is at the object, which NetTimedAction doesn't.
+-- The job's own rules are rechecked by GasJobs.perform, after it catches the target up.
 function Action:complete()
-    if not RenewableEnergy.onSquare(self.object) or (isServer() and not RenewableEnergy.withinReach(self.character, self.object, REACH)) then
+    if not (RenewableEnergy.onSquare(self.object) and self:atJobForAuthority()) then
         return false
     end
     local feature = FEATURES[self.feature]
@@ -183,8 +150,6 @@ function Action:new(character, feature, job, object, with)
     o.job = job
     o.object = object
     o.with = with
-    o.stopOnWalk = true
-    o.stopOnRun = true
     o.maxTime = o:getDuration()
     return o
 end
@@ -192,8 +157,8 @@ end
 --- Walks `playerNum`'s character over to `object` and queues `job` there, with the shovel in
 --- hand for a job that digs, as vanilla's Clear Ashes takes it. Client only.
 function Action.queue(playerNum, feature, job, object, with)
-    local character = getSpecificPlayer(playerNum)
-    if not luautils.walkAdj(character, object:getSquare(), true) then
+    local character = RenewableEnergy.walkTo(playerNum, object:getSquare())
+    if not character then
         return
     end
     if rowOf(feature, job).shovel then

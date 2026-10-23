@@ -60,7 +60,7 @@ local function holderText(summary)
 end
 
 function DigesterWindow:titleOf(summary)
-    return getText("IGUI_RenewableEnergy_Digester_" .. summary.tier)
+    return getText(Digester.nameKey(summary.tier))
 end
 
 function DigesterWindow:summaryNow()
@@ -81,7 +81,7 @@ function DigesterWindow:rowsOf(summary)
     row(rows, "IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= Digester.SMELL_SCORES[2] and "warn" or nil)
     if summary.scrubber then
         row(rows, "IGUI_RenewableEnergy_DigesterScrubber", getText("IGUI_RenewableEnergy_ScrubberState",
-            string.format("%.1f", summary.scrubCO2), string.format("%.1f", summary.scrubWool)),
+            Format.number(summary.scrubCO2, 1), Format.number(summary.scrubWool, 1)),
             (summary.scrubCO2 <= 0 or summary.scrubWool <= 0) and "warn" or nil)
     end
     if summary.heaterLit then

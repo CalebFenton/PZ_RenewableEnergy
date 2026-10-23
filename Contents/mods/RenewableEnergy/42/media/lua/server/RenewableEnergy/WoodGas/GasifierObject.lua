@@ -73,8 +73,7 @@ function GasifierObject:stoke(hopper)
         local item = items:get(i)
         local kg = Gasifier.fuelKg(item)
         if kg then
-            hopper:Remove(item)
-            sendRemoveItemFromContainer(hopper, item)
+            RenewableEnergy.removeItem(item)
             self.fireKg = self.fireKg + kg
             self.fireCharcoal = Gasifier.isCharcoal(item)
             return true
@@ -89,12 +88,8 @@ function GasifierObject:tarOne(filter)
     for i = 0, (items and items:size() or 0) - 1 do
         local item = items:get(i)
         if Gasifier.isPacking(item) then
-            filter:Remove(item)
-            sendRemoveItemFromContainer(filter, item)
-            local tarry = filter:AddItem(Gasifier.TARRY)
-            if tarry then
-                sendAddItemToContainer(filter, tarry)
-            end
+            RenewableEnergy.removeItem(item)
+            RenewableEnergy.addItem(filter, Gasifier.TARRY)
             return true
         end
     end
@@ -186,7 +181,7 @@ end
 --- Whether the generator its pipe leads to runs on its gas, so the gas line bills all it burns.
 function GasifierObject:feedsRunningGenerator()
     local square = self.pipe and Gasifier.squareOnSide(self.x, self.y, self.z, self.pipe)
-    local generator = RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
+    local generator = RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
     local state = generator and GasKit.stateOf(generator)
     return state ~= nil and state.onGas == true and generator:isActivated()
 end

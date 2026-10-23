@@ -49,8 +49,8 @@ end
 --- Walks `playerNum`'s character over to `object` and opens its window there with
 --- `open(playerNum, object)`.
 function InfoAction.queue(playerNum, object, open)
-    local character = getSpecificPlayer(playerNum)
-    if luautils.walkAdj(character, object:getSquare(), true) then
+    local character = RenewableEnergy.walkTo(playerNum, object:getSquare())
+    if character then
         ISTimedActionQueue.add(InfoAction:new(character, object, open))
     end
 end

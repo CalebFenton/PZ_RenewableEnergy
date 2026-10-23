@@ -173,4 +173,10 @@ function Sun.squareWatts(square, ratedWatts, sky)
     return Sun.wattsFrom(ratedWatts, (sky or Sun.skyNow()).flat, 0)
 end
 
+--- Whether it is dark under `sky` (Sun.skyNow or Sun.positionNow, now if nil): the sun at or
+--- below the horizon, when a photocell switches its lamp on.
+function Sun.isDark(sky)
+    return (sky or Sun.positionNow()).up <= 0
+end
+
 return Sun

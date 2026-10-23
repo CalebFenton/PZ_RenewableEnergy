@@ -142,16 +142,13 @@ function Digester.feedOf(item)
     return { potential = FOOD_POTENTIAL_PER_KG * kg, acid = FOOD_ACID_PER_KG * kg, whole = true }
 end
 
---- The hopper's AcceptItemFunction: feed and neutralisers only. Not saved with the container,
---- so every side sets it whenever a digester loads or is placed (Digester.adoptContainer).
+--- The hopper's AcceptItemFunction: feed and neutralisers only (Digester.adoptContainer).
 function Digester.acceptItem(container, item)
     return Digester.feedOf(item) ~= nil
 end
 
 function Digester.adoptContainer(container)
-    if container and container:getAcceptItemFunction() == nil then
-        container:setAcceptItemFunction("RenewableEnergy.Digester.acceptItem")
-    end
+    RenewableEnergy.adoptContainer(container, "RenewableEnergy.Digester.acceptItem")
 end
 
 -- How many feeds wait in the hopper `container`.
@@ -167,13 +164,18 @@ local function feedCount(container)
 end
 
 --- The tier of a digester tile, or nil for any other object.
-function Digester.tileOf(isoObject)
-    local kind, tier = Sprites.kindOf(Sprites.nameOf(isoObject))
+function Digester.tierOf(isoObject)
+    local kind, tier = Sprites.kindOfObject(isoObject)
     return kind == "digester" and tier or nil
 end
 
 function Digester.isDigester(isoObject)
-    return isoObject ~= nil and Digester.tileOf(isoObject) ~= nil
+    return isoObject ~= nil and Digester.tierOf(isoObject) ~= nil
+end
+
+--- The translation key of the name of a digester of `tier`.
+function Digester.nameKey(tier)
+    return "IGUI_RenewableEnergy_Digester_" .. tier
 end
 
 Digester.isHolderOverlay = Sprites.matcher(Sprites.digesterHolder)

@@ -82,11 +82,11 @@ function ArrowBoard.stockBatteryBox(container)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local options = SandboxVars.RenewableEnergy
     local stock = ArrowBoard.STOCK
-    local batteries = WorldSpawns.rollBetween(stock.batteries)
+    local batteries = Chance.between(stock.batteries.min, stock.batteries.max)
     for _ = 1, WorldSpawns.scaled(batteries, options.LRMBatteries) do
         local battery = container:AddItem(stock.battery)
         if battery then
-            RenewableEnergy.Wear.setCondition(battery, WorldSpawns.rollBetween(stock.batteryCondition))
+            RenewableEnergy.Wear.setCondition(battery, Chance.between(stock.batteryCondition.min, stock.batteryCondition.max))
         end
     end
     if Chance.hit(stock.controllerChance * options.LRMMisc) then

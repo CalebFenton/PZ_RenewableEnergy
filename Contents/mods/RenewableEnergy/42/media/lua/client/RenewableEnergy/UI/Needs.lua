@@ -13,9 +13,6 @@ RenewableEnergy = RenewableEnergy or {}
 local Needs = {}
 RenewableEnergy.Needs = Needs
 
--- An item to name for each tool tag, as vanilla names the wrench its jobs take.
-local TOOL_ITEMS = { WRENCH = "Base.Wrench", SCREWDRIVER = "Base.Screwdriver" }
-
 local function nameOf(need)
     if need.label then
         return need.label
@@ -23,8 +20,6 @@ local function nameOf(need)
         return getText(need.labelKey)
     elseif need.perk then
         return need.perk:getName()
-    elseif need.tool then
-        return getItemNameFromFullType(TOOL_ITEMS[need.tool] or need.item)
     elseif need.item then
         return getItemNameFromFullType(need.item)
     end

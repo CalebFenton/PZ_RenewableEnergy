@@ -77,7 +77,7 @@ end
 --- An object the system has not seen: a digester just built.
 function DigesterObject:stateFromIsoObject(isoObject)
     self:initNew()
-    self.tier = Digester.tileOf(isoObject)
+    self.tier = Digester.tierOf(isoObject)
     self.holder = self:tierSpec().holder
     self.temp = getClimateManager():getAirTemperatureForSquare(isoObject:getSquare())
     self:loaded(isoObject)
@@ -194,8 +194,7 @@ function DigesterObject:feedFromContainer(container)
     end
     local item, feed = items[index], entries[index]
     if feed.whole or item:getCurrentUses() <= 1 then
-        container:Remove(item)
-        sendRemoveItemFromContainer(container, item)
+        RenewableEnergy.removeItem(item)
     else
         item:setCurrentUses(item:getCurrentUses() - 1)
         sendItemStats(item)
@@ -232,8 +231,7 @@ function DigesterObject:takeEaten(container)
                 item:setCurrentUses(left)
                 sendItemStats(item)
             else
-                container:Remove(item)
-                sendRemoveItemFromContainer(container, item)
+                RenewableEnergy.removeItem(item)
             end
         end
     end
@@ -497,9 +495,11 @@ function DigesterObject:upgrade(isoObject)
     if container then
         container:setCapacity(tonumber(isoObject:getProperties():get("ContainerCapacity")) or container:getCapacity())
     end
+    isoObject:transmitUpdatedSpriteToClients()
+    -- After the tile: a client's SpriteConfig checks its new script against the tile it shows.
+    -- Single player has no other copy, and there sendObjectChange loops back to this one
+    -- (SinglePlayerServer).
     if isServer() then
-        isoObject:transmitUpdatedSpriteToClients()
-        -- After the tile: a client's SpriteConfig checks its new script against the tile it shows.
         isoObject:sendSyncEntity(nil)
         isoObject:sendObjectChange(IsoObjectChange.CONTAINERS)
     end

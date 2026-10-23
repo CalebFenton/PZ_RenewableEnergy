@@ -6,7 +6,7 @@ require "RenewableEnergy/Sprites"
 
 -- Rolls buildings once their surroundings load, and judges the ground around them. A chunk that
 -- loads brings in parts of buildings, not their surroundings, so a building waits until every
--- chunk within REACH of it is loaded. The rules:
+-- chunk within its watcher's reach of it is loaded. The rules:
 --
 -- - Each chunk that loads offers its buildings, up to HIGHEST_LEVEL, to every watcher once; a
 --   building the watcher `wants` waits in that watcher's queue, with a square of it in that chunk.
@@ -22,7 +22,8 @@ RenewableEnergy.BuildingWatch = BuildingWatch
 
 local Sprites = RenewableEnergy.Sprites
 
--- Squares out from a building's bounds that a roll may place on, and that must be loaded first.
+-- Squares out from a building's bounds that a roll may place on, and that must be loaded first,
+-- unless the watcher names its own reach.
 BuildingWatch.REACH = 4
 -- The highest level a building is looked at on: a deer stand's one room is on level 1.
 BuildingWatch.HIGHEST_LEVEL = 1
@@ -51,10 +52,11 @@ function BuildingWatch.isOpenGround(square)
         and not square:getProperties():has(IsoFlagType.water) and not isStreet(square)
 end
 
---- Whether every chunk within REACH of the building is loaded: one square per chunk tells. The
---- loaded area around several players needn't be a rectangle, so each chunk is checked.
-function BuildingWatch.surroundingsLoaded(def)
-    local reach = BuildingWatch.REACH
+--- Whether every chunk within `reach` (default REACH) of the building is loaded: one square per
+--- chunk tells. The loaded area around several players needn't be a rectangle, so each chunk is
+--- checked.
+function BuildingWatch.surroundingsLoaded(def, reach)
+    reach = reach or BuildingWatch.REACH
     local fromX, toX = math.floor((def:getX() - reach) / CHUNK_SIZE), math.floor((def:getX2() + reach) / CHUNK_SIZE)
     local fromY, toY = math.floor((def:getY() - reach) / CHUNK_SIZE), math.floor((def:getY2() + reach) / CHUNK_SIZE)
     for cx = fromX, toX do
@@ -68,9 +70,9 @@ function BuildingWatch.surroundingsLoaded(def)
 end
 
 --- Rolls, with `roll(def)`, each building a loading chunk brings in that `wants(def)`, once its
---- surroundings are loaded.
-function BuildingWatch.watch(wants, roll)
-    table.insert(watchers, { wants = wants, roll = roll, pending = {} })
+--- surroundings out to `reach` (default REACH) are loaded.
+function BuildingWatch.watch(wants, roll, reach)
+    table.insert(watchers, { wants = wants, roll = roll, reach = reach, pending = {} })
 end
 
 local function onLoadChunk(chunk)
@@ -105,7 +107,7 @@ local function rollLoaded()
             if not getSquare(entry.x, entry.y, entry.z) then
                 gone = gone or {}
                 table.insert(gone, key)
-            elseif BuildingWatch.surroundingsLoaded(entry.def) then
+            elseif BuildingWatch.surroundingsLoaded(entry.def, watcher.reach) then
                 ready = ready or {}
                 table.insert(ready, key)
             end

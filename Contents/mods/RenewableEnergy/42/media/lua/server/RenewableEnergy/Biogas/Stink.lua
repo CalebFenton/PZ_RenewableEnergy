@@ -109,7 +109,8 @@ Events.EveryOneMinute.Add(function()
     clearing = {}
 end)
 
---- The corpses the source `key` smells like in its chunk's count now.
+--- The corpses the source `key` smells like in its chunk's count now. The tests' probe: the
+--- game's own count (CorpseCount) is out of Lua's reach.
 function Stink.counted(key)
     local source = sources[key]
     return source and source.live or 0

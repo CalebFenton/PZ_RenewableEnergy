@@ -4,7 +4,7 @@
 --
 -- getGeneratorPowerConsumption reads the appliance's own switch, powered or not, so a bank that
 -- cut its power still sees what would draw when it comes back. Its figure is generator fuel an
--- hour, which Specs.wattsPerFuel turns into watts. The reach is the engine's own for every
+-- hour, which Specs.wattsFromFuel turns into watts. The reach is the engine's own for every
 -- generator (IsoGenerator.setSurroundingElectricity), on squares the grid doesn't power. A
 -- generator powers a square exactly when the square is in that reach
 -- (IsoGenerator.isPoweringSquare), so the same scan finds the generators powering the bank.
@@ -25,8 +25,7 @@ local Loads = {}
 RenewableEnergy.Loads = Loads
 
 local Specs = RenewableEnergy.Specs
-local WATTS_PER_FUEL = Specs.wattsPerFuel
-local PowerBank, Treadmill, Payers = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill, RenewableEnergy.Payers
+local Treadmill, Payers = RenewableEnergy.Treadmill, RenewableEnergy.Payers
 
 -- The kind of an object with a fridge or freezer container, as vanilla bills it: by its
 -- containers alone, so a mini fridge with its ice box is a fridge-freezer.
@@ -63,7 +62,7 @@ end
 
 -- Adds to `load` each appliance `object` runs now, at vanilla's figure for it.
 local function addAppliances(load, object)
-    local watts = object:getGeneratorPowerConsumption() * WATTS_PER_FUEL
+    local watts = Specs.wattsFromFuel(object:getGeneratorPowerConsumption())
     if instanceof(object, "IsoStackedWasherDryer") then
         -- Vanilla bills the two halves together, the same for each.
         local washer, dryer = object:isWasherActivated(), object:isDryerActivated()
@@ -120,7 +119,7 @@ local function drawsFromGenerator(object, allowExterior, gridGone)
 end
 
 local function isRunningGenerator(object)
-    return instanceof(object, "IsoGenerator") and object:isActivated() and not PowerBank.isBank(object)
+    return RenewableEnergy.isGenerator(object) and object:isActivated()
 end
 
 --- What `payer`, on `square`, pays for among `payers` (Payers.running), and the
@@ -146,7 +145,7 @@ function Loads.scan(square, payer, payers, gridGone)
                 end
             elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior, gridGone) then
                 if pays(object) then
-                    Loads.add(load, "treadmill", Specs.treadmill.drawFuel * WATTS_PER_FUEL)
+                    Loads.add(load, "treadmill", Specs.wattsFromFuel(Specs.treadmill.drawFuel))
                 end
             elseif isRunningGenerator(object) then
                 Payers.track(object)

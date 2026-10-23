@@ -10,6 +10,7 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Materials"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -59,10 +60,9 @@ local function settle(bank)
     end
 end
 
--- Takes from `player` the wire and scrap a wiring job (as Specs.wiring's) uses.
+-- Takes from `player` what a wiring job of `wiring` (as Specs.wiring's) uses.
 local function takeWiring(player, wiring)
-    RenewableEnergy.takeItems(player, PowerBank.WIRE, wiring.wire)
-    RenewableEnergy.takeItems(player, PowerBank.SCRAP, wiring.scrap)
+    RenewableEnergy.Materials.consume(player, PowerBank.wiringMaterials(wiring))
 end
 
 -- The bank looks at itself again after its parts changed.
@@ -184,11 +184,8 @@ function Commands.wireTreadmill(player, args)
     if not (player and object) then return false, "no treadmill" end
     local refusal = Treadmill.wiringRefusal(player, object)
     if refusal then return false, refusal end
-    local wiring = Specs.treadmill.wiring
-    takeWiring(player, wiring)
-    if RenewableEnergy.TreadmillSource.wire(object) then
-        addXp(player, Perks.Electricity, wiring.xp)
-    end
+    takeWiring(player, Specs.treadmill.wiring)
+    RenewableEnergy.TreadmillSource.wire(object, player)
     return true
 end
 
@@ -234,13 +231,8 @@ function Commands.wireIn(player, args)
     local wiring = PowerBank.wiringFor(item:getFullType())
     takeWiring(player, wiring)
     RenewableEnergy.takeItem(player, item)
-    container:AddItem(item)
-    sendAddItemToContainer(container, item)
-    local data = item:getModData()
-    if not data[PowerBank.WIRED_ONCE] then
-        data[PowerBank.WIRED_ONCE] = true
-        addXp(player, Perks.Electricity, wiring.xp)
-    end
+    RenewableEnergy.addItem(container, item)
+    RenewableEnergy.teachOnce(player, item, PowerBank.WIRED_ONCE, Perks.Electricity, wiring.xp)
     partsChanged(bank)
     return true
 end
@@ -251,7 +243,7 @@ function Commands.unwire(player, args)
     local container = bank and bank:container()
     if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
     local item = container:getItemWithID(args.itemId)
-    local refusal = PowerBank.unwireRefusal(player, bank:getIsoObject(), item)
+    local refusal = PowerBank.unwiringRefusal(player, bank:getIsoObject(), item)
     if refusal then return false, refusal end
     -- The battery leaves with the bank's shared charge as it is now.
     settle(bank)
@@ -272,7 +264,7 @@ function Commands.repairPart(player, args)
     local refusal = PowerBank.repairRefusal(player, item)
     if refusal then return false, refusal end
     settle(bank)
-    RenewableEnergy.takeItems(player, PowerBank.SCRAP, 1)
+    PowerBank.consumeRepair(player)
     Wear.setCondition(item, item:getCondition() + Specs.partRepair.condition)
     sendItemStats(item)
     addXp(player, Perks.Electricity, Specs.partRepair.xp)

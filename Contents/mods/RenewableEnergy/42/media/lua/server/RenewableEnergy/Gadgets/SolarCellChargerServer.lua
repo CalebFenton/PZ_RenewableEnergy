@@ -11,9 +11,6 @@ require "RenewableEnergy/Gadgets/SolarCellCharger"
 local SolarCellCharger = RenewableEnergy.SolarCellCharger
 local Battery, Specs, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun
 
--- Object modData: the charger's watt-hours not yet a whole use of a battery.
-SolarCellCharger.STORED_KEY = "RenewableEnergy_storedWh"
-
 --- Adds `hours` of the panel's output under `sky` (Sun.skyNow, now if nil) to the batteries in
 --- `charger`, one use at a time to the emptiest, so a set fills evenly. Returns the uses it added.
 function SolarCellCharger.charge(charger, hours, sky)
@@ -27,7 +24,7 @@ function SolarCellCharger.charge(charger, hours, sky)
     local added = 0
     local battery = Battery.emptiestIn(container, SolarCellCharger.isCell)
     while battery do
-        local useWh = battery:getUseDelta() * SolarCellCharger.BATTERY_WH
+        local useWh = battery:getUseDelta() * Specs.cellChargerBatteryWh
         if stored < useWh then
             break
         end

@@ -1,7 +1,7 @@
 -- Right-click menus for battery banks, their sources, garden lights and vehicles. Options are
 -- greyed out by the same refusal functions the job's action and the authority ask, so the menu
 -- refuses exactly what they would. Parts enter and leave a bank only through Wire In and Unwire
--- (see RenewableEnergy/Patches.lua).
+-- (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
 
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
@@ -61,15 +61,8 @@ local function lightOr(character, mode, blocker)
     return Needs.tooDark(character, Action.needsLight(mode)) or blocker
 end
 
--- Queues a local player's walk to beside `square` and returns their character, or returns nil
--- when no square beside it can be reached (luautils.walkAdj).
-local function walkedTo(playerNum, square)
-    local character = getSpecificPlayer(playerNum)
-    return luautils.walkAdj(character, square, true) and character or nil
-end
-
 local function queueAt(playerNum, square, mode, object, bank, item, bankName)
-    local character = walkedTo(playerNum, square)
+    local character = RenewableEnergy.walkTo(playerNum, square)
     if character then
         ISTimedActionQueue.add(Action:new(character, mode, object, bank, nil, item, bankName))
     end
@@ -103,7 +96,7 @@ local function queueConnectAll(playerNum, bank, sources)
 end
 
 local function queueClearSnow(playerNum, source)
-    local character = walkedTo(playerNum, source:getSquare())
+    local character = RenewableEnergy.walkTo(playerNum, source:getSquare())
     if not character then
         return
     end
@@ -116,7 +109,7 @@ local function queueBlades(playerNum, source, blades)
 end
 
 local function queueBulb(playerNum, mode, light, bulb)
-    local character = walkedTo(playerNum, light:getSquare())
+    local character = RenewableEnergy.walkTo(playerNum, light:getSquare())
     if not character then
         return
     end
@@ -132,7 +125,7 @@ local function queueVehicle(playerNum, mode, vehicle, item)
     if item then
         ISInventoryPaneContextMenu.transferIfNeeded(character, item)
     end
-    local battery = vehicle:getPartById(RenewableEnergy.VehicleBattery.PART)
+    local battery = RenewableEnergy.VehicleBattery.partOf(vehicle)
     ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, battery:getArea()))
     ISTimedActionQueue.add(Action:new(character, mode, nil, nil, vehicle, item))
 end
@@ -153,7 +146,7 @@ local function queueFixFrame(item, playerNum, fixingNum, fixerNum, part)
 end
 
 local function queueRun(playerNum, treadmill)
-    local character = walkedTo(playerNum, treadmill:getSquare())
+    local character = RenewableEnergy.walkTo(playerNum, treadmill:getSquare())
     if character then
         ISTimedActionQueue.add(RenewableEnergyTreadmillAction:new(character, treadmill))
     end
@@ -239,7 +232,7 @@ local function batteriesToWire(groups, bank)
         end
     end
     table.sort(batteries, function(a, b) return conditionOf(a) > conditionOf(b) end)
-    local free = PowerBank.freeSlots(bank, "battery")
+    local free = PowerBank.freePartSlots(bank, "battery")
     while free > 0 and #batteries > free do
         table.remove(batteries)
     end
@@ -318,7 +311,7 @@ function Menu.addUnwireOptions(playerNum, menu, bank)
     for _, item in ipairs(parts) do
         local option = submenu:addOption(partLabel(item), playerNum, queuePart, Action.UNWIRE, bank, item)
         Needs.show(option, PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())),
-            lightOr(character, Action.UNWIRE, PowerBank.unwireBlocker(bank, item)))
+            lightOr(character, Action.UNWIRE, PowerBank.unwiringBlocker(bank, item)))
     end
     return submenu
 end
@@ -338,25 +331,6 @@ function Menu.addRepairOptions(playerNum, menu, bank)
         Needs.show(option, needs, lightOr(character, Action.REPAIR_PART, PowerBank.repairBlocker(item)))
     end
     return submenu
-end
-
--- The sources in the bank's reach that could be connected to it now (Sources.connectRefusal),
--- those connected to another bank included.
-local function unconnectedSources(bank)
-    local here = PowerBank.positionOf(bank)
-    local reach = RenewableEnergy.Specs.sourceReach
-    local found = {}
-    for z = here.z - reach.levels, here.z + reach.levels do
-        for x = here.x - reach.tiles, here.x + reach.tiles do
-            for y = here.y - reach.tiles, here.y + reach.tiles do
-                local source = Sources.on(getSquare(x, y, z))
-                if source and not Sources.connectRefusal(source, here) then
-                    table.insert(found, source)
-                end
-            end
-        end
-    end
-    return found
 end
 
 -- Why none of `sources` fits in `freeSlots` input slots, or nil when one does.
@@ -394,7 +368,7 @@ function Menu.addBankOptions(playerNum, context, bank)
             PowerBank.connectRefusal(character, bank, summary, not connected)))
     end
 
-    local sources = unconnectedSources(bank)
+    local sources = Sources.sourcesInReach(PowerBank.positionOf(bank))
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
         queueConnectAll, bank, sources)
     Needs.refuse(connect, #sources == 0 and "Tooltip_RenewableEnergy_NoSourcesInReach"
@@ -523,7 +497,7 @@ function Menu.addTreadmillOptions(playerNum, context, treadmill)
     addRunOption(playerNum, menu, treadmill)
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireTreadmill"), playerNum, queueSource,
         Action.WIRE_TREADMILL, treadmill)
-    Needs.show(option, Treadmill.needs(character), lightOr(character, Action.WIRE_TREADMILL))
+    Needs.show(option, Treadmill.wiringNeeds(character), lightOr(character, Action.WIRE_TREADMILL))
 end
 
 --- Remove Light Bulb for a light that has one, else Add Light Bulb with one option for each type
@@ -613,7 +587,7 @@ end
 local function otherGenerator(worldobjects)
     local found, seen = nil, {}
     local function consider(object)
-        if instanceof(object, "IsoGenerator") and not PowerBank.isBank(object) then
+        if RenewableEnergy.isGenerator(object) then
             found = object
         end
     end

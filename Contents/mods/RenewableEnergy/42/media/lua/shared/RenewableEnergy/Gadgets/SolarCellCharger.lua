@@ -17,16 +17,15 @@ local Sprites = RenewableEnergy.Sprites
 SolarCellCharger.ITEM = "RenewableEnergy.SolarCellCharger"
 SolarCellCharger.BATTERY = "Base.Battery"
 SolarCellCharger.SLOTS = 4
--- Watt-hours that fill one Base.Battery: a game figure, not a real cell's, sized so a full tray
--- charges over a sunny day or two.
-SolarCellCharger.BATTERY_WH = 25
+-- Object modData: the charger's watt-hours not yet a whole use of a battery.
+SolarCellCharger.STORED_KEY = "RenewableEnergy_storedWh"
 
 -- The container's filter. The game finds it by this path (ItemContainer.getAcceptItemFunction),
 -- so acceptItem must stay reachable from the global table.
 local ACCEPT_FUNCTION = "RenewableEnergy.SolarCellCharger.acceptItem"
 
 function SolarCellCharger.isCharger(isoObject)
-    return Sprites.kindOf(Sprites.nameOf(isoObject)) == "cellCharger"
+    return Sprites.kindOfObject(isoObject) == "cellCharger"
 end
 
 --- Whether `item` is a cell the charger takes.

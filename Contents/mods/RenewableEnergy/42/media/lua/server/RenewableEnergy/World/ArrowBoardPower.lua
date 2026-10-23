@@ -22,7 +22,7 @@ local ArrowBoard = RenewableEnergy.ArrowBoard
 local Chance, Specs = RenewableEnergy.Chance, RenewableEnergy.Specs
 
 -- Battery box part modData. The box tracks its discharge cycle of the day as a bank tracks its
--- own (Bank:trackCycle).
+-- own (Battery.trackCycle).
 ArrowBoard.SWITCH_KEY = "RenewableEnergy_switchOn"
 local LAMPS_KEY, CUT_OFF_KEY = "RenewableEnergy_lamps", "RenewableEnergy_cutOff"
 local CYCLE_DAY, CYCLE_HIGH, CYCLE_DEPTH = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
@@ -115,14 +115,12 @@ function ArrowBoard.charge(vehicle, hours, sky)
     if not ArrowBoard.isTrailer(vehicle) then
         return 0
     end
-    local square = vehicle:getSquare()
     local box = boxOf(vehicle)
     local container = box and box:getItemContainer()
-    if not (container and square and square:isOutside()) then
+    if not container then
         return 0
     end
-    local Sun = RenewableEnergy.Sun
-    local wh = Sun.wattsFrom(ArrowBoard.panelWatts(vehicle), (sky or Sun.skyNow()).flat, 0) * hours
+    local wh = RenewableEnergy.Sun.squareWatts(vehicle:getSquare(), ArrowBoard.panelWatts(vehicle), sky) * hours
     return shift(container, wh, 1, 1)
 end
 
@@ -177,34 +175,19 @@ local function lampWatts()
 end
 
 -- Follows the box's discharge cycle, and on a new day wears its batteries by the day before's
--- deepest discharge, as a bank does (Bank:trackCycle, Bank:newDay).
+-- deepest discharge, as a bank does.
 local function trackCycle(box, container)
     local Battery = RenewableEnergy.Battery
-    local storedWh, nominalWh = 0, 0
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        local wh = Battery.nominalWh(item)
-        if wh > 0 then
-            storedWh, nominalWh = storedWh + Battery.getCharge(item) * wh, nominalWh + wh
-        end
-    end
+    local charge, nominalWh = Battery.containerCharge(container)
     if nominalWh <= 0 then
         return
     end
-    local charge = storedWh / nominalWh
-    local modData = box:getModData()
-    local high = math.max(modData[CYCLE_HIGH] or charge, charge)
-    local depth = math.max(modData[CYCLE_DEPTH] or 0, high - charge)
-    local day = math.floor(getGameTime():getWorldAgeHours() / 24)
-    if modData[CYCLE_DAY] ~= day then
-        if modData[CYCLE_DAY] and depth > 0 then
-            Battery.wearAll(container, depth)
-        end
-        modData[CYCLE_DAY] = day
-        high, depth = charge, 0
+    local modData, day = box:getModData(), Battery.today()
+    local high, depth, finished = Battery.trackCycle(modData[CYCLE_DAY], modData[CYCLE_HIGH], modData[CYCLE_DEPTH], charge, day)
+    if finished and finished > 0 then
+        Battery.wearAll(container, finished)
     end
-    modData[CYCLE_HIGH], modData[CYCLE_DEPTH] = high, depth
+    modData[CYCLE_DAY], modData[CYCLE_HIGH], modData[CYCLE_DEPTH] = day, high, depth
 end
 
 -- Sets the lamps by the switch, the board, the batteries and the photocell, which sees dark at
@@ -226,12 +209,6 @@ local function setLamps(vehicle, box, night)
     end
 end
 
--- Whether the photocell sees dark under `sky` (Sun.skyNow or Sun.positionNow, now if nil): the sun
--- below the horizon, when a garden light comes on too.
-local function isNight(sky)
-    return (sky or RenewableEnergy.Sun.positionNow()).up <= 0
-end
-
 --- `hours` of the lamps as they were lit, drawn from the box, then the lamps set again for the
 --- switch, the board, the batteries and the photocell (`night`, now if nil) as they are now.
 --- Authority only. Returns the watt-hours the lamps drew.
@@ -245,7 +222,7 @@ function ArrowBoard.runLamps(vehicle, hours, night)
     local drawn = lamps and shift(container, lampWatts() * hours, Specs.arrowBoard.cutoff, -1) or 0
     trackCycle(box, container)
     if night == nil then
-        night = isNight()
+        night = RenewableEnergy.Sun.isDark()
     end
     setLamps(vehicle, box, night)
     return drawn
@@ -260,7 +237,7 @@ function ArrowBoard.setSwitch(vehicle, on)
     end
     box:getModData()[ArrowBoard.SWITCH_KEY] = on
     vehicle:transmitPartModData(box)
-    setLamps(vehicle, box, isNight())
+    setLamps(vehicle, box, RenewableEnergy.Sun.isDark())
     return true
 end
 
@@ -275,7 +252,7 @@ function ArrowBoard.update(vehicle, hours, sky)
     ArrowBoard.stormCrack(vehicle, RenewableEnergy.PanelSource.stormHours(hours))
     ArrowBoard.showPanels(vehicle)
     local stored = ArrowBoard.charge(vehicle, hours, sky)
-    ArrowBoard.runLamps(vehicle, hours, isNight(sky))
+    ArrowBoard.runLamps(vehicle, hours, RenewableEnergy.Sun.isDark(sky))
     return stored
 end
 

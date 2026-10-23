@@ -1,6 +1,6 @@
-require "TimedActions/ISBaseTimedAction"
 require "Util/BuildingHelper"
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/TimedActions/JobAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -10,12 +10,11 @@ require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 
--- Every hands-on job at a battery bank, a source, a garden light or a vehicle. In multiplayer the
--- client runs start() and perform(), and the server rebuilds the action from new()'s parameters
--- and runs complete(), which makes the change; single player runs both. The server finds the
+-- Every hands-on job at a battery bank, a source, a garden light or a vehicle
+-- (RenewableEnergy.JobAction); the authority's complete() makes the change. The server finds the
 -- class by its Type with a plain global lookup (NetTimedAction.parse), which is why the class is a
 -- global outside the RenewableEnergy table.
-RenewableEnergyAction = ISBaseTimedAction:derive("RenewableEnergyAction")
+RenewableEnergyAction = RenewableEnergy.JobAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
@@ -50,14 +49,10 @@ Action.DISCONNECT_BANK = "DisconnectBank"
 -- What clears snow off a panel without scratching it: a broom sweeps, a snow shovel pushes.
 local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
 
--- Action units per real second at normal speed, whatever the day length: an in-game minute is
--- 2 * minutesPerDay units and lasts minutesPerDay / 24 real seconds.
-local UNITS_PER_SECOND = 48
-
 -- How far from the middle of the target's square, on each axis, a character may work: what
 -- luautils.walkAdj and getCorrectSquareForWall leave as "there", plus slack for drift and client lag.
 -- A vehicle job measures past the vehicle's body (ISPathFindAction.pathToVehicleArea).
-local REACH = 4.6
+Action.REACH = 4.6
 
 function Action.isSnowTool(item)
     return item ~= nil and SNOW_TOOLS[item:getFullType()] == true and RenewableEnergy.notBroken(item)
@@ -110,7 +105,7 @@ local function wiringUnits(self, wiring, share)
     if not wiring then
         return 1
     end
-    return wiring.seconds * skillFactor(electricity(self)) / skillFactor(0) * (share or 1) * UNITS_PER_SECOND
+    return wiring.seconds * skillFactor(electricity(self)) / skillFactor(0) * (share or 1) * RenewableEnergy.UNITS_PER_SECOND
 end
 
 local function partWiring(self)
@@ -194,10 +189,8 @@ local function brakeJob(braked)
 end
 
 -- Every job, by mode:
--- - keeps(self): what the job needs from moment to moment, cheap enough for isValid to ask every
---   tick: its target still in the world and its item still where the job needs it. These are what
---   another player or the world can take away mid-job, and the character's own copy of the world
---   shows them, so a multiplayer client asks them too.
+-- - keeps(self): what the job needs from moment to moment (JobAction): its target still in the
+--   world and its item still where the job needs it.
 -- - check(self), if any: the rest of its rules, the state of its target and its bank, which a
 --   multiplayer client's copy can show late, and the checks too dear for every tick. Single player
 --   asks them before the job starts, and the authority again in complete().
@@ -273,8 +266,8 @@ JOBS = {
         sound = "GeneratorConnect",
     },
     [Action.UNWIRE] = {
-        keeps = function(self) return PowerBank.unwireBlocker(self.bank, self.item) == nil end,
-        check = function(self) return PowerBank.unwireRefusal(self.character, self.bank, self.item) == nil end,
+        keeps = function(self) return PowerBank.unwiringBlocker(self.bank, self.item) == nil end,
+        check = function(self) return PowerBank.unwiringRefusal(self.character, self.bank, self.item) == nil end,
         command = function(self) return "unwire", { bank = positionOf(self.bank), itemId = self.item:getID() } end,
         units = function(self) return wiringUnits(self, partWiring(self), 0.5) end,
         light = true,
@@ -405,9 +398,13 @@ function Action.needsLight(mode)
     return JOBS[mode].light == true
 end
 
--- Whether the character stands where the menu would have walked them for the job.
-local function atJob(self)
-    return RenewableEnergy.withinReach(self.character, self:target(), REACH)
+function Action:keeps()
+    local job = JOBS[self.mode]
+    return job ~= nil and job.keeps(self)
+end
+
+function Action:row()
+    return JOBS[self.mode]
 end
 
 -- A job field that is a value or a function of the action.
@@ -418,10 +415,7 @@ local function valueOf(field, self)
     return field
 end
 
-function Action:getDuration()
-    if self.character:isTimedActionInstant() then
-        return 1
-    end
+function Action:units()
     local job = JOBS[self.mode]
     if job.units then
         return valueOf(job.units, self)
@@ -433,34 +427,6 @@ function Action:target()
     return self.vehicle or self.object or self.bank
 end
 
-function Action:isValid()
-    -- In multiplayer the server's complete() moves the item (into the bank, out of it, onto the
-    -- vehicle) while this client's action is still finishing; failing then would stop the action
-    -- and empty the player's queue (ISBaseTimedAction.stop). Vanilla stops checking there too
-    -- (ISInstallVehiclePart.isValid).
-    if self.action and self.action:getJobDelta() >= 0.9 then
-        return true
-    end
-    -- The game asks every tick (IsoGameCharacter.update), so this asks only what can change
-    -- mid-job and is cheap to see. The rest waits for start() and complete().
-    local job = JOBS[self.mode]
-    if not (job and job.keeps(self)) then
-        return false
-    end
-    -- The server can't tell whether a remote player stands in the dark
-    -- (IsoPlayer.tooDarkToRead), so the player's own side checks the light.
-    if job.light and self.character:tooDarkToRead() then
-        HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
-        return false
-    end
-    return atJob(self)
-end
-
-function Action:waitToStart()
-    self.character:faceThisObject(self:target())
-    return self.character:shouldBeTurning()
-end
-
 function Action:update()
     self.character:faceThisObject(self:target())
     local metabolics = JOBS[self.mode].metabolics
@@ -469,24 +435,20 @@ function Action:update()
     end
 end
 
-function Action:start()
-    -- Single player checks every rule once here, and again in complete(), as vanilla's crafting
-    -- checks its recipe in start() and leaves isValid to whether the bench is still in use
-    -- (ISHandcraftAction). A multiplayer client leaves them to the server's complete().
-    if not isClient() and not self:canPerform() then
-        self:forceStop()
+-- A bank gone meanwhile leaves no item, and isValid then stops the job.
+function Action:findItems()
+    if not self.item then
         return
     end
-    local job = JOBS[self.mode]
-    if isClient() and self.item then
-        -- Server syncs can replace the item objects while the action waits in the queue. A bank
-        -- gone meanwhile leaves no item, and isValid then stops the job.
-        local container = self.character:getInventory()
-        if job.partInBank then
-            container = isBank(self.bank) and self.bank:getContainer()
-        end
-        self.item = container and container:getItemWithIDRecursiv(self.item:getID()) or nil
+    local container = self.character:getInventory()
+    if JOBS[self.mode].partInBank then
+        container = isBank(self.bank) and self.bank:getContainer()
     end
+    self.item = container and container:getItemWithIDRecursiv(self.item:getID()) or nil
+end
+
+function Action:startJob()
+    local job = JOBS[self.mode]
     if job.begin then
         job.begin(self)
         return
@@ -499,35 +461,8 @@ function Action:start()
     end
 end
 
-local function stopSound(self)
-    if self.sound then
-        self.character:stopOrTriggerSound(self.sound)
-    end
-end
-
-function Action:stop()
-    stopSound(self)
-    ISBaseTimedAction.stop(self)
-end
-
-function Action:perform()
-    stopSound(self)
-    local doneSound = JOBS[self.mode].doneSound
-    if doneSound then
-        self.character:playSound(doneSound)
-    end
-    ISInventoryPage.renderDirty = true
-    ISBaseTimedAction.perform(self)
-end
-
--- The server never calls isValid(), so this checks the action again. NetTimedAction checks no
--- distance, so the server also makes sure the character is at the job, which a modified client
--- could otherwise send for any bank or vehicle in the world.
 function Action:complete()
-    if not self:canPerform() then
-        return false
-    end
-    if isServer() and not atJob(self) then
+    if not (self:canPerform() and self:atJobForAuthority()) then
         return false
     end
     local job = JOBS[self.mode]
@@ -552,8 +487,6 @@ function Action:new(character, mode, object, bank, vehicle, item, bankName, part
     o.item = item
     o.bankName = bankName
     o.partId = partId
-    o.stopOnWalk = true
-    o.stopOnRun = true
     o.maxTime = o:getDuration()
     return o
 end

@@ -4,14 +4,16 @@
 -- in and out of banks and the inventory shows it. Its condition is its health: capacity
 -- scales with it, and deep discharges wear it down.
 
+require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Wear"
 
 RenewableEnergy = RenewableEnergy or {}
 local Battery = {}
 RenewableEnergy.Battery = Battery
 
-local Specs, Wear = RenewableEnergy.Specs, RenewableEnergy.Wear
+local Chance, Specs, Sun, Wear = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.Sun, RenewableEnergy.Wear
 
 --- The Specs.batteries row for an item, or nil if it is no battery.
 function Battery.spec(item)
@@ -58,7 +60,7 @@ end
 --- see it. Authority only.
 function Battery.setFoundCharge(item)
     local range = Specs.foundCharge
-    Battery.setCharge(item, range.min + (range.max - range.min) * ZombRandFloat(0, 1))
+    Battery.setCharge(item, Chance.within(range.min, range.max))
     sendItemStats(item)
 end
 
@@ -78,6 +80,39 @@ function Battery.emptiestIn(container, accepts)
         end
     end
     return emptiest
+end
+
+--- The batteries in `container` taken together, as batteries wired in parallel: their charge, 0
+--- to 1 (0 when they hold nothing), and the watt-hours they hold when full, after wear.
+function Battery.containerCharge(container)
+    local storedWh, nominalWh = 0, 0
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        local wh = Battery.nominalWh(item)
+        storedWh, nominalWh = storedWh + Battery.getCharge(item) * wh, nominalWh + wh
+    end
+    return nominalWh > 0 and storedWh / nominalWh or 0, nominalWh
+end
+
+--- The calendar day now, as a number that differs from day to day: the day of a discharge cycle.
+function Battery.today()
+    local time = getGameTime()
+    return time:getYear() * 1000 + Sun.dayOfYear(time:getMonth(), time:getDay())
+end
+
+--- A day's discharge cycle after a reading of `charge` (0 to 1) on `day` (Battery.today), given the
+--- cycle so far: its day `cycleDay`, `high`, the highest charge in it, and `depth`, the deepest draw
+--- from that high (each nil before the first reading). Returns the cycle's new high and depth, and,
+--- when `day` moves on from `cycleDay`, the finished day's depth, to wear the batteries by
+--- (Battery.wearAll); the new day's cycle then starts at `charge`. The caller keeps `day`.
+function Battery.trackCycle(cycleDay, high, depth, charge, day)
+    high = math.max(high or charge, charge)
+    depth = math.max(depth or 0, high - charge)
+    if cycleDay == nil or cycleDay == day then
+        return high, depth, nil
+    end
+    return charge, 0, depth
 end
 
 --- Fraction of its life `item` loses to one discharge `depth` deep (0 to 1) of what it holds now.

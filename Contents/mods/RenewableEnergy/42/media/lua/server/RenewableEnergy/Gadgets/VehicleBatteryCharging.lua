@@ -1,4 +1,5 @@
 require "Vehicles/Vehicles"
+require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- Scales vanilla's vehicle battery charging and draining by the installed battery's capacity
@@ -11,17 +12,13 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 -- (VehiclePart.getLuaFunction), so the wrapped ones are the ones that run. What a start takes is
 -- Java's (BaseVehicle.tryStartEngine) and stays unscaled.
 
-local VehicleBattery = RenewableEnergy.VehicleBattery
-
-local function batteryItem(vehicle)
-    local part = vehicle and vehicle:getBattery()
-    return part and part:getInventoryItem()
-end
+local Battery, VehicleBattery = RenewableEnergy.Battery, RenewableEnergy.VehicleBattery
 
 local vanillaChargeBattery = VehicleUtils.chargeBattery
 
 function VehicleUtils.chargeBattery(vehicle, delta)
-    local item = batteryItem(vehicle)
+    local part = VehicleBattery.partOf(vehicle)
+    local item = part and part:getInventoryItem()
     vanillaChargeBattery(vehicle, delta * VehicleBattery.chargeScale(item))
 end
 
@@ -32,18 +29,18 @@ local vanillaUpdateBattery = Vehicles.Update.Battery
 -- went through chargeBattery, scaled already.
 function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
     local item = part:getInventoryItem()
-    local before = item and item:getCurrentUsesFloat()
+    local before = item and Battery.getCharge(item)
     vanillaUpdateBattery(vehicle, part, elapsedMinutes)
     if not before then
         return
     end
     local scale = VehicleBattery.chargeScale(item)
-    local after = item:getCurrentUsesFloat()
+    local after = Battery.getCharge(item)
     if scale == 1 or after <= before then
         return
     end
     local scaled = before + (after - before) * scale
-    item:setCurrentUsesFloat(scaled)
+    Battery.setCharge(item, scaled)
     -- Vanilla may already have sent the unscaled charge; resend if the scaled one shows differently.
     if VehicleUtils.compareFloats(after, scaled, 2) then
         vehicle:transmitPartUsedDelta(part)

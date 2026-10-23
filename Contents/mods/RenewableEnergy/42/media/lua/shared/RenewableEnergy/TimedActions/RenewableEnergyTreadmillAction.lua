@@ -1,5 +1,6 @@
 require "TimedActions/ISBaseTimedAction"
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/TimedActions/JobAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -41,12 +42,13 @@ local function runHours()
     return Specs.treadmill.runMinutes / 60
 end
 
-function Action:getDuration()
-    if self.character:isTimedActionInstant() then
-        return 1
-    end
+function Action:units()
     return Specs.treadmill.runMinutes * RenewableEnergy.unitsPerMinute()
 end
+
+-- Timed as the jobs are, though not one (RenewableEnergy.JobAction): the runner stands on the
+-- belt rather than facing a target, and the run settles its own way.
+Action.getDuration = RenewableEnergy.JobAction.getDuration
 
 -- A run on an unwired treadmill stops when its power goes out. The server never calls isValid(),
 -- but the client's stop reaches it (serverStop).
@@ -60,7 +62,7 @@ local TOWARD_CONSOLE = 0.3
 
 -- The way the belt runs the runner, from the treadmill's tile.
 local function facing(self)
-    local _, way = Sprites.kindOf(Sprites.nameOf(self.object))
+    local _, way = Sprites.kindOfObject(self.object)
     return IsoDirections[way] or self.character:getDir()
 end
 
@@ -199,8 +201,6 @@ function Action:new(character, object)
     o.object = object
     -- Whether this run feeds a bank, fixed for the run; the menu hands a wired treadmill's wired tile.
     o.wired = Treadmill.isWired(object)
-    o.stopOnWalk = true
-    o.stopOnRun = true
     o.maxTime = o:getDuration()
     return o
 end

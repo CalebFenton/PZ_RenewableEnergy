@@ -18,7 +18,7 @@ RenewableEnergy = RenewableEnergy or {}
 local GasKit = {}
 RenewableEnergy.GasKit = GasKit
 
-local Digester, Gasifier, PowerBank = RenewableEnergy.Digester, RenewableEnergy.Gasifier, RenewableEnergy.PowerBank
+local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
 local Sprites = RenewableEnergy.Sprites
 
 GasKit.MOD_DATA = "RenewableEnergy_gas"
@@ -53,18 +53,12 @@ function GasKit.idleLitresPerHour()
     return GasKit.IDLE_FUEL * SandboxVars.GeneratorFuelConsumption
 end
 
---- Whether `object` is a vanilla generator: a placed IsoGenerator that isn't one of the mod's
---- battery banks.
-function GasKit.isGenerator(object)
-    return object ~= nil and instanceof(object, "IsoGenerator") and not PowerBank.isBank(object)
-end
-
 --- The generator's gas state, or nil without a kit: { kit, source = { x, y, z, kind } or nil,
 --- line = { item, count } (what the line took) or nil, mode = "gas" or "petrol", tank, set, onGas,
 --- watts, stalled, outOfGas, and while it runs on gas billedHour and billLitres, vanilla's last bill
 --- as the gas line sees it (GasLines.run) }.
 function GasKit.stateOf(generator)
-    local state = GasKit.isGenerator(generator) and generator:getModData()[GasKit.MOD_DATA]
+    local state = RenewableEnergy.isGenerator(generator) and generator:getModData()[GasKit.MOD_DATA]
     return state and state.kit and state or nil
 end
 
@@ -84,14 +78,14 @@ end
 
 -- The sources a line runs from, by their tiles' kind (Sprites.kindOf), which the line keeps as its
 -- source's `kind`:
--- - owner: the source's shared module, whose recordAt gives the authority its record.
--- - nameKey, tierOf(object): its name in the menu, the key's ending its tier.
+-- - owner: the source's shared module, whose recordAt gives the authority its record and whose
+--   nameKey(tierOf(object)) names it in the menu.
 -- - inReach(generator, source): whether it may feed `generator`, else the key `tooFar` says why.
 -- - line(generator, source): what the line takes (a RenewableEnergy.Materials item).
 -- - piped: the line is a pipe drawn on both ends.
 GasKit.SOURCES = {
     digester = {
-        owner = Digester, nameKey = "IGUI_RenewableEnergy_Digester_", tierOf = Digester.tileOf,
+        owner = Digester,
         inReach = function(generator, source)
             return GasKit.lineLength(generator, source) <= GasKit.REACH
         end,
@@ -101,7 +95,7 @@ GasKit.SOURCES = {
         end,
     },
     gasifier = {
-        owner = Gasifier, nameKey = "IGUI_RenewableEnergy_Gasifier_", tierOf = Gasifier.tierOf,
+        owner = Gasifier,
         inReach = function(generator, source)
             return Gasifier.sideOf(generator:getX(), generator:getY(), source:getX(), source:getY()) ~= nil
         end,
@@ -115,7 +109,7 @@ GasKit.SOURCES = {
 
 --- The kind of gas source `object`'s tile is (a key of SOURCES), else nil.
 function GasKit.sourceKind(object)
-    local kind = Sprites.kindOf(Sprites.nameOf(object))
+    local kind = Sprites.kindOfObject(object)
     return kind and GasKit.SOURCES[kind] and kind or nil
 end
 
@@ -137,15 +131,12 @@ end
 --- The sources that may feed `generator`, nearest first.
 function GasKit.sourcesNear(generator)
     local found = {}
-    local gx, gy, z = generator:getX(), generator:getY(), generator:getZ()
-    for x = gx - GasKit.REACH, gx + GasKit.REACH do
-        for y = gy - GasKit.REACH, gy + GasKit.REACH do
-            local source = RenewableEnergy.findObjectOn(getSquare(x, y, z), GasKit.sourceKind)
-            if source and not sourceBlocker(generator, source) then
-                table.insert(found, source)
-            end
+    RenewableEnergy.eachSquareAround(generator:getX(), generator:getY(), generator:getZ(), GasKit.REACH, function(square)
+        local source = RenewableEnergy.findObjectOn(square, GasKit.sourceKind)
+        if source and not sourceBlocker(generator, source) then
+            table.insert(found, source)
         end
-    end
+    end)
     table.sort(found, function(a, b)
         return GasKit.lineLength(generator, a) < GasKit.lineLength(generator, b)
     end)
@@ -234,7 +225,7 @@ GasKit.JOBS = {
 
 RenewableEnergy.GasJobs.define(GasKit, {
     subjectOf = function(generator)
-        return GasKit.isGenerator(generator) and RenewableEnergy.onSquare(generator) and generator or nil
+        return RenewableEnergy.isGenerator(generator) and RenewableEnergy.onSquare(generator) and generator or nil
     end,
     missing = "Tooltip_RenewableEnergy_NoGenerator",
 })

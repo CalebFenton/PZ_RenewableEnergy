@@ -17,8 +17,7 @@ Treadmill.WIRED = "RenewableEnergy_treadmillWired"
 -- The item dismantling a treadmill gives.
 Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
 
--- A step in each facing, in squares.
-local FACING_STEPS = { N = { 0, -1 }, S = { 0, 1 }, E = { 1, 0 }, W = { -1, 0 } }
+local FACING_STEPS = RenewableEnergy.SIDE_STEPS
 -- Steps back from each end of the treadmill (Sprites.treadmill) to its rear end.
 local STEPS_TO_REAR = { rear = 0, console = 1 }
 
@@ -49,7 +48,7 @@ end
 --- end, as { x, y } each, and the step from rear to console, the way the runner faces
 --- (Sprites.treadmill).
 function Treadmill.ends(tile)
-    local _, facing, part = Sprites.kindOf(Sprites.nameOf(tile))
+    local _, facing, part = Sprites.kindOfObject(tile)
     local step = FACING_STEPS[facing]
     local square = tile:getSquare()
     local back = STEPS_TO_REAR[part]
@@ -80,18 +79,18 @@ end
 
 --- What wiring a treadmill to feed a bank takes of `character` (RenewableEnergy.firstUnmet), as
 --- PowerBank.wiringNeeds does for a part.
-function Treadmill.needs(character)
+function Treadmill.wiringNeeds(character)
     return PowerBank.jobNeeds(character, Specs.treadmill.wiring)
 end
 
 --- Why `character` can't wire the treadmill of `tile` now, or nil if they can: "already wired"
---- when either of its tiles is, else the kind of the first of Treadmill.needs they are short of.
---- Every path that wires one asks it, so a treadmill is wired once.
+--- when either of its tiles is, else the kind of the first of Treadmill.wiringNeeds they are
+--- short of. Every path that wires one asks it, so a treadmill is wired once.
 function Treadmill.wiringRefusal(character, tile)
     if Treadmill.wiredHalf(tile) then
         return "already wired"
     end
-    return RenewableEnergy.unmetKind(Treadmill.needs(character))
+    return RenewableEnergy.unmetKind(Treadmill.wiringNeeds(character))
 end
 
 --- What unwiring a treadmill takes of `character` (RenewableEnergy.firstUnmet): the tools wiring

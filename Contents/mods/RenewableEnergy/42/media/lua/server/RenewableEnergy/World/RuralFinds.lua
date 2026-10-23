@@ -6,6 +6,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Wind"
+require "RenewableEnergy/PowerBank/WindSource"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/Biogas/DigesterSystem"
@@ -29,6 +30,7 @@ local RuralFinds = {}
 RenewableEnergy.RuralFinds = RuralFinds
 
 local Sprites, Wind, Gasifier = RenewableEnergy.Sprites, RenewableEnergy.Wind, RenewableEnergy.Gasifier
+local Digester = RenewableEnergy.Digester
 local BuildingWatch, Chance = RenewableEnergy.BuildingWatch, RenewableEnergy.Chance
 
 -- Global ModData: by building key, the finds each rolled building got ({ [kind] = true }).
@@ -105,7 +107,7 @@ local function randomOf(entries)
         table.insert(list, value)
     end
     table.sort(list)
-    return list[ZombRand(#list) + 1]
+    return Chance.pick(list)
 end
 
 --- Leaves a pamphlet in a container of the building, if it has one; returns whether it did. An
@@ -120,11 +122,7 @@ function RuralFinds.leavePamphlet(def)
                 for i = 0, (objects and objects:size() or 0) - 1 do
                     local container = objects:get(i):getContainer()
                     if container then
-                        local item = container:AddItem(PAMPHLET)
-                        if item and isServer() then
-                            sendAddItemToContainer(container, item)
-                        end
-                        return item ~= nil
+                        return RenewableEnergy.addItem(container, PAMPHLET) ~= nil
                     end
                 end
             end
@@ -144,26 +142,31 @@ local LIVESTOCK = {
     barn = true, stable = true, stables = true, chickencoop = true, pigsty = true, cattleauction = true,
 }
 
---- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), whether a
---- building `qualifies`, how many squares out from the building it stands (`reach`) on open ground
---- that also `fits`, if given, and `place(square, def)`, which builds it worn.
+--- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), `is(object)`,
+--- whether an object is one, whether a building `qualifies`, how many squares out from the
+--- building it stands (`reach`) on open ground that also `fits`, if given, and `place(square,
+--- def)`, which builds it worn.
 RuralFinds.FINDS = {
     wind = {
         odds = 15,
+        is = Wind.isCharger,
         qualifies = function(def) return hasRoom(def, FARM) end,
         reach = BuildingWatch.REACH,
         fits = inTheOpen,
         -- The old farm wind charger, its wooden blades long broken and its brake set.
         place = function(square)
-            return build(square, randomOf(Sprites.windPropeller.wood),
-                Wind.OnCreate, function(thumpable)
-                    thumpable:getModData()[Wind.BROKEN] = true
-                    thumpable:getModData()[Wind.BRAKED] = true
-                end)
+            local charger = build(square, randomOf(Sprites.windPropeller.wood), Wind.OnCreate)
+            -- After the clients have the charger: the setters send its modData, which names it by
+            -- its index on the square.
+            local WindSource = RenewableEnergy.WindSource
+            WindSource.setBroken(charger, true)
+            WindSource.setBraked(charger, true)
+            return charger
         end,
     },
     digester = {
         odds = 20,
+        is = Digester.isDigester,
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
         reach = 1,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
@@ -181,6 +184,7 @@ RuralFinds.FINDS = {
     },
     gasifier = {
         odds = 3,
+        is = Gasifier.isGasifier,
         -- The map's hunting shacks and raised deer stands are buildings of hunting rooms only.
         qualifies = function(def)
             local rooms = def:getRooms()
@@ -224,8 +228,8 @@ function RuralFinds.canPlace(kind, square)
     return RuralFinds.canStand(square) and (not find.fits or find.fits(square))
 end
 
--- How far outside the building's bounds the square at x, y is, in squares (0 inside).
-local function outside(def, x, y)
+--- How far outside the building's bounds the square at x, y is, in squares (0 inside).
+function RuralFinds.distanceOutside(def, x, y)
     return math.max(def:getX() - x, x - (def:getX2() - 1), def:getY() - y, y - (def:getY2() - 1), 0)
 end
 
@@ -240,7 +244,7 @@ local function squareFor(def, kind)
             end
         end
     end
-    return #found > 0 and found[ZombRand(#found) + 1] or nil
+    return #found > 0 and Chance.pick(found) or nil
 end
 
 --- The chance a qualifying building has the find `kind`, with the Solar Sites option.
@@ -259,10 +263,9 @@ function RuralFinds.findsFor(def)
     return kinds
 end
 
---- Rolls a building once for each find it qualifies for, at its chance. Tests that are about the
---- find rather than its odds name the `kinds` and make them certain with `always`. Returns the
---- placed objects by kind; a building rolled before gets none.
-function RuralFinds.roll(def, kinds, always)
+--- Rolls a building once for each of `kinds` (default the finds it qualifies for), at its chance.
+--- Returns the placed objects by kind; a building rolled before gets none.
+function RuralFinds.roll(def, kinds)
     local key = BuildingWatch.key(def)
     local rolled = store()
     if rolled[key] ~= nil then
@@ -270,7 +273,7 @@ function RuralFinds.roll(def, kinds, always)
     end
     local found, placed = {}, {}
     for _, kind in ipairs(kinds or RuralFinds.findsFor(def)) do
-        if always or Chance.hit(RuralFinds.chanceFor(kind)) then
+        if Chance.hit(RuralFinds.chanceFor(kind)) then
             local square = squareFor(def, kind)
             if square then
                 placed[kind] = RuralFinds.FINDS[kind].place(square, def)
@@ -282,21 +285,30 @@ function RuralFinds.roll(def, kinds, always)
     return placed
 end
 
---- Counts a find of `kind` at x, y as the find of every building it stands by (within
---- BuildingWatch.REACH) that could have one, so none of them is rolled for another. Reads the
---- map, so the buildings needn't be loaded. A building rolled before keeps its finds and gains
---- this one.
-function RuralFinds.claim(kind, x, y)
-    local find, rolled, reach = RuralFinds.FINDS[kind], store(), BuildingWatch.REACH
-    local buildings = ArrayList.new()
+--- The buildings within BuildingWatch.REACH of x, y that could have the find `kind`. Reads the
+--- map, so the buildings needn't be loaded.
+function RuralFinds.buildingsBy(kind, x, y)
+    local qualifies, reach = RuralFinds.FINDS[kind].qualifies, BuildingWatch.REACH
+    local buildings, found = ArrayList.new(), {}
     getWorld():getMetaGrid():getBuildingsIntersecting(x - reach, y - reach, 2 * reach + 1, 2 * reach + 1, buildings)
     for i = 0, buildings:size() - 1 do
         local def = buildings:get(i)
-        if outside(def, x, y) <= reach and find.qualifies(def) then
-            local key = BuildingWatch.key(def)
-            rolled[key] = rolled[key] or {}
-            rolled[key][kind] = true
+        if RuralFinds.distanceOutside(def, x, y) <= reach and qualifies(def) then
+            table.insert(found, def)
         end
+    end
+    return found
+end
+
+--- Counts a find of `kind` at x, y as the find of every building it stands by that could have one
+--- (RuralFinds.buildingsBy), so none of them is rolled for another. A building rolled before keeps
+--- its finds and gains this one.
+function RuralFinds.claim(kind, x, y)
+    local rolled = store()
+    for _, def in ipairs(RuralFinds.buildingsBy(kind, x, y)) do
+        local key = BuildingWatch.key(def)
+        rolled[key] = rolled[key] or {}
+        rolled[key][kind] = true
     end
 end
 

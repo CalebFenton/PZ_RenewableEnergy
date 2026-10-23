@@ -92,18 +92,14 @@ Events.OnServerCommand.Add(function(module, command, args)
     end
 end)
 
--- Squares a generator powers are listed in the chunks around it (IsoChunk.addGeneratorPos).
-local CHUNK_SQUARES = 8
+-- A running generator's position is listed in every chunk its reach touches
+-- (IsoGenerator.setSurroundingElectricity, IsoChunk.addGeneratorPos).
+local CHUNK_SQUARES = getChunkSizeInSquares()
 
--- A server sends an object's removal before it removes its own copy (GameServer.RemoveItemFromMap),
--- so the bank system there switches a running bank off only after this client has lost its copy,
--- and the switch-off, which names the bank by its place on the square, finds nothing here. The
--- copy of a running bank leaving this client's square lets go of the squares it powers itself,
--- as a generator switching off does (IsoGenerator.setSurroundingElectricity); otherwise they stay
--- powered here until their chunks reload.
-local function releasePower(isoObject)
-    if not (PowerBank.isBank(isoObject) and isoObject:isActivated()) then return end
-    local x, y, z = isoObject:getX(), isoObject:getY(), isoObject:getZ()
+--- Lets this client's chunks go of the squares a generator at x, y, z powered, as the generator
+--- switching off does (IsoGenerator.setSurroundingElectricity); otherwise they stay powered here
+--- until their chunks reload.
+function PowerBank.releaseGeneratorPower(x, y, z)
     local radius = SandboxVars.GeneratorTileRange
     local cell = getCell()
     for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
@@ -113,6 +109,16 @@ local function releasePower(isoObject)
                 chunk:removeGeneratorPos(x, y, z)
             end
         end
+    end
+end
+
+-- A server sends an object's removal before it removes its own copy (GameServer.RemoveItemFromMap),
+-- so the bank system there switches a running bank off only after this client has lost its copy,
+-- and the switch-off, which names the bank by its place on the square, finds nothing here. So the
+-- copy of a running bank leaving this client's square lets go of the squares it powers itself.
+local function releasePower(isoObject)
+    if PowerBank.isBank(isoObject) and isoObject:isActivated() then
+        PowerBank.releaseGeneratorPower(isoObject:getX(), isoObject:getY(), isoObject:getZ())
     end
 end
 

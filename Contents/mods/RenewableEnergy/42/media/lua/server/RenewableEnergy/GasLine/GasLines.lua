@@ -13,7 +13,9 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/PowerBank/Loads"
+require "RenewableEnergy/PlaceTracker"
+require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/Fumes"
 require "RenewableEnergy/Chance"
 
@@ -38,13 +40,23 @@ local function keyOf(object)
     return object:getX() .. "," .. object:getY() .. "," .. object:getZ()
 end
 
-local function registry()
+local function store()
     return ModData.getOrCreate(GasLines.MOD_DATA)
+end
+
+--- Whether the gas pass lists `generator`, as Install Kit lists it.
+function GasLines.isListed(generator)
+    return store()[keyOf(generator)] ~= nil
+end
+
+--- Takes `generator` off the gas pass's list.
+function GasLines.unlist(generator)
+    store()[keyOf(generator)] = nil
 end
 
 local function generatorAt(position)
     local square = getSquare(position.x, position.y, position.z)
-    return square and RenewableEnergy.findObjectOn(square, GasKit.isGenerator)
+    return square and RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
 end
 
 -- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
@@ -58,19 +70,13 @@ local function isPiped(position)
     return position ~= nil and GasKit.SOURCES[position.kind].piped == true
 end
 
-local function sync(generator)
-    if isServer() then
-        generator:transmitModData()
-    end
-end
-
 local isKitOverlay = Sprites.matcher(Sprites.gasKit)
 local isGeneratorPipe = Sprites.matcher(Sprites.gasifierPipeGen)
 
--- Sets the line's source, in the generator's state and its registry entry.
+-- Sets the line's source, in the generator's state and its entry in the list.
 local function setSource(generator, state, source)
     state.source = source
-    registry()[keyOf(generator)].source = source
+    store()[keyOf(generator)].source = source
 end
 
 -- Takes the pipe off the piped source at `position`: its half of it.
@@ -134,22 +140,15 @@ local function capOf(state)
 end
 
 -- The banks whose chargers charge from `generator`, in the order they share what it can give:
--- nearest first, the lower place on a tie, as Payers picks who pays for an appliance.
+-- nearest first, the lower place on a tie (PlaceTracker.sortNearest).
 local function chargingBanks(generator)
     local list = {}
-    local gx, gy, gz = generator:getX(), generator:getY(), generator:getZ()
-    local banks = RenewableEnergy.PowerBank.serverSystem
-    for i = 1, (banks and banks:getLuaObjectCount() or 0) do
-        local bank = banks:getLuaObjectByIndex(i)
+    RenewableEnergy.PowerBank.eachBank(function(bank)
         if bank:chargesFrom(generator) then
-            local dx, dy, dz = bank.x - gx, bank.y - gy, bank.z - gz
-            table.insert(list, { bank = bank, distance = dx * dx + dy * dy + dz * dz,
-                key = RenewableEnergy.PlaceTracker.key(bank.x, bank.y, bank.z) })
+            table.insert(list, bank)
         end
-    end
-    table.sort(list, function(a, b)
-        return a.distance < b.distance or (a.distance == b.distance and a.key < b.key)
     end)
+    RenewableEnergy.PlaceTracker.sortNearest(list, RenewableEnergy.PlaceTracker.objectPlace(generator))
     return list
 end
 
@@ -165,13 +164,13 @@ local function split(generator)
     local cap = capOf(GasKit.stateOf(generator))
     local left = cap and math.max(0, cap - powered)
     local shares = {}
-    for _, entry in ipairs(chargingBanks(generator)) do
-        local watts = entry.bank.chargeWantW or 0
+    for _, bank in ipairs(chargingBanks(generator)) do
+        local watts = bank.chargeWantW or 0
         if left then
             watts = math.min(watts, left)
             left = left - watts
         end
-        shares[entry.bank] = watts
+        shares[bank] = watts
     end
     return powered, shares
 end
@@ -239,7 +238,7 @@ local function wear(generator, state, factor, hours)
     while state.wearHours >= 1 do
         state.wearHours = state.wearHours - 1
         if Chance.hit((factor - 1) / wearOneIn(generator)) then
-            generator:setCondition(generator:getCondition() - ZombRand(1, 3))
+            generator:setCondition(generator:getCondition() - Chance.between(1, 2))
         end
     end
 end
@@ -347,17 +346,14 @@ end
 
 -- Runs `generator` for the time since it last ran, at most LONGEST_PASS.
 local function catchUp(generator, state)
-    local now = getGameTime():getWorldAgeHours()
-    local hours = math.min(LONGEST_PASS, now - (state.lastHour or now))
-    state.lastHour = now
-    GasLines.run(generator, state, hours)
+    GasLines.run(generator, state, RenewableEnergy.hoursSince(state, LONGEST_PASS))
 end
 
 --- Runs every kitted generator whose chunk is loaded. One gone from its loaded square or without
 --- its kit leaves the list, and a gasifier's pipe to it comes off; an unloaded one waits.
 function GasLines.updateAll()
     local gone = {}
-    for key, entry in pairs(registry()) do
+    for key, entry in pairs(store()) do
         local loaded = getSquare(entry.x, entry.y, entry.z) ~= nil
         local generator = loaded and generatorAt(entry)
         local state = generator and GasKit.stateOf(generator)
@@ -365,12 +361,12 @@ function GasLines.updateAll()
             table.insert(gone, key)
         elseif state then
             catchUp(generator, state)
-            sync(generator)
+            generator:transmitModData()
         end
     end
     for _, key in ipairs(gone) do
-        unpipeSource(registry()[key].source)
-        registry()[key] = nil
+        unpipeSource(store()[key].source)
+        store()[key] = nil
     end
 end
 
@@ -382,7 +378,7 @@ function GasLines.cancelStall(generator)
     local state = GasKit.stateOf(generator)
     if state and state.stalled then
         state.stalled = false
-        sync(generator)
+        generator:transmitModData()
     end
 end
 
@@ -404,14 +400,14 @@ local DO = {
     [GasKit.INSTALL] = function(character, state, row, generator)
         generator:getModData()[GasKit.MOD_DATA] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
-        registry()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
+        store()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
         RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
         return true
     end,
     [GasKit.REMOVE] = function(character, state, row, generator)
         disconnect(character, generator, state)
         generator:getModData()[GasKit.MOD_DATA] = nil
-        registry()[keyOf(generator)] = nil
+        GasLines.unlist(generator)
         RenewableEnergy.showOverlay(generator, isKitOverlay, nil)
         RenewableEnergy.giveItems(character, GasKit.ITEM)
         return true
@@ -462,7 +458,7 @@ GasLines.jobSite = {
     end,
     tell = function(state, generator, done)
         if done or state then
-            sync(generator)
+            generator:transmitModData()
         end
     end,
 }
@@ -472,7 +468,7 @@ GasLines.jobSite = {
 function GasLines.fit(generator, source)
     DO[GasKit.INSTALL](nil, nil, GasKit.JOBS[GasKit.INSTALL], generator)
     DO[GasKit.CONNECT](nil, GasKit.stateOf(generator), GasKit.JOBS[GasKit.CONNECT], generator, source)
-    sync(generator)
+    generator:transmitModData()
 end
 
 -- Taking up a kitted generator is refused: the kit would fall off (ISTakeGenerator copies only

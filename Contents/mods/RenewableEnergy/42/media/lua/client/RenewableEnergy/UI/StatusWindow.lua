@@ -169,14 +169,13 @@ local function powerRows(rows, status)
             getText(generator.running and "IGUI_RenewableEnergy_GeneratorRunning" or "IGUI_RenewableEnergy_GeneratorStopped"),
             not generator.running and "dim" or nil)
         if generator.failsafe then
-            local options = SandboxVars.RenewableEnergy
             if not generator.controls then
                 row(rows, getText("IGUI_RenewableEnergy_Failsafe"), getText("IGUI_RenewableEnergy_FailsafeOtherBank"), "dim")
             elseif not generator.armed then
                 row(rows, getText("IGUI_RenewableEnergy_Failsafe"), getText("IGUI_RenewableEnergy_FailsafeIdle"), "dim")
             else
                 row(rows, getText("IGUI_RenewableEnergy_Failsafe"), getText("IGUI_RenewableEnergy_FailsafeRange",
-                    options.FailsafeStartCharge, options.FailsafeStopCharge))
+                    PowerBank.failsafeRange()))
             end
         end
     end
@@ -281,7 +280,7 @@ end
 
 -- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
 local function batteryValue(battery)
-    local charge, condition = Format.percent(battery.charge), Format.condition(battery.fullType, battery.condition)
+    local charge, condition = Format.percent(battery.charge), Format.condition(battery.type, battery.condition)
     local repair = batteryRepair(battery.condition, battery.repaired)
     if repair then
         return getText("IGUI_RenewableEnergy_BatteryValueRepair", charge, condition, getText(repair))
@@ -292,7 +291,7 @@ end
 local function batteryRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Batteries", #status.batteries)
     for _, battery in ipairs(status.batteries) do
-        row(rows, getItemNameFromFullType(battery.fullType), batteryValue(battery), battery.condition <= 0 and "bad" or nil)
+        row(rows, getItemNameFromFullType(battery.type), batteryValue(battery), battery.condition <= 0 and "bad" or nil)
     end
 end
 

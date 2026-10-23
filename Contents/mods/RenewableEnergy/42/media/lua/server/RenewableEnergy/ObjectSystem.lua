@@ -39,10 +39,7 @@ end
 
 --- Brings the record up to now: what the game hours since it last caught up did to it.
 function Object:catchUp()
-    local now = getGameTime():getWorldAgeHours()
-    local hours = math.min(LONGEST_PASS, now - (self.lastHour or now))
-    self.lastHour = now
-    self:advance(hours)
+    self:advance(RenewableEnergy.hoursSince(self, LONGEST_PASS))
 end
 
 --- Brings the record up to now, then shows and tells what changed.

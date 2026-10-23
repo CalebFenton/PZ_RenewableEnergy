@@ -6,6 +6,11 @@ RenewableEnergy = RenewableEnergy or {}
 local Specs = {}
 RenewableEnergy.Specs = Specs
 
+-- The tools wiring jobs take, as materials (RenewableEnergy.Materials): a tag, and the item a
+-- tooltip names for it, as vanilla names the wrench its jobs take.
+local SCREWDRIVER = { tool = "SCREWDRIVER", item = "Base.Screwdriver" }
+local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+
 -- Batteries by item type. wh is capacity at full condition; cyclesAt50 is how many discharges of
 -- half the new capacity use up a battery's condition (Battery.cycleWear), so one carrying such a
 -- load every night is at half capacity after cyclesAt50 / 2 nights: a car battery in about five
@@ -16,7 +21,7 @@ Specs.batteries = {
     ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 300 },
     ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 750 },
-    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500, wiring = { tools = { "SCREWDRIVER", "WRENCH" } } },
+    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500, wiring = { tools = { SCREWDRIVER, WRENCH } } },
     -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
     ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 150 },
 }
@@ -68,7 +73,7 @@ Specs.wind = {
 -- other clothing appliances (IsoGenerator.ClothingAppliancePowerConsumption).
 Specs.treadmill = {
     slots = 1,
-    wiring = { seconds = 90, wire = 2, scrap = 1, tools = { "SCREWDRIVER" }, skill = 2, xp = 10 },
+    wiring = { seconds = 90, wire = 2, scrap = 1, tools = { SCREWDRIVER }, skill = 2, xp = 10 },
     watts = 240, runMinutes = 30, drawFuel = 0.09,
     endurancePerHour = 0.6, thirstPerHour = 0.2,
     xpPerHour = { Fitness = 20, Sprinting = 15 },
@@ -131,15 +136,15 @@ Specs.banks = {
 }
 
 -- Wiring each part kind into a bank: seconds at normal speed at Electricity 0 (RenewableEnergyAction),
--- Electric Wire (returned by Unwire), Electronics Scrap (kept by the part), tool ItemTags (which
--- unwiring takes too), Electricity level, and XP for the first time an item is ever wired.
+-- Electric Wire (returned by Unwire), Electronics Scrap (kept by the part), tools (which unwiring
+-- takes too), Electricity level, and XP for the first time an item is ever wired.
 -- Inverters set skill/xp per type. Every part takes a screwdriver, as vanilla's battery, radio and
 -- headlights do in a car.
 Specs.wiring = {
-    battery = { seconds = 30, wire = 1, scrap = 0, tools = { "SCREWDRIVER" }, skill = 0, xp = 5 },
-    inverter = { seconds = 60, wire = 2, scrap = 0, tools = { "SCREWDRIVER" } },
-    charger = { seconds = 30, wire = 1, scrap = 0, tools = { "SCREWDRIVER" }, skill = 0, xp = 5 },
-    controller = { seconds = 60, wire = 2, scrap = 1, tools = { "SCREWDRIVER" }, skill = 3, xp = 15 },
+    battery = { seconds = 30, wire = 1, scrap = 0, tools = { SCREWDRIVER }, skill = 0, xp = 5 },
+    inverter = { seconds = 60, wire = 2, scrap = 0, tools = { SCREWDRIVER } },
+    charger = { seconds = 30, wire = 1, scrap = 0, tools = { SCREWDRIVER }, skill = 0, xp = 5 },
+    controller = { seconds = 60, wire = 2, scrap = 1, tools = { SCREWDRIVER }, skill = 3, xp = 15 },
 }
 
 -- Electricity XP for each module of a panel the first time it is ever connected to a bank.
@@ -148,6 +153,9 @@ Specs.connectXp = 5
 -- Rated watts of the gadgets' cells.
 Specs.cellChargerWatts = 5
 Specs.maintainerWatts = 10
+-- Watt-hours that fill one of the cell charger's batteries (Base.Battery): a game figure, not a
+-- real cell's, sized so a full tray charges over a sunny day or two.
+Specs.cellChargerBatteryWh = 25
 
 -- A solar garden light: its cell's rated watts, the watt-hours its battery holds, what its lamp
 -- draws at night, and the radius it lights.
@@ -169,10 +177,25 @@ Specs.foundCharge = { min = 0.3, max = 0.8 }
 -- radius in tiles, and floors up or down.
 Specs.sourceReach = { tiles = 20, levels = 3 }
 
+-- A backup generator a failsafe can start is one plugged in within this many squares of its bank
+-- on either axis, on the bank's floor.
+Specs.backupReach = 3
+
 -- Watts per unit of vanilla's generator bill for a switched-on appliance
 -- (IsoObject:getGeneratorPowerConsumption, fuel an hour before the GeneratorFuelConsumption option),
 -- so appliances keep vanilla's balance and follow its changes. Chosen so vanilla's car battery
 -- charger's bill matches the watts that fill a car battery in its charge time.
 Specs.wattsPerFuel = 2000
+
+--- The watts of an appliance vanilla bills `fuel` an hour for (Specs.wattsPerFuel).
+function Specs.wattsFromFuel(fuel)
+    return fuel * Specs.wattsPerFuel
+end
+
+--- The fuel an hour vanilla would bill for `watts` (Specs.wattsPerFuel), before the
+--- GeneratorFuelConsumption option.
+function Specs.fuelFromWatts(watts)
+    return watts / Specs.wattsPerFuel
+end
 
 return Specs

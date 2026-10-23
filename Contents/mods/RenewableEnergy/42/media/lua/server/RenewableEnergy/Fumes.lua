@@ -37,8 +37,8 @@ end
 -- Whether a generator runs inside `building`, which vanilla keeps toxic itself.
 local function generatorRunsIn(building)
     local id = building:getID()
-    for _, source in ipairs(RenewableEnergy.Payers.running()) do
-        local square = source.generator and source.generator:getSquare()
+    for _, payer in ipairs(RenewableEnergy.Payers.running()) do
+        local square = payer.generator and payer.generator:getSquare()
         local inside = square and Fumes.buildingOf(square)
         if inside and inside:getID() == id then
             return true

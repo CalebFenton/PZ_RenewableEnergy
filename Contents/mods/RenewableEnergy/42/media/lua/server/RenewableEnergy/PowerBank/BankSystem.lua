@@ -16,7 +16,10 @@ require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/PowerBank/TreadmillSource"
+require "RenewableEnergy/PowerBank/Payers"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
+require "RenewableEnergy/PowerBank/Backup"
+require "RenewableEnergy/PowerBank/BankStatus"
 
 RenewableEnergy = RenewableEnergy or {}
 local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
@@ -32,7 +35,7 @@ local EVERY_TEN_MINUTES = 1
 local SUN_STEP = 1 / 6
 -- Longer gaps than this between passes (a save loaded after the clock jumped) count as
 -- this long, so one pass never swings the charge by days of sun.
-local LONGEST_PASS = 24
+BankSystem.LONGEST_PASS = 24
 
 function BankSystem:new()
     return SGlobalObjectSystem.new(self, PowerBank.SYSTEM_NAME)
@@ -47,6 +50,9 @@ function BankSystem:initSystem()
     else
         Events.EveryHours.Add(BankSystem.updateAll)
     end
+    -- Billing comes after the pass, so it counts the banks as the pass left them: handlers run in
+    -- the order added, and GameTime.update fires EveryHours before EveryTenMinutes.
+    Events.EveryTenMinutes.Add(RenewableEnergy.Payers.billGenerators)
 end
 
 -- Each loaded bank gets the summary the clients are sent, which isn't saved, before any client
@@ -307,12 +313,6 @@ function BankSystem.passContext(hours)
     }
 end
 
--- Game hours since the bank's last pass, at most LONGEST_PASS, and the pass's end time.
-local function passHours(bank)
-    local now = getGameTime():getWorldAgeHours()
-    return math.min(LONGEST_PASS, now - (bank.lastHour or now)), now
-end
-
 -- A pass context for each span of hours, worked out once and shared by every bank that runs
 -- that span: banks placed at different times run different spans.
 local function sharedContexts()
@@ -327,8 +327,7 @@ end
 --- Bring one bank up to now. `contextFor(hours)`, optional, gives the pass context for the span
 --- (BankSystem.passContext unless given).
 function BankSystem.updateBank(bank, contextFor)
-    local hours, now = passHours(bank)
-    bank.lastHour = now
+    local hours = RenewableEnergy.hoursSince(bank, BankSystem.LONGEST_PASS)
     if hours > 0 then
         bank:update(hours, (contextFor or BankSystem.passContext)(hours))
     end
@@ -343,13 +342,10 @@ function BankSystem.dropSource(bank, x, y, z)
 end
 
 function BankSystem.updateAll()
-    local self = BankSystem.instance
     local contextFor = sharedContexts()
-    for i = 1, self:getLuaObjectCount() do
-        BankSystem.updateBank(self:getLuaObjectByIndex(i), contextFor)
-    end
-    -- Banks that came on or went off change what each generator nearby pays.
-    RenewableEnergy.Payers.billGenerators()
+    PowerBank.eachBank(function(bank)
+        BankSystem.updateBank(bank, contextFor)
+    end)
 end
 
 SGlobalObjectSystem.RegisterSystemClass(BankSystem)

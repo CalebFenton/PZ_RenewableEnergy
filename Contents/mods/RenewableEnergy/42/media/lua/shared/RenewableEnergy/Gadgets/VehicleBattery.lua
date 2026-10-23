@@ -28,6 +28,11 @@ function VehicleBattery.isBatteryPart(part)
     return part ~= nil and part:getId() == VehicleBattery.PART
 end
 
+--- The vehicle's battery slot, fitted or empty; nil for no vehicle or one without a slot.
+function VehicleBattery.partOf(vehicle)
+    return vehicle and vehicle:getPartById(VehicleBattery.PART)
+end
+
 --- The share of its own charge that a vanilla change of one unit of a car battery's charge
 --- makes in `item`: the car battery's capacity over the item's. 1 for anything the mod has no
 --- rating for, so other batteries charge and drain as vanilla has them.

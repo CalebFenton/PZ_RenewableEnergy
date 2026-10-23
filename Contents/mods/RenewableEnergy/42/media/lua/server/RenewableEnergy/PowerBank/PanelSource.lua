@@ -32,23 +32,12 @@ local SNOW_SHOWN = 0.5
 -- reason in the status.
 local LOW_SHARE = 0.7
 
--- Item ConditionMax by full type, read once from the item scripts.
-local CONDITION_MAX = {}
-
-local function conditionMax(fullType)
-    if not CONDITION_MAX[fullType] then
-        local script = getScriptManager():FindItem(fullType)
-        CONDITION_MAX[fullType] = script and script:getConditionMax() or 100
-    end
-    return CONDITION_MAX[fullType]
-end
-
 -- The watts a panel's modules are rated for as they are now, and at their best.
 local function ratedWatts(source)
     local now, best = 0, 0
     for _, module in ipairs(source.modules) do
         now = now + PowerBank.moduleWatts(module.type, module.condition)
-        best = best + PowerBank.moduleWatts(module.type, conditionMax(module.type))
+        best = best + PowerBank.moduleWatts(module.type, RenewableEnergy.conditionMaxOf(module.type))
     end
     return now, best
 end
@@ -137,12 +126,7 @@ end
 --- The chance that `stormHours` of thunderstorm crack a module of `source` (anything with a mount
 --- kind and material), at the StormDamage options.
 function PanelSource.stormChance(source, stormHours)
-    local options = SandboxVars.RenewableEnergy
-    if not options.StormDamage or stormHours <= 0 then
-        return 0
-    end
-    local perHour = Specs.storm.chancePerHour * stormFactor(source.kind, source.material) * options.StormDamageRate / 100
-    return 1 - (1 - math.min(1, perHour)) ^ stormHours
+    return Chance.stormDamage(Specs.storm.chancePerHour * stormFactor(source.kind, source.material), stormHours)
 end
 
 --- A thunderstorm may crack one of a panel's modules (`source`, anything with a mount kind,
@@ -161,7 +145,7 @@ function PanelSource.stormCrack(source, stormHours)
     if #whole == 0 or not Chance.hit(chance) then
         return false
     end
-    local module = whole[ZombRand(#whole) + 1]
+    local module = Chance.pick(whole)
     module.condition = math.max(0, module.condition - Specs.storm.crack)
     return true
 end

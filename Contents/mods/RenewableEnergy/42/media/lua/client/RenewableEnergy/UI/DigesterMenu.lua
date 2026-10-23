@@ -1,8 +1,7 @@
--- The right-click menus of a digester and of a gas heater, and the client's digester system.
+-- The right-click menus of a digester and of a gas heater.
 -- Feeding is the loot window's: the hopper is its container. The jobs' options are GasJobMenu's.
 
 require "ISUI/ISWorldObjectContextMenu"
-require "RenewableEnergy/ClientObjects"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/GasHeater"
@@ -18,26 +17,18 @@ RenewableEnergy.DigesterMenu = DigesterMenu
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
 local Needs, DigesterWindow, GasJobMenu = RenewableEnergy.Needs, RenewableEnergy.DigesterWindow, RenewableEnergy.GasJobMenu
 
-RenewableEnergy.ClientObjects.define({
-    name = "Digester", sprites = RenewableEnergy.Sprites.namesOf("digester"), owner = Digester, isObject = Digester.isDigester,
-    adoptCopy = function(isoObject)
-        Digester.adoptContainer(isoObject:getContainer())
-    end,
-    adoptContainer = Digester.adoptContainer,
-})
-
 -- Adds the option for `job`, with `item` the bag or tank it fills (GasJobMenu.add).
 local function addJob(menu, playerNum, job, digester, item)
     GasJobMenu.add(menu, playerNum, "digester", job, digester, item)
 end
 
---- Adds the digester's submenu to `context`. Returns the submenu, or nil before this client has
---- the digester's summary.
+--- Adds the digester's submenu to `context`. Returns the submenu, or nil while this side can't
+--- read the digester (DigesterJobs.subjectOf).
 function DigesterMenu.addOptions(playerNum, context, digester)
-    local summary = Digester.summaryOf(digester)
+    local summary = DigesterJobs.subjectOf(digester)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
-    local menu = Needs.addSubMenu(context, getText("IGUI_RenewableEnergy_Digester_" .. summary.tier))
+    local menu = Needs.addSubMenu(context, getText(Digester.nameKey(summary.tier)))
     menu:addOption(getText("ContextMenu_RenewableEnergy_DigesterStatus"), playerNum, RenewableEnergy.InfoAction.queue, digester,
         DigesterWindow.open)
 

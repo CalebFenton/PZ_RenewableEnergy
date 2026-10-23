@@ -8,6 +8,7 @@
 --
 -- Units: fuel in kilograms (an item's weight), time in game hours.
 
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/GlobalObjects"
 
@@ -112,8 +113,7 @@ function Gasifier.isPacking(item)
     return PACKING[item:getFullType()] == true
 end
 
--- The containers' AcceptItemFunctions: not saved with them, so every side sets them whenever a
--- gasifier loads or is placed (Gasifier.adoptContainers).
+-- The containers' AcceptItemFunctions (Gasifier.adoptContainer).
 function Gasifier.acceptFuel(container, item)
     return Gasifier.fuelKg(item) ~= nil
 end
@@ -129,8 +129,8 @@ local ACCEPT = {
 
 function Gasifier.adoptContainer(container)
     local accept = container and ACCEPT[container:getType()]
-    if accept and container:getAcceptItemFunction() == nil then
-        container:setAcceptItemFunction(accept)
+    if accept then
+        RenewableEnergy.adoptContainer(container, accept)
     end
 end
 
@@ -202,7 +202,7 @@ end
 
 --- The tier of a gasifier tile, or nil for any other object.
 function Gasifier.tierOf(isoObject)
-    local kind, tier = Sprites.kindOf(Sprites.nameOf(isoObject))
+    local kind, tier = Sprites.kindOfObject(isoObject)
     return kind == "gasifier" and tier or nil
 end
 
@@ -210,11 +210,15 @@ function Gasifier.isGasifier(isoObject)
     return isoObject ~= nil and Gasifier.tierOf(isoObject) ~= nil
 end
 
+--- The translation key of the name of a gasifier of `tier`.
+function Gasifier.nameKey(tier)
+    return "IGUI_RenewableEnergy_Gasifier_" .. tier
+end
+
 Gasifier.isLitOverlay = Sprites.matcher(Sprites.gasifierLit)
 Gasifier.isPipeOverlay = Sprites.matcher(Sprites.gasifierPipe)
 
--- A step toward each side, in squares.
-local SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
+local SIDE_STEPS = RenewableEnergy.SIDE_STEPS
 
 --- The side of (x, y) that (tx, ty), a square next to it, is on: "N", "E", "S" or "W", or nil if
 --- it isn't one of the four beside it.

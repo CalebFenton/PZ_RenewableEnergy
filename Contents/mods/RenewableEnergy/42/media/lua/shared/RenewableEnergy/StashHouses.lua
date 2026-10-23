@@ -1,3 +1,4 @@
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 
 -- Stash houses: buildings of the Muldraugh, KY map that the game's StashSystem stocks with a crate
@@ -25,18 +26,6 @@ local ANNOTATED_MAP = "Stash_AnnotedMap"
 
 local PENCIL = { 0.2, 0.2, 0.24 }
 local RED_MARKER = { 0.62, 0.1, 0.08 }
-
--- { weight, list } for each list of `lists`, followed by those of `rest`.
-local function weighted(weight, lists, rest)
-    local entries = {}
-    for _, list in ipairs(lists) do
-        table.insert(entries, { weight, list })
-    end
-    for _, entry in ipairs(rest or {}) do
-        table.insert(entries, entry)
-    end
-    return entries
-end
 
 -- The corpse loot of every survivalist and bandit outfit, early, mid and late game.
 local SURVIVALISTS_AND_BANDITS = {}
@@ -76,7 +65,8 @@ local HOUSES = {
         crateX = 7985, crateY = 12341, crateZ = 0,
         barricades = 90,
         traps = "1-3",
-        mapLoot = weighted(2, SURVIVALISTS_AND_BANDITS, weighted(1, PREPPER_CACHES)),
+        mapLoot = RenewableEnergy.weightedEntries(1, PREPPER_CACHES,
+            RenewableEnergy.weightedEntries(2, SURVIVALISTS_AND_BANDITS)),
         marks = {
             { symbol = "X", x = 7984, y = 12342, color = RED_MARKER },
             { note = 1, x = 7993, y = 12331 },

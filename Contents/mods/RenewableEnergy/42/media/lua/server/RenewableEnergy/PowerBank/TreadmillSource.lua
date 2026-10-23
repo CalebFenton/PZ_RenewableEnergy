@@ -23,15 +23,12 @@ local LEFT_WH = 0.001
 -- unwiring teaches nothing, as a bank's part teaches only its first wiring (PowerBank.WIRED_ONCE).
 local WIRED_ONCE = "RenewableEnergy_treadmillWiredOnce"
 
---- Wires the treadmill tile `object` to feed a bank. Returns whether this is the first time the
---- tile was ever wired.
-function TreadmillSource.wire(object)
-    local data = object:getModData()
-    local first = not data[WIRED_ONCE]
-    data[Treadmill.WIRED] = true
-    data[WIRED_ONCE] = true
+--- Wires the treadmill tile `object` to feed a bank, teaching `player` (if any) the wiring the
+--- first time the tile is ever wired.
+function TreadmillSource.wire(object, player)
+    object:getModData()[Treadmill.WIRED] = true
+    RenewableEnergy.teachOnce(player, object, WIRED_ONCE, Perks.Electricity, Specs.treadmill.wiring.xp)
     object:transmitModData()
-    return first
 end
 
 --- Unwires the treadmill tile `object`. Its wire comes back, as a bank's part gives back its wire:

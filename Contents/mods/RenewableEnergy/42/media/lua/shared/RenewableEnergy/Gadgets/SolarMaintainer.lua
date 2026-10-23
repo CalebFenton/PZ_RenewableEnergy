@@ -17,18 +17,13 @@ SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 -- Battery part modData: set while a maintainer is attached.
 SolarMaintainer.ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"
 
---- The vehicle's Battery part, which holds the maintainer's mark, or nil.
-function SolarMaintainer.batteryPart(vehicle)
-    return vehicle and vehicle:getPartById(VehicleBattery.PART)
-end
-
 function SolarMaintainer.isAttached(vehicle)
-    local part = SolarMaintainer.batteryPart(vehicle)
+    local part = VehicleBattery.partOf(vehicle)
     return part ~= nil and part:getModData()[SolarMaintainer.ATTACHED_KEY] ~= nil
 end
 
 function SolarMaintainer.canAttach(vehicle)
-    return SolarMaintainer.batteryPart(vehicle) ~= nil and not SolarMaintainer.isAttached(vehicle)
+    return VehicleBattery.partOf(vehicle) ~= nil and not SolarMaintainer.isAttached(vehicle)
 end
 
 return SolarMaintainer

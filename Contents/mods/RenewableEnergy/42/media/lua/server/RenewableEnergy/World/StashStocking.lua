@@ -10,6 +10,13 @@ require "RenewableEnergy/Chance"
 
 local Stash, Chance = RenewableEnergy.Stash, RenewableEnergy.Chance
 
+--- The house's building on the map, loaded or not, found as StashSystem finds it: the building of
+--- the ground floor room at its buildingX, buildingY. Nil if there is none.
+function Stash.buildingOf(description)
+    local room = getWorld():getMetaGrid():getRoomAt(description.buildingX, description.buildingY, 0)
+    return room and room:getBuilding()
+end
+
 --- Stocks each house that rolls its knownOnStart chance. StashSystem.prepareBuildingStash also
 --- records the stash as a map already read, and the world map draws every such entry as a found
 --- map (ISWorldMap.renderStashMaps), which would give the house away on day one.
@@ -36,12 +43,10 @@ function Stash.relistUnfound()
         listed[possible:get(i):getName()] = true
     end
     local alreadyRead = StashSystem.getAlreadyReadMap()
-    local metaGrid = getWorld():getMetaGrid()
     for description in pairs(Stash.descriptions) do
         local name = description.name
         if not listed[name] and not alreadyRead:contains(name) then
-            local room = metaGrid:getRoomAt(description.buildingX, description.buildingY, 0)
-            local building = room and room:getBuilding()
+            local building = Stash.buildingOf(description)
             if building and not building:isHasBeenVisited() then
                 possible:add(StashBuilding.new(name, description.buildingX, description.buildingY))
             end

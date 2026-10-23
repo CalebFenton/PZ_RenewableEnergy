@@ -33,7 +33,7 @@ GasHeater.LIGHT = "LightHeater"
 GasHeater.OFF = "HeaterOff"
 
 function GasHeater.isHeater(object)
-    return Sprites.kindOf(Sprites.nameOf(object)) == "gasHeater"
+    return Sprites.kindOfObject(object) == "gasHeater"
 end
 
 function GasHeater.isLit(object)
@@ -42,16 +42,9 @@ end
 
 -- The first object within REACH of `object`'s square on its level that `matches`, or nil.
 local function findNear(object, matches)
-    local x, y, z = object:getX(), object:getY(), object:getZ()
-    for dx = -GasHeater.REACH, GasHeater.REACH do
-        for dy = -GasHeater.REACH, GasHeater.REACH do
-            local found = RenewableEnergy.findObjectOn(getSquare(x + dx, y + dy, z), matches)
-            if found then
-                return found
-            end
-        end
-    end
-    return nil
+    return RenewableEnergy.eachSquareAround(object:getX(), object:getY(), object:getZ(), GasHeater.REACH, function(square)
+        return RenewableEnergy.findObjectOn(square, matches)
+    end)
 end
 
 --- The digester `heater` warms, or nil. This alone decides which, for the warmth and the gas.

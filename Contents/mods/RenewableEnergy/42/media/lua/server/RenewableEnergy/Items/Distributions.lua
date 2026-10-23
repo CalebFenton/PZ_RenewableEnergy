@@ -1,6 +1,7 @@
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/PowerBank/Battery"
@@ -213,12 +214,7 @@ local HOME_OTHER_SHELVES = { "proc:LivingRoomWardrobe", "proc:RecRoomShelf", "pr
 -- Randomized survivor safehouses' (RBSafehouse) bookshelves and hearths.
 local SAFEHOUSE_READING = { "proc:SafehouseFireplace", "proc:SafehouseFireplace_Late" }
 
-local function with(weight, lists, entries)
-    for _, list in ipairs(lists) do
-        table.insert(entries, { weight, list })
-    end
-    return entries
-end
+local weighted = RenewableEnergy.weightedEntries
 
 Distributions.items = {
     -- Scavenger: the first magazine, plug-in power and the solar gadgets
@@ -227,8 +223,9 @@ Distributions.items = {
         -- town's worth of houses.
         fullType = "RenewableEnergy.HomesteadPowerMag1",
         option = "LRMMisc",
-        entries = with(2, SURVIVOR_CRATES, with(1, SURVIVALIST_CORPSES, with(0.6, HOME_SHELVES,
-            with(0.4, HOME_SIDE_TABLES, with(0.6, HOME_OTHER_SHELVES, with(0.5, SAFEHOUSE_READING, {
+        entries = weighted(2, SURVIVOR_CRATES, weighted(1, SURVIVALIST_CORPSES,
+            weighted(0.6, HOME_SHELVES, weighted(0.4, HOME_SIDE_TABLES,
+            weighted(0.6, HOME_OTHER_SHELVES, weighted(0.5, SAFEHOUSE_READING, {
             { 6, "proc:ElectronicStoreMagazines" },
             { 2, "proc:ToolStoreBooks" },
             { 2, "proc:BookstoreBlueCollar" },
@@ -263,7 +260,7 @@ Distributions.items = {
         -- glove boxes and trunks and ended up in garages and junk drawers.
         fullType = "RenewableEnergy.PlugInInverter",
         option = "LRMMisc",
-        entries = with(1, SURVIVOR_CRATES, {
+        entries = weighted(1, SURVIVOR_CRATES, {
             { 2, "proc:CarSupplyTools" },
             { 2, "proc:CarSupplyBatteries" },
             { 2, "proc:GasStoreEmergency" },
@@ -292,7 +289,7 @@ Distributions.items = {
     {
         fullType = RenewableEnergy.SolarMaintainer.ITEM,
         option = "LRMMisc",
-        entries = with(1, SURVIVOR_CRATES, {
+        entries = weighted(1, SURVIVOR_CRATES, {
             -- Kept on the batteries of RVs, boats and seasonal tractors.
             { 2, "proc:CarSupplyBatteries" },
             { 1, "proc:CarSupplyTools" },
@@ -315,7 +312,7 @@ Distributions.items = {
     {
         fullType = RenewableEnergy.SolarCellCharger.ITEM,
         option = "LRMMisc",
-        entries = with(1.5, SURVIVOR_CRATES, {
+        entries = weighted(1.5, SURVIVOR_CRATES, {
             { 2, "proc:ElectronicStoreMisc" },
             { 1, "proc:GigamartHouseElectronics" },
             { 2, "proc:CampingStoreLighting" },
@@ -349,8 +346,9 @@ Distributions.items = {
         -- Turns up wherever the first magazine does, homes included, but less often.
         fullType = "RenewableEnergy.HomesteadPowerMag2",
         option = "LRMMisc",
-        entries = with(1.5, SURVIVOR_CRATES, with(0.5, SURVIVALIST_CORPSES, with(0.3, HOME_SHELVES,
-            with(0.2, HOME_SIDE_TABLES, with(0.3, HOME_OTHER_SHELVES, with(0.3, SAFEHOUSE_READING, {
+        entries = weighted(1.5, SURVIVOR_CRATES, weighted(0.5, SURVIVALIST_CORPSES,
+            weighted(0.3, HOME_SHELVES, weighted(0.2, HOME_SIDE_TABLES,
+            weighted(0.3, HOME_OTHER_SHELVES, weighted(0.3, SAFEHOUSE_READING, {
             { 3, "proc:ElectronicStoreMagazines" },
             { 1.5, "proc:BookstoreBlueCollar" },
             { 1, "proc:ToolStoreBooks" },
@@ -378,7 +376,8 @@ Distributions.items = {
         -- its recipes too.
         fullType = "RenewableEnergy.HomesteadPowerMag3",
         option = "LRMMisc",
-        entries = with(1, SURVIVOR_CRATES, with(0.3, SURVIVALIST_CORPSES, with(0.3, SAFEHOUSE_READING, {
+        entries = weighted(1, SURVIVOR_CRATES, weighted(0.3, SURVIVALIST_CORPSES,
+            weighted(0.3, SAFEHOUSE_READING, {
             { 3, "proc:BookstoreFarming" },
             { 2, "proc:Homesteading" },
             { 1.5, "proc:ToolStoreFarming" },
@@ -394,7 +393,8 @@ Distributions.items = {
         -- and civil defense, libraries and the army surplus that sold it on; and preppers.
         fullType = "RenewableEnergy.FemaPamphlet",
         option = "LRMMisc",
-        entries = with(1, SURVIVOR_CRATES, with(0.5, SURVIVALIST_CORPSES, with(0.2, SAFEHOUSE_READING, {
+        entries = weighted(1, SURVIVOR_CRATES, weighted(0.5, SURVIVALIST_CORPSES,
+            weighted(0.2, SAFEHOUSE_READING, {
             { 2, "proc:PostOfficeMagazines" },
             { 1, "proc:PoliceDesk" },
             { 1, "proc:FireStorageTools" },
@@ -409,7 +409,8 @@ Distributions.items = {
         -- since the skills teach its recipes too.
         fullType = "RenewableEnergy.HomesteadPowerMag4",
         option = "LRMMisc",
-        entries = with(1, SURVIVOR_CRATES, with(0.3, SURVIVALIST_CORPSES, with(0.3, SAFEHOUSE_READING, {
+        entries = weighted(1, SURVIVOR_CRATES, weighted(0.3, SURVIVALIST_CORPSES,
+            weighted(0.3, SAFEHOUSE_READING, {
             { 2, "proc:BookstoreFarming" },
             { 1.5, "proc:Homesteading" },
             { 1, "proc:ToolStoreFarming" },
@@ -424,7 +425,7 @@ Distributions.items = {
     {
         fullType = Specs.factoryModule,
         option = "LRMSolarPanels",
-        entries = with(2, SURVIVOR_CRATES, {
+        entries = weighted(2, SURVIVOR_CRATES, {
             -- RV roofs, installers' stock, preppers, telecom repeaters and arrow boards. Twice what
             -- the batteries' lists give, against the banks and car batteries a player finds besides.
             { 2, "veh:CamperTruckBed" },
@@ -449,7 +450,7 @@ Distributions.items = {
     {
         fullType = "RenewableEnergy.PowerInverter",
         option = "LRMMisc",
-        entries = with(1, SURVIVOR_CRATES, {
+        entries = weighted(1, SURVIVOR_CRATES, {
             { 1, "proc:CarSupplyBatteries" },
             { 0.5, "proc:CarSupplyTools" },
             { 0.5, "proc:MechanicShelfElectric" },
@@ -469,7 +470,7 @@ Distributions.items = {
     {
         fullType = "RenewableEnergy.ChargeController",
         option = "LRMMisc",
-        entries = with(0.8, SURVIVOR_CRATES, {
+        entries = weighted(0.8, SURVIVOR_CRATES, {
             { 1, "proc:ElectricianTools" },
             { 0.5, "proc:GeneratorRoom" },
             { 0.5, "proc:ControlRoomCounter" },
@@ -489,7 +490,7 @@ Distributions.items = {
     {
         fullType = "RenewableEnergy.DeepCycleBattery",
         option = "LRMBatteries",
-        entries = with(0.5, SURVIVOR_CRATES, {
+        entries = weighted(0.5, SURVIVOR_CRATES, {
             -- Far rarer than car batteries there.
             { 2, "proc:CarSupplyBatteries" },
             { 1, "proc:MechanicShelfElectric" },
@@ -519,7 +520,7 @@ Distributions.items = {
     {
         fullType = "RenewableEnergy.InverterCharger",
         option = "LRMMisc",
-        entries = with(0.3, SURVIVOR_CRATES, {
+        entries = weighted(0.3, SURVIVOR_CRATES, {
             { 0.3, "proc:GeneratorRoom" },
             { 0.3, "proc:ControlRoomCounter" },
             { 0.1, "proc:ArmyStorageElectronics" },
@@ -533,7 +534,7 @@ Distributions.items = {
     {
         fullType = "RenewableEnergy.L16Battery",
         option = "LRMBatteries",
-        entries = with(0.2, SURVIVOR_CRATES, {
+        entries = weighted(0.2, SURVIVOR_CRATES, {
             { 0.5, "proc:CrateBatteries" },
             { 0.2, "proc:GeneratorRoom" },
             { 0.2, "proc:ControlRoomCounter" },
@@ -696,18 +697,26 @@ Distributions.CRACKED_MODULE_CONTAINERS = {
 -- "junkyard"): someone pulled the panel off an RV.
 Distributions.CRACKED_MODULE_JUNKYARD = 3
 
+--- The cracked-module weight of a container of `containerType` in a room named `roomName`; 0 if
+--- it keeps none.
+function Distributions.crackedModuleRoomWeight(roomName, containerType)
+    return Distributions.CRACKED_MODULE_CONTAINERS[containerType] and Distributions.CRACKED_MODULE_ROOMS[roomName] or 0
+end
+
+--- The cracked-module weight of the container of the part `partId` of a vehicle in the vehicle
+--- zone `zoneName`; 0 if it keeps none.
+function Distributions.crackedModuleVehicleWeight(zoneName, partId)
+    local isCargo = string.find(partId, "Trunk") or string.find(partId, "TruckBed")
+    return (zoneName == "junkyard" and isCargo) and Distributions.CRACKED_MODULE_JUNKYARD or 0
+end
+
 local function crackedModuleWeight(roomName, containerType, container)
     local vehicle = container:getVehicle()
     if vehicle then
         local part = container:getVehiclePart()
-        local partId = part and part:getId() or ""
-        local isCargo = string.find(partId, "Trunk") or string.find(partId, "TruckBed")
-        return (vehicle:getZone() == "junkyard" and isCargo) and Distributions.CRACKED_MODULE_JUNKYARD or 0
+        return Distributions.crackedModuleVehicleWeight(vehicle:getZone(), part and part:getId() or "")
     end
-    if Distributions.CRACKED_MODULE_CONTAINERS[containerType] then
-        return Distributions.CRACKED_MODULE_ROOMS[roomName] or 0
-    end
-    return 0
+    return Distributions.crackedModuleRoomWeight(roomName, containerType)
 end
 
 --- The chance that a container of this weight gets a cracked module, at the save's options.

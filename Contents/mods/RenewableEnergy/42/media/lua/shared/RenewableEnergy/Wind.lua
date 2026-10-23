@@ -1,9 +1,6 @@
 -- Wind chargers: output from the game's wind (ClimateManager.getWindspeedKph, no day/night cycle),
 -- the power curve, height and shelter; plus the brake and broken-blade modData, written only on
 -- the authority (RenewableEnergy.WindSource).
---
--- Shelter has no direction: the game's wind angle is a screen-space value for weather effects
--- (ClimateManager.getWindAngleDegrees), so every side counts.
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Sources"
@@ -67,49 +64,6 @@ end
 --- Whether wind of `kph` can break a turbine of `spec` left running (only specs with breakKph can).
 function Wind.canBreak(spec, kph)
     return spec.breakKph ~= nil and kph >= spec.breakKph
-end
-
--- Whether the column at (x, y) shelters a turbine on level `z`: a tree near the ground, a building
--- at least as tall, or a solid wall on the turbine's level, the map's or one a player built. See-through
--- walls (windows, wire fences) and low fences let the wind through.
-local function blocks(x, y, z)
-    local ground = getSquare(x, y, 0)
-    if not ground then
-        return 0
-    end
-    if z <= 1 and ground:HasTree() then
-        return 1
-    end
-    local building = ground:getBuilding()
-    if building and building:getDef() and building:getDef():getMaxLevel() >= z then
-        return 1
-    end
-    local square = z == 0 and ground or getSquare(x, y, z)
-    local properties = square and square:getProperties()
-    if properties and (properties:has(IsoFlagType.WallN) or properties:has(IsoFlagType.WallW)
-            or properties:has(IsoFlagType.WallNW)) then
-        return 1
-    end
-    return 0
-end
-
---- The share of the ring of squares around (x, y) on the ground, out to Specs.wind.shelterRadius,
---- that shelters a turbine on level `z`: 0 in the open, 1 hemmed in.
-function Wind.shelterAt(x, y, z)
-    local radius = Specs.wind.shelterRadius
-    local blocked, count = 0, 0
-    for dx = -radius, radius do
-        for dy = -radius, radius do
-            local distance = math.sqrt(dx * dx + dy * dy)
-            if distance >= 1 and distance <= radius then
-                -- Nearer obstacles count for more.
-                local weight = 1 - (distance - 1) / radius
-                blocked = blocked + weight * blocks(x + dx, y + dy, z)
-                count = count + weight
-            end
-        end
-    end
-    return count > 0 and blocked / count or 0
 end
 
 --- The build menu's OnCreate for every wind charger, on the authority. Single player fires no

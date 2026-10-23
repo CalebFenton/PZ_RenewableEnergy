@@ -2,6 +2,8 @@
 -- same in every language, so they are not translated (m³ is a translation key only for its
 -- character; see Format.cubicMetres).
 
+require "RenewableEnergy/Utilities"
+
 RenewableEnergy = RenewableEnergy or {}
 local Format = {}
 RenewableEnergy.Format = Format
@@ -44,17 +46,32 @@ function Format.temperature(celsius)
     return Temperature.getRoundedDisplayTemperature(celsius) .. " " .. Temperature.getTemperaturePostfix()
 end
 
+-- `value` with `places` decimals: "1.5".
+function Format.number(value, places)
+    return string.format("%." .. places .. "f", value)
+end
+
+-- "2.5 kg" of fuel, to a tenth.
+function Format.kilograms(kg)
+    return Format.number(kg, 1) .. " kg"
+end
+
+-- "1.5 L" with `places` decimals.
+function Format.litres(litres, places)
+    return Format.number(litres, places) .. " L"
+end
+
 -- "1.25 m³" with `places` decimals. The symbol comes from a translation, which is read as UTF-8:
 -- the Lua compiler turns any non-ASCII character in a literal into "?" (Kahlua's LexState keeps
 -- each source character as one byte, then decodes the bytes as UTF-8).
 function Format.cubicMetres(m3, places)
-    return getText("IGUI_RenewableEnergy_CubicMetres", string.format("%." .. places .. "f", m3))
+    return getText("IGUI_RenewableEnergy_CubicMetres", Format.number(m3, places))
 end
 
 -- "72%": an item's condition as a share of its type's ConditionMax (vanilla's default when the
 -- script names none, as for the Car Battery Charger).
 function Format.condition(fullType, condition)
-    return Format.percent(condition / getScriptManager():FindItem(fullType):getConditionMax())
+    return Format.percent(condition / RenewableEnergy.conditionMaxOf(fullType))
 end
 
 -- Vanilla translates both forms of each unit into every language.

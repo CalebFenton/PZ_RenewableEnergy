@@ -92,7 +92,7 @@ local function pourWater(character, litres)
         local take = math.min(left, fluid:getAmount())
         if take > 0 then
             fluid:removeFluid(take, false)
-            syncItemFields(character, item)
+            item:syncItemFields()
             left = left - take
         end
         if left <= 0 then

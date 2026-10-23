@@ -10,10 +10,15 @@ RenewableEnergy.GasJobMenu = GasJobMenu
 
 local Needs = RenewableEnergy.Needs
 
+--- The translation key of `job`'s name in a menu.
+function GasJobMenu.labelKey(job)
+    return "ContextMenu_RenewableEnergy_" .. job
+end
+
 --- Adds the option for `feature`'s `job` at `target` to `menu`, with `with` what the job works with
---- (RenewableEnergyGasAction), named `label` or the job's own name: greyed out with the target's
---- state when that refuses it, else saying it's too dark for a job that needs light, else with the
---- needs listed when the character lacks any, else with what is wrong with `with`. A job its
+--- (RenewableEnergyGasAction), named `label` or the job's own name: greyed out saying it's too
+--- dark for a job that needs light, else with the target's state when that refuses it, else with
+--- the needs listed when the character lacks any, else with what is wrong with `with`. A job its
 --- target's state refuses that belongs to another state of it (hideBlocked) is left out, as is one
 --- at a target this side can't read. Returns the option, or nil when left out.
 function GasJobMenu.add(menu, playerNum, feature, job, target, with, label)
@@ -27,8 +32,8 @@ function GasJobMenu.add(menu, playerNum, feature, job, target, with, label)
         return nil
     end
     local character = getSpecificPlayer(playerNum)
-    blocker = blocker or Needs.tooDark(character, Jobs.needsLight(job))
-    local option = menu:addOption(label or getText("ContextMenu_RenewableEnergy_" .. job), playerNum,
+    blocker = Needs.tooDark(character, Jobs.needsLight(job)) or blocker
+    local option = menu:addOption(label or getText(GasJobMenu.labelKey(job)), playerNum,
         RenewableEnergyGasAction.queue, feature, job, target, with)
     Needs.show(option, Jobs.needs(character, job, subject, with), blocker)
     Needs.refuse(option, not option.notAvailable and Jobs.check(character, job, subject, with))

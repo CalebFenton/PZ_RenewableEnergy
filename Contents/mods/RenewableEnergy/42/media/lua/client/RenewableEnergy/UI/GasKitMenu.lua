@@ -16,8 +16,8 @@ local GasKit, Needs, GasJobMenu = RenewableEnergy.GasKit, RenewableEnergy.Needs,
 
 -- "Barrel Digester (6 squares)": a source Connect Gas Line can run to, by its name and distance.
 local function sourceLabel(generator, source)
-    local spec = GasKit.SOURCES[GasKit.sourceKind(source)]
-    return getText("ContextMenu_RenewableEnergy_LineTo", getText(spec.nameKey .. spec.tierOf(source)),
+    local owner = GasKit.SOURCES[GasKit.sourceKind(source)].owner
+    return getText("ContextMenu_RenewableEnergy_LineTo", getText(owner.nameKey(owner.tierOf(source))),
         round(GasKit.lineLength(generator, source)))
 end
 
@@ -37,7 +37,7 @@ function GasKitMenu.addOptions(playerNum, menu, generator)
         addJob(menu, playerNum, GasKit.DISCONNECT, generator)
     else
         local sources = GasKit.sourcesNear(generator)
-        local label = getText("ContextMenu_RenewableEnergy_" .. GasKit.CONNECT)
+        local label = getText(GasJobMenu.labelKey(GasKit.CONNECT))
         if #sources == 0 then
             Needs.refuse(menu:addOption(label), "Tooltip_RenewableEnergy_NoDigesterInReach", GasKit.REACH)
         else
@@ -59,7 +59,7 @@ local function generatorMenu(context)
 end
 
 function GasKitMenu.onFill(playerNum, context, worldobjects, test)
-    local generator = Needs.findClicked(worldobjects, GasKit.isGenerator)
+    local generator = Needs.findClicked(worldobjects, RenewableEnergy.isGenerator)
     if not generator then
         return
     end

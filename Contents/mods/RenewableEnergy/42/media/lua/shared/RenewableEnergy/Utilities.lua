@@ -18,15 +18,33 @@ function RenewableEnergy.findObjectOn(square, matches)
     return nil
 end
 
---- Takes `item` from `character`: out of their hands and out of the container that holds it, and
---- tells the clients. Authority only.
-function RenewableEnergy.takeItem(character, item)
-    character:removeFromHands(item)
+-- The sends act only in multiplayer (LuaManager's sendAddItemToContainer and
+-- sendRemoveItemFromContainer), so single player needs no guard around them.
+
+--- Takes `item` out of the container that holds it, if any, and tells the clients. Authority only.
+function RenewableEnergy.removeItem(item)
     local container = item:getContainer()
     if container then
         container:Remove(item)
         sendRemoveItemFromContainer(container, item)
     end
+end
+
+--- Puts `itemOrType`, an item or a full type, in `container` and tells the clients. Returns the
+--- item, or nil when the type names none. Authority only.
+function RenewableEnergy.addItem(container, itemOrType)
+    local item = container:AddItem(itemOrType)
+    if item then
+        sendAddItemToContainer(container, item)
+    end
+    return item
+end
+
+--- Takes `item` from `character`: out of their hands and out of the container that holds it, and
+--- tells the clients. Authority only.
+function RenewableEnergy.takeItem(character, item)
+    character:removeFromHands(item)
+    RenewableEnergy.removeItem(item)
 end
 
 --- Takes `count` items of `fullType` from `character`'s inventory, bags included. Authority only.
@@ -47,6 +65,15 @@ function RenewableEnergy.giveItems(character, itemOrType, count)
     end
 end
 
+--- Gives `container` the AcceptItemFunction `fnName` (a path from the global table, where
+--- ItemContainer finds it) unless it has one. The filter is neither saved nor sent, so every side
+--- sets it on its own copy whenever the object loads or is placed.
+function RenewableEnergy.adoptContainer(container, fnName)
+    if container and container:getAcceptItemFunction() == nil then
+        container:setAcceptItemFunction(fnName)
+    end
+end
+
 function RenewableEnergy.notBroken(item)
     return not item:isBroken()
 end
@@ -54,6 +81,16 @@ end
 --- Whether `character` carries a working tool with `tag` (an ItemTag value), bags included.
 function RenewableEnergy.hasWorkingTool(character, tag)
     return character:getInventory():containsTagEvalRecurse(tag, RenewableEnergy.notBroken)
+end
+
+--- Appends a loot entry { weight, list } to `entries` (a new table when nil) for each list of
+--- `lists`, and returns `entries`.
+function RenewableEnergy.weightedEntries(weight, lists, entries)
+    entries = entries or {}
+    for _, list in ipairs(lists) do
+        table.insert(entries, { weight, list })
+    end
+    return entries
 end
 
 --- Whether two values are the same, tables by what they hold, at any depth. Summaries compare
@@ -82,10 +119,65 @@ function RenewableEnergy.unitsPerMinute()
     return 2 * getGameTime():getMinutesPerDay()
 end
 
+--- Action units per real second at normal speed, whatever the day length: an in-game minute is
+--- unitsPerMinute() units and lasts minutesPerDay / 24 real seconds.
+RenewableEnergy.UNITS_PER_SECOND = 48
+
+--- Queues the walk of `playerNum`'s character to beside `square`, keeping their queue, and returns
+--- the character, or nil when no square beside it can be reached (luautils.walkAdj). Client only.
+function RenewableEnergy.walkTo(playerNum, square)
+    local character = getSpecificPlayer(playerNum)
+    return luautils.walkAdj(character, square, true) and character or nil
+end
+
 --- Whether `object` is still in the world, rather than a copy left behind by a removal or a
 --- chunk reload.
 function RenewableEnergy.onSquare(object)
     return object ~= nil and object:getObjectIndex() ~= -1
+end
+
+--- The game hours since `record.lastHour`, at most `longest`, and stamps `record.lastHour` with
+--- now; 0 for a record never stamped. The cap keeps a save loaded after the clock jumped from
+--- making up days at once.
+function RenewableEnergy.hoursSince(record, longest)
+    local now = getGameTime():getWorldAgeHours()
+    local hours = math.min(longest, now - (record.lastHour or now))
+    record.lastHour = now
+    return hours
+end
+
+--- Marks `holder` (an item or a placed object) under its modData `key` and, the first time it is
+--- marked, gives `character` (if any) `xp` of `perk`: a job teaches only the first time it is done
+--- on the thing. Returns whether this was the first time. Authority only; the caller sends a placed
+--- object's modData on.
+function RenewableEnergy.teachOnce(character, holder, key, perk, xp)
+    local data = holder:getModData()
+    if data[key] then
+        return false
+    end
+    data[key] = true
+    if character then
+        addXp(character, perk, xp)
+    end
+    return true
+end
+
+--- Whether `object` is a vanilla generator: an IsoGenerator that isn't a battery bank, which is a
+--- generator too (PowerBank.isBank).
+function RenewableEnergy.isGenerator(object)
+    return object ~= nil and instanceof(object, "IsoGenerator") and not RenewableEnergy.PowerBank.isBank(object)
+end
+
+-- Item ConditionMax by full type, read once from the item scripts.
+local CONDITION_MAX = {}
+
+--- The ConditionMax of items of `fullType`, as its item script gives it; 100 for a type with none.
+function RenewableEnergy.conditionMaxOf(fullType)
+    if not CONDITION_MAX[fullType] then
+        local script = getScriptManager():FindItem(fullType)
+        CONDITION_MAX[fullType] = script and script:getConditionMax() or 100
+    end
+    return CONDITION_MAX[fullType]
 end
 
 --- Whether `character` stands within `reach` squares on each axis of the middle of `target`'s
@@ -105,23 +197,46 @@ function RenewableEnergy.withinReach(character, target, reach)
         and math.abs(character:getZ() - square:getZ()) < 1
 end
 
+--- Calls `fn(square)` for every loaded square on level `z` within `radius` squares of x, y on each
+--- axis, x, y included, until one call returns a value other than nil, which this returns.
+function RenewableEnergy.eachSquareAround(x, y, z, radius, fn)
+    for squareX = x - radius, x + radius do
+        for squareY = y - radius, y + radius do
+            local square = getSquare(squareX, squareY, z)
+            local result = square and fn(square)
+            if result ~= nil then
+                return result
+            end
+        end
+    end
+    return nil
+end
+
+--- The step in x and y to the square on each side, by compass letter: north is up the map, -y.
+RenewableEnergy.SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
+
 -- The map's lowest and highest levels (IsoChunk.getGridSquare).
 local LOWEST_LEVEL, HIGHEST_LEVEL = -32, 31
 
---- Whether the square x, y, z is in a generator's reach of `origin` (an IsoGridSquare or an
---- IsoObject on one): GeneratorTileRange squares between square middles and
+--- A generator's reach: GeneratorTileRange squares between square middles and
 --- GeneratorVerticalPowerRange levels, as IsoGenerator.isPoweringSquare measures it. That one reads
 --- copies of the options taken only as a generator is built, so this reads the options.
-function RenewableEnergy.inGeneratorReach(origin, x, y, z)
-    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
-    local dx, dy, dz = x - origin:getX(), y - origin:getY(), z - origin:getZ()
+function RenewableEnergy.generatorReach()
+    return SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
+end
+
+--- Whether the square x, y, z is in a generator's reach (RenewableEnergy.generatorReach) of the
+--- square ox, oy, oz.
+function RenewableEnergy.inGeneratorReach(ox, oy, oz, x, y, z)
+    local radius, levels = RenewableEnergy.generatorReach()
+    local dx, dy, dz = x - ox, y - oy, z - oz
     return z >= LOWEST_LEVEL and z <= HIGHEST_LEVEL and math.abs(dz) <= levels and dx * dx + dy * dy <= radius * radius
 end
 
 --- Calls `fn(square)` for every loaded square in a generator's reach of `origin`
 --- (RenewableEnergy.inGeneratorReach).
 function RenewableEnergy.eachSquareInGeneratorReach(origin, fn)
-    local radius, levels = SandboxVars.GeneratorTileRange, SandboxVars.GeneratorVerticalPowerRange
+    local radius, levels = RenewableEnergy.generatorReach()
     local cx, cy, cz = origin:getX(), origin:getY(), origin:getZ()
     local cell = getCell()
     local radiusSquared = radius * radius
@@ -173,13 +288,11 @@ local function setTileSprite(isoObject, spriteName)
     isoObject:setSprite(getSprite(spriteName))
 end
 
---- Shows `isoObject` as the tile `spriteName` and, on a server, sends the tile to the clients.
---- Authority only.
+--- Shows `isoObject` as the tile `spriteName` and sends the tile to the clients (a server's
+--- transmitUpdatedSpriteToClients; nothing in single player). Authority only.
 function RenewableEnergy.showTile(isoObject, spriteName)
     setTileSprite(isoObject, spriteName)
-    if isServer() then
-        isoObject:transmitUpdatedSpriteToClients()
-    end
+    isoObject:transmitUpdatedSpriteToClients()
 end
 
 --- The game entity script whose SpriteConfig names the tile `spriteName`, or nil: what an object
@@ -209,11 +322,11 @@ function RenewableEnergy.setEntityTile(isoObject, spriteName)
 end
 
 -- A job's needs are a list of what it takes of the character, each { kind, have, need } and the
--- field naming it: `perk` (a Perk) for a skill, `tool` (an ItemTag name) for a tool, `item` (a full
--- type) for items counted by type, `input` (an InputScript) for a recipe's input, `recipe` for a
--- recipe to know (have 1 when known); `label` (text) or `labelKey` (a translation key) names it
--- instead. The same list refuses the job and tells the menu what it lacks, so the two can't
--- disagree.
+-- field naming it: `perk` (a Perk) for a skill, `tool` (an ItemTag name) and `item` (the tool to
+-- name) for a tool, `item` (a full type) for items counted by type, `input` (an InputScript) for a
+-- recipe's input, `recipe` for a recipe to know (have 1 when known); `label` (text) or `labelKey`
+-- (a translation key) names it instead. The same list refuses the job and tells the menu what it
+-- lacks, so the two can't disagree.
 
 --- The first of `needs` the character is short of, or nil when they have them all.
 function RenewableEnergy.firstUnmet(needs)

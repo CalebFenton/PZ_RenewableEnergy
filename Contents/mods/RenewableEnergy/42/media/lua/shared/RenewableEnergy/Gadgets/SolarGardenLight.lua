@@ -48,7 +48,7 @@ local LAMP_COLOR = { r = 1.0, g = 0.8, b = 0.55 }
 local lamps = {}
 
 function SolarGardenLight.isLight(isoObject)
-    return Sprites.kindOf(Sprites.nameOf(isoObject)) == "gardenLight"
+    return Sprites.kindOfObject(isoObject) == "gardenLight"
 end
 
 function SolarGardenLight.isLit(isoObject)
@@ -64,7 +64,7 @@ function SolarGardenLight.findOn(square)
     return RenewableEnergy.findObjectOn(square, SolarGardenLight.isLight)
 end
 
-function SolarGardenLight.getCharge(light)
+function SolarGardenLight.getChargeWh(light)
     return light:getModData()[SolarGardenLight.CHARGE_KEY] or 0
 end
 

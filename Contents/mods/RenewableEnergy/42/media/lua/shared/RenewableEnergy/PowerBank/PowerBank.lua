@@ -7,6 +7,7 @@
 -- copies its small `summary` to every client; the whole `status` goes only to players watching it.
 
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Materials"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 
@@ -14,7 +15,7 @@ RenewableEnergy = RenewableEnergy or {}
 local PowerBank = {}
 RenewableEnergy.PowerBank = PowerBank
 
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
+local Specs, Sprites, Materials = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Materials
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
 -- The sendServerCommand module that carries a bank's status to the players watching it.
@@ -185,46 +186,41 @@ function PowerBank.acceptItem(container, item)
     return false
 end
 
---- Gives a bank's container its filter, acceptItem by the dotted path the game resolves. The
---- filter is neither saved nor sent, so every side sets it on its own copy.
+--- Gives a bank's container its filter (RenewableEnergy.adoptContainer).
 function PowerBank.adoptContainer(container)
-    if container and container:getAcceptItemFunction() == nil then
-        container:setAcceptItemFunction("RenewableEnergy.PowerBank.acceptItem")
-    end
+    RenewableEnergy.adoptContainer(container, "RenewableEnergy.PowerBank.acceptItem")
 end
 
--- Adds a need to a list for RenewableEnergy.firstUnmet, unless nothing of it is needed.
-local function addNeed(needs, need)
-    if need.need > 0 then
-        table.insert(needs, need)
+--- What a wiring job of `wiring` (as Specs.wiring's) takes, as a materials list
+--- (RenewableEnergy.Materials): its Electricity level, tools, wire and scrap, leaving out what it
+--- takes none of.
+function PowerBank.wiringMaterials(wiring)
+    local list = {}
+    if wiring.skill > 0 then
+        table.insert(list, { perk = "Electricity", need = wiring.skill })
     end
-end
-
--- Adds a need for each of `tools` (ItemTag names) to a list for RenewableEnergy.firstUnmet.
-local function addToolNeeds(needs, character, tools)
-    for _, tool in ipairs(tools) do
-        addNeed(needs, { kind = "tool", tool = tool, have = RenewableEnergy.hasWorkingTool(character, ItemTag[tool]) and 1 or 0, need = 1 })
+    for _, tool in ipairs(wiring.tools) do
+        table.insert(list, tool)
     end
+    if wiring.wire > 0 then
+        table.insert(list, { item = PowerBank.WIRE, need = wiring.wire })
+    end
+    if wiring.scrap > 0 then
+        table.insert(list, { item = PowerBank.SCRAP, need = wiring.scrap })
+    end
+    return list
 end
 
 --- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`, for
 --- RenewableEnergy.firstUnmet.
 function PowerBank.jobNeeds(character, wiring)
-    local inventory = character:getInventory()
-    local needs = {}
-    addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = wiring.skill })
-    addToolNeeds(needs, character, wiring.tools)
-    addNeed(needs, { kind = "wire", item = PowerBank.WIRE, have = inventory:getCountTypeRecurse(PowerBank.WIRE), need = wiring.wire })
-    addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = inventory:getCountTypeRecurse(PowerBank.SCRAP), need = wiring.scrap })
-    return needs
+    return Materials.needs(character, PowerBank.wiringMaterials(wiring))
 end
 
 --- What undoing a wiring job of `wiring` takes of `character`: its tools, as vanilla takes a car
 --- part's install tools to uninstall it. For RenewableEnergy.firstUnmet.
 function PowerBank.unwiringNeeds(character, wiring)
-    local needs = {}
-    addToolNeeds(needs, character, wiring.tools)
-    return needs
+    return Materials.needs(character, wiring.tools)
 end
 
 --- What wiring a part of type `fullType` into a bank takes of `character`, for
@@ -234,7 +230,7 @@ function PowerBank.wiringNeeds(character, fullType)
 end
 
 --- How many more parts of `kind` (a PARTS key) the bank `bankObject` takes; 0 for no bank.
-function PowerBank.freeSlots(bankObject, kind)
+function PowerBank.freePartSlots(bankObject, kind)
     local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
     local container = bank and bankObject:getContainer()
     if not container then
@@ -250,7 +246,7 @@ function PowerBank.wiringBlocker(bankObject, item)
     local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
     if not (kind and PowerBank.bankOfSprite(Sprites.nameOf(bankObject)) and bankObject:getContainer()) then
         return "Tooltip_RenewableEnergy_NotAPart"
-    elseif PowerBank.freeSlots(bankObject, kind) == 0 then
+    elseif PowerBank.freePartSlots(bankObject, kind) == 0 then
         return "Tooltip_RenewableEnergy_NoSlot"
     end
     return nil
@@ -266,12 +262,17 @@ function PowerBank.wiringRefusal(character, bankObject, item)
     return RenewableEnergy.unmetKind(PowerBank.wiringNeeds(character, item:getFullType()))
 end
 
+-- What repairing an inverter or controller takes, as a materials list (RenewableEnergy.Materials).
+local REPAIR = { { perk = "Electricity", need = Specs.partRepair.skill }, { item = PowerBank.SCRAP, need = 1 } }
+
+--- What repairing an inverter or controller uses up of `character`. Authority only.
+function PowerBank.consumeRepair(character)
+    Materials.consume(character, REPAIR)
+end
+
 --- What repairing an inverter or controller takes of `character`, for RenewableEnergy.firstUnmet.
 function PowerBank.repairNeeds(character)
-    local needs = {}
-    addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = Specs.partRepair.skill })
-    addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = character:getInventory():getCountTypeRecurse(PowerBank.SCRAP), need = 1 })
-    return needs
+    return Materials.needs(character, REPAIR)
 end
 
 --- What keeps anyone from repairing `item` with Electronics Scrap now whatever they carry, as a
@@ -298,7 +299,7 @@ end
 --- What keeps anyone from unwiring `item` from the bank `bankObject` now whatever they carry, as a
 --- translation key, or nil: it must be a part in the bank's container. The light is the action's
 --- to check, as for wiringBlocker.
-function PowerBank.unwireBlocker(bankObject, item)
+function PowerBank.unwiringBlocker(bankObject, item)
     local container = PowerBank.isBank(bankObject) and bankObject:getContainer()
     if not (container and instanceof(item, "InventoryItem") and container:contains(item)
         and PowerBank.partKind(item:getFullType())) then
@@ -308,13 +309,20 @@ function PowerBank.unwireBlocker(bankObject, item)
 end
 
 --- Why `character` can't unwire `item` from the bank `bankObject` now, or nil if they can: what
---- unwireBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
-function PowerBank.unwireRefusal(character, bankObject, item)
-    local blocker = PowerBank.unwireBlocker(bankObject, item)
+--- unwiringBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
+function PowerBank.unwiringRefusal(character, bankObject, item)
+    local blocker = PowerBank.unwiringBlocker(bankObject, item)
     if blocker then
         return blocker
     end
     return RenewableEnergy.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
+end
+
+--- The failsafe's thresholds, in percent of a bank's charge: below `start` it starts its generator,
+--- at `stop` it stops it (the FailsafeStartCharge and FailsafeStopCharge options).
+function PowerBank.failsafeRange()
+    local options = SandboxVars.RenewableEnergy
+    return options.FailsafeStartCharge, options.FailsafeStopCharge
 end
 
 --- Why the bank whose summary or status is `bank` can't be switched `on` (true) or off now, or

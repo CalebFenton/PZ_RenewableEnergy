@@ -14,6 +14,7 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/PanelSource"
+require "RenewableEnergy/PowerBank/BankSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local PowerBank, Sources, PanelSource = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.PanelSource
@@ -26,10 +27,8 @@ RenewableEnergy.PanelStorms = PanelStorms
 local MOD_DATA = "RenewableEnergy_storms"
 -- Panel modData: the world's storm hours the panel has weathered.
 local WEATHERED = "RenewableEnergy_stormHours"
--- As a bank's pass: a save loaded after the clock jumped never counts days of storm at once.
-local LONGEST_PASS = 24
 
-local function ledger()
+local function store()
     return ModData.getOrCreate(MOD_DATA)
 end
 
@@ -41,7 +40,7 @@ end
 --- feeds no bank, the storm hours since it last weathered may crack a module, as a bank's pass
 --- would (PanelSource.stormCrack). Returns whether one cracked.
 function PanelStorms.weather(isoObject)
-    local total = ledger().hours or 0
+    local total = store().hours or 0
     local data = isoObject:getModData()
     local weathered = data[WEATHERED]
     if weathered == total then
@@ -82,8 +81,8 @@ function PanelStorms.pass(stormHours)
     if stormHours <= 0 then
         return 0
     end
-    local store = ledger()
-    store.hours = (store.hours or 0) + stormHours
+    local storms = store()
+    storms.hours = (storms.hours or 0) + stormHours
     local cracked = 0
     panels:each(function(isoObject)
         if PanelStorms.weather(isoObject) then
@@ -96,10 +95,8 @@ end
 -- EveryTenMinutes fires at most once a tick however much game time passed, so the pass measures
 -- the time itself.
 local function update()
-    local store = ledger()
-    local now = getGameTime():getWorldAgeHours()
-    local hours = math.min(LONGEST_PASS, now - (store.lastHour or now))
-    store.lastHour = now
+    -- As a bank's pass: a save loaded after the clock jumped never counts days of storm at once.
+    local hours = RenewableEnergy.hoursSince(store(), RenewableEnergy.BankSystem.LONGEST_PASS)
     PanelStorms.pass(PanelSource.stormHours(hours))
 end
 

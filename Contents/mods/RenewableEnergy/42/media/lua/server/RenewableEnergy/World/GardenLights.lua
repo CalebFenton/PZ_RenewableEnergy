@@ -43,6 +43,9 @@ local POOR = { Poor = true, StreetPoor = true, TrailerPark = true }
 
 -- How far down the path from a door the lights go.
 local PATH_LENGTH = 4
+-- Squares out from a house's bounds that a light may stand on, and that must be loaded before the
+-- house is rolled: beside the far end of a path that starts at a doorstep, one square out.
+GardenLights.REACH = 1 + PATH_LENGTH
 
 local function store()
     return ModData.getOrCreate(GardenLights.MOD_DATA)
@@ -155,7 +158,7 @@ end
 -- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
 -- Returns how many it placed.
 local function place(def)
-    local count = WorldSpawns.rollBetween(GardenLights.COUNT)
+    local count = Chance.between(GardenLights.COUNT.min, GardenLights.COUNT.max)
     local charged = { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh }
     local squares = frontSquares(def, count)
     for _, square in ipairs(squares) do
@@ -184,6 +187,6 @@ end
 BuildingWatch.watch(function(def)
     local roll = store()[BuildingWatch.key(def)]
     return roll == GardenLights.PROMISED or (roll == nil and def:isResidential())
-end, GardenLights.roll)
+end, GardenLights.roll, GardenLights.REACH)
 
 return GardenLights

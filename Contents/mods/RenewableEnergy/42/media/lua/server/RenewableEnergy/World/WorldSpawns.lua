@@ -3,6 +3,7 @@ if isClient() then
 end
 
 require "Moveables/ISMoveableSpriteProps"
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Chance"
@@ -189,17 +190,12 @@ WorldSpawns.CRATE_STOCK = {
 
 -- Module conditions
 
---- A whole number from range.min to range.max, both included.
-function WorldSpawns.rollBetween(range)
-    return ZombRand(range.min, range.max + 1)
-end
-
 function WorldSpawns.crackedCondition()
-    return WorldSpawns.rollBetween(WorldSpawns.CRACKED)
+    return Chance.between(WorldSpawns.CRACKED.min, WorldSpawns.CRACKED.max)
 end
 
 function WorldSpawns.weatheredCondition()
-    return WorldSpawns.rollBetween(WorldSpawns.WEATHERED)
+    return Chance.between(WorldSpawns.WEATHERED.min, WorldSpawns.WEATHERED.max)
 end
 
 -- A site module's condition: cracked or weathered.
@@ -253,19 +249,25 @@ local function pickByWeight(types)
     return types[#types][1]
 end
 
+--- The condition, in percent of new, that the BATTERY_WEAR profile `wear` gives a found battery
+--- that isn't a dud, from three rolls (each 0 up to 1): their mean bunches it around the profile's
+--- mean like a bell curve with no tails past halfWidth, and it is no better than new.
+function WorldSpawns.foundBatteryPercent(wear, roll1, roll2, roll3)
+    local spread = (roll1 + roll2 + roll3) / 3 * 2 - 1
+    return math.min(100, wear.mean + wear.halfWidth * spread)
+end
+
 --- Wears the found battery `item` as the BATTERY_WEAR profile `wearName` says: a dud at DUD's
---- condition with its repairs, or at a condition that is the mean of three rolls, which bunches
---- them around the profile's mean like a bell curve with no tails past halfWidth. Sends nothing.
+--- condition with its repairs, or at WorldSpawns.foundBatteryPercent. Sends nothing.
 function WorldSpawns.wearFoundBattery(item, wearName)
     local wear = WorldSpawns.BATTERY_WEAR[wearName]
     local percent
     if wear.dud and Chance.hit(wear.dud) then
         local dud = WorldSpawns.DUD
-        percent = math.min(dud.max, dud.min + math.floor((dud.max - dud.min + 1) * Chance.roll()))
+        percent = Chance.between(dud.min, dud.max)
         item:setHaveBeenRepaired(dud.repairs)
     else
-        local spread = (Chance.roll() + Chance.roll() + Chance.roll()) / 3 * 2 - 1
-        percent = math.min(100, wear.mean + wear.halfWidth * spread)
+        percent = WorldSpawns.foundBatteryPercent(wear, Chance.roll(), Chance.roll(), Chance.roll())
     end
     RenewableEnergy.Wear.setCondition(item, math.floor(item:getConditionMax() * percent / 100 + 0.5))
 end
@@ -299,7 +301,7 @@ function WorldSpawns.stockBank(container, stockName)
     local stock = WorldSpawns.BANK_STOCK[stockName]
     local spec = PowerBank.bankOfSprite(Sprites[stock.sprite]).spec
     local options = SandboxVars.RenewableEnergy
-    local batteries = WorldSpawns.scaled(WorldSpawns.rollBetween(stock.batteries), options.LRMBatteries)
+    local batteries = WorldSpawns.scaled(Chance.between(stock.batteries.min, stock.batteries.max), options.LRMBatteries)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
         addFound(container, pickByWeight(stock.batteries.types), stock.batteries.wear)
     end
@@ -313,7 +315,7 @@ end
 ---@param stockName string a CRATE_STOCK key
 function WorldSpawns.stockCrate(container, stockName)
     for _, line in ipairs(WorldSpawns.CRATE_STOCK[stockName]) do
-        local count = ZombRand(line[2], line[3] + 1)
+        local count = Chance.between(line[2], line[3])
         if line[4] then
             count = WorldSpawns.scaled(count, SandboxVars.RenewableEnergy[line[4]])
         end
@@ -430,15 +432,12 @@ function WorldSpawns.layModulesBeside(square, stockName)
         return 0
     end
     local room, beside = square:getRoom(), {}
-    for dx = -1, 1 do
-        for dy = -1, 1 do
-            local near = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
-            if near and near ~= square and near:getRoom() == room and near:isFree(false) then
-                table.insert(beside, near)
-            end
+    RenewableEnergy.eachSquareAround(square:getX(), square:getY(), square:getZ(), 1, function(near)
+        if near ~= square and near:getRoom() == room and near:isFree(false) then
+            table.insert(beside, near)
         end
-    end
-    local count = WorldSpawns.scaled(WorldSpawns.rollBetween(spec), SandboxVars.RenewableEnergy.LRMSolarPanels)
+    end)
+    local count = WorldSpawns.scaled(Chance.between(spec.min, spec.max), SandboxVars.RenewableEnergy.LRMSolarPanels)
     for i = 1, count do
         local item = instanceItem(MODULE)
         RenewableEnergy.Wear.setCondition(item, siteModuleCondition())

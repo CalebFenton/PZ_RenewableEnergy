@@ -34,16 +34,16 @@ end
 -- if it stays lit.
 local function run(light, hours, sky, bulbChanged)
     local spec = Specs.gardenLight
-    local night = sky.up <= 0
+    local night = Sun.isDark(sky)
     local hasBulb = SolarGardenLight.getBulb(light) ~= nil
-    local charge = SolarGardenLight.getCharge(light)
+    local chargeWh = SolarGardenLight.getChargeWh(light)
     if not night then
-        charge = math.min(spec.wh, charge + Sun.squareWatts(light:getSquare(), spec.watts, sky) * hours)
+        chargeWh = math.min(spec.wh, chargeWh + Sun.squareWatts(light:getSquare(), spec.watts, sky) * hours)
     elseif hasBulb then
-        charge = math.max(0, charge - spec.nightWatts * hours)
+        chargeWh = math.max(0, chargeWh - spec.nightWatts * hours)
     end
-    light:getModData()[SolarGardenLight.CHARGE_KEY] = charge
-    setLit(light, night and hasBulb and charge > 0, bulbChanged)
+    light:getModData()[SolarGardenLight.CHARGE_KEY] = chargeWh
+    setLit(light, night and hasBulb and chargeWh > 0, bulbChanged)
 end
 
 -- Puts `bulb` (nil for none) in the light, tells the clients, and lights or darkens it at once.
