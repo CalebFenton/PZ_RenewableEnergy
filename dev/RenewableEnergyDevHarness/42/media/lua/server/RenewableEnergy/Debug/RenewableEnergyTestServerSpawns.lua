@@ -525,11 +525,9 @@ local function armSite(site, defer)
     return spots
 end
 
--- Takes out every pamphlet of the building's containers.
+-- Takes every pamphlet out of the building.
 local function takePamphlets(def)
-    for container in pairs(Helpers.pamphletsIn(def)) do
-        Helpers.emptyContainer(container, PAMPHLET)
-    end
+    Helpers.takeReadingSince(def, PAMPHLET, {})
 end
 
 -- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
@@ -701,7 +699,7 @@ local SPOT_CHECKS = {
     end,
     pamphlet = function(expect, _, square)
         local building = square:getBuilding()
-        expect(building ~= nil and Helpers.pamphletTotal(building:getDef()) >= 1, "no pamphlet in the house's containers")
+        expect(building ~= nil and Helpers.readingTotal(building:getDef(), PAMPHLET) >= 1, "no pamphlet in the house")
     end,
     -- The house promised its lights, or rolled for them already.
     gardenLights = function(expect, _, square)

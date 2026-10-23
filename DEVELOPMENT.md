@@ -293,6 +293,9 @@ The mod's battery banks are `IsoGenerator`s, so all of this applies to them.
 - `ItemContainer.AddItem` puts every new item on the cell's processed items (`IsoCell.addToProcessItems`), an `ArrayList` it scans on every add, and the cell drops an item only on a later frame. Filling scratch containers thousands of times in one frame piles them up until the game crawls and runs out of memory, so take each sample's items off `getCell():getProcessItems()` yourself.
 - `ItemPickerJava.updateOverlaySprite(object)` sets a container's few-items or full overlay. On a server the overlay goes out by the object's index on its square, so call it only after clients have the object.
 - The map zones loot and Lua read with `getZonesAt` (`TownZone`, `TrailerPark`, `Farm`, the forests) come from Build 42's biome map (`media/maps/<map>/maps/biomemap_<x>_<y>.png`, `BiomeMapConfig.lua`) and exist only once their cell has loaded; a far square has only its `Region` zone. The map's `objects.lua` doesn't match them. Most farmhouses sit in `TownZone` there, and `Farm` marks fields.
+- The map's barns hold almost no loot containers: across its 201 barn rooms there are 56 crates and shelves besides 1,550 feed troughs (`dev/loot/census.py`), and most of those pick `CrateAnimalFeed`. Loot weights in `BarnTools` hardly reach a player; story clutter on barn tables (`RBBarn`, always run) and things Lua leaves in the building do.
+- `StoryTables.addItemToClutterTable` adds every item to a clutter list twice, vanilla's own included, so relative weights hold but a list's count of an item is twice the adds.
+- The `--loot` report's room estimates leave out lists a room only rolls for certain tiles, rooms or zones (`forceForTiles` and the like), such as the hardware store's book shelves, so it undercounts what stores' magazine racks give.
 
 ## Workshop page
 

@@ -37,9 +37,13 @@ local BuildingWatch, Chance = RenewableEnergy.BuildingWatch, RenewableEnergy.Cha
 RuralFinds.MOD_DATA = "RenewableEnergyRuralFinds"
 -- The Solar Sites percentage at which each find's odds are 1 in `odds`.
 local SITES_DEFAULT = 75
--- Chance the hunting shack also holds a FEMA pamphlet.
-local PAMPHLET_CHANCE = 0.5
-local PAMPHLET = "RenewableEnergy.FemaPamphlet"
+-- Chance a find's building also holds the reading that built it: the hunting shack's gasifier the
+-- FEMA plans, the livestock building's digester Homestead Power #3.
+local READING_CHANCE = 0.5
+RuralFinds.PAMPHLET = "RenewableEnergy.FemaPamphlet"
+RuralFinds.BIOGAS_MAGAZINE = "RenewableEnergy.HomesteadPowerMag3"
+-- Containers no one leaves reading in: most of a barn's are feed troughs.
+local NOT_FOR_READING = { trough = true, composter = true }
 
 local function store()
     return ModData.getOrCreate(RuralFinds.MOD_DATA)
@@ -110,10 +114,12 @@ local function randomOf(entries)
     return Chance.pick(list)
 end
 
---- Leaves a pamphlet in a container of the building, if it has one; returns whether it did. An
---- unexplored container keeps it: its loot is rolled on first look (ItemPickerJava.fillContainer,
+--- Leaves `fullType` in a container of the building, or on the floor of one of its rooms if it
+--- has none to keep it in, as most barns don't; returns whether it did. An unexplored container
+--- keeps it: its loot is rolled on first look (ItemPickerJava.fillContainer,
 --- RequestItemsForContainerPacket), which only adds items.
-function RuralFinds.leavePamphlet(def)
+function RuralFinds.leaveReading(def, fullType)
+    local floors = {}
     for z = 0, BuildingWatch.HIGHEST_LEVEL do
         for x = def:getX(), def:getX2() - 1 do
             for y = def:getY(), def:getY2() - 1 do
@@ -121,14 +127,20 @@ function RuralFinds.leavePamphlet(def)
                 local objects = square and square:getObjects()
                 for i = 0, (objects and objects:size() or 0) - 1 do
                     local container = objects:get(i):getContainer()
-                    if container then
-                        return RenewableEnergy.addItem(container, PAMPHLET) ~= nil
+                    if container and not NOT_FOR_READING[container:getType()] then
+                        return RenewableEnergy.addItem(container, fullType) ~= nil
                     end
+                end
+                if square and square:getRoom() and square:isFree(false) then
+                    table.insert(floors, square)
                 end
             end
         end
     end
-    return false
+    if #floors == 0 then
+        return false
+    end
+    return Chance.pick(floors):AddWorldInventoryItem(fullType, ZombRandFloat(0.2, 0.8), ZombRandFloat(0.2, 0.8), 0) ~= nil
 end
 
 -- Finds
@@ -170,9 +182,9 @@ RuralFinds.FINDS = {
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
         reach = 1,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
-        place = function(square)
+        place = function(square, def)
             local System = RenewableEnergy.DigesterSystem
-            return build(square, randomOf(Sprites.digester.barrel), System.OnCreate,
+            local thumpable = build(square, randomOf(Sprites.digester.barrel), System.OnCreate,
                 function(thumpable)
                     local digester = System.instance:getLuaObjectOnSquare(square)
                     digester.holderCondition = 0
@@ -180,6 +192,10 @@ RuralFinds.FINDS = {
                     digester.sour = true
                     digester:afterChange()
                 end)
+            if def and Chance.hit(READING_CHANCE) then
+                RuralFinds.leaveReading(def, RuralFinds.BIOGAS_MAGAZINE)
+            end
+            return thumpable
         end,
     },
     gasifier = {
@@ -213,8 +229,8 @@ RuralFinds.FINDS = {
                     gasifier.ash = Gasifier.ASH_FULL
                     gasifier:afterChange()
                 end)
-            if def and Chance.hit(PAMPHLET_CHANCE) then
-                RuralFinds.leavePamphlet(def)
+            if def and Chance.hit(READING_CHANCE) then
+                RuralFinds.leaveReading(def, RuralFinds.PAMPHLET)
             end
             return thumpable
         end,
@@ -331,22 +347,49 @@ end, function(def) RuralFinds.roll(def) end)
 
 -- Story clutter
 
--- Vanilla's barns and survivalist camps dress themselves from these lists (StoryClutter), refilled
--- by StoryClutter.Init when its file loads; added through vanilla's own adder
--- (StoryTables.addItemToClutterTable).
+-- Vanilla's barns, farm storerooms and survivalist camps dress themselves from these lists
+-- (StoryClutter), refilled by StoryClutter.Init when its file loads; added through vanilla's own
+-- adder (StoryTables.addItemToClutterTable), which puts each item in twice, vanilla's included.
+-- An item listed n times here gets n of those adds, so is picked n times as often as an item
+-- added once (RandomizedWorldBase.getBarnClutterItem picks uniformly).
+local MAG3, MAG4 = RuralFinds.BIOGAS_MAGAZINE, "RenewableEnergy.HomesteadPowerMag4"
 RuralFinds.CLUTTER = {
-    getSurvivalistCampsiteClutter = { "RenewableEnergy.FemaPamphlet", "RenewableEnergy.SolarCellCharger" },
-    getBarnClutter = { "RenewableEnergy.HomesteadPowerMag3", "RenewableEnergy.HomesteadPowerMag4" },
+    getSurvivalistCampsiteClutter = { RuralFinds.PAMPHLET, "RenewableEnergy.SolarCellCharger" },
+    getBarnClutter = { MAG3, MAG3, MAG3, MAG4, MAG4 },
+    getFarmStorageClutter = { MAG3, MAG3, MAG4 },
 }
 
+-- How many times the Java list holds `item`.
+function RuralFinds.countIn(list, item)
+    local count = 0
+    for i = 0, list:size() - 1 do
+        if list:get(i) == item then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+-- How many times each item of `items` is listed.
+function RuralFinds.wanted(items)
+    local wanted = {}
+    for _, item in ipairs(items) do
+        wanted[item] = (wanted[item] or 0) + 1
+    end
+    return wanted
+end
+
+-- An item already in a list was added by an earlier run since the list was last refilled.
 local function addClutter()
     local base = getWorld():getRandomizedWorldBase()
     for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter] and base[getter](base)
         if list then
-            for _, item in ipairs(items) do
-                if not list:contains(item) then
-                    StoryTables.addItemToClutterTable(list, item)
+            for item, count in pairs(RuralFinds.wanted(items)) do
+                if RuralFinds.countIn(list, item) == 0 then
+                    for _ = 1, count do
+                        StoryTables.addItemToClutterTable(list, item)
+                    end
                 end
             end
         else

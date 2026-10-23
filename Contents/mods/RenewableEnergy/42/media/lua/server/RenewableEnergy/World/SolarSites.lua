@@ -238,7 +238,7 @@ local SPOTS = {
         place = function(square)
             local building = square:getBuilding()
             if building then
-                RuralFinds.leavePamphlet(building:getDef())
+                RuralFinds.leaveReading(building:getDef(), RuralFinds.PAMPHLET)
             end
             return true
         end,

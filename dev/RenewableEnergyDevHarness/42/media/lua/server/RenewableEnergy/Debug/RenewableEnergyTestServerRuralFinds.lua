@@ -8,18 +8,20 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
 
-local PAMPHLET = "RenewableEnergy.FemaPamphlet"
-
 -- Forgets the building's rural find roll so that it can be rolled again, and when the test ends
--- puts the roll back and takes out the pamphlets the test's rolls left (the gasifier's).
+-- puts the roll back and takes out the reading the test's rolls left (the gasifier's pamphlet,
+-- the digester's magazine).
 local function forgetRoll(def, defer)
     local store, key = ModData.getOrCreate(RenewableEnergy.RuralFinds.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
     local roll = store[key]
-    local pamphlets = Helpers.pamphletsIn(def)
+    local RuralFinds, before = RenewableEnergy.RuralFinds, {}
+    for _, fullType in ipairs({ RuralFinds.PAMPHLET, RuralFinds.BIOGAS_MAGAZINE }) do
+        before[fullType] = Helpers.readingIn(def, fullType)
+    end
     defer(function()
         store[key] = roll
-        for container, count in pairs(Helpers.pamphletsIn(def)) do
-            Helpers.emptyContainer(container, PAMPHLET, count - (pamphlets[container] or 0))
+        for fullType, held in pairs(before) do
+            Helpers.takeReadingSince(def, fullType, held)
         end
     end)
     store[key] = nil
@@ -81,8 +83,8 @@ end
 -- and those standing by it, and, rolled again with its roll forgotten and every roll at 0 (the
 -- world rolled it, so Solar Sites is above 0 and every chance hits), so that every find it
 -- qualifies for gets a square, the finds its rooms qualify it for, where each placed find stands
--- and how many pamphlets it left. Everything that second roll did is put back before it answers,
--- while the building is still loaded: the test moves on from it.
+-- and how many pamphlets and biogas magazines it left. Everything that second roll did is put back
+-- before it answers, while the building is still loaded: the test moves on from it.
 handler("ruralFindAt", function(_, args)
     local RuralFinds = RenewableEnergy.RuralFinds
     local square = getSquare(args.x, args.y, args.z or 0)
@@ -103,12 +105,15 @@ handler("ruralFindAt", function(_, args)
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
     forgetRoll(def, defer)
-    local before = Helpers.pamphletTotal(def)
+    local pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET)
+    local magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE)
     local restoreRoll = Helpers.forceRolls(defer, 0)
     local found = track(RuralFinds.roll(def), defer, def)
     restoreRoll()
     local answer = { ready = true, world = world, standing = standing, qualifies = RuralFinds.findsFor(def), found = found,
-        pamphlets = Helpers.pamphletTotal(def) - before, reach = RenewableEnergy.BuildingWatch.REACH }
+        pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET) - pamphlets,
+        magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE) - magazines,
+        reach = RenewableEnergy.BuildingWatch.REACH }
     for i = #undo, 1, -1 do
         undo[i]()
     end
@@ -144,13 +149,19 @@ handler("ruralFindEmptyFilter", function(_, args)
     return {}
 end)
 
--- Vanilla's barn and survivalist camp story clutter lists hold the mod's additions.
+-- Vanilla's barn, farm storeroom and survivalist camp story clutter lists hold the mod's additions,
+-- each as many times as vanilla's adder puts an item in for every time RuralFinds.CLUTTER lists it.
 Helpers.check("ruralClutter", function(expect)
+    local RuralFinds = RenewableEnergy.RuralFinds
     local base = getWorld():getRandomizedWorldBase()
-    for getter, items in pairs(RenewableEnergy.RuralFinds.CLUTTER) do
+    for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter](base)
-        for _, item in ipairs(items) do
-            expect(list:contains(item), getter .. " lacks " .. item)
+        for item, count in pairs(RuralFinds.wanted(items)) do
+            local once = ArrayList.new()
+            StoryTables.addItemToClutterTable(once, item)
+            local held = RuralFinds.countIn(list, item)
+            expect(held == count * once:size(), getter .. " holds " .. item .. " " .. held .. " times, not "
+                .. count .. " × " .. once:size())
         end
     end
 end)

@@ -182,9 +182,10 @@ end
 
 local PAMPHLET = "RenewableEnergy.FemaPamphlet"
 
---- How many pamphlets each container holds on the levels of the building `def` that
---- RuralFinds.leavePamphlet fills: { [container] = count }.
-function Helpers.pamphletsIn(def)
+--- How many of `fullType` (default the pamphlet) each container and each floor holds on the levels
+--- of the building `def` that RuralFinds.leaveReading fills: { [container or square] = count }.
+function Helpers.readingIn(def, fullType)
+    fullType = fullType or PAMPHLET
     local found = {}
     for z = 0, RenewableEnergy.BuildingWatch.HIGHEST_LEVEL do
         for x = def:getX(), def:getX2() - 1 do
@@ -194,8 +195,18 @@ function Helpers.pamphletsIn(def)
                 for i = 0, (objects and objects:size() or 0) - 1 do
                     local container = objects:get(i):getContainer()
                     if container then
-                        found[container] = container:getCountType(PAMPHLET)
+                        found[container] = container:getCountType(fullType)
                     end
+                end
+                local onFloor = 0
+                local items = square and square:getWorldObjects()
+                for i = 0, (items and items:size() or 0) - 1 do
+                    if items:get(i):getItem():getFullType() == fullType then
+                        onFloor = onFloor + 1
+                    end
+                end
+                if onFloor > 0 then
+                    found[square] = onFloor
                 end
             end
         end
@@ -203,13 +214,37 @@ function Helpers.pamphletsIn(def)
     return found
 end
 
---- The pamphlets in all of Helpers.pamphletsIn's containers together.
-function Helpers.pamphletTotal(def)
+--- All of Helpers.readingIn's `fullType` together.
+function Helpers.readingTotal(def, fullType)
     local total = 0
-    for _, count in pairs(Helpers.pamphletsIn(def)) do
+    for _, count in pairs(Helpers.readingIn(def, fullType)) do
         total = total + count
     end
     return total
+end
+
+--- Takes out of the building `def` the `fullType` that wasn't there in `before` (Helpers.readingIn).
+function Helpers.takeReadingSince(def, fullType, before)
+    for holder, count in pairs(Helpers.readingIn(def, fullType)) do
+        local extra = count - (before[holder] or 0)
+        if extra > 0 then
+            if instanceof(holder, "IsoGridSquare") then
+                local items = holder:getWorldObjects()
+                for i = items:size() - 1, 0, -1 do
+                    local object = items:get(i)
+                    if extra > 0 and object:getItem():getFullType() == fullType then
+                        if isServer() then
+                            holder:transmitRemoveItemFromSquare(object)
+                        end
+                        holder:removeWorldObject(object)
+                        extra = extra - 1
+                    end
+                end
+            else
+                Helpers.emptyContainer(holder, fullType, extra)
+            end
+        end
+    end
 end
 
 -- The kinds of Global Object System record the tests build and drive (RenewableEnergyTestLibGas.lua):

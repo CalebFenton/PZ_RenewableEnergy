@@ -172,9 +172,9 @@ Think about who had this gear in 1993, and how far they'd have hauled it. Rarity
 | Solar garden lights | Garden centres and hardware stores, garages and barns, and along front walks, more often in the nicer neighbourhoods | Common |
 | Homestead Power #1 | Electronics store magazine racks, bookstores, tool, outdoor and auto parts stores, post offices, libraries, living rooms, campers | Common |
 | Homestead Power #2 | Where #1 is, less often; electricians, utility and radio vans, generator and control rooms | Uncommon |
-| Homestead Power #3 | Farms: farm supply, barns, farmers' trucks, the farming shelf of a bookstore | Uncommon |
-| Homestead Power #4 | Farm supply, barns, electricians, hobby shelves | Rare |
-| FEMA plans | Post offices, army surplus, police and fire stations, libraries, preppers, hunting shacks | Uncommon |
+| Homestead Power #3 | Hardware stores' farming shelves and book racks, farm supply and farm storerooms, the farming shelf of a bookstore, farmers' trucks, living rooms; in barns, on a table or beside an old digester | Uncommon: about half as often as #2 |
+| Homestead Power #4 | Hardware, electronics and farm supply stores, bookstores' farming shelves, electricians, hobby shelves, living rooms; on barn tables | Uncommon: about two thirds as often as #2 |
+| FEMA plans | Post offices, army surplus, police and fire stations, libraries, hardware store book racks, now and then a shelf at home; preppers, hunting shacks | Uncommon |
 | A bit of everything | Prepper caches, and survivalists dead or alive | |
 | Never found | The Gas Conversion Kit, Gas Heater, blades, treadmill motors and fridge compressors: craft or salvage them | |
 
@@ -198,7 +198,7 @@ Folks put their panels where the sun is, which is usually up on the roof, and fe
 | A prepper's cabin | In the woods near Echo Creek | A dirty gasifier piped to a generator, and the plans that built it |
 | Arrow board trailers | Road works around Muldraugh, Riverside and Rosewood, the checkpoints outside Louisville, and traffic jams and junkyards anywhere | Two panels, often one cracked, a box of worn deep cycles, usually a charge controller. The box is usually padlocked: cut the lock or unbolt the lid |
 | Barns | Now and then, by barns and farm storage | An old propeller wind charger with broken blades |
-| Livestock buildings | Now and then, by barns, stables, coops and pigsties | A barrel digester, gone sour, its bags torn |
+| Livestock buildings | Now and then, by barns, stables, coops and pigsties | A barrel digester, gone sour, its bags torn, sometimes with Homestead Power #3 left in the building |
 | Hunting shacks | Often, by hunting shacks and deer stands | A primitive gasifier full of ash and tar, sometimes with the FEMA plans in the shack |
 | Stash houses | Four of them, each marked on an annotated map. Survivalists and preppers carry one map, campers another, and two are on town maps | A crate of solar gear, and more crates and shelves of panels and batteries |
 

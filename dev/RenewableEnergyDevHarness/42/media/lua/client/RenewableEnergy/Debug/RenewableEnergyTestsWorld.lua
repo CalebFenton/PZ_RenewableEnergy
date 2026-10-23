@@ -1049,15 +1049,16 @@ test("renewable_energy_world_rural_gasifier", {
 -- them in and their surroundings: the world's roll is kept, and each find it gave stands by the
 -- building. Rolled again for certain, with every find it qualifies for, their rooms pick the finds
 -- and each find its square, outdoors on the ground within BuildingWatch.REACH of the building (the
--- wind charger needs open ground around it). In order: the barn west of Muldraugh, the hunting
--- shack west of Riverside, the deer stand, whose one room is above ground (`z`) while its find is
--- not, a farm storage shed without a barn, and a pigsty.
+-- wind charger needs open ground around it), and the gasifier and digester leave their reading in
+-- the building. In order: the barn west of Muldraugh, the hunting shack west of Riverside, the deer
+-- stand, whose one room is above ground (`z`) while its find is not, a farm storage shed without a
+-- barn, and a pigsty.
 local RURAL_PLACES = {
-    { 10469, 10121, 0, finds = { wind = true, digester = true } },
+    { 10469, 10121, 0, finds = { wind = true, digester = true }, magazine = true },
     { 7067, 8632, 0, finds = { gasifier = true }, pamphlet = true },
     { 7917, 8176, 1, finds = { gasifier = true } },
     { 7350, 8519, 0, finds = { wind = true } },
-    { 6605, 8894, 0, finds = { digester = true } },
+    { 6605, 8894, 0, finds = { digester = true }, magazine = true },
 }
 
 test("renewable_energy_world_rural_finds_real_buildings", {
@@ -1103,6 +1104,9 @@ test("renewable_energy_world_rural_finds_real_buildings", {
                 if place.pamphlet then
                     expect(answer.pamphlets == 1, "the shack at " .. where .. " got " .. answer.pamphlets .. " pamphlets, not 1")
                 end
+                if place.magazine then
+                    expect(answer.magazines == 1, "the building at " .. where .. " got " .. answer.magazines .. " biogas magazines, not 1")
+                end
             end
         end
     end,
@@ -1122,7 +1126,8 @@ test("renewable_energy_world_rural_finds_option_zero", {
     end,
 })
 
--- Vanilla's barns and survivalist camps are dressed with the mod's magazines, pamphlet and charger.
+-- Vanilla's barns, farm storerooms and survivalist camps are dressed with the mod's magazines,
+-- pamphlet and charger, the biogas and wind magazines weighted up.
 serverCheck("renewable_energy_world_rural_clutter", "ruralClutter")
 
 -- A room seen for the first time gets a bank of its room's stock (a shed's or garage's a wooden

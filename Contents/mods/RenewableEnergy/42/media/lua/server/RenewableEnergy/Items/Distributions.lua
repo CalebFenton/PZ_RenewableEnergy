@@ -372,55 +372,78 @@ Distributions.items = {
         })))))),
     },
     {
-        -- Biogas: on farms, where the manure is, and with preppers. Rarer, since the skills teach
-        -- its recipes too.
+        -- Biogas: about half as common as #2, on farms, where the manure is, and on the farming
+        -- shelves of hardware stores and bookstores; in homes too, less often, and with preppers.
+        -- Barns have almost no loot containers, so RuralFinds leaves this one in barns.
         fullType = "RenewableEnergy.HomesteadPowerMag3",
         option = "LRMMisc",
         entries = weighted(1, SURVIVOR_CRATES, weighted(0.3, SURVIVALIST_CORPSES,
-            weighted(0.3, SAFEHOUSE_READING, {
-            { 3, "proc:BookstoreFarming" },
-            { 2, "proc:Homesteading" },
-            { 1.5, "proc:ToolStoreFarming" },
-            { 1, "proc:ToolCabinetFarming" },
-            { 1, "proc:BarnTools" },
-            { 1, "proc:CrateFarming" },
+            weighted(0.1, HOME_SHELVES, weighted(0.07, HOME_SIDE_TABLES,
+            weighted(0.1, HOME_OTHER_SHELVES, weighted(0.3, SAFEHOUSE_READING, {
+            { 4, "proc:BookstoreFarming" },
+            { 1, "proc:BookstoreBlueCollar" },
+            { 3, "proc:ToolStoreBooks" },
+            { 6, "proc:ToolStoreFarming" },
+            { 1, "proc:GardenStoreMisc" },
+            { 3, "proc:Homesteading" },
+            { 3, "proc:ToolCabinetFarming" },
+            { 3, "proc:BarnTools" },
+            { 3, "proc:CrateFarming" },
+            { 0.3, "proc:CrateMagazines" },
+            { 0.3, "proc:MagazineRackMixed" },
+            { 0.3, "proc:LibraryMagazines" },
             { 1, "proc:SafehouseBookShelf" },
-            { 2, "veh:FarmerTruckBed" },
-        }))),
+            { 3, "veh:FarmerTruckBed" },
+        })))))),
     },
     {
         -- Wood gas: government paper, as FEMA sent it out in 1989 to post offices, police, fire
-        -- and civil defense, libraries and the army surplus that sold it on; and preppers.
+        -- and civil defense, libraries and the army surplus that sold it on, and the free
+        -- literature racks of hardware stores and newsstands; kept on a shelf at home now and then,
+        -- and by preppers.
         fullType = "RenewableEnergy.FemaPamphlet",
         option = "LRMMisc",
         entries = weighted(1, SURVIVOR_CRATES, weighted(0.5, SURVIVALIST_CORPSES,
-            weighted(0.2, SAFEHOUSE_READING, {
-            { 2, "proc:PostOfficeMagazines" },
-            { 1, "proc:PoliceDesk" },
-            { 1, "proc:FireStorageTools" },
-            { 1, "proc:LibraryGeneralReference" },
-            { 2, "proc:ArmySurplusLiterature" },
+            weighted(0.2, SAFEHOUSE_READING, weighted(0.15, HOME_OTHER_SHELVES, weighted(0.05, HOME_SHELVES, {
+            { 6, "proc:PostOfficeMagazines" },
+            { 3, "proc:PoliceDesk" },
+            { 3, "proc:FireStorageTools" },
+            { 3, "proc:LibraryGeneralReference" },
+            { 1, "proc:LibraryMagazines" },
+            { 4, "proc:ArmySurplusLiterature" },
+            { 1, "proc:ToolStoreBooks" },
+            { 1, "proc:BookstoreMisc" },
+            { 0.5, "proc:MagazineRackMixed" },
+            { 0.5, "proc:CrateMagazines" },
             { 0.5, "proc:SafehouseBookShelf" },
             { 0.5, "proc:SurvivalGear" },
-        }))),
+        }))))),
     },
     {
-        -- Wind and the treadmill: on farms, with electricians and in hobby shops; preppers. Rare,
-        -- since the skills teach its recipes too.
+        -- Wind and the treadmill: about two thirds as common as #2, on farms, with electricians, in
+        -- hobby shops and on the magazine racks of hardware and electronics stores; in homes, less
+        -- often, and with preppers.
         fullType = "RenewableEnergy.HomesteadPowerMag4",
         option = "LRMMisc",
         entries = weighted(1, SURVIVOR_CRATES, weighted(0.3, SURVIVALIST_CORPSES,
-            weighted(0.3, SAFEHOUSE_READING, {
-            { 2, "proc:BookstoreFarming" },
-            { 1.5, "proc:Homesteading" },
-            { 1, "proc:ToolStoreFarming" },
-            { 1, "proc:BarnTools" },
-            { 1, "proc:ElectricianTools" },
+            weighted(0.2, HOME_SHELVES, weighted(0.13, HOME_SIDE_TABLES,
+            weighted(0.2, HOME_OTHER_SHELVES, weighted(0.3, SAFEHOUSE_READING, {
+            { 2, "proc:ElectronicStoreMagazines" },
+            { 3, "proc:BookstoreFarming" },
+            { 1, "proc:BookstoreBlueCollar" },
+            { 1.5, "proc:ToolStoreBooks" },
+            { 2, "proc:ToolStoreFarming" },
+            { 2, "proc:Homesteading" },
+            { 2, "proc:BarnTools" },
+            { 1.5, "proc:ElectricianTools" },
             { 1, "proc:Hobbies" },
+            { 0.3, "proc:CrateMagazines" },
+            { 0.2, "proc:MagazineRackMixed" },
+            { 0.3, "proc:LibraryMagazines" },
             { 0.5, "proc:SafehouseBookShelf" },
-            { 1.5, "veh:FarmerTruckBed" },
+            { 2, "veh:FarmerTruckBed" },
             { 1, "veh:ElectricianTruckBed" },
-        }))),
+        })))))),
     },
     {
         fullType = Specs.factoryModule,
