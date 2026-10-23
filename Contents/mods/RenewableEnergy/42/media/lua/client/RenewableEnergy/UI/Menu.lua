@@ -258,15 +258,20 @@ local function batteriesToWire(groups, bank)
     return batteries
 end
 
--- What wiring `batteries` in one after another takes: a battery's job, with the wire and scrap of
--- them all.
-local function batteriesWiring(batteries)
-    local wiring = PowerBank.wiringFor(batteries[1]:getFullType())
-    wiring.wire, wiring.scrap = 0, 0
-    for _, item in ipairs(batteries) do
+-- What wiring `items` in one after another takes: the wire and scrap of them all, the highest
+-- skill, and every tool any of them takes.
+local function allWiring(items)
+    local wiring, seen = { skill = 0, wire = 0, scrap = 0, tools = {} }, {}
+    for _, item in ipairs(items) do
         local each = PowerBank.wiringFor(item:getFullType())
         wiring.wire, wiring.scrap = wiring.wire + each.wire, wiring.scrap + each.scrap
-        wiring.skill = math.max(wiring.skill, each.skill)
+        wiring.skill = math.max(wiring.skill, each.skill or 0)
+        for _, tool in ipairs(each.tools) do
+            if not seen[tool] then
+                seen[tool] = true
+                table.insert(wiring.tools, tool)
+            end
+        end
     end
     return wiring
 end
@@ -288,7 +293,7 @@ function Menu.addWireInOptions(playerNum, menu, bank)
     if #batteries > 1 then
         local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum,
             queueParts, Action.WIRE_IN, bank, batteries)
-        Needs.show(all, PowerBank.jobNeeds(character, batteriesWiring(batteries)),
+        Needs.show(all, PowerBank.jobNeeds(character, allWiring(batteries)),
             lightOr(character, Action.WIRE_IN, PowerBank.wiringBlocker(bank, batteries[1])))
     end
     for _, group in ipairs(groups) do
@@ -306,8 +311,9 @@ function Menu.addWireInOptions(playerNum, menu, bank)
 end
 
 --- Unwire: one option for each part in the bank, led by All Batteries when it holds more than
---- one. What doesn't fit in the character's inventory lands at their feet (RenewableEnergy.giveItems).
---- Returns the submenu, or nil for an empty bank.
+--- one, each greyed out while it can't come out with the tools that takes listed. What doesn't fit
+--- in the character's inventory lands at their feet (RenewableEnergy.giveItems). Returns the
+--- submenu, or nil for an empty bank.
 function Menu.addUnwireOptions(playerNum, menu, bank)
     local parts = wiredParts(bank, PowerBank.partKind)
     if #parts == 0 then
@@ -319,11 +325,12 @@ function Menu.addUnwireOptions(playerNum, menu, bank)
     if #batteries > 1 then
         local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum,
             queueParts, Action.UNWIRE, bank, batteries)
-        Needs.refuse(all, lightOr(character, Action.UNWIRE))
+        Needs.show(all, PowerBank.unwiringNeeds(character, allWiring(batteries)), lightOr(character, Action.UNWIRE))
     end
     for _, item in ipairs(parts) do
         local option = submenu:addOption(partLabel(item), playerNum, queuePart, Action.UNWIRE, bank, item)
-        Needs.refuse(option, lightOr(character, Action.UNWIRE, PowerBank.unwireBlocker(bank, item)))
+        Needs.show(option, PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())),
+            lightOr(character, Action.UNWIRE, PowerBank.unwireBlocker(bank, item)))
     end
     return submenu
 end
@@ -506,9 +513,10 @@ end
 -- Run on Treadmill and Unwire, for a wired treadmill, into its menu.
 local function addWiredTreadmillOptions(playerNum, menu, treadmill)
     addRunOption(playerNum, menu, treadmill)
+    local character = getSpecificPlayer(playerNum)
     local unwire = menu:addOption(getText("ContextMenu_RenewableEnergy_UnwireTreadmill"), playerNum, queueSource,
         Action.UNWIRE_TREADMILL, treadmill)
-    Needs.refuse(unwire, lightOr(getSpecificPlayer(playerNum), Action.UNWIRE_TREADMILL))
+    Needs.show(unwire, Treadmill.unwiringNeeds(character), lightOr(character, Action.UNWIRE_TREADMILL))
 end
 
 -- Run on Treadmill and Wire to Bank, for a treadmill neither of whose tiles is wired yet.

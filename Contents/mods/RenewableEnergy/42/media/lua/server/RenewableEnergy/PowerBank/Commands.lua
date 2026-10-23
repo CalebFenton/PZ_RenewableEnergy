@@ -195,7 +195,9 @@ end
 --- gets its wire back.
 function Commands.unwireTreadmill(player, args)
     local object = treadmillAt(args.source)
-    if not (player and object and Treadmill.isWired(object)) then return false, "not wired" end
+    if not (player and object) then return false, "no treadmill" end
+    local refusal = Treadmill.unwiringRefusal(player, object)
+    if refusal then return false, refusal end
     local bank = bankOfSource(args.source)
     if bank then
         -- What its runs banked up to now counts.
@@ -251,7 +253,7 @@ function Commands.unwire(player, args)
     local container = bank and containerOf(bank)
     if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
     local item = container:getItemWithID(args.itemId)
-    local refusal = PowerBank.unwireBlocker(bank:getIsoObject(), item)
+    local refusal = PowerBank.unwireRefusal(player, bank:getIsoObject(), item)
     if refusal then return false, refusal end
     -- The battery leaves with the bank's shared charge as it is now.
     settle(bank)

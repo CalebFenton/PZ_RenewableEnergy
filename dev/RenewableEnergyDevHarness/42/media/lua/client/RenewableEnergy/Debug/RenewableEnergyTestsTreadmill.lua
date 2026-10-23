@@ -119,7 +119,8 @@ end
 -- A loose treadmill offers Run on Treadmill, greyed saying it needs power while it has none and
 -- open once it has, and Wire to a Bank either way, greyed while the character lacks what it
 -- takes, even beside a wired one. Once one tile is wired, a right-click on either tile of that
--- treadmill offers Run greyed and saying why until it is connected to a bank, and Unwire.
+-- treadmill offers Run greyed and saying why until it is connected to a bank, and Unwire, greyed
+-- for the empty-handed character with the screwdriver it takes marked short.
 test("renewable_energy_treadmill_menu_offers_run_and_wiring", {
     run = function(self)
         T.setGrid(self, false)
@@ -156,7 +157,10 @@ test("renewable_energy_treadmill_menu_offers_run_and_wiring", {
         expect(wired.run ~= nil and wired.run.greyed and wired.run.reason == getText("Tooltip_RenewableEnergy_TreadmillNotConnected"),
             "the unwired tile of a wired, unconnected treadmill doesn't offer Run greyed with the reason")
         expect(wired.wire == nil, "a wired treadmill offers to be wired again")
-        expect(wired.unwire ~= nil and not wired.unwire.greyed, "a wired treadmill doesn't offer Unwire")
+        local screwdriver = ISVehicleMechanics.bhs .. getItemNameFromFullType("Base.Screwdriver")
+        expect(wired.unwire ~= nil and wired.unwire.greyed and (wired.unwire.reason or ""):find(screwdriver, 1, true) ~= nil,
+            "a wired treadmill doesn't offer Unwire greyed with the screwdriver marked short ("
+            .. tostring(wired.unwire and wired.unwire.reason) .. ")")
     end,
 })
 
@@ -457,6 +461,7 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
             table.insert(self.cases, { name = name, bank = bank, treadmill = treadmill, console = console })
         end
         T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
+        T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
         for _, case in ipairs(self.cases) do
             local bank, treadmill = case.bank, case.treadmill
             T.bankState(self, bank)

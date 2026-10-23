@@ -200,16 +200,30 @@ local function addNeed(needs, need)
     end
 end
 
+-- Adds a need for each of `tools` (ItemTag names) to a list for RenewableEnergy.firstUnmet.
+local function addToolNeeds(needs, character, tools)
+    for _, tool in ipairs(tools) do
+        addNeed(needs, { kind = "tool", tool = tool, have = RenewableEnergy.hasWorkingTool(character, ItemTag[tool]) and 1 or 0, need = 1 })
+    end
+end
+
 --- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`, for
 --- RenewableEnergy.firstUnmet.
 function PowerBank.jobNeeds(character, wiring)
     local inventory = character:getInventory()
     local needs = {}
     addNeed(needs, { kind = "skill", perk = Perks.Electricity, have = character:getPerkLevel(Perks.Electricity), need = wiring.skill })
-    addNeed(needs, { kind = "tool", tool = wiring.tool,
-        have = RenewableEnergy.hasWorkingTool(character, ItemTag[wiring.tool]) and 1 or 0, need = 1 })
+    addToolNeeds(needs, character, wiring.tools)
     addNeed(needs, { kind = "wire", item = PowerBank.WIRE, have = inventory:getCountTypeRecurse(PowerBank.WIRE), need = wiring.wire })
     addNeed(needs, { kind = "scrap", item = PowerBank.SCRAP, have = inventory:getCountTypeRecurse(PowerBank.SCRAP), need = wiring.scrap })
+    return needs
+end
+
+--- What undoing a wiring job of `wiring` takes of `character`: its tools, as vanilla takes a car
+--- part's install tools to uninstall it. For RenewableEnergy.firstUnmet.
+function PowerBank.unwiringNeeds(character, wiring)
+    local needs = {}
+    addToolNeeds(needs, character, wiring.tools)
     return needs
 end
 
@@ -283,8 +297,9 @@ function PowerBank.repairRefusal(character, item)
     return short and short.kind
 end
 
---- What keeps anyone from unwiring `item` from the bank `bankObject` now, as a translation key,
---- or nil: it must be a part in the bank's container.
+--- What keeps anyone from unwiring `item` from the bank `bankObject` now whatever they carry, as a
+--- translation key, or nil: it must be a part in the bank's container. The light is the action's
+--- to check, as for wiringBlocker.
 function PowerBank.unwireBlocker(bankObject, item)
     local container = PowerBank.isBank(bankObject) and bankObject:getContainer()
     if not (container and instanceof(item, "InventoryItem") and container:contains(item)
@@ -292,6 +307,17 @@ function PowerBank.unwireBlocker(bankObject, item)
         return "Tooltip_RenewableEnergy_NotAPart"
     end
     return nil
+end
+
+--- Why `character` can't unwire `item` from the bank `bankObject` now, or nil if they can: what
+--- unwireBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
+function PowerBank.unwireRefusal(character, bankObject, item)
+    local blocker = PowerBank.unwireBlocker(bankObject, item)
+    if blocker then
+        return blocker
+    end
+    local short = RenewableEnergy.firstUnmet(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
+    return short and short.kind
 end
 
 --- Why the bank whose summary or status is `bank` can't be switched `on` (true) or off now, or

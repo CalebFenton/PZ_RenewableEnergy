@@ -557,6 +557,37 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
     end,
 })
 
+-- A part comes out with the tools it went in with, as a car part does: a screwdriver for a car
+-- battery, a screwdriver and a wrench for an L-16, which won't go in without the wrench either.
+test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
+    run = function(self)
+        local L16 = "RenewableEnergy.L16Battery"
+        local bank = T.bank(self, "batteryRackWood", { "Base.CarBattery1", L16 })
+        if not bank then return end
+        self.bank = bank
+        local function unwire(key, fullType)
+            T.performInto(self, key, "unwire", { bank = bank.position }, { type = fullType, inBank = true })
+        end
+        unwire("carBare", "Base.CarBattery1")
+        T.give(self, "screwdriver", { { type = "Base.Screwdriver" }, { type = L16 },
+            { type = PowerBank.WIRE, count = PowerBank.wiringFor(L16).wire } })
+        T.step(function() end)
+        T.performInto(self, "l16InScrewdriver", "wireIn", { bank = bank.position }, { type = L16 })
+        unwire("l16Screwdriver", L16)
+        unwire("carScrewdriver", "Base.CarBattery1")
+        T.give(self, "wrench", { { type = "Base.Wrench" } })
+        T.step(function() end)
+        unwire("l16Both", L16)
+    end,
+    validate = function(self)
+        expect(reason(self, "carBare") == "tool", "a car battery came out without a screwdriver (" .. reason(self, "carBare") .. ")")
+        expect(reason(self, "l16InScrewdriver") == "tool", "an L-16 went in without a wrench (" .. reason(self, "l16InScrewdriver") .. ")")
+        expect(reason(self, "l16Screwdriver") == "tool", "an L-16 came out without a wrench (" .. reason(self, "l16Screwdriver") .. ")")
+        expect(self.carScrewdriver.ok, "a car battery didn't come out with a screwdriver (" .. reason(self, "carScrewdriver") .. ")")
+        expect(self.l16Both.ok, "an L-16 didn't come out with a screwdriver and a wrench (" .. reason(self, "l16Both") .. ")")
+    end,
+})
+
 -- In the dark nothing can be wired in or out: the menu greys them out and the action, the rule
 -- since a server can't tell whether a remote player stands in the dark, won't start.
 test("renewable_energy_bank_wiring_refused_in_the_dark", {
@@ -1938,11 +1969,13 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
-        -- One-kilogram stones up to room for one and a half batteries: one fits, the second doesn't.
+        -- A screwdriver to unwire with, and one-kilogram stones up to room for one and a half
+        -- batteries: one fits, the second doesn't.
         local inventory = p:getInventory()
         local batteryKg = getScriptManager():FindItem(CHARGED_BATTERY):getActualWeight()
-        local room = inventory:getEffectiveCapacity(p) - inventory:getCapacityWeight()
-        T.give(self, "filler", { { type = "Base.Stone2", count = math.floor(room - 1.5 * batteryKg) } })
+        local screwdriverKg = getScriptManager():FindItem("Base.Screwdriver"):getActualWeight()
+        local room = inventory:getEffectiveCapacity(p) - inventory:getCapacityWeight() - screwdriverKg
+        T.give(self, "filler", { { type = "Base.Screwdriver" }, { type = "Base.Stone2", count = math.floor(room - 1.5 * batteryKg) } })
         T.step(function()
             local context = T.newContext()
             local all = T.optionNamed(Menu.addUnwireOptions(0, context, bank.object),

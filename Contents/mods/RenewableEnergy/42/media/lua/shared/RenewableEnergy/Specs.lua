@@ -9,13 +9,14 @@ RenewableEnergy.Specs = Specs
 -- Batteries by item type. wh is capacity at full condition; cyclesAt50 is how many discharges of
 -- half the new capacity use up a battery's condition (Battery.cycleWear), so one carrying such a
 -- load every night is at half capacity after cyclesAt50 / 2 nights: a car battery in about five
--- months, a deep cycle in a year, an L-16 in about two. A long game outlives a bank or two.
+-- months, a deep cycle in a year, an L-16 in about two. A long game outlives a bank or two. wiring
+-- overrides Specs.wiring.battery: an L-16's cable lugs bolt onto its studs.
 Specs.batteries = {
     ["Base.CarBattery1"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 300 },
     ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 750 },
-    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500 },
+    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500, wiring = { tools = { "SCREWDRIVER", "WRENCH" } } },
     -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
     ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 150 },
 }
@@ -67,7 +68,7 @@ Specs.wind = {
 -- other clothing appliances (IsoGenerator.ClothingAppliancePowerConsumption).
 Specs.treadmill = {
     slots = 1,
-    wiring = { seconds = 90, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 2, xp = 10 },
+    wiring = { seconds = 90, wire = 2, scrap = 1, tools = { "SCREWDRIVER" }, skill = 2, xp = 10 },
     watts = 240, runMinutes = 30, drawFuel = 0.09,
     endurancePerHour = 0.6, thirstPerHour = 0.2,
     xpPerHour = { Fitness = 20, Sprinting = 15 },
@@ -130,14 +131,15 @@ Specs.banks = {
 }
 
 -- Wiring each part kind into a bank: seconds at normal speed at Electricity 0 (RenewableEnergyAction),
--- Electric Wire (returned by Unwire), Electronics Scrap (kept by the part), tool ItemTag, Electricity
--- level, and XP for the first time an item is ever wired. Inverters set skill/xp per type. Every
--- part takes a screwdriver, as vanilla's battery, radio and headlights do in a car.
+-- Electric Wire (returned by Unwire), Electronics Scrap (kept by the part), tool ItemTags (which
+-- unwiring takes too), Electricity level, and XP for the first time an item is ever wired.
+-- Inverters set skill/xp per type. Every part takes a screwdriver, as vanilla's battery, radio and
+-- headlights do in a car.
 Specs.wiring = {
-    battery = { seconds = 30, wire = 1, scrap = 0, tool = "SCREWDRIVER", skill = 0, xp = 5 },
-    inverter = { seconds = 60, wire = 2, scrap = 0, tool = "SCREWDRIVER" },
-    charger = { seconds = 30, wire = 1, scrap = 0, tool = "SCREWDRIVER", skill = 0, xp = 5 },
-    controller = { seconds = 60, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 3, xp = 15 },
+    battery = { seconds = 30, wire = 1, scrap = 0, tools = { "SCREWDRIVER" }, skill = 0, xp = 5 },
+    inverter = { seconds = 60, wire = 2, scrap = 0, tools = { "SCREWDRIVER" } },
+    charger = { seconds = 30, wire = 1, scrap = 0, tools = { "SCREWDRIVER" }, skill = 0, xp = 5 },
+    controller = { seconds = 60, wire = 2, scrap = 1, tools = { "SCREWDRIVER" }, skill = 3, xp = 15 },
 }
 
 -- Electricity XP for each module of a panel the first time it is ever connected to a bank.

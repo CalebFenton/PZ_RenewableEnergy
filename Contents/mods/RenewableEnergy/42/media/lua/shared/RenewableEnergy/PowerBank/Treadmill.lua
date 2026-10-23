@@ -95,6 +95,22 @@ function Treadmill.wiringRefusal(character, tile)
     return short and short.kind
 end
 
+--- What unwiring a treadmill takes of `character` (RenewableEnergy.firstUnmet): the tools wiring
+--- it took, as PowerBank.unwiringNeeds says for a part.
+function Treadmill.unwiringNeeds(character)
+    return PowerBank.unwiringNeeds(character, Specs.treadmill.wiring)
+end
+
+--- Why `character` can't unwire the treadmill tile `tile` now, or nil if they can: "not wired",
+--- else the kind of the first of Treadmill.unwiringNeeds they are short of.
+function Treadmill.unwiringRefusal(character, tile)
+    if not Treadmill.isWiredTile(tile) then
+        return "not wired"
+    end
+    local short = RenewableEnergy.firstUnmet(Treadmill.unwiringNeeds(character))
+    return short and short.kind
+end
+
 --- Whether the treadmill of `tile` has power, from the grid or a generator, a bank included, as
 --- vanilla decides an appliance has (ItemContainer.isObjectPowered).
 function Treadmill.isPowered(tile)

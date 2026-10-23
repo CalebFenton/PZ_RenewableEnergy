@@ -252,6 +252,7 @@ JOBS = {
     },
     [Action.UNWIRE] = {
         keeps = function(self) return PowerBank.unwireBlocker(self.bank, self.item) == nil end,
+        check = function(self) return PowerBank.unwireRefusal(self.character, self.bank, self.item) == nil end,
         command = function(self) return "unwire", { bank = positionOf(self.bank), itemId = self.item:getID() } end,
         units = function(self) return wiringUnits(self, partWiring(self), 0.5) end,
         light = true,
@@ -372,9 +373,10 @@ JOBS = {
         light = true,
         sound = "GeneratorConnect",
     },
-    -- As a part comes out of a bank: quicker than wiring, no tools, the wire given back.
+    -- As a part comes out of a bank: quicker than wiring, with the same tools, the wire given back.
     [Action.UNWIRE_TREADMILL] = {
         keeps = function(self) return onSquare(self.object) and Treadmill.isWiredTile(self.object) end,
+        check = function(self) return Treadmill.unwiringRefusal(self.character, self.object) == nil end,
         command = function(self) return "unwireTreadmill", { source = positionOf(self.object) } end,
         units = function(self) return wiringUnits(self, Specs.treadmill.wiring, 0.5) end,
         light = true,

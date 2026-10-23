@@ -428,7 +428,8 @@ module Base
         OnCreate = RenewableEnergy.Recipes.unmountModules,
         inputs
         {
-            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:wrench] mode:keep flags[MayDegradeLight],
             item 1 [RenewableEnergy.SolarRackMetal] mode:destroy,
         }
         outputs
@@ -510,6 +511,7 @@ module Base
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:pliers] mode:keep flags[MayDegradeLight],
             item 16 [RenewableEnergy.SolarCells],
             item 1 [Base.GlassPanel],
             item 1 [Base.SmallSheetMetal;4:Base.Plank],
@@ -682,7 +684,8 @@ module Base
 
     /*
         Stripping drains the battery's acid into empty containers and leaves its case and its
-        worn plates. Any battery strips, a dead one too.
+        worn plates. Any battery strips, a dead one too. A screwdriver prises the lid; an L-16's
+        cell links bolt on, so it takes a wrench as well, as its rebuild does.
     */
     craftRecipe RenewableEnergy_StripCarBattery
     {
@@ -697,8 +700,7 @@ module Base
         OnCreate = RenewableEnergy.Recipes.stripCarBattery,
         inputs
         {
-            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
-            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [Base.Gloves_Dish;Base.Gloves_Surgical;Base.Gloves_LeatherGloves;Base.Gloves_LeatherGlovesBlack;Base.Gloves_LeatherGlovesBrown] mode:keep,
             item 1 [Base.CarBattery1;Base.CarBattery2;Base.CarBattery3] mode:destroy flags[ItemCount;AllowDestroyedItem],
             item 1 [*],
@@ -723,8 +725,7 @@ module Base
         xpAward = Electricity:15,
         inputs
         {
-            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
-            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [Base.Gloves_Dish;Base.Gloves_Surgical;Base.Gloves_LeatherGloves;Base.Gloves_LeatherGlovesBlack;Base.Gloves_LeatherGlovesBrown] mode:keep,
             item 1 [RenewableEnergy.DeepCycleBattery] mode:destroy flags[ItemCount;AllowDestroyedItem],
             item 1 [*],
@@ -866,7 +867,7 @@ module Base
         OnCreate = RenewableEnergy.Recipes.rebuildCarBattery,
         inputs
         {
-            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.CarBatteryCase],
             item 1 [RenewableEnergy.BatteryPlates],
             item 1 [*],
@@ -892,7 +893,7 @@ module Base
         OnCreate = RenewableEnergy.Recipes.rebuildBattery,
         inputs
         {
-            item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.DeepCycleBatteryCase],
             item 2 [RenewableEnergy.BatteryPlates],
             item 1 [*],
@@ -922,6 +923,7 @@ module Base
         inputs
         {
             item 1 tags[base:wrench] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:screwdriver] mode:keep flags[MayDegradeLight],
             item 1 [RenewableEnergy.L16BatteryCase],
             item 3 [RenewableEnergy.BatteryPlates],
             item 1 [*],
@@ -1083,6 +1085,7 @@ module Base
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:pliers] mode:keep flags[MayDegradeLight],
             item 1 [Base.RemoteCraftedV3],
             item 2 [Base.ElectronicsScrap],
             item 2 [Base.ElectricWire],
