@@ -548,6 +548,21 @@ handler("panelState", function(_, args)
     return { modules = panel:getModData()[PowerBank.MODULES], overlays = overlaysOf(panel) }
 end)
 
+-- `args.hours` of storm over the world's panels that no bank runs (PanelStorms.pass), at the save's
+-- storm options. Answers the modules each panel at `args.panels` records after.
+handler("panelStorm", function(_, args)
+    RenewableEnergy.PanelStorms.pass(args.hours)
+    local modules = {}
+    for i, position in ipairs(args.panels) do
+        local panel = RenewableEnergy.Sources.on(squareAt(position))
+        if not panel then
+            return nil, "the panel at " .. position.x .. "," .. position.y .. "," .. position.z .. " on the server"
+        end
+        modules[i] = panel:getModData()[RenewableEnergy.PowerBank.MODULES]
+    end
+    return { modules = modules }
+end)
+
 -- Gadgets -----------------------------------------------------------------------------------------
 
 local function usesOf(container)

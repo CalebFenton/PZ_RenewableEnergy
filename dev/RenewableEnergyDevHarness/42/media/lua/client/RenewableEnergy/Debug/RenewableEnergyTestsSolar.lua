@@ -374,6 +374,43 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
     end,
 })
 
+-- A storm cracks a panel out in the weather whether or not it feeds a bank: a loose panel outdoors
+-- cracks, one indoors doesn't, and a connected one is its bank's to crack until it is
+-- disconnected, after which the next storm cracks it too.
+test("renewable_energy_solar_storms_crack_loose_panels", {
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" }, { charge = 0.5 })
+        local connected = bank and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100), connect = true })
+        local outdoors = connected and T.panel(self, Sprites.flat, { near = bank, modules = freshModule(100) })
+        local indoorSquare = outdoors and T.square(self, { indoors = true, near = bank }, "a free indoor square for a panel")
+        local indoors = indoorSquare and T.panel(self, Sprites.flat, { square = indoorSquare, modules = freshModule(100) })
+        if not indoors then return end
+        self.connected = connected
+        local panels = { connected.position, outdoors.position, indoors.position }
+        -- Every roll the lowest: each panel at risk cracks.
+        T.forceRoll(self, 0)
+        T.server(self, "panelStorm", { hours = 1, panels = panels })
+        T.step(function() self.first = self.server.panelStorm.modules end)
+        T.performInto(self, "disconnected", "disconnectSource", { bank = bank.position, source = connected.position })
+        T.server(self, "panelStorm", { hours = 1, panels = panels })
+        T.step(function() self.second = self.server.panelStorm.modules end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.connected) then return end
+        local crack = Specs.storm.crack
+        local function condition(modules, i) return modules[i] and modules[i][1] and modules[i][1].condition end
+        expectNear("the connected panel after a storm its bank didn't run", condition(self.first, 1), 100, 0)
+        expectNear("the loose outdoor panel after a storm", condition(self.first, 2), 100 - crack, 0)
+        expectNear("the loose indoor panel after a storm", condition(self.first, 3), 100, 0)
+        expect(self.disconnected and self.disconnected.ok, "disconnecting the panel failed ("
+            .. tostring(self.disconnected and self.disconnected.reason) .. ")")
+        expectNear("the disconnected panel after the next storm", condition(self.second, 1), 100 - crack, 0)
+        expectNear("the loose outdoor panel after a second storm", condition(self.second, 2), 100 - 2 * crack, 0)
+        expectNear("the loose indoor panel after a second storm", condition(self.second, 3), 100, 0)
+    end,
+})
+
 -- Connecting a panel gives Electricity XP once per module, the first time that module is ever
 -- connected: a rack holding one module connected before gives the other one's share and marks
 -- both, and connecting it again after disconnecting gives nothing.

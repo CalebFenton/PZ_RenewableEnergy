@@ -1098,9 +1098,35 @@ local function moduleDayWh(dayOfYear, mount, mix)
     return wh
 end
 
+-- Each kind of battery a bank holds; the three car batteries are alike, so one stands for them.
+local LIFE_BATTERIES = { "Base.CarBattery1", "RenewableEnergy.JarBattery", "RenewableEnergy.DeepCycleBattery",
+    "RenewableEnergy.L16Battery" }
+
+-- Nights a new battery of `fullType` takes to fall to half capacity carrying a load of `depth` of
+-- its new capacity every night, worn as a bank wears it (Battery.cycleWear at the Battery Wear
+-- option): the same load is a deeper share of what a worn battery holds. nil if wear is off.
+local function nightsToHalf(fullType, depth)
+    local Battery = RenewableEnergy.Battery
+    local scale = Battery.wearScale()
+    if scale <= 0 then
+        return nil
+    end
+    local item = instanceItem(fullType)
+    local full = item:getConditionMax()
+    local nights = 0
+    while item:getCondition() > full / 2 do
+        Battery.wear(item, Battery.cycleWear(item, math.min(1, depth * full / item:getCondition())) * scale)
+        nights = nights + 1
+    end
+    return nights
+end
+
 --- What turns the hauls into hours: `moduleWh[month][mount]`, { average, clear }, watt-hours a
 --- day one new factory module banks mid-July and mid-December; `applianceW`, each appliance's
---- watts as a bank bills it; `sunlight`, the Sunlight Multiplier they assume.
+--- watts as a bank bills it; `sunlight`, the Sunlight Multiplier they assume; `batteryLife`, for
+--- each of LIFE_BATTERIES in order, { fullType, half, quarter }, the nights it lasts to half
+--- capacity under a nightly load of half and of a quarter its new capacity (nil with wear off);
+--- `batteryWear`, the Battery Wear option they assume.
 function Loot.yardsticks()
     local Specs = RenewableEnergy.Specs
     local moduleWh = {}
@@ -1114,7 +1140,12 @@ function Loot.yardsticks()
     for name, fuel in pairs(Loot.APPLIANCE_FUEL) do
         applianceW[name] = fuel * Specs.wattsPerFuel
     end
-    return { moduleWh = moduleWh, applianceW = applianceW, sunlight = SandboxVars.RenewableEnergy.SunlightMultiplier }
+    local batteryLife = {}
+    for _, fullType in ipairs(LIFE_BATTERIES) do
+        table.insert(batteryLife, { fullType = fullType, half = nightsToHalf(fullType, 0.5), quarter = nightsToHalf(fullType, 0.25) })
+    end
+    return { moduleWh = moduleWh, applianceW = applianceW, sunlight = SandboxVars.RenewableEnergy.SunlightMultiplier,
+        batteryLife = batteryLife, batteryWear = SandboxVars.RenewableEnergy.BatteryWear }
 end
 
 return Loot

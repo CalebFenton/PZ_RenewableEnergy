@@ -1,6 +1,6 @@
 id=cf_renewable_energy
 name=Renewable Energy
-modversion=0.1.0
+modversion=0.2.0
 description=Off-grid solar power from 1993, for when the grid and the gas are gone: start with a car battery in a wooden box, work up to a room full of batteries and a yard of panels.
 icon=renewable_energy_icon.png
 poster=poster.png

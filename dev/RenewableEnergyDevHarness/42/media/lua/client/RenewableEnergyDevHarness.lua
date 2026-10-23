@@ -92,6 +92,13 @@ local function reportBatteries(census, modules)
     end
     table.sort(appliances)
     print("RELootReport yardstick: appliance watts as a bank bills them: " .. table.concat(appliances, ", "))
+    local function years(nights) return nights and string.format("%.1f", nights / 365) or "never" end
+    local lives = {}
+    for _, life in ipairs(sticks.batteryLife) do
+        table.insert(lives, string.format("%s %s (%s)", life.fullType:match("[^.]+$"), years(life.half), years(life.quarter)))
+    end
+    print(string.format("RELootReport yardstick: years a new battery lasts to half capacity under a nightly load of half (a quarter) its new capacity, at Battery Wear %d%%: %s",
+        sticks.batteryWear, table.concat(lives, ", ")))
     for i, town in ipairs(report.towns) do
         local newModules = modules.towns[i].total.condition / 100
         print(string.format("RELootReport power in %s: batteries store %.1f kWh; modules as found are %.1f new ones, banking %.1f kWh a day on south racks in July, %.1f in December",
