@@ -675,7 +675,7 @@ module Base
             item 1 [Base.CarBattery1;Base.CarBattery2;Base.CarBattery3;RenewableEnergy.DeepCycleBattery;RenewableEnergy.L16Battery;RenewableEnergy.JarBattery] mode:keep flags[ItemCount],
             item 1 [*],
             -fluid 1.0 [Water],
-            item 2 [Base.BakingSoda],
+            item 1 [Base.BakingSoda],
         }
         outputs
         {

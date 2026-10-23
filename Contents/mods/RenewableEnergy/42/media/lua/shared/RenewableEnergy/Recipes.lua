@@ -2,6 +2,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
@@ -19,6 +20,7 @@ local Recipes = {}
 RenewableEnergy.Recipes = Recipes
 
 local Specs, Battery, Wear, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
+local Sources = RenewableEnergy.Sources
 local SolarGardenLight, VehicleBattery = RenewableEnergy.SolarGardenLight, RenewableEnergy.VehicleBattery
 -- Case modData: the full type of the vanilla car battery it came out of.
 local CASE_BATTERY_KEY = "RenewableEnergy_batteryType"
@@ -65,10 +67,45 @@ function Recipes.repairLimit(timesRepaired)
     return Recipes.REPAIR_LIMIT - Recipes.REPAIR_LIMIT_STEP * timesRepaired
 end
 
+-- The most Seal Cracked Module can bring a module of `fullType`, sealed `repaired` times, to; nil
+-- for a type that is no module.
+local function sealCap(fullType, repaired)
+    local cap = Recipes.MODULE_REPAIR_CAP[fullType]
+    return cap and cap - Recipes.REPAIR_LIMIT_STEP * (repaired or 0)
+end
+
 -- The most Seal Cracked Module can bring `module` to, or nil for an item that is no module.
 function Recipes.sealLimit(module)
-    local cap = Recipes.MODULE_REPAIR_CAP[module:getFullType()]
-    return cap and cap - Recipes.REPAIR_LIMIT_STEP * module:getHaveBeenRepaired()
+    return sealCap(module:getFullType(), module:getHaveBeenRepaired())
+end
+
+--- Whether Seal Cracked Module can help the module record `module` (PowerBank.moduleRecord).
+function Recipes.canSealRecord(module)
+    local limit = sealCap(module.type, module.repaired)
+    return limit ~= nil and module.condition < limit
+end
+
+--- The placed panel's module records (PowerBank.modulesOf), or nil for an object that is no panel.
+function Recipes.panelModules(panel)
+    local kind = Sources.kindOf(panel)
+    return Sources.familyOf(kind) == "panel" and PowerBank.modulesOf(panel, kind) or nil
+end
+
+--- The module in `slot` of the placed panel `panel` if Seal Cracked Module can help it, else nil;
+--- second, the panel's whole list of module records it was read from.
+function Recipes.sealableModule(panel, slot)
+    local modules = Recipes.panelModules(panel)
+    local module = modules and type(slot) == "number" and modules[slot]
+    if module and Recipes.canSealRecord(module) then
+        return module, modules
+    end
+    return nil
+end
+
+--- Seals the module record `module` of a placed panel as Seal Cracked Module seals one in hand.
+function Recipes.sealRecord(module)
+    module.condition = math.min(sealCap(module.type, module.repaired), module.condition + Recipes.MODULE_REPAIR)
+    module.repaired = (module.repaired or 0) + 1
 end
 
 local function isModule(item)
@@ -176,10 +213,11 @@ function Recipes.reglazeModule(craftRecipeData, character)
     setRepairs(module, 0)
 end
 
--- Seal Cracked Panel seals a module still on the arrow board trailer the way Seal Cracked
--- Module seals one in hand. It reads the recipe's inputs, skill, time and XP from the recipe
--- itself, so the two can't drift apart; the module input is the panel. Reglazing isn't offered in
--- place: the panel comes off to be reglazed, as vanilla car glass is replaced, not repaired.
+-- Seal Cracked Panel seals a module still on the arrow board trailer, and Seal Cracked Module on a
+-- placed panel one still on its mount, the way Seal Cracked Module seals one in hand. They read the
+-- recipe's inputs, skill, time and XP from the recipe itself, so they can't drift apart; the module
+-- input is the panel. Reglazing isn't offered in place: the module comes off to be reglazed, as
+-- vanilla car glass is replaced, not repaired.
 local MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
 
 function Recipes.moduleRepairRecipe()

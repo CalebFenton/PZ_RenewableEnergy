@@ -108,6 +108,13 @@ local function queueBlades(playerNum, source, blades)
     queueAt(playerNum, source:getSquare(), Action.REPLACE_BLADES, source, nil, blades)
 end
 
+local function queueSeal(playerNum, source, slot)
+    local character = RenewableEnergy.walkTo(playerNum, source:getSquare())
+    if character then
+        ISTimedActionQueue.add(Action:new(character, Action.SEAL_MODULE, source, nil, nil, nil, nil, nil, slot))
+    end
+end
+
 local function queueBulb(playerNum, mode, light, bulb)
     local character = RenewableEnergy.walkTo(playerNum, light:getSquare())
     if not character then
@@ -441,6 +448,29 @@ local function addBladesOption(playerNum, menu, source)
     end
 end
 
+-- Seal Cracked Module for each module of a placed panel that the seal can help, listing what the
+-- seal takes and greyed out when the character can't do it, as a trailer's Seal Cracked Panel.
+local function addSealOptions(playerNum, menu, source)
+    local Recipes = RenewableEnergy.Recipes
+    local sealable = {}
+    for slot, module in ipairs(Recipes.panelModules(source) or {}) do
+        if Recipes.canSealRecord(module) then
+            table.insert(sealable, { slot = slot, condition = module.condition })
+        end
+    end
+    if #sealable == 0 then
+        return
+    end
+    local character = getSpecificPlayer(playerNum)
+    local needs = Recipes.panelRepairNeeds(character)
+    local blocker = lightOr(character, Action.SEAL_MODULE)
+    for _, entry in ipairs(sealable) do
+        local option = menu:addOption(getText("ContextMenu_RenewableEnergy_SealModule", entry.slot, math.floor(entry.condition)),
+            playerNum, queueSeal, source, entry.slot)
+        Needs.show(option, needs, blocker)
+    end
+end
+
 function Menu.addSourceOptions(playerNum, context, source)
     local menu = Needs.addSubMenu(context, Menu.nameOf(source))
     local character = getSpecificPlayer(playerNum)
@@ -456,6 +486,7 @@ function Menu.addSourceOptions(playerNum, context, source)
     end
     addBrakeOption(playerNum, menu, source)
     addBladesOption(playerNum, menu, source)
+    addSealOptions(playerNum, menu, source)
 
     local offered = false
     local kind = Sources.kindOf(source)

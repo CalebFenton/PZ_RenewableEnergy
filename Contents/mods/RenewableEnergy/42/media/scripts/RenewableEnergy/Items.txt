@@ -21,7 +21,7 @@ module RenewableEnergy
 
     /*
         A 1993 factory module. Its condition is the share of its rating it makes, and a mount keeps
-        each module's condition (Recipes.lua). Research teaches the mounts it goes into.
+        each module's condition (Recipes.lua). Research teaches the mounts it goes into and sealing.
     */
     item SolarModule
     {
@@ -33,7 +33,7 @@ module RenewableEnergy
         MetalValue = 1.0,
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_SolarModule,
-        ResearchableRecipes = RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWallWood;RenewableEnergy_MakeSolarWallMetal;RenewableEnergy_MakeSolarRackWood;RenewableEnergy_MakeSolarRackMetal,
+        ResearchableRecipes = RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWallWood;RenewableEnergy_MakeSolarWallMetal;RenewableEnergy_MakeSolarRackWood;RenewableEnergy_MakeSolarRackMetal;RenewableEnergy_RepairCrackedModule,
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
@@ -47,6 +47,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomemadeSolarModule_Ground,
         ConditionMax = 60,
         Tooltip = Tooltip_RenewableEnergy_HomemadeSolarModule,
+        ResearchableRecipes = RenewableEnergy_RepairCrackedModule,
         Tags = base:ignorezombiedensity;base:showcondition,
     }
 

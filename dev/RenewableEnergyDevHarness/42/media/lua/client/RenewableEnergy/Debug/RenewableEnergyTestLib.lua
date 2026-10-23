@@ -177,6 +177,14 @@ function T.factoryModules(...)
     return modules
 end
 
+--- Sets the character's skills to the levels `recipe` requires.
+function T.setRecipeSkills(self, recipe)
+    for i = 0, recipe:getRequiredSkillCount() - 1 do
+        local skill = recipe:getRequiredSkill(i)
+        T.setPerk(self, skill:getPerk(), skill:getLevel())
+    end
+end
+
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
 --- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
 --- beside it if `opts.failsafe`. When the test ends the server removes it and this client lets go

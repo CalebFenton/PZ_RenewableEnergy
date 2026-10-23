@@ -257,7 +257,7 @@ for _, chain in ipairs(REBUILDS) do
             -- Worn down again, then reconditioned.
             T.waitForCarried(self, chain.battery, "this client's rebuilt " .. chain.battery)
             T.step(function() T.changeItem(self, T.carried(chain.battery), { condition = limit(0) - 2 * step }) end)
-            T.give(self, "recondition", { { type = "Base.BakingSoda", count = 2 } })
+            T.give(self, "recondition", { { type = "Base.BakingSoda" } })
             T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
             waitForFluid(self, "Base.WaterBottle", 1)
             T.step(function()

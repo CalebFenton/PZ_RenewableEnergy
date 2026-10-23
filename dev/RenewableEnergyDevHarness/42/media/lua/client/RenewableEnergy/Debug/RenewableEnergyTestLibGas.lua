@@ -83,10 +83,7 @@ function T.buildRecord(self, kind, entity, tile, prefer)
     if not T.need(self, recipe, "the build recipe of " .. entity) then return nil end
     local handle = T.at(square)
     handle.square, handle.kind = square, kind
-    for i = 0, recipe:getRequiredSkillCount() - 1 do
-        local skill = recipe:getRequiredSkill(i)
-        T.setPerk(self, skill:getPerk(), skill:getLevel())
-    end
+    T.setRecipeSkills(self, recipe)
     local inputs, unmatched = T.recipeInputs(recipe, prefer)
     if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return nil end
     -- What a build should leave carried: its kept tools, and none of the items it takes whole.

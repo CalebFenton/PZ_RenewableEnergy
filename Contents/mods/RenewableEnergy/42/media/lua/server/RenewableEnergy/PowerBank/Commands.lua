@@ -13,6 +13,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
+require "RenewableEnergy/Recipes"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
@@ -26,6 +27,7 @@ RenewableEnergy = RenewableEnergy or {}
 local Specs, Wind, PowerBank, Wear = RenewableEnergy.Specs, RenewableEnergy.Wind, RenewableEnergy.PowerBank, RenewableEnergy.Wear
 local Sources, Treadmill, BankSystem = RenewableEnergy.Sources, RenewableEnergy.Treadmill, RenewableEnergy.BankSystem
 local PanelSource, WindSource = RenewableEnergy.PanelSource, RenewableEnergy.WindSource
+local Recipes = RenewableEnergy.Recipes
 local isPosition, bankAt = PowerBank.isPosition, BankSystem.bankAt
 
 local Commands = {}
@@ -136,6 +138,34 @@ function Commands.clearSnow(player, args)
     settle(bank)
     PanelSource.clearSnow(source, sourceAt(args.source))
     bank:sendStatus()
+    return true
+end
+
+--- Seals the module in `args.slot` of the placed panel at `args.source` with what the player
+--- carries, as Seal Cracked Module seals one in hand. Its bank's record, if it feeds one, takes the
+--- sealed modules at once.
+function Commands.sealModule(player, args)
+    local object = sourceAt(args.source)
+    if not object then return false, "no panel" end
+    local bank, source = recordOf(args.source)
+    settle(bank)
+    -- A storm may have cracked the bank's record while the panel's square was unloaded.
+    if source then
+        PanelSource.syncModules(source, object)
+    end
+    local module, modules = Recipes.sealableModule(object, args.slot)
+    if not module then return false, "nothing to seal" end
+    local refusal = Recipes.panelRepairRefusal(player)
+    if refusal then return false, refusal end
+    Recipes.useInputs(Recipes.panelRepairInputs(player), player)
+    Recipes.sealRecord(module)
+    PanelSource.writeModules(object, modules)
+    PanelSource.showCracks(object)
+    Recipes.moduleRepairRecipe():addXP(player)
+    if source then
+        source.modules = PowerBank.copyModules(modules)
+        bank:sendStatus()
+    end
     return true
 end
 

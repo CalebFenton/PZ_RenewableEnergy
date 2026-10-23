@@ -743,6 +743,55 @@ test("renewable_energy_solar_disconnect_panel", {
     end,
 })
 
+-- Seal Cracked Module, chosen from a connected rack's menu, seals the one cracked module still on
+-- its mount as the recipe seals one in hand: up to its cap, lowered by the seal it already had,
+-- counting the seal and still showing cracked. The whole module isn't offered, and the bank's
+-- record takes the sealed module at once.
+test("renewable_energy_solar_seal_module_in_place", {
+    instant = true,
+    run = function(self)
+        self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
+        local cracked = { type = FACTORY, condition = 20, repaired = 1 }
+        self.to = math.min(Recipes.MODULE_REPAIR_CAP[FACTORY] - Recipes.REPAIR_LIMIT_STEP, cracked.condition + Recipes.MODULE_REPAIR)
+        self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
+            modules = { { type = FACTORY, condition = 100 }, cracked } })
+        if not self.panel then return end
+        local bank = self.bank
+        T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
+        T.step(function()
+            local context = T.newContext()
+            local menu = Menu.addSourceOptions(0, context, self.panel.object)
+            local whole = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 1, 100))
+            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 2, cracked.condition))
+            context:hideAndChildren()
+            self.wholeOffered, self.offered = whole ~= nil, T.optionState(option)
+            if not (option and not option.notAvailable) then return end
+            T.standNextTo(self.panel.square)
+            T.choose(option)
+            T.waitFor(self, function()
+                local modules = self.panel.object:getModData()[MODULES_KEY]
+                return modules and modules[2] and modules[2].condition ~= cracked.condition
+            end, "this client's copy of the sealed module")
+            T.server(self, "panelState", self.panel.position)
+            T.bankState(self, bank)
+        end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        expect(not self.wholeOffered, "the whole module is offered a seal")
+        if not expect(self.offered.shown and not self.offered.greyed, "the cracked module's seal isn't offered ("
+            .. tostring(self.offered.reason) .. ")") then return end
+        local modules = self.server.panelState.modules
+        expectNear("the whole module", modules[1].condition, 100, 0)
+        expectNear("the sealed module", modules[2].condition, self.to, 0)
+        expect(modules[2].repaired == 2, "the sealed module reads repaired " .. tostring(modules[2].repaired) .. "x, expected 2")
+        expect(#self.server.panelState.overlays > 0, "the sealed module shows whole")
+        local listed = self.bank.state.status.sources[1]
+        expectNear("the bank's record of the sealed module", listed and listed.modules[2].condition, self.to, 0)
+    end,
+})
+
 -- The Clear Snow option on `panel`'s menu: whether it shows, whether it is greyed out, and why.
 local function clearSnowOption(panel)
     local context = T.newContext()

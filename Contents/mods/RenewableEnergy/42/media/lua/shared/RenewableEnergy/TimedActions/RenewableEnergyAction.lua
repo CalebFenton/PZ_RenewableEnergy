@@ -33,6 +33,7 @@ Action.UNWIRE = "Unwire"
 Action.REPAIR_PART = "RepairPart"
 Action.RENAME = "Rename"
 Action.REPAIR_PANEL = "RepairPanel"
+Action.SEAL_MODULE = "SealModule"
 Action.REMOVE_BULB = "RemoveBulb"
 Action.ADD_BULB = "AddBulb"
 Action.CUT_PADLOCK = "CutPadlock"
@@ -308,6 +309,18 @@ JOBS = {
         light = true,
         sound = "GeneratorRepair",
     },
+    -- Seal Cracked Panel's twin for a module on a placed panel.
+    [Action.SEAL_MODULE] = {
+        keeps = function(self) return isSource(self.object) end,
+        check = function(self)
+            return RenewableEnergy.Recipes.sealableModule(self.object, self.slot) ~= nil
+                and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
+        end,
+        command = function(self) return "sealModule", { source = positionOf(self.object), slot = self.slot } end,
+        units = function(self) return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
+        light = true,
+        sound = "GeneratorRepair",
+    },
     -- As long as vanilla's for a lamp's bulb at the default day length (ISLightActions).
     [Action.REMOVE_BULB] = {
         keeps = function(self) return isGardenLight(self.object) end,
@@ -479,9 +492,10 @@ end
 -- Parameter names must match the fields set on `o`: the multiplayer server rebuilds the action by
 -- passing those fields to new() in parameter order (NetTimedAction). `object` is the source or the
 -- garden light, `bank` the bank's IsoGenerator, `item` the tool or part the job uses, `bankName`
--- the bank's new name, `partId` the vehicle part worked on; unused ones are nil. The name can't
--- be a field called `name`, which NetTimedAction reads as the action's own name.
-function Action:new(character, mode, object, bank, vehicle, item, bankName, partId)
+-- the bank's new name, `partId` the vehicle part worked on, `slot` the panel's module; unused
+-- ones are nil. The name can't be a field called `name`, which NetTimedAction reads as the
+-- action's own name.
+function Action:new(character, mode, object, bank, vehicle, item, bankName, partId, slot)
     local o = ISBaseTimedAction.new(self, character)
     o.mode = mode
     o.object = object
@@ -490,6 +504,7 @@ function Action:new(character, mode, object, bank, vehicle, item, bankName, part
     o.item = item
     o.bankName = bankName
     o.partId = partId
+    o.slot = slot
     o.maxTime = o:getDuration()
     return o
 end

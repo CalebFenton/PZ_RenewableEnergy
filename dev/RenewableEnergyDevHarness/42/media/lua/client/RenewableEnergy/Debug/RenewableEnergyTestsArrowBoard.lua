@@ -1392,11 +1392,7 @@ end
 
 -- Sets the character's skills to Seal Cracked Module's required levels.
 local function setSealSkills(self)
-    local recipe = RenewableEnergy.Recipes.moduleRepairRecipe()
-    for i = 0, recipe:getRequiredSkillCount() - 1 do
-        local skill = recipe:getRequiredSkill(i)
-        T.setPerk(self, skill:getPerk(), skill:getLevel())
-    end
+    T.setRecipeSkills(self, RenewableEnergy.Recipes.moduleRepairRecipe())
 end
 
 -- The uses of epoxy Seal Cracked Module takes.

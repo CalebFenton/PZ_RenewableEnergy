@@ -150,10 +150,10 @@ function PanelSource.stormCrack(source, stormHours)
     return true
 end
 
--- Keep a panel's module record and the bank's copy the same: a crack while the panel's square
--- was unloaded goes to the object, otherwise the object (which unmounting and repairs change)
--- is the truth. Either way the tile shows the cracks the record now holds.
-local function syncModules(source, object)
+--- Keeps a panel's module record and the bank's copy `source` the same: a crack while the
+--- panel's square was unloaded goes to the object, otherwise the object (which unmounting and
+--- repairs change) is the truth. Either way the tile shows the cracks the record now holds.
+function PanelSource.syncModules(source, object)
     if source.modulesChanged then
         PanelSource.writeModules(object, source.modules)
         source.modulesChanged = nil
@@ -207,7 +207,7 @@ function PanelSource.update(source, object, inSlot, hours, context)
         source.modulesChanged = true
     end
     if object then
-        syncModules(source, object)
+        PanelSource.syncModules(source, object)
     end
     updateSnow(source, hours, context)
     if object then
