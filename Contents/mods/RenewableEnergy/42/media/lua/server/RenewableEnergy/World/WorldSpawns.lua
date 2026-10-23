@@ -159,7 +159,7 @@ WorldSpawns.BANK_STOCK = {
 }
 
 -- How used a crate's batteries are, as a BATTERY_WEAR profile: crates hold gear put away after use.
-local CRATE_WEAR = "used"
+WorldSpawns.CRATE_WEAR = "used"
 
 -- What a crate holds, by stock name: lines of { item, min, max, loot rarity option } (count
 -- scaled by the option; none: always the count). Modules get a site module's condition, and
@@ -316,7 +316,7 @@ function WorldSpawns.stockCrate(container, stockName)
             count = WorldSpawns.scaled(count, SandboxVars.RenewableEnergy[line[4]])
         end
         for _ = 1, count do
-            addFound(container, line[1], CRATE_WEAR)
+            addFound(container, line[1], WorldSpawns.CRATE_WEAR)
         end
     end
 end

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Counts what a thorough player could search in the TOWNS of the Build 42 map: every room, every
-container tile by the room it stands in, and every vehicle stall by its vehicle zone, and the
-whole map's vehicle stalls. Writes them to
+"""Counts what a thorough player could search in the TOWNS of the Build 42 map, and in the whole
+map: every room, every container tile by the room it stands in, and every vehicle stall by its
+vehicle zone, and the whole map's vehicle stalls. Writes them to
 dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevTownCensus.lua, which the
---loot report multiplies by each container's, room's and vehicle's expected modules.
+--loot report multiplies by each container's, room's and vehicle's expected modules and batteries.
 
     dev/loot/census.py [PZ media folder]
 
@@ -27,6 +27,7 @@ out by IsoChunk.AddVehicles_TrafficJam_*, closer together; their counts are the 
 of cars' slots, whether or not a car takes each.
 """
 import functools
+import multiprocessing
 import os
 import re
 import struct
@@ -52,6 +53,9 @@ TOWNS = [
     ("Rosewood", 7950, 11380, 8400, 11960),
     ("March Ridge", 9800, 12590, 10510, 13140),
 ]
+# The whole map, counted last as one more area; the countryside and the other towns are what it
+# holds beyond TOWNS.
+WHOLE_MAP = "Whole map"
 
 
 def container_types(media):
@@ -282,6 +286,34 @@ def lua_table(counts, indent):
     return "\n".join(lines)
 
 
+def whole_map(folder):
+    """The bounds of every cell the map has, as a town."""
+    cells = [tuple(map(int, re.match(r"(\d+)_(\d+)\.lotheader$", name).groups()))
+             for name in os.listdir(folder) if re.match(r"\d+_\d+\.lotheader$", name)]
+    xs, ys = [cx for cx, _ in cells], [cy for _, cy in cells]
+    return (WHOLE_MAP, min(xs) * CELL, min(ys) * CELL, (max(xs) + 1) * CELL - 1, (max(ys) + 1) * CELL - 1)
+
+
+def cell_containers(job):
+    """count_containers over one cell, for the whole map's pool."""
+    folder, types, cx, cy = job
+    return count_containers(folder, types, ("cell", cx * CELL, cy * CELL, (cx + 1) * CELL - 1, (cy + 1) * CELL - 1))
+
+
+def count_containers_by_cell(folder, types, town):
+    """count_containers over a large area a cell at a time, in parallel: one call over the whole
+    map would hold every room square at once."""
+    jobs = [(folder, types, cx, cy) for cx, cy, _ in town_cells(folder, town)]
+    containers = {}
+    with multiprocessing.Pool() as pool:
+        for part in pool.imap_unordered(cell_containers, jobs, chunksize=16):
+            for room_name, by_type in part.items():
+                total = containers.setdefault(room_name, {})
+                for kind, count in by_type.items():
+                    total[kind] = total.get(kind, 0) + count
+    return containers
+
+
 def main():
     media = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MEDIA
     folder = os.path.join(media, "maps", MAP)
@@ -289,15 +321,17 @@ def main():
     zones = parking_zones(folder)
     out = ["-- Written by dev/loot/census.py from the game's map; rerun it rather than edit this file.",
            "-- towns: each town's bounds, its rooms by name, its container tiles by room name and",
-           "-- container type, and its vehicle stalls by vehicle zone. mapVehicleStalls: the whole map's.",
+           "-- container type, and its vehicle stalls by vehicle zone; the last is the whole map.",
+           "-- mapVehicleStalls: the whole map's.",
            "return {",
            "    towns = {"]
-    for town in TOWNS:
+    for town in TOWNS + [whole_map(folder)]:
         name, x1, y1, x2, y2 = town
         print("counting", name, file=sys.stderr)
+        count = count_containers_by_cell if name == WHOLE_MAP else count_containers
         out.append('        { name = "%s", x1 = %d, y1 = %d, x2 = %d, y2 = %d,' % (name, x1, y1, x2, y2))
         for field, counts in (("rooms", count_rooms(folder, town)),
-                              ("containers", count_containers(folder, types, town)),
+                              ("containers", count(folder, types, town)),
                               ("vehicleStalls", vehicle_stalls(zones, town))):
             out.append("            %s = {" % field)
             out.append(lua_table(counts, 16))

@@ -7,6 +7,7 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/StatusWindow"
+require "RenewableEnergy/Debug/RenewableEnergyLoot"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (PZHarness/TestLib.lua explains the runner and the rules every helper keeps), plus fixtures
@@ -269,18 +270,12 @@ function T.snowfall(self, bank, hours)
     T.bankPass(self, bank, 0, { hours = hours or 1, snowing = true, airC = -10 })
 end
 
--- Vanilla's generator fuel an hour for each appliance kind the status lists (IsoGenerator's
--- *PowerConsumption constants), for loads the tests make up.
-local APPLIANCE_FUEL = {
-    fridgeFreezer = 0.13, fridge = 0.08, light = 0.002, television = 0.03, radio = 0.01,
-    microwave = 0.09, range = 0.09, washer = 0.09, dryer = 0.09, batteryCharger = 0.05,
-}
-
---- The watts appliances of the kinds `names` draw together, at vanilla's figures.
+--- The watts appliances of the kinds `names` draw together, at vanilla's figures
+--- (RenewableEnergy.Loot.APPLIANCE_FUEL).
 function T.applianceWatts(names)
     local watts = 0
     for _, name in ipairs(names) do
-        watts = watts + APPLIANCE_FUEL[name] * RenewableEnergy.Specs.wattsPerFuel
+        watts = watts + RenewableEnergy.Loot.APPLIANCE_FUEL[name] * RenewableEnergy.Specs.wattsPerFuel
     end
     return watts
 end

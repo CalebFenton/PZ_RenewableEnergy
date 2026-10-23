@@ -40,9 +40,10 @@
 #   dev/run-debug-client.sh --loot   the same, but instead of the tests the harness measures how
 #                                    often each of the mod's items spawns in each loot list and
 #                                    room container it is in, and the script prints one line per
-#                                    list, then the modules and watts a thorough player finds per
-#                                    town and per solar site, and the arrow boards per map (a few
-#                                    minutes)
+#                                    list, then the modules and watts and the batteries and
+#                                    watt-hours a thorough player finds per town, for the whole
+#                                    map and per solar site, the arrow boards per map, and
+#                                    yardsticks to read them by (under a minute)
 #
 # CACHE overrides the cache dir, JAVAC the compiler for ClickToStart.java (default: javac from
 # PATH), TIMEOUT the seconds a harness run may take, TESTS, a comma-separated list of test name
