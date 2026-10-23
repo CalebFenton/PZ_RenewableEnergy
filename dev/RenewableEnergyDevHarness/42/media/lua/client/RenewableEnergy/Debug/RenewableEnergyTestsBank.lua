@@ -169,7 +169,8 @@ test("renewable_energy_bank_powers_at_night", {
 
 -- While the grid still powers its square, a bank that is on stands by: its generator stays off and
 -- its batteries carry nothing, so through a night they don't drain or wear, and its inverter/charger
--- fills them from the grid. Once the grid goes, the next pass takes over the load.
+-- fills them from the grid. It still measures what is switched on in its reach, the same load it
+-- carries once the grid goes, at its next pass.
 test("renewable_energy_bank_stands_by_on_the_grid", {
     run = function(self)
         T.setGrid(self, true)
@@ -194,6 +195,10 @@ test("renewable_energy_bank_stands_by_on_the_grid", {
         expect(onGrid.status.state == "grid", "a switched-on bank on the grid reads " .. tostring(onGrid.status.state))
         expect(not onGrid.activated, "the bank ran its own generator while the grid powered its square")
         expectNear("the bank's draw on the grid", onGrid.drawW, 0, 0)
+        expect(onGrid.status.loadW >= T.applianceWatts({ "fridgeFreezer" }), string.format(
+            "on the grid the bank measures a load of %.1f W with a fridge on", onGrid.status.loadW))
+        expectNear("the load the bank measured on the grid, against the one it carries after", onGrid.status.loadW,
+            offGrid.status.loadW, 0)
         expectNear("the bank's deepest drop after a night on the grid", onGrid.cycleDepth, 0, 0)
         expect(onGrid.status.chargeSource == "grid" and onGrid.charge > 0.5, string.format(
             "on the grid the chargers charge from %s and the bank's charge went from 0.5 to %.3f", tostring(onGrid.status.chargeSource), onGrid.charge))
@@ -1572,7 +1577,7 @@ local JAR, L16 = "RenewableEnergy.JarBattery", "RenewableEnergy.L16Battery"
 local AWAY_HOURS = 20
 -- The condition each part of the away test's bank comes back with. A battery's discharge costs it
 -- (depth / 0.5)² over its type's half-depth cycles of its condition (SAND2004-3149): the day's 70%
--- is 1.96 / 150 of a jar battery's 100, 1.3 points, one of them whole, and 1.96 / 2500 of an L16's,
+-- is 1.96 / 150 of a jar battery's 100, 1.3 points, one of them whole, and 1.96 / 1500 of an L16's,
 -- less than one. The inverter wears 0.06 an hour on: 1.2 points in the hours away.
 local CAME_BACK = { [JAR] = 99, [L16] = 100, [INVERTER] = 99 }
 
@@ -1650,6 +1655,50 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
             local item = items:get(i)
             check("this client's " .. item:getFullType(), item:getFullType(), item:getCondition(), item:getCurrentUsesFloat())
         end
+    end,
+})
+
+-- A switched-on bank whose chunk is unloaded when the grid goes carries what was switched on in its
+-- reach, measured while the grid still powered it: the hours away drain it for that load, not just
+-- its inverter's idle draw, and its inverter/charger no longer charges from the grid. Single player
+-- only, as the bank above.
+test("renewable_energy_bank_unloaded_bank_carries_its_load_when_the_grid_goes", {
+    spOnly = "the server keeps chunks loaded after the character leaves",
+    timeoutSeconds = 120,
+    run = function(self)
+        T.setGrid(self, true)
+        local stand = T.square(self, nil, "a free outdoor square to stand on")
+        local bank = stand and T.bank(self, "batteryRackWood", { L16, L16, INVERTER }, { near = stand })
+        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
+        if not fridge then return end
+        self.bank = bank
+        local at = bank.position
+        T.switchOn(self, bank)
+        T.step(function() self.fridge = T.placeTile(self, fridge, MINI_FRIDGE) end)
+        T.bankPass(self, bank, 0)
+        -- The fridge goes before the trip: unloaded, the bank keeps what it measured, and a tile in a
+        -- chunk that loads again is a new copy the fixture's removal would miss.
+        T.step(function()
+            self.onGrid = bank.state
+            PZHarness.Fixtures.removePlaced(self.fridge.object)
+        end)
+        T.awayAndBack(self, T.at(stand), at.x, at.y, at.z, function()
+            T.step(function() T.setGrid(self, false) end)
+            T.bankPass(self, bank, 0, { hours = 2 })
+            T.step(function() self.away = bank.state end)
+        end)
+    end,
+    validate = function(self)
+        local onGrid, away = self.onGrid, self.away
+        expect(#away.items == 0, "the bank's chunk stayed loaded while the character was away")
+        expect(onGrid.status.state == "grid" and onGrid.status.loadW >= T.applianceWatts({ "fridgeFreezer" }), string.format(
+            "on the grid the bank reads %s and measures %.1f W with a fridge on", tostring(onGrid.status.state), onGrid.status.loadW))
+        expect(away.status.state == "on", "away with the grid gone the bank reads " .. tostring(away.status.state))
+        expectNear("the load the bank carries away, against the one it measured on the grid", away.status.loadW, onGrid.status.loadW, 0)
+        expect(away.drawW > onGrid.status.loadW, string.format("away the bank draws %.1f W for a load of %.1f W",
+            away.drawW, onGrid.status.loadW))
+        expect(away.charge < onGrid.charge, "away with the grid gone the bank's charge didn't fall")
+        expect(away.status.chargeSource == nil, "away with the grid gone the chargers charge from " .. tostring(away.status.chargeSource))
     end,
 })
 

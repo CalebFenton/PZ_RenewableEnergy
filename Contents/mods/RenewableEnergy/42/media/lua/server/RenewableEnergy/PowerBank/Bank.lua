@@ -488,10 +488,12 @@ function Bank:backupCarriesLoad()
     return self.generator and self.generator.running
 end
 
---- Measure what the bank pays for, and what powers the bank's square besides it. Unloaded, the
---- last measurement stands, until the grid shuts down. A bank that is off and has no charger
---- needs neither, and skips the scan of its whole reach. Returns the running generators that
---- reach the bank.
+--- Measure what the bank pays for, and what powers the bank's square besides it. The load counts
+--- what is switched on in its reach whether or not the grid powers it now: on the grid the bank
+--- carries none of it, but shows it, and a bank unloaded when the grid goes carries what was on.
+--- Unloaded, the last measurement stands, until the grid shuts down. A bank that is off and has no
+--- charger needs neither, and skips the scan of its whole reach. Returns the running generators
+--- that reach the bank.
 function Bank:measure()
     local square = self:getSquare()
     if not square then
@@ -499,7 +501,7 @@ function Bank:measure()
         return {}
     end
     self.gridPowered = square:hasGridPower()
-    local load = (self.on or self:chargerW() > 0) and Loads.scan(square, Payers.ofBank(self), Payers.running())
+    local load = (self.on or self:chargerW() > 0) and Loads.scan(square, Payers.ofBank(self), Payers.running(), true)
         or Loads.new()
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)
@@ -533,13 +535,14 @@ end
 --- pass's `hours`. A gas line shares its cap by those wants (GasLines.chargerLimitW), so it is saved
 --- with the source. Returns the watts they put in: the want, from a generator on gas no more than
 --- the line leaves them, and from a generator no more than its fuel pays for, which is all the
---- fuel it burns. Unloaded, only the grid carries on: the generator and its fuel are out of reach.
+--- fuel it burns. Unloaded, only the grid carries on, until it shuts down: the generator and its
+--- fuel are out of reach.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
     if self:getSquare() then
         generator = not self.gridPowered and fueled(self, generators)
         self.chargeSource = (self.gridPowered and "grid") or (generator and placeOf(generator)) or false
-    elseif self.chargeSource ~= "grid" then
+    elseif not (self.chargeSource == "grid" and self.gridPowered) then
         self.chargeSource = false
     end
     local charging = self.chargeSource and hours > 0 and roomWh > 0

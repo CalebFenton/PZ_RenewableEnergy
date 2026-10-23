@@ -40,7 +40,7 @@
     "IGUI_RenewableEnergy_StateOutdoors": "Outdoors: a bank only works inside a building",
     "IGUI_RenewableEnergy_StateDisconnected": "Not connected: connect the bank to power anything",
     "IGUI_RenewableEnergy_StateOff": "Switched off",
-    "IGUI_RenewableEnergy_StateGrid": "The grid is carrying the load",
+    "IGUI_RenewableEnergy_StateGrid": "Grid power on: inverter on standby, 0 W from batteries",
     "IGUI_RenewableEnergy_StateEmpty": "Batteries empty, waiting for a charge",
     "IGUI_RenewableEnergy_Power": "Power",
     "IGUI_RenewableEnergy_Sunlight": "Sunlight",

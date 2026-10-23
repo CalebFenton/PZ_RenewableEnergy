@@ -105,17 +105,18 @@ function Loads.byKind(load)
 end
 
 -- Whether a generator here, rather than the grid, would power `object`
--- (IsoGenerator.setSurroundingElectricity).
-local function offGrid(object, allowExterior)
-    return not ItemContainer.isObjectPowered(object, false)
+-- (IsoGenerator.setSurroundingElectricity). With `gridGone`, as if the grid were down: whatever the
+-- grid powers now counts too, since every grid check (ItemContainer.isObjectPowered) then fails.
+local function offGrid(object, allowExterior, gridGone)
+    return (gridGone or not ItemContainer.isObjectPowered(object, false))
         and (allowExterior or not object:getSquare():isOutside())
 end
 
 -- Objects the engine would bill a generator here for (IsoGenerator.setSurroundingElectricity).
-local function drawsFromGenerator(object, allowExterior)
+local function drawsFromGenerator(object, allowExterior, gridGone)
     return object:couldBePoweredByGenerator()
         and object:getGeneratorPowerConsumption() > 0
-        and offGrid(object, allowExterior)
+        and offGrid(object, allowExterior, gridGone)
 end
 
 local function isRunningGenerator(object)
@@ -123,9 +124,10 @@ local function isRunningGenerator(object)
 end
 
 --- What `payer` (a Payers source on `square`) pays for among `sources` (Payers.running), and the
---- running generators, banks aside, that power its square.
+--- running generators, banks aside, that power its square. With `gridGone`, what is switched on
+--- in its reach whether or not the grid powers it now.
 ---@param square IsoGridSquare the payer's square
-function Loads.scan(square, payer, sources)
+function Loads.scan(square, payer, sources, gridGone)
     local load = Loads.new()
     local allowExterior = SandboxVars.AllowExteriorGenerator
     local sharers = Payers.sharers(payer, sources)
@@ -136,13 +138,13 @@ function Loads.scan(square, payer, sources)
         local objects = scanned:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)
-            if drawsFromGenerator(object, allowExterior) then
+            if drawsFromGenerator(object, allowExterior, gridGone) then
                 if pays(object) then
                     addAppliances(load, object)
                 else
                     load.othersFuel = load.othersFuel + object:getGeneratorPowerConsumption()
                 end
-            elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior) then
+            elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior, gridGone) then
                 if pays(object) then
                     Loads.add(load, "treadmill", Specs.treadmill.drawFuel * WATTS_PER_FUEL)
                 end
