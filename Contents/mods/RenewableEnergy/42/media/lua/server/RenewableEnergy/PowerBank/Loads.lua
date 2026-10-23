@@ -54,7 +54,7 @@ local function kindOf(object)
         return "dryer"
     elseif instanceof(object, "IsoCombinationWasherDryer") then
         return object:isModeDryer() and "dryer" or "washer"
-    elseif object:getPipedFuelAmount() <= 0 and object:getContainerByEitherType("fridge", "freezer") then
+    elseif object:getContainerByEitherType("fridge", "freezer") then
         return fridgeKind(object)
     end
     return "other"
