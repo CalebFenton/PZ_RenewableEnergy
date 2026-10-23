@@ -148,7 +148,7 @@ PZHarness.register({
         -- Both wait on the lighting, the zoom, the UI and the vehicles rather than on frame
         -- counts, so they draw uncapped, and they shoot a clear day.
         promo = { uncapped = true, clearWeather = true, fastUI = true, run = Promo.capture },
-        art = { uncapped = true, clearWeather = true, fastUI = true, run = function(_, done) Art.capture(done) end },
+        art = { uncapped = true, clearWeather = true, fastUI = true, run = Art.capture },
         loot = { run = reportLoot },
     },
     onStart = function(mode)

@@ -219,24 +219,21 @@ local function isKnown(fullType)
     return getScriptManager():FindItem(fullType) ~= nil
 end
 
--- Every craftRecipe and build-menu recipe of the mod.
+-- Every craftRecipe and build menu recipe of the mod.
 local function modRecipes()
-    local recipes, prefix = {}, PZHarness.testSettings.recipePrefix
+    local scripts, recipes = getScriptManager(), {}
     for _, name in ipairs(PZHarness.Test.recipeNames()) do
-        table.insert(recipes, getScriptManager():getCraftRecipe(name))
+        table.insert(recipes, scripts:getCraftRecipe(name))
     end
-    local buildable = getScriptManager():getAllBuildableRecipes()
-    for i = 0, buildable:size() - 1 do
-        if PZHarness.startsWith(buildable:get(i):getName(), prefix) then
-            table.insert(recipes, buildable:get(i))
-        end
+    for _, name in ipairs(RenewableEnergy.Debug.buildRecipes()) do
+        table.insert(recipes, scripts:getBuildableRecipe(name))
     end
     return recipes
 end
 
 -- What making every recipe once takes, by item type and the fluid it holds: `kept`, as many of a
 -- kept tool as one recipe needs, and `used`, as many of what is used up as all of them together,
--- a drainable whose uses a recipe counts one full item per recipe. Also the inputs no item can meet.
+-- a drainable a recipe takes uses of counting as one full item. Also the inputs no item can meet.
 local function materials()
     local needs, order, unmatched = {}, {}, {}
     for _, recipe in ipairs(modRecipes()) do
@@ -282,8 +279,7 @@ local function materials()
     return order, unmatched
 end
 
--- Whether items of `fullType` come worn when asked for worn: batteries and modules, so that every
--- repair recipe takes them.
+-- Whether items of `fullType` come worn when asked for worn: batteries and modules.
 local function wears(fullType)
     return RenewableEnergy.Specs.batteries[fullType] ~= nil or RenewableEnergy.Specs.modules[fullType] ~= nil
 end
@@ -300,9 +296,9 @@ local function newItem(fullType, fluid, worn)
         container:addFluid(fluid, container:getCapacity())
     end
     if worn and RenewableEnergy.Specs.batteries[fullType] then
-        item:setCondition(WORN_BATTERY)
+        RenewableEnergy.Wear.setCondition(item, WORN_BATTERY)
     elseif worn then
-        item:setCondition(CRACKED_MODULE)
+        RenewableEnergy.Wear.setCondition(item, CRACKED_MODULE)
     end
     return item
 end
@@ -459,7 +455,7 @@ local function placeShattered(layout)
     local square = nextSquare(layout)
     if square then
         local module = instanceItem(RenewableEnergy.Specs.factoryModule)
-        module:setCondition(0)
+        RenewableEnergy.Wear.setCondition(module, 0)
         square:AddWorldInventoryItem(module, 0.5, 0.5, 0)
     end
 end
@@ -523,8 +519,7 @@ local function setUpCharacter(player)
         levels[perk:getId()] = SKILL
     end
     PZHarness.Fixtures.setPerkLevels(player, levels)
-    PZHarness.Test.learnRecipes(player)
-    PZHarness.Fixtures.learnRecipes(player, RenewableEnergy.Debug.buildRecipes())
+    RenewableEnergy.Debug.learnRecipes(player)
 end
 
 --- Sets the scenario up around `player`, and prints what it laid out, and anything it couldn't,

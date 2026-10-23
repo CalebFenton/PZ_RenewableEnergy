@@ -12,6 +12,7 @@ local Art = {}
 
 local Sprites = RenewableEnergy.Sprites
 local MARK = "REArt"
+local NOON = 12
 
 local SCALE_ITEM = "Base.CarBattery1"
 local ITEMS_PER_ROW = 10
@@ -319,18 +320,19 @@ local LONE_STATES = {
     { name = "art_trailer_lid_unlocked", set = function(pair) lockLid(pair, false) end },
 }
 
--- `pair` returns the current pair, which the steps only know once they run.
-local function addStates(steps, pair, states)
+-- `art.pair` is spawned by an earlier step, so the steps read it only as they run.
+local function addStates(steps, art, states)
     for _, state in ipairs(states) do
         table.insert(steps, function()
-            pair().trailer:repair()
+            local pair = art.pair
+            pair.trailer:repair()
             -- repair() mends the panels without anything showing their models again.
-            RenewableEnergy.ArrowBoard.showPanels(pair().trailer)
-            if pair().car then
-                pair().car:setStoplightsOn(false)
+            RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
+            if pair.car then
+                pair.car:setStoplightsOn(false)
             end
             -- A part's new condition reaches the overlay on the vehicle's next update, once a frame.
-            return state.set(pair()) or Capture.DRAW_FRAMES
+            return state.set(pair) or Capture.DRAW_FRAMES
         end)
         table.insert(steps, function()
             Capture.screenshot(MARK, state.name)
@@ -470,18 +472,17 @@ function IconSheet:new()
         table.insert(icons, { texture = Stage.iconTexture(fullType), name = getScriptManager():getItem(fullType):getName() })
     end
     local rows = math.ceil(#icons / ICON_COLUMNS)
-    local o = ISPanel.new(self, 60, 160, ICON_COLUMNS * CELL_W, rows * CELL_H + 8)
-    o.icons = icons
-    o.backgroundColor = { r = 0.25, g = 0.25, b = 0.25, a = 1 }
-    return o
+    local sheet = ISPanel.new(self, 60, 160, ICON_COLUMNS * CELL_W, rows * CELL_H + 8)
+    sheet.icons = icons
+    sheet.backgroundColor = { r = 0.25, g = 0.25, b = 0.25, a = 1 }
+    return sheet
 end
 
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
 local function addShot(steps, player, lot, shot)
     Stage.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
     table.insert(steps, function()
-        Stage.zoomOut(shot.zoomSteps)
-        return Capture.zoomSettled()
+        return Stage.zoomOut(shot.zoomSteps)
     end)
     table.insert(steps, function()
         return Capture.DRAW_FRAMES
@@ -550,7 +551,7 @@ end
 local function addTileAndItemShots(steps, player, lot)
     local iconSheet = IconSheet:new()
     table.insert(steps, function()
-        getGameTime():setTimeOfDay(12)
+        getGameTime():setTimeOfDay(NOON)
         Stage.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
     end)
@@ -595,8 +596,8 @@ local function addTileAndItemShots(steps, player, lot)
     addShot(steps, player, lot, SHOTS.windBehind)
 end
 
--- The trailer hitched to its car, then the rear in each of its states. `art.pair` holds the pair
--- the steps spawn.
+-- The trailer hitched to its car, then the rear in each of its states. The steps spawn the pair
+-- into `art.pair`.
 local function addHitchedTrailerShots(steps, player, lot, art)
     table.insert(steps, function()
         clearLot(lot)
@@ -609,14 +610,14 @@ local function addHitchedTrailerShots(steps, player, lot, art)
         return Stage.vehiclesAtRest(art.pair, true)
     end)
     addShot(steps, player, lot, SHOTS.trailer)
-    addStates(steps, art.currentPair, HITCHED_STATES)
+    addStates(steps, art, HITCHED_STATES)
 end
 
 -- A second trailer alone, facing the other way, in each of its states, then the cracked panels.
 local function addLoneAndCrackedShots(steps, player, lot, art)
     -- Back to noon after the hitched trailer's night shot.
     table.insert(steps, function()
-        getGameTime():setTimeOfDay(12)
+        getGameTime():setTimeOfDay(NOON)
         return Stage.lightingSettled(player, true)
     end)
     table.insert(steps, function()
@@ -629,11 +630,11 @@ local function addLoneAndCrackedShots(steps, player, lot, art)
         return Stage.vehiclesAtRest(art.pair, false)
     end)
     addShot(steps, player, lot, SHOTS.trailerFront)
-    addStates(steps, art.currentPair, LONE_STATES)
+    addStates(steps, art, LONE_STATES)
     addCrackedShot(steps, player, lot)
 end
 
-function Art.capture(onDone)
+function Art.capture(_, onDone)
     local run = Capture.new(MARK)
     local player = getPlayer()
     local lot = findLot(player)
@@ -641,11 +642,8 @@ function Art.capture(onDone)
         run:fail("no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
         return
     end
-    print(string.format("REArt stage at %d,%d", lot.x, lot.y))
+    print(string.format("%s stage at %d,%d", MARK, lot.x, lot.y))
     local art = {}
-    function art.currentPair()
-        return art.pair
-    end
     addTileAndItemShots(run.steps, player, lot)
     addHitchedTrailerShots(run.steps, player, lot, art)
     addLoneAndCrackedShots(run.steps, player, lot, art)

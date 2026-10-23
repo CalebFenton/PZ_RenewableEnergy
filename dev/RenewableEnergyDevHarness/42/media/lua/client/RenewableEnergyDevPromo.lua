@@ -5,7 +5,6 @@
 -- PROMO=<group>,... shoots only those groups, building only the setups they need. Shots of
 -- anything but the world are taken on black and on white (PZHarness/Capture.lua), and the empty
 -- floor too, so that art/promo/extract.py can find each item by difference.
--- The run draws frames as fast as it can, so steps wait on conditions, not frame counts.
 
 require "PZHarness/TestLib"
 local Capture = require "PZHarness/Capture"
@@ -229,13 +228,12 @@ local POSTER = {
     zoomOut = 3,
 }
 
--- The Release 2 setups (`yards`: biogas, wood gas, wind), each on open ground of its own, and the
--- treadmill indoors (`gym`): positions are (east, south) squares from the place found, and `shot`
--- names the positions the shot frames. A yard lays its things out along a line across the screen,
--- nearest the camera in front, so `open` is the band of squares that must be clear (trees may
--- stand there; they go).
-local R2 = {
-    yards = { "biogas", "woodgas", "wind" },
+-- The gas, wind and treadmill setups, by the name of their place: the yards (biogas, woodgas,
+-- wind), each on open ground of its own, and the treadmill indoors (gym). Positions are (east,
+-- south) squares from the place found, and `shot` names the positions the shot frames. A yard lays
+-- its things out along a line across the screen, nearest the camera in front, so `open` is the
+-- band of squares that must be clear (trees may stand there; they go).
+local LAYOUTS = {
     -- Every digester, working and full of gas, the brick dome feeding a kitted generator through
     -- its hose, and a lit gas heater warming the steel barrel.
     biogas = {
@@ -299,18 +297,20 @@ local R2 = {
         -- Real time the run plays before the shot, past the blend into the run.
         runMs = 2500,
     },
-    -- The wind every shot is taken in, as the climate's wind intensity (ClimateManager: 120 km/h at
-    -- 1): a fresh breeze, past every charger's cut-in and below the storms that break blades.
-    windIntensity = 0.3,
-    -- A digester well into its working life: how long it has made gas, its warmth, the share of
-    -- its potential it holds, its sludge, and the manure waiting in its hopper.
-    digester = { ageHours = 24 * 30, temp = 32, potential = 0.6, sludge = 30,
-        feed = { "Base.Dung_Cow", "Base.Dung_Cow", "Base.Dung_Pig" } },
-    -- A gasifier at work: wood in its hopper, its filter packed with hay, a little of it already
-    -- tarry, a fire going if lit, its ash pit part full and some condensate waiting.
-    gasifier = { wood = { "Base.Firewood", 6 }, packing = { { "Base.HayTuft", 8 }, { "RenewableEnergy.TarryPacking", 2 } },
-        fireKg = 2, ash = 35, condensate = 0.8 },
 }
+-- The wind every shot is taken in, as the climate's wind intensity: a fresh breeze, past every
+-- charger's cut-in and below the storms that break blades.
+local WIND_INTENSITY = 0.3
+-- The wind speed at a wind intensity of 1 (ClimateManager.getWindspeedKph).
+local FULL_WIND_KPH = 120
+-- A digester well into its working life: how long it has made gas, its warmth, the share of its
+-- potential it holds, its sludge, and the manure waiting in its hopper.
+local WORKING_DIGESTER = { ageHours = 24 * 30, temp = 32, potential = 0.6, sludge = 30,
+    feed = { "Base.Dung_Cow", "Base.Dung_Cow", "Base.Dung_Pig" } }
+-- A gasifier at work: wood in its hopper, its filter packed with hay, a little of it already
+-- tarry, a fire going if lit, its ash pit part full and some condensate waiting.
+local WORKING_GASIFIER = { wood = { "Base.Firewood", 6 },
+    packing = { { "Base.HayTuft", 8 }, { "RenewableEnergy.TarryPacking", 2 } }, fireKg = 2, ash = 35, condensate = 0.8 }
 -- How far around each setup radios and televisions are switched off, since their captions
 -- float over the shots.
 local QUIET_RADIUS = 25
@@ -331,7 +331,7 @@ local function iconFor(fullType)
     local key = "icon_" .. string.gsub(fullType, "%.", "_")
     if not icons[key] then
         local item = instanceItem(fullType)
-        icons[key] = { fullType = fullType, name = item:getDisplayName(), texture = Stage.iconTexture(fullType) }
+        icons[key] = { name = item:getDisplayName(), texture = Stage.iconTexture(fullType) }
         table.insert(iconOrder, key)
     end
     return key
@@ -819,14 +819,12 @@ end
 
 -- The markings and blends painted over a road's floor.
 local function isRoadPaint(object)
-    local sprite = object:getSprite()
-    local name = sprite and sprite:getName()
+    local name = Sprites.nameOf(object)
     return name ~= nil and (PZHarness.startsWith(name, "floors_overlay") or PZHarness.startsWith(name, "blends_"))
 end
 
 local function isOpenRoad(square, player)
-    local floor = square and square:getFloor()
-    local name = floor and floor:getSprite() and floor:getSprite():getName()
+    local name = square and Sprites.nameOf(square:getFloor())
     return name ~= nil and PZHarness.startsWith(name, "blends_street") and isClear(square, isRoadPaint)
         and square ~= player:getCurrentSquare()
 end
@@ -834,8 +832,7 @@ end
 -- Outdoors on natural ground (grass or dirt, not a road or a yard's paving) with nothing on it but
 -- ground cover and trees, which the setups take away.
 local function isYardSquare(square, player)
-    local floor = square and square:getFloor()
-    local name = floor and floor:getSprite() and floor:getSprite():getName()
+    local name = square and Sprites.nameOf(square:getFloor())
     return name ~= nil and PZHarness.startsWith(name, "blends_natural")
         and isClear(square, function(object) return instanceof(object, "IsoTree") end, true)
         and square ~= player:getCurrentSquare()
@@ -860,7 +857,7 @@ end
 -- Indoors, with free floor of one room for the treadmill, its battery box and the character beside
 -- it, nothing between them, and bare floor in front.
 local function fitsGym(place)
-    local gym, origin = R2.gym, place.origin
+    local gym, origin = LAYOUTS.gym, place.origin
     local room = origin:getRoom()
     if not room then
         return false
@@ -1004,7 +1001,7 @@ local function switchOnLights(square, otherBank)
     print("REPromo switched on " .. switched .. " lights")
 end
 
--- Release 2 ------------------------------------------------------------------------------------
+-- Gas, wind and treadmill ------------------------------------------------------------------------
 
 -- A generator plugged in on `square` with `fuel` of a full tank.
 local function placeGenerator(square, fuel)
@@ -1015,8 +1012,8 @@ local function placeGenerator(square, fuel)
     return generator
 end
 
--- A record of RECORD_KINDS kind `kind` built on its Sprites tile `tile` on `square` as the build
--- menu builds one (the tests' Helpers.placeRecord), clear of ground cover. Helpers is server Lua,
+-- A record of Helpers.RECORD_KINDS kind `kind` built on its Sprites tile `tile` on `square` by
+-- Helpers.placeRecord, as the build menu builds one, clear of ground cover. Helpers is server Lua,
 -- which loads after this file, so it is required here.
 local function placeRecord(kind, tile, square)
     clearGroundCover(square)
@@ -1028,12 +1025,13 @@ local function placeRecord(kind, tile, square)
     return thumpable
 end
 
--- A digester of the Sprites.digester tile `tile` ("barrel.MetalDrum", "dome", ...) built on `square`.
--- It is made one at work (R2.digester), its record's `fields` set over that, a day passed so that
--- it eats from its hopper and says what it makes a day, and its holder `full` of what it takes.
+-- A digester of the Sprites.digester tile `tile` ("barrel.MetalDrum", "dome", ...) built on
+-- `square`. It is made one at work (WORKING_DIGESTER), its record's `fields` set over that, a day
+-- passed so that it eats from its hopper and says what it makes a day, and its holder `full` of
+-- what it takes.
 local function placeDigester(square, tile, full, fields)
     local thumpable = placeRecord("digester", tile, square)
-    local record, working = RenewableEnergy.Digester.recordOf(thumpable), R2.digester
+    local record, working = RenewableEnergy.Digester.recordOf(thumpable), WORKING_DIGESTER
     for _, fullType in ipairs(working.feed) do
         thumpable:getContainer():AddItem(fullType)
     end
@@ -1051,9 +1049,9 @@ local function placeDigester(square, tile, full, fields)
     return thumpable
 end
 
--- A gasifier of `tier` built on `square`, at work (R2.gasifier), lit if `lit`.
+-- A gasifier of `tier` built on `square`, at work (WORKING_GASIFIER), lit if `lit`.
 local function placeGasifier(square, tier, lit)
-    local Gasifier, working = RenewableEnergy.Gasifier, R2.gasifier
+    local Gasifier, working = RenewableEnergy.Gasifier, WORKING_GASIFIER
     local thumpable = placeRecord("gasifier", tier, square)
     for _ = 1, working.wood[2] do
         Gasifier.hopperOf(thumpable):AddItem(working.wood[1])
@@ -1071,28 +1069,43 @@ local function placeGasifier(square, tier, lit)
     return thumpable
 end
 
+-- Gives `player` what the materials list `list` (RenewableEnergy.Materials) asks for: its skill
+-- levels, each with its restore added to `restores`, and its items, each added to `given`. An item
+-- counted in uses comes as one whole item.
+local function giveMaterials(player, list, given, restores)
+    local inventory = player:getInventory()
+    for _, material in ipairs(list) do
+        if material.perk then
+            table.insert(restores, PZHarness.Fixtures.setPerk(player, Perks[material.perk], material.need))
+        elseif material.item then
+            for _ = 1, material.uses and 1 or material.need or 1 do
+                table.insert(given, inventory:AddItem(material.item))
+            end
+        end
+    end
+end
+
 -- Fits the gas kit to `generator` and runs its line to `source`, a digester or a gasifier, by
 -- the jobs a player does (GasJobs.perform), the character holding what they take meanwhile.
 local function fitGasKit(generator, source)
     local GasKit, GasJobs, site = RenewableEnergy.GasKit, RenewableEnergy.GasJobs, RenewableEnergy.GasLines.jobSite
     local player = getPlayer()
-    local inventory = player:getInventory()
-    local restore = PZHarness.Fixtures.setPerk(player, Perks.Mechanics, 2)
-    local given = { inventory:AddItem(GasKit.ITEM), inventory:AddItem("Base.Wrench"), inventory:AddItem(GasKit.PIPE) }
-    for _ = 1, GasKit.REACH / GasKit.HOSE_SQUARES do
-        table.insert(given, inventory:AddItem(GasKit.HOSE))
-    end
+    local given, restores = {}, {}
     for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
+        giveMaterials(player, GasKit.materials(job, generator, source), given, restores)
         if not GasJobs.perform(GasKit, site, player, job, generator, source) then
             print("REPromo gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, source)))
         end
     end
+    local inventory = player:getInventory()
     for _, item in ipairs(given) do
         if item:getContainer() == inventory then
             inventory:Remove(item)
         end
     end
-    restore()
+    for i = #restores, 1, -1 do
+        restores[i]()
+    end
 end
 
 -- A generator plugged in and waiting at `layout.generator` of `place`, with a gas kit on an
@@ -1110,8 +1123,7 @@ local tallSquares = {}
 local function placeWindCharger(square, spriteName)
     clearGroundCover(square)
     local object = Stage.placeTile(square, spriteName)
-    -- As placing it does in multiplayer; single player fires no OnObjectAdded.
-    triggerEvent("OnObjectAdded", object)
+    RenewableEnergy.Wind.OnCreate({ thumpable = object })
     tallSquares[square] = true
     return object
 end
@@ -1164,6 +1176,7 @@ end
 -- then one of a minute: the window shows the sun averaged over the last pass, which would
 -- otherwise be the last hour of the morning.
 local function chargeThroughMorning()
+    -- Server Lua, which loads after this file.
     local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
     local system = PowerBank.serverSystem
     local banks = { system:getLuaObjectOnSquare(homesteadBank:getSquare()), system:getLuaObjectOnSquare(stage0Box:getSquare()) }
@@ -1212,9 +1225,9 @@ local function homesteadSquares()
         HOMESTEAD.wallPanels, HOMESTEAD.racks, HOMESTEAD.flatPanels)
 end
 
--- What the shot of the Release 2 place `name` frames: its wind chargers and its `shot` positions.
+-- What the shot of the place `name` of LAYOUTS frames: its wind chargers and its `shot` positions.
 local function placeSquares(name)
-    local layout, shot = R2[name], {}
+    local layout, shot = LAYOUTS[name], {}
     for _, key in ipairs(layout.shot) do
         table.insert(shot, layout[key])
     end
@@ -1226,6 +1239,14 @@ local function stage0Squares()
 end
 
 local CROP_MARGIN = 40
+
+-- The region from left, top to right, bottom, cut off at the screen's edges.
+local function onScreenRegion(name, left, top, right, bottom)
+    left, top = math.max(0, left), math.max(0, top)
+    right = math.min(getCore():getScreenWidth(), right)
+    bottom = math.min(getCore():getScreenHeight(), bottom)
+    return region(name, left, top, right - left, bottom - top)
+end
 
 -- A crop of the README's width from `left`, around `box`, kept on the screen: what lies past
 -- its edge comes out black.
@@ -1251,10 +1272,8 @@ end
 -- Just `squares`, for an inset.
 local function cropped(name, squares)
     local box = screenBox(squares)
-    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
-    local left, top = math.max(0, box.left - CROP_MARGIN), math.max(0, box.top - CROP_MARGIN)
-    local right, bottom = math.min(screenW, box.right + CROP_MARGIN), math.min(screenH, box.bottom + CROP_MARGIN)
-    return region(name, left, top, right - left, bottom - top)
+    return onScreenRegion(name, box.left - CROP_MARGIN, box.top - CROP_MARGIN, box.right + CROP_MARGIN,
+        box.bottom + CROP_MARGIN)
 end
 
 -- The clothes the character came with, and the settler's, each made once.
@@ -1303,8 +1322,7 @@ local function goTo(squares, stepsOut)
         end
     end
     run:add(function()
-        Stage.zoomOut(stepsOut)
-        return Capture.zoomSettled()
+        return Stage.zoomOut(stepsOut)
     end)
 end
 
@@ -1318,11 +1336,11 @@ local function addWorldSettings(origins)
         getGameTime():setTimeOfDay(NOON)
         local wind = getClimateManager():getClimateFloat(ClimateManager.FLOAT_WIND_INTENSITY)
         wind:setEnableAdmin(true)
-        wind:setAdminValue(R2.windIntensity)
+        wind:setAdminValue(WIND_INTENSITY)
         silenceRadios(origins)
         -- The climate takes the wind on its next update.
         return function()
-            return getClimateManager():getWindspeedKph() >= R2.windIntensity * 120 * 0.95
+            return getClimateManager():getWindspeedKph() >= WIND_INTENSITY * FULL_WIND_KPH * 0.95
         end
     end)
 end
@@ -1407,10 +1425,10 @@ local function addWindowShot(name, windowClass, objectOf, ready)
     local window, back
     run:add(function()
         run:newBackdrop()
-        local p, object = getPlayer(), objectOf()
-        back = { math.floor(p:getX()), math.floor(p:getY()), math.floor(p:getZ()) }
-        local at = AdjacentFreeTileFinder.Find(object:getSquare(), p) or object:getSquare()
-        PZHarness.Fixtures.teleportToMiddle(p, at:getX(), at:getY(), at:getZ())
+        local player, object = getPlayer(), objectOf()
+        back = { math.floor(player:getX()), math.floor(player:getY()), math.floor(player:getZ()) }
+        local stand = AdjacentFreeTileFinder.Find(object:getSquare(), player) or object:getSquare()
+        PZHarness.Fixtures.teleportToMiddle(player, stand:getX(), stand:getY(), stand:getZ())
         window = windowClass.open(0, object)
         window:setX(100)
         window:setY(100)
@@ -1508,10 +1526,7 @@ end
 local function studioWindow(name)
     local x, y = onScreen(places.studio.origin)
     local window = STUDIO.window
-    local left, top = math.max(0, x - window.half), math.max(0, y - window.up)
-    local right = math.min(getCore():getScreenWidth(), x + window.half)
-    local bottom = math.min(getCore():getScreenHeight(), y + window.down)
-    return region(name, left, top, right - left, bottom - top)
+    return onScreenRegion(name, x - window.half, y - window.up, x + window.half, y + window.down)
 end
 
 -- Every item alone on the studio floor. `models` gets one entry per item.
@@ -1578,14 +1593,14 @@ local function addTrailer()
     local pair
     addOutfit(false)
     run:add(function()
-        local car = road.origin
-        local x, y, z, reach = car:getX(), car:getY(), car:getZ(), ROAD.clearRadius
+        local carSquare = road.origin
+        local x, y, z, reach = carSquare:getX(), carSquare:getY(), carSquare:getZ(), ROAD.clearRadius
         removeTrees(road)
         Stage.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
         for _, spot in ipairs(ROAD.cones) do
             Stage.placeTile(at(road, spot), ROAD.cone)
         end
-        pair = Stage.spawnTrailer(car, road.frame.facing)
+        pair = Stage.spawnTrailer(carSquare, road.frame.facing)
         return Stage.vehiclesAtRest(pair, false)
     end)
     run:add(function()
@@ -1706,27 +1721,27 @@ local function addPoster()
     end)
 end
 
--- Release 2 shots ---------------------------------------------------------------------------------
+-- Gas, wind and treadmill shots ------------------------------------------------------------------
 
--- A function giving the square of the Release 2 place `name` at its R2 layout's position `key`.
+-- A function giving the square of the place `name` at its LAYOUTS position `key`.
 local function spotsOf(name)
-    local place, layout = places[name], R2[name]
+    local place, layout = places[name], LAYOUTS[name]
     return function(key)
         return at(place, layout[key])
     end
 end
 
--- Clears the trees around the Release 2 place `name` and the ground cover of its band.
+-- Clears the trees around the place `name` and the ground cover of its band.
 local function clearYard(name)
     removeTrees(places[name])
-    clearArea(places[name], R2[name].open)
+    clearArea(places[name], LAYOUTS[name].open)
 end
 
--- Has the character look around the Release 2 place `name` from its scout square, if it has one,
+-- Has the character look around the place `name` from its scout square, if it has one,
 -- then stand on its `standAt` square (its player square by default), `stepsOut` from the closest
 -- zoom.
 local function goToPlace(name, stepsOut, standAt)
-    local layout = R2[name]
+    local layout = LAYOUTS[name]
     local squares = { at(places[name], layout[standAt or "player"]) }
     if layout.scout then
         table.insert(squares, 1, at(places[name], layout.scout))
@@ -1777,7 +1792,7 @@ local function addWoodgas()
         local here = spotsOf("woodgas")
         clearYard("woodgas")
         placeGasifier(here("primitive"), "primitive", false)
-        for _, fuel in ipairs(R2.woodgas.fuelItems) do
+        for _, fuel in ipairs(LAYOUTS.woodgas.fuelItems) do
             local item = instanceItem(fuel[1])
             item:setWorldZRotation(fuel[4])
             here("fuel"):AddWorldInventoryItem(item, fuel[2], fuel[3], 0)
@@ -1803,7 +1818,7 @@ local function addWind()
     addOutfit(true)
     run:add(function()
         clearYard("wind")
-        for _, spot in ipairs(R2.wind.chargers) do
+        for _, spot in ipairs(LAYOUTS.wind.chargers) do
             placeWindCharger(at(places.wind, spot), spot.sprite)
         end
         return DRAW_FRAMES
@@ -1817,7 +1832,7 @@ end
 -- The treadmill wired to a battery box of car batteries beside it, as stage 0's, then the
 -- character running on it, indoors at the closest zoom, in the clothes it came with.
 local function addTreadmill()
-    local layout = R2.gym
+    local layout = LAYOUTS.gym
     addOutfit(false)
     run:add(function()
         local here = spotsOf("gym")
@@ -1849,7 +1864,7 @@ end
 
 -- Finding the places ------------------------------------------------------------------------------
 
--- A Release 2 yard: a band of natural ground (R2[name].open) clear for it.
+-- A yard: a band of natural ground (LAYOUTS[name].open) clear for it.
 local function yard(name)
     return {
         name = name,
@@ -1857,7 +1872,7 @@ local function yard(name)
         missing = "open ground for the " .. name .. " shot",
         frames = { GRID },
         fits = function(place, player)
-            return everyAreaSquare(place, R2[name].open, function(square)
+            return everyAreaSquare(place, LAYOUTS[name].open, function(square)
                 return isYardSquare(square, player)
             end)
         end,

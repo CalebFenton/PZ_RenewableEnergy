@@ -1,9 +1,9 @@
--- Development only. What the --art and --promo captures share besides the harness's
--- PZHarness/Capture.lua, which runs their steps: finding a place near the character, clearing its
--- trees and vehicles, the steps that walk the character to a shot and frame it, the arrow board
--- trailer hitched to a car, dark or its arrow held lit, and the waits for it to settle.
+-- Development only: staging the dev mod's captures and scenarios share. Finds a place near the
+-- character, clears it, walks the character to a shot and frames it, and sets out the arrow board
+-- trailer; PZHarness/Capture.lua runs the steps.
 
 require "PZHarness/Fixtures"
+local Capture = require "PZHarness/Capture"
 
 local Stage = {}
 
@@ -136,7 +136,8 @@ function Stage.clearGroundCover(square)
 end
 
 --- Removes every vehicle standing on a square from x1, y1 to x2, y2 on level z. Found through the
---- squares, since the cell keeps its vehicles in a Java Set (IsoCell.getVehicles), which Lua can't walk.
+--- squares, since the cell keeps its vehicles in a Java Set (IsoCell.getVehicles), which Lua can't
+--- walk.
 function Stage.removeVehicles(x1, y1, x2, y2, z)
     local cell, found = getCell(), {}
     for x = x1, x2 do
@@ -182,7 +183,8 @@ function Stage.addLookAround(steps, player, square)
     end)
 end
 
---- Sets the zoom `stepsOut` steps out from the closest.
+--- Sets the zoom `stepsOut` steps out from the closest, and returns a runSteps wait until it
+--- settles.
 function Stage.zoomOut(stepsOut)
     for _ = 1, STEPS_TO_CLOSEST do
         getCore():doZoomScroll(0, -1)
@@ -190,6 +192,7 @@ function Stage.zoomOut(stepsOut)
     for _ = 1, stepsOut do
         getCore():doZoomScroll(0, 1)
     end
+    return Capture.zoomSettled()
 end
 
 --- The icon the crafting window draws for `fullType`: the script's, which for a moveable is not
@@ -271,10 +274,11 @@ function Stage.vehiclesAtRest(pair, hitch)
     return function()
         local still = isStill(pair.trailer) and (pair.car == nil or isStill(pair.car))
         if still and hitch then
-            local a = pair.car:getTowingWorldPos("trailer", towing)
-            local b = pair.trailer:getTowedByWorldPos("trailer", towed)
-            still = a ~= nil and b ~= nil and pair.trailer:getVehicleTowedBy() == pair.car
-                and IsoUtils.DistanceToSquared(a:x(), a:y(), b:x(), b:y()) < HITCH_GAP * HITCH_GAP
+            local towPoint = pair.car:getTowingWorldPos("trailer", towing)
+            local towedPoint = pair.trailer:getTowedByWorldPos("trailer", towed)
+            still = towPoint ~= nil and towedPoint ~= nil and pair.trailer:getVehicleTowedBy() == pair.car
+                and IsoUtils.DistanceToSquared(towPoint:x(), towPoint:y(), towedPoint:x(), towedPoint:y())
+                    < HITCH_GAP * HITCH_GAP
         end
         if not still then
             since = nil
