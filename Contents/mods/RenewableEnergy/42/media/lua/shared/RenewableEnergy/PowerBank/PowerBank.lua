@@ -219,16 +219,24 @@ function PowerBank.wiringNeeds(character, fullType)
     return PowerBank.jobNeeds(character, PowerBank.wiringFor(fullType))
 end
 
+--- How many more parts of `kind` (a PARTS key) the bank `bankObject` takes; 0 for no bank.
+function PowerBank.freeSlots(bankObject, kind)
+    local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
+    local container = bank and bankObject:getContainer()
+    if not container then
+        return 0
+    end
+    return math.max(0, bank.spec[PowerBank.PARTS[kind].max] - countParts(container, kind))
+end
+
 --- What keeps anyone from wiring `item` into the bank `bankObject` now whatever they carry, as a
 --- translation key, or nil. The light is the action's to check (RenewableEnergyAction.needsLight):
 --- only the player's own side can see it (IsoPlayer.tooDarkToRead is false for a remote player).
 function PowerBank.wiringBlocker(bankObject, item)
-    local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
-    local container = bank and bankObject:getContainer()
     local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
-    if not (container and kind) then
+    if not (kind and PowerBank.bankOfSprite(Sprites.nameOf(bankObject)) and bankObject:getContainer()) then
         return "Tooltip_RenewableEnergy_NotAPart"
-    elseif countParts(container, kind) >= bank.spec[PowerBank.PARTS[kind].max] then
+    elseif PowerBank.freeSlots(bankObject, kind) == 0 then
         return "Tooltip_RenewableEnergy_NoSlot"
     end
     return nil

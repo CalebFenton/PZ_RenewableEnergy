@@ -71,12 +71,16 @@ local function backupSquare(self, near, reach)
     return T.need(self, square, "a free square for a generator within " .. reach .. " tiles of the bank")
 end
 
--- The option in `menu` that acts on `item` (the bank part menus pass it as the third parameter),
--- by id, since a server's sync can replace this client's item objects.
+-- The option in `menu` or its submenus that acts on `item` (the bank part menus pass it as the
+-- third parameter), by id, since a server's sync can replace this client's item objects.
 local function optionFor(menu, item)
     for _, option in ipairs(menu and menu.options or {}) do
         if instanceof(option.param3, "InventoryItem") and option.param3:getID() == item:getID() then
             return option
+        end
+        local found = option.subOption and optionFor(menu:getSubMenu(option.subOption), item)
+        if found then
+            return found
         end
     end
 end
@@ -512,7 +516,7 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         give("first", { { type = "Base.CarBattery1" }, { type = "Base.Hammer" } })
         wire("hammer", "Base.Hammer")
         wire("noTool", "Base.CarBattery1")
-        give("wrench", { { type = "Base.Wrench" } })
+        give("screwdriver", { { type = "Base.Screwdriver" } })
         wire("noWire", "Base.CarBattery1")
         give("wire", { { type = PowerBank.WIRE, count = batteryWire } })
         wire("wired", "Base.CarBattery1")
@@ -520,7 +524,7 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         T.performInto(self, "unwired", "unwire", { bank = bank.position }, { type = "Base.CarBattery1", inBank = true })
         T.count(self, "unwired", { PowerBank.WIRE, "Base.CarBattery1" })
         wire("rewired", "Base.CarBattery1")
-        give("inverter", { { type = "Base.Screwdriver" }, { type = PowerBank.WIRE, count = inverterWiring.wire }, { type = INVERTER } })
+        give("inverter", { { type = PowerBank.WIRE, count = inverterWiring.wire }, { type = INVERTER } })
         wire("skill", INVERTER)
         -- The rest of the slots, and one battery more.
         give("batteries", { { type = PowerBank.WIRE, count = self.maxBatteries * batteryWire },
@@ -535,9 +539,9 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
     end,
     validate = function(self)
         expect(reason(self, "hammer") == "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in (" .. reason(self, "hammer") .. ")")
-        expect(reason(self, "noTool") == "tool", "a battery was wired in without a wrench (" .. reason(self, "noTool") .. ")")
+        expect(reason(self, "noTool") == "tool", "a battery was wired in without a screwdriver (" .. reason(self, "noTool") .. ")")
         expect(reason(self, "noWire") == "wire", "a battery was wired in without wire (" .. reason(self, "noWire") .. ")")
-        expect(self.wired.ok, "wiring a battery in with a wrench and wire failed (" .. reason(self, "wired") .. ")")
+        expect(self.wired.ok, "wiring a battery in with a screwdriver and wire failed (" .. reason(self, "wired") .. ")")
         expect(self.wired.xpAfter > self.wired.xpBefore, "the first wiring gave no Electricity XP")
         expectNear("wire left after wiring a battery in", self.counts.wired[PowerBank.WIRE], 0, 0)
         expect(self.unwired.ok and self.counts.unwired["Base.CarBattery1"] == 1, "unwiring didn't give the battery back")
@@ -559,7 +563,7 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1", POWER_INVERTER })
         if not self.bank then return end
-        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Wrench" }, { type = PowerBank.WIRE } })
+        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE } })
         T.makeDark(self)
     end,
     validate = function(self)
@@ -1756,20 +1760,25 @@ test("renewable_energy_bank_menu_ignores_other_objects", {
     end,
 })
 
--- Wire In offers each carried part type once, greys out one that can't go in listing everything
--- it lacks, and offers it once it can.
+-- Wire In offers each carried part type once, listing every part of it with its condition, greys
+-- out one that can't go in listing everything it lacks, and offers it once it can.
 test("renewable_energy_bank_menu_wire_in_options", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {})
         if not self.bank then return end
-        T.give(self, "parts", { { type = "Base.CarBattery2", count = 2 }, { type = "RenewableEnergy.PlugInInverter" } })
+        T.give(self, "parts", { { type = "Base.CarBattery2", condition = 80 }, { type = "Base.CarBattery2", condition = 30 },
+            { type = "RenewableEnergy.PlugInInverter" } })
         T.step(function()
             local context = T.newContext()
             local menu = Menu.addWireInOptions(0, context, self.bank.object)
-            self.batteries = 0
+            self.batteryTypes, self.labels = 0, {}
             for _, option in ipairs(menu.options or {}) do
                 if option.name == getItemNameFromFullType("Base.CarBattery2") then
-                    self.batteries = self.batteries + 1
+                    self.batteryTypes = self.batteryTypes + 1
+                    local batteries = option.subOption and menu:getSubMenu(option.subOption)
+                    for _, battery in ipairs(batteries and batteries.options or {}) do
+                        table.insert(self.labels, battery.name)
+                    end
                 end
             end
             local plugIn = optionFor(menu, self.items.parts[3])
@@ -1787,7 +1796,12 @@ test("renewable_energy_bank_menu_wire_in_options", {
         end)
     end,
     validate = function(self)
-        expectNear("Wire In options for two batteries of one type", self.batteries, 1, 0)
+        expectNear("Wire In options for two batteries of one type", self.batteryTypes, 1, 0)
+        local name = getItemNameFromFullType("Base.CarBattery2")
+        local wanted = { getText("ContextMenu_RenewableEnergy_PartCondition", name, "80%"),
+            getText("ContextMenu_RenewableEnergy_PartCondition", name, "30%") }
+        expect(#self.labels == 2 and self.labels[1] == wanted[1] and self.labels[2] == wanted[2],
+            "the battery type lists " .. table.concat(self.labels, ", ") .. ", not " .. table.concat(wanted, ", "))
         expect(self.withoutTools.unavailable and self.withoutTools.screwdriverShort and self.withoutTools.wireShort,
             "Wire In doesn't grey out an inverter marking both the screwdriver and the wire short ("
             .. tostring(self.withoutTools.reason) .. ")")
@@ -1861,7 +1875,7 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
-        T.give(self, "parts", { { type = "Base.CarBattery1" }, { type = "Base.Wrench" }, { type = PowerBank.WIRE } })
+        T.give(self, "parts", { { type = "Base.CarBattery1" }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE } })
         T.step(function()
             local battery = self.items.parts[1]
             self.batteryId = battery:getID()
@@ -1932,7 +1946,7 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
         T.step(function()
             local context = T.newContext()
             local all = T.optionNamed(Menu.addUnwireOptions(0, context, bank.object),
-                getText("ContextMenu_RenewableEnergy_UnwireAllBatteries", 2))
+                getText("ContextMenu_RenewableEnergy_AllBatteries", 2))
             context:hideAndChildren()
             self.offered = all ~= nil and not all.notAvailable
             if not self.offered then return end
@@ -1954,6 +1968,54 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
         local carried, total = self.counts.carried[CHARGED_BATTERY], self.counts.carriedOrDropped[CHARGED_BATTERY]
         expect(carried == 1 and total == 2, "with room for one battery, " .. tostring(carried) .. " went into the inventory and "
             .. tostring(total - carried) .. " onto the floor")
+    end,
+})
+
+-- Wire In's All Batteries fills the bank's free battery slots from what the character carries,
+-- best condition first, taking a battery's wire for each: three batteries for a box's two slots
+-- leave the worst one carried.
+test("renewable_energy_bank_menu_wire_in_all_batteries", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        if not bank then return end
+        self.bank = bank
+        self.slots = Specs.banks["RenewableEnergy.BatteryBoxWood"].maxBatteries
+        T.watch(self, bank)
+        T.give(self, "parts", { { type = "Base.CarBattery1", condition = 60 }, { type = "Base.CarBattery1", condition = 20 },
+            { type = "Base.CarBattery1", condition = 90 }, { type = "Base.Screwdriver" },
+            { type = PowerBank.WIRE, count = 3 * PowerBank.wiringFor("Base.CarBattery1").wire } })
+        T.step(function()
+            local context = T.newContext()
+            local all = T.optionNamed(Menu.addWireInOptions(0, context, bank.object),
+                getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots))
+            context:hideAndChildren()
+            self.offered = all ~= nil and not all.notAvailable
+            if not self.offered then
+                self.refused = tostring(all and T.tooltipOf(all))
+                return
+            end
+            T.choose(all)
+            T.waitFor(self, function()
+                local status = T.clientStatus(bank)
+                return status ~= nil and #status.batteries == self.slots
+            end, "this client's status of the bank with its battery slots full")
+            T.bankState(self, bank)
+            T.count(self, "left", { "Base.CarBattery1", PowerBank.WIRE })
+        end)
+    end,
+    validate = function(self)
+        if not expect(self.offered, "carrying three batteries, Wire In doesn't offer All Batteries ("
+            .. tostring(self.slots) .. "): " .. tostring(self.refused)) then return end
+        local wired = {}
+        for _, item in ipairs(self.bank.state.items) do
+            table.insert(wired, item.condition)
+        end
+        table.sort(wired)
+        expect(#wired == 2 and wired[1] == 60 and wired[2] == 90, "All Batteries wired in batteries at "
+            .. table.concat(wired, ", ") .. ", not the two best, at 60 and 90")
+        expectNear("batteries left carried", self.counts.left["Base.CarBattery1"], 1, 0)
+        expectNear("wire left", self.counts.left[PowerBank.WIRE], PowerBank.wiringFor("Base.CarBattery1").wire, 0)
     end,
 })
 

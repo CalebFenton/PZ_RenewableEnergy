@@ -84,7 +84,7 @@ local function queuePart(playerNum, mode, bank, item)
     queueAt(playerNum, bank:getSquare(), mode, nil, bank, item)
 end
 
--- One Unwire per item, queued in order: each is its own job, refused or not on its own.
+-- One job per item, queued in order: each is refused or not on its own.
 local function queueParts(playerNum, mode, bank, items)
     for _, item in ipairs(items) do
         queuePart(playerNum, mode, bank, item)
@@ -214,28 +214,95 @@ local function oneOfEachType(character, matches)
     return found
 end
 
---- Wire In: one option for each type of part the character carries, listing what wiring it in
---- takes and greyed out while it can't go in. Returns the submenu, or the unavailable option when
---- the character carries no part.
+-- Every item the character carries for which `matches(item)` holds, bags included, grouped by
+-- type: { { fullType, items }, ... }, types and items in inventory order.
+local function carriedByType(character, matches)
+    local groups, byType = {}, {}
+    local items = character:getInventory():getAllEvalRecurse(matches)
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        local fullType = item:getFullType()
+        if not byType[fullType] then
+            byType[fullType] = { fullType = fullType, items = {} }
+            table.insert(groups, byType[fullType])
+        end
+        table.insert(byType[fullType].items, item)
+    end
+    return groups
+end
+
+local function isBattery(fullType)
+    return PowerBank.partKind(fullType) == "battery"
+end
+
+local function conditionOf(item)
+    return item:getCondition() / item:getConditionMax()
+end
+
+-- The carried batteries All Batteries wires in: as many as the bank has room for, best condition
+-- first; all of them when it has none, for the option to be refused.
+local function batteriesToWire(groups, bank)
+    local batteries = {}
+    for _, group in ipairs(groups) do
+        if isBattery(group.fullType) then
+            for _, item in ipairs(group.items) do
+                table.insert(batteries, item)
+            end
+        end
+    end
+    table.sort(batteries, function(a, b) return conditionOf(a) > conditionOf(b) end)
+    local free = PowerBank.freeSlots(bank, "battery")
+    while free > 0 and #batteries > free do
+        table.remove(batteries)
+    end
+    return batteries
+end
+
+-- What wiring `batteries` in one after another takes: a battery's job, with the wire and scrap of
+-- them all.
+local function batteriesWiring(batteries)
+    local wiring = PowerBank.wiringFor(batteries[1]:getFullType())
+    wiring.wire, wiring.scrap = 0, 0
+    for _, item in ipairs(batteries) do
+        local each = PowerBank.wiringFor(item:getFullType())
+        wiring.wire, wiring.scrap = wiring.wire + each.wire, wiring.scrap + each.scrap
+        wiring.skill = math.max(wiring.skill, each.skill)
+    end
+    return wiring
+end
+
+--- Wire In, as vanilla's mechanics menu offers parts to install: a submenu for each type of part
+--- the character carries, listing every one they carry with its condition, each greyed out while
+--- it can't go in with what that takes listed. All Batteries leads when they carry more than one
+--- battery. Returns the submenu, or the unavailable option when the character carries no part.
 function Menu.addWireInOptions(playerNum, menu, bank)
     local character = getSpecificPlayer(playerNum)
-    local parts = oneOfEachType(character, isPart)
-    if #parts == 0 then
+    local groups = carriedByType(character, isPart)
+    if #groups == 0 then
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireIn"))
         Needs.refuse(option, "Tooltip_RenewableEnergy_NothingToWire")
         return option
     end
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_WireIn"))
-    for _, item in ipairs(parts) do
-        local option = submenu:addOption(item:getDisplayName(), playerNum, queuePart, Action.WIRE_IN, bank, item)
-        Needs.show(option, PowerBank.wiringNeeds(character, item:getFullType()),
-            lightOr(character, Action.WIRE_IN, PowerBank.wiringBlocker(bank, item)))
+    local batteries = batteriesToWire(groups, bank)
+    if #batteries > 1 then
+        local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum,
+            queueParts, Action.WIRE_IN, bank, batteries)
+        Needs.show(all, PowerBank.jobNeeds(character, batteriesWiring(batteries)),
+            lightOr(character, Action.WIRE_IN, PowerBank.wiringBlocker(bank, batteries[1])))
+    end
+    for _, group in ipairs(groups) do
+        local script = getScriptManager():FindItem(group.fullType)
+        local itemsMenu, typeOption = Needs.addSubMenu(submenu, getItemNameFromFullType(group.fullType))
+        typeOption.iconTexture = script and script:getNormalTexture()
+        local needs = PowerBank.wiringNeeds(character, group.fullType)
+        for _, item in ipairs(group.items) do
+            local option = itemsMenu:addOption(partLabel(item), playerNum, queuePart, Action.WIRE_IN, bank, item)
+            option.itemForTexture = item
+            Needs.show(option, needs, lightOr(character, Action.WIRE_IN, PowerBank.wiringBlocker(bank, item)))
+        end
     end
     return submenu
-end
-
-local function isBattery(fullType)
-    return PowerBank.partKind(fullType) == "battery"
 end
 
 --- Unwire: one option for each part in the bank, led by All Batteries when it holds more than
@@ -250,7 +317,7 @@ function Menu.addUnwireOptions(playerNum, menu, bank)
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Unwire"))
     local batteries = wiredParts(bank, isBattery)
     if #batteries > 1 then
-        local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_UnwireAllBatteries", #batteries), playerNum,
+        local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum,
             queueParts, Action.UNWIRE, bank, batteries)
         Needs.refuse(all, lightOr(character, Action.UNWIRE))
     end

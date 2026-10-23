@@ -131,9 +131,10 @@ Specs.banks = {
 
 -- Wiring each part kind into a bank: seconds at normal speed at Electricity 0 (RenewableEnergyAction),
 -- Electric Wire (returned by Unwire), Electronics Scrap (kept by the part), tool ItemTag, Electricity
--- level, and XP for the first time an item is ever wired. Inverters set skill/xp per type.
+-- level, and XP for the first time an item is ever wired. Inverters set skill/xp per type. Every
+-- part takes a screwdriver, as vanilla's battery, radio and headlights do in a car.
 Specs.wiring = {
-    battery = { seconds = 30, wire = 1, scrap = 0, tool = "WRENCH", skill = 0, xp = 5 },
+    battery = { seconds = 30, wire = 1, scrap = 0, tool = "SCREWDRIVER", skill = 0, xp = 5 },
     inverter = { seconds = 60, wire = 2, scrap = 0, tool = "SCREWDRIVER" },
     charger = { seconds = 30, wire = 1, scrap = 0, tool = "SCREWDRIVER", skill = 0, xp = 5 },
     controller = { seconds = 60, wire = 2, scrap = 1, tool = "SCREWDRIVER", skill = 3, xp = 15 },

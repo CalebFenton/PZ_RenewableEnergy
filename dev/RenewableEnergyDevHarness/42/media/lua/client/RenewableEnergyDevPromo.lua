@@ -140,7 +140,7 @@ local SITE_DISTANCE = 12
 -- submenu open, while the character carries these parts, and the tools, wire and scrap that
 -- wiring them in takes, so that only what the bank has no room for is refused.
 local MENU_ITEMS = { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery", "Base.CarBattery1",
-    "RenewableEnergy.ChargeController", "RenewableEnergy.PowerInverter", "Base.Screwdriver", "Base.Wrench",
+    "RenewableEnergy.ChargeController", "RenewableEnergy.PowerInverter", "Base.Screwdriver",
     "Base.ElectricWire", "Base.ElectricWire", "Base.ElectricWire", "Base.ElectronicsScrap" }
 local MENU_AT = 100
 
