@@ -160,6 +160,7 @@ JOBS = {
             return "connectSource", { bank = positionOf(self.bank), source = positionOf(self.object) }
         end,
         minutes = connectMinutes,
+        light = true,
         sound = "GeneratorConnect",
     },
     [Action.DISCONNECT_SOURCE] = {
@@ -167,6 +168,7 @@ JOBS = {
         check = function(self) return PowerBank.connectedBank(self.object) ~= nil end,
         command = function(self) return "disconnectSource", { source = positionOf(self.object) } end,
         minutes = function(self) return connectMinutes(self) / 2 end,
+        light = true,
     },
     [Action.CLEAR_SNOW] = {
         keeps = function(self)
@@ -205,7 +207,8 @@ JOBS = {
         minutes = 0.5,
         doneSound = "LightSwitch",
     },
-    -- Vanilla's ISPlugGenerator, which can't tell the bank its state changed.
+    -- Vanilla's ISPlugGenerator, which can't tell the bank its state changed. Unlike vanilla's, it
+    -- needs light: it is wiring at the house's panel, as wiring a part in is.
     [Action.CONNECT_BANK] = {
         keeps = function(self) return isBank(self.bank) end,
         check = function(self)
@@ -214,6 +217,7 @@ JOBS = {
         end,
         command = function(self) return "setBankConnected", { bank = positionOf(self.bank), connected = true } end,
         units = 300,
+        light = true,
         sound = "GeneratorConnect",
     },
     [Action.DISCONNECT_BANK] = {
@@ -224,6 +228,7 @@ JOBS = {
         end,
         command = function(self) return "setBankConnected", { bank = positionOf(self.bank), connected = false } end,
         units = 300,
+        light = true,
         sound = "GeneratorConnect",
     },
     [Action.ATTACH_MAINTAINER] = {
@@ -390,6 +395,7 @@ JOBS = {
             return "replaceBlades", { source = positionOf(self.object), itemId = self.item:getID() }
         end,
         minutes = 20,
+        light = true,
     },
 }
 

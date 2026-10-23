@@ -11,6 +11,7 @@ require "RenewableEnergy/Biogas/GasHeater"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/GasJobMenu"
 require "RenewableEnergy/UI/DigesterWindow"
+require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local DigesterMenu = {}
@@ -39,7 +40,8 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, getText("IGUI_RenewableEnergy_Digester_" .. summary.tier))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_DigesterStatus"), playerNum, DigesterWindow.open, digester)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_DigesterStatus"), playerNum, RenewableEnergy.InfoAction.queue, digester,
+        DigesterWindow.open)
 
     addJob(menu, playerNum, DigesterJobs.TAKE_SLUDGE, digester, DigesterJobs.sludgeBag(character))
     for _, job in ipairs({ DigesterJobs.VENT, DigesterJobs.REPLACE_BAGS, DigesterJobs.SEW_TARP, DigesterJobs.UPGRADE }) do

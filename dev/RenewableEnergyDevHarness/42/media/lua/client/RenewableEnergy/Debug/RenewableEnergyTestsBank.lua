@@ -2092,6 +2092,28 @@ test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
     end,
 })
 
+-- A bank's status window stays open while the character stands at the bank and closes once they
+-- walk away, as vanilla's animal windows do: one left open would watch the bank's status forever.
+test("renewable_energy_bank_window_closes_once_walked_away", {
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
+        if not self.bank then return end
+        T.step(function() T.openWindow(self) end)
+        local function isOpen() return UIManager.getUI():contains(self.window.javaObject) end
+        T.step(function()
+            self.openAtBank = isOpen()
+            local square = self.bank.square
+            PZHarness.Fixtures.teleportToMiddle(player(), square:getX() + 8, square:getY(), square:getZ())
+        end)
+        T.waitFor(self, function() return not isOpen() end, "the status window closing once the character walked away")
+        -- Back beside the bank, so the next test starts where this one did.
+        T.step(function() T.standNextTo(self.bank.square) end)
+    end,
+    validate = function(self)
+        expect(self.openAtBank, "the status window closed with the character beside the bank")
+    end,
+})
+
 -- The rename box stops typing at the longest name a bank takes, and the authority refuses a longer
 -- name, or one on more than one line, leaving the name as it was; a name of the full length goes.
 test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
@@ -2460,7 +2482,8 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
 test("renewable_energy_bank_connect_and_disconnect", {
     instant = true,
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", {}, { connected = false })
+        -- Outdoors: connecting takes light to see by, which an unlit room lacks.
+        self.bank = T.bank(self, "batteryBoxWood", {}, { connected = false, outdoors = true })
         if not self.bank then return end
         -- Picking up a bank tile needs the Electrician tool.
         T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })

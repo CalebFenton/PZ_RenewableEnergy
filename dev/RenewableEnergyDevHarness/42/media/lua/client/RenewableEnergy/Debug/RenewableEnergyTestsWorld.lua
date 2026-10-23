@@ -879,6 +879,10 @@ test("renewable_energy_world_rural_wind_charger", {
             T.perform(self, "connectSource", { bank = bank.position, source = T.at(find) })
             T.step(function() self.connected = self.server.perform end)
             T.give(self, "blades", { { type = "RenewableEnergy.WoodenBlades" } })
+            -- Replacing the blades takes light to see by, and the square the character was moved to
+            -- out here lights up some frames after they arrive.
+            T.goNextTo(self, find.square)
+            T.waitFor(self, function() return not T.player():tooDarkToRead() end, "light where the character stands")
             T.doJob(self, find.square, function()
                 return RenewableEnergyAction:new(T.player(), RenewableEnergyAction.REPLACE_BLADES, find.object,
                     nil, nil, self.items.blades[1])

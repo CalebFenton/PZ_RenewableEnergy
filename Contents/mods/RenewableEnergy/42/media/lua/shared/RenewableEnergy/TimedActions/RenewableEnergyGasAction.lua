@@ -84,6 +84,12 @@ function Action:isValid()
     if isItem(self.with) and not self.character:getInventory():containsRecursive(self.with) then
         return false
     end
+    -- The server can't tell whether a remote player stands in the dark
+    -- (IsoPlayer.tooDarkToRead), so the player's own side checks the light.
+    if FEATURES[self.feature].jobs.needsLight(self.job) and self.character:tooDarkToRead() then
+        HaloTextHelper.addBadText(self.character, getText("Tooltip_RenewableEnergy_TooDark"))
+        return false
+    end
     return RenewableEnergy.withinReach(self.character, self.object, REACH)
 end
 

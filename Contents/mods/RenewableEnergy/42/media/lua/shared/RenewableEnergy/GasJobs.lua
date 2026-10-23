@@ -31,6 +31,8 @@ end
 --- - materials: what it takes of the character (RenewableEnergy.Materials), or a
 ---   function(subject, with) of them.
 --- - xp: { perk, amount }, what it gives once done.
+--- - light: it needs light to see by. Only the player's own side can tell (IsoPlayer.tooDarkToRead
+---   is false for a remote player), so the menu and the action's isValid check it, not refusal.
 --- - minutes, or a function(target, with) of them, and how it looks (RenewableEnergyGasAction).
 --- `spec.subjectOf(target)`: what the rows read of the target worked at, or nil when there is none
 --- to work at, which `spec.missing`, a translation key, says.
@@ -44,6 +46,11 @@ function GasJobs.define(Jobs, spec)
             return materials(subject, with)
         end
         return materials or {}
+    end
+
+    --- Whether `job` needs light to see by.
+    function Jobs.needsLight(job)
+        return Jobs.JOBS[job].light == true
     end
 
     --- What `job` takes of `character`, as needs (RenewableEnergy.firstUnmet, RenewableEnergy.Needs).

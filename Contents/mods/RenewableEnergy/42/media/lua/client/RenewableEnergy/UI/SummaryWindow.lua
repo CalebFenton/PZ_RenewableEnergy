@@ -4,6 +4,7 @@
 -- class defines titleOf(summary), summaryNow() and rowsOf(summary).
 
 require "ISUI/ISCollapsableWindow"
+require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local SummaryWindow = ISCollapsableWindow:derive("RenewableEnergySummaryWindow")
@@ -30,9 +31,10 @@ end
 
 -- The rows are laid out again only when the summary changed. A summary read is a fresh copy with
 -- what the object's containers hold now (RenewableEnergy.GlobalObjects), so it is compared by value.
+-- The window closes once the object is gone or the character walked away from it.
 function SummaryWindow:prerender()
     local summary = self:summaryNow()
-    if not summary or not RenewableEnergy.onSquare(self.object) then
+    if not (summary and RenewableEnergy.onSquare(self.object) and RenewableEnergy.InfoAction.inReach(self.playerNum, self.object)) then
         self:close()
         return
     end

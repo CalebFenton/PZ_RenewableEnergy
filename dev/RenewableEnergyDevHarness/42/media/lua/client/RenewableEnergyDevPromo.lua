@@ -1399,13 +1399,19 @@ local function addWorld()
     end)
 end
 
--- Adds the steps that open the window `open()` returns on a backdrop, wait until `ready(window)`
--- and the UI has drawn it again, shoot it as `name` and close it.
-local function addWindowShot(name, open, ready)
-    local window
+-- Adds the steps that open `windowClass`'s window on `objectOf()` on a backdrop, wait until
+-- `ready(window)` and the UI has drawn it again, shoot it as `name` and close it. The character
+-- stands beside the object meanwhile, as the window closes out of its reach
+-- (RenewableEnergy.InfoAction.inReach), and goes back after.
+local function addWindowShot(name, windowClass, objectOf, ready)
+    local window, back
     run:add(function()
         run:newBackdrop()
-        window = open()
+        local p, object = getPlayer(), objectOf()
+        back = { math.floor(p:getX()), math.floor(p:getY()), math.floor(p:getZ()) }
+        local at = AdjacentFreeTileFinder.Find(object:getSquare(), p) or object:getSquare()
+        PZHarness.Fixtures.teleportToMiddle(p, at:getX(), at:getY(), at:getZ())
+        window = windowClass.open(0, object)
         window:setX(100)
         window:setY(100)
         return function()
@@ -1420,14 +1426,15 @@ local function addWindowShot(name, open, ready)
     end)
     run:add(function()
         window:close()
+        PZHarness.Fixtures.teleportToMiddle(getPlayer(), back[1], back[2], back[3])
     end)
     run:removeBackdrop()
 end
 
 -- The homestead bank's status window, which lays its rows out from the bank's status as it draws.
 local function addStatus()
-    addWindowShot("status", function()
-        return RenewableEnergy.StatusWindow.open(0, PowerBank.bankOn(places.homestead.bank))
+    addWindowShot("status", RenewableEnergy.StatusWindow, function()
+        return PowerBank.bankOn(places.homestead.bank)
     end, function(window)
         return (window.renderedFrames or 0) >= 2
     end)
@@ -1730,8 +1737,8 @@ end
 -- The window of `windowClass` (RenewableEnergy.DigesterWindow or GasifierWindow) on what the shots
 -- show under `key`, which lays its rows out from the summary as it draws.
 local function addGasWindow(name, windowClass, key)
-    addWindowShot(name, function()
-        return windowClass.open(0, shown[key])
+    addWindowShot(name, windowClass, function()
+        return shown[key]
     end, function(window)
         return window.rowsToDraw ~= nil
     end)

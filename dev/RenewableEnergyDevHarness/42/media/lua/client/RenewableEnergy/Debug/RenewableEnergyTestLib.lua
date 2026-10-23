@@ -408,8 +408,10 @@ function T.walkTo(self, square, what)
 end
 
 --- Opens the status window on self.bank, closed when the test ends, and waits until it has drawn
---- the bank's status.
+--- the bank's status. The character stands next to the bank first, where the menu's Status walks
+--- them, as the window closes once they are out of reach.
 function T.openWindow(self)
+    T.standNextTo(self.bank.square)
     local window = RenewableEnergy.StatusWindow.open(0, self.bank.object)
     self.window = window
     T.defer(self, function() window:close() end)

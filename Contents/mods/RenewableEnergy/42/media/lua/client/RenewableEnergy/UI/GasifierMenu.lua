@@ -10,6 +10,7 @@ require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/GasJobMenu"
 require "RenewableEnergy/UI/GasifierWindow"
+require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasifierMenu = {}
@@ -58,7 +59,8 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, getText("IGUI_RenewableEnergy_Gasifier_" .. summary.tier))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_GasifierStatus"), playerNum, GasifierWindow.open, gasifier)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_GasifierStatus"), playerNum, RenewableEnergy.InfoAction.queue, gasifier,
+        GasifierWindow.open)
     GasJobMenu.add(menu, playerNum, "gasifier", summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT, gasifier)
     GasJobMenu.add(menu, playerNum, "gasifier", GasifierJobs.CLEAN_ASH, gasifier)
     addDrain(menu, character, playerNum, gasifier, summary)

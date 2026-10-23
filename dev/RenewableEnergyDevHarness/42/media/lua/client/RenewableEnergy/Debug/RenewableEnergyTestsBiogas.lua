@@ -634,12 +634,13 @@ local function useDrumDigester(self, handle, tile, label)
         local object, p = handle.object, T.player()
         if not object then return end
         local config = object:getSpriteConfig()
+        -- Where the menu's Status walks them: the window closes once they are out of reach.
+        T.standNextTo(getSquare(handle.x, handle.y, handle.z))
         local window = RenewableEnergy.DigesterWindow.open(0, object)
         window:prerender()
         self.views[label] = { title = window.title, configValid = config ~= nil and config:isValid(),
             master = object:getMasterObject() == object }
         window:close()
-        T.standNextTo(getSquare(handle.x, handle.y, handle.z))
         ISTimedActionQueue.add(ISInventoryTransferAction:new(p, self.items[label][1], p:getInventory(), object:getContainer()))
     end)
     T.waitFor(self, function() return hopperHoldsFeed(handle.object) end, "this client's hopper holding the dung")
@@ -736,6 +737,7 @@ test("renewable_energy_biogas_digester_menu", {
         if context then
             context:hideAndChildren()
         end
+        T.standNextTo(object:getSquare())
         local window = RenewableEnergy.DigesterWindow.open(0, object)
         window:prerender()
         T.expect(window.title == getText("IGUI_RenewableEnergy_Digester_barrel"), "the status window's title is " .. tostring(window.title))

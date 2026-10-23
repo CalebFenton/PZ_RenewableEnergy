@@ -17,6 +17,7 @@ require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
+require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/StatusWindow"
@@ -385,7 +386,7 @@ end
 
 function Menu.addBankOptions(playerNum, context, bank)
     local menu = Needs.addSubMenu(context, Menu.bankLabel(bank))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, StatusWindow.open, bank)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, bank, StatusWindow.open)
 
     local summary = PowerBank.summaryOf(bank)
     if not summary then
@@ -401,13 +402,16 @@ function Menu.addBankOptions(playerNum, context, bank)
     if not (connected and on) then
         local plug = menu:addOption(getText(connected and "ContextMenu_RenewableEnergy_DisconnectBank" or "ContextMenu_RenewableEnergy_ConnectBank"),
             playerNum, Menu.queueBank, connected and Action.DISCONNECT_BANK or Action.CONNECT_BANK, bank)
-        Needs.refuse(plug, PowerBank.connectRefusal(getSpecificPlayer(playerNum), bank, summary, not connected))
+        local character = getSpecificPlayer(playerNum)
+        Needs.refuse(plug, lightOr(character, Action.CONNECT_BANK,
+            PowerBank.connectRefusal(character, bank, summary, not connected)))
     end
 
     local sources = unconnectedSources(bank)
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
         queueConnectAll, bank, sources)
-    Needs.refuse(connect, #sources == 0 and "Tooltip_RenewableEnergy_NoSourcesInReach" or slotsRefusal(sources, summary.freeSlots))
+    Needs.refuse(connect, #sources == 0 and "Tooltip_RenewableEnergy_NoSourcesInReach"
+        or lightOr(getSpecificPlayer(playerNum), Action.CONNECT_SOURCE, slotsRefusal(sources, summary.freeSlots)))
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)
@@ -461,7 +465,10 @@ local function addBladesOption(playerNum, menu, source)
         return
     end
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ReplaceBlades"), playerNum, queueBlades, source, blades)
-    if refusal then
+    local dark = lightOr(getSpecificPlayer(playerNum), Action.REPLACE_BLADES)
+    if dark then
+        Needs.refuse(option, dark)
+    elseif refusal then
         local names = {}
         for fullType in pairs(fits) do
             table.insert(names, getItemNameFromFullType(fullType))
@@ -473,12 +480,15 @@ end
 
 function Menu.addSourceOptions(playerNum, context, source)
     local menu = Needs.addSubMenu(context, Menu.nameOf(source))
+    local character = getSpecificPlayer(playerNum)
 
     local here = PowerBank.positionOf(source)
     local connected = PowerBank.connectedBank(source)
     if connected then
         menu:addOption(getText("ContextMenu_RenewableEnergy_WiredTo", bankNameAt(connected), Format.away(here, connected)))
-        menu:addOption(getText("ContextMenu_RenewableEnergy_DisconnectSource"), playerNum, queueSource, Action.DISCONNECT_SOURCE, source)
+        local disconnect = menu:addOption(getText("ContextMenu_RenewableEnergy_DisconnectSource"), playerNum, queueSource,
+            Action.DISCONNECT_SOURCE, source)
+        Needs.refuse(disconnect, lightOr(character, Action.DISCONNECT_SOURCE))
         addSnowOption(playerNum, menu, source, sourceSummary(connected, here))
     end
     addBrakeOption(playerNum, menu, source)
@@ -492,7 +502,7 @@ function Menu.addSourceOptions(playerNum, context, source)
             local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank),
                 Format.away(here, bankPosition)), playerNum, queueSource, Action.CONNECT_SOURCE, source, bank)
             local summary = PowerBank.summaryOf(bank)
-            Needs.refuse(option, summary and Sources.slotRefusal(kind, summary.freeSlots))
+            Needs.refuse(option, lightOr(character, Action.CONNECT_SOURCE, summary and Sources.slotRefusal(kind, summary.freeSlots)))
             offered = true
         end
     end

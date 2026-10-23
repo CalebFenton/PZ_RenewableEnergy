@@ -157,7 +157,8 @@ GasKit.TO_GAS = "RunOnGas"
 GasKit.TO_PETROL = "RunOnPetrol"
 
 local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
--- The kit's fitting is spanner work at the engine; a switch-over is a turn of the valve.
+-- The kit's fitting is spanner work at the engine, which needs light to see the fittings by; a
+-- switch-over is a turn of the valve.
 local SPANNER_ANIM, SPANNER_SOUND = "VehicleWorkOnMid", "GeneratorRepair"
 
 -- A blocker of a job on the kit: none fitted refuses it, else `blocker(state, generator, source)`.
@@ -183,11 +184,11 @@ end
 
 -- Every job, by name, as GasJobs.define has them, read against the generator itself; `source` is
 -- Connect Gas Line's other end, nil for the other jobs. minutes; blocker(generator, source);
--- materials, or a function(generator, source) of them; xp; how it looks. `mode`: the fuel the job
--- switches to.
+-- materials, or a function(generator, source) of them; xp; light; how it looks. `mode`: the fuel
+-- the job switches to.
 GasKit.JOBS = {
     [GasKit.INSTALL] = {
-        minutes = 30, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        minutes = 30, anim = SPANNER_ANIM, sound = SPANNER_SOUND, light = true,
         blocker = function(generator)
             return GasKit.hasKit(generator) and "Tooltip_RenewableEnergy_HasKit" or nil
         end,
@@ -195,7 +196,7 @@ GasKit.JOBS = {
         xp = { perk = "Mechanics", amount = 15 },
     },
     [GasKit.REMOVE] = {
-        minutes = 15, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        minutes = 15, anim = SPANNER_ANIM, sound = SPANNER_SOUND, light = true,
         blocker = withKit(function(state, generator)
             return generator:isActivated() and "Tooltip_RenewableEnergy_GeneratorRunning" or nil
         end),
@@ -203,7 +204,7 @@ GasKit.JOBS = {
     },
     -- To the source `source`: a digester within REACH on its level, or a gasifier beside it.
     [GasKit.CONNECT] = {
-        minutes = 20, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        minutes = 20, anim = SPANNER_ANIM, sound = SPANNER_SOUND, light = true,
         blocker = withKit(function(state, generator, source)
             if state.source then
                 return "Tooltip_RenewableEnergy_HasLine"
@@ -220,7 +221,7 @@ GasKit.JOBS = {
         xp = { perk = "Mechanics", amount = 5 },
     },
     [GasKit.DISCONNECT] = {
-        minutes = 5, anim = SPANNER_ANIM, sound = SPANNER_SOUND,
+        minutes = 5, anim = SPANNER_ANIM, sound = SPANNER_SOUND, light = true,
         blocker = withKit(function(state)
             return not state.source and "Tooltip_RenewableEnergy_NoLine" or nil
         end),

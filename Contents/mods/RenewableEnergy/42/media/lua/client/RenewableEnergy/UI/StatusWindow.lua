@@ -9,6 +9,7 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
 require "RenewableEnergy/UI/Format"
 
 RenewableEnergy = RenewableEnergy or {}
@@ -549,8 +550,8 @@ function StatusWindow:onMouseDown(x, y)
 end
 
 function StatusWindow:prerender()
-    -- Picked up or destroyed.
-    if not RenewableEnergy.onSquare(self.bank) then
+    -- Picked up or destroyed, or the character walked away (as vanilla's animal windows close).
+    if not (RenewableEnergy.onSquare(self.bank) and RenewableEnergy.InfoAction.inReach(self.playerNum, self.bank)) then
         self:close()
         return
     end
