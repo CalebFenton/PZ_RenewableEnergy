@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Specs"
-local Stage = require "RenewableEnergyDevStage"
+local Harness = require "PZHarness/Stage"
 
 -- Arrow board trailer (World/ArrowBoard.lua, ArrowBoardPower.lua, ArrowBoardCrashes.lua,
 -- UI/BatteryBoxLid.lua, Vehicles.txt): stock, battery box and lid, panels, lamps, crashes, frame,
@@ -320,7 +320,7 @@ test(LID_SWINGS, {
                 p:teleportTo(spot:getX() - 2, spot:getY() + 2, trailer.vehicle:getZ())
             end)
             -- The squares around the new spot stay dark until the lighting has seen them.
-            T.waitFor(self, Stage.lightingSettled(p), "the lighting around the character")
+            T.waitFor(self, Harness.lightingSettled(p), "the lighting around the character")
             T.wait(3)
             T.step(function() lidShot(label, trailer.vehicle) end)
         end

@@ -6,6 +6,7 @@ require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
+local Harness = require "PZHarness/Stage"
 local Capture = require "PZHarness/Capture"
 
 local Art = {}
@@ -264,7 +265,7 @@ local function setLamps(pair, lit, night)
         getGameTime():setTimeOfDay(0)
     end
     Stage.lightLamps(pair.trailer, lit and 0.8 or nil, night)
-    local settled = night and Stage.lightingSettled(getPlayer(), true)
+    local settled = night and Harness.lightingSettled(getPlayer(), true)
     return function()
         if settled and not settled() then
             return false
@@ -364,7 +365,7 @@ end
 
 -- The north-west corner of the closest open lot that takes the whole stage.
 local function findLot(player)
-    local corner = Stage.closestSquare(player, function(square)
+    local corner = Harness.closestSquare(player, function(square)
         return Stage.isAreaOpen(square, AREA.w, AREA.h, isOpen)
     end)
     return corner and { x = corner:getX(), y = corner:getY(), z = corner:getZ() }
@@ -405,7 +406,7 @@ end
 local VEHICLE_MARGIN = 4
 
 local function clearVehicles(lot)
-    Stage.removeVehicles(lot.x - VEHICLE_MARGIN, lot.y - VEHICLE_MARGIN, lot.x + AREA.w + VEHICLE_MARGIN - 1,
+    Harness.removeVehicles(lot.x - VEHICLE_MARGIN, lot.y - VEHICLE_MARGIN, lot.x + AREA.w + VEHICLE_MARGIN - 1,
         lot.y + AREA.h + VEHICLE_MARGIN - 1, lot.z)
 end
 
@@ -473,7 +474,7 @@ end
 function IconSheet:new()
     local icons = {}
     for _, fullType in ipairs(itemTypes()) do
-        table.insert(icons, { texture = Stage.iconTexture(fullType), name = getScriptManager():getItem(fullType):getName() })
+        table.insert(icons, { texture = Capture.iconTexture(fullType), name = getScriptManager():getItem(fullType):getName() })
     end
     local rows = math.ceil(#icons / ICON_COLUMNS)
     local sheet = ISPanel.new(self, 60, 160, ICON_COLUMNS * CELL_W, rows * CELL_H + 8)
@@ -484,9 +485,9 @@ end
 
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
 local function addShot(steps, player, lot, shot)
-    Stage.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
+    Harness.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
     table.insert(steps, function()
-        return Stage.zoomOut(shot.zoomSteps)
+        return Harness.zoomOut(shot.zoomSteps)
     end)
     table.insert(steps, function()
         return Capture.DRAW_FRAMES
@@ -557,7 +558,7 @@ local function addTileAndItemShots(steps, player, lot)
     local iconSheet = IconSheet:new()
     table.insert(steps, function()
         getGameTime():setTimeOfDay(NOON)
-        Stage.removeTrees(lot.x, lot.y, lot.z)
+        Harness.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
     end)
     addShot(steps, player, lot, SHOTS.tiles)
@@ -625,7 +626,7 @@ local function addLoneAndCrackedShots(steps, player, lot, art)
     -- Back to noon after the hitched trailer's night shot.
     table.insert(steps, function()
         getGameTime():setTimeOfDay(NOON)
-        return Stage.lightingSettled(player, true)
+        return Harness.lightingSettled(player, true)
     end)
     table.insert(steps, function()
         clearVehicles(lot)
@@ -646,7 +647,7 @@ function Art.capture(_, onDone)
     local player = getPlayer()
     local lot = findLot(player)
     if not lot then
-        run:fail("no open lot within " .. Stage.SEARCH_RADIUS .. " squares")
+        run:fail("no open lot within " .. Harness.SEARCH_RADIUS .. " squares")
         return
     end
     print(string.format("%s stage at %d,%d", MARK, lot.x, lot.y))

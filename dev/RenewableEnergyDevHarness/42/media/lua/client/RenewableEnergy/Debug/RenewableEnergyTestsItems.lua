@@ -89,7 +89,7 @@ test("renewable_energy_items_recipes_load", {
 test("renewable_energy_items_taught_recipes_need_learning", {
     validate = function()
         local builds = {}
-        for _, name in ipairs(Debug.buildRecipes()) do
+        for _, name in ipairs(PZHarness.Test.buildRecipeNames()) do
             builds[name] = true
         end
         local function needsLearning(name)

@@ -6,7 +6,7 @@
 -- anything but the world are taken on black and on white (PZHarness/Capture.lua), and the empty
 -- floor too, so that art/promo/extract.py can find each item by difference.
 
-require "PZHarness/TestLib"
+require "PZHarness/Fixtures"
 local Capture = require "PZHarness/Capture"
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
@@ -26,6 +26,7 @@ require "RenewableEnergy/UI/DigesterWindow"
 require "RenewableEnergy/UI/GasifierWindow"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 local Stage = require "RenewableEnergyDevStage"
+local Harness = require "PZHarness/Stage"
 
 local Promo = {}
 
@@ -34,8 +35,6 @@ local PowerBank = RenewableEnergy.PowerBank
 
 local DRAW_FRAMES = Capture.DRAW_FRAMES
 
--- The world shots are as wide as the README's images, in UI units.
-local WORLD_W = 1260
 -- The banks charge through the morning, so the window shows a day's figures at noon.
 local MORNING, NOON = 8, 12
 -- Inputs that take any item with a tag show this one.
@@ -144,16 +143,15 @@ local MENU_ITEMS = { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Bat
 local MENU_AT = 100
 
 -- The item shots, on a patch of the road's own asphalt laid around the studio square that each
--- item lies on alone, at the closest zoom the game offers, which the zoom options leave out by
--- default. The character stands off to the side, (east, south) squares from the item, to its
--- left on the screen.
+-- item lies on alone, at the closest zoom the game draws, which the zoom options leave out
+-- (Harness.pushClosestZoom). The character stands off to the side, (east, south) squares from the
+-- item, to its left on the screen.
 local STUDIO = {
     -- The open ground the patch needs, and how far around the studio square the asphalt goes
     -- where the ground is clear, and the plants go anyway, since the bigger items' shots reach
     -- past the patch.
     open = { along = { -3, 3 }, out = { -3, 3 } },
     floor = { along = { -5, 5 }, out = { -5, 5 } },
-    zoom = 25,
     player = { -1, 1 },
     -- What extract.py searches for the item, in UI units around its square's floor centre: room
     -- for the tallest models, and clear of the character.
@@ -300,8 +298,6 @@ local LAYOUTS = {
 -- The wind every shot is taken in, as the climate's wind intensity: a fresh breeze, past every
 -- charger's cut-in and below the storms that break blades.
 local WIND_INTENSITY = 0.3
--- The wind speed at a wind intensity of 1 (ClimateManager.getWindspeedKph).
-local FULL_WIND_KPH = 120
 -- A digester well into its working life: how long it has made gas, its warmth, the share of its
 -- potential it holds, its sludge, and the manure waiting in its hopper.
 local WORKING_DIGESTER = { ageHours = 24 * 30, temp = 32, potential = 0.6, sludge = 30,
@@ -310,228 +306,26 @@ local WORKING_DIGESTER = { ageHours = 24 * 30, temp = 32, potential = 0.6, sludg
 -- tarry, a fire going if lit, its ash pit part full and some condensate waiting.
 local WORKING_GASIFIER = { wood = { "Base.Firewood", 6 },
     packing = { { "Base.HayTuft", 8 }, { "RenewableEnergy.TarryPacking", 2 } }, fireKg = 2, ash = 35, condensate = 0.8 }
--- How far around each setup radios and televisions are switched off, since their captions
--- float over the shots.
-local QUIET_RADIUS = 25
 
 -- Steps ------------------------------------------------------------------------------------------
 
--- The run whose steps are being added; Promo.capture makes it.
-local run
-local region, elementRegion = Capture.region, Capture.elementRegion
+-- The run whose steps are being added, and the item and recipe names its data holds; Promo.capture
+-- makes them.
+local run, catalog
 
--- Names ------------------------------------------------------------------------------------------
-
-local icons = {}
-local iconOrder = {}
-
--- Registers an item for the icon sheet and returns its key in captures/.
-local function iconFor(fullType)
-    local key = "icon_" .. string.gsub(fullType, "%.", "_")
-    if not icons[key] then
-        local item = instanceItem(fullType)
-        icons[key] = { name = item:getDisplayName(), texture = Stage.iconTexture(fullType) }
-        table.insert(iconOrder, key)
-    end
-    return key
-end
-
-local function itemEntry(fullType, count)
-    local key = iconFor(fullType)
-    return { icon = key, name = icons[key].name, fullType = fullType, count = count }
-end
-
--- What the build menu's recipe `name` builds (an entity of Entities.txt): its build menu icon,
--- registered for the icon sheet, and its name.
-local function buildEntry(name)
-    local key = "icon_build_" .. name
-    if not icons[key] then
-        local script = getScriptManager():getGameEntityScript("Base." .. name)
-        local component = script:getComponentScriptFor(ComponentType.CraftRecipe)
-        icons[key] = { name = getRecipeDisplayName(name), texture = component:getIconTexture() }
-        table.insert(iconOrder, key)
-    end
-    return { icon = key, name = icons[key].name }
-end
-
--- The fluid of a recipe line's fluid part and the litres it takes or gives: { name, litres }, and
--- the fluid's type.
-local function fluidEntry(fluid, litres)
-    return { name = fluid:getTranslatedName(), litres = litres }, fluid:getFluidTypeString()
-end
-
--- One input line: the items it names (every one, as alternatives, with what each takes), or for
--- a tag or any item the preferred one. A line that takes a fluid from a container (`fluid`), or
--- pours one into an empty container the player keeps (`fills`), says which and how much; `tag`
--- marks a line whose item only stands for the many it takes.
-local function inputEntry(input)
-    local names, counts = {}, {}
-    local listed = input:getItems()
-    for i = 0, listed:size() - 1 do
-        local fullType = listed:get(i)
-        if not string.find(fullType, "%.") then
-            fullType = "Base." .. fullType
-        end
-        table.insert(names, fullType)
-        table.insert(counts, input:getIntAmount(i))
-    end
-    local entry = { items = {}, count = input:getIntAmount(), keep = input:isKeep(), tag = #names == 0 }
-    local fluidType
-    if input:hasConsumeFromItem() then
-        local consume = input:getConsumeFromItemScript()
-        local fluids = consume:getPossibleInputFluids()
-        if fluids:size() > 0 then
-            entry.fluid, fluidType = fluidEntry(fluids:get(0), consume:getAmount())
-        end
-    elseif input:hasCreateToItem() then
-        local create = input:getCreateToItemScript()
-        if create:getFluid() then
-            entry.fills, fluidType = fluidEntry(create:getFluid(), create:getAmount())
-        end
-    end
-    if #names == 0 then
-        names = { FLUID_CONTAINERS[fluidType] or PZHarness.Test.inputItem(input, PREFER):getFullName() }
-        counts = { entry.count }
-    end
-    local first = getScriptManager():getItem(names[1])
-    -- A drainable input counts uses unless it says ItemCount.
-    entry.uses = first:isItemType(ItemType.DRAINABLE) and not input:isItemCount()
-    for i, fullType in ipairs(names) do
-        table.insert(entry.items, itemEntry(fullType, counts[i]))
-    end
-    return entry
-end
-
-local function skillList(count, get)
-    local skills = {}
-    for i = 0, count - 1 do
-        local skill = get(i)
-        table.insert(skills, { name = skill:getPerk():getName(), level = skill:getLevel() })
-    end
-    return skills
-end
-
--- The magazines that teach a recipe.
-local function magazinesTeaching(name)
-    local found = {}
-    for _, fullType in ipairs(MAGAZINES) do
-        local learned = getScriptManager():getItem(fullType):getLearnedRecipes()
-        for i = 0, (learned and learned:size() or 0) - 1 do
-            if learned:get(i) == name then
-                table.insert(found, getItemNameFromFullType(fullType))
-            end
-        end
-    end
-    return found
-end
-
--- The names of the items that research each recipe, by recipe: the ones whose script lists it
--- among its ResearchableRecipes, which the game extends with every recipe's own outputs
--- (OutputMapper). Built once, since it walks every item script.
-local researchers
-
-local function researchedBy(name)
-    if not researchers then
-        researchers = {}
-        local scripts = getScriptManager():getAllItems()
-        for i = 0, scripts:size() - 1 do
-            local script = scripts:get(i)
-            local recipes = script:hasResearchableRecipes() and script:getResearchableRecipes()
-            for j = 0, (recipes and recipes:size() or 0) - 1 do
-                local recipe = recipes:get(j)
-                researchers[recipe] = researchers[recipe] or {}
-                table.insert(researchers[recipe], getItemNameFromFullType(script:getFullName()))
-            end
-        end
-        for _, names in pairs(researchers) do
-            table.sort(names)
-        end
-    end
-    return researchers[name] or {}
-end
-
--- The recipe `name`, a craftRecipe or, with `build`, the build menu's recipe of an entity.
-local function recipeEntry(name, build)
-    local recipe = getScriptManager():getCraftRecipe(name)
-    local entry = {
-        id = name,
-        name = getRecipeDisplayName(name),
-        skills = skillList(recipe:getRequiredSkillCount(), function(i) return recipe:getRequiredSkill(i) end),
-        learn = {
-            needed = recipe:needToBeLearn(),
-            magazines = magazinesTeaching(name),
-            auto = skillList(recipe:getAutoLearnAnySkillCount(), function(i) return recipe:getAutoLearnAnySkill(i) end),
-            autoAll = skillList(recipe:getAutoLearnAllSkillCount(), function(i) return recipe:getAutoLearnAllSkill(i) end),
-            research = researchedBy(name),
-        },
-        inputs = {},
-        outputs = {},
-        build = build and buildEntry(name) or nil,
-    }
-    local inputs = recipe:getInputs()
-    for i = 0, inputs:size() - 1 do
-        table.insert(entry.inputs, inputEntry(inputs:get(i)))
-    end
-    local outputs = recipe:getOutputs()
-    for i = 0, outputs:size() - 1 do
-        local output = outputs:get(i)
-        table.insert(entry.outputs, itemEntry(output:getPossibleResultItems():get(0):getFullName(), output:getIntAmount()))
-    end
-    return entry
-end
-
-local function itemsList()
-    local items = {}
+-- The items the item sheet shows: the mod's, but the annotated maps, which are loot rather than
+-- something to build with, and VANILLA_ITEMS.
+local function sheetItems()
+    local fullTypes = {}
     for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
-        -- The annotated maps are loot, not something to build with.
         if getScriptManager():getItem(fullType):getMapID() == nil then
-            table.insert(items, itemEntry(fullType))
+            table.insert(fullTypes, fullType)
         end
     end
     for _, fullType in ipairs(VANILLA_ITEMS) do
-        table.insert(items, itemEntry(fullType))
+        table.insert(fullTypes, fullType)
     end
-    return items
-end
-
--- Icons ------------------------------------------------------------------------------------------
-
-local IconSheet = ISPanel:derive("RenewableEnergyDevPromoIconSheet")
-
-function IconSheet:render()
-    for _, icon in ipairs(self.icons) do
-        self:drawTextureScaled(icon.texture, icon.x, icon.y, icon.w, icon.h, 1, 1, 1, 1)
-    end
-end
-
-local function addIcons()
-    local sheet
-    run:add(function()
-        local backdrop = run:newBackdrop()
-        sheet = IconSheet:new(100, 100, getCore():getScreenWidth() - 200, getCore():getScreenHeight() - 200)
-        sheet:noBackground()
-        sheet.icons = {}
-        local x, y, rowHeight = 0, 0, 0
-        for _, key in ipairs(iconOrder) do
-            local texture = icons[key].texture
-            local w, h = texture:getWidthOrig(), texture:getHeightOrig()
-            if x + w > sheet.width then
-                x, y, rowHeight = 0, y + rowHeight + 32, 0
-            end
-            table.insert(sheet.icons, { name = key, texture = texture, x = x, y = y, w = w, h = h })
-            x = x + w + 32
-            rowHeight = math.max(rowHeight, h)
-        end
-        backdrop:addChild(sheet)
-    end)
-    run:addMatted("icons", function()
-        local regions = {}
-        for _, icon in ipairs(sheet.icons) do
-            table.insert(regions, region(icon.name, sheet:getAbsoluteX() + icon.x, sheet:getAbsoluteY() + icon.y, icon.w, icon.h))
-        end
-        return regions
-    end)
-    run:removeBackdrop()
+    return fullTypes
 end
 
 -- World ------------------------------------------------------------------------------------------
@@ -547,7 +341,7 @@ local function setBankOn(bank, on)
     perform("setBankOn", { bank = PowerBank.positionOf(bank), on = on })
 end
 
-local isGroundCover, clearGroundCover = Stage.isGroundCover, Stage.clearGroundCover
+local isGroundCover, clearGroundCover = Harness.isGroundCover, Harness.clearGroundCover
 
 -- Outdoors on solid floor, with no vehicle, no tree unless `trees`, and nothing but the floor,
 -- ground cover and the objects `allowed` accepts. A square's walls are objects on it, so walls
@@ -632,7 +426,7 @@ end
 
 local function removeTrees(place)
     local origin = place.origin
-    Stage.removeTrees(origin:getX(), origin:getY(), origin:getZ())
+    Harness.removeTrees(origin:getX(), origin:getY(), origin:getZ())
 end
 
 -- Whether fn(square) holds for every square of `area` (see GRID) of `place`, stopping at the first
@@ -890,7 +684,7 @@ end
 -- has one for which fits(place) holds; nil if none has.
 local function findPlace(player, others, frames, fits)
     for _, frame in ipairs(frames) do
-        local best = Stage.closestSquare(player, function(origin)
+        local best = Harness.closestSquare(player, function(origin)
             return isApart(origin, others) and fits(newPlace(origin, frame))
         end)
         if best then
@@ -954,25 +748,6 @@ local function quietNeighbourhood(homesteadSquare, stage0Square)
         end)
     end
     print(string.format("REPromo switched off %d lights and took away %d fridges", lights, fridges))
-end
-
--- Switches off the radios and televisions around each of `origins`, which play with their
--- captions floating over them.
-local function silenceRadios(origins)
-    local silenced = 0
-    for _, origin in ipairs(origins) do
-        RenewableEnergy.eachSquareAround(origin:getX(), origin:getY(), origin:getZ(), QUIET_RADIUS, function(square)
-            local objects = square:getObjects()
-            for i = 0, objects:size() - 1 do
-                local object = objects:get(i)
-                if instanceof(object, "IsoWaveSignal") and object:getDeviceData():getIsTurnedOn() then
-                    object:getDeviceData():setIsTurnedOn(false)
-                    silenced = silenced + 1
-                end
-            end
-        end)
-    end
-    print("REPromo switched off " .. silenced .. " radios and televisions")
 end
 
 -- Switches on lights in the building around `square`, nearest first, out of reach of the bank
@@ -1112,7 +887,7 @@ local function placeKittedGenerator(place, layout, tile)
     return generator
 end
 
--- The squares wind chargers stand on, which the shots frame taller (screenBox).
+-- The squares wind chargers stand on, which the shots frame taller (FRAMING).
 local tallSquares = {}
 
 -- A wind charger's tile on `square`, turning in the wind as one built does.
@@ -1190,30 +965,16 @@ local function chargeThroughMorning()
     end
 end
 
--- Where a square's floor centre is on the screen, in UI units.
-local function onScreen(square)
-    local x, y, z = square:getX() + 0.5, square:getY() + 0.5, square:getZ()
-    return isoToScreenX(0, x, y, z), isoToScreenY(0, x, y, z)
-end
+-- How far above its floor's centre a wind charger's rotor reaches at zoom 1, in UI units: it is
+-- drawn as a model about two storeys tall.
+local TALL_TOP = 560
 
--- The screen rectangle a set of squares and what stands on them take up, in UI units. A square's
--- diamond is 128 by 64 units at zoom 1, and its tile reaches this far above the floor's centre,
--- or a wind charger's rotor, which is drawn as a model about two storeys tall, TALL_TOP.
-local TILE_TOP, TALL_TOP = 224, 560
-
-local function screenBox(squares)
-    local zoom = getCore():getZoom(0)
-    local halfW, halfH = 64 / zoom, 32 / zoom
-    local box = { left = math.huge, right = -math.huge, top = math.huge, bottom = -math.huge }
-    for _, square in ipairs(squares) do
-        local x, y = onScreen(square)
-        box.left = math.min(box.left, x - halfW)
-        box.right = math.max(box.right, x + halfW)
-        box.top = math.min(box.top, y - (tallSquares[square] and TALL_TOP or TILE_TOP) / zoom)
-        box.bottom = math.max(box.bottom, y + halfH)
-    end
-    return box
-end
+-- The framing every world shot uses: the wind chargers' squares reach TALL_TOP.
+local FRAMING = {
+    top = function(square)
+        return tallSquares[square] and TALL_TOP or nil
+    end,
+}
 
 -- What the yard shots show; the bank stands indoors behind the wall, out of them.
 local function homesteadSquares()
@@ -1232,44 +993,6 @@ end
 
 local function stage0Squares()
     return squaresAt(places.stage0, { STAGE0.box, STAGE0.player, STAGE0.cellCharger, STAGE0.gardenLight }, STAGE0.flatPanels)
-end
-
-local CROP_MARGIN = 40
-
--- The region from left, top to right, bottom, cut off at the screen's edges.
-local function onScreenRegion(name, left, top, right, bottom)
-    left, top = math.max(0, left), math.max(0, top)
-    right = math.min(getCore():getScreenWidth(), right)
-    bottom = math.min(getCore():getScreenHeight(), bottom)
-    return region(name, left, top, right - left, bottom - top)
-end
-
--- A crop of the README's width from `left`, around `box`, kept on the screen: what lies past
--- its edge comes out black.
-local function worldRegion(name, left, box)
-    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
-    local top = math.max(0, box.top - CROP_MARGIN)
-    local bottom = math.min(screenH, box.bottom + CROP_MARGIN)
-    return region(name, math.max(0, math.min(screenW - WORLD_W, left)), top, WORLD_W, bottom - top)
-end
-
--- `squares` against the right edge, with room on the left for a title.
-local function rightAligned(name, squares)
-    local box = screenBox(squares)
-    return worldRegion(name, box.right + CROP_MARGIN - WORLD_W, box)
-end
-
--- `squares` in the middle.
-local function centred(name, squares)
-    local box = screenBox(squares)
-    return worldRegion(name, (box.left + box.right - WORLD_W) / 2, box)
-end
-
--- Just `squares`, for an inset.
-local function cropped(name, squares)
-    local box = screenBox(squares)
-    return onScreenRegion(name, box.left - CROP_MARGIN, box.top - CROP_MARGIN, box.right + CROP_MARGIN,
-        box.bottom + CROP_MARGIN)
 end
 
 -- The clothes the character came with, and the settler's, each made once.
@@ -1313,35 +1036,12 @@ local lookedFrom = {}
 local function goTo(squares, stepsOut)
     for i, square in ipairs(squares) do
         if i == #squares or not lookedFrom[square] then
-            Stage.addLookAround(run.steps, getPlayer(), square)
+            Harness.addLookAround(run.steps, getPlayer(), square)
             lookedFrom[square] = true
         end
     end
     run:add(function()
-        return Stage.zoomOut(stepsOut)
-    end)
-end
-
--- What every group's shots share: noon without grid power, full colour, a breeze that turns the
--- wind chargers, and no radio captions around the `origins` of the places the run uses. The
--- harness clears the rest of the weather.
-local function addWorldSettings(origins)
-    run:add(function()
-        -- The grid would power the squares and leave the bank nothing to run.
-        PZHarness.Fixtures.setGrid(false)
-        getGameTime():setTimeOfDay(NOON)
-        -- A fresh world's climate greys the picture by its season, so two runs' shots would differ.
-        local desaturation = getClimateManager():getClimateFloat(ClimateManager.FLOAT_DESATURATION)
-        desaturation:setEnableAdmin(true)
-        desaturation:setAdminValue(0)
-        local wind = getClimateManager():getClimateFloat(ClimateManager.FLOAT_WIND_INTENSITY)
-        wind:setEnableAdmin(true)
-        wind:setAdminValue(WIND_INTENSITY)
-        silenceRadios(origins)
-        -- The climate takes the wind on its next update.
-        return function()
-            return getClimateManager():getWindspeedKph() >= WIND_INTENSITY * FULL_WIND_KPH * 0.95
-        end
+        return Harness.zoomOut(stepsOut)
     end)
 end
 
@@ -1386,7 +1086,7 @@ local function addWorld()
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
     goTo(scouts, 1)
     run:addOpaque("homestead", function()
-        return { centred("homestead", homesteadSquares()) }
+        return { Harness.centred("homestead", homesteadSquares(), FRAMING) }
     end)
     -- The banner shows the whole homestead a step further out.
     run:add(function()
@@ -1394,7 +1094,7 @@ local function addWorld()
         return Capture.zoomSettled()
     end)
     run:addOpaque("world", function()
-        return { rightAligned("world", homesteadSquares()) }
+        return { Harness.rightAligned("world", homesteadSquares(), FRAMING) }
     end)
     -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
     -- The wind charger goes first: its rotor, drawn two storeys tall outside the wall, would stand
@@ -1406,47 +1106,30 @@ local function addWorld()
     end)
     goTo({ home.beside }, 0)
     run:addOpaque("bank", function()
-        return { cropped("bank", { home.bank, home.beside }) }
+        return { Harness.cropped("bank", { home.bank, home.beside }, FRAMING) }
     end)
     -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
     -- among them, then from the window, early on, in the clothes it came with.
     addOutfit(false)
     goTo(squaresAt(places.stage0, { STAGE0.scout, STAGE0.player }), 0)
     run:addOpaque("stage0", function()
-        return { centred("stage0", stage0Squares()) }
+        return { Harness.centred("stage0", stage0Squares(), FRAMING) }
     end)
 end
 
--- Adds the steps that open `windowClass`'s window on `objectOf()` on a backdrop, wait until
--- `ready(window)` and the UI has drawn it again, shoot it as `name` and close it. The character
--- stands beside the object meanwhile, as the window closes out of its reach
--- (RenewableEnergy.InfoAction.inReach), and goes back after.
+-- Adds the steps that shoot `windowClass`'s window on `objectOf()` as `name` once `ready(window)`
+-- holds. The character stands beside the object meanwhile, as the window closes out of its reach
+-- (RenewableEnergy.InfoAction.inReach).
 local function addWindowShot(name, windowClass, objectOf, ready)
-    local window, back
-    run:add(function()
-        run:newBackdrop()
-        local player, object = getPlayer(), objectOf()
-        back = { math.floor(player:getX()), math.floor(player:getY()), math.floor(player:getZ()) }
-        local stand = AdjacentFreeTileFinder.Find(object:getSquare(), player) or object:getSquare()
-        PZHarness.Fixtures.teleportToMiddle(player, stand:getX(), stand:getY(), stand:getZ())
-        window = windowClass.open(0, object)
-        window:setX(100)
-        window:setY(100)
-        return function()
-            return ready(window)
-        end
-    end)
-    run:add(function()
-        return Capture.drawn(2)
-    end)
-    run:addMatted(name, function()
-        return { elementRegion(name, window) }
-    end)
-    run:add(function()
-        window:close()
-        PZHarness.Fixtures.teleportToMiddle(getPlayer(), back[1], back[2], back[3])
-    end)
-    run:removeBackdrop()
+    Harness.addWindowShot(run, name, {
+        open = function()
+            return windowClass.open(0, objectOf())
+        end,
+        ready = ready,
+        near = function()
+            return objectOf():getSquare()
+        end,
+    })
 end
 
 -- The homestead bank's status window, which lays its rows out from the bank's status as it draws.
@@ -1458,25 +1141,11 @@ local function addStatus()
     end)
 end
 
--- The submenu of `menu`'s option named `name`, opened as if the mouse were over the option.
-local function openSubMenu(menu, name)
-    for i, option in ipairs(menu and menu.options or {}) do
-        if option.name == name and option.subOption then
-            menu.mouseOver = i
-            return menu:getSubMenu(option.subOption)
-        end
-    end
-    print("REPromo menu has no " .. name)
-end
-
--- The homestead bank's right-click menu on a backdrop, with the bank's submenu and its Wire In
--- submenu open and the first part the bank takes highlighted.
+-- The homestead bank's right-click menu, with the bank's submenu and its Wire In submenu open and
+-- the first part the bank takes highlighted, while the character carries MENU_ITEMS.
 local function addMenu()
-    local menus, carried = {}, {}
-    run:add(function()
-        run:newBackdrop()
-        -- In debug mode vanilla adds its debug options to every world menu unless told not to.
-        getDebugOptions():setBoolean("UI.HideDebugContextMenuOptions", true)
+    local carried = {}
+    Harness.addMenuShot(run, "menu", function()
         local inventory = getPlayer():getInventory()
         for _, fullType in ipairs(MENU_ITEMS) do
             table.insert(carried, inventory:AddItem(fullType))
@@ -1489,9 +1158,13 @@ local function addMenu()
         if switch then
             context:removeOptionByName(switch:getTileName())
         end
-        local bankMenu = openSubMenu(context, RenewableEnergy.Menu.bankLabel(homesteadBank))
-        local wireIn = openSubMenu(bankMenu, getText("ContextMenu_RenewableEnergy_WireIn"))
-        menus = { context, bankMenu, wireIn }
+        local bankLabel = RenewableEnergy.Menu.bankLabel(homesteadBank)
+        local wireInLabel = getText("ContextMenu_RenewableEnergy_WireIn")
+        local bankMenu = Harness.openSubMenu(context, bankLabel)
+        local wireIn = Harness.openSubMenu(bankMenu, wireInLabel)
+        if not wireIn then
+            return nil, "the bank's menu has no " .. (bankMenu and wireInLabel or bankLabel)
+        end
         wireIn.mouseOver = -1
         for i, option in ipairs(wireIn.options) do
             if not option.notAvailable then
@@ -1499,34 +1172,21 @@ local function addMenu()
                 break
             end
         end
-        -- The world menu was made when the game started, under the backdrop.
-        context:bringToTop()
-    end)
-    run:addMatted("menu", function()
-        local left, top, right, bottom = math.huge, math.huge, 0, 0
-        for _, menu in ipairs(menus) do
-            left, top = math.min(left, menu:getAbsoluteX()), math.min(top, menu:getAbsoluteY())
-            right = math.max(right, menu:getAbsoluteX() + menu:getWidth())
-            bottom = math.max(bottom, menu:getAbsoluteY() + menu:getHeight())
-        end
-        return { region("menu", left, top, right - left, bottom - top) }
+        return { context, bankMenu, wireIn }
     end)
     run:add(function()
-        menus[1]:hideAndChildren()
         for _, item in ipairs(carried) do
             getPlayer():getInventory():Remove(item)
         end
-        return 1
     end)
-    run:removeBackdrop()
 end
 
 -- Where extract.py looks for the item in a studio shot: STUDIO.window around the studio
 -- square's floor centre, kept on the screen.
 local function studioWindow(name)
-    local x, y = onScreen(places.studio.origin)
+    local x, y = Harness.onScreen(places.studio.origin)
     local window = STUDIO.window
-    return onScreenRegion(name, x - window.half, y - window.up, x + window.half, y + window.down)
+    return Harness.screenRegion(name, x - window.half, y - window.up, x + window.half, y + window.down)
 end
 
 -- Every item alone on the studio floor. `models` gets one entry per item.
@@ -1534,7 +1194,6 @@ local function addModels(items, models)
     local group = run.current
     local studio = places.studio
     local floorSquare = studio.origin
-    local zoomLevels
     run:add(function()
         local asphalt = places.road.origin:getFloor():getSprite():getName()
         print("REPromo item floor " .. asphalt)
@@ -1545,10 +1204,7 @@ local function addModels(items, models)
             end
             return true
         end)
-        zoomLevels = { getCore():getOptionZoomLevels1x(), getCore():getOptionZoomLevels2x() }
-        getCore():setOptionZoomLevels1x(zoomLevels[1] .. ";" .. STUDIO.zoom)
-        getCore():setOptionZoomLevels2x(zoomLevels[2] .. ";" .. STUDIO.zoom)
-        getCore():zoomLevelsChanged()
+        Harness.pushClosestZoom()
         -- Every item at once, so that their models load while the character looks around: Lua
         -- can't tell when a model has loaded, and a loaded one draws on the next frame.
         for _, item in ipairs(items) do
@@ -1579,11 +1235,7 @@ local function addModels(items, models)
             floorSquare:removeAllWorldObjects()
         end)
     end
-    run:add(function()
-        getCore():setOptionZoomLevels1x(zoomLevels[1])
-        getCore():setOptionZoomLevels2x(zoomLevels[2])
-        getCore():zoomLevelsChanged()
-    end)
+    run:add(Harness.popClosestZoom)
 end
 
 -- The arrow board trailer hitched to a car on the road, cones behind it, a step out from the
@@ -1596,7 +1248,7 @@ local function addTrailer()
         local carSquare = road.origin
         local x, y, z, reach = carSquare:getX(), carSquare:getY(), carSquare:getZ(), ROAD.clearRadius
         removeTrees(road)
-        Stage.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
+        Harness.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
         for _, spot in ipairs(ROAD.cones) do
             Stage.placeTile(at(road, spot), ROAD.cone)
         end
@@ -1614,7 +1266,7 @@ local function addTrailer()
     goTo({ at(places.studio, STUDIO.player), at(road, ROAD.player) }, 1)
     run:addOpaque("trailer", function()
         -- The car's nose, the trailer, the character and the cones.
-        return { centred("trailer", squaresAt(road, { { 2, 0 }, ROAD.trailer, ROAD.player }, ROAD.cones)) }
+        return { Harness.centred("trailer", squaresAt(road, { { 2, 0 }, ROAD.trailer, ROAD.player }, ROAD.cones), FRAMING) }
     end)
 end
 
@@ -1632,7 +1284,7 @@ local function addGardenLights()
         end
         getGameTime():setTimeOfDay(WALK.hour)
         -- The lighting takes most of a second to follow the clock.
-        return Stage.lightingSettled(getPlayer(), true)
+        return Harness.lightingSettled(getPlayer(), true)
     end)
     run:add(function()
         -- Lit now, rather than at the next minute's pass. Their light shows while the character
@@ -1641,7 +1293,7 @@ local function addGardenLights()
     end)
     goTo(squaresAt(walk, { WALK.scout, WALK.player }), 0)
     run:addOpaque("gardenlights", function()
-        return { centred("gardenlights", squaresAt(walk, { { 0, -1 }, WALK.player }, WALK.lights)) }
+        return { Harness.centred("gardenlights", squaresAt(walk, { { 0, -1 }, WALK.player }, WALK.lights), FRAMING) }
     end)
 end
 
@@ -1668,17 +1320,6 @@ local function buildPoster()
     setBankOn(posterBank, true)
 end
 
--- The smallest square around the yard, with a margin, kept on the screen.
-local function posterRegion()
-    local box = screenBox(squaresAt(places.poster, POSTER.racks,
-        { POSTER.player, POSTER.generator, POSTER.digester, POSTER.windCharger }))
-    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
-    local size = math.min(screenW, screenH, math.max(box.right - box.left, box.bottom - box.top) + 2 * CROP_MARGIN)
-    local left = math.max(0, math.min(screenW - size, (box.left + box.right - size) / 2))
-    local top = math.max(0, math.min(screenH - size, (box.top + box.bottom - size) / 2))
-    return region("poster", left, top, size, size)
-end
-
 local function addPoster()
     local poster = places.poster
     -- The settler in the yard at noon, after the garden lights' night.
@@ -1698,10 +1339,12 @@ local function addPoster()
     goTo(scouts, POSTER.zoomOut)
     -- The clock turned before the looking around, which outlasts the lighting's change.
     run:add(function()
-        return Stage.lightingSettled(getPlayer())
+        return Harness.lightingSettled(getPlayer())
     end)
     run:addOpaque("poster", function()
-        return { posterRegion() }
+        -- The smallest square around the yard, kept on the screen.
+        return { Harness.squareRegion("poster", squaresAt(places.poster, POSTER.racks,
+            { POSTER.player, POSTER.generator, POSTER.digester, POSTER.windCharger }), FRAMING) }
     end)
 end
 
@@ -1763,7 +1406,7 @@ local function addBiogas()
     end)
     goToPlace("biogas", 1)
     run:addOpaque("biogas", function()
-        return { centred("biogas", placeSquares("biogas")) }
+        return { Harness.centred("biogas", placeSquares("biogas"), FRAMING) }
     end)
     addGasWindow("digester", RenewableEnergy.DigesterWindow, "digester")
 end
@@ -1792,7 +1435,7 @@ local function addWoodgas()
     end)
     goToPlace("woodgas", 1)
     run:addOpaque("woodgas", function()
-        return { centred("woodgas", placeSquares("woodgas")) }
+        return { Harness.centred("woodgas", placeSquares("woodgas"), FRAMING) }
     end)
     addGasWindow("gasifier", RenewableEnergy.GasifierWindow, "standard")
 end
@@ -1809,7 +1452,7 @@ local function addWind()
     end)
     goToPlace("wind", 1)
     run:addOpaque("wind", function()
-        return { centred("wind", placeSquares("wind")) }
+        return { Harness.centred("wind", placeSquares("wind"), FRAMING) }
     end)
 end
 
@@ -1838,7 +1481,7 @@ local function addTreadmill()
         end
     end)
     run:addOpaque("treadmill", function()
-        return { centred("treadmill", placeSquares("gym")) }
+        return { Harness.centred("treadmill", placeSquares("gym"), FRAMING) }
     end)
     run:add(function()
         ISTimedActionQueue.clear(getPlayer())
@@ -1992,7 +1635,7 @@ local GROUPS = {
     world = { places = { "homestead", "stage0" }, setups = true, add = addWorld },
     status = { places = { "homestead", "stage0" }, setups = true, add = addStatus },
     menu = { places = { "homestead", "stage0" }, setups = true, add = addMenu },
-    icons = { places = {}, add = addIcons },
+    icons = { places = {}, add = function() run:addIconSheet("icons", catalog:iconList()) end },
     -- The item floor is the road's asphalt.
     models = { places = { "road", "studio" }, add = function(data) addModels(data.items, data.models) end },
     -- The character looks around from the item floor first, as a full run's has by then.
@@ -2005,73 +1648,51 @@ local GROUPS = {
     poster = { places = { "poster" }, add = addPoster },
 }
 
--- Adds a step that starts a clock, and returns a function that adds a step logging, under
--- "REPromo TIME", how long the steps added in between took.
-local function addTimer(label)
-    local started
-    run:add(function()
-        started = getTimestampMs()
-    end)
-    return function()
-        run:add(function()
-            print(string.format("REPromo TIME %s %.1f s", label, (getTimestampMs() - started) / 1000))
-        end)
-    end
-end
-
---- Shoots the groups named in `selection`, comma-separated in the order to shoot them, which
---- run-client.sh gives every group of MODE_GROUPS_promo when PROMO names none, and calls onDone.
-function Promo.capture(selection, onDone)
-    print("REPromo START " .. selection)
-    run = Capture.new("REPromo")
-    local chosen, needs = Capture.names(selection), {}
+-- Finds the places `chosen` groups need and adds the step that sets the world every shot is taken
+-- in: noon without grid power, a breeze that turns the wind chargers, and no radio captions around
+-- the places. Returns nil, or what it couldn't find.
+local function prepare(chosen)
+    local needs = {}
     for _, name in ipairs(chosen) do
-        if not GROUPS[name] then
-            run:fail("MODE_GROUPS_promo names " .. name .. ", which GROUPS lacks")
-            return
-        end
         for _, place in ipairs(GROUPS[name].places) do
             needs[place] = true
         end
     end
     local origins, missing = findPlaces(getPlayer(), needs)
     if not origins then
-        run:fail("within " .. Stage.SEARCH_RADIUS .. " squares, no " .. missing)
-        return
+        return "within " .. Harness.SEARCH_RADIUS .. " squares, no " .. missing
     end
-    -- Hides the HUD, the debug console and every other window; the shots add their own.
-    ISUIHandler.setVisibleAllUI(false)
-    -- In a corner, where it hovers over nothing the shots show: the world outlines what it is
-    -- over, and menus follow it.
-    setMouseXY(0, 0)
+    run:add(function()
+        -- The grid would power the squares and leave the bank nothing to run.
+        PZHarness.Fixtures.setGrid(false)
+    end)
+    Harness.addWorldSettings(run, { hour = NOON, wind = WIND_INTENSITY, origins = origins })
+end
+
+--- Shoots the groups named in `selection`, comma-separated in the order to shoot them, which
+--- run-client.sh gives every group of MODE_GROUPS_promo when PROMO names none, and calls onDone.
+function Promo.capture(selection, onDone)
+    run = Capture.new("REPromo")
+    catalog = Capture.newCatalog({ prefer = PREFER, fluidContainers = FLUID_CONTAINERS, literature = MAGAZINES })
     -- The names come with every run, since they cost no shot.
-    local data = { items = itemsList(), recipes = {}, models = {} }
-    for _, name in ipairs(PZHarness.Test.recipeNames()) do
-        table.insert(data.recipes, recipeEntry(name))
-    end
-    -- The build menu's, which recipeNames leaves out.
-    for _, name in ipairs(RenewableEnergy.Debug.buildRecipes()) do
-        table.insert(data.recipes, recipeEntry(name, true))
-    end
-    data.strings = {
-        modName = getText("Sandbox_RenewableEnergy"),
+    local data = {
+        items = catalog:items(sheetItems()),
+        recipes = catalog:recipes(),
+        models = {},
+        strings = { modName = getText("Sandbox_RenewableEnergy") },
     }
-    local endTotal = addTimer("total")
-    addWorldSettings(origins)
-    local setupsBuilt = false
-    for _, name in ipairs(chosen) do
-        local group = GROUPS[name]
-        run:group(name)
-        local endGroup = addTimer(name)
-        if group.setups and not setupsBuilt then
-            addSetups()
-            setupsBuilt = true
+    -- The first group that needs the setups builds them.
+    local adders, setupsBuilt = {}, false
+    for name, group in pairs(GROUPS) do
+        adders[name] = function()
+            if group.setups and not setupsBuilt then
+                addSetups()
+                setupsBuilt = true
+            end
+            group.add(data)
         end
-        group.add(data)
-        endGroup()
     end
-    endTotal()
-    run:run(data, onDone)
+    Harness.runGroups(run, selection, adders, prepare, data, onDone)
 end
 
 return Promo

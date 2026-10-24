@@ -5,6 +5,7 @@
 -- stations, a treadmill, and a car towing the arrow board trailer.
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
+local Harness = require "PZHarness/Stage"
 
 local QA = {}
 
@@ -171,8 +172,8 @@ end
 -- The layout's north-west corner: the closest whose whole lot is open, else the closest open row,
 -- from which the layout skips what stands in its way.
 local function layoutOrigin(player)
-    return Stage.closestSquare(player, lotOpen)
-        or Stage.closestSquare(player, function(square) return rowOpen(square, ROW) end)
+    return Harness.closestSquare(player, lotOpen)
+        or Harness.closestSquare(player, function(square) return rowOpen(square, ROW) end)
 end
 
 -- The layout: rows ROW squares wide from `origin`, south one after the other, skipping squares
@@ -190,7 +191,7 @@ local function nextSquare(layout)
         end
         if isOpen(square) then
             -- Out of the long grass and bushes, so what lies there shows.
-            Stage.clearGroundCover(square)
+            Harness.clearGroundCover(square)
             return square
         end
     end
@@ -213,7 +214,7 @@ local function modRecipes()
     for _, name in ipairs(PZHarness.Test.recipeNames()) do
         table.insert(recipes, scripts:getCraftRecipe(name))
     end
-    for _, name in ipairs(RenewableEnergy.Debug.buildRecipes()) do
+    for _, name in ipairs(PZHarness.Test.buildRecipeNames()) do
         table.insert(recipes, scripts:getBuildableRecipe(name))
     end
     return recipes
@@ -392,7 +393,7 @@ local function placeStations(layout, summary)
         else
             for i, sprite in ipairs(station.sprites) do
                 local square = getCell():getGridSquare(first:getX() + i - 1, first:getY(), first:getZ())
-                Stage.clearGroundCover(square)
+                Harness.clearGroundCover(square)
                 local _, missing = PZHarness.Fixtures.newBench(square, station.entity, sprite, getPlayer())
                 if missing and i == 1 then
                     table.insert(summary.unplaced, station.entity .. " (" .. missing .. ")")
@@ -521,7 +522,7 @@ function QA.setup(player)
     packToolboxes(player, stock, summary)
     local origin = layoutOrigin(player)
     if not origin then
-        print(MARK .. " no open row of " .. ROW .. " squares within " .. Stage.SEARCH_RADIUS .. " squares")
+        print(MARK .. " no open row of " .. ROW .. " squares within " .. Harness.SEARCH_RADIUS .. " squares")
         return summary
     end
     summary.lot = lotOpen(origin)

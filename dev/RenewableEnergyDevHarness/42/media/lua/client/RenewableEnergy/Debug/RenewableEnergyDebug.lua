@@ -40,24 +40,10 @@ Debug.ITEMS = {
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
 
---- The names of the mod's build menu recipes (scripts/RenewableEnergy/Entities.txt), which
---- getAllCraftRecipes, and so PZHarness.Test.learnRecipes, leaves out.
-function Debug.buildRecipes()
-    local names, recipes = {}, getScriptManager():getAllBuildableRecipes()
-    local prefix = PZHarness.testSettings.recipePrefix
-    for i = 0, recipes:size() - 1 do
-        local name = recipes:get(i):getName()
-        if PZHarness.startsWith(name, prefix) then
-            table.insert(names, name)
-        end
-    end
-    return names
-end
-
 --- Teaches `player` every recipe of the mod, the build menu's included.
 function Debug.learnRecipes(player)
     PZHarness.Test.learnRecipes(player)
-    PZHarness.Fixtures.learnRecipes(player, Debug.buildRecipes())
+    PZHarness.Fixtures.learnRecipes(player, PZHarness.Test.buildRecipeNames())
 end
 
 local function isContainerGeneratorOrSource(object)
