@@ -103,6 +103,24 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_InverterCharger,
         scale = 0.666667,
     }
+    model MakeshiftInverter_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_MakeshiftInverter,
+        texture = WorldItems/RenewableEnergy_MakeshiftInverter,
+        scale = 0.666667,
+    }
+    model HomemadeInverter_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_HomemadeInverter,
+        texture = WorldItems/RenewableEnergy_HomemadeInverter,
+        scale = 0.666667,
+    }
+    model MicrowaveTransformer_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_MicrowaveTransformer,
+        texture = WorldItems/RenewableEnergy_MicrowaveTransformer,
+        scale = 0.666667,
+    }
     model ChargeController_Ground
     {
         mesh = WorldItems/RenewableEnergy_ChargeController,
