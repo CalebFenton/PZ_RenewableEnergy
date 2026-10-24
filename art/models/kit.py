@@ -61,7 +61,7 @@ def _math(nodes, links, operation, a, b=None, c=None, clamp=False):
 
 
 def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None,
-             streaks=None, scorch=None):
+             streaks=None, scorch=None, turf=None, fade=None, shine=0.5):
     """A painted, plastic or metal surface. `grime` darkens it in blotches, so flat colours don't
     look like a render. `speckle` = (colour, amount) mottles it with a second colour in a web of
     flakes, the base colour left at each flake's centre and less of it the higher `amount`: the way
@@ -70,7 +70,12 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
     `scorch` = (soot, tint, height) blackens it from its foot up to a ragged line `height` metres
     up, with a band of heat tint above, as a fire inside leaves a stove. `emission` makes it glow,
     for lit LEDs. `grain`, a kind in GRAIN, draws dark grain lines along each part's longest side,
-    as `_object` laid them out."""
+    as `_object` laid them out. `turf` = (colour, start, end) turns it to that colour from `start`
+    to `end` metres out from the part's own centre, and `fade` = (start, end) thins it to nothing
+    over those, both along a ragged line: a bank of earth grassed over towards its foot and lost in
+    whatever ground the game draws round it. Only a tile sprite keeps a faded part's transparency;
+    a baked texture doesn't. `shine` is the strength of its reflection of the sky, as Principled
+    BSDF's Specular IOR Level: soil hardly has any, and with it greys like the game's grass never does."""
     key = name
     if key in _MATERIALS:
         return _MATERIALS[key]
@@ -79,6 +84,7 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
     links = mat.node_tree.links
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
+    bsdf.inputs["Specular IOR Level"].default_value = shine
     base = (*hex_rgb(color), 1.0)
     coords = nodes.new("ShaderNodeTexCoord")
     noise = nodes.new("ShaderNodeTexNoise")
@@ -96,6 +102,31 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
     tint.blend_type = "MULTIPLY"
     tint.inputs["Factor"].default_value = 1.0
     tint.inputs[6].default_value = base
+    reach = None
+    if turf or fade:
+        # How far out from the part's centre, give or take a ragged few centimetres.
+        axes = nodes.new("ShaderNodeSeparateXYZ")
+        links.new(coords.outputs["Object"], axes.inputs[0])
+        flat = nodes.new("ShaderNodeCombineXYZ")
+        links.new(axes.outputs["X"], flat.inputs["X"])
+        links.new(axes.outputs["Y"], flat.inputs["Y"])
+        length = nodes.new("ShaderNodeVectorMath")
+        length.operation = "LENGTH"
+        links.new(flat.outputs[0], length.inputs[0])
+        ragged = nodes.new("ShaderNodeTexNoise")
+        ragged.inputs["Scale"].default_value = 7.0
+        ragged.inputs["Detail"].default_value = 4.0
+        links.new(coords.outputs["Object"], ragged.inputs["Vector"])
+        reach = _math(nodes, links, "ADD", length.outputs["Value"], _math(nodes, links, "MULTIPLY_ADD", ragged.outputs["Fac"], 0.1, -0.05))
+    if turf:
+        colour, start, end = turf
+        grassed = nodes.new("ShaderNodeMix")
+        grassed.data_type = "RGBA"
+        links.new(_math(nodes, links, "MULTIPLY_ADD", reach, 1 / (end - start), -start / (end - start), clamp=True),
+                  grassed.inputs["Factor"])
+        grassed.inputs[6].default_value = base
+        grassed.inputs[7].default_value = (*hex_rgb(colour), 1.0)
+        links.new(grassed.outputs[2], tint.inputs[6])
     links.new(ramp.outputs["Color"], tint.inputs[7])
     color_out = tint.outputs[2]
     if speckle:
@@ -202,6 +233,16 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         links.new(shade.outputs["Color"], streaked.inputs[7])
         color_out = streaked.outputs[2]
     links.new(color_out, bsdf.inputs["Base Color"])
+    if fade:
+        # Thinned to a holdout, not a transparent shader, so the parts it buries stay hidden where it
+        # thins: only the game's ground shows through.
+        start, end = fade
+        thinned = nodes.new("ShaderNodeMixShader")
+        links.new(_math(nodes, links, "MULTIPLY_ADD", reach, -1 / (end - start), end / (end - start), clamp=True),
+                  thinned.inputs["Fac"])
+        links.new(nodes.new("ShaderNodeHoldout").outputs[0], thinned.inputs[1])
+        links.new(bsdf.outputs[0], thinned.inputs[2])
+        links.new(thinned.outputs[0], nodes.get("Material Output").inputs["Surface"])
     if emission:
         bsdf.inputs["Emission Color"].default_value = (*hex_rgb(emission), 1.0)
         bsdf.inputs["Emission Strength"].default_value = 6.0
@@ -352,6 +393,31 @@ def loft(collection, name, mat, sections):
     bm.faces.new(rings[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return _object(name, bm, mat, collection)
+
+
+def lathe(collection, name, mat, profile, at=(0, 0, 0), lumps=0.0, seed=0, segments=32):
+    """A surface turned round the Z axis through `profile`, [(radius, z), ...] from its inner edge
+    out, open at both edges and facing up: earth banked round something that hides its inner edge.
+    `lumps` raises or lowers each vertex by up to that fraction of its height at random (from
+    `seed`), so an edge on the ground stays on it. It is smooth shaded."""
+    rng = random.Random(seed)
+    bm = bmesh.new()
+    rings = []
+    for radius, z in profile:
+        row = []
+        for k in range(segments):
+            azimuth = 2 * math.pi * k / segments
+            row.append(bm.verts.new((radius * math.cos(azimuth), radius * math.sin(azimuth),
+                                     z * (1 + lumps * rng.uniform(-1, 1)))))
+        rings.append(row)
+    # Out along the radius, then on round the axis: counter-clockwise seen from above, facing up.
+    for a, b in zip(rings, rings[1:]):
+        for k in range(segments):
+            face = bm.faces.new((a[k], b[k], b[(k + 1) % segments], a[(k + 1) % segments]))
+            face.smooth = True
+    obj = _object(name, bm, mat, collection)
+    place(obj, at)
+    return obj
 
 
 def mound(collection, name, mat, radii, at=(0, 0, 0), rotate=None, squareness=1.0, lumps=0.0, seed=0, segments=16,

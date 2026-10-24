@@ -8,7 +8,7 @@ without its batteries and an overlay just the batteries.
 import math
 import random
 
-from kit import beam, box, cylinder, group, loft, material, mound, prism, text, tube
+from kit import beam, box, cylinder, group, lathe, loft, material, mound, prism, text, tube
 
 # Palette ------------------------------------------------------------------------------------------
 
@@ -156,6 +156,13 @@ def M(name):
         "potscorched": lambda: material("RE_PotScorched", "#8d9396", roughness=0.5, metallic=0.6, grime=0.3, scale=10,
                                         scorch=("#2a2622", "#6e5a48", 0.14)),
         "earth": lambda: material("RE_Earth", "#6e5b43", roughness=1.0, grime=0.3, scale=20, speckle=("#54462f", 0.35)),
+        # The earth banked round the brick dome: dug soil, grassed over towards its foot, where it
+        # thins into whatever ground the game draws round the square, the olive of its grass.
+        "domebank": lambda: material("RE_DomeBank", "#6e5b43", roughness=1.0, grime=0.45, scale=10, speckle=("#43420a", 0.5),
+                                     turf=("#625f09", BANK_TURF[0], BANK_TURF[1]), fade=BANK_FADE, shine=0.05),
+        # Blades of grass, green and gone to seed.
+        "grass": lambda: material("RE_Grass", "#414b10", roughness=0.9, grime=0.3, scale=20, shine=0.1),
+        "grassdry": lambda: material("RE_GrassDry", "#6f6828", roughness=0.9, grime=0.3, scale=20, shine=0.1),
         "brick": lambda: material("RE_Brick", "#a5503a", roughness=0.85, grime=0.2, scale=30),
         "brickdark": lambda: material("RE_BrickDark", "#86412d", roughness=0.85, grime=0.2, scale=30),
         "mortar": lambda: material("RE_Mortar", "#b0aa9c", roughness=0.95, grime=0.2, scale=30),
@@ -1606,9 +1613,16 @@ def _straw_box(col):
 
 
 # A real fixed dome holding the 4 m³ of gas the game gives it is 2 to 3 m across, its pit sunk in
-# the ground; on one square its dome fills the square, thigh high, bigger than the insulated
-# digester beside it as it is in play.
+# the ground and the dug earth banked back over its foot; on one square its dome fills the square,
+# thigh high, bigger than the insulated digester beside it as it is in play.
 DOME = (0.4, 0.6)  # the brick dome's radius and height
+# The earth over its foot: how high it stands against the bricks and how far out from the dome's
+# centre it runs, out to the square's sides; where round there it is grassed over, and where it
+# thins into the ground.
+BANK = (0.3, 0.53)
+BANK_TURF = (0.36, 0.42)
+BANK_FADE = (0.46, 0.53)
+BANK_TUFTS = 300
 DOME_AT = (-0.02, 0.02)
 BRICK = (0.2, 0.05, 0.068)  # a brick as laid: along the course, into the dome, up
 # Where round the dome its feed pipe comes out, in degrees from east: towards the viewer.
@@ -1617,10 +1631,10 @@ DOME_FEED_ANGLE = -60
 
 def dome_digester(col, frame=True, scrubber=False):
     """A fixed-dome digester of the Chinese kind: its pit sunk in the ground, the brick dome over it
-    standing on the ground, a concrete collar on its crown and the gas pipe and valve out of that,
-    its hose led off behind the dome, and the feed pipe climbing out of the dome's foot to a funnel,
-    as the other digesters are fed. `scrubber` draws the scrubber alone, on the ground at the
-    square's back corner, teed off the gas pipe above the valve."""
+    showing above the earth banked round its foot, a concrete collar on its crown and the gas pipe
+    and valve out of that, its hose led off behind the dome, and the feed pipe climbing out of the
+    bank to a funnel, as the other digesters are fed. `scrubber` draws the scrubber alone, on the
+    ground at the square's back corner, teed off the gas pipe above the valve."""
     cx, cy = DOME_AT
     crown = DOME[1]
     if frame:
@@ -1641,18 +1655,44 @@ def _dome(col):
     radius, rise = DOME
     # The mortar behind the bricks.
     mound(col, "Dome_Mortar", M("mortar"), (radius - 0.008, radius - 0.008, rise), segments=32, rings=10, at=(cx, cy, 0))
+    # The bank: from the bricks' faces, falling away in a soft curve to nothing on the ground.
+    height, reach = BANK
+    foot = radius * math.sqrt(1 - (height / rise) ** 2) + 0.01
+
+    def bank(out):
+        return height * (1 + math.cos(math.pi * min(1.0, max(0.0, (out - foot) / (reach - foot))))) / 2
+
+    steps = 10
+    lathe(col, "Dome_Bank", M("domebank"), [(foot + (reach - foot) * i / steps, bank(foot + (reach - foot) * i / steps))
+                                            for i in range(steps + 1)], at=(cx, cy, 0), lumps=0.08, seed=42, segments=48)
+    # Grass comes up through it, but not where the feed pipe was dug in.
+    rng = random.Random(43)
+    for _ in range(BANK_TUFTS):
+        azimuth = rng.uniform(0, 360)
+        if abs((azimuth - DOME_FEED_ANGLE + 180) % 360 - 180) < 20:
+            continue
+        out = rng.uniform(foot + 0.03, BANK_FADE[1] - 0.01)
+        x, y = _around((cx, cy), azimuth, out)
+        shade = M("grass" if rng.random() < 0.7 else "grassdry")
+        for _ in range(rng.randint(3, 5)):
+            tall = rng.uniform(0.04, 0.08)
+            prism(col, "Dome_Grass", shade, [(-0.004, 0), (0.004, 0), (rng.uniform(-0.015, 0.015), tall)], 0.002,
+                  at=(x + rng.uniform(-0.01, 0.01), y + rng.uniform(-0.01, 0.01), bank(out) - 0.01),
+                  rotate=(0, 0, rng.uniform(0, 180)))
     rng = random.Random(41)
     polar, course = 0.0, 0
     while polar < math.radians(70):
         ring, z = radius * math.cos(polar), rise * math.sin(polar)
         tilt = math.degrees(math.atan2(math.sin(polar) / rise, math.cos(polar) / radius))
         count = max(6, round(2 * math.pi * ring / (BRICK[0] + 0.012)))
-        for k in range(count):
-            azimuth = 360 * (k + 0.5 * (course % 2)) / count
-            x, y = _around((cx, cy), azimuth, ring)
-            length = 2 * math.pi * ring / count - 0.012
-            box(col, "Dome_Brick", M("brick" if rng.random() < 0.6 else "brickdark"), (length, BRICK[1], BRICK[2]),
-                at=(x, y, z), rotate=(tilt, 0, azimuth - 90))
+        # Courses the bank buries whole aren't laid: none of them would show.
+        if z + BRICK[2] > height - 0.03:
+            for k in range(count):
+                azimuth = 360 * (k + 0.5 * (course % 2)) / count
+                x, y = _around((cx, cy), azimuth, ring)
+                length = 2 * math.pi * ring / count - 0.012
+                box(col, "Dome_Brick", M("brick" if rng.random() < 0.6 else "brickdark"), (length, BRICK[1], BRICK[2]),
+                    at=(x, y, z), rotate=(tilt, 0, azimuth - 90))
         # The next course starts a brick and its mortar further up the curve.
         polar += (BRICK[2] + 0.01) / math.hypot(radius * math.sin(polar), rise * math.cos(polar))
         course += 1
