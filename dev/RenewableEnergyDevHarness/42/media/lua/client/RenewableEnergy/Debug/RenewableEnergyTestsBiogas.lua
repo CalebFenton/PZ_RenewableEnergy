@@ -21,14 +21,31 @@ local function standOn(square)
     PZHarness.Fixtures.teleportToMiddle(T.player(), square:getX(), square:getY(), square:getZ())
 end
 
--- Stands the character on a free outdoor square and answers it and another a few squares off for
--- a source, or nil.
+local CHUNK_SIZE = getChunkSizeInSquares()
+
+local function chunkOf(square)
+    return math.floor(square:getX() / CHUNK_SIZE), math.floor(square:getY() / CHUNK_SIZE)
+end
+
+-- Stands the character on a free outdoor square and answers it and another a few squares off in
+-- the same chunk for a source, or nil: in the source's own chunk a character smells all of an
+-- outdoor source's ghosts, its own and the ring's around it (Stink.spread).
 local function standNearSource(self)
-    local stand = T.square(self, nil, "a free outdoor square to stand on")
-    local source = stand and T.square(self, { near = stand, minDistance = 3 }, "a free outdoor square for the source")
-    if not source then return nil end
-    standOn(stand)
-    return stand, source
+    local candidates = T.squares(self, 60, {})
+    if not T.need(self, candidates, "free outdoor squares") then return nil end
+    for _, stand in ipairs(candidates) do
+        local sx, sy = chunkOf(stand)
+        for _, source in ipairs(candidates) do
+            local x, y = chunkOf(source)
+            local apart = math.max(math.abs(source:getX() - stand:getX()), math.abs(source:getY() - stand:getY()))
+            if x == sx and y == sy and source:getZ() == stand:getZ() and apart >= 3 then
+                standOn(stand)
+                return stand, source
+            end
+        end
+    end
+    T.need(self, nil, "two free outdoor squares three apart in one chunk")
+    return nil
 end
 
 -- Queues setting the stink of a source on `square` to `count` corpses.
@@ -117,6 +134,76 @@ test("renewable_energy_biogas_stink_outdoors", {
         T.expect(self.moodle.top == #self.levels, "this client's moodle shows level " .. tostring(self.moodle.top) .. " at the top")
         T.expect(self.smell.none and self.smell.none.level == 0, "with the ghosts gone the smell stayed")
         T.expect(self.moodle.none == 0, "with the ghosts gone this client's moodle shows " .. tostring(self.moodle.none))
+    end,
+})
+
+-- An outdoor square in the chunk `dx` chunks east of `square`'s, on its level, or nil.
+local function outdoorsInChunk(square, dx)
+    local cx, cy = chunkOf(square)
+    local x0, y0 = (cx + dx) * CHUNK_SIZE, cy * CHUNK_SIZE
+    for x = x0, x0 + CHUNK_SIZE - 1 do
+        for y = y0, y0 + CHUNK_SIZE - 1 do
+            local here = getSquare(x, y, square:getZ())
+            if here and here:isOutside() and not here:getBuilding() then
+                return here
+            end
+        end
+    end
+    return nil
+end
+
+-- The smell level `count` corpses make (Stink.LEVEL_CORPSES as `levels`).
+local function levelOf(levels, count)
+    local level = 0
+    for i, start in ipairs(levels) do
+        if count >= start then
+            level = i
+        end
+    end
+    return level
+end
+
+-- An outdoor source at the top smell level smells less the further off a character stands, a
+-- chunk at a time, as a pile of corpses with stragglers does: in its own chunk all its corpses,
+-- a chunk east its own ghosts and five of the eight chunks' around it (Stink.spread), two east
+-- three of those chunks', three east none.
+test("renewable_energy_biogas_stink_falls_off_with_distance", {
+    run = function(self)
+        self.smell = {}
+        local source = T.square(self, nil, "a free outdoor square for the source")
+        if not source then return end
+        self.stands = {}
+        for dx = 0, 3 do
+            self.stands[dx] = outdoorsInChunk(source, dx)
+            if not T.need(self, self.stands[dx], "an outdoor square " .. dx .. " chunks east of the source") then return end
+        end
+        withLevels(self, source, function(levels)
+            local top = levels[#levels]
+            T.server(self, "stinkSpread", { count = top })
+            T.step(function()
+                local own, ring = self.server.stinkSpread.own, self.server.stinkSpread.ring
+                self.wanted = { [0] = own + 8 * ring, own + 5 * ring, 3 * ring, 0 }
+                stink(self, source, top)
+                for dx = 0, 3 do
+                    T.step(function() standOn(self.stands[dx]) end)
+                    smellOnAuthority(self, source, levelOf(levels, self.wanted[dx]), "east" .. dx)
+                end
+            end)
+        end)
+    end,
+    validate = function(self)
+        local levels = self.levels
+        local last
+        for dx = 0, 3 do
+            local read, wanted = self.smell["east" .. dx], levelOf(levels, self.wanted[dx])
+            T.expect(read and read.level == wanted, dx .. " chunks east of the source: smell level "
+                .. tostring(read and read.level) .. ", not " .. wanted .. " (" .. self.wanted[dx] .. " corpses)")
+            if read and last then
+                T.expect(read.level < last, dx .. " chunks east the smell is no weaker than a chunk nearer")
+            end
+            last = read and read.level
+        end
+        T.expect(levelOf(levels, self.wanted[0]) == #levels, "beside the source the smell isn't at the top level")
     end,
 })
 

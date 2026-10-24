@@ -49,6 +49,13 @@ handler("stinkRead", function(player, args)
     }
 end)
 
+-- How an outdoor source smelling like `args.count` corpses spreads its ghosts (Stink.spread),
+-- which a multiplayer client's Lua doesn't have.
+handler("stinkSpread", function(_, args)
+    local own, ring = RenewableEnergy.Stink.spread(args.count)
+    return { own = own, ring = ring }
+end)
+
 -- The stink score's edges (Digester.SMELL_SCORES): none just below the first, then each smell
 -- level's corpses from its edge up to just below the next.
 Helpers.check("digesterCorpsesFor", function(expect)
