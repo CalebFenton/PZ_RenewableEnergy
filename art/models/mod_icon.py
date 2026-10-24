@@ -8,24 +8,24 @@ in a 3 x 2 grid, with the sun breaking its top right corner.
 
     art/models/mod_icon.py
 
-The mod list draws the icon at the height of a line of small text plus a little, about 22 pixels,
-and the load order list at about 28, with linear filtering and no mipmaps (getTexture loads it
-without them). So it is drawn pixel by pixel at 32, like the mod's item icons (one object, a dark
-one-pixel outline, no background), and shipped doubled with hard edges: shrunk from 64, each
-screen pixel blends at most two of the drawing's pixels across, and the grid lines stay crisp,
-where shrunk from 32 they smear into the cells. Larger fonts draw it larger, which 64 also covers.
+It is drawn pixel by pixel at the harness's MOD_ICON size, like the mod's item icons (one object, a
+dark one-pixel outline, no background), and saved doubled with hard edges by lib/promo.py's
+save_mod_icon, whose MOD_ICON says why: the grid lines stay crisp in the mod list's 22 pixels.
 
 It is drawn from the shapes below rather than kept as an edited image, so a rerun writes the same
 file. It needs uv (https://docs.astral.sh/uv/), which brings Pillow.
 """
-import os
+import sys
+from pathlib import Path
 
 from PIL import Image
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ICON = os.path.join(REPO, "Contents/mods/RenewableEnergy/42/renewable_energy_icon.png")
-SIZE = 32
-SCALE = 2
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "dev" / "harness" / "lib"))
+import promo  # noqa: E402
+
+ICON = REPO / "Contents/mods/RenewableEnergy/42/renewable_energy_icon.png"
+SIZE = promo.MOD_ICON
 
 # Darker than the item icons' outline, which sits on the lighter inventory: the mod list is dark.
 OUTLINE = (22, 24, 28)
@@ -100,8 +100,7 @@ def main():
     pixels = image.load()
     panel(pixels)
     sun(pixels)
-    image.resize((SIZE * SCALE, SIZE * SCALE), Image.NEAREST).save(ICON, optimize=True)
-    print(f"mod icon written: {os.path.relpath(ICON, REPO)}")
+    promo.save_mod_icon(image, ICON)
 
 
 if __name__ == "__main__":
