@@ -32,12 +32,14 @@ local Treadmill, Payers = RenewableEnergy.Treadmill, RenewableEnergy.Payers
 -- The other mods' consumers (Loads.addConsumer), in the order added.
 local consumers = {}
 
---- Bills another mod's appliances: `consumer(object)` is asked of every object in a bank's reach
---- that isn't a vanilla appliance, a treadmill or a generator, and answers the kind the status
---- lists it as and the generator fuel an hour it draws now, in vanilla's units
---- (getGeneratorPowerConsumption's); or nil while it draws nothing. The kind is a key of
---- StatusWindow's LOAD_KINDS or a translation key of the mod's own (IGUI_...). Server only: a mod
---- calls it from its own server files, which load after this one.
+--- Bills another mod's appliances on a bank: `consumer(object)` is asked of every object in a
+--- bank's reach that isn't a vanilla appliance, a treadmill or a generator, and answers the kind
+--- the status lists it as and the generator fuel an hour it would draw now, in vanilla's units
+--- (getGeneratorPowerConsumption's), powered or not, as an appliance's switch answers; or nil while
+--- it draws nothing. The kind is a key of StatusWindow's LOAD_KINDS or a translation key of the
+--- mod's own (IGUI_...). A vanilla generator's scan doesn't ask: its bill is vanilla's own total,
+--- which knows nothing of another mod's machines, so that mod bills a generator itself. Server
+--- only: a mod calls it from its own server files, which load after this one.
 ---@param consumer fun(object: IsoObject): string?, number?
 function Loads.addConsumer(consumer)
     table.insert(consumers, consumer)
@@ -177,14 +179,10 @@ function Loads.scan(square, payer, payers, gridGone)
             elseif isRunningGenerator(object) then
                 Payers.track(object)
                 table.insert(load.generators, object)
-            else
+            elseif not payer.generator then
                 local kind, fuel = consumerDraw(object)
-                if kind and offGrid(object, allowExterior, gridGone) then
-                    if pays(object) then
-                        Loads.add(load, kind, Specs.wattsFromFuel(fuel))
-                    else
-                        load.othersFuel = load.othersFuel + fuel
-                    end
+                if kind and offGrid(object, allowExterior, gridGone) and pays(object) then
+                    Loads.add(load, kind, Specs.wattsFromFuel(fuel))
                 end
             end
         end
