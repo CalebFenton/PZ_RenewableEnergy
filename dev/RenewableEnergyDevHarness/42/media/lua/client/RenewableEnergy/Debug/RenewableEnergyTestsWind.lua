@@ -612,3 +612,24 @@ test("renewable_energy_wind_sheltered_reason", {
         expect(walled.reason == "sheltered", "walled in out to 5 squares it reads " .. tostring(walled.reason))
     end,
 })
+
+-- Two speakers make the alternator, or four portable radios of one kind or both, and the craft
+-- takes them all. An input whose items take different amounts has a base amount of 1
+-- (InputScript.Load), which is all T.recipeInputs gives of the preferred item; setup gives the rest.
+local ALTERNATOR_RECIPE = "RenewableEnergy_MakeHomemadeAlternator"
+local SPEAKER, RED_RADIO, BLACK_RADIO = "Base.Speaker", "Base.RadioRed", "Base.RadioBlack"
+local MAGNET_ROWS = {
+    { "from_speakers", SPEAKER, { { type = SPEAKER, count = 1 } } },
+    { "from_four_radios", RED_RADIO, { { type = RED_RADIO, count = 3 } } },
+    { "from_mixed_radios", RED_RADIO, { { type = RED_RADIO, count = 1 }, { type = BLACK_RADIO, count = 2 } } },
+}
+for _, row in ipairs(MAGNET_ROWS) do
+    local behavior, first, rest = row[1], row[2], row[3]
+    T.craftTest(T.craftName("wind", ALTERNATOR_RECIPE, behavior), {
+        recipe = ALTERNATOR_RECIPE,
+        from = first,
+        prefer = { first },
+        setup = function(self) T.giveBeforeCalls(self, "magnets", rest) end,
+        counts = { ["RenewableEnergy.HomemadeAlternator"] = 1, [SPEAKER] = 0, [RED_RADIO] = 0, [BLACK_RADIO] = 0 },
+    })
+end
