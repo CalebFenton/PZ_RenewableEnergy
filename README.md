@@ -6,6 +6,16 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 
 **Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress.
 
+**[The player's guide](docs/player-guide.md)** explains every system: sizing a bank, placing a wind charger, feeding a digester, fixing a panel that goes quiet, and where to look.
+
+## Questions
+
+- **Can I add it to my save?** Yes. Loot turns up where you haven't been yet; solar sites and garden lights anywhere.
+- **Can I remove it?** Not cleanly: what it built into your world goes with it.
+- **Can I make it easier, or harder?** Yes, on the **Renewable Energy** sandbox page; each option says what it changes. Start with **Sunlight Multiplier**, **Battery Wear** and **Storm Damage**.
+- **Why isn't my panel making power?** Open **Status** on its bank: every source says why it falls short, in red if you can fix it.
+- **Does it work before the power goes out?** The bank stands by while the grid is on, filling its batteries, and takes over within minutes of the shutoff.
+
 ## How it plays
 
 ![A first battery box by a window with two panels outside, next to a homestead with wall panels, ground racks, a treadmill wind charger, and a digester feeding the generator](art/promo/images/setup.png)
@@ -19,7 +29,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 
 ## Everything you can find or build
 
-![Every item's model lying on the ground with its inventory icon: panels, battery storage, parts, batteries, the gas and wind parts, gadgets and magazines](art/promo/images/items.png)
+![Every item's model and icon: panels, storage, parts, batteries, gas and wind parts, gadgets and magazines](art/promo/images/items.png)
 
 - **Banks** hold the batteries and what you wire into them: inverters, charge controllers, a charger and a **Solar Failsafe** that starts the generator when they run low.
 - **Batteries wear** with every deep drain. Service and recondition them, each repair bringing them back less far, then strip and rebuild them with plates you cast yourself.
@@ -39,11 +49,11 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 4. Put up a panel outside, then **Connect Sources in Reach**.
 5. **Turn On**. **Status** shows what it's doing, and why each source isn't at full output.
 
-The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town. Switch on more than the inverters carry and the power cuts out until you switch something off.
+The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town.
 
 ## Wind
 
-![A scoop rotor, wooden and pipe-blade treadmill wind chargers and a homebuilt wind turbine turning on open ground](art/promo/images/wind.png)
+![A scoop rotor, a treadmill wind charger with carved blades, a car alternator wind charger with pipe blades and a homebuilt wind turbine on its tower, turning on open ground](art/promo/images/wind.png)
 
 Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares from each other, or they steal each other's wind.
 
@@ -57,7 +67,7 @@ No sun, no wind? **Wire the Motor**, connect the treadmill to a bank, and **Run 
 
 ## Biogas
 
-![A steel drum and an orange barrel digester, an insulated digester and a brick dome feeding a kitted generator, a gas heater by the first, and the brick dome's status window](art/promo/images/biogas.png)
+![Two barrel digesters, an insulated digester and a brick dome by a kitted generator, a gas heater, and the dome's status window](art/promo/images/biogas.png)
 
 Feed a digester manure and scraps, keep it above 10 °C, and it makes gas. Overfeed it and it sours until you add wood ash or baking soda; indoors, it can poison the house, and it stinks. **Install Gas Conversion Kit** on a generator, **Connect Gas Line** with a rubber hose for every five squares, and **Run on Gas**: its tank stays as it was. A tire pump or a fridge compressor bottles the gas for propane tanks.
 
@@ -73,34 +83,12 @@ Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling 
 
 ## Where to look
 
-Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually up on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, never in working order.
+Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually up on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, worn and in need of fixing up.
 
 The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
 
 ![The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a car](art/promo/images/trailer.png)
 
-## Sandbox options
-
-- **Sunlight Multiplier**: how much power panels make.
-- **Loot Rarity Multiplier**, for modules, batteries and the rest.
-- **Battery Wear** and **Storm Damage**: 0 and off for an easier game.
-
-The rest are on the **Renewable Energy** page.
-
-## Questions
-
-- **Can I add it to my save?** Yes. Loot turns up where you haven't been yet; solar sites and garden lights anywhere.
-- **Can I remove it?** Not cleanly: what it built into your world goes with it.
-- **How does it all work, and where do I look?** The [player's guide](docs/player-guide.md) explains every mechanic, how to size a bank and place a wind charger, and where to start looking.
-
 ## Credits
 
 Inspired by [Immersive Solar Arrays](https://github.com/radx5Blue/ImmersiveSolarArrays) by RadX5 and Poltergeist.
-
-## Install
-
-Playtest builds come as `RenewableEnergy-<version>.zip`. Unzip it into your mods folder, so that you end up with `~/Zomboid/mods/RenewableEnergy` (on Windows, `C:\Users\<you>\Zomboid\mods\RenewableEnergy`), and enable **Renewable Energy** in the mod list. Keep only one copy installed, since two copies conflict.
-
-## Development
-
-Clone this repository to `~/Zomboid/Workshop/RenewableEnergy`. [DEVELOPMENT.md](DEVELOPMENT.md) has the commands for testing the mod and rebuilding the art, plus notes on the Build 42 behavior it relies on. [AGENTS.md](AGENTS.md) has the rules. Rebuilding the art needs [Blender](https://www.blender.org/) and [uv](https://docs.astral.sh/uv/).
