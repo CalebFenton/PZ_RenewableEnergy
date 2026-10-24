@@ -280,6 +280,19 @@ onBank("setCharge", function(record, bank, args)
     return stateOf(record)
 end)
 
+-- Takes `args.points` of wear off the first `args.type` in the bank at `args.bank` by the mod's own
+-- Wear.take, which keeps a fraction pending on the item, and sends it. Answers the bank's state.
+onBank("takePartWear", function(record, bank, args)
+    local item = bank:getContainer():getFirstType(args.type)
+    if not item then
+        return nil, "a " .. args.type .. " in the bank"
+    end
+    if RenewableEnergy.Wear.take(item, args.points) then
+        sendItemStats(item)
+    end
+    return stateOf(record)
+end)
+
 -- Weather with snow falling hard.
 local SNOWING = { cloud = 1, fog = 0, rain = 0, snowing = true, groundSnow = 0 }
 

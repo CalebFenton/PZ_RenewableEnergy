@@ -114,9 +114,11 @@ Specs.treadmill = {
 Specs.chargerWatts = 100
 
 -- Condition a bank part loses per hour while its bank powers its area, and per overload that cuts
--- the bank; tuned so an inverter needs roughly weekly Electronics Scrap repairs.
+-- the bank. A bank's upkeep is all its parts together, so the rates are tuned on the fullest bank,
+-- two inverters and four controllers: together they lose about twice what a vanilla generator
+-- does in a day (IsoGenerator's hourly ConditionLowerChanceOneIn roll), and a lone inverter less.
 Specs.partWear = {
-    perHour = { inverter = 0.06, controller = 0.03 },
+    perHour = { inverter = 0.025, controller = 0.0125 },
     perOverload = { inverter = 1 },
 }
 -- What one Electronics Scrap repairs, and the Electricity level needed (as vanilla's ISFixGenerator).

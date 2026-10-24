@@ -169,7 +169,7 @@ Place it on a generator's square. It starts the generator when the bank drops to
 
 ### Upkeep
 
-Inverters lose condition every hour the bank powers its area, about one Electronics Scrap's worth a week. Controllers wear half as fast. **Repair with Scrap** in the bank's menu (Electricity 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.
+Inverters lose condition every hour the bank powers its area, about one Electronics Scrap's worth every two and a half weeks. Controllers wear half as fast, so even a full metal bank needs only a scrap every few days. **Repair with Scrap** in the bank's menu (Electricity 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.
 
 ### The status window
 

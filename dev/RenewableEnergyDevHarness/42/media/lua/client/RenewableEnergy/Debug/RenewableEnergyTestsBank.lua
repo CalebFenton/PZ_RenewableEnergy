@@ -684,8 +684,18 @@ local function repair(self, key, bank)
     T.performInto(self, key, "repairPart", { bank = bank.position }, { type = INVERTER, inBank = true })
 end
 
--- Hours of a wear pass: long enough for an inverter's wear to make whole points.
-local WEAR_HOURS = 20
+-- A wear pass: enough passes of PASS_HOURS, each from a full charge so that what the houses around
+-- draw can't run the bank empty, which would stop its parts' wear, for an inverter's wear to make
+-- a whole point, with half a point to spare so the summed fractions can't fall short of it.
+local PASS_HOURS = 20
+local WEAR_PASSES = math.ceil(1.5 / (Specs.partWear.perHour.inverter * PASS_HOURS))
+local WEAR_HOURS = WEAR_PASSES * PASS_HOURS
+local function wearPass(self, bank)
+    for _ = 1, WEAR_PASSES do
+        T.setCharge(self, bank, 1)
+        T.bankPass(self, bank, 0, { hours = PASS_HOURS })
+    end
+end
 -- Inverters and controllers wear in proportion to the hours their bank powers its area and not
 -- while it is off, a part at 0 does nothing, and Electronics Scrap repairs a part only at its skill
 -- and only if worn.
@@ -701,16 +711,13 @@ test("renewable_energy_bank_part_wear_and_repair", {
         if not bank then return end
         self.bank = bank
         T.switchOn(self, bank)
-        -- Charged full before each pass, so that what the houses around draw doesn't run the bank
-        -- empty, which would stop its parts' wear.
         T.batch(function()
-            T.bankPass(self, bank, 0, { hours = WEAR_HOURS })
+            wearPass(self, bank)
             T.step(function() self.once = bank.state end)
-            T.setCharge(self, bank, 1)
-            T.bankPass(self, bank, 0, { hours = WEAR_HOURS })
+            wearPass(self, bank)
             T.step(function() self.twice = bank.state end)
             T.perform(self, "setBankOn", { bank = bank.position, on = false })
-            T.bankPass(self, bank, 0, { hours = WEAR_HOURS })
+            wearPass(self, bank)
             T.step(function() self.off = bank.state end)
             T.perform(self, "setBankOn", { bank = bank.position, on = true })
             T.setPartCondition(self, bank, INVERTER, 50)
@@ -1660,8 +1667,12 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
 
 -- Unloaded ---------------------------------------------------------------------------------------
 
--- Hours of the pass while the bank is away, long enough for its inverter's wear to make a point.
+-- Hours the bank powers while away, which its batteries carry the houses around through, and the
+-- wear its inverter brings to the trip, pending on the item: together they make a whole point,
+-- with a tenth to spare so the summed fractions can't fall short of it, so the hours away must
+-- reach the inverter for its wear to show.
 local AWAY_HOURS = 20
+local PRIMED_WEAR = math.max(0, 1.1 - Specs.partWear.perHour.inverter * AWAY_HOURS)
 
 -- This client's copy of the bank at `position`, found afresh: a chunk loaded again brings new
 -- objects.
@@ -1697,6 +1708,7 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
             T.setCharge(self, bank, 0.3)
             T.bankPass(self, bank, 0, { hours = 0.1 })
             T.setCharge(self, bank, 1)
+            T.server(self, "takePartWear", { bank = at, type = INVERTER, points = PRIMED_WEAR })
             T.step(function() self.left = bank.state end)
         end)
         T.awayAndBack(self, T.at(stand), at.x, at.y, at.z, function()
@@ -1723,7 +1735,7 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
         local cameBack = {
             [JAR] = T.conditionAfterDischarge(JAR, self.left.cycleDepth),
             [L16] = T.conditionAfterDischarge(L16, self.left.cycleDepth),
-            [INVERTER] = 100 - math.floor(Specs.partWear.perHour.inverter * AWAY_HOURS),
+            [INVERTER] = 100 - math.floor(PRIMED_WEAR + Specs.partWear.perHour.inverter * AWAY_HOURS),
         }
         expect(cameBack[JAR] < 100 and cameBack[INVERTER] < 100, string.format("a %.2f deep day and %d hours on"
             .. " don't wear both the jar battery and the inverter a whole point, so their wear can't show", self.left.cycleDepth, AWAY_HOURS))
