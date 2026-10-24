@@ -132,7 +132,7 @@ Every part takes a screwdriver, Electric Wire and light to see by; an L-16's cab
 
 ### What it powers
 
-The bank powers everything a generator in its spot would, including the floors above and below. It takes over within minutes of the grid shutoff, which comes when vanilla's Electricity Shutoff option says. It keeps charging and draining while you're away, and anything left switched on in its reach keeps drawing.
+The bank powers everything a generator in its spot would, including the floors above and below. It takes over within minutes of the grid shutoff, which comes when vanilla's Electricity Shutoff option says. It keeps charging and draining while you're away, and anything left switched on in its reach keeps drawing. Mods that tell it what their machines draw are billed the same way: Enhanced Irrigation's Pump Houses show in the status window while they run.
 
 ### Overload
 

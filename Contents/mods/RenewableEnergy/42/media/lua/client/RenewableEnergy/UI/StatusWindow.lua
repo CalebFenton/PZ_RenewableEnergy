@@ -221,9 +221,11 @@ local LOAD_KINDS = {
     other = "IGUI_RenewableEnergy_LoadOther",
 }
 
--- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`.
+-- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`. Another mod's kind is its own
+-- translation key (Loads.addConsumer).
 local function loadLabel(entry)
-    local name = getText(LOAD_KINDS[entry.kind] or LOAD_KINDS.other)
+    local key = LOAD_KINDS[entry.kind] or (entry.kind:find("^IGUI_") and entry.kind) or LOAD_KINDS.other
+    local name = getText(key)
     if entry.count > 1 then
         return getText("IGUI_RenewableEnergy_LoadCount", name, entry.count)
     end

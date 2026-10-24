@@ -261,6 +261,38 @@ test("renewable_energy_bank_scan_sees_load_while_cut", {
     end,
 })
 
+-- The kind and draw the stand-in for another mod's appliance reports, a Pump House's in generator
+-- fuel an hour; the status lists a kind it doesn't know as other.
+local CONSUMER_KIND, CONSUMER_FUEL = "testConsumer", 0.2
+
+-- Another mod's appliance in a bank's reach (Loads.addConsumer) is in the bank's load at the draw
+-- its mod reports, under the mod's own kind, and not while it reports none. Catches a scan that
+-- never asks another mod, or bills its appliance switched off.
+test("renewable_energy_bank_bills_another_mods_appliance", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
+        local square = bank and T.square(self, { indoors = true, near = bank.square }, "a free indoor square for the appliance")
+        if not square then return end
+        local function drawing(fuel)
+            local args = T.at(square)
+            args.kind, args.fuel = CONSUMER_KIND, fuel
+            return args
+        end
+        T.server(self, "drawAt", drawing(0))
+        T.server(self, "scanLoad", bank.position)
+        T.step(function() self.off = self.server.scanLoad end)
+        T.server(self, "drawAt", drawing(CONSUMER_FUEL))
+        T.server(self, "scanLoad", bank.position)
+    end,
+    validate = function(self)
+        local on, off = self.server.scanLoad, self.off
+        expect((off.counts[CONSUMER_KIND] or 0) == 0, "the scan bills an appliance that draws nothing")
+        expect(on.counts[CONSUMER_KIND] == 1, "the scan lists the drawing appliance " .. tostring(on.counts[CONSUMER_KIND]) .. " times")
+        expectNear("the watts it adds", on.watts - off.watts, Specs.wattsFromFuel(CONSUMER_FUEL), 0.01)
+    end,
+})
+
 -- Banks stand indoors only: placement is refused outdoors, and a bank found outdoors won't
 -- switch on.
 test("renewable_energy_bank_refused_outdoors", {

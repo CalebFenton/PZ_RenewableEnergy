@@ -10,7 +10,9 @@
 -- (IsoGenerator.isPoweringSquare), so the same scan finds the generators powering the bank.
 --
 -- The engine knows nothing of a treadmill's draw: a run says when it draws (Treadmill.isDrawing),
--- and it is billed on the same squares as an appliance.
+-- and it is billed on the same squares as an appliance. Nor of another mod's appliances, such as
+-- Enhanced Irrigation's Pump Houses: the mod says what each draws (Loads.addConsumer), and they are
+-- billed the same way.
 
 if isClient() then return end
 
@@ -26,6 +28,31 @@ RenewableEnergy.Loads = Loads
 
 local Specs = RenewableEnergy.Specs
 local Treadmill, Payers = RenewableEnergy.Treadmill, RenewableEnergy.Payers
+
+-- The other mods' consumers (Loads.addConsumer), in the order added.
+local consumers = {}
+
+--- Bills another mod's appliances: `consumer(object)` is asked of every object in a bank's reach
+--- that isn't a vanilla appliance, a treadmill or a generator, and answers the kind the status
+--- lists it as and the generator fuel an hour it draws now, in vanilla's units
+--- (getGeneratorPowerConsumption's); or nil while it draws nothing. The kind is a key of
+--- StatusWindow's LOAD_KINDS or a translation key of the mod's own (IGUI_...). Server only: a mod
+--- calls it from its own server files, which load after this one.
+---@param consumer fun(object: IsoObject): string?, number?
+function Loads.addConsumer(consumer)
+    table.insert(consumers, consumer)
+end
+
+-- The first consumer's answer for `object` that draws: its kind and fuel an hour; or nil.
+local function consumerDraw(object)
+    for _, consumer in ipairs(consumers) do
+        local kind, fuel = consumer(object)
+        if kind and fuel and fuel > 0 then
+            return kind, fuel
+        end
+    end
+    return nil
+end
 
 -- The kind of an object with a fridge or freezer container, as vanilla bills it: by its
 -- containers alone, so a mini fridge with its ice box is a fridge-freezer.
@@ -150,6 +177,15 @@ function Loads.scan(square, payer, payers, gridGone)
             elseif isRunningGenerator(object) then
                 Payers.track(object)
                 table.insert(load.generators, object)
+            else
+                local kind, fuel = consumerDraw(object)
+                if kind and offGrid(object, allowExterior, gridGone) then
+                    if pays(object) then
+                        Loads.add(load, kind, Specs.wattsFromFuel(fuel))
+                    else
+                        load.othersFuel = load.othersFuel + fuel
+                    end
+                end
             end
         end
     end)

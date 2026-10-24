@@ -537,6 +537,32 @@ handler("scanLoad", function(_, args)
     return { watts = load.watts, counts = counts }
 end)
 
+-- Where the stand-in for another mod's appliance stands, its kind and the fuel an hour it draws,
+-- read by the consumer drawAt adds to the scan (Loads.addConsumer) once, as a --stay rerun loads
+-- this file again and the mod's consumers stay.
+RenewableEnergyTestConsumer = RenewableEnergyTestConsumer or {}
+
+-- The floor of the square at `args` draws `args.fuel` an hour as the kind `args.kind` until the
+-- test ends, as another mod's appliance that told the bank's scan what it draws.
+handler("drawAt", function(_, args, defer)
+    local stub = RenewableEnergyTestConsumer
+    if not stub.added then
+        stub.added = true
+        RenewableEnergy.Loads.addConsumer(function(object)
+            local at = stub.at
+            local square = at and object:getSquare()
+            if square and square:getX() == at.x and square:getY() == at.y and square:getZ() == at.z
+                    and object == square:getFloor() then
+                return at.kind, at.fuel
+            end
+            return nil
+        end)
+    end
+    stub.at = { x = args.x, y = args.y, z = args.z, kind = args.kind, fuel = args.fuel }
+    defer(function() stub.at = nil end)
+    return {}
+end)
+
 -- Panels ------------------------------------------------------------------------------------------
 
 -- A panel record off the map, as `args` lists it ({ kind, material, modules }).
