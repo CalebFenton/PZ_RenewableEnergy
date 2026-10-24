@@ -36,7 +36,7 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
 # Each tileset's name and rows, eight tiles to a row; the file numbers them from 1 in this order.
-TILESETS = (("renewable_energy_01", 47), ("renewable_energy_02", 56))
+TILESETS = (("renewable_energy_01", 53), ("renewable_energy_02", 56))
 COLUMNS = 8
 
 
@@ -159,12 +159,18 @@ for fixed, first in ((244, TURNED_HEATER_FIRST), (245, TURNED_HEATER_FIRST + len
     for facing, index in tiles.items():
         TILES[index] = gas_heater(**facings(tiles, facing))
 
-# The propeller and alternator chargers, a tile per facing (N, E, S, W): the wooden propeller's,
-# the pipe propeller's, then the alternator's.
-for first, name, material2 in ((265, "Propeller Wind Charger", "Wood"), (269, "Propeller Wind Charger", "Plastic"),
-                               (273, "Homemade Alternator Wind Charger", "MetalScrap")):
+# The blade machines, a tile per facing (N, E, S, W), in art/models/tiles.py's WIND_TILES order:
+# the treadmill wind charger with wooden and pipe blades, the homebuilt wind turbine with steel
+# blades, the treadmill charger with steel blades, the turbine with wooden and pipe blades, then
+# the car alternator wind charger with wooden, pipe and steel blades.
+BLADE_MATERIAL = {"wood": "Wood", "pipe": "Plastic", "steel": "MetalScrap"}
+for first, name, blades in ((265, "Treadmill Wind Charger", "wood"), (269, "Treadmill Wind Charger", "pipe"),
+                            (273, "Homebuilt Wind Turbine", "steel"), (372, "Treadmill Wind Charger", "steel"),
+                            (397, "Homebuilt Wind Turbine", "wood"), (401, "Homebuilt Wind Turbine", "pipe"),
+                            (405, "Car Alternator Wind Charger", "wood"), (409, "Car Alternator Wind Charger", "pipe"),
+                            (413, "Car Alternator Wind Charger", "steel")):
     for offset in range(4):
-        TILES[first + offset] = wind_charger(name, "MetalPipe", material2)
+        TILES[first + offset] = wind_charger(name, "MetalPipe", BLADE_MATERIAL[blades])
 
 # The barrel digester, a tile per barrel it can be built from: the Metal Drum, then the orange, dark
 # green and light green barrels, all steel like the game's own.

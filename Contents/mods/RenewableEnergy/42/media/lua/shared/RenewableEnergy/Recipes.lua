@@ -43,20 +43,31 @@ Recipes.MOUNTS = {
 Recipes.REPAIR_LIMIT_STEP = 10
 
 -- Seal Cracked Module (RenewableEnergy_RepairCrackedModule): condition it adds, and the most a
--- first seal brings each module type to. The caps stay below Specs.crackedBelow: sealed glass is
--- still cracked glass.
+-- first seal brings each module type to. The caps stay below Specs.crackLooks.lightBelow of the
+-- type's ConditionMax, and a first seal's at or above heavyBelow: sealed glass is still cracked
+-- glass, and at best shows light cracks (RenewableEnergy.crackLookOf).
 Recipes.MODULE_REPAIR = 20
 Recipes.MODULE_REPAIR_CAP = {
     [Specs.factoryModule] = 55,
     ["RenewableEnergy.HomemadeSolarModule"] = 40,
 }
 
--- Reglaze Module sets a module below this to it: new glass, but a factory module's cells stay
--- cracked under it; a homemade one is at its ConditionMax.
-Recipes.REGLAZE = {
-    [Specs.factoryModule] = 80,
-    ["RenewableEnergy.HomemadeSolarModule"] = 60,
-}
+-- Reglaze Module's new glass, as shares of the module's ConditionMax: a module whose cracks stayed
+-- in the glass comes back as new; one cracked heavily (RenewableEnergy.crackLookOf), or sealed,
+-- since a crack that needed sealing ran deep enough to let the weather in, keeps the cells cracked
+-- under it. Both shares stay at or above Specs.crackLooks.lightBelow, so new glass shows whole.
+Recipes.REGLAZE = { glassOnly = 1, cellsCracked = 0.9 }
+
+--- The condition Reglaze Module brings a module of `fullType` at `condition`, sealed `repaired`
+--- times, to; nil for a type that is no module.
+function Recipes.reglazedCondition(fullType, condition, repaired)
+    if not Specs.modules[fullType] then
+        return nil
+    end
+    local deep = (repaired or 0) > 0 or RenewableEnergy.crackLookOf(fullType, condition) == "heavy"
+    local share = deep and Recipes.REGLAZE.cellsCracked or Recipes.REGLAZE.glassOnly
+    return math.floor(RenewableEnergy.conditionMaxOf(fullType) * share)
+end
 
 -- Service Battery adds a little to a tired battery; Recondition brings it to its repair limit.
 Recipes.SERVICE_REPAIR = 10
@@ -198,18 +209,21 @@ function Recipes.repairModule(craftRecipeData, character)
     countRepair(module)
 end
 
+-- What Reglaze Module brings the module item `item` to (Recipes.reglazedCondition), or nil.
+local function reglazedItem(item)
+    return Recipes.reglazedCondition(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
+end
+
 -- OnTest of Reglaze Module: the module must be below what new glass brings it to.
 function Recipes.isModuleBelowReglaze(item, character)
-    local reglazed = Recipes.REGLAZE[item:getFullType()]
+    local reglazed = reglazedItem(item)
     return reglazed == nil or item:getCondition() < reglazed
 end
 
 -- OnCreate of Reglaze Module: new glass, so the seals on the old no longer count.
 function Recipes.reglazeModule(craftRecipeData, character)
-    local module = firstInput(craftRecipeData, function(item)
-        return Recipes.REGLAZE[item:getFullType()] ~= nil
-    end)
-    Wear.setCondition(module, Recipes.REGLAZE[module:getFullType()])
+    local module = firstInput(craftRecipeData, isModule)
+    Wear.setCondition(module, reglazedItem(module))
     setRepairs(module, 0)
 end
 
@@ -219,7 +233,14 @@ end
 -- input is the panel. Reglazing isn't offered in place: the module comes off to be reglazed, as
 -- vanilla car glass is replaced, not repaired.
 local MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
+-- Seal Cracked Module and its glue twin (Recipes.txt says why there are two), in the order the
+-- jobs in place try their inputs: glue first, the commoner tube, keeping epoxy for what only it
+-- does, such as vanilla's Fix With Epoxy (recipes_fixing.txt). The twins list the same inputs in
+-- the same order but the adhesive.
+local MODULE_REPAIR_RECIPES = { "RenewableEnergy_RepairCrackedModuleWithGlue", MODULE_REPAIR_RECIPE }
 
+--- Seal Cracked Module: the recipe the jobs in place need known, and take their skill, time and
+--- XP from; its glue twin has the same, and MetaRecipe makes it known with this one.
 function Recipes.moduleRepairRecipe()
     return getScriptManager():getCraftRecipe(MODULE_REPAIR_RECIPE)
 end
@@ -240,16 +261,10 @@ end
 -- The rounding CraftRecipeData.consumeInputFromItems forgives when scaled uses pay an input.
 local PAID_TOLERANCE = 1e-5
 
---- The inventory items, bags included, that pay for a Seal Cracked Panel's inputs but the
---- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
---- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; nil when an
---- input is missing. Second, each of those inputs as a need (RenewableEnergy.firstUnmet), `have`
---- being how many whole units of its amount the items found pay.
---- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
---- drainables add up to one input, each giving the uses it has until the input is paid.
-function Recipes.panelRepairInputs(character)
-    local inventory = character:getInventory()
-    local inputs = Recipes.moduleRepairRecipe():getInputs()
+-- What `recipe` takes of the character's inventory, bags included, but the module: the items that
+-- pay its inputs, nil when one is missing, and each input as a need (see panelRepairInputs).
+local function recipeInputs(recipe, inventory)
+    local inputs = recipe:getInputs()
     local picks, taken, needs, complete = {}, {}, {}, true
     for i = 0, inputs:size() - 1 do
         local input = inputs:get(i)
@@ -281,6 +296,51 @@ function Recipes.panelRepairInputs(character)
         end
     end
     return complete and picks or nil, needs
+end
+
+-- Whether two input lines take the same amount of the same items.
+local function sameInput(a, b)
+    local itemsA, itemsB = a:getPossibleInputItems(), b:getPossibleInputItems()
+    if a:getIntAmount() ~= b:getIntAmount() or itemsA:size() ~= itemsB:size() then
+        return false
+    end
+    for i = 0, itemsA:size() - 1 do
+        if itemsA:get(i):getFullName() ~= itemsB:get(i):getFullName() then
+            return false
+        end
+    end
+    return true
+end
+
+--- The inventory items, bags included, that pay for a Seal Cracked Panel's inputs but the
+--- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
+--- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; they pay the
+--- first of MODULE_REPAIR_RECIPES the character carries every input of, and are nil when there is
+--- none. Second, each of those inputs as a need (RenewableEnergy.firstUnmet), `have` being how many
+--- whole units of its amount the items found pay; an input the twins differ in is one need any of
+--- theirs meets. Since they differ only in the adhesive, that need is met exactly when a twin is.
+--- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
+--- drainables add up to one input, each giving the uses it has until the input is paid.
+function Recipes.panelRepairInputs(character)
+    local inventory = character:getInventory()
+    local paid, byRecipe = nil, {}
+    for _, name in ipairs(MODULE_REPAIR_RECIPES) do
+        local picks, needs = recipeInputs(getScriptManager():getCraftRecipe(name), inventory)
+        paid = paid or picks
+        table.insert(byRecipe, needs)
+    end
+    local needs = {}
+    for i, need in ipairs(byRecipe[1]) do
+        local options, met, same = {}, false, true
+        for _, recipeNeeds in ipairs(byRecipe) do
+            local option = recipeNeeds[i]
+            table.insert(options, option)
+            met = met or option.have >= option.need
+            same = same and sameInput(option.input, need.input)
+        end
+        table.insert(needs, same and need or { kind = "item", anyOf = options, have = met and 1 or 0, need = 1 })
+    end
+    return paid, needs
 end
 
 --- What Seal Cracked Panel takes of `character` (RenewableEnergy.firstUnmet): the recipe

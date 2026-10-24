@@ -8,12 +8,14 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/StormNotice"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 
 RenewableEnergy = RenewableEnergy or {}
 local Chance, Specs, Sprites, Sun = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
+local StormNotice = RenewableEnergy.StormNotice
 local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
 
 local PanelSource = {}
@@ -65,9 +67,9 @@ local function showCracksOf(isoObject, kind, facing, material, modules)
     RenewableEnergy.showOverlays(isoObject, isCrackOrSnow, wanted)
 end
 
---- Shows a cracked glass over each of a placed panel's modules below Specs.crackedBelow and over
---- none of the others, keeping the snow it shows on top, and sends the overlays to clients if
---- they changed. Does nothing for an object that is no panel.
+--- Shows each of a placed panel's modules' cracked glass, light or heavy as
+--- RenewableEnergy.crackLookOf has it, and none over the others, keeping the snow it shows on
+--- top, and sends the overlays to clients if they changed. Does nothing for an object that is no panel.
 function PanelSource.showCracks(isoObject)
     local kind, facing, material = Sources.kindOf(isoObject)
     if Sources.familyOf(kind) ~= "panel" then return end
@@ -109,24 +111,24 @@ function PanelSource.clearSnow(source, object)
     end
 end
 
--- How likely a storm is to crack a module of a mount, relative to Specs.storm.chancePerHour.
-local function stormFactor(mount, material)
+-- A mount's stormShare (Specs.storm), times its material's.
+local function stormShare(mount, material)
     local materialSpec = material and Specs.materials[material]
-    return Specs.mounts[mount].stormFactor * (materialSpec and materialSpec.stormFactor or 1)
+    return Specs.mounts[mount].stormShare * (materialSpec and materialSpec.stormShare or 1)
 end
 
 --- The hours of a pass of `hours`, ending now, in which a thunderstorm can crack modules: all
 --- of them while one blows hard enough, else none.
 function PanelSource.stormHours(hours)
     local climate = getClimateManager()
-    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.windMin
+    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.panelKph
     return storming and hours or 0
 end
 
 --- The chance that `stormHours` of thunderstorm crack a module of `source` (anything with a mount
 --- kind and material), at the StormDamage options.
 function PanelSource.stormChance(source, stormHours)
-    return Chance.stormDamage(Specs.storm.chancePerHour * stormFactor(source.kind, source.material), stormHours)
+    return Chance.stormDamage(Specs.storm.panelPerHour * stormShare(source.kind, source.material), stormHours)
 end
 
 --- A thunderstorm may crack one of a panel's modules (`source`, anything with a mount kind,
@@ -201,10 +203,12 @@ function PanelSource.connect(player, source, isoObject, facing, material)
     source.facing, source.material, source.snow, source.modules = facing, material, 0, modules
 end
 
---- The panel's output over the pass, and why it is low.
+--- The panel's output over the pass, and why it is low. A storm cracking a module tells the
+--- players in earshot (StormNotice).
 function PanelSource.update(source, object, inSlot, hours, context)
     if PanelSource.stormCrack(source, context.stormHours) then
         source.modulesChanged = true
+        StormNotice.tell(StormNotice.MODULE, source.x, source.y, source.z)
     end
     if object then
         PanelSource.syncModules(source, object)

@@ -145,7 +145,8 @@ end
 --- `opts.square`, else outdoors near `opts.near`, a mount holding `opts.modules` ({ { type,
 --- condition } }) and placed as the moveables cursor places one. When `opts.connect`, the server's
 --- character connects it to the bank handle `opts.near`; the handle gets `connected` and `reason`
---- (the refusal) from the server. A treadmill comes wired when `opts.wired`.
+--- (the refusal) from the server. A treadmill comes wired when `opts.wired`; a wind charger is its
+--- build-menu entity when `opts.built`, and its blades come broken when `opts.broken`.
 function T.panel(self, sprite, opts)
     opts = opts or {}
     local square = opts.square or T.square(self, { near = opts.near }, "a free outdoor square for a panel")
@@ -156,6 +157,7 @@ function T.panel(self, sprite, opts)
     local bank = opts.connect and opts.near
     local args = T.at(square)
     args.sprite, args.modules, args.bank, args.wired = sprite, opts.modules, bank and bank.position, opts.wired
+    args.built, args.broken = opts.built, opts.broken
     T.server(self, "placePanel", args)
     T.step(function()
         panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason

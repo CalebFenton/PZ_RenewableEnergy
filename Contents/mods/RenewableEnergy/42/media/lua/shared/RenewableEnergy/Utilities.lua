@@ -180,6 +180,21 @@ function RenewableEnergy.conditionMaxOf(fullType)
     return CONDITION_MAX[fullType]
 end
 
+--- How the glass of a module of `fullType` at `condition` looks (Specs.crackLooks): nil whole,
+--- "light" or "heavy" cracks. Every look of a module, a mount's tile or the arrow board's, asks
+--- this, so they agree. The share is taken by division, which rounds a share that is exactly a
+--- threshold to the threshold's own literal, as a product of the max wouldn't.
+function RenewableEnergy.crackLookOf(fullType, condition)
+    local looks = RenewableEnergy.Specs.crackLooks
+    local share = condition / RenewableEnergy.conditionMaxOf(fullType)
+    if share < looks.heavyBelow then
+        return "heavy"
+    elseif share < looks.lightBelow then
+        return "light"
+    end
+    return nil
+end
+
 --- Whether `character` stands within `reach` squares on each axis of the middle of `target`'s
 --- square, on its level: where the menu walks them for a job (luautils.walkAdj), with room for drift
 --- and client lag. A vehicle `target` adds half its longest side, as the menu walks to one of its
@@ -324,9 +339,10 @@ end
 -- A job's needs are a list of what it takes of the character, each { kind, have, need } and the
 -- field naming it: `perk` (a Perk) for a skill, `tool` (an ItemTag name) and `item` (the tool to
 -- name) for a tool, `item` (a full type) for items counted by type, `input` (an InputScript) for a
--- recipe's input, `recipe` for a recipe to know (have 1 when known); `label` (text) or `labelKey`
--- (a translation key) names it instead. The same list refuses the job and tells the menu what it
--- lacks, so the two can't disagree.
+-- recipe's input, `recipe` for a recipe to know (have 1 when known), `anyOf` (a list of needs) for
+-- one any of them meets (have 1 when one is met); `label` (text) or `labelKey` (a translation key)
+-- names it instead. The same list refuses the job and tells the menu what it lacks, so the two
+-- can't disagree.
 
 --- The first of `needs` the character is short of, or nil when they have them all.
 function RenewableEnergy.firstUnmet(needs)

@@ -140,9 +140,21 @@ local function unlockBox(self, trailer)
     T.waitFor(self, function() return not lidOf(trailer.vehicle):getDoor():isLocked() end, "this client's copy of the unlocked lid")
 end
 
+-- The model a panel shows for each look of RenewableEnergy.crackLookOf.
+local MODEL_OF_LOOK = { light = "LightCracked", heavy = "Cracked" }
+
 -- The model a panel holding a module at `condition` (nil: none) shows.
 local function modelFor(condition)
-    return condition and (RenewableEnergy.ArrowBoard.isCracked(condition) and "Cracked" or "Whole") or ""
+    if not condition then
+        return ""
+    end
+    local look = RenewableEnergy.crackLookOf(MODULE, condition)
+    return look and MODEL_OF_LOOK[look] or "Whole"
+end
+
+-- The condition at a share of the module's ConditionMax, such as a Specs.crackLooks threshold.
+local function conditionAt(share)
+    return math.floor(share * RenewableEnergy.conditionMaxOf(MODULE) + 0.5)
 end
 
 -- A found arrow board: a module on each panel at found conditions, each showing its model, to
@@ -1024,14 +1036,14 @@ end
 
 -- With the mechanics window's way, a cracked panel comes off as its module at the panel's
 -- condition, leaving nothing shown; a module put on shows whole or cracked by its condition
--- (Specs.crackedBelow), to players too.
+-- (Specs.crackLooks), to players too.
 test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
     instant = true,
     run = function(self)
         if not spawnTrailer(self) then return end
         local trailer, p = self.trailer, player()
-        local crackedBelow = RenewableEnergy.Specs.crackedBelow
-        self.offAt, self.onAt = crackedBelow - 1, crackedBelow
+        local looks = RenewableEnergy.Specs.crackLooks
+        self.offAt, self.onAt = conditionAt(looks.heavyBelow) - 1, conditionAt(looks.lightBelow)
         setPartSkills(self, trailer, LEFT, "uninstall")
         if isClient() then
             T.setMechanicsCheat(self, true)
@@ -1089,16 +1101,23 @@ test("renewable_energy_world_arrow_board_panels_name_real_skills", {
 })
 
 -- A crack, from a storm or a crash, takes as much from a panel's module as a storm takes from a
--- module on a mount, and shows it cracked, to players too; a storm cracks a trailer's panels as it
--- would flat panels.
+-- module on a mount, and shows it cracked, to players too: a new module's first crack light, one
+-- that takes a module under half its max heavy; a storm cracks a trailer's panels as it would
+-- flat panels.
 test("renewable_energy_world_arrow_board_panels_crack", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
+        local Specs = RenewableEnergy.Specs
+        self.whole = RenewableEnergy.conditionMaxOf(MODULE)
+        -- Half a crack above the heavy look, so a crack takes it below.
+        self.light = conditionAt(Specs.crackLooks.heavyBelow) + math.floor(Specs.storm.crack / 2)
         batchOnTrailer(function()
-            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = 80 } } })
+            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.whole },
+                [RIGHT] = { type = MODULE, condition = self.light } } })
             T.onVehicle(self, trailer, "arrowBoardCrack", { part = LEFT })
+            T.onVehicle(self, trailer, "arrowBoardCrack", { part = RIGHT })
         end)
         waitForPanelsCopy(self, trailer)
         T.step(function() self.crack = trailer.state end)
@@ -1118,10 +1137,13 @@ test("renewable_energy_world_arrow_board_panels_crack", {
     end,
     validate = function(self)
         local crack = RenewableEnergy.Specs.storm.crack
-        local left = panelCondition(self.crack, LEFT)
-        expect(left == 80 - crack, "a crack left the panel at 80 at " .. tostring(left))
-        expect(panelShown(self.crack, LEFT) == "Cracked", "the cracked panel at " .. tostring(left) .. " shows "
+        local left, right = panelCondition(self.crack, LEFT), panelCondition(self.crack, RIGHT)
+        expect(left == self.whole - crack, "a crack left the panel at " .. self.whole .. " at " .. tostring(left))
+        expect(panelShown(self.crack, LEFT) == "LightCracked", "the new panel cracked to " .. tostring(left) .. " shows "
             .. panelShown(self.crack, LEFT))
+        expect(right == self.light - crack, "a crack left the panel at " .. self.light .. " at " .. tostring(right))
+        expect(panelShown(self.crack, RIGHT) == "Cracked", "the panel cracked to " .. tostring(right) .. " shows "
+            .. panelShown(self.crack, RIGHT))
         expect(self.storm.cracked == 2, "a storm on the lowest rolls cracked " .. self.storm.cracked .. " panels, not both")
         local state = self.storm.state
         expect(panelCondition(state, LEFT) == 100 - crack and panelCondition(state, RIGHT) == 100 - crack,
@@ -1421,7 +1443,8 @@ local function repairTest(name, repaired, fromBelowCap)
             self.to = math.min(sealCap(repaired), self.from + RenewableEnergy.Recipes.MODULE_REPAIR)
             self.epoxyNeeded = sealEpoxyUses()
             setSealSkills(self)
-            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = RenewableEnergy.Specs.crackedBelow } } })
+            self.wholeAt = conditionAt(RenewableEnergy.Specs.crackLooks.lightBelow)
+            T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.wholeAt } } })
             waitForPanelsCopy(self, trailer)
             T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.repairablePanel(trailer.vehicle, LEFT) ~= nil end)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.from, repaired = repaired } } })
@@ -1445,9 +1468,9 @@ local function repairTest(name, repaired, fromBelowCap)
         validate = function(self)
             local left, from, to = self.counts.left, self.from, self.to
             local condition = panelCondition(self.trailer.state, LEFT)
-            expect(not self.wholeRepairable, "a panel at " .. RenewableEnergy.Specs.crackedBelow .. ", not cracked, can be sealed")
+            expect(not self.wholeRepairable, "a panel at " .. self.wholeAt .. ", not cracked, can be sealed")
             expect(condition == to, "the seal took the panel from " .. from .. " to " .. tostring(condition) .. ", expected " .. to)
-            expect(condition < RenewableEnergy.Specs.crackedBelow, "the sealed panel at " .. tostring(condition) .. " shows whole")
+            expect(panelShown(self.trailer.state, LEFT) ~= "Whole", "the sealed panel at " .. tostring(condition) .. " shows whole")
             local sealed = self.trailer.state.panels[LEFT].repaired
             expect(sealed == repaired + 1, "the sealed panel reads repaired " .. tostring(sealed) .. "x, expected " .. repaired + 1)
             expect(left["Base.Screwdriver"] == 1, "the seal used up the screwdriver")

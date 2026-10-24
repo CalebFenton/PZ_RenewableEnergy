@@ -16,6 +16,18 @@ handler("forceRoll", function(_, args, defer)
     return {}
 end)
 
+-- What cutting up the tile `args.sprite` gives the authority's character, where scrapping
+-- completes (ISMoveableSpriteProps.getScrapItemsList): the clicked tile's items, or another tile's
+-- of the same object if `args.otherTile`. Answers the usable items.
+handler("scrapItems", function(player, args)
+    local props = ISMoveableSpriteProps.new(args.sprite)
+    if args.otherTile then
+        props.scrappingMainTile = false
+    end
+    local items = props:getScrapItemsList(player)
+    return { usable = items and items.usable or {} }
+end)
+
 -- The server's record of the bank at `position`, and its tile.
 local function recordAt(position)
     local record = position and RenewableEnergy.PowerBank.serverSystem:getLuaObjectAt(position.x, position.y, position.z)
@@ -39,13 +51,18 @@ local function stateOf(record)
         table.insert(items, { type = item:getFullType(), id = item:getID(), condition = item:getCondition(),
             uses = item:getCurrentUsesFloat() })
     end
+    -- What the status doesn't show of each source's record.
+    local records = {}
+    for _, source in ipairs(record.sources) do
+        table.insert(records, { x = source.x, y = source.y, z = source.z, kind = source.kind, blades = source.blades })
+    end
     return {
         on = record.on == true, name = record.name or "", charge = record.charge,
         lastHour = record.lastHour, age = getGameTime():getWorldAgeHours(), calendarDay = getGameTime():getDay(),
         solarWhToday = record.solarWhToday, loadWhToday = record.loadWhToday,
         storedWh = record.charge * record.nominalWh, nominalWh = record.nominalWh, overloaded = record.overloaded == true,
         cycleDepth = record.cycleDepth, limitW = record:limitW(), drawW = record:drawW(),
-        sources = #record.sources, batteries = #record.batteries,
+        sources = #record.sources, batteries = #record.batteries, records = records,
         activated = bank ~= nil and bank:isActivated(), powered = square ~= nil and square:haveElectricity(),
         items = items, overlays = overlaysOf(bank), status = record:buildStatus(), watchers = Helpers.count(record.watchers),
     }
@@ -107,8 +124,10 @@ end)
 -- RenewableEnergyTest.panel's handler, for any source tile. A panel mount is placed from its item
 -- the way the moveables cursor places it (WorldSpawns.placePanel), carrying `args.modules`. A wind
 -- charger is built in place and a treadmill is vanilla furniture, neither from an item of the mod,
--- so their tile is put down bare; a treadmill's comes wired by its wiring's owner when `args.wired`.
--- Answers whether the source connected and the refusal.
+-- so their tile is put down bare, unless `args.built` builds the charger as its build-menu entity,
+-- as the world builds its finds (RuralFinds.build); its blades come broken when `args.broken`. A
+-- treadmill's comes wired by its wiring's owner when `args.wired`. Answers whether the source
+-- connected and the refusal.
 handler("placePanel", function(player, args, defer)
     local PowerBank, Treadmill, TreadmillSource = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill,
         RenewableEnergy.TreadmillSource
@@ -123,6 +142,8 @@ handler("placePanel", function(player, args, defer)
         if not panel then
             return nil, "a placed " .. args.sprite .. " on the server"
         end
+    elseif args.built then
+        panel = RenewableEnergy.RuralFinds.build(square, args.sprite, RenewableEnergy.Wind.OnCreate)
     else
         panel = IsoObject.new(square, args.sprite, "RenewableEnergy")
         square:AddTileObject(panel)
@@ -131,6 +152,9 @@ handler("placePanel", function(player, args, defer)
         end
         -- As placing does: the mod's OnObjectAdded handlers see the new tile.
         triggerEvent("OnObjectAdded", panel)
+    end
+    if args.broken then
+        RenewableEnergy.WindSource.setBroken(panel, true)
     end
     defer(function()
         if panel:getObjectIndex() ~= -1 then
@@ -196,6 +220,27 @@ handler("roofOver", function(_, args, defer)
         getCell():checkHaveRoof(args.x, args.y)
     end)
     return { outside = squareAt(args):isOutside() }
+end)
+
+-- A ring of `args.sprite` tiles on the eight squares around (x, y) on level `args.level`, the
+-- squares made where that level has none, as building upstairs makes them. Answers how many went
+-- down. Removed when the test ends.
+handler("ringOfTiles", function(_, args, defer)
+    local placed = 0
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            if dx ~= 0 or dy ~= 0 then
+                local x, y = args.x + dx, args.y + dy
+                local square = getSquare(x, y, args.level) or getCell():createNewGridSquare(x, y, args.level, true)
+                if square then
+                    local tile = PZHarness.Fixtures.newTile(square, args.sprite)
+                    defer(function() PZHarness.Fixtures.removePlaced(tile) end)
+                    placed = placed + 1
+                end
+            end
+        end
+    end
+    return { placed = placed }
 end)
 
 -- Banks ------------------------------------------------------------------------------------------

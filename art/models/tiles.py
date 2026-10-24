@@ -29,24 +29,24 @@ def _turned(at, facing):
 WALL_PANEL_HEIGHT = 1.1
 
 
-def _wall(material, facing, cracks=False):
+def _wall(material, facing, cracks=False, light_cracks=False):
     """On the square's north edge facing south, or on its west edge facing east. `cracks` makes the
-    overlay of the cracks in its glass."""
+    overlay of the cracks in its glass, the light ones with `light_cracks`."""
     at = (0, 0.5, WALL_PANEL_HEIGHT) if facing == "S" else (-0.5, 0, WALL_PANEL_HEIGHT)
     turn = FACING_TURN[facing]
     if cracks:
         return [layer(items.solar_wall, holdout=True, material=material, at=at, turn=turn),
-                layer(items.solar_wall, material=material, cracks=True, at=at, turn=turn)]
+                layer(items.solar_wall, material=material, cracks=True, light_cracks=light_cracks, at=at, turn=turn)]
     return [layer(items.solar_wall, material=material, at=at, turn=turn)]
 
 
-def _rack(material, facing, snow=False, cracks=None):
+def _rack(material, facing, snow=False, cracks=None, light_cracks=False):
     """`snow` makes the overlay of the snow on it, `cracks` (a module slot) that of the cracks in
-    one module's glass."""
+    one module's glass, the light ones with `light_cracks`."""
     turn = FACING_TURN[facing]
     if snow or cracks:
         return [layer(items.solar_rack, holdout=True, material=material, turn=turn),
-                layer(items.solar_rack, material=material, snow=snow, cracks=cracks, turn=turn)]
+                layer(items.solar_rack, material=material, snow=snow, cracks=cracks, light_cracks=light_cracks, turn=turn)]
     return [layer(items.solar_rack, material=material, turn=turn)]
 
 
@@ -76,6 +76,7 @@ TILES = {
     15: [layer(items.solar_garden_light, stake=False, lit=True)],
     16: [layer(items.solar_flat, holdout=True), layer(items.solar_flat, snow=True)],
     115: [layer(items.solar_flat, holdout=True), layer(items.solar_flat, cracks=True)],
+    376: [layer(items.solar_flat, holdout=True), layer(items.solar_flat, cracks=True, light_cracks=True)],
 }
 for material, first_wall, first_rack, first_snow in (("metal", 1, 3, 17), ("wood", 21, 24, 28)):
     for offset, facing in enumerate("SE"):
@@ -83,13 +84,15 @@ for material, first_wall, first_rack, first_snow in (("metal", 1, 3, 17), ("wood
     for offset, facing in enumerate("SENW"):
         TILES[first_rack + offset] = _rack(material, facing)
         TILES[first_snow + offset] = _rack(material, facing, snow=True)
-# Cracked glass: a wall panel's per facing, and a rack's per facing and module slot, slot 1 first.
-for material, first_wall, first_rack in (("metal", 116, 120), ("wood", 118, 128)):
-    for offset, facing in enumerate("SE"):
-        TILES[first_wall + offset] = _wall(material, facing, cracks=True)
-    for offset, facing in enumerate("SENW"):
-        for slot in (1, 2):
-            TILES[first_rack + 2 * offset + slot - 1] = _rack(material, facing, cracks=slot)
+# Cracked glass, heavy then light (RenewableEnergy.crackLookOf): a wall panel's per facing, and a
+# rack's per facing and module slot, slot 1 first.
+for light, metal_wall, metal_rack, wood_wall, wood_rack in ((False, 116, 120, 118, 128), (True, 377, 381, 379, 389)):
+    for material, first_wall, first_rack in (("metal", metal_wall, metal_rack), ("wood", wood_wall, wood_rack)):
+        for offset, facing in enumerate("SE"):
+            TILES[first_wall + offset] = _wall(material, facing, cracks=True, light_cracks=light)
+        for offset, facing in enumerate("SENW"):
+            for slot in (1, 2):
+                TILES[first_rack + 2 * offset + slot - 1] = _rack(material, facing, cracks=slot, light_cracks=light)
 
 # Battery storage: the item type, its tile, the first battery overlay of each look in
 # items.BANK_BATTERY_LOOKS' order, and its first meter overlay. Battery overlay n of a look shows a
@@ -214,16 +217,22 @@ for offset, side in enumerate("NESW"):
 # play the game draws its sprite model (items.SPRITE_MODELS) instead, and spins that.
 TILES[264] = [layer(items.scoop_rotor)]
 
-# The propeller and alternator chargers, wooden and pipe propellers first, one tile per facing in
-# Sprites.lua's N, E, S, W order, each its sprite model's first spin step. They stand taller than a
-# tile's sprite can draw, so the tiles show them shrunk to fit, whole; in play the game draws their
-# sprite models at full size.
-WIND_TILE_SCALE = {"Propeller": 0.55, "Alternator": 0.48}
-for first, build, scale, options in ((265, items.propeller_charger, WIND_TILE_SCALE["Propeller"], {"blades": "wood"}),
-                                     (269, items.propeller_charger, WIND_TILE_SCALE["Propeller"], {"blades": "pipe"}),
-                                     (273, items.alternator_charger, WIND_TILE_SCALE["Alternator"], {})):
+# The blade machines, one tile per facing in Sprites.lua's N, E, S, W order, each its sprite
+# model's first spin step: the treadmill wind charger with wooden and pipe blades, the homebuilt
+# wind turbine with steel blades, the treadmill charger with steel blades, then the turbine with
+# wooden and pipe blades, then the car alternator wind charger with each. They stand taller than a
+# tile's sprite can draw, so the tiles show them shrunk to fit, whole; in play the game draws
+# their sprite models at full size.
+WIND_TILE_SCALE = {"Propeller": 0.55, "CarAlternator": 0.55, "Alternator": 0.48}
+WIND_TILES = ((265, items.propeller_charger, "Propeller", "wood"), (269, items.propeller_charger, "Propeller", "pipe"),
+              (273, items.alternator_charger, "Alternator", "steel"), (372, items.propeller_charger, "Propeller", "steel"),
+              (397, items.alternator_charger, "Alternator", "wood"), (401, items.alternator_charger, "Alternator", "pipe"),
+              (405, items.car_alternator_charger, "CarAlternator", "wood"),
+              (409, items.car_alternator_charger, "CarAlternator", "pipe"),
+              (413, items.car_alternator_charger, "CarAlternator", "steel"))
+for first, build, model, blades in WIND_TILES:
     for offset, facing in enumerate("NESW"):
-        TILES[first + offset] = [layer(build, turn=FACING_TURN[facing], scale=scale, **options)]
+        TILES[first + offset] = [layer(build, turn=FACING_TURN[facing], scale=WIND_TILE_SCALE[model], blades=blades)]
 
 # Each tileset's tiles by number.
 TILESETS = {"renewable_energy_01": TILES, "renewable_energy_02": TILES_02}
@@ -239,5 +248,6 @@ BUILD_ICONS = {
     "AdvancedGasifier": [layer(items.gasifier, tier="advanced")],
     "ScoopRotor": [layer(items.scoop_rotor)],
     "Propeller": [layer(items.propeller_charger)],
+    "CarAlternator": [layer(items.car_alternator_charger)],
     "Alternator": [layer(items.alternator_charger)],
 }

@@ -352,8 +352,8 @@ def models_txt(specs, sprite_models):
              " sprite models' models. */"]
     models = [(name + "_Ground", name, name, spec.get("ground_scale", GROUND_SCALE)) for name, spec in specs.items()]
     for name in sprite_models:
-        meshes, textures, _ = items.sprite_model_names(name)
-        models += [(mesh, mesh, textures[0], SPRITE_MESH_SCALE) for mesh in meshes]
+        for texture, meshes in items.sprite_model_names(name)[0]:
+            models += [(mesh, mesh, texture, SPRITE_MESH_SCALE) for mesh in meshes]
     for model, mesh, texture, scale in models:
         lines += ["    model %s" % model, "    {",
                   "        mesh = WorldItems/%s%s," % (PREFIX, mesh),
@@ -367,11 +367,11 @@ def models_txt(specs, sprite_models):
 
 def sprite_models_txt(sprite_models):
     """A spriteModel per skin, yaw and spin step, centred on its square. It names its texture:
-    without one the game draws the model white, and it is how two skins share one mesh."""
+    without one the game draws the model white."""
     lines = ["module RenewableEnergy", "{",
              "    /* Written by art/models/models.py: the sprite models placed objects are drawn as. */"]
     for name in sprite_models:
-        for sprite, mesh, texture, yaw in items.sprite_model_names(name)[2]:
+        for sprite, mesh, texture, yaw in items.sprite_model_names(name)[1]:
             lines += ["    spriteModel %s" % sprite, "    {",
                       "        modelScript = RenewableEnergy.%s," % mesh,
                       "        texture = WorldItems/%s%s," % (PREFIX, texture),
@@ -386,50 +386,46 @@ def sprite_models_txt(sprite_models):
 
 def build_sprite_model(stage, name, spec):
     """Bakes and exports a sprite model about its builder's own origin, the square's centre, which
-    the game turns it about. Each skin builds the same parts in its own materials and bakes onto the
-    first skin's mesh, so the skins share one mesh and its UVs. The ambient occlusion is the first
-    skin's: the parts are the same. No light is painted in, or a model the game turns would turn
-    its lit side with it. Each spin step's mesh is that mesh with the rotor's parts (named with
-    items.ROTOR) turned about the hub's axis, along Y at the spec's "hub" height."""
-    meshes, textures, _ = items.sprite_model_names(name)
+    the game turns it about. Each skin builds its own parts, a mesh and texture of its own: skins
+    differ in shape as well as colour, as the blade sets do. No light is painted in, or a model the
+    game turns would turn its lit side with it. Each spin step's mesh is the skin's mesh with the
+    rotor's parts (named with items.ROTOR) turned about the hub's axis, along Y at the spec's "hub"
+    height."""
     size = SPRITE_MODEL_TEXTURE_SIZE
-    low = occlusion = None
-    for texture, options in zip(textures, (spec.get("skins") or {"": {}}).values()):
+    for (texture, meshes), options in zip(items.sprite_model_names(name)[0], (spec.get("skins") or {"": {}}).values()):
         kit.clear(stage)
         spec["model"](stage, **options)
         bpy.context.view_layer.update()
         parts = [obj for obj in stage.objects if obj.type == "MESH"]
         solid = [obj for obj in parts if not is_decal(obj)]
-        if low is None:
-            low = merge(solid, name, (0, 0, 0))
-            unwrap(low)
-            rotor = [part_name(obj).startswith(items.ROTOR) for obj in solid]
-        high = merge(parts, name + "_Detail", (0, 0, 0))
+        low = merge(solid, texture, (0, 0, 0))
+        unwrap(low)
+        rotor = [part_name(obj).startswith(items.ROTOR) for obj in solid]
+        high = merge(parts, texture + "_Detail", (0, 0, 0))
         stage.hide_render = True
         colour = bake(low, "COLOR", size, "sRGB", source=high)
         high.hide_render = True
-        if occlusion is None:
-            occlusion = bake(low, "AO", size, "Non-Color")[..., :1]
+        occlusion = bake(low, "AO", size, "Non-Color")[..., :1]
         bpy.data.objects.remove(high)
         stage.hide_render = False
         colour[..., :3] *= 0.55 + 0.45 * occlusion
         save_texture(os.path.join(TEXTURE_DIR, PREFIX + texture + ".png"), colour)
-    for mesh, spin in zip(meshes, spec.get("spins", (0,))):
-        piece = low.copy()
-        piece.data = low.data.copy()
-        bpy.context.scene.collection.objects.link(piece)
-        if spin:
-            bm = bmesh.new()
-            bm.from_mesh(piece.data)
-            layer = bm.faces.layers.int["part"]
-            turning = {v for face in bm.faces if rotor[face[layer]] for v in face.verts}
-            bmesh.ops.rotate(bm, verts=list(turning), cent=(0, 0, spec["hub"]), matrix=Matrix.Rotation(math.radians(spin), 3, "Y"))
-            bm.to_mesh(piece.data)
-            bm.free()
-        export(piece, mesh, os.path.join(MESH_DIR, PREFIX + mesh + ".fbx"))
-        print("sprite model %s: %d faces" % (mesh, len(piece.data.polygons)))
-        bpy.data.objects.remove(piece)
-    bpy.data.objects.remove(low)
+        for mesh, spin in zip(meshes, spec.get("spins", (0,))):
+            piece = low.copy()
+            piece.data = low.data.copy()
+            bpy.context.scene.collection.objects.link(piece)
+            if spin:
+                bm = bmesh.new()
+                bm.from_mesh(piece.data)
+                layer = bm.faces.layers.int["part"]
+                turning = {v for face in bm.faces if rotor[face[layer]] for v in face.verts}
+                bmesh.ops.rotate(bm, verts=list(turning), cent=(0, 0, spec["hub"]), matrix=Matrix.Rotation(math.radians(spin), 3, "Y"))
+                bm.to_mesh(piece.data)
+                bm.free()
+            export(piece, mesh, os.path.join(MESH_DIR, PREFIX + mesh + ".fbx"))
+            print("sprite model %s: %d faces" % (mesh, len(piece.data.polygons)))
+            bpy.data.objects.remove(piece)
+        bpy.data.objects.remove(low)
 
 
 def clear_stale(folders):

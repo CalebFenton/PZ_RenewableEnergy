@@ -597,7 +597,7 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
         self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, POWER_INVERTER }, { connected = false })
         if not self.bank then return end
         self.panel = T.panel(self, Sprites.flat, { near = self.bank })
-        self.charger = self.panel and T.panel(self, Sprites.windPropeller.wood.S, { near = self.bank })
+        self.charger = self.panel and T.panel(self, Sprites.windCharger.propeller.wood.S, { near = self.bank })
         if not self.charger then return end
         T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE },
             { type = "RenewableEnergy.WoodenBlades" } })

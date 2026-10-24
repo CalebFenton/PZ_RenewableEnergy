@@ -273,8 +273,8 @@ local LAYOUTS = {
     wind = {
         open = { along = { -1, 8 }, out = { -1, 8 }, sum = 6, half = 3 },
         chargers = {
-            { 0, 6, sprite = Sprites.windScoop }, { 2, 4, sprite = Sprites.windPropeller.wood.S },
-            { 4, 2, sprite = Sprites.windPropeller.pipe.S }, { 6, 0, sprite = Sprites.windAlternator.S },
+            { 0, 6, sprite = Sprites.windScoop }, { 2, 4, sprite = Sprites.windCharger.propeller.wood.S },
+            { 4, 2, sprite = Sprites.windCharger.carAlternator.pipe.S }, { 6, 0, sprite = Sprites.windCharger.alternator.steel.S },
         },
         player = { 2, 6 },
         scout = { 4, 5 },
@@ -1144,7 +1144,7 @@ local function buildHomestead()
     -- gas kit on the insulated digester beside it.
     local generator = placeKittedGenerator(home, HOMESTEAD)
     Stage.placeTile(generator:getSquare(), Sprites.failsafe)
-    shown.homesteadCharger = placeWindCharger(at(home, HOMESTEAD.windCharger), Sprites.windPropeller.wood[home.frame.facing])
+    shown.homesteadCharger = placeWindCharger(at(home, HOMESTEAD.windCharger), Sprites.windCharger.propeller.wood[home.frame.facing])
     connect(homesteadBank, shown.homesteadCharger)
     setBankOn(homesteadBank, true)
     switchOnLights(homesteadBank:getSquare(), at(places.stage0, STAGE0.box))
@@ -1654,7 +1654,7 @@ local function buildPoster()
     fillBank(posterBank, HOMESTEAD_BANK, 1)
     placePanels(posterBank, poster, POSTER.racks, "rack")
     placePanels(posterBank, poster, POSTER.flatPanels)
-    connect(posterBank, placeWindCharger(at(poster, POSTER.windCharger), Sprites.windPropeller.wood[poster.frame.facing]))
+    connect(posterBank, placeWindCharger(at(poster, POSTER.windCharger), Sprites.windCharger.propeller.wood[poster.frame.facing]))
     placeKittedGenerator(poster, POSTER)
     for _, bank in ipairs({ homesteadBank, stage0Box }) do
         setBankOn(bank, false)

@@ -183,7 +183,9 @@ function Commands.setBrake(player, args)
 end
 
 --- Puts the blades `itemId` from the player's inventory on the wind charger at `args.source`,
---- whose blades a storm broke. Its bank's record, if it feeds one, mends with the object.
+--- whose blades a storm broke, and hands the player what is left of the broken ones. Blades of
+--- another material its kind takes make it a charger of those (WindSource.fitBlades). Its bank's
+--- record, if it feeds one, mends with the object.
 function Commands.replaceBlades(player, args)
     local object = sourceAt(args.source)
     if not (object and Wind.isCharger(object)) then return false, "no wind charger" end
@@ -196,8 +198,11 @@ function Commands.replaceBlades(player, args)
     local item = type(args.itemId) == "number" and player:getInventory():getItemWithIDRecursiv(args.itemId) or nil
     local refusal = Wind.bladesRefusal(object, item)
     if refusal then return false, refusal end
+    local broke = Specs.wind.blades[Wind.bladesOfObject(object)]
     RenewableEnergy.takeItem(player, item)
+    WindSource.fitBlades(object, Wind.bladesOfItem(Sources.kindOf(object), item), source)
     WindSource.setBroken(object, false, source)
+    RenewableEnergy.giveItems(player, broke.broken)
     if bank then
         bank:sendStatus()
     end

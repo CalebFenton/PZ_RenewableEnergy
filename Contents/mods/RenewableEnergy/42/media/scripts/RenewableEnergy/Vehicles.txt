@@ -54,6 +54,13 @@ module Base
         invertX = false,
         scale = 1.0,
     }
+    model RenewableEnergyArrowBoardTrailerPanelLeftLightCracked
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeftLightCracked,
+        shader = vehicle_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
     model RenewableEnergyArrowBoardTrailerPanelRight
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRight,
@@ -64,6 +71,13 @@ module Base
     model RenewableEnergyArrowBoardTrailerPanelRightCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRightCracked,
+        shader = vehicle_multiuv_noreflect,
+        invertX = false,
+        scale = 1.0,
+    }
+    model RenewableEnergyArrowBoardTrailerPanelRightLightCracked
+    {
+        mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRightLightCracked,
         shader = vehicle_multiuv_noreflect,
         invertX = false,
         scale = 1.0,
@@ -353,6 +367,10 @@ module Base
             {
                 file = RenewableEnergyArrowBoardTrailerPanelLeft,
             }
+            model LightCracked
+            {
+                file = RenewableEnergyArrowBoardTrailerPanelLeftLightCracked,
+            }
             model Cracked
             {
                 file = RenewableEnergyArrowBoardTrailerPanelLeftCracked,
@@ -366,14 +384,18 @@ module Base
             {
                 file = RenewableEnergyArrowBoardTrailerPanelRight,
             }
+            model LightCracked
+            {
+                file = RenewableEnergyArrowBoardTrailerPanelRightLightCracked,
+            }
             model Cracked
             {
                 file = RenewableEnergyArrowBoardTrailerPanelRightCracked,
             }
         }
         /* The two panels hold a Solar Module each; the part's condition is the module's. Lua shows
-           the Whole or the Cracked model by that condition (RenewableEnergy.ArrowBoard), so the
-           game mustn't show both whenever a module is installed. specificItem = false keeps the
+           the Whole, LightCracked or Cracked model by that condition (RenewableEnergy.ArrowBoard), so
+           the game mustn't show them all whenever a module is installed. specificItem = false keeps the
            module types as written (see the frame). A pattern only reaches parts already declared,
            so this comes after them. */
         part RenewableEnergyPanel*

@@ -323,8 +323,9 @@ local SOURCE_NAMES = {
     rackwood = "IGUI_RenewableEnergy_MountRackWood",
     rackmetal = "IGUI_RenewableEnergy_MountRackMetal",
     scoop = "IGUI_RenewableEnergy_WindScoop",
-    propeller = "IGUI_RenewableEnergy_WindPropeller",
-    alternator = "IGUI_RenewableEnergy_WindAlternator",
+    propeller = "IGUI_RenewableEnergy_WindTreadmill",
+    carAlternator = "IGUI_RenewableEnergy_WindCarAlternator",
+    alternator = "IGUI_RenewableEnergy_WindTurbine",
     treadmill = "IGUI_RenewableEnergy_Treadmill",
 }
 
@@ -339,9 +340,11 @@ local REASONS = {
     noController = { key = "IGUI_RenewableEnergy_ReasonNoController", fixable = true },
     braked = { key = "IGUI_RenewableEnergy_ReasonBraked", fixable = true },
     broken = { key = "IGUI_RenewableEnergy_ReasonBroken", fixable = true },
+    gale = { key = "IGUI_RenewableEnergy_ReasonGale", fixable = true },
     calm = { key = "IGUI_RenewableEnergy_ReasonCalm" },
     furled = { key = "IGUI_RenewableEnergy_ReasonFurled" },
     sheltered = { key = "IGUI_RenewableEnergy_ReasonSheltered", fixable = true },
+    crowded = { key = "IGUI_RenewableEnergy_ReasonCrowded", fixable = true },
     idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }
 

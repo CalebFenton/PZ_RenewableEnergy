@@ -167,7 +167,7 @@ RuralFinds.FINDS = {
         fits = inTheOpen,
         -- The old farm wind charger, its wooden blades long broken and its brake set.
         place = function(square)
-            local charger = build(square, randomOf(Sprites.windPropeller.wood), Wind.OnCreate)
+            local charger = build(square, randomOf(Sprites.windCharger.propeller.wood), Wind.OnCreate)
             -- After the clients have the charger: the setters send its modData, which names it by
             -- its index on the square.
             local WindSource = RenewableEnergy.WindSource

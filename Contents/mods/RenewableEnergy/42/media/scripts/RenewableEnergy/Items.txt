@@ -555,7 +555,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag4_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_PropellerPipe;RenewableEnergy_AlternatorWindCharger;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator,
+        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_PropellerPipe;RenewableEnergy_PropellerSteel;RenewableEnergy_CarAlternatorWood;RenewableEnergy_CarAlternatorPipe;RenewableEnergy_CarAlternatorSteel;RenewableEnergy_TurbineWood;RenewableEnergy_TurbinePipe;RenewableEnergy_AlternatorWindCharger;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }
@@ -670,7 +670,7 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
-    /* A propeller wind charger's blades: carved from planks, or cut from plastic pipe. A spare set mends a storm-broken one. */
+    /* A wind charger's blades: carved from planks, or cut from plastic pipe. Every bladed charger takes any blades, and a spare set mends one a storm broke whatever blades it had. */
     item WoodenBlades
     {
         DisplayCategory = Material,
@@ -678,7 +678,7 @@ module RenewableEnergy
         Weight = 3.0,
         Icon = RenewableEnergy_WoodenBlades,
         WorldStaticModel = RenewableEnergy.WoodenBlades_Ground,
-        Tooltip = Tooltip_RenewableEnergy_PropellerBlades,
+        Tooltip = Tooltip_RenewableEnergy_Blades,
         Tags = base:ignorezombiedensity,
     }
 
@@ -689,11 +689,13 @@ module RenewableEnergy
         Weight = 2.0,
         Icon = RenewableEnergy_PipeBlades,
         WorldStaticModel = RenewableEnergy.PipeBlades_Ground,
-        Tooltip = Tooltip_RenewableEnergy_PropellerBlades,
+        Tooltip = Tooltip_RenewableEnergy_Blades,
         Tags = base:ignorezombiedensity,
     }
 
-    /* The homemade alternator wind charger's blades, forged from sheet steel. */
+    /* Blades forged from sheet steel, for any bladed wind charger. They
+       melt down as large steel, the size of the one sheet they were forged from, so melting never
+       gives back more steel than went in. */
     item SteelBlades
     {
         DisplayCategory = Material,
@@ -702,7 +704,45 @@ module RenewableEnergy
         Icon = RenewableEnergy_SteelBlades,
         WorldStaticModel = RenewableEnergy.SteelBlades_Ground,
         Tooltip = Tooltip_RenewableEnergy_SteelBlades,
-        Tags = base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:smeltablesteellarge,
+    }
+
+    /* What Replace Blades hands back of the blades a storm broke. Wood burns: vanilla's fires take
+       any item tagged base:isfirefuel (ISCampingMenu.isValidFuel), for weight-based hours, as they
+       take UnusableWood. */
+    item BrokenWoodenBlades
+    {
+        DisplayCategory = Junk,
+        ItemType = base:normal,
+        Weight = 2.0,
+        Icon = RenewableEnergy_BrokenWoodenBlades,
+        WorldStaticModel = RenewableEnergy.BrokenWoodenBlades_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BrokenWoodenBlades,
+        Tags = base:isfirefuel;base:ignorezombiedensity,
+    }
+
+    item BrokenPipeBlades
+    {
+        DisplayCategory = Junk,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = RenewableEnergy_BrokenPipeBlades,
+        WorldStaticModel = RenewableEnergy.BrokenPipeBlades_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BrokenPipeBlades,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /* Broken steel melts down a size smaller than whole blades, as vanilla's broken sword blade
+       (SwordBlade_Broken) does against a whole one. */
+    item BrokenSteelBlades
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 4.0,
+        Icon = RenewableEnergy_BrokenSteelBlades,
+        WorldStaticModel = RenewableEnergy.BrokenSteelBlades_Ground,
+        Tooltip = Tooltip_RenewableEnergy_BrokenSteelBlades,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:smeltablesteelmediumplus,
     }
 
     /* An axial-flux alternator built on a car's brake hub, with speaker magnets and hand-wound coils. */
@@ -714,6 +754,22 @@ module RenewableEnergy
         Icon = RenewableEnergy_HomemadeAlternator,
         WorldStaticModel = RenewableEnergy.HomemadeAlternator_Ground,
         Tooltip = Tooltip_RenewableEnergy_HomemadeAlternator,
+        Tags = base:hasmetal;base:ignorezombiedensity,
+    }
+
+    /*
+        A car's own alternator (RenewableEnergy.CarAlternator), taken out of a car or cut from a
+        smashed wreck: the generator of the car alternator wind charger. About as heavy as a real
+        one.
+    */
+    item CarAlternator
+    {
+        DisplayCategory = VehicleMaintenance,
+        ItemType = base:normal,
+        Weight = 5.0,
+        Icon = RenewableEnergy_CarAlternator,
+        WorldStaticModel = RenewableEnergy.CarAlternator_Ground,
+        Tooltip = Tooltip_RenewableEnergy_CarAlternator,
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 

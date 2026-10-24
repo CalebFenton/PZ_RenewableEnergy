@@ -442,8 +442,8 @@ module Base
 
     /**************************** Solar modules *****************************/
 
-    /* Epoxy over the cracks keeps the water out. The glass stays cracked, so the module still
-       shows cracked; new glass is Reglaze Module. */
+    /* Epoxy or glue over the cracks keeps the water out. The glass stays cracked, so the module
+       still shows cracked; new glass is Reglaze Module. */
     craftRecipe RenewableEnergy_RepairCrackedModule
     {
         timedAction = MakingElectrical,
@@ -461,8 +461,39 @@ module Base
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
-            /* Epoxy only: vanilla's white glue isn't waterproof. */
             item 1 [Base.Epoxy],
+        }
+        outputs
+        {
+        }
+    }
+
+    /* Seal Cracked Module with glue in place of epoxy. A recipe of its own, as vanilla has
+       FixWithGlue beside FixWithEpoxy (recipes_fixing.txt): no one line takes either adhesive
+       exactly, since [Base.Epoxy;2:Base.Glue] takes 1 use of glue and [Base.Glue;1:Base.Epoxy]
+       refuses a last use of epoxy (DEVELOPMENT.md, craftRecipe). MetaRecipe makes it known
+       whenever Seal Cracked Module is, so what teaches that teaches this, in older saves too. Keep
+       everything but the glue as Seal Cracked Module has it: the jobs in place take their skill,
+       time and XP from that one (Recipes.lua). */
+    craftRecipe RenewableEnergy_RepairCrackedModuleWithGlue
+    {
+        timedAction = MakingElectrical,
+        time = 120,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        MetaRecipe = RenewableEnergy_RepairCrackedModule,
+        AutoLearnAny = Electricity:3,
+        SkillRequired = Electricity:2,
+        xpAward = Electricity:10,
+        Tooltip = Tooltip_RenewableEnergy_RepairCrackedModule,
+        OnTest = RenewableEnergy.Recipes.isModuleBelowRepairCap,
+        OnCreate = RenewableEnergy.Recipes.repairModule,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
+            item 2 [Base.Glue],
         }
         outputs
         {
@@ -1247,7 +1278,7 @@ module Base
 
     /******************************* Wind chargers ********************************/
 
-    /* Propeller blades carved from planks, each a long twisted airfoil. Taught by Homestead
+    /* Wind charger blades carved from planks, each a long twisted airfoil. Taught by Homestead
        Power #4. */
     craftRecipe RenewableEnergy_CarveWoodenBlades
     {
@@ -1272,7 +1303,7 @@ module Base
     }
 
     /* Blades sawn from a length of plastic pipe: a curved airfoil for free, the quick way
-       to a propeller. */
+       to a wind charger. */
     craftRecipe RenewableEnergy_CutPipeBlades
     {
         timedAction = Making,
@@ -1294,7 +1325,9 @@ module Base
         }
     }
 
-    /* Steel blades hammered out of sheet steel at a forge, for the homemade alternator. */
+    /* Steel blades hammered out of sheet steel at a forge, for any bladed wind charger. Its
+       skill is that of vanilla's own sheet-steel work at the forge
+       (recipes_blacksmith_ii.txt): this is no finer. */
     craftRecipe RenewableEnergy_ForgeSteelBlades
     {
         timedAction = HammerMetalStanding,
@@ -1302,8 +1335,8 @@ module Base
         Tags = Forge,
         category = Blacksmithing,
         NeedToBeLearn = true,
-        AutoLearnAll = Blacksmith:8,
-        SkillRequired = Blacksmith:6,
+        AutoLearnAll = Blacksmith:5,
+        SkillRequired = Blacksmith:3,
         xpAward = Blacksmith:30,
         inputs
         {

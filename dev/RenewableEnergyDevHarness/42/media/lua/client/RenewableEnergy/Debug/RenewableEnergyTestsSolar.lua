@@ -333,14 +333,13 @@ test("renewable_energy_solar_storms_crack_under_the_chance", {
     end,
 })
 
--- A crack reaches the panel's own record and its tile in the same bank pass: a whole-looking
--- panel cracked below Specs.crackedBelow shows cracks, on this client too.
+-- A crack reaches the panel's own record and its tile in the same bank pass: a new panel's first
+-- crack shows light cracks, on this client too.
 test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.5 })
-        -- Half a crack above the cracked look, so a crack takes it below.
-        local whole = Specs.crackedBelow + math.floor(Specs.storm.crack / 2)
+        local whole = RenewableEnergy.conditionMaxOf(FACTORY)
         self.crackedTo = whole - Specs.storm.crack
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole), connect = true })
         if not panel then return end
@@ -362,8 +361,69 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
         expectNear("the panel's recorded condition after a crack", modules and modules[1] and modules[1].condition, self.crackedTo, 0)
         expectNear("this client's copy of the panel's recorded condition", recordedCondition(self.panel.object), self.crackedTo, 0)
         local after = table.concat(self.server.panelState.overlays, ",")
-        expect(after == Sprites.cracks.flat, "the storm-cracked panel shows '" .. after .. "'")
+        expect(after == Sprites.cracks.light.flat, "the storm-cracked panel shows '" .. after .. "'")
         expect(self.copyOverlays == after, "this client's copy of the storm-cracked panel shows '" .. tostring(self.copyOverlays) .. "'")
+    end,
+})
+
+-- What a flat panel shows of a module through its life (Sprites.crackOverlays): whole when new,
+-- light cracks from the first storm crack until under half its ConditionMax, heavy cracks below,
+-- light once sealed (where Seal Cracked Module takes it) and whole once reglazed; a homemade
+-- module the same by its own max. Each row: the module, how many storm cracks it took from new,
+-- and what it shows then.
+local LIFE_LOOKS = {
+    { FACTORY, 0, nil },
+    { FACTORY, 1, "light" },
+    { FACTORY, 2, "light" },
+    { FACTORY, 3, "heavy" },
+    { HOMEMADE, 0, nil },
+    { HOMEMADE, 1, "light" },
+    { HOMEMADE, 2, "heavy" },
+}
+test("renewable_energy_solar_crack_looks_follow_the_module", {
+    run = function(self)
+        local function shows(record)
+            return table.concat(Sprites.crackOverlays("flat", nil, nil, { record }), ",")
+        end
+        self.rows = {}
+        local function reglazed(record)
+            local glass = Recipes.reglazedCondition(record.type, record.condition, record.repaired)
+            return shows({ type = record.type, condition = math.max(record.condition, glass) })
+        end
+        for _, row in ipairs(LIFE_LOOKS) do
+            local module, cracks = row[1], row[2]
+            local condition = RenewableEnergy.conditionMaxOf(module) - cracks * Specs.storm.crack
+            local record = { type = module, condition = condition, repaired = 0 }
+            local sealed, sealedReglazed = nil, nil
+            if Recipes.canSealRecord(record) then
+                local copy = { type = module, condition = condition, repaired = 0 }
+                Recipes.sealRecord(copy)
+                sealed, sealedReglazed = shows(copy), reglazed(copy)
+            end
+            table.insert(self.rows, { row = row, condition = condition, cracked = shows(record), sealed = sealed,
+                reglazed = reglazed(record), sealedReglazed = sealedReglazed })
+        end
+    end,
+    validate = function(self)
+        for _, result in ipairs(self.rows) do
+            local module, cracks, look = result.row[1], result.row[2], result.row[3]
+            local what = module .. " at " .. result.condition .. " after " .. cracks .. " cracks"
+            local expected = look and Sprites.cracks[look].flat or ""
+            expect(result.cracked == expected, what .. " shows '" .. result.cracked .. "', expected '" .. expected .. "'")
+            if result.sealed then
+                expect(result.sealed == Sprites.cracks.light.flat, what .. ", sealed once, shows '" .. result.sealed .. "'")
+            end
+            expect(result.reglazed == "", what .. ", reglazed, shows '" .. result.reglazed .. "'")
+            if result.sealedReglazed then
+                expect(result.sealedReglazed == "", what .. ", sealed then reglazed, shows '" .. result.sealedReglazed .. "'")
+            end
+        end
+        -- Rows whose modules Seal Cracked Module takes, so the sealed look above was tested.
+        local sealedRows = 0
+        for _, result in ipairs(self.rows) do
+            sealedRows = sealedRows + (result.sealed and 1 or 0)
+        end
+        expect(sealedRows >= 2, "only " .. sealedRows .. " rows could be sealed")
     end,
 })
 
@@ -746,7 +806,9 @@ test("renewable_energy_solar_disconnect_panel", {
 -- Seal Cracked Module, chosen from a connected rack's menu, seals the one cracked module still on
 -- its mount as the recipe seals one in hand: up to its cap, lowered by the seal it already had,
 -- counting the seal and still showing cracked. The whole module isn't offered, and the bank's
--- record takes the sealed module at once.
+-- record takes the sealed module at once. Its tooltip names both adhesives, and with both
+-- carried the seal takes the glue twin's uses of glue and leaves the epoxy (Recipes.lua,
+-- MODULE_REPAIR_RECIPES).
 test("renewable_energy_solar_seal_module_in_place", {
     instant = true,
     run = function(self)
@@ -758,7 +820,7 @@ test("renewable_energy_solar_seal_module_in_place", {
         if not self.panel then return end
         local bank = self.bank
         T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
-        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
         T.step(function()
             local context = T.newContext()
             local menu = Menu.addSourceOptions(0, context, self.panel.object)
@@ -775,6 +837,7 @@ test("renewable_energy_solar_seal_module_in_place", {
             end, "this client's copy of the sealed module")
             T.server(self, "panelState", self.panel.position)
             T.bankState(self, bank)
+            T.readCarried(self, { "Base.Glue", "Base.Epoxy" })
         end)
     end,
     validate = function(self)
@@ -789,6 +852,15 @@ test("renewable_energy_solar_seal_module_in_place", {
         expect(#self.server.panelState.overlays > 0, "the sealed module shows whole")
         local listed = self.bank.state.status.sources[1]
         expectNear("the bank's record of the sealed module", listed and listed.modules[2].condition, self.to, 0)
+        for _, adhesive in ipairs({ "Base.Glue", "Base.Epoxy" }) do
+            expect(tostring(self.offered.reason):find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
+                "the seal's tooltip doesn't name " .. adhesive .. ": " .. tostring(self.offered.reason))
+        end
+        -- One full tube of each was given; "carried" reads the fraction of it left.
+        local glue, epoxy = T.carriedFirst(self, "Base.Glue"), T.carriedFirst(self, "Base.Epoxy")
+        expectNear("the glue left of a full tube", glue and glue.uses or 0,
+            1 - 2 * getScriptManager():FindItem("Base.Glue"):getUseDelta(), 0.001)
+        expectNear("the epoxy left of a full tube", epoxy and epoxy.uses or 0, 1, 0.001)
     end,
 })
 
@@ -1181,7 +1253,7 @@ for _, entry in ipairs(MODULE_REPAIRS) do
             expect(item.condition == after, "the module is at " .. item.condition .. ", expected " .. after)
             expect(item.repaired == repairedAfter, "the module reads repaired " .. item.repaired .. "x, expected " .. repairedAfter)
             -- The seal leaves the glass cracked, and the module showing it.
-            expect(item.condition < Specs.crackedBelow, "a sealed module shows whole")
+            expect(RenewableEnergy.crackLookOf(module, item.condition) ~= nil, "a sealed module shows whole")
             if refused then
                 expect(self.refusal ~= nil, "the game would start the seal")
             end
@@ -1189,23 +1261,57 @@ for _, entry in ipairs(MODULE_REPAIRS) do
     })
 end
 
--- Reglaze Module sets a module below what new glass brings it to, and is refused there with the
+-- Seal Cracked Module and its glue twin each take exactly their adhesive's uses, which a line
+-- scaling one adhesive against the other gets wrong (DEVELOPMENT.md, craftRecipe).
+-- Each row: the behaviour, the recipe, its adhesive, and the uses of it a seal takes.
+local SEAL_ADHESIVES = {
+    { "takes_one_use_of_epoxy", "RenewableEnergy_RepairCrackedModule", "Base.Epoxy", 1 },
+    { "takes_two_uses_of_glue", "RenewableEnergy_RepairCrackedModuleWithGlue", "Base.Glue", 2 },
+}
+for _, entry in ipairs(SEAL_ADHESIVES) do
+    local behavior, recipe, adhesive, uses = entry[1], entry[2], entry[3], entry[4]
+    craftTest(craftName(recipe, behavior), {
+        recipe = recipe,
+        from = FACTORY,
+        prefer = { FACTORY },
+        setup = function(self)
+            T.changeItem(self, T.inputsOf(self, FACTORY)[1], { condition = sealLimit(FACTORY, 0) - Recipes.MODULE_REPAIR - 1 })
+        end,
+        counts = { [FACTORY] = 1 },
+        after = function(self) T.readCarried(self, { adhesive }) end,
+        validate = function(self)
+            -- T.recipeInputs gave one full tube; "carried" reads the fraction of it left.
+            local tube = T.carriedFirst(self, adhesive)
+            local left = 1 - uses * getScriptManager():FindItem(adhesive):getUseDelta()
+            expectNear("the " .. adhesive .. " left of a full tube", tube and tube.uses or 0, left, 0.001)
+        end,
+    })
+end
+
+-- Reglaze Module brings a module below what new glass brings it to, and is refused there with the
 -- module and the pane untouched; it teaches Glassmaking, and the new glass clears the old seals.
--- Each row: the behaviour, the module, its condition and seal count before, and whether the game
--- refuses.
-local REGLAZE = Recipes.REGLAZE
-local function cracked(module) return math.floor(REGLAZE[module] / 4) end
+-- New glass on light cracks brings a module back to new; on heavy cracks, or on a sealed module, to
+-- the cells-cracked share of new. Each row: the behaviour, the module, its condition and seal count
+-- before, the condition after, and whether the game refuses.
+local REGLAZE, LOOKS = Recipes.REGLAZE, Specs.crackLooks
+local function share(module, part) return math.floor(RenewableEnergy.conditionMaxOf(module) * part) end
+local function heavy(module) return share(module, LOOKS.heavyBelow) - 1 end
+local function light(module) return share(module, (LOOKS.heavyBelow + LOOKS.lightBelow) / 2) end
+local function new(module) return share(module, REGLAZE.glassOnly) end
+local function cellsCracked(module) return share(module, REGLAZE.cellsCracked) end
 local REGLAZES = {
-    { "factory_cracked_set_to_new_glass", FACTORY, cracked(FACTORY), 0 },
-    { "factory_sealed_three_times_clears_seals", FACTORY, cracked(FACTORY), 3 },
-    { "factory_just_below_set_to_new_glass", FACTORY, REGLAZE[FACTORY] - 1, 0 },
-    { "factory_at_new_glass_refused", FACTORY, REGLAZE[FACTORY], 0, true },
-    { "homemade_cracked_set_to_new_glass", HOMEMADE, cracked(HOMEMADE), 0 },
-    { "homemade_at_new_glass_refused", HOMEMADE, REGLAZE[HOMEMADE], 0, true },
+    { "factory_heavy_cracks_cells_stay_cracked", FACTORY, heavy(FACTORY), 0, cellsCracked(FACTORY) },
+    { "factory_light_cracks_back_to_new", FACTORY, light(FACTORY), 0, new(FACTORY) },
+    { "factory_sealed_three_times_clears_seals", FACTORY, light(FACTORY), 3, cellsCracked(FACTORY) },
+    { "factory_just_below_new_back_to_new", FACTORY, new(FACTORY) - 1, 0, new(FACTORY) },
+    { "factory_at_new_refused", FACTORY, new(FACTORY), 0, new(FACTORY), true },
+    { "homemade_heavy_cracks_cells_stay_cracked", HOMEMADE, heavy(HOMEMADE), 0, cellsCracked(HOMEMADE) },
+    { "homemade_light_cracks_back_to_new", HOMEMADE, light(HOMEMADE), 0, new(HOMEMADE) },
+    { "homemade_at_new_refused", HOMEMADE, new(HOMEMADE), 0, new(HOMEMADE), true },
 }
 for _, entry in ipairs(REGLAZES) do
-    local behavior, module, before, repaired, refused = entry[1], entry[2], entry[3], entry[4], entry[5]
-    local after = refused and before or REGLAZE[module]
+    local behavior, module, before, repaired, reglazed, refused = entry[1], entry[2], entry[3], entry[4], entry[5], entry[6]
+    local after = refused and before or reglazed
     local repairedAfter = refused and repaired or 0
     craftTest(craftName("RenewableEnergy_ReglazeModule", behavior), {
         recipe = "RenewableEnergy_ReglazeModule",
@@ -1232,7 +1338,7 @@ for _, entry in ipairs(REGLAZES) do
             if refused then
                 expect(self.refusal ~= nil, "the game would start the reglaze")
             else
-                expect(item.condition >= Specs.crackedBelow, "a reglazed module shows cracked")
+                expect(RenewableEnergy.crackLookOf(module, item.condition) == nil, "a reglazed module shows cracked")
                 local xp = self.server and self.server.perkXp
                 expect(xp and self.glassmakingBefore and xp.value > self.glassmakingBefore, "reglazing taught no Glassmaking")
             end
@@ -1284,6 +1390,70 @@ test("renewable_energy_solar_storms_chance_by_hours_and_rate", {
         expectNear("10% an hour over two hours at rate 200", self.doubled[1], 0.36, 1e-9)
         expectNear("60% an hour over an hour at rate 200", self.doubled[2], 1, 1e-9)
         expectNear("10% an hour over two hours with Storm Damage off", self.off, 0, 0)
+    end,
+})
+
+-- The longest run of thunderstorms the game makes: a tropical storm of up to 24 hours and the two
+-- storms of up to 10 hours each that can follow it (WeatherPeriod.createWeatherPattern).
+local LONGEST_THUNDER_HOURS = 24 + 2 * 10
+
+-- Storm strength (Chance.stormStrength) is none up to where the damage starts, the square of the
+-- way from there to the game's strongest wind, and all of it from there on. The worst the game
+-- blows, Specs.storm worstHours at full strength at the default rate, breaks the weakest blades
+-- with worstChance and no others any more often, and in any wind that can break both, weaker
+-- blades are likelier to break than stronger ones. The longest run of thunderstorms cracks a
+-- module of no panel more often than that either.
+test("renewable_energy_solar_storms_worst_case_rule", {
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
+    run = function(self)
+        local Chance, storm = RenewableEnergy.Chance, Specs.storm
+        T.step(function()
+            local from = storm.fullKph / 2
+            self.strengths = { Chance.stormStrength(from, from), Chance.stormStrength(from, (from + storm.fullKph) / 2),
+                Chance.stormStrength(from, storm.fullKph), Chance.stormStrength(from, storm.fullKph * 2) }
+            self.blades = {}
+            for material, spec in pairs(Specs.wind.blades) do
+                self.blades[material] = Chance.stormDamage(Chance.stormPerHour(spec.stormShare),
+                    storm.worstHours * Chance.stormStrength(spec.breakKph, storm.fullKph))
+            end
+            self.order = {}
+            for kph = Specs.wind.blades.pipe.breakKph + 1, storm.fullKph do
+                local hourly = {}
+                for material, spec in pairs(Specs.wind.blades) do
+                    hourly[material] = Chance.stormPerHour(spec.stormShare) * Chance.stormStrength(spec.breakKph, kph)
+                end
+                if not (hourly.pipe > hourly.wood or hourly.wood == 0) or not (hourly.wood > hourly.steel or hourly.steel == 0) then
+                    table.insert(self.order, string.format("%d km/h: pipe %g, wood %g, steel %g", kph, hourly.pipe, hourly.wood, hourly.steel))
+                end
+            end
+        end)
+        self.mounts = { "flat", "wall", "woodRack", "metalRack" }
+        local trials = {}
+        for i, mount in ipairs(self.mounts) do
+            trials[i] = stormTrial(mount, LONGEST_THUNDER_HOURS)
+        end
+        self.chances = {}
+        stormChances(self, "longest", trials)
+    end,
+    validate = function(self)
+        local storm = Specs.storm
+        expectNear("storm strength where the damage starts", self.strengths[1], 0, 0)
+        expectNear("storm strength halfway to the strongest wind", self.strengths[2], 0.25, 1e-9)
+        expectNear("storm strength at the strongest wind", self.strengths[3], 1, 1e-9)
+        expectNear("storm strength past the strongest wind", self.strengths[4], 1, 1e-9)
+        local highest = 0
+        for material, chance in pairs(self.blades) do
+            expect(chance <= storm.worstChance + 1e-9,
+                string.format("%s blades break in the worst storm with %g, past %g", material, chance, storm.worstChance))
+            highest = math.max(highest, chance)
+        end
+        expectNear("the weakest blades' chance in the worst storm", highest, storm.worstChance, 1e-9)
+        expect(#self.order == 0, "stronger blades are as likely to break: " .. table.concat(self.order, "; "))
+        for i, mount in ipairs(self.mounts) do
+            local chance = self.chances.longest[i]
+            expect(chance <= storm.worstChance, string.format("the longest thunderstorms crack a %s panel with %g, past %g",
+                mount, chance, storm.worstChance))
+        end
     end,
 })
 

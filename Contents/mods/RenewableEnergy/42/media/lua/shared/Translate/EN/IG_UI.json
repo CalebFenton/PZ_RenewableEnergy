@@ -192,12 +192,19 @@
     "IGUI_RenewableEnergy_ReasonBraked": "braked",
     "IGUI_RenewableEnergy_ReasonCalm": "too little wind",
     "IGUI_RenewableEnergy_ReasonSheltered": "sheltered",
+    "IGUI_RenewableEnergy_ReasonCrowded": "too close to another charger",
     "IGUI_RenewableEnergy_Treadmill": "Treadmill",
     "IGUI_RenewableEnergy_TreadmillsNow": "Treadmills now",
     "IGUI_RenewableEnergy_TreadmillsToday": "Treadmills today",
     "IGUI_RenewableEnergy_ReasonIdle": "nobody running",
-    "IGUI_RenewableEnergy_WindPropeller": "Propeller wind charger",
-    "IGUI_RenewableEnergy_WindAlternator": "Homemade alternator wind charger",
+    "IGUI_RenewableEnergy_WindTreadmill": "Treadmill wind charger",
+    "IGUI_RenewableEnergy_WindCarAlternator": "Car alternator wind charger",
+    "IGUI_RenewableEnergy_WindTurbine": "Homebuilt wind turbine",
     "IGUI_RenewableEnergy_ReasonBroken": "blades broken",
-    "IGUI_RenewableEnergy_ReasonFurled": "turned out of the wind"
+    "IGUI_RenewableEnergy_ReasonFurled": "turned out of the wind",
+    "IGUI_RenewableEnergy_ReasonGale": "gale, set the brake",
+    "IGUI_RenewableEnergy_BladesBroke": "A wind charger's blades broke in the gale",
+    "IGUI_RenewableEnergy_ModuleCracked": "A solar module cracked in the storm",
+    "IGUI_RenewableEnergy_TakeOutAlternator": "Take Out Alternator",
+    "IGUI_RenewableEnergy_PutBackAlternator": "Put Back Alternator"
 }

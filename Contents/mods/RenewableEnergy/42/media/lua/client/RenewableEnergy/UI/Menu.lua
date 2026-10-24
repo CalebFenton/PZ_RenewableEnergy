@@ -28,7 +28,7 @@ RenewableEnergy.Menu = Menu
 
 local Action = RenewableEnergyAction
 local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
-local Wind = RenewableEnergy.Wind
+local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
 local SolarGardenLight, SolarMaintainer = RenewableEnergy.SolarGardenLight, RenewableEnergy.SolarMaintainer
 local Format = RenewableEnergy.Format
 local Needs = RenewableEnergy.Needs
@@ -423,27 +423,27 @@ local function addBrakeOption(playerNum, menu, source)
         playerNum, queueSource, braked and Action.RELEASE_BRAKE or Action.BRAKE, source)
 end
 
--- Replace Blades, for a wind charger a storm broke: the first blades carried that fit it, or the
--- option greyed, naming the ones that would.
+-- Replace Blades, for a wind charger a storm broke: blades of its own material if carried, else the
+-- first other blades it takes that are carried, or the option greyed, naming all it takes.
 local function addBladesOption(playerNum, menu, source)
-    local fits = Sources.bladesFor(Sources.kindOf(source))
-    local blades = getSpecificPlayer(playerNum):getInventory():getFirstEvalRecurse(function(item)
-        return fits[item:getFullType()] == true
-    end)
-    local refusal = Wind.bladesRefusal(source, blades)
-    if refusal == "not broken" then
+    local own = Wind.bladesOfObject(source)
+    if not (own and Wind.isBroken(source)) then
         return
     end
+    local inventory = getSpecificPlayer(playerNum):getInventory()
+    local blades = inventory:getFirstTypeRecurse(Specs.wind.blades[own].item)
+    local names = {}
+    for _, material in ipairs(Specs.wind.turbines[Sources.kindOf(source)].blades) do
+        local item = Specs.wind.blades[material].item
+        blades = blades or inventory:getFirstTypeRecurse(item)
+        table.insert(names, getItemNameFromFullType(item))
+    end
+    local refusal = Wind.bladesRefusal(source, blades)
     local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ReplaceBlades"), playerNum, queueBlades, source, blades)
     local dark = lightOr(getSpecificPlayer(playerNum), Action.REPLACE_BLADES)
     if dark then
         Needs.refuse(option, dark)
     elseif refusal then
-        local names = {}
-        for fullType in pairs(fits) do
-            table.insert(names, getItemNameFromFullType(fullType))
-        end
-        table.sort(names)
         Needs.refuse(option, "Tooltip_RenewableEnergy_NeedBlades", table.concat(names, ", "))
     end
 end

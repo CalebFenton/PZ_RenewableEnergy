@@ -3,6 +3,7 @@ require "VehicleZoneDefinition"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
+require "RenewableEnergy/StormNotice"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/World/WorldSpawns"
@@ -18,15 +19,16 @@ require "RenewableEnergy/World/WorldSpawns"
 -- files have no isClient guard; what only the authority may do says so.
 --
 -- Each panel is a vehicle part holding a Solar Module, whose condition is the part's, shown by
--- its Whole or Cracked model. Nothing in the game reports a part's condition changing, so every
--- change this file makes shows the model at once, and each charge pass shows every loaded
--- trailer's panels again for the changes it didn't make (a failed uninstall, a debug tool).
+-- its Whole, LightCracked or Cracked model. Nothing in the game reports a part's condition
+-- changing, so every change this file makes shows the model at once, and each charge pass shows
+-- every loaded trailer's panels again for the changes it didn't make (a failed uninstall, a debug
+-- tool).
 
 RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
 RenewableEnergy.ArrowBoard = ArrowBoard
 
-local Chance, Specs = RenewableEnergy.Chance, RenewableEnergy.Specs
+local Chance, Specs, StormNotice = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.StormNotice
 
 -- Script name without its module, as VehicleDistributions and OnFillContainer name it.
 local VEHICLE = "RenewableEnergyArrowBoardTrailer"
@@ -221,19 +223,41 @@ local function isPanel(part)
     return id == ArrowBoard.PANELS[1] or id == ArrowBoard.PANELS[2]
 end
 
---- Whether a module at this condition has a cracked cover glass.
-function ArrowBoard.isCracked(condition)
-    return condition < Specs.crackedBelow
+-- The panel model that shows each look of RenewableEnergy.crackLookOf, and the whole one.
+local MODEL_OF_LOOK = { light = "LightCracked", heavy = "Cracked" }
+local PANEL_MODELS = { "Whole", "LightCracked", "Cracked" }
+
+--- How the glass of the module on the panel `part` looks (RenewableEnergy.crackLookOf): nil
+--- whole or without a module, else "light" or "heavy".
+function ArrowBoard.crackLookOf(part)
+    local item = part:getInventoryItem()
+    return item and RenewableEnergy.crackLookOf(item:getFullType(), part:getCondition())
 end
 
---- Shows the panel's Whole or Cracked model by its module's condition, or neither without one.
---- Showing a model that already shows costs nothing, so callers needn't know what changed. On
---- the server the game sends the models to every client (VehiclePartModels).
+--- Whether the module on the panel `part` shows any cracks.
+function ArrowBoard.isCracked(part)
+    return ArrowBoard.crackLookOf(part) ~= nil
+end
+
+-- Hides every model of the panel `part`.
+local function hidePanel(part)
+    for _, model in ipairs(PANEL_MODELS) do
+        part:setModelVisible(model, false)
+    end
+end
+
+--- Shows exactly one of the panel's Whole, LightCracked or Cracked models by its module's look, or
+--- none without one. Showing a model that already shows costs nothing, so callers needn't know
+--- what changed. On the server the game sends the models to every client (VehiclePartModels).
 function ArrowBoard.showPanel(part)
-    local installed = part:getInventoryItem() ~= nil
-    local cracked = installed and ArrowBoard.isCracked(part:getCondition())
-    part:setModelVisible("Whole", installed and not cracked)
-    part:setModelVisible("Cracked", cracked)
+    local shown = nil
+    if part:getInventoryItem() then
+        local look = ArrowBoard.crackLookOf(part)
+        shown = look and MODEL_OF_LOOK[look] or "Whole"
+    end
+    for _, model in ipairs(PANEL_MODELS) do
+        part:setModelVisible(model, model == shown)
+    end
 end
 
 function ArrowBoard.showPanels(vehicle)
@@ -302,8 +326,7 @@ local function keepStockConditions()
                 -- A client may have got the trailer already and shown the panel by the condition
                 -- it had then, and the server sends a part's models only when they change
                 -- (BaseVehicle.setModelVisible), so they change twice.
-                part:setModelVisible("Whole", false)
-                part:setModelVisible("Cracked", false)
+                hidePanel(part)
                 setPanelCondition(trailer.vehicle, part, panel.condition)
             end
         end
@@ -353,7 +376,8 @@ local function installedPanels(vehicle)
 end
 
 --- A thunderstorm may crack each panel as it would a flat panel's module (PanelSource.stormCrack), over
---- `stormHours` of storm. Authority only. Returns how many cracked.
+--- `stormHours` of storm, telling the players in earshot (StormNotice). Authority only. Returns how
+--- many cracked.
 function ArrowBoard.stormCrack(vehicle, stormHours)
     local cracked = 0
     for _, part in ipairs(installedPanels(vehicle)) do
@@ -362,6 +386,9 @@ function ArrowBoard.stormCrack(vehicle, stormHours)
             setPanelCondition(vehicle, part, source.modules[1].condition)
             cracked = cracked + 1
         end
+    end
+    if cracked > 0 then
+        StormNotice.tell(StormNotice.MODULE, math.floor(vehicle:getX()), math.floor(vehicle:getY()), math.floor(vehicle:getZ()))
     end
     return cracked
 end
@@ -389,7 +416,7 @@ end
 function ArrowBoard.repairablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
-    if item and ArrowBoard.isCracked(part:getCondition()) and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
+    if item and ArrowBoard.isCracked(part) and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
         return part
     end
     return nil

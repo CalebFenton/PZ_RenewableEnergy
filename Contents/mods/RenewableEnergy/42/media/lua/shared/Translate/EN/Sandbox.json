@@ -39,7 +39,7 @@
     "Sandbox_RenewableEnergy_ConnectPanelMin": "Connect Panel Time",
     "Sandbox_RenewableEnergy_ConnectPanelMin_tooltip": "Base number of in-game minutes it takes to connect one panel, wind charger or treadmill to a bank.",
     "Sandbox_RenewableEnergy_StormDamage": "Storm Damage",
-    "Sandbox_RenewableEnergy_StormDamage_tooltip": "Thunderstorms with strong wind can crack solar modules. Wall panels are safe, metal mounts hold up better than wooden ones.<br>Strong wind also breaks the blades of propeller and homemade alternator wind chargers left unbraked.",
+    "Sandbox_RenewableEnergy_StormDamage_tooltip": "Thunderstorms with strong wind can crack solar modules. Wall panels are safe, metal mounts hold up better than wooden ones.<br>A gale can also break the blades of wind chargers left unbraked, the likelier the stronger the wind: plastic pipe blades first, then carved wood, then steel. A homebuilt wind turbine's tail swings it aside, and its blades hold longer.",
     "Sandbox_RenewableEnergy_StormDamageRate": "Storm Damage Rate",
-    "Sandbox_RenewableEnergy_StormDamageRate_tooltip": "Percent of the chance that a thunderstorm cracks a solar module, or that strong wind breaks an unbraked wind charger's blades.<br>100 cracks about one module every two to three months on ten panels."
+    "Sandbox_RenewableEnergy_StormDamageRate_tooltip": "Percent of the chance that a thunderstorm cracks a solar module, or that a gale breaks an unbraked wind charger's blades.<br>100 cracks about one module every four to six months on ten panels, and even two days of the strongest wind the game blows break the weakest blades only about one time in seven."
 }

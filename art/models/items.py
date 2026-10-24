@@ -171,6 +171,9 @@ def M(name):
         "hammered": lambda: material("RE_Hammered", "#9a9c9b", roughness=0.5, metallic=0.6, grime=0.3, scale=30,
                                      speckle=("#55595b", 0.35), streaks=("#7a5434", 0.35)),
         "resin": lambda: material("RE_Resin", "#c99a4a", roughness=0.35, grime=0.15),
+        # The flat belt a car alternator wind charger's rotor drives its alternator with, cut from
+        # leather the brown of the game's own leather belt (Belt2).
+        "leather": lambda: material("RE_Leather", "#6e4a2c", roughness=0.7, grime=0.2, scale=14),
     }[name]()
 
 
@@ -182,15 +185,18 @@ MODULE = (0.986, 0.446, 0.036)
 FRAME = 0.028
 
 
-# A module whose condition is below Specs.crackedBelow has a cracked cover glass, drawn by
-# module_cracks everywhere it shows: on the mounts' crack overlay tiles and on the arrow board
-# trailer's cracked panels. Lines wide enough to read at a tile's scale, about a centimetre a pixel.
+# A module's cover glass shows whole, lightly cracked or heavily cracked by its condition
+# (RenewableEnergy.crackLookOf), drawn by module_cracks everywhere it shows: on the mounts' crack
+# overlay tiles and on the arrow board trailer's cracked panels. Lines wide enough to read at a
+# tile's scale, about a centimetre a pixel.
 CRACK_WIDTH = 0.01
 
 
-def module_cracks(col, name):
+def module_cracks(col, name, light=False):
     """The cracks of a broken cover glass, lying on a module built by solar_module: lines
-    radiating from where something struck it, and a broken ring round the strike."""
+    radiating from where something struck it, and a broken ring round the strike. `light` draws
+    the first cracks of a glass that took a knock: a few short lines from a strike near a corner,
+    no ring, so the two looks tell apart at a glance."""
     width, depth, height = MODULE
     inner_w, inner_d = width / 2 - FRAME - 0.01, depth / 2 - FRAME - 0.01
     rng = random.Random(42)
@@ -204,16 +210,22 @@ def module_cracks(col, name):
         parts.append(box(col, name + "_Crack", M("crack"), (length + CRACK_WIDTH * 0.5, CRACK_WIDTH, 0.0008),
                          at=((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z), rotate=(0, 0, angle)))
 
-    for i in range(9):
-        heading = 2 * math.pi * i / 9 + rng.uniform(-0.3, 0.3)
-        reach = rng.uniform(0.18, 0.5)
+    if light:
+        strike, rays, steps, reaches = (-0.2, 0.06), 3, 2, (0.12, 0.26)
+    else:
+        rays, steps, reaches = 9, 3, (0.18, 0.5)
+    for i in range(rays):
+        heading = 2 * math.pi * i / rays + rng.uniform(-0.3, 0.3)
+        reach = rng.uniform(*reaches)
         point = strike
-        for _ in range(3):
+        for _ in range(steps):
             heading += rng.uniform(-0.35, 0.35)
-            x = max(-inner_w, min(inner_w, point[0] + reach / 3 * math.cos(heading)))
-            y = max(-inner_d, min(inner_d, point[1] + reach / 3 * math.sin(heading)))
+            x = max(-inner_w, min(inner_w, point[0] + reach / steps * math.cos(heading)))
+            y = max(-inner_d, min(inner_d, point[1] + reach / steps * math.sin(heading)))
             segment(point, (x, y))
             point = (x, y)
+    if light:
+        return parts
     ring = 0.07
     for i in range(8):
         if i % 3 == 2:
@@ -224,11 +236,12 @@ def module_cracks(col, name):
     return parts
 
 
-def solar_module(col, name="Module", snow=False, cracked=False, cracks=False):
+def solar_module(col, name="Module", snow=False, cracked=False, cracks=False, light_cracks=False):
     """A module lying glass up. `snow` adds only the snow lying on it and `cracks` only the cracks
-    of a broken glass, for overlay tiles; `cracked` draws the whole module with those cracks."""
+    of a broken glass, for overlay tiles; `cracked` draws the whole module with those cracks.
+    `light_cracks` makes either the light cracks rather than the heavy ones."""
     if cracks:
-        return module_cracks(col, name)
+        return module_cracks(col, name, light=light_cracks)
     width, depth, height = MODULE
     parts = []
     if snow:
@@ -254,7 +267,7 @@ def solar_module(col, name="Module", snow=False, cracked=False, cracks=False):
                              at=(0, y + offset, height - 0.0025)))
     parts.append(box(col, name + "_JunctionBox", M("black"), (0.11, 0.08, 0.02), at=(0, 0.06, 0.004), bevel=0.004))
     if cracked:
-        parts += module_cracks(col, name)
+        parts += module_cracks(col, name, light=light_cracks)
     return parts
 
 
@@ -273,10 +286,10 @@ def amorphous_panel(col, name, size, stripes):
     return parts
 
 
-def solar_flat(col, snow=False, cracks=False):
+def solar_flat(col, snow=False, cracks=False, light_cracks=False):
     """One module on two low rails, for a roof or the ground at 0 degrees. `snow` and `cracks` give
-    only the snow on it or the cracks in its glass, for overlay tiles."""
-    module = solar_module(col, "Flat", snow=snow, cracks=cracks)
+    only the snow on it or the cracks in its glass, for overlay tiles; `light_cracks` the light ones."""
+    module = solar_module(col, "Flat", snow=snow, cracks=cracks, light_cracks=light_cracks)
     lift = 0.045
     for obj in module:
         obj.location.z += lift
@@ -291,13 +304,15 @@ def solar_flat(col, snow=False, cracks=False):
 WALL_STANDOFF = 0.05
 
 
-def solar_wall(col, material="metal", lying=False, cracks=False):
+def solar_wall(col, material="metal", lying=False, cracks=False, light_cracks=False):
     """One module upright, its back WALL_STANDOFF in front of y = 0 (the wall), its bottom edge at
     z = 0: on two galvanised channel brackets lagged to the wall, or on two pine battens with a
     ledger board under it and cleats nailed over its top edge. `lying` lays it glass up on its
-    brackets, as it lies on the ground. `cracks` gives only the cracks in its glass."""
+    brackets, as it lies on the ground. `cracks` gives only the cracks in its glass, `light_cracks`
+    the light ones."""
     # Turning +90 degrees about X takes glass up to glass to the front (-Y).
-    module = group(col, "Wall_Module", solar_module(col, "Wall", cracks=cracks), at=(0, -WALL_STANDOFF, MODULE[1] / 2),
+    module = group(col, "Wall_Module", solar_module(col, "Wall", cracks=cracks, light_cracks=light_cracks),
+                   at=(0, -WALL_STANDOFF, MODULE[1] / 2),
                    rotate=(90, 0, 0))
     if cracks:
         return
@@ -327,11 +342,11 @@ RACK_TILT = 38
 RACK_FRONT = 0.25  # height of the lower edge
 
 
-def solar_rack(col, material="metal", snow=False, cracks=None):
+def solar_rack(col, material="metal", snow=False, cracks=None, light_cracks=False):
     """Two modules, one above the other, tilted RACK_TILT degrees to the front on a galvanised pipe
     frame or a frame of pine 2 x 4s on skids. Both hold the modules in the same place, so the
     snow on them is the same. `cracks`, a module slot (1 the lower module, 2 the upper), gives only
-    the cracks in that module's glass."""
+    the cracks in that module's glass, `light_cracks` the light ones."""
     tilt = math.radians(RACK_TILT)
     gap = 0.01
     span = 2 * MODULE[1] + gap
@@ -339,7 +354,7 @@ def solar_rack(col, material="metal", snow=False, cracks=None):
     for i, offset in enumerate((-(MODULE[1] + gap) / 2, (MODULE[1] + gap) / 2)):
         if cracks and cracks != i + 1:
             continue
-        module = solar_module(col, "Rack%d" % i, snow=snow, cracks=bool(cracks))
+        module = solar_module(col, "Rack%d" % i, snow=snow, cracks=bool(cracks), light_cracks=light_cracks)
         panels.append(group(col, "Rack_Module%d" % i, module, at=(0, offset, 0)))
     group(col, "Rack_Panels", panels, at=(0, 0, RACK_FRONT + span / 2 * math.sin(tilt)), rotate=(RACK_TILT, 0, 0))
     if snow or cracks:
@@ -951,7 +966,7 @@ def magazine(col, issue):
         prism(col, "Mag3_Flame", M("flameblue"), [(-0.01, 0), (0.01, 0), (0.0, 0.03)], 0.0008, at=(0.05, -0.005, height + 0.0003),
               rotate=(-90, 0, 0))
     else:
-        # A propeller wind charger on its mast over a red barn, and a treadmill in the yard.
+        # A treadmill wind charger on its mast over a red barn, and a treadmill in the yard.
         box(col, "Mag4_Ground", M("earth"), (0.17, 0.035, 0.0008), at=(0, -0.0875, height + 0.0002))
         prism(col, "Mag4_Barn", M("red"), [(-0.03, 0), (0.03, 0), (0.03, 0.03), (0.0, 0.048), (-0.03, 0.03)], 0.0008,
               at=(-0.045, -0.07, height + 0.0003), rotate=(-90, 0, 0))
@@ -2216,12 +2231,13 @@ def treadmill_motor(col):
                                              (back - 0.06, side * 0.035, 0.006)], 0.0035, 6)
 
 
-# The propeller and alternator chargers face the wind on a heading fixed when they are built. Each
-# is built facing south (-Y), its mast at the origin, and the game turns the whole to face the other
-# ways. Only its rotor spins: the parts named with ROTOR are turned about the hub's axis within the
-# mesh, a mesh per spin step (models.py), the mast staying put.
+# The treadmill and car alternator wind chargers and the homebuilt wind turbine face the wind on a
+# heading fixed when they are built. Each is built facing south (-Y), its mast at the origin, and
+# the game turns the whole to face the other ways. Only its rotor spins: the parts named with ROTOR
+# are turned about the hub's axis within the mesh, a mesh per spin step (models.py), the mast
+# staying put.
 ROTOR = "Rotor_"
-PROPELLER_HUB = 3.8  # the hub's height, a storey and a half up
+PROPELLER_HUB = 3.8  # the hub's height, a storey and a half up, on either pipe mast
 PROPELLER_BLADE = (0.82, 0.13, 0.02)  # a blade's length past its root, its chord at the root, its thickness
 ALTERNATOR_HUB = 4.3
 ALTERNATOR_BLADE = (1.0, 0.14, 0.005)
@@ -2231,7 +2247,7 @@ ROTOR_SPINS = (0, 20, 40, 60, 80, 100)
 PIPE_BLADE_CURVE = 0.1
 
 
-def _blade(col, name, kind, size):
+def _blade(col, name, kind, size, kept=None):
     """A blade along +Z from its root at the origin, its chord along X, made the way its material
     allows, so each reads apart at a glance:
     - "wood": carved from a plank, thick at a square root block bolted on, a twisted airfoil
@@ -2239,27 +2255,30 @@ def _blade(col, name, kind, size):
     - "pipe": sawn lengthwise from plastic pipe, a thin curved shell that keeps the pipe's grey,
       cut on a straight taper, its flat root bolted to a steel strap;
     - "steel": hammered from sheet, thin, flat and narrow to a point, a welded strap at its root,
-      bare steel pocked by the hammer."""
+      bare steel pocked by the hammer.
+    A blade a storm snapped keeps only its `kept` pieces from the root, and no tip."""
     length, chord, thick = size
     pieces = 6
+    kept = pieces if kept is None else kept
     bolt = M("weld")
     parts = []
     if kind == "wood":
         mat = M("carvedwood")
         parts.append(box(col, name, mat, (chord * 0.9, thick * 2.2, 0.1), bevel=0.006))
-        for i in range(pieces):
+        for i in range(kept):
             t = (i + 0.5) / pieces
             parts.append(box(col, name, mat, (chord * (1 - 0.55 * t), thick * (1.6 - 0.9 * t), length / pieces + 0.004),
                              at=(chord * 0.18 * t, 0, 0.08 + i * length / pieces), rotate=(0, 0, 26 - 20 * t), bevel=0.006))
-        parts.append(mound(col, name, mat, (chord * 0.22, thick * 0.35, 0.05), at=(chord * 0.18, 0, 0.08 + length - 0.004),
-                           segments=10, rings=3))
+        if kept == pieces:
+            parts.append(mound(col, name, mat, (chord * 0.22, thick * 0.35, 0.05), at=(chord * 0.18, 0, 0.08 + length - 0.004),
+                               segments=10, rings=3))
         for z in (0.03, 0.07):
             parts.append(cylinder(col, name, bolt, 0.01, 0.006, at=(0, -thick * 1.1, z), rotate=(90, 0, 0), segments=6))
     elif kind == "pipe":
         mat = M("pvc")
         parts.append(box(col, name, M("rawsteel"), (chord * 0.6, 0.006, 0.12), at=(0, 0.004, -0.02)))
         strips = 4
-        for i in range(pieces):
+        for i in range(kept):
             t = (i + 0.5) / pieces
             width = chord * (1 - 0.6 * t)
             arc = width / PIPE_BLADE_CURVE
@@ -2274,7 +2293,7 @@ def _blade(col, name, kind, size):
     else:
         mat = M("hammered")
         parts.append(box(col, name, M("weld"), (chord * 0.7, thick * 3, 0.07), bevel=0.002))
-        for i in range(pieces):
+        for i in range(kept):
             t = (i + 0.5) / pieces
             parts.append(box(col, name, mat, (chord * (1 - 0.85 * t), thick, length / pieces + 0.002),
                              at=(chord * 0.1 * t, 0, 0.05 + i * length / pieces), rotate=(0, 0, 14 - 10 * t)))
@@ -2297,20 +2316,33 @@ def _tail(col, name, start, length, vane, z):
     box(col, name + "_Vane", M("drummetal"), (0.004, vane[0], vane[1]), at=(0, end[1] + vane[0] / 2 - 0.05, z - vane[1] / 2 + 0.05))
 
 
-def propeller_charger(col, blades="wood"):
-    """A homestead propeller wind charger: a welded pipe mast on a concrete footing, a yaw bearing
-    on top, the treadmill motor as its generator, three blades on its shaft, carved from pine planks
-    ("wood") or cut from plastic pipe ("pipe"), to the same shape, and a tail vane behind."""
-    hub = PROPELLER_HUB
-    box(col, "Prop_Footing", M("concrete"), (0.4, 0.4, 0.08), bevel=0.01)
-    box(col, "Prop_BasePlate", M("rawsteel"), (0.26, 0.26, 0.012), at=(0, 0, 0.08))
+def _pipe_mast(col, name, top):
+    """A welded pipe mast on a concrete footing, gusseted to its base plate, with the yaw bearing a
+    wind charger's head turns on from `top` up."""
+    box(col, name + "_Footing", M("concrete"), (0.4, 0.4, 0.08), bevel=0.01)
+    box(col, name + "_BasePlate", M("rawsteel"), (0.26, 0.26, 0.012), at=(0, 0, 0.08))
     for angle in (45, 135, 225, 315):
-        box(col, "Prop_Gusset", M("weld"), (0.1, 0.008, 0.12), at=(*_around((0, 0), angle, 0.09), 0.092), rotate=(0, 0, angle))
-    top = hub - 0.12
-    cylinder(col, "Prop_Mast", M("galvanised"), 0.045, top - 0.092, at=(0, 0, 0.092), segments=14)
+        box(col, name + "_Gusset", M("weld"), (0.1, 0.008, 0.12), at=(*_around((0, 0), angle, 0.09), 0.092), rotate=(0, 0, angle))
+    cylinder(col, name + "_Mast", M("galvanised"), 0.045, top - 0.092, at=(0, 0, 0.092), segments=14)
     for z in (top / 3, 2 * top / 3):
-        _ring(col, "Prop_MastWeld", M("weld"), (0, 0), 0.046, z, 0.006)
-    cylinder(col, "Prop_YawBearing", M("weld"), 0.065, 0.07, at=(0, 0, top), segments=14)
+        _ring(col, name + "_MastWeld", M("weld"), (0, 0), 0.046, z, 0.006)
+    cylinder(col, name + "_YawBearing", M("weld"), 0.065, 0.07, at=(0, 0, top), segments=14)
+
+
+def _spinner(col, y, hub):
+    """The plate the blades bolt to, its back at `y`, and the nose cone in front of it."""
+    cylinder(col, ROTOR + "Spinner", M("rawsteel"), 0.07, 0.05, at=(0, y, hub), rotate=(90, 0, 0), segments=16)
+    cylinder(col, ROTOR + "Nose", M("rawsteel"), 0.07, 0.05, at=(0, y - 0.05, hub), rotate=(90, 0, 0), radius_top=0.02, segments=16)
+
+
+def propeller_charger(col, blades="wood"):
+    """The treadmill wind charger: a welded pipe mast on a concrete footing, a yaw bearing on top,
+    the treadmill motor as its generator, three blades on its shaft, carved from pine planks
+    ("wood"), cut from plastic pipe ("pipe") or forged from sheet steel ("steel"), to the same shape,
+    and a tail vane behind."""
+    hub = PROPELLER_HUB
+    top = hub - 0.12
+    _pipe_mast(col, "Prop", top)
     box(col, "Prop_MotorPlate", M("rawsteel"), (0.1, 0.36, 0.01), at=(0, -0.08, hub - 0.075))
     cylinder(col, "Prop_Motor", M("black"), 0.065, 0.3, at=(0, 0.06, hub), rotate=(90, 0, 0), segments=18)
     for y in (0.075, -0.24):
@@ -2318,9 +2350,121 @@ def propeller_charger(col, blades="wood"):
     _tail(col, "Prop_Tail", (0, 0.06), 0.8, (0.42, 0.32), hub)
     tube(col, "Prop_Cable", M("black"), [(0.04, 0.04, hub - 0.07), (0.055, 0.0, top), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09),
                                          (0.2, 0.2, 0.0)], 0.007, 6)
-    cylinder(col, ROTOR + "Spinner", M("rawsteel"), 0.07, 0.05, at=(0, -0.255, hub), rotate=(90, 0, 0), segments=16)
-    cylinder(col, ROTOR + "Nose", M("rawsteel"), 0.07, 0.05, at=(0, -0.305, hub), rotate=(90, 0, 0), radius_top=0.02, segments=16)
+    _spinner(col, -0.255, hub)
     _rotor_blades(col, (0, -0.28, hub), blades, PROPELLER_BLADE)
+
+
+CAR_ALTERNATOR_RADIUS = 0.065  # its case's
+CAR_ALTERNATOR_PULLEY = (0.036, 0.03)  # its pulley's radius and width
+
+
+def _car_alternator(col, name):
+    """A car's alternator, its axis along Y, its pulley's front face at the origin and the rest
+    behind (+Y): the pulley and the cooling fan behind it, the cast aluminium case in two halves
+    slotted for air, the dark stator core showing between them and the through-bolts along it,
+    the mounting ears below and the adjusting ear above, the output stud and the regulator's plug
+    at the back."""
+    radius = CAR_ALTERNATOR_RADIUS
+    pulley, width = CAR_ALTERNATOR_PULLEY
+    alloy = M("aluminium")
+    parts = [cylinder(col, name + "Nut", M("galvanised"), 0.012, 0.008, at=(0, 0, 0), rotate=(90, 0, 0), segments=6),
+             cylinder(col, name + "Pulley", M("rawsteel"), pulley, width, at=(0, width, 0), rotate=(90, 0, 0), segments=20)]
+    fan = width + 0.003
+    parts.append(cylinder(col, name + "FanDisc", M("darkgrey"), radius - 0.006, 0.003, at=(0, fan + 0.003, 0), rotate=(90, 0, 0),
+                          segments=20))
+    for k in range(12):
+        a = 30 * k
+        x, z = _around((0, 0), a, 0.024)
+        parts.append(box(col, name + "FanBlade", M("darkgrey"), (0.004, 0.012, radius - 0.032), at=(x, fan + 0.009, z),
+                         rotate=(0, 90 - a, 0)))
+    front, core, back = fan + 0.016, fan + 0.056, fan + 0.074
+    end = back + 0.06
+    parts.append(cylinder(col, name + "FrontCase", alloy, radius, core - front, at=(0, core, 0), rotate=(90, 0, 0), segments=22))
+    parts.append(cylinder(col, name + "Stator", M("weld"), radius + 0.002, back - core, at=(0, back, 0), rotate=(90, 0, 0), segments=22))
+    parts.append(cylinder(col, name + "RearCase", alloy, radius, end - back, at=(0, end, 0), rotate=(90, 0, 0), segments=22))
+    parts.append(cylinder(col, name + "RearCap", M("darkgrey"), radius * 0.65, 0.018, at=(0, end + 0.018, 0), rotate=(90, 0, 0),
+                          segments=18))
+    # The air slots round each half: dark windows on the case, which a boolean cut would only
+    # thicken into the same look.
+    for k in range(8):
+        a = 45 * k + 22.5
+        for y in ((front + core) / 2, (back + end) / 2):
+            x, z = _around((0, 0), a, radius - 0.0015)
+            parts.append(box(col, name + "Slot", M("black"), (0.02, 0.022, 0.003), at=(x, y, z), rotate=(0, 90 - a, 0)))
+    for k in range(4):
+        x, z = _around((0, 0), 90 * k + 45, radius - 0.002)
+        parts.append(cylinder(col, name + "ThroughBolt", M("galvanised"), 0.005, end - front, at=(x, end, z), rotate=(90, 0, 0), segments=6))
+    for y in (front + 0.012, end - 0.012):
+        parts.append(box(col, name + "Ear", alloy, (0.028, 0.022, 0.04), at=(0, y, -radius - 0.035), bevel=0.004))
+    parts.append(cylinder(col, name + "PivotBolt", M("galvanised"), 0.007, end - front + 0.01, at=(0, end + 0.005, -radius - 0.018),
+                          rotate=(90, 0, 0), segments=8))
+    parts.append(box(col, name + "AdjustEar", alloy, (0.026, 0.02, 0.03), at=(0, front + 0.012, radius - 0.008), bevel=0.004))
+    parts.append(cylinder(col, name + "Stud", M("copper"), 0.005, 0.035, at=(0.028, end, 0.02), rotate=(-90, 0, 0), segments=8))
+    parts.append(box(col, name + "Plug", M("black"), (0.022, 0.016, 0.018), at=(-0.026, end + 0.024, 0.012)))
+    return parts
+
+
+def _flat_belt(col, name, mat, a, ra, b, rb, y, width, thick, step=12):
+    """An open flat belt round two pulleys turning in the plane at `y`, their centres `a` and `b`
+    as (x, z) and their radii `ra` and `rb`: the two straight runs on the pulleys' outer tangents,
+    and the belt's wrap round each pulley between them, a facet every `step` degrees."""
+    angle = math.atan2(b[1] - a[1], b[0] - a[0])
+    # Each run leaves both pulleys at the same angle about their centres, off the line between them.
+    off = math.acos((ra - rb) / math.dist(a, b))
+
+    def arc(centre, radius, start, span):
+        count = max(2, int(math.degrees(span) / step))
+        return [_around(centre, math.degrees(start + span * i / count), radius + thick / 2) for i in range(count + 1)]
+
+    loop = arc(a, ra, angle + off, 2 * math.pi - 2 * off) + arc(b, rb, angle - off, 2 * off)
+    for p, q in zip(loop, loop[1:] + loop[:1]):
+        beam(col, name, mat, (p[0], y, p[1]), (q[0], y, q[1]), (thick, width))
+
+
+CAR_ALTERNATOR_RAISE = 0.34  # how far the shaft runs above the head plate, for its pulley to clear it
+CAR_ALTERNATOR_PULLEY_RADIUS = 0.22  # the rotor's pulley, many times the alternator's to step it up
+CAR_ALTERNATOR_X = 0.2  # the alternator beside the mast, clear of the rotor's pulley
+
+
+def car_alternator_charger(col, blades="wood"):
+    """The car alternator wind charger: the treadmill charger's welded pipe mast with a sheet-metal
+    head plate on its yaw bearing, three blades on a short shaft in two pillow-block bearings and
+    a large flat pulley behind them, a leather flat belt down to the small pulley of a car's
+    alternator bolted to the plate beside the mast, and a sheet-metal tail vane clamped rigid
+    behind."""
+    hub = PROPELLER_HUB
+    deck = hub - CAR_ALTERNATOR_RAISE
+    top = deck - 0.08
+    _pipe_mast(col, "CarAlt", top)
+    # The plate stops short of the blades' sweep in front.
+    box(col, "CarAlt_HeadPlate", M("rawsteel"), (0.42, 0.56, 0.01), at=(0.1, 0.01, deck - 0.01))
+    for y in (-0.22, 0.02):
+        box(col, "CarAlt_PedestalFoot", M("rustysteel"), (0.15, 0.06, 0.008), at=(0, y, deck))
+        box(col, "CarAlt_Pedestal", M("rustysteel"), (0.08, 0.05, hub - deck - 0.03), at=(0, y, deck))
+        cylinder(col, "CarAlt_Bearing", M("darkgrey"), 0.042, 0.06, at=(0, y + 0.03, hub), rotate=(90, 0, 0), segments=14)
+        for x in (-0.058, 0.058):
+            cylinder(col, "CarAlt_Bolt", M("galvanised"), 0.008, 0.008, at=(x, y, deck + 0.008), segments=6)
+    cylinder(col, ROTOR + "Shaft", M("galvanised"), 0.02, 0.36, at=(0, 0.08, hub), rotate=(90, 0, 0), segments=10)
+    belt_y = -0.125
+    big, width = CAR_ALTERNATOR_PULLEY_RADIUS, 0.05
+    cylinder(col, ROTOR + "Pulley", M("rawsteel"), big, width, at=(0, belt_y + width / 2, hub), rotate=(90, 0, 0), segments=32)
+    cylinder(col, ROTOR + "PulleyBoss", M("weld"), 0.05, width + 0.02, at=(0, belt_y + width / 2 + 0.01, hub), rotate=(90, 0, 0),
+             segments=14)
+    for k in range(6):
+        x, z = _around((0, hub), 60 * k, big * 0.6)
+        cylinder(col, ROTOR + "PulleyBolt", M("galvanised"), 0.01, 0.006, at=(x, belt_y - width / 2, z), rotate=(90, 0, 0), segments=6)
+    pulley, small_width = CAR_ALTERNATOR_PULLEY
+    # The alternator stands on its mounting ears on the plate, its pulley in line with the rotor's.
+    axis = deck + CAR_ALTERNATOR_RADIUS + 0.035
+    group(col, "CarAlt_Alternator", _car_alternator(col, "CarAlt_Alt"), at=(CAR_ALTERNATOR_X, belt_y - small_width / 2, axis))
+    _flat_belt(col, "CarAlt_Belt", M("leather"), (0, hub), big, (CAR_ALTERNATOR_X, axis), pulley, belt_y, small_width - 0.004, 0.006)
+    for y in (0.14, 0.24):
+        box(col, "CarAlt_TailClamp", M("weld"), (0.06, 0.025, 0.055), at=(0, y, deck), bevel=0.003)
+    _tail(col, "CarAlt_Tail", (0, 0.1), 0.85, (0.42, 0.32), deck + 0.03)
+    tube(col, "CarAlt_Cable", M("black"), [(CAR_ALTERNATOR_X + 0.03, 0.06, axis + 0.02), (0.33, 0.07, deck - 0.02), (0.1, 0.03, top - 0.15),
+                                           (0.055, 0.0, top - 0.3), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09), (0.2, 0.2, 0.0)], 0.007, 6)
+    _spinner(col, -0.28, hub)
+    _rotor_blades(col, (0, -0.305, hub), blades, PROPELLER_BLADE)
 
 
 def _alternator_head(col, rotor):
@@ -2348,10 +2492,10 @@ def _alternator_head(col, rotor):
 ALTERNATOR_HEAD_Y = -0.32  # the hub's face, in front of the mast
 
 
-def alternator_charger(col):
-    """The best of the homestead wind chargers: a two-storey braced tripod of welded angle iron,
-    kept inside its own square, a homemade alternator on its head, three forged steel blades and a
-    tail vane that folds it out of a storm."""
+def alternator_charger(col, blades="steel"):
+    """The homebuilt wind turbine, the best of the homestead wind chargers: a two-storey braced
+    tripod of welded angle iron, kept inside its own square, a homemade alternator on its head,
+    three long blades of any kind _blade makes and a tail vane that folds it out of a storm."""
     hub = ALTERNATOR_HUB
     top = hub - 0.2
     feet = [_around((0, 0), angle, 0.42) for angle in (90, 210, 330)]
@@ -2378,7 +2522,7 @@ def alternator_charger(col):
     _tail(col, "Alt_Tail", (0, 0.05), 1.05, (0.55, 0.42), hub)
     tube(col, "Alt_Cable", M("black"), [(0.03, 0.05, hub - 0.1), on_leg(0, top - 0.05), on_leg(0, 0.3), (feet[0][0] + 0.05, feet[0][1], 0.0)],
          0.007, 6)
-    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), "steel", ALTERNATOR_BLADE)
+    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), blades, ALTERNATOR_BLADE)
 
 
 # How far apart blades of each kind stack in a bundle: their roots' thickness, or a pipe blade's curve.
@@ -2411,9 +2555,38 @@ def steel_blades(col):
     _blade_bundle(col, "SteelBlades", "steel", ALTERNATOR_BLADE)
 
 
+def _broken_blades(col, name, kind, size):
+    """Three blades of `kind` a storm snapped, their root ends lying splayed in a loose heap."""
+    length, chord, _ = size
+    spacing = BUNDLE_SPACING[kind]
+    for i, (kept, turn) in enumerate(((3, 0), (2, 25), (4, -20))):
+        group(col, name, _blade(col, name, kind, size, kept=kept),
+              at=(-length * 0.3, chord * 0.4 * (i - 1), spacing * (0.5 + i)), rotate=(90, 0, 90 + turn))
+
+
+def broken_wooden_blades(col):
+    """What a storm left of a set of carved propeller blades."""
+    _broken_blades(col, "BrokenWoodBlades", "wood", PROPELLER_BLADE)
+
+
+def broken_pipe_blades(col):
+    """What a storm left of a set of plastic pipe blades."""
+    _broken_blades(col, "BrokenPipeBlades", "pipe", PROPELLER_BLADE)
+
+
+def broken_steel_blades(col):
+    """What a storm left of a set of forged steel blades."""
+    _broken_blades(col, "BrokenSteelBlades", "steel", ALTERNATOR_BLADE)
+
+
 def homemade_alternator(col):
     """The homemade alternator lying on its back, the hub's face up."""
     group(col, "AltItem", _alternator_head(col, "AltItem_"), at=(0, 0, 0.27), rotate=(-90, 0, 0))
+
+
+def car_alternator(col):
+    """A car's alternator, loose, standing on its mounting ears, its pulley on."""
+    group(col, "CarAltItem", _car_alternator(col, "CarAltItem_"), at=(0, -0.085, CAR_ALTERNATOR_RADIUS + 0.035))
 
 
 # The sprite model's yaw that turns a south-facing model to face each way. The game draws an
@@ -2421,29 +2594,33 @@ def homemade_alternator(col):
 # half round again (seen in the art mode's art_wind_tall shot).
 FACING_YAWS = {"N": 0, "E": -90, "S": 180, "W": 90}
 
-# Sprite models by name. "skins" are the builders' options for each texture the same mesh takes,
-# by the name after the model's; "yaws" the turns of the whole model, by the name after that;
-# "spins" the rotor's angles in degrees about the hub at height "hub", a mesh each, named by their
-# index last. A sprite model's name is the model's, the skin's, the yaw's and the spin's, so the
-# scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor and an index.
+# Sprite models by name. "skins" are the builders' options for each skin, a mesh and texture of
+# its own, by the name after the model's; "yaws" the turns of the whole model, by the name after
+# that; "spins" the rotor's angles in degrees about the hub at height "hub", a mesh each, named by
+# their index last. A sprite model's name is the model's, the skin's, the yaw's and the spin's, so
+# the scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor and an
+# index. Every blade machine takes every blade set, a skin each: each set's blades are shaped
+# their own way (_blade), and baked onto another set's shape they would leave its edges uncoloured.
+BLADE_SKINS = {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}, "Steel": {"blades": "steel"}}
 SPRITE_MODELS = {
     "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): 30 * step for step in range(6)}},
-    "Propeller": {"model": propeller_charger, "skins": {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}},
-                  "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": PROPELLER_HUB},
-    "Alternator": {"model": alternator_charger, "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": ALTERNATOR_HUB},
+    "Propeller": {"model": propeller_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": PROPELLER_HUB},
+    "CarAlternator": {"model": car_alternator_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS,
+                      "hub": PROPELLER_HUB},
+    "Alternator": {"model": alternator_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": ALTERNATOR_HUB},
 }
 
 
 def sprite_model_names(name):
-    """A sprite model's meshes, one per spin step, its textures, one per skin, and its sprite models
-    as (name, mesh, texture, yaw)."""
+    """A sprite model's skins as (texture, meshes), a mesh per spin step, and its sprite models as
+    (name, mesh, texture, yaw)."""
     spec = SPRITE_MODELS[name]
-    skins = spec.get("skins") or {"": {}}
     spins = spec.get("spins", (0,))
-    meshes = [name + (str(index) if len(spins) > 1 else "") for index in range(len(spins))]
-    sprites = [(name + skin + label + (str(index) if len(spins) > 1 else ""), mesh, name + skin, yaw)
-               for skin in skins for label, yaw in spec["yaws"].items() for index, mesh in enumerate(meshes)]
-    return meshes, [name + skin for skin in skins], sprites
+    steps = [str(index) if len(spins) > 1 else "" for index in range(len(spins))]
+    skins = [(name + skin, [name + skin + step for step in steps]) for skin in spec.get("skins") or {"": {}}]
+    sprites = [(texture + label + step, mesh, texture, yaw)
+               for texture, meshes in skins for label, yaw in spec["yaws"].items() for step, mesh in zip(steps, meshes)]
+    return skins, sprites
 
 
 # Vehicles -----------------------------------------------------------------------------------------
@@ -2605,20 +2782,25 @@ def _arrow_board(col, rear):
         cylinder(col, "Board_Lamp", M("amberlampdark"), 0.045, 0.006, at=(x, centre_y + y, top + 0.012), segments=16)
 
 
-# The trailer's panels are vehicle parts the player can take off, each shown whole or cracked by
-# its module's condition, so each is a model of its own: TrailerN_ the whole module N (0 on the
-# left, at -X), TrailerCrackedN_ the cracked one. The cracked pair is built this far off and moved
-# back after baking, because the bake takes each surface's colour from the nearest detail and the
-# two pairs would otherwise lie in one place.
+# The trailer's panels are vehicle parts the player can take off, each shown whole, lightly cracked
+# or cracked by its module's condition, so each is a model of its own: TrailerN_ the whole module N
+# (0 on the left, at -X), TrailerLightCrackedN_ the lightly cracked one, TrailerCrackedN_ the
+# cracked one. The cracked pairs are built this far off, each its own distance, and moved back
+# after baking, because the bake takes each surface's colour from the nearest detail and the pairs
+# would otherwise lie in one place.
 TRAILER_CRACKED_OFFSET = (0.0, 0.0, 4.0)
+TRAILER_LIGHT_CRACKED_OFFSET = (0.0, 0.0, 8.0)
 
 
 def _trailer_modules(col, front):
     """Two modules side by side, long sides front to back, on rails over the front of the deck and
     the battery box, raised a little at the front, on posts from the deck."""
     tilt, centre_y, height = 10, 0.2, 0.72
-    for prefix, cracked, offset in (("Trailer", False, (0, 0, 0)), ("TrailerCracked", True, TRAILER_CRACKED_OFFSET)):
-        modules = [group(col, "Trailer_Module", solar_module(col, "%s%d" % (prefix, i), cracked=cracked), at=(x, 0, 0),
+    for prefix, cracked, light, offset in (("Trailer", False, False, (0, 0, 0)),
+                                           ("TrailerLightCracked", True, True, TRAILER_LIGHT_CRACKED_OFFSET),
+                                           ("TrailerCracked", True, False, TRAILER_CRACKED_OFFSET)):
+        modules = [group(col, "Trailer_Module", solar_module(col, "%s%d" % (prefix, i), cracked=cracked, light_cracks=light),
+                         at=(x, 0, 0),
                          rotate=(0, 0, 90))
                    for i, x in enumerate((-0.235, 0.235))]
         group(col, "Trailer_Panels", modules, at=(offset[0], centre_y + offset[1], height + offset[2]), rotate=(tilt, 0, 0))
@@ -2699,7 +2881,11 @@ ITEMS = {
     "WoodenBlades": {"model": wooden_blades, "icon_elevation": 50},
     "PipeBlades": {"model": pipe_blades, "icon_elevation": 50},
     "SteelBlades": {"model": steel_blades, "icon_elevation": 50},
+    "BrokenWoodenBlades": {"model": broken_wooden_blades, "icon_elevation": 50},
+    "BrokenPipeBlades": {"model": broken_pipe_blades, "icon_elevation": 50},
+    "BrokenSteelBlades": {"model": broken_steel_blades, "icon_elevation": 50},
     "HomemadeAlternator": {"model": homemade_alternator, "icon_elevation": 40},
+    "CarAlternator": {"model": car_alternator, "icon_elevation": 35},
 }
 
 # Vanilla items with no ground model of their own, which the game drops as a flat icon: the drums
@@ -2722,6 +2908,8 @@ VEHICLES = {
             "_PanelRight": (("Trailer1_",), (0, 0, 0)),
             "_PanelLeftCracked": (("TrailerCracked0_",), TRAILER_CRACKED_OFFSET),
             "_PanelRightCracked": (("TrailerCracked1_",), TRAILER_CRACKED_OFFSET),
+            "_PanelLeftLightCracked": (("TrailerLightCracked0_",), TRAILER_LIGHT_CRACKED_OFFSET),
+            "_PanelRightLightCracked": (("TrailerLightCracked1_",), TRAILER_LIGHT_CRACKED_OFFSET),
         },
         "hinged": {
             "_Lid": {"pivot": TRAILER_LID_HINGE, "axis": (1, 0, 0), "open": TRAILER_LID_OPEN, "clip": "Lid_closing"},

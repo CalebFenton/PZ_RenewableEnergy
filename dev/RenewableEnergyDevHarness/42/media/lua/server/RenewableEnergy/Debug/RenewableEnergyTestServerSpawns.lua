@@ -345,8 +345,8 @@ handler("worldCrate", function(_, args, defer)
     return { stock = stockOf(container), overlay = overlay and overlay:getName() }
 end)
 
--- The cracked and weathered condition ranges are real conditions, and a cracked module always
--- reads worse than a weathered one, so players can tell which needs repair.
+-- The cracked and weathered condition ranges are real conditions, a cracked module always reads
+-- worse than a weathered one, so players can tell which needs repair, and shows cracked glass.
 local function expectConditionRanges(expect)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     for name, range in pairs({ cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }) do
@@ -354,6 +354,9 @@ local function expectConditionRanges(expect)
             "the " .. name .. " condition range is " .. range.min .. " to " .. range.max)
     end
     expect(WorldSpawns.CRACKED.max < WorldSpawns.WEATHERED.min, "cracked and weathered conditions overlap")
+    local best = WorldSpawns.CRACKED.max
+    expect(RenewableEnergy.crackLookOf(RenewableEnergy.Specs.factoryModule, best) ~= nil,
+        "a cracked module at " .. best .. " shows whole glass")
 end
 
 -- Farm storage shelves get a cracked module, at a cracked condition, when the roll comes in under

@@ -1,6 +1,7 @@
 require "Vehicles/Vehicles"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/VehicleBattery"
+require "RenewableEnergy/Gadgets/CarAlternator"
 
 -- Scales vanilla's vehicle battery charging and draining by the installed battery's capacity
 -- (RenewableEnergy.VehicleBattery.chargeScale), so a deep cycle battery's charge moves slower
@@ -13,6 +14,7 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 -- Java's (BaseVehicle.tryStartEngine) and stays unscaled.
 
 local Battery, VehicleBattery = RenewableEnergy.Battery, RenewableEnergy.VehicleBattery
+local CarAlternator = RenewableEnergy.CarAlternator
 
 local vanillaChargeBattery = VehicleUtils.chargeBattery
 
@@ -26,7 +28,8 @@ local vanillaUpdateBattery = Vehicles.Update.Battery
 
 -- Scales only a rise, which is the alternator's alone: the lightbar drain this update also runs
 -- comes only with the engine off (Vehicles.Update.Lightbar), when the alternator adds nothing, and
--- went through chargeBattery, scaled already.
+-- went through chargeBattery, scaled already. A car whose alternator was taken out
+-- (RenewableEnergy.CarAlternator) has nothing to make the rise, so it keeps none of it.
 function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
     local item = part:getInventoryItem()
     local before = item and Battery.getCharge(item)
@@ -34,7 +37,7 @@ function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
     if not before then
         return
     end
-    local scale = VehicleBattery.chargeScale(item)
+    local scale = CarAlternator.isOut(vehicle) and 0 or VehicleBattery.chargeScale(item)
     local after = Battery.getCharge(item)
     if scale == 1 or after <= before then
         return

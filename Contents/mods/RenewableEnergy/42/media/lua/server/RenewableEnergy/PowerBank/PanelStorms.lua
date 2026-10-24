@@ -2,15 +2,17 @@
 -- connected, so disconnecting one before a storm doesn't spare it: a bank's pass cracks its own
 -- panels (PanelSource.update), and this cracks every other outdoor panel the same way.
 --
--- The world keeps a running total of storm hours, and each panel the total it has weathered, so a
--- panel whose chunk was unloaded through a storm takes it when its chunk next loads. A panel seen
--- for the first time starts at the total: it was just placed, or is from a save before this.
+-- The world keeps a running total of storm hours (PanelSource.stormHours), and each panel the
+-- total it has weathered, so a panel whose chunk was unloaded through a storm takes it when its
+-- chunk next loads. A panel seen for the first time starts at the total: it was just placed, or is
+-- from a save before this.
 
 if isClient() then return end
 
 require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
+require "RenewableEnergy/StormNotice"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/PanelSource"
@@ -18,6 +20,7 @@ require "RenewableEnergy/PowerBank/BankSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local PowerBank, Sources, PanelSource = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.PanelSource
+local StormNotice = RenewableEnergy.StormNotice
 
 local PanelStorms = {}
 RenewableEnergy.PanelStorms = PanelStorms
@@ -59,6 +62,7 @@ function PanelStorms.weather(isoObject)
     end
     PanelSource.writeModules(isoObject, source.modules)
     PanelSource.showCracks(isoObject)
+    StormNotice.tell(StormNotice.MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
     return true
 end
 

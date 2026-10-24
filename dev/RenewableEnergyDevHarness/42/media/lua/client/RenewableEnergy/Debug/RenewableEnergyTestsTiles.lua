@@ -22,7 +22,7 @@ local PLACED = T.PLACED_TILES
 
 -- Every overlay tile Sprites.lua names.
 local function overlays()
-    local all = { Sprites.crateOverlays.full, Sprites.crateOverlays.closed, Sprites.snow.flat, Sprites.cracks.flat }
+    local all = { Sprites.crateOverlays.full, Sprites.crateOverlays.closed, Sprites.snow.flat }
     local function add(list)
         for _, name in pairs(list) do
             table.insert(all, name)
@@ -31,12 +31,15 @@ local function overlays()
     for _, facings in pairs(Sprites.snow.rack) do
         add(facings)
     end
-    for _, facings in pairs(Sprites.cracks.wall) do
-        add(facings)
-    end
-    for _, facings in pairs(Sprites.cracks.rack) do
-        for _, slots in pairs(facings) do
-            add(slots)
+    for _, cracks in pairs(Sprites.cracks) do
+        table.insert(all, cracks.flat)
+        for _, facings in pairs(cracks.wall) do
+            add(facings)
+        end
+        for _, facings in pairs(cracks.rack) do
+            for _, slots in pairs(facings) do
+                add(slots)
+            end
         end
     end
     for _, facings in pairs(Sprites.bankFill) do
@@ -308,24 +311,45 @@ test("renewable_energy_tiles_bank_scraps_to_parts", {
     end,
 })
 
--- Cutting up a vanilla fridge also gives its compressor, which a digester needs to fill propane
--- tanks.
-local FRIDGE = "appliances_refrigeration_01_0"
+-- Cutting up a vanilla fridge gives its compressor, which a digester needs to fill propane tanks,
+-- on a roll under the character's chance, at most one, and only for the clicked tile, not again
+-- for the others vanilla scraps along with it: 10% at Metalworking 0, 10% more a level, so certain
+-- at 9. A stove, which vanilla also cuts up as a Fridge, has none. Each case: what is cut up, the
+-- Metalworking level, the roll, whether it is another tile of the fridge, and the compressors.
+local FRIDGE, STOVE = "appliances_refrigeration_01_0", "appliances_cooking_01_0"
+local UNDER = 1e-9
+local COMPRESSOR_CASES = {
+    { "a fridge at Metalworking 0, rolling just under 10%", FRIDGE, 0, 0.1 - UNDER, false, 1 },
+    { "a fridge at Metalworking 0, rolling 10%", FRIDGE, 0, 0.1, false, 0 },
+    { "a fridge at Metalworking 4, rolling just under 50%", FRIDGE, 4, 0.5 - UNDER, false, 1 },
+    { "a fridge at Metalworking 4, rolling 50%", FRIDGE, 4, 0.5, false, 0 },
+    { "a fridge at Metalworking 9, on the highest roll", FRIDGE, 9, 1 - UNDER, false, 1 },
+    { "a fridge's other tile, on the lowest roll", FRIDGE, 9, 0, true, 0 },
+    { "a stove, on the lowest roll", STOVE, 9, 0, false, 0 },
+}
 test("renewable_energy_tiles_fridge_scraps_to_compressor", {
-    validate = function()
-        local props = ISMoveableSpriteProps.new(FRIDGE)
-        expect(props.material == "Fridge" or props.material2 == "Fridge" or props.material3 == "Fridge",
-            FRIDGE .. " isn't cut up as a Fridge")
-        local _, entries = scrapEntries("Fridge")
-        local compressor = RenewableEnergy.Digester.COMPRESSOR
-        local found
-        for _, entry in ipairs(entries or {}) do
-            if entry.returnItem == compressor then
-                found = entry
-            end
+    run = function(self)
+        self.counts = {}
+        for i, case in ipairs(COMPRESSOR_CASES) do
+            T.step(function() T.setPerk(self, Perks.MetalWelding, case[3]) end)
+            T.forceRoll(self, case[4])
+            T.server(self, "scrapItems", { sprite = case[2], otherTile = case[5] })
+            T.step(function()
+                local count = 0
+                for _, fullType in ipairs(self.server.scrapItems.usable or {}) do
+                    if fullType == RenewableEnergy.Digester.COMPRESSOR then
+                        count = count + 1
+                    end
+                end
+                self.counts[i] = count
+            end)
         end
-        if expect(found ~= nil, "cutting up a Fridge doesn't give " .. compressor) then
-            expectGivable("cutting up a Fridge", found)
+    end,
+    validate = function(self)
+        local stove = ISMoveableSpriteProps.new(STOVE)
+        expect(stove.canScrap and stove.material == "Fridge", "the stove can't be cut up, or isn't cut up as a Fridge")
+        for i, case in ipairs(COMPRESSOR_CASES) do
+            expect(self.counts[i] == case[6], case[1] .. " gave " .. tostring(self.counts[i]) .. " compressors, expected " .. case[6])
         end
     end,
 })
@@ -509,25 +533,33 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
     end,
 })
 
--- A module just below Specs.crackedBelow shows cracks over its own slot, one at it shows whole,
--- repair clears them, and snow stays drawn over cracks added under it; this client matches.
-local CRACKED_AT, WHOLE_AT = Specs.crackedBelow - 1, Specs.crackedBelow
-local CRACKS, SNOW = Sprites.cracks, Sprites.snow
+-- A module just below each Specs.crackLooks threshold shows that look's cracks over its own slot,
+-- one at the light threshold shows whole, repair clears them, and snow stays drawn over cracks
+-- added under it; this client matches.
+local function factoryAt(share)
+    return math.floor(share * RenewableEnergy.conditionMaxOf(Specs.factoryModule) + 0.5)
+end
+local HEAVY_AT, LIGHT_AT = factoryAt(Specs.crackLooks.heavyBelow) - 1, factoryAt(Specs.crackLooks.lightBelow) - 1
+local WHOLE_AT = LIGHT_AT + 1
+local HEAVY, LIGHT, SNOW = Sprites.cracks.heavy, Sprites.cracks.light, Sprites.snow
 local CRACKED = {
-    { name = "flatCracked", sprite = Sprites.flat, modules = T.factoryModules(CRACKED_AT), shows = CRACKS.flat,
-        what = "a flat panel just below the crack" },
-    { name = "flatWhole", sprite = Sprites.flat, modules = T.factoryModules(WHOLE_AT), shows = "", what = "a flat panel at the crack" },
-    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = T.factoryModules(100, CRACKED_AT), shows = CRACKS.rack.metal.W[2],
+    { name = "flatHeavy", sprite = Sprites.flat, modules = T.factoryModules(HEAVY_AT), shows = HEAVY.flat,
+        what = "a flat panel just below the heavy cracks" },
+    { name = "flatLight", sprite = Sprites.flat, modules = T.factoryModules(LIGHT_AT), shows = LIGHT.flat,
+        what = "a flat panel just below the light cracks" },
+    { name = "flatWhole", sprite = Sprites.flat, modules = T.factoryModules(WHOLE_AT), shows = "", what = "a flat panel at the light cracks" },
+    { name = "rackUpper", sprite = Sprites.rack.metal.W, modules = T.factoryModules(100, HEAVY_AT), shows = HEAVY.rack.metal.W[2],
         what = "a metal rack facing west with its upper module cracked" },
-    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = T.factoryModules(0, CRACKED_AT),
-        shows = CRACKS.rack.wood.E[1] .. "," .. CRACKS.rack.wood.E[2], what = "a wooden rack facing east with both modules cracked" },
+    { name = "rackBoth", sprite = Sprites.rack.wood.E, modules = T.factoryModules(LIGHT_AT, HEAVY_AT),
+        shows = LIGHT.rack.wood.E[1] .. "," .. HEAVY.rack.wood.E[2],
+        what = "a wooden rack facing east with its lower module lightly and its upper heavily cracked" },
     -- A wall panel needs a wall to be placed against, so this one is a bare tile.
-    { name = "wall", sprite = Sprites.wall.wood.E, modules = T.factoryModules(CRACKED_AT), shows = CRACKS.wall.wood.E,
-        what = "a cracked wooden wall panel facing east" },
-    { name = "repaired", sprite = Sprites.flat, modules = T.factoryModules(CRACKED_AT),
-        change = { modules = T.factoryModules(WHOLE_AT) }, shows = "", what = "a cracked flat panel repaired to the crack" },
+    { name = "wall", sprite = Sprites.wall.wood.E, modules = T.factoryModules(LIGHT_AT), shows = LIGHT.wall.wood.E,
+        what = "a lightly cracked wooden wall panel facing east" },
+    { name = "repaired", sprite = Sprites.flat, modules = T.factoryModules(HEAVY_AT),
+        change = { modules = T.factoryModules(WHOLE_AT) }, shows = "", what = "a cracked flat panel repaired to whole" },
     { name = "snowed", sprite = Sprites.flat, modules = T.factoryModules(100),
-        change = { modules = T.factoryModules(CRACKED_AT), snow = true }, shows = CRACKS.flat .. "," .. SNOW.flat,
+        change = { modules = T.factoryModules(HEAVY_AT), snow = true }, shows = HEAVY.flat .. "," .. SNOW.flat,
         what = "a snowed-on flat panel cracked under the snow" },
 }
 

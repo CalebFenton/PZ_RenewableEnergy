@@ -157,11 +157,13 @@ local function windTiles()
     return list
 end
 
--- The propeller chargers, wooden then pipe, and the alternator charger, a row each, as their sprite
--- models facing each way in turn, spaced for their rotors, each at a different spin step.
+-- The treadmill charger with wooden blades, the car alternator charger with pipe blades and the
+-- homebuilt turbine with steel ones, a row each, as their sprite models facing each way in turn,
+-- spaced for their rotors, each at a different spin step.
 local function tallWindTiles()
     local list = {}
-    for row, sprites in ipairs({ Sprites.windPropeller.wood, Sprites.windPropeller.pipe, Sprites.windAlternator }) do
+    local chargers = Sprites.windCharger
+    for row, sprites in ipairs({ chargers.propeller.wood, chargers.carAlternator.pipe, chargers.alternator.steel }) do
         for column, facing in ipairs({ "N", "E", "S", "W" }) do
             table.insert(list, { x = (column - 1) * 3, y = row * 4 - 2, sprite = sprites[facing],
                 spriteModel = Sprites.windModelOf(sprites[facing]) .. (column - 1) })
@@ -494,20 +496,21 @@ local function addShot(steps, player, lot, shot)
     end)
 end
 
--- Cracked mounts, by lot square, and their modules' conditions in slot order. Each rack has one
--- cracked module, the wooden one its lower and the metal one its upper.
+-- Cracked mounts, by lot square, and their modules' conditions in slot order: the metal walls and
+-- the metal rack's upper module lightly cracked, the rest heavily. Each rack has one cracked
+-- module, the wooden one its lower and the metal one its upper.
 local CRACKED_WALLS = {
     { x = 1, y = 1, sprite = WALL_NORTH }, { x = 2, y = 1, sprite = WALL_NORTH },
     { x = 0, y = 2, sprite = WALL_WEST }, { x = 0, y = 3, sprite = WALL_WEST },
 }
 local CRACKED_PANELS = {
-    { x = 1, y = 1, sprite = Sprites.wall.metal.S, conditions = { 40 } },
+    { x = 1, y = 1, sprite = Sprites.wall.metal.S, conditions = { 70 } },
     { x = 2, y = 1, sprite = Sprites.wall.wood.S, conditions = { 40 } },
-    { x = 0, y = 2, sprite = Sprites.wall.metal.E, conditions = { 40 } },
+    { x = 0, y = 2, sprite = Sprites.wall.metal.E, conditions = { 70 } },
     { x = 0, y = 3, sprite = Sprites.wall.wood.E, conditions = { 40 } },
     { x = 2, y = 3, sprite = Sprites.flat, conditions = { 30 } },
     { x = 1, y = 5, sprite = Sprites.rack.wood.S, conditions = { 30, 100 } },
-    { x = 3, y = 5, sprite = Sprites.rack.metal.S, conditions = { 100, 45 } },
+    { x = 3, y = 5, sprite = Sprites.rack.metal.S, conditions = { 100, 70 } },
 }
 -- The squares east of the mounts stay open for a trailer with a cracked panel. The character
 -- stands south-east of the mounts and south-west of the open ground, hiding neither.

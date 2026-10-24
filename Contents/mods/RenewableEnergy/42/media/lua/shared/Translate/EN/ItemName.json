@@ -50,5 +50,9 @@
     "RenewableEnergy.WoodenBlades": "Carved Wooden Blades",
     "RenewableEnergy.PipeBlades": "Plastic Pipe Blades",
     "RenewableEnergy.SteelBlades": "Forged Steel Blades",
-    "RenewableEnergy.HomemadeAlternator": "Homemade Alternator"
+    "RenewableEnergy.BrokenWoodenBlades": "Broken Wooden Blades",
+    "RenewableEnergy.BrokenPipeBlades": "Broken Pipe Blades",
+    "RenewableEnergy.BrokenSteelBlades": "Broken Steel Blades",
+    "RenewableEnergy.HomemadeAlternator": "Homemade Alternator",
+    "RenewableEnergy.CarAlternator": "Car Alternator"
 }

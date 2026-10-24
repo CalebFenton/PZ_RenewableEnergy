@@ -289,10 +289,34 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_SteelBlades,
         scale = 0.666667,
     }
+    model BrokenWoodenBlades_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BrokenWoodenBlades,
+        texture = WorldItems/RenewableEnergy_BrokenWoodenBlades,
+        scale = 0.666667,
+    }
+    model BrokenPipeBlades_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BrokenPipeBlades,
+        texture = WorldItems/RenewableEnergy_BrokenPipeBlades,
+        scale = 0.666667,
+    }
+    model BrokenSteelBlades_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_BrokenSteelBlades,
+        texture = WorldItems/RenewableEnergy_BrokenSteelBlades,
+        scale = 0.666667,
+    }
     model HomemadeAlternator_Ground
     {
         mesh = WorldItems/RenewableEnergy_HomemadeAlternator,
         texture = WorldItems/RenewableEnergy_HomemadeAlternator,
+        scale = 0.666667,
+    }
+    model CarAlternator_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternator,
+        texture = WorldItems/RenewableEnergy_CarAlternator,
         scale = 0.666667,
     }
     model MetalDrum_Ground
@@ -325,76 +349,328 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_ScoopRotor,
         scale = 1,
     }
-    model Propeller0
+    model PropellerWood0
     {
-        mesh = WorldItems/RenewableEnergy_Propeller0,
+        mesh = WorldItems/RenewableEnergy_PropellerWood0,
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
-    model Propeller1
+    model PropellerWood1
     {
-        mesh = WorldItems/RenewableEnergy_Propeller1,
+        mesh = WorldItems/RenewableEnergy_PropellerWood1,
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
-    model Propeller2
+    model PropellerWood2
     {
-        mesh = WorldItems/RenewableEnergy_Propeller2,
+        mesh = WorldItems/RenewableEnergy_PropellerWood2,
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
-    model Propeller3
+    model PropellerWood3
     {
-        mesh = WorldItems/RenewableEnergy_Propeller3,
+        mesh = WorldItems/RenewableEnergy_PropellerWood3,
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
-    model Propeller4
+    model PropellerWood4
     {
-        mesh = WorldItems/RenewableEnergy_Propeller4,
+        mesh = WorldItems/RenewableEnergy_PropellerWood4,
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
-    model Propeller5
+    model PropellerWood5
     {
-        mesh = WorldItems/RenewableEnergy_Propeller5,
+        mesh = WorldItems/RenewableEnergy_PropellerWood5,
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
-    model Alternator0
+    model PropellerPipe0
     {
-        mesh = WorldItems/RenewableEnergy_Alternator0,
-        texture = WorldItems/RenewableEnergy_Alternator,
+        mesh = WorldItems/RenewableEnergy_PropellerPipe0,
+        texture = WorldItems/RenewableEnergy_PropellerPipe,
         scale = 1,
     }
-    model Alternator1
+    model PropellerPipe1
     {
-        mesh = WorldItems/RenewableEnergy_Alternator1,
-        texture = WorldItems/RenewableEnergy_Alternator,
+        mesh = WorldItems/RenewableEnergy_PropellerPipe1,
+        texture = WorldItems/RenewableEnergy_PropellerPipe,
         scale = 1,
     }
-    model Alternator2
+    model PropellerPipe2
     {
-        mesh = WorldItems/RenewableEnergy_Alternator2,
-        texture = WorldItems/RenewableEnergy_Alternator,
+        mesh = WorldItems/RenewableEnergy_PropellerPipe2,
+        texture = WorldItems/RenewableEnergy_PropellerPipe,
         scale = 1,
     }
-    model Alternator3
+    model PropellerPipe3
     {
-        mesh = WorldItems/RenewableEnergy_Alternator3,
-        texture = WorldItems/RenewableEnergy_Alternator,
+        mesh = WorldItems/RenewableEnergy_PropellerPipe3,
+        texture = WorldItems/RenewableEnergy_PropellerPipe,
         scale = 1,
     }
-    model Alternator4
+    model PropellerPipe4
     {
-        mesh = WorldItems/RenewableEnergy_Alternator4,
-        texture = WorldItems/RenewableEnergy_Alternator,
+        mesh = WorldItems/RenewableEnergy_PropellerPipe4,
+        texture = WorldItems/RenewableEnergy_PropellerPipe,
         scale = 1,
     }
-    model Alternator5
+    model PropellerPipe5
     {
-        mesh = WorldItems/RenewableEnergy_Alternator5,
-        texture = WorldItems/RenewableEnergy_Alternator,
+        mesh = WorldItems/RenewableEnergy_PropellerPipe5,
+        texture = WorldItems/RenewableEnergy_PropellerPipe,
+        scale = 1,
+    }
+    model PropellerSteel0
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteel0,
+        texture = WorldItems/RenewableEnergy_PropellerSteel,
+        scale = 1,
+    }
+    model PropellerSteel1
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteel1,
+        texture = WorldItems/RenewableEnergy_PropellerSteel,
+        scale = 1,
+    }
+    model PropellerSteel2
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteel2,
+        texture = WorldItems/RenewableEnergy_PropellerSteel,
+        scale = 1,
+    }
+    model PropellerSteel3
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteel3,
+        texture = WorldItems/RenewableEnergy_PropellerSteel,
+        scale = 1,
+    }
+    model PropellerSteel4
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteel4,
+        texture = WorldItems/RenewableEnergy_PropellerSteel,
+        scale = 1,
+    }
+    model PropellerSteel5
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteel5,
+        texture = WorldItems/RenewableEnergy_PropellerSteel,
+        scale = 1,
+    }
+    model CarAlternatorWood0
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWood0,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorWood1
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWood1,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorWood2
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWood2,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorWood3
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWood3,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorWood4
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWood4,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorWood5
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWood5,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorPipe0
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
+        scale = 1,
+    }
+    model CarAlternatorPipe1
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
+        scale = 1,
+    }
+    model CarAlternatorPipe2
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
+        scale = 1,
+    }
+    model CarAlternatorPipe3
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
+        scale = 1,
+    }
+    model CarAlternatorPipe4
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
+        scale = 1,
+    }
+    model CarAlternatorPipe5
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
+        scale = 1,
+    }
+    model CarAlternatorSteel0
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model CarAlternatorSteel1
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model CarAlternatorSteel2
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model CarAlternatorSteel3
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model CarAlternatorSteel4
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model CarAlternatorSteel5
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorWood0
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWood0,
+        texture = WorldItems/RenewableEnergy_AlternatorWood,
+        scale = 1,
+    }
+    model AlternatorWood1
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWood1,
+        texture = WorldItems/RenewableEnergy_AlternatorWood,
+        scale = 1,
+    }
+    model AlternatorWood2
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWood2,
+        texture = WorldItems/RenewableEnergy_AlternatorWood,
+        scale = 1,
+    }
+    model AlternatorWood3
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWood3,
+        texture = WorldItems/RenewableEnergy_AlternatorWood,
+        scale = 1,
+    }
+    model AlternatorWood4
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWood4,
+        texture = WorldItems/RenewableEnergy_AlternatorWood,
+        scale = 1,
+    }
+    model AlternatorWood5
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWood5,
+        texture = WorldItems/RenewableEnergy_AlternatorWood,
+        scale = 1,
+    }
+    model AlternatorPipe0
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_AlternatorPipe,
+        scale = 1,
+    }
+    model AlternatorPipe1
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_AlternatorPipe,
+        scale = 1,
+    }
+    model AlternatorPipe2
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_AlternatorPipe,
+        scale = 1,
+    }
+    model AlternatorPipe3
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_AlternatorPipe,
+        scale = 1,
+    }
+    model AlternatorPipe4
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_AlternatorPipe,
+        scale = 1,
+    }
+    model AlternatorPipe5
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_AlternatorPipe,
+        scale = 1,
+    }
+    model AlternatorSteel0
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorSteel1
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorSteel2
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorSteel3
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorSteel4
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorSteel5
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_AlternatorSteel,
         scale = 1,
     }
 }

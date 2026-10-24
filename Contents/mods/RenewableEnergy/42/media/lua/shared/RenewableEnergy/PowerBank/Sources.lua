@@ -18,20 +18,14 @@ local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmil
 -- Whether a source of each family must stand outdoors: a treadmill works under a roof.
 local OUTDOORS = { panel = true, wind = true, treadmill = false }
 
-local NO_BLADES = {}
-
--- Kind -> { family, spec, blades, isPlaced }: blades the set of blade items that mend a broken
--- wind charger; isPlaced(isoObject), if any, whether a tile of the kind is a source yet.
+-- Kind -> { family, spec, isPlaced }: isPlaced(isoObject), if any, whether a tile of the kind is
+-- a source yet.
 local KINDS = {}
 for kind, spec in pairs(Specs.mounts) do
     KINDS[kind] = { family = "panel", spec = spec }
 end
 for kind, spec in pairs(Specs.wind.turbines) do
-    local blades = {}
-    for _, fullType in ipairs(spec.blades or {}) do
-        blades[fullType] = true
-    end
-    KINDS[kind] = { family = "wind", spec = spec, blades = blades }
+    KINDS[kind] = { family = "wind", spec = spec }
 end
 -- A treadmill's tile is a source once it is wired to feed a bank.
 KINDS.treadmill = { family = "treadmill", spec = Specs.treadmill, isPlaced = Treadmill.isWired }
@@ -72,13 +66,6 @@ end
 function Sources.sweepable(kind)
     local entry = kind and KINDS[kind]
     return entry ~= nil and entry.spec.holdsSnow == true and not entry.spec.shedsSnow
-end
-
---- The blade items that make a wind charger of `kind` whole again, as a set of full types; empty
---- for a kind that never breaks. The set is shared: callers must not change it.
-function Sources.bladesFor(kind)
-    local entry = kind and KINDS[kind]
-    return entry and entry.blades or NO_BLADES
 end
 
 --- The kind of a placed source (Sprites.kindOf), the way it faces and what it is made of; nil for

@@ -9,6 +9,7 @@ require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/Gadgets/CarAlternator"
 
 -- Every hands-on job at a battery bank, a source, a garden light or a vehicle
 -- (RenewableEnergy.JobAction); the authority's complete() makes the change. The server finds the
@@ -20,6 +21,7 @@ local Action = RenewableEnergyAction
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
 local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
 local positionOf, onSquare = PowerBank.positionOf, RenewableEnergy.onSquare
+local CarAlternator = RenewableEnergy.CarAlternator
 
 Action.CONNECT_SOURCE = "ConnectSource"
 Action.DISCONNECT_SOURCE = "DisconnectSource"
@@ -46,6 +48,8 @@ Action.UNWIRE_TREADMILL = "UnwireTreadmill"
 Action.REPLACE_BLADES = "ReplaceBlades"
 Action.CONNECT_BANK = "ConnectBank"
 Action.DISCONNECT_BANK = "DisconnectBank"
+Action.TAKE_OUT_ALTERNATOR = "TakeOutAlternator"
+Action.PUT_BACK_ALTERNATOR = "PutBackAlternator"
 
 -- What clears snow off a panel without scratching it: a broom sweeps, a snow shovel pushes.
 local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.SnowShovel"] = true }
@@ -399,6 +403,29 @@ JOBS = {
         end,
         minutes = 20,
         light = true,
+    },
+    -- Take Out and Put Back Alternator (RenewableEnergy.CarAlternator), worked as vanilla works on
+    -- an engine-bay part (ISUninstallVehiclePart). The hood and the engine are checked with the
+    -- rest, not every tick: a multiplayer client's copy shows the hood the menu opened only a
+    -- little after the server opened it.
+    [Action.TAKE_OUT_ALTERNATOR] = {
+        keeps = function(self) return CarAlternator.isCar(self.vehicle) end,
+        check = function(self) return CarAlternator.refusal(self.character, self.vehicle, false) == nil end,
+        run = function(self) return CarAlternator.takeOut(self.character, self.vehicle) end,
+        units = function(self) return CarAlternator.units(self.character) end,
+        metabolics = Metabolics.MediumWork,
+        begin = function(self) self:setActionAnim("VehicleWorkOnMid") end,
+    },
+    [Action.PUT_BACK_ALTERNATOR] = {
+        keeps = function(self)
+            return CarAlternator.isCar(self.vehicle) and self.item ~= nil and self.item:getFullType() == CarAlternator.ITEM
+                and holdsItem(self)
+        end,
+        check = function(self) return CarAlternator.refusal(self.character, self.vehicle, true) == nil end,
+        run = function(self) return CarAlternator.putBack(self.character, self.vehicle, self.item) end,
+        units = function(self) return CarAlternator.units(self.character) end,
+        metabolics = Metabolics.MediumWork,
+        begin = function(self) self:setActionAnim("VehicleWorkOnMid") end,
     },
 }
 

@@ -12,6 +12,7 @@ require "RenewableEnergy/World/ArrowBoardPower"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/Gadgets/CarAlternator"
 
 -- Where the mod's items spawn, 1993 style. apply() puts Distributions.items into the game's loot
 -- tables in OnInitGlobalModData, scaled by the save's loot rarity options.
@@ -578,6 +579,22 @@ Distributions.items = {
             { 2, "proc:MechanicShelfElectric" },
             { 0.5, "proc:GarageMechanics" },
             { 4, "proc:CrateBatteries" },
+        },
+    },
+    {
+        -- Wind: rebuilt alternators on the shelves of mechanics and auto parts stores, less often
+        -- than the engine parts, brakes and batteries vanilla stocks there, which wear out sooner.
+        fullType = RenewableEnergy.CarAlternator.ITEM,
+        option = "LRMMisc",
+        entries = {
+            { 3, "proc:MechanicShelfElectric" },
+            { 2, "proc:CarSupplyBatteries" },
+            { 3, "proc:CrateMechanics" },
+            { 1, "proc:MechanicShelfBrakes" },
+            { 1, "proc:MechanicShelfMufflers" },
+            { 1, "proc:MechanicShelfSuspension" },
+            { 1, "proc:MechanicSpecial" },
+            { 0.5, "proc:GarageMechanics" },
         },
     },
 }

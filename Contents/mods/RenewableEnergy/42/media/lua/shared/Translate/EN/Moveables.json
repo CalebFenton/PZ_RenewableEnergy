@@ -20,6 +20,7 @@
     "Gasifier": "Gasifier",
     "Advanced_Gasifier": "Advanced Gasifier",
     "Scoop_Rotor_Wind_Charger": "Scoop Rotor Wind Charger",
-    "Propeller_Wind_Charger": "Propeller Wind Charger",
-    "Homemade_Alternator_Wind_Charger": "Homemade Alternator Wind Charger"
+    "Treadmill_Wind_Charger": "Treadmill Wind Charger",
+    "Car_Alternator_Wind_Charger": "Car Alternator Wind Charger",
+    "Homebuilt_Wind_Turbine": "Homebuilt Wind Turbine"
 }

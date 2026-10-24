@@ -6,7 +6,6 @@
 require "RenewableEnergy/Specs"
 
 RenewableEnergy = RenewableEnergy or {}
-local Specs = RenewableEnergy.Specs
 
 local Sprites = {}
 RenewableEnergy.Sprites = Sprites
@@ -156,14 +155,27 @@ Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = 
 -- the squares' shared edge: `gasifierPipe` on the gasifier's tile, by the generator's direction from
 -- it, and the generator's half (Sprites.gasifierPipeGenFor) on the generator's tile with the kit.
 Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
--- Wind charger tiles, per blade material and rotor facing where the kind has them. In play the game
--- draws each as a sprite model instead (Sprites.windModels).
+-- Wind charger tiles: the scoop rotor's, and each bladed kind's per blade material and rotor
+-- facing (propeller the treadmill wind charger, alternator the homebuilt wind turbine, as
+-- Specs.wind.turbines). In play the game draws each as a sprite model instead (Sprites.windModels).
 Sprites.windScoop = tile(264)
-Sprites.windPropeller = {
-    wood = { N = tile(265), E = tile(266), S = tile(267), W = tile(268) },
-    pipe = { N = tile(269), E = tile(270), S = tile(271), W = tile(272) },
+Sprites.windCharger = {
+    propeller = {
+        wood = { N = tile(265), E = tile(266), S = tile(267), W = tile(268) },
+        pipe = { N = tile(269), E = tile(270), S = tile(271), W = tile(272) },
+        steel = { N = tile(372), E = tile(373), S = tile(374), W = tile(375) },
+    },
+    carAlternator = {
+        wood = { N = tile(405), E = tile(406), S = tile(407), W = tile(408) },
+        pipe = { N = tile(409), E = tile(410), S = tile(411), W = tile(412) },
+        steel = { N = tile(413), E = tile(414), S = tile(415), W = tile(416) },
+    },
+    alternator = {
+        steel = { N = tile(273), E = tile(274), S = tile(275), W = tile(276) },
+        wood = { N = tile(397), E = tile(398), S = tile(399), W = tile(400) },
+        pipe = { N = tile(401), E = tile(402), S = tile(403), W = tile(404) },
+    },
 }
-Sprites.windAlternator = { N = tile(273), E = tile(274), S = tile(275), W = tile(276) }
 -- Each wind charger kind's sprite models (scripts SpriteModels.txt): the name before the step
 -- number, suffixed with blade material and/or facing per the by* flags; `steps` models each turn
 -- the rotor one step, and stepsPerTurn is how many steps bring it back round (fewer for rotors that
@@ -171,7 +183,9 @@ Sprites.windAlternator = { N = tile(273), E = tile(274), S = tile(275), W = tile
 Sprites.windModels = {
     scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
     propeller = { name = "RenewableEnergy.Propeller", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
-    alternator = { name = "RenewableEnergy.Alternator", byFacing = true, steps = 6, stepsPerTurn = 18 },
+    carAlternator = { name = "RenewableEnergy.CarAlternator", byMaterial = true, byFacing = true, steps = 6,
+        stepsPerTurn = 18 },
+    alternator = { name = "RenewableEnergy.Alternator", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
 }
 
 -- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles per facing, keyed by the way a runner
@@ -193,17 +207,31 @@ Sprites.snow = {
     },
 }
 
--- A cracked module's glass, drawn over its mount's tile. A rack has one per module slot, slot 1
--- the lower module, so it shows only the modules that are cracked.
+-- A cracked module's glass, drawn over its mount's tile, by the look RenewableEnergy.crackLookOf
+-- gives it. A rack has one per module slot, slot 1 the lower module, so it shows only the modules
+-- that are cracked, each as it is cracked.
 Sprites.cracks = {
-    flat = tile(115),
-    wall = {
-        wood = { S = tile(118), E = tile(119) },
-        metal = { S = tile(116), E = tile(117) },
+    heavy = {
+        flat = tile(115),
+        wall = {
+            wood = { S = tile(118), E = tile(119) },
+            metal = { S = tile(116), E = tile(117) },
+        },
+        rack = {
+            wood = { S = tiles(128, 2), E = tiles(130, 2), N = tiles(132, 2), W = tiles(134, 2) },
+            metal = { S = tiles(120, 2), E = tiles(122, 2), N = tiles(124, 2), W = tiles(126, 2) },
+        },
     },
-    rack = {
-        wood = { S = tiles(128, 2), E = tiles(130, 2), N = tiles(132, 2), W = tiles(134, 2) },
-        metal = { S = tiles(120, 2), E = tiles(122, 2), N = tiles(124, 2), W = tiles(126, 2) },
+    light = {
+        flat = tile(376),
+        wall = {
+            wood = { S = tile(379), E = tile(380) },
+            metal = { S = tile(377), E = tile(378) },
+        },
+        rack = {
+            wood = { S = tiles(389, 2), E = tiles(391, 2), N = tiles(393, 2), W = tiles(395, 2) },
+            metal = { S = tiles(381, 2), E = tiles(383, 2), N = tiles(385, 2), W = tiles(387, 2) },
+        },
     },
 }
 
@@ -294,13 +322,12 @@ for facing, ends in pairs(Sprites.treadmill) do
         KINDS[name] = { "treadmill", facing, part }
     end
 end
-for material, facings in pairs(Sprites.windPropeller) do
-    for facing, name in pairs(facings) do
-        KINDS[name] = { "propeller", facing, material }
+for kind, materials in pairs(Sprites.windCharger) do
+    for material, facings in pairs(materials) do
+        for facing, name in pairs(facings) do
+            KINDS[name] = { kind, facing, material }
+        end
     end
-end
-for facing, name in pairs(Sprites.windAlternator) do
-    KINDS[name] = { "alternator", facing }
 end
 for tier, name in pairs(Sprites.gasifier) do
     KINDS[name] = { "gasifier", tier }
@@ -332,9 +359,9 @@ end
 
 --- What a placed tile is.
 ---@param spriteName string?
----@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
----@return string? facing "S", "E", "N" or "W" for walls, racks, banks, gas heaters, propellers, alternators and treadmills; a digester's or gasifier's tier
----@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood" or "pipe" for propellers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
+---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "carAlternator", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
+---@return string? facing "S", "E", "N" or "W" for walls, racks, banks, gas heaters, bladed wind chargers and treadmills; a digester's or gasifier's tier
+---@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood", "pipe" or "steel" for bladed wind chargers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
 function Sprites.kindOf(spriteName)
     local entry = spriteName and KINDS[spriteName]
     if not entry then
@@ -375,6 +402,13 @@ Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.crateO
     Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.gasKit, Sprites.gasifierLit, Sprites.gasifierPipe,
     Sprites.gasifierPipeGen)
 
+--- The tile of a bladed wind charger of `kind` facing `facing` (Sprites.kindOf) with blades of
+--- `material` (Specs.wind.blades), or nil for blades it has no tile for.
+function Sprites.windTileOf(kind, facing, material)
+    local facings = Sprites.windCharger[kind] and Sprites.windCharger[kind][material]
+    return facings and facings[facing]
+end
+
 --- The name of the sprite model a wind charger tile is drawn as, but for the step number, and its
 --- kind's row of Sprites.windModels; nil for any other sprite.
 ---@param spriteName string?
@@ -402,8 +436,8 @@ end
 -- loader of the same sprites needs a priority of its own, as RenewableEnergy.PlaceTracker's has.
 Sprites.LOAD_PRIORITY = 6
 
--- What a mount's tile shows of `byKind` (Sprites.snow or Sprites.cracks): the kind's own entry, or
--- for a kind that has one per material and facing, that one; nil for none.
+-- What a mount's tile shows of `byKind` (Sprites.snow or a look of Sprites.cracks): the kind's own
+-- entry, or for a kind that has one per material and facing, that one; nil for none.
 local function ofMount(byKind, kind, facing, material)
     local entry = byKind[kind]
     if type(entry) == "table" then
@@ -415,9 +449,9 @@ end
 
 local NO_SLOTS = {}
 
--- A mount's crack overlays by module slot. May be Sprites.cracks' own list: don't change it.
-local function crackSlots(kind, facing, material)
-    local slots = ofMount(Sprites.cracks, kind, facing, material)
+-- A mount's crack overlays of `look` by module slot. May be Sprites.cracks' own list: don't change it.
+local function crackSlots(look, kind, facing, material)
+    local slots = ofMount(Sprites.cracks[look], kind, facing, material)
     if type(slots) == "string" then
         return { slots }
     end
@@ -434,7 +468,8 @@ function Sprites.snowOverlay(kind, facing, material)
     return ofMount(Sprites.snow, kind, facing, material)
 end
 
---- The crack overlays a mount's tile shows: one for each module below Specs.crackedBelow, by slot.
+--- The crack overlays a mount's tile shows: one for each cracked module, by slot, of the look
+--- RenewableEnergy.crackLookOf gives it.
 ---@param kind string "flat", "wall" or "rack" (see kindOf)
 ---@param facing string? the mount's facing, for walls and racks
 ---@param material string? "wood" or "metal", for walls and racks
@@ -442,10 +477,12 @@ end
 ---@return string[]
 function Sprites.crackOverlays(kind, facing, material, modules)
     local shown = {}
-    for slot, name in ipairs(crackSlots(kind, facing, material)) do
+    -- Both looks have an overlay for every slot.
+    for slot in ipairs(crackSlots("heavy", kind, facing, material)) do
         local module = modules[slot]
-        if module and module.condition < Specs.crackedBelow then
-            table.insert(shown, name)
+        local look = module and RenewableEnergy.crackLookOf(module.type, module.condition)
+        if look then
+            table.insert(shown, crackSlots(look, kind, facing, material)[slot])
         end
     end
     return shown

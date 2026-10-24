@@ -48,23 +48,52 @@ Specs.freeSlots = 2
 Specs.slotsPerController = 7
 
 -- Wind chargers by kind (RenewableEnergy.Wind): watts at ratedKph, starting at cutInKph. Game wind is
--- ClimateManager's windPower × 120 km/h. Left unbraked at breakKph or more, blades break at
--- breakPerHour (scaled by the StormDamage options); any item in `blades` repairs them. A turbine with
--- furlKph turns out of strong wind, making furledShare of its rating instead of breaking early.
+-- ClimateManager's windPower × 120 km/h. The generator alone sets the power: `blades` lists the
+-- blade materials (Specs.wind.blades) it takes, the first for a charger whose sprite names none,
+-- and they decide only when it breaks. rotorAbove is how many levels above its own the rotor turns
+-- (each mast charger's hub is a storey and a half up, art/models/items.py), where its shelter is
+-- counted. A turbine with furlKph swings its tail-hinged head out of strong wind and holds
+-- furledShare of its rating, as a furling tail governs the rotor near its rated speed; turned
+-- aside, its blades take less of the gale and break only furledBladeKph above their break speed.
+-- propeller is the treadmill wind charger, alternator the homebuilt wind turbine (their names in
+-- saved records and tiles from before they were renamed).
 Specs.wind = {
     turbines = {
-        scoop = { slots = 1, watts = 480, cutInKph = 8, ratedKph = 50 },
-        propeller = { slots = 2, watts = 1600, cutInKph = 10, ratedKph = 40, breakKph = 55, breakPerHour = 0.25,
-            blades = { "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades" } },
-        alternator = { slots = 3, watts = 3200, cutInKph = 9, ratedKph = 40, furlKph = 55, furledShare = 0.3,
-            breakKph = 90, breakPerHour = 0.1, blades = { "RenewableEnergy.SteelBlades" } },
+        scoop = { slots = 1, watts = 480, cutInKph = 8, ratedKph = 50, rotorAbove = 0 },
+        propeller = { slots = 2, watts = 1600, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
+            blades = { "wood", "pipe", "steel" } },
+        carAlternator = { slots = 2, watts = 2000, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
+            blades = { "wood", "pipe", "steel" } },
+        alternator = { slots = 3, watts = 3200, cutInKph = 9, ratedKph = 40, rotorAbove = 1,
+            furlKph = 55, furledShare = 0.85, furledBladeKph = 20, blades = { "steel", "wood", "pipe" } },
+    },
+    -- Blades by material: the item that makes and mends them, and the `broken` item a mend hands
+    -- back; the wind above which unbraked they can break (Specs.storm), and their stormShare of the
+    -- weakest blades' chance; the sound they make straining in that wind and breaking. Plastic pipe
+    -- goes brittle and snaps first, carved wood flexes, and forged steel holds through all but the worst.
+    blades = {
+        pipe = { item = "RenewableEnergy.PipeBlades", broken = "RenewableEnergy.BrokenPipeBlades", breakKph = 60,
+            stormShare = 1, strainSound = "WindowRattle", breakSound = "BreakObject" },
+        wood = { item = "RenewableEnergy.WoodenBlades", broken = "RenewableEnergy.BrokenWoodenBlades", breakKph = 70,
+            stormShare = 0.5, strainSound = "WoodDoorCreak", breakSound = "BreakBarricadePlank" },
+        steel = { item = "RenewableEnergy.SteelBlades", broken = "RenewableEnergy.BrokenSteelBlades", breakKph = 90,
+            stormShare = 0.25, strainSound = "WindowRattle", breakSound = "BreakBarricadeMetal" },
     },
     -- Share added per level above ground, capped at maxBonusLevel.
     heightBonusPerLevel = 0.15,
     maxBonusLevel = 3,
-    -- Squares checked for shelter, and the share lost when fully hemmed in.
+    -- Squares checked for shelter, and the share lost when fully hemmed in. Trees shelter a rotor
+    -- turning on treetopLevel or lower: a mast charger standing on the ground or a first floor.
     shelterRadius = 8,
     shelterLoss = 0.7,
+    treetopLevel = 2,
+    -- Another charger whose rotor turns on the same level within crowdRadius squares takes wind
+    -- from this one, crowdLoss of it right beside it and less with each square further, none
+    -- beyond: a rotor's wake takes a few rotor widths to fill back in, and these rotors are about
+    -- two squares across (art/models/items.py blade lengths). Each such neighbour takes its share
+    -- of what the others leave. Not shelter: a mast and a turning rotor stop far less wind than a wall.
+    crowdRadius = 3,
+    crowdLoss = 0.25,
 }
 
 -- Treadmill (RenewableEnergy.Treadmill): wiring cost (as Specs.wiring), watts a runner puts in (an
@@ -104,26 +133,43 @@ Specs.modules = {
 Specs.factoryModule = "RenewableEnergy.SolarModule"
 
 -- Panel mounts by kind (RenewableEnergy.Sprites.kindOf): input slots, modules held, tilt from flat,
--- and storm crack factor before the material's. Snow settles where holdsSnow and stays until it
--- melts or is swept, unless shedsSnow lets it slide off in sun or mild air.
+-- and stormShare (Specs.storm), times its material's. Snow settles where holdsSnow and stays until
+-- it melts or is swept, unless shedsSnow lets it slide off in sun or mild air.
 Specs.mounts = {
-    flat = { slots = 1, modules = 1, tilt = 0, stormFactor = 1, holdsSnow = true },
-    wall = { slots = 1, modules = 1, tilt = 90, stormFactor = 0 },
-    rack = { slots = 1, modules = 2, tilt = 38, stormFactor = 1, holdsSnow = true, shedsSnow = true },
+    flat = { slots = 1, modules = 1, tilt = 0, stormShare = 0.5, holdsSnow = true },
+    wall = { slots = 1, modules = 1, tilt = 90, stormShare = 0 },
+    rack = { slots = 1, modules = 2, tilt = 38, stormShare = 1, holdsSnow = true, shedsSnow = true },
 }
--- A wooden mount flexes and lets modules crack; a welded one holds them.
+-- A wooden mount flexes and lets modules crack; a welded one holds them. A wooden rack is the
+-- weakest panel, at a stormShare of 1.
 Specs.materials = {
-    wood = { stormFactor = 2 },
-    metal = { stormFactor = 0.5 },
+    wood = { stormShare = 1 },
+    metal = { stormShare = 0.25 },
 }
 
--- Thunderstorms at windMin km/h or more crack a module per panel with chancePerHour (times the
--- mount, material and StormDamageRate factors), costing `crack` condition. Tuned from a
--- fast-forwarded game year to crack an occasional module every few months across a modest array.
-Specs.storm = { windMin = 45, chancePerHour = 0.0035, crack = 30 }
--- Below this condition a module shows cracked glass, on a mount or the arrow board. Reglazed modules
--- show whole; sealed ones still show cracked, because the glass still is.
-Specs.crackedBelow = 60
+-- Storm damage. Unbraked blades (Specs.wind.blades) break with an hourly chance that rises with the
+-- square of the wind above their break speed (wind load goes with the square of its speed), from
+-- none there to the full chance at fullKph, the game's strongest wind. The full chance is set so
+-- worstHours of it, the longest blizzard (WeatherPeriod: 24 + 24 × strength), break the weakest
+-- blades with worstChance at the default Storm Damage Rate; other blades get their stormShare of
+-- it. Most weather never comes close: a thunderstorm tops out at 84 km/h, a blizzard blows 90 to
+-- 120 (WeatherPeriod.updateCurrentStage).
+-- Modules crack in any thunderstorm blowing panelKph or more, at panelPerHour for the weakest panel
+-- and its stormShare of that for the others: half the chance a fast-forwarded game year once tuned
+-- to crack a module every few months across a modest array. That keeps the longest run of
+-- thunderstorms, a tropical storm and the two storms that can follow it
+-- (WeatherPeriod.createWeatherPattern), under worstChance too. A crack, a storm's or a trailer
+-- crash's (ArrowBoard), costs `crack` condition.
+Specs.storm = { fullKph = 120, worstHours = 48, worstChance = 0.15, panelKph = 45, panelPerHour = 0.0035,
+    crack = 20, crackSound = "BreakGlassItem" }
+-- How a module's glass looks, on a mount or the arrow board, by its condition as a share of its
+-- own ConditionMax (RenewableEnergy.crackLookOf): whole down to `lightBelow`, lightly cracked
+-- below that, heavily cracked below `heavyBelow`. A share, so a homemade module, whose max is
+-- lower, looks whole when new and cracks into each look as a factory one does. The first crack
+-- of a new module shows: lightBelow sits above the share one crack (storm.crack) leaves it. Reglazed
+-- modules show whole; sealed ones still show cracked, because the glass still is (Recipes.lua
+-- keeps both levels so).
+Specs.crackLooks = { lightBelow = 0.85, heavyBelow = 0.5 }
 
 -- Banks by item type: the Sprites field of its placed tile, and how many of each part it takes.
 Specs.banks = {

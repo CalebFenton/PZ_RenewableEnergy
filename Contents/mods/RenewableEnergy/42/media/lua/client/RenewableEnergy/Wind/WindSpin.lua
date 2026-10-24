@@ -1,8 +1,9 @@
 -- Turns the wind chargers this client can see, a cosmetic only it draws. Each charger is drawn as a
 -- 3D model through a sprite model (Sprites.windModels), and the rotor turns by stepping the object
 -- through models yawed a step apart (IsoObject.setSpriteModelName); animating keeps it out of the
--- cached chunk, so each step shows at once. The game's wind is the same on every client, and a
--- charger's brake is in its modData, so nothing needs sending.
+-- cached chunk, so each step shows at once. An unbraked charger in a wind that can break its blades
+-- strains audibly now and then, the warning to set the brake. The game's wind is the same on every
+-- client, and a charger's brake is in its modData, so nothing needs sending.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
@@ -16,6 +17,8 @@ RenewableEnergy.WindSpin = WindSpin
 
 -- Turns a second: a slow start at the cut-in speed, faster with the wind, no faster than this.
 local START_TPS, TPS_PER_KPH, MAX_TPS = 0.3, 0.04, 2
+-- Seconds between a straining charger's sounds, at random between these.
+local STRAIN_MIN_SECONDS, STRAIN_MAX_SECONDS = 6, 14
 
 -- Wind charger objects this client has, and how far round each one is, in steps; and how many.
 local chargers, tracked = {}, 0
@@ -35,17 +38,24 @@ local function modelNames(prefix, model)
     return names
 end
 
+-- A charger's turning state for the tile `name`, shown at its first step; nil for any other tile.
+local function stateFor(name)
+    local prefix, model = Sprites.windModelOf(name)
+    if not prefix then return nil end
+    local kind, _, material = Sprites.kindOf(name)
+    return { sprite = name, spec = Specs.wind.turbines[kind], blades = Wind.bladesOf(kind, material),
+        model = model, names = modelNames(prefix, model), phase = 0, shown = 0, strainIn = 0 }
+end
+
 --- Starts turning `object` if it is a wind charger: as its chunk loads, or as it is added to the
 --- map (OnObjectAdded, which Wind.OnCreate fires for a charger built in single player).
 function WindSpin.track(object)
     if chargers[object] then return end
-    local name = Sprites.nameOf(object)
-    local prefix, model = Sprites.windModelOf(name)
-    if not prefix then return end
-    local names = modelNames(prefix, model)
-    chargers[object] = { spec = Specs.wind.turbines[Sprites.kindOf(name)], model = model, names = names, phase = 0, shown = 0 }
+    local state = stateFor(Sprites.nameOf(object))
+    if not state then return end
+    chargers[object] = state
     tracked = tracked + 1
-    object:setSpriteModelName(names[1])
+    object:setSpriteModelName(state.names[1])
     object:setAnimating(true)
 end
 
@@ -58,8 +68,23 @@ end
 
 local lastMs
 
--- Each tick: drops the chargers gone from the map, and steps on those turning. A calm, braked or
--- broken charger costs only the check that it is still there.
+-- Counts down to the charger's next strain sound while the wind can break its blades, and plays it.
+local function strain(object, state, kph, seconds)
+    if not Wind.canBreak(state.spec, state.blades, kph) then
+        state.strainIn = 0
+        return
+    end
+    state.strainIn = state.strainIn - seconds
+    if state.strainIn <= 0 then
+        state.strainIn = ZombRandFloat(STRAIN_MIN_SECONDS, STRAIN_MAX_SECONDS)
+        object:getSquare():playSound(Specs.wind.blades[state.blades].strainSound)
+    end
+end
+
+-- Each tick: drops the chargers gone from the map, and steps on those turning. A charger whose
+-- tile changed, as Replace Blades with blades of another material changes it, here or from the
+-- server, with no event for it, takes the new tile's models. A calm, braked or broken charger costs
+-- only the checks that it is still there on the same tile.
 local function spin()
     local now = getTimestampMs()
     local seconds = lastMs and (now - lastMs) / 1000 or 0
@@ -67,7 +92,16 @@ local function spin()
     if seconds <= 0 or tracked == 0 or isGamePaused() then return end
     local kph = getClimateManager():getWindspeedKph()
     for object, state in pairs(chargers) do
-        if not RenewableEnergy.onSquare(object) then
+        local name = RenewableEnergy.onSquare(object) and Sprites.nameOf(object)
+        if name and name ~= state.sprite then
+            state = stateFor(name)
+            if state then
+                -- Replacing a key the walk has reached is allowed; adding one is not.
+                chargers[object] = state
+                object:setSpriteModelName(state.names[1])
+            end
+        end
+        if not (name and state) then
             chargers[object] = nil
             tracked = tracked - 1
         else
@@ -80,6 +114,7 @@ local function spin()
                     state.shown = step
                     object:setSpriteModelName(state.names[step + 1])
                 end
+                strain(object, state, kph, seconds)
             end
         end
     end

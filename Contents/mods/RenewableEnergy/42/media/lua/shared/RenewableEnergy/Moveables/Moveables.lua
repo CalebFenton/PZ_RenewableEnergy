@@ -6,6 +6,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Biogas/Digester"
+require "RenewableEnergy/Chance"
 
 -- How the mod's placed objects move: what dismantling a bank gives back, where each may be
 -- placed, and what an object's modData carries into its item when picked up.
@@ -45,7 +46,6 @@ local BANK_SCRAP = {
 }
 
 -- Added after vanilla's own OnGameBoot handler, which resets the definitions before filling them.
--- Scrapping a fridge also gives its compressor, which a digester uses to fill propane tanks.
 Events.OnGameBoot.Add(function()
     local defs = ISMoveableDefinitions:getInstance()
     for material, items in pairs(BANK_SCRAP) do
@@ -54,11 +54,29 @@ Events.OnGameBoot.Add(function()
             defs.addScrapItem(material, entry[1], entry[2], entry[3], true)
         end
     end
-    defs.addScrapItem("Fridge", RenewableEnergy.Digester.COMPRESSOR, 1, 80, true)
 end)
 
--- A dismantled treadmill gives its motor. Vanilla scraps each tile of a multi-tile object in turn
--- (ISMoveableSpriteProps.scrapObject), so the motor comes only with the clicked tile.
+-- Whether the tile `sprite` is a refrigerator: its container is a fridge. Not its Material: vanilla
+-- gives stoves, washers, dryers and plastic chairs the Fridge scrap material too, and leaves it off
+-- shop coolers and trailer fridges (newtiledefinitions.tiles).
+local function isFridge(sprite)
+    return sprite ~= nil and sprite:getProperties():get("container") == "fridge"
+end
+
+-- The chance that `character` cuts a refrigerator's compressor out whole: vanilla's own scrap skill
+-- chance (ISMoveableSpriteProps.getChanceByDef: 10% and 10% a level, certain with the movables
+-- cheat) on Metalworking, the perk vanilla's Fridge scrap trains. One roll a fridge, whatever its
+-- size, since a fridge has one compressor.
+local function compressorChance(character)
+    if ISMoveableDefinitions.cheat or character:isMovablesCheat() then
+        return 1
+    end
+    return math.min(1, (10 + 10 * character:getPerkLevel(Perks.MetalWelding)) / 100)
+end
+
+-- A dismantled treadmill gives its motor, and a dismantled refrigerator may give its compressor,
+-- which a digester uses to fill propane tanks. Vanilla scraps each tile of a multi-tile object in
+-- turn (ISMoveableSpriteProps.scrapObject), so each comes only with the clicked tile.
 local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
 function ISMoveableSpriteProps:scrapObjectInternal(character, scrapDef, square, object, ...)
     self.scrappingMainTile = object == self.object
@@ -70,8 +88,12 @@ end
 local vanillaScrapItems = ISMoveableSpriteProps.getScrapItemsList
 function ISMoveableSpriteProps:getScrapItemsList(character)
     local items = vanillaScrapItems(self, character)
-    if items and Treadmill.isSprite(self.spriteName) and self.scrappingMainTile ~= false then
-        table.insert(items.usable, Treadmill.MOTOR)
+    if items and self.scrappingMainTile ~= false then
+        if Treadmill.isSprite(self.spriteName) then
+            table.insert(items.usable, Treadmill.MOTOR)
+        elseif isFridge(self.sprite) and character and RenewableEnergy.Chance.hit(compressorChance(character)) then
+            table.insert(items.usable, RenewableEnergy.Digester.COMPRESSOR)
+        end
     end
     return items
 end

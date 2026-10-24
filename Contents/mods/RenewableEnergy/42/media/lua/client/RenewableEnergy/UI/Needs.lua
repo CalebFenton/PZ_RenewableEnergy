@@ -26,13 +26,29 @@ local function nameOf(need)
     return need.input:getPossibleInputItems():get(0):getDisplayName()
 end
 
--- One need's line; a recipe gets vanilla's recipe line, which has no count.
+local function colourOf(need)
+    return need.have >= need.need and ISVehicleMechanics.ghs or ISVehicleMechanics.bhs
+end
+
+local function counted(need)
+    return colourOf(need) .. nameOf(need) .. " " .. need.have .. "/" .. need.need
+end
+
+-- One need's line; a recipe gets vanilla's recipe line, which has no count, and a need any of
+-- several meets gets theirs in a row, each in its own colour, joined by the crafting window's "or"
+-- (ISWidgetTitleHeader).
 local function line(need)
-    local colour = need.have >= need.need and ISVehicleMechanics.ghs or ISVehicleMechanics.bhs
     if need.recipe then
-        return " " .. colour .. " " .. getText("Tooltip_vehicle_requireRecipe", need.recipe:getTranslationName()) .. " <LINE>"
+        return " " .. colourOf(need) .. " " .. getText("Tooltip_vehicle_requireRecipe", need.recipe:getTranslationName()) .. " <LINE>"
     end
-    return " " .. colour .. nameOf(need) .. " " .. need.have .. "/" .. need.need .. " <LINE>"
+    if need.anyOf then
+        local options = {}
+        for _, option in ipairs(need.anyOf) do
+            table.insert(options, counted(option))
+        end
+        return " " .. table.concat(options, " " .. colourOf(need) .. getText("IGUI_CraftingWindow_Or") .. " ") .. " <LINE>"
+    end
+    return " " .. counted(need) .. " <LINE>"
 end
 
 local function setTooltip(option, description)
