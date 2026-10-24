@@ -270,6 +270,7 @@ module Base
         component SpriteConfig
         {
             OnCreate = RenewableEnergy.DigesterSystem.OnCreate,
+            OnIsValid = RenewableEnergy.Digester.OnIsValidDome,
             face S
             {
                 layer

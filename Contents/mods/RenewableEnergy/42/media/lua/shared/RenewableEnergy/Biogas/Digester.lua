@@ -178,6 +178,26 @@ function Digester.nameKey(tier)
     return "IGUI_RenewableEnergy_Digester_" .. tier
 end
 
+-- The floors a pit can be dug in: the ones vanilla digs a grave in (ISEmptyGraves:isValid).
+local DIGGABLE_FLOORS = { "floors_exterior_natural", "blends_natural_01" }
+
+--- Whether a brick dome can be built on the square `params.square`: its pit is dug, so only into
+--- the ground, on a ground floor of earth, grass or sand (the build cursor's OnIsValid).
+function Digester.OnIsValidDome(params)
+    local square = params.square
+    local floor = square:getZ() == 0 and square:getFloor()
+    local name = floor and floor:getTextureName()
+    if not name then
+        return false
+    end
+    for _, prefix in ipairs(DIGGABLE_FLOORS) do
+        if luautils.stringStarts(name, prefix) then
+            return true
+        end
+    end
+    return false
+end
+
 Digester.isHolderOverlay = Sprites.matcher(Sprites.digesterHolder)
 Digester.isScrubberOverlay = Sprites.matcher(Sprites.digesterScrubber)
 

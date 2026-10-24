@@ -108,7 +108,7 @@ Car batteries come first, then **Deep Cycle Marine Batteries**, which hold twice
 | Digesters | Barrel Digester | Insulated Digester: three times the barrel, built new or upgraded from a barrel | Brick Dome Digester: three times again, buried and warm |
 | Gasifiers | Primitive Gasifier (trash can) | Gasifier (steel drum) | Advanced Gasifier (welded sheet metal) |
 
-A bigger digester holds more feed and gas and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel. A bigger gasifier carries more fuel and makes less ash.
+A bigger digester holds more feed and gas and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel. The brick dome sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
 
 ### Sizing a bank
 

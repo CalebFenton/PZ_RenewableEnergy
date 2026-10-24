@@ -774,6 +774,30 @@ test("renewable_energy_biogas_build_from_orange_barrel_shows_orange", buildsBarr
 test("renewable_energy_biogas_build_from_dark_green_barrel_shows_dark_green", buildsBarrelDigester("Mov_DarkGreenBarrel"))
 test("renewable_energy_biogas_build_from_light_green_barrel_shows_light_green", buildsBarrelDigester("Mov_LightGreenBarrel"))
 
+-- The brick dome's pit is dug, so its build cursor takes the ground, as vanilla's grave does, and
+-- refuses a building's floor.
+test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
+    instant = true,
+    run = function(self)
+        local ground
+        for _, square in ipairs(T.squares(self, 24, { bare = true }) or {}) do
+            local name = Sprites.nameOf(square:getFloor())
+            if name and PZHarness.startsWith(name, "blends_natural") then
+                ground = square
+                break
+            end
+        end
+        local indoors = T.square(self, { indoors = true }, "a free indoor square")
+        if not (T.need(self, ground, "a bare square of natural ground") and indoors) then return end
+        self.onGround = T.placeable("Base.RenewableEnergy_BrickDome", ground)
+        self.indoors = T.placeable("Base.RenewableEnergy_BrickDome", indoors)
+    end,
+    validate = function(self)
+        T.expect(self.onGround == true, "the cursor refuses natural ground: " .. tostring(self.onGround))
+        T.expect(self.indoors == false, "the cursor takes a building's floor: " .. tostring(self.indoors))
+    end,
+})
+
 -- A digester built from a barrel loads whole from the save: its chunk unloaded and loaded again, it
 -- still opens and takes feed. Single player only, as the chunk reload test.
 test("renewable_energy_biogas_barrel_digester_reloads_whole", {

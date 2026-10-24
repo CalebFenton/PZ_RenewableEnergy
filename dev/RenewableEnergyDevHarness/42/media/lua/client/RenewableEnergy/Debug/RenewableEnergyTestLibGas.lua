@@ -69,6 +69,18 @@ local function buildEntry(entity)
     return nil
 end
 
+--- Whether the build cursor of `entity` would place it on `square`, materials aside: the cursor's
+--- own test of each square it covers (ISBuildIsoEntity:isValidPerSquare), which runs the entity's
+--- OnIsValid. Nil without the build menu entry.
+function T.placeable(entity, square)
+    local info = buildEntry(entity)
+    if not info then return nil end
+    local player = T.player()
+    local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
+    build.player = player:getPlayerNum()
+    return build:isValidPerSquare(square, build:getFace():getTileInfo(0, 0, 0), true, false, false)
+end
+
 --- Queues building a record of `kind` from the build menu's entry of `entity` on a bare outdoor
 --- square, through the build menu's own path (ISBuildIsoEntity, ISBuildAction): the character gets
 --- the recipe's skill levels and exactly its inputs (T.recipeInputs with `prefer`), and the build
