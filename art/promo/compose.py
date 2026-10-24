@@ -91,9 +91,11 @@ ITEM_ROWS = [
     ("Biogas", ["RenewableEnergy.GasConversionKit", "RenewableEnergy.FridgeCompressor", "RenewableEnergy.GasHeater",
                 "RenewableEnergy.HomesteadPowerMag3"]),
     ("Wood gas", ["RenewableEnergy.WoodAsh", "RenewableEnergy.TarryPacking", "RenewableEnergy.FemaPamphlet"]),
-    ("Wind and treadmills", ["RenewableEnergy.TreadmillMotor", "RenewableEnergy.WoodenBlades",
+    ("Wind and treadmills", ["RenewableEnergy.TreadmillMotor", "RenewableEnergy.CarAlternator",
+                             "RenewableEnergy.HomemadeAlternator", "RenewableEnergy.WoodenBlades",
                              "RenewableEnergy.PipeBlades", "RenewableEnergy.SteelBlades",
-                             "RenewableEnergy.HomemadeAlternator", "RenewableEnergy.HomesteadPowerMag4"]),
+                             "RenewableEnergy.BrokenWoodenBlades", "RenewableEnergy.BrokenPipeBlades",
+                             "RenewableEnergy.BrokenSteelBlades", "RenewableEnergy.HomesteadPowerMag4"]),
 ]
 ITEM_COLUMNS = 6
 # recipes.png: the recipes by what they're for.
@@ -109,6 +111,7 @@ RECIPE_SECTIONS = [
                                             "RenewableEnergy_UnmountSolarRackWood",
                                             "RenewableEnergy_UnmountSolarRackMetal"]),
     ("Modules: repair, homemade, and solar cells", ["RenewableEnergy_RepairCrackedModule",
+                                                    "RenewableEnergy_RepairCrackedModuleWithGlue",
                                                     "RenewableEnergy_ReglazeModule",
                                                     "RenewableEnergy_MakeHomemadeSolarModule",
                                                     "RenewableEnergy_TakeApartCalculator",
@@ -137,6 +140,8 @@ RECIPE_SECTIONS = [
       "RenewableEnergy_MakeVinegarAphidSpray"]),
     ("Wind: chargers in the build menu, blades and the alternator",
      ["RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
+      "RenewableEnergy_PropellerSteel", "RenewableEnergy_CarAlternatorWood", "RenewableEnergy_CarAlternatorPipe",
+      "RenewableEnergy_CarAlternatorSteel", "RenewableEnergy_TurbineWood", "RenewableEnergy_TurbinePipe",
       "RenewableEnergy_AlternatorWindCharger", "RenewableEnergy_CarveWoodenBlades",
       "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
       "RenewableEnergy_MakeHomemadeAlternator"]),
@@ -175,7 +180,8 @@ RECIPE_K = 1.33
 GALLERY_ITEMS = [
     ("items-power", "Panels to mount, banks to fill, parts to wire in", ITEM_ROWS[:3], 7),
     ("items-batteries", "Batteries to rebuild, gadgets to take apart", ITEM_ROWS[3:5], 7),
-    ("items-gas-wind", "Gas kits, blades, and the books that teach them", ITEM_ROWS[5:], 6),
+    ("items-gas", "Gas kits, heaters, and the books that teach them", ITEM_ROWS[5:7], 6),
+    ("items-wind", "Generators and blades for the wind chargers", ITEM_ROWS[7:], 6),
 ]
 # The recipe sheet over as few pictures as its cards fit at RECIPE_K: for each picture, the
 # sections it shows by title, and which of each section's recipes.
@@ -188,17 +194,24 @@ GALLERY_RECIPES = [
      [("Battery storage", slice(4, None)), (MOUNTS, slice(3, 5))]),
     ("recipes-unmounting-electronics", "Recipes: taking panels down, and electronics",
      [(MOUNTS, slice(5, None)), ("Electronics", slice(None))]),
-    ("recipes-modules", "Recipes: modules and solar cells", [("Modules: repair, homemade, and solar cells",
-                                                              slice(None))]),
+    ("recipes-modules", "Recipes: sealing, reglazing and homemade modules",
+     [("Modules: repair, homemade, and solar cells", slice(0, 4))]),
+    ("recipes-solar-cells", "Recipes: solar cells from what you take apart",
+     [("Modules: repair, homemade, and solar cells", slice(4, None))]),
     ("recipes-battery-care", "Recipes: servicing and stripping batteries", [(CARE, slice(0, 5))]),
     ("recipes-plates", "Recipes: casting battery plates", [(CARE, slice(5, 10))]),
     ("recipes-rebuilding", "Recipes: rebuilding batteries, jar batteries", [(CARE, slice(10, None))]),
     ("recipes-digesters", "Build menu: the four digesters", [(BIOGAS, slice(0, 4))]),
     ("recipes-gas-kit", "Recipes: the gas kit, the heater, propane", [(BIOGAS, slice(4, None))]),
     ("recipes-woodgas", "Build menu: gasifiers. Recipes: drums and sprays", [(WOODGAS, slice(None))]),
-    ("recipes-wind-small", "Build menu: the scoop rotor, the wooden propeller", [(WIND, slice(0, 2))]),
-    ("recipes-wind-large", "Build menu: the pipe propeller, the alternator", [(WIND, slice(2, 4))]),
-    ("recipes-wind-parts", "Recipes: blades and the homemade alternator", [(WIND, slice(4, None))]),
+    ("recipes-wind-treadmill", "Build menu: the scoop rotor, the treadmill wind charger", [(WIND, slice(0, 2))]),
+    ("recipes-wind-treadmill-blades", "Build menu: treadmill chargers, pipe and steel blades",
+     [(WIND, slice(2, 4))]),
+    ("recipes-wind-car-alternator", "Build menu: the car alternator wind charger", [(WIND, slice(4, 6))]),
+    ("recipes-wind-car-alternator-turbine", "Build menu: car alternator and wind turbine",
+     [(WIND, slice(6, 8))]),
+    ("recipes-wind-turbine", "Build menu: wind turbines, pipe and steel blades", [(WIND, slice(8, 10))]),
+    ("recipes-wind-parts", "Recipes: blades and the homemade alternator", [(WIND, slice(10, None))]),
 ]
 
 
