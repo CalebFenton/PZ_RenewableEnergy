@@ -8,14 +8,14 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 
 ## How it plays
 
-![A first battery box by a window with two panels outside, next to a homestead with wall panels, ground racks, a propeller wind charger, and a digester feeding the generator](art/promo/images/setup.png)
+![A first battery box by a window with two panels outside, next to a homestead with wall panels, ground racks, a treadmill wind charger, and a digester feeding the generator](art/promo/images/setup.png)
 
 | When | What you're after | What it takes |
 |---|---|---|
 | The first weeks | The TV and the lights, and a mini fridge while the sun's up | A battery box, two car batteries, a plug-in inverter, two panels or a treadmill |
 | A month or so in | The kitchen fridge through the night | A battery rack of deep cycles, a bigger inverter, a charge controller, a handful of panels, a scoop rotor |
-| Months later | The freezer, the washer, and a backup that needs no gasoline | A bank of L-16s, an inverter/charger, two controllers, a propeller wind charger, a generator with a failsafe on digester or wood gas |
-| The long haul | The whole house, all winter | A metal bank, two inverter/chargers, four controllers, every panel you can find, homemade wind chargers on the high ground, a brick dome digester |
+| Months later | The freezer, the washer, and a backup that needs no gasoline | A bank of L-16s, an inverter/charger, two controllers, a treadmill wind charger, a generator with a failsafe on digester or wood gas |
+| The long haul | The whole house, all winter | A metal bank, two inverter/chargers, four controllers, every panel you can find, homebuilt wind turbines on the high ground, a brick dome digester |
 
 ## Everything you can find or build
 
@@ -23,7 +23,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 
 - **Banks** hold the batteries and what you wire into them: inverters, charge controllers, a charger and a **Solar Failsafe** that starts the generator when they run low.
 - **Batteries wear** with every deep drain. Service and recondition them, each repair bringing them back less far, then strip and rebuild them with plates you cast yourself.
-- **Panels follow the sun**: flat ones for summer, wall panels for winter, ground racks for the year. Storms crack modules; seal them with epoxy or reglaze them.
+- **Panels follow the sun**: flat ones for summer, wall panels for winter, ground racks for the year. Storms crack modules; seal them with epoxy or glue, or reglaze them.
 - **Wind chargers, treadmills, digesters and gasifiers** fill in when the sun won't.
 - **Small gadgets** need no bank: a maintainer for a parked car's battery, a charger for flashlight batteries, and garden lights.
 
@@ -43,9 +43,11 @@ The bank powers everything a generator in its spot would, the neighbours' lights
 
 ## Wind
 
-![A scoop rotor, wooden and pipe-blade propellers and a homemade alternator wind charger turning on open ground](art/promo/images/wind.png)
+![A scoop rotor, wooden and pipe-blade treadmill wind chargers and a homebuilt wind turbine turning on open ground](art/promo/images/wind.png)
 
-Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks; a propeller makes real power, but **Set the Brake** before a gale or you'll be replacing blades; a homemade alternator on a two-storey mast turns itself out of the wind. Trees and buildings steal wind; upper floors give more.
+Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares from each other, or they steal each other's wind.
+
+When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from pipe, or forged steel that breaks last. The turbine swings itself out of the worst of it.
 
 ## Treadmills
 
@@ -89,7 +91,7 @@ The rest are on the **Renewable Energy** page.
 
 - **Can I add it to my save?** Yes. Loot turns up where you haven't been yet; solar sites and garden lights anywhere.
 - **Can I remove it?** Not cleanly: what it built into your world goes with it.
-- **How does it all work, and where do I look?** The [player's guide](docs/player-guide.md) explains every mechanic and hints where the gear is.
+- **How does it all work, and where do I look?** The [player's guide](docs/player-guide.md) explains every mechanic, how to size a bank and place a wind charger, and where to start looking.
 
 ## Credits
 
