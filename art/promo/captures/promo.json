@@ -86,6 +86,21 @@
       "name": "Inverter/Charger"
     },
     {
+      "fullType": "RenewableEnergy.MakeshiftInverter",
+      "icon": "icon_RenewableEnergy_MakeshiftInverter",
+      "name": "Makeshift Inverter"
+    },
+    {
+      "fullType": "RenewableEnergy.HomemadeInverter",
+      "icon": "icon_RenewableEnergy_HomemadeInverter",
+      "name": "Homemade Inverter"
+    },
+    {
+      "fullType": "RenewableEnergy.MicrowaveTransformer",
+      "icon": "icon_RenewableEnergy_MicrowaveTransformer",
+      "name": "Microwave Transformer"
+    },
+    {
       "fullType": "RenewableEnergy.ChargeController",
       "icon": "icon_RenewableEnergy_ChargeController",
       "name": "Charge Controller"
@@ -377,7 +392,7 @@
         105,
         105,
         407,
-        401
+        402
       ]
     },
     {
@@ -394,7 +409,7 @@
       "box": [
         105,
         105,
-        316,
+        315,
         407
       ]
     },
@@ -426,6 +441,33 @@
       ]
     },
     {
+      "name": "model_RenewableEnergy_MakeshiftInverter",
+      "box": [
+        27,
+        27,
+        103,
+        82
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomemadeInverter",
+      "box": [
+        40,
+        40,
+        153,
+        109
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_MicrowaveTransformer",
+      "box": [
+        18,
+        18,
+        70,
+        55
+      ]
+    },
+    {
       "name": "model_RenewableEnergy_ChargeController",
       "box": [
         24,
@@ -449,7 +491,7 @@
         46,
         46,
         178,
-        167
+        166
       ]
     },
     {
@@ -521,7 +563,7 @@
         19,
         19,
         73,
-        53
+        52
       ]
     },
     {
@@ -1170,13 +1212,25 @@
           "uses": false
         },
         {
-          "count": 2,
+          "count": 1,
           "items": [
             {
               "count": 2,
               "fullType": "Base.Speaker",
               "icon": "icon_Base_Speaker",
               "name": "Speaker"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.RadioRed",
+              "icon": "icon_Base_RadioRed",
+              "name": "Premium Technologies Radio"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.RadioBlack",
+              "icon": "icon_Base_RadioBlack",
+              "name": "ValuTech Radio"
             }
           ],
           "keep": false,
@@ -3324,6 +3378,155 @@
         }
       ],
       "skills": []
+    },
+    {
+      "id": "RenewableEnergy_MakeHomemadeInverter",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Pliers",
+              "icon": "icon_Base_Pliers",
+              "name": "Pliers"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.MicrowaveTransformer",
+              "icon": "icon_RenewableEnergy_MicrowaveTransformer",
+              "name": "Microwave Transformer"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.Amplifier",
+              "icon": "icon_Base_Amplifier",
+              "name": "Amplifier"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.SmallSheetMetal",
+              "icon": "icon_Base_SmallSheetMetal",
+              "name": "Steel Sheet - Small"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 7,
+            "name": "Electrical"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true,
+        "research": [
+          "Homemade Inverter",
+          "Power Inverter"
+        ]
+      },
+      "name": "Make Homemade Inverter",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.HomemadeInverter",
+          "icon": "icon_RenewableEnergy_HomemadeInverter",
+          "name": "Homemade Inverter"
+        }
+      ],
+      "skills": [
+        {
+          "level": 4,
+          "name": "Electrical"
+        }
+      ]
     },
     {
       "id": "RenewableEnergy_StripL16Battery",
@@ -6236,6 +6439,119 @@
       ]
     },
     {
+      "id": "RenewableEnergy_MakeMakeshiftInverter",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.CarBatteryCharger",
+              "icon": "icon_Base_CarBatteryCharger",
+              "name": "Car Battery Charger"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.MicrowaveTransformer",
+              "icon": "icon_RenewableEnergy_MicrowaveTransformer",
+              "name": "Microwave Transformer"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Amplifier",
+              "icon": "icon_Base_Amplifier",
+              "name": "Amplifier"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 5,
+            "name": "Electrical"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #1: Sun & Batteries"
+        ],
+        "needed": true,
+        "research": [
+          "Makeshift Inverter",
+          "Plug-in Inverter"
+        ]
+      },
+      "name": "Make Makeshift Inverter",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.MakeshiftInverter",
+          "icon": "icon_RenewableEnergy_MakeshiftInverter",
+          "name": "Makeshift Inverter"
+        }
+      ],
+      "skills": [
+        {
+          "level": 2,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
       "build": {
         "icon": "icon_build_RenewableEnergy_PropellerWood",
         "name": "Treadmill Wind Charger (Wooden Blades)"
@@ -8900,6 +9216,7 @@
       "icon_Base_CarBattery1",
       "icon_Base_CarBattery2",
       "icon_Base_CarBattery3",
+      "icon_Base_CarBatteryCharger",
       "icon_Base_Charcoal",
       "icon_Base_Clay",
       "icon_Base_ClayBrick",
@@ -8947,6 +9264,8 @@
       "icon_Base_Pot",
       "icon_Base_PropaneTank",
       "icon_Base_Propane_Refill",
+      "icon_Base_RadioBlack",
+      "icon_Base_RadioRed",
       "icon_Base_RemoteCraftedV3",
       "icon_Base_RippedSheets",
       "icon_Base_RubberHose",
@@ -8990,6 +9309,7 @@
       "icon_RenewableEnergy_GasConversionKit",
       "icon_RenewableEnergy_GasHeater",
       "icon_RenewableEnergy_HomemadeAlternator",
+      "icon_RenewableEnergy_HomemadeInverter",
       "icon_RenewableEnergy_HomemadeSolarModule",
       "icon_RenewableEnergy_HomesteadPowerMag1",
       "icon_RenewableEnergy_HomesteadPowerMag2",
@@ -8999,6 +9319,8 @@
       "icon_RenewableEnergy_JarBattery",
       "icon_RenewableEnergy_L16Battery",
       "icon_RenewableEnergy_L16BatteryCase",
+      "icon_RenewableEnergy_MakeshiftInverter",
+      "icon_RenewableEnergy_MicrowaveTransformer",
       "icon_RenewableEnergy_PipeBlades",
       "icon_RenewableEnergy_PlugInInverter",
       "icon_RenewableEnergy_PowerInverter",
@@ -9065,6 +9387,7 @@
       "model_RenewableEnergy_GasConversionKit",
       "model_RenewableEnergy_GasHeater",
       "model_RenewableEnergy_HomemadeAlternator",
+      "model_RenewableEnergy_HomemadeInverter",
       "model_RenewableEnergy_HomemadeSolarModule",
       "model_RenewableEnergy_HomesteadPowerMag1",
       "model_RenewableEnergy_HomesteadPowerMag2",
@@ -9074,6 +9397,8 @@
       "model_RenewableEnergy_JarBattery",
       "model_RenewableEnergy_L16Battery",
       "model_RenewableEnergy_L16BatteryCase",
+      "model_RenewableEnergy_MakeshiftInverter",
+      "model_RenewableEnergy_MicrowaveTransformer",
       "model_RenewableEnergy_PipeBlades",
       "model_RenewableEnergy_PlugInInverter",
       "model_RenewableEnergy_PowerInverter",
