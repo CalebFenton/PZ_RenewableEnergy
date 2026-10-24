@@ -1324,14 +1324,18 @@ local function goTo(squares, stepsOut)
     end)
 end
 
--- What every group's shots share: noon without grid power, a breeze that turns the wind
--- chargers, and no radio captions around the `origins` of the places the run uses. The harness
--- clears the rest of the weather.
+-- What every group's shots share: noon without grid power, full colour, a breeze that turns the
+-- wind chargers, and no radio captions around the `origins` of the places the run uses. The
+-- harness clears the rest of the weather.
 local function addWorldSettings(origins)
     run:add(function()
         -- The grid would power the squares and leave the bank nothing to run.
         PZHarness.Fixtures.setGrid(false)
         getGameTime():setTimeOfDay(NOON)
+        -- A fresh world's climate greys the picture by its season, so two runs' shots would differ.
+        local desaturation = getClimateManager():getClimateFloat(ClimateManager.FLOAT_DESATURATION)
+        desaturation:setEnableAdmin(true)
+        desaturation:setAdminValue(0)
         local wind = getClimateManager():getClimateFloat(ClimateManager.FLOAT_WIND_INTENSITY)
         wind:setEnableAdmin(true)
         wind:setAdminValue(WIND_INTENSITY)
