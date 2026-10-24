@@ -8,11 +8,15 @@
   its size on a floor diamond, overlays drawn over their base.
 - icons.png: every icon at four times its size.
 - build_icons.png: every build-menu icon at four times its size.
+- index.html: every cell of those sheets on its own, named, the models at twice the sheet's size,
+  from the folders models, tiles, icons and build_icons beside it; a page to review the art by.
 
 Writes to PREVIEWS (default $TMPDIR/renewable-energy-previews) and prints the folder.
 """
+import html
 import math
 import os
+import shutil
 import sys
 import tempfile
 
@@ -30,6 +34,48 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 MEDIA = os.path.join(REPO, "Contents/mods/RenewableEnergy/common/media")
 OUT = os.environ.get("PREVIEWS", os.path.join(tempfile.gettempdir(), "renewable-energy-previews"))
 BACKGROUND = np.array([0.3, 0.3, 0.3, 1.0], dtype=np.float32)
+# index.html's sections in order: the width each image shows at (a click opens it whole), and a
+# list of (file under OUT, caption).
+GALLERY = {"Models": (256, []), "Tiles": (128, []), "Item icons": (128, []), "Build-menu icons": (96, [])}
+
+
+def keep(section, folder, name, pixels, caption):
+    """Saves `pixels` as OUT/folder/name.png and lists it in index.html's `section`."""
+    file = "%s/%s.png" % (folder, name)
+    kit.save_pixels(os.path.join(OUT, file), pixels)
+    GALLERY[section][1].append((file, caption))
+
+
+def layer_caption(layer):
+    """What a tile layer draws: its build's name, its options, and how it's turned and placed."""
+    build = layer["build"]
+    words = [getattr(build, "__name__", None) or getattr(getattr(build, "func", None), "__name__", "?")]
+    words += ["%s=%s" % item for item in sorted(layer["options"].items())]
+    if layer["turn"]:
+        words.append("turn %s" % layer["turn"])
+    if layer["holdout"]:
+        words.append("(overlay)")
+    return " ".join(words)
+
+
+def write_index():
+    parts = ["<!doctype html><meta charset=utf-8><title>Renewable Energy art</title><style>",
+             "body{background:#2b2b2b;color:#ddd;font:13px system-ui;margin:16px}a{color:#9cf}"
+             "h2{margin:24px 0 8px}div{display:flex;flex-wrap:wrap;gap:8px}"
+             "figure{margin:0;background:#4d4d4d;padding:4px}"
+             "img{display:block;image-rendering:pixelated}figcaption{padding-top:4px;word-break:break-word}",
+             "</style><h1>Renewable Energy art</h1><p>",
+             " · ".join('<a href="#%d">%s (%d)</a>' % (i, section, len(entries))
+                        for i, (section, (_, entries)) in enumerate(GALLERY.items())),
+             "</p>"]
+    for i, (section, (width, entries)) in enumerate(GALLERY.items()):
+        parts.append('<h2 id="%d">%s (%d)</h2><div>' % (i, section, len(entries)))
+        for file, caption in entries:
+            parts.append('<figure style="width:%dpx"><a href="%s"><img src="%s" width=%d loading=lazy></a>'
+                         '<figcaption>%s</figcaption></figure>' % (width, file, file, width, html.escape(caption)))
+        parts.append("</div>")
+    with open(os.path.join(OUT, "index.html"), "w") as page:
+        page.write("".join(parts))
 
 
 def over(sheet, pixels, x, y):
@@ -77,15 +123,21 @@ def tile_sheet(tileset, out):
             over(cell, kit.load_pixels(path % base), 0, 0)
         over(cell, kit.load_pixels(path % (tileset, index)), 0, 0)
         cells.append(enlarge(cell, 2))
+        keep("Tiles", "tiles", "%s_%d" % (tileset, index), cells[-1],
+             "%s_%d: %s" % (tileset, index, ", ".join(layer_caption(layer) for layer in layers)))
     kit.save_pixels(os.path.join(OUT, out), grid(cells, 8, 256, 512))
 
 
 def icon_sheet():
-    cells = [enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/Item_RenewableEnergy_%s.png" % name)), 4)
-             for name in items.ITEMS]
+    cells = []
+    for name in items.ITEMS:
+        cells.append(enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/Item_RenewableEnergy_%s.png" % name)), 4))
+        keep("Item icons", "icons", name, cells[-1], name)
     kit.save_pixels(os.path.join(OUT, "icons.png"), grid(cells, 8, 136, 136))
-    cells = [enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/RenewableEnergy_Build_%s.png" % name)), 4)
-             for name in tiles.BUILD_ICONS]
+    cells = []
+    for name in tiles.BUILD_ICONS:
+        cells.append(enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/RenewableEnergy_Build_%s.png" % name)), 4))
+        keep("Build-menu icons", "build_icons", name, cells[-1], name)
     kit.save_pixels(os.path.join(OUT, "build_icons.png"), grid(cells, 4, 200, 200))
 
 
@@ -95,7 +147,8 @@ def model_sheet():
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.display.shading.light = "STUDIO"
     scene.display.shading.color_type = "TEXTURE"
-    scene.render.resolution_x = scene.render.resolution_y = 256
+    # index.html shows each model at twice the sheet's size; the sheet takes it halved.
+    scene.render.resolution_x = scene.render.resolution_y = 512
     scene.render.film_transparent = True
     camera = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera"))
     camera.data.type = "ORTHO"
@@ -104,15 +157,16 @@ def model_sheet():
     cells = []
     # A vehicle shows as its body with its part models, once whole and once with every cracked
     # variant in place of the part it replaces. A sprite model shows from one side: one mesh at each
-    # of its yaws, as the game spins it whole, or each spin step's mesh, then each other skin.
+    # of its yaws, as the game spins it whole, or the first skin's each spin step, then each other
+    # skin's first step.
     models = [("WorldItems", name, name, [name], None) for name in {**items.ITEMS, **items.GROUND_MODELS}]
     for name, spec in items.SPRITE_MODELS.items():
-        meshes, textures, _ = items.sprite_model_names(name)
+        (texture, meshes), *others = items.sprite_model_names(name)[0]
         if len(meshes) == 1:
-            models.append(("WorldItems", name, textures[0], meshes, list(spec["yaws"].values())))
+            models.append(("WorldItems", name, texture, meshes, list(spec["yaws"].values())))
             continue
-        models += [("WorldItems", mesh, textures[0], [mesh], [0]) for mesh in meshes]
-        models += [("WorldItems", texture, texture, meshes[:1], [0]) for texture in textures[1:]]
+        models += [("WorldItems", mesh, texture, [mesh], [0]) for mesh in meshes]
+        models += [("WorldItems", texture, texture, meshes[:1], [0]) for texture, meshes in others]
     for name, spec in items.VEHICLES.items():
         whole = [s for s in spec["pieces"] if not s.endswith("Cracked")]
         cracked = [s + "Cracked" if s + "Cracked" in spec["pieces"] else s for s in whole]
@@ -149,11 +203,12 @@ def model_sheet():
             camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
             camera.location = centre - direction * 10
             camera.data.ortho_scale = size
-            path = os.path.join(OUT, "model_%s_%d.png" % (name, view))
-            scene.render.filepath = path
+            file = "models/%s_%d.png" % (name, view)
+            scene.render.filepath = os.path.join(OUT, file)
             bpy.ops.render.render(write_still=True)
-            cells.append(kit.load_pixels(path))
-            os.remove(path)
+            pixels = kit.load_pixels(scene.render.filepath)
+            cells.append(pixels.reshape(256, 2, 256, 2, 4).mean(axis=(1, 3)))
+            GALLERY["Models"][1].append((file, "%s, %s" % (name, "side %d" % (view + 1) if steps is None else "yaw %s" % yaw)))
         for obj in imported:
             bpy.data.objects.remove(obj)
         print("previewed %s" % name)
@@ -162,10 +217,14 @@ def model_sheet():
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    # Last run's named cells go, so a model or tile that's gone doesn't linger on the page.
+    for folder in ("models", "tiles", "icons", "build_icons"):
+        shutil.rmtree(os.path.join(OUT, folder), ignore_errors=True)
     model_sheet()
     tile_sheet("renewable_energy_01", "tiles.png")
     tile_sheet("renewable_energy_02", "tiles_02.png")
     icon_sheet()
+    write_index()
     print("previews:", OUT)
 
 

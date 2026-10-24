@@ -9,7 +9,8 @@
 #   mod_icon.py  the mod list icon, drawn pixel by pixel with Pillow (the poster and the Workshop
 #                preview.png are in-game shots that art/promo/compose.py lays out)
 #   tools/make_tiles.py and tools/pack_textures.py   renewable_energy.tiles and the pack
-#   preview.py   review sheets of all of it, read back from the written files
+#   preview.py   review sheets of all of it, and index.html naming each piece, read back from the
+#                written files
 #
 # BLENDER overrides the Blender binary, PREVIEWS the preview folder (default
 # $TMPDIR/renewable-energy-previews). mod_icon.py and tools/pack_textures.py run with uv
