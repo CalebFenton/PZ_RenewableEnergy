@@ -57,10 +57,11 @@ MODELS_TXT = os.path.join(MOD, "42/media/scripts/RenewableEnergy/Models.txt")
 PREFIX = "RenewableEnergy_"
 VEHICLE_TEXTURE_SIZE = 1024
 
-# Big flat things need more texels for their cells than a battery does, and a drum's side is as big.
+# Big flat things need more texels for their cells than a battery does, and a drum's side is as big;
+# the jar battery's six jars and their lids share one texture with its tray.
 TEXTURE_SIZE = {name: 512 for name in ("SolarModule", "HomemadeSolarModule", "SolarFlat", "SolarWallWood", "SolarWallMetal",
                                        "SolarRackWood", "SolarRackMetal", "BatteryRackWood", "BatteryRackMetal",
-                                       "BatteryBankWood", "BatteryBankMetal", *items.GROUND_MODELS)}
+                                       "BatteryBankWood", "BatteryBankMetal", "JarBattery", *items.GROUND_MODELS)}
 DEFAULT_TEXTURE_SIZE = 256
 # The game draws a dropped item through the same camera as a sprite model, which scales everything
 # by 1.5 (ItemModelRenderer$WorldModelCamera.Begin, Core.DoPushIsoStuff with vehicle false), so a

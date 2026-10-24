@@ -38,8 +38,10 @@ _MATERIALS = {}
 # how many times longer it runs along the grain, how many lines cross one figure, and how dark a
 # line is. Boards are sawn, so their grain runs in long straight streaks; plywood's face is a veneer
 # peeled off the log, its figure broad and wavy. Weathered planks, as the game draws its own crates
-# and composters, are dark with grain cut deep by the rain.
-GRAIN = {"board": (0.08, 12.0, 3.0, 0.5), "veneer": (0.09, 4.0, 3.0, 0.5), "weathered": (0.05, 14.0, 4.0, 0.3)}
+# and composters, are dark with grain cut deep by the rain. Small wood, a tray's sides or a carved
+# blade, takes a finer figure, or a board's would cross it once or not at all and leave it flat.
+GRAIN = {"board": (0.08, 12.0, 3.0, 0.5), "veneer": (0.09, 4.0, 3.0, 0.5), "weathered": (0.05, 14.0, 4.0, 0.3),
+         "fine": (0.025, 10.0, 3.0, 0.45)}
 GRAIN_EARLY = 1.1  # the pale wood between grain lines
 
 
@@ -333,6 +335,23 @@ def prism(collection, name, mat, outline, depth, at=(0, 0, 0), rotate=None):
     obj = _object(name, bm, mat, collection)
     place(obj, at, rotate)
     return obj
+
+
+def loft(collection, name, mat, sections):
+    """A solid skinned through cross-sections, each (z, [(x, y), ...]): one closed outline,
+    counter-clockwise seen from above, the same number of points in every section, capped at both
+    ends. One mesh with no faces buried in another, where boxes laid end to end would leave seams
+    that bake dark and split the texture into slivers."""
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x, y, z)) for x, y in outline] for z, outline in sections]
+    n = len(rings[0])
+    for a, b in zip(rings, rings[1:]):
+        for k in range(n):
+            bm.faces.new((a[k], a[(k + 1) % n], b[(k + 1) % n], b[k]))
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return _object(name, bm, mat, collection)
 
 
 def mound(collection, name, mat, radii, at=(0, 0, 0), rotate=None, squareness=1.0, lumps=0.0, seed=0, segments=16,

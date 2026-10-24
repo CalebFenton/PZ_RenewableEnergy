@@ -8,7 +8,7 @@ without its batteries and an overlay just the batteries.
 import math
 import random
 
-from kit import beam, box, cylinder, group, material, mound, prism, text, tube
+from kit import beam, box, cylinder, group, loft, material, mound, prism, text, tube
 
 # Palette ------------------------------------------------------------------------------------------
 
@@ -70,9 +70,12 @@ def M(name):
         "magazine4": lambda: material("RE_Mag4", "#8c3b2e", roughness=0.4, grime=0.05),
         "sky": lambda: material("RE_Sky", "#8fc4e8", roughness=0.4, grime=0.05),
         "sun": lambda: material("RE_Sun", "#ffd640", roughness=0.4, grime=0.0),
-        # Pine boards and 2 x 4s, two shades so neighbouring boards read apart.
+        # Pine boards and 2 x 4s, two shades so neighbouring boards read apart, and the same pine
+        # in strips too narrow for a board's grain, as a tray's sides.
         "pine": lambda: material("RE_Pine", "#c39b62", roughness=0.8, grime=0.2, scale=9, grain="board"),
         "pinedark": lambda: material("RE_PineDark", "#9a7041", roughness=0.8, grime=0.2, scale=9, grain="board"),
+        "pinestrip": lambda: material("RE_PineStrip", "#c39b62", roughness=0.8, grime=0.2, scale=9, grain="fine"),
+        "pinestripdark": lambda: material("RE_PineStripDark", "#9a7041", roughness=0.8, grime=0.2, scale=9, grain="fine"),
         # Bare mild steel, as pale as the game's own sheet metal, with darker weld beads at its joints.
         # Rusty steel, flecked brown, is scrap welded up at home. Worn steel is bare steel rubbed
         # bright, or showing through chipped paint.
@@ -88,10 +91,12 @@ def M(name):
         "clay": lambda: material("RE_Clay", "#8e8172", roughness=0.9, grime=0.2, scale=16),
         "terracotta": lambda: material("RE_Terracotta", "#b2603b", roughness=0.85, grime=0.25, scale=16),
         "hdpe": lambda: material("RE_Hdpe", "#e8e4d8", roughness=0.5, grime=0.1),
-        # A jar's green-tinged glass, opaque as the game draws its own jars, and the dark acid
-        # showing at the open mouth.
-        "jarglass": lambda: material("RE_JarGlass", "#9fbdb2", roughness=0.12, grime=0.06),
-        "acid": lambda: material("RE_Acid", "#3d4a42", roughness=0.1, grime=0.05),
+        # A jar's green-tinged glass, opaque as the game draws its own jars, pale streaks running up
+        # it where it catches the light; below the acid line, the glass darkened by the acid behind it.
+        "jarglass": lambda: material("RE_JarGlass", "#a6c4b9", roughness=0.12, grime=0.06, scale=20, streaks=("#e4f2ec", 0.7)),
+        "jaracid": lambda: material("RE_JarAcid", "#6b877d", roughness=0.12, grime=0.08, scale=20, streaks=("#a9c4ba", 0.6)),
+        # Pale tan twine.
+        "twine": lambda: material("RE_Twine", "#c8b07a", roughness=0.9, grime=0.15, scale=40),
         "sand": lambda: material("RE_Sand", "#c9b48a", roughness=0.95, grime=0.2, scale=60, speckle=("#a48f64", 0.4)),
         "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
         # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is black
@@ -127,11 +132,12 @@ def M(name):
         "rubberhose": lambda: material("RE_RubberHose", "#8c7a50", roughness=0.7, grime=0.25),
         "funnel": lambda: material("RE_Funnel", "#c9b234", roughness=0.45, grime=0.15),
         "pvc": lambda: material("RE_Pvc", "#a4a6a8", roughness=0.45, grime=0.2),
-        "straw": lambda: material("RE_Straw", "#d6bd6c", roughness=0.9, grime=0.25, scale=60, speckle=("#a2833a", 0.5)),
-        # Planks nailed up outdoors, as dark and deeply grained as the game's own composters and
-        # crates, two shades so neighbouring boards read apart.
-        "planks": lambda: material("RE_Planks", "#80573a", roughness=0.85, grime=0.35, scale=10, grain="weathered"),
-        "planksdark": lambda: material("RE_PlanksDark", "#634129", roughness=0.85, grime=0.35, scale=10, grain="weathered"),
+        # Old straw, gone dull and dusty, flecked with darker stalks.
+        "straw": lambda: material("RE_Straw", "#bfa862", roughness=0.9, grime=0.3, scale=60, speckle=("#8a7234", 0.6)),
+        # Planks nailed up outdoors, grey-brown and deeply grained by the rain as the game's own
+        # composters and crates are, two shades so neighbouring boards read apart.
+        "planks": lambda: material("RE_Planks", "#946a44", roughness=0.85, grime=0.35, scale=10, grain="weathered"),
+        "planksdark": lambda: material("RE_PlanksDark", "#77553a", roughness=0.85, grime=0.35, scale=10, grain="weathered"),
         "nail": lambda: material("RE_Nail", "#3b3936", roughness=0.6, metallic=0.5, grime=0.2),
         # The game's round bin, a plain steel can painted near black, and its galvanised bucket.
         "roundbin": lambda: material("RE_RoundBin", "#3a352f", roughness=0.7, metallic=0.2, grime=0.35, scale=8,
@@ -156,6 +162,9 @@ def M(name):
         "concrete": lambda: material("RE_Concrete", "#a9a69d", roughness=0.9, grime=0.3, scale=20),
         "sludge": lambda: material("RE_Sludge", "#4f4330", roughness=0.5, grime=0.2, scale=20),
         "ash": lambda: material("RE_Ash", "#a3a09a", roughness=1.0, grime=0.3, scale=6, speckle=("#75726c", 0.5)),
+        # Ash fines settled round a heap's foot, and the white of ash burnt clean.
+        "ashdark": lambda: material("RE_AshDark", "#7d7a74", roughness=1.0, grime=0.3, scale=6, speckle=("#5e5b56", 0.5)),
+        "ashwhite": lambda: material("RE_AshWhite", "#e0ded8", roughness=1.0, grime=0.1),
         "charcoal": lambda: material("RE_Charcoal", "#36312d", roughness=0.8, grime=0.1),
         "brass": lambda: material("RE_Brass", "#c8a24c", roughness=0.35, metallic=0.85, grime=0.15),
         # A gas flame: yellow-orange where it licks the steel, blue at the burner.
@@ -167,7 +176,7 @@ def M(name):
         # Blades: carved from the game's planks and oiled; and hammered out of sheet steel at the
         # forge, left bare, pocked by the hammer and rusting at the edges, the amber casting resin a
         # homemade alternator's coils are set in.
-        "carvedwood": lambda: material("RE_CarvedWood", "#9a6a43", roughness=0.6, grime=0.25, scale=10, grain="board"),
+        "carvedwood": lambda: material("RE_CarvedWood", "#a2703f", roughness=0.6, grime=0.25, scale=10, grain="fine"),
         "hammered": lambda: material("RE_Hammered", "#9a9c9b", roughness=0.5, metallic=0.6, grime=0.3, scale=30,
                                      speckle=("#55595b", 0.35), streaks=("#7a5434", 0.35)),
         "resin": lambda: material("RE_Resin", "#c99a4a", roughness=0.35, grime=0.15),
@@ -455,25 +464,42 @@ def l16_battery(col):
 
 
 def jar_battery(col):
-    """Six open glass jars, each a 2 V cell with its plates' lugs standing out of the acid, set in
-    sand in a nailed pine tray and wired in series by copper straps across their tops."""
+    """Six of the game's glass jars, each a 2 V cell, its lid screwed down and its plates' lugs
+    standing up through it, sealed round with pitch; the acid line showing through the glass. They
+    stand in sand in a nailed pine tray, lashed together with twine round their middles, wired in
+    series by copper straps across their tops."""
     width, depth, wall, tray_height = 0.36, 0.25, 0.015, 0.06
-    box(col, "JarTray_Bottom", M("pine"), (width, depth, wall), bevel=0.002)
+    # A hair inside the sides and ends, so their outer faces don't lie in one plane with it.
+    box(col, "JarTray_Bottom", M("pinestrip"), (width - 0.004, depth - 0.004, wall), bevel=0.002)
     for sign in (-1, 1):
-        box(col, "JarTray_Side", M("pinedark"), (width, wall, tray_height), at=(0, sign * (depth - wall) / 2, 0), bevel=0.002)
-        box(col, "JarTray_End", M("pine"), (wall, depth - 2 * wall, tray_height), at=(sign * (width - wall) / 2, 0, 0), bevel=0.002)
+        box(col, "JarTray_Side", M("pinestripdark"), (width, wall, tray_height), at=(0, sign * (depth - wall) / 2, 0), bevel=0.002)
+        box(col, "JarTray_End", M("pinestrip"), (wall, depth - 2 * wall, tray_height), at=(sign * (width - wall) / 2, 0, 0), bevel=0.002)
     box(col, "JarTray_Sand", M("sand"), (width - 2 * wall, depth - 2 * wall, tray_height - 0.015), at=(0, 0, wall), bevel=0.004)
-    radius, height, pitch = 0.05, 0.16, 0.112
+    radius, neck, pitch, rows = 0.05, 0.039, 0.112, (-0.055, 0.055)
+    acid, body, shoulder, band = 0.1, 0.13, 0.014, 0.016
+    lid_top = wall + body + shoulder + band + 0.003
     lugs = []
-    for row, y in enumerate((-0.055, 0.055)):
+    for y in rows:
         for i in range(3):
             x = (i - 1) * pitch
-            cylinder(col, "Jar_Glass", M("jarglass"), radius, height, at=(x, y, wall), segments=16)
-            cylinder(col, "Jar_Acid", M("acid"), radius - 0.006, 0.002, at=(x, y, wall + height - 0.02), segments=16)
+            cylinder(col, "Jar_AcidGlass", M("jaracid"), radius, acid, at=(x, y, wall), segments=16)
+            cylinder(col, "Jar_Glass", M("jarglass"), radius, body - acid, at=(x, y, wall + acid), segments=16)
+            cylinder(col, "Jar_Shoulder", M("jarglass"), radius, shoulder, at=(x, y, wall + body), radius_top=neck, segments=16)
+            cylinder(col, "Jar_Band", M("galvanised"), neck + 0.003, band, at=(x, y, wall + body + shoulder), segments=16)
+            cylinder(col, "Jar_Lid", M("galvanised"), neck, 0.003, at=(x, y, wall + body + shoulder + band), segments=16)
             for sign in (-1, 1):
-                box(col, "Jar_Lug", M("lead"), (0.012, 0.012, 0.035), at=(x + sign * 0.022, y, wall + height - 0.02), bevel=0.002)
-                lugs.append((x + sign * 0.022, y))
-    top = wall + height + 0.015
+                lx = x + sign * 0.02
+                cylinder(col, "Jar_Pitch", M("black"), 0.011, 0.005, at=(lx, y, lid_top), segments=10)
+                box(col, "Jar_Lug", M("lead"), (0.011, 0.011, 0.028), at=(lx, y, lid_top), bevel=0.002)
+                lugs.append((lx, y))
+    # Twine round the six, following the outside of the corner jars, and a knot at the front.
+    corners = ((pitch, rows[1], 0), (-pitch, rows[1], 90), (-pitch, rows[0], 180), (pitch, rows[0], 270))
+    lash = wall + 0.085
+    loop = [(*_around((cx, cy), start + 15 * k, radius + 0.003), lash) for cx, cy, start in corners for k in range(7)]
+    tube(col, "Jar_Twine", M("twine"), loop + loop[:1], 0.0035, 6)
+    mound(col, "Jar_Knot", M("twine"), (0.008, 0.006, 0.01), at=(0.05, rows[0] - radius - 0.004, lash - 0.005), rotate=(90, 0, 0),
+          segments=8, rings=3)
+    top = lid_top + 0.022
     # In series: each jar's + lug to the next jar's - lug, along the front row and back.
     order = [lugs[1], lugs[2], lugs[3], lugs[4], lugs[5], lugs[11], lugs[10], lugs[9], lugs[8], lugs[7], lugs[6]]
     for a, b in zip(order[::2], order[1::2]):
@@ -1471,20 +1497,26 @@ def _tarp_bag(col, fill, torn):
               rotate=(60, 0, -30))
 
 
-INSULATED = (0.92, 0.78)  # the box's width and height
-INSULATED_GAP = 0.025  # between its boards, where the straw shows
+# The box's width and height: as tight round the 55 gallon drum as a hand's depth of straw allows,
+# and tall enough for the straw to bury it to its head.
+INSULATED = (0.8, 0.84)
+INSULATED_GAP = 0.006  # between its boards
 FLOAT_DRUM = (0.24, 0.62)  # a 30 gallon drum's radius and height
 # The floating drum's head above the slurry drum's, by gas level, and the guide pipe's top.
 FLOAT_RISE = (0.08, 0.2, 0.32, 0.44)
 GUIDE_TOP = DRUM[1] + FLOAT_RISE[-1] + 0.22
+# The feed funnel, on the box's north-east corner, and where its pipe enters the drum's side.
+INSULATED_FEED = (0.26, 0.26)
+INSULATED_INLET = (0.19, 0.19)
 
 
 def insulated_digester(col, frame=True, level=0, scrubber=False):
     """A floating-drum digester of the village kind, built for a cold winter: the slurry in a 55
-    gallon drum packed round with straw in a box of planks, a tarp thrown over the back corner, a
-    guide pipe standing up out of the slurry. The gas holder is a smaller drum turned upside down
-    in the slurry, riding up the pipe as gas fills it: `level` draws it alone at its height from 1
-    (low) to 4 (high), its gas valve and hose on its head. `scrubber` draws the scrubber alone: the
+    gallon drum standing in a box of planks, straw packed round it and heaped over it to its head,
+    a guide pipe standing up out of the slurry, fed through a funnel on the box's corner whose pipe
+    runs down through the straw into the drum's side. The gas holder is a smaller drum turned upside
+    down in the slurry, riding up the pipe as gas fills it: `level` draws it alone at its height from
+    1 (low) to 4 (high), its gas valve and hose on its head. `scrubber` draws the scrubber alone: the
     box fills its square, so it stands on the front corner of the box's top, clear of both drums,
     fed from a fitting on the slurry drum's rim outside the floating drum."""
     size, height = INSULATED
@@ -1496,6 +1528,11 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
         cylinder(col, "Insulated_Slurry", M("sludge"), radius - 0.006, 0.002, at=(0, 0, rim), segments=28)
         cylinder(col, "Insulated_Guide", M("galvanised"), 0.021, GUIDE_TOP - rim, at=(0, 0, rim), segments=10)
         cylinder(col, "Insulated_GuideCap", M("galvanised"), 0.028, 0.025, at=(0, 0, GUIDE_TOP), segments=10)
+        fx, fy = INSULATED_FEED
+        tube(col, "Insulated_FeedPipe", M("pvc"), [(fx, fy, height + 0.06), (fx, fy, height), (*INSULATED_INLET, rim - 0.16)], 0.024, 12)
+        cylinder(col, "Insulated_FeedTape", M("ducttape"), 0.03, 0.04, at=(fx, fy, height + 0.03), segments=14)
+        cylinder(col, "Insulated_Funnel", M("funnel"), 0.03, 0.12, at=(fx, fy, height + 0.06), radius_top=0.1, segments=18)
+        cylinder(col, "Insulated_FunnelMouth", M("black"), 0.088, 0.003, at=(fx, fy, height + 0.178), segments=18)
     if level:
         top = rim + FLOAT_RISE[level - 1]
         float_radius, float_height = FLOAT_DRUM
@@ -1516,7 +1553,7 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
         base = height + 0.02
         fitting = _around((0, 0), -45, radius - 0.015)
         cylinder(col, "Insulated_ScrubberFitting", M("copper"), 0.012, 0.04, at=(*fitting, rim), segments=10)
-        inlet, outlet = _scrubber(col, (0.3, -0.3), (0.08, -0.38), z=base)
+        inlet, outlet = _scrubber(col, (0.28, -0.28), (0.06, -0.34), z=base)
         tube(col, "Insulated_ScrubberHose", M("rubberhose"), [(*fitting, rim + 0.04), (fitting[0] + 0.03, fitting[1] - 0.03, rim + 0.12),
                                                          (inlet[0] - 0.03, inlet[1] + 0.03, inlet[2] + 0.08), inlet], 0.012, 8)
         tube(col, "Insulated_ScrubberOut", M("rubberhose"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.06, outlet[2] + 0.02),
@@ -1525,18 +1562,18 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
 
 
 def _straw_box(col):
-    """Weathered planks nailed round the drum to corner posts with gaps between them, each a little
-    off true as boards nailed up by hand are, nail heads at their ends, a batten down the middle of
-    each side, straw packed inside and heaped over the top, tufts of it poking out of the gaps, and
-    the tarp."""
+    """Weathered planks nailed round the drum to corner posts, butted close, each a little off true
+    as boards nailed up by hand are, nail heads at their ends, a batten down the middle of each side,
+    and straw packed inside and heaped over the top to the drum's head. The inside is dark, so the
+    hairline gaps between boards read as shadow."""
     size, height = INSULATED
-    rows = 4
+    rows = 5
     board = (height - (rows - 1) * INSULATED_GAP) / rows
     shades = ("planks", "planksdark")
     post = 0.05
-    box(col, "Insulated_Straw", M("straw"), (size - 0.03, size - 0.03, height - 0.01))
-    mound(col, "Insulated_StrawTop", M("straw"), (size / 2 - 0.02, size / 2 - 0.02, 0.1), at=(0, 0, height - 0.05),
-          squareness=3, lumps=0.12, seed=30, segments=24, rings=5)
+    box(col, "Insulated_Core", M("planksdark"), (size - 0.03, size - 0.03, height - 0.01))
+    mound(col, "Insulated_StrawTop", M("straw"), (size / 2 - 0.02, size / 2 - 0.02, 0.06), at=(0, 0, height - 0.03),
+          squareness=3, lumps=0.1, seed=30, segments=24, rings=5)
     # Corner posts inside the boards, which are nailed to them.
     inside = size / 2 - BOARD - post / 2
     for sx in (-1, 1):
@@ -1546,10 +1583,10 @@ def _straw_box(col):
     for row in range(rows):
         z = row * (board + INSULATED_GAP)
         for sign in (-1, 1):
-            lift, tilt = rng.uniform(-0.006, 0.006), rng.uniform(-0.8, 0.8)
+            lift, tilt = rng.uniform(-0.004, 0.004), rng.uniform(-0.6, 0.6)
             box(col, "Insulated_FrontBack", M(shades[row % 2]), (size, BOARD, board), at=(0, sign * (size - BOARD) / 2, z + lift),
                 rotate=(0, tilt, 0), bevel=0.005)
-            lift, tilt = rng.uniform(-0.006, 0.006), rng.uniform(-0.8, 0.8)
+            lift, tilt = rng.uniform(-0.004, 0.004), rng.uniform(-0.6, 0.6)
             box(col, "Insulated_Side", M(shades[(row + 1) % 2]), (BOARD, size - 2 * BOARD, board),
                 at=(sign * (size - BOARD) / 2, 0, z + lift), rotate=(tilt, 0, 0), bevel=0.005)
         # The nail heads the viewer sees, on the front (-Y) and east (+X) faces: into the posts at
@@ -1565,47 +1602,32 @@ def _straw_box(col):
     for sign in (-1, 1):
         box(col, "Insulated_Batten", M("planksdark"), (0.07, 0.022, height), at=(0.05 * sign, sign * (size / 2 + 0.011), 0), bevel=0.005)
         box(col, "Insulated_Batten", M("planksdark"), (0.022, 0.07, height), at=(sign * (size / 2 + 0.011), -0.05 * sign, 0), bevel=0.005)
-    rng = random.Random(31)
-    for _ in range(14):
-        row = rng.randrange(1, rows)
-        z = row * (board + INSULATED_GAP) - INSULATED_GAP / 2
-        along = rng.uniform(-size / 2 + 0.06, size / 2 - 0.06)
-        if rng.random() < 0.5:
-            start, out = (along, -size / 2 + 0.01, z), (along + rng.uniform(-0.03, 0.03), -size / 2 - 0.05, z - rng.uniform(0.0, 0.04))
-        else:
-            start, out = (size / 2 - 0.01, along, z), (size / 2 + 0.05, along + rng.uniform(-0.03, 0.03), z - rng.uniform(0.0, 0.04))
-        beam(col, "Insulated_Tuft", M("straw"), start, out, (0.014, 0.005))
-    # The tarp over the back corner, clear of the drum, hanging down the side.
-    box(col, "Insulated_Tarp", M("tarp"), (0.17, size - 0.38, 0.006), at=(size / 2 - 0.085, 0.19, height + 0.06))
-    box(col, "Insulated_TarpSide", M("tarp"), (0.006, size - 0.38, 0.47), at=(size / 2 + 0.026, 0.19, height - 0.4),
-        rotate=(0, -2, 0))
 
 
-# A real fixed dome holding the 4 m³ of gas the game gives it is 2 to 3 m across and mostly buried;
-# on one square it fills the square, thigh high above an earth berm, bigger than the insulated
+# A real fixed dome holding the 4 m³ of gas the game gives it is 2 to 3 m across, its pit sunk in
+# the ground; on one square its dome fills the square, thigh high, bigger than the insulated
 # digester beside it as it is in play.
-DOME = (0.4, 0.5)  # the brick dome's radius and its height above its footing
-DOME_AT = (-0.06, 0.06)
-DOME_FOOTING = 0.1  # where the berm leaves off and the bricks show
-BERM = (0.5, 0.5, 0.2)
+DOME = (0.4, 0.6)  # the brick dome's radius and height
+DOME_AT = (-0.02, 0.02)
 BRICK = (0.2, 0.05, 0.068)  # a brick as laid: along the course, into the dome, up
+# Where round the dome its feed pipe comes out, in degrees from east: towards the viewer.
+DOME_FEED_ANGLE = -60
 
 
 def dome_digester(col, frame=True, scrubber=False):
-    """A fixed-dome digester of the Chinese kind, buried: an earth berm over the pit filling its
-    square, the upper part of its brick dome showing above it, a concrete collar on its crown and
-    the gas pipe and valve out of that, its hose led off behind the dome, the feed pipe slanting
-    down into it from a concrete inlet basin on one side and the box its spent slurry overflows into
-    against the dome on the other. `scrubber` draws the scrubber alone, on the berm's back corner,
-    teed off the gas pipe above the valve."""
+    """A fixed-dome digester of the Chinese kind: its pit sunk in the ground, the brick dome over it
+    standing on the ground, a concrete collar on its crown and the gas pipe and valve out of that,
+    its hose led off behind the dome, and the feed pipe climbing out of the dome's foot to a funnel,
+    as the other digesters are fed. `scrubber` draws the scrubber alone, on the ground at the
+    square's back corner, teed off the gas pipe above the valve."""
     cx, cy = DOME_AT
-    crown = DOME_FOOTING + DOME[1]
+    crown = DOME[1]
     if frame:
         _dome(col)
     if scrubber:
         tee = (cx + 0.03, cy + 0.03, crown + 0.17)
         tube(col, "Dome_ScrubberTee", M("galvanised"), [(cx, cy, tee[2]), tee], 0.014, 8)
-        inlet, outlet = _scrubber(col, (0.37, 0.37), (0.43, 0.1), z=0.04, can_z=0.05)
+        inlet, outlet = _scrubber(col, (0.37, 0.37), (0.43, 0.1))
         tube(col, "Dome_ScrubberHose", M("rubberhose"), [tee, (tee[0] + 0.08, tee[1] + 0.06, tee[2] + 0.03),
                                                          (0.24, 0.3, inlet[2] + 0.14), inlet], 0.012, 8)
         # On to the house, underground.
@@ -1616,15 +1638,13 @@ def dome_digester(col, frame=True, scrubber=False):
 def _dome(col):
     cx, cy = DOME_AT
     radius, rise = DOME
-    mound(col, "Dome_Earth", M("earth"), BERM, squareness=1.8, lumps=0.04, seed=40, segments=32, rings=6)
-    # The mortar behind the bricks, from below the berm so no gap shows at its foot.
-    mound(col, "Dome_Mortar", M("mortar"), (radius - 0.008, radius - 0.008, rise + DOME_FOOTING), segments=32, rings=10,
-          at=(cx, cy, 0))
+    # The mortar behind the bricks.
+    mound(col, "Dome_Mortar", M("mortar"), (radius - 0.008, radius - 0.008, rise), segments=32, rings=10, at=(cx, cy, 0))
     rng = random.Random(41)
-    polar, course = math.asin(DOME_FOOTING / (rise + DOME_FOOTING)), 0
+    polar, course = 0.0, 0
     while polar < math.radians(70):
-        ring, z = radius * math.cos(polar), (rise + DOME_FOOTING) * math.sin(polar)
-        tilt = math.degrees(math.atan2(math.sin(polar) / (rise + DOME_FOOTING), math.cos(polar) / radius))
+        ring, z = radius * math.cos(polar), rise * math.sin(polar)
+        tilt = math.degrees(math.atan2(math.sin(polar) / rise, math.cos(polar) / radius))
         count = max(6, round(2 * math.pi * ring / (BRICK[0] + 0.012)))
         for k in range(count):
             azimuth = 360 * (k + 0.5 * (course % 2)) / count
@@ -1633,9 +1653,9 @@ def _dome(col):
             box(col, "Dome_Brick", M("brick" if rng.random() < 0.6 else "brickdark"), (length, BRICK[1], BRICK[2]),
                 at=(x, y, z), rotate=(tilt, 0, azimuth - 90))
         # The next course starts a brick and its mortar further up the curve.
-        polar += (BRICK[2] + 0.01) / math.hypot(radius * math.sin(polar), (rise + DOME_FOOTING) * math.cos(polar))
+        polar += (BRICK[2] + 0.01) / math.hypot(radius * math.sin(polar), rise * math.cos(polar))
         course += 1
-    crown = DOME_FOOTING + rise
+    crown = rise
     cylinder(col, "Dome_Collar", M("concrete"), 0.17, 0.09, at=(cx, cy, crown - 0.07), radius_top=0.14, segments=24)
     pipe_top = crown + 0.2
     cylinder(col, "Dome_GasPipe", M("galvanised"), 0.016, pipe_top - crown, at=(cx, cy, crown), segments=10)
@@ -1644,36 +1664,47 @@ def _dome(col):
     tube(col, "Dome_GasHose", M("rubberhose"), [(cx, cy, pipe_top), (cx - 0.02, cy + 0.04, pipe_top + 0.04),
                                                 (cx - 0.1, cy + 0.12, pipe_top), (cx - 0.24, cy + 0.3, crown - 0.15),
                                                 (-0.36, 0.44, 0.12), (-0.38, 0.48, 0.03)], 0.014, 8)
-    # The feed: the recipe's pipe slanting down into the dome's foot from a little concrete basin
-    # the slurry is mixed in, standing on the berm clear of the dome.
-    fx, fy = _around((cx, cy), 225, radius + 0.08)
-    lx, ly = _around((cx, cy), 225, radius - 0.02)
-    tube(col, "Dome_Feed", M("pvc"), [(lx, ly, 0.12), (fx, fy, 0.2)], 0.03, 12)
-    cylinder(col, "Dome_Inlet", M("concrete"), 0.09, 0.14, at=(fx, fy, 0.06), radius_top=0.1, segments=20)
-    cylinder(col, "Dome_InletSlurry", M("sludge"), 0.08, 0.002, at=(fx, fy, 0.195), segments=20)
-    # The overflow box: cast concrete against the dome's foot, full of spent slurry to its lip.
-    ox, oy, side, wall, tall = 0.33, -0.33, 0.21, 0.03, 0.26
-    box(col, "Dome_Sludge", M("sludge"), (side - wall, side - wall, tall - 0.025), at=(ox, oy, 0))
-    for sign in (-1, 1):
-        box(col, "Dome_BoxWall", M("concrete"), (side, wall, tall), at=(ox, oy + sign * (side - wall) / 2, 0), bevel=0.004)
-        box(col, "Dome_BoxWall", M("concrete"), (wall, side - 2 * wall, tall), at=(ox + sign * (side - wall) / 2, oy, 0), bevel=0.004)
+    # The feed: the recipe's pipe out of the dome's foot, bent up to stand clear of it, a funnel
+    # taped into its end.
+    lx, ly = _around((cx, cy), DOME_FEED_ANGLE, radius - 0.03)
+    bx, by = _around((cx, cy), DOME_FEED_ANGLE, radius + 0.04)
+    fx, fy = _around((cx, cy), DOME_FEED_ANGLE, radius + 0.06)
+    tube(col, "Dome_Feed", M("pvc"), [(lx, ly, 0.1), (bx, by, 0.12), (fx, fy, 0.2), (fx, fy, 0.32)], 0.024, 12)
+    cylinder(col, "Dome_FeedTape", M("ducttape"), 0.03, 0.04, at=(fx, fy, 0.29), segments=14)
+    cylinder(col, "Dome_Funnel", M("funnel"), 0.03, 0.12, at=(fx, fy, 0.32), radius_top=0.1, segments=18)
+    cylinder(col, "Dome_FunnelMouth", M("black"), 0.088, 0.003, at=(fx, fy, 0.438), segments=18)
 
 
 def wood_ash(col):
-    """A shovelful of wood ash out of a stove: a soft pale grey heap with bits of charcoal in it."""
+    """A shovelful of wood ash out of a stove: a soft pale grey heap slumped into a darker skirt
+    of fines round its foot, flecked white where the ash burnt clean, with bits of charcoal in it
+    and a couple of charred twig ends poking out."""
     rx, ry, height = 0.12, 0.1, 0.075
+    mound(col, "Ash_Skirt", M("ashdark"), (rx * 1.3, ry * 1.3, 0.02), lumps=0.08, seed=52, segments=24, rings=4)
     mound(col, "Ash_Heap", M("ash"), (rx, ry, height), lumps=0.08, seed=50, segments=20, rings=6)
     rng = random.Random(51)
+
+    def on_heap(spread):
+        # Clear of the heap's lumps, which raise its surface by up to a twelfth.
+        return height * math.sqrt(1 - spread * spread) * 1.06
     # Spread evenly over the heap, on a golden-angle spiral, so no side of it is bare.
     for i in range(12):
         spread = 0.75 * math.sqrt((i + 0.5) / 12)
-        angle = i * 137.5
-        u, v = _around((0, 0), angle, spread)
+        u, v = _around((0, 0), i * 137.5, spread)
         size = (rng.uniform(0.012, 0.022), rng.uniform(0.008, 0.014), 0.01)
-        # Clear of the heap's lumps, which raise its surface by up to a twelfth.
-        surface = height * math.sqrt(1 - spread * spread) * 1.06
-        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u * rx, v * ry, surface - 0.004),
+        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u * rx, v * ry, on_heap(spread) - 0.004),
             rotate=(rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 180)))
+    for i in range(9):
+        spread = 0.8 * math.sqrt((i + 0.3) / 9)
+        u, v = _around((0, 0), 60 + i * 137.5, spread)
+        mound(col, "Ash_Fleck", M("ashwhite"), (rng.uniform(0.008, 0.014), rng.uniform(0.006, 0.01), 0.004),
+              at=(u * rx, v * ry, on_heap(spread) - 0.003), rotate=(0, 0, rng.uniform(0, 180)), segments=8, rings=2)
+    for angle, spread, length in ((30, 0.55, 0.07), (200, 0.45, 0.06)):
+        u, v = _around((0, 0), angle, spread)
+        start = (u * rx, v * ry, on_heap(spread) - 0.012)
+        out = _around((0, 0), angle, 1)
+        beam(col, "Ash_Twig", M("charcoal"), start, (start[0] + out[0] * length, start[1] + out[1] * length, start[2] + 0.025),
+             (0.009, 0.009))
 
 
 SCRUBBER_BUCKET = (0.12, 0.34)  # a 5 gallon bucket's radius at its rim and its height
@@ -2117,18 +2148,28 @@ def generator_gas_pipe(col, side, body=None, facing="S"):
 
 
 def tarry_packing(col):
-    """A wad of straw out of a gasifier's filter, soaked black-brown with tar, strands sticking out."""
+    """A wad of straw out of a gasifier's filter, soaked black-brown with tar, a glossy smear of tar
+    run out under it, patches of the straw showing through where it soaked less, and strands
+    sticking out, some soaked dark and some still pale."""
     rx, ry, height = 0.1, 0.08, 0.045
+    mound(col, "Tarry_Smear", M("tar"), (rx * 1.2, ry * 1.15, 0.006), lumps=0.12, seed=62, segments=20, rings=3)
     mound(col, "Tarry_Wad", M("tar"), (rx, ry, height), lumps=0.25, seed=60, segments=16, rings=5)
     rng = random.Random(61)
-    for _ in range(16):
+    for i in range(4):
+        spread = rng.uniform(0.2, 0.6)
+        u, v = _around((0, 0), 40 + i * 95, spread)
+        mound(col, "Tarry_Patch", M("tarstraw"), (rng.uniform(0.012, 0.018), rng.uniform(0.008, 0.012), 0.008),
+              at=(u * rx, v * ry, height * math.sqrt(1 - spread * spread) * 1.05), rotate=(0, 0, rng.uniform(0, 180)),
+              lumps=0.1, seed=63 + i, segments=10, rings=3)
+    for k in range(18):
         angle, reach = rng.uniform(0, 360), rng.uniform(0.5, 0.85)
         ux, uy = _around((0, 0), angle, 1)
         z = height * math.sqrt(1 - reach * reach) + 0.003
         start = (ux * rx * reach, uy * ry * reach, z)
         length = rng.uniform(0.04, 0.07)
         end = (start[0] + ux * length, start[1] + uy * length, max(0.004, z + rng.uniform(-0.03, 0.01)))
-        beam(col, "Tarry_Strand", M("tarstraw"), start, end, (0.006, 0.002))
+        # Thicker than a decal (models.DECAL_THICKNESS), so the ground model keeps them standing out.
+        beam(col, "Tarry_Strand", M("straw" if k % 3 == 0 else "tarstraw"), start, end, (0.006, 0.003))
 
 
 # A government digest-size pamphlet. Its pages are thick enough to be modelled (models.py
@@ -2247,6 +2288,12 @@ ROTOR_SPINS = (0, 20, 40, 60, 80, 100)
 PIPE_BLADE_CURVE = 0.1
 
 
+def _section(points, turn, shift):
+    """An outline of (x, y) points turned `turn` degrees about Z and moved `shift` along X."""
+    c, s = math.cos(math.radians(turn)), math.sin(math.radians(turn))
+    return [(x * c - y * s + shift, x * s + y * c) for x, y in points]
+
+
 def _blade(col, name, kind, size, kept=None):
     """A blade along +Z from its root at the origin, its chord along X, made the way its material
     allows, so each reads apart at a glance:
@@ -2256,47 +2303,59 @@ def _blade(col, name, kind, size, kept=None):
       cut on a straight taper, its flat root bolted to a steel strap;
     - "steel": hammered from sheet, thin, flat and narrow to a point, a welded strap at its root,
       bare steel pocked by the hammer.
-    A blade a storm snapped keeps only its `kept` pieces from the root, and no tip."""
+    Each blade is one mesh lofted through its sections (kit.loft), so the bake gives it one long
+    stretch of texture. A blade a storm snapped keeps only its first `kept` of `pieces` lengths
+    from the root, and no tip."""
     length, chord, thick = size
     pieces = 6
     kept = pieces if kept is None else kept
     bolt = M("weld")
     parts = []
+
+    def stations(foot):
+        return [(j / pieces, foot + j * length / pieces) for j in range(kept + 1)]
+
     if kind == "wood":
         mat = M("carvedwood")
         parts.append(box(col, name, mat, (chord * 0.9, thick * 2.2, 0.1), bevel=0.006))
-        for i in range(kept):
-            t = (i + 0.5) / pieces
-            parts.append(box(col, name, mat, (chord * (1 - 0.55 * t), thick * (1.6 - 0.9 * t), length / pieces + 0.004),
-                             at=(chord * 0.18 * t, 0, 0.08 + i * length / pieces), rotate=(0, 0, 26 - 20 * t), bevel=0.006))
+        # An airfoil as thick as the plank's piece there: round at the leading edge (-X), thinning
+        # to the trailing edge.
+        foil = [(math.cos(a) / 2, math.sin(a) * (0.45 - 0.27 * math.cos(a)))
+                for a in (2 * math.pi * k / 10 for k in range(10))]
+        parts.append(loft(col, name, mat, [(z, _section([(x * chord * (1 - 0.55 * t), y * thick * (1.6 - 0.9 * t))
+                                                         for x, y in foil], 26 - 20 * t, chord * 0.18 * t))
+                                           for t, z in stations(0.08)]))
         if kept == pieces:
             parts.append(mound(col, name, mat, (chord * 0.22, thick * 0.35, 0.05), at=(chord * 0.18, 0, 0.08 + length - 0.004),
-                               segments=10, rings=3))
+                               rotate=(0, 0, 6), segments=10, rings=3))
         for z in (0.03, 0.07):
             parts.append(cylinder(col, name, bolt, 0.01, 0.006, at=(0, -thick * 1.1, z), rotate=(90, 0, 0), segments=6))
     elif kind == "pipe":
         mat = M("pvc")
         parts.append(box(col, name, M("rawsteel"), (chord * 0.6, 0.006, 0.12), at=(0, 0.004, -0.02)))
-        strips = 4
-        for i in range(kept):
-            t = (i + 0.5) / pieces
-            width = chord * (1 - 0.6 * t)
-            arc = width / PIPE_BLADE_CURVE
-            for s in range(strips):
-                a = (s + 0.5) / strips - 0.5
-                x = math.sin(a * arc) * PIPE_BLADE_CURVE
-                y = PIPE_BLADE_CURVE * (1 - math.cos(a * arc))
-                parts.append(box(col, name, mat, (width / strips + 0.002, 0.005, length / pieces + 0.002),
-                                 at=(x + chord * 0.2 * t, -y, 0.06 + i * length / pieces), rotate=(0, 0, 12 + math.degrees(a * arc))))
+        wall, arcs = 0.005, 6
+
+        def shell(width):
+            # The pipe's wall across `width` of its curve: the outside of the arc, then back along
+            # the inside.
+            span = width / PIPE_BLADE_CURVE
+            angles = [(k / arcs - 0.5) * span for k in range(arcs + 1)]
+            outer = [(math.sin(a) * PIPE_BLADE_CURVE, PIPE_BLADE_CURVE * (math.cos(a) - 1)) for a in angles]
+            inner = [(math.sin(a) * (PIPE_BLADE_CURVE - wall), PIPE_BLADE_CURVE * (math.cos(a) - 1) - wall * math.cos(a))
+                     for a in reversed(angles)]
+            return outer + inner
+        parts.append(loft(col, name, mat, [(z, _section(shell(chord * (1 - 0.6 * t)), 12, chord * 0.2 * t))
+                                           for t, z in stations(0.06)]))
         for z in (0.0, 0.06):
             parts.append(cylinder(col, name, bolt, 0.008, 0.006, at=(0, -0.003, z), rotate=(90, 0, 0), segments=6))
     else:
         mat = M("hammered")
         parts.append(box(col, name, M("weld"), (chord * 0.7, thick * 3, 0.07), bevel=0.002))
-        for i in range(kept):
-            t = (i + 0.5) / pieces
-            parts.append(box(col, name, mat, (chord * (1 - 0.85 * t), thick, length / pieces + 0.002),
-                             at=(chord * 0.1 * t, 0, 0.05 + i * length / pieces), rotate=(0, 0, 14 - 10 * t)))
+
+        def plate(width):
+            return [(-width / 2, -thick / 2), (width / 2, -thick / 2), (width / 2, thick / 2), (-width / 2, thick / 2)]
+        parts.append(loft(col, name, mat, [(z, _section(plate(chord * (1 - 0.85 * t)), 14 - 10 * t, chord * 0.1 * t))
+                                           for t, z in stations(0.05)]))
         for z in (0.02, 0.05):
             parts.append(cylinder(col, name, M("galvanised"), 0.008, 0.005, at=(0, -thick * 1.5, z), rotate=(90, 0, 0), segments=6))
     return parts
