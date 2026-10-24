@@ -1109,7 +1109,7 @@ def solar_garden_light(col, lit=False, stake=True):
     from the lamp SolarGardenLight lights on its square. `stake` adds the spike that a placed
     light has in the ground."""
     base = 0.1 if stake else 0.0
-    post = 0.32
+    post = 0.26
     if stake:
         cylinder(col, "Garden_Stake", M("black"), 0.003, base, radius_top=0.016, segments=8)
     cylinder(col, "Garden_Post", M("black"), 0.014, post, at=(0, 0, base), segments=10)
@@ -1502,9 +1502,10 @@ def _tarp_bag(col, fill, torn):
 INSULATED = (0.8, 0.84)
 INSULATED_GAP = 0.006  # between its boards
 FLOAT_DRUM = (0.24, 0.62)  # a 30 gallon drum's radius and height
-# The floating drum's head above the slurry drum's, by gas level, and the guide pipe's top.
-FLOAT_RISE = (0.08, 0.2, 0.32, 0.44)
-GUIDE_TOP = DRUM[1] + FLOAT_RISE[-1] + 0.22
+# The floating drum's head above the slurry drum's, by gas level: only its top pokes out of the
+# straw, as the gas fills it, so the digester stays packed in to its head. And the guide pipe's top.
+FLOAT_RISE = (0.03, 0.07, 0.11, 0.15)
+GUIDE_TOP = DRUM[1] + FLOAT_RISE[-1] + 0.12
 # The feed funnel, on the box's north-east corner, and where its pipe enters the drum's side.
 INSULATED_FEED = (0.26, 0.26)
 INSULATED_INLET = (0.19, 0.19)
