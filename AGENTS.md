@@ -29,4 +29,5 @@
 - Before changing scripts, translations, multiplayer sync, loot, tests, art or the promo shots, read `DEVELOPMENT.md` for the Build 42 behavior that fails silently, the command to decompile the game, and the art, promo and loot commands. Before editing `DEVELOPMENT.md`, read its opening on what belongs there.
 - Before changing `README.md`, the Workshop page, read `dev/harness/docs/workshop-page.md`.
 - Before designing or balancing a feature, read `docs/design.md`: the principles every cost, payoff and repair is weighed against.
+- Before working on Project Viewpoint compatibility, read `docs/viewpoint.md`: how Viewpoint draws and picks objects, its model-pack format, and what it means for this mod.
 - When a change alters how a mechanic plays or where something spawns, update `docs/player-guide.md` in the same commit. It gives rarity tiers and rough sizes; exact figures only where players plan around them, such as slots, reach and inverter watts.
