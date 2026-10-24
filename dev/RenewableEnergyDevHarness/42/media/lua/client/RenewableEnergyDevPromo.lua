@@ -200,33 +200,31 @@ local WALK = {
     -- Late enough for the sky to be dark in any season.
     hour = 23,
 }
--- The poster and the Workshop preview, after dark: a house with every light on, run by a bank
--- indoors behind a window and fed by racks, flat panels and a propeller wind charger in its yard,
--- with a kitted generator on a digester's gas beside them, while the neighbours' houses, with the
--- grid gone, stand dark. Positions are (along, out) from the square outside the window, as the
--- homestead's.
+-- The poster and the Workshop preview, by day and close in, so that it reads where Steam shows it
+-- smallest: a homebuilt turbine turning over a house's yard, racks of panels before its windows, a
+-- brick dome feeding a kitted generator, and the settler beside them, all run by a bank indoors
+-- behind the window. Positions are (along, out) from the square outside the window, as the
+-- homestead's; each stands clear of the others on the screen, the racks across the middle, the
+-- dome and generator to their left, the turbine and the settler to their right.
 local POSTER = {
-    -- Lit windows sell it, so the wall the camera sees needs several, and the house some rooms.
+    -- A wall with windows reads as a home rather than a shed.
     windows = { along = { -4, 4 }, count = 2 },
     rooms = 3,
     bank = { 0, -1 },
     open = { along = { -2, 3 }, out = { 1, 3 } },
-    racks = { { -1, 2, "metal" }, { 0, 2, "metal" }, { 1, 2, "metal" }, { 2, 2, "metal" } },
-    flatPanels = { { -1, 3 }, { 0, 3 }, { 1, 3 } },
-    generator = { -2, 1 },
-    digester = { -2, 2 },
+    -- In front of the yard, where the shot reaches below it.
+    front = { along = { -3, 5 }, out = { 4, 6 } },
+    racks = { { 0, 2, "metal" }, { 1, 2, "metal" }, { 2, 2, "metal" } },
+    generator = { -2, 2 },
+    digester = { -2, 1 },
     windCharger = { 3, 1 },
-    player = { 2, 3 },
-    -- Where the character looks around first, by day, so that the house, its rooms behind the
-    -- windows and its neighbours are drawn rather than left black as unseen: indoors where the
-    -- floor is free, then outdoors.
+    player = { 3, 2 },
+    -- Where the character looks around first, so that the house and the yard are drawn rather than
+    -- left black as unseen: indoors where the floor is free, then outdoors.
     indoors = { { -3, -2 }, { 0, -2 }, { 3, -2 } },
     scouts = { { -4, 4 }, { 0, 8 }, { 6, 4 }, { 6, 0 } },
-    -- Past 24 the clock rolls over into the next morning: darker than the garden lights' hour, so
-    -- the lit house stands out of the street.
-    hour = 25,
-    -- Out far enough for the whole house and the dark around it.
-    zoomOut = 3,
+    -- A step out from the closest zoom: the closest leaves the turbine's rotor off the top.
+    zoomOut = 1,
 }
 
 -- The gas, wind and treadmill setups, by the name of their place: the yards (biogas, woodgas,
@@ -1106,11 +1104,11 @@ local function fitGasKit(generator, source)
     end
 end
 
--- A generator plugged in and waiting at `layout.generator` of `place`, with a gas kit on an
--- insulated digester at `layout.digester`. Returns the generator.
-local function placeKittedGenerator(place, layout)
+-- A generator plugged in and waiting at `layout.generator` of `place`, with a gas kit on a digester
+-- of the Sprites.digester tile `tile` at `layout.digester`. Returns the generator.
+local function placeKittedGenerator(place, layout, tile)
     local generator = placeGenerator(at(place, layout.generator), 0.7)
-    fitGasKit(generator, (placeDigester(at(place, layout.digester), "insulated", 1)))
+    fitGasKit(generator, (placeDigester(at(place, layout.digester), tile, 1)))
     return generator
 end
 
@@ -1142,7 +1140,7 @@ local function buildHomestead()
     placePanels(homesteadBank, home, HOMESTEAD.flatPanels)
     -- A backup generator with a failsafe outside the bank's wall, plugged in and waiting, with a
     -- gas kit on the insulated digester beside it.
-    local generator = placeKittedGenerator(home, HOMESTEAD)
+    local generator = placeKittedGenerator(home, HOMESTEAD, "insulated")
     Stage.placeTile(generator:getSquare(), Sprites.failsafe)
     shown.homesteadCharger = placeWindCharger(at(home, HOMESTEAD.windCharger), Sprites.windCharger.propeller.wood[home.frame.facing])
     connect(homesteadBank, shown.homesteadCharger)
@@ -1647,63 +1645,48 @@ local function addGardenLights()
     end)
 end
 
--- The poster's setup, built after dark so that the bank's first pass starts its clock there rather
--- than running the house's lights through the evening. Every light in the house that the bank
--- reaches goes on, upstairs too, and every other light in its reach off; the other setups' banks
--- go off, so that this is the one lit house.
+-- The poster's setup: the bank indoors, full, running what it reaches, with the yard's racks, turbine
+-- and kitted generator on a brick dome's gas. What stands in the band in front of the yard goes
+-- down to the floor, as a clothesline or a shrub there would stand over the racks in the shot.
 local function buildPoster()
     local poster = places.poster
+    everyAreaSquare(poster, POSTER.front, function(square)
+        local floor, objects = square:getFloor(), square:getObjects()
+        for i = objects:size() - 1, 0, -1 do
+            if objects:get(i) ~= floor then
+                square:transmitRemoveItemFromSquare(objects:get(i))
+            end
+        end
+        return true
+    end)
     clearArea(poster, POSTER.open, true)
     posterBank = PowerBank.place(at(poster, POSTER.bank), Sprites.batteryBankMetal.S, -1)
     fillBank(posterBank, HOMESTEAD_BANK, 1)
     placePanels(posterBank, poster, POSTER.racks, "rack")
-    placePanels(posterBank, poster, POSTER.flatPanels)
-    connect(posterBank, placeWindCharger(at(poster, POSTER.windCharger), Sprites.windCharger.propeller.wood[poster.frame.facing]))
-    placeKittedGenerator(poster, POSTER)
-    for _, bank in ipairs({ homesteadBank, stage0Box }) do
-        setBankOn(bank, false)
-    end
+    connect(posterBank, placeWindCharger(at(poster, POSTER.windCharger), Sprites.windCharger.alternator.steel[poster.frame.facing]))
+    placeKittedGenerator(poster, POSTER, "dome")
     setBankOn(posterBank, true)
-    local building = posterBank:getSquare():getBuilding()
-    local lit, unlit = 0, 0
-    RenewableEnergy.eachSquareInGeneratorReach(posterBank:getSquare(), function(square)
-        local inHouse = square:getBuilding() == building
-        local objects = square:getObjects()
-        for i = 0, objects:size() - 1 do
-            local object = objects:get(i)
-            if instanceof(object, "IsoLightSwitch") and switchLight(object, inHouse) then
-                lit, unlit = lit + (inHouse and 1 or 0), unlit + (inHouse and 0 or 1)
-            end
-        end
-    end)
-    print(string.format("REPromo poster: switched on %d lights in the house and off %d around it", lit, unlit))
 end
 
--- A square as tall as the screen, centred across on the house and the panels.
+-- The smallest square around the yard, with a margin, kept on the screen.
 local function posterRegion()
-    local poster = places.poster
-    local def = posterBank:getSquare():getBuilding():getDef()
-    local squares = squaresAt(poster, { POSTER.player }, POSTER.racks, POSTER.flatPanels,
-        { POSTER.generator, POSTER.digester, POSTER.windCharger })
-    for _, corner in ipairs({ { def:getX(), def:getY() }, { def:getX2() - 1, def:getY() },
-        { def:getX(), def:getY2() - 1 }, { def:getX2() - 1, def:getY2() - 1 } }) do
-        local square = getCell():getGridSquare(corner[1], corner[2], poster.origin:getZ())
-        if square then
-            table.insert(squares, square)
-        end
-    end
-    local box = screenBox(squares)
-    local size = getCore():getScreenHeight()
-    local left = math.max(0, math.min(getCore():getScreenWidth() - size, (box.left + box.right - size) / 2))
-    return region("poster", left, 0, size, size)
+    local box = screenBox(squaresAt(places.poster, POSTER.racks,
+        { POSTER.player, POSTER.generator, POSTER.digester, POSTER.windCharger }))
+    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
+    local size = math.min(screenW, screenH, math.max(box.right - box.left, box.bottom - box.top) + 2 * CROP_MARGIN)
+    local left = math.max(0, math.min(screenW - size, (box.left + box.right - size) / 2))
+    local top = math.max(0, math.min(screenH - size, (box.top + box.bottom - size) / 2))
+    return region("poster", left, top, size, size)
 end
 
 local function addPoster()
     local poster = places.poster
-    -- The homestead at night, its settler by the racks.
+    -- The settler in the yard at noon, after the garden lights' night.
     addOutfit(true)
     run:add(function()
         removeTrees(poster)
+        getGameTime():setTimeOfDay(NOON)
+        buildPoster()
     end)
     local scouts = loadedSquares(poster, POSTER.indoors, function(square)
         return RenewableEnergy.Debug.isFreeSquare(square, true)
@@ -1713,10 +1696,9 @@ local function addPoster()
     end
     table.insert(scouts, at(poster, POSTER.player))
     goTo(scouts, POSTER.zoomOut)
+    -- The clock turned before the looking around, which outlasts the lighting's change.
     run:add(function()
-        getGameTime():setTimeOfDay(POSTER.hour)
-        buildPoster()
-        return Stage.lightingSettled(getPlayer(), true)
+        return Stage.lightingSettled(getPlayer())
     end)
     run:addOpaque("poster", function()
         return { posterRegion() }

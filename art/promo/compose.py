@@ -566,17 +566,27 @@ def treadmill():
     return scaled(shot, WIDTH / shot.width)
 
 
+# What the poster's yard runs on, under the name; the height of the band the two take below the
+# yard, which keeps the yard's middle and loses the open grass above and below it.
+POSTER_LINE = "Solar · Wind · Biogas · Wood gas"
+POSTER_BAND = 120
+
+
 def poster():
-    """The lit house at night under the mod's name, in the banner's type. The name is set large
-    enough to read where Steam shows the preview smallest, about 196 pixels across."""
-    image = capture("poster").resize((POSTER_SIZE, POSTER_SIZE), Image.LANCZOS)
-    # Dark from the house's yard down, behind the title; the night above stays as it was shot.
-    shade = Image.linear_gradient("L").resize(image.size)
-    shade = shade.point(lambda v: round(210 * min(1, max(0, (v / 255 - 0.55) / 0.45)) ** 0.8))
-    image.paste(Image.new("RGBA", image.size, (12, 13, 16, 255)), (0, 0), shade)
-    title = "\n".join(PROMO["strings"]["modName"].split())
-    ImageDraw.Draw(image).multiline_text((30, POSTER_SIZE - 30), title, font=font(68, "Bold"), fill=TEXT,
-                                         anchor="ld", spacing=4)
+    """The yard by day, close in, over a band with the mod's name, set large enough to read where
+    Steam shows the preview smallest, about 196 pixels across, and what the yard runs on."""
+    shot = capture("poster").resize((POSTER_SIZE, POSTER_SIZE), Image.LANCZOS)
+    cut = POSTER_BAND // 2
+    image = Image.new("RGBA", (POSTER_SIZE, POSTER_SIZE), BACKGROUND + (255,))
+    image.alpha_composite(shot.crop((0, cut, POSTER_SIZE, POSTER_SIZE - cut)))
+    draw = ImageDraw.Draw(image)
+    middle, band = POSTER_SIZE / 2, POSTER_SIZE - POSTER_BAND
+    draw.line((0, band, POSTER_SIZE, band), fill=SOLAR, width=3)
+    name, size = PROMO["strings"]["modName"], 56
+    while draw.textlength(name, font=font(size, "Bold")) > POSTER_SIZE - 2 * 32:
+        size -= 1
+    draw.text((middle, band + 60), name, font=font(size, "Bold"), fill=TEXT, anchor="ms")
+    draw.text((middle, band + 96), POSTER_LINE, font=font(24, "Medium"), fill=MUTED, anchor="ms")
     return image
 
 
