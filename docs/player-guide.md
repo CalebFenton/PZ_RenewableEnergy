@@ -45,11 +45,11 @@ A bank bills each appliance what vanilla bills a generator for it:
 
 A fridge runs day and night, so it's what sizes your bank: 160 W around the clock is about 4 kWh a day, 2 of them overnight. A stove or a washer counts only while it's on.
 
-The inverter also loses a tenth of what passes through it, and draws a few watts while it's on. Everything in the bank's reach counts, the neighbours' lights and fridges included, so set up away from town or switch off what you don't need.
+The inverter also loses a share of what passes through it, a tenth for a found one and more for a homemade one, and draws a few watts while it's on. Everything in the bank's reach counts, the neighbours' lights and fridges included, so set up away from town or switch off what you don't need.
 
 ## Your first setup
 
-You need a **Wooden Battery Box** (Homestead Power #1, or Woodwork), two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box, and a solar module or two.
+You need a **Wooden Battery Box** (Homestead Power #1, or Woodwork), two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box (or a **Makeshift Inverter** you build, see [Inverters](#inverters)), and a solar module or two.
 
 1. Place the box inside a building, in a room. Outdoors, it does nothing.
 2. Right-click it and **Wire In** the batteries and the inverter. That takes a screwdriver, some Electric Wire and enough light to see by.
@@ -79,13 +79,22 @@ A metal rack or bank holds more batteries than a wooden one; a metal box holds t
 
 The inverter decides how much you can switch on at once. With two inverters, a bank carries what both add up to.
 
-| Inverter | Carries | Wire it in at | Found |
-|---|---|---|---|
-| Plug-in Inverter | 300 W | Electricity 0 | Common |
-| Power Inverter | 600 W | Electricity 2 | Uncommon |
-| Inverter/Charger | 1000 W | Electricity 4 | Rare |
+| Inverter | Carries | Wastes | Wire it in at | Comes from |
+|---|---|---|---|---|
+| Makeshift Inverter | 300 W | A quarter | Electricity 0 | Crafted (Electricity 2) |
+| Plug-in Inverter | 300 W | A tenth | Electricity 0 | Common |
+| Homemade Inverter | 600 W | A fifth | Electricity 2 | Crafted (Electricity 4) |
+| Power Inverter | 600 W | A tenth | Electricity 2 | Uncommon |
+| Inverter/Charger | 1000 W | A tenth | Electricity 4 | Rare |
 
-Inverters can't be crafted. The Inverter/Charger also has a 1000 W charger built in (see [Chargers and generators](#chargers-and-generators)). As a guide, 300 W runs a fridge with the TV, the radio and the lights; 600 W adds the washer or the stove; 1000 W runs a fridge-freezer, the stove and the washer at once; a pair of inverter/chargers runs the whole house.
+The Inverter/Charger also has a 1000 W charger built in (see [Chargers and generators](#chargers-and-generators)). As a guide, 300 W runs a fridge with the TV, the radio and the lights; 600 W adds the washer or the stove; 1000 W runs a fridge-freezer, the stove and the washer at once; a pair of inverter/chargers runs the whole house.
+
+**Building one.** A homemade inverter carries what the found one of its size does, but wastes more of your charge, idles hotter, wears a little faster and never comes up to a found one's condition: a makeshift one tops out at 80, a homemade one at 90. The better your Electricity when you build it, the closer to that it comes out. A found inverter is always an upgrade.
+
+- **Makeshift Inverter**: a Car Battery Charger or a Microwave Transformer, an Amplifier, two Electronics Scrap and two lengths of wire, with a screwdriver, at Electricity 2.
+- **Homemade Inverter**: a Microwave Transformer (a battery charger's is too small), two Amplifiers, four Electronics Scrap, four lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electricity 4.
+
+Taking apart a radio or a TV often gives an Amplifier, and a Speaker always does. Dismantling a microwave gives its transformer 20% of the time at Electricity 0, 10% more for each level, and every time from Electricity 8.
 
 ### Sources
 
@@ -514,16 +523,16 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 
 | Read | It teaches |
 |---|---|
-| Homestead Power #1: Sun & Batteries | Battery boxes and racks, every panel mount, sealing |
-| Homestead Power #2: Inverters & Control | Battery banks, the charge controller, the failsafe, homemade modules, reglazing, reconditioning, the whole battery rebuild |
+| Homestead Power #1: Sun & Batteries | Battery boxes and racks, every panel mount, sealing, the makeshift inverter |
+| Homestead Power #2: Inverters & Control | Battery banks, the homemade inverter, the charge controller, the failsafe, homemade modules, reglazing, reconditioning, the whole battery rebuild |
 | Homestead Power #3 | Digesters, the Gas Conversion Kit, the Gas Heater |
 | Homestead Power #4 | Every wind charger, their blades, the homemade alternator |
 | FEMA Wood Gas Generator Plans | The three gasifiers, the Gas Conversion Kit, the wood vinegar sprays |
 
 ### Other ways to learn
 
-- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. Boxes, racks, banks and panels come from Woodwork, Metalworking or Electricity. Battery work and controllers come from Electricity, digesters from Farming plus a building skill, gasifiers from Mechanics and Metalworking, wind chargers from Metalworking and Electricity, and the car alternator wind charger takes Mechanics too.
-- **Research.** Researching a found module teaches the panel mounts and sealing, and a homemade one teaches sealing. A plug-in inverter teaches battery boxes, a power inverter racks, and an inverter/charger banks and the failsafe.
+- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. Boxes, racks, banks and panels come from Woodwork, Metalworking or Electricity. Battery work, inverters and controllers come from Electricity, digesters from Farming plus a building skill, gasifiers from Mechanics and Metalworking, wind chargers from Metalworking and Electricity, and the car alternator wind charger takes Mechanics too.
+- **Research.** Researching a found module teaches the panel mounts and sealing, and a homemade one teaches sealing. A plug-in inverter teaches battery boxes and the makeshift inverter, a power inverter racks and the homemade inverter, and an inverter/charger banks and the failsafe.
 
 ### What a recipe needs around it
 
@@ -537,7 +546,7 @@ Light is also needed for wiring and fittings: wiring parts in and out, wiring a 
 
 ### What you can't craft
 
-Inverters, the maintainer, the solar battery charger, garden lights, factory modules, car alternators, and new deep cycle or L-16 batteries all have to be found. Treadmill motors and fridge compressors come only from taking things apart. Cutting up a fridge (a blowtorch and a welding mask, as in vanilla) gives its compressor 10% of the time at Metalworking 0, 10% more for each level, and every time from Metalworking 9.
+Found inverters, the maintainer, the solar battery charger, garden lights, factory modules, car alternators, and new deep cycle or L-16 batteries all have to be found. Treadmill motors, fridge compressors and microwave transformers come only from taking things apart. Cutting up a fridge (a blowtorch and a welding mask, as in vanilla) gives its compressor 10% of the time at Metalworking 0, 10% more for each level, and every time from Metalworking 9.
 
 ## When something isn't working
 

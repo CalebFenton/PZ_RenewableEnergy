@@ -776,6 +776,82 @@ test("renewable_energy_bank_part_wear_and_repair", {
     end,
 })
 
+-- A homemade inverter beside a found one: the two share the load by what each carries, each
+-- wasting its own share, both idle, and the homemade one wears by its `wear` share. The hours on
+-- make the homemade one's wear a whole point more than the found one's, with a tenth to spare.
+local HOMEMADE_INVERTER = "RenewableEnergy.HomemadeInverter"
+local HOMEMADE_HOURS = math.ceil(2.1 / (Specs.inverters[HOMEMADE_INVERTER].wear * Specs.partWear.perHour.inverter))
+local HOMEMADE_PASSES = math.ceil(HOMEMADE_HOURS / PASS_HOURS)
+test("renewable_energy_bank_homemade_inverter_wastes_and_wears_more", {
+    run = function(self)
+        T.setGrid(self, false)
+        local parts = { HOMEMADE_INVERTER, POWER_INVERTER }
+        for _ = 1, 4 do
+            table.insert(parts, L16)
+        end
+        local bank = T.bank(self, "batteryBankMetal", parts)
+        if not bank then return end
+        self.bank = bank
+        T.switchOn(self, bank)
+        T.batch(function()
+            for _ = 1, HOMEMADE_PASSES do
+                T.setCharge(self, bank, 1)
+                T.bankPass(self, bank, 0, { hours = HOMEMADE_HOURS / HOMEMADE_PASSES })
+            end
+            T.step(function() self.after = bank.state end)
+        end)
+    end,
+    validate = function(self)
+        local status = self.after.status
+        if not expect(status.state == "on" and status.loadW > 0, string.format(
+            "the bank isn't carrying a load to share (%s, %.1f W)", tostring(status.state), status.loadW)) then return end
+        local homemade, found = Specs.inverters[HOMEMADE_INVERTER], Specs.inverters[POWER_INVERTER]
+        local carried = homemade.watts + found.watts
+        local drawn = homemade.watts / homemade.efficiency + found.watts / found.efficiency
+        expectNear("W drawn for the shared load", status.drawW,
+            status.loadW * drawn / carried + homemade.idle + found.idle, 0.01)
+        local rate = Specs.partWear.perHour.inverter
+        local foundLoss = math.floor(rate * HOMEMADE_HOURS)
+        local homemadeLoss = math.floor(homemade.wear * rate * HOMEMADE_HOURS)
+        expect(homemadeLoss > foundLoss, "the hours on wear the homemade inverter no more whole points than the found one")
+        expectNear("found inverter after " .. HOMEMADE_HOURS .. " hours on", conditionOf(self.after, POWER_INVERTER),
+            100 - foundLoss, 0)
+        expectNear("homemade inverter after " .. HOMEMADE_HOURS .. " hours on", conditionOf(self.after, HOMEMADE_INVERTER),
+            instanceItem(HOMEMADE_INVERTER):getConditionMax() - homemadeLoss, 0)
+    end,
+})
+
+-- A crafted inverter comes out short of its cap at the recipe's Electricity level, better with
+-- each level past it, and at its cap well past it.
+local MAKESHIFT_RECIPE, MAKESHIFT = "RenewableEnergy_MakeMakeshiftInverter", "RenewableEnergy.MakeshiftInverter"
+for _, row in ipairs({ { "at_recipe_level", 0 }, { "two_levels_past", 2 }, { "far_past_capped", 10 } }) do
+    local behavior, past = row[1], row[2]
+    T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, behavior), {
+        recipe = MAKESHIFT_RECIPE,
+        from = Specs.charger,
+        prefer = { Specs.charger },
+        setup = function(self)
+            local recipe = getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE)
+            self.required = recipe:getRequiredSkill(0):getLevel()
+            T.setPerk(self, Perks.Electricity, math.min(10, self.required + past))
+        end,
+        counts = { [MAKESHIFT] = 1 },
+        after = function(self) T.readCarried(self, { MAKESHIFT }) end,
+        validate = function(self)
+            local inverter = T.carriedFirst(self, MAKESHIFT)
+            if not expect(inverter ~= nil, "no makeshift inverter was made") then return end
+            local cap = instanceItem(MAKESHIFT):getConditionMax()
+            local level = math.min(10, self.required + past)
+            local expected = math.min(cap, cap - Recipes.CRAFTED_SHORTFALL + Recipes.CRAFTED_PER_LEVEL * (level - self.required))
+            expect(inverter.condition == expected, string.format("made at Electricity %d it is at %d, expected %d",
+                level, inverter.condition, expected))
+            if past >= 10 then
+                expect(inverter.condition == cap, "made far past the recipe's level it is below its cap " .. cap)
+            end
+        end,
+    })
+end
+
 -- Chargers and generator charging --------------------------------------------------------------
 
 -- With the grid off, a rack bank with batteries, car battery chargers and an Inverter/Charger,
@@ -1568,7 +1644,7 @@ test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
         local before, after = self.before, self.after
         expect(after.storedWh == 0 and after.status.state == "empty",
             "an hour of load left the bank at " .. after.storedWh .. " Wh, " .. after.status.state)
-        local billed, most = after.loadWhToday - before.loadWhToday, before.storedWh * Specs.inverterEfficiency
+        local billed, most = after.loadWhToday - before.loadWhToday, before.storedWh * Specs.inverters[INVERTER].efficiency
         expect(billed > 0 and billed <= most + 1e-6, "the pass that emptied the bank billed " .. billed
             .. " Wh of load, expected more than 0 and at most the " .. most .. " Wh the batteries could give")
     end,

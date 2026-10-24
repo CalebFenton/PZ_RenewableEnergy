@@ -78,14 +78,15 @@ local GROUP_TYPES = {
     -- Blades and alternators for the wind chargers.
     wind = {
         "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades", "RenewableEnergy.SteelBlades",
-        "RenewableEnergy.HomemadeAlternator", "Base.Speaker", "Base.NormalBrake*", "Base.OldBrake*",
-        "Base.ModernBrake*", "Base.KitchenKnife",
+        "RenewableEnergy.HomemadeAlternator", "Base.Speaker", "Base.RadioRed", "Base.RadioBlack",
+        "Base.NormalBrake*", "Base.OldBrake*", "Base.ModernBrake*", "Base.KitchenKnife",
     },
     treadmill = { "RenewableEnergy.TreadmillMotor" },
     -- Storage, and the parts wired into a bank.
     bank = {
         "RenewableEnergy.BatteryBox*", "RenewableEnergy.BatteryRack*", "RenewableEnergy.BatteryBank*",
         "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger",
+        "RenewableEnergy.MakeshiftInverter", "RenewableEnergy.HomemadeInverter", "RenewableEnergy.MicrowaveTransformer",
         "RenewableEnergy.ChargeController", "RenewableEnergy.SolarFailsafe", "Base.CarBatteryCharger",
         "Base.Amplifier", "Base.RemoteCraftedV3",
     },

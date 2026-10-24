@@ -1075,6 +1075,64 @@ module Base
 
     /**************************** Bank parts ********************************/
 
+    /* Square-wave inverters of the kind hobby magazines printed: a transformer run backwards,
+       switched by an amplifier's power transistors. A car battery charger's transformer is big
+       enough for the makeshift one only; the homemade one takes a rewound microwave transformer
+       and twice the transistors, on a heatsink. OnCreate sets the condition the maker's skill
+       gives (Recipes.craftedInverterCondition). */
+    craftRecipe RenewableEnergy_MakeMakeshiftInverter
+    {
+        timedAction = MakingElectrical,
+        time = 200,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:5,
+        SkillRequired = Electricity:2,
+        xpAward = Electricity:20,
+        OnCreate = RenewableEnergy.Recipes.makeInverter,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [Base.CarBatteryCharger;RenewableEnergy.MicrowaveTransformer],
+            item 1 [Base.Amplifier],
+            item 2 [Base.ElectronicsScrap],
+            item 2 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.MakeshiftInverter,
+        }
+    }
+
+    craftRecipe RenewableEnergy_MakeHomemadeInverter
+    {
+        timedAction = MakingElectrical,
+        time = 400,
+        Tags = AnySurfaceCraft,
+        category = Electrical,
+        NeedToBeLearn = true,
+        AutoLearnAny = Electricity:7,
+        SkillRequired = Electricity:4,
+        xpAward = Electricity:40,
+        OnCreate = RenewableEnergy.Recipes.makeInverter,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 tags[base:pliers] mode:keep flags[MayDegradeLight],
+            item 1 [RenewableEnergy.MicrowaveTransformer],
+            item 2 [Base.Amplifier],
+            item 4 [Base.ElectronicsScrap],
+            item 4 [Base.ElectricWire],
+            item 1 [Base.SmallSheetMetal],
+            item 4 [Base.Screws],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.HomemadeInverter,
+        }
+    }
+
     /* The Amplifier stands in for the power transistors a shunt controller switches with. */
     craftRecipe RenewableEnergy_MakeChargeController
     {

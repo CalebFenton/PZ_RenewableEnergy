@@ -460,6 +460,40 @@ function Recipes.makeChargeController(craftRecipeData, character)
     controller:syncItemFields()
 end
 
+-- A crafted inverter comes out short of its ConditionMax by CRAFTED_SHORTFALL at the recipe's
+-- Electricity level, and each level past it makes up CRAFTED_PER_LEVEL, up to the cap: the more
+-- skilled the maker, the better the first build.
+Recipes.CRAFTED_SHORTFALL = 20
+Recipes.CRAFTED_PER_LEVEL = 5
+
+--- The condition an inverter of ConditionMax `conditionMax` comes out at, made at Electricity
+--- `level` by a recipe that needs `required`.
+function Recipes.craftedInverterCondition(conditionMax, level, required)
+    local condition = conditionMax - Recipes.CRAFTED_SHORTFALL + Recipes.CRAFTED_PER_LEVEL * math.max(0, level - required)
+    return math.min(conditionMax, condition)
+end
+
+-- The Electricity level `recipe` needs, 0 if none.
+local function electricityRequired(recipe)
+    for i = 0, recipe:getRequiredSkillCount() - 1 do
+        local skill = recipe:getRequiredSkill(i)
+        if skill:getPerk() == Perks.Electricity then
+            return skill:getLevel()
+        end
+    end
+    return 0
+end
+
+-- OnCreate of the inverter recipes: the maker's skill sets the new inverter's condition, and it
+-- is marked as having a condition of its own, as a new controller is.
+function Recipes.makeInverter(craftRecipeData, character)
+    local inverter = craftRecipeData:getFirstCreatedItem()
+    Wear.setCondition(inverter, Recipes.craftedInverterCondition(inverter:getConditionMax(),
+        character:getPerkLevel(Perks.Electricity), electricityRequired(craftRecipeData:getRecipe())))
+    Wear.markOwnCondition(inverter)
+    inverter:syncItemFields()
+end
+
 -- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
 function Recipes.takeApartGardenLight(craftRecipeData, character)
     local light = firstInput(craftRecipeData, function(item)

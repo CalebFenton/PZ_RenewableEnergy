@@ -282,9 +282,11 @@ function WorldSpawns.wearFoundBattery(item, wearName)
     setPercent(item, percent)
 end
 
---- Whether `fullType` is a part PART_WEAR wears: an inverter or a charge controller.
+--- Whether `fullType` is a part PART_WEAR wears: a found inverter or a charge controller. A
+--- homemade inverter is never loot, and its crafted condition is its own.
 function WorldSpawns.isWornPart(fullType)
-    return Specs.inverters[fullType] ~= nil or fullType == Specs.controller
+    local inverter = Specs.inverters[fullType]
+    return (inverter ~= nil and not inverter.homemade) or fullType == Specs.controller
 end
 
 --- Wears the found inverter or controller `item` as PART_WEAR says, a dud at PART_DUD's

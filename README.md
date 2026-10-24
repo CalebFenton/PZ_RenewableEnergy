@@ -79,7 +79,7 @@ FEMA's 1989 plans run an engine on wood: a gasifier from a trash can, a steel dr
 
 ## Crafting
 
-Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. Inverters, the maintainer and the battery charger can't be crafted. Every recipe is on [one sheet](art/promo/images/recipes.png).
+Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A homemade inverter, wound on a microwave's transformer, gets a bank going until you find a real one. The maintainer and the battery charger can't be crafted. Every recipe is on [one sheet](art/promo/images/recipes.png).
 
 ## Where to look
 

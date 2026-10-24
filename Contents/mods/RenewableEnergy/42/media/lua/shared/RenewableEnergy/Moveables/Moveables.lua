@@ -74,9 +74,26 @@ local function compressorChance(character)
     return math.min(1, (10 + 10 * character:getPerkLevel(Perks.MetalWelding)) / 100)
 end
 
--- A dismantled treadmill gives its motor, and a dismantled refrigerator may give its compressor,
--- which a digester uses to fill propane tanks. Vanilla scraps each tile of a multi-tile object in
--- turn (ISMoveableSpriteProps.scrapObject), so each comes only with the clicked tile.
+-- What a microwave oven may give: the transformer a homemade inverter is wound on.
+local TRANSFORMER = "RenewableEnergy.MicrowaveTransformer"
+
+-- Whether the tile `sprite` is a microwave oven: its container is a microwave.
+local function isMicrowave(sprite)
+    return sprite ~= nil and sprite:getProperties():get("container") == "microwave"
+end
+
+-- The chance that `character` takes a microwave's transformer out whole: vanilla's own chance for
+-- the Electric scrap material microwave tiles carry (ISMoveableSpriteProps.getChanceByDef, the
+-- movables cheat included), so it rises with Electricity as the oven's electronics do.
+local function transformerChance(props, character)
+    local def = ISMoveableDefinitions:getInstance().getScrapDefinition("Electric")
+    return def and props:getChanceByDef(def, character) / 100 or 0
+end
+
+-- A dismantled treadmill gives its motor, a dismantled refrigerator may give its compressor,
+-- which a digester uses to fill propane tanks, and a dismantled microwave its transformer. Vanilla
+-- scraps each tile of a multi-tile object in turn (ISMoveableSpriteProps.scrapObject), so each
+-- comes only with the clicked tile.
 local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
 function ISMoveableSpriteProps:scrapObjectInternal(character, scrapDef, square, object, ...)
     self.scrappingMainTile = object == self.object
@@ -93,6 +110,8 @@ function ISMoveableSpriteProps:getScrapItemsList(character)
             table.insert(items.usable, Treadmill.MOTOR)
         elseif isFridge(self.sprite) and character and RenewableEnergy.Chance.hit(compressorChance(character)) then
             table.insert(items.usable, RenewableEnergy.Digester.COMPRESSOR)
+        elseif isMicrowave(self.sprite) and character and RenewableEnergy.Chance.hit(transformerChance(self, character)) then
+            table.insert(items.usable, TRANSFORMER)
         end
     end
     return items

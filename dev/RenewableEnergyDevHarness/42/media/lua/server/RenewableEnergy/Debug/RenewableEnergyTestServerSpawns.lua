@@ -243,20 +243,25 @@ check("batteryWear", function(expect, _, _, _, defer)
     end
 end)
 
--- PART_WEAR wears every inverter and the charge controller, not the battery charger: to its mean
--- less its half width at the lowest rolls, its mean at middling ones and no better than new at the
--- highest; a roll just under its dud chance makes a dud, at PART_DUD's lowest and highest condition
--- by the next roll, worse than any working find, and a roll at it doesn't. Each worn part is marked
--- as having a condition of its own. With every roll middling, the parts of a bank's stock, a
--- crate's and an arrow board's battery box come at the mean, marked.
+-- PART_WEAR wears every found inverter and the charge controller, not a homemade inverter or the
+-- battery charger: to its mean less its half width at the lowest rolls, its mean at middling ones
+-- and no better than new at the highest; a roll just under its dud chance makes a dud, at
+-- PART_DUD's lowest and highest condition by the next roll, worse than any working find, and a
+-- roll at it doesn't. Each worn part is marked as having a condition of its own. With every roll
+-- middling, the parts of a bank's stock, a crate's and an arrow board's battery box come at the
+-- mean, marked.
 check("partWear", function(expect, _, _, _, defer)
     local WorldSpawns, Specs, Wear = RenewableEnergy.WorldSpawns, RenewableEnergy.Specs, RenewableEnergy.Wear
     local wear, dud = WorldSpawns.PART_WEAR, WorldSpawns.PART_DUD
     expect(dud.min >= 0 and dud.min <= dud.max and dud.max < wear.mean - wear.halfWidth,
         "a part dud's condition " .. dud.min .. " to " .. dud.max .. " overlaps a found part's from " .. wear.mean - wear.halfWidth)
     local types = { Specs.controller }
-    for fullType in pairs(Specs.inverters) do
-        table.insert(types, fullType)
+    for fullType, spec in pairs(Specs.inverters) do
+        if spec.homemade then
+            expect(not WorldSpawns.isWornPart(fullType), fullType .. ", crafted, is worn as if found")
+        else
+            table.insert(types, fullType)
+        end
     end
     for _, fullType in ipairs(types) do
         expect(WorldSpawns.isWornPart(fullType), fullType .. " isn't worn when found")

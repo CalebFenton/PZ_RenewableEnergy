@@ -217,8 +217,9 @@ module RenewableEnergy
 
     /**************************** Bank parts ********************************/
     /*
-        Research on found inverters teaches the banks they go into. Inverters and controllers
-        wear while their bank runs, and Electronics Scrap repairs them (Lua: PowerBank).
+        Research on found inverters teaches the banks they go into and the homemade inverter of
+        their size. Inverters and controllers wear while their bank runs, and Electronics Scrap
+        repairs them (Lua: PowerBank). A homemade inverter's ConditionMax caps it below a found one.
     */
     item PlugInInverter
     {
@@ -230,7 +231,7 @@ module RenewableEnergy
         MetalValue = 0.5,
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_PlugInInverter,
-        ResearchableRecipes = RenewableEnergy_MakeBatteryBoxWood;RenewableEnergy_MakeBatteryBoxMetal,
+        ResearchableRecipes = RenewableEnergy_MakeBatteryBoxWood;RenewableEnergy_MakeBatteryBoxMetal;RenewableEnergy_MakeMakeshiftInverter,
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
@@ -244,7 +245,7 @@ module RenewableEnergy
         MetalValue = 1.0,
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_PowerInverter,
-        ResearchableRecipes = RenewableEnergy_BuildBatteryRackWood;RenewableEnergy_BuildBatteryRackMetal,
+        ResearchableRecipes = RenewableEnergy_BuildBatteryRackWood;RenewableEnergy_BuildBatteryRackMetal;RenewableEnergy_MakeHomemadeInverter,
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
@@ -260,6 +261,49 @@ module RenewableEnergy
         Tooltip = Tooltip_RenewableEnergy_InverterCharger,
         ResearchableRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeSolarFailsafe,
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
+    }
+
+    /* A car battery charger's or a microwave's transformer run backwards on one heatsink of
+       power transistors. */
+    item MakeshiftInverter
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 3.0,
+        Icon = RenewableEnergy_MakeshiftInverter,
+        WorldStaticModel = RenewableEnergy.MakeshiftInverter_Ground,
+        MetalValue = 1.0,
+        ConditionMax = 80,
+        Tooltip = Tooltip_RenewableEnergy_MakeshiftInverter,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
+    }
+
+    /* A rewound microwave transformer on a sheet-metal chassis, with two heatsinks. */
+    item HomemadeInverter
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 5.0,
+        Icon = RenewableEnergy_HomemadeInverter,
+        WorldStaticModel = RenewableEnergy.HomemadeInverter_Ground,
+        MetalValue = 2.0,
+        ConditionMax = 90,
+        Tooltip = Tooltip_RenewableEnergy_HomemadeInverter,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
+    }
+
+    /* What a microwave oven gives when cut up, now and then (Lua: Moveables); a homemade
+       inverter's transformer, rewound. */
+    item MicrowaveTransformer
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 4.0,
+        Icon = RenewableEnergy_MicrowaveTransformer,
+        WorldStaticModel = RenewableEnergy.MicrowaveTransformer_Ground,
+        MetalValue = 2.0,
+        Tooltip = Tooltip_RenewableEnergy_MicrowaveTransformer,
+        Tags = base:hasmetal;base:heavyitem;base:ignorezombiedensity,
     }
 
     item ChargeController
@@ -508,7 +552,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag1_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_MakeBatteryBoxWood;RenewableEnergy_MakeBatteryBoxMetal;RenewableEnergy_BuildBatteryRackWood;RenewableEnergy_BuildBatteryRackMetal;RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWallWood;RenewableEnergy_MakeSolarWallMetal;RenewableEnergy_MakeSolarRackWood;RenewableEnergy_MakeSolarRackMetal;RenewableEnergy_RepairCrackedModule,
+        LearnedRecipes = RenewableEnergy_MakeBatteryBoxWood;RenewableEnergy_MakeBatteryBoxMetal;RenewableEnergy_BuildBatteryRackWood;RenewableEnergy_BuildBatteryRackMetal;RenewableEnergy_MakeSolarFlat;RenewableEnergy_MakeSolarWallWood;RenewableEnergy_MakeSolarWallMetal;RenewableEnergy_MakeSolarRackWood;RenewableEnergy_MakeSolarRackMetal;RenewableEnergy_RepairCrackedModule;RenewableEnergy_MakeMakeshiftInverter,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }
@@ -523,7 +567,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag2_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReglazeModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_StripJarBattery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_CastBatteryPlatesFromLeadPipe;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeJarBattery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
+        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeHomemadeInverter;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReglazeModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_StripJarBattery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_CastBatteryPlatesFromLeadPipe;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeJarBattery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

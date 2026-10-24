@@ -318,7 +318,7 @@ test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
         local watts = Specs.wattsFromFuel(Specs.treadmill.drawFuel)
         T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, watts, 0.01)
         T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
-            watts / Specs.inverterEfficiency, 0.01)
+            watts / Specs.inverters[INVERTER_CHARGER].efficiency, 0.01)
         T.expectNear("W of the bank's load after the run, against before it", after.loadW - before.loadW, 0, 0.01)
         local run = self.server.completeStartedTreadmillRun
         expect(run.done, "the authority settled nothing of a run on a powered, unwired treadmill")

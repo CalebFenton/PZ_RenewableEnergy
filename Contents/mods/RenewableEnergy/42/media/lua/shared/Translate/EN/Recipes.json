@@ -39,6 +39,8 @@
     "RenewableEnergy_MakeBatteryPlatePattern": "Make Wooden Battery Plate Pattern",
     "RenewableEnergy_PressBatteryPlateMold": "Press Battery Plate Mold",
     "RenewableEnergy_FireBatteryPlateMold": "Fire Battery Plate Mold",
+    "RenewableEnergy_MakeMakeshiftInverter": "Make Makeshift Inverter",
+    "RenewableEnergy_MakeHomemadeInverter": "Make Homemade Inverter",
     "RenewableEnergy_MakeChargeController": "Make Charge Controller",
     "RenewableEnergy_MakeSolarFailsafe": "Make Solar Failsafe",
     "RenewableEnergy_BarrelDigester": "Barrel Digester",

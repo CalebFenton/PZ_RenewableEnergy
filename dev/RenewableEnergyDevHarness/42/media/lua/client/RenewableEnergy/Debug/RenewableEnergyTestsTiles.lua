@@ -354,6 +354,46 @@ test("renewable_energy_tiles_fridge_scraps_to_compressor", {
     end,
 })
 
+-- Dismantling a vanilla microwave gives its transformer, which the homemade inverters are wound on,
+-- on a roll under vanilla's chance for the microwave's Electric scrap: 20% at Electricity 0, 10%
+-- more a level, so certain at 8. A stove has none. Each case: what is dismantled, the Electricity
+-- level, the roll, and the transformers.
+local MICROWAVE, TRANSFORMER = "appliances_cooking_01_24", "RenewableEnergy.MicrowaveTransformer"
+local TRANSFORMER_CASES = {
+    { "a microwave at Electricity 0, rolling just under 20%", MICROWAVE, 0, 0.2 - UNDER, 1 },
+    { "a microwave at Electricity 0, rolling 20%", MICROWAVE, 0, 0.2, 0 },
+    { "a microwave at Electricity 4, rolling just under 60%", MICROWAVE, 4, 0.6 - UNDER, 1 },
+    { "a microwave at Electricity 4, rolling 60%", MICROWAVE, 4, 0.6, 0 },
+    { "a microwave at Electricity 8, on the highest roll", MICROWAVE, 8, 1 - UNDER, 1 },
+    { "a stove, on the lowest roll", STOVE, 10, 0, 0 },
+}
+test("renewable_energy_tiles_microwave_scraps_to_transformer", {
+    run = function(self)
+        self.counts = {}
+        for i, case in ipairs(TRANSFORMER_CASES) do
+            T.step(function() T.setPerk(self, Perks.Electricity, case[3]) end)
+            T.forceRoll(self, case[4])
+            T.server(self, "scrapItems", { sprite = case[2] })
+            T.step(function()
+                local count = 0
+                for _, fullType in ipairs(self.server.scrapItems.usable or {}) do
+                    if fullType == TRANSFORMER then
+                        count = count + 1
+                    end
+                end
+                self.counts[i] = count
+            end)
+        end
+    end,
+    validate = function(self)
+        local microwave = ISMoveableSpriteProps.new(MICROWAVE)
+        expect(microwave.canScrap, "the microwave can't be dismantled")
+        for i, case in ipairs(TRANSFORMER_CASES) do
+            expect(self.counts[i] == case[5], case[1] .. " gave " .. tostring(self.counts[i]) .. " transformers, expected " .. case[5])
+        end
+    end,
+})
+
 -- The tiles' PickUpTool and PlaceTool, Electrician, are a screwdriver and some Electricity.
 local function electrician(self)
     T.setPerk(self, Perks.Electricity, 10)

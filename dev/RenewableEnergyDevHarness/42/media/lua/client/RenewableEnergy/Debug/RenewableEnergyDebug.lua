@@ -21,6 +21,7 @@ Debug.ITEMS = {
     "RenewableEnergy.BatteryRackWood", "RenewableEnergy.BatteryRackMetal",
     "RenewableEnergy.BatteryBankWood", "RenewableEnergy.BatteryBankMetal",
     "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger",
+    "RenewableEnergy.MakeshiftInverter", "RenewableEnergy.HomemadeInverter", "RenewableEnergy.MicrowaveTransformer",
     "RenewableEnergy.ChargeController", "RenewableEnergy.SolarFailsafe",
     "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery",
     "RenewableEnergy.CarBatteryCase", "RenewableEnergy.DeepCycleBatteryCase", "RenewableEnergy.L16BatteryCase",

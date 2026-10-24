@@ -274,14 +274,17 @@ function Bank:slotsUsed()
 end
 
 -- Inverters and controllers wear while they work, and an overload strains the inverters
--- (Specs.partWear).
+-- (Specs.partWear); a homemade inverter by its own `wear` share.
 function Bank:wearParts(container, hours, overloads)
     local wear = Specs.partWear
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        local kind = PowerBank.partKind(item:getFullType())
-        local points = kind and (wear.perHour[kind] or 0) * hours + (wear.perOverload[kind] or 0) * overloads or 0
+        local fullType = item:getFullType()
+        local kind = PowerBank.partKind(fullType)
+        local inverter = Specs.inverters[fullType]
+        local scale = inverter and inverter.wear or 1
+        local points = kind and scale * ((wear.perHour[kind] or 0) * hours + (wear.perOverload[kind] or 0) * overloads) or 0
         if Wear.take(item, points) then
             sendItemStats(item)
         end
@@ -532,9 +535,20 @@ function Bank:trackCycle(container)
     self.day = day
 end
 
--- The watts the inverters take from the batteries to carry the load and run themselves.
+-- The watts the inverters take from the batteries to carry the load and run themselves. Working
+-- inverters share the load in proportion to what each carries, and each wastes its own share of
+-- its part.
 local function inverterDrawW(bank)
-    return bank.loadW / Specs.inverterEfficiency + sumInverters(bank, "idle")
+    local carried, drawn = 0, 0
+    for _, inverter in ipairs(bank.inverters) do
+        if working(inverter) then
+            local spec = Specs.inverters[inverter.type]
+            carried = carried + spec.watts
+            drawn = drawn + spec.watts / spec.efficiency
+        end
+    end
+    local loadDrawW = carried > 0 and bank.loadW * drawn / carried or 0
+    return loadDrawW + sumInverters(bank, "idle")
 end
 
 --- The watts the batteries give the inverters now.

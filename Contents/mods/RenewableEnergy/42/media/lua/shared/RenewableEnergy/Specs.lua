@@ -27,16 +27,24 @@ Specs.batteries = {
 }
 
 -- Inverters by item type: watts carried (a bank's limit sums its working inverters), idle draw while
--- on, built-in charger watts from grid/generator power (0 for none), and the wiring skill/xp that
--- override Specs.wiring.inverter. Sized so each tier carries a meaningfully larger set of appliances.
+-- on, the share of battery power it turns into AC, built-in charger watts from grid/generator power
+-- (0 for none), and the wiring skill/xp that override Specs.wiring.inverter. Sized so each tier
+-- carries a meaningfully larger set of appliances. A `homemade` one is crafted, never found, and
+-- its `wear` scales its share of Specs.partWear. The homemade pair carry what their found twins do
+-- but waste more, idle hotter and wear sooner, and the makeshift one worst of all, so a found
+-- inverter or the next recipe is always worth having.
 Specs.inverters = {
-    ["RenewableEnergy.PlugInInverter"] = { watts = 300, idle = 4, chargerWatts = 0, wiring = { skill = 0, xp = 10 } },
-    ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, chargerWatts = 0, wiring = { skill = 2, xp = 15 } },
-    ["RenewableEnergy.InverterCharger"] = { watts = 1000, idle = 15, chargerWatts = 1000, wiring = { skill = 4, xp = 25 } },
+    ["RenewableEnergy.PlugInInverter"] = { watts = 300, idle = 4, efficiency = 0.9, chargerWatts = 0,
+        wiring = { skill = 0, xp = 10 } },
+    ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, efficiency = 0.9, chargerWatts = 0,
+        wiring = { skill = 2, xp = 15 } },
+    ["RenewableEnergy.InverterCharger"] = { watts = 1000, idle = 15, efficiency = 0.9, chargerWatts = 1000,
+        wiring = { skill = 4, xp = 25 } },
+    ["RenewableEnergy.MakeshiftInverter"] = { watts = 300, idle = 8, efficiency = 0.75, chargerWatts = 0,
+        wiring = { skill = 0, xp = 10 }, homemade = true, wear = 1.2 },
+    ["RenewableEnergy.HomemadeInverter"] = { watts = 600, idle = 16, efficiency = 0.8, chargerWatts = 0,
+        wiring = { skill = 2, xp = 15 }, homemade = true, wear = 1.2 },
 }
-
--- Share of battery power a period modified-sine inverter turns into AC.
-Specs.inverterEfficiency = 0.9
 
 -- Bank parts besides batteries and inverters; vanilla's car battery charger doubles as a bank charger.
 Specs.controller = "RenewableEnergy.ChargeController"
