@@ -1355,7 +1355,7 @@ module Base
        wound from electric wire, and a scrap-board rectifier to charge a battery. A portable
        radio's speaker has a smaller magnet, so it takes twice as many; loose speakers are rare
        and radios lie in every house. Without mode:destroy the craft leaves the radios behind
-       (the wind craft tests), so it destroys them, as vanilla's DismantleElectronicsDevice does. */
+       (DEVELOPMENT.md, craftRecipe). */
     craftRecipe RenewableEnergy_MakeHomemadeAlternator
     {
         timedAction = MakingElectrical,
