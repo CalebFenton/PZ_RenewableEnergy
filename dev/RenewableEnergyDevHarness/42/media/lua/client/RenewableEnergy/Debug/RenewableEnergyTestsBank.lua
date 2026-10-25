@@ -1,4 +1,4 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "TimedActions/ISInventoryTransferAction"
 require "ISUI/ISContextMenu"
 require "ISUI/ISWorldObjectContextMenu"
@@ -43,11 +43,6 @@ local function loadUpTo(base, kind, limitW, over)
     end
     if over then table.insert(names, kind) end
     return names
-end
-
--- The refusal reason in the command answer self[key], as a string.
-local function reason(self, key)
-    return tostring(self[key].reason)
 end
 
 local function distanceSquared(a, b)
@@ -242,9 +237,8 @@ test("renewable_energy_bank_scan_sees_load_while_cut", {
         self.bank = bank
         local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
         if not squares then return end
-        T.server(self, "scanLoad", bank.position)
+        T.serverInto(self, "without", "scanLoad", bank.position)
         T.step(function()
-            self.without = self.server.scanLoad
             T.placeTile(self, squares[1], FRIDGE)
             T.placeTile(self, squares[2], MINI_FRIDGE)
             T.bankState(self, bank)
@@ -276,15 +270,9 @@ test("renewable_energy_bank_bills_another_mods_appliance", {
         local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         local square = bank and T.square(self, { indoors = true, near = bank.square }, "a free indoor square for the appliance")
         if not square then return end
-        local function drawing(fuel)
-            local args = T.at(square)
-            args.kind, args.fuel = CONSUMER_KIND, fuel
-            return args
-        end
-        T.server(self, "drawAt", drawing(0))
-        T.server(self, "scanLoad", bank.position)
-        T.step(function() self.off = self.server.scanLoad end)
-        T.server(self, "drawAt", drawing(CONSUMER_FUEL))
+        T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = 0 }))
+        T.serverInto(self, "off", "scanLoad", bank.position)
+        T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = CONSUMER_FUEL }))
         T.server(self, "scanLoad", bank.position)
     end,
     validate = function(self)
@@ -449,15 +437,13 @@ test("renewable_energy_bank_turn_on_refused_without_inverter", {
         self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY })
         if not self.bank then return end
         T.step(function() T.openWindow(self) end)
-        T.perform(self, "setBankOn", { bank = self.bank.position, on = true })
-        T.step(function() self.refused = self.server.perform end)
+        T.performInto(self, "refused", "setBankOn", { bank = self.bank.position, on = true })
         T.bankState(self, self.bank)
     end,
     validate = function(self)
         local bank, button, why = self.bank.object, self.window.switchButton, getText("Tooltip_RenewableEnergy_NoInverter")
         expect(not Action:new(player(), Action.TURN_ON, nil, bank):canPerform(), "Turn On can start on a bank without an inverter")
-        expect(not self.refused.ok and self.refused.reason == "Tooltip_RenewableEnergy_NoInverter",
-            "the authority switched on a bank without an inverter (" .. tostring(self.refused.reason) .. ")")
+        T.expectRefused(self.refused, "Tooltip_RenewableEnergy_NoInverter", "the authority switched on a bank without an inverter")
         expect(not self.bank.state.on, "the bank without an inverter is on")
         expect(not button.enable and button.tooltip == why,
             "the window's switch isn't greyed out saying there's no inverter (" .. tostring(button.tooltip) .. ")")
@@ -493,8 +479,7 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
             { self.dead, self.deadRefused, "whose only battery is dead" } }) do
             local bank, refused, what = case[1], case[2], case[3]
             expect(not Action:new(player(), Action.TURN_ON, nil, bank.object):canPerform(), "Turn On can start on a bank " .. what)
-            expect(not refused.ok and refused.reason == key,
-                "the authority switched on a bank " .. what .. " (" .. tostring(refused.reason) .. ")")
+            T.expectRefused(refused, key, "the authority switched on a bank " .. what)
             expect(not bank.state.on and not bank.state.activated, "the bank " .. what .. " is on")
         end
         local button = self.window.switchButton
@@ -576,21 +561,21 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         T.bankState(self, bank)
     end,
     validate = function(self)
-        expect(reason(self, "hammer") == "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in (" .. reason(self, "hammer") .. ")")
-        expect(reason(self, "noTool") == "tool", "a battery was wired in without a screwdriver (" .. reason(self, "noTool") .. ")")
-        expect(reason(self, "noWire") == "item", "a battery was wired in without wire (" .. reason(self, "noWire") .. ")")
-        expect(self.wired.ok, "wiring a battery in with a screwdriver and wire failed (" .. reason(self, "wired") .. ")")
+        T.expectRefused(self.hammer, "Tooltip_RenewableEnergy_NotAPart", "a hammer was wired in")
+        T.expectRefused(self.noTool, "tool", "a battery was wired in without a screwdriver")
+        T.expectRefused(self.noWire, "item", "a battery was wired in without wire")
+        T.expectOk(self.wired, "wiring a battery in with a screwdriver and wire")
         expect(self.wired.xpAfter > self.wired.xpBefore, "the first wiring gave no Electricity XP")
         expectNear("wire left after wiring a battery in", self.counts.wired[PowerBank.WIRE], 0, 0)
         expect(self.unwired.ok and self.counts.unwired[CAR_BATTERY] == 1, "unwiring didn't give the battery back")
         expectNear("wire back after unwiring", self.counts.unwired[PowerBank.WIRE], PowerBank.wiringFor(CAR_BATTERY).wire, 0)
-        expect(self.rewired.ok, "wiring the battery in again failed (" .. reason(self, "rewired") .. ")")
+        T.expectOk(self.rewired, "wiring the battery in again")
         expectNear("XP for wiring the same battery again", self.rewired.xpAfter - self.rewired.xpBefore, 0, 0)
-        expect(reason(self, "skill") == "skill", "an Inverter/Charger was wired in a level below its skill (" .. reason(self, "skill") .. ")")
+        T.expectRefused(self.skill, "skill", "an Inverter/Charger was wired in a level below its skill")
         for i, answer in ipairs(self.filled) do
-            expect(answer.ok, "a battery box refused battery " .. (i + 1) .. " of " .. self.maxBatteries .. " (" .. tostring(answer.reason) .. ")")
+            T.expectOk(answer, "a battery box taking battery " .. (i + 1) .. " of " .. self.maxBatteries)
         end
-        expect(reason(self, "full") == "Tooltip_RenewableEnergy_NoSlot", "a full battery box took another battery (" .. reason(self, "full") .. ")")
+        T.expectRefused(self.full, "Tooltip_RenewableEnergy_NoSlot", "a full battery box took another battery")
         expectNear("batteries in the full box", self.bank.state.batteries, self.maxBatteries, 0)
     end,
 })
@@ -615,11 +600,11 @@ test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
         unwire("l16Both", L16)
     end,
     validate = function(self)
-        expect(reason(self, "carBare") == "tool", "a car battery came out without a screwdriver (" .. reason(self, "carBare") .. ")")
-        expect(reason(self, "l16InScrewdriver") == "tool", "an L-16 went in without a wrench (" .. reason(self, "l16InScrewdriver") .. ")")
-        expect(reason(self, "l16Screwdriver") == "tool", "an L-16 came out without a wrench (" .. reason(self, "l16Screwdriver") .. ")")
-        expect(self.carScrewdriver.ok, "a car battery didn't come out with a screwdriver (" .. reason(self, "carScrewdriver") .. ")")
-        expect(self.l16Both.ok, "an L-16 didn't come out with a screwdriver and a wrench (" .. reason(self, "l16Both") .. ")")
+        T.expectRefused(self.carBare, "tool", "a car battery came out without a screwdriver")
+        T.expectRefused(self.l16InScrewdriver, "tool", "an L-16 went in without a wrench")
+        T.expectRefused(self.l16Screwdriver, "tool", "an L-16 came out without a wrench")
+        T.expectOk(self.carScrewdriver, "a car battery coming out with a screwdriver")
+        T.expectOk(self.l16Both, "an L-16 coming out with a screwdriver and a wrench")
     end,
 })
 
@@ -647,7 +632,7 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
     end,
     validate = function(self)
         local p = player()
-        if not expect(p:tooDarkToRead(), "midnight with the grid off isn't dark where the character stands") then return end
+        if not T.expectDark() then return end
         local bank, battery = self.bank.object, self.items.parts[1]
         local context = T.newContext()
         local wireIn = optionFor(Menu.addWireInOptions(0, context, bank), battery)
@@ -764,13 +749,12 @@ test("renewable_energy_bank_part_wear_and_repair", {
                 conditionOf(self.twice, fullType), 0)
         end
         expect(conditionOf(self.twice, INVERTER) < 100, "an inverter on for " .. 2 * WEAR_HOURS .. " hours didn't wear")
-        expect(reason(self, "unskilled") == "skill", "a part was repaired below Electricity "
-            .. Specs.partRepair.skill .. " (" .. reason(self, "unskilled") .. ")")
-        expect(self.repaired.ok, "repairing a worn inverter with scrap failed (" .. reason(self, "repaired") .. ")")
+        T.expectRefused(self.unskilled, "skill", "a part was repaired below Electricity " .. Specs.partRepair.skill)
+        T.expectOk(self.repaired, "repairing a worn inverter with scrap")
         expectNear("condition after one scrap", self.repairedCondition, 50 + Specs.partRepair.condition, 0)
         expectNear("scrap left", self.counts.scrap[PowerBank.SCRAP], 0, 0)
-        expect(reason(self, "noScrap") == "item", "a part was repaired without scrap (" .. reason(self, "noScrap") .. ")")
-        expect(reason(self, "whole") == "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair (" .. reason(self, "whole") .. ")")
+        T.expectRefused(self.noScrap, "item", "a part was repaired without scrap")
+        T.expectRefused(self.whole, "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair")
         local broken = self.bank.state
         expect(broken.on, "the bank was switched off before its inverter broke")
         expectNear("limit with the only inverter at 0", broken.limitW, 0, 0)
@@ -1217,7 +1201,7 @@ test("renewable_energy_bank_backup_load_kept_apart", {
         end)
     end,
     validate = function(self)
-        if not expect(self.switched.ok, "switching the bank on failed (" .. reason(self, "switched") .. ")") then return end
+        if not T.expectOk(self.switched, "switching the bank on") then return end
         local before, after = self.before, self.after
         expectNear("load Wh the bank carried while the generator ran", after.loadWhToday - before.loadWhToday, 0, 0)
         local backupWh = (after.status.backupWhToday or 0) - (before.status.backupWhToday or 0)
@@ -1588,7 +1572,7 @@ test("renewable_energy_bank_connect_credits_from_connection", {
         end)
     end,
     validate = function(self)
-        if not expect(self.connected.ok, "connecting the panel failed (" .. reason(self, "connected") .. ")") then return end
+        if not T.expectOk(self.connected, "connecting the panel") then return end
         local connected, passed = self.afterConnect, self.afterPass
         expectNear("hours between the connect and the bank's last pass", connected.age - connected.lastHour, 0, 0.01)
         expectNear("solar Wh today credited for the hour before the connect", connected.solarWhToday, 0, 0)
@@ -1615,7 +1599,7 @@ test("renewable_energy_bank_switch_on_bills_from_switch", {
         end)
     end,
     validate = function(self)
-        if not expect(self.switched.ok, "switching the bank on failed (" .. reason(self, "switched") .. ")") then return end
+        if not T.expectOk(self.switched, "switching the bank on") then return end
         local switched, passed = self.afterSwitch, self.afterPass
         expect(switched.on, "setBankOn left the bank off")
         expectNear("hours between the switch and the bank's last pass", switched.age - switched.lastHour, 0, 0.01)
@@ -1642,7 +1626,7 @@ test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
         end)
     end,
     validate = function(self)
-        if not expect(self.switched.ok, "switching the bank on failed (" .. reason(self, "switched") .. ")") then return end
+        if not T.expectOk(self.switched, "switching the bank on") then return end
         local before, after = self.before, self.after
         expect(after.storedWh == 0 and after.status.state == "empty",
             "an hour of load left the bank at " .. after.storedWh .. " Wh, " .. after.status.state)
@@ -1708,8 +1692,7 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
         local light = T.placeAsPlayer(self, squares[2], SolarGardenLight.ITEM, Sprites.gardenLight.off)
         local function fixtures()
             return { bank = bank.position, car = T.vehicleArgs(car), trailer = T.vehicleArgs(trailer),
-                charger = { x = charger.x, y = charger.y, z = charger.z },
-                light = { x = light.x, y = light.y, z = light.z } }
+                charger = T.at(charger), light = T.at(light) }
         end
         T.server(self, "stockGadgets", fixtures)
         T.step(function()
@@ -1765,7 +1748,7 @@ end
 -- this client's copies. Batteries enough to carry what the houses around draw through the hours
 -- away, so the inverter powers them all.
 test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
-    spOnly = "the server keeps chunks loaded after the character leaves",
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 120,
     sandbox = { BatteryWear = 100 },
     run = function(self)
@@ -1841,7 +1824,7 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
 -- reach, measured while the grid still powered it: the hours away drain it for that load, not just
 -- its inverter's idle draw, and its inverter/charger no longer charges from the grid.
 test("renewable_energy_bank_unloaded_bank_carries_its_load_when_the_grid_goes", {
-    spOnly = "the server keeps chunks loaded after the character leaves",
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 120,
     run = function(self)
         T.setGrid(self, true)
@@ -2036,8 +2019,6 @@ test("renewable_energy_bank_menu_repair_part", {
     end,
 })
 
-local INSTANT_OFF = "the debug option Cheats > Timed Action > Instant off, which makes every action instant"
-
 -- Wire In from the menu walks over and wires the part in, on the server and this client's copy,
 -- which then offers to unwire it; Electricity shortens the wiring.
 test("renewable_energy_bank_menu_wire_in_and_unwire", {
@@ -2055,7 +2036,7 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
             -- An action takes its duration when it is made, so these two are made with the instant
             -- cheat off and never queued.
             p:setTimedActionInstantCheat(false)
-            if not T.need(self, not p:isTimedActionInstant(), INSTANT_OFF) then return end
+            if not T.needActionTime(self) then return end
             local function wiringTime(level)
                 T.setPerk(self, Perks.Electricity, level)
                 return Action:new(p, Action.WIRE_IN, nil, bank.object, nil, battery).maxTime
@@ -2119,10 +2100,7 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
         local room = inventory:getEffectiveCapacity(p) - inventory:getCapacityWeight() - screwdriverKg
         T.give(self, "filler", { { type = "Base.Screwdriver" }, { type = "Base.Stone2", count = math.floor(room - 1.5 * batteryKg) } })
         T.step(function()
-            local context = T.newContext()
-            local all = T.optionNamed(Menu.addUnwireOptions(0, context, bank.object),
-                getText("ContextMenu_RenewableEnergy_AllBatteries", 2))
-            context:hideAndChildren()
+            local all = T.menuOption(Menu.addUnwireOptions, bank.object, getText("ContextMenu_RenewableEnergy_AllBatteries", 2))
             self.offered = all ~= nil and not all.notAvailable
             if not self.offered then return end
             T.choose(all)
@@ -2161,10 +2139,7 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
             { type = CAR_BATTERY, condition = 90 }, { type = "Base.Screwdriver" },
             { type = PowerBank.WIRE, count = 3 * PowerBank.wiringFor(CAR_BATTERY).wire } })
         T.step(function()
-            local context = T.newContext()
-            local all = T.optionNamed(Menu.addWireInOptions(0, context, bank.object),
-                getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots))
-            context:hideAndChildren()
+            local all = T.menuOption(Menu.addWireInOptions, bank.object, getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots))
             self.offered = all ~= nil and not all.notAvailable
             if not self.offered then
                 self.refused = tostring(all and T.tooltipOf(all))
@@ -2284,7 +2259,7 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
         end)
     end,
     validate = function(self)
-        expect(self.named.ok, "renaming the bank Shed failed (" .. reason(self, "named") .. ")")
+        T.expectOk(self.named, "renaming the bank Shed")
         expect(not self.long.ok, "the authority took a name longer than " .. PowerBank.NAME_LENGTH .. " characters")
         expect(not self.twoLines.ok, "the authority took a name on two lines")
         expect(self.refusedState.name == "Shed", "the refused names left the bank called " .. tostring(self.refusedState.name))
@@ -2529,8 +2504,7 @@ test("renewable_energy_bank_needs_connecting", {
             self.before = bank.state
             self.nearBefore = self.near:haveElectricity()
         end)
-        T.perform(self, "setBankConnected", { bank = bank.position, connected = true })
-        T.step(function() self.connected = self.server.perform end)
+        T.performInto(self, "connected", "setBankConnected", { bank = bank.position, connected = true })
         T.waitFor(self, function() return bank.square:haveElectricity() and self.near:haveElectricity() end,
             "power on the connected bank's square and the square near it here")
         T.bankState(self, bank)
@@ -2540,7 +2514,7 @@ test("renewable_energy_bank_needs_connecting", {
         expect(before.on and not before.activated and not before.powered, "an unconnected bank that is on powered its square")
         expect(not self.nearBefore, "an unconnected bank that is on powered a square near it")
         expect(before.status.state == "disconnected", "the unconnected bank's status says " .. tostring(before.status.state))
-        expect(self.connected.ok, "the authority refused to connect the bank (" .. tostring(self.connected.reason) .. ")")
+        T.expectOk(self.connected, "connecting the bank")
         expect(after.activated and after.powered, "the connected bank doesn't power its square")
         expect(after.status.state == "on", "the connected bank's status says " .. tostring(after.status.state))
     end,
@@ -2588,14 +2562,6 @@ local function knowGenerator(self, known)
     end
 end
 
--- The bank's Connect Bank option on this client, read from a fresh menu.
-local function connectBankOption(bank)
-    local context = T.newContext()
-    local option = T.optionNamed(Menu.addBankOptions(0, context, bank.object), getText("ContextMenu_RenewableEnergy_ConnectBank"))
-    context:hideAndChildren()
-    return option
-end
-
 -- Connecting a bank takes what connecting a generator does in vanilla: the Electricity level or
 -- the "Generator" recipe, enforced by the menu, the action and the authority.
 test("renewable_energy_bank_connect_needs_generator_skill", {
@@ -2607,32 +2573,29 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         knowGenerator(self, false)
         T.setPerk(self, Perks.Electricity, 2)
         T.step(function()
-            self.connect = T.optionState(connectBankOption(self.unskilled))
+            self.connect = T.optionState(T.menuOption(Menu.addBankOptions, self.unskilled.object,
+                getText("ContextMenu_RenewableEnergy_ConnectBank")))
             self.canStart = Action:new(player(), Action.CONNECT_BANK, nil, self.unskilled.object):canPerform()
         end)
-        T.perform(self, "setBankConnected", { bank = self.unskilled.position, connected = true })
-        T.step(function() self.refused = self.server.perform end)
+        T.performInto(self, "refused", "setBankConnected", { bank = self.unskilled.position, connected = true })
         -- T.setPerk sets the level when called, so the later levels wait for their turn.
         T.step(function() T.setPerk(self, Perks.Electricity, 3) end)
-        T.perform(self, "setBankConnected", { bank = self.unskilled.position, connected = true })
-        T.step(function() self.skilled = self.server.perform end)
+        T.performInto(self, "skilled", "setBankConnected", { bank = self.unskilled.position, connected = true })
         T.step(function()
             T.setPerk(self, Perks.Electricity, 2)
             knowGenerator(self, true)
         end)
-        T.perform(self, "setBankConnected", { bank = self.magazine.position, connected = true })
-        T.step(function() self.withRecipe = self.server.perform end)
+        T.performInto(self, "withRecipe", "setBankConnected", { bank = self.magazine.position, connected = true })
         T.step(function() knowGenerator(self, self.knewGenerator) end)
     end,
     validate = function(self)
         expect(self.connect.greyed and self.connect.reason == getText("ContextMenu_GeneratorPlugTT"),
             "at Electricity 2 Connect Bank isn't greyed out with vanilla's reason (" .. tostring(self.connect.reason) .. ")")
         expect(not self.canStart, "Connect Bank can start at Electricity 2 without the Generator recipe")
-        expect(not self.refused.ok and self.refused.reason == "ContextMenu_GeneratorPlugTT",
-            "the authority connected a bank at Electricity 2 without the Generator recipe (" .. tostring(self.refused.reason) .. ")")
-        expect(self.skilled.ok, "the authority refused to connect a bank at Electricity 3 (" .. tostring(self.skilled.reason) .. ")")
-        expect(self.withRecipe.ok,
-            "the authority refused to connect a bank with the Generator recipe (" .. tostring(self.withRecipe.reason) .. ")")
+        T.expectRefused(self.refused, "ContextMenu_GeneratorPlugTT",
+            "the authority connected a bank at Electricity 2 without the Generator recipe")
+        T.expectOk(self.skilled, "connecting a bank at Electricity 3")
+        T.expectOk(self.withRecipe, "connecting a bank with the Generator recipe")
     end,
 })
 
@@ -2652,7 +2615,7 @@ test("renewable_energy_bank_connect_and_disconnect", {
             return ISMoveableSpriteProps.new(object:getSprite():getName()):canPickUpMoveable(player(), bank.square, object)
         end
         T.step(function()
-            local option = connectBankOption(bank)
+            local option = T.menuOption(Menu.addBankOptions, bank.object, getText("ContextMenu_RenewableEnergy_ConnectBank"))
             self.offered = option ~= nil and not option.notAvailable
             if not self.offered then return end
             T.standNextTo(bank.square)
@@ -2660,9 +2623,7 @@ test("renewable_energy_bank_connect_and_disconnect", {
             T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
             T.step(function()
                 self.connectedPickUp = canPickUp()
-                local context = T.newContext()
-                local option = T.optionNamed(Menu.addBankOptions(0, context, bank.object), getText("ContextMenu_RenewableEnergy_DisconnectBank"))
-                context:hideAndChildren()
+                local option = T.menuOption(Menu.addBankOptions, bank.object, getText("ContextMenu_RenewableEnergy_DisconnectBank"))
                 self.disconnectOffered = option ~= nil and not option.notAvailable
                 if not self.disconnectOffered then return end
                 T.choose(option)
@@ -2678,24 +2639,6 @@ test("renewable_energy_bank_connect_and_disconnect", {
         expect(self.disconnectedPickUp, "a disconnected empty bank can't be picked up")
     end,
 })
-
-local Sources = RenewableEnergy.Sources
-
--- The panel's Connect to `bank` (`one`) and the bank's Connect Sources in Reach (`all`), read from
--- fresh menus, as T.optionState.
-local function connectOptions(bank, panel)
-    local context = T.newContext()
-    local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
-    local bankMenu = Menu.addBankOptions(0, context, bank.object)
-    local options = {
-        one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
-            Menu.bankLabel(bank.object), Format.away(panel.position, bank.position)))),
-        all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach",
-            #Sources.sourcesInReach(bank.position)))),
-    }
-    context:hideAndChildren()
-    return options
-end
 
 local function canConnect(panel, bank)
     return Action:new(player(), Action.CONNECT_SOURCE, panel.object, bank.object):canPerform()
@@ -2716,14 +2659,14 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
         T.holdLight(self)
         T.setPerk(self, Perks.Electricity, 3)
         T.step(function()
-            self.unconnected = connectOptions(bank, panel)
+            self.unconnected = T.connectOptions(bank, panel, 1)
             self.unconnectedAction = canConnect(panel, bank)
         end)
         T.performInto(self, "refused", "connectSource", args)
         T.performInto(self, "bankConnected", "setBankConnected", { bank = bank.position, connected = true })
         T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
         T.step(function()
-            self.connected = connectOptions(bank, panel)
+            self.connected = T.connectOptions(bank, panel, 1)
             self.connectedAction = canConnect(panel, bank)
         end)
         T.performInto(self, "accepted", "connectSource", args)
@@ -2738,17 +2681,16 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
                 name .. " isn't offered greyed out saying the bank isn't connected (" .. tostring(option.reason) .. ")")
         end
         expect(not self.unconnectedAction, "the Connect action starts for a bank that isn't connected")
-        expect(not self.refused.ok and self.refused.reason == key,
-            "the authority connected a panel to a bank that isn't connected (" .. reason(self, "refused") .. ")")
-        if not expect(self.bankConnected.ok, "the authority refused to connect the bank (" .. reason(self, "bankConnected") .. ")") then
+        T.expectRefused(self.refused, key, "the authority connected a panel to a bank that isn't connected")
+        if not T.expectOk(self.bankConnected, "connecting the bank") then
             return
         end
         for name, option in pairs({ ["the panel's Connect"] = after.one, ["Connect Sources in Reach"] = after.all }) do
             expect(option.shown and not option.greyed, name .. " isn't open for a connected bank (" .. tostring(option.reason) .. ")")
         end
         expect(self.connectedAction, "the Connect action doesn't start for a connected bank")
-        expect(self.accepted.ok, "the authority refused a panel on a connected bank (" .. reason(self, "accepted") .. ")")
-        expect(self.bankDisconnected.ok, "the authority refused to disconnect the bank (" .. reason(self, "bankDisconnected") .. ")")
+        T.expectOk(self.accepted, "putting a panel on a connected bank")
+        T.expectOk(self.bankDisconnected, "disconnecting the bank")
         expect(T.stateSource(self.bank.state, self.panel.position) ~= nil, "disconnecting the bank dropped its panel")
     end,
 })
@@ -2771,26 +2713,23 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
                 and PowerBank.isInReach(rack.position, here.x, here.y, here.z), "the box and the rack in reach of the panel") then
                 return
             end
-            self.unconnected = { box = connectOptions(box, panel).one, rack = connectOptions(rack, panel).one }
+            self.unconnected = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
         T.performInto(self, "boxConnected", "setBankConnected", { bank = box.position, connected = true })
         T.performInto(self, "rackConnected", "setBankConnected", { bank = rack.position, connected = true })
         T.waitFor(self, function() return box.object:isConnected() and rack.object:isConnected() end,
             "this client's copies of the connected box and rack")
         T.step(function()
-            self.connected = { box = connectOptions(box, panel).one, rack = connectOptions(rack, panel).one }
+            self.connected = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
         T.performInto(self, "onBox", "connectSource", { bank = box.position, source = panel.position })
         T.waitFor(self, function() return PowerBank.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
             "this client's summary of the box listing the panel")
         T.step(function()
             -- Each fresh context reuses the player's one context menu, so read this one first.
-            local context = T.newContext()
-            local menu = Menu.addSourceOptions(0, context, panel.object)
-            local wiredTo = T.optionState(T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_WiredTo",
+            local wiredTo = T.optionState(T.menuOption(Menu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
                 Format.bankName(PowerBank.summaryOf(box.object)), Format.away(panel.position, box.position))))
-            context:hideAndChildren()
-            self.wired = { wiredTo = wiredTo, box = connectOptions(box, panel).one, rack = connectOptions(rack, panel).one }
+            self.wired = { wiredTo = wiredTo, box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
     end,
     validate = function(self)
@@ -2803,7 +2742,7 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         for name, option in pairs(self.connected) do
             expect(option.shown and not option.greyed, "the connected " .. name .. " isn't offered open (" .. tostring(option.reason) .. ")")
         end
-        expect(self.onBox.ok, "the authority refused the panel on the box (" .. reason(self, "onBox") .. ")")
+        T.expectOk(self.onBox, "putting the panel on the box")
         local wired = self.wired
         expect(wired.wiredTo.shown, "a panel on the box doesn't say it is connected to the box")
         expect(not wired.box.shown, "a panel on the box offers to connect to the box again")

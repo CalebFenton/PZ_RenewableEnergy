@@ -456,8 +456,7 @@ test("renewable_energy_solar_storms_crack_loose_panels", {
         expectNear("the connected panel after a storm its bank didn't run", condition(self.first, 1), 100, 0)
         expectNear("the loose outdoor panel after a storm", condition(self.first, 2), 100 - crack, 0)
         expectNear("the loose indoor panel after a storm", condition(self.first, 3), 100, 0)
-        expect(self.disconnected and self.disconnected.ok, "disconnecting the panel failed ("
-            .. tostring(self.disconnected and self.disconnected.reason) .. ")")
+        T.expectOk(self.disconnected, "disconnecting the panel")
         expectNear("the disconnected panel after the next storm", condition(self.second, 1), 100 - crack, 0)
         expectNear("the loose outdoor panel after a second storm", condition(self.second, 2), 100 - 2 * crack, 0)
         expectNear("the loose indoor panel after a second storm", condition(self.second, 3), 100, 0)
@@ -487,13 +486,13 @@ test("renewable_energy_solar_connect_xp_once_per_module", {
         end)
     end,
     validate = function(self)
-        if not expect(self.connected and self.connected.ok, "connecting the rack failed") then return end
+        if not T.expectOk(self.connected, "connecting the rack") then return end
         local award, gained = self.server.electricityAward.gained, self.connected.xpAfter - self.connected.xpBefore
         -- An award retuned to nothing would match a connection that gives nothing.
         expect(Specs.connectXp > 0 and award > 0, "a module's first connection is worth " .. award .. " Electricity XP")
         expectNear("Electricity XP from connecting a rack with one new module", gained, award, 0.01)
-        expect(self.disconnected.ok, "disconnecting the rack failed (" .. tostring(self.disconnected.reason) .. ")")
-        expect(self.reconnected.ok, "connecting the rack again failed (" .. tostring(self.reconnected.reason) .. ")")
+        T.expectOk(self.disconnected, "disconnecting the rack")
+        T.expectOk(self.reconnected, "connecting the rack again")
         expectNear("Electricity XP from connecting the rack again", self.reconnected.xpAfter - self.reconnected.xpBefore, 0, 0)
         local modules = self.server.panelState.modules or {}
         expect(#modules == 2 and modules[1].connected == true and modules[2].connected == true,
@@ -674,14 +673,10 @@ test("renewable_energy_solar_menu_panel_connect", {
                 "the unavailable connect option says " .. tostring(alone.reason))
             expect(not alone.enabled, "a panel with no bank in reach offers something to do")
         end
-        local context = T.newContext()
-        local submenu = Menu.addSourceOptions(0, context, panel)
-        local connect = T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(self.bank.object),
-            Format.away(self.panel.position, self.bank.position)))
-        expect(connect ~= nil and not connect.notAvailable, "a panel next to a bank offers no connection to it")
-        expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_DisconnectSource")) == nil,
+        local connect = T.connectOptions(self.bank, self.panel, 1).one
+        expect(connect.shown and not connect.greyed, "a panel next to a bank offers no connection to it")
+        expect(T.menuOption(Menu.addSourceOptions, panel, getText("ContextMenu_RenewableEnergy_DisconnectSource")) == nil,
             "a panel that isn't connected offers to disconnect")
-        context:hideAndChildren()
     end,
 })
 
@@ -698,21 +693,9 @@ test("renewable_energy_solar_menu_panel_wired_to", {
         end, "this client's summary of the renamed bank")
     end,
     validate = function(self)
-        local context = T.newContext()
-        local submenu = Menu.addSourceOptions(0, context, self.panel.object)
-        local wiredTo
-        for _, option in ipairs(submenu.options) do
-            if option.name:find("Shed Bank", 1, true) then
-                wiredTo = option.name
-            end
-        end
-        local bank, panel = self.bank.position, self.panel.position
-        local dx, dy = bank.x - panel.x, bank.y - panel.y
-        local tiles = round(math.sqrt(dx * dx + dy * dy))
-        expect(wiredTo ~= nil, "a connected panel's menu doesn't name its renamed bank")
-        expect(wiredTo == nil or wiredTo:find(tostring(tiles), 1, true) ~= nil,
-            "the panel menu says " .. tostring(wiredTo) .. ", but the bank is " .. tiles .. " tiles away")
-        context:hideAndChildren()
+        local wiredTo = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
+            Format.bankName(PowerBank.summaryOf(self.bank.object)), Format.away(self.panel.position, self.bank.position)))
+        expect(wiredTo ~= nil, "a connected panel's menu doesn't name its renamed bank and how far away it stands")
     end,
 })
 
@@ -724,8 +707,6 @@ local function connectSpeed()
     return isClient() and 1 or 10
 end
 
-local INSTANT_OFF = "the debug option Cheats > Timed Action > Instant off, which makes every action instant"
-
 local function worldMinutes()
     return getGameTime():getWorldAgeHours() * 60
 end
@@ -736,7 +717,7 @@ test("renewable_energy_solar_connect_panel", {
     sandbox = { ConnectPanelMin = CONNECT_MINUTES },
     run = function(self)
         local p = player()
-        if not T.need(self, not p:isTimedActionInstant(), INSTANT_OFF) then return end
+        if not T.needActionTime(self) then return end
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
         if not self.panel then return end
@@ -783,10 +764,7 @@ test("renewable_energy_solar_disconnect_panel", {
         self.panel = self.bank and T.panel(self, Sprites.wall.wood.S, { near = self.bank, connect = true })
         if not self.panel then return end
         T.step(function()
-            local context = T.newContext()
-            local option = T.optionNamed(Menu.addSourceOptions(0, context, self.panel.object),
-                getText("ContextMenu_RenewableEnergy_DisconnectSource"))
-            context:hideAndChildren()
+            local option = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_DisconnectSource"))
             self.offered = option ~= nil and not option.notAvailable
             if not self.offered then return end
             T.standNextTo(self.panel.square)
@@ -814,7 +792,7 @@ test("renewable_energy_solar_seal_module_in_place", {
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         local cracked = { type = FACTORY, condition = 20, repaired = 1 }
-        self.to = math.min(Recipes.MODULE_REPAIR_CAP[FACTORY] - Recipes.REPAIR_LIMIT_STEP, cracked.condition + Recipes.MODULE_REPAIR)
+        self.to = math.min(T.sealCap(FACTORY, cracked.repaired), cracked.condition + Recipes.MODULE_REPAIR)
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = { { type = FACTORY, condition = 100 }, cracked } })
         if not self.panel then return end
@@ -866,10 +844,7 @@ test("renewable_energy_solar_seal_module_in_place", {
 
 -- The Clear Snow option on `panel`'s menu: whether it shows, whether it is greyed out, and why.
 local function clearSnowOption(panel)
-    local context = T.newContext()
-    local option = T.optionNamed(Menu.addSourceOptions(0, context, panel.object), getText("ContextMenu_RenewableEnergy_ClearSnow"))
-    context:hideAndChildren()
-    return T.optionState(option)
+    return T.optionState(T.menuOption(Menu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_ClearSnow")))
 end
 
 -- A snowy flat panel offers Clear Snow, greyed out saying why until the character carries a broom
@@ -927,21 +902,6 @@ test("renewable_energy_solar_clear_snow_requirements", {
     end,
 })
 
--- Connect options on a bank, with `loose` sources in its reach, and on the loose panel `panel`,
--- read from this client's copies: whether they show greyed, and why.
-local function connectOptions(bank, panel, loose)
-    local context = T.newContext()
-    local bankMenu = Menu.addBankOptions(0, context, bank.object)
-    local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
-    local options = {
-        all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
-        one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank.object),
-            Format.away(panel.position, bank.position)))),
-    }
-    context:hideAndChildren()
-    return options
-end
-
 -- A bank with every input slot taken greys out connecting another panel, from the bank's menu and
 -- from the panel's, saying there's no slot; one slot freed, both offer it. Read on this client's
 -- summary, which carries the free slots. Catches a menu that offers a connection the bank then
@@ -967,11 +927,11 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
             end, "this client's summary with " .. count .. " free input slots")
         end
         freeSlots(0)
-        T.step(function() self.full = connectOptions(bank, self.loose, 1) end)
+        T.step(function() self.full = T.connectOptions(bank, self.loose, 1) end)
         T.perform(self, "disconnectSource", { bank = bank.position, source = wired[1].position })
         freeSlots(1)
         -- The disconnected panel is loose in reach now too.
-        T.step(function() self.freed = connectOptions(bank, self.loose, 2) end)
+        T.step(function() self.freed = T.connectOptions(bank, self.loose, 2) end)
     end,
     validate = function(self)
         local why = getText("Tooltip_RenewableEnergy_NoInputSlot")
@@ -1212,22 +1172,19 @@ test("renewable_energy_solar_mount_xp_only_for_new_modules", {
 -- Seal Cracked Module adds Recipes.MODULE_REPAIR up to the module type's cap, lowered a step for
 -- each earlier seal, and is refused at that limit with the module untouched. Each seal counts
 -- once, on this client's copy too, and a sealed module still shows cracked.
-local function sealLimit(module, seals)
-    return Recipes.MODULE_REPAIR_CAP[module] - Recipes.REPAIR_LIMIT_STEP * seals
-end
 -- Each row: the behaviour, the module, its seal count, and its condition before.
 local MODULE_REPAIRS = {
-    { "factory_adds_a_step", FACTORY, 0, sealLimit(FACTORY, 0) - Recipes.MODULE_REPAIR - 1 },
-    { "factory_below_limit_stops_at_limit", FACTORY, 0, sealLimit(FACTORY, 0) - 1 },
-    { "factory_at_limit_refused", FACTORY, 0, sealLimit(FACTORY, 0) },
-    { "factory_after_two_seals_stops_at_lower_limit", FACTORY, 2, sealLimit(FACTORY, 2) - 1 },
-    { "factory_after_three_seals_at_limit_refused", FACTORY, 3, sealLimit(FACTORY, 3) },
-    { "homemade_below_limit_stops_at_limit", HOMEMADE, 0, sealLimit(HOMEMADE, 0) - 1 },
-    { "homemade_after_one_seal_stops_at_lower_limit", HOMEMADE, 1, sealLimit(HOMEMADE, 1) - 1 },
+    { "factory_adds_a_step", FACTORY, 0, T.sealCap(FACTORY, 0) - Recipes.MODULE_REPAIR - 1 },
+    { "factory_below_limit_stops_at_limit", FACTORY, 0, T.sealCap(FACTORY, 0) - 1 },
+    { "factory_at_limit_refused", FACTORY, 0, T.sealCap(FACTORY, 0) },
+    { "factory_after_two_seals_stops_at_lower_limit", FACTORY, 2, T.sealCap(FACTORY, 2) - 1 },
+    { "factory_after_three_seals_at_limit_refused", FACTORY, 3, T.sealCap(FACTORY, 3) },
+    { "homemade_below_limit_stops_at_limit", HOMEMADE, 0, T.sealCap(HOMEMADE, 0) - 1 },
+    { "homemade_after_one_seal_stops_at_lower_limit", HOMEMADE, 1, T.sealCap(HOMEMADE, 1) - 1 },
 }
 for _, entry in ipairs(MODULE_REPAIRS) do
     local behavior, module, repaired, before = entry[1], entry[2], entry[3], entry[4]
-    local limit = sealLimit(module, repaired)
+    local limit = T.sealCap(module, repaired)
     local refused = before >= limit
     local after = refused and before or math.min(limit, before + Recipes.MODULE_REPAIR)
     local repairedAfter = refused and repaired or repaired + 1
@@ -1242,10 +1199,7 @@ for _, entry in ipairs(MODULE_REPAIRS) do
         counts = { [module] = 1 },
         after = function(self)
             T.readCarried(self, { module })
-            T.waitFor(self, function()
-                local item = T.carried(module)
-                return item ~= nil and item:getHaveBeenRepaired() == repairedAfter
-            end, "this client's module repaired " .. repairedAfter .. "x")
+            T.waitForRepaired(self, module, repairedAfter)
         end,
         validate = function(self)
             local item = T.carriedFirst(self, module)
@@ -1275,7 +1229,7 @@ for _, entry in ipairs(SEAL_ADHESIVES) do
         from = FACTORY,
         prefer = { FACTORY },
         setup = function(self)
-            T.changeItem(self, T.inputsOf(self, FACTORY)[1], { condition = sealLimit(FACTORY, 0) - Recipes.MODULE_REPAIR - 1 })
+            T.changeItem(self, T.inputsOf(self, FACTORY)[1], { condition = T.sealCap(FACTORY, 0) - Recipes.MODULE_REPAIR - 1 })
         end,
         counts = { [FACTORY] = 1 },
         after = function(self) T.readCarried(self, { adhesive }) end,
@@ -1365,10 +1319,9 @@ for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
     })
 end
 
--- Storm damage over hours at the Storm Damage options (Chance.stormDamage), worked by hand: 10% an
--- hour is 10% in one hour and 1 - 0.9² = 19% in two; at a rate of 200 it is 20% an hour, so 36% in
--- two, and 60% an hour doubles past certain, which stays certain; no hours, or Storm Damage off,
--- is no chance.
+-- Storm damage over hours at the Storm Damage options (Chance.stormDamage): a chance an hour
+-- compounds over the hours, the rate scales the chance an hour, and a chance scaled past certain
+-- stays certain; no hours, or Storm Damage off, is no chance. The expected chances are worked by hand.
 test("renewable_energy_solar_storms_chance_by_hours_and_rate", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
@@ -1457,8 +1410,9 @@ test("renewable_energy_solar_storms_worst_case_rule", {
     end,
 })
 
--- A connect job takes ConnectPanelMin minutes at Electricity 3, and 9.5% of that less for each
--- level above and more for each below: 12.85 minutes of 10 at level 0, 3.35 at level 10.
+-- A connect job takes ConnectPanelMin minutes at Electricity 3, a fixed share of that less for each
+-- level above and more for each below (RenewableEnergyAction's skillFactor); the expected minutes
+-- are worked by hand.
 test("renewable_energy_solar_connect_time_by_electricity", {
     sandbox = { ConnectPanelMin = 10 },
     run = function(self)

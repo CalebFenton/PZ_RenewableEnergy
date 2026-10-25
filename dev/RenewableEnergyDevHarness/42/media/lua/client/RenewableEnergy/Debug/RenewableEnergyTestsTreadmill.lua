@@ -10,7 +10,6 @@ local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmil
 
 local CAR_BATTERY = "Base.CarBattery1"
 local INVERTER = "RenewableEnergy.PlugInInverter"
--- A bank whose inverter carries whatever the test map's house has switched on, a run included.
 local L16 = "RenewableEnergy.L16Battery"
 local INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
 -- A pass this long barely moves a bank's batteries.
@@ -120,26 +119,20 @@ test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
         expect(self.unskilled == "skill", "below the Electricity level the wiring is refused for " .. tostring(self.unskilled))
         expect(carriedCount(self, PowerBank.WIRE) == 0 and carriedCount(self, PowerBank.SCRAP) == 0,
             "wiring left " .. carriedCount(self, PowerBank.WIRE) .. " wire and " .. carriedCount(self, PowerBank.SCRAP) .. " scrap")
-        expect(self.connected.ok == true, "the bank refused the wired treadmill: " .. tostring(self.connected.reason))
-        expect(self.again.ok ~= true and self.again.reason == "already wired",
-            "wiring the treadmill's other tile too wasn't refused as already wired: " .. tostring(self.again.reason))
+        T.expectOk(self.connected, "connecting the wired treadmill")
+        T.expectRefused(self.again, "already wired", "wiring the treadmill's other tile too wasn't refused as already wired")
     end,
 })
 
 -- What a right-click on the treadmill tile `object` offers in its submenu: Run on Treadmill, Wire
 -- the Motor and Unwire the Motor, each as T.optionState.
 local function treadmillMenu(object)
-    local menu, context = T.worldSubmenu(object, getText("IGUI_RenewableEnergy_Treadmill"))
-    local function offered(key)
-        return T.optionState(T.optionNamed(menu, getText(key)))
-    end
-    local seen = {
-        run = offered("ContextMenu_RenewableEnergy_RunOnTreadmill"),
-        wire = offered("ContextMenu_RenewableEnergy_WireTreadmill"),
-        unwire = offered("ContextMenu_RenewableEnergy_UnwireTreadmill"),
-    }
-    if context then context:hideAndChildren() end
-    return seen
+    local options = T.worldOptions(object, getText("IGUI_RenewableEnergy_Treadmill"), {
+        run = getText("ContextMenu_RenewableEnergy_RunOnTreadmill"),
+        wire = getText("ContextMenu_RenewableEnergy_WireTreadmill"),
+        unwire = getText("ContextMenu_RenewableEnergy_UnwireTreadmill"),
+    }) or {}
+    return { run = T.optionState(options.run), wire = T.optionState(options.wire), unwire = T.optionState(options.unwire) }
 end
 
 -- A loose treadmill offers Run on Treadmill, greyed saying it needs power while it has none and
@@ -198,12 +191,22 @@ test("renewable_energy_treadmill_wiring_refused_in_the_dark", {
         if self.treadmill then T.makeDark(self) end
     end,
     validate = function(self)
-        if not expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands") then return end
+        if not T.expectDark() then return end
         local wire = treadmillMenu(self.treadmill.object).wire
         expect(wire.greyed and wire.reason == getText("Tooltip_RenewableEnergy_TooDark"),
             "Wire the Motor in the dark isn't greyed out saying it's too dark (" .. tostring(wire.reason) .. ")")
     end,
 })
+
+-- The status entry of the bank state's treadmill, or nil.
+local function treadmillSource(state)
+    for _, source in ipairs(state and state.status and state.status.sources or {}) do
+        if source.kind == "treadmill" then
+            return source
+        end
+    end
+    return nil
+end
 
 -- A run on a wired treadmill banks its watt-hours, paid out over the passes after it rather than
 -- in one go, into the batteries as the status says, and costs the runner sweat and trains Fitness.
@@ -235,7 +238,7 @@ test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
     end,
     validate = function(self)
         if not T.expectConnected(self.treadmill) then return end
-        local short, after = T.stateSourceOfKind(self.short, "treadmill"), T.stateSourceOfKind(self.after, "treadmill")
+        local short, after = treadmillSource(self.short), treadmillSource(self.after)
         if not expect(short ~= nil and after ~= nil, "the bank's status lists no treadmill") then return end
         local banked = self.after.status.runWhToday
         if not expect(banked > 0, "the run banked nothing") then return end
@@ -249,7 +252,8 @@ test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
     end,
 })
 
--- A bank of L-16s with an inverter-charger, switched on with the grid off, and a treadmill tile of
+-- A bank of L-16s with an inverter-charger, which carries whatever the test map's house has
+-- switched on, a run included, switched on with the grid off, and a treadmill tile of
 -- `sprite` on an indoor square it powers, wired and connected to it if `wired`. Returns both
 -- handles once this client sees power on the treadmill's square, or nil.
 local function poweredTreadmill(self, sprite, wired)
@@ -337,8 +341,7 @@ test("renewable_energy_treadmill_wired_run_draws_nothing", {
         T.goNextTo(self, treadmill.square)
         T.batch(function()
             T.server(self, "startTreadmillRun", T.at(treadmill))
-            T.server(self, "scanLoad", bank.position)
-            T.step(function() self.during = self.server.scanLoad end)
+            T.serverInto(self, "during", "scanLoad", bank.position)
             T.server(self, "completeStartedTreadmillRun", T.at(treadmill))
         end)
     end,
@@ -369,11 +372,9 @@ test("renewable_energy_treadmill_unconnected_run_gives_nothing", {
             "this client's copy of the disconnected treadmill")
         T.step(function() self.refusal = Treadmill.runRefusal(treadmill.object) end)
         T.batch(function()
-            T.server(self, "completeTreadmillRun", T.at(treadmill))
-            T.step(function() self.unconnected = self.server.completeTreadmillRun end)
+            T.serverInto(self, "unconnected", "completeTreadmillRun", T.at(treadmill))
             T.perform(self, "connectSource", args)
-            T.server(self, "completeTreadmillRun", T.at(treadmill))
-            T.step(function() self.connected = self.server.completeTreadmillRun end)
+            T.serverInto(self, "connected", "completeTreadmillRun", T.at(treadmill))
         end)
     end,
     validate = function(self)
@@ -423,14 +424,14 @@ test("renewable_energy_treadmill_unwire_gives_back_wire", {
     end,
     validate = function(self)
         expect(self.wired.ok and self.wired.xpAfter > self.wired.xpBefore, "the first wiring failed or taught nothing")
-        expect(self.connected.ok, "the bank refused the wired treadmill: " .. tostring(self.connected.reason))
+        T.expectOk(self.connected, "connecting the wired treadmill")
         expect(self.bank.state.sources == 0, "the bank still feeds from the unwired treadmill")
         local before, wired, after = self.beforeWiring, self.afterWiring, self.afterUnwire
         expect(wired.wire < before.wire and wired.scrap < before.scrap, "wiring took no wire or no scrap")
         expect(after.wire == before.wire and after.scrap == wired.scrap, "unwiring left " .. after.wire .. " wire and "
             .. after.scrap .. " scrap, expected the " .. before.wire .. " wire carried before wiring and the "
             .. wired.scrap .. " scrap left after it")
-        expect(self.rewired.ok, "wiring the treadmill again failed (" .. tostring(self.rewired.reason) .. ")")
+        T.expectOk(self.rewired, "wiring the treadmill again")
         T.expectNear("Electricity XP for wiring the same treadmill again", self.rewired.xpAfter - self.rewired.xpBefore, 0, 0)
     end,
 })
@@ -483,7 +484,7 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
             expect(case.run.done, "the authority settled no run on the " .. case.name .. " treadmill")
             stored[case.name] = case.bank.state.storedWh - case.before
         end
-        expect(self.unwired.ok, "unwiring the treadmill failed (" .. tostring(self.unwired.reason) .. ")")
+        T.expectOk(self.unwired, "unwiring the treadmill")
         if not expect(stored.kept > 0, "the run on the treadmill left wired stored nothing") then return end
         T.expectNear("Wh a run stored with the treadmill unwired at once, against left wired", stored.unwired, stored.kept, 0.5)
         T.expectNear("Wh a run stored with the treadmill picked up at once, against left wired", stored.pickedUp, stored.kept, 0.5)
@@ -509,8 +510,8 @@ test("renewable_energy_treadmill_pickup_drops_wire", {
         T.server(self, "takeFloorItems", { squares = { treadmill.position, console.position } })
     end,
     validate = function(self)
-        expect(self.wired.ok, "wiring the treadmill failed (" .. tostring(self.wired.reason) .. ")")
-        expect(self.connected.ok, "the bank refused the wired treadmill: " .. tostring(self.connected.reason))
+        T.expectOk(self.wired, "wiring the treadmill")
+        T.expectOk(self.connected, "connecting the wired treadmill")
         expect(self.bank.state.sources == 0, "the bank still feeds from the picked-up treadmill")
         local took = self.beforeWiring.wire - self.afterWiring.wire
         local wire, wiredItems = 0, 0

@@ -76,8 +76,7 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
 
 -- Ringing the charger `handle` with `sprite` tiles on `level` (the ringOfTiles handler).
 local function ring(self, handle, level, sprite)
-    local p = handle.position
-    T.server(self, "ringOfTiles", { x = p.x, y = p.y, level = level, sprite = sprite })
+    T.server(self, "ringOfTiles", T.at(handle, { level = level, sprite = sprite }))
 end
 
 -- Solid walls on the scoop rotor's own level, where it turns, shelter it and cut its output, but
@@ -328,18 +327,18 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
             T.forceRoll(self, { chance })
             T.bankPass(self, bank, 0, { windKph = gale })
             T.step(function() self.atChance = bank.state end)
-            T.forceRoll(self, { chance - 1e-9 })
+            T.forceRoll(self, { chance - T.UNDER })
             T.bankPass(self, bank, 0, { windKph = gale })
             T.step(function() self.storm = bank.state end)
             -- Every later roll misses, so whatever else draws one while the test goes on neither
             -- runs past the list nor comes up.
-            T.forceRoll(self, 1 - 1e-9)
+            T.forceRoll(self, 1 - T.UNDER)
         end)
         T.waitFor(self, function() return Wind.isBroken(self.left.object) end, "this client's copy of the broken blades")
         T.step(function()
-            local menu, context = T.worldSubmenu(self.left.object, RenewableEnergy.Menu.nameOf(self.left.object))
-            self.emptyHanded = T.optionState(T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReplaceBlades"))).greyed
-            if context then context:hideAndChildren() end
+            local options = T.worldOptions(self.left.object, RenewableEnergy.Menu.nameOf(self.left.object),
+                { replace = getText("ContextMenu_RenewableEnergy_ReplaceBlades") })
+            self.emptyHanded = T.optionState(options and options.replace).greyed
         end)
         T.give(self, "blades", { { type = WOODEN_BLADES } })
         T.doJob(self, self.left.square, function()
@@ -492,9 +491,9 @@ test("renewable_energy_wind_any_charger_takes_any_blades", {
                 local refusal = Wind.bladesRefusal(object, blades)
                 expect(refusal == nil, material .. " blades on the " .. charger.label .. " are refused for " .. tostring(refusal))
             end
-            local menu, context = T.worldSubmenu(object, RenewableEnergy.Menu.nameOf(object))
-            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReplaceBlades"))
-            if context then context:hideAndChildren() end
+            local options = T.worldOptions(object, RenewableEnergy.Menu.nameOf(object),
+                { replace = getText("ContextMenu_RenewableEnergy_ReplaceBlades") })
+            local option = options and options.replace
             local kind, _, own = Sprites.kindOf(charger.sprite)
             local wanted = carried[own]
             for _, material in ipairs(Specs.wind.turbines[kind].blades) do
@@ -564,7 +563,7 @@ swapTest("renewable_energy_wind_turbine_blades_swap_material", "wooden turbine",
     { kind = "batteryRackWood", parts = { CAR_BATTERY, INVERTER, CONTROLLER } },
     Sprites.windCharger.alternator.steel.N, Sprites.windCharger.alternator.wood.N, WOODEN_BLADES, "RenewableEnergy.BrokenSteelBlades")
 
--- A charger losing more than SHELTERED_LOSS (30%) of its unsheltered watts to shelter gives
+-- A charger losing more than SHELTERED_LOSS of its unsheltered watts to shelter gives
 -- "sheltered" as its reason, and one losing less gives none: a ring of walls beside it costs about
 -- 6%, walls filling the squares out to 5 about 43% (WindSource's shelter weights, worked by hand).
 test("renewable_energy_wind_sheltered_reason", {

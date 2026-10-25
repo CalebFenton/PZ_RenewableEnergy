@@ -1,6 +1,8 @@
 -- The authority's half of the gas line and wood gas tests (RenewableEnergyTestsGasLine.lua,
 -- RenewableEnergyTestsWoodGas.lua): generators with the Gas Conversion Kit, the load they carry,
--- and burning a gasifier's wood. The records themselves are RenewableEnergyTestServerBiogas.lua's.
+-- and burning a gasifier's wood. The generator reads, settings and billing serve the bank tests'
+-- generators too (RenewableEnergyTestsBank.lua). The records themselves are
+-- RenewableEnergyTestServerBiogas.lua's.
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 

@@ -15,25 +15,6 @@ local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.Gasifie
 local WOOD = { { type = "Base.Plank", count = 6 } }
 local PACKING = { { type = "Base.HayTuft" } }
 
--- An empty-tanked generator and a gasifier of `tier` beside it, or nil.
-local function gasifierBeside(self, tier)
-    local generator = T.generator(self, { fuel = 0 })
-    if not generator then return nil end
-    local square = T.need(self, T.squareBeside(generator.square), "a free square beside the generator")
-    local gasifier = square and T.placeRecord(self, "gasifier", tier, { square = square })
-    return gasifier and generator, gasifier
-end
-
--- Queues lighting the gasifier once this client sees wood in it, with what that takes then given
--- first.
-local function light(self, gasifier)
-    T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
-    T.step(function()
-        T.giveMaterials(self, "light", GasifierJobs.materials(GasifierJobs.LIGHT, T.recordSummary(gasifier)))
-    end)
-    T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
-end
-
 -- Building ----------------------------------------------------------------------------------------
 
 -- The build menu's own path builds a gasifier of `tier` from its entity's recipe, taking its
@@ -70,14 +51,14 @@ test("renewable_energy_woodgas_gasifier_runs_generator", {
     -- must skip come to well over the wood the check lets pass.
     sandbox = { GeneratorFuelConsumption = 10 },
     run = function(self)
-        local generator, gasifier = gasifierBeside(self, "standard")
+        local generator, gasifier = T.gasifierBeside(self, "standard")
         if not gasifier then return end
         self.generatorSide = Gasifier.sideOf(gasifier.x, gasifier.y, generator.x, generator.y)
         self.gasifierSide = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
         self.hours = 10
         T.fillRecord(self, gasifier, { hopper = WOOD, filter = PACKING })
         -- Lit first, so gas reaches the generator the moment the line is in.
-        light(self, gasifier)
+        T.lightGasifier(self, gasifier)
         T.fitAndConnect(self, generator, gasifier)
         T.batch(function()
             T.readRecord(self, gasifier, "lit")
@@ -92,7 +73,7 @@ test("renewable_energy_woodgas_gasifier_runs_generator", {
             T.ageRecord(self, gasifier, self.hours, "fed")
             T.readGenerator(self, generator, "running")
             -- More than the hopper and the firebox hold.
-            T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = 2 * Gasifier.TIERS.standard.hopperKg }))
+            T.burnGasifier(self, gasifier, 2 * Gasifier.TIERS.standard.hopperKg)
             T.gasPass(self, generator, 0.1)
             T.readGenerator(self, generator, "out")
         end)
@@ -130,7 +111,7 @@ test("renewable_energy_woodgas_gasifier_runs_generator", {
 test("renewable_energy_woodgas_full_ash_or_spent_filter_cuts_output", {
     instant = true,
     run = function(self)
-        local generator, gasifier = gasifierBeside(self, "standard")
+        local generator, gasifier = T.gasifierBeside(self, "standard")
         if not gasifier then return end
         self.dirtyCap = GasKit.CAP_W * Gasifier.DIRTY_OUTPUT
         T.fillRecord(self, gasifier, { hopper = WOOD, filter = PACKING })
@@ -146,7 +127,7 @@ test("renewable_energy_woodgas_full_ash_or_spent_filter_cuts_output", {
             end
             -- More than one packing item's worth of wood tars the filter's only tuft; its ash is
             -- cleared so only the filter counts.
-            T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = 1.5 * Gasifier.TIERS.standard.tarKgPerItem }))
+            T.burnGasifier(self, gasifier, 1.5 * Gasifier.TIERS.standard.tarKgPerItem)
             T.setRecord(self, gasifier, { ash = 0 })
             T.readRecord(self, gasifier, "spent")
             T.gasPass(self, generator, 0.1)
@@ -176,7 +157,7 @@ test("renewable_energy_woodgas_gasifier_idles_as_a_generator", {
     instant = true,
     sandbox = { GeneratorFuelConsumption = 1 },
     run = function(self)
-        local generator, idling = gasifierBeside(self, "standard")
+        local generator, idling = T.gasifierBeside(self, "standard")
         local burning = idling and T.placeRecord(self, "gasifier", "standard")
         if not burning then return end
         self.hours = 10
@@ -188,10 +169,7 @@ test("renewable_energy_woodgas_gasifier_idles_as_a_generator", {
             T.readRecord(self, idling, "lit")
             T.ageRecord(self, idling, self.hours, "idledOff")
             T.setGenerator(self, generator, { running = true })
-            -- Any load the line can't carry stalls it; how much isn't what this is about.
-            T.gasLoad(self, GasKit.CAP_W + 1)
-            T.gasPass(self, generator, 0.1)
-            T.readGenerator(self, generator, "stalled")
+            T.stallLine(self, generator, "stalled")
             T.ageRecord(self, idling, self.hours, "idledStalled")
         end)
         T.step(function()
@@ -232,9 +210,9 @@ test("renewable_energy_woodgas_dirty_gas_wears_generator", {
         -- Vanilla's chance, set so the dirty one lies well inside 0 to 1.
         local oneIn = 2 * Gasifier.WEAR_DIRTY
         self.chance = (Gasifier.WEAR_DIRTY - 1) / oneIn
-        local dirtyGenerator, dirty = gasifierBeside(self, "standard")
+        local dirtyGenerator, dirty = T.gasifierBeside(self, "standard")
         if not dirty then return end
-        local cleanGenerator, clean = gasifierBeside(self, "standard")
+        local cleanGenerator, clean = T.gasifierBeside(self, "standard")
         if not clean then return end
         local lines = { { name = "dirty", generator = dirtyGenerator, gasifier = dirty, filter = {} },
             { name = "clean", generator = cleanGenerator, gasifier = clean, filter = PACKING } }
@@ -243,9 +221,7 @@ test("renewable_energy_woodgas_dirty_gas_wears_generator", {
             T.setRecord(self, line.gasifier, { lit = true })
             T.fitAndConnect(self, line.generator, line.gasifier)
         end
-        local args = T.at(dirtyGenerator)
-        args.oneIn = oneIn
-        T.server(self, "generatorWearChance", args)
+        T.server(self, "generatorWearChance", T.at(dirtyGenerator, { oneIn = oneIn }))
         local passes = { { "dirtyHit", dirtyGenerator, self.chance - 0.01 }, { "dirtyMiss", dirtyGenerator, self.chance + 0.01 },
             { "clean", cleanGenerator, 0 } }
         T.batch(function()
@@ -346,7 +322,7 @@ test("renewable_energy_woodgas_burning_fills_ash_and_tars_packing", {
             T.setRecord(self, gasifier, { lit = true })
             for _ = 1, self.burns do
                 T.setRecord(self, gasifier, { condensate = 0 })
-                T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = self.kg }))
+                T.burnGasifier(self, gasifier, self.kg)
             end
             T.readRecord(self, gasifier, "burned")
         end)
@@ -425,7 +401,7 @@ test("renewable_energy_woodgas_drain_condensate", {
         T.expect(self.potHot == nil, "a pot won't take the condensate hot: " .. tostring(self.potHot))
         T.expect(self.coldBottle, "a plastic bottle won't take it cold")
         local poured = math.min(self.condensate, instanceItem("Base.Pot"):getFluidContainer():getCapacity())
-        T.expectNear("wood vinegar carried", T.carriedLitres(self, Gasifier.VINEGAR), poured, 0.01)
+        T.expectNear("wood vinegar carried", self.server.carried and self.server.carried.fluids[Gasifier.VINEGAR], poured, 0.01)
         T.expectNear("condensate left", self.reads.drained.condensate, self.condensate - poured, 0.01)
     end,
 })

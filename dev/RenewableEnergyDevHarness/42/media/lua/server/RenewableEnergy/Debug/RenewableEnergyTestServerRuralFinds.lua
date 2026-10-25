@@ -12,14 +12,12 @@ local handler = PZHarness.serverHandler
 -- puts the roll back and takes out the reading the test's rolls left (the gasifier's pamphlet,
 -- the digester's magazine).
 local function forgetRoll(def, defer)
-    local store, key = ModData.getOrCreate(RenewableEnergy.RuralFinds.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
-    local roll = store[key]
     local RuralFinds, before = RenewableEnergy.RuralFinds, {}
+    local store, key = Helpers.keepBuildingRoll(RuralFinds.MOD_DATA, def, defer)
     for _, fullType in ipairs({ RuralFinds.PAMPHLET, RuralFinds.BIOGAS_MAGAZINE }) do
         before[fullType] = Helpers.readingIn(def, fullType)
     end
     defer(function()
-        store[key] = roll
         for fullType, held in pairs(before) do
             Helpers.takeReadingSince(def, fullType, held)
         end
@@ -62,22 +60,6 @@ handler("ruralFind", function(player, args, defer)
     return { at = found[args.kind], kept = rolled ~= nil and rolled[args.kind] == true, again = Helpers.count(again) }
 end)
 
--- The finds of each kind standing within BuildingWatch.REACH of the building, by kind.
-local function findsAround(def)
-    local reach, counts = RenewableEnergy.BuildingWatch.REACH, {}
-    for kind, find in pairs(RenewableEnergy.RuralFinds.FINDS) do
-        counts[kind] = 0
-        for x = def:getX() - reach, def:getX2() + reach - 1 do
-            for y = def:getY() - reach, def:getY2() + reach - 1 do
-                if RenewableEnergy.findObjectOn(getSquare(x, y, 0), find.is) then
-                    counts[kind] = counts[kind] + 1
-                end
-            end
-        end
-    end
-    return counts
-end
-
 -- The building at x, y of the map: { ready = false, why } until the world has rolled it, which it
 -- does once the building's surroundings have loaded here. Then the finds the world's roll gave it
 -- and those standing by it, and, rolled again with its roll forgotten and every roll at 0 (the
@@ -101,7 +83,10 @@ handler("ruralFindAt", function(_, args)
     for kind in pairs(worldRoll) do
         table.insert(world, kind)
     end
-    local standing = findsAround(def)
+    local standing = {}
+    for kind, find in pairs(RuralFinds.FINDS) do
+        standing[kind] = Helpers.findsAround(def, find.is)
+    end
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
     forgetRoll(def, defer)

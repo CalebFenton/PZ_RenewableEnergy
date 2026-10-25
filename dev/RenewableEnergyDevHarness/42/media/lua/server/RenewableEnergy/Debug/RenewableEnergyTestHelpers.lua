@@ -98,6 +98,15 @@ function Helpers.squareAt(args)
     return args and args.x and getSquare(args.x, args.y, args.z)
 end
 
+--- The object drawn as `args.sprite` on the square at `args`, or nil and what is missing.
+function Helpers.objectAt(args)
+    local object = PZHarness.Fixtures.objectWithSprite(Helpers.squareAt(args), args.sprite)
+    if not object then
+        return nil, "the placed " .. tostring(args.sprite) .. " on the server"
+    end
+    return object
+end
+
 --- The vehicle `args` names ({ id, x, y, z }: RenewableEnergyTest.vehicleArgs; single player
 --- finds it by the squares around x, y, z), or nil and what is missing when there is none or it
 --- has been taken out of the world.
@@ -107,6 +116,18 @@ function Helpers.vehicleAt(args)
         return nil, "vehicle " .. tostring(args and args.id) .. " on the server"
     end
     return vehicle
+end
+
+--- Registers the handler `name` on the vehicle `args` names (RenewableEnergyTest.onVehicle):
+--- `fn(vehicle, args, player, defer)` runs once it is found.
+function Helpers.onVehicle(name, fn)
+    PZHarness.serverHandler(name, function(player, args, defer)
+        local vehicle, missing = Helpers.vehicleAt(args)
+        if not vehicle then
+            return nil, missing
+        end
+        return fn(vehicle, args, player, defer)
+    end)
 end
 
 --- The names of the overlays an object's tile shows, in drawing order.
@@ -142,6 +163,12 @@ end
 --- How far under a chance a roll still comes in under it.
 Helpers.UNDER = 1e-9
 
+--- `roll` as a trial gives it: "under" or "at" for just under or at `chance`, worked out here so
+--- the roll is exactly the chance, else the number itself.
+function Helpers.trialRoll(roll, chance)
+    return roll == "under" and chance - Helpers.UNDER or roll == "at" and chance or roll
+end
+
 --- Whether `value` lies in `range` ({ min, max }), both ends included.
 function Helpers.inRange(value, range)
     return value >= range.min and value <= range.max
@@ -164,6 +191,14 @@ function Helpers.emptyContainer(container, fullType, count)
     end
 end
 
+--- Takes the item `object` lying on `square` off the floor and tells the clients.
+function Helpers.removeFloorItem(square, object)
+    if isServer() then
+        square:transmitRemoveItemFromSquare(object)
+    end
+    square:removeWorldObject(object)
+end
+
 --- The def of the building nearest x, y on the ground level, within `radius` squares, that
 --- `accept(def)`, if given, takes; nil if there is none.
 function Helpers.buildingNear(x, y, radius, accept)
@@ -180,12 +215,40 @@ function Helpers.buildingNear(x, y, radius, accept)
     return nil
 end
 
-local PAMPHLET = "RenewableEnergy.FemaPamphlet"
+--- Keeps the roll of the building `def` that the ModData table `modDataName` holds (by
+--- BuildingWatch.key) as it stands now, and puts it back when the test ends. Returns the table and
+--- the building's key, for a caller that forgets the roll.
+function Helpers.keepBuildingRoll(modDataName, def, defer)
+    local store, key = ModData.getOrCreate(modDataName), RenewableEnergy.BuildingWatch.key(def)
+    local saved = store[key]
+    if type(saved) == "table" then
+        local copy = {}
+        for field, value in pairs(saved) do
+            copy[field] = value
+        end
+        saved = copy
+    end
+    defer(function() store[key] = saved end)
+    return store, key
+end
 
---- How many of `fullType` (default the pamphlet) each container and each floor holds on the levels
---- of the building `def` that RuralFinds.leaveReading fills: { [container or square] = count }.
+--- How many ground squares within BuildingWatch.REACH of the building `def` hold an object that
+--- `isFind(object)` takes, leaving out the square `except` ({ x, y }), if given.
+function Helpers.findsAround(def, isFind, except)
+    local reach, count = RenewableEnergy.BuildingWatch.REACH, 0
+    for x = def:getX() - reach, def:getX2() + reach - 1 do
+        for y = def:getY() - reach, def:getY2() + reach - 1 do
+            if not (except and x == except[1] and y == except[2]) and RenewableEnergy.findObjectOn(getSquare(x, y, 0), isFind) then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+--- How many of `fullType` each container and each floor holds on the levels of the building `def`
+--- that RuralFinds.leaveReading fills: { [container or square] = count }.
 function Helpers.readingIn(def, fullType)
-    fullType = fullType or PAMPHLET
     local found = {}
     for z = 0, RenewableEnergy.BuildingWatch.HIGHEST_LEVEL do
         for x = def:getX(), def:getX2() - 1 do
@@ -233,10 +296,7 @@ function Helpers.takeReadingSince(def, fullType, before)
                 for i = items:size() - 1, 0, -1 do
                     local object = items:get(i)
                     if extra > 0 and object:getItem():getFullType() == fullType then
-                        if isServer() then
-                            holder:transmitRemoveItemFromSquare(object)
-                        end
-                        holder:removeWorldObject(object)
+                        Helpers.removeFloorItem(holder, object)
                         extra = extra - 1
                     end
                 end

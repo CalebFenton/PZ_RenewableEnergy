@@ -112,6 +112,15 @@ local function removePossibleStash(name)
     end
 end
 
+-- Marks the stash `name` read or not in StashSystem's already-read map.
+local function setRead(name, read)
+    local alreadyRead = StashSystem.getAlreadyReadMap()
+    alreadyRead:remove(name)
+    if read then
+        alreadyRead:add(name)
+    end
+end
+
 -- Puts each house through Stash.relistUnfound in every case of `args.cases` ({ visited, read }),
 -- then back as it was. Answers { name, case, relisted } for each, in order.
 handler("stashRelist", function(_, args, defer)
@@ -135,10 +144,7 @@ handler("stashRelist", function(_, args, defer)
     local restore = deferOnce(defer, function()
         for _, house in ipairs(houses) do
             house.building:setHasBeenVisited(house.visited)
-            alreadyRead:remove(house.name)
-            if house.read then
-                alreadyRead:add(house.name)
-            end
+            setRead(house.name, house.read)
         end
         -- Last, since marking a house visited drops it from the list.
         possible:clear()
@@ -152,10 +158,7 @@ handler("stashRelist", function(_, args, defer)
         for i, case in ipairs(args.cases) do
             removePossibleStash(name)
             building:setHasBeenVisited(case.visited)
-            alreadyRead:remove(name)
-            if case.read then
-                alreadyRead:add(name)
-            end
+            setRead(name, case.read)
             Stash.relistUnfound()
             table.insert(results, { name = name, case = i, relisted = isPossibleStash(name) })
         end
@@ -178,10 +181,7 @@ handler("stashKnownOnStart", function(_, _, defer)
         end
         -- stockFromStart unmarks a house it stocks, even one read before.
         for name, wasRead in pairs(read) do
-            alreadyRead:remove(name)
-            if wasRead then
-                alreadyRead:add(name)
-            end
+            setRead(name, wasRead)
         end
         Stash.relistUnfound()
     end)

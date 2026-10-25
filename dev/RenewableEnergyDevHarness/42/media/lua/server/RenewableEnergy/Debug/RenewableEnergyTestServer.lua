@@ -7,7 +7,7 @@ require "PZHarness/ServerHandlers"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local overlaysOf, squareAt, vehicleAt = Helpers.overlaysOf, Helpers.squareAt, Helpers.vehicleAt
+local overlaysOf, squareAt, vehicleAt, onVehicle = Helpers.overlaysOf, Helpers.squareAt, Helpers.vehicleAt, Helpers.onVehicle
 
 -- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll gives `args.rolls` until
 -- the test ends (Helpers.forceRolls).
@@ -145,11 +145,7 @@ handler("placePanel", function(player, args, defer)
     elseif args.built then
         panel = RenewableEnergy.WorldSpawns.buildEntity(square, args.sprite, RenewableEnergy.Wind.OnCreate)
     else
-        panel = IsoObject.new(square, args.sprite, "RenewableEnergy")
-        square:AddTileObject(panel)
-        if isServer() then
-            panel:transmitCompleteItemToClients()
-        end
+        panel = PZHarness.Fixtures.newTile(square, args.sprite)
         -- As placing does: the mod's OnObjectAdded handlers see the new tile.
         triggerEvent("OnObjectAdded", panel)
     end
@@ -180,8 +176,8 @@ handler("placePanel", function(player, args, defer)
 end)
 
 -- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
--- unless given), started as a player starts one if `args.running`, with a failsafe tile beside it
--- if `args.failsafe`. Both are removed when the test ends.
+-- unless given), started as a player starts one if `args.running`, with a failsafe tile on its
+-- square if `args.failsafe`. Both are removed when the test ends.
 handler("placeGenerator", function(_, args, defer)
     local square = squareAt(args)
     if not square then
@@ -193,12 +189,8 @@ handler("placeGenerator", function(_, args, defer)
     generator:setFuel(args.fuel or 10)
     generator:setCondition(100)
     if args.failsafe then
-        local failsafe = IsoObject.new(square, RenewableEnergy.Sprites.failsafe, "RenewableEnergy")
-        square:AddTileObject(failsafe)
+        local failsafe = PZHarness.Fixtures.newTile(square, RenewableEnergy.Sprites.failsafe)
         defer(function() PZHarness.Fixtures.removePlaced(failsafe) end)
-        if isServer() then
-            failsafe:transmitCompleteItemToClients()
-        end
     end
     if args.running then
         ISActivateGenerator.complete({ generator = generator, activate = true })
@@ -473,9 +465,9 @@ end)
 -- Takes the tile of `args.sprite` on the square at `args` away, as a player picking it up does,
 -- such as a fridge out of a bank's reach.
 handler("removeTile", function(_, args)
-    local object = PZHarness.Fixtures.objectWithSprite(squareAt(args), args.sprite)
+    local object, missing = Helpers.objectAt(args)
     if not object then
-        return nil, "a " .. tostring(args.sprite) .. " on the server"
+        return nil, missing
     end
     PZHarness.Fixtures.removePlaced(object)
     return {}
@@ -511,7 +503,7 @@ handler("takeFloorItems", function(_, args)
             end
             table.insert(items, { type = item:getFullType(), modData = modData,
                 uses = instanceof(item, "DrainableComboItem") and item:getCurrentUsesFloat() or nil })
-            square:transmitRemoveItemFromSquare(object)
+            Helpers.removeFloorItem(square, object)
         end
     end
     return { items = items }
@@ -606,10 +598,7 @@ handler("stormCrack", function(_, args, defer)
     local results = {}
     for i, trial in ipairs(args.trials) do
         local source = panelRecord(trial.source)
-        local roll = trial.roll
-        if roll == "under" or roll == "at" then
-            roll = PanelSource.stormChance(source, trial.hours) - (roll == "under" and Helpers.UNDER or 0)
-        end
+        local roll = Helpers.trialRoll(trial.roll, PanelSource.stormChance(source, trial.hours))
         local restore = Helpers.forceRolls(defer, { roll, 0 })
         results[i] = { cracked = PanelSource.stormCrack(source, trial.hours), modules = source.modules }
         restore()
@@ -750,7 +739,7 @@ end
 
 -- What the tests read of a vehicle: its battery, whether a maintainer is attached, whether its
 -- engine runs.
-local function vehicleState(vehicle)
+local function carState(vehicle)
     local _, battery = batteryOf(vehicle)
     return {
         battery = battery and { type = battery:getFullType(), uses = battery:getCurrentUsesFloat() } or nil,
@@ -759,29 +748,11 @@ local function vehicleState(vehicle)
     }
 end
 
--- Named apart from the arrow board tests' "vehicleState" (RenewableEnergyTestServerTrailer.lua):
--- one registry holds every handler, and the file loaded later wins.
-handler("carState", function(_, args)
-    local vehicle, missing = vehicleAt(args)
-    if not vehicle then return nil, missing end
-    return vehicleState(vehicle)
-end)
-
--- Registers the handler `name` on the vehicle `args.vehicle` names (RenewableEnergyTest.vehicleArgs):
--- `fn(vehicle, args)` runs once it is found.
-local function onCar(name, fn)
-    handler(name, function(_, args)
-        local vehicle, missing = vehicleAt(args.vehicle)
-        if not vehicle then
-            return nil, missing
-        end
-        return fn(vehicle, args)
-    end)
-end
+onVehicle("carState", carState)
 
 -- Puts a new `args.type` in the vehicle's battery slot if given, empties it if `args.empty`, and
 -- charges its battery to `args.uses` if given, sent to the clients.
-onCar("vehicleBattery", function(vehicle, args)
+onVehicle("vehicleBattery", function(vehicle, args)
     local part = batteryOf(vehicle)
     if not part then
         return nil, "a battery slot in the vehicle on the server"
@@ -795,13 +766,13 @@ onCar("vehicleBattery", function(vehicle, args)
         battery:setCurrentUsesFloat(args.uses)
         vehicle:transmitPartUsedDelta(part)
     end
-    return vehicleState(vehicle)
+    return carState(vehicle)
 end)
 
 -- `args.hours` of the maintainer on the vehicle at the sun of the moment, from a battery at
 -- `args.uses`: the Wh it added, the charge after, the battery's capacity in Wh, and flatWh as
 -- cellCharge answers it.
-onCar("maintainerCharge", function(vehicle, args)
+onVehicle("maintainerCharge", function(vehicle, args)
     local _, battery = batteryOf(vehicle)
     battery:setCurrentUsesFloat(args.uses)
     local wh = RenewableEnergy.SolarMaintainer.charge(vehicle, args.hours)
@@ -811,16 +782,16 @@ end)
 
 -- Marks a maintainer attached in the shape older saves hold, with the condition it went on with,
 -- which no code writes but detach must still take.
-onCar("oldMaintainerMark", function(vehicle, args)
+onVehicle("oldMaintainerMark", function(vehicle, args)
     local part = batteryOf(vehicle)
     part:getModData()[RenewableEnergy.SolarMaintainer.ATTACHED_KEY] = { condition = args.condition }
     vehicle:transmitPartModData(part)
-    return vehicleState(vehicle)
+    return carState(vehicle)
 end)
 
 -- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
 -- vehicle's battery charge before and after.
-onCar("chargeVehicles", function(vehicle, args)
+onVehicle("chargeVehicles", function(vehicle, args)
     local _, battery = batteryOf(vehicle)
     local before = battery:getCurrentUsesFloat()
     RenewableEnergy.GadgetCharging.chargeVehicles(args.hours)
@@ -829,7 +800,7 @@ end)
 
 -- Vanilla's headlight update (Vehicles.Update.Headlight) for `args.minutes` with the engine off,
 -- from a battery at `args.uses`: the share of a full charge it took.
-onCar("headlightDrain", function(vehicle, args)
+onVehicle("headlightDrain", function(vehicle, args)
     local headlight = vehicle:getPartById("HeadlightLeft")
     if not (headlight and headlight:getInventoryItem()) then
         return nil, "a left headlight on the vehicle on the server"
@@ -845,7 +816,7 @@ end)
 -- Vanilla's lightbar drain for `args.minutes` with the engine off, from a battery at `args.uses`:
 -- the battery's update runs it, there being no lightbar part (Vehicles.Update.Battery calls
 -- Vehicles.Update.Lightbar). Answers the share of a full charge it took.
-onCar("lightbarDrain", function(vehicle, args)
+onVehicle("lightbarDrain", function(vehicle, args)
     if not vehicle:hasLightbar() then
         return nil, "a lightbar on the vehicle on the server"
     end
@@ -860,7 +831,7 @@ end)
 -- Vanilla's alternator charging (Vehicles.Update.Battery) for `args.minutes` with the engine
 -- running, from a battery at `args.uses`: the share of a full charge it added. The engine is
 -- repaired and fuelled first, since it shuts down without fuel and stalls at random when worn.
-onCar("alternatorCharge", function(vehicle, args)
+onVehicle("alternatorCharge", function(vehicle, args)
     vehicle:repair()
     local tank = vehicle:getPartById("GasTank")
     if tank then

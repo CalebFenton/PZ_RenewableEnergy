@@ -50,9 +50,7 @@ end
 
 -- Queues setting the stink of a source on `square` to `count` corpses.
 local function stink(self, square, count)
-    local args = T.at(square)
-    args.key, args.count = "test", count
-    T.server(self, "stinkSet", args)
+    T.server(self, "stinkSet", T.at(square, { key = "test", count = count }))
 end
 
 -- Queues reading the corpse counts at which the game's smell levels start (Stink.LEVEL_CORPSES,
@@ -91,10 +89,6 @@ local function waitForSmell(self, level, label)
         return now == level or getTimestampMs() > deadline
     end, math.huge, "the smell moodle at " .. level)
     T.step(function() self.moodle[label] = T.player():getMoodles():getMoodleLevel(MoodleType.NOXIOUS_SMELL) end)
-end
-
-local function placeDigester(self, tile, opts)
-    return T.placeRecord(self, "digester", tile, opts)
 end
 
 -- Stink ------------------------------------------------------------------------------------------
@@ -259,7 +253,7 @@ test("renewable_energy_biogas_stink_gas_mask", {
 -- loads, and can be taken away after without the count going wrong. Single player only: a
 -- multiplayer server keeps the chunk loaded long after the character leaves.
 test("renewable_energy_biogas_stink_chunk_reload", {
-    spOnly = "the server keeps chunks loaded after the character leaves",
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 120,
     run = function(self)
         self.moodle = {}
@@ -289,12 +283,12 @@ test("renewable_energy_biogas_stink_chunk_reload", {
 -- at the second; an unfed one not at all; the Brick Dome never past the first, at its worst.
 test("renewable_energy_biogas_digester_stink_levels", {
     run = function(self)
-        local barrel = placeDigester(self, "barrel.MetalDrum")
-        local dome = barrel and placeDigester(self, "dome")
+        local barrel = T.placeRecord(self, "digester", "barrel.MetalDrum")
+        local dome = barrel and T.placeRecord(self, "digester", "dome")
         if not dome then return end
         -- Mid-startup, when the startup stinks most, full, its sludge at the top and sour.
-        local worst = T.sourDigester("dome")
-        worst.started, worst.startupHours, worst.seedHours, worst.sludge = false, getSandboxOptions():getCompostHours() / 2, 0, 100
+        local worst = T.sourDigester("dome", { started = false, startupHours = getSandboxOptions():getCompostHours() / 2, seedHours = 0,
+            sludge = 100 })
         T.batch(function()
             T.server(self, "stinkRead", T.at(barrel))
             T.server(self, "digesterCorpsesFor", {})
@@ -330,7 +324,7 @@ test("renewable_energy_biogas_digester_stink_levels", {
 -- shortens it by at most its share.
 test("renewable_energy_biogas_digester_startup_then_gas", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local needed = getSandboxOptions():getCompostHours()
         local edge, below = Digester.STARTUP_MIN_TEMP, Digester.STARTUP_MIN_TEMP - 1
@@ -377,7 +371,7 @@ test("renewable_energy_biogas_digester_startup_then_gas", {
 -- the same along the best stretch. The barrel follows the air within days.
 test("renewable_energy_biogas_digester_temperature", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local rows = Digester.K_BY_TEMP
         local best = 0
@@ -396,9 +390,7 @@ test("renewable_energy_biogas_digester_temperature", {
         local temps = { coldest, coldest + 1, hottest - 1, hottest, self.plateau[1], self.plateau[#self.plateau] }
         T.batch(function()
             for _, temp in ipairs(temps) do
-                local state = T.matureDigester("barrel")
-                state.temp, state.gas = temp, 0
-                T.setRecord(self, handle, state)
+                T.setRecord(self, handle, T.matureDigester("barrel", { temp = temp, gas = 0 }))
                 T.runDigester(self, handle, 1, temp)
                 T.readRecord(self, handle, "at" .. temp)
             end
@@ -425,13 +417,12 @@ test("renewable_energy_biogas_digester_temperature", {
 -- The Biogas Multiplier scales the gas a digester makes in proportion.
 test("renewable_energy_biogas_digester_multiplier_scales_gas", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local function runAt(multiplier, label)
             T.step(function() T.setSandbox(self, "BiogasMultiplier", multiplier) end)
             T.batch(function()
-                local state = T.matureDigester("barrel")
-                state.gas = 0
+                local state = T.matureDigester("barrel", { gas = 0 })
                 T.setRecord(self, handle, state)
                 T.runDigester(self, handle, 2, state.temp)
                 T.readRecord(self, handle, label)
@@ -451,13 +442,11 @@ test("renewable_energy_biogas_digester_multiplier_scales_gas", {
 -- below the share of the limit it recovers at. Wood ash fixes it whole, baking soda a use at a time.
 test("renewable_energy_biogas_digester_sour_and_fix", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local limit = Digester.ACID_LIMIT * Digester.TIERS.barrel.potentialCap
         local function set(share, sour)
-            local state = T.matureDigester("barrel")
-            state.acid, state.sour = share * limit, sour
-            T.setRecord(self, handle, state)
+            T.setRecord(self, handle, T.matureDigester("barrel", { acid = share * limit, sour = sour }))
         end
         -- An hour's decay takes far less acid than the step, so each side stays on its side.
         local step = 0.01
@@ -497,7 +486,7 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
 -- one item an hour until the tank holds its cap; manure eaten brings its head start.
 test("renewable_energy_biogas_digester_hopper_meters", {
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         self.digester = handle
         self.cow = Digester.feedOf(instanceItem(FEED))
@@ -546,11 +535,11 @@ test("renewable_energy_biogas_digester_hopper_meters", {
 -- when the chunk loads, what it ate has left the hopper. Single player only, as the chunk reload
 -- test.
 test("renewable_energy_biogas_digester_eats_while_unloaded", {
-    spOnly = "the server keeps chunks loaded after the character leaves",
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 120,
     run = function(self)
         local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local handle = stand and placeDigester(self, "barrel.MetalDrum", { near = stand, minDistance = 2 })
+        local handle = stand and T.placeRecord(self, "digester", "barrel.MetalDrum", { near = stand, minDistance = 2 })
         if not handle then return end
         T.fillRecord(self, handle, { hopper = { { type = FEED, count = 4 } } })
         -- Part of an hour already on the meter, so each whole hour away eats one item.
@@ -577,11 +566,10 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
 test("renewable_energy_biogas_digester_holder", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local bags = Digester.HOLDERS.bags
-        local overfull = T.matureDigester("barrel")
-        overfull.gas = bags.capacity + 0.1
+        local overfull = T.matureDigester("barrel", { gas = bags.capacity + 0.1 })
         T.batch(function()
             T.setRecord(self, handle, overfull)
             T.runDigester(self, handle, 1, 30)
@@ -620,7 +608,7 @@ test("renewable_energy_biogas_digester_holder", {
 test("renewable_energy_biogas_digester_sludge_into_bags", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local full, part = 3.5 * Digester.SLUDGE_PER_BAG, Digester.SLUDGE_PER_BAG / 2
         self.full = full
@@ -659,7 +647,7 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
 test("renewable_energy_biogas_digester_upgrade", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "barrel.MetalDrum")
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         self.digester = handle
         self.capacity = tonumber(getSprite(Sprites.digester.insulated):getProperties():get("ContainerCapacity"))
@@ -697,17 +685,6 @@ test("renewable_energy_biogas_digester_upgrade", {
     end,
 })
 
--- Whether this client's copy of the digester `object` holds the feed in its hopper.
-local function hopperHoldsFeed(object)
-    local items = object and object:getContainer():getItems()
-    for i = 0, (items and items:size() or 0) - 1 do
-        if items:get(i):getFullType() == FEED then
-            return true
-        end
-    end
-    return false
-end
-
 -- Queues, on this client's copy of the barrel digester `handle` showing the tile `tile`, what a
 -- player does with it, into self.views[label]: its status window's title, and whether its hopper
 -- took the cow dung they dragged in (the record's count, in self.reads[label]). Also whether its
@@ -732,7 +709,8 @@ local function useDrumDigester(self, handle, tile, label)
         window:close()
         ISTimedActionQueue.add(ISInventoryTransferAction:new(p, self.items[label][1], p:getInventory(), object:getContainer()))
     end)
-    T.waitFor(self, function() return hopperHoldsFeed(handle.object) end, "this client's hopper holding the dung")
+    T.waitFor(self, function() return handle.object and handle.object:getContainer():containsType(FEED) end,
+        "this client's hopper holding the dung")
     T.readRecord(self, handle, label)
 end
 
@@ -801,7 +779,7 @@ test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
 -- A digester built from a barrel loads whole from the save: its chunk unloaded and loaded again, it
 -- still opens and takes feed. Single player only, as the chunk reload test.
 test("renewable_energy_biogas_barrel_digester_reloads_whole", {
-    spOnly = "the server keeps chunks loaded after the character leaves",
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 120,
     instant = true,
     run = function(self)
@@ -828,27 +806,26 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
 -- status window opens on it and shows its state.
 test("renewable_energy_biogas_digester_menu", {
     run = function(self)
-        self.digester = placeDigester(self, "barrel.MetalDrum")
+        self.digester = T.placeRecord(self, "digester", "barrel.MetalDrum")
     end,
     validate = function(self)
         local object = self.digester.object
-        local submenu, context = T.worldSubmenu(object, getText("IGUI_RenewableEnergy_Digester_barrel"))
-        if T.expect(submenu ~= nil, "right-clicking a digester shows no digester submenu") then
-            local function option(job)
-                return submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_" .. job))
-            end
-            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_Status")) ~= nil, "no Status option")
-            local sludge = option(DigesterJobs.TAKE_SLUDGE)
+        local function job(name)
+            return getText("ContextMenu_RenewableEnergy_" .. name)
+        end
+        local options = T.worldOptions(object, getText("IGUI_RenewableEnergy_Digester_barrel"), { status = job("Status"),
+            sludge = job(DigesterJobs.TAKE_SLUDGE), vent = job(DigesterJobs.VENT), bags = job(DigesterJobs.REPLACE_BAGS),
+            tarp = job(DigesterJobs.SEW_TARP), upgrade = job(DigesterJobs.UPGRADE) })
+        if T.expect(options ~= nil, "right-clicking a digester shows no digester submenu") then
+            T.expect(options.status ~= nil, "no Status option")
+            local sludge = options.sludge
             T.expect(sludge and sludge.notAvailable and sludge.toolTip.description == getText("Tooltip_RenewableEnergy_NoSludge"),
                 "Take Sludge isn't greyed out for an empty digester")
-            T.expect(option(DigesterJobs.VENT) and option(DigesterJobs.VENT).notAvailable, "Vent Gas isn't greyed out with no gas")
-            T.expect(option(DigesterJobs.REPLACE_BAGS) ~= nil and option(DigesterJobs.SEW_TARP) ~= nil, "no holder options on a barrel")
-            local upgrade = option(DigesterJobs.UPGRADE)
+            T.expect(options.vent and options.vent.notAvailable, "Vent Gas isn't greyed out with no gas")
+            T.expect(options.bags ~= nil and options.tarp ~= nil, "no holder options on a barrel")
+            local upgrade = options.upgrade
             T.expect(upgrade and upgrade.notAvailable and upgrade.toolTip.description:find(getItemNameFromFullType("Base.Plank"), 1, true),
                 "Upgrade isn't greyed out listing its planks")
-        end
-        if context then
-            context:hideAndChildren()
         end
         T.standNextTo(object:getSquare())
         local window = RenewableEnergy.DigesterWindow:openOn(0, object)
@@ -872,13 +849,12 @@ end
 -- with what lighting takes given: the digester's handle, the heater's and the heater's square, or
 -- nil.
 local function fedDigesterAndHeater(self, facing)
-    local digester = placeDigester(self, "barrel.MetalDrum")
+    local digester = T.placeRecord(self, "digester", "barrel.MetalDrum")
     local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
     if not square then return nil end
-    local fed = T.matureDigester("barrel")
-    fed.gas = Digester.HOLDERS.bags.capacity
+    local fed = T.matureDigester("barrel", { gas = Digester.HOLDERS.bags.capacity })
     T.setRecord(self, digester, fed)
-    T.waitForSummary(self, digester, function(summary) return summary.gas == fed.gas end, "this client's summary of the gas")
+    T.waitForGas(self, digester, fed.gas)
     local heater = T.placeTile(self, square, Sprites.gasHeater.off[facing or "S"])
     T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
     return digester, heater, square
@@ -892,22 +868,19 @@ test("renewable_energy_biogas_heater_warms_digester", {
     -- A heavier burn, so hours of it stand out from the digester's own gas.
     sandbox = { GeneratorFuelConsumption = 1 },
     run = function(self)
-        local first = placeDigester(self, "barrel.MetalDrum")
+        local first = T.placeRecord(self, "digester", "barrel.MetalDrum")
         local square = first and T.square(self, { near = first.square }, "a square beside the digester for a heater")
-        local second = square and placeDigester(self, "barrel.MetalDrum", { near = square })
+        local second = square and T.placeRecord(self, "digester", "barrel.MetalDrum", { near = square })
         if not second then return end
         self.digesters = { first, second }
         self.rate = GasHeater.m3PerHour()
         -- Gas for more than the warming hours and less than the whole run.
         self.temp, self.gas = 5, 4.5 * self.rate
         if not T.need(self, self.gas < Digester.HOLDERS.bags.capacity, "bags that hold four and a half hours of the heater's gas") then return end
-        local cold = T.matureDigester("barrel")
-        cold.temp, cold.gas = self.temp, self.gas
+        local cold = T.matureDigester("barrel", { temp = self.temp, gas = self.gas })
         for _, handle in ipairs(self.digesters) do
             T.setRecord(self, handle, cold)
-            -- The summary rounds gas to hundredths.
-            T.waitForSummary(self, handle, function(summary) return math.abs(summary.gas - self.gas) <= 0.005 end,
-                "this client's summary of the gas")
+            T.waitForGas(self, handle, self.gas)
         end
         local heater = T.placeTile(self, square, Sprites.gasHeater.off.S)
         T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
@@ -1004,17 +977,16 @@ end
 test("renewable_energy_biogas_pump_fills_tank_to_limit", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "dome")
+        local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
         self.digester = handle
         self.gas = Digester.HOLDERS.dome.capacity
-        local full = T.matureDigester("dome")
-        full.gas = self.gas
+        local full = T.matureDigester("dome", { gas = self.gas })
         T.batch(function()
             T.setRecord(self, handle, full)
             T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
         end)
-        T.waitForSummary(self, handle, function(summary) return summary.gas == self.gas end, "this client's summary of the gas")
+        T.waitForGas(self, handle, self.gas)
         -- Room for half the gas under the pump's limit, so it stops there with gas left.
         self.pumped = math.min(self.gas, Digester.PUMP_FILL * Digester.M3_PER_TANK) / 2
         T.give(self, "tools", { { type = Digester.PUMP }, { type = Digester.TANK, uses = Digester.PUMP_FILL - self.pumped / Digester.M3_PER_TANK } })
@@ -1046,19 +1018,17 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
 test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
     instant = true,
     run = function(self)
-        local handle = placeDigester(self, "dome")
+        local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
         -- Less than the dome, the charge, the wool or the tank's room above the pump's share holds.
         self.gas = math.min(Digester.HOLDERS.dome.capacity, Digester.SCRUB_M3.lime, Digester.WOOL_M3,
             (1 - Digester.PUMP_FILL) * Digester.M3_PER_TANK) / 2
-        local full = T.matureDigester("dome")
-        full.gas = self.gas
-        T.setRecord(self, handle, full)
+        T.setRecord(self, handle, T.matureDigester("dome", { gas = self.gas }))
         -- A running generator powers the squares around it, outdoors too.
         if not T.generator(self, { near = handle.square, fuel = 10, running = true }) then return end
         T.give(self, "fill", { { type = Digester.COMPRESSOR }, { type = Digester.TANK, uses = Digester.PUMP_FILL } })
         waitForPower(self)
-        T.waitForSummary(self, handle, function(summary) return summary.gas == self.gas end, "this client's summary of the gas")
+        T.waitForGas(self, handle, self.gas)
         T.step(function()
             self.unscrubbed = DigesterJobs.refusal(T.player(), DigesterJobs.FILL_COMPRESSOR, handle.object, self.items.fill[2])
         end)
@@ -1181,11 +1151,9 @@ test("renewable_energy_biogas_propane_refill_from_floor_tank", {
         if not recipe then return end
         local here = T.player():getCurrentSquare()
         self.tankUses, self.bottleUses = 0.5, 0.5
-        local args = T.at(here)
-        args.type, args.uses = Digester.TANK, self.tankUses
         T.batch(function()
             T.give(self, "bottle", { { type = "Base.Propane_Refill", uses = self.bottleUses } })
-            T.server(self, "floorItem", args)
+            T.server(self, "floorItem", T.at(here, { type = Digester.TANK, uses = self.tankUses }))
         end)
         T.waitFor(self, function()
             self.tank = floorTank(here)

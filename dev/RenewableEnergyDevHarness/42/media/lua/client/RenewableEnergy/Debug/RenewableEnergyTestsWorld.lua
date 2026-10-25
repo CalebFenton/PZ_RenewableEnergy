@@ -20,9 +20,7 @@ local Wind, PowerBank = RenewableEnergy.Wind, RenewableEnergy.PowerBank
 
 -- Stash houses ----------------------------------------------------------------------------------
 
--- StashSystem gives up without an error when the stash building isn't a building, prepares only a
--- building whose bounds strictly contain the building square (doBuildingStash), and stocks the
--- crate only if its square is in a room of that building, so a wrong coordinate is an empty house.
+-- Every stash house resolves to a building and a room StashSystem can stock.
 serverCheck("renewable_energy_world_stash_houses_resolve", "stashHousesResolve")
 
 -- Unless Stash Houses is at None, the stashes join the list StashSystem reads, once however often
@@ -99,9 +97,7 @@ test("renewable_energy_world_known_on_start_stocks_and_stays_hidden", {
     end,
 })
 
--- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
--- and lies in vanilla's prepper caches; campers' glove boxes hold the trailer park's; and every
--- loot list a map names exists.
+-- Every map's corpse, cache, glove-box and loot-list targets exist.
 serverCheck("renewable_energy_world_prepper_map_targets", "prepperMapTargets")
 
 -- A map item of the mod's own shows the area of its stash house, found or not: its Map id is the
@@ -171,7 +167,7 @@ test("renewable_energy_world_bank_spawns_stocked", {
         T.batch(function()
             for i, stockName in ipairs(SPAWNED_BANKS) do
                 local square = squares[i]
-                T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = stockName })
+                T.server(self, "worldBank", T.at(square, { stock = stockName }))
                 T.step(function()
                     local bank = self.server.worldBank
                     bank.square, bank.stockName = square, stockName
@@ -214,7 +210,7 @@ test("renewable_energy_world_bank_spawn_refused_outdoors", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "shed" })
+        T.server(self, "worldBank", T.at(square, { stock = "shed" }))
     end,
     validate = function(self)
         expect(not self.server.worldBank.placed, "a bank was placed outdoors")
@@ -266,7 +262,7 @@ test("renewable_energy_world_bank_backs_onto_wall", {
         for i, back in ipairs(BACKS) do
             local square = picked[i]
             T.placeTile(self, getSquare(square:getX() + back.dx, square:getY() + back.dy, square:getZ()), back.wall)
-            T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "shed" })
+            T.server(self, "worldBank", T.at(square, { stock = "shed" }))
             T.step(function() self.placed[i] = self.server.worldBank.sprite end)
         end
     end,
@@ -319,7 +315,7 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
         T.batch(function()
             for i, stockName in ipairs(WORN_STOCKS) do
                 local square = squares[i]
-                T.server(self, "worldBank", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = stockName, roll = 0.5 })
+                T.server(self, "worldBank", T.at(square, { stock = stockName, roll = 0.5 }))
                 T.step(function()
                     self.banks[stockName] = self.server.worldBank
                     T.need(self, self.server.worldBank.placed, "a " .. stockName .. " bank")
@@ -361,9 +357,9 @@ test("renewable_energy_world_bank_modules_beside", {
         T.step(function()
             local chance = self.server.worldSpawnStock.banks.shed.modules.chance
             self.cases = {}
-            for i, roll in ipairs({ chance - 1e-9, chance }) do
+            for i, roll in ipairs({ chance - T.UNDER, chance }) do
                 local square = squares[i]
-                T.server(self, "bankModulesBeside", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "shed", roll = roll })
+                T.server(self, "bankModulesBeside", T.at(square, { stock = "shed", roll = roll }))
                 T.step(function() self.cases[i] = self.server.bankModulesBeside end)
             end
         end)
@@ -396,7 +392,7 @@ test("renewable_energy_world_crate_spawns_stocked", {
         local square = T.square(self, { indoors = true }, "a free indoor square")
         if not square then return end
         T.batch(function()
-            T.server(self, "worldCrate", { x = square:getX(), y = square:getY(), z = square:getZ(), stock = "kit" })
+            T.server(self, "worldCrate", T.at(square, { stock = "kit" }))
             T.server(self, "worldSpawnStock", { names = {}, crate = "kit" })
         end)
         T.waitFor(self, function()
@@ -437,7 +433,6 @@ serverCheck("renewable_energy_world_cracked_modules", "crackedModules")
 -- (SolarSites.addSite), then let the world place them as their chunks load. Near the start a trip
 -- away and back unloads the chunk and loads it again, which only single player does.
 
-local KEPT_LOADED = "the server keeps chunks loaded after the character leaves"
 -- Game minutes to let pass once a spot's chunk is back: a spot that waits goes down at the next.
 local SETTLE_MINUTES = 2
 -- The longest a wait on the game clock may take, in frames; the test's time limit comes first.
@@ -469,7 +464,7 @@ end
 -- again places nothing. Its pump's pole mount holds as many modules as its kind says, at site
 -- conditions, and players see it.
 test("renewable_energy_world_site_placed_once", {
-    spOnly = KEPT_LOADED,
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 240,
     run = function(self)
         T.setMultiplier(self, VISIT_SPEED)
@@ -479,8 +474,7 @@ test("renewable_energy_world_site_placed_once", {
         T.server(self, "siteArm", { at = at })
         reloadChunk(self, home, at)
         T.server(self, "sitePlaced", armedSpots)
-        T.server(self, "siteSpots", armedSpots)
-        T.step(function() self.first = self.server.siteSpots end)
+        T.serverInto(self, "first", "siteSpots", armedSpots)
         T.waitFor(self, function() return T.objectWithSprite(getSquare(at.x, at.y, at.z), Sprites.rack.metal.S) ~= nil end,
             "this client's copy of the site's rack")
         reloadChunk(self, home, at)
@@ -500,7 +494,7 @@ test("renewable_energy_world_site_placed_once", {
 -- places nothing, neither charger nor bank; with the table gone, the next load places both, the
 -- charger braked with its blades broken and wired to a plugged-in rack of tired batteries.
 test("renewable_energy_world_site_waits_for_a_free_square", {
-    spOnly = KEPT_LOADED,
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 240,
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -512,8 +506,7 @@ test("renewable_energy_world_site_waits_for_a_free_square", {
         T.step(function()
             local at = self.server.siteArm.at
             reloadChunk(self, home, at)
-            T.server(self, "siteSpots", armedSpots)
-            T.step(function() self.blocked = self.server.siteSpots end)
+            T.serverInto(self, "blocked", "siteSpots", armedSpots)
             T.server(self, "siteUnblock", at)
             reloadChunk(self, home, at)
             T.server(self, "sitePlaced", armedSpots)
@@ -531,11 +524,7 @@ test("renewable_energy_world_site_waits_for_a_free_square", {
     end,
 })
 
--- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
--- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
--- outdoors with a facing, a wind charger within reach of its bank, a generator within reach of its
--- gas source; each site has a unique name, a known kind, and the spots its kind uses; and every
--- site a world that rolled all sites at once stands for is still one by that name.
+-- Every site's spots make sense on the map, and every site name a world rolled stays one.
 serverCheck("renewable_energy_world_sites_placed_sensibly", "sitesPlacedSensibly")
 
 -- A world rolls each site once by its name: a world saved while every site was rolled at once
@@ -769,8 +758,7 @@ test("renewable_energy_world_sites_placed_on_visit", {
             names[i] = place[1]
         end
         self.start, self.visits = startVisits(self), {}
-        T.server(self, "sitesArm", { names = names })
-        T.step(function() self.armed = self.server.sitesArm end)
+        T.serverInto(self, "armed", "sitesArm", { names = names })
         for i, place in ipairs(VISITED_SITES) do
             local name, x, y = place[1], place[2], place[3]
             local visit = {}
@@ -862,8 +850,7 @@ test("renewable_energy_world_site_garden_lights_promised", {
         T.step(function() self.teleportTo(self.edge.x + 0.5, self.edge.y + 0.5, 0) end)
         T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, "the house loaded at the edge", VISIT_FRAMES)
         waitGameMinutes(self, SETTLE_MINUTES)
-        T.server(self, "gardenLightsHouse", { x = x, y = y })
-        T.step(function() self.atEdge = self.server.gardenLightsHouse end)
+        T.serverInto(self, "atEdge", "gardenLightsHouse", { x = x, y = y })
         T.step(function() self.teleportTo(x + 0.5, y + 0.5, 0) end)
         T.serverUntil(self, "gardenLightsHouse", { x = x, y = y }, function(at) return at.rolled end, ROLL_MS)
         local function args() return { name = name, spots = self.server.sitesArm[name].spots } end
@@ -899,7 +886,7 @@ local function rollFind(self, kind, isObject, recordKind)
     T.server(self, "ruralFind", { kind = kind })
     T.step(function()
         local at = self.server.ruralFind.at
-        self.find = { x = at.x, y = at.y, z = at.z, square = getSquare(at.x, at.y, at.z), kind = recordKind }
+        self.find = T.at(at, { square = getSquare(at.x, at.y, at.z), kind = recordKind })
     end)
     T.waitFor(self, function()
         local find = self.find
@@ -930,8 +917,7 @@ test("renewable_energy_world_rural_wind_charger", {
             local bank = T.bank(self, "batteryRackWood", { "Base.CarBattery1", "RenewableEnergy.PlugInInverter",
                 "RenewableEnergy.ChargeController" }, { near = find.square })
             if not bank then return end
-            T.perform(self, "connectSource", { bank = bank.position, source = T.at(find) })
-            T.step(function() self.connected = self.server.perform end)
+            T.performInto(self, "connected", "connectSource", { bank = bank.position, source = T.at(find) })
             T.give(self, "blades", { { type = "RenewableEnergy.WoodenBlades" } })
             -- Replacing the blades takes light to see by, and the square the character was moved to
             -- out here lights up some frames after they arrive.
@@ -1026,10 +1012,7 @@ test("renewable_energy_world_rural_gasifier", {
             end)
             T.waitForSummary(self, find, function(summary) return summary.hopperKg > 0 and summary.ash == 0 end,
                 "this client's summary of the cleaned, stocked gasifier")
-            T.step(function()
-                T.giveMaterials(self, "light", GasifierJobs.materials(GasifierJobs.LIGHT, T.recordSummary(find)))
-            end)
-            T.gasJob(self, "gasifier", find, GasifierJobs.LIGHT)
+            T.lightGasifier(self, find)
             T.readRecord(self, find, "lit")
         end)
     end,
@@ -1154,7 +1137,7 @@ test("renewable_energy_world_bank_rooms_seen_first_time", {
         for i, entry in ipairs(SEEN_ROOMS) do
             trials[i] = entry.trial
         end
-        T.server(self, "seenRoom", { x = square:getX(), y = square:getY(), z = square:getZ(), trials = trials })
+        T.server(self, "seenRoom", T.at(square, { trials = trials }))
     end,
     validate = function(self)
         for i, entry in ipairs(SEEN_ROOMS) do

@@ -21,7 +21,7 @@ require "RenewableEnergy/Debug/RenewableEnergyLoot"
 RenewableEnergyTest = setmetatable({}, { __index = PZHarness.Test })
 local T = RenewableEnergyTest
 
-local PowerBank, Sprites = RenewableEnergy.PowerBank, RenewableEnergy.Sprites
+local PowerBank = RenewableEnergy.PowerBank
 local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
 
 -- The longest a fixture waits for the server's copies, in ticks. A multiplayer server sends them
@@ -37,13 +37,19 @@ local function squareOf(near)
 end
 
 --- The { x, y, z } of a handle (its x, y, z, else its square) or a square, the form the server
---- handlers take.
-function T.at(handleOrSquare)
+--- handlers take, with `fields`' fields added.
+function T.at(handleOrSquare, fields)
+    local at
     if type(handleOrSquare) == "table" and handleOrSquare.x then
-        return { x = handleOrSquare.x, y = handleOrSquare.y, z = handleOrSquare.z }
+        at = { x = handleOrSquare.x, y = handleOrSquare.y, z = handleOrSquare.z }
+    else
+        local square = squareOf(handleOrSquare)
+        at = { x = square:getX(), y = square:getY(), z = square:getZ() }
     end
-    local square = squareOf(handleOrSquare)
-    return { x = square:getX(), y = square:getY(), z = square:getZ() }
+    for key, value in pairs(fields or {}) do
+        at[key] = value
+    end
+    return at
 end
 
 --- A free square as T.squares picks one by `opts`, whose `near` may also be a fixture handle; nil,
@@ -70,6 +76,58 @@ end
 --- either side of a chance (Chance.hit) in one try each.
 function T.forceRoll(self, rolls)
     T.server(self, "forceRoll", { rolls = rolls })
+end
+
+--- How far below a chance a roll that just hits it falls: the server's Helpers.UNDER, for rolls
+--- this client works out.
+T.UNDER = 1e-9
+
+--- The reason a test of a chunk that unloads and loads again runs in single player only.
+T.CHUNK_RELOAD_SP_ONLY = "the server keeps chunks loaded after the character leaves"
+
+--- Queues the server handler `name` with `args` and leaves its answer in self[key].
+function T.serverInto(self, key, name, args)
+    T.server(self, name, args)
+    T.step(function() self[key] = self.server[name] end)
+end
+
+--- Queues the server handler `name` with `args` and puts its answer in self.reads[label], if given.
+function T.read(self, name, args, label)
+    T.server(self, name, args)
+    if label then
+        T.step(function()
+            self.reads = self.reads or {}
+            self.reads[label] = self.server[name]
+        end)
+    end
+end
+
+--- Expects a server check's answer ({ failures = { message, ... } }) to have found nothing wrong.
+function T.expectNoFailures(answer)
+    for _, failure in ipairs(answer and answer.failures or { "the check never answered" }) do
+        T.expect(false, failure)
+    end
+end
+
+--- Registers a test that runs the server check `name` with `args`, under the sandbox options
+--- `sandbox` if given, and expects it to find nothing wrong.
+function T.serverCheck(testName, name, args, sandbox)
+    T.test(testName, {
+        sandbox = sandbox,
+        run = function(self) T.server(self, name, args) end,
+        validate = function(self) T.expectNoFailures(self.server[name]) end,
+    })
+end
+
+--- Fails the test unless timed actions take their time, for a test that times one.
+function T.needActionTime(self)
+    return T.need(self, not T.player():isTimedActionInstant(),
+        "the debug option Cheats > Timed Action > Instant off, which makes every action instant")
+end
+
+--- Expects the character to stand in the dark (IsoPlayer.tooDarkToRead), as T.makeDark leaves them.
+function T.expectDark()
+    return T.expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands")
 end
 
 --- The first `fullType` this client's character carries, in any bag, or nil.
@@ -118,9 +176,8 @@ function T.bank(self, kind, items, opts)
     local bank = { square = square, position = T.at(square) }
     local count = #(items or {})
     local connected = opts.connected ~= false
-    local args = T.at(square)
-    args.kind, args.facing, args.items, args.charge, args.connected = kind, opts.facing, items, opts.charge, connected
-    T.server(self, "placeBank", args)
+    T.server(self, "placeBank",
+        T.at(square, { kind = kind, facing = opts.facing, items = items, charge = opts.charge, connected = connected }))
     T.waitFor(self, function()
         bank.object = bankCopy(square, count)
         return bank.object ~= nil and bank.object:isConnected() == connected
@@ -155,10 +212,8 @@ function T.panel(self, sprite, opts)
     end
     local panel = { square = square, position = T.at(square) }
     local bank = opts.connect and opts.near
-    local args = T.at(square)
-    args.sprite, args.modules, args.bank, args.wired = sprite, opts.modules, bank and bank.position, opts.wired
-    args.built, args.broken = opts.built, opts.broken
-    T.server(self, "placePanel", args)
+    T.server(self, "placePanel", T.at(square, { sprite = sprite, modules = opts.modules, bank = bank and bank.position,
+        wired = opts.wired, built = opts.built, broken = opts.broken }))
     T.step(function()
         panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason
     end)
@@ -189,7 +244,7 @@ end
 
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
 --- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
---- beside it if `opts.failsafe`. When the test ends the server removes it and this client lets go
+--- on its square if `opts.failsafe`. When the test ends the server removes it and this client lets go
 --- of its squares (RenewableEnergy.PowerBank.releaseGeneratorPower). Returns { x, y, z, square, object }.
 function T.generator(self, opts)
     opts = opts or {}
@@ -198,11 +253,8 @@ function T.generator(self, opts)
     if not square then
         return nil
     end
-    local handle = T.at(square)
-    handle.square = square
-    local args = T.at(square)
-    args.fuel, args.running, args.failsafe = opts.fuel, opts.running, opts.failsafe
-    T.server(self, "placeGenerator", args)
+    local handle = T.at(square, { square = square })
+    T.server(self, "placeGenerator", T.at(square, { fuel = opts.fuel, running = opts.running, failsafe = opts.failsafe }))
     T.step(function()
         -- A multiplayer client lets its chunks go of the squares the generator powered before the
         -- server's undo switches it off and removes it. That switch-off can miss this client's copy:
@@ -220,6 +272,25 @@ function T.generator(self, opts)
         return handle.object ~= nil
     end, "this client's copy of the generator")
     return handle
+end
+
+--- Queues a read of the generator `generator` (a T.generator handle) into self.reads[label]:
+--- running, fuel, condition, its bill, its kit's state, whether the gas pass lists it, its
+--- overlays, its building's toxicity, the world hour.
+function T.readGenerator(self, generator, label)
+    T.read(self, "generatorRead", T.at(generator), label)
+end
+
+--- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and,
+--- with `fields.rebuild`, having vanilla rebuild the bills of the generators reaching it. A rebuild
+--- happens in the generators' next update, which a multiplayer server runs on its own clock, so the
+--- wait is for a later server frame rather than a count of this client's ticks; the shares Payers
+--- sets after a rebuild stand by then too.
+function T.setGenerator(self, generator, fields)
+    T.server(self, "generatorSet", T.at(generator, { pour = fields.pour, running = fields.running, rebuild = fields.rebuild }))
+    if fields.rebuild then
+        T.serverUntil(self, "worldFrame", {}, function(now) return now.frame > self.server.generatorSet.frame end)
+    end
 end
 
 --- Queues a job at `square`: the character goes next to it unless it already stands where the
@@ -270,16 +341,31 @@ function T.vehicleBattery(vehicle)
     return part and part:getInventoryItem()
 end
 
+--- Queues the server handler `name` on the vehicle with `args` (a table, or a function called
+--- when the call goes out); leaves its answer in vehicle.answer and any state in vehicle.state.
+function T.onVehicle(self, vehicle, name, args)
+    local function allArgs()
+        local all = T.vehicleArgs(vehicle)
+        for key, value in pairs(type(args) == "function" and args() or args or {}) do
+            all[key] = value
+        end
+        return all
+    end
+    -- Queued once the vehicle is placed, the call can go out ahead of its turn (T.server, T.batch).
+    T.server(self, name, (vehicle.id and type(args) ~= "function") and allArgs() or allArgs)
+    T.step(function()
+        vehicle.answer = self.server[name]
+        vehicle.state = vehicle.answer.state or vehicle.state
+    end)
+end
+
 --- The shared T.placeVehicle, then, on the server, the battery replaced by a new `opts.battery`
 --- and charged to `opts.charge`, and a wait until this client's copy has that battery.
 function T.placeVehicle(self, script, opts)
     opts = opts or {}
-    local vehicle = PZHarness.Test.placeVehicle(self, script,
-        { square = opts.square, near = opts.near, facing = opts.facing, args = opts.args })
+    local vehicle = PZHarness.Test.placeVehicle(self, script, opts)
     if opts.battery or opts.charge then
-        T.server(self, "vehicleBattery", function()
-            return { vehicle = T.vehicleArgs(vehicle), type = opts.battery, uses = opts.charge }
-        end)
+        T.onVehicle(self, vehicle, "vehicleBattery", { type = opts.battery, uses = opts.charge })
         T.waitFor(self, function()
             local item = T.vehicleBattery(vehicle)
             return item ~= nil and (not opts.battery or item:getFullType() == opts.battery)
@@ -393,24 +479,14 @@ function T.stateItem(state, fullType)
     end
 end
 
--- The first entry of a bank state's status sources that `matches`, or nil.
-local function stateSource(state, matches)
+--- The status entry of the source at `position` in a bank state, or nil.
+function T.stateSource(state, position)
     for _, source in ipairs(state and state.status and state.status.sources or {}) do
-        if matches(source) then
+        if PowerBank.samePosition(source, position) then
             return source
         end
     end
     return nil
-end
-
---- The status entry of the source at `position` in a bank state, or nil.
-function T.stateSource(state, position)
-    return stateSource(state, function(source) return PowerBank.samePosition(source, position) end)
-end
-
---- The status entry of the first source of `kind` in a bank state, or nil.
-function T.stateSourceOfKind(state, kind)
-    return stateSource(state, function(source) return source.kind == kind end)
 end
 
 --- The first `fullType` in this client's copy of `bank` (a handle), or nil.
@@ -434,13 +510,23 @@ end
 
 --- Queues T.perform and leaves its answer in self[key].
 function T.performInto(self, key, command, args, item)
-    T.perform(self, command, args, item)
-    T.step(function() self[key] = self.server.perform end)
+    T.serverInto(self, key, "perform", { command = command, args = args, item = item })
 end
 
 --- Checks that the panel fixture `panel` connected, saying why not.
 function T.expectConnected(panel)
     return T.expect(panel.connected, "connecting the panel failed (" .. tostring(panel.reason) .. ")")
+end
+
+--- Checks that the command answer `answer` ({ ok, reason }) succeeded: "`what` failed (reason)".
+function T.expectOk(answer, what)
+    return T.expect(answer ~= nil and answer.ok == true, what .. " failed (" .. tostring(answer and answer.reason) .. ")")
+end
+
+--- Checks that the command answer `answer` was refused for `reason`: "`what` (reason)" if not.
+function T.expectRefused(answer, reason, what)
+    local got = answer and answer.reason
+    return T.expect(answer ~= nil and answer.ok ~= true and got == reason, what .. " (" .. tostring(got) .. ")")
 end
 
 --- Queues switching `bank` on with the bank system's command, and a wait until this client's
@@ -487,6 +573,46 @@ function T.optionState(option)
     return { shown = true, greyed = option.notAvailable == true, reason = T.tooltipOf(option) }
 end
 
+--- The option `name` that `build(0, context, object)` (a Menu.add*Options) adds to a fresh context
+--- menu, or nil; the menu is hidden again.
+function T.menuOption(build, object, name)
+    local context = T.newContext()
+    local option = T.optionNamed(build(0, context, object), name)
+    context:hideAndChildren()
+    return option
+end
+
+--- The options of the submenu `label` in vanilla's right-click menu for `object`, by the keys of
+--- `names` ({ key = option name }), each nil when not offered; nil without the submenu. The menu
+--- is hidden again.
+function T.worldOptions(object, label, names)
+    local submenu, context = T.worldSubmenu(object, label)
+    local options = submenu and {}
+    for key, name in pairs(submenu and names or {}) do
+        options[key] = submenu:getOptionFromName(name)
+    end
+    if context then
+        context:hideAndChildren()
+    end
+    return options
+end
+
+--- The panel's Connect to `bank` (`one`) and the bank's Connect Sources in Reach with `loose`
+--- sources in its reach (`all`), read from fresh menus on this client's copies, as T.optionState.
+function T.connectOptions(bank, panel, loose)
+    local Menu, Format = RenewableEnergy.Menu, RenewableEnergy.Format
+    local context = T.newContext()
+    local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
+    local bankMenu = Menu.addBankOptions(0, context, bank.object)
+    local options = {
+        one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
+            Menu.bankLabel(bank.object), Format.away(panel.position, bank.position)))),
+        all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
+    }
+    context:hideAndChildren()
+    return options
+end
+
 --- Stands the character next to `square` so vanilla's walkAdj has nowhere to go, then makes that
 --- walk, as the menu does before an action: a multiplayer server refuses a job from afar.
 function T.walkTo(self, square, what)
@@ -507,10 +633,15 @@ end
 
 -- Crafting -------------------------------------------------------------------------------------
 
+-- `name` in snake case, for test names: "HomesteadPowerMag1" -> "homestead_power_mag1".
+local function snake(name)
+    return string.lower((name:gsub("(%l)(%u)", "%1_%2"):gsub("(%d)(%u)", "%1_%2")))
+end
+
 --- The test name for `recipe` in `system`'s tests: "solar", "RenewableEnergy_TakeApartSolarCellCharger",
 --- "returns_x" -> "renewable_energy_solar_craft_take_apart_solar_cell_charger_returns_x".
 function T.craftName(system, recipe, behavior)
-    return "renewable_energy_" .. system .. "_craft_" .. T.snake((recipe:gsub("^RenewableEnergy_", "")))
+    return "renewable_energy_" .. system .. "_craft_" .. snake((recipe:gsub("^RenewableEnergy_", "")))
         .. (behavior and "_" .. behavior or "")
 end
 
@@ -541,61 +672,32 @@ function T.carriedFirst(self, fullType)
     return T.carriedItems(self, fullType)[1]
 end
 
---- The authority's litres of `fluid` from the last T.readCarried, or nil.
-function T.carriedLitres(self, fluid)
-    return self.server.carried and self.server.carried.fluids[fluid]
-end
-
---- Queues setting the repair count of the carried `fullType` items on the authority, and a wait
---- until this client's copy has it: the craft reads this client's copy.
-function T.setRepaired(self, fullType, repaired)
-    T.server(self, "setRepaired", { type = fullType, repaired = repaired })
+--- Queues a wait until this client's copy of the carried `fullType` has been repaired `repaired`
+--- times: the craft and the tooltip read this client's copy.
+function T.waitForRepaired(self, fullType, repaired)
     T.waitFor(self, function()
         local item = T.carried(fullType)
         return item ~= nil and item:getHaveBeenRepaired() == repaired
     end, "this client's " .. fullType .. " repaired " .. repaired .. "x")
 end
 
--- Data -----------------------------------------------------------------------------------------
-
---- `name` in snake case, for test names: "HomesteadPowerMag1" -> "homestead_power_mag1".
-function T.snake(name)
-    return string.lower((name:gsub("(%l)(%u)", "%1_%2"):gsub("(%d)(%u)", "%1_%2")))
+--- Queues setting the repair count of the carried `fullType` items on the authority, and a wait
+--- until this client's copy has it.
+function T.setRepaired(self, fullType, repaired)
+    T.server(self, "setRepaired", { type = fullType, repaired = repaired })
+    T.waitForRepaired(self, fullType, repaired)
 end
 
--- Every placed tile: the item picking it up gives, what Sprites.kindOf reports, and whether it
--- holds items.
-T.PLACED_TILES = {
-    { sprite = Sprites.flat, item = "RenewableEnergy.SolarFlat", kind = "flat" },
-    { sprite = Sprites.failsafe, item = "RenewableEnergy.SolarFailsafe", kind = "failsafe" },
-    { sprite = Sprites.cellCharger, item = RenewableEnergy.SolarCellCharger.ITEM, kind = "cellCharger", container = true },
-    { sprite = Sprites.gardenLight.off, item = RenewableEnergy.SolarGardenLight.ITEM, kind = "gardenLight" },
-    { sprite = Sprites.gardenLight.lit, item = RenewableEnergy.SolarGardenLight.ITEM, kind = "gardenLight" },
-}
-for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
-    for _, mount in ipairs({ "wall", "rack" }) do
-        local item = "RenewableEnergy.Solar" .. (mount == "wall" and "Wall" or "Rack") .. suffix
-        for facing, sprite in pairs(Sprites[mount][material]) do
-            table.insert(T.PLACED_TILES, { sprite = sprite, item = item, kind = mount, facing = facing, material = material })
-        end
-    end
-    for _, tier in ipairs({ "Box", "Rack", "Bank" }) do
-        local field = "battery" .. tier .. suffix
-        for facing, sprite in pairs(Sprites[field]) do
-            table.insert(T.PLACED_TILES, { sprite = sprite, item = "RenewableEnergy.Battery" .. tier .. suffix,
-                kind = field, facing = facing, material = material, container = true })
-        end
-    end
+--- The condition at `share` of `fullType`'s ConditionMax, such as a Specs.crackLooks threshold.
+function T.conditionAt(fullType, share)
+    return math.floor(share * RenewableEnergy.conditionMaxOf(fullType) + 0.5)
 end
--- The fixed tiles a save's banks may stand on (Sprites.fixedTiles), each as its turnable twin.
-for fixed, twin in pairs(Sprites.fixedTiles) do
-    for _, placed in ipairs(T.PLACED_TILES) do
-        if placed.sprite == twin then
-            table.insert(T.PLACED_TILES, { sprite = fixed, item = placed.item, kind = placed.kind, facing = placed.facing,
-                material = placed.material, container = placed.container })
-            break
-        end
-    end
+
+--- The most a seal brings a `fullType` module sealed `repaired` times before to: its
+--- Recipes.MODULE_REPAIR_CAP, a Recipes.REPAIR_LIMIT_STEP lower for each seal.
+function T.sealCap(fullType, repaired)
+    local Recipes = RenewableEnergy.Recipes
+    return Recipes.MODULE_REPAIR_CAP[fullType] - Recipes.REPAIR_LIMIT_STEP * repaired
 end
 
 -- How far the character goes for a chunk to unload, and the longest that and its loading again

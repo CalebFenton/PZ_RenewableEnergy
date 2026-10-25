@@ -152,11 +152,6 @@ local function modelFor(condition)
     return look and MODEL_OF_LOOK[look] or "Whole"
 end
 
--- The condition at a share of the module's ConditionMax, such as a Specs.crackLooks threshold.
-local function conditionAt(share)
-    return math.floor(share * RenewableEnergy.conditionMaxOf(MODULE) + 0.5)
-end
-
 -- A found arrow board: a module on each panel at found conditions, each showing its model, to
 -- players too; a box of stock batteries in the stock count, no modules, at most one controller;
 -- and it spawns in junkyards and traffic jams.
@@ -1043,7 +1038,7 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
         if not spawnTrailer(self) then return end
         local trailer, p = self.trailer, player()
         local looks = RenewableEnergy.Specs.crackLooks
-        self.offAt, self.onAt = conditionAt(looks.heavyBelow) - 1, conditionAt(looks.lightBelow)
+        self.offAt, self.onAt = T.conditionAt(MODULE, looks.heavyBelow) - 1, T.conditionAt(MODULE, looks.lightBelow)
         setPartSkills(self, trailer, LEFT, "uninstall")
         if isClient() then
             T.setMechanicsCheat(self, true)
@@ -1112,7 +1107,7 @@ test("renewable_energy_world_arrow_board_panels_crack", {
         local Specs = RenewableEnergy.Specs
         self.whole = RenewableEnergy.conditionMaxOf(MODULE)
         -- Half a crack above the heavy look, so a crack takes it below.
-        self.light = conditionAt(Specs.crackLooks.heavyBelow) + math.floor(Specs.storm.crack / 2)
+        self.light = T.conditionAt(MODULE, Specs.crackLooks.heavyBelow) + math.floor(Specs.storm.crack / 2)
         batchOnTrailer(function()
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.whole },
                 [RIGHT] = { type = MODULE, condition = self.light } } })
@@ -1406,12 +1401,6 @@ local function sealPanel(trailer)
     end)
 end
 
--- The most a seal brings a factory module sealed `repaired` times before to (Recipes.sealLimit).
-local function sealCap(repaired)
-    local Recipes = RenewableEnergy.Recipes
-    return Recipes.MODULE_REPAIR_CAP[MODULE] - Recipes.REPAIR_LIMIT_STEP * repaired
-end
-
 -- Sets the character's skills to Seal Cracked Module's required levels.
 local function setSealSkills(self)
     T.setRecipeSkills(self, RenewableEnergy.Recipes.moduleRepairRecipe())
@@ -1439,11 +1428,11 @@ local function repairTest(name, repaired, fromBelowCap)
         run = function(self)
             if not spawnTrailer(self) then return end
             local trailer = self.trailer
-            self.from = fromBelowCap(sealCap(repaired))
-            self.to = math.min(sealCap(repaired), self.from + RenewableEnergy.Recipes.MODULE_REPAIR)
+            self.from = fromBelowCap(T.sealCap(MODULE, repaired))
+            self.to = math.min(T.sealCap(MODULE, repaired), self.from + RenewableEnergy.Recipes.MODULE_REPAIR)
             self.epoxyNeeded = sealEpoxyUses()
             setSealSkills(self)
-            self.wholeAt = conditionAt(RenewableEnergy.Specs.crackLooks.lightBelow)
+            self.wholeAt = T.conditionAt(MODULE, RenewableEnergy.Specs.crackLooks.lightBelow)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.wholeAt } } })
             waitForPanelsCopy(self, trailer)
             T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.sealablePanel(trailer.vehicle, LEFT) ~= nil end)
@@ -1507,7 +1496,7 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
         setSealSkills(self)
-        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = sealCap(0) - 1 } } })
+        T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = T.sealCap(MODULE, 0) - 1 } } })
         waitForPanelsCopy(self, trailer)
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
         T.step(function() self.lit = sealPanelOption(trailer.vehicle) end)
@@ -1656,7 +1645,7 @@ test("renewable_energy_world_arrow_board_second_panel_cracked_roll", {
 })
 
 -- A found battery box holds a charge controller on a roll just under STOCK.controllerChance × the
--- Misc loot option and none at it: 0.75 at an option of 1, 0.375 at 0.5.
+-- Misc loot option and none at it.
 test("renewable_energy_world_arrow_board_box_controller_roll", {
     run = function(self)
         T.server(self, "arrowBoardControllerRolls", { trials = {
@@ -1681,6 +1670,7 @@ test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
     run = function(self)
         local trailer = spawnTrailer(self, { repair = true })
         if not trailer then return end
+        -- serverUntil sends its args as they are, so they carry the trailer's own.
         local function lampsArgs()
             local args = T.vehicleArgs(trailer)
             args.hours, args.night = 0, true

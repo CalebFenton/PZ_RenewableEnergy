@@ -18,7 +18,41 @@ local PowerBank, SolarGardenLight = RenewableEnergy.PowerBank, RenewableEnergy.S
 
 local MATERIALS = { "wood", "metal" }
 
-local PLACED = T.PLACED_TILES
+-- Every placed tile: the item picking it up gives, what Sprites.kindOf reports, and whether it
+-- holds items.
+local PLACED = {
+    { sprite = Sprites.flat, item = "RenewableEnergy.SolarFlat", kind = "flat" },
+    { sprite = Sprites.failsafe, item = "RenewableEnergy.SolarFailsafe", kind = "failsafe" },
+    { sprite = Sprites.cellCharger, item = RenewableEnergy.SolarCellCharger.ITEM, kind = "cellCharger", container = true },
+    { sprite = Sprites.gardenLight.off, item = SolarGardenLight.ITEM, kind = "gardenLight" },
+    { sprite = Sprites.gardenLight.lit, item = SolarGardenLight.ITEM, kind = "gardenLight" },
+}
+for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
+    for _, mount in ipairs({ "wall", "rack" }) do
+        local item = "RenewableEnergy.Solar" .. (mount == "wall" and "Wall" or "Rack") .. suffix
+        for facing, sprite in pairs(Sprites[mount][material]) do
+            table.insert(PLACED, { sprite = sprite, item = item, kind = mount, facing = facing, material = material })
+        end
+    end
+    for _, tier in ipairs({ "Box", "Rack", "Bank" }) do
+        local field = "battery" .. tier .. suffix
+        for facing, sprite in pairs(Sprites[field]) do
+            table.insert(PLACED, { sprite = sprite, item = "RenewableEnergy.Battery" .. tier .. suffix,
+                kind = field, facing = facing, material = material, container = true })
+        end
+    end
+end
+-- The fixed tiles a save's banks may stand on (Sprites.fixedTiles), each as its turnable twin.
+for fixed, twin in pairs(Sprites.fixedTiles) do
+    for _, placed in ipairs(PLACED) do
+        if placed.sprite == twin then
+            table.insert(PLACED, { sprite = fixed, item = placed.item, kind = placed.kind, facing = placed.facing,
+                material = placed.material, container = placed.container })
+            break
+        end
+    end
+end
+
 
 -- Every overlay tile Sprites.lua names.
 local function overlays()
@@ -317,13 +351,12 @@ test("renewable_energy_tiles_bank_scraps_to_parts", {
 -- at 9. A stove, which vanilla also cuts up as a Fridge, has none. Each case: what is cut up, the
 -- Metalworking level, the roll, whether it is another tile of the fridge, and the compressors.
 local FRIDGE, STOVE = "appliances_refrigeration_01_0", "appliances_cooking_01_0"
-local UNDER = 1e-9
 local COMPRESSOR_CASES = {
-    { "a fridge at Metalworking 0, rolling just under 10%", FRIDGE, 0, 0.1 - UNDER, false, 1 },
+    { "a fridge at Metalworking 0, rolling just under 10%", FRIDGE, 0, 0.1 - T.UNDER, false, 1 },
     { "a fridge at Metalworking 0, rolling 10%", FRIDGE, 0, 0.1, false, 0 },
-    { "a fridge at Metalworking 4, rolling just under 50%", FRIDGE, 4, 0.5 - UNDER, false, 1 },
+    { "a fridge at Metalworking 4, rolling just under 50%", FRIDGE, 4, 0.5 - T.UNDER, false, 1 },
     { "a fridge at Metalworking 4, rolling 50%", FRIDGE, 4, 0.5, false, 0 },
-    { "a fridge at Metalworking 9, on the highest roll", FRIDGE, 9, 1 - UNDER, false, 1 },
+    { "a fridge at Metalworking 9, on the highest roll", FRIDGE, 9, 1 - T.UNDER, false, 1 },
     { "a fridge's other tile, on the lowest roll", FRIDGE, 9, 0, true, 0 },
     { "a stove, on the lowest roll", STOVE, 9, 0, false, 0 },
 }
@@ -360,11 +393,11 @@ test("renewable_energy_tiles_fridge_scraps_to_compressor", {
 -- level, the roll, and the transformers.
 local MICROWAVE, TRANSFORMER = "appliances_cooking_01_24", "RenewableEnergy.MicrowaveTransformer"
 local TRANSFORMER_CASES = {
-    { "a microwave at Electricity 0, rolling just under 20%", MICROWAVE, 0, 0.2 - UNDER, 1 },
+    { "a microwave at Electricity 0, rolling just under 20%", MICROWAVE, 0, 0.2 - T.UNDER, 1 },
     { "a microwave at Electricity 0, rolling 20%", MICROWAVE, 0, 0.2, 0 },
-    { "a microwave at Electricity 4, rolling just under 60%", MICROWAVE, 4, 0.6 - UNDER, 1 },
+    { "a microwave at Electricity 4, rolling just under 60%", MICROWAVE, 4, 0.6 - T.UNDER, 1 },
     { "a microwave at Electricity 4, rolling 60%", MICROWAVE, 4, 0.6, 0 },
-    { "a microwave at Electricity 8, on the highest roll", MICROWAVE, 8, 1 - UNDER, 1 },
+    { "a microwave at Electricity 8, on the highest roll", MICROWAVE, 8, 1 - T.UNDER, 1 },
     { "a stove, on the lowest roll", STOVE, 10, 0, 0 },
 }
 test("renewable_energy_tiles_microwave_scraps_to_transformer", {
@@ -446,8 +479,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                     local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite, carried and { [carried.key] = carried.value })
                     T.step(function() result.container = handle.object ~= nil and handle.object:getContainer() ~= nil end)
                     if carried then
-                        T.server(self, "objectModData", { x = square:getX(), y = square:getY(), z = square:getZ(),
-                            sprite = placed.sprite, key = carried.key })
+                        T.server(self, "objectModData", T.at(square, { sprite = placed.sprite, key = carried.key }))
                         T.step(function() result.placedData = describe(self.server.objectModData.value) end)
                     end
                     T.pickUpAsPlayer(self, handle, placed.sprite)
@@ -522,7 +554,7 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
                 return bank ~= nil and Sprites.nameOf(bank) == tile and PowerBank.summaryOf(bank) ~= nil
             end, "this client's copy of the bank placed facing " .. facing .. ", working")
             -- Taken away when the test ends if the pick-up leaves it.
-            T.server(self, "PZHarness.trackPlaced", { x = square:getX(), y = square:getY(), z = square:getZ(), sprite = tile })
+            T.server(self, "PZHarness.trackPlaced", T.at(square, { sprite = tile }))
             T.pickUpAsPlayer(self, square, tile)
             T.readCarried(self, { item })
             T.step(function()
@@ -576,10 +608,8 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
 -- A module just below each Specs.crackLooks threshold shows that look's cracks over its own slot,
 -- one at the light threshold shows whole, repair clears them, and snow stays drawn over cracks
 -- added under it; this client matches.
-local function factoryAt(share)
-    return math.floor(share * RenewableEnergy.conditionMaxOf(Specs.factoryModule) + 0.5)
-end
-local HEAVY_AT, LIGHT_AT = factoryAt(Specs.crackLooks.heavyBelow) - 1, factoryAt(Specs.crackLooks.lightBelow) - 1
+local HEAVY_AT = T.conditionAt(Specs.factoryModule, Specs.crackLooks.heavyBelow) - 1
+local LIGHT_AT = T.conditionAt(Specs.factoryModule, Specs.crackLooks.lightBelow) - 1
 local WHOLE_AT = LIGHT_AT + 1
 local HEAVY, LIGHT, SNOW = Sprites.cracks.heavy, Sprites.cracks.light, Sprites.snow
 local CRACKED = {
@@ -612,7 +642,7 @@ test("renewable_energy_tiles_cracked_modules_show", {
                 local panel = T.panel(self, case.sprite, { modules = case.modules })
                 if not panel then return end
                 local at = panel.position
-                T.server(self, "panelCracks", { x = at.x, y = at.y, z = at.z, sprite = case.sprite, change = case.change })
+                T.server(self, "panelCracks", T.at(at, { sprite = case.sprite, change = case.change }))
                 T.waitFor(self, function()
                     return T.overlays(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
                 end, "this client's overlays of " .. case.what)

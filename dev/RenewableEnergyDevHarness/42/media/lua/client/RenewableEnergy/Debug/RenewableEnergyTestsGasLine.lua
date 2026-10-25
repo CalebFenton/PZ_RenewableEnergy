@@ -109,11 +109,9 @@ test("renewable_energy_gasline_kit_menu", {
         if not generator then return end
         self.generator = generator
         T.step(function()
-            local submenu, context = T.worldSubmenu(generator.object, getText("ContextMenu_Generator"))
-            self.install = T.optionState(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_InstallKit")))
-            if context then
-                context:hideAndChildren()
-            end
+            local options = T.worldOptions(generator.object, getText("ContextMenu_Generator"),
+                { install = getText("ContextMenu_RenewableEnergy_InstallKit") })
+            self.install = T.optionState(options and options.install)
         end)
         T.fitAndConnect(self, generator, digester)
         T.waitFor(self, function()
@@ -124,15 +122,12 @@ test("renewable_energy_gasline_kit_menu", {
     validate = function(self)
         T.expect(self.install.greyed, "without a kit and wrench, Install isn't offered greyed out")
         local generator = self.generator.object
-        local submenu, context = T.worldSubmenu(generator, getText("ContextMenu_Generator"))
-        if T.expect(submenu ~= nil, "a kitted generator has no generator submenu") then
-            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_DisconnectLine")) ~= nil, "no Disconnect Gas Line")
-            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_RemoveKit")) ~= nil, "no Remove Gas Conversion Kit")
-            local take = submenu:getOptionFromName(getText("ContextMenu_GeneratorTake"))
-            T.expect(take == nil or take.notAvailable, "Take Generator is offered on a kitted generator")
-        end
-        if context then
-            context:hideAndChildren()
+        local options = T.worldOptions(generator, getText("ContextMenu_Generator"), { disconnect = getText("ContextMenu_RenewableEnergy_DisconnectLine"),
+            remove = getText("ContextMenu_RenewableEnergy_RemoveKit"), take = getText("ContextMenu_GeneratorTake") })
+        if T.expect(options ~= nil, "a kitted generator has no generator submenu") then
+            T.expect(options.disconnect ~= nil, "no Disconnect Gas Line")
+            T.expect(options.remove ~= nil, "no Remove Gas Conversion Kit")
+            T.expect(options.take == nil or options.take.notAvailable, "Take Generator is offered on a kitted generator")
         end
         T.expect(not ISTakeGenerator:new(T.player(), generator):isValid(), "the client lets a kitted generator be taken")
         local text = ISGeneratorInfoWindow.getRichText(generator, true)
@@ -150,24 +145,19 @@ test("renewable_energy_gasline_kit_refused_in_the_dark", {
         local generator = T.generator(self, {})
         if not generator then return end
         self.generator = generator
-        T.give(self, "tools", { { type = GasKit.ITEM }, { type = "Base.Wrench" } })
-        T.setPerk(self, Perks.Mechanics, 2)
+        T.giveMaterials(self, "kit", GasKit.materials(GasKit.INSTALL))
         T.step(function() T.standNextTo(generator.square) end)
         T.makeDark(self)
     end,
     validate = function(self)
-        local p = T.player()
-        if not T.expect(p:tooDarkToRead(), "midnight with the grid off isn't dark where the character stands") then return end
+        if not T.expectDark() then return end
         local generator = self.generator.object
-        local submenu, context = T.worldSubmenu(generator, getText("ContextMenu_Generator"))
-        local install = submenu and submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_InstallKit"))
+        local options = T.worldOptions(generator, getText("ContextMenu_Generator"), { install = getText("ContextMenu_RenewableEnergy_InstallKit") })
+        local install = options and options.install
         local reason = T.tooltipOf(install)
         T.expect(install ~= nil and install.notAvailable and reason == getText("Tooltip_RenewableEnergy_TooDark"),
             "Install isn't offered greyed out saying it's too dark (" .. tostring(reason) .. ")")
-        if context then
-            context:hideAndChildren()
-        end
-        T.expect(not RenewableEnergyGasAction:new(p, "kit", GasKit.INSTALL, generator):isValid(), "the Install action runs in the dark")
+        T.expect(not RenewableEnergyGasAction:new(T.player(), "kit", GasKit.INSTALL, generator):isValid(), "the Install action runs in the dark")
     end,
 })
 
@@ -300,7 +290,7 @@ test("renewable_energy_gasline_generator_runs_on_past_vanilla_stop", {
 -- loads, and the gas pays for them. Single player only: a multiplayer server keeps the chunk loaded
 -- after the character leaves.
 test("renewable_energy_gasline_generator_runs_on_after_absence", {
-    spOnly = "the server keeps chunks loaded after the character leaves",
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 120,
     hour = 12,
     instant = true,
@@ -571,9 +561,7 @@ test("renewable_energy_gasline_unknown_job_refused", {
         local generator = T.generator(self, { fuel = 0 })
         if not generator then return end
         local function build(label, feature, job)
-            local args = T.at(generator)
-            args.feature, args.job = feature, job
-            T.read(self, "gasActionFrom", args, label)
+            T.read(self, "gasActionFrom", T.at(generator, { feature = feature, job = job }), label)
         end
         build("known", "kit", GasKit.INSTALL)
         build("noFeature", "NoSuchFeature", GasKit.INSTALL)
@@ -601,9 +589,7 @@ test("renewable_energy_gasline_kit_job_not_done_takes_nothing", {
             T.read(self, "perkXp", { perk = "Mechanics" }, "before")
         end)
         T.goNextTo(self, generator.square)
-        local args = T.at(generator)
-        args.job = GasKit.INSTALL
-        T.read(self, "kitJobComplete", args, "complete")
+        T.read(self, "kitJobComplete", T.at(generator, { job = GasKit.INSTALL }), "complete")
         T.batch(function()
             T.readGenerator(self, generator, "after")
             T.countMaterials(self, "after", self.install)
@@ -653,11 +639,8 @@ test("renewable_energy_gasline_gasifier_must_stand_beside", {
 test("renewable_energy_gasline_line_lost_with_its_source_on_petrol", {
     instant = true,
     run = function(self)
-        local generator = T.generator(self, { fuel = 3 })
+        local generator, gasifier = T.gasifierBeside(self, "primitive", 3)
         if not generator then return end
-        local square = T.need(self, T.squareBeside(generator.square), "a free square beside the generator")
-        local gasifier = square and T.placeRecord(self, "gasifier", "primitive", { square = square })
-        if not gasifier then return end
         self.side = Gasifier.sideOf(generator.x, generator.y, gasifier.x, gasifier.y)
         T.fitAndConnect(self, generator, gasifier)
         T.kitJob(self, generator, GasKit.TO_PETROL)
@@ -751,10 +734,7 @@ test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
             T.setRecord(self, gasifier, { lit = false })
             T.readRecord(self, gasifier, "gasifierOut")
             T.setRecord(self, digester, T.sourDigester("barrel"))
-            -- Any load the line can't carry stalls it; how much isn't what this is about.
-            T.gasLoad(self, GasKit.CAP_W + 1)
-            T.gasPass(self, generator, 0.1)
-            T.readGenerator(self, generator, "stalled")
+            T.stallLine(self, generator, "stalled")
         end)
     end,
     validate = function(self)

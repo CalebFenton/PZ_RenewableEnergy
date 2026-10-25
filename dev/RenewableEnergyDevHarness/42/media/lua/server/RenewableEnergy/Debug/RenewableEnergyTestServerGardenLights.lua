@@ -31,9 +31,7 @@ end
 -- Forgets the house's garden light roll until the test ends, so that it can be rolled or promised
 -- lights again.
 local function forgetRoll(def, defer)
-    local store, key = ModData.getOrCreate(RenewableEnergy.GardenLights.MOD_DATA), RenewableEnergy.BuildingWatch.key(def)
-    local roll = store[key]
-    defer(function() store[key] = roll end)
+    local store, key = Helpers.keepBuildingRoll(RenewableEnergy.GardenLights.MOD_DATA, def, defer)
     store[key] = nil
 end
 
@@ -97,18 +95,22 @@ handler("gardenLightsAt", function(_, args)
     }
 end)
 
--- The building of the map at x, y, loaded or not.
-local function buildingAt(args)
-    return getWorld():getMetaGrid():getBuildingAt(args.x, args.y)
+-- The building of the map at x, y, loaded or not, or nil and what is missing.
+local function houseAt(args)
+    local def = getWorld():getMetaGrid():getBuildingAt(args.x, args.y)
+    if not def then
+        return nil, "a building at " .. args.x .. "," .. args.y
+    end
+    return def
 end
 
 -- The house at x, y of the map, its roll forgotten until the test ends, so that a solar site can
 -- promise it lights. Answers its bounds, x2 and y2 past its last squares, and how far around it
 -- must load before it is rolled.
 handler("gardenLightsForgetHouse", function(_, args, defer)
-    local def = buildingAt(args)
+    local def, missing = houseAt(args)
     if not def then
-        return nil, "a building at " .. args.x .. "," .. args.y
+        return nil, missing
     end
     forgetRoll(def, defer)
     return { x = def:getX(), y = def:getY(), x2 = def:getX2(), y2 = def:getY2(), reach = RenewableEnergy.GardenLights.REACH }
@@ -119,9 +121,9 @@ end)
 -- many lights its roll placed, and how many stand around it.
 handler("gardenLightsHouse", function(_, args)
     local GardenLights = RenewableEnergy.GardenLights
-    local def = buildingAt(args)
+    local def, missing = houseAt(args)
     if not def then
-        return nil, "a building at " .. args.x .. "," .. args.y
+        return nil, missing
     end
     local roll = ModData.getOrCreate(GardenLights.MOD_DATA)[RenewableEnergy.BuildingWatch.key(def)]
     local rolled = GardenLights.isRolled(def)
@@ -137,9 +139,9 @@ end)
 -- Takes away the garden lights around the house at x, y of the map, while it is loaded: the test
 -- moves on.
 handler("gardenLightsClearHouse", function(_, args)
-    local def = buildingAt(args)
+    local def, missing = houseAt(args)
     if not def then
-        return nil, "a building at " .. args.x .. "," .. args.y
+        return nil, missing
     end
     for _, light in pairs(lightsAround(def)) do
         removePlaced(light)

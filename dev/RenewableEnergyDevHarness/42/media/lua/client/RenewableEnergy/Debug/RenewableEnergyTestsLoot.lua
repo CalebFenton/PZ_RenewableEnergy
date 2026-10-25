@@ -38,7 +38,7 @@ test("renewable_energy_loot_found_batteries_part_charged", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        T.server(self, "lootFoundBatteries", { x = square:getX(), y = square:getY(), z = square:getZ() })
+        T.server(self, "lootFoundBatteries", T.at(square))
     end,
     validate = function(self) T.expectNoFailures(self.server.lootFoundBatteries) end,
 })
@@ -49,7 +49,7 @@ test("renewable_energy_loot_found_parts_worn", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        T.server(self, "lootFoundParts", { x = square:getX(), y = square:getY(), z = square:getZ() })
+        T.server(self, "lootFoundParts", T.at(square))
     end,
     validate = function(self) T.expectNoFailures(self.server.lootFoundParts) end,
 })

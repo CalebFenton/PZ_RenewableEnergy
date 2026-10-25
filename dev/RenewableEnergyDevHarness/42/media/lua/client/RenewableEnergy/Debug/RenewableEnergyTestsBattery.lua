@@ -6,7 +6,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 
 -- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua), jar batteries, and the
 -- battery recipes that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
--- RenewableEnergyTestLib.lua for the runner and the helpers.
+-- PZHarness/TestLib.lua for the runner and RenewableEnergyTestLib.lua for the helpers.
 
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, player, stateItem = T.test, T.craftTest, T.expect, T.expectNear, T.player, T.stateItem
@@ -192,10 +192,7 @@ for _, entry in ipairs(BATTERY_REPAIRS) do
         after = function(self)
             T.readCarried(self, { CAR_BATTERY })
             -- The tooltip's "Repaired: Nx" reads this client's copy.
-            T.waitFor(self, function()
-                local battery = T.carried(CAR_BATTERY)
-                return battery ~= nil and battery:getHaveBeenRepaired() == repairedAfter
-            end, "this client's battery repaired " .. repairedAfter .. "x")
+            T.waitForRepaired(self, CAR_BATTERY, repairedAfter)
         end,
         validate = function(self)
             local battery = T.carriedFirst(self, CAR_BATTERY)

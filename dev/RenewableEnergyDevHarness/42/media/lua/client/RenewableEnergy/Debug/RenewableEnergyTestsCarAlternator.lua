@@ -33,7 +33,7 @@ local function readyCar(self, opts)
     local car = T.placeVehicle(self, CAR, opts)
     if not car then return nil end
     T.give(self, "wrench", { { type = "Base.Wrench" } })
-    T.server(self, "openCarHood", function() return { vehicle = T.vehicleArgs(car) } end)
+    T.onVehicle(self, car, "openCarHood")
     T.waitFor(self, function() return CarAlternator.hoodOpen(car.vehicle) end, "this client's car with its hood open")
     return car
 end
@@ -66,7 +66,7 @@ test("renewable_energy_gadgets_car_alternator_take_out_once", {
             if context then context:closeAll() end
         end)
         alternatorJob(self, car, Action.TAKE_OUT_ALTERNATOR, true)
-        T.server(self, "alternatorState", function() return { vehicle = T.vehicleArgs(car) } end)
+        T.onVehicle(self, car, "alternatorState")
         T.count(self, "takenOut", { CarAlternator.ITEM })
         T.step(function()
             local context = T.newContext()
@@ -75,7 +75,7 @@ test("renewable_energy_gadgets_car_alternator_take_out_once", {
             context:hideAndChildren()
             self.canTakeTwice = Action:new(T.player(), Action.TAKE_OUT_ALTERNATOR, nil, nil, car.vehicle):canPerform()
         end)
-        T.server(self, "takeOutAlternatorAgain", function() return { vehicle = T.vehicleArgs(car) } end)
+        T.onVehicle(self, car, "takeOutAlternatorAgain")
         T.count(self, "afterSecond", { CarAlternator.ITEM })
     end,
     validate = function(self)
@@ -105,8 +105,8 @@ test("renewable_energy_gadgets_car_alternator_out_stops_charging", {
         local car = readyCar(self, { battery = CAR_BATTERY })
         if not car then return end
         local function charge(key)
-            T.server(self, "alternatorCharge", function() return { vehicle = T.vehicleArgs(car), uses = 0.2, minutes = 60 } end)
-            T.step(function() self[key] = self.server.alternatorCharge end)
+            T.onVehicle(self, car, "alternatorCharge", { uses = 0.2, minutes = 60 })
+            T.step(function() self[key] = car.answer end)
         end
         alternatorJob(self, car, Action.TAKE_OUT_ALTERNATOR, true)
         charge("without")
@@ -126,7 +126,7 @@ test("renewable_energy_gadgets_car_alternator_out_stops_charging", {
 -- a burnt wreck never does, whatever the roll.
 local SCRAPS = {
     { behavior = "smashed_wreck_hit_drops_one", script = "Base.CarNormalSmashedFront", roll = 0, alternators = 1 },
-    { behavior = "smashed_wreck_miss_drops_none", script = "Base.CarNormalSmashedFront", roll = 1 - 1e-9, alternators = 0 },
+    { behavior = "smashed_wreck_miss_drops_none", script = "Base.CarNormalSmashedFront", roll = 1 - T.UNDER, alternators = 0 },
     { behavior = "burnt_wreck_never_drops", script = "Base.CarNormalBurnt", roll = 0, alternators = 0 },
 }
 for _, case in ipairs(SCRAPS) do
@@ -135,7 +135,7 @@ for _, case in ipairs(SCRAPS) do
             local wreck = T.placeVehicle(self, case.script)
             if not wreck then return end
             T.forceRoll(self, case.roll)
-            T.server(self, "scrapWreck", function() return { vehicle = T.vehicleArgs(wreck) } end)
+            T.onVehicle(self, wreck, "scrapWreck")
         end,
         validate = function(self)
             local scrap = self.server.scrapWreck

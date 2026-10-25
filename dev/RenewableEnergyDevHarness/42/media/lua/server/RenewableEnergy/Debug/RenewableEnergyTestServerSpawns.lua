@@ -145,6 +145,15 @@ local function bankPartsAt(container, stockName, roll, defer)
     return found
 end
 
+-- A scratch container for stocking parts, and the function that puts the loot options back. Found
+-- batteries are sent to the clients that see them, and a server can't send an item of a container
+-- that isn't in the world, so the Batteries option keeps them out; the parts don't depend on them.
+local function partsContainer(defer)
+    local restoreOptions = saveOptions(defer, { "LRMBatteries", "LRMMisc" })
+    SandboxVars.RenewableEnergy.LRMBatteries = 0
+    return RenewableEnergy.Loot.newContainer(nil), restoreOptions
+end
+
 -- Every stock's parts are of their line's kind, each at a chance; the bank `args.stock` holds a
 -- part when the roll comes in under its chance × the misc loot option and not at it, so neither a
 -- part's chance nor the option goes astray; and a battery box (a tile of `args.boxTiles`), which has
@@ -162,12 +171,8 @@ check("bankStockParts", function(expect, _, _, args, defer)
             end
         end
     end
-    local container = RenewableEnergy.Loot.newContainer(nil)
-    -- Found batteries are sent to the clients that see them, and a server can't send an item of a
-    -- container that isn't in the world; the parts don't depend on the batteries.
+    local container, restoreOptions = partsContainer(defer)
     local options = SandboxVars.RenewableEnergy
-    local restoreOptions = saveOptions(defer, { "LRMBatteries", "LRMMisc" })
-    options.LRMBatteries = 0
     local stock = WorldSpawns.BANK_STOCK[args.stock]
     for _, multiplier in ipairs({ 1, 2 }) do
         options.LRMMisc = multiplier
@@ -199,6 +204,24 @@ check("bankStockParts", function(expect, _, _, args, defer)
     restoreOptions()
 end)
 
+-- The conditions the wear profile `wear` gives a find, from its lowest roll to its highest: no
+-- better than new.
+local function wearRange(wear)
+    return { min = wear.mean - wear.halfWidth, max = math.min(100, wear.mean + wear.halfWidth) }
+end
+
+-- The rolls a wear profile is checked at, its lowest, a middling one and its highest, and the
+-- condition each gives.
+local function wearCases(wear)
+    local range = wearRange(wear)
+    return { { roll = 0, condition = range.min }, { roll = 0.5, condition = wear.mean }, { roll = 1 - UNDER, condition = range.max } }
+end
+
+-- The rolls a dud's condition is checked at, its lowest and its highest, and the condition each gives.
+local function dudCases(dud)
+    return { { roll = 0, condition = dud.min }, { roll = 1 - UNDER, condition = dud.max } }
+end
+
 -- Every stock's batteries name a wear profile. Each profile wears a found battery to its mean less
 -- its half width at the lowest rolls, its mean at middling ones, and no better than new at the
 -- highest, unrepaired; with a dud chance, a roll just under it makes a dud, at the dud's lowest
@@ -216,16 +239,10 @@ check("batteryWear", function(expect, _, _, _, defer)
         restoreRoll()
         return { condition = item:getCondition(), repairs = item:getHaveBeenRepaired() }
     end
-    local TOP = 1 - UNDER
     for name, wear in pairs(WorldSpawns.BATTERY_WEAR) do
         -- A profile with duds rolls for one first; at the chance, it isn't one.
         local first = wear.dud and { wear.dud } or {}
-        local cases = {
-            { roll = 0, condition = wear.mean - wear.halfWidth },
-            { roll = 0.5, condition = wear.mean },
-            { roll = TOP, condition = math.min(100, wear.mean + wear.halfWidth) },
-        }
-        for _, case in ipairs(cases) do
+        for _, case in ipairs(wearCases(wear)) do
             local rolls = { unpack(first) }
             for _ = 1, 3 do table.insert(rolls, case.roll) end
             local got = worn(name, rolls)
@@ -233,7 +250,7 @@ check("batteryWear", function(expect, _, _, _, defer)
                 name, case.roll, got.condition, got.repairs, case.condition))
         end
         if wear.dud then
-            for _, case in ipairs({ { roll = 0, condition = dud.min }, { roll = TOP, condition = dud.max } }) do
+            for _, case in ipairs(dudCases(dud)) do
                 local got = worn(name, { wear.dud - UNDER, case.roll })
                 expect(got.condition == case.condition and got.repairs == dud.repairs, string.format(
                     "a %s dud at a roll of %s has condition %d and %d repairs, not %d and %d",
@@ -253,8 +270,9 @@ end)
 check("partWear", function(expect, _, _, _, defer)
     local WorldSpawns, Specs, Wear = RenewableEnergy.WorldSpawns, RenewableEnergy.Specs, RenewableEnergy.Wear
     local wear, dud = WorldSpawns.PART_WEAR, WorldSpawns.PART_DUD
-    expect(dud.min >= 0 and dud.min <= dud.max and dud.max < wear.mean - wear.halfWidth,
-        "a part dud's condition " .. dud.min .. " to " .. dud.max .. " overlaps a found part's from " .. wear.mean - wear.halfWidth)
+    local lowest = wearRange(wear).min
+    expect(dud.min >= 0 and dud.min <= dud.max and dud.max < lowest,
+        "a part dud's condition " .. dud.min .. " to " .. dud.max .. " overlaps a found part's from " .. lowest)
     local types = { Specs.controller }
     for fullType, spec in pairs(Specs.inverters) do
         if spec.homemade then
@@ -274,29 +292,20 @@ check("partWear", function(expect, _, _, _, defer)
         restoreRoll()
         return item:getCondition(), Wear.hasOwnCondition(item)
     end
-    local TOP = 1 - UNDER
     for _, fullType in ipairs(types) do
-        for _, case in ipairs({
-            { roll = 0, condition = wear.mean - wear.halfWidth },
-            { roll = 0.5, condition = wear.mean },
-            { roll = TOP, condition = math.min(100, wear.mean + wear.halfWidth) },
-        }) do
+        for _, case in ipairs(wearCases(wear)) do
             local condition, marked = worn(fullType, { wear.dud, case.roll, case.roll, case.roll })
             expect(condition == case.condition and marked, string.format("a found %s at rolls of %s has condition %d, marked %s, not %d",
                 fullType, case.roll, condition, tostring(marked), case.condition))
         end
-        for _, case in ipairs({ { roll = 0, condition = dud.min }, { roll = TOP, condition = dud.max } }) do
+        for _, case in ipairs(dudCases(dud)) do
             local condition, marked = worn(fullType, { wear.dud - UNDER, case.roll })
             expect(condition == case.condition and marked, string.format("a %s dud at a roll of %s has condition %d, marked %s, not %d",
                 fullType, case.roll, condition, tostring(marked), case.condition))
         end
     end
-    -- Found batteries are sent to the clients that see them, which a scratch container can't be, so
-    -- the Batteries option keeps them out; the parts don't depend on them.
-    local options = SandboxVars.RenewableEnergy
-    local restoreOptions = saveOptions(defer, { "LRMBatteries", "LRMMisc" })
-    options.LRMBatteries, options.LRMMisc = 0, 1
-    local container = RenewableEnergy.Loot.newContainer(nil)
+    local container, restoreOptions = partsContainer(defer)
+    SandboxVars.RenewableEnergy.LRMMisc = 1
     local fills = {
         ["the powerYard bank"] = function(c) WorldSpawns.stockBank(c, "powerYard") end,
         ["the kit crate"] = function(c) WorldSpawns.stockCrate(c, "kit") end,
@@ -432,8 +441,6 @@ end)
 -- chunk that holds a spot loads, the system's OnChunkLoaded places it, or queues it for the next
 -- game minute. Nothing here places a spot by hand.
 
-local PAMPHLET = "RenewableEnergy.FemaPamphlet"
-
 -- The site named `name` of this world's map, or nil.
 local function siteNamed(name)
     for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
@@ -506,16 +513,8 @@ local function armSite(site, defer)
         forgetSpot(at[1], at[2], at[3])
     end
     local _, _, defs = findOf(site)
-    local store = ModData.getOrCreate(RenewableEnergy.RuralFinds.MOD_DATA)
-    for key in pairs(defs or {}) do
-        local saved = nil
-        if store[key] then
-            saved = {}
-            for found, value in pairs(store[key]) do
-                saved[found] = value
-            end
-        end
-        defer(function() store[key] = saved end)
+    for _, def in pairs(defs or {}) do
+        Helpers.keepBuildingRoll(RenewableEnergy.RuralFinds.MOD_DATA, def, defer)
     end
     SolarSites.addSite(site)
     local spots = {}
@@ -531,11 +530,6 @@ local function armSite(site, defer)
         end
     end
     return spots
-end
-
--- Takes every pamphlet out of the building.
-local function takePamphlets(def)
-    Helpers.takeReadingSince(def, PAMPHLET, {})
 end
 
 -- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
@@ -656,7 +650,7 @@ local SPOT_CHECKS = {
         expect(wired ~= nil and PowerBank.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
             "the wind charger isn't wired to the site's bank")
         local wear = WorldSpawns.BATTERY_WEAR[stock.batteries.wear]
-        local range = { min = wear.mean - wear.halfWidth, max = math.min(100, wear.mean + wear.halfWidth) }
+        local range = wearRange(wear)
         local batteries, items = 0, bank:getContainer():getItems()
         for i = 0, items:size() - 1 do
             local item = items:get(i)
@@ -707,7 +701,7 @@ local SPOT_CHECKS = {
     end,
     pamphlet = function(expect, _, square)
         local building = square:getBuilding()
-        expect(building ~= nil and Helpers.readingTotal(building:getDef(), PAMPHLET) >= 1, "no pamphlet in the house")
+        expect(building ~= nil and Helpers.readingTotal(building:getDef(), RenewableEnergy.RuralFinds.PAMPHLET) >= 1, "no pamphlet in the house")
     end,
     -- The house promised its lights, or rolled for them already.
     gardenLights = function(expect, _, square)
@@ -822,11 +816,7 @@ handler("siteArm", function(_, args, defer)
         end)
     end
     if args.block then
-        local blocker = IsoObject.new(at, PZHarness.Fixtures.WORK_TABLE_SPRITE, "Table")
-        at:AddTileObject(blocker)
-        if isServer() then
-            blocker:transmitCompleteItemToClients()
-        end
+        PZHarness.Fixtures.newTile(at, PZHarness.Fixtures.WORK_TABLE_SPRITE)
     end
     return { spots = armSite(site, defer), at = { x = ends[1], y = ends[2], z = ends[3] } }
 end)
@@ -1013,8 +1003,8 @@ handler("sitesArm", function(_, args, defer)
     return armed
 end)
 
--- The site named `args.name`, whose armed spots are `args.spots`: { ready = false, why } until
--- every spot's square is loaded here, then how many of its spots still wait.
+-- The site whose armed spots are `args.spots`: { ready = false, why } until every spot's square is
+-- loaded here, then how many of its spots still wait.
 handler("siteVisit", function(_, args)
     local squares, notLoaded = spotSquaresLoaded(args.spots)
     if not squares then
@@ -1034,17 +1024,8 @@ check("siteVisited", function(expect, expectNear, _, args)
     if not kind then
         return
     end
-    local isFind = RenewableEnergy.RuralFinds.FINDS[kind].is
-    local reach = RenewableEnergy.BuildingWatch.REACH
     for key, def in pairs(defs) do
-        local others = 0
-        for x = def:getX() - reach, def:getX2() + reach - 1 do
-            for y = def:getY() - reach, def:getY2() + reach - 1 do
-                if not (x == at[1] and y == at[2]) and RenewableEnergy.findObjectOn(getSquare(x, y, 0), isFind) then
-                    others = others + 1
-                end
-            end
-        end
+        local others = Helpers.findsAround(def, RenewableEnergy.RuralFinds.FINDS[kind].is, at)
         expect(others == 0, args.name .. ": " .. others .. " more " .. kind .. " finds by the building at " .. key)
     end
 end)
@@ -1062,7 +1043,7 @@ handler("siteClear", function(_, args)
     local site = siteNamed(args.name)
     local house = site and site.house and getSquare(site.house[1], site.house[2], 0)
     if house and house:getBuilding() then
-        takePamphlets(house:getBuilding():getDef())
+        Helpers.takeReadingSince(house:getBuilding():getDef(), RenewableEnergy.RuralFinds.PAMPHLET, {})
     end
     return {}
 end)
@@ -1098,8 +1079,7 @@ handler("seenRoom", function(_, args, defer)
         local roll = trial.roll
         if trial.edge then
             local odds = trial.edge == "bank" and WorldSpawns.BANK_ROOMS[trial.room].odds or WorldSpawns.CRATE_ROOMS[trial.room]
-            local chance = 1 / (odds * WorldSpawns.RARITY[trial.setting])
-            roll = trial.roll == "under" and chance - UNDER or chance
+            roll = Helpers.trialRoll(roll, 1 / (odds * WorldSpawns.RARITY[trial.setting]))
         end
         local objectsBefore, itemsBefore = objectsOn(square), itemsAround(square)
         local restoreRoll = Helpers.forceRolls(defer, roll)

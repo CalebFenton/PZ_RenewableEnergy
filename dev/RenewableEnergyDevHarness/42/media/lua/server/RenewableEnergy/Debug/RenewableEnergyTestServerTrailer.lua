@@ -9,7 +9,7 @@ require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local vehicleAt, deferOnce = Helpers.vehicleAt, Helpers.deferOnce
+local vehicleAt, deferOnce, onVehicle, trialRoll = Helpers.vehicleAt, Helpers.deferOnce, Helpers.onVehicle, Helpers.trialRoll
 
 local Trailer = {}
 
@@ -173,19 +173,7 @@ function Trailer.vehicleState(vehicle)
     return state
 end
 
--- Registers the handler `name` on the vehicle `args` names (RenewableEnergyTest.onVehicle):
--- `fn(vehicle, args, player, defer)` runs once it is found.
-local function onVehicle(name, fn)
-    handler(name, function(player, args, defer)
-        local vehicle, missing = vehicleAt(args)
-        if not vehicle then
-            return nil, missing
-        end
-        return fn(vehicle, args, player, defer)
-    end)
-end
-
-onVehicle("vehicleState", function(vehicle)
+onVehicle("arrowBoardState", function(vehicle)
     return { state = Trailer.vehicleState(vehicle) }
 end)
 
@@ -311,8 +299,7 @@ onVehicle("arrowBoardSwitchRolls", function(vehicle, args, _, defer)
     end)
     for i, trial in ipairs(args.trials) do
         modData[key] = trial.was
-        local roll = trial.roll == "under" and chance - Helpers.UNDER or trial.roll == "at" and chance or trial.roll
-        local restoreRoll = Helpers.forceRolls(defer, { roll })
+        local restoreRoll = Helpers.forceRolls(defer, { trialRoll(trial.roll, chance) })
         ArrowBoard.rollSwitch(vehicle)
         restoreRoll()
         on[i] = ArrowBoard.isSwitchedOn(vehicle)
@@ -400,12 +387,6 @@ end)
 onVehicle("arrowBoardKey", function(vehicle, _, player)
     return { given = { PZHarness.giveItem(player, vehicle:createVehicleKey()) } }
 end)
-
--- `roll` as a trial gives it: "under" or "at" for just under or at `chance`, worked out here so the
--- roll is exactly the chance, else the number itself.
-local function trialRoll(roll, chance)
-    return roll == "under" and chance - Helpers.UNDER or roll == "at" and chance or roll
-end
 
 -- Makes the trailer's lid as its part `create` does (ArrowBoard.createLid) for each trial
 -- { was, roll, easyUse }: the lid locked or not as `was`, every roll at `roll` (trialRoll of

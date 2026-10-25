@@ -38,8 +38,8 @@ end
 -- Queues reading the server's copy of `car` (a handle) into self[key]: its battery, whether a
 -- maintainer is attached and whether its engine runs.
 local function carState(self, car, key)
-    T.server(self, "carState", function() return T.vehicleArgs(car) end)
-    T.step(function() self[key] = self.server.carState end)
+    T.onVehicle(self, car, "carState")
+    T.step(function() self[key] = car.answer end)
 end
 
 -- Solar battery maintainer -----------------------------------------------------------------------
@@ -113,7 +113,7 @@ test("renewable_energy_gadgets_maintainer_charge", {
         -- Each hour's clock is set in its turn: single player sets it at once, when it is queued.
         local function hour(row)
             T.step(function() T.setTime(self, row.hour) end)
-            T.server(self, "maintainerCharge", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS, uses = ROW_START } end)
+            T.onVehicle(self, car, "maintainerCharge", { hours = ROW_HOURS, uses = ROW_START })
             T.step(function() table.insert(self.rows, { row = row, reply = self.server.maintainerCharge }) end)
         end
         hour(WITHOUT_MAINTAINER)
@@ -126,7 +126,7 @@ test("renewable_energy_gadgets_maintainer_charge", {
         for _, row in ipairs(WITH_MAINTAINER) do
             hour(row)
         end
-        T.server(self, "chargeVehicles", function() return { vehicle = T.vehicleArgs(car), hours = ROW_HOURS } end)
+        T.onVehicle(self, car, "chargeVehicles", { hours = ROW_HOURS })
     end,
     validate = function(self)
         if not expect(#self.rows == #WITH_MAINTAINER + 1 and self.server.chargeVehicles, "the hours on the car never all ran ("
@@ -182,7 +182,7 @@ test("renewable_energy_gadgets_maintainer_detach_older_save_mark", {
     run = function(self)
         local car = T.placeVehicle(self, CAR)
         if not car then return end
-        T.server(self, "oldMaintainerMark", function() return { vehicle = T.vehicleArgs(car), condition = 1 } end)
+        T.onVehicle(self, car, "oldMaintainerMark", { condition = 1 })
         T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end,
             "this client's car with the older save's maintainer mark")
         chooseMaintainerOption(self, car, false, "detachOffered")
@@ -233,7 +233,7 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
             end
             T.waitFor(self, function() return container:getItems():size() == SolarCellCharger.SLOTS end,
                 "this client's charger holding " .. SolarCellCharger.SLOTS .. " batteries")
-            T.server(self, "chargerState", { x = charger.x, y = charger.y, z = charger.z })
+            T.server(self, "chargerState", T.at(charger))
             T.step(function() self.acceptsPastSlots = container:isItemAllowed(instanceItem(SolarCellCharger.BATTERY)) end)
         end)
     end,
@@ -267,8 +267,8 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
             local charger = placeCharger(self)
             if not charger then return end
             T.step(function() T.setTime(self, row.hour) end)
-            T.server(self, "cellCharge", { x = charger.x, y = charger.y, z = charger.z,
-                count = SolarCellCharger.SLOTS, uses = row.uses, hours = CELL_HOURS, pass = row.pass })
+            T.server(self, "cellCharge", T.at(charger,
+                { count = SolarCellCharger.SLOTS, uses = row.uses, hours = CELL_HOURS, pass = row.pass }))
             T.step(function() self.rows[row.name] = self.server.cellCharge end)
         end
     end,
@@ -321,7 +321,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
         T.setPerk(self, Perks.Mechanics, 10)
         local car = T.placeVehicle(self, CAR)
         if not car then return end
-        T.server(self, "vehicleBattery", function() return { vehicle = T.vehicleArgs(car), empty = true } end)
+        T.onVehicle(self, car, "vehicleBattery", { empty = true })
         T.waitFor(self, function() return T.vehicleBattery(car) == nil end, "this client's car without a battery")
         T.give(self, "battery", { { type = VehicleBattery.ITEM } })
         T.step(function()
@@ -371,18 +371,12 @@ local function onBothBatteries(self, script, name, args)
     for _, batteryType in ipairs({ CAR_BATTERY, VehicleBattery.ITEM }) do
         local car = T.placeVehicle(self, script, { battery = batteryType })
         if not car then return end
-        T.server(self, name, function()
-            local withCar = { vehicle = T.vehicleArgs(car) }
-            for key, value in pairs(args) do
-                withCar[key] = value
-            end
-            return withCar
-        end)
-        T.step(function() table.insert(self.answers, self.server[name]) end)
+        T.onVehicle(self, car, name, args)
+        T.step(function() table.insert(self.answers, car.answer) end)
     end
 end
 
--- An hour of each vanilla vehicle update on a car battery and on a deep cycle battery moves the
+-- The same run of each vanilla vehicle update on a car battery and on a deep cycle battery moves the
 -- same watt-hours, so the deep cycle's share changes less by the capacity ratio. The lightbar must
 -- be scaled once, though vanilla drains it inside the battery update the mod scales. `change` is
 -- the answer field holding that share.
@@ -460,8 +454,7 @@ end
 -- Queues running the light on the server through the gadget pass for `hours` of the clock, from
 -- `charge` Wh if given, and a wait until this client's tile and lamp match the server's answer.
 local function runLight(self, light, charge, hours)
-    T.server(self, "gardenLightUpdate", { x = light.x, y = light.y, z = light.z,
-        charge = charge, hours = hours })
+    T.server(self, "gardenLightUpdate", T.at(light, { charge = charge, hours = hours }))
     T.waitFor(self, function()
         local reply = self.server.gardenLightUpdate
         return light.object:getTextureName() == reply.sprite and lampOn(light.square) == reply.lit
@@ -672,7 +665,7 @@ test("renewable_energy_gadgets_garden_light_bulb_swap_recolours_lamp", {
         if not light then return end
         runLight(self, light, LIT_WH, NIGHT_HOURS)
         T.step(function() self.litBefore = lampOn(light.square) end)
-        T.server(self, "gardenLightSwapBulb", { x = light.x, y = light.y, z = light.z, bulb = GREEN })
+        T.server(self, "gardenLightSwapBulb", T.at(light, { bulb = GREEN }))
         T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green after the swap")
     end,
     validate = function(self)
@@ -702,7 +695,7 @@ local function placeCarriedLight(self, light)
             props:getFaceDirectionFromSpriteName(sprite), item, nil))
         T.waitFor(self, function() return T.objectWithSprite(light.square, sprite) ~= nil end,
             "this client's copy of the placed garden light")
-        T.server(self, "PZHarness.trackPlaced", { x = light.x, y = light.y, z = light.z, sprite = sprite })
+        T.server(self, "PZHarness.trackPlaced", T.at(light, { sprite = sprite }))
         T.step(function() light.object = T.objectWithSprite(light.square, sprite) end)
     end)
 end

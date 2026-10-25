@@ -7,20 +7,7 @@ require "PZHarness/ServerHandlers"
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
-local vehicleAt = Helpers.vehicleAt
-
--- Registers the handler `name` on the vehicle `args.vehicle` names (RenewableEnergyTest.vehicleArgs):
--- `fn(player, vehicle, args, defer)` runs once it is found.
-local function onCar(name, fn)
-    handler(name, function(player, args, defer)
-        local vehicle, missing = vehicleAt(args.vehicle)
-        if not vehicle then
-            return nil, missing
-        end
-        return fn(player, vehicle, args, defer)
-    end)
-end
+local onVehicle = Helpers.onVehicle
 
 local function alternatorState(vehicle)
     local CarAlternator = RenewableEnergy.CarAlternator
@@ -28,14 +15,12 @@ local function alternatorState(vehicle)
 end
 
 -- Whether the server's copy of the car has its alternator out, and its hood open.
-onCar("alternatorState", function(_, vehicle)
-    return alternatorState(vehicle)
-end)
+onVehicle("alternatorState", alternatorState)
 
 -- Opens the car's hood, and unlocks its doors so that working on the engine needs no key
 -- (VehicleUtils.RequiredKeyNotFound), both sent to the clients, as a player who got in would
 -- leave them.
-onCar("openCarHood", function(_, vehicle)
+onVehicle("openCarHood", function(vehicle)
     for i = 0, vehicle:getPartCount() - 1 do
         local part = vehicle:getPartByIndex(i)
         local door = part:getDoor()
@@ -53,7 +38,7 @@ end)
 
 -- Takes the alternator out for the player straight away, as the job's complete() would; answers
 -- whether it gave one, which it mustn't once the alternator is out.
-onCar("takeOutAlternatorAgain", function(player, vehicle)
+onVehicle("takeOutAlternatorAgain", function(vehicle, _, player)
     return { gave = RenewableEnergy.CarAlternator.takeOut(player, vehicle) }
 end)
 
@@ -65,7 +50,7 @@ end
 -- Scraps the wreck as vanilla's blowtorch job completes it (ISRemoveBurntVehicle:complete), the
 -- player's blowtorch a fresh one, and answers how many car alternators it left on the wreck's
 -- square and whether the wreck is gone. Everything the scrap dropped goes when the test ends.
-onCar("scrapWreck", function(player, vehicle, _, defer)
+onVehicle("scrapWreck", function(vehicle, _, player, defer)
     local square = vehicle:getSquare()
     local before = {}
     local objects = square:getWorldObjects()
@@ -88,10 +73,7 @@ onCar("scrapWreck", function(player, vehicle, _, defer)
     end
     defer(function()
         for _, object in ipairs(dropped) do
-            if isServer() then
-                square:transmitRemoveItemFromSquare(object)
-            end
-            square:removeWorldObject(object)
+            Helpers.removeFloorItem(square, object)
         end
     end)
     return { done = done == true, alternators = alternators, removed = vehicle:isRemovedFromWorld() }

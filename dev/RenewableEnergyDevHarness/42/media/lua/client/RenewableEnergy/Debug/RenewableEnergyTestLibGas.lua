@@ -1,18 +1,19 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
+require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
 
--- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas.lua,
--- RenewableEnergyTestsGasLine.lua, RenewableEnergyTestsWoodGas.lua), added to RenewableEnergyTest.
+-- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
+-- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the world tests'
+-- rural digesters and gasifiers (RenewableEnergyTestsWorld*.lua), added to RenewableEnergyTest.
 -- Digesters and gasifiers are records of the Global Object System on the authority; the server
 -- handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua) build, drive and read them by kind
 -- and place. A record handle is { x, y, z, square, kind }, and `object` is this client's copy of
 -- its tile once it has its summary. Reads land in self.reads[label].
 
 local T = RenewableEnergyTest
-local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
+local Digester, GasKit, GasifierJobs = RenewableEnergy.Digester, RenewableEnergy.GasKit, RenewableEnergy.GasifierJobs
 
 -- What a record kind's tile and summary are on this client: the server helper's RECORD_KINDS, whose
 -- owner and tile test are shared code. The helper loads after client Lua, so it is required here.
@@ -23,11 +24,8 @@ end
 
 --- The server handlers' args for the record `handle`, with `extra`'s fields added.
 function T.recordArgs(handle, extra)
-    local args = T.at(handle)
+    local args = T.at(handle, extra)
     args.kind = handle.kind
-    for key, value in pairs(extra or {}) do
-        args[key] = value
-    end
     return args
 end
 
@@ -40,8 +38,7 @@ function T.placeRecord(self, kind, tile, opts)
     local square = opts.square or T.square(self, { indoors = opts.indoors, near = opts.near, minDistance = opts.minDistance },
         "a free square for a " .. kind)
     if not square then return nil end
-    local handle = T.at(square)
-    handle.square, handle.kind = square, kind
+    local handle = T.at(square, { square = square, kind = kind })
     T.server(self, "recordPlace", T.recordArgs(handle, { tile = tile }))
     local spec = kindOf(handle)
     local owner = spec.owner()
@@ -93,8 +90,7 @@ function T.buildRecord(self, kind, entity, tile, prefer)
     local info = T.need(self, buildEntry(entity), "the build menu entry of " .. entity)
     local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
     if not T.need(self, recipe, "the build recipe of " .. entity) then return nil end
-    local handle = T.at(square)
-    handle.square, handle.kind = square, kind
+    local handle = T.at(square, { square = square, kind = kind })
     T.setRecipeSkills(self, recipe)
     local inputs, unmatched = T.recipeInputs(recipe, prefer)
     if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return nil end
@@ -172,17 +168,6 @@ end
 --- Queues taking the record's tile away the way the game does (a sledgehammer, a pickup).
 function T.removeRecord(self, handle)
     T.server(self, "recordRemove", T.recordArgs(handle))
-end
-
---- Queues the server handler `name` with `args` and puts its answer in self.reads[label], if given.
-function T.read(self, name, args, label)
-    T.server(self, name, args)
-    if label then
-        T.step(function()
-            self.reads = self.reads or {}
-            self.reads[label] = self.server[name]
-        end)
-    end
 end
 
 --- The record's summary as this client has it, or nil.
@@ -267,16 +252,23 @@ end
 -- Digesters ------------------------------------------------------------------------------------
 
 --- Saved fields of a started, mature digester of tier `tier`, past its startup and settled down,
---- holding its tier's potential cap.
-function T.matureDigester(tier)
-    return { fed = true, started = true, gasHours = 1000, potential = Digester.TIERS[tier].potentialCap, temp = 30,
+--- holding its tier's potential cap, with `fields`' fields over them.
+function T.matureDigester(tier, fields)
+    local state = { fed = true, started = true, gasHours = 1000, potential = Digester.TIERS[tier].potentialCap, temp = 30,
         acid = 0, sour = false, sludge = 0 }
+    for key, value in pairs(fields or {}) do
+        state[key] = value
+    end
+    return state
 end
 
 --- The same, soured: acid well past its limit, so the passes that run meanwhile keep it sour.
-function T.sourDigester(tier)
+function T.sourDigester(tier, fields)
     local state = T.matureDigester(tier)
     state.sour, state.acid = true, 2 * Digester.ACID_LIMIT * state.potential
+    for key, value in pairs(fields or {}) do
+        state[key] = value
+    end
     return state
 end
 
@@ -286,43 +278,61 @@ function T.runDigester(self, handle, hours, air)
     T.server(self, "digesterRun", T.recordArgs(handle, { hours = hours, air = air }))
 end
 
--- Generators -----------------------------------------------------------------------------------
-
---- Queues a read of the generator `generator` (a T.generator handle) into self.reads[label]:
---- running, fuel, condition, its bill, its kit's state, whether the gas pass lists it, its
---- overlays, its building's toxicity, the world hour.
-function T.readGenerator(self, generator, label)
-    T.read(self, "generatorRead", T.at(generator), label)
+--- Queues a wait until this client's summary of the record shows `gas` m³, to the hundredth the
+--- summary rounds it to.
+function T.waitForGas(self, handle, gas)
+    T.waitForSummary(self, handle, function(summary) return math.abs(summary.gas - gas) < 0.005 end,
+        "this client's summary of the gas")
 end
 
---- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and,
---- with `fields.rebuild`, having vanilla rebuild the bills of the generators reaching it. A rebuild
---- happens in the generators' next update, which a multiplayer server runs on its own clock, so the
---- wait is for a later server frame rather than a count of this client's ticks; the shares Payers
---- sets after a rebuild stand by then too.
-function T.setGenerator(self, generator, fields)
-    local args = T.at(generator)
-    args.pour, args.running, args.rebuild = fields.pour, fields.running, fields.rebuild
-    T.server(self, "generatorSet", args)
-    if fields.rebuild then
-        T.serverUntil(self, "worldFrame", {}, function(now) return now.frame > self.server.generatorSet.frame end)
-    end
+-- Gasifiers ------------------------------------------------------------------------------------
+
+--- Queues an empty-tanked generator, or one with `fuel` litres, and a gasifier of `tier` beside it.
+--- Returns the generator and the gasifier's handle, or nil.
+function T.gasifierBeside(self, tier, fuel)
+    local generator = T.generator(self, { fuel = fuel or 0 })
+    if not generator then return nil end
+    local square = T.need(self, T.squareBeside(generator.square), "a free square beside the generator")
+    local gasifier = square and T.placeRecord(self, "gasifier", tier, { square = square })
+    return gasifier and generator, gasifier
+end
+
+--- Queues lighting the gasifier once this client sees wood in it, with what that takes then given
+--- first.
+function T.lightGasifier(self, gasifier)
+    T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
+    T.step(function()
+        T.giveMaterials(self, "light", GasifierJobs.materials(GasifierJobs.LIGHT, T.recordSummary(gasifier)))
+    end)
+    T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
+end
+
+--- Queues the gasifier burning `kg` of its wood at once.
+function T.burnGasifier(self, gasifier, kg)
+    T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = kg }))
+end
+
+-- Generators -----------------------------------------------------------------------------------
+
+--- Queues a load the line feeding the running `generator` can't carry, a gas pass, and a read of
+--- the generator, stalled, into self.reads[label].
+function T.stallLine(self, generator, label)
+    -- Any load the line can't carry stalls it; how much isn't what this is about.
+    T.gasLoad(self, GasKit.CAP_W + 1)
+    T.gasPass(self, generator, 0.1)
+    T.readGenerator(self, generator, label)
 end
 
 --- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging
 --- from it take it, but at once and with no pass running; the next gas pass or job bills them to a
 --- line on gas.
 function T.burnFuel(self, generator, litres)
-    local args = T.at(generator)
-    args.litres = litres
-    T.server(self, "generatorBurn", args)
+    T.server(self, "generatorBurn", T.at(generator, { litres = litres }))
 end
 
 --- Queues the gas pass, as though `hours` had passed since the generator's last.
 function T.gasPass(self, generator, hours)
-    local args = T.at(generator)
-    args.hours = hours
-    T.server(self, "gasPass", args)
+    T.server(self, "gasPass", T.at(generator, { hours = hours }))
 end
 
 --- Queues a gas pass, then reads of the generator and of the record `source` feeding it into

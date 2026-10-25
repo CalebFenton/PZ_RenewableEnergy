@@ -12,11 +12,6 @@ local check, saveOptions, countPairs = Helpers.check, Helpers.saveOptions, PZHar
 local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
 local Sprites = RenewableEnergy.Sprites
 
-local function distributions(expect)
-    local D = RenewableEnergy.Distributions
-    return expect(D ~= nil, "RenewableEnergy.Distributions did not load") and D
-end
-
 -- Calls fn(items, path) for every items list of every room, bag, procedural and vehicle table.
 local function forEachItemsList(fn)
     local seen = {}
@@ -125,10 +120,7 @@ local function checkHandedOut(expect, spec, capacity)
 end
 
 check("lootListsInUse", function(expect)
-    local D = distributions(expect)
-    if not D then
-        return
-    end
+    local D = RenewableEnergy.Distributions
     local procUsers = procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
@@ -203,10 +195,7 @@ end)
 
 -- For each row of `args.rows`, applied twice: see renewable_energy_loot_rarity_options_scale_weights.
 check("lootRarityOptions", function(expect, expectNear, _, args, defer)
-    local D = distributions(expect)
-    if not D then
-        return
-    end
+    local D = RenewableEnergy.Distributions
     local options, names = SandboxVars.RenewableEnergy, {}
     for option in pairs(args.rows[1]) do
         table.insert(names, option)
@@ -254,19 +243,29 @@ end)
 local PROBE_CONTAINER = "RenewableEnergyTestBatteries"
 local PROBE_LOOT = { rolls = 2, items = { "RenewableEnergy.DeepCycleBattery", 1000, "RenewableEnergy.L16Battery", 1000 } }
 
--- The mod's batteries in the container, bags included.
-local function modBatteries(container, found)
+-- The items in the container, bags included, that `matches(item)` takes.
+local function itemsIn(container, matches, found)
     found = found or {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item:IsInventoryContainer() then
-            modBatteries(item:getInventory(), found)
-        elseif string.find(item:getFullType(), "^RenewableEnergy%.") and RenewableEnergy.Battery.isBattery(item) then
+            itemsIn(item:getInventory(), matches, found)
+        elseif matches(item) then
             table.insert(found, item)
         end
     end
     return found
+end
+
+-- Whether the item is one of the mod's batteries.
+local function isModBattery(item)
+    return string.find(item:getFullType(), "^RenewableEnergy%.") ~= nil and RenewableEnergy.Battery.isBattery(item)
+end
+
+-- Whether the item is an inverter or a controller a find wears.
+local function isWornPart(item)
+    return RenewableEnergy.WorldSpawns.isWornPart(item:getFullType())
 end
 
 -- A container of type `containerType` on a crate tile on the square, in the world, so that the game
@@ -286,9 +285,6 @@ end
 -- rolls its type's "all" table, here the probe's, and one of a corpse's type the corpse lists; a bag
 -- in each holds a battery. Vehicle fills are the arrow board tests'. `args` is a free outdoor square.
 check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
-    if not distributions(expect) then
-        return
-    end
     local square = squareAt(args)
     if not square or square:getRoom() then
         return "an outdoor square loaded on the server"
@@ -308,7 +304,7 @@ check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
         local bag = container:AddItem("Base.Bag_DuffelBag")
         bag:getInventory():AddItem("RenewableEnergy.DeepCycleBattery")
         ItemPickerJava.fillContainer(container, nil)
-        local batteries = modBatteries(container)
+        local batteries = itemsIn(container, isModBattery)
         -- The bag's battery and, from the probe table, at least one rolled.
         expect(#batteries >= (fill.rolled and 2 or 1), #batteries .. " batteries in " .. fill.what .. " after a fill")
         for _, battery in ipairs(batteries) do
@@ -338,30 +334,12 @@ end)
 local PART_PROBE_CONTAINER = "RenewableEnergyTestParts"
 local PART_PROBE_LOOT = { rolls = 2, items = { "RenewableEnergy.PlugInInverter", 1000, "RenewableEnergy.ChargeController", 1000 } }
 
--- The mod's inverters and controllers in the container, bags included.
-local function modParts(container, found)
-    found = found or {}
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:IsInventoryContainer() then
-            modParts(item:getInventory(), found)
-        elseif RenewableEnergy.WorldSpawns.isWornPart(item:getFullType()) then
-            table.insert(found, item)
-        end
-    end
-    return found
-end
-
 -- With every Chance roll middling, inverters and controllers a fill hands out, and one already in
 -- a bag in the container, come at PART_WEAR's mean and marked, whatever condition the game rolled
 -- them. A refill leaves alone a found part that came out as new and a crafted controller (its
 -- recipe's OnCreate); and a fill of a bank's container type wears no part in it, marked or not.
 -- `args` is a free outdoor square.
 check("lootFoundParts", function(expect, _, _, args, defer)
-    if not distributions(expect) then
-        return
-    end
     local square = squareAt(args)
     if not square or square:getRoom() then
         return "an outdoor square loaded on the server"
@@ -378,7 +356,7 @@ check("lootFoundParts", function(expect, _, _, args, defer)
     local container = containerInWorld(square, PART_PROBE_CONTAINER, defer)
     container:AddItem("Base.Bag_DuffelBag"):getInventory():AddItem("RenewableEnergy.PowerInverter")
     ItemPickerJava.fillContainer(container, nil)
-    local found = modParts(container)
+    local found = itemsIn(container, isWornPart)
     -- The bag's inverter and, from the probe table, at least one rolled.
     expect(#found >= 2, #found .. " parts in the container after a fill")
     for _, part in ipairs(found) do
@@ -417,10 +395,7 @@ local VANILLA_ALL_ROOMS = { sodatruck = true }
 -- and a stash house is the only place that uses it. `args.sprites` are the Sprites fields of the
 -- tiles a player builds, a bank's in every facing.
 check("lootPlayerContainers", function(expect, _, _, args)
-    local D = distributions(expect)
-    if not D then
-        return
-    end
+    local D = RenewableEnergy.Distributions
     local Stash = RenewableEnergy.Stash
     local own = {}
     for _, containerType in ipairs(D.OWN_CONTAINER_TYPES) do

@@ -3,13 +3,11 @@
 -- how these handlers work.
 
 require "PZHarness/ServerHandlers"
-require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local objectWithSprite = PZHarness.Fixtures.objectWithSprite
-local squareAt, overlaysOf = Helpers.squareAt, Helpers.overlaysOf
+local objectAt, overlaysOf = Helpers.objectAt, Helpers.overlaysOf
 local Sprites = RenewableEnergy.Sprites
 
 -- The panel drawn as `args.sprite` on the square at `args`, changed by `args.change`, if given: its
@@ -17,9 +15,9 @@ local Sprites = RenewableEnergy.Sprites
 -- cracks shown as the mod shows them. Answers its overlays in drawing order.
 handler("panelCracks", function(_, args)
     local PanelSource = RenewableEnergy.PanelSource
-    local panel = objectWithSprite(squareAt(args), args.sprite)
+    local panel, missing = objectAt(args)
     if not panel then
-        return nil, "the panel " .. tostring(args.sprite) .. " on the server"
+        return nil, missing
     end
     local change = args.change
     if change then
@@ -34,9 +32,9 @@ end)
 
 -- The modData key `args.key` of the object drawn as `args.sprite` on the square at `args`.
 handler("objectModData", function(_, args)
-    local object = objectWithSprite(squareAt(args), args.sprite)
+    local object, missing = objectAt(args)
     if not object then
-        return nil, "the placed " .. tostring(args.sprite) .. " on the server"
+        return nil, missing
     end
     return { value = object:getModData()[args.key] }
 end)
