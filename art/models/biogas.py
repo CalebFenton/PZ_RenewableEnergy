@@ -129,11 +129,18 @@ TARP = (0.21, 0.19)  # half its length and width
 TARP_HEIGHTS = (0.06, 0.13, 0.2)
 
 
-def _tarp_bag(col, fill, torn):
+def tarp_gas_bag(col):
+    """The tarp gas holder as a loose item: the slack pillow, its hose stub out of the front corner."""
+    rx, ry = TARP
+    _tarp_bag(col, 1, False, centre=(0, 0), barb=(-rx - 0.06, -ry - 0.06, 0.03))
+
+
+def _tarp_bag(col, fill, torn, centre=TARP_AT, barb=None):
     """A pillow sewn from a blue poly tarp, a hem round it with a grommet at each corner and a hose
-    barb in the corner nearest the barrel: soft and creased at `fill` 1, filled square at 3, or flat
+    barb in the corner nearest the barrel (reaching to `barb`, the holder's inlet by default), centred
+    on `centre`: soft and creased at `fill` 1, filled square at 3, or flat
     and ripped across when `torn`."""
-    cx, cy = TARP_AT
+    cx, cy = centre
     rx, ry = TARP
     height = 0.022 if torn else TARP_HEIGHTS[fill - 1]
     lumps = 0.3 if torn else (0.2, 0.08, 0.02)[fill - 1]
@@ -144,8 +151,8 @@ def _tarp_bag(col, fill, torn):
     for sx in (-1, 1):
         for sy in (-1, 1):
             cylinder(col, "Tarp_Grommet", M("lead"), 0.01, 0.014, at=(cx + sx * (rx + 0.01), cy + sy * (ry + 0.01), 0), segments=8)
-    hx, hy = HOLDER_INLET
-    tube(col, "Tarp_Barb", M("galvanised"), [(hx, hy, 0.04), (cx - rx * 0.78, cy - ry * 0.78, min(height, 0.05))], 0.011, 8)
+    barb = barb or (*HOLDER_INLET, 0.04)
+    tube(col, "Tarp_Barb", M("galvanised"), [barb, (cx - rx * 0.78, cy - ry * 0.78, min(height, 0.05))], 0.011, 8)
     if torn:
         mound(col, "Tarp_Rip", M("earth"), (rx * 0.6, 0.03, height * 1.3), at=(cx + 0.02, cy - 0.02, 0), rotate=(0, 0, -30),
               lumps=0.2, seed=22, segments=10, rings=3)

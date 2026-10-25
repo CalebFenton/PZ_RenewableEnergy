@@ -202,7 +202,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.gasJob(self, "digester", handle, DigesterJobs.FIT_SCRUBBER)
         -- Fitting took the bucket; the charge's water comes in another.
         T.batch(function()
-            T.giveMaterials(self, "charge", DigesterJobs.materials(T.player(), DigesterJobs.CHARGE_LIME))
+            T.giveMaterials(self, "charge", DigesterJobs.materials(T.player(), DigesterJobs.REFILL_LIME))
             T.give(self, "water", { { type = "Base.Bucket" } })
             T.fillCarried(self, "Base.Bucket", "Water", Digester.SCRUB_WATER)
         end)
@@ -211,7 +211,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
             local summary = T.recordSummary(handle)
             return summary ~= nil and summary.scrubber and self.items.water[1]:getFluidContainer():getAmount() >= Digester.SCRUB_WATER
         end, "this client's copies of the fitted scrubber and the water")
-        T.gasJob(self, "digester", handle, DigesterJobs.CHARGE_LIME)
+        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_LIME)
         T.readRecord(self, handle, "charged")
         T.waitForSummary(self, handle, function(summary) return summary.scrubCO2 > 0 end, "this client's summary of the charged scrubber")
         T.gasJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[2] end)

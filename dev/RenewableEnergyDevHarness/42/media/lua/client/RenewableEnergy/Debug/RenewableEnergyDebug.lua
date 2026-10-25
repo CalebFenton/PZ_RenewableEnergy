@@ -32,7 +32,7 @@ Debug.ITEMS = {
     "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
     "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
-    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.FridgeCompressor",
+    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.TarpGasBag", "RenewableEnergy.FridgeCompressor",
     "RenewableEnergy.GasHeater", "RenewableEnergy.TarryPacking", "RenewableEnergy.FemaPamphlet",
     "RenewableEnergy.TreadmillMotor", "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades",
     "RenewableEnergy.SteelBlades", "RenewableEnergy.BrokenWoodenBlades", "RenewableEnergy.BrokenPipeBlades",

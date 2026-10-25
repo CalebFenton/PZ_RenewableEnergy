@@ -14,16 +14,17 @@ local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
 
 DigesterJobs.TAKE_SLUDGE = "TakeSludge"
 DigesterJobs.VENT = "VentGas"
-DigesterJobs.REPLACE_BAGS = "ReplaceBags"
-DigesterJobs.SEW_TARP = "SewTarp"
+DigesterJobs.FIT_BAGS = "FitGarbageBags"
+DigesterJobs.FIT_TARP = "FitTarpGasBag"
+DigesterJobs.TAKE_OFF_BAG = "TakeOffGasBag"
 DigesterJobs.UPGRADE = "Upgrade"
 DigesterJobs.FILL_PUMP = "FillByPump"
 DigesterJobs.FILL_COMPRESSOR = "FillByCompressor"
 DigesterJobs.FIT_SCRUBBER = "FitScrubber"
-DigesterJobs.CHARGE_WATER = "ChargeScrubberWater"
-DigesterJobs.CHARGE_ASH = "ChargeScrubberAsh"
-DigesterJobs.CHARGE_LIME = "ChargeScrubberLime"
-DigesterJobs.REPACK_WOOL = "RepackWool"
+DigesterJobs.REFILL_WATER = "RefillScrubberWater"
+DigesterJobs.REFILL_ASH = "RefillScrubberAsh"
+DigesterJobs.REFILL_LIME = "RefillScrubberLime"
+DigesterJobs.REFILL_WOOL = "RefillScrubberWool"
 
 DigesterJobs.COMPOST_BAG = "Base.CompostBag"
 local STEEL_WOOL = "Base.SteelWool"
@@ -36,25 +37,52 @@ function DigesterJobs.sludgePerUse()
     return Digester.SLUDGE_PER_BAG * script:getUseDelta()
 end
 
+--- The uses of compost `bag` would take from `sludge`: as many as it has room for, a new compost
+--- bag's for an empty sack, or 0 when it isn't either.
+function DigesterJobs.sludgeUses(bag, sludge)
+    local room
+    if bag:getFullType() == DigesterJobs.COMPOST_BAG then
+        room = bag:getMaxUses() - bag:getCurrentUses()
+    elseif bag:hasTag(ItemTag.HOLD_COMPOST) and bag:getInventory():isEmpty() then
+        room = round(1 / getScriptManager():FindItem(DigesterJobs.COMPOST_BAG):getUseDelta())
+    else
+        return 0
+    end
+    return math.min(room, math.floor(sludge / DigesterJobs.sludgePerUse()))
+end
+
 -- Whether `bag` takes sludge: an empty sack, as vanilla's composter takes (every kind it tags as
 -- holding compost), or a compost bag with room.
 local function takesSludge(bag)
-    if bag:getFullType() == DigesterJobs.COMPOST_BAG then
-        return bag:getCurrentUses() < bag:getMaxUses()
-    end
-    return bag:hasTag(ItemTag.HOLD_COMPOST) and bag:getInventory():isEmpty()
+    return DigesterJobs.sludgeUses(bag, math.huge) > 0
 end
 
---- The part-filled compost bag or empty sack the character would fill with sludge, or nil.
-function DigesterJobs.sludgeBag(character)
-    local inventory = character:getInventory()
-    local bags = inventory:getAllTypeRecurse(DigesterJobs.COMPOST_BAG)
-    for i = 0, bags:size() - 1 do
-        if takesSludge(bags:get(i)) then
-            return bags:get(i)
+--- The part-filled compost bags, then the empty sacks, the character could fill with sludge, as
+--- vanilla's Get Compost lists them.
+function DigesterJobs.sludgeBags(character)
+    local inventory, bags = character:getInventory(), {}
+    local compost = inventory:getAllTypeRecurse(DigesterJobs.COMPOST_BAG)
+    for i = 0, compost:size() - 1 do
+        if takesSludge(compost:get(i)) then
+            table.insert(bags, compost:get(i))
         end
     end
-    return inventory:getFirstEvalRecurse(takesSludge)
+    local sacks = inventory:getAllEvalRecurse(takesSludge)
+    for i = 0, sacks:size() - 1 do
+        if sacks:get(i):getFullType() ~= DigesterJobs.COMPOST_BAG then
+            table.insert(bags, sacks:get(i))
+        end
+    end
+    return bags
+end
+
+--- The Tarp Gas Bags the character carries.
+function DigesterJobs.tarpBags(character)
+    local found, bags = character:getInventory():getAllTypeRecurse(Digester.HOLDERS.tarp.item), {}
+    for i = 0, found:size() - 1 do
+        table.insert(bags, found:get(i))
+    end
+    return bags
 end
 
 --- The propane tank the character would fill: the emptiest they carry, or nil.
@@ -106,6 +134,14 @@ local function noScrubber(character, summary)
     return not summary.scrubber and "Tooltip_RenewableEnergy_NoScrubber" or nil
 end
 
+-- A gas bag goes on or comes off a barrel only once its gas is out.
+local function bagBlocker(character, summary)
+    if not Digester.TIERS[summary.tier].bags then
+        return "Tooltip_RenewableEnergy_NoGasBags"
+    end
+    return summary.gas > 0 and "Tooltip_RenewableEnergy_VentFirst" or nil
+end
+
 -- Completes the row of a job that fills the propane tank `with` from the holder. `fields.fill`:
 -- limit, the share of a full tank it stops at, and `full`, the key that says it got there;
 -- scrubbed, it takes scrubbed gas beyond the pump's share; power, it needs the square powered;
@@ -140,12 +176,13 @@ local function fillJob(fields)
 end
 
 -- Every job, by name (Jobs.define), read against the digester's summary
--- (Digester.currentSummary), with `with` the bag or tank it fills, which its materials leave out.
--- holder, charge and fill say what it does on the authority. Vanilla has no pump stroke; a tire
--- pump is worked kneeling at a wheel. The rest are reached into at waist height.
+-- (Digester.currentSummary), with `with` the bag or tank it fills or the Tarp Gas Bag it fits,
+-- which its materials leave out. holder, charge and fill say what it does on the authority.
+-- Vanilla has no pump stroke; a tire pump is worked kneeling at a wheel. The rest are reached into
+-- at waist height.
 DigesterJobs.JOBS = {
     [DigesterJobs.TAKE_SLUDGE] = {
-        minutes = 10, position = "Mid", metabolics = Metabolics.HeavyWork,
+        minutes = 10, position = "Mid", metabolics = Metabolics.HeavyWork, tooltip = "Tooltip_RenewableEnergy_TakeSludge",
         blocker = function(character, summary)
             return summary.sludge < DigesterJobs.sludgePerUse() and "Tooltip_RenewableEnergy_NoSludge" or nil
         end,
@@ -156,37 +193,36 @@ DigesterJobs.JOBS = {
             return nil
         end,
     },
-    [DigesterJobs.VENT] = { minutes = 1, position = "Mid", blocker = noGas },
-    [DigesterJobs.REPLACE_BAGS] = {
-        minutes = 15, position = "Mid", holder = "bags", hideBlocked = true,
-        blocker = function(character, summary)
-            return summary.holder ~= "bags" and "Tooltip_RenewableEnergy_NotBags" or nil
-        end,
+    [DigesterJobs.VENT] = { minutes = 1, position = "Mid", tooltip = "Tooltip_RenewableEnergy_VentGas", blocker = noGas },
+    [DigesterJobs.FIT_BAGS] = {
+        minutes = 15, position = "Mid", holder = "bags", tooltip = "Tooltip_RenewableEnergy_FitGarbageBags",
+        blocker = bagBlocker,
         materials = {
             { item = "Base.Garbagebag", need = 3 },
         },
     },
-    [DigesterJobs.SEW_TARP] = {
-        minutes = 60, anim = "SewingCloth", holder = "tarp", hideBlocked = true,
-        -- Over bags, or a torn tarp.
-        blocker = function(character, summary)
-            if not Digester.HOLDERS[summary.holder].wearPerDay then
-                return "Tooltip_RenewableEnergy_NotBags"
+    [DigesterJobs.FIT_TARP] = {
+        minutes = 15, position = "Mid", holder = "tarp", tooltip = "Tooltip_RenewableEnergy_FitTarpGasBag",
+        blocker = bagBlocker,
+        withRefusal = function(character, summary, bag)
+            if not Jobs.carries(character, bag, function(item) return item:getFullType() == Digester.HOLDERS.tarp.item end) then
+                return "Tooltip_RenewableEnergy_NeedsTarpGasBag"
             end
-            return summary.holder == "tarp" and not summary.torn and "Tooltip_RenewableEnergy_HasTarp" or nil
+            return nil
         end,
-        materials = {
-            { perk = "Tailoring", need = 2 },
-            { tool = "SEWING_NEEDLE", item = "Base.Needle" },
-            { item = "Base.Thread", uses = 1 },
-            { item = "Base.Tarp", need = 1 },
-            { item = "Base.DuctTape", uses = 2 },
-        },
-        xp = { perk = "Tailoring", amount = 10 },
+    },
+    [DigesterJobs.TAKE_OFF_BAG] = {
+        minutes = 10, position = "Mid", holder = "none", tooltip = "Tooltip_RenewableEnergy_TakeOffGasBag",
+        blocker = function(character, summary)
+            if summary.holder == "none" then
+                return "Tooltip_RenewableEnergy_NoGasBag"
+            end
+            return bagBlocker(character, summary)
+        end,
     },
     [DigesterJobs.UPGRADE] = {
         minutes = 120, anim = CharacterActionAnims.Build, sound = "Hammering", metabolics = Metabolics.HeavyWork,
-        hideBlocked = true,
+        hideBlocked = true, tooltip = "Tooltip_RenewableEnergy_Upgrade",
         blocker = function(character, summary)
             return not Digester.TIERS[summary.tier].upgrade and "Tooltip_RenewableEnergy_NotBarrel" or nil
         end,
@@ -204,7 +240,7 @@ DigesterJobs.JOBS = {
         xp = { perk = "Woodwork", amount = 30 },
     },
     [DigesterJobs.FILL_PUMP] = fillJob({
-        baseMinutes = 5, anim = "VehicleWorkOnTire", metabolics = Metabolics.HeavyWork,
+        baseMinutes = 5, anim = "VehicleWorkOnTire", metabolics = Metabolics.HeavyWork, tooltip = "Tooltip_RenewableEnergy_FillByPump",
         materials = { { item = Digester.PUMP, keep = true } },
         fill = {
             limit = Digester.PUMP_FILL, full = "Tooltip_RenewableEnergy_PumpLimit",
@@ -212,7 +248,7 @@ DigesterJobs.JOBS = {
         },
     }),
     [DigesterJobs.FILL_COMPRESSOR] = fillJob({
-        baseMinutes = 2, position = "Mid",
+        baseMinutes = 2, position = "Mid", tooltip = "Tooltip_RenewableEnergy_FillByCompressor",
         materials = { { item = Digester.COMPRESSOR, keep = true } },
         fill = {
             limit = 1, full = "Tooltip_RenewableEnergy_TankFull", scrubbed = true, power = true,
@@ -220,7 +256,7 @@ DigesterJobs.JOBS = {
         },
     }),
     [DigesterJobs.FIT_SCRUBBER] = {
-        minutes = 30, position = "Mid", hideBlocked = true,
+        minutes = 30, position = "Mid", hideBlocked = true, tooltip = "Tooltip_RenewableEnergy_FitScrubber",
         blocker = function(character, summary)
             return summary.scrubber and "Tooltip_RenewableEnergy_HasScrubber" or nil
         end,
@@ -233,21 +269,26 @@ DigesterJobs.JOBS = {
         },
         xp = { perk = "Mechanics", amount = 10 },
     },
-    -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3).
-    [DigesterJobs.CHARGE_WATER] = {
-        minutes = 5, position = "Mid", charge = "water", blocker = noScrubber,
+    -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3). The steel wool and the
+    -- water wear out apart, so each is refilled on its own.
+    [DigesterJobs.REFILL_WATER] = {
+        minutes = 5, position = "Mid", charge = "water", blocker = noScrubber, hideBlocked = true,
+        tooltip = "Tooltip_RenewableEnergy_RefillScrubberWater",
         materials = { SCRUB_WATER },
     },
-    [DigesterJobs.CHARGE_ASH] = {
-        minutes = 5, position = "Mid", charge = "ash", blocker = noScrubber,
+    [DigesterJobs.REFILL_ASH] = {
+        minutes = 5, position = "Mid", charge = "ash", blocker = noScrubber, hideBlocked = true,
+        tooltip = "Tooltip_RenewableEnergy_RefillScrubberAsh",
         materials = { SCRUB_WATER, { item = Gasifier.WOOD_ASH, need = 1 } },
     },
-    [DigesterJobs.CHARGE_LIME] = {
-        minutes = 5, position = "Mid", charge = "lime", blocker = noScrubber,
+    [DigesterJobs.REFILL_LIME] = {
+        minutes = 5, position = "Mid", charge = "lime", blocker = noScrubber, hideBlocked = true,
+        tooltip = "Tooltip_RenewableEnergy_RefillScrubberLime",
         materials = { SCRUB_WATER, { item = "Base.Quicklime", need = 1 } },
     },
-    [DigesterJobs.REPACK_WOOL] = {
+    [DigesterJobs.REFILL_WOOL] = {
         minutes = 5, position = "Mid", blocker = noScrubber, hideBlocked = true,
+        tooltip = "Tooltip_RenewableEnergy_RefillScrubberWool",
         materials = { { item = STEEL_WOOL, uses = 1 } },
     },
 }

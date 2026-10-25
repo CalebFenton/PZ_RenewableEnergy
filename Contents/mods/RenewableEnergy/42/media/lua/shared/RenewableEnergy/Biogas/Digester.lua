@@ -24,10 +24,11 @@ Digester.SYSTEM_NAME = "renewable_energy_digester"
 -- stink: its share of the stink score; stinkCap: the most it stinks whatever its state.
 -- warmTo: the dome is buried and burns its gas to keep at least this warm, as a lit gas heater
 -- does (GasHeater.m3PerHour).
--- holder: the gas holder it is built with (HOLDERS). upgrade: the tier its Upgrade job makes of it.
+-- holder: the gas holder it is built with (HOLDERS). bags: its holder comes off, and a gas bag goes
+-- on (DigesterJobs). upgrade: the tier its Upgrade job makes of it.
 -- sealed: it never fumes indoors.
 Digester.TIERS = {
-    barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", upgrade = "insulated" },
+    barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", bags = true, upgrade = "insulated" },
     insulated = { potentialCap = 15, days = 3, stink = 0.6, holder = "drum" },
     dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, holder = "dome",
         sealed = true },
@@ -35,12 +36,15 @@ Digester.TIERS = {
 
 -- capacity: gas the holder stores. wearPerDay: condition lost a day; a holder at none is torn,
 -- holds nothing and leaks. levels: its overlays from slack to full, and torn: its overlay once torn;
--- the dome's holder is the dome itself.
+-- the dome's holder is the dome itself. item: what comes off the digester with the holder's wear
+-- as its condition, and goes back on with it. A barrel with its bag off has none.
 Digester.HOLDERS = {
     bags = { capacity = 0.6, wearPerDay = 1, levels = Sprites.digesterHolder.bags, torn = Sprites.digesterHolder.bagsTorn },
-    tarp = { capacity = 1.0, wearPerDay = 0.25, levels = Sprites.digesterHolder.tarp, torn = Sprites.digesterHolder.tarpTorn },
+    tarp = { capacity = 1.0, wearPerDay = 0.25, levels = Sprites.digesterHolder.tarp, torn = Sprites.digesterHolder.tarpTorn,
+        item = "RenewableEnergy.TarpGasBag" },
     drum = { capacity = 1.5, levels = Sprites.digesterHolder.drum },
     dome = { capacity = 4.0 },
+    none = { capacity = 0 },
 }
 
 -- The stink score at which each smell level starts.

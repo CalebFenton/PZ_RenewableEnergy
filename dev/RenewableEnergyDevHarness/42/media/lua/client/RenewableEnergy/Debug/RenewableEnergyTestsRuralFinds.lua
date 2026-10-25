@@ -105,8 +105,8 @@ test("renewable_energy_world_rural_digester", {
             -- Its drum's entity, or each load of it logs "Invalid SpriteConfig object!".
             local config = find.object:getSpriteConfig()
             self.configValid = config ~= nil and config:isValid()
-            T.giveMaterials(self, "bags", DigesterJobs.materials(T.player(), DigesterJobs.REPLACE_BAGS))
-            T.gasJob(self, "digester", find, DigesterJobs.REPLACE_BAGS)
+            T.giveMaterials(self, "bags", DigesterJobs.materials(T.player(), DigesterJobs.FIT_BAGS))
+            T.gasJob(self, "digester", find, DigesterJobs.FIT_BAGS)
             T.batch(function()
                 T.fillRecord(self, find, { hopper = { { type = "Base.Dung_Cow", count = 2 } } })
                 T.runDigester(self, find, 2, 30)
@@ -130,7 +130,7 @@ test("renewable_energy_world_rural_digester", {
         -- New bags, worn only by the two hours since; the summary rounds the condition.
         local wear = (Digester.HOLDERS[fed.holder].wearPerDay or 0) * 2 / 24
         expect(not fed.torn and fed.holderCondition >= 100 - wear - 0.5,
-            "Replace Bags didn't mend the found digester: condition " .. tostring(fed.holderCondition))
+            "Fit Garbage Bags didn't mend the found digester: condition " .. tostring(fed.holderCondition))
         expect(fed.hopperItems == 0 and fed.potential > 0, "the re-bagged digester left " .. tostring(fed.hopperItems)
             .. " manure in its hopper, potential " .. tostring(fed.potential))
     end,

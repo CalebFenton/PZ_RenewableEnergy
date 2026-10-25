@@ -7,6 +7,7 @@ require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/GasHeater"
 require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
+require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/ObjectWindow"
 require "RenewableEnergy/UI/DigesterWindow"
 local JobOptions = require "cf_commonlib/JobOptions"
@@ -17,12 +18,48 @@ local DigesterMenu = {}
 RenewableEnergy.DigesterMenu = DigesterMenu
 
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local ObjectWindow, DigesterWindow = RenewableEnergy.ObjectWindow, RenewableEnergy.DigesterWindow
+local ObjectWindow, DigesterWindow, Format = RenewableEnergy.ObjectWindow, RenewableEnergy.DigesterWindow, RenewableEnergy.Format
 local Action = RenewableEnergyGasAction
 
--- Adds the option for `feature`'s `job`, with `item` the bag or tank it fills.
-local function addJob(menu, playerNum, feature, job, target, item)
-    return JobOptions.add(menu, playerNum, Action, feature, job, target, item, getText(Action.labelKey(job)))
+-- The job's name, with what it has to go on as an eyeball share, as vanilla's Get Compost (45%).
+local function label(job, share)
+    local name = getText(Action.labelKey(job))
+    return share and name .. " (" .. Format.percent(share) .. ")" or name
+end
+
+-- Adds the option for `feature`'s `job`, with `item` the bag, tank or gas bag it works with.
+local function addJob(menu, playerNum, feature, job, target, item, text)
+    return JobOptions.add(menu, playerNum, Action, feature, job, target, item, text or label(job))
+end
+
+-- Take Sludge, into each bag that takes it, as vanilla's Get Compost lists them with the share of
+-- the digester each would take.
+local function addSludge(menu, playerNum, digester, summary)
+    local perUse = DigesterJobs.sludgePerUse()
+    JobOptions.addEach(menu, playerNum, Action, "digester", DigesterJobs.TAKE_SLUDGE, digester,
+        DigesterJobs.sludgeBags(getSpecificPlayer(playerNum)), label(DigesterJobs.TAKE_SLUDGE, summary.sludge / 100),
+        function(bag)
+            return bag:getDisplayName() .. " (" .. Format.percent(DigesterJobs.sludgeUses(bag, summary.sludge) * perUse / 100) .. ")"
+        end)
+end
+
+-- A barrel's gas bag: new garbage bags, each Tarp Gas Bag carried at its condition, and taking off
+-- the one there.
+local function addGasBag(menu, playerNum, digester, summary)
+    local bagMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_GasBag"))
+    addJob(bagMenu, playerNum, "digester", DigesterJobs.FIT_BAGS, digester)
+    local tarps = DigesterJobs.tarpBags(getSpecificPlayer(playerNum))
+    if #tarps == 0 then
+        addJob(bagMenu, playerNum, "digester", DigesterJobs.FIT_TARP, digester)
+    end
+    for _, tarp in ipairs(tarps) do
+        local option = addJob(bagMenu, playerNum, "digester", DigesterJobs.FIT_TARP, digester, tarp,
+            label(DigesterJobs.FIT_TARP, tarp:getCondition() / tarp:getConditionMax()))
+        option.itemForTexture = tarp
+    end
+    if summary.holder ~= "none" then
+        addJob(bagMenu, playerNum, "digester", DigesterJobs.TAKE_OFF_BAG, digester)
+    end
 end
 
 --- Adds the digester's submenu to `context`. Returns the submenu, or nil while this side can't
@@ -35,22 +72,27 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, ObjectWindow.queueOpen, digester,
         DigesterWindow)
 
-    addJob(menu, playerNum, "digester", DigesterJobs.TAKE_SLUDGE, digester, DigesterJobs.sludgeBag(character))
-    for _, job in ipairs({ DigesterJobs.VENT, DigesterJobs.REPLACE_BAGS, DigesterJobs.SEW_TARP, DigesterJobs.UPGRADE }) do
-        addJob(menu, playerNum, "digester", job, digester)
+    addSludge(menu, playerNum, digester, summary)
+    addJob(menu, playerNum, "digester", DigesterJobs.VENT, digester, nil,
+        label(DigesterJobs.VENT, summary.capacity > 0 and summary.gas / summary.capacity or nil))
+    if Digester.TIERS[summary.tier].bags then
+        addGasBag(menu, playerNum, digester, summary)
     end
+    addJob(menu, playerNum, "digester", DigesterJobs.UPGRADE, digester)
+
     local tank = DigesterJobs.tankToFill(character)
+    local fillMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_FillPropaneTank"))
     for _, job in ipairs({ DigesterJobs.FILL_PUMP, DigesterJobs.FILL_COMPRESSOR }) do
-        addJob(menu, playerNum, "digester", job, digester, tank)
+        addJob(fillMenu, playerNum, "digester", job, digester, tank)
     end
-    addJob(menu, playerNum, "digester", DigesterJobs.FIT_SCRUBBER, digester)
-    if summary.scrubber then
-        local chargeMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_ChargeScrubber"))
-        for _, job in ipairs({ DigesterJobs.CHARGE_WATER, DigesterJobs.CHARGE_ASH, DigesterJobs.CHARGE_LIME }) do
-            addJob(chargeMenu, playerNum, "digester", job, digester)
-        end
+    if not summary.scrubber then
+        addJob(menu, playerNum, "digester", DigesterJobs.FIT_SCRUBBER, digester)
+        return menu
     end
-    addJob(menu, playerNum, "digester", DigesterJobs.REPACK_WOOL, digester)
+    local refillMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_RefillScrubber"))
+    for _, job in ipairs({ DigesterJobs.REFILL_WATER, DigesterJobs.REFILL_ASH, DigesterJobs.REFILL_LIME, DigesterJobs.REFILL_WOOL }) do
+        addJob(refillMenu, playerNum, "digester", job, digester)
+    end
     return menu
 end
 

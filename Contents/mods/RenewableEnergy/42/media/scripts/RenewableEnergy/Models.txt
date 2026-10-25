@@ -259,6 +259,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_GasConversionKit,
         scale = 0.666667,
     }
+    model TarpGasBag_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_TarpGasBag,
+        texture = WorldItems/RenewableEnergy_TarpGasBag,
+        scale = 0.666667,
+    }
     model FridgeCompressor_Ground
     {
         mesh = WorldItems/RenewableEnergy_FridgeCompressor,

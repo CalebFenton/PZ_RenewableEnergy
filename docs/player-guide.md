@@ -117,7 +117,7 @@ Car batteries come first, then **Deep Cycle Marine Batteries**, which hold twice
 | Digesters | Barrel Digester | Insulated Digester: three times the barrel, built new or upgraded from a barrel | Brick Dome Digester: three times again, buried and warm |
 | Gasifiers | Primitive Gasifier (trash can) | Gasifier (steel drum) | Advanced Gasifier (welded sheet metal) |
 
-A bigger digester holds more feed and gas and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel. The brick dome sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
+A bigger digester holds more feed and gas and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel, which goes in a box of planks and straw under a second drum that floats on top to hold the gas. A tarp gas bag on the barrel comes back to you. The brick dome sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
 
 ### Sizing a bank
 
@@ -443,11 +443,11 @@ The gas waits in a holder until something burns it. Gas made past what the holde
 | Holder | On | Holds | Wear |
 |---|---|---|---|
 | Garbage bags | Barrel | 0.6 m³ | Tear within a few months |
-| Sewn tarp | Barrel | 1 m³ | Lasts about four times as long |
+| Tarp Gas Bag | Barrel | 1 m³ | Lasts about four times as long |
 | Floating drum | Insulated digester | 1.5 m³ | Never wears out |
 | The dome itself | Brick dome | 4 m³ | Never wears out |
 
-**Replace Gas Bags** or **Sew Tarp Gas Bag** to fix a torn holder; either loses the gas stored in it. **Vent Gas** empties the holder.
+A barrel's **Gas Bag** menu fits new garbage bags or a **Tarp Gas Bag**, sewn in the crafting menu (Tailoring 2) from a tarp, thread and duct tape. A bag goes on or comes off only once its gas is out, so **Vent Gas** first. **Take Off Gas Bag** gives a tarp bag back with its wear, to repair with duct tape, glue, epoxy or a tarp piece as any vanilla item is repaired; garbage bags are thrown away. With no bag on, a barrel's gas is wasted.
 
 ### Smell and fumes
 
@@ -461,9 +461,9 @@ A barrel or insulated digester inside a building poisons the whole building whil
 
 Generators burn raw gas, but bottling it needs it cleaned first.
 
-- **Fit Scrubber**, then **Charge Scrubber** with water (cleans about 5 m³), water and wood ash (15 m³) or water and quicklime (30 m³). A new charge replaces the old one. Its steel wool cleans about 10 m³ per use before you **Repack Steel Wool**.
-- **Fill Propane Tank (Tire Pump)** fills a tank only a quarter of the way, and it's tiring work.
-- **Fill Propane Tank (Compressor)** fills it all the way where there's power, using scrubbed gas past the first quarter. Salvage a **Fridge Compressor** by cutting up a fridge.
+- **Fit Scrubber**, then keep it going from **Refill Scrubber**. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its steel wool cleans about 10 m³ before it needs fresh **Steel Wool**. The two wear out separately.
+- **Fill Propane Tank** with a **Tire Pump** fills a tank only a quarter of the way, and it's tiring work.
+- **Fill Propane Tank** with a **Compressor** fills it all the way where there's power, using scrubbed gas past the first quarter. Salvage a **Fridge Compressor** by cutting up a fridge.
 
 A propane tank refills lantern bottles. Where there's power, a carried Fridge Compressor inflates tires too.
 
@@ -491,7 +491,7 @@ Logs, branches, planks, firewood, twigs, pinecones, charcoal, and anything a cha
 
 ### Upkeep
 
-- **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel gives **Wood Ash**, which settles a sour digester or charges a scrubber.
+- **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel gives **Wood Ash**, which settles a sour digester or goes in a scrubber's water.
 - **Filter.** The filter holds hay, straw, grass or splinters, which turn into **Tarry Packing** as it burns. Change the packing in time: once no clean packing is left, tar reaches the engine, for half the gas and fast wear. Tarry packing wears the generator faster even before then.
 - **Condensate.** Burning fills a condensate drain, and while it's full, tar builds up twice as fast. **Drain Condensate** into a metal or glass container while the gasifier is lit. It's wood vinegar: poisonous to drink, but mixed with water it makes mildew spray and aphid spray.
 

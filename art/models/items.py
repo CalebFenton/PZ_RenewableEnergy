@@ -93,6 +93,7 @@ ITEMS = {
     "HomesteadPowerMag4": {"model": lambda col: magazines.magazine(col, 4), "icon_elevation": 70},
     "WoodAsh": {"model": woodgas.wood_ash, "icon_elevation": 25},
     "GasConversionKit": {"model": biogas.gas_conversion_kit, "icon_elevation": 45},
+    "TarpGasBag": {"model": biogas.tarp_gas_bag, "icon_elevation": 50},
     "FridgeCompressor": {"model": biogas.fridge_compressor},
     "GasHeater": {"model": biogas.gas_heater},
     "TarryPacking": {"model": woodgas.tarry_packing, "icon_elevation": 35},

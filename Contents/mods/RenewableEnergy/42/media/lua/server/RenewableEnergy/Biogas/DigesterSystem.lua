@@ -40,26 +40,20 @@ end
 -- Take Sludge, as vanilla's ISGetCompost fills compost bags from a composter: into the part-filled
 -- compost bag `item`, or a new one for the empty sack `item`.
 local function takeSludge(character, record, row, isoObject, item)
-    local perUse = DigesterJobs.sludgePerUse()
-    local uses = math.floor(record.sludge / perUse)
+    local uses = DigesterJobs.sludgeUses(item, record.sludge)
+    if uses <= 0 then
+        return false
+    end
     if item:getFullType() == DigesterJobs.COMPOST_BAG then
-        uses = math.min(uses, item:getMaxUses() - item:getCurrentUses())
-        if uses <= 0 then
-            return false
-        end
         item:setCurrentUses(item:getCurrentUses() + uses)
         item:syncItemFields()
     else
         local bag = instanceItem(DigesterJobs.COMPOST_BAG)
-        uses = math.min(uses, bag:getMaxUses())
-        if uses <= 0 then
-            return false
-        end
         Items.takeItem(character, item)
         bag:setCurrentUses(uses)
         Items.giveItems(character, bag)
     end
-    record.sludge = math.max(0, record.sludge - uses * perUse)
+    record.sludge = math.max(0, record.sludge - uses * DigesterJobs.sludgePerUse())
     return true
 end
 
@@ -71,15 +65,35 @@ local function vent(character, record)
     return true
 end
 
--- A new holder of the row's kind, empty.
-local function newHolder(character, record, row)
+-- Takes the holder off: one with an item (Digester.HOLDERS) comes back to the character with its
+-- wear as the item's condition, rounded up so a holder not yet torn doesn't come back broken.
+local function takeOffHolder(character, record)
+    local fullType = Digester.HOLDERS[record.holder].item
+    if fullType then
+        local item = instanceItem(fullType)
+        item:setCondition(math.ceil(record.holderCondition / 100 * item:getConditionMax()))
+        Items.giveItems(character, item)
+    end
+    record.holder = "none"
+    record.holderCondition = 0
+end
+
+-- Puts the row's holder on in place of the one there: new garbage bags, or the Tarp Gas Bag `item`
+-- at its condition; with the row's holder "none", only takes it off.
+local function fitHolder(character, record, row, isoObject, item)
+    takeOffHolder(character, record)
     record.holder = row.holder
-    record.holderCondition = 100
-    record.gas = 0
+    if item then
+        Items.takeItem(character, item)
+        record.holderCondition = 100 * item:getCondition() / item:getConditionMax()
+    elseif row.holder ~= "none" then
+        record.holderCondition = 100
+    end
     return true
 end
 
 local function upgrade(character, record, row, isoObject)
+    takeOffHolder(character, record)
     record:upgrade(isoObject)
     return true
 end
@@ -111,32 +125,32 @@ local function fitScrubber(character, record)
     return true
 end
 
-local function charge(character, record, row)
-    record.scrubCO2 = Digester.SCRUB_M3[row.charge]
-    return true
-end
-
-local function repackWool(character, record)
-    record.scrubWool = Digester.WOOL_M3
+local function refill(character, record, row)
+    if row.charge then
+        record.scrubCO2 = Digester.SCRUB_M3[row.charge]
+    else
+        record.scrubWool = Digester.WOOL_M3
+    end
     return true
 end
 
 -- What each job does to the digester's record `record` (its tile `isoObject`) beyond taking its
--- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag or tank. Returns whether it
--- was done.
+-- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag, tank or Tarp Gas Bag.
+-- Returns whether it was done.
 local DO = {
     [DigesterJobs.TAKE_SLUDGE] = takeSludge,
     [DigesterJobs.VENT] = vent,
-    [DigesterJobs.REPLACE_BAGS] = newHolder,
-    [DigesterJobs.SEW_TARP] = newHolder,
+    [DigesterJobs.FIT_BAGS] = fitHolder,
+    [DigesterJobs.FIT_TARP] = fitHolder,
+    [DigesterJobs.TAKE_OFF_BAG] = fitHolder,
     [DigesterJobs.UPGRADE] = upgrade,
     [DigesterJobs.FILL_PUMP] = fill,
     [DigesterJobs.FILL_COMPRESSOR] = fill,
     [DigesterJobs.FIT_SCRUBBER] = fitScrubber,
-    [DigesterJobs.CHARGE_WATER] = charge,
-    [DigesterJobs.CHARGE_ASH] = charge,
-    [DigesterJobs.CHARGE_LIME] = charge,
-    [DigesterJobs.REPACK_WOOL] = repackWool,
+    [DigesterJobs.REFILL_WATER] = refill,
+    [DigesterJobs.REFILL_ASH] = refill,
+    [DigesterJobs.REFILL_LIME] = refill,
+    [DigesterJobs.REFILL_WOOL] = refill,
 }
 
 --- The authority's side of the jobs at a digester (Jobs.perform), whose `with` is the job's bag

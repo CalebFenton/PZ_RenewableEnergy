@@ -1243,6 +1243,39 @@ module Base
         }
     }
 
+    /* The barrel digester's tarp gas bag (DigesterJobs fits it), sewn like vanilla's Sew Sack:
+       free to all, as any sewing is. */
+    craftRecipe RenewableEnergy_SewTarpGasBag
+    {
+        timedAction = SewingCloth,
+        time = 600,
+        Tags = InHandCraft,
+        category = Tailoring,
+        SkillRequired = Tailoring:2,
+        xpAward = Tailoring:10,
+        inputs
+        {
+            item 1 tags[base:sewingneedle] mode:keep,
+            item 1 tags[base:thread],
+            item 1 [Base.Tarp],
+            item 2 [Base.DuctTape],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.TarpGasBag,
+        }
+    }
+
+    /* A worn or torn Tarp Gas Bag patched, as vanilla fixes a car seat. */
+    fixing Fix Tarp Gas Bag
+    {
+        Require = RenewableEnergy.TarpGasBag,
+        Fixer = Base.DuctTape=2; Tailoring=1,
+        Fixer = Base.Glue=2; Tailoring=1,
+        Fixer = Base.Epoxy=2; Tailoring=1,
+        Fixer = Base.TarpPiece; Tailoring=2,
+    }
+
     /* A lantern's propane bottle topped up from a tank, as Refill Blow Torch does (OnCreate moves
        the propane). Free to all: decanting needs no book. */
     craftRecipe RenewableEnergy_RefillPropaneBottle

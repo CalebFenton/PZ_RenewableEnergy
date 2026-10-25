@@ -296,7 +296,7 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
 -- Holder -----------------------------------------------------------------------------------------
 
 -- The bags hold what they can and vent the rest; worn through they tear, hold nothing and show
--- torn; Replace Bags takes new bags and mends them.
+-- torn; Fit Garbage Bags takes new bags and mends them.
 test("renewable_energy_biogas_digester_holder", {
     instant = true,
     run = function(self)
@@ -314,9 +314,9 @@ test("renewable_energy_biogas_digester_holder", {
             T.readRecord(self, handle, "torn")
         end)
         T.waitForSummary(self, handle, function(summary) return summary.torn end, "this client's summary of the torn bags")
-        self.replace = DigesterJobs.materials(T.player(), DigesterJobs.REPLACE_BAGS)
+        self.replace = DigesterJobs.materials(T.player(), DigesterJobs.FIT_BAGS)
         T.giveMaterials(self, "bags", self.replace)
-        T.gasJob(self, "digester", handle, DigesterJobs.REPLACE_BAGS)
+        T.gasJob(self, "digester", handle, DigesterJobs.FIT_BAGS)
         T.batch(function()
             T.readRecord(self, handle, "mended")
             T.countMaterials(self, "left", self.replace)
@@ -330,7 +330,47 @@ test("renewable_energy_biogas_digester_holder", {
         T.expect(T.hasOverlay(reads.torn, Sprites.digesterHolder.bagsTorn), "torn bags don't show torn")
         T.expect(reads.mended.holderCondition == 100 and not reads.mended.torn, "new bags didn't mend it")
         T.expect(T.hasOverlay(reads.mended, levels[1]), "new bags don't show empty")
-        T.expectMaterialsUsed(self, "left", self.replace, "Replace Bags")
+        T.expectMaterialsUsed(self, "left", self.replace, "Fit Garbage Bags")
+    end,
+})
+
+-- A Tarp Gas Bag goes on only once the gas is vented, at its own wear, and comes off whole, its
+-- wear its condition again, leaving the barrel with nothing to hold gas.
+test("renewable_energy_biogas_digester_tarp_gas_bag", {
+    instant = true,
+    run = function(self)
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
+        if not handle then return end
+        self.tarp = Digester.HOLDERS.tarp.item
+        T.setRecord(self, handle, T.matureDigester("barrel", { gas = 0.3 }))
+        T.give(self, "tarp", { { type = self.tarp, condition = 6 } })
+        T.waitForGas(self, handle, 0.3)
+        T.step(function()
+            self.gassy = DigesterJobs.refusal(T.player(), DigesterJobs.FIT_TARP, handle.object, self.items.tarp[1])
+        end)
+        T.gasJob(self, "digester", handle, DigesterJobs.VENT)
+        T.waitForGas(self, handle, 0)
+        T.gasJob(self, "digester", handle, DigesterJobs.FIT_TARP, function() return self.items.tarp[1] end)
+        T.batch(function()
+            T.readRecord(self, handle, "fitted")
+            T.readCarried(self, { self.tarp }, nil, "fittedCarried")
+        end)
+        T.waitForSummary(self, handle, function(summary) return summary.holder == "tarp" end, "this client's summary of the tarp")
+        T.gasJob(self, "digester", handle, DigesterJobs.TAKE_OFF_BAG)
+        T.batch(function()
+            T.readRecord(self, handle, "off")
+            T.readCarried(self, { self.tarp }, nil, "offCarried")
+        end)
+    end,
+    validate = function(self)
+        local fitted, off = self.reads.fitted, self.reads.off
+        T.expect(self.gassy == "Tooltip_RenewableEnergy_VentFirst", "Fit Tarp Gas Bag with gas in the bags: " .. tostring(self.gassy))
+        T.expect(fitted.holder == "tarp" and fitted.holderCondition == 60, "the fitted tarp is " .. tostring(fitted.holder)
+            .. " at " .. tostring(fitted.holderCondition))
+        T.expect(#T.carriedItems(self, self.tarp, "fittedCarried") == 0, "fitting left the Tarp Gas Bag in the inventory")
+        T.expect(off.holder == "none", "taking it off left " .. tostring(off.holder))
+        local back = T.carriedFirst(self, self.tarp, "offCarried")
+        T.expect(back ~= nil and back.condition == 6, "the Tarp Gas Bag came back at " .. tostring(back and back.condition))
     end,
 })
 
@@ -536,7 +576,8 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
 })
 
 -- Right-clicking a barrel digester shows its submenu through vanilla's menu builder: its status,
--- and its jobs greyed out with the reason while the digester or the character can't do them. The
+-- and its jobs, each tooltip saying what it does, greyed out with the reason under that while the
+-- digester or the character can't do them; the gas bag's jobs in a submenu of their own. The
 -- status window opens on it and shows its state.
 test("renewable_energy_biogas_digester_menu", {
     run = function(self)
@@ -544,19 +585,21 @@ test("renewable_energy_biogas_digester_menu", {
     end,
     validate = function(self)
         local object = self.digester.object
-        local function job(name)
-            return getText("ContextMenu_RenewableEnergy_" .. name)
+        local function job(name, share)
+            return getText("ContextMenu_RenewableEnergy_" .. name) .. (share and " (" .. share .. ")" or "")
         end
         local options = T.worldOptions(object, getText("IGUI_RenewableEnergy_Digester_barrel"), { status = job("Status"),
-            sludge = job(DigesterJobs.TAKE_SLUDGE), vent = job(DigesterJobs.VENT), bags = job(DigesterJobs.REPLACE_BAGS),
-            tarp = job(DigesterJobs.SEW_TARP), upgrade = job(DigesterJobs.UPGRADE) })
+            sludge = job(DigesterJobs.TAKE_SLUDGE, "0%"), vent = job(DigesterJobs.VENT, "0%"), bag = job("GasBag"),
+            upgrade = job(DigesterJobs.UPGRADE) })
         if T.expect(options ~= nil, "right-clicking a digester shows no digester submenu") then
             T.expect(options.status ~= nil, "no Status option")
-            local sludge = options.sludge
-            T.expect(sludge and sludge.notAvailable and T.tooltipOf(sludge) == getText("Tooltip_RenewableEnergy_NoSludge"),
-                "Take Sludge isn't greyed out for an empty digester")
+            local sludge = T.tooltipOf(options.sludge)
+            T.expect(options.sludge and options.sludge.notAvailable
+                and sludge:find(getText("Tooltip_RenewableEnergy_TakeSludge"), 1, true) == 1
+                and sludge:find(getText("Tooltip_RenewableEnergy_NoSludge"), 1, true),
+                "Take Sludge isn't greyed out for an empty digester under what it does: " .. sludge)
             T.expect(options.vent and options.vent.notAvailable, "Vent Gas isn't greyed out with no gas")
-            T.expect(options.bags ~= nil and options.tarp ~= nil, "no holder options on a barrel")
+            T.expect(options.bag ~= nil and options.bag.subOption ~= nil, "no Gas Bag submenu on a barrel")
             local upgrade = options.upgrade
             T.expect(upgrade and upgrade.notAvailable and T.tooltipOf(upgrade):find(getItemNameFromFullType("Base.Plank"), 1, true),
                 "Upgrade isn't greyed out listing its planks")

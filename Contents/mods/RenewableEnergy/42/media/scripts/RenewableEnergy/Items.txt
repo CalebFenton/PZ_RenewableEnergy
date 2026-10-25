@@ -832,6 +832,20 @@ module RenewableEnergy
         Tags = base:ignorezombiedensity,
     }
 
+    /* The barrel digester's longer-lasting gas holder (Digester.HOLDERS.tarp), sewn in the
+       crafting menu, fitted and taken off at the digester with its wear as its condition. */
+    item TarpGasBag
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 2.5,
+        ConditionMax = 10,
+        Icon = RenewableEnergy_TarpGasBag,
+        WorldStaticModel = RenewableEnergy.TarpGasBag_Ground,
+        Tooltip = Tooltip_RenewableEnergy_TarpGasBag,
+        Tags = base:ignorezombiedensity,
+    }
+
     /* The compressor a fridge gives when cut up; presses scrubbed biogas into propane tanks. */
     item FridgeCompressor
     {
