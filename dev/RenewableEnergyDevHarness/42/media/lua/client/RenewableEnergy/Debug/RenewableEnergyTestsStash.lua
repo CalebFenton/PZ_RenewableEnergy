@@ -1,7 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 local Stash = require "RenewableEnergy/Stash"
 
--- Stash houses (Stash.lua, StashHouses.lua, MapDefinitions.lua): registered, stocked and mapped on
+-- Stash houses (Stash.lua, StashStocking.lua, MapDefinitions.lua): registered, stocked and mapped on
 -- the authority (RenewableEnergyTestServerStash.lua).
 
 local T = RenewableEnergyTest
