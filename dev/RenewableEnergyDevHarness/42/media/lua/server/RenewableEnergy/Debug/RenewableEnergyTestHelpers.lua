@@ -9,60 +9,9 @@
 -- before the files that require it.
 
 require "PZHarness/ServerHandlers"
-require "PZHarness/Checks"
 require "PZHarness/Fixtures"
 
 local Helpers = {}
-
---- Registers the server check `name`, which only reads the authority's state and answers
---- { failures = { message, ... } }, which the test expects to be empty
---- (RenewableEnergyTest.expectNoFailures). `fn(expect, expectNear, player, args, defer)` records
---- what it finds wrong through the PZHarness.Checks.new pair; it may instead return what is
---- missing, which fails the test as a handler's `nil, missing` does.
-function Helpers.check(name, fn)
-    PZHarness.serverHandler(name, function(player, args, defer)
-        local expect, expectNear, failures = PZHarness.Checks.new()
-        local missing = fn(expect, expectNear, player, args, defer)
-        if missing then
-            return nil, missing
-        end
-        return { failures = failures }
-    end)
-end
-
---- Defers `undo` for a handler that changes shared state, and returns the function that runs it
---- now, which the handler calls when done. Being deferred too, it still runs when the handler
---- throws first (the harness unwinds a failed call at once). It runs once either way.
-function Helpers.deferOnce(defer, undo)
-    local done = false
-    local function once()
-        if done then
-            return
-        end
-        done = true
-        undo()
-    end
-    defer(once)
-    return once
-end
-
---- Saves the mod's sandbox options `names` for a handler that changes them, and returns the
---- function that puts them back and then calls `reapply`, if given, to rebuild what the game made
---- from them; Helpers.deferOnce says when it runs.
-function Helpers.saveOptions(defer, names, reapply)
-    local options, saved = SandboxVars.RenewableEnergy, {}
-    for _, name in ipairs(names) do
-        saved[name] = options[name]
-    end
-    return Helpers.deferOnce(defer, function()
-        for _, name in ipairs(names) do
-            options[name] = saved[name]
-        end
-        if reapply then
-            reapply()
-        end
-    end)
-end
 
 -- The game's roll, kept while a test sets its own; and the rolls tests set, so that setting one
 -- over another still keeps the game's.
@@ -72,8 +21,8 @@ local setRolls = setmetatable({}, { __mode = "k" })
 --- Sets what Chance.roll gives until the test ends: `rolls` a number, every roll; or a list, the
 --- next rolls in order, and an error once they run out, so a draw the test didn't expect shows.
 --- The error puts the game's roll back first, so the draws after it, a pass's or a tick's, roll
---- as usual. Returns the function that puts the game's roll back; Helpers.deferOnce says when it
---- runs.
+--- as usual. Returns the function that puts the game's roll back; PZHarness.Fixtures.deferOnce
+--- says when it runs.
 function Helpers.forceRolls(defer, rolls)
     local Chance = RenewableEnergy.Chance
     if not setRolls[Chance.roll] then
@@ -90,17 +39,12 @@ function Helpers.forceRolls(defer, rolls)
     end
     setRolls[roll] = true
     Chance.roll = roll
-    return Helpers.deferOnce(defer, function() Chance.roll = gameRoll end)
-end
-
---- The square at `args` ({ x, y, z }), or nil when there is none or it isn't loaded here.
-function Helpers.squareAt(args)
-    return args and args.x and getSquare(args.x, args.y, args.z)
+    return PZHarness.Fixtures.deferOnce(defer, function() Chance.roll = gameRoll end)
 end
 
 --- The object drawn as `args.sprite` on the square at `args`, or nil and what is missing.
 function Helpers.objectAt(args)
-    local object = PZHarness.Fixtures.objectWithSprite(Helpers.squareAt(args), args.sprite)
+    local object = PZHarness.Fixtures.objectWithSprite(PZHarness.Fixtures.squareAt(args), args.sprite)
     if not object then
         return nil, "the placed " .. tostring(args.sprite) .. " on the server"
     end
@@ -134,27 +78,6 @@ function Helpers.onVehicle(name, fn)
         end
         return fn(vehicle, args, player, defer)
     end)
-end
-
---- The names of the overlays an object's tile shows, in drawing order.
-function Helpers.overlaysOf(object)
-    local names = {}
-    local attached = object and object:getAttachedAnimSprite()
-    for i = 0, (attached and attached:size() or 0) - 1 do
-        table.insert(names, attached:get(i):getName())
-    end
-    return names
-end
-
---- The fields `keys` of `source` that aren't tables, as plain values for an answer.
-function Helpers.plainFields(source, keys)
-    local fields = {}
-    for _, key in ipairs(keys) do
-        if type(source[key]) ~= "table" then
-            fields[key] = source[key]
-        end
-    end
-    return fields
 end
 
 --- How many keys `entries` holds; 0 for nil.
@@ -371,7 +294,7 @@ function Helpers.recordAt(args)
     if not kind then
         return nil, nil, "a record kind " .. tostring(args.kind)
     end
-    local square = Helpers.squareAt(args)
+    local square = PZHarness.Fixtures.squareAt(args)
     local object = square and RenewableEnergy.findObjectOn(square, kind.isObject)
     local record = object and kind.owner().recordOf(object)
     if not record then
@@ -404,13 +327,13 @@ end
 --- builds.
 function Helpers.recordState(kind, record, object)
     local spec = KINDS[kind]
-    local state = Helpers.plainFields(record, spec.object().SAVED_FIELDS)
+    local state = PZHarness.Fixtures.fieldsOf(record, spec.object().SAVED_FIELDS)
     state.loaded = object ~= nil
     if object then
         local building = object:getSquare():getBuilding()
         state.toxic = building ~= nil and building:isToxic()
         state.sprite = object:getSprite():getName()
-        state.overlays = Helpers.overlaysOf(object)
+        state.overlays = PZHarness.Fixtures.overlaysOf(object)
         state.summary = spec.owner().currentSummary(object)
     end
     spec.extras(record, object, state)

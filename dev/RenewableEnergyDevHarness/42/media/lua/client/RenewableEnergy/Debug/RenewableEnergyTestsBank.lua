@@ -39,7 +39,7 @@ test("renewable_energy_bank_panel_charges_bank", {
             local status = T.clientStatus(bank)
             return math.abs(T.copyUses(bank, CAR_BATTERY) - bank.state.charge) < 0.001
                 and status ~= nil and status.solarW == bank.state.status.solarW
-                and T.overlays(bank.object) == table.concat(bank.state.overlays, ",")
+                and table.concat(T.overlaysOf(bank.object), ",") == table.concat(bank.state.overlays, ",")
         end, "this client's copies of the charged battery, the status and the overlays")
     end,
     validate = function(self)

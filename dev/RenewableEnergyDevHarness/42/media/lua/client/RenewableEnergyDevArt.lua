@@ -7,6 +7,7 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
+require "PZHarness/StageLots"
 local Capture = require "PZHarness/Capture"
 
 local Art = {}
@@ -357,42 +358,7 @@ local function addStates(run, art, states)
     end
 end
 
-local function isBareGround(square)
-    return square ~= nil and square:isOutside() and square:isSolidFloor() and square:getObjects():size() == 1
-        and square:getVehicleContainer() == nil
-end
-
--- The north-west corner of the closest open lot that takes the whole stage.
-local function findLot(player)
-    local corner = Harness.closestSquare(player, function(square)
-        return Stage.isAreaOpen(square, AREA.w, AREA.h, isBareGround)
-    end)
-    return corner and { x = corner:getX(), y = corner:getY(), z = corner:getZ() }
-end
-
-local function lotSquare(lot, x, y)
-    return getCell():getGridSquare(lot.x + x, lot.y + y, lot.z)
-end
-
-local function recalcLot(lot)
-    for x = 0, AREA.w - 1 do
-        for y = 0, AREA.h - 1 do
-            lotSquare(lot, x, y):RecalcAllWithNeighbours(true)
-        end
-    end
-end
-
--- Takes the last stage down to the floor, so the next one starts on an empty lot.
-local function clearLot(lot)
-    for x = 0, AREA.w - 1 do
-        for y = 0, AREA.h - 1 do
-            local square = lotSquare(lot, x, y)
-            square:removeAllWorldObjects()
-            Stage.clearToFloor(square)
-        end
-    end
-    recalcLot(lot)
-end
+local lotSquare = Harness.lotSquare
 
 -- The world can park vehicles on and around the lot after it was chosen, as its chunks load, and
 -- one there hides the trailer or runs into it.
@@ -408,7 +374,7 @@ end
 -- chunk, so the model shows at once.
 local function placeTiles(lot, list)
     for _, tile in ipairs(list) do
-        local object = Stage.placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite)
+        local object = Harness.placeTile(lotSquare(lot, tile.x, tile.y), tile.sprite)
         for _, overlay in ipairs(tile.overlays or {}) do
             object:addAttachedAnimSpriteByName(overlay)
         end
@@ -478,10 +444,7 @@ end
 
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
 local function addShot(run, player, lot, shot)
-    Harness.addLookAround(run.steps, player, lotSquare(lot, shot.x, shot.y))
-    run:add(function()
-        return Harness.zoomOut(shot.zoomSteps)
-    end)
+    Harness.addGoTo(run, player, { lotSquare(lot, shot.x, shot.y) }, shot.zoomSteps)
     run:addOpaque(shot.name, function() return {} end)
 end
 
@@ -507,7 +470,7 @@ local CRACKED_SHOT = { name = "cracked", x = 7, y = 7, zoomSteps = 2 }
 
 local function addCrackedShot(run, player, lot)
     run:add(function()
-        clearLot(lot)
+        Harness.emptyLot(lot)
         clearVehicles(lot)
         placeTiles(lot, CRACKED_WALLS)
         for _, panel in ipairs(CRACKED_PANELS) do
@@ -517,7 +480,7 @@ local function addCrackedShot(run, player, lot)
             end
             RenewableEnergy.WorldSpawns.placePanel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
         end
-        recalcLot(lot)
+        Harness.recalcLot(lot)
     end)
     -- A trailer beside them with one panel cracked as theirs are and one whole, to compare the look.
     -- The tick after stocking puts the stock conditions back over any set in the same tick
@@ -552,7 +515,7 @@ local function addTileAndItemShots(run, player, lot)
     addShot(run, player, lot, SHOTS.tiles)
     addShot(run, player, lot, SHOTS.overlays)
     run:add(function()
-        clearLot(lot)
+        Harness.emptyLot(lot)
         dropItems(lot)
     end)
     addShot(run, player, lot, SHOTS.items)
@@ -569,23 +532,23 @@ local function addTileAndItemShots(run, player, lot)
     end)
     for _, facing in ipairs({ "S", "E", "N", "W" }) do
         run:add(function()
-            clearLot(lot)
+            Harness.emptyLot(lot)
             placeTiles(lot, fillTiles(facing))
         end)
         addShot(run, player, lot, SHOTS.fill[facing])
     end
     run:add(function()
-        clearLot(lot)
+        Harness.emptyLot(lot)
         placeTiles(lot, digesterTiles())
     end)
     addShot(run, player, lot, SHOTS.digesters)
     run:add(function()
-        clearLot(lot)
+        Harness.emptyLot(lot)
         placeTiles(lot, windTiles())
     end)
     addShot(run, player, lot, SHOTS.wind)
     run:add(function()
-        clearLot(lot)
+        Harness.emptyLot(lot)
         placeTiles(lot, tallWindTiles())
     end)
     addShot(run, player, lot, SHOTS.windTall)
@@ -596,7 +559,7 @@ end
 -- into `art.pair`.
 local function addHitchedTrailerShots(run, player, lot, art)
     run:add(function()
-        clearLot(lot)
+        Harness.emptyLot(lot)
         clearVehicles(lot)
         art.pair = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
         return Stage.vehiclesAtRest(art.pair, false)
@@ -633,7 +596,8 @@ end
 function Art.capture(_, onDone)
     local run = Capture.new(MARK)
     local player = getPlayer()
-    local lot = findLot(player)
+    -- Bare ground, since the first stage is set on the lot as it was found.
+    local lot = Harness.findLot(player, AREA.w, AREA.h, { bare = true })
     if not lot then
         run:fail("no open lot within " .. Harness.SEARCH_RADIUS .. " squares")
         return

@@ -2,7 +2,7 @@
 import math
 import random
 
-from kit import FACING_TURN, around, beam, box, cylinder, group, lathe, mound, prism, ring, tube
+from art.kit import FACING_TURN, around, bank, beam, box, cylinder, group, mound, prism, ring, tube
 from palette import BANK_FADE, M
 from parts import BOARD, DRUM, FEED_BUNG, GAS_BUNG, drum
 
@@ -304,12 +304,12 @@ def _dome(col):
     height, reach = BANK
     foot = radius * math.sqrt(1 - (height / rise) ** 2) + 0.01
 
-    def bank(out):
+    def bank_height(out):
         return height * (1 + math.cos(math.pi * min(1.0, max(0.0, (out - foot) / (reach - foot))))) / 2
 
     steps = 10
-    lathe(col, "Dome_Bank", M("domebank"), [(foot + (reach - foot) * i / steps, bank(foot + (reach - foot) * i / steps))
-                                            for i in range(steps + 1)], at=(cx, cy, 0), lumps=0.08, seed=42, segments=48)
+    bank(col, "Dome_Bank", M("domebank"), [(foot + (reach - foot) * i / steps, bank_height(foot + (reach - foot) * i / steps))
+                                           for i in range(steps + 1)], at=(cx, cy, 0), lumps=0.08, seed=42, segments=48)
     # Grass comes up through it, but not where the feed pipe was dug in.
     rng = random.Random(43)
     for _ in range(BANK_TUFTS):
@@ -322,7 +322,7 @@ def _dome(col):
         for _ in range(rng.randint(3, 5)):
             tall = rng.uniform(0.04, 0.08)
             prism(col, "Dome_Grass", shade, [(-0.004, 0), (0.004, 0), (rng.uniform(-0.015, 0.015), tall)], 0.002,
-                  at=(x + rng.uniform(-0.01, 0.01), y + rng.uniform(-0.01, 0.01), bank(out) - 0.01),
+                  at=(x + rng.uniform(-0.01, 0.01), y + rng.uniform(-0.01, 0.01), bank_height(out) - 0.01),
                   rotate=(0, 0, rng.uniform(0, 180)))
     rng = random.Random(41)
     polar, course = 0.0, 0

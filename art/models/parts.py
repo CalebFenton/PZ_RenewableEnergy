@@ -2,7 +2,7 @@
 55 gallon drums."""
 import math
 
-from kit import around, box, cylinder, ring, tube
+from art.kit import around, box, cylinder, ring, tube
 from palette import M
 
 BOARD = 0.019  # a pine 1 x 6's thickness

@@ -259,7 +259,7 @@ test("renewable_energy_solar_seal_module_in_place", {
             expect(tostring(self.offered.reason):find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
                 "the seal's tooltip doesn't name " .. adhesive .. ": " .. tostring(self.offered.reason))
         end
-        -- One full tube of each was given; "carried" reads the fraction of it left.
+        -- One full tube of each was given; T.readCarried's `uses` is the fraction of it left.
         local glue, epoxy = T.carriedFirst(self, "Base.Glue"), T.carriedFirst(self, "Base.Epoxy")
         expectNear("the glue left of a full tube", glue and glue.uses or 0,
             1 - 2 * getScriptManager():FindItem("Base.Glue"):getUseDelta(), 0.001)

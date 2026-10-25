@@ -2,7 +2,7 @@
 homemade inverters are wound on."""
 import math
 
-from kit import box, cylinder, group, prism, ring, text, tube
+from art.kit import box, cylinder, group, prism, ring, text, tube
 from palette import M
 from parts import BOARD, SHEET, side_handles
 

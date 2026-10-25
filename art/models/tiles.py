@@ -6,7 +6,7 @@ are in tile_numbers.py; the overlays' are here alone. A tile is a list of layers
 only the pixels the object doesn't hide.
 
 Tile coordinates are a square one metre wide centred on the origin: its north edge is y = +0.5 and
-its west edge x = -0.5 (see kit.py).
+its west edge x = -0.5 (see the harness's lib/art/kit.py).
 """
 import batteries
 import biogas
@@ -14,14 +14,11 @@ import electronics
 import solar
 import wind
 import woodgas
-from kit import FACING_TURN
+from art.kit import FACING_TURN
+from art.render import layer
 from tile_numbers import (BARREL_DIGESTERS, DOME_DIGESTER, FACINGS, GARDEN_LIGHT, GARDEN_LIGHT_LIT, GASIFIERS, HEATER,
                           HEATER_LIT, INSULATED_DIGESTER, MOUNTS, SCOOP_ROTOR, SOLAR_CELL_CHARGER, SOLAR_CRATE, SOLAR_FAILSAFE,
                           SOLAR_FLAT, STORAGE_TILES, TURNED_HEATER_FIRST, TURNED_STORAGE_FIRST, WIND_TILES)
-
-
-def layer(build, holdout=False, at=(0, 0, 0), turn=0, scale=1, **options):
-    return {"build": build, "options": options, "at": at, "turn": turn, "scale": scale, "holdout": holdout}
 
 
 def _turned(at, facing):

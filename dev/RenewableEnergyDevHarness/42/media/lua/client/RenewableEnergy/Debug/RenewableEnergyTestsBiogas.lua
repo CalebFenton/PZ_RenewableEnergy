@@ -278,7 +278,7 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
         T.fillRecord(self, handle, { hopper = { { type = FEED, count = 4 } } })
         -- Part of an hour already on the meter, so each whole hour away eats one item.
         T.runDigester(self, handle, 0.5, 25)
-        T.awayAndBack(self, T.at(stand), handle.x, handle.y, handle.z, function()
+        T.reloadChunk(self, handle, function()
             T.ageRecord(self, handle, 3, "away")
         end)
         T.readRecord(self, handle, "back")
@@ -526,13 +526,7 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
         local tile = Sprites.digester.barrel.Mov_LightGreenBarrel
         local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", tile, { "Base.Mov_LightGreenBarrel" })
         if not handle then return end
-        -- Where the build left the character, filled in once it stands there.
-        local home = {}
-        T.step(function()
-            local square = T.player():getCurrentSquare()
-            home.x, home.y, home.z = square:getX(), square:getY(), square:getZ()
-        end)
-        T.awayAndBack(self, home, handle.x, handle.y, handle.z)
+        T.reloadChunk(self, handle)
         useBarrelDigester(self, handle, tile, "reloaded")
     end,
     validate = function(self)
@@ -558,12 +552,12 @@ test("renewable_energy_biogas_digester_menu", {
         if T.expect(options ~= nil, "right-clicking a digester shows no digester submenu") then
             T.expect(options.status ~= nil, "no Status option")
             local sludge = options.sludge
-            T.expect(sludge and sludge.notAvailable and sludge.toolTip.description == getText("Tooltip_RenewableEnergy_NoSludge"),
+            T.expect(sludge and sludge.notAvailable and T.tooltipOf(sludge) == getText("Tooltip_RenewableEnergy_NoSludge"),
                 "Take Sludge isn't greyed out for an empty digester")
             T.expect(options.vent and options.vent.notAvailable, "Vent Gas isn't greyed out with no gas")
             T.expect(options.bags ~= nil and options.tarp ~= nil, "no holder options on a barrel")
             local upgrade = options.upgrade
-            T.expect(upgrade and upgrade.notAvailable and upgrade.toolTip.description:find(getItemNameFromFullType("Base.Plank"), 1, true),
+            T.expect(upgrade and upgrade.notAvailable and T.tooltipOf(upgrade):find(getItemNameFromFullType("Base.Plank"), 1, true),
                 "Upgrade isn't greyed out listing its planks")
         end
         T.standNextTo(object:getSquare())

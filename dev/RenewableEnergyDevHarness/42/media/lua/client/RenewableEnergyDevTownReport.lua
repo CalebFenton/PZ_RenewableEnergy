@@ -415,7 +415,7 @@ end
 
 -- build(census) at the default loot settings and loot rarity options 1.
 local function atDefaultLoot(build, census)
-    return Loot.withMeasureOptions(function()
+    return PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
         return Loot.withLootRarity(1, function()
             return build(census)
         end)

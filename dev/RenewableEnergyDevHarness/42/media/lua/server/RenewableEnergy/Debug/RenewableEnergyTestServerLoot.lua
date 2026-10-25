@@ -2,56 +2,17 @@
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
+require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
+require "PZHarness/Loot"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Stash"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local check, saveOptions, countPairs = Helpers.check, Helpers.saveOptions, PZHarness.Fixtures.countPairs
-local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
+local check, saveOptions, countPairs = PZHarness.checkHandler, PZHarness.Fixtures.saveOptions, PZHarness.Fixtures.countPairs
+local squareAt, removePlaced = PZHarness.Fixtures.squareAt, PZHarness.Fixtures.removePlaced
 local Sprites = RenewableEnergy.Sprites
-
--- Calls fn(items, path) for every items list of every room, bag, procedural and vehicle table.
-local function forEachItemsList(fn)
-    local seen = {}
-    local function walk(t, path, depth)
-        if seen[t] or depth > 6 then
-            return
-        end
-        seen[t] = true
-        if type(t.items) == "table" then
-            fn(t.items, path)
-        end
-        for key, value in pairs(t) do
-            if type(value) == "table" and key ~= "items" and key ~= "procList" then
-                walk(value, path .. "." .. tostring(key), depth + 1)
-            end
-        end
-    end
-    walk(SuburbsDistributions, "SuburbsDistributions", 0)
-    walk(ProceduralDistributions.list, "ProceduralDistributions", 0)
-    walk(VehicleDistributions, "VehicleDistributions", 0)
-end
-
--- The first room and container type whose procList names each ProceduralDistributions list.
-local function procListUsers()
-    local users = {}
-    for roomName, room in pairs(SuburbsDistributions) do
-        if type(room) == "table" and room.rolls == nil then
-            for containerType, containerTable in pairs(room) do
-                if type(containerTable) == "table" and type(containerTable.procList) == "table" then
-                    for _, choice in ipairs(containerTable.procList) do
-                        if choice.name and not users[choice.name] then
-                            users[choice.name] = { room = roomName, container = containerType }
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return users
-end
 
 -- The VehicleDistributions tables some vehicle's Normal or Specific distribution fills from.
 local function vehicleTablesInUse()
@@ -101,7 +62,7 @@ end
 -- ItemPickerJava.tryAddItemToContainer hands out nothing for an unknown item or one heavier than
 -- the container holds, and getActualSpawnChance nothing at a loot multiplier of 0. An obsolete,
 -- disabled or debug-only script never loads (ScriptBucket), so it is no item either. The loot
--- multipliers are the default settings', as Loot.withMeasureOptions sets them.
+-- multipliers are the default settings', as RenewableEnergy.Loot.MEASURE_OPTIONS sets them.
 local function checkHandedOut(expect, spec, capacity)
     local option = getSandboxOptions():getOptionByName("RenewableEnergy." .. spec.option)
     if expect(option ~= nil, spec.fullType .. ": no sandbox option " .. tostring(spec.option)) then
@@ -121,11 +82,11 @@ end
 
 check("lootListsInUse", function(expect)
     local D = RenewableEnergy.Distributions
-    local procUsers = procListUsers()
+    local procUsers = PZHarness.Loot.procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
     local capacity = ItemContainer.new("crate", nil, nil):getCapacity()
-    RenewableEnergy.Loot.withMeasureOptions(function()
+    PZHarness.Loot.withMeasureOptions(RenewableEnergy.Loot.MEASURE_OPTIONS, function()
         for _, spec in ipairs(D.items) do
             checkHandedOut(expect, spec, capacity)
         end
@@ -225,7 +186,7 @@ check("lootRarityOptions", function(expect, expectNear, _, args, defer)
                 end
             end
         end
-        forEachItemsList(function(items, path)
+        PZHarness.Loot.forEachItemsList(function(items, path)
             for i = 1, #items - 1, 2 do
                 if removed[items[i]] then
                     expect(false, label .. ": " .. items[i] .. " is still in " .. path)

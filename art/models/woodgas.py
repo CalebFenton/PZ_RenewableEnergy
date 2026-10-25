@@ -2,8 +2,8 @@
 import math
 import random
 
+from art.kit import around, beam, box, cylinder, mound, ring, tube
 from biogas import generator_fit
-from kit import around, beam, box, cylinder, mound, ring, tube
 from palette import M
 from parts import DRUM, arch, drum, drum_patch
 

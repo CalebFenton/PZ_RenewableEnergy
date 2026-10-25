@@ -9,7 +9,7 @@ import numpy as np
 from bpy_extras.io_utils import axis_conversion
 from mathutils import Quaternion, Vector
 
-import kit
+from art import kit
 
 # Vehicle overlays ---------------------------------------------------------------------------------
 #

@@ -4,6 +4,7 @@
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
@@ -26,7 +27,7 @@ end)
 -- what is left of the filter of a worn gas mask, if any; and the corpse counts at which the game's
 -- smell levels start (Stink.LEVEL_CORPSES), which a multiplayer client's Lua doesn't have.
 handler("stinkRead", function(player, args)
-    local square = Helpers.squareAt(args)
+    local square = PZHarness.Fixtures.squareAt(args)
     local mask
     local worn = player:getWornItems()
     for i = 0, worn:size() - 1 do
@@ -58,7 +59,7 @@ end)
 
 -- The stink score's edges (Digester.SMELL_SCORES): none just below the first, then each smell
 -- level's corpses from its edge up to just below the next.
-Helpers.check("digesterCorpsesFor", function(expect)
+PZHarness.checkHandler("digesterCorpsesFor", function(expect)
     local corpsesFor = RenewableEnergy.DigesterObject.corpsesFor
     local levels, scores = RenewableEnergy.Stink.LEVEL_CORPSES, RenewableEnergy.Digester.SMELL_SCORES
     local below = 0.001
@@ -82,7 +83,7 @@ end)
 -- build menu does (Helpers.placeRecord). Taken away when the test ends, the way the game removes
 -- it, found again by its place, since a chunk that unloaded and loaded meanwhile holds a new copy.
 handler("recordPlace", function(player, args, defer)
-    local thumpable, missing = Helpers.placeRecord(args.kind, args.tile, Helpers.squareAt(args))
+    local thumpable, missing = Helpers.placeRecord(args.kind, args.tile, PZHarness.Fixtures.squareAt(args))
     if not thumpable then return nil, missing end
     defer(function() removePlaced(select(2, Helpers.recordAt(args)) or thumpable) end)
     return {}
@@ -204,7 +205,7 @@ end)
 -- Drops an `args.type` holding `args.uses` (its share of full) on the floor of the square at x, y,
 -- z, as a player dropping it does, for everyone to see. Taken away when the test ends.
 handler("floorItem", function(player, args, defer)
-    local square = Helpers.squareAt(args)
+    local square = PZHarness.Fixtures.squareAt(args)
     local item = square and instanceItem(args.type)
     if not item then
         return nil, "a loaded square and an item " .. tostring(args.type)

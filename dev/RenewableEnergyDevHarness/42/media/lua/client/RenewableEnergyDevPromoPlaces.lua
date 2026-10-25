@@ -7,10 +7,10 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
+require "PZHarness/StageLots"
 
 local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
-local isGroundCover = Harness.isGroundCover
 
 -- Every setup is a place (newPlace): a square its positions are measured from, and a frame, the
 -- directions a position's two numbers run in, `along` and `out`. An area of a place is the
@@ -221,27 +221,9 @@ local LAYOUTS = {
     },
 }
 
--- Outdoors on solid floor, with no vehicle, no tree unless `trees`, and nothing but the floor,
--- ground cover and the objects `allowed` accepts. A square's walls are objects on it, so walls
--- count too.
-local function isClear(square, allowed, trees)
-    if not (square and square:isOutside() and square:isSolidFloor() and (trees or not square:HasTree())
-        and square:getVehicleContainer() == nil) then
-        return false
-    end
-    local floor = square:getFloor()
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        local object = objects:get(i)
-        if object ~= floor and not isGroundCover(object) and not (allowed and allowed(object)) then
-            return false
-        end
-    end
-    return true
-end
-
-local function isOpenGround(square, player)
-    return isClear(square) and square ~= player:getCurrentSquare()
+-- Open ground (Harness.isOpenGround) the character isn't standing on.
+local function isUnoccupiedGround(square, player)
+    return Harness.isOpenGround(square) and square ~= player:getCurrentSquare()
 end
 
 -- Walls, their trim and what hangs on them: lamps, pipes, signs.
@@ -316,9 +298,9 @@ local function everyAreaSquare(place, area, fn, outFrom)
     return true
 end
 
-local function isOpenArea(place, player, area)
+local function hasOpenGround(place, player, area)
     return everyAreaSquare(place, area, function(square)
-        return isOpenGround(square, player)
+        return isUnoccupiedGround(square, player)
     end)
 end
 
@@ -326,7 +308,8 @@ end
 -- or a window.
 local function isAtWall(place, along, plain)
     local square, inside, wallNorth = at(place, { along, 0 }), at(place, { along, -1 }), place.frame.wallNorth
-    if not (square and inside and inside:getRoom() and square:getWall(wallNorth) and isClear(square, isOnWall)) then
+    if not (square and inside and inside:getRoom() and square:getWall(wallNorth)
+        and Harness.isOpenGround(square, { allows = isOnWall })) then
         return false
     end
     return not plain or (square:getDoorOrWindow(wallNorth) == nil and square:getGarageDoor(wallNorth) == nil)
@@ -424,7 +407,7 @@ local function fitsHomestead(place, player)
             return false
         end
     end
-    return bankPlace(place) ~= nil and isOpenArea(place, player, OPEN)
+    return bankPlace(place) ~= nil and hasOpenGround(place, player, OPEN)
 end
 
 -- At a window if `needWindow`, else at any outside wall.
@@ -434,7 +417,7 @@ local function fitsStage0(place, player, needWindow)
         return false
     end
     return isFreeIndoorsAt(place, STAGE0.box) and isFreeIndoorsAt(place, STAGE0.player)
-        and isOpenArea(place, player, STAGE0.open)
+        and hasOpenGround(place, player, STAGE0.open)
 end
 
 -- A window into a house (a building with a bedroom and POSTER.rooms rooms), on a wall with
@@ -442,7 +425,7 @@ end
 -- the panels in front.
 local function fitsPoster(place, player)
     if not (hasOpening(place, 0, "IsoWindow") and isFreeIndoorsAt(place, POSTER.bank)
-        and isOpenArea(place, player, POSTER.open)) then
+        and hasOpenGround(place, player, POSTER.open)) then
         return false
     end
     local building = at(place, { 0, -1 }):getBuilding()
@@ -462,18 +445,15 @@ local function isRoadPaint(object)
     return name ~= nil and (PZHarness.startsWith(name, "floors_overlay") or PZHarness.startsWith(name, "blends_"))
 end
 
-local function isOpenRoad(square, player)
-    local name = square and Sprites.nameOf(square:getFloor())
-    return name ~= nil and PZHarness.startsWith(name, "blends_street") and isClear(square, isRoadPaint)
+local function isClearRoad(square, player)
+    return Harness.isOpenGround(square, { floor = "blends_street", allows = isRoadPaint })
         and square ~= player:getCurrentSquare()
 end
 
 -- Outdoors on natural ground (grass or dirt, not a road or a yard's paving) with nothing on it but
 -- ground cover and trees, which the setups take away.
 local function isYardSquare(square, player)
-    local name = square and Sprites.nameOf(square:getFloor())
-    return name ~= nil and PZHarness.startsWith(name, "blends_natural")
-        and isClear(square, function(object) return instanceof(object, "IsoTree") end, true)
+    return Harness.isOpenGround(square, { floor = Harness.NATURAL_FLOOR, trees = true })
         and square ~= player:getCurrentSquare()
 end
 
@@ -609,7 +589,7 @@ local PLACES = {
         frames = ROAD.headings,
         fits = function(place, player)
             return everyAreaSquare(place, ROAD.open, function(square)
-                return isOpenRoad(square, player)
+                return isClearRoad(square, player)
             end)
         end,
     },
@@ -619,7 +599,7 @@ local PLACES = {
         missing = "open ground for the item shots' floor",
         frames = { GRID },
         fits = function(place, player)
-            return isOpenArea(place, player, STUDIO.open)
+            return hasOpenGround(place, player, STUDIO.open)
         end,
     },
     {
@@ -628,7 +608,7 @@ local PLACES = {
         missing = "door with open ground in front, for the garden lights",
         frames = SITES,
         fits = function(place, player)
-            return hasOpening(place, 0, "IsoDoor") and isOpenArea(place, player, WALK.open)
+            return hasOpening(place, 0, "IsoDoor") and hasOpenGround(place, player, WALK.open)
         end,
     },
     {
@@ -684,6 +664,6 @@ end
 return {
     HOMESTEAD = HOMESTEAD, OPEN = OPEN, STAGE0 = STAGE0, STUDIO = STUDIO, ROAD = ROAD, WALK = WALK, POSTER = POSTER,
     LAYOUTS = LAYOUTS, places = places, at = at, squaresAt = squaresAt, loadedSquares = loadedSquares,
-    everyAreaSquare = everyAreaSquare, eachShotSquare = eachShotSquare, isClear = isClear, isOnWall = isOnWall,
+    everyAreaSquare = everyAreaSquare, eachShotSquare = eachShotSquare, isOnWall = isOnWall,
     find = findPlaces,
 }

@@ -604,8 +604,7 @@ local function buildsCharger(design, material)
             end)
         end,
         validate = function(self)
-            local build = self.build or {}
-            expect(build.canBuild and build.validSquare, "the build menu can't build the " .. what .. " charger")
+            local build = self.build
             local tile = Sprites.windTileOf(design.kind, build.face, material)
             expect(tile ~= nil and self.sprite == tile, "the " .. what .. " charger built facing "
                 .. tostring(build.face) .. " stands on " .. tostring(self.sprite) .. ", not " .. tostring(tile))

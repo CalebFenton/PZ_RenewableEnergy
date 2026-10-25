@@ -1,5 +1,5 @@
 """The printed matter: the Homestead Power magazines and the FEMA wood gas pamphlet."""
-from kit import around, box, cylinder, prism, ring, text
+from art.kit import around, box, cylinder, prism, ring, text
 from palette import M
 
 MAGAZINE = (0.21, 0.275, 0.004)

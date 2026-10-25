@@ -108,15 +108,15 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole), connect = true })
         if not panel then return end
         self.panel = panel
-        T.step(function() self.before = T.overlays(panel.object) end)
+        T.step(function() self.before = table.concat(T.overlaysOf(panel.object), ",") end)
         T.forceRoll(self, 0)
         T.bankPass(self, bank, 1000, { stormHours = 1 })
         T.server(self, "panelState", panel.position)
         T.waitFor(self, function()
             return recordedCondition(panel.object) == self.crackedTo
-                and T.overlays(panel.object) == table.concat(self.server.panelState.overlays, ",")
+                and table.concat(T.overlaysOf(panel.object), ",") == table.concat(self.server.panelState.overlays, ",")
         end, "this client's copy of the storm-cracked panel")
-        T.step(function() self.copyOverlays = T.overlays(panel.object) end)
+        T.step(function() self.copyOverlays = table.concat(T.overlaysOf(panel.object), ",") end)
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end

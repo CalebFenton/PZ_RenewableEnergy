@@ -9,16 +9,14 @@
 -- are a little lower in lists of heavy items.
 
 require "RenewableEnergy/Specs"
-require "PZHarness/Fixtures"
+require "PZHarness/Loot"
 local Stash = require "RenewableEnergy/Stash"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loot = {}
 RenewableEnergy.Loot = Loot
+local PZLoot = PZHarness.Loot
 
--- ItemPickerJava.getItemContainer reaches a parsed table only through a room, and vehicle lists
--- not at all, so withLoot files the tables it measures under this made-up room.
-local PROBE_ROOM = "RenewableEnergyLootProbe"
 -- Prefix of the made-up ProceduralDistributions lists the room containers pick from.
 local PROBE_LIST = "RenewableEnergyLootProbe_"
 local MOD_PREFIX = "RenewableEnergy."
@@ -144,32 +142,19 @@ local ROOM_CONTAINERS = {
     { room = Stash.SPAWN_TABLE, container = "metal_shelves", label = "Metal shelves in the mod's stash houses" },
 }
 
--- Sandbox options while measuring: a new default-preset game's loot settings, without the zombie
--- density bonus (of the mod's items only the magazines can get it, and the preset turns it off
--- anyway) and without annotated maps, each of which uses up a stash of the world. DEFAULT stands
--- for the option's default value, which the game takes from the Apocalypse preset
--- (SandboxOptions constructor).
-local DEFAULT = {}
-local MEASURE_OPTIONS = {
-    OtherLootNew = DEFAULT,
-    RecipeResourceLoot = DEFAULT,
-    RollsMultiplier = DEFAULT,
+--- Sandbox options while measuring (PZHarness.Loot.withMeasureOptions): a new default-preset
+--- game's loot settings, without the zombie density bonus (of the mod's items only the magazines
+--- can get it, and the preset turns it off anyway) and without annotated maps, each of which uses
+--- up a stash of the world.
+Loot.MEASURE_OPTIONS = {
+    OtherLootNew = PZLoot.DEFAULT,
+    RecipeResourceLoot = PZLoot.DEFAULT,
+    RollsMultiplier = PZLoot.DEFAULT,
     MaximumDiminishedLoot = 0,
     ZombiePopLootEffect = 0,
     AnnotatedMapChance = 1,
 }
 local LRM_OPTIONS = { "LRMSolarPanels", "LRMBatteries", "LRMMisc" }
-
--- Returns fn()'s result, calling restore() after fn whether or not it throws; a throw goes on
--- after restore, so a failed measurement still leaves the game's loot and options as they were.
-local function restoring(fn, restore)
-    local ok, result = pcall(fn)
-    restore()
-    if not ok then
-        error(result)
-    end
-    return result
-end
 
 --- Runs fn() with the mod's loot rarity options at `lrm` and the mod's loot applied for them, then
 --- restores the options and applies the loot again. ItemPickerJava.Parse is left to the caller.
@@ -179,7 +164,7 @@ function Loot.withLootRarity(lrm, fn)
         saved[option] = SandboxVars.RenewableEnergy[option]
         SandboxVars.RenewableEnergy[option] = lrm
     end
-    return restoring(function()
+    return PZLoot.restoring(function()
         RenewableEnergy.Distributions.apply()
         return fn()
     end, function()
@@ -231,34 +216,15 @@ local function modItemsOnly(lootTable)
 end
 
 -- Runs fn(parsed) with the mod's loot rarity options at `lrm` and the probe build() returns
--- parsed by the game. build() runs once the mod's loot is in for `lrm` and returns `containers`,
--- key -> loot table, and optionally `lists`, name -> extra ProceduralDistributions list for
--- procedural containers to pick. parsed[key] is the game's copy of the container to pass to
--- ItemPickerJava.rollItem, or nil if the game didn't take it. Afterwards restores the options and
--- parses the loot as it was.
+-- parsed by the game (PZHarness.Loot.withParsed). build() runs once the mod's loot is in for `lrm`
+-- and returns `containers`, key -> loot table, and optionally `lists`, name -> extra
+-- ProceduralDistributions list for procedural containers to pick. Afterwards restores the options
+-- and parses the loot again, since withParsed parses before the options are back.
 local function withLoot(lrm, build, fn)
-    return restoring(function()
+    return PZLoot.restoring(function()
         return Loot.withLootRarity(lrm, function()
             local containers, lists = build()
-            lists = lists or {}
-            return restoring(function()
-                for name, list in pairs(lists) do
-                    ProceduralDistributions.list[name] = list
-                end
-                SuburbsDistributions[PROBE_ROOM] = containers
-                ItemPickerJava.Parse()
-                local parsed = {}
-                for key, containerTable in pairs(containers) do
-                    -- For a procedural container, a list name no entry has returns the container itself.
-                    parsed[key] = ItemPickerJava.getItemContainer(PROBE_ROOM, key, containerTable.procedural and "" or nil, false)
-                end
-                return fn(parsed)
-            end, function()
-                SuburbsDistributions[PROBE_ROOM] = nil
-                for name in pairs(lists) do
-                    ProceduralDistributions.list[name] = nil
-                end
-            end)
+            return PZLoot.withParsed(containers, lists, fn)
         end)
     end, function() ItemPickerJava.Parse() end)
 end
@@ -299,45 +265,9 @@ local function roomContainersModOnly()
     return containers, lists
 end
 
---- Runs fn with MEASURE_OPTIONS and the General debug log off: in debug mode ItemPickInfo logs a
---- line for every roll into a container that isn't on a square, which floods console.txt. The
---- loot category multipliers are cached when a game loads, so they are reloaded around fn.
-function Loot.withMeasureOptions(fn)
-    local options = getSandboxOptions()
-    local saved = {}
-    local generalLog = DebugType.General:getLogSeverity()
-    return restoring(function()
-        for name, value in pairs(MEASURE_OPTIONS) do
-            local option = options:getOptionByName(name)
-            saved[name] = option:getValue()
-            option:setValue(value == DEFAULT and option:getDefaultValue() or value)
-        end
-        ItemPickerJava.InitSandboxLootSettings()
-        DebugType.General:setLogSeverity(LogSeverity.Off)
-        return fn()
-    end, function()
-        DebugType.General:setLogSeverity(generalLog)
-        for name, value in pairs(saved) do
-            options:getOptionByName(name):setValue(value)
-        end
-        ItemPickerJava.InitSandboxLootSettings()
-    end)
-end
-
--- Adds the items in the container to `counts` (fullType -> count), bags' and boxes' contents
--- included: the mod's items, or every item with `everything`.
-local function countItems(container, counts, everything)
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        local fullType = item:getFullType()
-        if everything or isModItem(fullType) then
-            counts[fullType] = (counts[fullType] or 0) + 1
-        end
-        if item:IsInventoryContainer() then
-            countItems(item:getInventory(), counts, everything)
-        end
-    end
+-- The mod's items in the container, bags' and boxes' contents included: fullType -> count.
+local function countModItems(container)
+    return PZLoot.countItems(container, isModItem)
 end
 
 --- A scratch crate. A procedural table rolls only into a container on a square; give those one
@@ -346,73 +276,6 @@ end
 ---@param square IsoGridSquare?
 function Loot.newContainer(square)
     return ItemContainer.new("crate", square, nil)
-end
-
--- Takes the container's items, bags' contents included, off the cell's processed items, where
--- ItemContainer.AddItem puts every new item: thousands of fills in one frame pile up there until
--- the run runs out of memory (DEVELOPMENT.md, Loot).
-local function forgetItems(container, processItems)
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        processItems:remove(item)
-        if item:IsInventoryContainer() then
-            forgetItems(item:getInventory(), processItems)
-        end
-    end
-end
-
---- Calls fill(container) on an emptied `container` once and returns what it got, bags' contents
---- included: fullType -> count, of the mod's items, or of every item with `everything`.
-function Loot.fillOnce(fill, container, everything)
-    container:removeAllItems()
-    fill(container)
-    local counts = {}
-    countItems(container, counts, everything)
-    forgetItems(container, getCell():getProcessItems())
-    container:removeAllItems()
-    return counts
-end
-
-local function rollFill(list)
-    return function(container)
-        ItemPickerJava.rollItem(list, container, true, nil, nil)
-    end
-end
-
--- Fills `container` `samples` times. Returns fullType -> { share = fraction of samples holding
--- at least one, perContainer = mean count in those }.
-local function sample(fill, samples, container, everything)
-    local holding, total = {}, {}
-    for _ = 1, samples do
-        for fullType, count in pairs(Loot.fillOnce(fill, container, everything)) do
-            holding[fullType] = (holding[fullType] or 0) + 1
-            total[fullType] = (total[fullType] or 0) + count
-        end
-    end
-    local result = {}
-    for fullType, n in pairs(holding) do
-        result[fullType] = { share = n / samples, perContainer = total[fullType] / n }
-    end
-    return result
-end
-
--- An outdoor square near the player, for procedural rolls.
-local function squareOutsideRooms()
-    local character, cell = getPlayer(), getCell()
-    if not character or not cell then
-        return nil
-    end
-    local px, py = math.floor(character:getX()), math.floor(character:getY())
-    for radius = 0, 40 do
-        for x, y in PZHarness.Fixtures.ring(px, py, radius) do
-            local square = cell:getGridSquare(x, y, 0)
-            if square and square:getRoom() == nil then
-                return square
-            end
-        end
-    end
-    return nil
 end
 
 local function sortedKeys(t)
@@ -452,7 +315,7 @@ end
 --- { [fullType] = true } }, with the loot multipliers it measured at in `settings`: { other = ...,
 --- recipeResource = ... }. World stock counts vanilla items too.
 function Loot.report(samples)
-    return Loot.withMeasureOptions(function()
+    return PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
         local targets = lootTargets()
         table.insert(targets, { reference = STASH_CRATE, items = {} })
         local function build()
@@ -469,20 +332,20 @@ function Loot.report(samples)
                     label = label,
                     reference = reference,
                     samples = fill and samples or 0,
-                    items = fill and sample(fill, samples, container, everything) or {},
+                    items = fill and PZLoot.sample(fill, samples, container, everything and PZLoot.countItems or countModItems) or {},
                     expected = expected,
                 })
             end
             local container = Loot.newContainer(nil)
             for i, target in ipairs(targets) do
                 local list = parsed["t" .. i]
-                add(labelFor(target.reference), target.reference, list and rollFill(list), container, target.items)
+                add(labelFor(target.reference), target.reference, list and PZLoot.rollFill(list), container, target.items)
             end
-            local square = squareOutsideRooms()
+            local square = PZLoot.squareOutsideRooms(getPlayer())
             local roomContainer = Loot.newContainer(square)
             for i, spec in ipairs(ROOM_CONTAINERS) do
                 local list = square and parsed["r" .. i]
-                add(spec.label, spec.room .. "." .. spec.container, list and rollFill(list), roomContainer, {})
+                add(spec.label, spec.room .. "." .. spec.container, list and PZLoot.rollFill(list), roomContainer, {})
             end
             for _, stock in ipairs(worldStock()) do
                 add(stock.label, stock.reference, stock.fill, container, {}, true)

@@ -6,6 +6,8 @@
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
+require "PZHarness/StageLots"
+local HarnessQA = require "PZHarness/QA"
 
 local QA = {}
 
@@ -19,8 +21,6 @@ local ROW, MAX_ROWS = 20, 60
 -- The rows of open ground looked for at the layout's head; the layout runs on south past them,
 -- around whatever stands there.
 local LOT_ROWS = 20
--- Every perk the mod reads or trains (the tests' `perks` setting) goes to this level.
-local SKILL = 10
 -- The batteries and modules among the materials come worn, so that every repair recipe takes them.
 local WORN_BATTERY, CRACKED_MODULE = 40, 30
 
@@ -146,18 +146,23 @@ local STATIONS = {
     { entity = "Base.Forge", sprites = { "crafted_01_42", "crafted_01_116", "crafted_01_38" } },
 }
 
+-- Where the layout may lay an item: open ground a character can walk onto (Stage.isOpenGround),
+-- whatever stands there but a tree or a wall.
+local function isNotTree(object)
+    return object:getType() ~= IsoObjectType.tree
+end
+
 local function isWalkableGround(square)
-    return square ~= nil and square:isOutside() and square:isSolidFloor() and square:isFree(false)
-        and not square:HasTree() and square:getWall(true) == nil and square:getWall(false) == nil
-        and square:getVehicleContainer() == nil and not square:getProperties():has(IsoFlagType.water)
+    return Harness.isOpenGround(square, { free = true, allows = isNotTree })
+        and square:getWall(true) == nil and square:getWall(false) == nil
 end
 
 local function rowOpen(square, length)
-    return Stage.isAreaOpen(square, length, 1, isWalkableGround)
+    return Harness.isAreaOpen(square, length, 1, isWalkableGround)
 end
 
 local function lotOpen(square)
-    return Stage.isAreaOpen(square, ROW, LOT_ROWS, isWalkableGround)
+    return Harness.isAreaOpen(square, ROW, LOT_ROWS, isWalkableGround)
 end
 
 -- The layout's north-west corner: the closest whose whole lot is open, else the closest open row,
@@ -208,89 +213,17 @@ local function nextRun(layout, length)
     return first
 end
 
-local function isKnown(fullType)
-    return getScriptManager():FindItem(fullType) ~= nil
-end
-
--- Every craftRecipe and build menu recipe of the mod.
-local function modRecipes()
-    local scripts, recipes = getScriptManager(), {}
-    for _, name in ipairs(PZHarness.Test.recipeNames()) do
-        table.insert(recipes, scripts:getCraftRecipe(name))
-    end
-    for _, name in ipairs(PZHarness.Test.buildRecipeNames()) do
-        table.insert(recipes, scripts:getBuildableRecipe(name))
-    end
-    return recipes
-end
-
--- What making every recipe once takes, by item type and the fluid it holds: `kept`, as many of a
--- kept tool as one recipe needs, and `used`, as many of what is used up as all of them together,
--- a drainable a recipe takes uses of counting as one full item. Also the inputs no item can meet.
-local function materials()
-    local needs, order, unmatched = {}, {}, {}
-    for _, recipe in ipairs(modRecipes()) do
-        local inputs = recipe:getInputs()
-        for i = 0, inputs:size() - 1 do
-            local input = inputs:get(i)
-            if input:getResourceType() == ResourceType.Item then
-                local item = PZHarness.Test.inputItem(input, RenewableEnergy.Debug.PREFERRED_INPUTS)
-                if item then
-                    local count = input:getIntAmount()
-                    if item:isItemType(ItemType.DRAINABLE) and not input:isItemCount() then
-                        count = 1
-                    end
-                    local fluid
-                    local drawn = input:hasConsumeFromItem() and input:getConsumeFromItemScript()
-                    if drawn and drawn:getResourceType() == ResourceType.Fluid and drawn:getPossibleInputFluids():size() > 0 then
-                        fluid = drawn:getPossibleInputFluids():get(0)
-                    end
-                    local key = item:getFullName() .. (fluid and "+" .. fluid:getFluidTypeString() or "")
-                    local need = needs[key]
-                    if not need then
-                        need = { type = item:getFullName(), fluid = fluid, used = 0, kept = 0 }
-                        needs[key] = need
-                        table.insert(order, need)
-                    end
-                    if input:isKeep() then
-                        need.kept = math.max(need.kept, count)
-                    else
-                        need.used = need.used + count
-                    end
-                else
-                    table.insert(unmatched, recipe:getName() .. ": " .. input:getOriginalLine())
-                end
-            end
-        end
-    end
-    table.sort(order, function(a, b)
-        local ia, ib = getScriptManager():FindItem(a.type), getScriptManager():FindItem(b.type)
-        local ca, cb = ia:getDisplayCategory() or "", ib:getDisplayCategory() or ""
-        if ca ~= cb then return ca < cb end
-        return a.type < b.type
-    end)
-    return order, unmatched
-end
-
 -- Whether items of `fullType` come worn when asked for worn: batteries and modules.
 local function wears(fullType)
     return RenewableEnergy.Specs.batteries[fullType] ~= nil or RenewableEnergy.Specs.modules[fullType] ~= nil
 end
 
--- A new item of `fullType`, its fluid container filled with `fluid` if given, worn if `worn`.
-local function newItem(fullType, fluid, worn)
-    local item = instanceItem(fullType)
-    if not item then
-        return nil
-    end
-    local container = fluid and item:getFluidContainer()
-    if container then
-        container:Empty()
-        container:addFluid(fluid, container:getCapacity())
-    end
-    if worn and RenewableEnergy.Specs.batteries[fullType] then
+-- A new item of `fullType` (PZHarness.QA.newItem), worn if `worn`.
+local function stockItem(fullType, fluid, worn)
+    local item = HarnessQA.newItem(fullType, fluid)
+    if item and worn and RenewableEnergy.Specs.batteries[fullType] then
         RenewableEnergy.Wear.setCondition(item, WORN_BATTERY)
-    elseif worn then
+    elseif item and worn then
         RenewableEnergy.Wear.setCondition(item, CRACKED_MODULE)
     end
     return item
@@ -298,7 +231,7 @@ end
 
 -- Lays `count` items of `fullType` on the layout's next square, scattered over it so they show.
 local function lay(layout, summary, fullType, count, fluid, worn)
-    if not isKnown(fullType) then
+    if not HarnessQA.isKnown(fullType) then
         table.insert(summary.unknown, fullType)
         return
     end
@@ -308,7 +241,7 @@ local function lay(layout, summary, fullType, count, fluid, worn)
         return
     end
     for _ = 1, count do
-        local item = newItem(fullType, fluid, worn)
+        local item = stockItem(fullType, fluid, worn)
         RenewableEnergy.dropOn(square, item)
         summary.items = summary.items + 1
     end
@@ -339,7 +272,7 @@ local function collectStock(summary)
         addStock(stock, fullType, 1, 0)
     end
     local needs
-    needs, summary.unmatched = materials()
+    needs, summary.unmatched = HarnessQA.materials(HarnessQA.modRecipeNames(), RenewableEnergy.Debug.PREFERRED_INPUTS)
     for _, need in ipairs(needs) do
         addStock(stock, need.type, need.used, need.kept, need.fluid, true)
     end
@@ -371,15 +304,15 @@ local function packToolboxes(player, stock, summary)
                     table.insert(boxes, box)
                     container = box:getItemContainer()
                 end
-                container:AddItem(newItem(entry.type))
+                container:AddItem(HarnessQA.newItem(entry.type))
                 summary.tools = summary.tools + 1
             end
-            table.insert(summary.toolTypes, entry.type)
+            table.insert(summary.toolboxes, entry.type)
             entry.kept = 0
         end
         entry.used = entry.used + entry.kept
     end
-    summary.toolboxes = #boxes
+    summary.boxes = #boxes
     player:setPrimaryHandItem(boxes[1])
     player:setSecondaryHandItem(boxes[2])
     -- So the inventory window shows the held toolboxes at once.
@@ -414,8 +347,8 @@ local function placeTreadmill(layout, summary)
     end
     local rear = getCell():getGridSquare(console:getX() + 1, console:getY(), console:getZ())
     Harness.clearGroundCover(rear)
-    Stage.placeTile(console, RenewableEnergy.Sprites.treadmill.W.console)
-    Stage.placeTile(rear, RenewableEnergy.Sprites.treadmill.W.rear)
+    Harness.placeTile(console, RenewableEnergy.Sprites.treadmill.W.console)
+    Harness.placeTile(rear, RenewableEnergy.Sprites.treadmill.W.rear)
 end
 
 -- A car facing east with the arrow board trailer behind it (Stage.spawnTrailer), on a whole open
@@ -493,25 +426,12 @@ local function layGroups(layout, stock, summary)
     end
 end
 
-local function setUpCharacter(player)
-    player:setGodMod(true)
-    player:setInvisible(true)
-    player:setUnlimitedCarry(true)
-    player:setUnlimitedEndurance(true)
-    local levels = {}
-    for _, perk in ipairs(PZHarness.testSettings.perks) do
-        levels[perk:getId()] = SKILL
-    end
-    PZHarness.Fixtures.setPerkLevels(player, levels)
-    RenewableEnergy.Debug.learnRecipes(player)
-end
-
 --- Sets the scenario up around `player`, and prints what it laid out, and anything it couldn't,
 --- under MARK. Returns that summary.
 function QA.setup(player)
     getGameTime():setTimeOfDay(10)
-    setUpCharacter(player)
-    local summary = { types = 0, items = 0, groups = 0, stations = 0, tools = 0, toolboxes = 0, toolTypes = {},
+    HarnessQA.setUpCharacter(player)
+    local summary = { types = 0, items = 0, groups = 0, stations = 0, tools = 0, boxes = 0, toolboxes = {},
         unknown = {}, unplaced = {}, unmatched = {}, unsorted = {} }
     local stock = collectStock(summary)
     packToolboxes(player, stock, summary)
@@ -526,27 +446,12 @@ function QA.setup(player)
     -- At the head of the layout, with a table to craft at beside it.
     PZHarness.Fixtures.teleportToMiddle(player, origin:getX(), origin:getY(), origin:getZ())
     PZHarness.Test.placeWorkTable(player)
-    print(string.format("%s laid out %d items of %d types in %d groups from %d,%d (whole lot open: %s), %d stations,"
-        .. " trailer %s; %d tools of %d types in %d toolboxes", MARK, summary.items, summary.types, summary.groups,
-        origin:getX(), origin:getY(), tostring(summary.lot), summary.stations, tostring(summary.trailer == true),
-        summary.tools, #summary.toolTypes, summary.toolboxes))
-    print(MARK .. " toolboxes: " .. table.concat(summary.toolTypes, ", "))
-    for _, what in ipairs({ "unknown", "unplaced", "unmatched", "unsorted" }) do
-        if #summary[what] > 0 then
-            print(MARK .. " " .. what .. ": " .. table.concat(summary[what], "; "))
-        end
-    end
+    HarnessQA.printSummary(MARK, string.format("laid out %d items of %d types in %d groups from %d,%d (whole lot"
+        .. " open: %s), %d stations, trailer %s; %d tools of %d types in %d toolboxes", summary.items, summary.types,
+        summary.groups, origin:getX(), origin:getY(), tostring(summary.lot), summary.stations,
+        tostring(summary.trailer == true), summary.tools, #summary.toolboxes, summary.boxes), summary,
+        { "toolboxes", "unknown", "unplaced", "unmatched", "unsorted" })
     return summary
-end
-
---- QA.setup on the first tick: a scenario's onStart runs during the world's start (OnGameStart),
---- before the global object systems exist, which clearing a square's ground cover reaches.
-function QA.setupSoon()
-    local function onTick()
-        Events.OnTick.Remove(onTick)
-        QA.setup(getPlayer())
-    end
-    Events.OnTick.Add(onTick)
 end
 
 return QA

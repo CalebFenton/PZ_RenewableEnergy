@@ -48,7 +48,8 @@ function T.waitForVehicleCopy(self, vehicle, matches, what)
     T.waitFor(self, function() return vehicle.vehicle ~= nil and matches(T.copyState(vehicle)) end, what)
 end
 
-local function isOpenGround(x, y, z)
+-- Ground a trailer can stand on: outdoors, with nothing on it that blocks, whatever else lies there.
+local function isTrailerGround(x, y, z)
     local square = getSquare(x, y, z)
     return square ~= nil and square:isOutside() and square:isFree(false) and not square:HasTree()
         and square:getVehicleContainer() == nil
@@ -67,7 +68,7 @@ local function openStrip(ahead, behind)
                 local open = true
                 for sx = x - 1, x + 1 do
                     for sy = y - ahead, y + behind do
-                        open = open and isOpenGround(sx, sy, z)
+                        open = open and isTrailerGround(sx, sy, z)
                     end
                 end
                 if open then

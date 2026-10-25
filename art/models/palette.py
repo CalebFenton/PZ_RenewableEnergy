@@ -1,5 +1,5 @@
 """The shared materials every builder paints its parts with, made on first use: M("name")."""
-from kit import material
+from art.shading import material
 
 # The earth banked round the brick dome (biogas.DOME) is grassed over this far out from the dome's
 # centre, and thins into the ground over this, in metres.

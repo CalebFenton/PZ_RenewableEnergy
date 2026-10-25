@@ -188,7 +188,7 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
         takeBattery(self, trailer)
         T.step(function()
             self.canPutBack = trailer.vehicle:canInstallPart(p, self.lid)
-            local lid = p:getInventory():getFirstTypeRecurse(self.lidType)
+            local lid = T.carried(self.lidType)
             if lid then
                 ISVehiclePartMenu.onInstallPart(p, self.lid, lid)
                 T.shortenQueuedInstalls()
@@ -353,7 +353,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         expect(self.cutSlice == "none", "the menu shows Cut Padlock on a cut lock (" .. tostring(self.cutSlice) .. ")")
         expect(self.openAccess, "the box doesn't open once its padlock is cut")
         expectBatteryTaken(self)
-        expect(player():getInventory():getFirstTypeRecurse(RenewableEnergy.BatteryBoxLid.CUTTERS) ~= nil,
+        expect(T.carried(RenewableEnergy.BatteryBoxLid.CUTTERS) ~= nil,
             "cutting used up the bolt cutters")
     end,
 })

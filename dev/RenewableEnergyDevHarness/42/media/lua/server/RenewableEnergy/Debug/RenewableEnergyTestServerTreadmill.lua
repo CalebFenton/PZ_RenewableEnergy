@@ -4,10 +4,10 @@
 -- handlers work.
 
 require "PZHarness/ServerHandlers"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+require "PZHarness/Fixtures"
 
 local handler = PZHarness.serverHandler
-local squareAt = Helpers.squareAt
+local squareAt = PZHarness.Fixtures.squareAt
 
 -- Completes the treadmill action `run` as the server finishes a client's action (complete()).
 -- Answers whether it settled, and the character's Fitness XP, endurance and thirst before and

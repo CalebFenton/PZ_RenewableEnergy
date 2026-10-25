@@ -74,15 +74,11 @@ local function waitForAuthoritySmell(self, square, level, label)
 end
 
 -- Queues a wait until this client's smell moodle is at `level`, or SMELL_MS pass, then records the
--- level in self.moodle[label] for validate. The limit is real time, not frames: a multiplayer
--- client's moodle follows the rate the server sends, whatever the frame rate.
+-- level in self.moodle[label] for validate.
 local function waitForClientSmell(self, level, label)
-    local deadline
     T.waitUntil(function()
-        deadline = deadline or getTimestampMs() + SMELL_MS
-        local now = T.player():getMoodles():getMoodleLevel(MoodleType.NOXIOUS_SMELL)
-        return now == level or getTimestampMs() > deadline
-    end, math.huge, "the smell moodle at " .. level)
+        return T.player():getMoodles():getMoodleLevel(MoodleType.NOXIOUS_SMELL) == level
+    end, SMELL_MS, "the smell moodle at " .. level)
     T.step(function() self.moodle[label] = T.player():getMoodles():getMoodleLevel(MoodleType.NOXIOUS_SMELL) end)
 end
 
@@ -252,12 +248,12 @@ test("renewable_energy_biogas_stink_chunk_reload", {
     timeoutSeconds = 120,
     run = function(self)
         self.moodle = {}
-        local stand, source = standNearSource(self)
+        local _, source = standNearSource(self)
         if not source then return end
         withLevels(self, source, function(levels)
             stink(self, source, levels[#levels])
             waitForClientSmell(self, #levels, "before")
-            T.awayAndBack(self, T.at(stand), source:getX(), source:getY(), source:getZ())
+            T.reloadChunk(self, T.at(source))
             waitForClientSmell(self, #levels, "reloaded")
             stink(self, source, 0)
             waitForClientSmell(self, 0, "cleared")

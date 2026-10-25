@@ -283,9 +283,8 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
 
 -- Whether this client's copy of the panel handle `panel` draws snow on its tile.
 local function showsSnow(panel)
-    local attached = panel.object:getAttachedAnimSprite()
-    for i = 0, (attached and attached:size() or 0) - 1 do
-        if Sprites.isSnow(attached:get(i):getName()) then
+    for _, name in ipairs(T.overlaysOf(panel.object)) do
+        if Sprites.isSnow(name) then
             return true
         end
     end

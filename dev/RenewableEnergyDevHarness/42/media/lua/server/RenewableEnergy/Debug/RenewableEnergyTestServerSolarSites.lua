@@ -5,13 +5,14 @@
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
+local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
 local objectWithSprite = PZHarness.Fixtures.objectWithSprite
-local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
+local squareAt, removePlaced = PZHarness.Fixtures.squareAt, PZHarness.Fixtures.removePlaced
 local inRange, wearRange = Helpers.inRange, Helpers.wearRange
 local Sprites = RenewableEnergy.Sprites
 
@@ -173,7 +174,7 @@ local function expectKittedGenerator(expect, expectNear, square, source, kind)
         expectNear("the generator's tank as the kit keeps it", state.tank or -1, fuel, 0.01)
     end
     expect(RenewableEnergy.GasLines.isListed(generator), "the gas pass doesn't list the generator")
-    local overlays = Helpers.overlaysOf(generator)
+    local overlays = PZHarness.Fixtures.overlaysOf(generator)
     local kit = Sprites.gasKitFor(Sprites.nameOf(generator))
     local hasKit = false
     for _, overlay in ipairs(overlays) do

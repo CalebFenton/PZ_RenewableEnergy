@@ -3,7 +3,6 @@ says what each shows, and tools/make_tiles.py, which gives each its properties. 
 media/lua/shared/RenewableEnergy/Sprites.lua; keep it in step. It imports nothing, so
 make_tiles.py runs without Blender.
 """
-COLUMNS = 8  # the game reads tilesets and their depth maps eight tiles wide
 # The order of an object's tiles from its first, one per facing, that the placing cursor turns it
 # through.
 FACINGS = "SENW"

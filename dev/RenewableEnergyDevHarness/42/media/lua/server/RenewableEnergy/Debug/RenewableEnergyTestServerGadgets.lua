@@ -4,10 +4,11 @@
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local squareAt, vehicleAt, onVehicle = Helpers.squareAt, Helpers.vehicleAt, Helpers.onVehicle
+local squareAt, vehicleAt, onVehicle = PZHarness.Fixtures.squareAt, Helpers.vehicleAt, Helpers.onVehicle
 
 -- Gadgets -----------------------------------------------------------------------------------------
 

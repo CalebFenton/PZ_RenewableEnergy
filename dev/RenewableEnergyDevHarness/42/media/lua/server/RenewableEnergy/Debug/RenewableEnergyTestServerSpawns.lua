@@ -4,13 +4,15 @@
 -- sites' are in RenewableEnergyTestServerSolarSites.lua.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
+require "PZHarness/Loot"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
-local squareAt, removePlaced = Helpers.squareAt, PZHarness.Fixtures.removePlaced
+local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
+local squareAt, removePlaced = PZHarness.Fixtures.squareAt, PZHarness.Fixtures.removePlaced
 local inRange, wearRange, UNDER = Helpers.inRange, Helpers.wearRange, Helpers.UNDER
 local Sprites = RenewableEnergy.Sprites
 
@@ -187,7 +189,7 @@ local function bankPartsAt(container, stockName, roll, defer)
     local restoreRoll = Helpers.forceRolls(defer, roll)
     local found = { inverter = 0, controller = 0, charger = 0 }
     local function stock(c) WorldSpawns.stockBank(c, stockName) end
-    for fullType, count in pairs(RenewableEnergy.Loot.fillOnce(stock, container, true)) do
+    for fullType, count in pairs(PZHarness.Loot.fillOnce(stock, container)) do
         local kind = RenewableEnergy.PowerBank.partKind(fullType)
         if found[kind] then
             found[kind] = found[kind] + count

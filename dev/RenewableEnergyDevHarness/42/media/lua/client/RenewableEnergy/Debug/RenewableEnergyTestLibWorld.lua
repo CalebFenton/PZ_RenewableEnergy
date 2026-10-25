@@ -72,7 +72,7 @@ end
 --- the authority's handler `name` asked with `args` until `done(answer)` holds or ROLL_MS pass.
 function T.visitUntil(self, x, y, where, name, args, done)
     T.step(function() self.teleportTo(x + 0.5, y + 0.5, 0) end)
-    T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, where .. " loaded on this client", T.CHUNK_FRAMES)
+    T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, where .. " loaded on this client", T.CHUNK_MS)
     T.serverUntil(self, name, args, done, ROLL_MS)
 end
 
@@ -82,7 +82,7 @@ function T.returnHome(self)
     local home = self.home
     T.step(function() self.teleportTo(home.x, home.y, home.z) end)
     T.waitFor(self, function() return loadedAround(math.floor(home.x), math.floor(home.y), home.z, HOME_RADIUS) end,
-        "the start loaded again", T.CHUNK_FRAMES)
+        "the start loaded again", T.CHUNK_MS)
 end
 
 return T

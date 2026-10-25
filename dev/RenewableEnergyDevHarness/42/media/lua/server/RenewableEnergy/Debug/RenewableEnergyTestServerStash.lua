@@ -4,6 +4,7 @@
 -- handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
@@ -11,8 +12,8 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local EngineStash = Stash
 local Stash = require "RenewableEnergy/Stash"
 
-local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
-local deferOnce = Helpers.deferOnce
+local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
+local deferOnce = PZHarness.Fixtures.deferOnce
 local countPairs = PZHarness.Fixtures.countPairs
 local Sprites = RenewableEnergy.Sprites
 

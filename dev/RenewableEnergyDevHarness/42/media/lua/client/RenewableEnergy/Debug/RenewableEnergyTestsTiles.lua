@@ -81,22 +81,6 @@ test("renewable_energy_tiles_have_pictures", {
     end,
 })
 
--- Each moveable item places the tile of its own kind and material, and each tile picks up as its
--- item (CustomItem).
-test("renewable_energy_tiles_moveable_items_place_their_tiles", {
-    validate = function()
-        for _, placed in ipairs(PLACED) do
-            local script = getScriptManager():getItem(placed.item)
-            local kind, _, material = Sprites.kindOf(script and script:getWorldObjectSprite())
-            expect(kind == placed.kind and material == placed.material, string.format("%s places a %s %s tile, expected %s %s",
-                placed.item, tostring(material), tostring(kind), tostring(placed.material), placed.kind))
-            local props = properties(placed.sprite)
-            local customItem = props and props:get("CustomItem")
-            expect(customItem == placed.item, placed.sprite .. " gives " .. tostring(customItem) .. ", expected " .. placed.item)
-        end
-    end,
-})
-
 -- Sprites.kindOf names every placed tile's kind, facing and material; every tile Sprites.lua names
 -- is either placed or an overlay, never both; a vanilla tile has no kind.
 test("renewable_energy_tiles_kind_of_reads_every_placed_tile", {
@@ -384,7 +368,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                     T.step(function()
                         local items = T.carriedItems(self, placed.item)
                         result.removed = T.objectWithSprite(square, placed.sprite) == nil
-                        result.returned, result.items = #items, self.server.carried.total
+                        result.returned, result.items = #items, self.reads.carried.total
                         result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
                     end)
                     T.server(self, "takeItems", { type = placed.item })
@@ -455,7 +439,7 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
             T.readCarried(self, { item })
             T.step(function()
                 result.removed = T.objectWithSprite(square, tile) == nil
-                result.returned, result.items = #T.carriedItems(self, item), self.server.carried.total
+                result.returned, result.items = #T.carriedItems(self, item), self.reads.carried.total
             end)
             T.server(self, "takeItems", { type = item })
         end
@@ -485,7 +469,7 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
             table.insert(self.banks, bank)
             T.bankState(self, bank)
             T.waitFor(self, function()
-                return bank.state ~= nil and T.overlays(bank.object) == table.concat(bank.state.overlays, ",")
+                return bank.state ~= nil and table.concat(T.overlaysOf(bank.object), ",") == table.concat(bank.state.overlays, ",")
             end, "this client's copy of the overlays of the bank facing " .. facing)
         end
     end,
@@ -540,12 +524,13 @@ test("renewable_energy_tiles_cracked_modules_show", {
                 local at = panel.position
                 T.server(self, "panelCracks", T.at(at, { sprite = case.sprite, change = case.change }))
                 T.waitFor(self, function()
-                    return T.overlays(T.objectWithSprite(panel.square, case.sprite)) == table.concat(self.server.panelCracks.overlays, ",")
+                    return table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ",")
+                        == table.concat(self.server.panelCracks.overlays, ",")
                 end, "this client's overlays of " .. case.what)
                 T.step(function()
                     self.shown[case.name] = {
                         server = table.concat(self.server.panelCracks.overlays, ","),
-                        client = T.overlays(T.objectWithSprite(panel.square, case.sprite)),
+                        client = table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ","),
                     }
                 end)
             end

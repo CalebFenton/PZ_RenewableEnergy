@@ -4,10 +4,11 @@
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local overlaysOf, squareAt, bankRecordAt = Helpers.overlaysOf, Helpers.squareAt, Helpers.bankRecordAt
+local overlaysOf, squareAt, bankRecordAt = PZHarness.Fixtures.overlaysOf, PZHarness.Fixtures.squareAt, Helpers.bankRecordAt
 
 -- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll gives `args.rolls` until
 -- the test ends (Helpers.forceRolls).

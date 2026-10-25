@@ -281,7 +281,7 @@ test("renewable_energy_gasline_generator_runs_on_after_absence", {
         T.readGenerator(self, generator, "bill")
         billDryOver(self, "bill", self.hours)
         T.readBill(self, generator, digester, "before")
-        T.awayAndBack(self, T.at(stand), generator.x, generator.y, generator.z, function()
+        T.reloadChunk(self, generator, function()
             T.jumpClock(self, self.hours)
         end)
         T.waitForBill(self, generator, "before")

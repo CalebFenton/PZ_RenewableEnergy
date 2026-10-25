@@ -22,7 +22,7 @@ local PLUG_IN_INVERTER, POWER_INVERTER = T.PLUG_IN_INVERTER, T.POWER_INVERTER
 -- Whether the option's tooltip lists the item `fullType` in the colour for what the character is
 -- short of.
 local function marksShort(option, fullType)
-    local text = T.tooltipOf(option) or ""
+    local text = T.tooltipOf(option)
     return text:find(ISVehicleMechanics.bhs .. getItemNameFromFullType(fullType), 1, true) ~= nil
 end
 
@@ -36,8 +36,8 @@ test("renewable_energy_bank_context_menu_opens_bank_menu", {
     end,
     validate = function(self)
         local bank = self.bank.object
-        local context = ISWorldObjectContextMenu.createMenu(0, { bank }, 0, 0)
-        if not expect(type(context) == "table", "right-clicking a bank built no menu") then return end
+        local context = T.worldMenu(bank)
+        if not expect(context ~= nil, "right-clicking a bank built no menu") then return end
         local option = T.optionNamed(context, Menu.bankLabel(bank))
         expect(option ~= nil and option.subOption ~= nil, "right-clicking a bank shows no bank submenu")
         expect(T.optionNamed(context, getText("ContextMenu_Generator")) == nil, "right-clicking a bank shows vanilla's generator submenu")

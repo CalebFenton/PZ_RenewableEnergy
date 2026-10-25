@@ -1,7 +1,6 @@
 -- Development only. What the dev mod's captures and scenarios need besides the harness's staging
--- (PZHarness/Stage.lua): testing an area for room, placing a tile so it draws at once, clearing a
--- square down to its floor, and setting out the arrow board trailer; PZHarness/Capture.lua runs the
--- steps.
+-- (PZHarness/Stage.lua, PZHarness/StageLots.lua): setting out the arrow board trailer;
+-- PZHarness/Capture.lua runs the steps.
 
 require "PZHarness/Fixtures"
 
@@ -12,44 +11,6 @@ local TOWING_CAR = "Base.OffRoad"
 -- hitch then moves it up to the tow bar.
 Stage.TRAILER_GAP = 5
 local BEHIND = { N = { 0, 1 }, S = { 0, -1 }, E = { -1, 0 }, W = { 1, 0 } }
-
---- Whether `accepts(square)` holds for every square of the `w` by `h` rectangle whose north-west
---- corner is `corner`, on its level. `accepts` is passed nil for a square not loaded; a nil
---- `corner` is not open.
-function Stage.isAreaOpen(corner, w, h, accepts)
-    if not corner then
-        return false
-    end
-    local cell, x, y, z = getCell(), corner:getX(), corner:getY(), corner:getZ()
-    for dy = 0, h - 1 do
-        for dx = 0, w - 1 do
-            if not accepts(cell:getGridSquare(x + dx, y + dy, z)) then
-                return false
-            end
-        end
-    end
-    return true
-end
-
---- A tile of `spriteName` placed on `square` as the tests place one (PZHarness.Fixtures.newTile),
---- with `modData`, its neighbours recalculated so it draws at once. Returns it.
-function Stage.placeTile(square, spriteName, modData)
-    local object = PZHarness.Fixtures.newTile(square, spriteName, modData)
-    square:RecalcAllWithNeighbours(true)
-    return object
-end
-
---- Takes every object off `square` but its floor and those `keeps(object)` accepts, from the top
---- down.
-function Stage.clearToFloor(square, keeps)
-    local floor, objects = square:getFloor(), square:getObjects()
-    for i = objects:size() - 1, 0, -1 do
-        local object = objects:get(i)
-        if object ~= floor and not (keeps and keeps(object)) then
-            square:RemoveTileObject(object)
-        end
-    end
-end
 
 --- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer
 --- behind it, both repaired, the trailer's lamps switched off: { car, trailer, facing }. A vehicle

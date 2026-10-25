@@ -50,18 +50,6 @@ function T.placeRecord(self, kind, tile, opts)
     return handle
 end
 
---- Whether the build cursor of `entity` would place it on `square`, materials aside: the cursor's
---- own test of each square it covers (ISBuildIsoEntity:isValidPerSquare), which runs the entity's
---- OnIsValid. Nil without the build menu entry.
-function T.placeable(entity, square)
-    local info = T.buildEntry(entity)
-    if not info then return nil end
-    local player = T.player()
-    local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
-    build.player = player:getPlayerNum()
-    return build:isValidPerSquare(square, build:getFace():getTileInfo(0, 0, 0), true, false, false)
-end
-
 --- Queues building a record of `kind` from the build menu's entry of `entity` on a bare outdoor
 --- square (T.build with `prefer`), waiting for this client's copy of the tile `tile`. Its record
 --- lands in self.reads.built, the build in self.build, what is left carried in self.counts.left;
@@ -82,8 +70,8 @@ function T.buildRecord(self, kind, entity, tile, prefer)
     return handle
 end
 
---- Expects T.buildRecord's build to have been possible, built its record on the tile `tile`, and
---- taken what it takes while keeping its tools.
+--- Expects T.buildRecord's build to have built its record on the tile `tile`, and taken what it
+--- takes while keeping its tools (T.expectBuildUsed).
 function T.expectBuilt(self, tile)
     local built = self.reads.built or {}
     T.expectBuildUsed(self.build, self.counts.left)

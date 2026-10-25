@@ -3,6 +3,7 @@
 -- again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
@@ -90,7 +91,7 @@ handler("ruralFindAt", function(_, args, testDefer)
     end
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
-    local undoNow = Helpers.deferOnce(testDefer, function()
+    local undoNow = PZHarness.Fixtures.deferOnce(testDefer, function()
         for i = #undo, 1, -1 do
             undo[i]()
         end
@@ -140,7 +141,7 @@ end)
 
 -- Vanilla's barn, farm storeroom and survivalist camp story clutter lists hold the mod's additions,
 -- each as many times as vanilla's adder puts an item in for every time RuralFinds.CLUTTER lists it.
-Helpers.check("ruralClutter", function(expect)
+PZHarness.checkHandler("ruralClutter", function(expect)
     local RuralFinds = RenewableEnergy.RuralFinds
     local base = getWorld():getRandomizedWorldBase()
     for getter, items in pairs(RuralFinds.CLUTTER) do

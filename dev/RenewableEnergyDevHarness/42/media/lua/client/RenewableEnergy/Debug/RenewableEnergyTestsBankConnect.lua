@@ -74,25 +74,8 @@ test("renewable_energy_bank_placed_bank_starts_unconnected", {
     end,
 })
 
--- Makes the character know vanilla's "Generator" recipe (the generator magazine's) or not, on both
--- sides. This client's copy goes back when the test ends; the server undoes no recipe change, so the
--- test sets the server's back itself.
-local function knowGenerator(self, known)
-    local p, names = player(), { "Generator" }
-    local function apply(learn)
-        if learn then
-            PZHarness.Fixtures.learnRecipes(p, names)
-        else
-            PZHarness.Fixtures.forgetRecipes(p, names)
-        end
-    end
-    local was = p:getKnownRecipes():contains("Generator")
-    apply(known)
-    T.defer(self, function() apply(was) end)
-    if isClient() then
-        T.server(self, known and "PZHarness.learnRecipes" or "PZHarness.forgetRecipes", { names = names })
-    end
-end
+-- Vanilla's recipe of the generator magazine.
+local GENERATOR = { "Generator" }
 
 -- Connecting a bank takes what connecting a generator does in vanilla: the Electricity level or
 -- the "Generator" recipe, enforced by the menu, the action and the authority.
@@ -101,8 +84,7 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         self.unskilled = T.bank(self, "batteryBoxWood", {}, { connected = false })
         self.magazine = self.unskilled and T.bank(self, "batteryBoxWood", {}, { connected = false, near = self.unskilled })
         if not self.magazine then return end
-        self.knewGenerator = player():getKnownRecipes():contains("Generator")
-        knowGenerator(self, false)
+        T.knowRecipes(self, GENERATOR, false)
         T.setPerk(self, Perks.Electricity, 2)
         T.step(function()
             self.connect = T.optionState(T.menuOption(Menu.addBankOptions, self.unskilled.object,
@@ -113,12 +95,9 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         -- T.setPerk sets the level when called, so the later levels wait for their turn.
         T.step(function() T.setPerk(self, Perks.Electricity, 3) end)
         T.performInto(self, "skilled", "setBankConnected", { bank = self.unskilled.position, connected = true })
-        T.step(function()
-            T.setPerk(self, Perks.Electricity, 2)
-            knowGenerator(self, true)
-        end)
+        T.step(function() T.setPerk(self, Perks.Electricity, 2) end)
+        T.knowRecipes(self, GENERATOR)
         T.performInto(self, "withRecipe", "setBankConnected", { bank = self.magazine.position, connected = true })
-        T.step(function() knowGenerator(self, self.knewGenerator) end)
     end,
     validate = function(self)
         expect(self.connect.greyed and self.connect.reason == getText("ContextMenu_GeneratorPlugTT"),

@@ -27,6 +27,7 @@ require "RenewableEnergy/UI/GasifierWindow"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
+require "PZHarness/StageLots"
 local Places = require "RenewableEnergyDevPromoPlaces"
 
 local Promo = {}
@@ -39,8 +40,7 @@ local DRAW_FRAMES = Capture.DRAW_FRAMES
 local HOMESTEAD, OPEN, STAGE0, STUDIO, ROAD, WALK, POSTER, LAYOUTS = Places.HOMESTEAD, Places.OPEN, Places.STAGE0,
     Places.STUDIO, Places.ROAD, Places.WALK, Places.POSTER, Places.LAYOUTS
 local places, at, squaresAt, loadedSquares = Places.places, Places.at, Places.squaresAt, Places.loadedSquares
-local everyAreaSquare, eachShotSquare, isClear, isOnWall = Places.everyAreaSquare, Places.eachShotSquare,
-    Places.isClear, Places.isOnWall
+local everyAreaSquare, eachShotSquare, isOnWall = Places.everyAreaSquare, Places.eachShotSquare, Places.isOnWall
 
 -- The banks charge through the morning, so the window shows a day's figures at noon.
 local MORNING, NOON = 8, 12
@@ -161,7 +161,7 @@ end
 -- shut. Walls, what hangs on them, light switches and windows stay.
 local function clearBankShot(bank, player)
     eachShotSquare(bank, player, function(square)
-        Stage.clearToFloor(square, function(object)
+        Harness.clearToFloor(square, function(object)
             return not instanceof(object, "IsoDoor") and (isOnWall(object) or instanceof(object, "IsoWindow")
                 or instanceof(object, "IsoLightSwitch"))
         end)
@@ -199,7 +199,7 @@ local function placePanels(bank, place, spots, mount, modules)
     for i, spot in ipairs(spots) do
         local sprite = mount and Sprites[mount][spot[3]][place.frame.facing] or Sprites.flat
         local held = modules and modules[i]
-        connect(bank, Stage.placeTile(at(place, spot), sprite, held and { [PowerBank.MODULES_KEY] = held } or nil))
+        connect(bank, Harness.placeTile(at(place, spot), sprite, held and { [PowerBank.MODULES_KEY] = held } or nil))
     end
 end
 
@@ -373,7 +373,7 @@ local tallSquares = {}
 -- A wind charger's tile on `square`, turning in the wind as one built does.
 local function placeWindCharger(square, spriteName)
     clearGroundCover(square)
-    local object = Stage.placeTile(square, spriteName)
+    local object = Harness.placeTile(square, spriteName)
     RenewableEnergy.Wind.OnCreate({ thumpable = object })
     tallSquares[square] = true
     return object
@@ -395,7 +395,7 @@ local function buildHomestead()
     -- A backup generator with a failsafe outside the bank's wall, plugged in and waiting, with a
     -- gas kit on the insulated digester beside it.
     local generator = placeKittedGenerator(home, HOMESTEAD, "insulated")
-    Stage.placeTile(generator:getSquare(), Sprites.failsafe)
+    Harness.placeTile(generator:getSquare(), Sprites.failsafe)
     shown.homesteadCharger = placeWindCharger(at(home, HOMESTEAD.windCharger), Sprites.windCharger.propeller.wood[home.frame.facing])
     connect(homesteadBank, shown.homesteadCharger)
     setBankOn(homesteadBank, true)
@@ -407,7 +407,7 @@ local function buildStage0()
     clearArea(stage0, STAGE0.open)
     stage0Box = placeBank(at(stage0, STAGE0.box), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
     placePanels(stage0Box, stage0, STAGE0.flatPanels)
-    local charger = Stage.placeTile(at(stage0, STAGE0.cellCharger), Sprites.cellCharger)
+    local charger = Harness.placeTile(at(stage0, STAGE0.cellCharger), Sprites.cellCharger)
     if not charger:getContainer() then
         charger:createContainersFromSpriteProperties()
     end
@@ -503,24 +503,6 @@ local function addOutfit(settler)
     end)
 end
 
--- The squares the character has looked around from so far in the run. What it saw stays seen.
-local lookedFrom = {}
-
--- Has the character look around from each of `squares` and stay on the last, since squares they
--- never saw are drawn dark, and sets the zoom `stepsOut` steps out from the closest. Of the others,
--- it skips those it has looked around from already.
-local function goTo(squares, stepsOut)
-    for i, square in ipairs(squares) do
-        if i == #squares or not lookedFrom[square] then
-            Harness.addLookAround(run.steps, getPlayer(), square)
-            lookedFrom[square] = true
-        end
-    end
-    run:add(function()
-        return Harness.zoomOut(stepsOut)
-    end)
-end
-
 -- Logs each bank's status as the window would read it. The promo runs single player, where the
 -- banks' records are at hand; the status itself goes only to players watching a bank.
 local function logBanks()
@@ -560,7 +542,7 @@ local function addWorld()
     table.insert(scouts, at(home, HOMESTEAD.player))
     addOutfit(true)
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
-    goTo(scouts, 1)
+    Harness.addGoTo(run, getPlayer(), scouts, 1)
     run:addOpaque("homestead", function()
         return { Harness.centred("homestead", homesteadSquares(), FRAMING) }
     end)
@@ -580,14 +562,14 @@ local function addWorld()
         local charger = shown.homesteadCharger
         charger:getSquare():transmitRemoveItemFromSquare(charger)
     end)
-    goTo({ home.beside }, 0)
+    Harness.addGoTo(run, getPlayer(), { home.beside }, 0)
     run:addOpaque("bank", function()
         return { Harness.cropped("bank", { home.bank, home.beside }, FRAMING) }
     end)
     -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
     -- among them, then from the window, early on, in the clothes it came with.
     addOutfit(false)
-    goTo(squaresAt(places.stage0, { STAGE0.scout, STAGE0.player }), 0)
+    Harness.addGoTo(run, getPlayer(), squaresAt(places.stage0, { STAGE0.scout, STAGE0.player }), 0)
     run:addOpaque("stage0", function()
         return { Harness.centred("stage0", stage0Squares(), FRAMING) }
     end)
@@ -675,7 +657,7 @@ local function addModels(items, models)
         print(MARK .. " item floor " .. asphalt)
         everyAreaSquare(studio, STUDIO.floor, function(square)
             clearGroundCover(square)
-            if isClear(square) then
+            if Harness.isOpenGround(square) then
                 square:addFloor(asphalt)
             end
             return true
@@ -687,7 +669,7 @@ local function addModels(items, models)
             floorSquare:AddWorldInventoryItem(instanceItem(item.fullType), 0.5, 0.5, 0)
         end
     end)
-    goTo({ at(studio, STUDIO.player) }, 0)
+    Harness.addGoTo(run, getPlayer(), { at(studio, STUDIO.player) }, 0)
     local floor = run.prefix .. "models_floor"
     run:add(function()
         floorSquare:removeAllWorldObjects()
@@ -726,7 +708,7 @@ local function addTrailer()
         removeTrees(road)
         Harness.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
         for _, spot in ipairs(ROAD.cones) do
-            Stage.placeTile(at(road, spot), ROAD.cone)
+            Harness.placeTile(at(road, spot), ROAD.cone)
         end
         pair = Stage.spawnTrailer(carSquare, road.frame.facing)
         return Stage.vehiclesAtRest(pair, false)
@@ -739,7 +721,7 @@ local function addTrailer()
     end)
     -- From the item floor first, as a full run's character has by now: the hedges and fences along
     -- a road hide what lies past them from the road itself.
-    goTo({ at(places.studio, STUDIO.player), at(road, ROAD.player) }, 1)
+    Harness.addGoTo(run, getPlayer(), { at(places.studio, STUDIO.player), at(road, ROAD.player) }, 1)
     run:addOpaque("trailer", function()
         -- The car's nose, the trailer, the character and the cones.
         return { Harness.centred("trailer", squaresAt(road, { { 2, 0 }, ROAD.trailer, ROAD.player }, ROAD.cones), FRAMING) }
@@ -766,7 +748,7 @@ local function addGardenLights()
         -- looks around.
         SolarGardenLight.updateAll(0)
     end)
-    goTo(squaresAt(walk, { WALK.scout, WALK.player }), 0)
+    Harness.addGoTo(run, getPlayer(), squaresAt(walk, { WALK.scout, WALK.player }), 0)
     run:addOpaque("gardenlights", function()
         return { Harness.centred("gardenlights", squaresAt(walk, { { 0, -1 }, WALK.player }, WALK.lights), FRAMING) }
     end)
@@ -778,7 +760,7 @@ end
 local function buildPoster()
     local poster = places.poster
     everyAreaSquare(poster, POSTER.front, function(square)
-        Stage.clearToFloor(square)
+        Harness.clearToFloor(square)
         return true
     end)
     clearArea(poster, POSTER.open, true)
@@ -805,7 +787,7 @@ local function addPoster()
         table.insert(scouts, square)
     end
     table.insert(scouts, at(poster, POSTER.player))
-    goTo(scouts, POSTER.zoomOut)
+    Harness.addGoTo(run, getPlayer(), scouts, POSTER.zoomOut)
     -- The clock turned before the looking around, which outlasts the lighting's change.
     run:add(function()
         return Harness.lightingSettled(getPlayer())
@@ -842,7 +824,7 @@ local function goToPlace(name, stepsOut, standAt)
     if layout.scout then
         table.insert(squares, 1, at(places[name], layout.scout))
     end
-    goTo(squares, stepsOut)
+    Harness.addGoTo(run, getPlayer(), squares, stepsOut)
 end
 
 -- The window of `windowClass` (RenewableEnergy.DigesterWindow or GasifierWindow) on what the shots
@@ -863,7 +845,7 @@ local function addBiogas()
         clearYard("biogas")
         -- The heater first: the barrel's pass reads whether it is heated from the lit heater tile
         -- beside it (DigesterObject:advance).
-        Stage.placeTile(here("heater"), Sprites.gasHeater.lit.S)
+        Harness.placeTile(here("heater"), Sprites.gasHeater.lit.S)
         placeDigester(here("barrelSteel"), "barrel.MetalDrum", 1)
         placeDigester(here("barrelOrange"), "barrel.Mov_OrangeBarrel", 0.6, { holder = "tarp" })
         placeDigester(here("insulated"), "insulated", 0.8)
@@ -934,8 +916,8 @@ local function addTreadmill()
         local here = spotsOf("gym")
         local box = placeBank(here("box"), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
         local tiles = Sprites.treadmill[layout.facing]
-        Stage.placeTile(here("rear"), tiles.rear)
-        shown.treadmill = Stage.placeTile(here("console"), tiles.console, { [RenewableEnergy.Treadmill.WIRED_KEY] = true })
+        Harness.placeTile(here("rear"), tiles.rear)
+        shown.treadmill = Harness.placeTile(here("console"), tiles.console, { [RenewableEnergy.Treadmill.WIRED_KEY] = true })
         connect(box, shown.treadmill)
         setBankOn(box, true)
         return DRAW_FRAMES
@@ -981,12 +963,7 @@ local GROUPS = {
 -- in: noon without grid power, a breeze that turns the wind chargers, and no radio captions around
 -- the places. Returns nil, or what it couldn't find.
 local function prepare(chosen)
-    local needs = {}
-    for _, name in ipairs(chosen) do
-        for _, place in ipairs(GROUPS[name].places) do
-            needs[place] = true
-        end
-    end
+    local needs = Harness.groupNeeds(GROUPS, chosen, "places")
     local origins, missing = Places.find(getPlayer(), needs, MARK)
     if not origins then
         return "within " .. Harness.SEARCH_RADIUS .. " squares, no " .. missing

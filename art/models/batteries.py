@@ -2,7 +2,7 @@
 import functools
 import random
 
-from kit import added, around, beam, box, cylinder, group, mound, prism, text, tube
+from art.kit import added, around, beam, box, cylinder, group, mound, prism, text, tube
 from palette import M
 from parts import BOARD, SHEET, arch, side_handles
 

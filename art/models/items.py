@@ -3,9 +3,9 @@
 The builders are in their family's module (solar.py, batteries.py, electronics.py, magazines.py,
 biogas.py, woodgas.py, wind.py and trailer.py), in real-world sizes of 1993 hardware, painted from
 palette.py and sharing the parts in parts.py. Each adds one thing's parts to a collection, standing
-on z = 0, centred, front to -Y (see kit.py); tiles.py places the same builders on tiles. A builder
-takes keyword options, so a tile can draw a battery rack without its batteries and an overlay just
-the batteries.
+on z = 0, centred, front to -Y (see the harness's lib/art/kit.py); tiles.py places the same
+builders on tiles. A builder takes keyword options, so a tile can draw a battery rack without its
+batteries and an overlay just the batteries.
 """
 import batteries
 import biogas
@@ -14,7 +14,7 @@ import magazines
 import solar
 import wind
 import woodgas
-from kit import added, group
+from art.kit import added, group
 from parts import DRUM_LOOKS, dropped_drum
 
 

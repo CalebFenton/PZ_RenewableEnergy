@@ -203,7 +203,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.batch(function()
             T.giveMaterials(self, "charge", DigesterJobs.materials(DigesterJobs.CHARGE_LIME))
             T.give(self, "water", { { type = "Base.Bucket" } })
-            T.server(self, "refillFluid", { type = "Base.Bucket", fluid = "Water", liters = Digester.SCRUB_WATER })
+            T.fillCarried(self, "Base.Bucket", "Water", Digester.SCRUB_WATER)
         end)
         -- Each job's action checks this client's copies, of the digester and the water.
         T.waitFor(self, function()

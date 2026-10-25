@@ -236,10 +236,6 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
     end,
 })
 
--- The frames a watch of the lamps may take at most: far more than its real time needs at any
--- frame rate.
-local FLASH_WATCH_FRAMES = 100000
-
 -- While the server has the lamps lit, this game flashes them lit and dark (ArrowBoard.flashPhase);
 -- switched off, they stay dark for a whole flash period.
 test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
@@ -251,13 +247,13 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
         -- of them are seen or `ms` pass.
         local function watch(key, ms, enough)
             T.step(function()
-                local seen = { lit = 0, dark = 0, start = getTimestampMs() }
+                local seen = { lit = 0, dark = 0 }
                 self[key] = seen
                 T.waitUntil(function()
                     local lit = trailer.vehicle:getWindowLightsOn()
                     seen.lit, seen.dark = seen.lit + (lit and 1 or 0), seen.dark + (lit and 0 or 1)
-                    return enough(seen) or getTimestampMs() - seen.start >= ms
-                end, FLASH_WATCH_FRAMES, "the lamps' flashes")
+                    return enough(seen)
+                end, ms, "the lamps' flashes")
             end)
         end
         batchOnTrailer(function()

@@ -1,7 +1,7 @@
 """The arrow board trailer, the mod's vehicle."""
 import math
 
-from kit import beam, box, cylinder, group, text, tube
+from art.kit import beam, box, cylinder, group, text, tube
 from palette import M
 from parts import arch
 from solar import MODULE, solar_module

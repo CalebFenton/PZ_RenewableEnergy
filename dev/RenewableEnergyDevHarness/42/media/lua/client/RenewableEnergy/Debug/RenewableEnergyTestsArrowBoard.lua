@@ -325,7 +325,7 @@ local function repairTest(name, repaired, fromBelowCap)
             local sealed = self.trailer.state.panels[LEFT].repaired
             expect(sealed == repaired + 1, "the sealed panel reads repaired " .. tostring(sealed) .. "x, expected " .. repaired + 1)
             expect(left["Base.Screwdriver"] == 1, "the seal used up the screwdriver")
-            local epoxy = player():getInventory():getFirstTypeRecurse("Base.Epoxy")
+            local epoxy = T.carried("Base.Epoxy")
             local epoxyLeft = epoxy and epoxy:getCurrentUses() or 0
             expect(epoxyLeft == self.epoxyUses - self.epoxyNeeded, "the epoxy went from " .. self.epoxyUses .. " uses to " .. epoxyLeft
                 .. ", the seal takes " .. self.epoxyNeeded)

@@ -7,6 +7,7 @@ require "RenewableEnergy/PowerBank/ClientBankSystem"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/UI/StatusWindow"
 require "PZHarness/TestLib"
+require "PZHarness/QA"
 
 RenewableEnergy = RenewableEnergy or {}
 local Debug = {}
@@ -49,12 +50,6 @@ Debug.PREFERRED_INPUTS = {
     "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1",
 }
 
---- Teaches `player` every recipe of the mod, the build menu's included.
-function Debug.learnRecipes(player)
-    PZHarness.Test.learnRecipes(player)
-    PZHarness.Fixtures.learnRecipes(player, PZHarness.Test.buildRecipeNames())
-end
-
 local function isContainerGeneratorOrSource(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
         or RenewableEnergy.Sources.kindOf(object) ~= nil
@@ -75,7 +70,7 @@ function Debug.setupPlayer(player)
     player:setPerkLevelDebug(Perks.Electricity, 8)
     player:setPerkLevelDebug(Perks.MetalWelding, 4)
     player:setPerkLevelDebug(Perks.Woodwork, 3)
-    Debug.learnRecipes(player)
+    PZHarness.QA.learnAllRecipes(player)
     player:getInventory():AddItem("Base.Screwdriver")
     PZHarness.Test.placeWorkTable(player)
 end

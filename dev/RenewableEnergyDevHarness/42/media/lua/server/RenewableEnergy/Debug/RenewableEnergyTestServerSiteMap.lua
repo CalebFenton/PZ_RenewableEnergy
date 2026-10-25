@@ -3,7 +3,7 @@
 -- rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how checks work.
 
 require "RenewableEnergy/Sprites"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+require "PZHarness/ServerChecks"
 
 local Sprites = RenewableEnergy.Sprites
 
@@ -49,7 +49,7 @@ end
 -- unique name, a known kind, and the spots its kind uses, as many panel spots as the kind may
 -- place. Every name a world that rolled all sites at once stands for is a site's, since a renamed
 -- site would be rolled again in such worlds.
-Helpers.check("sitesPlacedSensibly", function(expect)
+PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
     local SolarSites = RenewableEnergy.SolarSites
     local metaGrid = getWorld():getMetaGrid()
     local sites = SolarSites.sites()

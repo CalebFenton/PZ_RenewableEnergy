@@ -20,27 +20,25 @@ names and values follow the vanilla tile definitions
   Electricity skill), PickUpLevel the skill needed.
 - Container types and scrap materials are global across mods, so they carry the mod's name.
 
-The game loads a mod's depth maps (media/depthmaps/DEPTH_<tileset>.png, which art/models/render.py
-renders) only when the mod's common/media has a tileGeometry.txt (TileDepthTextureManager.init),
-so this writes one without geometry. Without the depth map every tile would be drawn as if it
+With the harness's lib/art/tilefile.py, it also writes the tileGeometry.txt that makes the game
+load the depth maps art/models/render.py renders. Without them every tile would be drawn as if it
 filled its square up to the ceiling, and hide a character standing in front of a wall panel.
 """
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "dev", "harness", "check"))
+sys.path.insert(0, os.path.join(HERE, "..", "dev", "harness", "lib"))
 sys.path.insert(0, os.path.join(HERE, "..", "art", "models"))
-import tiledefs  # noqa: E402
-from tile_numbers import (BARREL_DIGESTERS, COLUMNS, DOME_DIGESTER, FACINGS, GARDEN_LIGHT, GARDEN_LIGHT_LIT,  # noqa: E402
+from art import tilefile  # noqa: E402
+from tile_numbers import (BARREL_DIGESTERS, DOME_DIGESTER, FACINGS, GARDEN_LIGHT, GARDEN_LIGHT_LIT,  # noqa: E402
                           GASIFIERS, HEATER, HEATER_LIT, INSULATED_DIGESTER, MOUNTS, SCOOP_ROTOR, SOLAR_CELL_CHARGER,
                           SOLAR_CRATE, SOLAR_FAILSAFE, SOLAR_FLAT, STORAGE_TILES, TURNED_HEATER_FIRST,
                           TURNED_STORAGE_FIRST, WIND_TILES)
 
 MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common", "media")
-TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
-GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
-# Each tileset's name and rows, COLUMNS tiles to a row; the file numbers them from 1 in this order.
+# Each tileset's name and rows, tilefile.COLUMNS tiles to a row; the file numbers them from 1 in
+# this order.
 TILESETS = (("renewable_energy_01", 53), ("renewable_energy_02", 56))
 
 
@@ -62,17 +60,11 @@ def wall(item, facing):
     return panel("Wall Mounted", item, 3, MoveType="WallObject", Facing="E", attachedW="", IsHigh="", Soffset="-1")
 
 
-def facings(tiles, facing):
-    """The placing cursor's rotation for `facing`'s tile of `tiles`, a tile number by facing."""
-    own = tiles[facing]
-    return {"Facing": facing, **{other + "offset": str(index - own) for other, index in tiles.items() if other != facing}}
-
-
 def turned(first, make):
     """Four tiles from `first`, one per facing in FACINGS' order, each make(**its rotation)."""
     tiles = {facing: first + f for f, facing in enumerate(FACINGS)}
     for facing, index in tiles.items():
-        TILES[index] = make(**facings(tiles, facing))
+        TILES[index] = make(**tilefile.facings(tiles, facing))
 
 
 def rack(item, **props):
@@ -172,20 +164,9 @@ for index in BARREL_DIGESTERS.values():
 
 
 def main():
-    tilesets = []
-    for number, (name, rows) in enumerate(TILESETS, 1):
-        properties = TILES if number == 1 else {}
-        assert max(properties, default=0) < COLUMNS * rows, "%s has more tiles than rows" % name
-        tiles = [sorted(properties.get(index, {}).items(), key=lambda prop: prop[0].lower())
-                 for index in range(COLUMNS * rows)]
-        tilesets.append(tiledefs.Tileset(name, name + ".png", COLUMNS, rows, number, tiles))
-    data = tiledefs.dumps(tilesets)
-    assert tiledefs.loads(data) == tilesets, "the tiles would not read back as written"
-    with open(TILES_FILE, "wb") as f:
-        f.write(data)
-    print("%s: %d tiles with properties" % (os.path.basename(TILES_FILE), len(TILES)))
-    with open(GEOMETRY_FILE, "w") as f:
-        f.write("tileGeometry\n{\n    VERSION = 2,\n}\n")
+    # Only renewable_energy_01's tiles have properties: renewable_energy_02 is all overlays.
+    tilefile.write(MEDIA, "renewable_energy.tiles",
+                   [(name, rows, TILES if number == 1 else {}) for number, (name, rows) in enumerate(TILESETS, 1)])
 
 
 if __name__ == "__main__":

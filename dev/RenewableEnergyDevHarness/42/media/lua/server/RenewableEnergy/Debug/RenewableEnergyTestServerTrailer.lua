@@ -9,7 +9,7 @@ require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local deferOnce, onVehicle, trialRoll = Helpers.deferOnce, Helpers.onVehicle, Helpers.trialRoll
+local deferOnce, onVehicle, trialRoll = PZHarness.Fixtures.deferOnce, Helpers.onVehicle, Helpers.trialRoll
 
 local Trailer = {}
 
@@ -397,7 +397,7 @@ end)
 -- and weathered ranges.
 onVehicle("arrowBoardPanelStockRolls", function(vehicle, args, _, defer)
     local ArrowBoard, WorldSpawns = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns
-    local restoreOptions = Helpers.saveOptions(defer, { "LRMSolarPanels" })
+    local restoreOptions = PZHarness.Fixtures.saveOptions(defer, { "LRMSolarPanels" })
     SandboxVars.RenewableEnergy.LRMSolarPanels = 1
     local stocked = {}
     for i, roll in ipairs(args.rolls) do
@@ -424,7 +424,7 @@ end)
 handler("arrowBoardControllerRolls", function(_, args, defer)
     local ArrowBoard, options = RenewableEnergy.ArrowBoard, SandboxVars.RenewableEnergy
     local controller = RenewableEnergy.Specs.controller
-    local restoreOptions = Helpers.saveOptions(defer, { "LRMBatteries", "LRMMisc" })
+    local restoreOptions = PZHarness.Fixtures.saveOptions(defer, { "LRMBatteries", "LRMMisc" })
     options.LRMBatteries = 0
     local container, controllers = ItemContainer.new("crate", nil, nil), {}
     for i, trial in ipairs(args.trials) do

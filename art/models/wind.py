@@ -1,7 +1,7 @@
 """Wind chargers, their blades and alternators, and the sprite models the game draws them as."""
 import math
 
-from kit import around, beam, box, cylinder, group, loft, mound, ring, tube
+from art.kit import around, beam, box, cylinder, group, loft, mound, ring, tube
 from palette import M
 from parts import DRUM
 

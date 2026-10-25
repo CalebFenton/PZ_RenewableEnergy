@@ -11,7 +11,7 @@ require "RenewableEnergy/Wind"
 -- away and back unloads the chunk and loads it again, which only single player does.
 
 local T = RenewableEnergyTest
-local test, expect, player, serverCheck = T.test, T.expect, T.player, T.serverCheck
+local test, expect, serverCheck = T.test, T.expect, T.serverCheck
 
 local Sprites = RenewableEnergy.Sprites
 local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
@@ -19,20 +19,20 @@ local Wind, PowerBank = RenewableEnergy.Wind, RenewableEnergy.PowerBank
 
 -- Game minutes to let pass once a spot's chunk is back: a spot that waits goes down at the next.
 local SETTLE_MINUTES = 2
--- The longest a wait on the game clock may take, in frames; the test's time limit comes first.
-local CLOCK_FRAMES = 1000000
+-- A wait on the game clock has no limit of its own: the test's time limit comes first.
+local CLOCK_MS = math.huge
 
 local function waitGameMinutes(self, minutes)
     local till
     T.step(function() till = getGameTime():getWorldAgeHours() + minutes / 60 end)
     T.waitFor(self, function() return till ~= nil and getGameTime():getWorldAgeHours() >= till end,
-        minutes .. " game minutes passing", CLOCK_FRAMES)
+        minutes .. " game minutes passing", CLOCK_MS)
 end
 
 -- Queues a trip that unloads the chunk of `at` ({ x, y, z }) and loads it again, and a wait for
 -- the minute after, when its waiting spots go down.
-local function reloadChunk(self, home, at)
-    T.awayAndBack(self, home, at.x, at.y, at.z)
+local function reloadAndSettle(self, at)
+    T.reloadChunk(self, at)
     waitGameMinutes(self, SETTLE_MINUTES)
 end
 
@@ -51,14 +51,14 @@ test("renewable_energy_world_site_placed_once", {
         T.setMultiplier(self, T.VISIT_SPEED)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        local home, at = T.at(player():getSquare()), T.at(square)
+        local at = T.at(square)
         T.server(self, "siteArm", { at = at })
-        reloadChunk(self, home, at)
+        reloadAndSettle(self, at)
         T.server(self, "sitePlaced", armedSpots)
         T.serverInto(self, "first", "siteSpots", armedSpots)
         T.waitFor(self, function() return T.objectWithSprite(getSquare(at.x, at.y, at.z), Sprites.rack.metal.S) ~= nil end,
             "this client's copy of the site's rack")
-        reloadChunk(self, home, at)
+        reloadAndSettle(self, at)
         T.server(self, "siteSpots", armedSpots)
     end,
     validate = function(self)
@@ -82,14 +82,13 @@ test("renewable_energy_world_site_waits_for_a_free_square", {
         T.setMultiplier(self, T.VISIT_SPEED)
         local bank = T.square(self, { indoors = true }, "a free indoor square for the bank")
         if not bank then return end
-        local home = T.at(player():getSquare())
         T.server(self, "siteArm", { bank = T.at(bank), block = true })
         T.step(function()
             local at = self.server.siteArm.at
-            reloadChunk(self, home, at)
+            reloadAndSettle(self, at)
             T.serverInto(self, "blocked", "siteSpots", armedSpots)
             T.server(self, "siteUnblock", at)
-            reloadChunk(self, home, at)
+            reloadAndSettle(self, at)
             T.server(self, "sitePlaced", armedSpots)
             T.waitFor(self, function()
                 return RenewableEnergy.findObjectOn(getSquare(at.x, at.y, at.z), Wind.isCharger) ~= nil
@@ -283,7 +282,7 @@ test("renewable_energy_world_site_garden_lights_promised", {
         T.server(self, "sitesArm", { names = { name } })
         T.step(function() self.edge = T.need(self, edgeOfLoaded(self.server.gardenLightsForgetHouse), "a side of the house its reach crosses") end)
         T.step(function() self.teleportTo(self.edge.x + 0.5, self.edge.y + 0.5, 0) end)
-        T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, "the house loaded at the edge", T.CHUNK_FRAMES)
+        T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, "the house loaded at the edge", T.CHUNK_MS)
         waitGameMinutes(self, SETTLE_MINUTES)
         T.serverInto(self, "atEdge", "gardenLightsHouse", { x = x, y = y })
         T.visitUntil(self, x, y, name, "gardenLightsHouse", { x = x, y = y }, function(answer) return answer.rolled end)

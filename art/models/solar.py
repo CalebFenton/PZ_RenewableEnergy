@@ -3,7 +3,7 @@ garden light."""
 import math
 import random
 
-from kit import beam, box, cylinder, group, text, tube
+from art.kit import beam, box, cylinder, group, text, tube
 from palette import M
 
 # Solar modules ------------------------------------------------------------------------------------

@@ -379,11 +379,10 @@ test("renewable_energy_woodgas_drain_condensate", {
         T.batch(function()
             T.setRecord(self, gasifier, { lit = true, fireKg = Gasifier.TIERS.primitive.hopperKg, condensate = self.condensate })
             T.give(self, "containers", { { type = "Base.WaterBottle" }, { type = "Base.Pot" } })
-            T.server(self, "refillFluid", { type = "Base.WaterBottle" })
-            T.server(self, "refillFluid", { type = "Base.Pot" })
+            T.fillCarried(self, "Base.WaterBottle")
+            T.fillCarried(self, "Base.Pot")
         end)
         T.waitForSummary(self, gasifier, function(summary) return summary.condensate >= self.condensate end, "this client's summary of the condensate")
-        T.waitFor(self, function() return self.items.containers[1]:getFluidContainer():isEmpty() end, "this client's copy of the emptied bottle")
         T.step(function()
             local bottle, pot = self.items.containers[1], self.items.containers[2]
             self.bottleHot = GasifierJobs.refusal(T.player(), GasifierJobs.DRAIN, gasifier.object, bottle)
@@ -401,7 +400,7 @@ test("renewable_energy_woodgas_drain_condensate", {
         T.expect(self.potHot == nil, "a pot won't take the condensate hot: " .. tostring(self.potHot))
         T.expect(self.coldBottle, "a plastic bottle won't take it cold")
         local poured = math.min(self.condensate, instanceItem("Base.Pot"):getFluidContainer():getCapacity())
-        T.expectNear("wood vinegar carried", self.server.carried and self.server.carried.fluids[Gasifier.VINEGAR], poured, 0.01)
+        T.expectNear("wood vinegar carried", self.reads.carried and self.reads.carried.fluids[Gasifier.VINEGAR], poured, 0.01)
         T.expectNear("condensate left", self.reads.drained.condensate, self.condensate - poured, 0.01)
     end,
 })

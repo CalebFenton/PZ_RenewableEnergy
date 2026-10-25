@@ -443,7 +443,7 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
             T.server(self, "takePartWear", { bank = at, type = INVERTER_CHARGER, points = PRIMED_WEAR })
             T.step(function() self.left = bank.state end)
         end)
-        T.awayAndBack(self, T.at(stand), at.x, at.y, at.z, function()
+        T.reloadChunk(self, at, function()
             T.step(function() T.setTime(self, 24.01) end)
             T.serverUntil(self, "bankState", at, function(state)
                 return state ~= nil and state.calendarDay ~= self.left.calendarDay
@@ -514,7 +514,7 @@ test("renewable_energy_bank_unloaded_bank_carries_its_load_when_the_grid_goes", 
             self.onGrid = bank.state
             PZHarness.Fixtures.removePlaced(self.fridge.object)
         end)
-        T.awayAndBack(self, T.at(stand), at.x, at.y, at.z, function()
+        T.reloadChunk(self, at, function()
             T.step(function() T.setGrid(self, false) end)
             T.bankPass(self, bank, 0, { hours = 2 })
             T.step(function() self.away = bank.state end)

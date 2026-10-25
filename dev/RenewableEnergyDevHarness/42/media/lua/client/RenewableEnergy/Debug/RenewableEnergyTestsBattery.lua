@@ -95,16 +95,6 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
     end,
 })
 
--- Queues a wait until this client's first `fullType` holds `liters` of fluid: the server's refill
--- reaches this client after its answer, and a craft picks its inputs from this client's copies.
-local function waitForFluid(self, fullType, liters)
-    T.waitFor(self, function()
-        local item = T.carried(fullType)
-        local fluids = item and item:getFluidContainer()
-        return fluids ~= nil and math.abs(fluids:getAmount() - liters) < 0.001
-    end, "this client's " .. fullType .. " holding " .. liters .. " L")
-end
-
 local WORN, PLATES = "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates"
 
 -- The jar battery comes out new and empty (Recipes.rebuildBattery), where a new item would be
@@ -116,8 +106,7 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
     prefer = { "RenewableEnergy.BatteryElectrolyte", "Base.EmptyJar", "Base.Sandbag" },
     setup = function(self)
         T.give(self, "water", { { type = "Base.PopBottle" } })
-        T.server(self, "refillFluid", { type = "Base.PopBottle", fluid = "Water", liters = 2 })
-        waitForFluid(self, "Base.PopBottle", 2)
+        T.fillCarried(self, "Base.PopBottle", "Water", 2)
     end,
     counts = { [JAR_BATTERY] = 1 },
     after = function(self) T.readCarried(self, { JAR_BATTERY }) end,
@@ -164,8 +153,7 @@ for _, entry in ipairs(BATTERY_REPAIRS) do
         setup = function(self)
             T.changeItem(self, T.inputsOf(self, CAR_BATTERY)[1], { condition = before, uses = START_CHARGE })
             T.setRepaired(self, CAR_BATTERY, repaired)
-            T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte", fluid = "Water", liters = 1 })
-            waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
+            T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte", "Water", 1)
         end,
         counts = { [CAR_BATTERY] = 1 },
         after = function(self)
@@ -219,15 +207,13 @@ for _, chain in ipairs(REBUILDS) do
             end
             T.give(self, "inputs", given)
             T.setRepaired(self, chain.battery, SPENT)
-            T.server(self, "refillFluid", { type = "RenewableEnergy.BatteryElectrolyte" })
-            waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 0)
+            T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte")
             T.step(function() T.startCraft(self, strip, T.inputsOf(self, chain.battery)[1]) end)
             -- New plates in place of the worn, and water to top up.
             T.server(self, "takeItems", { type = WORN })
             T.give(self, "rebuild", { { type = PLATES, count = chain.plates }, { type = "Base.WaterBottle" } })
-            T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
+            T.fillCarried(self, "Base.WaterBottle", "Water", 1)
             T.waitForCarried(self, chain.case, "this client's " .. chain.case)
-            waitForFluid(self, "Base.WaterBottle", 1)
             T.step(function() T.startCraft(self, rebuild, T.carried(chain.case)) end)
             T.readCarried(self, { chain.battery })
             T.step(function() self.rebuilt = T.carriedFirst(self, chain.battery) end)
@@ -235,8 +221,7 @@ for _, chain in ipairs(REBUILDS) do
             T.waitForCarried(self, chain.battery, "this client's rebuilt " .. chain.battery)
             T.step(function() T.changeItem(self, T.carried(chain.battery), { condition = limit(0) - 2 * step }) end)
             T.give(self, "recondition", { { type = "Base.BakingSoda" } })
-            T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
-            waitForFluid(self, "Base.WaterBottle", 1)
+            T.fillCarried(self, "Base.WaterBottle", "Water", 1)
             T.step(function() T.startCraft(self, recondition, T.carried(chain.battery)) end)
             T.readCarried(self, { chain.battery })
         end,
@@ -269,9 +254,8 @@ test(craftName("RenewableEnergy_RebuildCarBattery", "from_a_case_with_no_record"
         T.setPerk(self, Perks.Electricity, 5)
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "RenewableEnergy.CarBatteryCase" }, { type = PLATES },
             { type = "RenewableEnergy.BatteryElectrolyte" }, { type = "Base.WaterBottle" } })
-        T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
-        waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
-        waitForFluid(self, "Base.WaterBottle", 1)
+        T.fillCarried(self, "Base.WaterBottle", "Water", 1)
+        T.waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
         T.step(function() T.startCraft(self, rebuild, T.carried("RenewableEnergy.CarBatteryCase")) end)
         T.readCarried(self, { RenewableEnergy.VehicleBattery.CAR_BATTERY })
     end,

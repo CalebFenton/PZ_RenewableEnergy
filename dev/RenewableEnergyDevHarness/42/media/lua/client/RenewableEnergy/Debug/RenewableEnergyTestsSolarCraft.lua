@@ -343,7 +343,7 @@ for _, entry in ipairs(SEAL_ADHESIVES) do
         counts = { [FACTORY] = 1 },
         after = function(self) T.readCarried(self, { adhesive }) end,
         validate = function(self)
-            -- T.recipeInputs gave one full tube; "carried" reads the fraction of it left.
+            -- T.recipeInputs gave one full tube; T.readCarried's `uses` is the fraction of it left.
             local tube = T.carriedFirst(self, adhesive)
             local left = 1 - uses * getScriptManager():FindItem(adhesive):getUseDelta()
             expectNear("the " .. adhesive .. " left of a full tube", tube and tube.uses or 0, left, 0.001)

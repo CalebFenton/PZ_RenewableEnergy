@@ -21,10 +21,9 @@ place of its tile (build_sprite_model).
 An item's exported mesh rests on y = 0 with y up, centred, in metres, transforms baked into the
 vertices (like HearingAid's ground model): the game draws a dropped item that way.
 
-The FBX files come out the same, byte for byte, from the same parts (make.sh says why).
+The FBX files come out the same, byte for byte, from the same parts (the harness's lib/art/fbx.py
+says why).
 """
-import datetime
-import functools
 import math
 import os
 import sys
@@ -32,28 +31,22 @@ import sys
 import bmesh
 import bpy
 import numpy as np
-from io_scene_fbx import export_fbx_bin
 from mathutils import Matrix, Vector
 
-if sys.flags.hash_randomization:
-    sys.exit("models.py: set PYTHONHASHSEED and pass --python-use-system-env, or every FBX object id changes")
-# The exporter's own hook for the creation time; it takes the time of writing without one.
-export_fbx_bin.fbx_header_elements = functools.partial(export_fbx_bin.fbx_header_elements,
-                                                       time=datetime.datetime(2000, 1, 1))
-
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+sys.path[:0] = [HERE, os.path.join(os.path.dirname(os.path.dirname(HERE)), "dev", "harness", "lib")]
 import items  # noqa: E402
-import kit  # noqa: E402
+import paths  # noqa: E402
 import trailer  # noqa: E402
 import vehicles  # noqa: E402
 import wind  # noqa: E402
+from art import fbx, kit  # noqa: E402
 
-MESH_DIR = os.path.join(kit.MEDIA, "models_X/WorldItems")
-TEXTURE_DIR = os.path.join(kit.MEDIA, "textures/WorldItems")
-VEHICLE_MESH_DIR = os.path.join(kit.MEDIA, "models_X/vehicles")
-VEHICLE_TEXTURE_DIR = os.path.join(kit.MEDIA, "textures/Vehicles")
-MODELS_TXT = os.path.join(kit.MOD, "42/media/scripts/RenewableEnergy/Models.txt")
+MESH_DIR = os.path.join(paths.MEDIA, "models_X/WorldItems")
+TEXTURE_DIR = os.path.join(paths.MEDIA, "textures/WorldItems")
+VEHICLE_MESH_DIR = os.path.join(paths.MEDIA, "models_X/vehicles")
+VEHICLE_TEXTURE_DIR = os.path.join(paths.MEDIA, "textures/Vehicles")
+MODELS_TXT = os.path.join(paths.MOD, "42/media/scripts/RenewableEnergy/Models.txt")
 PREFIX = "RenewableEnergy_"
 VEHICLE_TEXTURE_SIZE = 1024
 
@@ -77,7 +70,7 @@ SPRITE_MODEL_SCALE = 1 / 1.5
 SPRITE_MESH_SCALE = 1.0
 # A sprite model stands taller than a person, so it needs the texels of the big flat things.
 SPRITE_MODEL_TEXTURE_SIZE = 512
-SPRITE_MODELS_TXT = os.path.join(kit.MOD, "42/media/scripts/RenewableEnergy/SpriteModels.txt")
+SPRITE_MODELS_TXT = os.path.join(paths.MOD, "42/media/scripts/RenewableEnergy/SpriteModels.txt")
 
 
 def setup():
@@ -135,18 +128,11 @@ def ground_offset(objects):
     return (-(low[0] + high[0]) / 2, -(low[1] + high[1]) / 2, -low[2])
 
 
-def _select(obj):
-    """Makes `obj` the only selected object and the active one, as the operators below act on."""
-    bpy.ops.object.select_all(action="DESELECT")
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
-
-
 def unwrap(obj):
     for uv in list(obj.data.uv_layers):
         obj.data.uv_layers.remove(uv)
     obj.data.uv_layers.new(name="UVMap")
-    _select(obj)
+    kit.select(obj)
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.006)
@@ -173,7 +159,7 @@ def bake(obj, kind, size, colorspace, source=None):
         node.image = image
         mat.node_tree.nodes.active = node
         added.append((mat, node))
-    _select(obj)
+    kit.select(obj)
     if kind == "AO":
         bpy.ops.object.bake(type="AO", margin=4)
     else:
@@ -219,7 +205,7 @@ def bake_emit(obj, size, shader):
     kept = list(obj.data.materials)
     for i in range(len(kept)):
         obj.data.materials[i] = mat
-    _select(obj)
+    kit.select(obj)
     samples = bpy.context.scene.cycles.samples
     bpy.context.scene.cycles.samples = max(1, samples // SUPERSAMPLE ** 2)
     bpy.ops.object.bake(type="EMIT", margin=4 * SUPERSAMPLE)
@@ -286,17 +272,13 @@ def export(obj, name, path):
     would write the texture's absolute path, so each checkout would write different files."""
     obj.data.materials.clear()
     obj.data.materials.append(bpy.data.materials.new(PREFIX + name))
-    _select(obj)
-    options = dict(filepath=path, use_selection=True, apply_scale_options="FBX_SCALE_ALL", add_leaf_bones=False,
-                   mesh_smooth_type="FACE")
     if obj.parent is None:
-        bpy.ops.export_scene.fbx(object_types={"MESH"}, bake_space_transform=True, **options)
+        fbx.export(path, obj, mesh_smooth_type="FACE")
         return
     # Baking the turn into the data breaks armatures; rig turned the data itself instead.
-    obj.parent.select_set(True)
-    bpy.ops.export_scene.fbx(object_types={"ARMATURE", "MESH"}, bake_space_transform=False, bake_anim=True,
-                             bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False,
-                             bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0, **options)
+    fbx.export(path, obj, obj.parent, mesh_smooth_type="FACE", object_types={"ARMATURE", "MESH"}, bake_space_transform=False,
+               bake_anim=True, bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False,
+               bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0)
 
 
 def build_baked(stage, builder, name, size, to_ground):

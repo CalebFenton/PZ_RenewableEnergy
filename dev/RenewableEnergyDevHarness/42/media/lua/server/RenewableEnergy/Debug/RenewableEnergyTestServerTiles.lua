@@ -3,11 +3,12 @@
 -- how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local objectAt, overlaysOf = Helpers.objectAt, Helpers.overlaysOf
+local objectAt, overlaysOf = Helpers.objectAt, PZHarness.Fixtures.overlaysOf
 local Sprites = RenewableEnergy.Sprites
 
 -- The panel drawn as `args.sprite` on the square at `args`, changed by `args.change`, if given: its

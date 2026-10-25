@@ -1,4 +1,9 @@
 require "PZHarness/TestLib"
+require "PZHarness/TestMenus"
+require "PZHarness/TestChunks"
+require "PZHarness/TestBuild"
+require "PZHarness/TestLearning"
+require "PZHarness/TestReads"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -23,10 +28,6 @@ local T = RenewableEnergyTest
 
 local PowerBank = RenewableEnergy.PowerBank
 local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
-
--- The longest a fixture waits for the server's copies, in ticks. A multiplayer server sends them
--- a tick or more later in real time, so a high frame rate needs more ticks.
-local COPY_FRAMES = 3000
 
 -- The square a fixture handle, an object or a square stands on.
 local function squareOf(near)
@@ -64,13 +65,6 @@ function T.square(self, opts, what)
     return (T.need(self, T.squares(self, 1, picked), what) or {})[1]
 end
 
---- Queues a wait until `condition()` holds on this client, then fails the test as missing `what`
---- if it still doesn't, so a copy that never came can't pass; the harness's T.waitUntil just ends.
-function T.waitFor(self, condition, what, maxFrames)
-    T.waitUntil(condition, maxFrames or COPY_FRAMES, what)
-    T.step(function() T.need(self, condition(), what) end)
-end
-
 --- Queues setting the authority's Chance.roll until the test ends: `rolls` a number, every roll;
 --- or a list, the next rolls in order, failing the call that draws one more. So a test checks
 --- either side of a chance (Chance.hit) in one try each.
@@ -82,47 +76,11 @@ end
 --- this client works out.
 T.UNDER = 1e-9
 
---- The reason a test of a chunk that unloads and loads again runs in single player only.
-T.CHUNK_RELOAD_SP_ONLY = "the server keeps chunks loaded after the character leaves"
-
 --- The parts and appliances the bank tests wire in and place.
 T.PLUG_IN_INVERTER, T.POWER_INVERTER = "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter"
 T.INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
 T.L16, T.JAR_BATTERY = "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery"
 T.MINI_FRIDGE = "appliances_refrigeration_01_25"
-
---- Queues the server handler `name` with `args` and leaves its answer in self[key].
-function T.serverInto(self, key, name, args)
-    T.server(self, name, args)
-    T.step(function() self[key] = self.server[name] end)
-end
-
---- Queues the server handler `name` with `args` and puts its answer in self.reads[label], if given.
-function T.read(self, name, args, label)
-    T.server(self, name, args)
-    if label then
-        T.step(function()
-            self.reads = self.reads or {}
-            self.reads[label] = self.server[name]
-        end)
-    end
-end
-
---- Expects a server check's answer ({ failures = { message, ... } }) to have found nothing wrong.
-function T.expectNoFailures(answer)
-    for _, failure in ipairs(answer and answer.failures or { "the check never answered" }) do
-        T.expect(false, failure)
-    end
-end
-
---- Registers a test that runs the server check `name` with `args` and expects it to find nothing
---- wrong.
-function T.serverCheck(testName, name, args)
-    T.test(testName, {
-        run = function(self) T.server(self, name, args) end,
-        validate = function(self) T.expectNoFailures(self.server[name]) end,
-    })
-end
 
 --- Fails the test unless timed actions take their time, for a test that times one.
 function T.needActionTime(self)
@@ -133,17 +91,6 @@ end
 --- Expects the character to stand in the dark (IsoPlayer.tooDarkToRead), as T.makeDark leaves them.
 function T.expectDark()
     return T.expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands")
-end
-
---- The first `fullType` this client's character carries, in any bag, or nil.
-function T.carried(fullType)
-    return T.player():getInventory():getFirstTypeRecurse(fullType)
-end
-
---- Queues a wait until this client's character carries a `fullType`: what the server gives
---- reaches this client after its answer.
-function T.waitForCarried(self, fullType, what)
-    T.waitFor(self, function() return T.carried(fullType) ~= nil end, what)
 end
 
 --- Queues T.give, then an empty step: a T.server call with table args goes out ahead of T.give's
@@ -239,86 +186,6 @@ function T.factoryModules(...)
     return modules
 end
 
---- Sets the character's skills to the levels `recipe` requires.
-function T.setRecipeSkills(self, recipe)
-    for i = 0, recipe:getRequiredSkillCount() - 1 do
-        local skill = recipe:getRequiredSkill(i)
-        T.setPerk(self, skill:getPerk(), skill:getLevel())
-    end
-end
-
---- The build menu entry of `entity` (a game entity script's full name), or nil.
-function T.buildEntry(entity)
-    local script = getScriptManager():getGameEntityScript(entity)
-    local spriteConfig = script and script:getComponentScriptFor(ComponentType.SpriteConfig)
-    if not spriteConfig then
-        return nil
-    end
-    local infos = SpriteConfigManager.GetObjectInfoList()
-    for i = 0, infos:size() - 1 do
-        if infos:get(i):getScript() == spriteConfig then
-            return infos:get(i)
-        end
-    end
-    return nil
-end
-
---- Queues building the build menu's entry of `entity` on `square` through the build menu's own
---- path (ISBuildIsoEntity, ISBuildAction): the character gets the recipe's skill levels and
---- exactly its inputs (T.recipeInputs with `prefer`), and the build waits until `arrived()` holds
---- on this client, else misses `what`. Returns the build, or nil: once it has run, `canBuild` and
---- `validSquare` are the build panel's and cursor's answers and `face` the face it built, as
---- Sprites names facings; `expected` is what it should leave carried of each of `types`, for
---- T.expectBuildUsed.
-function T.build(self, entity, square, prefer, arrived, what)
-    local info = T.need(self, T.buildEntry(entity), "the build menu entry of " .. entity)
-    local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
-    if not T.need(self, recipe, "the build recipe of " .. entity) then return nil end
-    T.setRecipeSkills(self, recipe)
-    local inputs, unmatched = T.recipeInputs(recipe, prefer)
-    if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return nil end
-    -- What a build should leave carried: its kept tools, and none of the items it takes whole.
-    -- A drainable it takes uses of stays part-used, so isn't counted.
-    local result = { expected = {}, types = {} }
-    for i, entry in ipairs(inputs) do
-        local input = recipe:getInputs():get(i - 1)
-        if input:isKeep() then
-            result.expected[entry.type] = entry.count
-        elseif input:isItemCount() or not getScriptManager():FindItem(entry.type):isItemType(ItemType.DRAINABLE) then
-            result.expected[entry.type] = 0
-        end
-        table.insert(result.types, entry.type)
-    end
-    T.give(self, "materials", inputs)
-    T.step(function()
-        local player = T.player()
-        T.standNextTo(square)
-        local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
-        -- What the build panel does before the cursor can build (ISBuildPanel): the player
-        -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
-        build.player = player:getPlayerNum()
-        build.buildPanelLogic:refresh()
-        build.buildPanelLogic:autoPopulateInputs()
-        result.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
-        result.validSquare = build:isValid(square)
-        result.face = string.upper(build:getFace():getFaceName())
-        build:tryBuild(square:getX(), square:getY(), square:getZ())
-    end)
-    T.waitFor(self, arrived, what)
-    return result
-end
-
---- Expects T.build's `build` to have been possible, and to have taken what it takes while keeping
---- its tools, by `left` (T.count's counts of its types once it built).
-function T.expectBuildUsed(build, left)
-    build = build or {}
-    T.expect(build.canBuild and build.validSquare, "the build menu can't build it from its materials on a bare square")
-    for fullType, count in pairs(build.expected or {}) do
-        local carried = left and left[fullType] or 0
-        T.expect(carried == count, "building left " .. carried .. " " .. fullType .. ", not " .. count)
-    end
-end
-
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
 --- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
 --- on its square if `opts.failsafe`. When the test ends the server removes it and this client lets go
@@ -389,21 +256,6 @@ end
 function T.holdLight(self)
     T.give(self, "light", { { type = "Base.Torch", equip = "secondary" } })
     T.step(function() self.items.light[1]:setActivated(true) end)
-end
-
---- The submenu `option` opens in `context`, or nil.
-function T.subMenu(context, option)
-    return option and option.subOption and context:getSubMenu(option.subOption)
-end
-
---- The submenu labelled `label` that vanilla's right-click menu (ISWorldObjectContextMenu.createMenu)
---- builds for `object`, and the context menu, to hide once read.
-function T.worldSubmenu(object, label)
-    local context = ISWorldObjectContextMenu.createMenu(0, { object }, 0, 0)
-    if type(context) ~= "table" then
-        return nil, nil
-    end
-    return T.subMenu(context, context:getOptionFromName(label)), context
 end
 
 --- The server handlers' name for a T.placeVehicle handle's vehicle. Call it once the server has
@@ -628,77 +480,7 @@ function T.switchOn(self, bank)
     end, "this client's copy of the bank's summary, switched on")
 end
 
---- The overlays `object` shows, as sprite names joined by commas in drawing order, the form a
---- bank state's `overlays` takes. The helper loads after client Lua, so it is required here.
-function T.overlays(object)
-    local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
-    return table.concat(Helpers.overlaysOf(object), ",")
-end
-
---- Chooses a context menu option the way a click does.
-function T.choose(option)
-    option.onSelect(option.target, option.param1, option.param2, option.param3, option.param4)
-end
-
 -- Menus and the status window -----------------------------------------------------------------
-
-function T.newContext()
-    return ISContextMenu.get(0, 0, 0)
-end
-
-function T.optionNamed(menu, name)
-    return menu and menu.getOptionFromName and menu:getOptionFromName(name)
-end
-
-function T.tooltipOf(option)
-    return option and option.toolTip and option.toolTip.description
-end
-
---- The option in `menu` or its submenus that acts on `item` (the bank part menus pass it as the
---- third parameter), by id, since a server's sync can replace this client's item objects.
-function T.optionFor(menu, item)
-    for _, option in ipairs(menu and menu.options or {}) do
-        if instanceof(option.param3, "InventoryItem") and option.param3:getID() == item:getID() then
-            return option
-        end
-        local found = T.optionFor(T.subMenu(menu, option), item)
-        if found then
-            return found
-        end
-    end
-end
-
---- What a context menu option (nil when not offered) shows: { shown, greyed, reason }.
-function T.optionState(option)
-    if not option then
-        return { shown = false, greyed = false }
-    end
-    return { shown = true, greyed = option.notAvailable == true, reason = T.tooltipOf(option) }
-end
-
---- The option `name` that `build(0, context, object)` (a Menu.add*Options) adds to a fresh context
---- menu, or nil; the menu is hidden again.
-function T.menuOption(build, object, name)
-    local context = T.newContext()
-    local option = T.optionNamed(build(0, context, object), name)
-    context:hideAndChildren()
-    return option
-end
-
---- The options of the submenu `label` in vanilla's right-click menu for `object`, by the keys of
---- `names` ({ key = option name }), each nil when not offered; nil without the submenu. The menu
---- is hidden again.
-function T.worldOptions(object, label, names)
-    local submenu, context = T.worldSubmenu(object, label)
-    local options = submenu and {}
-    for key, name in pairs(submenu and names or {}) do
-        options[key] = submenu:getOptionFromName(name)
-    end
-    if context then
-        context:hideAndChildren()
-    end
-    return options
-end
 
 --- The panel's Connect to `bank` (`one`) and the bank's Connect Sources in Reach with `loose`
 --- sources in its reach (`all`), read from fresh menus on this client's copies, as T.optionState.
@@ -778,22 +560,6 @@ function T.inputsOf(self, fullType)
     return found
 end
 
---- Queues reading the authority's copies of `types` and its litres of `fluids` into
---- self.server.carried (see the carried handler), whose `total` counts its main inventory.
-function T.readCarried(self, types, fluids)
-    T.server(self, "carried", { types = types, fluids = fluids })
-end
-
---- The authority's items of `fullType` from the last T.readCarried, in a list, empty if none.
-function T.carriedItems(self, fullType)
-    return self.server.carried and self.server.carried.items[fullType] or {}
-end
-
---- The authority's first item of `fullType` from the last T.readCarried, or nil.
-function T.carriedFirst(self, fullType)
-    return T.carriedItems(self, fullType)[1]
-end
-
 --- Queues a wait until this client's copy of the carried `fullType` has been repaired `repaired`
 --- times: the craft and the tooltip read this client's copy.
 function T.waitForRepaired(self, fullType, repaired)
@@ -820,68 +586,6 @@ end
 function T.sealCap(fullType, repaired)
     local Recipes = RenewableEnergy.Recipes
     return Recipes.MODULE_REPAIR_CAP[fullType] - Recipes.REPAIR_LIMIT_STEP * repaired
-end
-
--- How far the character goes for a chunk to unload.
-local AWAY = 600
---- The longest a trip's chunks may take to unload or load, in frames. Loading takes real time, so
---- at an uncapped frame rate it takes many frames.
-T.CHUNK_FRAMES = 6000
--- How long the character stays away once the chunk has unloaded, in real milliseconds. Back at
--- once, a chunk has been seen to load with a vehicle a test had removed before the trip, as an
--- earlier save of it held it; the game hot-saves loaded chunks every second
--- (IsoChunkMap.hotSaveFrequency).
-local AWAY_MS = 2000
-
---- Lets `self` move the character until the test ends: returns teleport(x, y, z), which asks for
---- the move, made on the next tick, as a teleport from inside a timed action doesn't stick.
-function T.teleporter(self)
-    local p, target = T.player(), nil
-    T.onTick(self, function()
-        if target then
-            p:teleportTo(target[1], target[2], target[3])
-            target = nil
-        end
-    end)
-    return function(x, y, z) target = { x, y, z } end
-end
-
---- Queues a trip that unloads the chunk of the square at x, y, z and loads it again: the
---- character goes AWAY squares east of `home` ({ x, y, z }) and back. `whileAway()`, if given, is
---- queued while the chunk is unloaded. A trip that doesn't unload the chunk, or brings it back
---- without LoadChunk (from a cache, with its state), misses its fixture.
-function T.awayAndBack(self, home, x, y, z, whileAway)
-    local p = T.player()
-    local teleport = T.teleporter(self)
-    -- `home` may be filled in by a queued step that a failed test never reached.
-    T.defer(self, function()
-        if home.x then
-            p:teleportTo(home.x + 0.5, home.y + 0.5, home.z)
-        end
-    end)
-    local loads = 0
-    local function onLoadChunk(chunk)
-        local origin = chunk:getGridSquare(0, 0, 0)
-        local dx, dy = origin and x - origin:getX(), origin and y - origin:getY()
-        if origin and dx >= 0 and dx < 8 and dy >= 0 and dy < 8 then
-            loads = loads + 1
-        end
-    end
-    Events.LoadChunk.Add(onLoadChunk)
-    T.defer(self, function() Events.LoadChunk.Remove(onLoadChunk) end)
-    T.step(function() teleport(home.x + AWAY + 0.5, home.y + 0.5, 0) end)
-    T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the fixture's chunk unloaded", T.CHUNK_FRAMES)
-    local awaySince
-    T.waitFor(self, function()
-        awaySince = awaySince or getTimestampMs()
-        return getTimestampMs() - awaySince >= AWAY_MS
-    end, "a stay away from the fixture's chunk", T.CHUNK_FRAMES)
-    if whileAway then
-        whileAway()
-    end
-    T.step(function() teleport(home.x + 0.5, home.y + 0.5, home.z) end)
-    T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the fixture's chunk loaded again", T.CHUNK_FRAMES)
-    T.step(function() T.need(self, loads > 0, "the fixture's chunk loaded again through LoadChunk") end)
 end
 
 return T
