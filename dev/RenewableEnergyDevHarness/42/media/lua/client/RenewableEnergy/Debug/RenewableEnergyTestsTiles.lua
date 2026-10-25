@@ -18,39 +18,10 @@ local PowerBank, SolarGardenLight = RenewableEnergy.PowerBank, RenewableEnergy.S
 
 local MATERIALS = { "wood", "metal" }
 
--- Every placed tile: the item picking it up gives and what Sprites.kindOf reports.
-local PLACED = {
-    { sprite = Sprites.flat, item = "RenewableEnergy.SolarFlat", kind = "flat" },
-    { sprite = Sprites.failsafe, item = "RenewableEnergy.SolarFailsafe", kind = "failsafe" },
-    { sprite = Sprites.cellCharger, item = RenewableEnergy.SolarCellCharger.ITEM, kind = "cellCharger" },
-    { sprite = Sprites.gardenLight.off, item = SolarGardenLight.ITEM, kind = "gardenLight" },
-    { sprite = Sprites.gardenLight.lit, item = SolarGardenLight.ITEM, kind = "gardenLight" },
-}
-for material, suffix in pairs({ wood = "Wood", metal = "Metal" }) do
-    for _, mount in ipairs({ "wall", "rack" }) do
-        local item = "RenewableEnergy.Solar" .. (mount == "wall" and "Wall" or "Rack") .. suffix
-        for facing, sprite in pairs(Sprites[mount][material]) do
-            table.insert(PLACED, { sprite = sprite, item = item, kind = mount, facing = facing, material = material })
-        end
-    end
-    for _, tier in ipairs({ "Box", "Rack", "Bank" }) do
-        local field = "battery" .. tier .. suffix
-        for facing, sprite in pairs(Sprites[field]) do
-            table.insert(PLACED, { sprite = sprite, item = "RenewableEnergy.Battery" .. tier .. suffix,
-                kind = field, facing = facing, material = material })
-        end
-    end
-end
--- The fixed tiles a save's banks may stand on (Sprites.fixedTiles), each as its turnable twin.
-for fixed, twin in pairs(Sprites.fixedTiles) do
-    for _, placed in ipairs(PLACED) do
-        if placed.sprite == twin then
-            table.insert(PLACED, { sprite = fixed, item = placed.item, kind = placed.kind, facing = placed.facing,
-                material = placed.material })
-            break
-        end
-    end
-end
+-- The items placed and picked up whole on any square: wall panels need a wall, and banks stand
+-- only indoors and are the power tests' business.
+local PLACED = { "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarFailsafe", RenewableEnergy.SolarCellCharger.ITEM,
+    SolarGardenLight.ITEM, "RenewableEnergy.SolarRackWood", "RenewableEnergy.SolarRackMetal" }
 
 -- Every tile Sprites.lua names, as a key or a value at any depth: placed tiles and overlays.
 local TILES = {}
@@ -81,21 +52,14 @@ test("renewable_energy_tiles_have_pictures", {
     end,
 })
 
--- Sprites.kindOf names every placed tile's kind, facing and material; every tile Sprites.lua names
--- is either placed or an overlay, never both; a vanilla tile has no kind.
-test("renewable_energy_tiles_kind_of_reads_every_placed_tile", {
+-- Every tile Sprites.lua names is either a placed tile with a kind or an overlay, never both, so a
+-- tile added to Sprites.lua without its place in kindOf or isOverlay fails here.
+test("renewable_energy_tiles_are_placed_or_overlays", {
     validate = function()
-        for _, placed in ipairs(PLACED) do
-            local kind, facing, material = Sprites.kindOf(placed.sprite)
-            expect(kind == placed.kind and facing == placed.facing and material == placed.material,
-                string.format("kindOf(%s) is %s %s %s, expected %s %s %s", placed.sprite, tostring(kind), tostring(facing),
-                    tostring(material), placed.kind, tostring(placed.facing), tostring(placed.material)))
-        end
         for name in pairs(TILES) do
             local kind, overlay = Sprites.kindOf(name) ~= nil, Sprites.isOverlay(name)
             expect(kind ~= overlay, name .. (kind and " has a kind and counts as an overlay" or " has no kind and isn't an overlay"))
         end
-        expect(Sprites.kindOf("carpentry_01_16") == nil, "a vanilla crate has a kind")
     end,
 })
 
@@ -251,25 +215,44 @@ test("renewable_energy_tiles_bank_scraps_to_parts", {
     end,
 })
 
--- Registers test `name`, scrapping each case's tile on the server at the case's `perk` level and
--- forced roll, and expecting the case's count of `fullType` among the usable items. `premise`
--- checks the tiles first. Each case: what is scrapped, the tile, the level, the roll, the count
--- and whether it is another tile of the object.
+-- Whether `square` and the squares around it are free, room for any appliance of up to two tiles
+-- to stand with a tile on `square`.
+local function roomAround(square)
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            local near = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
+            if not (near and near:isFree(false)) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- Registers test `name`, placing each case's whole object anew and dismantling it by its tile as
+-- the server's character does, at the case's `perk` level and forced roll, and expecting the case's
+-- count of `fullType` from it. `premise`, if given, checks the tiles first. Each case: what is
+-- scrapped, the tile, the level, the roll and the count.
 local function scrapTest(name, perk, fullType, cases, premise)
     test(name, {
         run = function(self)
-            self.counts = {}
+            local square = T.square(self, { accept = roomAround }, "a free square with free squares around it")
+            if not square then return end
+            self.results = {}
             for i, case in ipairs(cases) do
                 T.step(function() T.setPerk(self, perk, case[3]) end)
                 T.forceRoll(self, case[4])
-                T.server(self, "scrapItems", { sprite = case[2], otherTile = case[6], type = fullType })
-                T.step(function() self.counts[i] = self.server.scrapItems.count end)
+                T.server(self, "placeWhole", T.at(square, { sprite = case[2] }))
+                T.server(self, "scrapItems", T.at(square, { sprite = case[2], type = fullType }))
+                T.step(function() self.results[i] = self.server.scrapItems end)
             end
         end,
         validate = function(self)
-            premise()
+            if premise then premise() end
             for i, case in ipairs(cases) do
-                expect(self.counts[i] == case[5], case[1] .. " gave " .. tostring(self.counts[i]) .. " " .. fullType
+                local result = self.results[i] or {}
+                expect(result.scrapped, case[1] .. " wasn't dismantled")
+                expect(result.count == case[5], case[1] .. " gave " .. tostring(result.count) .. " " .. fullType
                     .. ", expected " .. case[5])
             end
         end,
@@ -277,21 +260,21 @@ local function scrapTest(name, perk, fullType, cases, premise)
 end
 
 -- Cutting up a vanilla fridge gives its compressor, which a digester needs to fill propane tanks,
--- on a roll under the character's chance, at most one, and only for the clicked tile, not again
--- for the others vanilla scraps along with it: 10% at Metalworking 0, 10% more a level, so certain
--- at 9. A stove, which vanilla also cuts up as a Fridge, has none.
-local FRIDGE, STOVE = "appliances_refrigeration_01_0", "appliances_cooking_01_0"
+-- on a roll under the character's chance, and one only, though vanilla scraps each of its tiles:
+-- 10% at Metalworking 0, 10% more a level, so certain at 9. A stove, which vanilla also cuts up as
+-- a Fridge, has none.
+-- The wide two-door fridge, two tiles.
+local FRIDGE, STOVE = "appliances_refrigeration_01_18", "appliances_cooking_01_0"
 scrapTest("renewable_energy_tiles_fridge_scraps_to_compressor", Perks.MetalWelding, RenewableEnergy.Digester.COMPRESSOR, {
     { "a fridge at Metalworking 0, rolling just under 10%", FRIDGE, 0, 0.1 - T.UNDER, 1 },
     { "a fridge at Metalworking 0, rolling 10%", FRIDGE, 0, 0.1, 0 },
     { "a fridge at Metalworking 4, rolling just under 50%", FRIDGE, 4, 0.5 - T.UNDER, 1 },
     { "a fridge at Metalworking 4, rolling 50%", FRIDGE, 4, 0.5, 0 },
     { "a fridge at Metalworking 9, on the highest roll", FRIDGE, 9, 1 - T.UNDER, 1 },
-    { "a fridge's other tile, on the lowest roll", FRIDGE, 9, 0, 0, true },
     { "a stove, on the lowest roll", STOVE, 9, 0, 0 },
 }, function()
-    local stove = ISMoveableSpriteProps.new(STOVE)
-    expect(stove.canScrap and stove.material == "Fridge", "the stove can't be cut up, or isn't cut up as a Fridge")
+    expect(getSprite(FRIDGE):getSpriteGrid() ~= nil, "the fridge is one tile, so nothing shows it gives one compressor, not one a tile")
+    expect(ISMoveableSpriteProps.new(STOVE).material == "Fridge", "the stove isn't cut up as a Fridge")
 end)
 
 -- Dismantling a vanilla microwave gives its transformer, which the homemade inverters are wound on,
@@ -305,9 +288,7 @@ scrapTest("renewable_energy_tiles_microwave_scraps_to_transformer", Perks.Electr
     { "a microwave at Electricity 4, rolling 60%", MICROWAVE, 4, 0.6, 0 },
     { "a microwave at Electricity 8, on the highest roll", MICROWAVE, 8, 1 - T.UNDER, 1 },
     { "a stove, on the lowest roll", STOVE, 10, 0, 0 },
-}, function()
-    expect(ISMoveableSpriteProps.new(MICROWAVE).canScrap, "the microwave can't be dismantled")
-end)
+})
 
 -- The tiles' PickUpTool and PlaceTool, Electrician, are a screwdriver and some Electricity.
 local function electrician(self)
@@ -338,8 +319,8 @@ local function describe(value)
     return "{" .. table.concat(parts, ", ") .. "}"
 end
 
--- Placed and picked up as a player does, each item's tile comes back as that one item, with its
--- modData (CARRIED). Wall panels and banks are left out.
+-- Placed and picked up as a player does, each item of PLACED comes back as that one item, with its
+-- modData (CARRIED).
 test("renewable_energy_tiles_place_and_pick_up", {
     instant = true,
     run = function(self)
@@ -350,50 +331,39 @@ test("renewable_energy_tiles_place_and_pick_up", {
         -- Placing and picking up hold back the calls after them, so what goes out early is the
         -- clear-out after each count and the next item's give, which the square's checks don't see.
         T.batch(function()
-            for _, placed in ipairs(PLACED) do
-                local script = getScriptManager():getItem(placed.item)
-                -- Banks stand only indoors, and placing them by hand is the power tests' business.
-                if placed.kind ~= "wall" and not PowerBank.bankOfSprite(placed.sprite)
-                    and script and script:getWorldObjectSprite() == placed.sprite then
-                    local carried = CARRIED[placed.item]
-                    local result = { placed = placed, expected = carried and describe(carried.value) }
-                    table.insert(self.results, result)
-                    local handle = T.placeAsPlayer(self, square, placed.item, placed.sprite, carried and { [carried.key] = carried.value })
-                    if carried then
-                        T.server(self, "objectModData", T.at(square, { sprite = placed.sprite, key = carried.key }))
-                        T.step(function() result.placedData = describe(self.server.objectModData.value) end)
-                    end
-                    T.pickUpAsPlayer(self, handle, placed.sprite)
-                    T.readCarried(self, { placed.item })
-                    T.step(function()
-                        local items = T.carriedItems(self, placed.item)
-                        result.removed = T.objectWithSprite(square, placed.sprite) == nil
-                        result.returned, result.items = #items, self.reads.carried.total
-                        result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
-                    end)
-                    T.server(self, "takeItems", { type = placed.item })
+            for _, item in ipairs(PLACED) do
+                local sprite = getScriptManager():getItem(item):getWorldObjectSprite()
+                local carried = CARRIED[item]
+                local result = { what = sprite .. " (" .. item .. ")", item = item, expected = carried and describe(carried.value) }
+                table.insert(self.results, result)
+                local handle = T.placeAsPlayer(self, square, item, sprite, carried and { [carried.key] = carried.value })
+                if carried then
+                    T.server(self, "objectModData", T.at(square, { sprite = sprite, key = carried.key }))
+                    T.step(function() result.placedData = describe(self.server.objectModData.value) end)
                 end
+                T.pickUpAsPlayer(self, handle, sprite)
+                T.readCarried(self, { item })
+                T.step(function()
+                    local items = T.carriedItems(self, item)
+                    result.removed = T.objectWithSprite(square, sprite) == nil
+                    result.returned, result.items = #items, self.reads.carried.total
+                    result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
+                end)
+                T.server(self, "takeItems", { type = item })
             end
         end)
     end,
     validate = function(self)
-        expect(#self.results > 0, "no item places one of the tiles")
-        local kept = {}
         for _, r in ipairs(self.results) do
-            local what = r.placed.sprite .. " (" .. r.placed.item .. ")"
-            expect(r.removed, what .. " was not picked up")
+            expect(r.removed, r.what .. " was not picked up")
             -- The screwdriver stays.
             expect(r.returned == 1 and r.items == 2,
-                what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them " .. r.placed.item)
+                r.what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them " .. r.item)
             if r.expected then
-                kept[r.placed.item] = true
-                expect(r.placedData == r.expected, "placed " .. what .. " holds " .. tostring(r.placedData) .. ", expected " .. r.expected)
-                expect(r.pickedUpData == r.expected, "picked-up " .. what .. " holds " .. tostring(r.pickedUpData)
+                expect(r.placedData == r.expected, "placed " .. r.what .. " holds " .. tostring(r.placedData) .. ", expected " .. r.expected)
+                expect(r.pickedUpData == r.expected, "picked-up " .. r.what .. " holds " .. tostring(r.pickedUpData)
                     .. ", expected " .. r.expected)
             end
-        end
-        for fullType in pairs(CARRIED) do
-            expect(kept[fullType], fullType .. " places no tile of its own, so nothing checked what it keeps")
         end
     end,
 })

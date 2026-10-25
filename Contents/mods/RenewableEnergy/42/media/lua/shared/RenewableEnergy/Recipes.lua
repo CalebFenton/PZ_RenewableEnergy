@@ -523,18 +523,12 @@ function Recipes.refillPropaneBottle(craftRecipeData, character)
 end
 
 -- OnCreate of Air Out Iron Sponge: the sponge comes back with one packing fewer left than the
--- spent one had (its condition), as each airing leaves less iron to rust.
+-- spent one had (its condition), as each airing leaves less iron to rust. The water's container
+-- is kept, so the spent sponge is the only item consumed.
 function Recipes.airOutIronSponge(craftRecipeData, character)
     local sponge = craftRecipeData:getFirstCreatedItem()
-    local consumed = craftRecipeData:getAllConsumedItems()
-    for i = 0, consumed:size() - 1 do
-        local spent = consumed:get(i)
-        if spent:getFullType() == RenewableEnergy.Digester.SPENT_SPONGE then
-            sponge:setCondition(spent:getCondition() - 1)
-            sponge:syncItemFields()
-            return
-        end
-    end
+    sponge:setCondition(craftRecipeData:getAllConsumedItems():get(0):getCondition() - 1)
+    sponge:syncItemFields()
 end
 
 return Recipes

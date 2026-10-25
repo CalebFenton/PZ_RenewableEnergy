@@ -838,7 +838,7 @@ module RenewableEnergy
     {
         DisplayCategory = Material,
         ItemType = base:normal,
-        Weight = 2.5,
+        Weight = 2.0,
         ConditionMax = 10,
         Icon = RenewableEnergy_TarpGasBag,
         WorldStaticModel = RenewableEnergy.TarpGasBag_Ground,

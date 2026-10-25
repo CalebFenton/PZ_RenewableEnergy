@@ -97,11 +97,12 @@ local function fillTiles(facing)
 end
 
 -- The Metal Drum and insulated digesters bare, then with each of their holder's overlays, a column
--- to each; the other barrels bare, then every barrel with a holder and its scrubber. The barrels'
--- holders lie on the east side of their square, which the next barrel to the east would hide, so
--- the variants run south.
+-- to each; the other barrels sour, then every barrel with a holder and its scrubber, the last one
+-- dry. The barrels' holders lie on the east side of their square, which the next barrel to the
+-- east would hide, so the variants run south.
 local function digesterTiles()
     local list, holder, scrubber = {}, Sprites.digesterHolder, Sprites.digesterScrubber
+    local sour, dry = Sprites.digesterSour, Sprites.digesterScrubberSpent
     local columns = {
         { x = 1, sprite = Sprites.digester.barrel.MetalDrum, overlays = { holder.bags[1], holder.bags[2],
             holder.bags[3], holder.bagsTorn, holder.tarp[1], holder.tarp[2], holder.tarp[3], holder.tarpTorn } },
@@ -115,18 +116,24 @@ local function digesterTiles()
     end
     local others = { "Mov_OrangeBarrel", "Mov_DarkGreenBarrel", "Mov_LightGreenBarrel" }
     for i, barrel in ipairs(others) do
-        table.insert(list, { x = 5, y = i - 1, sprite = Sprites.digester.barrel[barrel] })
+        table.insert(list, { x = 5, y = i - 1, sprite = Sprites.digester.barrel[barrel], overlays = { sour.barrel } })
     end
-    local scrubbed = { MetalDrum = holder.bags[3], Mov_OrangeBarrel = holder.tarp[2],
-        Mov_DarkGreenBarrel = holder.bags[1], Mov_LightGreenBarrel = holder.tarp[3] }
+    local scrubbed = {
+        MetalDrum = { holder.bags[3], scrubber.barrel }, Mov_OrangeBarrel = { holder.tarp[2], scrubber.barrel },
+        Mov_DarkGreenBarrel = { holder.bags[1], scrubber.barrel }, Mov_LightGreenBarrel = { holder.tarp[3], dry.barrel },
+    }
     for i, barrel in ipairs({ "MetalDrum", unpack(others) }) do
-        table.insert(list, { x = 5, y = i + 3, sprite = Sprites.digester.barrel[barrel], overlays = { scrubbed[barrel], scrubber.barrel } })
+        table.insert(list, { x = 5, y = i + 3, sprite = Sprites.digester.barrel[barrel], overlays = scrubbed[barrel] })
     end
-    -- The insulated digester with its scrubber, the dome bare and with it, then the gas heater off
-    -- and lit and the game's generator bodies with the gas kit on their intakes.
+    -- The insulated digester with its scrubber, sour, then dry; the dome sour, with its scrubber, then
+    -- dry; then the gas heater off and lit and the game's generator bodies with the gas kit on their
+    -- intakes.
     table.insert(list, { x = 7, y = 1, sprite = Sprites.digester.insulated, overlays = { holder.drum[2], scrubber.insulated } })
-    table.insert(list, { x = 7, y = 4, sprite = Sprites.digester.dome })
+    table.insert(list, { x = 3, y = 6, sprite = Sprites.digester.insulated, overlays = { holder.drum[2], sour.insulated } })
+    table.insert(list, { x = 3, y = 8, sprite = Sprites.digester.insulated, overlays = { holder.drum[1], dry.insulated } })
+    table.insert(list, { x = 7, y = 4, sprite = Sprites.digester.dome, overlays = { sour.dome } })
     table.insert(list, { x = 7, y = 6, sprite = Sprites.digester.dome, overlays = { scrubber.dome } })
+    table.insert(list, { x = 7, y = 8, sprite = Sprites.digester.dome, overlays = { dry.dome } })
     table.insert(list, { x = 9, y = 0, sprite = Sprites.gasHeater.off.S })
     table.insert(list, { x = 9, y = 2, sprite = Sprites.gasHeater.lit.S })
     for i, generator in ipairs({ "appliances_misc_01_0", "appliances_misc_01_5", "appliances_misc_01_12" }) do

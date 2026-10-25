@@ -75,7 +75,7 @@ function DigesterWindow:rowsOf(summary)
     if summary.scrubber then
         row(rows, "IGUI_RenewableEnergy_DigesterScrubber", getText("IGUI_RenewableEnergy_ScrubberState",
             Format.number(summary.scrubCO2, 1), Format.number(summary.scrubWool, 1)),
-            (summary.scrubCO2 <= 0 or summary.scrubWool <= 0) and "bad" or nil)
+            Digester.scrubLeft(summary) <= 0 and "bad" or nil)
     end
     if summary.heaterLit then
         row(rows, "IGUI_RenewableEnergy_DigesterHeater", getText("IGUI_RenewableEnergy_HeaterBurning",

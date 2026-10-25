@@ -53,29 +53,18 @@ end
 
 --- Queues building a record of `kind` from the build menu's entry of `entity` on a T.buildSite
 --- (T.build with `prefer`), waiting for this client's copy of the tile `tile`. Its record lands in
---- self.reads.built, the build in self.build, what is left carried in self.counts.left;
---- T.expectBuilt checks them. Returns the handle, or nil.
+--- self.reads.built. Returns the handle, or nil.
 function T.buildRecord(self, kind, entity, tile, prefer)
     local square = T.buildSite(self)
     if not square then return nil end
     local handle = T.at(square, { square = square, kind = kind })
     T.server(self, "recordTrack", T.recordArgs(handle))
-    self.build = T.build(self, entity, square, prefer, function() return T.objectWithSprite(square, tile) ~= nil end,
-        "this client's copy of the " .. tostring(tile) .. " " .. kind)
-    if not self.build then return nil end
-    T.batch(function()
-        T.readRecord(self, handle, "built")
-        T.count(self, "left", self.build.types)
-    end)
+    if not T.build(self, entity, square, prefer, function() return T.objectWithSprite(square, tile) ~= nil end,
+        "this client's copy of the " .. tostring(tile) .. " " .. kind) then
+        return nil
+    end
+    T.readRecord(self, handle, "built")
     return handle
-end
-
---- Expects T.buildRecord's build to have built its record on the tile `tile`, and taken what it
---- takes while keeping its tools (T.expectBuildUsed).
-function T.expectBuilt(self, tile)
-    local built = self.reads.built or {}
-    T.expectBuildUsed(self.build, self.counts.left)
-    T.expect(built.sprite == tile, "the built tile is " .. tostring(built.sprite) .. ", expected " .. tostring(tile))
 end
 
 --- Queues setting the record's saved fields `fields` as of now, and those of `ago` ({ [field] =

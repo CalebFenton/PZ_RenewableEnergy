@@ -578,7 +578,9 @@ local BUILT = {
 -- The build menu's own path builds the bladed kind of `design` from its one entry with `material`
 -- blades, and the charger's OnCreate fits the blades the build took: it stands on its kind's tile
 -- of those blades, facing the way it was built, as that tile's entity, whose SpriteConfig takes
--- it. One build a test, as each built charger stands in the way of the next one's walk.
+-- it. The entity is named, not inferred from a valid SpriteConfig: the config finds its tile once,
+-- as it is added, so a tile swapped under the old entity still reads valid. One build a test, as
+-- each built charger stands in the way of the next one's walk.
 local function buildsCharger(design, material)
     local what = material .. " " .. design.kind
     return {

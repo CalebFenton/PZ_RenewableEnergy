@@ -166,6 +166,8 @@ PALETTE = {
     "mortar": lambda: material("RE_Mortar", "#b0aa9c", roughness=0.95, grime=0.2, scale=30),
     "concrete": lambda: material("RE_Concrete", "#a9a69d", roughness=0.9, grime=0.3, scale=20),
     "sludge": lambda: material("RE_Sludge", "#4f4330", roughness=0.5, grime=0.2, scale=20),
+    # The froth a sour digester heaves up: grey-cream bubbles stained with the slurry.
+    "foam": lambda: material("RE_Foam", "#c9bc98", roughness=0.6, grime=0.25, scale=25, speckle=("#7d6a45", 0.45)),
     "ash": lambda: material("RE_Ash", "#a3a09a", roughness=1.0, grime=0.3, scale=6, speckle=("#75726c", 0.5)),
     # Ash fines settled round a heap's foot, and the white of ash burnt clean.
     "ashdark": lambda: material("RE_AshDark", "#7d7a74", roughness=1.0, grime=0.3, scale=6, speckle=("#5e5b56", 0.5)),

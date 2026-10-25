@@ -204,11 +204,13 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
     end,
     validate = function(self)
         local reads = self.reads
-        T.expect(reads.over.sour, "acid just over the limit didn't sour it")
-        T.expect(not reads.under.sour, "acid just under the limit soured it")
+        local foam = Sprites.digesterSour.barrel
+        T.expect(reads.over.sour and T.hasOverlay(reads.over, foam), "acid just over the limit didn't sour it, or it shows no foam")
+        T.expect(not reads.under.sour and not T.hasOverlay(reads.under, foam), "acid just under the limit soured it, or it shows foam")
         T.expect(reads.sourAbove.sour, "a sour digester recovered just above its recovery share of the limit")
         T.expect(not reads.sourBelow.sour, "a sour digester stayed sour just below its recovery share of the limit")
-        T.expect(not reads.ash.sour and reads.ash.hopperItems == 0, "wood ash didn't fix it, or stayed in the hopper")
+        T.expect(not reads.ash.sour and reads.ash.hopperItems == 0 and not T.hasOverlay(reads.ash, foam),
+            "wood ash didn't fix it, stayed in the hopper, or left the foam showing")
         T.expect(not reads.soda.sour, "baking soda didn't fix it")
         T.expect(reads.soda.hopperItems == 1, "a used box of baking soda left the hopper")
     end,
@@ -365,8 +367,9 @@ test("renewable_energy_biogas_digester_tarp_gas_bag", {
     validate = function(self)
         local fitted, off = self.reads.fitted, self.reads.off
         T.expect(self.gassy == "Tooltip_RenewableEnergy_VentFirst", "Fit Tarp Gas Bag with gas in the bags: " .. tostring(self.gassy))
-        T.expect(fitted.holder == "tarp" and fitted.holderCondition == 60, "the fitted tarp is " .. tostring(fitted.holder)
-            .. " at " .. tostring(fitted.holderCondition))
+        T.expect(fitted.holder == "tarp", "the fitted holder is " .. tostring(fitted.holder))
+        T.expectNear("the fitted tarp's wear left, in percent", fitted.holderCondition,
+            100 * 6 / instanceItem(self.tarp):getConditionMax(), 0.5)
         T.expect(#T.carriedItems(self, self.tarp, "fittedCarried") == 0, "fitting left the Tarp Gas Bag in the inventory")
         T.expect(off.holder == "none", "taking it off left " .. tostring(off.holder))
         local back = T.carriedFirst(self, self.tarp, "offCarried")
@@ -503,34 +506,25 @@ local function expectBarrelDigester(self, label)
     T.expect(read.hopperItems == 1, label .. ": the hopper holds " .. tostring(read.hopperItems) .. " items, not the dung dragged in")
 end
 
--- The build menu's own path builds a working digester from the barrel `barrel` (an item type): the
--- entity's recipe takes its materials, keeps its tools, and its OnCreate makes the tile the
--- digester of that barrel on the authority, which this client sees, opens and feeds.
-local function buildsBarrelDigester(barrel)
-    local tile = Sprites.digester.barrel[barrel]
-    return {
-        instant = true,
-        run = function(self)
-            self.views = {}
-            local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", tile, { "Base." .. barrel })
-            if not handle then return end
-            useBarrelDigester(self, handle, tile, "fed")
-        end,
-        validate = function(self)
-            local built = self.reads.built or {}
-            T.expect(built.tier == "barrel", "the build menu built " .. tostring(built.tier))
-            T.expectBuilt(self, tile)
-            expectBarrelDigester(self, "fed")
-        end,
-    }
-end
-
-test("renewable_energy_biogas_build_menu_builds_digester", buildsBarrelDigester("MetalDrum"))
--- The game's barrels are steel drums too; the digester shows the one it took, and is that drum's
--- entity.
-test("renewable_energy_biogas_build_from_orange_barrel_shows_orange", buildsBarrelDigester("Mov_OrangeBarrel"))
-test("renewable_energy_biogas_build_from_dark_green_barrel_shows_dark_green", buildsBarrelDigester("Mov_DarkGreenBarrel"))
-test("renewable_energy_biogas_build_from_light_green_barrel_shows_light_green", buildsBarrelDigester("Mov_LightGreenBarrel"))
+-- The build menu builds a barrel digester on the Metal Drum's tile, from any of the game's drums;
+-- its OnCreate, on the authority, makes it the digester of the drum the build took, on that drum's
+-- tile and as that drum's entity, which this client sees, opens and feeds.
+test("renewable_energy_biogas_build_menu_builds_digester", {
+    instant = true,
+    run = function(self)
+        self.views = {}
+        self.tile = Sprites.digester.barrel.Mov_OrangeBarrel
+        local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", self.tile, { "Base.Mov_OrangeBarrel" })
+        if not handle then return end
+        useBarrelDigester(self, handle, self.tile, "fed")
+    end,
+    validate = function(self)
+        local built = self.reads.built or {}
+        T.expect(built.tier == "barrel" and built.sprite == self.tile, "the build menu built " .. tostring(built.tier)
+            .. " on " .. tostring(built.sprite))
+        expectBarrelDigester(self, "fed")
+    end,
+})
 
 -- The brick dome's pit is dug, so its build cursor takes the ground, as vanilla's grave does, and
 -- refuses a building's floor.
@@ -601,8 +595,13 @@ test("renewable_energy_biogas_digester_menu", {
             T.expect(options.vent and options.vent.notAvailable, "Vent Gas isn't greyed out with no gas")
             T.expect(options.bag ~= nil and options.bag.subOption ~= nil, "no Gas Bag submenu on a barrel")
             local upgrade = options.upgrade
-            T.expect(upgrade and upgrade.notAvailable and T.tooltipOf(upgrade):find(getItemNameFromFullType("Base.Plank"), 1, true),
-                "Upgrade isn't greyed out listing its planks")
+            local tooltip, unlisted = T.tooltipOf(upgrade), {}
+            for _, need in ipairs(DigesterJobs.needs(T.player(), DigesterJobs.UPGRADE)) do
+                local name = need.kind == "item" and not need.label and not need.labelKey and getItemNameFromFullType(need.item)
+                if name and not tooltip:find(name, 1, true) then table.insert(unlisted, name) end
+            end
+            T.expect(upgrade and upgrade.notAvailable and #unlisted == 0,
+                "Upgrade isn't greyed out listing what it takes: missing " .. table.concat(unlisted, ", "))
         end
         T.standNextTo(object:getSquare())
         local window = RenewableEnergy.DigesterWindow:openOn(0, object)

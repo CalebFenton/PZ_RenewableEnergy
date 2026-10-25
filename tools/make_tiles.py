@@ -5,8 +5,8 @@ renewable_energy_02, and tileGeometry.txt.
 
 Tile numbers come from art/models/tile_numbers.py, which art/models/tiles.py renders from and
 media/lua/shared/RenewableEnergy/Sprites.lua names for Lua. Overlay tiles (snow, cracked
-glass, batteries, the charge meter, the crate's contents and lid, the digesters' gas holders and
-scrubbers, the generator's gas kit, the gasifiers' glow and gas pipes, and all of
+glass, batteries, the charge meter, the crate's contents and lid, the digesters' gas holders,
+scrubbers and sour foam, the generator's gas kit, the gasifiers' glow and gas pipes, and all of
 renewable_energy_02) are only ever attached to another tile, so they have no properties. Property
 names and values follow the vanilla tile definitions
 (newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:

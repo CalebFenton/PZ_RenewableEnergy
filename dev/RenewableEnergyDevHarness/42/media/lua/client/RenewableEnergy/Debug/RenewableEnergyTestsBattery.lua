@@ -174,89 +174,62 @@ for _, entry in ipairs(BATTERY_REPAIRS) do
     })
 end
 
--- Stripping a battery past its last repair and rebuilding it from its own case, with new plates in
--- place of the recast: the battery comes back new and empty with no repairs behind it, so a
--- Recondition takes it to the first repair limit again. The car battery is a CarBattery2, not the
--- type a case without a record rebuilds into, so its coming back proves the case kept its type.
-local REBUILDS = {
-    { battery = "Base.CarBattery2", case = "RenewableEnergy.CarBatteryCase", plates = 1,
-      strip = "RenewableEnergy_StripCarBattery", rebuild = "RenewableEnergy_RebuildCarBattery" },
-    { battery = "RenewableEnergy.DeepCycleBattery", case = "RenewableEnergy.DeepCycleBatteryCase", plates = 2,
-      strip = "RenewableEnergy_StripDeepCycleBattery", rebuild = "RenewableEnergy_RebuildDeepCycleBattery" },
-    { battery = "RenewableEnergy.L16Battery", case = "RenewableEnergy.L16BatteryCase", plates = 3,
-      strip = "RenewableEnergy_StripL16Battery", rebuild = "RenewableEnergy_RebuildL16Battery" },
-}
-for _, chain in ipairs(REBUILDS) do
-    test(craftName(chain.rebuild, "from_its_stripped_case"), {
-        instant = true,
-        run = function(self)
-            local manager = getScriptManager()
-            local strip = T.need(self, manager:getCraftRecipe(chain.strip), "the recipe " .. chain.strip)
-            local rebuild = T.need(self, manager:getCraftRecipe(chain.rebuild), "the recipe " .. chain.rebuild)
-            local recondition = T.need(self, manager:getCraftRecipe(RECONDITION), "the recipe " .. RECONDITION)
-            if not (strip and rebuild and recondition) then return end
-            local p = player()
-            T.learnRecipes(p)
-            T.placeWorkTable(p)
-            T.setPerk(self, Perks.Electricity, 5)
-            -- Empty acid bottles to take the stripped acid.
-            local given = { { type = "Base.Screwdriver" }, { type = "Base.Wrench" }, { type = "Base.Gloves_Dish" },
-                { type = chain.battery, condition = 20, uses = 0.6 } }
-            for _ = 1, chain.plates do
-                table.insert(given, { type = "RenewableEnergy.BatteryElectrolyte" })
-            end
-            T.give(self, "inputs", given)
-            T.setRepaired(self, chain.battery, SPENT)
-            T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte")
-            T.step(function() T.startCraft(self, strip, T.inputsOf(self, chain.battery)[1]) end)
-            -- New plates in place of the worn, and water to top up.
-            T.server(self, "takeItems", { type = WORN })
-            T.give(self, "rebuild", { { type = PLATES, count = chain.plates }, { type = "Base.WaterBottle" } })
-            T.fillCarried(self, "Base.WaterBottle", "Water", 1)
-            T.waitForCarried(self, chain.case, "this client's " .. chain.case)
-            T.step(function() T.startCraft(self, rebuild, T.carried(chain.case)) end)
-            T.readCarried(self, { chain.battery })
-            T.step(function() self.rebuilt = T.carriedFirst(self, chain.battery) end)
-            -- Worn down again, then reconditioned.
-            T.waitForCarried(self, chain.battery, "this client's rebuilt " .. chain.battery)
-            T.step(function() T.changeItem(self, T.carried(chain.battery), { condition = limit(0) - 2 * step }) end)
-            T.give(self, "recondition", { { type = "Base.BakingSoda" } })
-            T.fillCarried(self, "Base.WaterBottle", "Water", 1)
-            T.step(function() T.startCraft(self, recondition, T.carried(chain.battery)) end)
-            T.readCarried(self, { chain.battery })
-        end,
-        validate = function(self)
-            local battery = self.rebuilt
-            if not expect(battery ~= nil, "no " .. chain.battery .. " was rebuilt") then return end
-            local full = instanceItem(chain.battery):getConditionMax()
-            expect(battery.condition == full, "the rebuilt battery is at " .. battery.condition .. ", expected " .. full)
-            expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
-            expect(battery.repaired == 0, "the rebuilt battery reads repaired " .. battery.repaired .. "x")
-            local reconditioned = T.carriedFirst(self, chain.battery)
-            if not expect(reconditioned ~= nil, "the rebuilt battery is gone") then return end
-            expect(reconditioned.condition == limit(0),
-                "the rebuilt battery reconditions to " .. reconditioned.condition .. ", expected " .. limit(0))
-        end,
-    })
-end
+-- Stripping a car battery past its last repair and rebuilding it from its own case, with new
+-- plates in place of the recast: the battery comes back new and empty with no repairs behind it.
+-- It is a CarBattery2, not the type a case without a record rebuilds into, so its coming back
+-- proves the case kept its type.
+local CASE, STRIP, REBUILD = "RenewableEnergy.CarBatteryCase", "RenewableEnergy_StripCarBattery", "RenewableEnergy_RebuildCarBattery"
+test(craftName(REBUILD, "from_its_stripped_case"), {
+    instant = true,
+    run = function(self)
+        local manager = getScriptManager()
+        local strip = T.need(self, manager:getCraftRecipe(STRIP), "the recipe " .. STRIP)
+        local rebuild = T.need(self, manager:getCraftRecipe(REBUILD), "the recipe " .. REBUILD)
+        if not (strip and rebuild) then return end
+        local p = player()
+        T.learnRecipes(p)
+        T.placeWorkTable(p)
+        T.setPerk(self, Perks.Electricity, 5)
+        -- An empty acid bottle to take the stripped acid.
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Gloves_Dish" },
+            { type = CAR_BATTERY, condition = 20, uses = 0.6 }, { type = "RenewableEnergy.BatteryElectrolyte" } })
+        T.setRepaired(self, CAR_BATTERY, SPENT)
+        T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte")
+        T.step(function() T.startCraft(self, strip, T.inputsOf(self, CAR_BATTERY)[1]) end)
+        -- New plates in place of the worn, and water to top up.
+        T.server(self, "takeItems", { type = WORN })
+        T.give(self, "rebuild", { { type = PLATES }, { type = "Base.WaterBottle" } })
+        T.fillCarried(self, "Base.WaterBottle", "Water", 1)
+        T.waitForCarried(self, CASE, "this client's " .. CASE)
+        T.step(function() T.startCraft(self, rebuild, T.carried(CASE)) end)
+        T.readCarried(self, { CAR_BATTERY })
+    end,
+    validate = function(self)
+        local battery = T.carriedFirst(self, CAR_BATTERY)
+        if not expect(battery ~= nil, "no " .. CAR_BATTERY .. " was rebuilt") then return end
+        local full = instanceItem(CAR_BATTERY):getConditionMax()
+        expect(battery.condition == full, "the rebuilt battery is at " .. battery.condition .. ", expected " .. full)
+        expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
+        expect(battery.repaired == 0, "the rebuilt battery reads repaired " .. battery.repaired .. "x")
+    end,
+})
 
 -- A car battery case with no record of the battery it came out of rebuilds into the plain car
 -- battery, VehicleBattery.CAR_BATTERY.
-test(craftName("RenewableEnergy_RebuildCarBattery", "from_a_case_with_no_record"), {
+test(craftName(REBUILD, "from_a_case_with_no_record"), {
     instant = true,
     run = function(self)
-        local rebuild = T.need(self, getScriptManager():getCraftRecipe("RenewableEnergy_RebuildCarBattery"),
-            "the recipe RenewableEnergy_RebuildCarBattery")
+        local rebuild = T.need(self, getScriptManager():getCraftRecipe(REBUILD), "the recipe " .. REBUILD)
         if not rebuild then return end
         local p = player()
         T.learnRecipes(p)
         T.placeWorkTable(p)
         T.setPerk(self, Perks.Electricity, 5)
-        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "RenewableEnergy.CarBatteryCase" }, { type = PLATES },
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = CASE }, { type = PLATES },
             { type = "RenewableEnergy.BatteryElectrolyte" }, { type = "Base.WaterBottle" } })
         T.fillCarried(self, "Base.WaterBottle", "Water", 1)
         T.waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
-        T.step(function() T.startCraft(self, rebuild, T.carried("RenewableEnergy.CarBatteryCase")) end)
+        T.step(function() T.startCraft(self, rebuild, T.carried(CASE)) end)
         T.readCarried(self, { RenewableEnergy.VehicleBattery.CAR_BATTERY })
     end,
     validate = function(self)

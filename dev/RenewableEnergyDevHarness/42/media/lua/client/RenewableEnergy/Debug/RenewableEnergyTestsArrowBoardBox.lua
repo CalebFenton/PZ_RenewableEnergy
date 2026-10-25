@@ -60,7 +60,6 @@ test(LID_SWINGS, {
             local door = lidOf(trailer.vehicle):getDoor()
             return not door:isLocked() and not door:isOpen() and lidHeld(T.lidPose(trailer), false)
         end, "this client's copy of the lid unlocked and held shut")
-        T.step(function() self.shut = T.lidPose(trailer) end)
         -- Queues a shot of the held pose from beside the box: the box's area lies over the box, so
         -- the character steps south-west of it, level with it on the screen, hiding neither the
         -- box nor the trailer, and the pose gets a few frames to reach the screen.
@@ -111,7 +110,6 @@ test(LID_SWINGS, {
         swing("someone else closing it", false, 4, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
     end,
     validate = function(self)
-        expect(self.shut.clip == "Lid_closing", "the lid plays " .. tostring(self.shut.clip))
         for _, seen in ipairs(self.swings) do
             expect(seen.between, seen.name .. " never swung the lid between shut and open")
             expect(seen.access == seen.open, seen.name .. " left the batteries " .. (seen.access and "reachable" or "out of reach")

@@ -24,20 +24,20 @@ Digester.SYSTEM_NAME = "renewable_energy_digester"
 -- stink: its share of the stink score; stinkCap: the most it stinks whatever its state.
 -- warmTo: the dome is buried and burns its gas to keep at least this warm, as a lit gas heater
 -- does (GasHeater.m3PerHour).
--- holder: the gas holder it is built with (HOLDERS). bags: its holder comes off, and a gas bag goes
--- on (DigesterJobs). upgrade: the tier its Upgrade job makes of it.
+-- holder: the gas holder it is built with (HOLDERS). gasBag: its holder is a gas bag, which comes
+-- off and goes on (DigesterJobs). upgrade: the tier its Upgrade job makes of it.
 -- sealed: it never fumes indoors.
 Digester.TIERS = {
-    barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", bags = true, upgrade = "insulated" },
+    barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", gasBag = true, upgrade = "insulated" },
     insulated = { potentialCap = 15, days = 3, stink = 0.6, holder = "drum" },
     dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, holder = "dome",
         sealed = true },
 }
 
--- capacity: gas the holder stores. wearPerDay: condition lost a day; a holder at none is torn,
--- holds nothing and leaks. levels: its overlays from slack to full, and torn: its overlay once torn;
--- the dome's holder is the dome itself. item: what comes off the digester with the holder's wear
--- as its condition, and goes back on with it. A barrel with its bag off has none.
+-- capacity: gas the holder stores. wearPerDay: condition lost a day; a holder worn to nothing is
+-- torn, holds nothing and leaks. levels: its overlays from slack to full, and torn: its overlay once
+-- torn; the dome's holder is the dome itself. item: what comes off the digester with the holder's
+-- wear as its condition, and goes back on with it. none: a barrel's with its gas bag off.
 Digester.HOLDERS = {
     bags = { capacity = 0.6, wearPerDay = 1, levels = Sprites.digesterHolder.bags, torn = Sprites.digesterHolder.bagsTorn },
     tarp = { capacity = 1.0, wearPerDay = 0.25, levels = Sprites.digesterHolder.tarp, torn = Sprites.digesterHolder.tarpTorn,
@@ -76,12 +76,13 @@ Digester.M3_PER_TANK = 16
 -- A lantern's propane bottle holds this share of a full tank: a one-pound bottle off a twenty.
 Digester.BOTTLE = "Base.Propane_Refill"
 Digester.BOTTLE_SHARE = 0.05
+Digester.TORCH = "Base.BlowTorch"
 -- What a digester fills directly, by full type: the share of a full tank each holds when full. A
--- blowtorch's is what vanilla's Refill Blow Torch takes of a tank for a full torch
--- (RecipeCodeOnCreate.refillBlowTorch: 70 tank uses per torch use, 10 uses of 5000), so filling a
--- torch here costs the gas going through a tank would.
-Digester.FILL_SHARES = { [Digester.TANK] = 1, ["Base.BlowTorch"] = 0.14, [Digester.BOTTLE] = Digester.BOTTLE_SHARE }
--- A tire pump fills what it fills this far at most, and it is hard work: minutes and endurance per
+-- torch's is what vanilla's Refill Blow Torch takes of a tank for a full torch
+-- (RecipeCodeOnCreate.refillBlowTorch: 70 of the tank's 5000 uses for each of the torch's 10), so
+-- filling a torch here costs the gas going through a tank would.
+Digester.FILL_SHARES = { [Digester.TANK] = 1, [Digester.TORCH] = 0.14, [Digester.BOTTLE] = Digester.BOTTLE_SHARE }
+-- A tire pump fills any of them this far at most, and it is hard work: minutes and endurance per
 -- m³.
 Digester.PUMP = "Base.TirePump"
 Digester.PUMP_FILL = 0.25
@@ -106,6 +107,12 @@ Digester.IRON_SPONGE = "RenewableEnergy.IronSponge"
 Digester.SPENT_SPONGE = "RenewableEnergy.SpentIronSponge"
 -- Litres of water a scrubber charge takes.
 Digester.SCRUB_WATER = 4
+
+--- The m³ of gas a digester's scrubber can still clean, from its record or summary: what the
+--- sooner spent of its water and its packing has left. At none it is spent.
+function Digester.scrubLeft(state)
+    return math.min(state.scrubCO2 or 0, state.scrubWool or 0)
+end
 
 -- By full type: potential (m³ before the Biogas multiplier), acid (what it adds to souring;
 -- below zero neutralises), seedHours (startup it saves: manure brings the bacteria).
@@ -226,7 +233,17 @@ function Digester.OnIsValidDome(params)
 end
 
 Digester.isHolderOverlay = Sprites.matcher(Sprites.digesterHolder)
-Digester.isScrubberOverlay = Sprites.matcher(Sprites.digesterScrubber)
+Digester.isScrubberOverlay = Sprites.matcher(Sprites.digesterScrubber, Sprites.digesterScrubberSpent)
+Digester.isSourOverlay = Sprites.matcher(Sprites.digesterSour)
+
+--- The scrubber overlay of a digester of `tier` whose record or summary is `state`: working, or
+--- spent once it has nothing left to clean; nil without a scrubber.
+function Digester.scrubberOverlay(tier, state)
+    if not state.scrubber then
+        return nil
+    end
+    return (Digester.scrubLeft(state) > 0 and Sprites.digesterScrubber or Sprites.digesterScrubberSpent)[tier]
+end
 
 --- The holder overlay for a holder kind, its fill (0..1) and whether it's torn, or nil for the
 --- dome, whose holder is itself.

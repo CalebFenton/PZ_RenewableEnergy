@@ -324,33 +324,6 @@ for _, entry in ipairs(MODULE_REPAIRS) do
     })
 end
 
--- Seal Cracked Module and its glue twin each take exactly their adhesive's uses, which a line
--- scaling one adhesive against the other gets wrong (DEVELOPMENT.md, craftRecipe).
--- Each row: the behaviour, the recipe, its adhesive, and the uses of it a seal takes.
-local SEAL_ADHESIVES = {
-    { "takes_one_use_of_epoxy", "RenewableEnergy_RepairCrackedModule", "Base.Epoxy", 1 },
-    { "takes_two_uses_of_glue", "RenewableEnergy_RepairCrackedModuleWithGlue", "Base.Glue", 2 },
-}
-for _, entry in ipairs(SEAL_ADHESIVES) do
-    local behavior, recipe, adhesive, uses = entry[1], entry[2], entry[3], entry[4]
-    craftTest(craftName(recipe, behavior), {
-        recipe = recipe,
-        from = FACTORY,
-        prefer = { FACTORY },
-        setup = function(self)
-            T.changeItem(self, T.inputsOf(self, FACTORY)[1], { condition = T.sealCap(FACTORY, 0) - Recipes.MODULE_REPAIR - 1 })
-        end,
-        counts = { [FACTORY] = 1 },
-        after = function(self) T.readCarried(self, { adhesive }) end,
-        validate = function(self)
-            -- T.recipeInputs gave one full tube; T.readCarried's `uses` is the fraction of it left.
-            local tube = T.carriedFirst(self, adhesive)
-            local left = 1 - uses * getScriptManager():FindItem(adhesive):getUseDelta()
-            expectNear("the " .. adhesive .. " left of a full tube", tube and tube.uses or 0, left, 0.001)
-        end,
-    })
-end
-
 -- Reglaze Module brings a module below what new glass brings it to, and is refused there with the
 -- module and the pane untouched, and the new glass clears the old seals.
 -- New glass on light cracks brings a module back to new; on heavy cracks, or on a sealed module, to

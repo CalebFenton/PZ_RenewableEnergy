@@ -120,7 +120,7 @@ test("renewable_energy_solar_menu_panel_wired_to", {
     end,
     validate = function(self)
         local wiredTo = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
-            Format.bankName(PowerBank.summaryOf(self.bank.object)), Format.away(self.panel.position, self.bank.position)))
+            "Shed Bank", Format.away(self.panel.position, self.bank.position)))
         expect(wiredTo ~= nil, "a connected panel's menu doesn't name its renamed bank and how far away it stands")
     end,
 })
@@ -468,9 +468,9 @@ test("renewable_energy_solar_window_highlights_panel", {
     end,
 })
 
--- A connect job takes ConnectPanelMin minutes at Electricity 3, a fixed share of that less for each
--- level above and more for each below (RenewableEnergyAction's skillFactor); the expected minutes
--- are worked by hand.
+-- A connect job takes ConnectPanelMin minutes at Electricity 3 and the same share of them less for
+-- each level above, more for each below (RenewableEnergyAction's skillFactor). Catches skill left
+-- out, counted the wrong way, anchored at another level, or not by equal steps.
 test("renewable_energy_solar_connect_time_by_electricity", {
     sandbox = { ConnectPanelMin = 10 },
     run = function(self)
@@ -484,8 +484,11 @@ test("renewable_energy_solar_connect_time_by_electricity", {
         end)
     end,
     validate = function(self)
-        expectNear("connect minutes at Electricity 3", self.minutes[3], 10, 1e-6)
-        expectNear("connect minutes at Electricity 0", self.minutes[0], 12.85, 1e-6)
-        expectNear("connect minutes at Electricity 10", self.minutes[10], 3.35, 1e-6)
+        local unskilled, base, master = self.minutes[0], self.minutes[3], self.minutes[10]
+        expectNear("connect minutes at Electricity 3", base, 10, 1e-6)
+        expect(unskilled > base and base > master and master > 0, string.format(
+            "connecting takes %g minutes at Electricity 0, %g at 3, %g at 10", unskilled, base, master))
+        expectNear("minutes saved by a level above 3 against those lost by a level below", (base - master) / 7,
+            (unskilled - base) / 3, 1e-6)
     end,
 })

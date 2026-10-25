@@ -161,10 +161,12 @@ for holder, first in (("bags", 232), ("tarp", 236)):
     TILES[first + 3] = _overlay(biogas.barrel_digester, holder=holder, torn=True)
 for level in range(1, 5):
     TILES[239 + level] = _overlay(biogas.insulated_digester, level=level)
-# The scrubber fitted to each digester, drawn over its tile.
-TILES[247] = _overlay(biogas.barrel_digester, scrubber=True)
-TILES[248] = _overlay(biogas.insulated_digester, scrubber=True)
-TILES[249] = _overlay(biogas.dome_digester, scrubber=True)
+# Each digester's scrubber, drawn over its tile, working and then spent; and the foam a sour
+# digester heaves out of its funnel.
+for offset, build in enumerate((biogas.barrel_digester, biogas.insulated_digester, biogas.dome_digester)):
+    TILES[247 + offset] = _overlay(build, scrubber=True)
+    TILES[420 + offset] = _overlay(build, scrubber=True, spent=True)
+    TILES[417 + offset] = _overlay(build, sour=True)
 
 # The gas heater, off and lit, then turned as the storage turns.
 TILES[HEATER] = [layer(biogas.gas_heater)]

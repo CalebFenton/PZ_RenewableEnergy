@@ -2,7 +2,7 @@
 import math
 import random
 
-from art.kit import FACING_TURN, around, bank, beam, box, cylinder, group, mound, prism, ring, tube
+from art.kit import FACING_TURN, around, bank, beam, box, cylinder, group, lathe, mound, prism, ring, tube
 from palette import BANK_FADE, M
 from parts import BOARD, DRUM, FEED_BUNG, GAS_BUNG, drum
 
@@ -20,12 +20,37 @@ BARREL_AT = (-0.21, -0.21)
 SPIGOT_ANGLE = -40
 # Where the gas hose comes down off the barrel's head to the holder on the ground.
 HOLDER_INLET = (0.06, 0.06)
+# The foot of the barrel's feed funnel, on the tape round its big bung.
+BARREL_FUNNEL = (BARREL_AT[0] + FEED_BUNG[0], BARREL_AT[1] + FEED_BUNG[1], DRUM[1] + 0.05)
+FUNNEL = (0.03, 0.1, 0.12)  # the funnel's radius at its foot and at its mouth, and its height
 
 
-def _funnel(col, name, x, y, z):
-    """The recipe's funnel, its foot at (x, y, z), and its dark mouth."""
-    cylinder(col, name + "_Funnel", M("funnel"), 0.03, 0.12, at=(x, y, z), radius_top=0.1, segments=18)
-    cylinder(col, name + "_FunnelMouth", M("black"), 0.088, 0.003, at=(x, y, z + 0.118), segments=18)
+def _funnel(col, name, foot):
+    """The recipe's funnel, its foot at `foot`, and its dark mouth."""
+    x, y, z = foot
+    neck, mouth, height = FUNNEL
+    cylinder(col, name + "_Funnel", M("funnel"), neck, height, at=foot, radius_top=mouth, segments=18)
+    cylinder(col, name + "_FunnelMouth", M("black"), mouth - 0.012, 0.003, at=(x, y, z + height - 0.002), segments=18)
+
+
+def _sour_foam(col, name, foot):
+    """The froth a sour digester heaves up its feed pipe: heaped over the mouth of the funnel whose
+    foot is at `foot`, bubbling, and run down the funnel's sides towards the viewer."""
+    x, y, z = foot
+    neck, mouth, height = FUNNEL
+    top, heap = z + height - 0.01, 0.045
+    mound(col, name + "_Foam", M("foam"), (mouth, mouth, heap), at=(x, y, top), lumps=0.2, seed=60, segments=18, rings=5)
+    rng = random.Random(61)
+    for _ in range(8):
+        out, size = rng.uniform(0.01, mouth * 0.9), rng.uniform(0.01, 0.022)
+        bx, by = around((x, y), rng.uniform(0, 360), out)
+        rise = heap * math.sqrt(1 - (out / mouth) ** 2)
+        mound(col, name + "_Bubble", M("foam"), (size, size, size), at=(bx, by, top + rise - size * 0.5), segments=10, rings=4)
+    # Down the cone's outside, just proud of it, to the funnel's foot.
+    for angle in (-80, -10):
+        tube(col, name + "_FoamRun", M("foam"), [(*around((x, y), angle, mouth + 0.004), top + 0.01),
+                                                 (*around((x, y), angle, (neck + mouth) / 2 + 0.008), z + height / 2),
+                                                 (*around((x, y), angle, neck + 0.008), z + 0.005)], 0.009, 8)
 
 
 def _gas_valve(col, name, x, y, z, side):
@@ -34,22 +59,24 @@ def _gas_valve(col, name, x, y, z, side):
     box(col, name + "_GasLever", M("red"), (0.07, 0.014, 0.01), at=(x + side * 0.03, y, z + 0.03))
 
 
-def barrel_digester(col, look="MetalDrum", frame=True, holder=None, fill=3, torn=False, scrubber=False):
+def barrel_digester(col, look="MetalDrum", frame=True, holder=None, fill=3, torn=False, scrubber=False, spent=False, sour=False):
     """A homestead batch digester: a 55 gallon drum of slurry, any of the game's four (DRUM_LOOKS,
     by `look`), fed through a funnel taped into its big bung, the recipe's rubber hose run down
     inside it to near the bottom so feeding lets no gas out; emptied at a spigot near its foot; its
     gas taken off the small bung through a valve and a hose down to a holder on the ground beside
     it. `holder` draws the holder alone, "bags" or "tarp", `fill` its level from 1 (slack) to 3
-    (taut), `torn` it ripped and empty. `scrubber` draws the scrubber alone, in front of the barrel
-    where neither it nor the holder hides it, teed off the head and led on to the holder."""
+    (taut), `torn` it ripped, flat and the hose pulled out of it. `scrubber` draws the scrubber
+    alone, in front of the barrel where neither it nor the holder hides it, teed off the head and
+    led on to the holder, `spent` with nothing left to scrub. `sour` draws alone the foam out of
+    its funnel."""
     radius, height = DRUM
     x, y = BARREL_AT
     if frame:
         drum(col, "Barrel", BARREL_AT, look)
-        fx, fy = x + FEED_BUNG[0], y + FEED_BUNG[1]
+        fx, fy, _ = BARREL_FUNNEL
         cylinder(col, "Barrel_FeedBung", M("darkgrey"), 0.042, 0.012, at=(fx, fy, height), segments=14)
         cylinder(col, "Barrel_FeedTape", M("ducttape"), 0.034, 0.04, at=(fx, fy, height + 0.012), segments=14)
-        _funnel(col, "Barrel", fx, fy, height + 0.05)
+        _funnel(col, "Barrel", BARREL_FUNNEL)
         gx, gy = x + GAS_BUNG[0], y + GAS_BUNG[1]
         cylinder(col, "Barrel_GasBung", M("darkgrey"), 0.026, 0.012, at=(gx, gy, height), segments=12)
         _gas_valve(col, "Barrel", gx, gy, height + 0.012, -1)
@@ -77,42 +104,61 @@ def barrel_digester(col, look="MetalDrum", frame=True, holder=None, fill=3, torn
         _garbage_bags(col, fill, torn)
     elif holder == "tarp":
         _tarp_bag(col, fill, torn)
+    if torn:
+        _loose_hose(col, holder == "bags")
     if scrubber:
         tee = (x + 0.17, y - 0.1)
         cylinder(col, "Barrel_ScrubberTee", M("copper"), 0.014, 0.04, at=(*tee, height), segments=10)
-        inlet, outlet = _scrubber(col, (0.32, -0.33), (0.45, -0.21))
+        inlet, outlet = _scrubber(col, (0.32, -0.33), (0.45, -0.21), spent=spent)
         tube(col, "Barrel_ScrubberHose", M("rubberhose"), [(*tee, height + 0.04), (tee[0] + 0.05, tee[1] - 0.04, height + 0.08),
                                                       (0.24, -0.27, 0.6), inlet], 0.012, 8)
         # Back into the holder's south end, where the bags and the tarp both lie.
         tube(col, "Barrel_ScrubberReturn", M("rubberhose"), [outlet, (outlet[0], outlet[1] + 0.03, outlet[2] + 0.04),
                                                         (0.4, -0.08, 0.12), (0.36, -0.02, 0.04)], 0.012, 8)
+    if sour:
+        _sour_foam(col, "Barrel", BARREL_FUNNEL)
+
+
+# The pulled-out hose's path along the ground from the holder's inlet: out towards the viewer between
+# the barrel and the holder, where neither hides it.
+LOOSE_HOSE = ((0.12, -0.06), (0.17, -0.17), (0.12, -0.27), (0.16, -0.36))
+
+
+def _loose_hose(col, taped):
+    """The gas hose's end pulled out of a torn holder and lying loose on the ground in front of it,
+    `taped` still in the ring of tape and the shreds of bag neck that held it."""
+    hx, hy = HOLDER_INLET
+    radius = 0.014
+    tube(col, "Loose_Hose", M("rubberhose"), [(hx, hy, 0.04)] + [(x, y, radius) for x, y in LOOSE_HOSE], radius, 8)
+    if taped:
+        (ax, ay), (bx, by) = LOOSE_HOSE[-2:]
+        tube(col, "Loose_Tape", M("ducttape"), [((ax + bx) / 2, (ay + by) / 2, radius), (bx, by, radius)], radius + 0.005, 8)
+        turn = math.degrees(math.atan2(by - ay, bx - ax))
+        for side, lean in ((-1, 50), (1, -60)):
+            prism(col, "Loose_Shred", M("garbagebag"), [(-0.025, 0), (0.025, 0), (0.005, 0.07)], 0.003, at=(bx, by, radius),
+                  rotate=(lean, 0, turn + 90 + side * 15))
 
 
 # The garbage bags' centres, half lengths and widths, and turns: three lying round the hose's end,
 # their necks gathered and taped round it, taped to each other where they touch.
 BAGS = (((0.04, 0.3), (0.21, 0.14), 0), ((0.3, 0.04), (0.21, 0.14), 90), ((0.3, 0.3), (0.17, 0.16), 45))
-BAG_HEIGHTS = (0.08, 0.15, 0.23)
-BAG_LUMPS = (0.28, 0.12, 0.03)
+BAG_HEIGHTS = (0.06, 0.15, 0.26)
+BAG_LUMPS = (0.3, 0.12, 0.02)
+BAG_SWELL = (1.0, 1.0, 1.1)
 
 
 def _garbage_bags(col, fill, torn):
-    """Black garbage bags taped into one holder, creased and slack at `fill` 1, taut at 3, or
-    split open and lying flat when `torn`."""
-    height = 0.026 if torn else BAG_HEIGHTS[fill - 1]
-    lumps = 0.25 if torn else BAG_LUMPS[fill - 1]
-    swell = 1.08 if fill == 3 and not torn else 1.0
+    """Black garbage bags taped into one holder, creased and slack at `fill` 1, swollen tight at 3,
+    or `torn`."""
+    if torn:
+        _torn_bags(col)
+        return
+    height, lumps, swell = BAG_HEIGHTS[fill - 1], BAG_LUMPS[fill - 1], BAG_SWELL[fill - 1]
     for i, ((bx, by), (rx, ry), turn) in enumerate(BAGS):
         mound(col, "Bags_Bag", M("garbagebag"), (rx * swell, ry * swell, height), at=(bx, by, 0), rotate=(0, 0, turn),
               lumps=lumps, seed=10 + i, segments=20, rings=5)
-        if torn:
-            # The split, the ground showing through it, and a flap of the bag lifting off it.
-            mound(col, "Bags_Split", M("earth"), (rx * 0.45, ry * 0.25, height * 1.3), at=(bx, by, 0), rotate=(0, 0, turn + 15),
-                  lumps=0.2, seed=13 + i, segments=10, rings=3)
-            flap_x, flap_y = around((bx, by), turn + 15 + 90, ry * 0.25)
-            prism(col, "Bags_Flap", M("garbagebag"), [(-0.06, 0), (0.07, 0), (0.0, 0.08)], 0.003,
-                  at=(flap_x, flap_y, height * 1.1), rotate=(55, 0, turn + 15))
     hx, hy = HOLDER_INLET
-    neck = 0.03 if torn else 0.09
+    neck = 0.09
     cylinder(col, "Bags_Neck", M("garbagebag"), 0.045, neck, at=(hx, hy, 0), radius_top=0.02, segments=10)
     cylinder(col, "Bags_NeckTape", M("ducttape"), 0.025, 0.03, at=(hx, hy, neck - 0.035), segments=10)
     # Tape across each join, dipping into the crease between the two bags.
@@ -124,13 +170,35 @@ def _garbage_bags(col, fill, torn):
             beam(col, "Bags_Tape", M("ducttape"), start, end, (0.05, 0.003))
 
 
+def _torn_bags(col):
+    """The garbage bags split along their length and lying flat, the halves of each pulled apart so
+    the ground shows between them, ragged flaps standing up off each tear."""
+    rng = random.Random(14)
+    for i, ((bx, by), (rx, ry), turn) in enumerate(BAGS):
+        for side in (-1, 1):
+            half = around((bx, by), turn + 90 * side, ry * 0.5 + 0.03)
+            mound(col, "Bags_Torn", M("garbagebag"), (rx, ry * 0.5, 0.025), at=(*half, 0), rotate=(0, 0, turn), lumps=0.35,
+                  seed=10 + 2 * i + (side > 0), segments=16, rings=4)
+            tear = around(half, turn - 90 * side, ry * 0.4)
+            for along in (-0.45, 0.2):
+                width = rng.uniform(0.05, 0.08)
+                prism(col, "Bags_Flap", M("garbagebag"), [(-width, 0), (width, 0), (rng.uniform(-0.03, 0.03), rng.uniform(0.06, 0.1))],
+                      0.003, at=(*around(tear, turn, rx * (along + rng.uniform(-0.1, 0.1))), 0.015),
+                      rotate=(-side * rng.uniform(30, 60), 0, turn))
+
+
 TARP_AT = (0.25, 0.25)
 TARP = (0.21, 0.19)  # half its length and width
-TARP_HEIGHTS = (0.06, 0.13, 0.2)
+# By fill from slack to taut: its height, how far it is rumpled, how square it is filled out, and
+# how far it swells past its hem.
+TARP_HEIGHTS = (0.03, 0.12, 0.25)
+TARP_LUMPS = (0.35, 0.1, 0.01)
+TARP_SQUARENESS = (1.5, 2.2, 3.0)
+TARP_SWELL = (1.0, 1.0, 1.06)
 
 
 def tarp_gas_bag(col):
-    """The tarp gas holder as a loose item: the slack pillow, its hose stub out of the front corner."""
+    """The tarp gas holder as a loose item: the slack pillow, its hose barb out of the front corner."""
     rx, ry = TARP
     _tarp_bag(col, 1, False, centre=(0, 0), barb=(-rx - 0.06, -ry - 0.06, 0.03))
 
@@ -158,7 +226,7 @@ def iron_sponge(col, spent=False):
             length = rng.uniform(0.03, 0.05)
             end = (at[0] + ux * length, at[1] + uy * length, max(0.004, z + rng.uniform(-0.02, 0.01)))
             beam(col, "Sponge_Shaving", body, at, end, (0.008, 0.003))
-    for i in range(6):
+    for _ in range(6):
         spread = rng.uniform(0.1, 0.7)
         u, v = around((0, 0), rng.uniform(0, 360), spread)
         mound(col, "Sponge_Fleck", fleck, (0.006, 0.005, 0.004),
@@ -166,28 +234,48 @@ def iron_sponge(col, spent=False):
 
 
 def _tarp_bag(col, fill, torn, centre=TARP_AT, barb=None):
-    """A pillow sewn from a blue poly tarp, a hem round it with a grommet at each corner and a hose
-    barb in the corner nearest the barrel (reaching to `barb`, the holder's inlet by default), centred
-    on `centre`: soft and creased at `fill` 1, filled square at 3, or flat
-    and ripped across when `torn`."""
+    """A pillow sewn from the game's tarp, centred on `centre`, a hem round it with a grommet at each
+    corner and a hose barb in the corner nearest the barrel, reaching to `barb` (the holder's inlet
+    by default): lying in folds at `fill` 1, a soft pillow at 2 and blown up square and tight at 3;
+    or `torn`, flat and ripped open across, its barb out of the hose."""
     cx, cy = centre
     rx, ry = TARP
-    height = 0.022 if torn else TARP_HEIGHTS[fill - 1]
-    lumps = 0.3 if torn else (0.2, 0.08, 0.02)[fill - 1]
-    squareness = 1.6 if torn else (1.8, 2.2, 2.6)[fill - 1]
-    mound(col, "Tarp_Bag", M("tarp"), (rx, ry, height), at=(cx, cy, 0), squareness=squareness, lumps=lumps, seed=20,
-          segments=24, rings=6)
+    corner = (cx - rx * 0.78, cy - ry * 0.78)
+    if torn:
+        height, lumps, squareness, swell = 0.02, 0.3, 1.6, 1.0
+    else:
+        height, lumps = TARP_HEIGHTS[fill - 1], TARP_LUMPS[fill - 1]
+        squareness, swell = TARP_SQUARENESS[fill - 1], TARP_SWELL[fill - 1]
+    mound(col, "Tarp_Bag", M("tarp"), (rx * swell, ry * swell, height), at=(cx, cy, 0), squareness=squareness, lumps=lumps,
+          seed=20, segments=24, rings=6)
     mound(col, "Tarp_Hem", M("tarp"), (rx + 0.03, ry + 0.03, 0.012), at=(cx, cy, 0), squareness=4, segments=24, rings=2)
     for sx in (-1, 1):
         for sy in (-1, 1):
             cylinder(col, "Tarp_Grommet", M("lead"), 0.01, 0.014, at=(cx + sx * (rx + 0.01), cy + sy * (ry + 0.01), 0), segments=8)
-    barb = barb or (*HOLDER_INLET, 0.04)
-    tube(col, "Tarp_Barb", M("galvanised"), [barb, (cx - rx * 0.78, cy - ry * 0.78, min(height, 0.05))], 0.011, 8)
     if torn:
-        mound(col, "Tarp_Rip", M("earth"), (rx * 0.6, 0.03, height * 1.3), at=(cx + 0.02, cy - 0.02, 0), rotate=(0, 0, -30),
-              lumps=0.2, seed=22, segments=10, rings=3)
-        prism(col, "Tarp_Flap", M("tarp"), [(-0.09, 0), (0.09, 0), (0.02, 0.07)], 0.003, at=(cx + 0.03, cy - 0.05, height),
-              rotate=(60, 0, -30))
+        barb = (corner[0] - 0.04, corner[1] - 0.04, 0.02)
+    tube(col, "Tarp_Barb", M("galvanised"), [barb or (*HOLDER_INLET, 0.04), (*corner, min(height, 0.05))], 0.011, 8)
+    if torn:
+        _tarp_rip(col, centre)
+
+
+# The heading of the rip across a torn tarp bag, in degrees from east: across the viewer's sight,
+# where it shows longest.
+TARP_RIP = 45
+
+
+def _tarp_rip(col, centre):
+    """A jagged rip across a flattened tarp bag, gaping dark, its torn edges peeled up off it."""
+    rng = random.Random(22)
+    for step in (-1, 0, 1):
+        x, y = around(centre, TARP_RIP, step * 0.11)
+        mound(col, "Tarp_Rip", M("black"), (0.075, 0.04, 0.03), at=(x, y, 0), rotate=(0, 0, TARP_RIP + step * 20), lumps=0.2,
+              seed=23 + step, segments=10, rings=3)
+        for side in (-1, 1):
+            width = rng.uniform(0.045, 0.065)
+            prism(col, "Tarp_Flap", M("tarp"), [(-width, 0), (width, 0), (rng.uniform(-0.02, 0.02), rng.uniform(0.08, 0.11))],
+                  0.003, at=(*around((x, y), TARP_RIP + 90 * side, 0.04), 0.02),
+                  rotate=(-side * rng.uniform(35, 60), 0, TARP_RIP))
 
 
 # The box's width and height: as tight round the 55 gallon drum as a hand's depth of straw allows,
@@ -202,9 +290,10 @@ GUIDE_TOP = DRUM[1] + FLOAT_RISE[-1] + 0.12
 # The feed funnel, on the box's north-east corner, and where its pipe enters the drum's side.
 INSULATED_FEED = (0.26, 0.26)
 INSULATED_INLET = (0.19, 0.19)
+INSULATED_FUNNEL = (*INSULATED_FEED, INSULATED[1] + 0.06)
 
 
-def insulated_digester(col, frame=True, level=0, scrubber=False):
+def insulated_digester(col, frame=True, level=0, scrubber=False, spent=False, sour=False):
     """A floating-drum digester of the village kind, built for a cold winter: the slurry in a 55
     gallon drum standing in a box of planks, straw packed round it and heaped over it to its head,
     a guide pipe standing up out of the slurry, fed through a funnel on the box's corner whose pipe
@@ -212,7 +301,8 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
     down in the slurry, riding up the pipe as gas fills it: `level` draws it alone at its height from
     1 (low) to 4 (high), its gas valve and hose on its head. `scrubber` draws the scrubber alone: the
     box fills its square, so it stands on the front corner of the box's top, clear of both drums,
-    fed from a fitting on the slurry drum's rim outside the floating drum."""
+    fed from a fitting on the slurry drum's rim outside the floating drum; `spent` with nothing
+    left to scrub. `sour` draws alone the foam out of its funnel."""
     size, height = INSULATED
     radius, rim = DRUM
     if frame:
@@ -222,10 +312,10 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
         cylinder(col, "Insulated_Slurry", M("sludge"), radius - 0.006, 0.002, at=(0, 0, rim), segments=28)
         cylinder(col, "Insulated_Guide", M("galvanised"), 0.021, GUIDE_TOP - rim, at=(0, 0, rim), segments=10)
         cylinder(col, "Insulated_GuideCap", M("galvanised"), 0.028, 0.025, at=(0, 0, GUIDE_TOP), segments=10)
-        fx, fy = INSULATED_FEED
-        tube(col, "Insulated_FeedPipe", M("pvc"), [(fx, fy, height + 0.06), (fx, fy, height), (*INSULATED_INLET, rim - 0.16)], 0.024, 12)
+        fx, fy, fz = INSULATED_FUNNEL
+        tube(col, "Insulated_FeedPipe", M("pvc"), [(fx, fy, fz), (fx, fy, height), (*INSULATED_INLET, rim - 0.16)], 0.024, 12)
         cylinder(col, "Insulated_FeedTape", M("ducttape"), 0.03, 0.04, at=(fx, fy, height + 0.03), segments=14)
-        _funnel(col, "Insulated", fx, fy, height + 0.06)
+        _funnel(col, "Insulated", INSULATED_FUNNEL)
     if level:
         top = rim + FLOAT_RISE[level - 1]
         float_radius, float_height = FLOAT_DRUM
@@ -245,12 +335,14 @@ def insulated_digester(col, frame=True, level=0, scrubber=False):
         base = height + 0.02
         fitting = around((0, 0), -45, radius - 0.015)
         cylinder(col, "Insulated_ScrubberFitting", M("copper"), 0.012, 0.04, at=(*fitting, rim), segments=10)
-        inlet, outlet = _scrubber(col, (0.28, -0.28), (0.06, -0.34), z=base)
+        inlet, outlet = _scrubber(col, (0.28, -0.28), (0.06, -0.34), z=base, spent=spent)
         tube(col, "Insulated_ScrubberHose", M("rubberhose"), [(*fitting, rim + 0.04), (fitting[0] + 0.03, fitting[1] - 0.03, rim + 0.12),
                                                          (inlet[0] - 0.03, inlet[1] + 0.03, inlet[2] + 0.08), inlet], 0.012, 8)
         tube(col, "Insulated_ScrubberOut", M("rubberhose"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.06, outlet[2] + 0.02),
                                                         (0.1, -size / 2 - 0.03, height - 0.05), (0.11, -size / 2 - 0.035, 0.25),
                                                         (0.13, -size / 2 - 0.06, 0.03)], 0.012, 8)
+    if sour:
+        _sour_foam(col, "Insulated", INSULATED_FUNNEL)
 
 
 def _straw_box(col):
@@ -307,16 +399,19 @@ BANK = (0.3, 0.53)
 BANK_TUFTS = 300
 DOME_AT = (-0.02, 0.02)
 BRICK = (0.2, 0.05, 0.068)  # a brick as laid: along the course, into the dome, up
-# Where round the dome its feed pipe comes out, in degrees from east: towards the viewer.
+# Where round the dome its feed pipe comes out, in degrees from east: towards the viewer. Its
+# funnel stands on the pipe's end, just clear of the dome.
 DOME_FEED_ANGLE = -60
+DOME_FUNNEL = (*around(DOME_AT, DOME_FEED_ANGLE, DOME[0] + 0.06), 0.32)
 
 
-def dome_digester(col, frame=True, scrubber=False):
+def dome_digester(col, frame=True, scrubber=False, spent=False, sour=False):
     """A fixed-dome digester of the Chinese kind: its pit sunk in the ground, the brick dome over it
     showing above the earth banked round its foot, a concrete collar on its crown and the gas pipe
     and valve out of that, its hose led off behind the dome, and the feed pipe climbing out of the
     bank to a funnel, as the other digesters are fed. `scrubber` draws the scrubber alone, on the
-    ground at the square's back corner, teed off the gas pipe above the valve."""
+    ground at the square's back corner, teed off the gas pipe above the valve; `spent` with nothing
+    left to scrub. `sour` draws alone the foam out of its funnel."""
     cx, cy = DOME_AT
     crown = DOME[1]
     if frame:
@@ -324,12 +419,14 @@ def dome_digester(col, frame=True, scrubber=False):
     if scrubber:
         tee = (cx + 0.03, cy + 0.03, crown + 0.17)
         tube(col, "Dome_ScrubberTee", M("galvanised"), [(cx, cy, tee[2]), tee], 0.014, 8)
-        inlet, outlet = _scrubber(col, (0.37, 0.37), (0.43, 0.1))
+        inlet, outlet = _scrubber(col, (0.37, 0.37), (0.43, 0.1), spent=spent)
         tube(col, "Dome_ScrubberHose", M("rubberhose"), [tee, (tee[0] + 0.08, tee[1] + 0.06, tee[2] + 0.03),
                                                          (0.24, 0.3, inlet[2] + 0.14), inlet], 0.012, 8)
         # On to the house, underground.
         tube(col, "Dome_ScrubberOut", M("rubberhose"), [outlet, (outlet[0] + 0.02, outlet[1] - 0.02, outlet[2] + 0.03),
                                                         (0.48, 0.02, 0.12), (0.49, 0.0, 0.02)], 0.012, 8)
+    if sour:
+        _sour_foam(col, "Dome", DOME_FUNNEL)
 
 
 def _dome(col):
@@ -391,39 +488,68 @@ def _dome(col):
     # taped into its end.
     lx, ly = around((cx, cy), DOME_FEED_ANGLE, radius - 0.03)
     bx, by = around((cx, cy), DOME_FEED_ANGLE, radius + 0.04)
-    fx, fy = around((cx, cy), DOME_FEED_ANGLE, radius + 0.06)
-    tube(col, "Dome_FeedPipe", M("pvc"), [(lx, ly, 0.1), (bx, by, 0.12), (fx, fy, 0.2), (fx, fy, 0.32)], 0.024, 12)
-    cylinder(col, "Dome_FeedTape", M("ducttape"), 0.03, 0.04, at=(fx, fy, 0.29), segments=14)
-    _funnel(col, "Dome", fx, fy, 0.32)
+    fx, fy, fz = DOME_FUNNEL
+    tube(col, "Dome_FeedPipe", M("pvc"), [(lx, ly, 0.1), (bx, by, 0.12), (fx, fy, 0.2), (fx, fy, fz)], 0.024, 12)
+    cylinder(col, "Dome_FeedTape", M("ducttape"), 0.03, 0.04, at=(fx, fy, fz - 0.03), segments=14)
+    _funnel(col, "Dome", DOME_FUNNEL)
 
 
 SCRUBBER_BUCKET = (0.12, 0.34)  # a 5 gallon bucket's radius at its rim and its height
 SCRUBBER_CAN = (0.045, 0.2)  # the steel wool can's radius and height
+# A spent scrubber's lid, lifted on the side of its rim away from the viewer and leant back past
+# upright so it stays up: the heading of that side from the bucket's centre, in degrees from east,
+# and how far the lid is tipped.
+LID_PROPPED = (135, 100)
 
 
-def _scrubber(col, bucket_at, can_at, z=0.0, can_z=None):
+def _scrubber(col, bucket_at, can_at, z=0.0, spent=False):
     """A biogas scrubber: an orange 5 gallon bucket of water, its lid on, the gas bubbling in through
     one pipe stub and out of the other, then through a coffee can packed with steel wool, capped,
-    that takes out the rotten-egg gas. The bucket stands at `bucket_at` on `z`, the can at `can_at`
-    on `can_z` (default `z`). Returns the tops of the bucket's inlet stub and the can's outlet."""
+    that takes out the rotten-egg gas. The bucket and the can stand at `bucket_at` and `can_at` on
+    `z`. `spent` draws it with nothing left to scrub: its lid propped open on the rim, the hoses
+    still on it, and the bucket dry inside, crusted where the water stood. Returns the tops of the
+    bucket's inlet stub and the can's outlet."""
     radius, height = SCRUBBER_BUCKET
     bx, by = bucket_at
-    cylinder(col, "Scrubber_Bucket", M("safety"), radius * 0.88, height, at=(bx, by, z), radius_top=radius, segments=20)
+    foot = radius * 0.88
+    lid = radius + 0.008
+    if spent:
+        wall = 0.006
+        lathe(col, "Scrubber_Bucket", M("safety"), [(0, 0), (foot, 0), (radius, height), (radius - wall, height), (foot - wall, wall),
+                                                    (0, wall)], segments=20, at=(bx, by, z))
+        crust = [(foot - wall - 0.001 + (radius - foot) * up / height, up) for up in (height - 0.09, height - 0.05)]
+        lathe(col, "Scrubber_Crust", M("ashwhite"), crust, segments=20, at=(bx, by, z))
+        heading, tilt = LID_PROPPED
+        hinge = (*around(bucket_at, heading, radius), z + height)
+        turn = (0, tilt, heading)
+
+        def on_lid(x, y, up):
+            """The point `up` off the lid and (x, y) across it from its centre, as it stands propped."""
+            along, across = _rotated((x, y), -heading)
+            along -= lid
+            t = math.radians(tilt)
+            out, rise = along * math.cos(t) + up * math.sin(t), -along * math.sin(t) + up * math.cos(t)
+            ox, oy = _rotated((out, across), heading)
+            return hinge[0] + ox, hinge[1] + oy, hinge[2] + rise
+    else:
+        cylinder(col, "Scrubber_Bucket", M("safety"), foot, height, at=(bx, by, z), radius_top=radius, segments=20)
+        turn = None
+
+        def on_lid(x, y, up):
+            return bx + x, by + y, z + height + up
     for rib in (0.5, 0.88):
         ring(col, "Scrubber_Rib", M("safety"), bucket_at, radius * (0.88 + 0.12 * rib), z + height * rib, 0.006)
-    cylinder(col, "Scrubber_Lid", M("hdpe"), radius + 0.008, 0.022, at=(bx, by, z + height), segments=20)
-    top = z + height + 0.022
+    cylinder(col, "Scrubber_Lid", M("hdpe"), lid, 0.022, at=on_lid(0, 0, 0), rotate=turn, segments=20)
     stubs = []
     for dx, dy in ((-0.05, 0.03), (0.05, -0.03)):
-        cylinder(col, "Scrubber_Stub", M("pvc"), 0.013, 0.05, at=(bx + dx, by + dy, top), segments=10)
-        stubs.append((bx + dx, by + dy, top + 0.05))
+        cylinder(col, "Scrubber_Stub", M("pvc"), 0.013, 0.05, at=on_lid(dx, dy, 0.022), rotate=turn, segments=10)
+        stubs.append(on_lid(dx, dy, 0.072))
     can_radius, can_height = SCRUBBER_CAN
     cx, cy = can_at
-    cz = z if can_z is None else can_z
-    cylinder(col, "Scrubber_Can", M("galvanised"), can_radius, can_height, at=(cx, cy, cz), segments=16)
-    cylinder(col, "Scrubber_CanLabel", M("red"), can_radius + 0.001, 0.07, at=(cx, cy, cz + 0.06), segments=16)
-    cylinder(col, "Scrubber_CanCap", M("black"), can_radius + 0.004, 0.018, at=(cx, cy, cz + can_height), segments=16)
-    can_top = cz + can_height + 0.018
+    cylinder(col, "Scrubber_Can", M("galvanised"), can_radius, can_height, at=(cx, cy, z), segments=16)
+    cylinder(col, "Scrubber_CanLabel", M("red"), can_radius + 0.001, 0.07, at=(cx, cy, z + 0.06), segments=16)
+    cylinder(col, "Scrubber_CanCap", M("black"), can_radius + 0.004, 0.018, at=(cx, cy, z + can_height), segments=16)
+    can_top = z + can_height + 0.018
     cylinder(col, "Scrubber_CanStub", M("pvc"), 0.011, 0.04, at=(cx - 0.015, cy, can_top), segments=10)
     cylinder(col, "Scrubber_CanOut", M("pvc"), 0.011, 0.04, at=(cx + 0.015, cy, can_top), segments=10)
     out = stubs[1]

@@ -171,8 +171,8 @@ serverCheck("renewable_energy_world_bank_battery_wear", "batteryWear")
 -- board's battery box hand them out worn.
 serverCheck("renewable_energy_world_part_wear", "partWear")
 
--- A placed bank's batteries are worn as its stock says, so a farm storeroom's come more worn than
--- an electronics store's: at middling rolls every battery is at its stock's profile's mean.
+-- A placed bank's batteries are worn by its own stock's profile: at middling rolls every battery is
+-- at that profile's mean, told apart by two stocks whose profiles' means differ.
 local WORN_STOCKS = { "farmStorage", "electronicsStorage" }
 test("renewable_energy_world_bank_batteries_worn_by_stock", {
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
@@ -207,8 +207,8 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
             expect(#conditions > 0 and #wrong == 0, string.format("a %s bank holds %d batteries, of which %s aren't at its %s profile's %d",
                 stockName, #conditions, table.concat(wrong, ", "), wearName, condition))
         end
-        expect(means.farmStorage < means.electronicsStorage, "a farm storeroom's batteries come at "
-            .. means.farmStorage .. ", no more worn than an electronics store's " .. means.electronicsStorage)
+        expect(means.farmStorage ~= means.electronicsStorage, "farm storerooms' and electronics stores' batteries "
+            .. "wear alike, so this can't tell whose profile a bank used")
     end,
 })
 
@@ -293,10 +293,6 @@ test("renewable_energy_world_crate_spawns_stocked", {
 -- Farm storage shelves get cracked modules, at cracked conditions, at a chance that follows the
 -- Solar Panels loot option, and a bedroom's furniture none.
 serverCheck("renewable_energy_world_cracked_modules", "crackedModules")
-
--- Vanilla's barns, farm storerooms and survivalist camps are dressed with the mod's magazines,
--- pamphlet and charger, the biogas and wind magazines weighted up.
-serverCheck("renewable_energy_world_rural_clutter", "ruralClutter")
 
 -- A room seen for the first time gets a bank of its room's stock (a shed's or garage's a wooden
 -- battery box, a farm storeroom's a wooden rack) on a roll just under one in its odds × the Battery

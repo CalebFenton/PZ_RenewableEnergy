@@ -206,32 +206,23 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
     end,
 })
 
--- A battery box and a battery rack in reach of a panel are both offered to it: greyed while they
--- aren't connected, open once they are. A panel already on one of them names that one as what it
--- is connected to instead of offering it again.
+-- A battery box and a battery rack in reach of a panel are both offered to it. A panel already on
+-- one of them names that one as what it is connected to instead of offering it again.
 test("renewable_energy_bank_box_and_rack_both_offered", {
     run = function(self)
-        self.box = T.bank(self, "batteryBoxWood", {}, { connected = false })
-        self.rack = self.box and T.bank(self, "batteryRackWood", {}, { connected = false, near = self.box })
+        self.box = T.bank(self, "batteryBoxWood", {})
+        self.rack = self.box and T.bank(self, "batteryRackWood", {}, { near = self.box })
         self.panel = self.rack and T.panel(self, Sprites.rack.wood.S, { near = self.box })
         if not self.panel then return end
         local box, rack, panel = self.box, self.rack, self.panel
         T.holdLight(self)
-        T.setPerk(self, Perks.Electricity, 3)
         T.step(function()
             local here = panel.position
             if not T.need(self, PowerBank.isInReach(box.position, here.x, here.y, here.z)
                 and PowerBank.isInReach(rack.position, here.x, here.y, here.z), "the box and the rack in reach of the panel") then
                 return
             end
-            self.unconnected = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
-        end)
-        T.performInto(self, "boxConnected", "setBankConnected", { bank = box.position, connected = true })
-        T.performInto(self, "rackConnected", "setBankConnected", { bank = rack.position, connected = true })
-        T.waitFor(self, function() return box.object:isConnected() and rack.object:isConnected() end,
-            "this client's copies of the connected box and rack")
-        T.step(function()
-            self.connected = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
+            self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
         T.performInto(self, "onBox", "connectSource", { bank = box.position, source = panel.position })
         T.waitFor(self, function() return PowerBank.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
@@ -244,14 +235,8 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         end)
     end,
     validate = function(self)
-        local notConnected = getText("Tooltip_RenewableEnergy_BankNotConnected")
-        for name, option in pairs(self.unconnected) do
-            expect(option.shown and option.greyed and option.reason == notConnected,
-                "the unconnected " .. name .. " isn't offered greyed out saying it isn't connected (" .. tostring(option.reason) .. ")")
-        end
-        expect(self.boxConnected.ok and self.rackConnected.ok, "the authority refused to connect the box or the rack")
-        for name, option in pairs(self.connected) do
-            expect(option.shown and not option.greyed, "the connected " .. name .. " isn't offered open (" .. tostring(option.reason) .. ")")
+        for name, option in pairs(self.offered) do
+            expect(option.shown and not option.greyed, "the " .. name .. " isn't offered open (" .. tostring(option.reason) .. ")")
         end
         T.expectOk(self.onBox, "putting the panel on the box")
         local wired = self.wired

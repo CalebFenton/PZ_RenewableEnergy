@@ -80,8 +80,12 @@ Sprites.digesterHolder = {
     tarpTorn = tile(239),
     drum = tiles(240, 4),
 }
--- The scrubber fitted to each digester, drawn over the digester's own tile.
+-- The scrubber fitted to each digester, drawn over the digester's own tile, and the same scrubber
+-- spent (Digester.scrubLeft), its lid off and its bucket dry.
 Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = tile(249) }
+Sprites.digesterScrubberSpent = { barrel = tile(420), insulated = tile(421), dome = tile(422) }
+-- The foam a sour digester heaves up out of its feed funnel, drawn over its own tile.
+Sprites.digesterSour = { barrel = tile(417), insulated = tile(418), dome = tile(419) }
 -- The homemade gas heater, off and lit, by facing; every tile gives the heater back.
 Sprites.gasHeater = {
     off = { S = tile(364), E = tile(365), N = tile(366), W = tile(367) },
@@ -399,8 +403,8 @@ end
 Sprites.isSnow = Sprites.matcher(Sprites.snow)
 --- Whether a sprite is one of the overlays drawn over a tile, which are never placed on their own.
 Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.crateOverlays, Sprites.bankFill,
-    Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.gasKit, Sprites.gasifierLit, Sprites.gasifierPipe,
-    Sprites.gasifierPipeGen)
+    Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.digesterScrubberSpent, Sprites.digesterSour, Sprites.gasKit,
+    Sprites.gasifierLit, Sprites.gasifierPipe, Sprites.gasifierPipeGen)
 
 --- The tile of a bladed wind charger of `kind` facing `facing` (Sprites.kindOf) with blades of
 --- `material` (Specs.wind.blades), or nil for blades it has no tile for.

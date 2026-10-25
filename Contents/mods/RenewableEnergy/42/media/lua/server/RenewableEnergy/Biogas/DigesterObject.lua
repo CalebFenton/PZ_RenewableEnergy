@@ -455,14 +455,15 @@ function DigesterObject:setHeaterLit(heater, lit)
     DigesterObject.showHeaterLit(heater, lit)
 end
 
--- The holder's fill, the scrubber, and a heater put out once the digester stops feeding it: out
--- of gas, here or while its chunk was unloaded.
+-- The holder's fill, the scrubber, the foam of a sour digester, and a heater put out once the
+-- digester stops feeding it: out of gas, here or while its chunk was unloaded.
 function DigesterObject:show()
     local isoObject = self:getIsoObject()
     if not isoObject then return end
     local capacity = Digester.HOLDERS[self.holder].capacity
     showOverlay(isoObject, Digester.isHolderOverlay, Digester.holderOverlay(self.holder, self.gas / capacity, self:isTorn()))
-    showOverlay(isoObject, Digester.isScrubberOverlay, self.scrubber and Sprites.digesterScrubber[self.tier] or nil)
+    showOverlay(isoObject, Digester.isScrubberOverlay, Digester.scrubberOverlay(self.tier, self))
+    showOverlay(isoObject, Digester.isSourOverlay, self.sour and Sprites.digesterSour[self.tier] or nil)
     if not self.heaterLit then
         local heater = GasHeater.litHeaterFor(isoObject)
         if heater then

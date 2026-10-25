@@ -27,7 +27,7 @@ local function label(job, share)
     return share and name .. " (" .. Format.percent(share) .. ")" or name
 end
 
--- Adds the option for `feature`'s `job`, with `item` the bag, tank or gas bag it works with.
+-- Adds the option for `feature`'s `job`, with `item` the item it works with.
 local function addJob(menu, playerNum, feature, job, target, item, text)
     return JobOptions.add(menu, playerNum, Action, feature, job, target, item, text or label(job))
 end
@@ -75,7 +75,7 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     addSludge(menu, playerNum, digester, summary)
     addJob(menu, playerNum, "digester", DigesterJobs.VENT, digester, nil,
         label(DigesterJobs.VENT, summary.capacity > 0 and summary.gas / summary.capacity or nil))
-    if Digester.TIERS[summary.tier].bags then
+    if Digester.TIERS[summary.tier].gasBag then
         addGasBag(menu, playerNum, digester, summary)
     end
     addJob(menu, playerNum, "digester", DigesterJobs.UPGRADE, digester)

@@ -77,20 +77,15 @@ end
 -- Dismantling a treadmill gives its motor, the wind charger's generator, once: for the tile that
 -- was clicked, not again for its other tile, which vanilla scraps along with it.
 test("renewable_energy_treadmill_dismantle_gives_motor_once", {
-    validate = function()
-        local props = ISMoveableSpriteProps.new(Sprites.treadmill.W.console)
-        local function motors()
-            local count = 0
-            for _, fullType in ipairs((props:getScrapItemsList(T.player()) or {}).usable or {}) do
-                if fullType == Treadmill.MOTOR then
-                    count = count + 1
-                end
-            end
-            return count
-        end
-        expect(motors() == 1, "a treadmill's clicked tile scraps to " .. motors() .. " motors")
-        props.scrappingMainTile = false
-        expect(motors() == 0, "a treadmill's other tile scraps to " .. motors() .. " motors")
+    run = function(self)
+        local treadmill = T.panel(self, Sprites.treadmill.W.rear)
+        if not (treadmill and westConsole(self, treadmill)) then return end
+        T.server(self, "scrapItems", T.at(treadmill, { sprite = Sprites.treadmill.W.rear, type = Treadmill.MOTOR }))
+    end,
+    validate = function(self)
+        local scrap = self.server.scrapItems
+        if not expect(scrap.scrapped, "dismantling the treadmill left one of its tiles standing") then return end
+        expect(scrap.count == 1, "dismantling a treadmill gave " .. scrap.count .. " motors")
     end,
 })
 

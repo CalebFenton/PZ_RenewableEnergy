@@ -6,7 +6,6 @@
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
-require "RenewableEnergy/Sprites"
 local LibLoot = require "cf_commonlib/Loot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
@@ -16,14 +15,12 @@ local Stash = require "RenewableEnergy/Stash"
 local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
 local deferOnce = PZHarness.Fixtures.deferOnce
 local countPairs = PZHarness.Fixtures.countPairs
-local Sprites = RenewableEnergy.Sprites
 
--- StashSystem gives up without an error when the stash building isn't a building, prepares only a
--- building whose bounds strictly contain the building square (doBuildingStash), and stocks the
--- crate only if its square is in a room of that building, so a wrong coordinate is an empty house.
--- The crate is the mod's, and the house's spawn table has loot for its container type.
+-- StashSystem gives up without an error when the stash building isn't a building, and prepares
+-- only a building whose bounds strictly contain the building square (doBuildingStash), so a wrong
+-- coordinate is an empty house; and the house's spawn table has loot for its crate's container
+-- type. The static check's stash-crate rule checks the crate stands in a room of the house.
 check("stashHousesResolve", function(expect)
-    local metaGrid = getWorld():getMetaGrid()
     for stashMap in pairs(Stash.descriptions) do
         local x, y = stashMap.buildingX, stashMap.buildingY
         local building = Stash.buildingOf(stashMap)
@@ -31,15 +28,11 @@ check("stashHousesResolve", function(expect)
         if expect(building ~= nil, stashMap.name .. ": no building at its building coordinates") then
             expect(building:getX() < x and x < building:getX2() and building:getY() < y and y < building:getY2(),
                 stashMap.name .. ": the building square is on the edge of the building's bounds")
-            for _, crate in ipairs(stashMap.containers) do
-                local crateRoom = metaGrid:getRoomAt(crate.contX, crate.contY, crate.contZ)
-                expect(crateRoom ~= nil and crateRoom:getBuilding() == building,
-                    stashMap.name .. ": the crate square is not in a room of the building")
-                expect(crate.containerSprite == Sprites.crate, stashMap.name .. ": the crate is not the mod's solar crate")
-                expect(spawnTable ~= nil and spawnTable[crate.containerType] ~= nil,
-                    stashMap.name .. ": its spawn table " .. tostring(stashMap.spawnTable) .. " has no loot for "
-                    .. tostring(crate.containerType))
-            end
+        end
+        for _, crate in ipairs(stashMap.containers) do
+            expect(spawnTable ~= nil and spawnTable[crate.containerType] ~= nil,
+                stashMap.name .. ": its spawn table " .. tostring(stashMap.spawnTable) .. " has no loot for "
+                .. tostring(crate.containerType))
         end
     end
 end)

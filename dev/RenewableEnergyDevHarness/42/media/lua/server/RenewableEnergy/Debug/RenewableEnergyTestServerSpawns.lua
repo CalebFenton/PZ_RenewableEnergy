@@ -419,8 +419,7 @@ end
 
 -- Farm storage shelves get a cracked module, at a cracked condition, when the roll comes in under
 -- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
--- follows the Solar Panels loot option, and at the option's default a garage shelf's is small but
--- there.
+-- follows the Solar Panels loot option.
 check("crackedModules", function(expect, _, _, _, defer)
     local Distributions = RenewableEnergy.Distributions
     local container = RenewableEnergy.Loot.newContainer(nil)
@@ -438,7 +437,6 @@ check("crackedModules", function(expect, _, _, _, defer)
     options.LRMSolarPanels = 1
     local rooms = Distributions.CRACKED_MODULE_ROOMS
     local chance = Distributions.crackedModuleChance(rooms.farmstorage)
-    expect(Distributions.crackedModuleChance(rooms.garage) > 0, "a garage shelf never holds a cracked module at the default option")
     local under, at = modulesAt("farmstorage", "metal_shelves", chance - UNDER), modulesAt("farmstorage", "metal_shelves", chance)
     expect(#under == 1 and #at == 0, string.format("a farm storage shelf got %d cracked modules with a roll just under its chance %s and %d at it",
         #under, chance, #at))

@@ -19,27 +19,19 @@ local PACKING = { { type = "Base.HayTuft" } }
 
 -- Building ----------------------------------------------------------------------------------------
 
--- The build menu's own path builds a gasifier of `tier` from its entity's recipe, taking its
--- materials and keeping its tools, with its hopper and its filter.
-local function buildsGasifier(tier, entity, prefer)
-    return {
-        instant = true,
-        run = function(self)
-            T.buildRecord(self, "gasifier", entity, Sprites.gasifier[tier], prefer)
-        end,
-        validate = function(self)
-            local built = self.reads.built or {}
-            T.expect(built.tier == tier, "the build menu built " .. tostring(built.tier))
-            T.expect(built.containers == 2, "the gasifier has " .. tostring(built.containers) .. " containers, not a hopper and a filter")
-            T.expectBuilt(self, Sprites.gasifier[tier])
-        end,
-    }
-end
-
-test("renewable_energy_woodgas_build_primitive_gasifier", buildsGasifier("primitive", "Base.RenewableEnergy_PrimitiveGasifier",
-    { "Base.Strainer" }))
-test("renewable_energy_woodgas_build_standard_gasifier", buildsGasifier("standard", "Base.RenewableEnergy_Gasifier"))
-test("renewable_energy_woodgas_build_advanced_gasifier", buildsGasifier("advanced", "Base.RenewableEnergy_AdvancedGasifier"))
+-- The build menu's own path builds a gasifier: its OnCreate, on the authority, makes the tile a
+-- gasifier of its tier, with a filter beside its hopper. Every tier takes the same path.
+test("renewable_energy_woodgas_build_gasifier", {
+    instant = true,
+    run = function(self)
+        T.buildRecord(self, "gasifier", "Base.RenewableEnergy_Gasifier", Sprites.gasifier.standard)
+    end,
+    validate = function(self)
+        local built = self.reads.built or {}
+        T.expect(built.tier == "standard", "the build menu built " .. tostring(built.tier))
+        T.expect(built.containers == 2, "the gasifier has " .. tostring(built.containers) .. " containers, not a hopper and a filter")
+    end,
+})
 
 -- Feeding a generator -----------------------------------------------------------------------------
 

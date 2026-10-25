@@ -44,38 +44,27 @@ test("renewable_energy_items_have_ground_models_and_debug_listing", {
 
 -- Recipes -------------------------------------------------------------------------------------
 
--- Every recipe of the mod's resolves by its bare name in module Base, as research and the magazines
--- look it up, and names only items that exist and have icons: the crafting window's "Possible Items"
--- throws on one without (ISCraftInventoryPanel.populate). Each fluid input fits a fluid: an unknown
--- fluid name fails only as the game resolves the scripts (InputScript.OnPostWorldDictionaryInit).
+-- Every item a recipe of the mod's accepts, vanilla's included, has an icon: the crafting window's
+-- "Possible Items" throws on one without (ISCraftInventoryPanel.populate). Each fluid input fits a
+-- fluid: an unknown fluid name fails only as the game resolves the scripts
+-- (InputScript.OnPostWorldDictionaryInit). The static check covers the rest of a recipe's shape.
 test("renewable_energy_items_recipes_load", {
     validate = function()
         local names = T.recipeNames()
         expect(#names > 0, "no RenewableEnergy_ recipe loaded")
         for _, name in ipairs(names) do
             local recipe = getScriptManager():getCraftRecipe(name)
-            if expect(recipe ~= nil, name .. " does not resolve by its bare name") then
-                expect(recipe:getModule():getName() == "Base", name .. " is in module " .. recipe:getModule():getName())
-                local inputs = recipe:getInputs()
-                for i = 0, inputs:size() - 1 do
-                    local input = inputs:get(i)
-                    if input:getResourceType() == ResourceType.Item then
-                        local possible = input:getPossibleInputItems()
-                        expect(possible:size() > 0, name .. ": no item fits " .. input:getOriginalLine())
-                        for j = 0, possible:size() - 1 do
-                            local item = possible:get(j)
-                            expect(item:getNormalTexture() ~= nil, name .. " accepts " .. item:getFullName() .. ", which has no icon")
-                        end
-                    elseif input:getResourceType() == ResourceType.Fluid then
-                        expect(input:getPossibleInputFluids():size() > 0, name .. ": no fluid fits " .. input:getOriginalLine())
+            local inputs = recipe and recipe:getInputs()
+            for i = 0, (inputs and inputs:size() or 0) - 1 do
+                local input = inputs:get(i)
+                if input:getResourceType() == ResourceType.Item then
+                    local possible = input:getPossibleInputItems()
+                    for j = 0, possible:size() - 1 do
+                        local item = possible:get(j)
+                        expect(item:getNormalTexture() ~= nil, name .. " accepts " .. item:getFullName() .. ", which has no icon")
                     end
-                end
-                local outputs = recipe:getOutputs()
-                for i = 0, outputs:size() - 1 do
-                    local output = outputs:get(i)
-                    if output:getResourceType() == ResourceType.Item then
-                        expect(output:getPossibleResultItems():size() > 0, name .. ": an output is no item")
-                    end
+                elseif input:getResourceType() == ResourceType.Fluid then
+                    expect(input:getPossibleInputFluids():size() > 0, name .. ": no fluid fits " .. input:getOriginalLine())
                 end
             end
         end

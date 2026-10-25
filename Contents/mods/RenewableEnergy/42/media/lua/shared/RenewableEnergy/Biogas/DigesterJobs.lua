@@ -103,7 +103,7 @@ end
 --- propane tank, a blowtorch and a lantern bottle, in that order.
 function DigesterJobs.toFill(character)
     local inventory, found = character:getInventory(), {}
-    for _, fullType in ipairs({ Digester.TANK, "Base.BlowTorch", Digester.BOTTLE }) do
+    for _, fullType in ipairs({ Digester.TANK, Digester.TORCH, Digester.BOTTLE }) do
         local items, best = inventory:getAllTypeRecurse(fullType), nil
         for i = 0, items:size() - 1 do
             local item = items:get(i)
@@ -135,7 +135,7 @@ function DigesterJobs.fillUses(fill, summary, vessel)
     local plain = math.min(gasUses, math.max(0, pumped - filled))
     local scrubbed = 0
     if fill.scrubbed then
-        local clean = math.floor(math.min(summary.scrubCO2 or 0, summary.scrubWool or 0) / perUse)
+        local clean = math.floor(Digester.scrubLeft(summary) / perUse)
         scrubbed = math.max(0, math.min(gasUses - plain, vessel:getMaxUses() - math.max(filled, pumped), clean))
     end
     return plain, scrubbed, perUse
@@ -157,7 +157,7 @@ end
 
 -- A gas bag goes on or comes off a barrel only once its gas is out.
 local function bagBlocker(character, summary)
-    if not Digester.TIERS[summary.tier].bags then
+    if not Digester.TIERS[summary.tier].gasBag then
         return "Tooltip_RenewableEnergy_NoGasBags"
     end
     return summary.gas > 0 and "Tooltip_RenewableEnergy_VentFirst" or nil
@@ -180,7 +180,7 @@ local function fillJob(fields)
     end
     fields.withRefusal = function(character, summary, vessel)
         if not Jobs.carries(character, vessel, function(item) return Digester.FILL_SHARES[item:getFullType()] ~= nil end) then
-            return "Tooltip_RenewableEnergy_NeedsGasBottle"
+            return "Tooltip_RenewableEnergy_NeedsVessel"
         end
         if fill.power and not Digester.compressorPowered(character) then
             return "Tooltip_RenewableEnergy_NoPower"
@@ -197,10 +197,9 @@ local function fillJob(fields)
 end
 
 -- Every job, by name (Jobs.define), read against the digester's summary
--- (Digester.currentSummary), with `with` the bag or tank it fills or the Tarp Gas Bag it fits,
--- which its materials leave out. holder, charge and fill say what it does on the authority.
--- Vanilla has no pump stroke; a tire pump is worked kneeling at a wheel. The rest are reached into
--- at waist height.
+-- (Digester.currentSummary), with `with` the item it works with, which its materials leave out.
+-- holder, charge and fill say what it does on the authority. Vanilla has no pump stroke; a tire
+-- pump is worked kneeling at a wheel. The rest are reached into at waist height.
 DigesterJobs.JOBS = {
     [DigesterJobs.TAKE_SLUDGE] = {
         minutes = 10, position = "Mid", metabolics = Metabolics.HeavyWork, tooltip = "Tooltip_RenewableEnergy_TakeSludge",
@@ -277,7 +276,7 @@ DigesterJobs.JOBS = {
         },
     }),
     [DigesterJobs.FIT_SCRUBBER] = {
-        minutes = 30, position = "Mid", hideBlocked = true, tooltip = "Tooltip_RenewableEnergy_FitScrubber",
+        minutes = 30, position = "Mid", tooltip = "Tooltip_RenewableEnergy_FitScrubber",
         blocker = function(character, summary)
             return summary.scrubber and "Tooltip_RenewableEnergy_HasScrubber" or nil
         end,
@@ -290,31 +289,31 @@ DigesterJobs.JOBS = {
         },
         xp = { perk = "Mechanics", amount = 10 },
     },
-    -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3). The water and the
-    -- packing wear out apart, so each is refilled on its own; `packing` puts in steel wool, or the
-    -- Iron Sponge `with`.
+    -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3); a row without one
+    -- refills the packing, with steel wool or the Iron Sponge `with`. The water and the packing wear
+    -- out apart, so each is refilled on its own.
     [DigesterJobs.REFILL_WATER] = {
-        minutes = 5, position = "Mid", charge = "water", blocker = noScrubber, hideBlocked = true,
+        minutes = 5, position = "Mid", charge = "water", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberWater",
         materials = { SCRUB_WATER },
     },
     [DigesterJobs.REFILL_ASH] = {
-        minutes = 5, position = "Mid", charge = "ash", blocker = noScrubber, hideBlocked = true,
+        minutes = 5, position = "Mid", charge = "ash", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberAsh",
         materials = { SCRUB_WATER, { item = Gasifier.WOOD_ASH, need = 1 } },
     },
     [DigesterJobs.REFILL_LIME] = {
-        minutes = 5, position = "Mid", charge = "lime", blocker = noScrubber, hideBlocked = true,
+        minutes = 5, position = "Mid", charge = "lime", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberLime",
         materials = { SCRUB_WATER, { item = "Base.Quicklime", need = 1 } },
     },
     [DigesterJobs.REFILL_WOOL] = {
-        minutes = 5, position = "Mid", packing = "wool", blocker = noScrubber, hideBlocked = true,
+        minutes = 5, position = "Mid", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberWool",
         materials = { { item = STEEL_WOOL, uses = 1 } },
     },
     [DigesterJobs.REFILL_SPONGE] = {
-        minutes = 5, position = "Mid", packing = "sponge", blocker = noScrubber, hideBlocked = true,
+        minutes = 5, position = "Mid", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberSponge",
         withRefusal = function(character, summary, sponge)
             if not Jobs.carries(character, sponge, function(item) return item:getFullType() == Digester.IRON_SPONGE end) then

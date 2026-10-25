@@ -149,9 +149,8 @@ local function refill(character, record, row, isoObject, sponge)
 end
 
 -- What each job does to the digester's record `record` (its tile `isoObject`) beyond taking its
--- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag, tank, torch, bottle, Tarp
--- Gas Bag or Iron Sponge.
--- Returns whether it was done.
+-- materials, by its row of DigesterJobs.JOBS, with `item` the item it works with. Returns whether
+-- it was done.
 local DO = {
     [DigesterJobs.TAKE_SLUDGE] = takeSludge,
     [DigesterJobs.VENT] = vent,
