@@ -174,23 +174,31 @@ local function forgetOldCrashes(now)
     end
 end
 
--- The server takes a crash only from the driver of the car towing the trailer, or towing it until
--- a moment ago, and only one within CRASH.quietMs: a client's own gate is all that keeps one crash
--- from cracking the panels twice, so the server keeps it too.
+--- Whether the server takes the crash `player` reports for the trailer `vehicle` behind `car` at
+--- real time `now` in ms, noting it if so: only from the driver of the car towing the trailer, or
+--- towing it until a moment ago, and only one within CRASH.quietMs. A client's own gate is all
+--- that keeps one crash from cracking the panels twice, so the server keeps it too.
+function ArrowBoard.takesCrash(player, vehicle, car, now)
+    if not (ArrowBoard.isTrailer(vehicle) and car and car:isDriver(player)
+        and (vehicle:getVehicleTowedBy() == car or justUnhitched(vehicle, car))) then
+        return false
+    end
+    forgetOldCrashes(now)
+    local id = vehicle:getId()
+    if crashTakenAt[id] then
+        return false
+    end
+    crashTakenAt[id] = now
+    return true
+end
+
 local function onClientCommand(module, command, player, args)
     if module ~= COMMAND_MODULE or command ~= CRASH_COMMAND or type(args) ~= "table" or type(args.vehicle) ~= "number"
         or type(args.car) ~= "number" then
         return
     end
-    local vehicle, car = getVehicleById(args.vehicle), getVehicleById(args.car)
-    if not (ArrowBoard.isTrailer(vehicle) and car and car:isDriver(player)
-        and (vehicle:getVehicleTowedBy() == car or justUnhitched(vehicle, car))) then
-        return
-    end
-    local now = getTimestampMs()
-    forgetOldCrashes(now)
-    if not crashTakenAt[args.vehicle] then
-        crashTakenAt[args.vehicle] = now
+    local vehicle = getVehicleById(args.vehicle)
+    if ArrowBoard.takesCrash(player, vehicle, getVehicleById(args.car), getTimestampMs()) then
         ArrowBoard.crashCrack(vehicle)
     end
 end

@@ -85,6 +85,12 @@ T.UNDER = 1e-9
 --- The reason a test of a chunk that unloads and loads again runs in single player only.
 T.CHUNK_RELOAD_SP_ONLY = "the server keeps chunks loaded after the character leaves"
 
+--- The parts and appliances the bank tests wire in and place.
+T.PLUG_IN_INVERTER, T.POWER_INVERTER = "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter"
+T.INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
+T.L16, T.JAR_BATTERY = "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery"
+T.MINI_FRIDGE = "appliances_refrigeration_01_25"
+
 --- Queues the server handler `name` with `args` and leaves its answer in self[key].
 function T.serverInto(self, key, name, args)
     T.server(self, name, args)
@@ -109,11 +115,10 @@ function T.expectNoFailures(answer)
     end
 end
 
---- Registers a test that runs the server check `name` with `args`, under the sandbox options
---- `sandbox` if given, and expects it to find nothing wrong.
-function T.serverCheck(testName, name, args, sandbox)
+--- Registers a test that runs the server check `name` with `args` and expects it to find nothing
+--- wrong.
+function T.serverCheck(testName, name, args)
     T.test(testName, {
-        sandbox = sandbox,
         run = function(self) T.server(self, name, args) end,
         validate = function(self) T.expectNoFailures(self.server[name]) end,
     })
@@ -417,6 +422,12 @@ function T.applianceWatts(names)
     return watts
 end
 
+--- What a fridge adds to a bank's load. The tests' area has appliances of its own, so each test
+--- reads what one fridge it places adds.
+function T.fridgeW()
+    return T.applianceWatts({ "fridgeFreezer" })
+end
+
 --- Queues replacing the measured load of `bank` with appliances of the kinds `names`, and letting
 --- the bank cut or restore its power and send its status. For the window tests, which are about
 --- how a load of given kinds shows; a pass measures the real load again.
@@ -477,6 +488,12 @@ function T.stateItem(state, fullType)
             return item
         end
     end
+end
+
+--- The condition of the first `fullType` in a bank state, or nil.
+function T.stateCondition(state, fullType)
+    local item = T.stateItem(state, fullType)
+    return item and item.condition
 end
 
 --- The status entry of the source at `position` in a bank state, or nil.
@@ -565,6 +582,20 @@ function T.tooltipOf(option)
     return option and option.toolTip and option.toolTip.description
 end
 
+--- The option in `menu` or its submenus that acts on `item` (the bank part menus pass it as the
+--- third parameter), by id, since a server's sync can replace this client's item objects.
+function T.optionFor(menu, item)
+    for _, option in ipairs(menu and menu.options or {}) do
+        if instanceof(option.param3, "InventoryItem") and option.param3:getID() == item:getID() then
+            return option
+        end
+        local found = T.optionFor(T.subMenu(menu, option), item)
+        if found then
+            return found
+        end
+    end
+end
+
 --- What a context menu option (nil when not offered) shows: { shown, greyed, reason }.
 function T.optionState(option)
     if not option then
@@ -629,6 +660,25 @@ function T.openWindow(self)
     self.window = window
     T.defer(self, function() window:close() end)
     T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
+end
+
+--- Whether the status summary `lines` (StatusRows.summary, a window's summaryLines) hold `text`.
+function T.hasLine(lines, text)
+    for _, line in ipairs(lines or {}) do
+        if line.text == text then
+            return true
+        end
+    end
+    return false
+end
+
+--- The status row labelled `label` in `rows` (StatusRows.rows' columns), or nil.
+function T.rowLabelled(rows, label)
+    for _, r in ipairs(rows or {}) do
+        if r.label == label then
+            return r
+        end
+    end
 end
 
 -- Crafting -------------------------------------------------------------------------------------
@@ -700,10 +750,11 @@ function T.sealCap(fullType, repaired)
     return Recipes.MODULE_REPAIR_CAP[fullType] - Recipes.REPAIR_LIMIT_STEP * repaired
 end
 
--- How far the character goes for a chunk to unload, and the longest that and its loading again
--- may take, in ticks.
+-- How far the character goes for a chunk to unload.
 local AWAY = 600
-local CHUNK_FRAMES = 6000
+--- The longest a trip's chunks may take to unload or load, in frames. Loading takes real time, so
+--- at an uncapped frame rate it takes many frames.
+T.CHUNK_FRAMES = 6000
 -- How long the character stays away once the chunk has unloaded, in real milliseconds. Back at
 -- once, a chunk has been seen to load with a vehicle a test had removed before the trip, as an
 -- earlier save of it held it; the game hot-saves loaded chunks every second
@@ -747,17 +798,17 @@ function T.awayAndBack(self, home, x, y, z, whileAway)
     Events.LoadChunk.Add(onLoadChunk)
     T.defer(self, function() Events.LoadChunk.Remove(onLoadChunk) end)
     T.step(function() teleport(home.x + AWAY + 0.5, home.y + 0.5, 0) end)
-    T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the fixture's chunk unloaded", CHUNK_FRAMES)
+    T.waitFor(self, function() return getSquare(x, y, z) == nil end, "the fixture's chunk unloaded", T.CHUNK_FRAMES)
     local awaySince
     T.waitFor(self, function()
         awaySince = awaySince or getTimestampMs()
         return getTimestampMs() - awaySince >= AWAY_MS
-    end, "a stay away from the fixture's chunk", CHUNK_FRAMES)
+    end, "a stay away from the fixture's chunk", T.CHUNK_FRAMES)
     if whileAway then
         whileAway()
     end
     T.step(function() teleport(home.x + 0.5, home.y + 0.5, home.z) end)
-    T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the fixture's chunk loaded again", CHUNK_FRAMES)
+    T.waitFor(self, function() return getSquare(x, y, z) ~= nil end, "the fixture's chunk loaded again", T.CHUNK_FRAMES)
     T.step(function() T.need(self, loads > 0, "the fixture's chunk loaded again through LoadChunk") end)
 end
 

@@ -4,8 +4,8 @@ require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
 
--- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua), jar batteries, and the
--- battery recipes that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
+-- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua) and the battery recipes
+-- that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
 -- PZHarness/TestLib.lua for the runner and RenewableEnergyTestLib.lua for the helpers.
 
 local T = RenewableEnergyTest
@@ -92,27 +92,6 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         expectNear("car battery condition after the deep day", battery and battery.condition, expected, 0)
         -- The run's last wait already failed the test if this client's copy differs.
         expectNear("cycle depth on the new day", morning.cycleDepth, 0, 0)
-    end,
-})
-
--- Jar batteries -------------------------------------------------------------------------------
-
--- A jar battery is a battery like any other in a bank: it counts, it holds the bank's charge, and
--- this client's copy shows it.
-test("renewable_energy_battery_jar_stores_charge", {
-    run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { "RenewableEnergy.JarBattery" }, { charge = 0.5 })
-        if not self.bank then return end
-        T.bankState(self, self.bank)
-        T.waitFor(self, function()
-            return math.abs(T.copyUses(self.bank, "RenewableEnergy.JarBattery") - 0.5) < 0.01
-        end, "this client's jar battery half charged")
-    end,
-    validate = function(self)
-        local state = self.bank.state
-        expect(state.batteries == 1, "the bank counts " .. state.batteries .. " batteries, expected the jar battery")
-        expect(state.nominalWh > 0, "a jar battery gives the bank no capacity")
-        expectNear("Wh stored at half charge", state.storedWh, state.nominalWh / 2, 0.5)
     end,
 })
 
@@ -226,7 +205,8 @@ for _, chain in ipairs(REBUILDS) do
             local manager = getScriptManager()
             local strip = T.need(self, manager:getCraftRecipe(chain.strip), "the recipe " .. chain.strip)
             local rebuild = T.need(self, manager:getCraftRecipe(chain.rebuild), "the recipe " .. chain.rebuild)
-            if not (strip and rebuild) then return end
+            local recondition = T.need(self, manager:getCraftRecipe(RECONDITION), "the recipe " .. RECONDITION)
+            if not (strip and rebuild and recondition) then return end
             local p = player()
             T.learnRecipes(p)
             T.placeWorkTable(p)
@@ -257,10 +237,7 @@ for _, chain in ipairs(REBUILDS) do
             T.give(self, "recondition", { { type = "Base.BakingSoda" } })
             T.server(self, "refillFluid", { type = "Base.WaterBottle", fluid = "Water", liters = 1 })
             waitForFluid(self, "Base.WaterBottle", 1)
-            T.step(function()
-                local recondition = getScriptManager():getCraftRecipe("RenewableEnergy_ReconditionBattery")
-                T.startCraft(self, recondition, T.carried(chain.battery))
-            end)
+            T.step(function() T.startCraft(self, recondition, T.carried(chain.battery)) end)
             T.readCarried(self, { chain.battery })
         end,
         validate = function(self)

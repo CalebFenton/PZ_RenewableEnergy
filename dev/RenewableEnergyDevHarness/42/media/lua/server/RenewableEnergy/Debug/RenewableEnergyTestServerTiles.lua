@@ -1,4 +1,4 @@
--- The authority's half of the tile tests: placed panels and their modData. Only registers
+-- The authority's half of the tile tests: placed panels, their modData, and scrapping. Only registers
 -- handlers, so a --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says
 -- how these handlers work.
 
@@ -37,4 +37,20 @@ handler("objectModData", function(_, args)
         return nil, missing
     end
     return { value = object:getModData()[args.key] }
+end)
+
+-- What cutting up the tile `args.sprite` gives the authority's character, where scrapping
+-- completes (ISMoveableSpriteProps.getScrapItemsList): the clicked tile's items, or another tile's
+-- of the same object if `args.otherTile`. Answers the count of `args.type` among the usable items.
+handler("scrapItems", function(player, args)
+    local props = ISMoveableSpriteProps.new(args.sprite)
+    if args.otherTile then
+        props.scrappingMainTile = false
+    end
+    local items = props:getScrapItemsList(player)
+    local count = 0
+    for _, fullType in ipairs(items and items.usable or {}) do
+        count = count + (fullType == args.type and 1 or 0)
+    end
+    return { count = count }
 end)

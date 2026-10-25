@@ -1,4 +1,4 @@
--- The authority's half of the bank, panel and gadget tests: fixtures only the server's bank system
+-- The authority's half of the bank and panel tests: fixtures only the server's bank system
 -- can build, its passes, and its records, which a multiplayer client holds only copies of. Only
 -- registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
@@ -7,7 +7,7 @@ require "PZHarness/ServerHandlers"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local overlaysOf, squareAt, vehicleAt, onVehicle = Helpers.overlaysOf, Helpers.squareAt, Helpers.vehicleAt, Helpers.onVehicle
+local overlaysOf, squareAt, bankRecordAt = Helpers.overlaysOf, Helpers.squareAt, Helpers.bankRecordAt
 
 -- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll gives `args.rolls` until
 -- the test ends (Helpers.forceRolls).
@@ -15,28 +15,6 @@ handler("forceRoll", function(_, args, defer)
     Helpers.forceRolls(defer, args.rolls)
     return {}
 end)
-
--- What cutting up the tile `args.sprite` gives the authority's character, where scrapping
--- completes (ISMoveableSpriteProps.getScrapItemsList): the clicked tile's items, or another tile's
--- of the same object if `args.otherTile`. Answers the usable items.
-handler("scrapItems", function(player, args)
-    local props = ISMoveableSpriteProps.new(args.sprite)
-    if args.otherTile then
-        props.scrappingMainTile = false
-    end
-    local items = props:getScrapItemsList(player)
-    return { usable = items and items.usable or {} }
-end)
-
--- The server's record of the bank at `position`, and its tile.
-local function recordAt(position)
-    local record = position and RenewableEnergy.PowerBank.serverSystem:getLuaObjectAt(position.x, position.y, position.z)
-    return record, record and record:getIsoObject()
-end
-
-local function firstOfType(container, fullType)
-    return container and container:getFirstType(fullType)
-end
 
 -- What the tests read of a bank on the authority: its record, the status it would send a watching
 -- player now, how many players watch it, its tile and the parts in it, and the world age now and at
@@ -71,7 +49,7 @@ end
 -- The state of the bank at `position`, or nil and what is missing, so that a test never indexes a
 -- bank the server doesn't have.
 local function stateAt(position)
-    local record = recordAt(position)
+    local record = bankRecordAt(position)
     if not record then
         return nil, "the bank's record on the server"
     end
@@ -246,7 +224,7 @@ end)
 -- runs once the server's record of it and its tile are found.
 local function onBank(name, fn)
     handler(name, function(player, args, defer)
-        local record, bank = recordAt(args.bank)
+        local record, bank = bankRecordAt(args.bank)
         if not bank then
             return nil, "the bank's record and tile on the server"
         end
@@ -295,7 +273,7 @@ local SNOWING = { cloud = 1, fog = 0, rain = 0, snowing = true, groundSnow = 0 }
 -- `args.airC` °C (mild if nil); `args.stormHours` of storm and a wind of `args.windKph`. A bank
 -- whose chunk is unloaded runs too. Answers the bank's state after the pass.
 handler("bankPass", function(_, args)
-    local record = recordAt(args.bank)
+    local record = bankRecordAt(args.bank)
     if not record then
         return nil, "the bank's record on the server"
     end
@@ -323,7 +301,7 @@ end)
 -- (BankSystem:initLuaObjects). Answers what the running generator at `args.generator` delivers
 -- (GasLines.loadOf) before and after, and the bank's charger watts.
 handler("saveAndLoadBank", function(_, args)
-    local record = recordAt(args.bank)
+    local record = bankRecordAt(args.bank)
     local square = squareAt(args.generator)
     local generator = square and square:getGenerator()
     if not (record and generator) then
@@ -373,7 +351,7 @@ end)
 -- RenewableEnergyTest.setPartCondition's handler, which sends the item to the clients; answers the
 -- bank's state.
 onBank("setPartCondition", function(record, bank, args)
-    local item = firstOfType(bank:getContainer(), args.type)
+    local item = bank:getContainer():getFirstType(args.type)
     if not item then
         return nil, "a " .. tostring(args.type) .. " in the bank on the server"
     end
@@ -394,7 +372,7 @@ end)
 -- part that disappeared would.
 onBank("removePart", function(record, bank, args)
     local container = bank:getContainer()
-    local item = firstOfType(container, args.type)
+    local item = container:getFirstType(args.type)
     if not item then
         return nil, "a " .. tostring(args.type) .. " in the bank on the server"
     end
@@ -410,8 +388,8 @@ local function itemFor(player, item, bank)
     if not item.inBank then
         return player:getInventory():getFirstTypeRecurse(item.type)
     end
-    local _, object = recordAt(bank)
-    return object and firstOfType(object:getContainer(), item.type)
+    local _, object = bankRecordAt(bank)
+    return object and object:getContainer():getFirstType(item.type)
 end
 
 -- Runs the bank system's command `args.command` with `args.args` as the server's character, the
@@ -437,29 +415,6 @@ end)
 onBank("completeRename", function(_, bank, args, player)
     local Action = RenewableEnergyAction
     return { done = Action:new(player, Action.RENAME, nil, bank, nil, nil, args.name):complete() == true }
-end)
-
--- Completes the treadmill action `run` as the server finishes a client's action (complete()).
--- Answers whether it settled, and the character's Fitness XP, endurance and thirst before and
--- after.
-local function completeRun(player, run)
-    local stats, xp = player:getStats(), player:getXp()
-    local reply = { xpBefore = xp:getXP(Perks.Fitness), enduranceBefore = stats:get(CharacterStat.ENDURANCE),
-        thirstBefore = stats:get(CharacterStat.THIRST) }
-    reply.done = run:complete() == true
-    reply.xpAfter, reply.enduranceAfter = xp:getXP(Perks.Fitness), stats:get(CharacterStat.ENDURANCE)
-    reply.thirstAfter = stats:get(CharacterStat.THIRST)
-    return reply
-end
-
--- A whole Run on Treadmill on the wired treadmill tile at `args` as the server's character
--- (completeRun).
-handler("completeTreadmillRun", function(player, args)
-    local tile = RenewableEnergy.findObjectOn(squareAt(args), RenewableEnergy.Treadmill.isWiredTile)
-    if not tile then
-        return nil, "a wired treadmill on the server"
-    end
-    return completeRun(player, RenewableEnergyTreadmillAction:new(player, tile))
 end)
 
 -- Takes the tile of `args.sprite` on the square at `args` away, as a player picking it up does,
@@ -629,336 +584,4 @@ handler("panelStorm", function(_, args)
         modules[i] = panel:getModData()[RenewableEnergy.PowerBank.MODULES_KEY]
     end
     return { modules = modules }
-end)
-
--- Gadgets -----------------------------------------------------------------------------------------
-
-local function usesOf(container)
-    local uses = {}
-    for i = 0, (container and container:getItems():size() or 0) - 1 do
-        uses[i + 1] = container:getItems():get(i):getCurrentUsesFloat()
-    end
-    return uses
-end
-
--- The watt-hours the solar battery charger keeps toward the next use.
-local function storedWh(charger)
-    return charger:getModData()[RenewableEnergy.SolarCellCharger.STORED_KEY] or 0
-end
-
--- What the solar battery charger on the square at `args` holds: its batteries' charges and the
--- watt-hours it keeps toward the next use.
-handler("chargerState", function(_, args)
-    local charger = RenewableEnergy.SolarCellCharger.findOn(squareAt(args))
-    if not charger then
-        return nil, "the solar battery charger on the server"
-    end
-    return { uses = usesOf(charger:getContainer()), storedWh = storedWh(charger) }
-end)
-
--- Fills the solar battery charger on the square at `args` with `args.count` batteries at
--- `args.uses` (full if nil) and charges it for `args.hours` at the sun of the moment, then, with
--- `args.pass`, runs the pass over every charger as long again. One call, since an empty battery
--- leaves its container on its next update (DrainableComboItem.update). Answers the uses added, the
--- charges after, `full` (every battery at its whole maximum, which the float can't tell), the Wh
--- kept, and flatWh: what an hour of that sun gives a flat panel per rated watt.
-handler("cellCharge", function(_, args)
-    local SolarCellCharger = RenewableEnergy.SolarCellCharger
-    local charger = SolarCellCharger.findOn(squareAt(args))
-    if not charger then
-        return nil, "the solar battery charger on the server"
-    end
-    local container = charger:getContainer()
-    for _ = 1, args.count do
-        local battery = container:AddItem(SolarCellCharger.BATTERY)
-        if args.uses then
-            battery:setCurrentUsesFloat(args.uses)
-        end
-        sendAddItemToContainer(container, battery)
-    end
-    local reply = { added = SolarCellCharger.charge(charger, args.hours), after = usesOf(container),
-        flatWh = RenewableEnergy.Sun.wattsFrom(1, RenewableEnergy.Sun.skyNow().flat) }
-    local items, full = container:getItems(), true
-    for i = 0, items:size() - 1 do
-        full = full and items:get(i):getCurrentUses() == items:get(i):getMaxUses()
-    end
-    reply.full, reply.storedWh = full, storedWh(charger)
-    if args.pass then
-        SolarCellCharger.chargeAll(args.hours)
-        reply.afterPass = usesOf(container)
-    end
-    return reply
-end)
-
--- Runs the garden light on the square at `args` through the gadget pass (GadgetCharging.update)
--- for `args.hours`, at most the longest one pass makes up for, by moving the clock on that far,
--- from `args.charge` Wh if given. A pass first brings every gadget up to now, so that the next
--- covers only the hours the clock moves. The clock starts from its whole hour: the world age the
--- pass measures is a float (GameTime.getWorldAgeHours), which holds a whole hour plus the test's
--- hours exactly, and the moment the call lands a few ticks after the hour doesn't. Answers whether
--- the light is lit, its sprite and its charge in Wh.
-handler("gardenLightUpdate", function(_, args)
-    local SolarGardenLight, GadgetCharging = RenewableEnergy.SolarGardenLight, RenewableEnergy.GadgetCharging
-    local light = SolarGardenLight.findOn(squareAt(args))
-    if not light then
-        return nil, "the garden light on the server"
-    end
-    local time = getGameTime()
-    time:setTimeOfDay(math.floor(time:getTimeOfDay()))
-    GadgetCharging.update()
-    if args.charge then
-        light:getModData()[SolarGardenLight.CHARGE_KEY] = args.charge
-    end
-    time:setTimeOfDay(time:getTimeOfDay() + args.hours)
-    GadgetCharging.update()
-    return { lit = SolarGardenLight.isLit(light), sprite = light:getTextureName(), charge = SolarGardenLight.getChargeWh(light) }
-end)
-
--- Swaps the bulb of the garden light on the square at `args` for a new `args.bulb` in one go, so
--- that a multiplayer client gets the new bulb while its lamp is still lit, which no pair of timed
--- actions does reliably. The old bulb goes to the character. Answers whether the light is lit and
--- the bulb it holds.
-handler("gardenLightSwapBulb", function(player, args)
-    local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    local light = SolarGardenLight.findOn(squareAt(args))
-    if not light then
-        return nil, "the garden light on the server"
-    end
-    if not (SolarGardenLight.removeBulb(player, light) and SolarGardenLight.addBulb(player, light, instanceItem(args.bulb))) then
-        return nil, "a bulb swap in the garden light on the server"
-    end
-    return { lit = SolarGardenLight.isLit(light), bulb = SolarGardenLight.getBulb(light) }
-end)
-
--- Vehicles ----------------------------------------------------------------------------------------
-
-local function batteryOf(vehicle)
-    local part = RenewableEnergy.VehicleBattery.partOf(vehicle)
-    return part, part and part:getInventoryItem()
-end
-
--- What the tests read of a vehicle: its battery, whether a maintainer is attached, whether its
--- engine runs.
-local function carState(vehicle)
-    local _, battery = batteryOf(vehicle)
-    return {
-        battery = battery and { type = battery:getFullType(), uses = battery:getCurrentUsesFloat() } or nil,
-        attached = RenewableEnergy.SolarMaintainer.isAttached(vehicle),
-        running = vehicle:isEngineRunning(),
-    }
-end
-
-onVehicle("carState", carState)
-
--- Puts a new `args.type` in the vehicle's battery slot if given, empties it if `args.empty`, and
--- charges its battery to `args.uses` if given, sent to the clients.
-onVehicle("vehicleBattery", function(vehicle, args)
-    local part = batteryOf(vehicle)
-    if not part then
-        return nil, "a battery slot in the vehicle on the server"
-    end
-    if args.type or args.empty then
-        part:setInventoryItem(args.type and instanceItem(args.type) or nil)
-        vehicle:transmitPartItem(part)
-    end
-    local _, battery = batteryOf(vehicle)
-    if battery and args.uses then
-        battery:setCurrentUsesFloat(args.uses)
-        vehicle:transmitPartUsedDelta(part)
-    end
-    return carState(vehicle)
-end)
-
--- `args.hours` of the maintainer on the vehicle at the sun of the moment, from a battery at
--- `args.uses`: the Wh it added, the charge after, the battery's capacity in Wh, and flatWh as
--- cellCharge answers it.
-onVehicle("maintainerCharge", function(vehicle, args)
-    local _, battery = batteryOf(vehicle)
-    battery:setCurrentUsesFloat(args.uses)
-    local wh = RenewableEnergy.SolarMaintainer.charge(vehicle, args.hours)
-    return { wh = wh, after = battery:getCurrentUsesFloat(), capacityWh = RenewableEnergy.Battery.nominalWh(battery),
-        flatWh = RenewableEnergy.Sun.wattsFrom(1, RenewableEnergy.Sun.skyNow().flat) }
-end)
-
--- Marks a maintainer attached in the shape older saves hold, with the condition it went on with,
--- which no code writes but detach must still take.
-onVehicle("oldMaintainerMark", function(vehicle, args)
-    local part = batteryOf(vehicle)
-    part:getModData()[RenewableEnergy.SolarMaintainer.ATTACHED_KEY] = { condition = args.condition }
-    vehicle:transmitPartModData(part)
-    return carState(vehicle)
-end)
-
--- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
--- vehicle's battery charge before and after.
-onVehicle("chargeVehicles", function(vehicle, args)
-    local _, battery = batteryOf(vehicle)
-    local before = battery:getCurrentUsesFloat()
-    RenewableEnergy.GadgetCharging.chargeVehicles(args.hours)
-    return { before = before, after = battery:getCurrentUsesFloat() }
-end)
-
--- Vanilla's headlight update (Vehicles.Update.Headlight) for `args.minutes` with the engine off,
--- from a battery at `args.uses`: the share of a full charge it took.
-onVehicle("headlightDrain", function(vehicle, args)
-    local headlight = vehicle:getPartById("HeadlightLeft")
-    if not (headlight and headlight:getInventoryItem()) then
-        return nil, "a left headlight on the vehicle on the server"
-    end
-    local _, battery = batteryOf(vehicle)
-    battery:setCurrentUsesFloat(args.uses)
-    vehicle:setHeadlightsOn(true)
-    Vehicles.Update.Headlight(vehicle, headlight, args.minutes)
-    vehicle:setHeadlightsOn(false)
-    return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
-end)
-
--- Vanilla's lightbar drain for `args.minutes` with the engine off, from a battery at `args.uses`:
--- the battery's update runs it, there being no lightbar part (Vehicles.Update.Battery calls
--- Vehicles.Update.Lightbar). Answers the share of a full charge it took.
-onVehicle("lightbarDrain", function(vehicle, args)
-    if not vehicle:hasLightbar() then
-        return nil, "a lightbar on the vehicle on the server"
-    end
-    local part, battery = batteryOf(vehicle)
-    battery:setCurrentUsesFloat(args.uses)
-    vehicle:setLightbarLightsMode(1)
-    Vehicles.Update.Battery(vehicle, part, args.minutes)
-    vehicle:setLightbarLightsMode(0)
-    return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
-end)
-
--- Vanilla's alternator charging (Vehicles.Update.Battery) for `args.minutes` with the engine
--- running, from a battery at `args.uses`: the share of a full charge it added. The engine is
--- repaired and fuelled first, since it shuts down without fuel and stalls at random when worn.
-onVehicle("alternatorCharge", function(vehicle, args)
-    vehicle:repair()
-    local tank = vehicle:getPartById("GasTank")
-    if tank then
-        tank:setContainerContentAmount(tank:getContainerCapacity())
-    end
-    local part, battery = batteryOf(vehicle)
-    battery:setCurrentUsesFloat(args.uses)
-    vehicle:engineDoRunning()
-    if not vehicle:isEngineRunning() then
-        return nil, "a running engine in the vehicle on the server"
-    end
-    Vehicles.Update.Battery(vehicle, part, args.minutes)
-    local gain = battery:getCurrentUsesFloat() - args.uses
-    vehicle:shutOff()
-    return { gain = gain, type = battery:getFullType() }
-end)
-
--- The clock ---------------------------------------------------------------------------------------
-
-local function batteryBoxOf(trailer)
-    local part = trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
-    return part and part:getItemContainer()
-end
-
--- What the clock test's fixtures hold, on the squares and vehicles `args` names, in Wh: the bank's,
--- the car battery's, the solar battery charger's in its cells and toward the next use, the garden
--- light's, and the trailer box battery's (-1 for none). Also the world age of the bank's last pass
--- and of now, and the watts the trailer's panels make in full sun.
-local function gadgetCharges(args)
-    local SolarCellCharger, Battery = RenewableEnergy.SolarCellCharger, RenewableEnergy.Battery
-    local record = recordAt(args.bank)
-    local car, trailer = vehicleAt(args.car), vehicleAt(args.trailer)
-    local charger = SolarCellCharger.findOn(squareAt(args.charger))
-    local light = RenewableEnergy.SolarGardenLight.findOn(squareAt(args.light))
-    if not (record and car and trailer and charger and light) then
-        return nil, "the clock test's bank, car, trailer, solar battery charger and garden light on the server"
-    end
-    local cellWh = storedWh(charger)
-    for _, uses in ipairs(usesOf(charger:getContainer())) do
-        cellWh = cellWh + uses * RenewableEnergy.Specs.cellChargerBatteryWh
-    end
-    local function whIn(battery)
-        return Battery.getCharge(battery) * Battery.nominalWh(battery)
-    end
-    local _, carBattery = batteryOf(car)
-    local boxed = batteryBoxOf(trailer):getItems()
-    return {
-        bank = record.charge * record.nominalWh,
-        bankPassAge = record.lastHour, age = getGameTime():getWorldAgeHours(),
-        car = whIn(carBattery), charger = cellWh,
-        light = RenewableEnergy.SolarGardenLight.getChargeWh(light),
-        trailer = boxed:size() > 0 and whIn(boxed:get(0)) or -1,
-        trailerWatts = RenewableEnergy.ArrowBoard.panelWatts(trailer),
-    }
-end
-
--- Readies the clock test's gadgets, half charged: a maintainer on the car, one deep cycle battery
--- in the trailer's box, which may have spawned stocked, with its lamps switched off, since they
--- would draw what the panels make, a cell in every slot of the solar battery charger, and the
--- garden light empty. Answers their charges (gadgetCharges). The gadget pass runs first, so that
--- the clock's passes from here on cover no more than the time the clock moves.
-handler("stockGadgets", function(player, args)
-    RenewableEnergy.GadgetCharging.update()
-    local SolarCellCharger = RenewableEnergy.SolarCellCharger
-    local car, trailer = vehicleAt(args.car), vehicleAt(args.trailer)
-    local charger = SolarCellCharger.findOn(squareAt(args.charger))
-    local light = RenewableEnergy.SolarGardenLight.findOn(squareAt(args.light))
-    if not (car and trailer and charger and light) then
-        return nil, "the clock test's car, trailer, solar battery charger and garden light on the server"
-    end
-    if not RenewableEnergy.SolarMaintainer.attach(player, car, instanceItem(RenewableEnergy.SolarMaintainer.ITEM)) then
-        return nil, "a maintainer on the car on the server"
-    end
-    local box = batteryBoxOf(trailer)
-    box:removeAllItems()
-    box:AddItem("RenewableEnergy.DeepCycleBattery"):setCurrentUsesFloat(0.5)
-    RenewableEnergy.ArrowBoard.setSwitch(trailer, false)
-    -- An empty cell is used up and leaves its container on its next update
-    -- (DrainableComboItem.update), so the cells start half charged.
-    local cells = charger:getContainer()
-    for _ = 1, SolarCellCharger.SLOTS do
-        local cell = cells:AddItem(SolarCellCharger.BATTERY)
-        cell:setCurrentUsesFloat(0.5)
-        sendAddItemToContainer(cells, cell)
-    end
-    light:getModData()[RenewableEnergy.SolarGardenLight.CHARGE_KEY] = 0
-    return gadgetCharges(args)
-end)
-
-handler("gadgetCharges", function(_, args)
-    return gadgetCharges(args)
-end)
-
--- Treadmill runs ----------------------------------------------------------------------------------
-
--- The runs startTreadmillRun started and completeStartedTreadmillRun has yet to finish, by the
--- treadmill tile's position.
-local treadmillRuns = {}
-
--- Starts a Run on Treadmill on the treadmill tile at `args` as the server's character, the way the
--- multiplayer server starts a client's action (serverStart), and leaves it running until
--- completeStartedTreadmillRun or the end of the test.
-handler("startTreadmillRun", function(player, args, defer)
-    local tile = RenewableEnergy.Treadmill.findOn(squareAt(args))
-    if not tile then
-        return nil, "a treadmill on the server"
-    end
-    local run = RenewableEnergyTreadmillAction:new(player, tile)
-    run:serverStart()
-    local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
-    treadmillRuns[key] = run
-    defer(function()
-        if treadmillRuns[key] == run then
-            treadmillRuns[key] = nil
-            RenewableEnergy.Treadmill.stopDrawing(tile, run)
-        end
-    end)
-    return {}
-end)
-
--- Finishes the run startTreadmillRun started on the tile at `args` (completeRun).
-handler("completeStartedTreadmillRun", function(player, args)
-    local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
-    local run = treadmillRuns[key]
-    if not run then
-        return nil, "a run startTreadmillRun started on the server"
-    end
-    treadmillRuns[key] = nil
-    return completeRun(player, run)
 end)

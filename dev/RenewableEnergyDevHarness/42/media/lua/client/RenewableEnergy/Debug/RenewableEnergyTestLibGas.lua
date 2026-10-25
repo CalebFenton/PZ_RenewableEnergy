@@ -5,8 +5,8 @@ require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
 
 -- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
--- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the world tests'
--- rural digesters and gasifiers (RenewableEnergyTestsWorld*.lua), added to RenewableEnergyTest.
+-- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the rural find tests'
+-- digesters and gasifiers (RenewableEnergyTestsRuralFinds.lua), added to RenewableEnergyTest.
 -- Digesters and gasifiers are records of the Global Object System on the authority; the server
 -- handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua) build, drive and read them by kind
 -- and place. A record handle is { x, y, z, square, kind }, and `object` is this client's copy of
@@ -283,6 +283,25 @@ end
 function T.waitForGas(self, handle, gas)
     T.waitForSummary(self, handle, function(summary) return math.abs(summary.gas - gas) < 0.005 end,
         "this client's summary of the gas")
+end
+
+--- A digester holding `gas` and making none, placed as T.placeRecord's `opts` say: not started, so
+--- it neither digests nor, a dome, burns any to keep warm, and only a line takes its gas.
+function T.digesterWithGas(self, tile, gas, opts)
+    local digester = T.placeRecord(self, "digester", tile, opts)
+    if not digester then return nil end
+    T.setRecord(self, digester, { gas = gas })
+    return digester
+end
+
+--- A generator holding `fuel` litres beside a T.digesterWithGas, kitted and on a line to it: the
+--- generator's handle and the digester's, or nil.
+function T.generatorOnDigester(self, tile, gas, fuel)
+    local digester = T.digesterWithGas(self, tile, gas)
+    local generator = digester and T.generator(self, { near = digester.square, fuel = fuel })
+    if not generator then return nil end
+    T.fitAndConnect(self, generator, digester)
+    return generator, digester
 end
 
 -- Gasifiers ------------------------------------------------------------------------------------

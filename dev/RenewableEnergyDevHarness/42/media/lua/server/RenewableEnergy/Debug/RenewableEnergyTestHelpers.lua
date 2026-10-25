@@ -107,6 +107,12 @@ function Helpers.objectAt(args)
     return object
 end
 
+--- The server's record of the bank at `position` ({ x, y, z }), and its tile.
+function Helpers.bankRecordAt(position)
+    local record = position and RenewableEnergy.PowerBank.serverSystem:getLuaObjectAt(position.x, position.y, position.z)
+    return record, record and record:getIsoObject()
+end
+
 --- The vehicle `args` names ({ id, x, y, z }: RenewableEnergyTest.vehicleArgs; single player
 --- finds it by the squares around x, y, z), or nil and what is missing when there is none or it
 --- has been taken out of the world.
@@ -172,6 +178,12 @@ end
 --- Whether `value` lies in `range` ({ min, max }), both ends included.
 function Helpers.inRange(value, range)
     return value >= range.min and value <= range.max
+end
+
+--- The conditions the WorldSpawns wear profile `wear` gives a find, from its lowest roll to its
+--- highest: no better than new.
+function Helpers.wearRange(wear)
+    return { min = wear.mean - wear.halfWidth, max = math.min(100, wear.mean + wear.halfWidth) }
 end
 
 --- Takes `count` (default all) items of `fullType` (default any type) out of `container` and

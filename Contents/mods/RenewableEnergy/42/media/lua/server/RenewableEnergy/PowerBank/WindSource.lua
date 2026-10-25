@@ -20,8 +20,6 @@ local PowerBank, Sources, Sprites = RenewableEnergy.PowerBank, RenewableEnergy.S
 local WindSource = {}
 RenewableEnergy.WindSource = WindSource
 
--- A charger losing more than this share of its watts to shelter says so in the status.
-local SHELTERED_LOSS = 0.3
 -- A charger losing at least this share to other chargers near it says so, when shelter doesn't.
 local CROWDED_LOSS = 0.15
 
@@ -247,7 +245,7 @@ function WindSource.update(source, object, inSlot, hours, context)
         source.reason = "calm"
     elseif Wind.furled(spec, context.windKph) then
         source.reason = "furled"
-    elseif (source.shelter or 0) * Specs.wind.shelterLoss > SHELTERED_LOSS then
+    elseif (source.shelter or 0) * Specs.wind.shelterLoss > Specs.wind.shelteredShare then
         source.reason = "sheltered"
     elseif (source.crowding or 0) >= CROWDED_LOSS then
         source.reason = "crowded"

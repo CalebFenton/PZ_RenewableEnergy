@@ -1,7 +1,7 @@
 -- The authority's half of the gas line and wood gas tests (RenewableEnergyTestsGasLine.lua,
 -- RenewableEnergyTestsWoodGas.lua): generators with the Gas Conversion Kit, the load they carry,
 -- and burning a gasifier's wood. The generator reads, settings and billing serve the bank tests'
--- generators too (RenewableEnergyTestsBank.lua). The records themselves are
+-- generators too (RenewableEnergyTestsBankGenerators.lua). The records themselves are
 -- RenewableEnergyTestServerBiogas.lua's.
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
@@ -181,9 +181,10 @@ end)
 
 -- Gasifiers ------------------------------------------------------------------------------------
 
--- Burns `args.kg` in the gasifier at x, y, z, as a pass would, to leave its ash and tar.
+-- Burns `args.kg` in the gasifier record `args` (T.recordArgs), as a pass would, to leave its ash
+-- and tar.
 handler("gasifierBurn", function(player, args)
-    local record, _, missing = Helpers.recordAt({ kind = "gasifier", x = args.x, y = args.y, z = args.z })
+    local record, _, missing = Helpers.recordAt(args)
     if not record then return nil, missing end
     local burned = record:burn(args.kg)
     record:afterChange()

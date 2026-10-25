@@ -9,7 +9,7 @@ local PowerBank, Specs, Sprites, Wind = RenewableEnergy.PowerBank, RenewableEner
 local sourceAt = T.stateSource
 
 local CAR_BATTERY = "Base.CarBattery1"
-local INVERTER = "RenewableEnergy.PlugInInverter"
+local PLUG_IN_INVERTER = T.PLUG_IN_INVERTER
 local CONTROLLER = "RenewableEnergy.ChargeController"
 local WOODEN_BLADES = "RenewableEnergy.WoodenBlades"
 local PIPE_BLADES = "RenewableEnergy.PipeBlades"
@@ -18,10 +18,23 @@ local BROKEN_WOODEN_BLADES = "RenewableEnergy.BrokenWoodenBlades"
 -- A battery box and a scoop rotor connected to it, the rotor's handle also in self.rotor; nil
 -- when either is missing.
 local function scoopOnBank(self)
-    local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+    local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
     self.rotor = bank and T.panel(self, Sprites.windScoop, { near = bank, connect = true })
     if not self.rotor then return nil end
     return bank, self.rotor
+end
+
+-- A pass of `bank` in a `kph` wind, its status's source at `handle` kept in self.passes[label].
+local function windPass(self, bank, handle, label, kph)
+    T.bankPass(self, bank, 0, { windKph = kph })
+    T.step(function() self.passes[label] = sourceAt(bank.state, handle.position) end)
+end
+
+-- The source the `label` pass kept, failing when the bank's status listed no `what` there.
+local function passSource(self, label, what)
+    local source = self.passes[label]
+    expect(source ~= nil, "after the " .. label .. " pass the bank's status lists no " .. what)
+    return source
 end
 
 -- A scoop rotor wired to a bank makes power once the wind is past its cut-in speed, none at it or
@@ -32,10 +45,7 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
         if not bank then return end
         self.passes = {}
         local spec = Specs.wind.turbines.scoop
-        local function pass(label, kph)
-            T.bankPass(self, bank, 0, { windKph = kph })
-            T.step(function() self.passes[label] = sourceAt(bank.state, rotor.position) end)
-        end
+        local function pass(label, kph) windPass(self, bank, rotor, label, kph) end
         T.batch(function()
             pass("windy", spec.ratedKph)
             T.step(function() self.windyBankW = bank.state.status.windW end)
@@ -47,11 +57,7 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
     end,
     validate = function(self)
         if not T.expectConnected(self.rotor) then return end
-        local function read(label)
-            local source = self.passes[label]
-            expect(source ~= nil, "after the " .. label .. " pass the bank's status lists no scoop rotor")
-            return source
-        end
+        local function read(label) return passSource(self, label, "scoop rotor") end
         local windy = read("windy")
         if windy then
             expect(windy.watts > 0, "the scoop rotor made nothing at its rated speed")
@@ -92,10 +98,7 @@ test("renewable_energy_wind_walls_shelter_and_fences_dont", {
         local bank, rotor = scoopOnBank(self)
         if not bank then return end
         self.passes = {}
-        local function pass(label)
-            T.bankPass(self, bank, 0, { windKph = Specs.wind.turbines.scoop.ratedKph })
-            T.step(function() self.passes[label] = sourceAt(bank.state, rotor.position) end)
-        end
+        local function pass(label) windPass(self, bank, rotor, label, Specs.wind.turbines.scoop.ratedKph) end
         local level = rotor.position.z
         T.batch(function()
             pass("open")
@@ -123,14 +126,11 @@ test("renewable_energy_wind_walls_shelter_and_fences_dont", {
 -- above shelter it.
 test("renewable_energy_wind_mast_sheltered_only_at_its_blades", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         self.mast = bank and T.panel(self, Sprites.windCharger.propeller.wood.S, { near = bank, connect = true })
         if not self.mast then return end
         self.passes = {}
-        local function pass(label)
-            T.bankPass(self, bank, 0, { windKph = Specs.wind.turbines.propeller.ratedKph })
-            T.step(function() self.passes[label] = sourceAt(bank.state, self.mast.position) end)
-        end
+        local function pass(label) windPass(self, bank, self.mast, label, Specs.wind.turbines.propeller.ratedKph) end
         local foot = self.mast.position.z
         T.batch(function()
             pass("open")
@@ -157,7 +157,7 @@ test("renewable_energy_wind_mast_sheltered_only_at_its_blades", {
 -- scoop rotor right beside one turns a level below its blades and takes nothing, nor loses any.
 test("renewable_energy_wind_chargers_close_together_crowd_each_other", {
     run = function(self)
-        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
+        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, PLUG_IN_INVERTER, CONTROLLER })
         local squares = bank and T.squares(self, 40, { near = bank.square })
         if not T.need(self, squares, "free outdoor squares by the bank") then return end
         local first = squares[1]
@@ -301,7 +301,7 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
     instant = true,
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
+        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, PLUG_IN_INVERTER, CONTROLLER })
         if not bank then return end
         self.left = T.panel(self, Sprites.windCharger.propeller.wood.S, { near = bank, connect = true })
         self.braked = T.panel(self, Sprites.windCharger.propeller.pipe.S, { near = bank, connect = true })
@@ -388,7 +388,7 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
     instant = true,
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         if not box then return end
         T.batch(function()
             self.panel = T.panel(self, Sprites.flat, { near = box, connect = true })
@@ -397,7 +397,7 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
             T.bankState(self, box)
             T.step(function() self.box = box.state end)
         end)
-        local rack = T.bank(self, "batteryRackWood", { CAR_BATTERY, INVERTER, CONTROLLER })
+        local rack = T.bank(self, "batteryRackWood", { CAR_BATTERY, PLUG_IN_INVERTER, CONTROLLER })
         if not rack then return end
         T.batch(function()
             self.alternator = T.panel(self, Sprites.windCharger.alternator.steel.E, { near = rack, connect = true })
@@ -557,15 +557,17 @@ local function swapTest(name, what, bank, from, to, newBlades, brokenBlades)
 end
 
 swapTest("renewable_energy_wind_blades_swap_material", "pipe treadmill charger",
-    { kind = "batteryBoxWood", parts = { CAR_BATTERY, INVERTER } },
+    { kind = "batteryBoxWood", parts = { CAR_BATTERY, PLUG_IN_INVERTER } },
     Sprites.windCharger.propeller.wood.E, Sprites.windCharger.propeller.pipe.E, PIPE_BLADES, BROKEN_WOODEN_BLADES)
 swapTest("renewable_energy_wind_turbine_blades_swap_material", "wooden turbine",
-    { kind = "batteryRackWood", parts = { CAR_BATTERY, INVERTER, CONTROLLER } },
+    { kind = "batteryRackWood", parts = { CAR_BATTERY, PLUG_IN_INVERTER, CONTROLLER } },
     Sprites.windCharger.alternator.steel.N, Sprites.windCharger.alternator.wood.N, WOODEN_BLADES, "RenewableEnergy.BrokenSteelBlades")
 
--- A charger losing more than SHELTERED_LOSS of its unsheltered watts to shelter gives
--- "sheltered" as its reason, and one losing less gives none: a ring of walls beside it costs about
--- 6%, walls filling the squares out to 5 about 43% (WindSource's shelter weights, worked by hand).
+local SHELTERED_SHARE = RenewableEnergy.Specs.wind.shelteredShare
+
+-- A charger losing more than shelteredShare of its unsheltered watts to shelter gives "sheltered"
+-- as its reason, and one losing less gives none: a ring of walls beside it costs about 6%, walls
+-- filling the squares out to 5 about 43% (WindSource's shelter weights, worked by hand).
 test("renewable_energy_wind_sheltered_reason", {
     run = function(self)
         local bank, rotor = scoopOnBank(self)
@@ -588,26 +590,22 @@ test("renewable_energy_wind_sheltered_reason", {
                 end)
             end)
         end
-        local function pass(label)
-            T.bankPass(self, bank, 0, { windKph = rated })
-            T.step(function() self.passes[label] = sourceAt(bank.state, rotor.position) end)
-        end
         wallsOut(0, 1.5)
-        pass("ring")
+        windPass(self, bank, rotor, "ring", rated)
         wallsOut(1.5, 5)
-        pass("walled")
+        windPass(self, bank, rotor, "walled", rated)
     end,
     validate = function(self)
         if not T.expectConnected(self.rotor) then return end
         local spec = Specs.wind.turbines.scoop
-        for _, label in ipairs({ "ring", "walled" }) do
-            local source = self.passes[label]
-            if not expect(source ~= nil, "after the " .. label .. " pass the bank's status lists no scoop rotor") then return end
-            local loss = 1 - source.watts / Wind.watts(spec, spec.ratedKph, source.z, 0)
-            expect((source.reason == "sheltered") == (loss > 0.3), string.format(
-                "%s, losing %.0f%% of its watts to shelter, it reads %s", label, 100 * loss, tostring(source.reason)))
+        local function loss(source)
+            return 1 - source.watts / Wind.watts(spec, spec.ratedKph, source.z, 0)
         end
-        local walled = self.passes.walled
-        expect(walled.reason == "sheltered", "walled in out to 5 squares it reads " .. tostring(walled.reason))
+        local ring, walled = passSource(self, "ring", "scoop rotor"), passSource(self, "walled", "scoop rotor")
+        if not (ring and walled) then return end
+        expect(loss(ring) < SHELTERED_SHARE and ring.reason ~= "sheltered", string.format(
+            "a ring of walls beside it, losing %.0f%% of its watts to shelter, it reads %s", 100 * loss(ring), tostring(ring.reason)))
+        expect(loss(walled) > SHELTERED_SHARE and walled.reason == "sheltered", string.format(
+            "walled in out to 5 squares, losing %.0f%% of its watts to shelter, it reads %s", 100 * loss(walled), tostring(walled.reason)))
     end,
 })

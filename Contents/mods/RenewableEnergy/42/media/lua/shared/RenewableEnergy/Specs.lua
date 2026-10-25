@@ -93,10 +93,12 @@ Specs.wind = {
     heightBonusPerLevel = 0.15,
     maxBonusLevel = 3,
     -- Squares checked for shelter, and the share lost when fully hemmed in. Trees shelter a rotor
-    -- turning on treetopLevel or lower: a mast charger standing on the ground or a first floor.
+    -- turning on treetopLevel or lower: a mast charger standing on the ground or a first floor. A
+    -- charger losing more than shelteredShare of its watts to shelter says so in its status.
     shelterRadius = 8,
     shelterLoss = 0.7,
     treetopLevel = 2,
+    shelteredShare = 0.3,
     -- Another charger whose rotor turns on the same level within crowdRadius squares takes wind
     -- from this one, crowdLoss of it right beside it and less with each square further, none
     -- beyond: a rotor's wake takes a few rotor widths to fill back in, and these rotors are about

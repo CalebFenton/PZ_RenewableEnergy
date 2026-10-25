@@ -78,7 +78,7 @@ handler("gardenLightsOnce", function(player, _, defer)
     local rolled = GardenLights.isRolled(def)
     local second = GardenLights.roll(def)
     return { first = first, rolled = rolled, second = second, lights = newLights(def, before, defer),
-        count = GardenLights.COUNT, wh = RenewableEnergy.Specs.gardenLight.wh }
+        count = GardenLights.COUNT }
 end)
 
 -- At the square at `args`: whether it is loaded, the house nearest it within `args.radius`, whether

@@ -3,43 +3,18 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 -- The gas line: the Gas Conversion Kit on a vanilla generator and the line that runs it on a
 -- digester's or gasifier's gas (GasLine/GasKit.lua, GasLine/GasLines.lua, UI/GasKitMenu.lua), and
 -- the fumes those sources fill a building with (Fumes.lua). Vanilla's own hourly bill takes the
--- fuel, as the clock moves (T.jumpClock).
+-- fuel, as the clock moves (T.jumpClock). The line's load and stalls are in
+-- RenewableEnergyTestsGasLineLoad.lua.
 
 local T = RenewableEnergyTest
 local test = T.test
 
 local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
-local Gasifier, Sprites, Specs = RenewableEnergy.Gasifier, RenewableEnergy.Sprites, RenewableEnergy.Specs
-
--- A digester holding `gas` and making none, placed as T.placeRecord's `opts` say: not started, so
--- it neither digests nor, a dome, burns any to keep warm, and only the line takes its gas.
-local function digesterWithGas(self, tile, gas, opts)
-    local digester = T.placeRecord(self, "digester", tile, opts)
-    if not digester then return nil end
-    T.setRecord(self, digester, { gas = gas })
-    return digester
-end
-
--- A generator holding `fuel` litres beside a digesterWithGas, kitted and on a line to it: the
--- generator's handle and the digester's, or nil.
-local function generatorOnDigester(self, tile, gas, fuel)
-    local digester = digesterWithGas(self, tile, gas)
-    local generator = digester and T.generator(self, { near = digester.square, fuel = fuel })
-    if not generator then return nil end
-    T.fitAndConnect(self, generator, digester)
-    return generator, digester
-end
+local Gasifier, Sprites = RenewableEnergy.Gasifier, RenewableEnergy.Sprites
 
 -- What the clock tests that run a generator dry have vanilla bill it, in shares of the fuel it shows
 -- on gas: past that, so vanilla stops it, and little enough past for a dome's gas to pay.
 local DRY_BILL = 1.1
-
--- The inverter with a charger the banks of the real-load stall test hold, and how many banks: their
--- chargers alone carry a line's whole cap, so beside any appliance the cap limits what they draw.
-local BANK_CHARGER = "RenewableEnergy.InverterCharger"
-local CHARGING_BANKS = math.ceil(GasKit.CAP_W / Specs.inverters[BANK_CHARGER].chargerWatts)
--- A mini fridge with its ice box, which vanilla bills as a fridge-freezer (Loads).
-local MINI_FRIDGE = "appliances_refrigeration_01_25"
 
 -- Queues setting the GeneratorFuelConsumption option so that vanilla bills `generator` (the read
 -- `label`, T.readGenerator) DRY_BILL times the fuel it shows on gas over `hours`. The read's bill has
@@ -104,7 +79,7 @@ test("renewable_energy_gasline_kit_install_and_remove", {
 test("renewable_energy_gasline_kit_menu", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "barrel.MetalDrum", Digester.HOLDERS.bags.capacity)
+        local digester = T.digesterWithGas(self, "barrel.MetalDrum", Digester.HOLDERS.bags.capacity)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         self.generator = generator
@@ -174,7 +149,7 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
     sandbox = { GeneratorFuelConsumption = 1 },
     run = function(self)
         self.gas, self.poured = Digester.HOLDERS.bags.capacity, 3
-        local digester = digesterWithGas(self, "barrel.MetalDrum", self.gas)
+        local digester = T.digesterWithGas(self, "barrel.MetalDrum", self.gas)
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         self.generator = generator
@@ -260,7 +235,7 @@ test("renewable_energy_gasline_generator_runs_on_past_vanilla_stop", {
     instant = true,
     run = function(self)
         self.hours = 2
-        local generator, digester = generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
+        local generator, digester = T.generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
         if not generator then return end
         T.setGenerator(self, generator, { running = true })
         T.readGenerator(self, generator, "bill")
@@ -297,7 +272,7 @@ test("renewable_energy_gasline_generator_runs_on_after_absence", {
     run = function(self)
         self.hours = 2
         local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local digester = stand and digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity, { near = stand, minDistance = 2 })
+        local digester = stand and T.digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity, { near = stand, minDistance = 2 })
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         T.server(self, "generatorTrack", T.at(generator))
@@ -334,7 +309,7 @@ test("renewable_energy_gasline_job_bills_the_fuel_before_it", {
     run = function(self)
         self.gas, self.tank = Digester.HOLDERS.bags.capacity, 1
         self.litres = self.tank / 5
-        local generator, digester = generatorOnDigester(self, "barrel.MetalDrum", self.gas, self.tank)
+        local generator, digester = T.generatorOnDigester(self, "barrel.MetalDrum", self.gas, self.tank)
         if not generator then return end
         T.batch(function()
             T.setGenerator(self, generator, { running = true })
@@ -364,193 +339,6 @@ test("renewable_energy_gasline_job_bills_the_fuel_before_it", {
         local backOnGas = reads.generatorBackOnGas
         if T.expect(backOnGas.state ~= nil, "the generator lost its kit") then
             T.expectNear("tank back on gas", backOnGas.state.tank, self.tank - self.litres, 0.01)
-        end
-    end,
-})
-
--- A load past what the line carries stalls the generator, at exactly that it runs, and once the
--- load fits again it starts by itself. Cutting the line while stalled forgets the stall, so a new
--- line doesn't start it. The loads are made up (gasLoad): no set of appliances adds up to exactly
--- the cap; renewable_energy_gasline_generator_stalls_on_real_load measures a real one.
-test("renewable_energy_gasline_generator_stalls_over_cap", {
-    instant = true,
-    run = function(self)
-        local generator, digester = generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
-        if not generator then return end
-        T.batch(function()
-            T.setGenerator(self, generator, { running = true })
-            for _, case in ipairs({ { "atCap", GasKit.CAP_W }, { "over", GasKit.CAP_W + 1 }, { "fits", GasKit.CAP_W },
-                { "stalled", GasKit.CAP_W + 1 } }) do
-                T.gasLoad(self, case[2])
-                T.gasPass(self, generator, 0.2)
-                T.readGenerator(self, generator, case[1])
-            end
-        end)
-        -- Cutting the line gives its hoses back, for the next.
-        T.kitJob(self, generator, GasKit.DISCONNECT)
-        T.readGenerator(self, generator, "cut")
-        T.kitJob(self, generator, GasKit.CONNECT, digester)
-        T.batch(function()
-            T.gasLoad(self, GasKit.CAP_W)
-            T.gasPass(self, generator, 0.2)
-            T.readGenerator(self, generator, "reconnected")
-        end)
-    end,
-    validate = function(self)
-        local reads = self.reads
-        local atCap, over, fits = reads.atCap, reads.over, reads.fits
-        T.expect(atCap.running and atCap.state ~= nil and not atCap.state.stalled, "the generator stalled at exactly its cap")
-        T.expect(T.isStalled(over), "a watt over its cap didn't stall it")
-        T.expect(fits.running and fits.state ~= nil and not fits.state.stalled, "the generator didn't start again once the load fit")
-        T.expect(T.isStalled(reads.stalled), "a watt over its cap didn't stall it again")
-        T.expect(reads.cut.state ~= nil and not reads.cut.state.stalled, "cutting the line left the generator stalled")
-        T.expect(not reads.reconnected.running, "a new line started a generator stalled on the line before")
-    end,
-})
-
--- The test's bank handles `banks` in the order a generator on gas shares its cap between them:
--- nearest first, the lower place on a tie (GasLines.lua's chargingBanks).
-local function shareOrder(generator, banks)
-    local order = {}
-    for _, bank in ipairs(banks) do
-        local p = bank.position
-        local dx, dy, dz = p.x - generator.x, p.y - generator.y, p.z - generator.z
-        table.insert(order, { bank = bank, distance = dx * dx + dy * dy + dz * dz,
-            key = RenewableEnergy.PlaceTracker.key(p.x, p.y, p.z) })
-    end
-    table.sort(order, function(a, b)
-        return a.distance < b.distance or (a.distance == b.distance and a.key < b.key)
-    end)
-    local list = {}
-    for i, entry in ipairs(order) do
-        list[i] = entry.bank
-    end
-    return list
-end
-
--- What the banks charging from a generator on gas draw: `headroomW`, the cap less what the generator
--- powers, shared in shareOrder, each bank at most what it wants (`wants`, by bank; its chargers'
--- rating if not given). Answers each bank's watts.
-local function expectedShares(generator, banks, headroomW, wants)
-    local left, shares = math.max(0, headroomW), {}
-    for _, bank in ipairs(shareOrder(generator, banks)) do
-        shares[bank] = math.min(wants and wants[bank] or Specs.inverters[BANK_CHARGER].chargerWatts, left)
-        left = left - shares[bank]
-    end
-    return shares
-end
-
--- The load a line carries is what the generator's scan finds and what the banks charging from it
--- draw. Beside a fridge, banks whose chargers alone carry the whole cap charge at what the cap leaves,
--- split between them, and the generator runs on through their passes; the nearest bank once full
--- leaves its share to the banks behind it; fridges past the cap stall it, and the banks then draw
--- nothing from it.
-test("renewable_energy_gasline_generator_stalls_on_real_load", {
-    instant = true,
-    run = function(self)
-        T.setGrid(self, false)
-        local generator = generatorOnDigester(self, "dome", Digester.HOLDERS.dome.capacity, 0)
-        local fridge = generator and T.square(self, { indoors = true, near = generator.square }, "a free indoor square for a fridge")
-        if not fridge then return end
-        self.generator = generator
-        T.setGenerator(self, generator, { running = true })
-        T.step(function() T.placeTile(self, fridge, MINI_FRIDGE) end)
-        T.batch(function()
-            T.gasPass(self, generator, 0.1)
-            T.readGenerator(self, generator, "alone")
-        end)
-        self.banks = {}
-        for i = 1, CHARGING_BANKS do
-            self.banks[i] = T.bank(self, "batteryBoxWood", { BANK_CHARGER, "Base.CarBattery1" },
-                { charge = 0.5, near = generator.square })
-            if not self.banks[i] then return end
-        end
-        -- Every bank's pass, then the line's, and what each bank's chargers drew. The first round
-        -- names the generator as each bank's source; the second shares the cap between all of them.
-        self.drawn = {}
-        local function passes(label)
-            T.batch(function()
-                for _, bank in ipairs(self.banks) do
-                    T.bankPass(self, bank, 0, { hours = 0.01 })
-                end
-                T.gasPass(self, generator, 0.1)
-                T.readGenerator(self, generator, label)
-                T.step(function()
-                    local drawn = {}
-                    for _, bank in ipairs(self.banks) do
-                        local status = bank.state and bank.state.status
-                        drawn[bank] = { watts = status and status.chargerW, source = status and status.chargeSource }
-                    end
-                    self.drawn[label] = drawn
-                end)
-            end)
-        end
-        passes("charging")
-        passes("shared")
-        T.step(function()
-            self.nearest = shareOrder(generator, self.banks)[1]
-            T.setCharge(self, self.nearest, 1)
-        end)
-        passes("nearFull")
-        -- Fridges whose load alone is past the cap, with the one already there.
-        T.step(function()
-            local alone = self.reads.alone.state and self.reads.alone.state.watts
-            if not T.need(self, alone, "the generator's load with the fridge alone") then return end
-            local count = math.floor((GasKit.CAP_W - alone) / T.applianceWatts({ "fridgeFreezer" })) + 1
-            local squares = T.need(self, count > 0 and T.squares(self, count, { indoors = true, near = generator.square }),
-                count .. " free indoor squares for fridges past the line's cap")
-            if not squares then return end
-            for _, square in ipairs(squares) do
-                T.placeTile(self, square, MINI_FRIDGE)
-            end
-            passes("overloaded")
-        end)
-    end,
-    validate = function(self)
-        local reads = self.reads
-        local alone = reads.alone
-        T.expect(alone.running and alone.state ~= nil and alone.state.watts ~= nil, "the generator didn't run the fridge alone")
-        if not alone.state or not alone.state.watts then return end
-        local headroomW = GasKit.CAP_W - alone.state.watts
-        T.expect(alone.state.watts > 0 and headroomW > 0,
-            "the fridge alone makes a load of " .. alone.state.watts .. " W, not one the line carries")
-        T.expect(CHARGING_BANKS * Specs.inverters[BANK_CHARGER].chargerWatts > headroomW,
-            "the banks' chargers fit in what the cap leaves, so nothing limits them")
-        for _, label in ipairs({ "charging", "shared" }) do
-            local read = reads[label]
-            T.expect(read.running and read.state ~= nil and not read.state.stalled,
-                "after the " .. label .. " passes, the banks charging from the generator stalled it")
-        end
-        local shares = expectedShares(self.generator, self.banks, headroomW)
-        local sum = 0
-        for i, bank in ipairs(self.banks) do
-            local drawn = self.drawn.shared[bank]
-            T.expect(drawn.source == "generator", "bank " .. i .. " charges from " .. tostring(drawn.source))
-            T.expectNear("bank " .. i .. "'s share of what the cap leaves", drawn.watts or -1, shares[bank], 0.01)
-            sum = sum + (drawn.watts or 0)
-        end
-        T.expectNear("the banks' charge together", sum, headroomW, 0.01)
-        T.expectNear("the generator's load with the banks charging", reads.shared.state and reads.shared.state.watts or 0,
-            GasKit.CAP_W, 0.01)
-        -- Full, the nearest bank takes next to nothing, and the banks behind it what it leaves.
-        local nearFull = self.drawn.nearFull
-        local fullW = nearFull[self.nearest].watts or -1
-        T.expect(fullW >= 0 and fullW < Specs.inverters[BANK_CHARGER].chargerWatts / 100,
-            "the full nearest bank draws " .. fullW .. " W")
-        T.expect(reads.nearFull.running and reads.nearFull.state ~= nil and not reads.nearFull.state.stalled,
-            "with the nearest bank full, the banks charging from the generator stalled it")
-        local nearFullShares = expectedShares(self.generator, self.banks, headroomW, { [self.nearest] = fullW })
-        for i, bank in ipairs(self.banks) do
-            T.expectNear("bank " .. i .. "'s share with the nearest bank full", nearFull[bank].watts or -1,
-                nearFullShares[bank], 0.01)
-        end
-        local overloaded = reads.overloaded
-        if not T.expect(overloaded ~= nil and overloaded.state ~= nil, "no read of the generator past its cap") then return end
-        T.expect((overloaded.state.watts or 0) > GasKit.CAP_W,
-            "the fridges make a load of " .. tostring(overloaded.state.watts) .. " W, not past the cap")
-        T.expect(T.isStalled(overloaded), "fridges past the cap didn't stall the generator")
-        for i, bank in ipairs(self.banks) do
-            T.expectNear("bank " .. i .. "'s charge with the cap taken", self.drawn.overloaded[bank].watts or -1, 0, 0)
         end
     end,
 })
@@ -716,7 +504,7 @@ test("renewable_energy_gasline_fumes_clear_with_the_last_source", {
 test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
     instant = true,
     run = function(self)
-        local digester = digesterWithGas(self, "barrel.MetalDrum", Digester.HOLDERS.bags.capacity, { indoors = true })
+        local digester = T.digesterWithGas(self, "barrel.MetalDrum", Digester.HOLDERS.bags.capacity, { indoors = true })
         local squares = digester and T.squares(self, 2, { indoors = true, near = digester.square, minDistance = 2 })
         if not T.need(self, squares, "two more indoor squares") then return end
         local building = digester.square:getBuilding()

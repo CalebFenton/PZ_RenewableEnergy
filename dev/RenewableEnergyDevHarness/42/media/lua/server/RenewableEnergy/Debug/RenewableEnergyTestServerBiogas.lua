@@ -13,12 +13,12 @@ local removePlaced = PZHarness.Fixtures.removePlaced
 -- Stink ------------------------------------------------------------------------------------------
 
 -- Makes the source `args.key` at x, y, z smell like `args.count` corpses (RenewableEnergy.Stink),
--- until the test ends. Answers how many its chunk counts now.
+-- until the test ends.
 handler("stinkSet", function(player, args, defer)
     local Stink = RenewableEnergy.Stink
     Stink.set(args.key, args.x, args.y, args.z, args.count)
     defer(function() Stink.set(args.key, args.x, args.y, args.z, 0) end)
-    return { counted = Stink.counted(args.key) }
+    return {}
 end)
 
 -- What the authority's copy of the character smells: its noxious smell moodle level and corpse
@@ -191,26 +191,11 @@ end)
 -- Runs the digester at x, y, z for `args.hours` at the air temperature `args.air` (°C), feeding
 -- from its hopper as its pass does, without moving the clock.
 handler("digesterRun", function(player, args)
-    local record, object, missing = Helpers.recordAt({ kind = "digester", x = args.x, y = args.y, z = args.z })
+    local record, object, missing = Helpers.recordAt(args)
     if not record then return nil, missing end
     record:run(args.hours, object:getContainer(), args.air)
     record.lastHour = getGameTime():getWorldAgeHours()
     record:afterChange()
-    return {}
-end)
-
--- Has the job `args.job` of the job module RenewableEnergy[args.module] (DigesterJobs, GasHeater,
--- ...) give `args.amount` XP of the perk `args.perk` once done, until the test ends: for a job
--- whose row names none, to see whether its feature gives what its row says.
-handler("gasJobXp", function(player, args, defer)
-    local Jobs = RenewableEnergy[args.module]
-    local row = Jobs and Jobs.JOBS and Jobs.JOBS[args.job]
-    if not row then
-        return nil, "the job " .. tostring(args.job) .. " of " .. tostring(args.module)
-    end
-    local was = row.xp
-    row.xp = { perk = args.perk, amount = args.amount }
-    defer(function() row.xp = was end)
     return {}
 end)
 

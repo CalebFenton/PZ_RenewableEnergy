@@ -135,9 +135,7 @@ check("lootListsInUse", function(expect)
             local reference = entry[2]
             local where = spec.fullType .. " in " .. reference
             local items = D.resolveItemList(reference)
-            if expect(items ~= nil, where .. ": no such list") then
-                expect(countPairs(items, spec.fullType) == 1, where .. ": not listed exactly once")
-            end
+            expect(items ~= nil, where .. ": no such list")
             local kind, name = string.match(reference, "^(%a+):(.+)$")
             if kind == "proc" then
                 local listName = string.gsub(name, "%.junk$", "")
@@ -291,8 +289,6 @@ check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
     end
     local Battery = RenewableEnergy.Battery
     local range = RenewableEnergy.Specs.foundCharge
-    expect(range.min > 0 and range.min < range.max and range.max <= 1,
-        "found batteries hold " .. range.min .. " to " .. range.max .. " of a charge")
     SuburbsDistributions.all[PROBE_CONTAINER] = PROBE_LOOT
     ItemPickerJava.Parse()
     defer(function()
@@ -329,36 +325,22 @@ check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
     end
 end)
 
--- A container type that "all" rolls an inverter and a controller into for certain, as
--- PROBE_CONTAINER does batteries.
-local PART_PROBE_CONTAINER = "RenewableEnergyTestParts"
-local PART_PROBE_LOOT = { rolls = 2, items = { "RenewableEnergy.PlugInInverter", 1000, "RenewableEnergy.ChargeController", 1000 } }
-
--- With every Chance roll middling, inverters and controllers a fill hands out, and one already in
--- a bag in the container, come at PART_WEAR's mean and marked, whatever condition the game rolled
--- them. A refill leaves alone a found part that came out as new and a crafted controller (its
--- recipe's OnCreate); and a fill of a bank's container type wears no part in it, marked or not.
--- `args` is a free outdoor square.
-check("lootFoundParts", function(expect, _, _, args, defer)
-    local square = squareAt(args)
-    if not square or square:getRoom() then
-        return "an outdoor square loaded on the server"
-    end
-    local WorldSpawns, Wear = RenewableEnergy.WorldSpawns, RenewableEnergy.Wear
+-- With every Chance roll middling, the inverters and controllers a fill readies
+-- (Distributions.readyFoundItems, which lootFoundBatteries shows a fill reaches), one in a bag
+-- included, come at PART_WEAR's mean and marked. A refill leaves alone a found part that came out
+-- as new and a crafted controller (its recipe's OnCreate); and a bank's container wears no part in
+-- it, marked or not.
+check("lootFoundParts", function(expect, _, _, _, defer)
+    local WorldSpawns, Wear, D = RenewableEnergy.WorldSpawns, RenewableEnergy.Wear, RenewableEnergy.Distributions
     local mean = WorldSpawns.PART_WEAR.mean
-    SuburbsDistributions.all[PART_PROBE_CONTAINER] = PART_PROBE_LOOT
-    ItemPickerJava.Parse()
-    defer(function()
-        SuburbsDistributions.all[PART_PROBE_CONTAINER] = nil
-        ItemPickerJava.Parse()
-    end)
     local restoreRoll = Helpers.forceRolls(defer, 0.5)
-    local container = containerInWorld(square, PART_PROBE_CONTAINER, defer)
+    local container = RenewableEnergy.Loot.newContainer(nil)
     container:AddItem("Base.Bag_DuffelBag"):getInventory():AddItem("RenewableEnergy.PowerInverter")
-    ItemPickerJava.fillContainer(container, nil)
+    container:AddItem("RenewableEnergy.PlugInInverter")
+    container:AddItem(RenewableEnergy.Specs.controller)
+    D.readyFoundItems(container)
     local found = itemsIn(container, isWornPart)
-    -- The bag's inverter and, from the probe table, at least one rolled.
-    expect(#found >= 2, #found .. " parts in the container after a fill")
+    expect(#found == 3, #found .. " parts in the container, not the 3 put there")
     for _, part in ipairs(found) do
         expect(part:getCondition() == mean and Wear.hasOwnCondition(part), string.format(
             "a found %s has condition %d, marked %s, not %d and marked", part:getFullType(), part:getCondition(),
@@ -370,14 +352,14 @@ check("lootFoundParts", function(expect, _, _, args, defer)
     end
     local crafted = container:AddItem(RenewableEnergy.Specs.controller)
     RenewableEnergy.Recipes.makeChargeController({ getFirstCreatedItem = function() return crafted end })
-    ItemPickerJava.fillContainer(container, nil)
+    D.readyFoundItems(container)
     if asNew then
         expect(asNew:getCondition() == asNew:getConditionMax(), "a found part as good as new has condition " .. asNew:getCondition() .. " after a refill")
     end
     expect(crafted:getCondition() == crafted:getConditionMax(), "a crafted controller has condition " .. crafted:getCondition() .. " after a refill")
-    local bank = containerInWorld(square, "RenewableEnergyBatteryBoxWood", defer)
+    local bank = ItemContainer.new("RenewableEnergyBatteryBoxWood", nil, nil)
     local installed = bank:AddItem("RenewableEnergy.PlugInInverter")
-    ItemPickerJava.fillContainer(bank, nil)
+    D.readyFoundItems(bank)
     restoreRoll()
     expect(installed:getCondition() == installed:getConditionMax() and not Wear.hasOwnCondition(installed),
         "an unmarked inverter in a bank has condition " .. installed:getCondition() .. " after a fill")

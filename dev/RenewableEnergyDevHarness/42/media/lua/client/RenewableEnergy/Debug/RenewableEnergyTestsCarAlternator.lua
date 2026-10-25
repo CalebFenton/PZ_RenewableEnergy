@@ -96,7 +96,7 @@ test("renewable_energy_gadgets_car_alternator_take_out_once", {
     end,
 })
 
--- An hour of vanilla's alternator charging (the alternatorCharge handler, RenewableEnergyTestServer.lua)
+-- An hour of vanilla's alternator charging (the alternatorCharge handler, RenewableEnergyTestServerGadgets.lua)
 -- adds nothing to the battery of a car whose alternator is out, and charges it again once the
 -- alternator is back, which takes it from the inventory.
 test("renewable_energy_gadgets_car_alternator_out_stops_charging", {
@@ -122,20 +122,19 @@ test("renewable_energy_gadgets_car_alternator_out_stops_charging", {
     end,
 })
 
--- Scrapping a smashed wreck drops one alternator when the roll comes up and none when it doesn't;
--- a burnt wreck never does, whatever the roll.
+-- Scrapping a smashed wreck drops one alternator on a roll just under the character's scrap
+-- chance and none on a roll at it; a burnt wreck never does, even just under it.
 local SCRAPS = {
-    { behavior = "smashed_wreck_hit_drops_one", script = "Base.CarNormalSmashedFront", roll = 0, alternators = 1 },
-    { behavior = "smashed_wreck_miss_drops_none", script = "Base.CarNormalSmashedFront", roll = 1 - T.UNDER, alternators = 0 },
-    { behavior = "burnt_wreck_never_drops", script = "Base.CarNormalBurnt", roll = 0, alternators = 0 },
+    { behavior = "smashed_wreck_hit_drops_one", script = "Base.CarNormalSmashedFront", roll = "under", alternators = 1 },
+    { behavior = "smashed_wreck_miss_drops_none", script = "Base.CarNormalSmashedFront", roll = "at", alternators = 0 },
+    { behavior = "burnt_wreck_never_drops", script = "Base.CarNormalBurnt", roll = "under", alternators = 0 },
 }
 for _, case in ipairs(SCRAPS) do
     test("renewable_energy_gadgets_car_alternator_scrap_" .. case.behavior, {
         run = function(self)
             local wreck = T.placeVehicle(self, case.script)
             if not wreck then return end
-            T.forceRoll(self, case.roll)
-            T.onVehicle(self, wreck, "scrapWreck")
+            T.onVehicle(self, wreck, "scrapWreck", { roll = case.roll })
         end,
         validate = function(self)
             local scrap = self.server.scrapWreck

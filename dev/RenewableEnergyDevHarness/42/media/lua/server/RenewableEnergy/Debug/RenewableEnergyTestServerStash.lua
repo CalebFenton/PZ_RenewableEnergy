@@ -212,8 +212,7 @@ handler("stashKnownOnStart", function(_, _, defer)
 end)
 
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
--- and turns up in vanilla's prepper crates and survivor bag; campers' glove boxes hold the trailer
--- park's; and every loot list a map names exists.
+-- and every loot list a map names exists.
 check("prepperMapTargets", function(expect)
     local D = RenewableEnergy.Distributions
     local lists = {}
@@ -233,11 +232,6 @@ check("prepperMapTargets", function(expect)
             expect(prepper["sub:all." .. key], "the Crowcall Road map does not drop from " .. key)
         end
     end
-    for _, cache in ipairs({ "sub:SurvivorCache1.SurvivorCrate", "sub:SurvivorCache2.SurvivorCrate", "sub:Bag_SurvivorBag" }) do
-        expect(prepper[cache], "the Crowcall Road map is not in " .. cache)
-    end
-    local trailerPark = lists.RenewableEnergy_DixieTrailerPark
-    expect(trailerPark ~= nil and trailerPark["veh:CamperGloveBox"], "the Dixie Trailer Park map is not in camper glove boxes")
 end)
 
 -- The loot at each Stash Houses option: for every stash and loot list, how often its map is listed

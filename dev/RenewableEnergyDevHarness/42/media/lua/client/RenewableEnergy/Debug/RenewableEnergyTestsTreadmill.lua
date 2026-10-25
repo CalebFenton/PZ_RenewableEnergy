@@ -9,9 +9,7 @@ local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 local CAR_BATTERY = "Base.CarBattery1"
-local INVERTER = "RenewableEnergy.PlugInInverter"
-local L16 = "RenewableEnergy.L16Battery"
-local INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
+local PLUG_IN_INVERTER, L16, INVERTER_CHARGER = T.PLUG_IN_INVERTER, T.L16, T.INVERTER_CHARGER
 -- A pass this long barely moves a bank's batteries.
 local PASS_HOURS = 1 / 60
 -- A pass too short to pay out a whole run.
@@ -33,15 +31,11 @@ local function giveWiringParts(self, sets)
         { type = PowerBank.SCRAP, count = sets * wiring.scrap }, { type = "Base.Screwdriver" } })
 end
 
-local function carriedCount(self, fullType)
-    return #T.carriedItems(self, fullType)
-end
-
 -- Queues reading the wire and scrap the authority's character carries into self[key].
 local function carriedParts(self, key)
     T.readCarried(self, { PowerBank.WIRE, PowerBank.SCRAP })
     T.step(function()
-        self[key] = { wire = carriedCount(self, PowerBank.WIRE), scrap = carriedCount(self, PowerBank.SCRAP) }
+        self[key] = { wire = #T.carriedItems(self, PowerBank.WIRE), scrap = #T.carriedItems(self, PowerBank.SCRAP) }
     end)
 end
 
@@ -53,6 +47,20 @@ local function restRunner(self)
     end)
     T.waitFor(self, function() return T.player():getStats():get(CharacterStat.ENDURANCE) > 0.99 end,
         "this client's copy of the rested runner")
+end
+
+-- Queues a restRunner's run on `treadmill`, with the Fitness XP before it in self.xpBefore, then
+-- in one batch the stats and XP expectRunTrained reads and `after`'s calls.
+local function trainedRun(self, treadmill, after)
+    restRunner(self)
+    T.server(self, "perkXp", { perk = "Fitness" })
+    T.step(function() self.xpBefore = self.server.perkXp.value end)
+    T.doJob(self, treadmill.square, function() return RenewableEnergyTreadmillAction:new(T.player(), treadmill.object) end)
+    T.batch(function()
+        T.server(self, "characterStats", { stats = { "ENDURANCE", "THIRST" } })
+        T.server(self, "perkXp", { perk = "Fitness" })
+        after()
+    end)
 end
 
 -- Expects the restRunner's run, read into self.server.characterStats and perkXp, to have cost
@@ -91,7 +99,7 @@ test("renewable_energy_treadmill_dismantle_gives_motor_once", {
 test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank })
         self.console = treadmill and westConsole(self, treadmill)
         if not self.console then return end
@@ -117,8 +125,8 @@ test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
     validate = function(self)
         expect(not self.looseWired, "an unwired treadmill is already wired")
         expect(self.unskilled == "skill", "below the Electricity level the wiring is refused for " .. tostring(self.unskilled))
-        expect(carriedCount(self, PowerBank.WIRE) == 0 and carriedCount(self, PowerBank.SCRAP) == 0,
-            "wiring left " .. carriedCount(self, PowerBank.WIRE) .. " wire and " .. carriedCount(self, PowerBank.SCRAP) .. " scrap")
+        local wire, scrap = #T.carriedItems(self, PowerBank.WIRE), #T.carriedItems(self, PowerBank.SCRAP)
+        expect(wire == 0 and scrap == 0, "wiring left " .. wire .. " wire and " .. scrap .. " scrap")
         T.expectOk(self.connected, "connecting the wired treadmill")
         T.expectRefused(self.again, "already wired", "wiring the treadmill's other tile too wasn't refused as already wired")
     end,
@@ -213,22 +221,14 @@ end
 test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER }, { charge = 0.5 })
         if not bank then return end
         local treadmill = T.panel(self, Sprites.treadmill.N.console, { near = bank, connect = true, wired = true })
         if not treadmill then return end
         self.treadmill = treadmill
-        restRunner(self)
-        T.batch(function()
-            T.server(self, "perkXp", { perk = "Fitness" })
-            T.step(function() self.xpBefore = self.server.perkXp.value end)
-            T.bankState(self, bank)
-            T.step(function() self.before = bank.state end)
-        end)
-        T.doJob(self, treadmill.square, function() return RenewableEnergyTreadmillAction:new(T.player(), treadmill.object) end)
-        T.batch(function()
-            T.server(self, "characterStats", { stats = { "ENDURANCE", "THIRST" } })
-            T.server(self, "perkXp", { perk = "Fitness" })
+        T.bankState(self, bank)
+        T.step(function() self.before = bank.state end)
+        trainedRun(self, treadmill, function()
             -- A short pass, then a long one that pays out the rest.
             T.bankPass(self, bank, 0, { hours = SHORT_PASS_HOURS })
             T.step(function() self.short = bank.state end)
@@ -275,15 +275,7 @@ test("renewable_energy_treadmill_unwired_run_trains_without_banking", {
         local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
         if not bank then return end
         self.bank = bank
-        restRunner(self)
-        T.server(self, "perkXp", { perk = "Fitness" })
-        T.step(function() self.xpBefore = self.server.perkXp.value end)
-        T.doJob(self, treadmill.square, function() return RenewableEnergyTreadmillAction:new(T.player(), treadmill.object) end)
-        T.batch(function()
-            T.server(self, "characterStats", { stats = { "ENDURANCE", "THIRST" } })
-            T.server(self, "perkXp", { perk = "Fitness" })
-            T.bankPass(self, bank, 0, { hours = PASS_HOURS })
-        end)
+        trainedRun(self, treadmill, function() T.bankPass(self, bank, 0, { hours = PASS_HOURS }) end)
     end,
     validate = function(self)
         expectRunTrained(self)
@@ -360,7 +352,7 @@ test("renewable_energy_treadmill_wired_run_draws_nothing", {
 test("renewable_energy_treadmill_unconnected_run_gives_nothing", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         local treadmill = bank and T.panel(self, Sprites.treadmill.N.console, { near = bank, connect = true, wired = true })
         if not treadmill then return end
         self.treadmill = treadmill
@@ -408,7 +400,7 @@ end
 test("renewable_energy_treadmill_unwire_gives_back_wire", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank })
         if not treadmill then return end
         self.bank = bank
@@ -445,7 +437,7 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
     run = function(self)
         self.cases = {}
         for _, name in ipairs({ "kept", "unwired", "pickedUp" }) do
-            local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER }, { charge = 0.5 })
+            local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER }, { charge = 0.5 })
             local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank, connect = true, wired = true })
             -- The pickup takes both tiles.
             local console = treadmill and westConsole(self, treadmill)
@@ -497,7 +489,7 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
 test("renewable_energy_treadmill_pickup_drops_wire", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, INVERTER })
+        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER })
         local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank })
         -- The pickup takes both tiles.
         local console = treadmill and westConsole(self, treadmill)

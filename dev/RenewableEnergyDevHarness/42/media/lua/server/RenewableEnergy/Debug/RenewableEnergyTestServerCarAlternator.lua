@@ -9,13 +9,10 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local onVehicle = Helpers.onVehicle
 
-local function alternatorState(vehicle)
-    local CarAlternator = RenewableEnergy.CarAlternator
-    return { out = CarAlternator.isOut(vehicle), hoodOpen = CarAlternator.hoodOpen(vehicle) }
-end
-
--- Whether the server's copy of the car has its alternator out, and its hood open.
-onVehicle("alternatorState", alternatorState)
+-- Whether the server's copy of the car has its alternator out.
+onVehicle("alternatorState", function(vehicle)
+    return { out = RenewableEnergy.CarAlternator.isOut(vehicle) }
+end)
 
 -- Opens the car's hood, and unlocks its doors so that working on the engine needs no key
 -- (VehicleUtils.RequiredKeyNotFound), both sent to the clients, as a player who got in would
@@ -33,7 +30,7 @@ onVehicle("openCarHood", function(vehicle)
             vehicle:transmitPartDoor(part)
         end
     end
-    return alternatorState(vehicle)
+    return {}
 end)
 
 -- Takes the alternator out for the player straight away, as the job's complete() would; answers
@@ -48,9 +45,13 @@ local function isAlternator(object)
 end
 
 -- Scraps the wreck as vanilla's blowtorch job completes it (ISRemoveBurntVehicle:complete), the
--- player's blowtorch a fresh one, and answers how many car alternators it left on the wreck's
--- square and whether the wreck is gone. Everything the scrap dropped goes when the test ends.
-onVehicle("scrapWreck", function(vehicle, _, player, defer)
+-- player's blowtorch a fresh one, rolling `args.roll` (Helpers.trialRoll) against the player's
+-- CarAlternator.scrapChance, and answers how many car alternators it left on the wreck's square
+-- and whether the wreck is gone. Everything the scrap dropped goes when the test ends.
+onVehicle("scrapWreck", function(vehicle, args, player, defer)
+    local chance = RenewableEnergy.CarAlternator.scrapChance(player:getPerkLevel(Perks.Mechanics),
+        player:getPerkLevel(Perks.MetalWelding))
+    Helpers.forceRolls(defer, Helpers.trialRoll(args.roll, chance))
     local square = vehicle:getSquare()
     local before = {}
     local objects = square:getWorldObjects()

@@ -9,7 +9,7 @@ require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
-local vehicleAt, deferOnce, onVehicle, trialRoll = Helpers.vehicleAt, Helpers.deferOnce, Helpers.onVehicle, Helpers.trialRoll
+local deferOnce, onVehicle, trialRoll = Helpers.deferOnce, Helpers.onVehicle, Helpers.trialRoll
 
 local Trailer = {}
 
@@ -128,14 +128,11 @@ local function partState(vehicle, partId)
 end
 
 --- What the tests read of a vehicle on either side: each panel's module, condition and shown
---- models, the frame's parts and the lamp board, the blood on each side, what the battery box
---- holds, the lid, the switch, the lamps and the colour.
+--- models, the frame's parts and the lamp board, what the battery box holds, the lid, the switch,
+--- the lamps and the colour.
 function Trailer.vehicleState(vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
-    local state = {
-        id = vehicle:getId(), panels = {}, frame = {}, blood = {},
-        colorSat = vehicle:getColorSaturation(), colorVal = vehicle:getColorValue(),
-    }
+    local state = { panels = {}, frame = {}, colorSat = vehicle:getColorSaturation(), colorVal = vehicle:getColorValue() }
     if not ArrowBoard.isTrailer(vehicle) then
         return state
     end
@@ -145,10 +142,6 @@ function Trailer.vehicleState(vehicle)
     end
     for _, frame in ipairs(ArrowBoard.FRAME) do
         state.frame[frame.id] = partState(vehicle, frame.id)
-        state.frame[frame.id].category = vehicle:getPartById(frame.id):getCategory()
-    end
-    for _, side in ipairs({ "Front", "Rear", "Left", "Right" }) do
-        state.blood[side] = vehicle:getBloodIntensity(side)
     end
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local container = box and box:getItemContainer()
@@ -201,19 +194,15 @@ local function putPanel(vehicle, partId, spec)
     RenewableEnergy.ArrowBoard.showPanel(part)
 end
 
--- Sets up the trailer `args.id` on the authority, in this order: whole if `args.repair`; each
--- panel of `args.panels` ({ [partId] = { type, condition, repaired } }, an empty table taking the module
--- off); each frame part and the lamp board of `args.frame` ({ [partId] = condition }); the battery
--- box emptied and filled with `args.box` ({ { type, charge } }) if given; the blood of
--- `args.blood` ({ [side] = intensity }); the lid taken off or a new one put on if
+-- Sets up the trailer `args.id` on the authority, in this order: each panel of `args.panels`
+-- ({ [partId] = { type, condition, repaired } }, an empty table taking the module off); each frame
+-- part and the lamp board of `args.frame` ({ [partId] = condition }); the battery box emptied and
+-- filled with `args.box` ({ { type, charge } }) if given; the lid taken off or a new one put on if
 -- `args.lidInstalled` is set, open or shut if `args.lidOpen` is, locked or not if `args.lidLocked`
 -- is, and its lock cut or whole if `args.lidLockBroken` is; the switch on or off if
 -- `args.switchOn` is set, as the switch action does. Answers its state.
 onVehicle("setTrailer", function(vehicle, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
-    if args.repair then
-        vehicle:repair()
-    end
     for partId, spec in pairs(args.panels or {}) do
         putPanel(vehicle, partId, spec)
     end
@@ -232,9 +221,6 @@ onVehicle("setTrailer", function(vehicle, args)
             end
             sendAddItemToContainer(container, item)
         end
-    end
-    for side, intensity in pairs(args.blood or {}) do
-        vehicle:setBloodIntensity(side, intensity)
     end
     local lid = vehicle:getPartById(ArrowBoard.LID)
     if args.lidInstalled == false then
@@ -370,18 +356,6 @@ onVehicle("arrowBoardOldFrame", function(vehicle, args)
     return { state = Trailer.vehicleState(vehicle), forcedSat = script:getForcedSat(), forcedVal = script:getForcedVal() }
 end)
 
--- Turns the car `args.car` and the trailer `args.trailer` (each RenewableEnergyTest.vehicleArgs) square to
--- `args.facing` and puts the trailer's coupler on the car's tow bar
--- (PZHarness.Fixtures.lineUpTrailer), on the authority, which sends the clients their new places.
-handler("lineUpTrailer", function(_, args)
-    local car, trailer = vehicleAt(args.car), vehicleAt(args.trailer)
-    if not (car and trailer) then
-        return nil, "the car and the trailer on the server"
-    end
-    PZHarness.Fixtures.lineUpTrailer(car, trailer, args.facing)
-    return {}
-end)
-
 -- Gives the character a key to the vehicle `args`, which no arrow board ever spawns with, so a
 -- test can show what a key holder could do to its lid.
 onVehicle("arrowBoardKey", function(vehicle, _, player)
@@ -458,13 +432,7 @@ handler("arrowBoardControllerRolls", function(_, args, defer)
         local restoreRoll = Helpers.forceRolls(defer, trialRoll(trial.roll, ArrowBoard.STOCK.controllerChance * trial.misc))
         ArrowBoard.stockBatteryBox(container)
         restoreRoll()
-        local items = container:getItems()
-        controllers[i] = 0
-        for j = 0, items:size() - 1 do
-            if items:get(j):getFullType() == controller then
-                controllers[i] = controllers[i] + 1
-            end
-        end
+        controllers[i] = container:getCountType(controller)
         container:removeAllItems()
     end
     restoreOptions()

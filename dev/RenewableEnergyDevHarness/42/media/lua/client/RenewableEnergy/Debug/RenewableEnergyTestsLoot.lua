@@ -9,7 +9,7 @@ local test, serverCheck = T.test, T.serverCheck
 -- Lists ----------------------------------------------------------------------------------------
 
 -- Every entry names an item that exists, since the game drops an unknown item silently, and sits
--- once in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
+-- in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
 -- table or a corpse's outfit list. The game hands each item out: not obsolete, light enough for a
 -- crate, and with a weight and loot multiplier above 0 at the default settings.
 serverCheck("renewable_energy_loot_lists_in_use", "lootListsInUse")
@@ -45,14 +45,7 @@ test("renewable_energy_loot_found_batteries_part_charged", {
 
 -- Inverters and controllers that rooms hand out come worn, once: a later refill leaves a found or
 -- crafted part already there alone, and a bank's parts are never worn by a fill.
-test("renewable_energy_loot_found_parts_worn", {
-    run = function(self)
-        local square = T.square(self, nil, "a free outdoor square")
-        if not square then return end
-        T.server(self, "lootFoundParts", T.at(square))
-    end,
-    validate = function(self) T.expectNoFailures(self.server.lootFoundParts) end,
-})
+serverCheck("renewable_energy_loot_found_parts_worn", "lootFoundParts")
 
 -- Containers the player owns --------------------------------------------------------------------
 

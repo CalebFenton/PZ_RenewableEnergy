@@ -64,10 +64,11 @@ end)
 -- does once the building's surroundings have loaded here. Then the finds the world's roll gave it
 -- and those standing by it, and, rolled again with its roll forgotten and every roll at 0 (the
 -- world rolled it, so Solar Sites is above 0 and every chance hits), so that every find it
--- qualifies for gets a square, the finds its rooms qualify it for, where each placed find stands
--- and how many pamphlets and biogas magazines it left. Everything that second roll did is put back
--- before it answers, while the building is still loaded: the test moves on from it.
-handler("ruralFindAt", function(_, args)
+-- qualifies for gets a square, the finds its rooms qualify it for, where each placed find stands,
+-- how far out each kind may stand, and how many pamphlets and biogas magazines it left.
+-- Everything that second roll did is put back before it answers, while the building is still
+-- loaded: the test moves on from it.
+handler("ruralFindAt", function(_, args, testDefer)
     local RuralFinds = RenewableEnergy.RuralFinds
     local square = getSquare(args.x, args.y, args.z or 0)
     local building = square and square:getBuilding()
@@ -83,12 +84,17 @@ handler("ruralFindAt", function(_, args)
     for kind in pairs(worldRoll) do
         table.insert(world, kind)
     end
-    local standing = {}
+    local standing, reach = {}, {}
     for kind, find in pairs(RuralFinds.FINDS) do
-        standing[kind] = Helpers.findsAround(def, find.is)
+        standing[kind], reach[kind] = Helpers.findsAround(def, find.is), find.reach
     end
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
+    local undoNow = Helpers.deferOnce(testDefer, function()
+        for i = #undo, 1, -1 do
+            undo[i]()
+        end
+    end)
     forgetRoll(def, defer)
     local pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET)
     local magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE)
@@ -98,10 +104,8 @@ handler("ruralFindAt", function(_, args)
     local answer = { ready = true, world = world, standing = standing, qualifies = RuralFinds.findsFor(def), found = found,
         pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET) - pamphlets,
         magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE) - magazines,
-        reach = RenewableEnergy.BuildingWatch.REACH }
-    for i = #undo, 1, -1 do
-        undo[i]()
-    end
+        reach = reach }
+    undoNow()
     return answer
 end)
 
