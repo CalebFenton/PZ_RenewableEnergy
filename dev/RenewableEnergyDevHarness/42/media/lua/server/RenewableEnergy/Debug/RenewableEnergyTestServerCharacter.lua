@@ -3,6 +3,7 @@
 -- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+require "PZHarness/Fixtures"
 
 local handler = PZHarness.serverHandler
 
@@ -135,4 +136,62 @@ end)
 -- The character's XP in the perk `args.perk` (a Perks field name) as the authority has it.
 handler("perkXp", function(player, args)
     return { value = player:getXp():getXP(Perks[args.perk]) }
+end)
+
+-- Whether the character knows each of `names`, by name, judged by the recipe as the crafting menus
+-- judge it, which counts its MetaRecipe.
+local function knownOf(player, names)
+    local known, scripts = {}, getScriptManager()
+    for _, name in ipairs(names) do
+        known[name] = player:isRecipeActuallyKnown(scripts:getCraftRecipe(name))
+    end
+    return known
+end
+
+-- Whether the authority's copy of the character knows each of `args.names`, in `known` by name.
+handler("recipesKnown", function(player, args)
+    return { known = knownOf(player, args.names) }
+end)
+
+-- The server's half of T.knowRecipes: the character knows (`args.known`) or forgets `args.names`,
+-- and when the test ends knows exactly what it knew before, including what a level up taught.
+handler("knowRecipes", function(player, args, defer)
+    local Fixtures = PZHarness.Fixtures
+    local saved = Fixtures.knownRecipes(player)
+    if args.known then
+        Fixtures.learnRecipes(player, args.names)
+    else
+        Fixtures.forgetRecipes(player, args.names)
+    end
+    defer(function()
+        local known = player:getKnownRecipes()
+        known:clear()
+        for _, name in ipairs(saved) do
+            known:add(name)
+        end
+    end)
+    return {}
+end)
+
+-- Forgets `args.forget`, sets the levels `args.levels` (perk id -> level), each at the XP that starts
+-- it, then awards the XP that takes `args.perk` one level up, as the authority awards a timed
+-- action's XP: the game levels the perk up and fires LevelPerk. The perks setting puts the levels
+-- back when the test ends, knowRecipes the recipes. Answers the level before and after.
+handler("levelUp", function(player, args)
+    local Fixtures = PZHarness.Fixtures
+    Fixtures.forgetRecipes(player, args.forget)
+    Fixtures.setPerkLevels(player, args.levels)
+    local perk = Perks.FromString(args.perk)
+    local before = player:getPerkLevel(perk)
+    local next = PerkFactory.getPerk(perk):getTotalXpForLevel(before + 1)
+    addXpNoMultiplier(player, perk, next - player:getXp():getXP(perk) + 1)
+    return { before = before, after = player:getPerkLevel(perk) }
+end)
+
+-- Sets the levels `args.levels` (perk id -> level) with no level up, so no LevelPerk teaches
+-- anything: a character who earned them before the mod, or its AutoLearn check, was added. The
+-- perks setting puts them back when the test ends. Answers what it knows of `args.names`.
+handler("setLevelsQuietly", function(player, args)
+    PZHarness.Fixtures.setPerkLevels(player, args.levels)
+    return { known = knownOf(player, args.names) }
 end)
