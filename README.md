@@ -4,7 +4,7 @@
 
 Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels, wind chargers, a treadmill, a bank of batteries, and a generator that runs on manure gas or wood. You start with a car battery in a wooden box, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
 
-**Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress.
+**Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress. Requires **cf_commonlib**.
 
 **[The player's guide](docs/player-guide.md)** explains every system: sizing a bank, placing a wind charger, feeding a digester, fixing a panel that goes quiet, and where to look.
 
@@ -55,7 +55,7 @@ The bank powers everything a generator in its spot would, the neighbours' lights
 
 ![A scoop rotor, a treadmill wind charger with carved blades, a car alternator wind charger with pipe blades and a homebuilt wind turbine on its tower, turning on open ground](art/promo/images/wind.png)
 
-Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares from each other, or they steal each other's wind.
+Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares apart, or they steal each other's wind.
 
 When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from pipe, or forged steel that breaks last. The turbine swings itself out of the worst of it.
 
@@ -83,7 +83,7 @@ Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling 
 
 ## Where to look
 
-Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually up on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, worn and in need of fixing up.
+Think about who had this in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, worn and needing repair.
 
 The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
 

@@ -8,6 +8,7 @@ require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/UI/StatusWindow"
 require "PZHarness/TestLib"
 require "PZHarness/QA"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local Debug = {}
@@ -61,7 +62,7 @@ end
 function Debug.isFreeSquare(square, indoors)
     return square ~= nil and square:isFree(false) and square:getVehicleContainer() == nil
         and RenewableEnergy.PowerBank.canPlaceBank(square) == indoors and (indoors or square:isOutside())
-        and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrSource)
+        and not Squares.findObjectOn(square, isContainerGeneratorOrSource)
 end
 
 -- A character with the electrical and building skills the mod gates on, every recipe, a

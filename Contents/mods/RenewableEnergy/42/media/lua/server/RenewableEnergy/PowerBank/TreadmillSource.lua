@@ -10,6 +10,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
+local Items = require "cf_commonlib/Items"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, PowerBank, Treadmill = RenewableEnergy.Specs, RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
@@ -39,12 +40,12 @@ function TreadmillSource.unwire(object, player)
     object:transmitModData()
     local wire = Specs.treadmill.wiring.wire
     if player then
-        RenewableEnergy.giveItems(player, PowerBank.WIRE, wire)
+        Items.giveItems(player, PowerBank.WIRE, wire)
         return
     end
     local square = object:getSquare()
     for _ = 1, wire do
-        RenewableEnergy.dropOn(square, PowerBank.WIRE)
+        Items.dropOn(square, PowerBank.WIRE)
     end
 end
 

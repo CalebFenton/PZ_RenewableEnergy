@@ -26,6 +26,7 @@ require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/GasLine/GasLines"
 require "RenewableEnergy/Fumes"
 require "RenewableEnergy/PowerBank/Loads"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
@@ -624,7 +625,7 @@ function Bank:showBatteries()
     for i = #self.batteries, 1, -1 do
         table.insert(types, self.batteries[i].type)
     end
-    RenewableEnergy.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(Sprites.nameOf(isoObject), types, self.charge))
+    Tiles.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(Sprites.nameOf(isoObject), types, self.charge))
 end
 
 return Bank

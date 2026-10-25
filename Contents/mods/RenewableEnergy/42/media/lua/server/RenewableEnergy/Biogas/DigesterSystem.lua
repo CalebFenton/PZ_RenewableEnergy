@@ -9,6 +9,9 @@ require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/GasHeater"
 require "RenewableEnergy/Biogas/DigesterObject"
+local Items = require "cf_commonlib/Items"
+local Tiles = require "cf_commonlib/Tiles"
+local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
@@ -24,14 +27,12 @@ RenewableEnergy.DigesterSystem = DigesterSystem
 -- sends the object, so clients get it whole.
 local onCreate = DigesterSystem.OnCreate
 function DigesterSystem.OnCreate(params)
-    local thumpable, data = params.thumpable, params.craftRecipeData
-    local items = thumpable and data and data:getAllConsumedItems()
-    for i = 0, items and items:size() - 1 or -1 do
-        local tile = Sprites.digester.barrel[items:get(i):getType()]
-        if tile then
-            RenewableEnergy.setEntityTile(thumpable, tile)
-            break
-        end
+    local thumpable = params.thumpable
+    local barrel = thumpable and Items.firstConsumed(params.craftRecipeData, function(item)
+        return Sprites.digester.barrel[item:getType()] ~= nil
+    end)
+    if barrel then
+        Tiles.setEntityTile(thumpable, Sprites.digester.barrel[barrel:getType()])
     end
     onCreate(params)
 end
@@ -54,9 +55,9 @@ local function takeSludge(character, record, row, isoObject, item)
         if uses <= 0 then
             return false
         end
-        RenewableEnergy.takeItem(character, item)
+        Items.takeItem(character, item)
         bag:setCurrentUses(uses)
-        RenewableEnergy.giveItems(character, bag)
+        Items.giveItems(character, bag)
     end
     record.sludge = math.max(0, record.sludge - uses * perUse)
     return true
@@ -138,11 +139,11 @@ local DO = {
     [DigesterJobs.REPACK_WOOL] = repackWool,
 }
 
---- The authority's side of the jobs at a digester (GasJobs.perform), whose `with` is the job's bag
+--- The authority's side of the jobs at a digester (Jobs.perform), whose `with` is the job's bag
 --- or tank.
-DigesterSystem.jobSite = ObjectSystem.jobSite(Digester, DO)
+DigesterSystem.jobSite = LibObjectSystem.jobSite(Digester, DO)
 
---- The authority's side of the jobs at a gas heater (GasJobs.perform), which light it or put it
+--- The authority's side of the jobs at a gas heater (Jobs.perform), which light it or put it
 --- out. They work on the record of the digester it warms, if any, brought up to now first, so the
 --- time before counts at the heater's old state.
 DigesterSystem.heaterSite = {

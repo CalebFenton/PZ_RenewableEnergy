@@ -1,5 +1,6 @@
 -- Where the mod's items spawn, 1993 style. apply() puts Distributions.items into the game's loot
--- tables in OnInitGlobalModData, scaled by the save's loot rarity options.
+-- tables once the save's options are loaded (cf_commonlib's Loot), scaled by its loot rarity
+-- options.
 
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
@@ -12,6 +13,7 @@ require "RenewableEnergy/Stash"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/ArrowBoard"
 require "RenewableEnergy/World/ArrowBoardPower"
+local Loot = require "cf_commonlib/Loot"
 
 RenewableEnergy = RenewableEnergy or {}
 local Distributions = {}
@@ -179,94 +181,23 @@ Distributions.items = require "RenewableEnergy/Items/LootEntries"
 
 -- Applying
 
--- The items-list holder each prefix of a list reference names, by the name after the prefix.
-local LIST_HOLDERS = {
-    -- A ProceduralDistributions list, or "<list>.junk" for its junk.
-    proc = function(name)
-        local listName = string.match(name, "^([^.]+)%.junk$")
-        if listName then
-            return procLists[listName] and procLists[listName].junk
-        end
-        return procLists[name]
-    end,
-    veh = function(name)
-        return vehDist[name]
-    end,
-    -- A dotted path into SuburbsDistributions.
-    sub = function(name)
-        local holder = subDist
-        for part in string.gmatch(name, "[^.]+") do
-            holder = type(holder) == "table" and holder[part] or nil
-        end
-        return holder
-    end,
-}
-
---- The loot table a "proc:", "veh:" or "sub:" name refers to, the one whose `items` the name's
---- entries go into ("proc:<list>.junk": the list's junk table), or nil if the game has no such
---- table.
----@param reference string
----@return table?
-function Distributions.resolveTable(reference)
-    local prefix, name = string.match(reference, "^(%a+):(.+)$")
-    local holderOf = LIST_HOLDERS[prefix]
-    local holder = holderOf and holderOf(name)
-    return type(holder) == "table" and holder or nil
-end
-
---- The items list a "proc:", "veh:" or "sub:" name refers to, or nil if the game has no such
---- list.
----@param reference string
----@return table?
-function Distributions.resolveItemList(reference)
-    local holder = Distributions.resolveTable(reference)
-    return holder and holder.items or nil
-end
-
--- Items lists are flat name, weight pairs.
-local function unlist(items, fullType)
-    for i = #items - 1, 1, -2 do
-        if items[i] == fullType then
-            table.remove(items, i + 1)
-            table.remove(items, i)
-        end
-    end
-end
-
--- Puts `fullType` into the loot list of each of `entries` at the entry's weight times
--- `multiplier`, replacing the entry an earlier call made; a multiplier of 0 leaves it out.
-local function placeEntries(fullType, entries, multiplier)
-    for _, entry in ipairs(entries) do
-        local items = Distributions.resolveItemList(entry[2])
-        if items then
-            unlist(items, fullType)
-            if multiplier > 0 then
-                table.insert(items, fullType)
-                table.insert(items, entry[1] * multiplier)
-            end
-        else
-            print("RenewableEnergy: missing loot list " .. entry[2] .. " for " .. fullType .. ", skipped")
-        end
-    end
-end
+-- The mod's name in the log line of a loot list the game lacks (Loot.place).
+local MOD_NAME = "RenewableEnergy"
 
 -- Puts each stash's map item into the loot lists its description names, if the Stash Houses
 -- option drops maps.
 local function applyStashMaps()
     local multiplier = Stash.mapsInLoot() and 1 or 0
     for description, extra in pairs(Stash.descriptions) do
-        placeEntries(description.item, extra.loot or {}, multiplier)
+        Loot.place(MOD_NAME, description.item, extra.loot or {}, multiplier)
     end
 end
 
 --- Puts every entry of Distributions.items into its list, weighted by the save's sandbox options,
---- and the stash maps into their lists, replacing the entries an earlier call made. An option at
---- 0 leaves its items out altogether: a zero weight would still spawn through the zombie density
---- bonus, which ItemPickerJava adds rather than multiplies. ItemPickerJava reads the Lua tables
---- only when it parses them, so ItemPickerJava.Parse() has to run afterwards.
+--- and the stash maps into their lists, replacing the entries an earlier call made (Loot.place).
 function Distributions.apply()
     for _, spec in ipairs(Distributions.items) do
-        placeEntries(spec.fullType, spec.entries, SandboxVars.RenewableEnergy[spec.option])
+        Loot.place(MOD_NAME, spec.fullType, spec.entries, SandboxVars.RenewableEnergy[spec.option])
     end
     applyStashMaps()
 end
@@ -382,20 +313,12 @@ local function onFillContainer(roomName, containerType, container)
     end
 end
 
--- The sandbox options of the save aren't loaded yet when this file runs, nor during the
--- distribution merge events: IsoWorld.init fires those, then loads the options, then parses the
--- tables, and only then fires OnInitGlobalModData. A multiplayer client fills no containers.
-local function onInitGlobalModData()
-    if isClient() then
-        return
-    end
-    Distributions.apply()
-    ItemPickerJava.Parse()
-end
+-- The save's options are loaded only after the distribution merge events; Loot runs this then and
+-- has the tables parsed again.
+Loot.register(Distributions.apply)
 
 Events.OnPostDistributionMerge.Add(addOwnVehicleTables)
 Events.OnPostDistributionMerge.Add(addOwnContainersToRooms)
-Events.OnInitGlobalModData.Add(onInitGlobalModData)
 Events.OnFillContainer.Add(onFillContainer)
 
 return Distributions

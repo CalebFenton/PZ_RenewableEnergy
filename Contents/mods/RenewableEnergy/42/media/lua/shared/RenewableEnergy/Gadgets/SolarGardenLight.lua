@@ -11,6 +11,7 @@ require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
@@ -62,7 +63,7 @@ function SolarGardenLight.canPlaceOn(square)
 end
 
 function SolarGardenLight.findOn(square)
-    return RenewableEnergy.findObjectOn(square, SolarGardenLight.isLight)
+    return Squares.findObjectOn(square, SolarGardenLight.isLight)
 end
 
 function SolarGardenLight.getChargeWh(light)

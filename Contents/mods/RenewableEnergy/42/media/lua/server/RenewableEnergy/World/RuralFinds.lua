@@ -22,6 +22,8 @@ require "RenewableEnergy/WoodGas/GasifierSystem"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/BuildingWatch"
 require "RandomizedWorldContent/StoryTable_Initialization"
+local Items = require "cf_commonlib/Items"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local RuralFinds = {}
@@ -111,9 +113,9 @@ function RuralFinds.leaveReading(def, fullType)
         for x = def:getX(), def:getX2() - 1 do
             for y = def:getY(), def:getY2() - 1 do
                 local square = getSquare(x, y, z)
-                local holder = RenewableEnergy.findObjectOn(square, keepsReading)
+                local holder = Squares.findObjectOn(square, keepsReading)
                 if holder then
-                    return RenewableEnergy.addItem(holder:getContainer(), fullType) ~= nil
+                    return Items.addItem(holder:getContainer(), fullType) ~= nil
                 end
                 if square and square:getRoom() and square:isFree(false) then
                     table.insert(floors, square)
@@ -124,7 +126,7 @@ function RuralFinds.leaveReading(def, fullType)
     if #floors == 0 then
         return false
     end
-    return RenewableEnergy.dropOn(Chance.pick(floors), fullType) ~= nil
+    return Items.dropOn(Chance.pick(floors), fullType) ~= nil
 end
 
 -- Finds

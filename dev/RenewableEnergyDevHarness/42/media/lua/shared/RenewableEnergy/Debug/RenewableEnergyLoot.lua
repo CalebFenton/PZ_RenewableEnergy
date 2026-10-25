@@ -231,10 +231,13 @@ end
 
 -- One table per target of lootTargets(), keyed "t<index>": a copy of the list with only the
 -- mod's items.
+-- cf_commonlib/Loot is server Lua, which a dedicated server loads after this shared file, so it is
+-- required here, on the authority, when the loot is measured.
 local function modOnlyTables(targets)
+    local LibLoot = require "cf_commonlib/Loot"
     local tables = {}
     for i, target in ipairs(targets) do
-        local lootTable = RenewableEnergy.Distributions.resolveTable(target.reference)
+        local lootTable = LibLoot.resolveTable(target.reference)
         tables["t" .. i] = lootTable and modItemsOnly(lootTable)
     end
     return tables

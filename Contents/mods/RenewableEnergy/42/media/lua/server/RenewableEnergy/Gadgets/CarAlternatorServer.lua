@@ -7,6 +7,7 @@ require "Vehicles/TimedActions/ISRemoveBurntVehicle"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/Gadgets/CarAlternator"
+local Items = require "cf_commonlib/Items"
 
 local CarAlternator, Chance = RenewableEnergy.CarAlternator, RenewableEnergy.Chance
 
@@ -20,7 +21,7 @@ function CarAlternator.takeOut(character, vehicle)
     engine:getModData()[CarAlternator.OUT_KEY] = true
     RenewableEnergy.teachOnce(character, engine, CarAlternator.XP_KEY, Perks.Mechanics, CarAlternator.XP)
     vehicle:transmitPartModData(engine)
-    RenewableEnergy.giveItems(character, CarAlternator.ITEM)
+    Items.giveItems(character, CarAlternator.ITEM)
     return true
 end
 
@@ -31,7 +32,7 @@ function CarAlternator.putBack(character, vehicle, item)
     if not (engine and item and item:getFullType() == CarAlternator.ITEM and CarAlternator.isOut(vehicle)) then
         return false
     end
-    RenewableEnergy.takeItem(character, item)
+    Items.takeItem(character, item)
     engine:getModData()[CarAlternator.OUT_KEY] = nil
     vehicle:transmitPartModData(engine)
     return true
@@ -54,7 +55,7 @@ function ISRemoveBurntVehicle:complete()
         return done
     end
     if Chance.hit(chance) then
-        RenewableEnergy.dropOn(square, CarAlternator.ITEM)
+        Items.dropOn(square, CarAlternator.ITEM)
         addXp(character, Perks.MetalWelding, 1)
     end
     return done

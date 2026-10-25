@@ -3,6 +3,7 @@ require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
+local Squares = require "cf_commonlib/Squares"
 
 -- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
 -- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the rural find tests'
@@ -43,7 +44,7 @@ function T.placeRecord(self, kind, tile, opts)
     local spec = kindOf(handle)
     local owner = spec.owner()
     T.waitFor(self, function()
-        local object = RenewableEnergy.findObjectOn(getSquare(handle.x, handle.y, handle.z), spec.isObject)
+        local object = Squares.findObjectOn(getSquare(handle.x, handle.y, handle.z), spec.isObject)
         handle.object = object and owner.summaryOf(object) and object or nil
         return handle.object ~= nil
     end, "this client's copy of the " .. kind)
@@ -136,12 +137,12 @@ end
 
 -- Materials -------------------------------------------------------------------------------------
 
--- The full type a material (RenewableEnergy.Materials) names, if it is an item.
+-- The full type a material (cf_commonlib's Materials) names, if it is an item.
 local function materialItem(material)
     return not material.perk and not material.water and material.item or nil
 end
 
---- Queues giving the character what the materials list `list` (RenewableEnergy.Materials) asks
+--- Queues giving the character what the materials list `list` (cf_commonlib's Materials) asks
 --- for, into self.items[name]: its skill levels, and each item, tool or tagged item at its count.
 --- An item counted in uses comes as one whole item, which holds more uses than any job takes.
 --- Water is the test's own to pour.
@@ -257,7 +258,7 @@ end
 function T.lightGasifier(self, gasifier)
     T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
     T.step(function()
-        T.giveMaterials(self, "light", GasifierJobs.materials(GasifierJobs.LIGHT, T.recordSummary(gasifier)))
+        T.giveMaterials(self, "light", GasifierJobs.materials(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
     end)
     T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
 end
@@ -353,7 +354,7 @@ end
 
 --- Queues fitting the kit to `generator`, with what that takes given first.
 function T.fitKit(self, generator)
-    T.giveMaterials(self, "kit", GasKit.materials(GasKit.INSTALL))
+    T.giveMaterials(self, "kit", GasKit.materials(T.player(), GasKit.INSTALL))
     T.kitJob(self, generator, GasKit.INSTALL)
 end
 
@@ -362,7 +363,7 @@ end
 function T.fitAndConnect(self, generator, source)
     T.fitKit(self, generator)
     T.step(function()
-        self.line = GasKit.materials(GasKit.CONNECT, generator.object, source.object)
+        self.line = GasKit.materials(T.player(), GasKit.CONNECT, generator.object, source.object)
         T.giveMaterials(self, "line", self.line)
     end)
     T.kitJob(self, generator, GasKit.CONNECT, source)

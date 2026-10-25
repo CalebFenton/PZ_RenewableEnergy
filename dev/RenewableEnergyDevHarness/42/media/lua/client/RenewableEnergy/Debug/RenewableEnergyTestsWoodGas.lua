@@ -1,4 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+require "RenewableEnergy/Specs"
+local Materials = require "cf_commonlib/Materials"
 
 -- Wood gas: the gasifier, built from the build menu, burning wood for the generator it is piped to
 -- or idling, leaving ash, tar and condensate, and the jobs at it (WoodGas/Gasifier.lua,
@@ -8,7 +10,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local T = RenewableEnergyTest
 local test = T.test
 
-local GasKit, Materials, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Materials, RenewableEnergy.Sprites
+local GasKit, Specs, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Specs, RenewableEnergy.Sprites
 local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
 
 -- A hopper load of wood, and a filter of clean packing.
@@ -266,10 +268,10 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
         local gasifier = T.placeRecord(self, "gasifier", "primitive")
         if not gasifier then return end
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 2 } } })
-        T.give(self, "matches", { { type = Materials.FIRE_STARTER.item } })
+        T.give(self, "matches", { { type = Specs.FIRE_STARTER.item } })
         T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
         T.step(function()
-            self.coldNeed = RenewableEnergy.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
+            self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
         end)
         T.give(self, "bellows", { { type = Gasifier.BELLOWS[1] } })
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
@@ -345,7 +347,7 @@ test("renewable_energy_woodgas_clean_out_ash", {
         self.whole = 2
         self.ash = (self.whole + 0.5) * Gasifier.ASH_PER_ITEM
         T.setRecord(self, gasifier, { ash = self.ash })
-        T.giveMaterials(self, "shovel", GasifierJobs.materials(GasifierJobs.CLEAN_ASH))
+        T.giveMaterials(self, "shovel", GasifierJobs.materials(T.player(), GasifierJobs.CLEAN_ASH))
         T.waitForSummary(self, gasifier, function(summary) return summary.ash == math.floor(self.ash) end,
             "this client's summary of the ash pit")
         T.gasJob(self, "gasifier", gasifier, GasifierJobs.CLEAN_ASH)

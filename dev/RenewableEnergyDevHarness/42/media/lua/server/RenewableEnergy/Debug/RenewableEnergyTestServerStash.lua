@@ -7,6 +7,7 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
+local LibLoot = require "cf_commonlib/Loot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
@@ -215,12 +216,11 @@ end)
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
 -- and every loot list a map names exists.
 check("prepperMapTargets", function(expect)
-    local D = RenewableEnergy.Distributions
     local lists = {}
     for stashMap, added in pairs(Stash.descriptions) do
         lists[stashMap.name] = {}
         for _, entry in ipairs(added.loot or {}) do
-            expect(D.resolveItemList(entry[2]) ~= nil, stashMap.name .. ": no loot list " .. entry[2])
+            expect(LibLoot.resolveItemList(entry[2]) ~= nil, stashMap.name .. ": no loot list " .. entry[2])
             lists[stashMap.name][entry[2]] = true
         end
     end
@@ -248,7 +248,7 @@ handler("stashMapsInCorpseLoot", function(_, _, defer)
         D.apply()
         for stashMap, added in pairs(Stash.descriptions) do
             for _, entry in ipairs(added.loot or {}) do
-                local count, weight = countPairs(D.resolveItemList(entry[2]), stashMap.item)
+                local count, weight = countPairs(LibLoot.resolveItemList(entry[2]), stashMap.item)
                 table.insert(found, {
                     mode = mode, where = stashMap.name .. " in " .. entry[2], count = count, weight = weight, rarity = entry[1],
                 })

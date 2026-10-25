@@ -19,18 +19,19 @@ require "Vehicles/TimedActions/ISUnlockVehicleDoor"
 require "RenewableEnergy/Gadgets/CarAlternator"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/Needs"
+local Items = require "cf_commonlib/Items"
+local Needs = require "cf_commonlib/Needs"
 
 RenewableEnergy = RenewableEnergy or {}
 local CarAlternatorMenu = {}
 RenewableEnergy.CarAlternatorMenu = CarAlternatorMenu
 
 local Action = RenewableEnergyAction
-local CarAlternator, Needs = RenewableEnergy.CarAlternator, RenewableEnergy.Needs
+local CarAlternator = RenewableEnergy.CarAlternator
 local VehicleBattery = RenewableEnergy.VehicleBattery
 
 local function isWrench(item)
-    return item:hasTag(ItemTag.WRENCH) and RenewableEnergy.notBroken(item)
+    return item:hasTag(ItemTag.WRENCH) and Items.notBroken(item)
 end
 
 --- Queues `character`'s Take Out Alternator (`item` nil) or Put Back Alternator with `item` on

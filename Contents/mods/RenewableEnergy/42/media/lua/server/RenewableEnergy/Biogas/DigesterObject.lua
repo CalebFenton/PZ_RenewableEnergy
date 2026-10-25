@@ -15,6 +15,8 @@ require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/Stink"
 require "RenewableEnergy/Biogas/GasHeater"
 require "RenewableEnergy/GasLine/GasKit"
+local Items = require "cf_commonlib/Items"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, Stink, Sprites = RenewableEnergy.Digester, RenewableEnergy.Stink, RenewableEnergy.Sprites
@@ -179,7 +181,7 @@ function DigesterObject:feedFromContainer(container)
     end
     local item, feed = items[index], entries[index]
     if feed.whole or item:getCurrentUses() <= 1 then
-        RenewableEnergy.removeItem(item)
+        Items.removeItem(item)
     else
         item:setCurrentUses(item:getCurrentUses() - 1)
         sendItemStats(item)
@@ -216,7 +218,7 @@ function DigesterObject:takeEaten(container)
                 item:setCurrentUses(left)
                 sendItemStats(item)
             else
-                RenewableEnergy.removeItem(item)
+                Items.removeItem(item)
             end
         end
     end
@@ -437,13 +439,13 @@ function DigesterObject:fuming()
     return self.indoors and not self:tierSpec().sealed and (self.sour or self.leakHours > 0)
 end
 
-local showOverlay = RenewableEnergy.showOverlay
+local showOverlay = Tiles.showOverlay
 
 --- Lights or puts out `heater`, by its tile in the facing it stands.
 function DigesterObject.showHeaterLit(heater, lit)
     if GasHeater.isLit(heater) == lit then return end
     local _, facing = Sprites.kindOfObject(heater)
-    RenewableEnergy.showTile(heater, Sprites.gasHeater[lit and "lit" or "off"][facing])
+    Tiles.showTile(heater, Sprites.gasHeater[lit and "lit" or "off"][facing])
 end
 
 --- Lights or puts out `heater`, the one that warms this digester (GasHeater.digesterNear).
@@ -476,7 +478,7 @@ function DigesterObject:upgrade(isoObject)
     self.holder = self:tierSpec().holder
     self.holderCondition = 100
     self.gas = math.min(self.gas, self:capacity())
-    RenewableEnergy.setEntityTile(isoObject, Sprites.digester[self.tier])
+    Tiles.setEntityTile(isoObject, Sprites.digester[self.tier])
     local container = isoObject:getContainer()
     if container then
         container:setCapacity(tonumber(isoObject:getProperties():get("ContainerCapacity")) or container:getCapacity())

@@ -15,6 +15,8 @@ require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/BankSystem"
 require "RenewableEnergy/PowerBank/BankJobs"
+local Items = require "cf_commonlib/Items"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local WorldSpawns = {}
@@ -437,12 +439,12 @@ function WorldSpawns.placePanel(square, spriteName, modules)
     WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES_KEY] = modules })
 end
 
---- Builds the entity of the tile `sprite` (RenewableEnergy.tileEntity) as ISBuildIsoEntity:create
+--- Builds the entity of the tile `sprite` (Tiles.tileEntity) as ISBuildIsoEntity:create
 --- does: a thumpable with its entity's components on the square, then the entity's OnCreate, and
 --- sends it to the clients. `wear(thumpable)`, if given, sets its worn state before they get it.
 function WorldSpawns.buildEntity(square, sprite, onCreate, wear)
     local thumpable = IsoThumpable.new(square:getCell(), square, sprite, false, nil)
-    GameEntityFactory.CreateIsoObjectEntity(thumpable, RenewableEnergy.tileEntity(sprite), true)
+    GameEntityFactory.CreateIsoObjectEntity(thumpable, Tiles.tileEntity(sprite), true)
     square:AddSpecialObject(thumpable)
     thumpable:setExplored(true)
     onCreate({ thumpable = thumpable })
@@ -493,7 +495,7 @@ function WorldSpawns.layModulesBeside(square, stockName)
     for i = 1, count do
         local item = WorldSpawns.newModule(siteModuleCondition())
         local floor = beside[(i - 1) % math.max(1, #beside) + 1] or square
-        RenewableEnergy.dropOn(floor, item)
+        Items.dropOn(floor, item)
     end
     return count
 end

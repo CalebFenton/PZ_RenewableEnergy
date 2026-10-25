@@ -10,7 +10,7 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/GlobalObjects"
+local GlobalObjects = require "cf_commonlib/GlobalObjects"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier = {}
@@ -240,7 +240,7 @@ end
 -- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
 -- containers and the clock: `hopperKg` (the hopper and the firebox), the filter's `clean` and
 -- `tarry` packing, the `output` share and `wear` factor they make, and whether it is `cold`.
-RenewableEnergy.GlobalObjects.addAccessors(Gasifier, function(summary, isoObject)
+GlobalObjects.addAccessors(Gasifier, function(summary, isoObject)
     local clean, tarry = Gasifier.filterCounts(Gasifier.filterOf(isoObject))
     summary.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(isoObject)) + summary.fireKg
     summary.clean, summary.tarry = clean, tarry

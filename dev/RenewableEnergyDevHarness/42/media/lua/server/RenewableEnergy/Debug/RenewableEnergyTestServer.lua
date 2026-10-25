@@ -5,6 +5,7 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
@@ -117,7 +118,7 @@ handler("placePanel", function(player, args, defer)
     local panel
     if getSprite(args.sprite):getProperties():has("CustomItem") then
         RenewableEnergy.WorldSpawns.placePanel(square, args.sprite, args.modules)
-        panel = RenewableEnergy.findObjectOn(square, function(object) return RenewableEnergy.Sprites.nameOf(object) == args.sprite end)
+        panel = Squares.findObjectOn(square, function(object) return RenewableEnergy.Sprites.nameOf(object) == args.sprite end)
         if not panel then
             return nil, "a placed " .. args.sprite .. " on the server"
         end

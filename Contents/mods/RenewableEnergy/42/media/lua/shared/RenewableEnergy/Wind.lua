@@ -6,6 +6,8 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/Sources"
+local Items = require "cf_commonlib/Items"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local Wind = {}
@@ -145,21 +147,18 @@ function Wind.canBreak(spec, blades, kph)
 end
 
 -- One recipe builds each bladed kind with any blades it takes, always on its wood tile: this makes
--- the charger the tile, and so the entity (RenewableEnergy.setEntityTile), of the blades the build
+-- the charger the tile, and so the entity (Tiles.setEntityTile), of the blades the build
 -- took. Nothing is sent here: ISBuildIsoEntity sends the object on after OnCreate. A charger the
 -- world builds (RuralFinds) has no recipe data and keeps the tile it was given.
 local function fitBuiltBlades(thumpable, data)
-    local items = data and data:getAllConsumedItems()
     local kind, facing = Sources.kindOf(thumpable)
-    for i = 0, items and items:size() - 1 or -1 do
-        local material = Wind.bladesOfItem(kind, items:get(i))
-        if material then
-            local tile = Sprites.windTileOf(kind, facing, material)
-            if tile and tile ~= thumpable:getSprite():getName() then
-                RenewableEnergy.setEntityTile(thumpable, tile)
-            end
-            return
-        end
+    local blades = Items.firstConsumed(data, function(item)
+        return Wind.bladesOfItem(kind, item) ~= nil
+    end)
+    if not blades then return end
+    local tile = Sprites.windTileOf(kind, facing, Wind.bladesOfItem(kind, blades))
+    if tile and tile ~= thumpable:getSprite():getName() then
+        Tiles.setEntityTile(thumpable, tile)
     end
 end
 

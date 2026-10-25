@@ -10,6 +10,7 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Squares = require "cf_commonlib/Squares"
 
 local Helpers = {}
 
@@ -173,7 +174,7 @@ function Helpers.findsAround(def, isFind, except)
     local reach, count = RenewableEnergy.BuildingWatch.REACH, 0
     for x = def:getX() - reach, def:getX2() + reach - 1 do
         for y = def:getY() - reach, def:getY2() + reach - 1 do
-            if not (except and x == except[1] and y == except[2]) and RenewableEnergy.findObjectOn(getSquare(x, y, 0), isFind) then
+            if not (except and x == except[1] and y == except[2]) and Squares.findObjectOn(getSquare(x, y, 0), isFind) then
                 count = count + 1
             end
         end
@@ -295,7 +296,7 @@ function Helpers.recordAt(args)
         return nil, nil, "a record kind " .. tostring(args.kind)
     end
     local square = PZHarness.Fixtures.squareAt(args)
-    local object = square and RenewableEnergy.findObjectOn(square, kind.isObject)
+    local object = square and Squares.findObjectOn(square, kind.isObject)
     local record = object and kind.owner().recordOf(object)
     if not record then
         return nil, nil, "a " .. args.kind .. " at " .. tostring(args.x) .. "," .. tostring(args.y)

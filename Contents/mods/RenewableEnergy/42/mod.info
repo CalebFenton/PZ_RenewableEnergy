@@ -10,3 +10,4 @@ url=https://github.com/CalebFenton/PZ_RenewableEnergy
 pack=renewable_energy
 tiledef=renewable_energy 6142
 versionMin=42.20
+require=\cf_commonlib

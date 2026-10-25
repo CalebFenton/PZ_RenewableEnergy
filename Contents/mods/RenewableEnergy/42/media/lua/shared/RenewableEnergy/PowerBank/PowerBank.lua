@@ -7,15 +7,16 @@
 -- copies its small `summary` to every client; the whole `status` goes only to players watching it.
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
+local Materials = require "cf_commonlib/Materials"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local PowerBank = {}
 RenewableEnergy.PowerBank = PowerBank
 
-local Specs, Sprites, Materials = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Materials
+local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
 -- The sendServerCommand module and command that carry a bank's status to the players watching it.
@@ -71,7 +72,7 @@ end
 
 --- The working bank on a square, or nil.
 function PowerBank.findOn(square)
-    return RenewableEnergy.findObjectOn(square, PowerBank.isBank)
+    return Squares.findObjectOn(square, PowerBank.isBank)
 end
 
 function PowerBank.copyModules(modules)
@@ -198,7 +199,7 @@ function PowerBank.adoptContainer(container)
 end
 
 --- What a wiring job of `wiring` (as Specs.wiring's) takes, as a materials list
---- (RenewableEnergy.Materials): its Electricity level, tools, wire and scrap, leaving out what it
+--- (cf_commonlib's Materials): its Electricity level, tools, wire and scrap, leaving out what it
 --- takes none of.
 function PowerBank.wiringMaterials(wiring)
     local list = {}
@@ -218,13 +219,13 @@ function PowerBank.wiringMaterials(wiring)
 end
 
 --- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`, for
---- RenewableEnergy.firstUnmet.
+--- Materials.firstUnmet.
 function PowerBank.wiringNeeds(character, wiring)
     return Materials.needs(character, PowerBank.wiringMaterials(wiring))
 end
 
 --- What undoing a wiring job of `wiring` takes of `character`: its tools, as vanilla takes a car
---- part's install tools to uninstall it. For RenewableEnergy.firstUnmet.
+--- part's install tools to uninstall it. For Materials.firstUnmet.
 function PowerBank.unwiringNeeds(character, wiring)
     return Materials.needs(character, wiring.tools)
 end
@@ -256,10 +257,10 @@ end
 --- wiringBlocker says, else the kind of the first of the part's wiringNeeds they are short of.
 function PowerBank.wiringRefusal(character, bank, item)
     return PowerBank.wiringBlocker(bank, item)
-        or RenewableEnergy.unmetKind(PowerBank.wiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
+        or Materials.unmetKind(PowerBank.wiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
 end
 
--- What repairing an inverter or controller takes, as a materials list (RenewableEnergy.Materials).
+-- What repairing an inverter or controller takes, as a materials list (cf_commonlib's Materials).
 local REPAIR = { { perk = "Electricity", need = Specs.partRepair.skill }, { item = PowerBank.SCRAP, need = 1 } }
 
 --- What repairing an inverter or controller uses up of `character`. Authority only.
@@ -267,7 +268,7 @@ function PowerBank.consumeRepair(character)
     Materials.consume(character, REPAIR)
 end
 
---- What repairing an inverter or controller takes of `character`, for RenewableEnergy.firstUnmet.
+--- What repairing an inverter or controller takes of `character`, for Materials.firstUnmet.
 function PowerBank.repairNeeds(character)
     return Materials.needs(character, REPAIR)
 end
@@ -286,7 +287,7 @@ end
 --- Why `character` can't repair the inverter or controller `item` now, or nil if they can: what
 --- repairBlocker says, else the kind of the first of repairNeeds they are short of.
 function PowerBank.repairRefusal(character, item)
-    return PowerBank.repairBlocker(item) or RenewableEnergy.unmetKind(PowerBank.repairNeeds(character))
+    return PowerBank.repairBlocker(item) or Materials.unmetKind(PowerBank.repairNeeds(character))
 end
 
 --- What keeps anyone from unwiring `item` from the bank `bank` now whatever they carry, as a
@@ -305,7 +306,7 @@ end
 --- unwiringBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
 function PowerBank.unwiringRefusal(character, bank, item)
     return PowerBank.unwiringBlocker(bank, item)
-        or RenewableEnergy.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
+        or Materials.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
 end
 
 --- The failsafe's thresholds, in percent of a bank's charge: below `start` it starts its generator,

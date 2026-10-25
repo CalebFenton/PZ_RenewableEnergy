@@ -19,6 +19,10 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/Fumes"
 require "RenewableEnergy/Chance"
+local Clock = require "cf_commonlib/Clock"
+local Items = require "cf_commonlib/Items"
+local Squares = require "cf_commonlib/Squares"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasLines = {}
@@ -57,7 +61,7 @@ end
 
 local function generatorAt(position)
     local square = getSquare(position.x, position.y, position.z)
-    return square and RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
+    return square and Squares.findObjectOn(square, RenewableEnergy.isGenerator)
 end
 
 -- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
@@ -91,7 +95,7 @@ end
 -- Lays a pipe between `generator` and the piped source `source`, each half on its own tile.
 local function pipe(generator, source)
     local gx, gy, x, y = generator:getX(), generator:getY(), source:getX(), source:getY()
-    RenewableEnergy.showOverlay(generator, isGeneratorPipeOverlay,
+    Tiles.showOverlay(generator, isGeneratorPipeOverlay,
         Sprites.gasifierPipeGenFor(Sprites.nameOf(generator), Gasifier.sideOf(gx, gy, x, y)))
     local record = Gasifier.recordOf(source)
     if record then
@@ -111,7 +115,7 @@ end
 -- took ({ item, count }), or nil.
 local function cutLine(generator, state)
     if isPiped(state.source) then
-        RenewableEnergy.showOverlay(generator, isGeneratorPipeOverlay, nil)
+        Tiles.showOverlay(generator, isGeneratorPipeOverlay, nil)
         unpipeSource(state.source)
     end
     local line = state.line
@@ -367,7 +371,7 @@ end
 
 -- Runs `generator` for the time since it last ran, at most LONGEST_PASS.
 local function catchUp(generator, state)
-    GasLines.run(generator, state, RenewableEnergy.hoursSince(state, LONGEST_PASS))
+    GasLines.run(generator, state, Clock.hoursSince(state, LONGEST_PASS))
 end
 
 --- Runs every kitted generator whose chunk is loaded. One gone from its loaded square or without
@@ -407,7 +411,7 @@ end
 local function disconnect(character, generator, state)
     local line = cutLine(generator, state)
     if line then
-        RenewableEnergy.giveItems(character, line.item, line.count)
+        Items.giveItems(character, line.item, line.count)
     end
     settleFuel(generator, state, false)
     if state.mode ~= "petrol" then
@@ -422,15 +426,15 @@ local DO = {
         generator:getModData()[GasKit.STATE_KEY] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
         store()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
-        RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
+        Tiles.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
         return true
     end,
     [GasKit.REMOVE] = function(character, state, row, generator)
         disconnect(character, generator, state)
         generator:getModData()[GasKit.STATE_KEY] = nil
         GasLines.unlist(generator)
-        RenewableEnergy.showOverlay(generator, isKitOverlay, nil)
-        RenewableEnergy.giveItems(character, GasKit.ITEM)
+        Tiles.showOverlay(generator, isKitOverlay, nil)
+        Items.giveItems(character, GasKit.ITEM)
         return true
     end,
     [GasKit.CONNECT] = function(character, state, row, generator, source)
@@ -462,7 +466,7 @@ local DO = {
     end,
 }
 
---- The authority's side of the jobs at a generator (GasJobs.perform), whose `with` is the far end
+--- The authority's side of the jobs at a generator (Jobs.perform), whose `with` is the far end
 --- of Connect Gas Line. They work on its kit state, the line caught up first so the time before
 --- bills at the old state; the state goes to the clients when a job was done or there was one to
 --- catch up.

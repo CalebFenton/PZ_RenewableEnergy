@@ -1,13 +1,13 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/RecipeLearning"
+local RecipeLearning = require "cf_commonlib/RecipeLearning"
 
--- Learning the mod's recipes by skill level (RecipeLearning.lua). Levels go up through the
--- authority's XP award, which fires LevelPerk. Each side's copy of the character is checked: the
--- authority's decides what may be built and crafted, this client's what the menus offer.
+-- Learning the mod's recipes by skill level (cf_commonlib's RecipeLearning, which Recipes.lua
+-- registers the mod's prefix with). Levels go up through the authority's XP award, which fires
+-- LevelPerk. Each side's copy of the character is checked: the authority's decides what may be
+-- built and crafted, this client's what the menus offer.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
-local RecipeLearning = RenewableEnergy.RecipeLearning
 
 -- Every recipe of the mod, craftRecipe or build, that a character has to learn, as the scripts
 -- state them: what each test expects known or not. Named here, not by the recipePrefix setting,

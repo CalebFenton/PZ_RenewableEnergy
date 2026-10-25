@@ -4,15 +4,15 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Bank"
+local ObjectSystem = require "cf_commonlib/ObjectSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local PowerBank, Sources, Bank = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Bank
 
-Bank.sendSummary = RenewableEnergy.ObjectSystem.Object.sendSummary
+Bank.sendSummary = ObjectSystem.Object.sendSummary
 
 --- What the bank is doing, for the status window.
 function Bank:state()

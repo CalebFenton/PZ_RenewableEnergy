@@ -6,12 +6,14 @@
 -- sound runs), give the container its unsaved, unsent filter, and release the squares a running
 -- bank powered when it is removed.
 
+require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/ClientObjects"
+local ClientObjects = require "cf_commonlib/ClientObjects"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
-local PowerBank, ClientObjects, PlaceTracker = RenewableEnergy.PowerBank, RenewableEnergy.ClientObjects,
-    RenewableEnergy.PlaceTracker
+local PowerBank, PlaceTracker = RenewableEnergy.PowerBank, RenewableEnergy.PlaceTracker
+local Sprites = RenewableEnergy.Sprites
 
 local function adoptCopy(isoObject)
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
@@ -19,7 +21,8 @@ local function adoptCopy(isoObject)
 end
 
 local BankSystem = ClientObjects.define({
-    name = "Bank", sprites = PowerBank.bankSprites(), owner = PowerBank, isObject = PowerBank.isBank,
+    prefix = "RenewableEnergy_", name = "Bank", owner = PowerBank, isObject = PowerBank.isBank,
+    sprites = PowerBank.bankSprites(), loadPriority = Sprites.LOAD_PRIORITY,
     adoptCopy = adoptCopy, adoptContainer = PowerBank.adoptContainer,
 })
 
@@ -100,7 +103,7 @@ local CHUNK_SQUARES = getChunkSizeInSquares()
 --- switching off does (IsoGenerator.setSurroundingElectricity); otherwise they stay powered here
 --- until their chunks reload.
 function PowerBank.releaseGeneratorPower(x, y, z)
-    local radius = RenewableEnergy.generatorReach()
+    local radius = GeneratorReach.range()
     local cell = getCell()
     for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
         for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do

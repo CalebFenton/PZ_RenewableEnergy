@@ -37,7 +37,7 @@ test("renewable_energy_gasline_kit_install_and_remove", {
         self.fuel = 3
         local generator = T.generator(self, { fuel = self.fuel })
         if not generator then return end
-        self.install = GasKit.materials(GasKit.INSTALL)
+        self.install = GasKit.materials(T.player(), GasKit.INSTALL)
         T.fitKit(self, generator)
         T.batch(function()
             T.readGenerator(self, generator, "fitted")
@@ -120,7 +120,7 @@ test("renewable_energy_gasline_kit_refused_in_the_dark", {
         local generator = T.generator(self, {})
         if not generator then return end
         self.generator = generator
-        T.giveMaterials(self, "kit", GasKit.materials(GasKit.INSTALL))
+        T.giveMaterials(self, "kit", GasKit.materials(T.player(), GasKit.INSTALL))
         T.step(function() T.standNextTo(generator.square) end)
         T.makeDark(self)
     end,
@@ -370,7 +370,7 @@ test("renewable_energy_gasline_kit_job_not_done_takes_nothing", {
     run = function(self)
         local generator = T.generator(self, { fuel = 0 })
         if not generator then return end
-        self.install = GasKit.materials(GasKit.INSTALL)
+        self.install = GasKit.materials(T.player(), GasKit.INSTALL)
         T.giveMaterials(self, "kit", self.install)
         T.batch(function()
             T.server(self, "kitJobNotDone", { job = GasKit.INSTALL })
@@ -409,7 +409,7 @@ test("renewable_energy_gasline_gasifier_must_stand_beside", {
         if not diagonal then return end
         T.fitKit(self, generator)
         T.step(function()
-            T.giveMaterials(self, "line", GasKit.materials(GasKit.CONNECT, generator.object, beside.object))
+            T.giveMaterials(self, "line", GasKit.materials(T.player(), GasKit.CONNECT, generator.object, beside.object))
         end)
         T.step(function()
             self.beside = GasKit.refusal(T.player(), GasKit.CONNECT, generator.object, beside.object)

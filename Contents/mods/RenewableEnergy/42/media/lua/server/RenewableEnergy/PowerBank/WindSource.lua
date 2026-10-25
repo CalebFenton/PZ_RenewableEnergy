@@ -12,6 +12,7 @@ require "RenewableEnergy/StormNotice"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local Chance, Specs, StormNotice, Wind = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.StormNotice, RenewableEnergy.Wind
@@ -152,7 +153,7 @@ end
 --- Fits blades of `material` (Specs.wind.blades), which its kind takes, to the wind charger
 --- `isoObject`, and to `source`, its bank's record, if it feeds one (else nil). Blades of another
 --- material than it turns make it that material's tile for its facing, and so that tile's entity
---- (RenewableEnergy.setEntityTile), on every side.
+--- (Tiles.setEntityTile), on every side.
 function WindSource.fitBlades(isoObject, material, source)
     if source then
         source.blades = material
@@ -161,7 +162,7 @@ function WindSource.fitBlades(isoObject, material, source)
     local kind, facing = Sources.kindOf(isoObject)
     local tile = Sprites.windTileOf(kind, facing, material)
     if not tile then return end
-    RenewableEnergy.setEntityTile(isoObject, tile)
+    Tiles.setEntityTile(isoObject, tile)
     isoObject:transmitUpdatedSpriteToClients()
     -- After the tile, as DigesterObject:upgrade sends it: a client's SpriteConfig checks its new
     -- script against the tile it shows. Single player has no other copy.

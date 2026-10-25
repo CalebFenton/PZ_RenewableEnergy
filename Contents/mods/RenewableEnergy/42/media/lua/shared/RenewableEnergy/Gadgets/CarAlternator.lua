@@ -8,13 +8,12 @@
 -- are the authority's: server/RenewableEnergy/Gadgets/CarAlternatorServer.lua.
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
 require "RenewableEnergy/Gadgets/VehicleBattery"
+local Materials = require "cf_commonlib/Materials"
 
 RenewableEnergy = RenewableEnergy or {}
 local CarAlternator = {}
 RenewableEnergy.CarAlternator = CarAlternator
-local Materials = RenewableEnergy.Materials
 
 CarAlternator.ITEM = "RenewableEnergy.CarAlternator"
 CarAlternator.ENGINE = "Engine"
@@ -26,7 +25,7 @@ CarAlternator.OUT_KEY = "RenewableEnergy_AlternatorOut"
 -- taking it out and putting it back over and over teaches nothing more.
 CarAlternator.XP_KEY = "RenewableEnergy_AlternatorXp"
 
--- What the job takes, as materials (RenewableEnergy.Materials). An alternator hangs on two bolts
+-- What the job takes, as materials (cf_commonlib's Materials). An alternator hangs on two bolts
 -- and a belt tensioner: a wrench, and a little more skill than the battery's screwdriver.
 local SKILL = { perk = "Mechanics", need = 2 }
 local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
@@ -95,7 +94,7 @@ function CarAlternator.shutHood(vehicle)
 end
 
 --- What taking the alternator out (`putBack` false) or putting one back takes of `character`,
---- for RenewableEnergy.firstUnmet and RenewableEnergy.Needs.
+--- for Materials.firstUnmet and cf_commonlib's Needs.
 function CarAlternator.needs(character, putBack)
     return Materials.needs(character, putBack and PUT_BACK or TAKE_OUT)
 end
@@ -131,7 +130,7 @@ function CarAlternator.refusal(character, vehicle, putBack)
     elseif not CarAlternator.hoodOpen(vehicle) then
         return "Tooltip_RenewableEnergy_HoodShut"
     end
-    return RenewableEnergy.unmetKind(CarAlternator.needs(character, putBack))
+    return Materials.unmetKind(CarAlternator.needs(character, putBack))
 end
 
 --- The job's length in action units for `character`: less with Mechanics, as a part's uninstall

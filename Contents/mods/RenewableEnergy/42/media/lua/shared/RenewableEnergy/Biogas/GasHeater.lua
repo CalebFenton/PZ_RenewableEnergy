@@ -4,17 +4,18 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Materials"
-require "RenewableEnergy/GasJobs"
+require "RenewableEnergy/Specs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/GasLine/GasKit"
+local Jobs = require "cf_commonlib/Jobs"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasHeater = {}
 RenewableEnergy.GasHeater = GasHeater
 
 local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
-local Sprites, Materials = RenewableEnergy.Sprites, RenewableEnergy.Materials
+local Sprites, Specs = RenewableEnergy.Sprites, RenewableEnergy.Specs
 
 -- What a lit heater keeps its digester at, at least: as warm as vanilla's lit barbecue keeps its
 -- square (IsoBarbecue's heat source).
@@ -43,7 +44,7 @@ end
 -- The first object within REACH of `object`'s square on its level that `matches`, or nil.
 local function findNear(object, matches)
     return RenewableEnergy.eachSquareAround(object:getX(), object:getY(), object:getZ(), GasHeater.REACH, function(square)
-        return RenewableEnergy.findObjectOn(square, matches)
+        return Squares.findObjectOn(square, matches)
     end)
 end
 
@@ -64,12 +65,12 @@ function GasHeater.litHeaterFor(digester)
     end)
 end
 
--- Every job, by name (GasJobs.define), read against the heater itself. `lit`: how it leaves the
+-- Every job, by name (Jobs.define), read against the heater itself. `lit`: how it leaves the
 -- heater.
 GasHeater.JOBS = {
     [GasHeater.LIGHT] = {
         minutes = 1, lit = true, doneSound = "CampfireLight",
-        blocker = function(heater)
+        blocker = function(character, heater)
             if GasHeater.isLit(heater) then
                 return "Tooltip_RenewableEnergy_AlreadyLit"
             end
@@ -77,19 +78,20 @@ GasHeater.JOBS = {
             local summary = digester and Digester.currentSummary(digester)
             return not (summary and summary.gas > 0) and "Tooltip_RenewableEnergy_NoDigesterNear" or nil
         end,
-        materials = { Materials.FIRE_STARTER },
+        materials = { Specs.FIRE_STARTER },
     },
     [GasHeater.OFF] = {
         minutes = 1, lit = false,
-        blocker = function(heater)
+        blocker = function(character, heater)
             return not GasHeater.isLit(heater) and "Tooltip_RenewableEnergy_NotLit" or nil
         end,
     },
 }
 
-RenewableEnergy.GasJobs.define(GasHeater, {
+Jobs.define(GasHeater, {
+    short = "short",
     subjectOf = function(heater)
-        return RenewableEnergy.onSquare(heater) and GasHeater.isHeater(heater) and heater or nil
+        return Squares.onSquare(heater) and GasHeater.isHeater(heater) and heater or nil
     end,
     missing = "Tooltip_RenewableEnergy_NoHeater",
 })

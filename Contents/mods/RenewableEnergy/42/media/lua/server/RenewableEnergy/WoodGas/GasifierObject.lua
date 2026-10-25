@@ -14,6 +14,9 @@ require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/Fumes"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/WoodGas/Gasifier"
+local Items = require "cf_commonlib/Items"
+local Squares = require "cf_commonlib/Squares"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier, GasKit, Sprites = RenewableEnergy.Gasifier, RenewableEnergy.GasKit, RenewableEnergy.Sprites
@@ -73,7 +76,7 @@ function GasifierObject:stoke(hopper)
         local item = items:get(i)
         local kg = Gasifier.fuelKg(item)
         if kg then
-            RenewableEnergy.removeItem(item)
+            Items.removeItem(item)
             self.fireKg = self.fireKg + kg
             self.fireCharcoal = Gasifier.isCharcoal(item)
             return true
@@ -88,8 +91,8 @@ function GasifierObject:tarOne(filter)
     for i = 0, (items and items:size() or 0) - 1 do
         local item = items:get(i)
         if Gasifier.isPacking(item) then
-            RenewableEnergy.removeItem(item)
-            RenewableEnergy.addItem(filter, Gasifier.TARRY)
+            Items.removeItem(item)
+            Items.addItem(filter, Gasifier.TARRY)
             return true
         end
     end
@@ -181,7 +184,7 @@ end
 --- Whether the generator its pipe leads to runs on its gas, so the gas line bills all it burns.
 function GasifierObject:feedsRunningGenerator()
     local square = self.pipe and Gasifier.squareOnSide(self.x, self.y, self.z, self.pipe)
-    local generator = RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
+    local generator = Squares.findObjectOn(square, RenewableEnergy.isGenerator)
     local state = generator and GasKit.stateOf(generator)
     return state ~= nil and state.onGas == true and generator:isActivated()
 end
@@ -200,8 +203,8 @@ function GasifierObject:afterChange()
     self:setFuming(self.lit and self.indoors)
     local isoObject = self:getIsoObject()
     if isoObject then
-        RenewableEnergy.showOverlay(isoObject, Gasifier.isLitOverlay, self.lit and Sprites.gasifierLit[self.tier] or nil)
-        RenewableEnergy.showOverlay(isoObject, Gasifier.isPipeOverlay, self.pipe and Sprites.gasifierPipe[self.pipe] or nil)
+        Tiles.showOverlay(isoObject, Gasifier.isLitOverlay, self.lit and Sprites.gasifierLit[self.tier] or nil)
+        Tiles.showOverlay(isoObject, Gasifier.isPipeOverlay, self.pipe and Sprites.gasifierPipe[self.pipe] or nil)
     end
     self:sendSummary()
 end

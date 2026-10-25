@@ -8,8 +8,8 @@
 -- time in game hours.
 
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/GlobalObjects"
 require "RenewableEnergy/WoodGas/Gasifier"
+local GlobalObjects = require "cf_commonlib/GlobalObjects"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester = {}
@@ -228,7 +228,7 @@ end
 
 -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
 -- copy of the hopper.
-RenewableEnergy.GlobalObjects.addAccessors(Digester, function(summary, isoObject)
+GlobalObjects.addAccessors(Digester, function(summary, isoObject)
     local _, feeds = Digester.feedsIn(isoObject:getContainer())
     summary.hopper = #feeds
 end)

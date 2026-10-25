@@ -5,6 +5,8 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
+local Materials = require "cf_commonlib/Materials"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local Treadmill = {}
@@ -41,7 +43,7 @@ end
 
 --- A treadmill's tile on `square`, wired or not, or nil.
 function Treadmill.findOn(square)
-    return RenewableEnergy.findObjectOn(square, Treadmill.isTreadmill)
+    return Squares.findObjectOn(square, Treadmill.isTreadmill)
 end
 
 --- Where the treadmill of `tile` has its rear end, which the runner stands on, and its console
@@ -77,7 +79,7 @@ function Treadmill.wiredHalf(tile)
     return nil
 end
 
---- What wiring a treadmill to feed a bank takes of `character` (RenewableEnergy.firstUnmet), as
+--- What wiring a treadmill to feed a bank takes of `character` (Materials.firstUnmet), as
 --- PowerBank.wiringNeeds does for a part.
 function Treadmill.wiringNeeds(character)
     return PowerBank.wiringNeeds(character, Specs.treadmill.wiring)
@@ -90,10 +92,10 @@ function Treadmill.wiringRefusal(character, tile)
     if Treadmill.wiredHalf(tile) then
         return "already wired"
     end
-    return RenewableEnergy.unmetKind(Treadmill.wiringNeeds(character))
+    return Materials.unmetKind(Treadmill.wiringNeeds(character))
 end
 
---- What unwiring a treadmill takes of `character` (RenewableEnergy.firstUnmet): the tools wiring
+--- What unwiring a treadmill takes of `character` (Materials.firstUnmet): the tools wiring
 --- it took, as PowerBank.unwiringNeeds says for a part.
 function Treadmill.unwiringNeeds(character)
     return PowerBank.unwiringNeeds(character, Specs.treadmill.wiring)
@@ -105,7 +107,7 @@ function Treadmill.unwiringRefusal(character, tile)
     if not Treadmill.isWiredTile(tile) then
         return "not wired"
     end
-    return RenewableEnergy.unmetKind(Treadmill.unwiringNeeds(character))
+    return Materials.unmetKind(Treadmill.unwiringNeeds(character))
 end
 
 --- Whether the treadmill of `tile` has power, from the grid or a generator, a bank included, as

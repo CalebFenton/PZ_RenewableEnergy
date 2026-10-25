@@ -7,6 +7,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local Sources = {}
@@ -85,7 +86,7 @@ end
 
 --- The source on a square, or nil.
 function Sources.findOn(square)
-    return RenewableEnergy.findObjectOn(square, isSource)
+    return Squares.findObjectOn(square, isSource)
 end
 
 --- Whether a source of `kind` may feed a bank from `square`: outdoors, unless its family works

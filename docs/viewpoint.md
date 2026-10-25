@@ -118,11 +118,11 @@ Not supported in 3D: placement. `IsoCell.render` and `IsoCursor.render` are skip
 | Ground items, the arrow-board trailer, garden lights and the trailer's ground light, bank-powered lamps, halo notes, our windows | Work [INFERENCE for items and trailer parts] | Vanilla paths Viewpoint reuses |
 | Status window's source highlight | Not drawn | `setHighlighted` unread |
 
-Sprite names in `RenewableEnergy/Sprites.lua`: tilesets `renewable_energy_01` (104 placed tiles with properties in `tools/make_tiles.py`, the legacy save-compatibility tiles among them, plus about 308 overlays) and `renewable_energy_02` (444 bank-fill overlays for the E, N and W facings). About 860 names in all. Runtime changes: overlays through `RenewableEnergy.showOverlays/showOverlay` (`Utilities.lua`), tile swaps through `showTile`/`setEntityTile`, the crate through container overlays, rotors through `WindSpin.lua`.
+Sprite names in `RenewableEnergy/Sprites.lua`: tilesets `renewable_energy_01` (104 placed tiles with properties in `tools/make_tiles.py`, the legacy save-compatibility tiles among them, plus about 308 overlays) and `renewable_energy_02` (444 bank-fill overlays for the E, N and W facings). About 860 names in all. Runtime changes: overlays through cf_commonlib's `Tiles.showOverlays/showOverlay`, tile swaps through `Tiles.showTile`/`Tiles.setEntityTile`, the crate through container overlays, rotors through `WindSpin.lua`.
 
 ### Menus
 
-- Our options pass the bank, source, light, digester or gasifier as a parameter, so look mode keeps them. Refusals made with no arguments (`Needs.refuse(menu:addOption(label))`) survive only inside a submenu, and their tooltip reasons are lost.
+- Our options pass the bank, source, light, digester or gasifier as a parameter, so look mode keeps them. Refusals made with no arguments (cf_commonlib's `Needs.refuse(menu:addOption(label))`) survive only inside a submenu, and their tooltip reasons are lost.
 - Look mode targets one object. Our hooks find their object by scanning the square (`Needs.findClicked`), so aiming at another object on the same square (a generator under a failsafe, a vanilla object beside a bank) builds our options referencing our object, not the aimed one, and they are dropped.
 - Lost in look mode: Seal Cracked Panel, Repair Frame and Attach/Detach Solar Maintainer (`UI/Menu.lua`, found with `PickVehicle`). Kept: the trailer's radial slices (`UI/BatteryBoxLid.lua` uses the globals at call time and `addSlice`).
 - The hooks have no side effects (no commands, sounds or state), which matters because harvest runs them unseen and often.

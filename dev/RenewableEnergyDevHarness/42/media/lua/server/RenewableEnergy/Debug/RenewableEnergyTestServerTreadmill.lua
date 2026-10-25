@@ -5,6 +5,7 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Squares = require "cf_commonlib/Squares"
 
 local handler = PZHarness.serverHandler
 local squareAt = PZHarness.Fixtures.squareAt
@@ -25,7 +26,7 @@ end
 -- A whole Run on Treadmill on the wired treadmill tile at `args` as the server's character
 -- (completeRun).
 handler("completeTreadmillRun", function(player, args)
-    local tile = RenewableEnergy.findObjectOn(squareAt(args), RenewableEnergy.Treadmill.isWiredTile)
+    local tile = Squares.findObjectOn(squareAt(args), RenewableEnergy.Treadmill.isWiredTile)
     if not tile then
         return nil, "a wired treadmill on the server"
     end

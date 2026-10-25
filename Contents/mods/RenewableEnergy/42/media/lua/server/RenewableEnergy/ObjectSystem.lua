@@ -1,15 +1,13 @@
--- The authority's side of features kept in a Global Object System (digesters, gasifiers): a system
--- per feature that saves each record with the world, runs every record each ten minutes loaded or
--- not, and sends clients its summary; a base for the records; and their side of the jobs players
--- do at them (GasJobs.perform).
+-- The mod's features kept in a Global Object System on the authority (digesters, gasifiers, banks),
+-- defined through cf_commonlib's ObjectSystem with the mod's own names, tiles and pass cap, and the
+-- base of their records with what the mod's session-only services ask of them.
 
 if isClient() then return end
 
-require "Map/SGlobalObjectSystem"
-require "Map/SGlobalObject"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Fumes"
+local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local ObjectSystem = {}
@@ -17,15 +15,15 @@ RenewableEnergy.ObjectSystem = ObjectSystem
 
 local Sprites, Fumes = RenewableEnergy.Sprites, RenewableEnergy.Fumes
 
+-- Saves keep the system and record classes by their names, which start with this.
+local PREFIX = "RenewableEnergy_"
+
 -- Cap on one pass (a save loaded after the clock jumped). These objects run while unloaded, so time
 -- away counts as digesting or burning.
 local LONGEST_PASS = 24 * 7
 
---- The base of a feature's records. A record is its global object's table, so the fields its
---- class's SAVED_FIELDS names are saved with the world. A class defines advance(hours), what the
---- time does to it; afterChange(), which shows and tells what changed; and buildSummary(), what
---- every client keeps of it.
-local Object = SGlobalObject:derive("RenewableEnergy_Object")
+--- The base of the mod's records (cf_commonlib's ObjectSystem.Object).
+local Object = LibObjectSystem.Object:derive(PREFIX .. "Object")
 ObjectSystem.Object = Object
 
 --- What the record goes by in session-only services (Stink, Fumes).
@@ -35,26 +33,6 @@ end
 
 function Object:tierSpec()
     return self.luaSystem.owner.TIERS[self.tier]
-end
-
---- Brings the record up to now: what the game hours since it last caught up did to it.
-function Object:catchUp()
-    self:advance(RenewableEnergy.hoursSince(self, LONGEST_PASS))
-end
-
---- Brings the record up to now, then shows and tells what changed.
-function Object:update()
-    self:catchUp()
-    self:afterChange()
-end
-
---- Sends the clients the summary, if it changed.
-function Object:sendSummary()
-    local summary = self:buildSummary()
-    if not RenewableEnergy.sameValue(summary, self.summary) then
-        self.summary = summary
-        self:updateOnClient()
-    end
 end
 
 --- Says whether the object fills its building with fumes now (RenewableEnergy.Fumes).
@@ -69,103 +47,34 @@ function Object:aboutToRemoveFromSystem()
     Fumes.set(self:key(), nil, false)
 end
 
---- A system class RenewableEnergy_<name>System keeping the records of `owner` (its shared module:
---- SYSTEM_NAME) in class `Record`, for the isoObjects `isObject` says are its: each record is
---- saved by Record.SAVED_FIELDS and sends clients its summary.
-function ObjectSystem.deriveSystem(name, owner, Record, isObject)
-    local System = SGlobalObjectSystem:derive("RenewableEnergy_" .. name .. "System")
-
-    function System:new()
-        return SGlobalObjectSystem.new(self, owner.SYSTEM_NAME)
-    end
-
-    function System:initSystem()
-        owner.serverSystem = self
-        self.system:setObjectModDataKeys(Record.SAVED_FIELDS)
-        self.system:setObjectSyncKeys({ "summary" })
-    end
-
-    -- The summary isn't saved; each record gets it before any client connects.
-    function System:initLuaObjects()
-        SGlobalObjectSystem.initLuaObjects(self)
-        for i = 1, self:getLuaObjectCount() do
-            local record = self:getLuaObjectByIndex(i)
-            record.summary = record:buildSummary()
-        end
-    end
-
-    function System:isValidIsoObject(isoObject)
-        return isObject(isoObject)
-    end
-
-    function System:newLuaObject(globalObject)
-        return Record:new(self, globalObject)
-    end
-
-    return System
-end
-
---- Defines and registers a feature's system. `spec`: name (the class is RenewableEnergy_<name>System),
---- kind (its tiles' Sprites kind), owner (its shared module: SYSTEM_NAME, TIERS, and the
---- accessors of GlobalObjects.addAccessors), Object (its record class), isObject(isoObject).
---- Returns the class, whose System.OnCreate(params) is the build menu's for its tiles.
-function ObjectSystem.define(spec)
-    local System = ObjectSystem.deriveSystem(spec.name, spec.owner, spec.Object, spec.isObject)
-    System.kind, System.owner = spec.kind, spec.owner
-
-    -- The build menu's OnCreate (scripts/RenewableEnergy/Entities.txt), on the authority: the new
-    -- tile gets its record. The build adds it to the square before this runs and sends it to the
-    -- clients after.
-    function System.OnCreate(params)
-        local thumpable = params.thumpable
-        if thumpable and thumpable:getSquare() then
-            System.instance:loadIsoObject(thumpable)
-        end
-    end
-
-    -- Every record, loaded or not, each ten minutes.
-    local function updateAll()
-        local self = System.instance
-        for i = 1, self:getLuaObjectCount() do
-            self:getLuaObjectByIndex(i):update()
-        end
-    end
-
-    local function load(isoObject)
-        if spec.isObject(isoObject) then
-            System.instance:loadIsoObject(isoObject)
-        end
-    end
-    for _, name in ipairs(Sprites.namesOf(spec.kind)) do
-        MapObjects.OnLoadWithSprite(name, load, Sprites.LOAD_PRIORITY)
-    end
-    Events.EveryTenMinutes.Add(updateAll)
-    SGlobalObjectSystem.RegisterSystemClass(System)
-    return System
-end
-
---- The authority's side of the jobs at a feature's tiles (a site of GasJobs.perform), whose
---- records are `owner`'s: each job works on the record of the tile worked at, brought up to now
---- first, and `DO[job](character, record, row, isoObject, with)` does it, returning whether it was
---- done. A tile without a record has nothing for a job to work on.
-function ObjectSystem.jobSite(owner, DO)
+-- `spec` with the mod's prefix, for cf_commonlib's ObjectSystem.
+local function prefixed(spec)
     return {
-        open = function(isoObject)
-            local record = owner.recordOf(isoObject)
-            if record then
-                record:catchUp()
-            end
-            return record
-        end,
-        act = function(character, job, record, row, isoObject, with)
-            return record ~= nil and DO[job](character, record, row, isoObject, with)
-        end,
-        tell = function(record)
-            if record then
-                record:afterChange()
-            end
-        end,
+        prefix = PREFIX, name = spec.name, owner = spec.owner, Object = spec.Object, isObject = spec.isObject,
     }
+end
+
+--- A system class RenewableEnergy_<name>System (cf_commonlib's ObjectSystem.deriveSystem), not
+--- registered. `spec`: name, owner, Object, isObject.
+function ObjectSystem.deriveSystem(spec)
+    return LibObjectSystem.deriveSystem(prefixed(spec))
+end
+
+--- Defines and registers a feature's system (cf_commonlib's ObjectSystem.define), loaded with the
+--- tiles of its Sprites kind and given its record as the build menu's OnCreate builds one
+--- (scripts/RenewableEnergy/Entities.txt). `spec`: name (the class is
+--- RenewableEnergy_<name>System), kind, owner (its shared module: SYSTEM_NAME, TIERS, and the
+--- accessors of GlobalObjects.addAccessors), Object (its record class, an ObjectSystem.Object),
+--- isObject. Returns the class.
+function ObjectSystem.define(spec)
+    local full = prefixed(spec)
+    full.sprites = Sprites.namesOf(spec.kind)
+    full.loadPriority = Sprites.LOAD_PRIORITY
+    full.longestPass = LONGEST_PASS
+    full.loadOnCreate = true
+    local System = LibObjectSystem.define(full)
+    System.kind = spec.kind
+    return System
 end
 
 return ObjectSystem

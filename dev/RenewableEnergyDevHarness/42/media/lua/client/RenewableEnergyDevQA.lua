@@ -7,6 +7,7 @@ require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
 require "PZHarness/StageLots"
+local Items = require "cf_commonlib/Items"
 local HarnessQA = require "PZHarness/QA"
 
 local QA = {}
@@ -242,7 +243,7 @@ local function lay(layout, summary, fullType, count, fluid, worn)
     end
     for _ = 1, count do
         local item = stockItem(fullType, fluid, worn)
-        RenewableEnergy.dropOn(square, item)
+        Items.dropOn(square, item)
         summary.items = summary.items + 1
     end
     summary.types = summary.types + 1

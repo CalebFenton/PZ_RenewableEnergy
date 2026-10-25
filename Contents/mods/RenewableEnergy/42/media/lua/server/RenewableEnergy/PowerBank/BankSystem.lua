@@ -21,13 +21,16 @@ require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/PowerBank/Bank"
 require "RenewableEnergy/PowerBank/Backup"
 require "RenewableEnergy/PowerBank/BankStatus"
+local Clock = require "cf_commonlib/Clock"
 
 RenewableEnergy = RenewableEnergy or {}
 local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
 local Sources, PanelSource, Treadmill = RenewableEnergy.Sources, RenewableEnergy.PanelSource, RenewableEnergy.Treadmill
 local Bank = RenewableEnergy.Bank
 
-local BankSystem = RenewableEnergy.ObjectSystem.deriveSystem("Bank", PowerBank, Bank, PowerBank.isBank)
+local BankSystem = RenewableEnergy.ObjectSystem.deriveSystem({
+    name = "Bank", owner = PowerBank, Object = Bank, isObject = PowerBank.isBank,
+})
 RenewableEnergy.BankSystem = BankSystem
 
 -- Values of the ChargeFreq sandbox option.
@@ -311,7 +314,7 @@ end
 --- Bring one bank up to now. `contextFor(hours)`, optional, gives the pass context for the span
 --- (BankSystem.passContext unless given).
 function BankSystem.updateBank(bank, contextFor)
-    local hours = RenewableEnergy.hoursSince(bank, BankSystem.LONGEST_PASS)
+    local hours = Clock.hoursSince(bank, BankSystem.LONGEST_PASS)
     if hours > 0 then
         bank:update(hours, (contextFor or BankSystem.passContext)(hours))
     end

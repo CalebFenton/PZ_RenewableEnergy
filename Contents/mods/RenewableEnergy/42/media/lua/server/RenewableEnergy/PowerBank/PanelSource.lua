@@ -12,6 +12,7 @@ require "RenewableEnergy/StormNotice"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
+local Tiles = require "cf_commonlib/Tiles"
 
 RenewableEnergy = RenewableEnergy or {}
 local Chance, Specs, Sprites, Sun = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
@@ -64,7 +65,7 @@ local function showCracksOf(isoObject, kind, facing, material, modules)
             table.insert(wanted, name)
         end
     end
-    RenewableEnergy.showOverlays(isoObject, isCrackOrSnow, wanted)
+    Tiles.showOverlays(isoObject, isCrackOrSnow, wanted)
 end
 
 --- Shows each of a placed panel's modules' cracked glass, light or heavy as
@@ -100,7 +101,7 @@ end
 
 local function showSnow(object, source)
     local shown = source.snow >= SNOW_SHOWN and Sprites.snowOverlay(source.kind, source.facing, source.material) or nil
-    RenewableEnergy.showOverlay(object, Sprites.isSnow, shown)
+    Tiles.showOverlay(object, Sprites.isSnow, shown)
 end
 
 --- Someone swept the panel `source` (a bank's record), whose object is `object` when loaded.

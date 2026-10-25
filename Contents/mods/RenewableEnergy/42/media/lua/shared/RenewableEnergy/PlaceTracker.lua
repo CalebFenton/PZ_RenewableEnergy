@@ -7,6 +7,7 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local PlaceTracker = {}
@@ -125,7 +126,7 @@ end
 function PlaceTracker:each(fn)
     local cell = getCell()
     for key, place in pairs(self.places) do
-        local isoObject = RenewableEnergy.findObjectOn(cell:getGridSquare(place.x, place.y, place.z), self.matches)
+        local isoObject = Squares.findObjectOn(cell:getGridSquare(place.x, place.y, place.z), self.matches)
         if isoObject then
             fn(isoObject)
         else

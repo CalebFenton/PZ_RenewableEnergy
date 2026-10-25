@@ -1,11 +1,10 @@
--- Every hands-on job at a battery bank, a source, a garden light or a vehicle
--- (RenewableEnergy.JobAction); the authority's complete() makes the change. The server finds the
--- class by its Type with a plain global lookup (NetTimedAction.parse), which is why the class is a
--- global outside the RenewableEnergy table.
+-- Every hands-on job at a battery bank, a source, a garden light or a vehicle (cf_commonlib's
+-- JobAction); the authority's complete() makes the change. The server finds the class by its Type
+-- with a plain global lookup (NetTimedAction.parse), which is why the class is a global outside
+-- the RenewableEnergy table.
 
 require "Util/BuildingHelper"
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/TimedActions/JobAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -15,14 +14,20 @@ require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/CarAlternator"
+local Clock = require "cf_commonlib/Clock"
+local Items = require "cf_commonlib/Items"
+local JobAction = require "cf_commonlib/JobAction"
+local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergyAction = RenewableEnergy.JobAction:derive("RenewableEnergyAction")
+-- Kept across a reload of this file, so the actions already queued stay of this class.
+RenewableEnergyAction = RenewableEnergyAction or JobAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
 Action.REPORTS_LOOT = true
+Action.TOO_DARK = "Tooltip_RenewableEnergy_TooDark"
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
 local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
-local positionOf, onSquare = PowerBank.positionOf, RenewableEnergy.onSquare
+local positionOf, onSquare = PowerBank.positionOf, Squares.onSquare
 local CarAlternator = RenewableEnergy.CarAlternator
 local Recipes, SolarMaintainer = RenewableEnergy.Recipes, RenewableEnergy.SolarMaintainer
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
@@ -64,11 +69,11 @@ local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.S
 Action.REACH = 4.6
 
 function Action.isSnowTool(item)
-    return item ~= nil and SNOW_TOOLS[item:getFullType()] == true and RenewableEnergy.notBroken(item)
+    return item ~= nil and SNOW_TOOLS[item:getFullType()] == true and Items.notBroken(item)
 end
 
 function Action.isBoltCutters(item)
-    return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and RenewableEnergy.notBroken(item)
+    return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and Items.notBroken(item)
 end
 
 local function isBank(bank)
@@ -465,7 +470,7 @@ function Action:units()
     if row.units then
         return valueOf(row.units, self)
     end
-    return valueOf(row.minutes, self) * RenewableEnergy.unitsPerMinute()
+    return valueOf(row.minutes, self) * Clock.unitsPerMinute()
 end
 
 function Action:target()

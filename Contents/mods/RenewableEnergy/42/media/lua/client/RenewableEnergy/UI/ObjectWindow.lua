@@ -2,16 +2,16 @@
 -- gasifier's (SummaryWindow). Each family keeps one window per local player in its class's
 -- `windows`; a new one opens where the player's last one of the family stood, takes the
 -- controller's focus, and closes with B, as vanilla's windows do. It closes once its object is
--- gone or the character walked away (InfoAction.inReach), as vanilla's animal windows close. A
--- derived class defines refresh(), which brings it up to date before each frame is drawn and
--- returns false when there is nothing left to show.
+-- gone or the character walked away (cf_commonlib's OpenAction.inReach), as vanilla's animal
+-- windows close. A derived class defines refresh(), which brings it up to date before each frame
+-- is drawn and returns false when there is nothing left to show.
 --
 -- The windows draw their rows alike: a row is { header = text }, { label = text, value = text,
 -- color = name, source = entry }, { bar = 0..1 } or { gap = true }, measured by
 -- ObjectWindow.measure and drawn by ObjectWindow:drawRows.
 
 require "ISUI/ISCollapsableWindow"
-require "RenewableEnergy/TimedActions/InfoAction"
+local OpenAction = require "cf_commonlib/OpenAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local ObjectWindow = ISCollapsableWindow:derive("RenewableEnergyObjectWindow")
@@ -121,7 +121,7 @@ function ObjectWindow:drawRows(rows, layout, x, y)
 end
 
 function ObjectWindow:prerender()
-    if not (RenewableEnergy.InfoAction.inReach(self.playerNum, self.object) and self:refresh() ~= false) then
+    if not (OpenAction.inReach(self.playerNum, self.object) and self:refresh() ~= false) then
         self:close()
         return
     end
@@ -169,6 +169,14 @@ function ObjectWindow:openOn(playerNum, object)
         setJoypadFocus(playerNum, window)
     end
     return window
+end
+
+--- Walks `playerNum`'s character over to `object` and opens their window of the class `window`
+--- (an ObjectWindow) on it there, as things stand then (cf_commonlib's OpenAction).
+function ObjectWindow.queueOpen(playerNum, object, window)
+    OpenAction.queue(getSpecificPlayer(playerNum), object, function(character, target)
+        window:openOn(character:getPlayerNum(), target)
+    end)
 end
 
 return ObjectWindow

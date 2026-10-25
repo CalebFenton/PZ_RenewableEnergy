@@ -9,6 +9,7 @@ require "PZHarness/Fixtures"
 require "PZHarness/Loot"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
@@ -72,7 +73,7 @@ handler("worldBank", function(_, args, defer)
         defer(function() removePlaced(bank) end)
     end
     local kind = RenewableEnergy.WorldSpawns.BANK_STOCK[args.stock].sprite
-    local onSquare = RenewableEnergy.findObjectOn(square, function(object) return Sprites.kindOfObject(object) == kind end)
+    local onSquare = Squares.findObjectOn(square, function(object) return Sprites.kindOfObject(object) == kind end)
     local answer = { placed = bank ~= nil, boxOnSquare = onSquare ~= nil }
     if bank then
         answer.sprite = bank:getTextureName()

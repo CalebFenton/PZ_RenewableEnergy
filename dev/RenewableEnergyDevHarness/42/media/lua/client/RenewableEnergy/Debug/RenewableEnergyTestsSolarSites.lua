@@ -4,6 +4,7 @@ require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/Wind"
+local Squares = require "cf_commonlib/Squares"
 
 -- Solar sites (World/SolarSites.lua): the tests arm a site's spots on the authority as the world
 -- does when it rolls the site in (SolarSites.addSite), then let the world place them as their
@@ -91,7 +92,7 @@ test("renewable_energy_world_site_waits_for_a_free_square", {
             reloadAndSettle(self, at)
             T.server(self, "sitePlaced", armedSpots)
             T.waitFor(self, function()
-                return RenewableEnergy.findObjectOn(getSquare(at.x, at.y, at.z), Wind.isCharger) ~= nil
+                return Squares.findObjectOn(getSquare(at.x, at.y, at.z), Wind.isCharger) ~= nil
             end, "this client's copy of the wind charger")
         end)
     end,
@@ -143,7 +144,7 @@ local VISITED_SITES = {
 -- and garden lights are a promise.
 local function siteCopiesArrived(spots)
     local function on(x, y, z, matches)
-        return RenewableEnergy.findObjectOn(getSquare(x, y, z), matches) ~= nil
+        return Squares.findObjectOn(getSquare(x, y, z), matches) ~= nil
     end
     local function isMount(object)
         local kind = Sprites.kindOfObject(object)

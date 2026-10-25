@@ -12,6 +12,7 @@ require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/GasLine/GasLines"
 require "RenewableEnergy/PowerBank/Bank"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
@@ -38,7 +39,7 @@ local function generatorsInReach(bank)
         local generator = square:getGenerator()
         if RenewableEnergy.isGenerator(generator) and generator:isConnected() then
             Payers.track(generator)
-            table.insert(found, { generator = generator, failsafe = RenewableEnergy.findObjectOn(square, isFailsafe) ~= nil })
+            table.insert(found, { generator = generator, failsafe = Squares.findObjectOn(square, isFailsafe) ~= nil })
         end
     end)
     PlaceTracker.sortNearest(found, bank.x, bank.y, bank.z, generatorPlace)

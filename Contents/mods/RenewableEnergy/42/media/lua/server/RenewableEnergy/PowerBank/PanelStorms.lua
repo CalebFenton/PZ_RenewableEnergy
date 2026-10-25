@@ -17,6 +17,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/PowerBank/BankSystem"
+local Clock = require "cf_commonlib/Clock"
 
 RenewableEnergy = RenewableEnergy or {}
 local PowerBank, Sources, PanelSource = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.PanelSource
@@ -100,7 +101,7 @@ end
 -- the time itself.
 local function update()
     -- As a bank's pass: a save loaded after the clock jumped never counts days of storm at once.
-    local hours = RenewableEnergy.hoursSince(store(), RenewableEnergy.BankSystem.LONGEST_PASS)
+    local hours = Clock.hoursSince(store(), RenewableEnergy.BankSystem.LONGEST_PASS)
     PanelStorms.pass(PanelSource.stormHours(hours))
 end
 

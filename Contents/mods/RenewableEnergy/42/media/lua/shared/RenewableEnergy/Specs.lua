@@ -9,10 +9,13 @@ RenewableEnergy = RenewableEnergy or {}
 local Specs = {}
 RenewableEnergy.Specs = Specs
 
--- The tools wiring jobs take, as materials (RenewableEnergy.Materials): a tag, and the item a
+-- The tools wiring jobs take, as materials (cf_commonlib's Materials): a tag, and the item a
 -- tooltip names for it, as vanilla names the wrench its jobs take.
 local SCREWDRIVER = { tool = "SCREWDRIVER", item = "Base.Screwdriver" }
 local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+
+-- Lighting a fire takes one use of a match or lighter, as a campfire does.
+Specs.FIRE_STARTER = { tool = "START_FIRE", item = "Base.Matches", useOne = true }
 
 -- Batteries by item type. wh is capacity at full condition; cyclesAt50 is how many discharges of
 -- half the new capacity use up a battery's condition (Battery.cycleWear), so one carrying such a

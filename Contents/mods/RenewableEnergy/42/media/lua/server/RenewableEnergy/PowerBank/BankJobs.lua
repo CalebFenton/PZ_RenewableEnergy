@@ -10,7 +10,6 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/Recipes"
@@ -22,13 +21,15 @@ require "RenewableEnergy/PowerBank/BankSystem"
 require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/PowerBank/WindSource"
 require "RenewableEnergy/PowerBank/TreadmillSource"
+local Items = require "cf_commonlib/Items"
+local Materials = require "cf_commonlib/Materials"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Wind, PowerBank, Wear = RenewableEnergy.Specs, RenewableEnergy.Wind, RenewableEnergy.PowerBank, RenewableEnergy.Wear
 local Sources, Treadmill, BankSystem = RenewableEnergy.Sources, RenewableEnergy.Treadmill, RenewableEnergy.BankSystem
 local PanelSource, WindSource = RenewableEnergy.PanelSource, RenewableEnergy.WindSource
 local Recipes = RenewableEnergy.Recipes
-local Materials, TreadmillSource = RenewableEnergy.Materials, RenewableEnergy.TreadmillSource
+local TreadmillSource = RenewableEnergy.TreadmillSource
 local isPosition, bankAt = PowerBank.isPosition, BankSystem.bankAt
 
 local BankJobs = {}
@@ -200,10 +201,10 @@ function BankJobs.replaceBlades(player, args)
     local refusal = Wind.bladesRefusal(object, item)
     if refusal then return false, refusal end
     local broke = Specs.wind.blades[Wind.bladesOfObject(object)]
-    RenewableEnergy.takeItem(player, item)
+    Items.takeItem(player, item)
     WindSource.fitBlades(object, Wind.bladesOfItem(Sources.kindOf(object), item), source)
     WindSource.setBroken(object, false, source)
-    RenewableEnergy.giveItems(player, broke.broken)
+    Items.giveItems(player, broke.broken)
     if bank then
         bank:sendStatus()
     end
@@ -275,8 +276,8 @@ function BankJobs.wireIn(player, args)
     settle(bank)
     local wiring = PowerBank.wiringFor(item:getFullType())
     takeWiring(player, wiring)
-    RenewableEnergy.takeItem(player, item)
-    RenewableEnergy.addItem(container, item)
+    Items.takeItem(player, item)
+    Items.addItem(container, item)
     RenewableEnergy.teachOnce(player, item, PowerBank.WIRED_ONCE_KEY, Perks.Electricity, wiring.xp)
     partsChanged(bank)
     return true
@@ -292,9 +293,9 @@ function BankJobs.unwire(player, args)
     -- The battery leaves with the bank's shared charge as it is now.
     settle(bank)
     bank:writeBatteries(container, false)
-    RenewableEnergy.takeItem(player, item)
-    RenewableEnergy.giveItems(player, item)
-    RenewableEnergy.giveItems(player, PowerBank.WIRE, PowerBank.wiringFor(item:getFullType()).wire)
+    Items.takeItem(player, item)
+    Items.giveItems(player, item)
+    Items.giveItems(player, PowerBank.WIRE, PowerBank.wiringFor(item:getFullType()).wire)
     partsChanged(bank)
     return true
 end

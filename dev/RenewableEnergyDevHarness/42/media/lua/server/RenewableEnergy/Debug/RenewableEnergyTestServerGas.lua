@@ -8,6 +8,7 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
@@ -16,7 +17,7 @@ local handler = PZHarness.serverHandler
 
 local function generatorOn(args)
     local square = PZHarness.Fixtures.squareAt(args)
-    local generator = square and RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
+    local generator = square and Squares.findObjectOn(square, RenewableEnergy.isGenerator)
     if not generator then
         return nil, "a generator at " .. tostring(args.x) .. "," .. tostring(args.y)
     end
@@ -143,7 +144,7 @@ handler("kitJobComplete", function(player, args)
 end)
 
 -- Has the kit job `args.job` not get done on the authority until the test ends, as a job whose
--- work fails there: its site's act (GasJobs.perform) answers false and changes nothing.
+-- work fails there: its site's act (Jobs.perform) answers false and changes nothing.
 handler("kitJobNotDone", function(player, args, defer)
     local site = RenewableEnergy.GasLines.jobSite
     local act = site.act

@@ -9,6 +9,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Wind"
+local Squares = require "cf_commonlib/Squares"
 
 local Specs, Sprites, Wind = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Wind
 
@@ -92,7 +93,7 @@ local function spin()
     if seconds <= 0 or tracked == 0 or isGamePaused() then return end
     local kph = getClimateManager():getWindspeedKph()
     for object, state in pairs(chargers) do
-        local name = RenewableEnergy.onSquare(object) and Sprites.nameOf(object)
+        local name = Squares.onSquare(object) and Sprites.nameOf(object)
         if name and name ~= state.sprite then
             state = stateFor(name)
             if state then

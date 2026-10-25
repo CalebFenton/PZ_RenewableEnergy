@@ -9,6 +9,7 @@
 require "RenewableEnergy/PlaceTracker"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local SolarCellCharger = {}
@@ -39,7 +40,7 @@ function SolarCellCharger.acceptItem(container, item)
 end
 
 function SolarCellCharger.findOn(square)
-    return RenewableEnergy.findObjectOn(square, SolarCellCharger.isCharger)
+    return Squares.findObjectOn(square, SolarCellCharger.isCharger)
 end
 
 local function adoptContainer(isoObject)

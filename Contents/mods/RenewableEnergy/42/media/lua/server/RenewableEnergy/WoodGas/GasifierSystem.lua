@@ -8,6 +8,8 @@ require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/WoodGas/GasifierObject"
+local Items = require "cf_commonlib/Items"
+local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 RenewableEnergy = RenewableEnergy or {}
 local Gasifier, GasifierJobs, ObjectSystem = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs, RenewableEnergy.ObjectSystem
@@ -31,7 +33,7 @@ local DO = {
     end,
     [GasifierJobs.CLEAN_ASH] = function(character, record)
         local count = math.floor(record.ash / Gasifier.ASH_PER_ITEM)
-        RenewableEnergy.giveItems(character, Gasifier.WOOD_ASH, count)
+        Items.giveItems(character, Gasifier.WOOD_ASH, count)
         record.ash = record.ash - count * Gasifier.ASH_PER_ITEM
         return true
     end,
@@ -50,8 +52,8 @@ local DO = {
     end,
 }
 
---- The authority's side of the jobs at a record (GasJobs.perform), whose `with` is the container
+--- The authority's side of the jobs at a record (Jobs.perform), whose `with` is the container
 --- Drain Condensate fills.
-GasifierSystem.jobSite = ObjectSystem.jobSite(Gasifier, DO)
+GasifierSystem.jobSite = LibObjectSystem.jobSite(Gasifier, DO)
 
 return GasifierSystem

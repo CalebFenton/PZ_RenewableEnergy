@@ -10,6 +10,7 @@ require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
 require "RenewableEnergy/UI/StatusWindow"
+local Clock = require "cf_commonlib/Clock"
 
 -- Solar menus: the panel menus, actions and highlight (UI/Menu.lua, UI/StatusWindow.lua) and the
 -- connect action's XP and time (TimedActions/RenewableEnergyAction.lua).
@@ -403,7 +404,7 @@ test("renewable_energy_solar_connect_time_by_electricity", {
             for _, level in ipairs({ 0, 3, 10 }) do
                 T.setPerk(self, Perks.Electricity, level)
                 local units = Action:new(player(), Action.CONNECT_SOURCE, nil, nil):units()
-                self.minutes[level] = units / RenewableEnergy.unitsPerMinute()
+                self.minutes[level] = units / Clock.unitsPerMinute()
             end
         end)
     end,

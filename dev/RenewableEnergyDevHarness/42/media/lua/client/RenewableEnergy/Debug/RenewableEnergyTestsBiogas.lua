@@ -314,7 +314,7 @@ test("renewable_energy_biogas_digester_holder", {
             T.readRecord(self, handle, "torn")
         end)
         T.waitForSummary(self, handle, function(summary) return summary.torn end, "this client's summary of the torn bags")
-        self.replace = DigesterJobs.materials(DigesterJobs.REPLACE_BAGS)
+        self.replace = DigesterJobs.materials(T.player(), DigesterJobs.REPLACE_BAGS)
         T.giveMaterials(self, "bags", self.replace)
         T.gasJob(self, "digester", handle, DigesterJobs.REPLACE_BAGS)
         T.batch(function()
@@ -386,7 +386,7 @@ test("renewable_energy_biogas_digester_upgrade", {
         if not handle then return end
         self.digester = handle
         self.capacity = tonumber(getSprite(Sprites.digester.insulated):getProperties():get("ContainerCapacity"))
-        self.upgrade = DigesterJobs.materials(DigesterJobs.UPGRADE)
+        self.upgrade = DigesterJobs.materials(T.player(), DigesterJobs.UPGRADE)
         self.dung = 2
         -- At its cap, so it eats nothing from the hopper meanwhile.
         T.batch(function()

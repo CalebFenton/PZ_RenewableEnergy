@@ -8,6 +8,7 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
+local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
@@ -156,7 +157,7 @@ end
 -- its line connected and listed for the gas pass, its kit drawn on it. Answers the generator.
 local function expectKittedGenerator(expect, expectNear, square, source, kind)
     local GasKit, SolarSites = RenewableEnergy.GasKit, RenewableEnergy.SolarSites
-    local generator = RenewableEnergy.findObjectOn(square, RenewableEnergy.isGenerator)
+    local generator = Squares.findObjectOn(square, RenewableEnergy.isGenerator)
     if not expect(generator ~= nil, "no generator at the site's far end") then
         return nil
     end
@@ -218,7 +219,7 @@ local SPOT_CHECKS = {
     -- The wind charger braked with its blades broken, wired to a plugged-in rack of tired batteries.
     windCharger = function(expect, _, at, spot, far)
         local Wind, PowerBank, WorldSpawns = RenewableEnergy.Wind, RenewableEnergy.PowerBank, RenewableEnergy.WorldSpawns
-        local charger = RenewableEnergy.findObjectOn(at, Wind.isCharger)
+        local charger = Squares.findObjectOn(at, Wind.isCharger)
         local bank = PowerBank.findOn(far)
         if not (expect(charger ~= nil, "no wind charger on the site's square") and expect(bank ~= nil, "no bank on the site's bank square")) then
             return

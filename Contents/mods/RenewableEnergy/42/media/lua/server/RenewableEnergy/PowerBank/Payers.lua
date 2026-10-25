@@ -21,6 +21,8 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local Payers = {}
@@ -88,12 +90,12 @@ function Payers.running()
 end
 
 local function reaches(payer, x, y, z)
-    return RenewableEnergy.inGeneratorReach(payer.x, payer.y, payer.z, x, y, z)
+    return GeneratorReach.covers(payer.x, payer.y, payer.z, x, y, z)
 end
 
 --- `payer` and the payers in `payers` that reach any square it does: those it may share with.
 function Payers.sharers(payer, payers)
-    local radius, levels = RenewableEnergy.generatorReach()
+    local radius, levels = GeneratorReach.range()
     local span = 2 * radius
     local list = { payer }
     for _, other in ipairs(payers) do
@@ -205,7 +207,7 @@ local function keepShares()
     if consumption <= 0 then return end
     for key, entry in pairs(billed) do
         local generator = entry.generator
-        if not generator:getSquare() or not RenewableEnergy.onSquare(generator) or not generator:isActivated() then
+        if not generator:getSquare() or not Squares.onSquare(generator) or not generator:isActivated() then
             billed[key] = nil
         else
             local now = generator:getTotalPowerUsing()

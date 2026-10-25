@@ -7,7 +7,7 @@ description=[i]Work in progress: still being balanced and updated. Feedback is w
 description=
 description=Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels, wind chargers, a treadmill, a bank of batteries, and a generator that runs on manure gas or wood. You start with a car battery in a wooden box, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
 description=
-description=[b]Build 42.20 or newer.[/b] Single player and multiplayer. Fine to add to a save in progress.
+description=[b]Build 42.20 or newer.[/b] Single player and multiplayer. Fine to add to a save in progress. Requires [b]cf_commonlib[/b].
 description=
 description=[b][url=https://github.com/CalebFenton/PZ_RenewableEnergy/blob/master/docs/player-guide.md]The player's guide[/url][/b] explains every system: sizing a bank, placing a wind charger, feeding a digester, fixing a panel that goes quiet, and where to look.
 description=
@@ -54,7 +54,7 @@ description=
 description=[h2]Wind[/h2]
 description=[img]https://raw.githubusercontent.com/CalebFenton/PZ_RenewableEnergy/master/art/promo/images/wind.png[/img]
 description=
-description=Build them on the [b]Welding[/b] page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares from each other, or they steal each other's wind.
+description=Build them on the [b]Welding[/b] page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares apart, or they steal each other's wind.
 description=
 description=When a gale sets the blades creaking and rattling, [b]Set the Brake[/b] or you'll be replacing them: carved, cut from pipe, or forged steel that breaks last. The turbine swings itself out of the worst of it.
 description=
@@ -77,7 +77,7 @@ description=[h2]Crafting[/h2]
 description=Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A homemade inverter, wound on a microwave's transformer, gets a bank going until you find a real one. The maintainer and the battery charger can't be crafted. Every recipe is on [url=https://raw.githubusercontent.com/CalebFenton/PZ_RenewableEnergy/master/art/promo/images/recipes.png]one sheet[/url].
 description=
 description=[h2]Where to look[/h2]
-description=Think about who had this stuff in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually up on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, worn and in need of fixing up.
+description=Think about who had this in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, worn and needing repair.
 description=
 description=The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
 description=

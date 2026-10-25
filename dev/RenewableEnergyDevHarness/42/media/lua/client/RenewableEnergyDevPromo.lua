@@ -28,6 +28,9 @@ require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
 require "PZHarness/StageLots"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
+local Jobs = require "cf_commonlib/Jobs"
+local Squares = require "cf_commonlib/Squares"
 local Places = require "RenewableEnergyDevPromoPlaces"
 
 local Promo = {}
@@ -214,7 +217,7 @@ end
 local function quietNeighbourhood(homesteadSquare, stage0Square)
     local lights, fridges = 0, 0
     for _, bankSquare in ipairs({ homesteadSquare, stage0Square }) do
-        RenewableEnergy.eachSquareInGeneratorReach(bankSquare, function(square)
+        GeneratorReach.eachSquare(bankSquare:getX(), bankSquare:getY(), bankSquare:getZ(), function(square)
             local objects = square:getObjects()
             for i = objects:size() - 1, 0, -1 do
                 local object = objects:get(i)
@@ -240,7 +243,7 @@ local function switchOnLights(square, otherBank)
         for x, y in PZHarness.Fixtures.ring(square:getX(), square:getY(), radius) do
             local near = getCell():getGridSquare(x, y, square:getZ())
             local objects = near and building and near:getBuilding() == building
-                and not RenewableEnergy.inGeneratorReach(bankX, bankY, bankZ, x, y, square:getZ()) and near:getObjects()
+                and not GeneratorReach.covers(bankX, bankY, bankZ, x, y, square:getZ()) and near:getObjects()
             for i = 0, (objects and objects:size() or 0) - 1 do
                 local object = objects:get(i)
                 if switched < HOUSE_LIGHTS and instanceof(object, "IsoLightSwitch") and switchLight(object, true) then
@@ -320,7 +323,7 @@ local function placeGasifier(square, tier, lit)
     return thumpable
 end
 
--- Gives `player` what the materials list `list` (RenewableEnergy.Materials) asks for: its skill
+-- Gives `player` what the materials list `list` (cf_commonlib's Materials) asks for: its skill
 -- levels, each with its restore added to `restores`, and its items, each added to `given`. An item
 -- counted in uses comes as one whole item.
 local function giveMaterials(player, list, given, restores)
@@ -337,14 +340,14 @@ local function giveMaterials(player, list, given, restores)
 end
 
 -- Fits the gas kit to `generator` and runs its line to `source`, a digester or a gasifier, by
--- the jobs a player does (GasJobs.perform), the character holding what they take meanwhile.
+-- the jobs a player does (Jobs.perform), the character holding what they take meanwhile.
 local function fitGasKit(generator, source)
-    local GasKit, GasJobs, site = RenewableEnergy.GasKit, RenewableEnergy.GasJobs, RenewableEnergy.GasLines.jobSite
+    local GasKit, site = RenewableEnergy.GasKit, RenewableEnergy.GasLines.jobSite
     local player = getPlayer()
     local given, restores = {}, {}
     for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
-        giveMaterials(player, GasKit.materials(job, generator, source), given, restores)
-        if not GasJobs.perform(GasKit, site, player, job, generator, source) then
+        giveMaterials(player, GasKit.materials(player, job, generator, source), given, restores)
+        if not Jobs.perform(GasKit, site, player, job, generator, source) then
             print(MARK .. " gas kit " .. job .. " refused: " .. tostring(GasKit.refusal(player, job, generator, source)))
         end
     end
@@ -577,7 +580,7 @@ end
 
 -- Adds the steps that shoot `windowClass`'s window on `objectOf()` as `name` once `ready(window)`
 -- holds. The character stands beside the object meanwhile, as the window closes out of its reach
--- (RenewableEnergy.InfoAction.inReach).
+-- (cf_commonlib's OpenAction.inReach).
 local function addWindowShot(name, windowClass, objectOf, ready)
     Harness.addWindowShot(run, name, {
         open = function()
@@ -610,7 +613,7 @@ local function addMenu()
         end
         local context = ISWorldObjectContextMenu.createMenu(0, { homesteadBank }, MENU_AT, MENU_AT)
         -- A light switch on the bank's wall adds its own option above the bank's.
-        local switch = RenewableEnergy.findObjectOn(homesteadBank:getSquare(), function(object)
+        local switch = Squares.findObjectOn(homesteadBank:getSquare(), function(object)
             return instanceof(object, "IsoLightSwitch")
         end)
         if switch then

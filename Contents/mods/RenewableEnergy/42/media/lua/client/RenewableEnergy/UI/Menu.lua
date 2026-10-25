@@ -14,10 +14,11 @@ require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
-require "RenewableEnergy/TimedActions/InfoAction"
 require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/Needs"
+require "RenewableEnergy/UI/ObjectWindow"
 require "RenewableEnergy/UI/StatusWindow"
+local Needs = require "cf_commonlib/Needs"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergy = RenewableEnergy or {}
 local Menu = {}
@@ -28,8 +29,7 @@ local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Format = RenewableEnergy.Format
-local Needs = RenewableEnergy.Needs
-local StatusWindow = RenewableEnergy.StatusWindow
+local ObjectWindow, StatusWindow = RenewableEnergy.ObjectWindow, RenewableEnergy.StatusWindow
 
 --- The name of a placed tile: the item it is (CustomItem), which picking it up gives back, else
 --- its moveable's name (CustomName, Moveables.json), as a wind charger has. A vanilla treadmill's
@@ -55,11 +55,11 @@ end
 -- "Too dark" for a job that needs light to see by (RenewableEnergyAction.needsLight) while the
 -- character stands in the dark, else `blocker`.
 local function lightOr(character, job, blocker)
-    return Needs.tooDark(character, Action.needsLight(job)) or blocker
+    return Needs.tooDark(character, Action.needsLight(job), Action.TOO_DARK) or blocker
 end
 
 local function queueAt(playerNum, square, job, object, bank, item, bankName, slot)
-    local character = RenewableEnergy.walkTo(playerNum, square)
+    local character = Squares.walkTo(playerNum, square)
     if character then
         ISTimedActionQueue.add(Action:new(character, job, object, bank, nil, item, bankName, nil, slot))
     end
@@ -93,7 +93,7 @@ local function queueConnectAll(playerNum, bank, sources)
 end
 
 local function queueClearSnow(playerNum, source)
-    local character = RenewableEnergy.walkTo(playerNum, source:getSquare())
+    local character = Squares.walkTo(playerNum, source:getSquare())
     if not character then
         return
     end
@@ -110,7 +110,7 @@ local function queueSeal(playerNum, source, slot)
 end
 
 local function queueBulb(playerNum, job, light, bulb)
-    local character = RenewableEnergy.walkTo(playerNum, light:getSquare())
+    local character = Squares.walkTo(playerNum, light:getSquare())
     if not character then
         return
     end
@@ -121,7 +121,7 @@ local function queueBulb(playerNum, job, light, bulb)
 end
 
 local function queueRun(playerNum, treadmill)
-    local character = RenewableEnergy.walkTo(playerNum, treadmill:getSquare())
+    local character = Squares.walkTo(playerNum, treadmill:getSquare())
     if character then
         ISTimedActionQueue.add(RenewableEnergyTreadmillAction:new(character, treadmill))
     end
@@ -268,7 +268,7 @@ end
 
 --- Unwire: one option for each part in the bank, led by All Batteries when it holds more than
 --- one, each greyed out while it can't come out with the tools that takes listed. What doesn't fit
---- in the character's inventory lands at their feet (RenewableEnergy.giveItems). Returns the
+--- in the character's inventory lands at their feet (Items.giveItems). Returns the
 --- submenu, or nil for an empty bank.
 function Menu.addUnwireOptions(playerNum, menu, bank)
     local parts = wiredParts(bank, PowerBank.partKind)
@@ -331,7 +331,7 @@ end
 function Menu.addBankOptions(playerNum, context, bank)
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, Menu.bankLabel(bank))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, bank, StatusWindow)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, ObjectWindow.queueOpen, bank, StatusWindow)
 
     local summary = PowerBank.summaryOf(bank)
     if not summary then

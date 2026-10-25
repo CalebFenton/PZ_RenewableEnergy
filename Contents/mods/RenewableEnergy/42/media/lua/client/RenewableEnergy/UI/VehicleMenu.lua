@@ -7,7 +7,7 @@ require "Vehicles/TimedActions/ISPathFindAction"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/Needs"
+local Needs = require "cf_commonlib/Needs"
 
 RenewableEnergy = RenewableEnergy or {}
 local VehicleMenu = {}
@@ -15,7 +15,6 @@ RenewableEnergy.VehicleMenu = VehicleMenu
 
 local Action = RenewableEnergyAction
 local SolarMaintainer = RenewableEnergy.SolarMaintainer
-local Needs = RenewableEnergy.Needs
 
 -- Walks to the vehicle's battery, where a maintainer clips on.
 local function queueVehicle(playerNum, job, vehicle, item)
@@ -52,7 +51,7 @@ function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     end
     local character = getSpecificPlayer(playerNum)
     local needs = RenewableEnergy.Recipes.sealInPlaceNeeds(character)
-    local blocker = Needs.tooDark(character, Action.needsLight(Action.SEAL_PANEL))
+    local blocker = Needs.tooDark(character, Action.needsLight(Action.SEAL_PANEL), Action.TOO_DARK)
     for _, partId in ipairs(ArrowBoard.PANELS) do
         local part = ArrowBoard.sealablePanel(vehicle, partId)
         if part then

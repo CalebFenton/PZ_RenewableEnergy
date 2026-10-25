@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Builds a playtest and review copy without launching the game: lays out the README images from
 # the committed captures (art/promo/compose.py), renders README.md the way GitHub shows it to a
-# self-contained HTML page and a PDF, and zips the mod folder the way players install it, and the
+# self-contained HTML page and a PDF, and zips the mod folder the way players install it, with the
+# libraries it requires (the conf's LIBRARY_MODS) beside it, each library on its own too, and the
 # dev mods (this mod's and the shared test harness) the same way. All of it lands in REVIEW_DIR
 # (default ~/Nextcloud):
 #
 #   RenewableEnergy-<modversion>.zip    unzip into ~/Zomboid/mods (or the Windows equivalent)
+#   <library>-<modversion>.zip          each library alone, as the Workshop publishes it
 #   RenewableEnergyDevMods.zip          the same, for the debug scenario and the tests
 #   RenewableEnergy-README.html, .pdf
 #   RenewableEnergy-player-guide.html
@@ -49,17 +51,28 @@ bottom = max([b[3] for b in page.get_text("blocks")] + [i["bbox"][3] for i in pa
 page.set_cropbox(pymupdf.Rect(0, 0, page.rect.width, min(page.rect.height, bottom + 36)))
 doc.save(sys.argv[2], garbage=3, deflate=True)
 EOF
-# The folder layout players unzip into their mods folder; Finder's .DS_Store files stay out. The
-# shared harness goes in under the folder name the game runs it from (HARNESS_MOD_FOLDER).
-(cd "$MOD_DIR/.." && zip -qrX "$WORK/RenewableEnergy-$VERSION.zip" "$(basename "$MOD_DIR")" -x '*.DS_Store')
+# The folder layout players unzip into their mods folder, each library beside the mod, as a player
+# subscribed to both has them; Finder's .DS_Store files stay out. The shared harness goes in under
+# the folder name the game runs it from (HARNESS_MOD_FOLDER).
+mkdir "$WORK/mods"
+ln -s "$MOD_DIR" "$WORK/mods/$MOD_FOLDER"
+PLAYTEST=("$MOD_FOLDER/") LIBRARY_ZIPS=()
+for library in ${LIBRARY_DIRS[@]+"${LIBRARY_DIRS[@]}"}; do
+    folder="$(basename "$library")"
+    library_zip="$folder-$(mod_info "$library" modversion).zip"
+    ln -s "$library" "$WORK/mods/$folder"
+    (cd "$WORK/mods" && zip -qrX "$WORK/$library_zip" "$folder/" -x '*.DS_Store')
+    PLAYTEST+=("$folder/") LIBRARY_ZIPS+=("$library_zip")
+done
+(cd "$WORK/mods" && zip -qrX "$WORK/RenewableEnergy-$VERSION.zip" "${PLAYTEST[@]}" -x '*.DS_Store')
 mkdir "$WORK/dev"
 ln -s "$DEV_MOD_DIR" "$WORK/dev/$DEV_MOD_FOLDER"
 ln -s "$HARNESS_MOD_DIR" "$WORK/dev/$HARNESS_MOD_FOLDER"
 (cd "$WORK/dev" && zip -qrX "$WORK/RenewableEnergyDevMods.zip" "$HARNESS_MOD_FOLDER/" "$DEV_MOD_FOLDER/" -x '*.DS_Store')
 
 mkdir -p "$REVIEW_DIR"
-for file in "RenewableEnergy-$VERSION.zip" RenewableEnergyDevMods.zip RenewableEnergy-README.html RenewableEnergy-README.pdf \
-    RenewableEnergy-player-guide.html; do
+for file in "RenewableEnergy-$VERSION.zip" ${LIBRARY_ZIPS[@]+"${LIBRARY_ZIPS[@]}"} RenewableEnergyDevMods.zip \
+    RenewableEnergy-README.html RenewableEnergy-README.pdf RenewableEnergy-player-guide.html; do
     mv "$WORK/$file" "$REVIEW_DIR/$file"
     echo "wrote $REVIEW_DIR/$file"
 done

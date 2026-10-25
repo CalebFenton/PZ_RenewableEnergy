@@ -10,6 +10,7 @@ require "RenewableEnergy/Gadgets/SolarCellChargerServer"
 require "RenewableEnergy/Gadgets/SolarGardenLightServer"
 require "RenewableEnergy/World/ArrowBoard"
 require "RenewableEnergy/World/ArrowBoardPower"
+local Clock = require "cf_commonlib/Clock"
 
 RenewableEnergy = RenewableEnergy or {}
 local GadgetCharging = {}
@@ -35,7 +36,7 @@ end
 -- EveryTenMinutes fires at most once a tick however much game time passed, so the pass
 -- measures the time itself.
 function GadgetCharging.update()
-    local hours = RenewableEnergy.hoursSince(clock, LONGEST_PASS)
+    local hours = Clock.hoursSince(clock, LONGEST_PASS)
     if hours <= 0 then
         return
     end

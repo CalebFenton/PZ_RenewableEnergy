@@ -15,10 +15,17 @@ require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
+local Items = require "cf_commonlib/Items"
+local Materials = require "cf_commonlib/Materials"
+local RecipeLearning = require "cf_commonlib/RecipeLearning"
 
 RenewableEnergy = RenewableEnergy or {}
 local Recipes = {}
 RenewableEnergy.Recipes = Recipes
+
+-- The mod's craftRecipes and build recipes with an AutoLearn skill are learned by level, its build
+-- recipes only through this (cf_commonlib's RecipeLearning).
+RecipeLearning.register("RenewableEnergy_")
 
 local Specs, Battery, Wear, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
 local Sources = RenewableEnergy.Sources
@@ -186,7 +193,7 @@ function Recipes.unmountModules(craftRecipeData, character)
         local item = instanceItem(module.type)
         Wear.setCondition(item, module.condition)
         PowerBank.markModule(item, module)
-        RenewableEnergy.giveItems(character, item)
+        Items.giveItems(character, item)
     end
 end
 
@@ -273,7 +280,7 @@ local function recipeInputs(recipe, inventory)
             local amount = input:getIntAmount()
             local needed = amount
             local candidates = inventory:getAllEvalRecurse(function(item)
-                return not taken[item] and RenewableEnergy.notBroken(item) and input:containsItem(item:getScriptItem())
+                return not taken[item] and Items.notBroken(item) and input:containsItem(item:getScriptItem())
             end)
             for j = 0, candidates:size() - 1 do
                 if needed <= PAID_TOLERANCE then break end
@@ -317,7 +324,7 @@ end
 --- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
 --- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; they pay the
 --- first of MODULE_REPAIR_RECIPES the character carries every input of, and are nil when there is
---- none. Second, each of those inputs as a need (RenewableEnergy.firstUnmet), `have` being how many
+--- none. Second, each of those inputs as a need (Materials.firstUnmet), `have` being how many
 --- whole units of its amount the items found pay; an input the twins differ in is one need any of
 --- theirs meets. Since they differ only in the adhesive, that need is met exactly when a twin is.
 --- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
@@ -344,7 +351,7 @@ function Recipes.sealInPlaceInputs(character)
     return paid, needs
 end
 
---- What Seal Cracked Panel takes of `character` (RenewableEnergy.firstUnmet): the recipe
+--- What Seal Cracked Panel takes of `character` (Materials.firstUnmet): the recipe
 --- known, its skills, and its inputs but the module.
 function Recipes.sealInPlaceNeeds(character)
     local recipe = Recipes.moduleRepairRecipe()
@@ -363,7 +370,7 @@ end
 --- Why the character can't do Seal Cracked Panel, or nil when they can: the kind of the first
 --- of sealInPlaceNeeds they are short of.
 function Recipes.sealInPlaceRefusal(character)
-    return RenewableEnergy.unmetKind(Recipes.sealInPlaceNeeds(character))
+    return Materials.unmetKind(Recipes.sealInPlaceNeeds(character))
 end
 
 --- Uses up what Recipes.sealInPlaceInputs picked; tools are kept and may wear as the recipe's
@@ -441,7 +448,7 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
     end)
     local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or VehicleBattery.CAR_BATTERY)
     setRebuilt(battery)
-    RenewableEnergy.giveItems(character, battery)
+    Items.giveItems(character, battery)
 end
 
 -- OnCreate of Make Charge Controller: a new controller has a condition of its own, so a loot
@@ -493,7 +500,7 @@ function Recipes.takeApartGardenLight(craftRecipeData, character)
     end)
     local bulb = light and SolarGardenLight.getBulb(light)
     if bulb then
-        RenewableEnergy.giveItems(character, bulb)
+        Items.giveItems(character, bulb)
     end
 end
 

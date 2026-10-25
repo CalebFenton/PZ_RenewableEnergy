@@ -1,10 +1,11 @@
 -- A status window that lists an object's summary as labelled rows: the base of the digester's and
 -- the gasifier's windows, which share one window per local player (ObjectWindow). A summary is
--- what every client keeps (RenewableEnergy.GlobalObjects), so the window reads the same in single
+-- what every client keeps (cf_commonlib's GlobalObjects), so the window reads the same in single
 -- player and multiplayer and needs no watching. A derived class sets `owner`, its shared module
 -- (nameKey, summaryOf), and defines rowsOf(summary).
 
 require "RenewableEnergy/UI/ObjectWindow"
+local Tables = require "cf_commonlib/Tables"
 
 RenewableEnergy = RenewableEnergy or {}
 local ObjectWindow = RenewableEnergy.ObjectWindow
@@ -23,13 +24,13 @@ function SummaryWindow.row(rows, key, value, color)
 end
 
 -- The rows are laid out again only when the summary changed. A summary read is a fresh copy with
--- what the object's containers hold now (RenewableEnergy.GlobalObjects), so it is compared by value.
+-- what the object's containers hold now (GlobalObjects.addAccessors), so it is compared by value.
 function SummaryWindow:refresh()
     local summary = self.owner.summaryOf(self.object)
     if not summary then
         return false
     end
-    if not RenewableEnergy.sameValue(summary, self.summary) then
+    if not Tables.sameValue(summary, self.summary) then
         self.summary = summary
         self:layOut(summary)
     end

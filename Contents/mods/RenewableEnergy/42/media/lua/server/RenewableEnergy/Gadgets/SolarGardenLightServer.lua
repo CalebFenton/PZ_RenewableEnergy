@@ -8,6 +8,8 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
+local Items = require "cf_commonlib/Items"
+local Tiles = require "cf_commonlib/Tiles"
 
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
@@ -17,7 +19,7 @@ local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, Rene
 local function setLit(light, lit, bulbChanged)
     local changed = SolarGardenLight.isLit(light) ~= lit
     if changed then
-        RenewableEnergy.showTile(light, lit and Sprites.gardenLight.lit or Sprites.gardenLight.off)
+        Tiles.showTile(light, lit and Sprites.gardenLight.lit or Sprites.gardenLight.off)
     end
     -- Also when the tile stays lit, since its bulb may have changed.
     SolarGardenLight.syncLamp(light)
@@ -59,7 +61,7 @@ function SolarGardenLight.removeBulb(character, light)
         return false
     end
     setBulb(light, nil)
-    RenewableEnergy.giveItems(character, bulb)
+    Items.giveItems(character, bulb)
     return true
 end
 
@@ -69,7 +71,7 @@ function SolarGardenLight.addBulb(character, light, item)
     if SolarGardenLight.getBulb(light) or not SolarGardenLight.isBulb(item) then
         return false
     end
-    RenewableEnergy.takeItem(character, item)
+    Items.takeItem(character, item)
     setBulb(light, item:getFullType())
     return true
 end

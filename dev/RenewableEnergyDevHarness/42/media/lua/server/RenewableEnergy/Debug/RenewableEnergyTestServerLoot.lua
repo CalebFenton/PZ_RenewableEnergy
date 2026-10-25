@@ -8,6 +8,7 @@ require "PZHarness/Loot"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Stash"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local LibLoot = require "cf_commonlib/Loot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local check, saveOptions, countPairs = PZHarness.checkHandler, PZHarness.Fixtures.saveOptions, PZHarness.Fixtures.countPairs
@@ -95,7 +96,7 @@ check("lootListsInUse", function(expect)
         for _, entry in ipairs(spec.entries) do
             local reference = entry[2]
             local where = spec.fullType .. " in " .. reference
-            local items = D.resolveItemList(reference)
+            local items = LibLoot.resolveItemList(reference)
             expect(items ~= nil, where .. ": no such list")
             local kind, name = string.match(reference, "^(%a+):(.+)$")
             if kind == "proc" then
@@ -175,7 +176,7 @@ check("lootRarityOptions", function(expect, expectNear, _, args, defer)
             else
                 for _, entry in ipairs(spec.entries) do
                     local where = label .. ": " .. spec.fullType .. " in " .. entry[2]
-                    local items = D.resolveItemList(entry[2])
+                    local items = LibLoot.resolveItemList(entry[2])
                     local count, weight = 0, nil
                     if items then
                         count, weight = countPairs(items, spec.fullType)

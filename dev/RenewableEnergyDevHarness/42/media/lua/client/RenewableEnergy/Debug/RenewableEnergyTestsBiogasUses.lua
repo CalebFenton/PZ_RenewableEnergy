@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+local Squares = require "cf_commonlib/Squares"
 
 -- What the digester's gas is used for (Contents/.../RenewableEnergy/Biogas/*, the propane bottle
 -- refill in Recipes.lua): the gas heater, the tire pump, the compressor and propane.
@@ -13,7 +14,7 @@ local Sprites = RenewableEnergy.Sprites
 
 -- The sprite this client shows of the gas heater on `square`, or nil.
 local function heaterSprite(square)
-    local heater = RenewableEnergy.findObjectOn(square, GasHeater.isHeater)
+    local heater = Squares.findObjectOn(square, GasHeater.isHeater)
     return heater and heater:getSprite():getName()
 end
 
@@ -28,7 +29,7 @@ local function fedDigesterAndHeater(self, facing)
     T.setRecord(self, digester, fed)
     T.waitForGas(self, digester, fed.gas)
     local heater = T.placeTile(self, square, Sprites.gasHeater.off[facing or "S"])
-    T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+    T.giveMaterials(self, "light", GasHeater.materials(T.player(), GasHeater.LIGHT))
     return digester, heater, square
 end
 
@@ -55,7 +56,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
             T.waitForGas(self, handle, self.gas)
         end
         local heater = T.placeTile(self, square, Sprites.gasHeater.off.S)
-        T.giveMaterials(self, "light", GasHeater.materials(GasHeater.LIGHT))
+        T.giveMaterials(self, "light", GasHeater.materials(T.player(), GasHeater.LIGHT))
         T.gasJob(self, "heater", heater, GasHeater.LIGHT)
         T.batch(function()
             for i, handle in ipairs(self.digesters) do
@@ -183,7 +184,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.step(function()
             self.unscrubbed = DigesterJobs.refusal(T.player(), DigesterJobs.FILL_COMPRESSOR, handle.object, self.items.fill[2])
         end)
-        local scrubber = DigesterJobs.materials(DigesterJobs.FIT_SCRUBBER)
+        local scrubber = DigesterJobs.materials(T.player(), DigesterJobs.FIT_SCRUBBER)
         local bucket
         for _, material in ipairs(scrubber) do
             bucket = material.tag and material.item or bucket
@@ -201,7 +202,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.gasJob(self, "digester", handle, DigesterJobs.FIT_SCRUBBER)
         -- Fitting took the bucket; the charge's water comes in another.
         T.batch(function()
-            T.giveMaterials(self, "charge", DigesterJobs.materials(DigesterJobs.CHARGE_LIME))
+            T.giveMaterials(self, "charge", DigesterJobs.materials(T.player(), DigesterJobs.CHARGE_LIME))
             T.give(self, "water", { { type = "Base.Bucket" } })
             T.fillCarried(self, "Base.Bucket", "Water", Digester.SCRUB_WATER)
         end)

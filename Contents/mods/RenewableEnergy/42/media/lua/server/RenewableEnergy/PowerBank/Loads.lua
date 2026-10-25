@@ -21,6 +21,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/PowerBank/Payers"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loads = {}
@@ -162,7 +163,7 @@ function Loads.scan(square, payer, payers, gridGone)
     local function pays(object)
         return #sharers == 1 or Payers.payerAt(sharers, object:getX(), object:getY(), object:getZ()) == payer
     end
-    RenewableEnergy.eachSquareInGeneratorReach(square, function(scanned)
+    GeneratorReach.eachSquare(square:getX(), square:getY(), square:getZ(), function(scanned)
         local objects = scanned:getObjects()
         for i = 0, objects:size() - 1 do
             local object = objects:get(i)

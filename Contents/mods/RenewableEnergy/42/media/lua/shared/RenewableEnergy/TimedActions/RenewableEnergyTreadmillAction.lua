@@ -7,11 +7,13 @@
 
 require "TimedActions/ISBaseTimedAction"
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/TimedActions/JobAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
+local Clock = require "cf_commonlib/Clock"
+local JobAction = require "cf_commonlib/JobAction"
+local Squares = require "cf_commonlib/Squares"
 
 RenewableEnergyTreadmillAction = ISBaseTimedAction:derive("RenewableEnergyTreadmillAction")
 
@@ -30,7 +32,7 @@ local REACH = 1.6
 -- unwired one wired meanwhile would draw power while its motor fed a bank.
 local function isOnTreadmill(self)
     local object = self.object
-    if not (RenewableEnergy.onSquare(object) and RenewableEnergy.withinReach(self.character, object, REACH)) then
+    if not (Squares.onSquare(object) and Squares.withinReach(self.character, object, REACH)) then
         return false
     end
     if self.wired then
@@ -44,12 +46,12 @@ local function runHours()
 end
 
 function Action:units()
-    return Specs.treadmill.runMinutes * RenewableEnergy.unitsPerMinute()
+    return Specs.treadmill.runMinutes * Clock.unitsPerMinute()
 end
 
--- Timed as the jobs are, though not one (RenewableEnergy.JobAction): the runner stands on the
+-- Timed as the jobs are, though not one (cf_commonlib's JobAction): the runner stands on the
 -- belt rather than facing a target, and the run settles its own way.
-Action.getDuration = RenewableEnergy.JobAction.getDuration
+Action.getDuration = JobAction.getDuration
 
 -- A run on an unwired treadmill stops when its power goes out. The server never calls isValid(),
 -- but the client's stop reaches it (serverStop).

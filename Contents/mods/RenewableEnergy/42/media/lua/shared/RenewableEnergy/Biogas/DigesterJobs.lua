@@ -1,10 +1,10 @@
 -- The hands-on jobs at a digester: what each takes of the character and what refuses it
--- (RenewableEnergy.GasJobs). DigesterSystem does them.
+-- (cf_commonlib's Jobs). DigesterSystem does them.
 
 require "RenewableEnergy/Utilities"
-require "RenewableEnergy/GasJobs"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
+local Jobs = require "cf_commonlib/Jobs"
 
 RenewableEnergy = RenewableEnergy or {}
 local DigesterJobs = {}
@@ -28,6 +28,8 @@ DigesterJobs.REPACK_WOOL = "RepackWool"
 DigesterJobs.SANDBAG = "Base.EmptySandbag"
 DigesterJobs.COMPOST_BAG = "Base.CompostBag"
 local STEEL_WOOL = "Base.SteelWool"
+-- The water a scrubber charge takes, named in litres in the tooltip.
+local SCRUB_WATER = { water = Digester.SCRUB_WATER, labelKey = "IGUI_RenewableEnergy_WaterLitres" }
 
 --- Sludge in one use of a compost bag.
 function DigesterJobs.sludgePerUse()
@@ -95,11 +97,11 @@ local function fillAmount(fill, summary, tank)
 end
 
 -- What refuses a job for the state of the digester, from its summary.
-local function noGas(summary)
+local function noGas(character, summary)
     return summary.gas <= 0 and "Tooltip_RenewableEnergy_NoGas" or nil
 end
 
-local function noScrubber(summary)
+local function noScrubber(character, summary)
     return not summary.scrubber and "Tooltip_RenewableEnergy_NoScrubber" or nil
 end
 
@@ -136,14 +138,14 @@ local function fillJob(fields)
     return fields
 end
 
--- Every job, by name (GasJobs.define), read against the digester's summary
+-- Every job, by name (Jobs.define), read against the digester's summary
 -- (Digester.currentSummary), with `with` the bag or tank it fills, which its materials leave out.
 -- holder, charge and fill say what it does on the authority. Vanilla has no pump stroke; a tire
 -- pump is worked kneeling at a wheel. The rest are reached into at waist height.
 DigesterJobs.JOBS = {
     [DigesterJobs.TAKE_SLUDGE] = {
         minutes = 10, position = "Mid", metabolics = Metabolics.HeavyWork,
-        blocker = function(summary)
+        blocker = function(character, summary)
             return summary.sludge < DigesterJobs.sludgePerUse() and "Tooltip_RenewableEnergy_NoSludge" or nil
         end,
         withRefusal = function(character, summary, bag)
@@ -156,7 +158,7 @@ DigesterJobs.JOBS = {
     [DigesterJobs.VENT] = { minutes = 1, position = "Mid", blocker = noGas },
     [DigesterJobs.REPLACE_BAGS] = {
         minutes = 15, position = "Mid", holder = "bags", hideBlocked = true,
-        blocker = function(summary)
+        blocker = function(character, summary)
             return summary.holder ~= "bags" and "Tooltip_RenewableEnergy_NotBags" or nil
         end,
         materials = {
@@ -166,7 +168,7 @@ DigesterJobs.JOBS = {
     [DigesterJobs.SEW_TARP] = {
         minutes = 60, anim = "SewingCloth", holder = "tarp", hideBlocked = true,
         -- Over bags, or a torn tarp.
-        blocker = function(summary)
+        blocker = function(character, summary)
             if not Digester.HOLDERS[summary.holder].wearPerDay then
                 return "Tooltip_RenewableEnergy_NotBags"
             end
@@ -175,16 +177,16 @@ DigesterJobs.JOBS = {
         materials = {
             { perk = "Tailoring", need = 2 },
             { tool = "SEWING_NEEDLE", item = "Base.Needle" },
-            { item = "Base.Thread", need = 1, uses = true },
+            { item = "Base.Thread", uses = 1 },
             { item = "Base.Tarp", need = 1 },
-            { item = "Base.DuctTape", need = 2, uses = true },
+            { item = "Base.DuctTape", uses = 2 },
         },
         xp = { perk = "Tailoring", amount = 10 },
     },
     [DigesterJobs.UPGRADE] = {
         minutes = 120, anim = CharacterActionAnims.Build, sound = "Hammering", metabolics = Metabolics.HeavyWork,
         hideBlocked = true,
-        blocker = function(summary)
+        blocker = function(character, summary)
             return not Digester.TIERS[summary.tier].upgrade and "Tooltip_RenewableEnergy_NotBarrel" or nil
         end,
         materials = {
@@ -218,7 +220,7 @@ DigesterJobs.JOBS = {
     }),
     [DigesterJobs.FIT_SCRUBBER] = {
         minutes = 30, position = "Mid", hideBlocked = true,
-        blocker = function(summary)
+        blocker = function(character, summary)
             return summary.scrubber and "Tooltip_RenewableEnergy_HasScrubber" or nil
         end,
         materials = {
@@ -226,31 +228,31 @@ DigesterJobs.JOBS = {
             { tag = "BUCKET", item = "Base.Bucket" },
             { item = "Base.Pipe", need = 1 },
             { item = "Base.RubberHose", need = 1 },
-            { item = STEEL_WOOL, need = 1, uses = true },
+            { item = STEEL_WOOL, uses = 1 },
         },
         xp = { perk = "Mechanics", amount = 10 },
     },
     -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3).
     [DigesterJobs.CHARGE_WATER] = {
         minutes = 5, position = "Mid", charge = "water", blocker = noScrubber,
-        materials = { { water = Digester.SCRUB_WATER } },
+        materials = { SCRUB_WATER },
     },
     [DigesterJobs.CHARGE_ASH] = {
         minutes = 5, position = "Mid", charge = "ash", blocker = noScrubber,
-        materials = { { water = Digester.SCRUB_WATER }, { item = Gasifier.WOOD_ASH, need = 1 } },
+        materials = { SCRUB_WATER, { item = Gasifier.WOOD_ASH, need = 1 } },
     },
     [DigesterJobs.CHARGE_LIME] = {
         minutes = 5, position = "Mid", charge = "lime", blocker = noScrubber,
-        materials = { { water = Digester.SCRUB_WATER }, { item = "Base.Quicklime", need = 1 } },
+        materials = { SCRUB_WATER, { item = "Base.Quicklime", need = 1 } },
     },
     [DigesterJobs.REPACK_WOOL] = {
         minutes = 5, position = "Mid", blocker = noScrubber, hideBlocked = true,
-        materials = { { item = STEEL_WOOL, need = 1, uses = true } },
+        materials = { { item = STEEL_WOOL, uses = 1 } },
     },
 }
 
-RenewableEnergy.GasJobs.define(DigesterJobs, {
-    subjectOf = Digester.currentSummary, missing = "Tooltip_RenewableEnergy_NoDigester",
+Jobs.define(DigesterJobs, {
+    short = "short", subjectOf = Digester.currentSummary, missing = "Tooltip_RenewableEnergy_NoDigester",
 })
 
 return DigesterJobs

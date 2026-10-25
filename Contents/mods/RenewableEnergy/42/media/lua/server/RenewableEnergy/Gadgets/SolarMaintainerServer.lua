@@ -9,6 +9,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
+local Items = require "cf_commonlib/Items"
 
 local SolarMaintainer, VehicleBattery = RenewableEnergy.SolarMaintainer, RenewableEnergy.VehicleBattery
 local Battery, Specs, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun
@@ -19,7 +20,7 @@ function SolarMaintainer.attach(character, vehicle, item)
     if not (item and item:getFullType() == SolarMaintainer.ITEM and SolarMaintainer.canAttach(vehicle)) then
         return false
     end
-    RenewableEnergy.takeItem(character, item)
+    Items.takeItem(character, item)
     local part = VehicleBattery.partOf(vehicle)
     part:getModData()[ATTACHED_KEY] = true
     vehicle:transmitPartModData(part)
@@ -35,7 +36,7 @@ function SolarMaintainer.detach(character, vehicle)
     local part = VehicleBattery.partOf(vehicle)
     part:getModData()[ATTACHED_KEY] = nil
     vehicle:transmitPartModData(part)
-    RenewableEnergy.giveItems(character, SolarMaintainer.ITEM)
+    Items.giveItems(character, SolarMaintainer.ITEM)
     return true
 end
 

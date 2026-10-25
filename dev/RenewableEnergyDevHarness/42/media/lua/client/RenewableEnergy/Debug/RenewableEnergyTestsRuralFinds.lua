@@ -4,6 +4,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/Wind"
+local Squares = require "cf_commonlib/Squares"
 
 -- Rural finds (World/RuralFinds.lua): wind chargers, digesters and gasifiers the world leaves by
 -- rural buildings, rolled on the authority (RenewableEnergyTestServerRuralFinds.lua).
@@ -30,7 +31,7 @@ local function rollFind(self, kind, isObject, recordKind)
     end)
     T.waitFor(self, function()
         local find = self.find
-        local object = RenewableEnergy.findObjectOn(find.square, isObject)
+        local object = Squares.findObjectOn(find.square, isObject)
         -- T.recordSummary reads the handle's object.
         find.object = object
         find.object = object and (not recordKind or T.recordSummary(find)) and object or nil
@@ -104,7 +105,7 @@ test("renewable_energy_world_rural_digester", {
             -- Its drum's entity, or each load of it logs "Invalid SpriteConfig object!".
             local config = find.object:getSpriteConfig()
             self.configValid = config ~= nil and config:isValid()
-            T.giveMaterials(self, "bags", DigesterJobs.materials(DigesterJobs.REPLACE_BAGS))
+            T.giveMaterials(self, "bags", DigesterJobs.materials(T.player(), DigesterJobs.REPLACE_BAGS))
             T.gasJob(self, "digester", find, DigesterJobs.REPLACE_BAGS)
             T.batch(function()
                 T.fillRecord(self, find, { hopper = { { type = "Base.Dung_Cow", count = 2 } } })
@@ -144,7 +145,7 @@ test("renewable_energy_world_rural_gasifier", {
         T.step(function()
             local find = self.find
             T.readRecord(self, find, "found")
-            T.giveMaterials(self, "shovel", GasifierJobs.materials(GasifierJobs.CLEAN_ASH))
+            T.giveMaterials(self, "shovel", GasifierJobs.materials(T.player(), GasifierJobs.CLEAN_ASH))
             T.gasJob(self, "gasifier", find, GasifierJobs.CLEAN_ASH)
             T.batch(function()
                 T.server(self, "ruralFindEmptyFilter", T.at(find))
