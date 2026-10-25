@@ -285,7 +285,7 @@ A **Homemade Solar Module** is 16 solar cells under glass. Cells come from takin
 
 ## Wind chargers
 
-Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself.
+Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, pipe or steel, and stands with whichever set the build used.
 
 ### The four kinds
 

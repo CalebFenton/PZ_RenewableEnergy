@@ -124,12 +124,9 @@ RECIPE_SECTIONS = [
                "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray",
                "RenewableEnergy_MakeVinegarAphidSpray"]),
     (WIND,
-     ["RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
-      "RenewableEnergy_PropellerSteel", "RenewableEnergy_CarAlternatorWood", "RenewableEnergy_CarAlternatorPipe",
-      "RenewableEnergy_CarAlternatorSteel", "RenewableEnergy_TurbineWood", "RenewableEnergy_TurbinePipe",
-      "RenewableEnergy_AlternatorWindCharger", "RenewableEnergy_CarveWoodenBlades",
-      "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
-      "RenewableEnergy_MakeHomemadeAlternator"]),
+     ["RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_CarAlternatorWood",
+      "RenewableEnergy_TurbineWood", "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades",
+      "RenewableEnergy_ForgeSteelBlades", "RenewableEnergy_MakeHomemadeAlternator"]),
 ]
 # The accent along the top of each section's recipe cards; the solar recipes take the panels' blue.
 SECTION_ACCENTS = {BIOGAS: (112, 168, 92), WOODGAS: (214, 132, 64), WIND: (120, 196, 204)}
@@ -178,13 +175,9 @@ GALLERY_RECIPES = [
     ("recipes-gas-kit", "Recipes: the gas kit, the heater, propane", [(BIOGAS, slice(4, None))]),
     ("recipes-woodgas", "Build menu: gasifiers. Recipes: drums and sprays", [(WOODGAS, slice(None))]),
     ("recipes-wind-treadmill", "Build menu: the scoop rotor, the treadmill wind charger", [(WIND, slice(0, 2))]),
-    ("recipes-wind-treadmill-blades", "Build menu: treadmill chargers, pipe and steel blades",
+    ("recipes-wind-car-alternator-turbine", "Build menu: car alternator charger, wind turbine",
      [(WIND, slice(2, 4))]),
-    ("recipes-wind-car-alternator", "Build menu: the car alternator wind charger", [(WIND, slice(4, 6))]),
-    ("recipes-wind-car-alternator-turbine", "Build menu: car alternator and wind turbine",
-     [(WIND, slice(6, 8))]),
-    ("recipes-wind-turbine", "Build menu: wind turbines, pipe and steel blades", [(WIND, slice(8, 10))]),
-    ("recipes-wind-parts", "Recipes: blades and the homemade alternator", [(WIND, slice(10, None))]),
+    ("recipes-wind-parts", "Recipes: blades and the homemade alternator", [(WIND, slice(4, None))]),
 ]
 
 

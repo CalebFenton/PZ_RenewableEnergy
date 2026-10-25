@@ -3276,7 +3276,11 @@
             "name": "Welding"
           }
         ],
-        "magazines": [],
+        "magazines": [
+          "Homestead Power #3",
+          "FEMA Wood Gas Generator Plans",
+          "Homestead Power #4"
+        ],
         "needed": true,
         "research": [
           "Metal Drum"
@@ -6554,7 +6558,7 @@
     {
       "build": {
         "icon": "icon_build_RenewableEnergy_PropellerWood",
-        "name": "Treadmill Wind Charger (Wooden Blades)"
+        "name": "Treadmill Wind Charger"
       },
       "id": "RenewableEnergy_PropellerWood",
       "inputs": [
@@ -6608,6 +6612,18 @@
               "fullType": "RenewableEnergy.WoodenBlades",
               "icon": "icon_RenewableEnergy_WoodenBlades",
               "name": "Carved Wooden Blades"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.PipeBlades",
+              "icon": "icon_RenewableEnergy_PipeBlades",
+              "name": "Plastic Pipe Blades"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SteelBlades",
+              "icon": "icon_RenewableEnergy_SteelBlades",
+              "name": "Forged Steel Blades"
             }
           ],
           "keep": false,
@@ -6703,7 +6719,7 @@
         "needed": true,
         "research": []
       },
-      "name": "Treadmill Wind Charger (Wooden Blades)",
+      "name": "Treadmill Wind Charger",
       "outputs": [],
       "skills": [
         {
@@ -6847,374 +6863,8 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_CarAlternatorPipe",
-        "name": "Car Alternator Wind Charger (Pipe Blades)"
-      },
-      "id": "RenewableEnergy_CarAlternatorPipe",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 5,
-          "items": [
-            {
-              "count": 5,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.PipeBlades",
-              "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Plastic Pipe Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.CarAlternator",
-              "icon": "icon_RenewableEnergy_CarAlternator",
-              "name": "Car Alternator"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Belt2",
-              "icon": "icon_Base_Belt2",
-              "name": "Belt"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SmallSheetMetal",
-              "icon": "icon_Base_SmallSheetMetal",
-              "name": "Steel Sheet - Small"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 6,
-            "name": "Welding"
-          },
-          {
-            "level": 5,
-            "name": "Electrical"
-          },
-          {
-            "level": 3,
-            "name": "Mechanics"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Car Alternator Wind Charger (Pipe Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 4,
-          "name": "Welding"
-        },
-        {
-          "level": 4,
-          "name": "Electrical"
-        },
-        {
-          "level": 2,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_PropellerSteel",
-        "name": "Treadmill Wind Charger (Steel Blades)"
-      },
-      "id": "RenewableEnergy_PropellerSteel",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.SteelBlades",
-              "icon": "icon_RenewableEnergy_SteelBlades",
-              "name": "Forged Steel Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.TreadmillMotor",
-              "icon": "icon_RenewableEnergy_TreadmillMotor",
-              "name": "Treadmill Motor"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 5,
-            "name": "Welding"
-          },
-          {
-            "level": 4,
-            "name": "Electrical"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Treadmill Wind Charger (Steel Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 3,
-          "name": "Welding"
-        },
-        {
-          "level": 3,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_TurbineWood",
-        "name": "Homebuilt Wind Turbine (Wooden Blades)"
+        "name": "Homebuilt Wind Turbine"
       },
       "id": "RenewableEnergy_TurbineWood",
       "inputs": [
@@ -7268,6 +6918,18 @@
               "fullType": "RenewableEnergy.WoodenBlades",
               "icon": "icon_RenewableEnergy_WoodenBlades",
               "name": "Carved Wooden Blades"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.PipeBlades",
+              "icon": "icon_RenewableEnergy_PipeBlades",
+              "name": "Plastic Pipe Blades"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SteelBlades",
+              "icon": "icon_RenewableEnergy_SteelBlades",
+              "name": "Forged Steel Blades"
             }
           ],
           "keep": false,
@@ -7363,7 +7025,7 @@
         "needed": true,
         "research": []
       },
-      "name": "Homebuilt Wind Turbine (Wooden Blades)",
+      "name": "Homebuilt Wind Turbine",
       "outputs": [],
       "skills": [
         {
@@ -7535,207 +7197,6 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_CarAlternatorSteel",
-        "name": "Car Alternator Wind Charger (Steel Blades)"
-      },
-      "id": "RenewableEnergy_CarAlternatorSteel",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 5,
-          "items": [
-            {
-              "count": 5,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.SteelBlades",
-              "icon": "icon_RenewableEnergy_SteelBlades",
-              "name": "Forged Steel Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.CarAlternator",
-              "icon": "icon_RenewableEnergy_CarAlternator",
-              "name": "Car Alternator"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Belt2",
-              "icon": "icon_Base_Belt2",
-              "name": "Belt"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SmallSheetMetal",
-              "icon": "icon_Base_SmallSheetMetal",
-              "name": "Steel Sheet - Small"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 6,
-            "name": "Welding"
-          },
-          {
-            "level": 5,
-            "name": "Electrical"
-          },
-          {
-            "level": 3,
-            "name": "Mechanics"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Car Alternator Wind Charger (Steel Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 4,
-          "name": "Welding"
-        },
-        {
-          "level": 4,
-          "name": "Electrical"
-        },
-        {
-          "level": 2,
-          "name": "Mechanics"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_ScoopRotor",
         "name": "Scoop Rotor Wind Charger"
       },
@@ -7887,173 +7348,8 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_PropellerPipe",
-        "name": "Treadmill Wind Charger (Pipe Blades)"
-      },
-      "id": "RenewableEnergy_PropellerPipe",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.PipeBlades",
-              "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Plastic Pipe Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.TreadmillMotor",
-              "icon": "icon_RenewableEnergy_TreadmillMotor",
-              "name": "Treadmill Motor"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 5,
-            "name": "Welding"
-          },
-          {
-            "level": 4,
-            "name": "Electrical"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Treadmill Wind Charger (Pipe Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 3,
-          "name": "Welding"
-        },
-        {
-          "level": 3,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_CarAlternatorWood",
-        "name": "Car Alternator Wind Charger (Wooden Blades)"
+        "name": "Car Alternator Wind Charger"
       },
       "id": "RenewableEnergy_CarAlternatorWood",
       "inputs": [
@@ -8107,6 +7403,18 @@
               "fullType": "RenewableEnergy.WoodenBlades",
               "icon": "icon_RenewableEnergy_WoodenBlades",
               "name": "Carved Wooden Blades"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.PipeBlades",
+              "icon": "icon_RenewableEnergy_PipeBlades",
+              "name": "Plastic Pipe Blades"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SteelBlades",
+              "icon": "icon_RenewableEnergy_SteelBlades",
+              "name": "Forged Steel Blades"
             }
           ],
           "keep": false,
@@ -8234,7 +7542,7 @@
         "needed": true,
         "research": []
       },
-      "name": "Car Alternator Wind Charger (Wooden Blades)",
+      "name": "Car Alternator Wind Charger",
       "outputs": [],
       "skills": [
         {
@@ -8726,336 +8034,6 @@
     },
     {
       "build": {
-        "icon": "icon_build_RenewableEnergy_TurbinePipe",
-        "name": "Homebuilt Wind Turbine (Pipe Blades)"
-      },
-      "id": "RenewableEnergy_TurbinePipe",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 5,
-          "items": [
-            {
-              "count": 5,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.PipeBlades",
-              "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Plastic Pipe Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.HomemadeAlternator",
-              "icon": "icon_RenewableEnergy_HomemadeAlternator",
-              "name": "Homemade Alternator"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 8,
-          "items": [
-            {
-              "count": 8,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 7,
-            "name": "Welding"
-          },
-          {
-            "level": 6,
-            "name": "Electrical"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Homebuilt Wind Turbine (Pipe Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 5,
-          "name": "Welding"
-        },
-        {
-          "level": 5,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
-      "build": {
-        "icon": "icon_build_RenewableEnergy_AlternatorWindCharger",
-        "name": "Homebuilt Wind Turbine (Steel Blades)"
-      },
-      "id": "RenewableEnergy_AlternatorWindCharger",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.WeldingMask",
-              "icon": "icon_Base_WeldingMask",
-              "name": "Welder Mask"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
-              "fullType": "Base.BlowTorch",
-              "icon": "icon_Base_BlowTorch",
-              "name": "Welding Torch"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 5,
-          "items": [
-            {
-              "count": 5,
-              "fullType": "Base.WeldingRods",
-              "icon": "icon_Base_WeldingRods",
-              "name": "Welding Rods"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.SteelBlades",
-              "icon": "icon_RenewableEnergy_SteelBlades",
-              "name": "Forged Steel Blades"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.HomemadeAlternator",
-              "icon": "icon_RenewableEnergy_HomemadeAlternator",
-              "name": "Homemade Alternator"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 8,
-          "items": [
-            {
-              "count": 8,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 4,
-          "items": [
-            {
-              "count": 4,
-              "fullType": "Base.ElectricWire",
-              "icon": "icon_Base_ElectricWire",
-              "name": "Electrical Wire"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.ElectronicsScrap",
-              "icon": "icon_Base_ElectronicsScrap",
-              "name": "Scrap Electronics"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        }
-      ],
-      "learn": {
-        "auto": [],
-        "autoAll": [
-          {
-            "level": 7,
-            "name": "Welding"
-          },
-          {
-            "level": 6,
-            "name": "Electrical"
-          }
-        ],
-        "magazines": [
-          "Homestead Power #4"
-        ],
-        "needed": true,
-        "research": []
-      },
-      "name": "Homebuilt Wind Turbine (Steel Blades)",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 5,
-          "name": "Welding"
-        },
-        {
-          "level": 5,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
-      "build": {
         "icon": "icon_build_RenewableEnergy_Gasifier",
         "name": "Gasifier"
       },
@@ -9343,20 +8321,14 @@
       "icon_RenewableEnergy_WoodenBlades",
       "icon_RenewableEnergy_WornBatteryPlates",
       "icon_build_RenewableEnergy_AdvancedGasifier",
-      "icon_build_RenewableEnergy_AlternatorWindCharger",
       "icon_build_RenewableEnergy_BarrelDigester",
       "icon_build_RenewableEnergy_BrickDome",
-      "icon_build_RenewableEnergy_CarAlternatorPipe",
-      "icon_build_RenewableEnergy_CarAlternatorSteel",
       "icon_build_RenewableEnergy_CarAlternatorWood",
       "icon_build_RenewableEnergy_Gasifier",
       "icon_build_RenewableEnergy_InsulatedDigester",
       "icon_build_RenewableEnergy_PrimitiveGasifier",
-      "icon_build_RenewableEnergy_PropellerPipe",
-      "icon_build_RenewableEnergy_PropellerSteel",
       "icon_build_RenewableEnergy_PropellerWood",
       "icon_build_RenewableEnergy_ScoopRotor",
-      "icon_build_RenewableEnergy_TurbinePipe",
       "icon_build_RenewableEnergy_TurbineWood"
     ],
     "menu": [

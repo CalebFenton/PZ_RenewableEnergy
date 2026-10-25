@@ -247,6 +247,78 @@ function T.setRecipeSkills(self, recipe)
     end
 end
 
+--- The build menu entry of `entity` (a game entity script's full name), or nil.
+function T.buildEntry(entity)
+    local script = getScriptManager():getGameEntityScript(entity)
+    local spriteConfig = script and script:getComponentScriptFor(ComponentType.SpriteConfig)
+    if not spriteConfig then
+        return nil
+    end
+    local infos = SpriteConfigManager.GetObjectInfoList()
+    for i = 0, infos:size() - 1 do
+        if infos:get(i):getScript() == spriteConfig then
+            return infos:get(i)
+        end
+    end
+    return nil
+end
+
+--- Queues building the build menu's entry of `entity` on `square` through the build menu's own
+--- path (ISBuildIsoEntity, ISBuildAction): the character gets the recipe's skill levels and
+--- exactly its inputs (T.recipeInputs with `prefer`), and the build waits until `arrived()` holds
+--- on this client, else misses `what`. Returns the build, or nil: once it has run, `canBuild` and
+--- `validSquare` are the build panel's and cursor's answers and `face` the face it built, as
+--- Sprites names facings; `expected` is what it should leave carried of each of `types`, for
+--- T.expectBuildUsed.
+function T.build(self, entity, square, prefer, arrived, what)
+    local info = T.need(self, T.buildEntry(entity), "the build menu entry of " .. entity)
+    local recipe = info and info:getRecipe() and info:getRecipe():getCraftRecipe()
+    if not T.need(self, recipe, "the build recipe of " .. entity) then return nil end
+    T.setRecipeSkills(self, recipe)
+    local inputs, unmatched = T.recipeInputs(recipe, prefer)
+    if not T.need(self, #unmatched == 0, "an item for " .. table.concat(unmatched, "; ")) then return nil end
+    -- What a build should leave carried: its kept tools, and none of the items it takes whole.
+    -- A drainable it takes uses of stays part-used, so isn't counted.
+    local result = { expected = {}, types = {} }
+    for i, entry in ipairs(inputs) do
+        local input = recipe:getInputs():get(i - 1)
+        if input:isKeep() then
+            result.expected[entry.type] = entry.count
+        elseif input:isItemCount() or not getScriptManager():FindItem(entry.type):isItemType(ItemType.DRAINABLE) then
+            result.expected[entry.type] = 0
+        end
+        table.insert(result.types, entry.type)
+    end
+    T.give(self, "materials", inputs)
+    T.step(function()
+        local player = T.player()
+        T.standNextTo(square)
+        local build = ISBuildIsoEntity:new(player, info, 1, ISInventoryPaneContextMenu.getContainers(player))
+        -- What the build panel does before the cursor can build (ISBuildPanel): the player
+        -- number the drag sets (IsoCell.setDrag), and the recipe's inputs picked from what is carried.
+        build.player = player:getPlayerNum()
+        build.buildPanelLogic:refresh()
+        build.buildPanelLogic:autoPopulateInputs()
+        result.canBuild = build.buildPanelLogic:canPerformCurrentRecipe()
+        result.validSquare = build:isValid(square)
+        result.face = string.upper(build:getFace():getFaceName())
+        build:tryBuild(square:getX(), square:getY(), square:getZ())
+    end)
+    T.waitFor(self, arrived, what)
+    return result
+end
+
+--- Expects T.build's `build` to have been possible, and to have taken what it takes while keeping
+--- its tools, by `left` (T.count's counts of its types once it built).
+function T.expectBuildUsed(build, left)
+    build = build or {}
+    T.expect(build.canBuild and build.validSquare, "the build menu can't build it from its materials on a bare square")
+    for fullType, count in pairs(build.expected or {}) do
+        local carried = left and left[fullType] or 0
+        T.expect(carried == count, "building left " .. carried .. " " .. fullType .. ", not " .. count)
+    end
+end
+
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
 --- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
 --- on its square if `opts.failsafe`. When the test ends the server removes it and this client lets go

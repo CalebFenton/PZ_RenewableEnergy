@@ -3,13 +3,15 @@
 -- the authority (RenewableEnergy.WindSource).
 
 require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/Sources"
 
 RenewableEnergy = RenewableEnergy or {}
 local Wind = {}
 RenewableEnergy.Wind = Wind
 
-local Specs, Sources = RenewableEnergy.Specs, RenewableEnergy.Sources
+local Specs, Sources, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sources, RenewableEnergy.Sprites
 
 -- Placed wind charger modData: its brake is on; its blades are broken.
 Wind.BRAKED_KEY = "RenewableEnergy_braked"
@@ -142,12 +144,34 @@ function Wind.canBreak(spec, blades, kph)
     return breakKph ~= nil and kph > breakKph
 end
 
---- The build menu's OnCreate for every wind charger, on the authority. Single player fires no
---- OnObjectAdded for a built object, so this fires it, as vanilla's TrapBO does, letting
---- RenewableEnergy.WindSpin start it turning. MP clients get it from the server's AddItemToMapPacket.
+-- One recipe builds each bladed kind with any blades it takes, always on its wood tile: this makes
+-- the charger the tile, and so the entity (RenewableEnergy.setEntityTile), of the blades the build
+-- took. Nothing is sent here: ISBuildIsoEntity sends the object on after OnCreate. A charger the
+-- world builds (RuralFinds) has no recipe data and keeps the tile it was given.
+local function fitBuiltBlades(thumpable, data)
+    local items = data and data:getAllConsumedItems()
+    local kind, facing = Sources.kindOf(thumpable)
+    for i = 0, items and items:size() - 1 or -1 do
+        local material = Wind.bladesOfItem(kind, items:get(i))
+        if material then
+            local tile = Sprites.windTileOf(kind, facing, material)
+            if tile and tile ~= thumpable:getSprite():getName() then
+                RenewableEnergy.setEntityTile(thumpable, tile)
+            end
+            return
+        end
+    end
+end
+
+--- The build menu's OnCreate for every wind charger, on the authority: fits the blades the build
+--- took (fitBuiltBlades). Single player fires no OnObjectAdded for a built object, so this fires
+--- it, as vanilla's TrapBO does, letting RenewableEnergy.WindSpin start it turning. MP clients get
+--- it from the server's AddItemToMapPacket.
 function Wind.OnCreate(params)
-    if params.thumpable then
-        triggerEvent("OnObjectAdded", params.thumpable)
+    local thumpable = params.thumpable
+    if thumpable then
+        fitBuiltBlades(thumpable, params.craftRecipeData)
+        triggerEvent("OnObjectAdded", thumpable)
     end
 end
 

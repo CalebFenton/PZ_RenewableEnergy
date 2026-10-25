@@ -153,6 +153,19 @@ handler("placePanel", function(player, args, defer)
     return { connected = connected, reason = reason }
 end)
 
+-- Takes away, when the test ends, whatever source the test builds at x, y, z by other means (the
+-- build menu), on whichever tile its OnCreate left it.
+handler("sourceTrack", function(_, args, defer)
+    defer(function()
+        local square = squareAt(args)
+        local source = square and RenewableEnergy.Sources.findOn(square)
+        if source then
+            PZHarness.Fixtures.removePlaced(source)
+        end
+    end)
+    return {}
+end)
+
 -- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
 -- unless given), started as a player starts one if `args.running`, with a failsafe tile on its
 -- square if `args.failsafe`. Both are removed when the test ends.

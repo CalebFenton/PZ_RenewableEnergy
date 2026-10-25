@@ -563,6 +563,64 @@ swapTest("renewable_energy_wind_turbine_blades_swap_material", "wooden turbine",
     { kind = "batteryRackWood", parts = { CAR_BATTERY, PLUG_IN_INVERTER, CONTROLLER } },
     Sprites.windCharger.alternator.steel.N, Sprites.windCharger.alternator.wood.N, WOODEN_BLADES, "RenewableEnergy.BrokenSteelBlades")
 
+-- Each bladed kind's one build menu entry, and the entity each of its blades makes of it: the
+-- entities of the tiles Sprites.windCharger names, since a SpriteConfig takes only its own tiles.
+local BUILT = {
+    { entry = "Base.RenewableEnergy_PropellerWood", kind = "propeller", entities = { wood = "RenewableEnergy_PropellerWood",
+        pipe = "RenewableEnergy_PropellerPipe", steel = "RenewableEnergy_PropellerSteel" } },
+    { entry = "Base.RenewableEnergy_CarAlternatorWood", kind = "carAlternator", entities = {
+        wood = "RenewableEnergy_CarAlternatorWood", pipe = "RenewableEnergy_CarAlternatorPipe",
+        steel = "RenewableEnergy_CarAlternatorSteel" } },
+    { entry = "Base.RenewableEnergy_TurbineWood", kind = "alternator", entities = { wood = "RenewableEnergy_TurbineWood",
+        pipe = "RenewableEnergy_TurbinePipe", steel = "RenewableEnergy_AlternatorWindCharger" } },
+}
+
+-- The build menu's own path builds the bladed kind of `design` from its one entry with `material`
+-- blades, and the charger's OnCreate fits the blades the build took: it stands on its kind's tile
+-- of those blades, facing the way it was built, as that tile's entity, whose SpriteConfig takes
+-- it. One build a test, as each built charger stands in the way of the next one's walk.
+local function buildsCharger(design, material)
+    local what = material .. " " .. design.kind
+    return {
+        instant = true,
+        run = function(self)
+            -- Bare: grass and the like block placing anything built (BlocksPlacement).
+            local squares = T.need(self, T.squares(self, 1, { bare = true }), "a bare outdoor square")
+            if not squares then return end
+            local square = squares[1]
+            T.server(self, "sourceTrack", T.at(square))
+            self.build = T.build(self, design.entry, square, { Specs.wind.blades[material].item }, function()
+                self.object = RenewableEnergy.Sources.findOn(square)
+                return self.object ~= nil
+            end, "this client's copy of the " .. what .. " charger")
+            if not self.build then return end
+            T.step(function()
+                local object = self.object
+                if not object then return end
+                local config, script = object:getSpriteConfig(), object:getEntityScript()
+                self.sprite = Sprites.nameOf(object)
+                self.built = script and script:getName()
+                self.configValid = config ~= nil and config:isValid() and object:getMasterObject() == object
+            end)
+        end,
+        validate = function(self)
+            local build = self.build or {}
+            expect(build.canBuild and build.validSquare, "the build menu can't build the " .. what .. " charger")
+            local tile = Sprites.windTileOf(design.kind, build.face, material)
+            expect(tile ~= nil and self.sprite == tile, "the " .. what .. " charger built facing "
+                .. tostring(build.face) .. " stands on " .. tostring(self.sprite) .. ", not " .. tostring(tile))
+            expect(self.built == design.entities[material], "the " .. what .. " charger is the entity " .. tostring(self.built))
+            expect(self.configValid, "the " .. what .. " charger's SpriteConfig refused its tile")
+        end,
+    }
+end
+
+for _, design in ipairs(BUILT) do
+    for _, material in ipairs(Specs.wind.turbines[design.kind].blades) do
+        test("renewable_energy_wind_build_menu_fits_" .. material .. "_blades_" .. design.kind, buildsCharger(design, material))
+    end
+end
+
 local SHELTERED_SHARE = RenewableEnergy.Specs.wind.shelteredShare
 
 -- A charger losing more than shelteredShare of its unsheltered watts to shelter gives "sheltered"
