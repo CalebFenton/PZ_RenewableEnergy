@@ -147,12 +147,7 @@ end
 --- Whether a character at the box can reach the switch: inside the box, so only with the lid open
 --- or off, as the padlock means it to be.
 function ArrowBoard.switchReachable(vehicle)
-    local lid = vehicle:getPartById(ArrowBoard.LID)
-    local door = lid and lid:getDoor()
-    if not (door and lid:getInventoryItem()) then
-        return true
-    end
-    return door:isOpen()
+    return RenewableEnergy.isPartOpen(vehicle, ArrowBoard.LID)
 end
 
 --- Whether the switch can be set to `on`: on an arrow board, reachable, and not there already.

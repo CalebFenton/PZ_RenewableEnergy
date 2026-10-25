@@ -9,6 +9,7 @@
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Materials"
+require "RenewableEnergy/Gadgets/VehicleBattery"
 
 RenewableEnergy = RenewableEnergy or {}
 local CarAlternator = {}
@@ -71,7 +72,7 @@ end
 --- battery parts, so the script name rules them out.
 function CarAlternator.isCar(vehicle)
     return vehicle ~= nil and not vehicle:isRemovedFromWorld() and CarAlternator.enginePart(vehicle) ~= nil
-        and vehicle:getPartById("Battery") ~= nil and not CarAlternator.isWreck(vehicle)
+        and RenewableEnergy.VehicleBattery.partOf(vehicle) ~= nil and not CarAlternator.isWreck(vehicle)
 end
 
 --- Whether `vehicle`'s alternator has been taken out.
@@ -82,8 +83,7 @@ end
 
 --- Whether the engine bay is open to work in: the hood open, off or not there at all.
 function CarAlternator.hoodOpen(vehicle)
-    local hood = vehicle:getPartById(CarAlternator.HOOD)
-    return hood == nil or hood:getDoor() == nil or hood:getInventoryItem() == nil or hood:getDoor():isOpen()
+    return RenewableEnergy.isPartOpen(vehicle, CarAlternator.HOOD)
 end
 
 --- The hood part that has to be opened before the job, or nil when the bay is open.

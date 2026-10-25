@@ -1,8 +1,12 @@
--- Take Out Alternator and Put Back Alternator in the vehicle mechanics window's menu for a car's
--- engine, beside vanilla's Take Engine Parts, the other job inside the engine bay. Picking one
--- goes about it as vanilla's engine jobs do (ISVehicleMechanics.onTakeEngineParts): out of the
+-- The vehicle mechanics window's menu for a part. For a car's engine: Take Out Alternator and Put
+-- Back Alternator, beside vanilla's Take Engine Parts, the other job inside the engine bay. Picking
+-- one goes about it as vanilla's engine jobs do (ISVehicleMechanics.onTakeEngineParts): out of the
 -- car, to the engine, the hood unlocked and opened if shut and closed again after, the wrench in
 -- hand as a part's uninstall holds it (ISVehiclePartMenu.equipRequiredItems).
+-- For an empty battery slot: the deep cycle battery under Install, the way vanilla offers the car
+-- batteries the slot's script lists, which the deep cycle battery isn't among (see
+-- RenewableEnergy.VehicleBattery). Picking one runs vanilla's own install
+-- (ISVehiclePartMenu.onInstallPart), with the slot's tools, time and hood.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
@@ -13,6 +17,7 @@ require "Vehicles/TimedActions/ISOpenVehicleDoor"
 require "Vehicles/TimedActions/ISCloseVehicleDoor"
 require "Vehicles/TimedActions/ISUnlockVehicleDoor"
 require "RenewableEnergy/Gadgets/CarAlternator"
+require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Needs"
 
@@ -22,6 +27,7 @@ RenewableEnergy.CarAlternatorMenu = CarAlternatorMenu
 
 local Action = RenewableEnergyAction
 local CarAlternator, Needs = RenewableEnergy.CarAlternator, RenewableEnergy.Needs
+local VehicleBattery = RenewableEnergy.VehicleBattery
 
 local function isWrench(item)
     return item:hasTag(ItemTag.WRENCH) and RenewableEnergy.notBroken(item)
@@ -69,14 +75,52 @@ function CarAlternatorMenu.addOption(context, character, vehicle)
     return option
 end
 
+-- Adds the deep cycle battery to the Install submenu that `mechanics:doPartContextMenu` built
+-- for `part` in `mechanics.context`. Vanilla builds no submenu when the slot is full or can't
+-- be worked on now, and then there is nothing to add to.
+local function addInstallOptions(mechanics, part)
+    if not VehicleBattery.isBatteryPart(part) or part:getInventoryItem() then
+        return
+    end
+    local install = mechanics.context:getOptionFromName(getText("IGUI_Install"))
+    local subMenu = install and install.subOption and mechanics.context:getSubMenu(install.subOption)
+    if not subMenu then
+        return
+    end
+    local character = mechanics.chr
+    local fullType = VehicleBattery.ITEM
+    local script = getItem(fullType)
+    local option = subMenu:addOption(getItemName(fullType), character, nil)
+    option.iconTexture = script and script:getNormalTexture()
+    mechanics:doMenuTooltip(part, option, "install", fullType)
+    local items = VehicleUtils.getItems(character:getPlayerNum())[fullType]
+    if not items then
+        option.notAvailable = true
+        return
+    end
+    local itemMenu = ISContextMenu:getNew(subMenu)
+    mechanics.context:addSubMenu(option, itemMenu)
+    for _, item in ipairs(items) do
+        local itemOption = itemMenu:addOption(item:getDisplayName() .. " (" .. item:getCondition() .. "%)", character,
+            ISVehiclePartMenu.onInstallPart, part, item)
+        itemOption.itemForTexture = item
+        mechanics:doMenuTooltip(part, itemOption, "install", fullType)
+    end
+end
+
 local vanillaDoPartContextMenu = ISVehicleMechanics.doPartContextMenu
 
 function ISVehicleMechanics:doPartContextMenu(part, x, y)
     vanillaDoPartContextMenu(self, part, x, y)
     -- Vanilla returns before building a menu while the game is paused or the character sits in
     -- the vehicle (unless debug or an admin); self.context is then the last menu, closed.
-    if part:getId() == CarAlternator.ENGINE and self.context and self.context:getIsVisible() then
+    if not (self.context and self.context:getIsVisible()) then
+        return
+    end
+    if part:getId() == CarAlternator.ENGINE then
         CarAlternatorMenu.addOption(self.context, self.chr, part:getVehicle())
+    else
+        addInstallOptions(self, part)
     end
 end
 

@@ -56,39 +56,26 @@ Events.OnGameBoot.Add(function()
     end
 end)
 
--- Whether the tile `sprite` is a refrigerator: its container is a fridge. Not its Material: vanilla
--- gives stoves, washers, dryers and plastic chairs the Fridge scrap material too, and leaves it off
--- shop coolers and trailer fridges (newtiledefinitions.tiles).
-local function isFridge(sprite)
-    return sprite ~= nil and sprite:getProperties():get("container") == "fridge"
+-- The container type of the tile `sprite`, or nil. A refrigerator is a tile whose container is a
+-- fridge, not its Material: vanilla gives stoves, washers, dryers and plastic chairs the Fridge
+-- scrap material too, and leaves it off shop coolers and trailer fridges (newtiledefinitions.tiles).
+local function containerOf(sprite)
+    return sprite and sprite:getProperties():get("container")
 end
 
--- The chance that `character` cuts a refrigerator's compressor out whole: vanilla's own scrap skill
--- chance (ISMoveableSpriteProps.getChanceByDef: 10% and 10% a level, certain with the movables
--- cheat) on Metalworking, the perk vanilla's Fridge scrap trains. One roll a fridge, whatever its
--- size, since a fridge has one compressor.
-local function compressorChance(character)
-    if ISMoveableDefinitions.cheat or character:isMovablesCheat() then
-        return 1
-    end
-    return math.min(1, (10 + 10 * character:getPerkLevel(Perks.MetalWelding)) / 100)
+-- The chance that `character` takes a part out whole of a tile `props` with the scrap material
+-- `material`: vanilla's own scrap skill chance for it (ISMoveableSpriteProps.getChanceByDef, the
+-- movables cheat included). A refrigerator's compressor goes by the Fridge material's perk,
+-- Metalworking, one roll a fridge, whatever its size, since a fridge has one compressor. A
+-- microwave's transformer goes by the Electric material microwave tiles carry, so it rises with
+-- Electricity as the oven's electronics do.
+local function scrapChance(props, material, character)
+    local def = ISMoveableDefinitions:getInstance().getScrapDefinition(material)
+    return def and props:getChanceByDef(def, character) / 100 or 0
 end
 
 -- What a microwave oven may give: the transformer a homemade inverter is wound on.
 local TRANSFORMER = "RenewableEnergy.MicrowaveTransformer"
-
--- Whether the tile `sprite` is a microwave oven: its container is a microwave.
-local function isMicrowave(sprite)
-    return sprite ~= nil and sprite:getProperties():get("container") == "microwave"
-end
-
--- The chance that `character` takes a microwave's transformer out whole: vanilla's own chance for
--- the Electric scrap material microwave tiles carry (ISMoveableSpriteProps.getChanceByDef, the
--- movables cheat included), so it rises with Electricity as the oven's electronics do.
-local function transformerChance(props, character)
-    local def = ISMoveableDefinitions:getInstance().getScrapDefinition("Electric")
-    return def and props:getChanceByDef(def, character) / 100 or 0
-end
 
 -- A dismantled treadmill gives its motor, a dismantled refrigerator may give its compressor,
 -- which a digester uses to fill propane tanks, and a dismantled microwave its transformer. Vanilla
@@ -108,9 +95,9 @@ function ISMoveableSpriteProps:getScrapItemsList(character)
     if items and self.scrappingMainTile ~= false then
         if Treadmill.isSprite(self.spriteName) then
             table.insert(items.usable, Treadmill.MOTOR)
-        elseif isFridge(self.sprite) and character and RenewableEnergy.Chance.hit(compressorChance(character)) then
+        elseif containerOf(self.sprite) == "fridge" and character and RenewableEnergy.Chance.hit(scrapChance(self, "Fridge", character)) then
             table.insert(items.usable, RenewableEnergy.Digester.COMPRESSOR)
-        elseif isMicrowave(self.sprite) and character and RenewableEnergy.Chance.hit(transformerChance(self, character)) then
+        elseif containerOf(self.sprite) == "microwave" and character and RenewableEnergy.Chance.hit(scrapChance(self, "Electric", character)) then
             table.insert(items.usable, TRANSFORMER)
         end
     end

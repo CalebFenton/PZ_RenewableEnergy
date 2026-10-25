@@ -39,7 +39,7 @@ local function haveOf(character, material)
     if material.perk then
         return character:getPerkLevel(Perks[material.perk])
     elseif material.tool then
-        return RenewableEnergy.hasWorkingTool(character, ItemTag[material.tool]) and 1 or 0
+        return inventory:containsTagEvalRecurse(ItemTag[material.tool], RenewableEnergy.notBroken) and 1 or 0
     elseif material.tag then
         return inventory:getCountTagEvalRecurse(ItemTag[material.tag], RenewableEnergy.notBroken)
     elseif material.water then

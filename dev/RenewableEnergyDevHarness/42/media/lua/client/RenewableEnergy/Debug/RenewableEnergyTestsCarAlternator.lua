@@ -1,11 +1,11 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Gadgets/CarAlternator"
-require "RenewableEnergy/UI/CarAlternatorMenu"
+require "RenewableEnergy/UI/VehicleMechanicsMenu"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "Vehicles/ISUI/ISVehicleMechanics"
 
 -- The car alternator: taken out of a car and put back (Gadgets/CarAlternator*.lua,
--- UI/CarAlternatorMenu.lua), the car's battery charging without it (VehicleBatteryCharging.lua),
+-- UI/VehicleMechanicsMenu.lua), the car's battery charging without it (VehicleBatteryCharging.lua),
 -- and a wreck's scrap dropping one. The authority runs the jobs and the scrap, so the tests drive
 -- them through the job's action and T.server, and check this client's copies.
 

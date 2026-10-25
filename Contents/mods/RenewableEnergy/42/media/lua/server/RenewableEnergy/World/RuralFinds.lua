@@ -43,6 +43,11 @@ RuralFinds.BIOGAS_MAGAZINE = "RenewableEnergy.HomesteadPowerMag3"
 -- Containers no one leaves reading in: most of a barn's are feed troughs.
 local NOT_FOR_READING = { trough = true, composter = true }
 
+local function keepsReading(object)
+    local container = object:getContainer()
+    return container ~= nil and not NOT_FOR_READING[container:getType()]
+end
+
 local function store()
     return ModData.getOrCreate(RuralFinds.MOD_DATA)
 end
@@ -85,23 +90,7 @@ end
 
 -- Building
 
---- Builds the entity of the tile `sprite` (RenewableEnergy.tileEntity) as ISBuildIsoEntity:create
---- does: a thumpable with its entity's components on the square, then the entity's OnCreate, and
---- sends it to the clients. `wear(thumpable)`, if given, sets its worn state before they get it.
-function RuralFinds.build(square, sprite, onCreate, wear)
-    local thumpable = IsoThumpable.new(square:getCell(), square, sprite, false, nil)
-    GameEntityFactory.CreateIsoObjectEntity(thumpable, RenewableEnergy.tileEntity(sprite), true)
-    square:AddSpecialObject(thumpable)
-    thumpable:setExplored(true)
-    onCreate({ thumpable = thumpable })
-    if wear then
-        wear(thumpable)
-    end
-    square:RecalcAllWithNeighbours(true)
-    thumpable:transmitCompleteItemToClients()
-    return thumpable
-end
-local build = RuralFinds.build
+local build = RenewableEnergy.WorldSpawns.buildEntity
 
 local function randomOf(entries)
     local list = {}
@@ -122,12 +111,9 @@ function RuralFinds.leaveReading(def, fullType)
         for x = def:getX(), def:getX2() - 1 do
             for y = def:getY(), def:getY2() - 1 do
                 local square = getSquare(x, y, z)
-                local objects = square and square:getObjects()
-                for i = 0, (objects and objects:size() or 0) - 1 do
-                    local container = objects:get(i):getContainer()
-                    if container and not NOT_FOR_READING[container:getType()] then
-                        return RenewableEnergy.addItem(container, fullType) ~= nil
-                    end
+                local holder = RenewableEnergy.findObjectOn(square, keepsReading)
+                if holder then
+                    return RenewableEnergy.addItem(holder:getContainer(), fullType) ~= nil
                 end
                 if square and square:getRoom() and square:isFree(false) then
                     table.insert(floors, square)
@@ -154,8 +140,8 @@ local LIVESTOCK = {
 
 --- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), `is(object)`,
 --- whether an object is one, whether a building `qualifies`, how many squares out from the
---- building it stands (`reach`) on open ground that also `fits`, if given, and `place(square,
---- def)`, which builds it worn.
+--- building it stands (`reach`) on open ground that also `fits`, if given, `place(square)`, which
+--- builds it worn, and the `reading`, if any, a building's roll may leave with it.
 RuralFinds.FINDS = {
     wind = {
         odds = 15,
@@ -179,10 +165,11 @@ RuralFinds.FINDS = {
         is = Digester.isDigester,
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
         reach = 1,
+        reading = RuralFinds.BIOGAS_MAGAZINE,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
-        place = function(square, def)
+        place = function(square)
             local System = RenewableEnergy.DigesterSystem
-            local thumpable = build(square, randomOf(Sprites.digester.barrel), System.OnCreate,
+            return build(square, randomOf(Sprites.digester.barrel), System.OnCreate,
                 function(thumpable)
                     local digester = System.instance:getLuaObjectOnSquare(square)
                     digester.holderCondition = 0
@@ -190,10 +177,6 @@ RuralFinds.FINDS = {
                     digester.sour = true
                     digester:afterChange()
                 end)
-            if def and Chance.hit(READING_CHANCE) then
-                RuralFinds.leaveReading(def, RuralFinds.BIOGAS_MAGAZINE)
-            end
-            return thumpable
         end,
     },
     gasifier = {
@@ -210,15 +193,17 @@ RuralFinds.FINDS = {
             return rooms:size() > 0
         end,
         reach = 1,
+        reading = RuralFinds.PAMPHLET,
         -- Put away dirty: its filter packing all tarred and its ash pit full.
-        place = function(square, def)
+        place = function(square)
             local System = RenewableEnergy.GasifierSystem
-            local thumpable = build(square, Sprites.gasifier.primitive,
+            return build(square, Sprites.gasifier.primitive,
                 System.OnCreate, function(thumpable)
                     local filter = Gasifier.filterOf(thumpable)
                     for _ = 1, 100 do
                         local tarry = instanceItem(Gasifier.TARRY)
-                        if filter:getContentsWeight() + tarry:getUnequippedWeight() > filter:getCapacity() + 1e-4 then
+                        local weight = filter:getContentsWeight() + tarry:getUnequippedWeight()
+                        if weight > filter:getCapacity() + RenewableEnergy.EPSILON then
                             break
                         end
                         filter:AddItem(tarry)
@@ -227,10 +212,6 @@ RuralFinds.FINDS = {
                     gasifier.ash = Gasifier.ASH_FULL
                     gasifier:afterChange()
                 end)
-            if def and Chance.hit(READING_CHANCE) then
-                RuralFinds.leaveReading(def, RuralFinds.PAMPHLET)
-            end
-            return thumpable
         end,
     },
 }
@@ -240,6 +221,13 @@ local KINDS = { "wind", "digester", "gasifier" }
 function RuralFinds.canPlace(kind, square)
     local find = RuralFinds.FINDS[kind]
     return RuralFinds.canStand(square) and (not find.fits or find.fits(square))
+end
+
+--- Why the find `kind` may not stand on the square, or nil if it may (RuralFinds.canPlace).
+function RuralFinds.refusal(kind, square)
+    if not RuralFinds.canPlace(kind, square) then
+        return "no open ground for a " .. kind
+    end
 end
 
 --- How far outside the building's bounds the square at x, y is, in squares (0 inside).
@@ -290,7 +278,11 @@ function RuralFinds.roll(def, kinds)
         if Chance.hit(RuralFinds.chanceFor(kind)) then
             local square = squareFor(def, kind)
             if square then
-                placed[kind] = RuralFinds.FINDS[kind].place(square, def)
+                local find = RuralFinds.FINDS[kind]
+                placed[kind] = find.place(square)
+                if find.reading and Chance.hit(READING_CHANCE) then
+                    RuralFinds.leaveReading(def, find.reading)
+                end
                 found[kind] = true
             end
         end
@@ -326,12 +318,9 @@ function RuralFinds.claim(kind, x, y)
     end
 end
 
---- Builds the find `kind` on the square, worn, as a building's roll would, if it may stand there.
---- Returns it, or nil and why not.
+--- Builds the find `kind` on the square, worn, as a building's roll would. Only where it may
+--- stand (RuralFinds.refusal nil). Returns it.
 function RuralFinds.placeAt(kind, square)
-    if not RuralFinds.canPlace(kind, square) then
-        return nil, "no open ground for a " .. kind
-    end
     return RuralFinds.FINDS[kind].place(square)
 end
 
@@ -391,7 +380,7 @@ local function addClutter()
                 end
             end
         else
-            print("RenewableEnergy: no story clutter list " .. getter)
+            print("RenewableEnergy: missing story clutter list " .. getter)
         end
     end
 end

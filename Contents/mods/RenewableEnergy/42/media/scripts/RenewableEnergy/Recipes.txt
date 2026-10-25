@@ -674,7 +674,7 @@ module Base
         SkillRequired = Electricity:1,
         xpAward = Electricity:5,
         Tooltip = Tooltip_RenewableEnergy_ServiceBattery,
-        OnTest = RenewableEnergy.Recipes.canServiceBattery,
+        OnTest = RenewableEnergy.Recipes.canRepairBattery,
         OnCreate = RenewableEnergy.Recipes.serviceBattery,
         inputs
         {
@@ -699,7 +699,7 @@ module Base
         SkillRequired = Electricity:3,
         xpAward = Electricity:15,
         Tooltip = Tooltip_RenewableEnergy_ReconditionBattery,
-        OnTest = RenewableEnergy.Recipes.canReconditionBattery,
+        OnTest = RenewableEnergy.Recipes.canRepairBattery,
         OnCreate = RenewableEnergy.Recipes.reconditionBattery,
         inputs
         {

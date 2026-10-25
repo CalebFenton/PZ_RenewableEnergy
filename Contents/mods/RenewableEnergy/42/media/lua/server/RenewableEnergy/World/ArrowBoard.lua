@@ -234,15 +234,10 @@ function ArrowBoard.crackLookOf(part)
     return item and RenewableEnergy.crackLookOf(item:getFullType(), part:getCondition())
 end
 
---- Whether the module on the panel `part` shows any cracks.
-function ArrowBoard.isCracked(part)
-    return ArrowBoard.crackLookOf(part) ~= nil
-end
-
--- Hides every model of the panel `part`.
-local function hidePanel(part)
+-- Shows the model `shown` of the panel `part` and hides the others; nil hides every one.
+local function showModel(part, shown)
     for _, model in ipairs(PANEL_MODELS) do
-        part:setModelVisible(model, false)
+        part:setModelVisible(model, model == shown)
     end
 end
 
@@ -255,9 +250,7 @@ function ArrowBoard.showPanel(part)
         local look = ArrowBoard.crackLookOf(part)
         shown = look and MODEL_OF_LOOK[look] or "Whole"
     end
-    for _, model in ipairs(PANEL_MODELS) do
-        part:setModelVisible(model, model == shown)
-    end
+    showModel(part, shown)
 end
 
 function ArrowBoard.showPanels(vehicle)
@@ -291,8 +284,7 @@ local function stockPanels(vehicle)
         local part = vehicle:getPartById(id)
         if part and i <= count and not part:getInventoryItem() then
             local cracked = i == 2 and Chance.hit(stock.secondCrackedChance)
-            local item = instanceItem(Specs.factoryModule)
-            RenewableEnergy.Wear.setCondition(item, cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
+            local item = WorldSpawns.newModule(cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
             part:setInventoryItem(item)
             vehicle:transmitPartItem(part)
             table.insert(panels, { part = part, item = item, condition = item:getCondition() })
@@ -326,7 +318,7 @@ local function keepStockConditions()
                 -- A client may have got the trailer already and shown the panel by the condition
                 -- it had then, and the server sends a part's models only when they change
                 -- (BaseVehicle.setModelVisible), so they change twice.
-                hidePanel(part)
+                showModel(part, nil)
                 setPanelCondition(trailer.vehicle, part, panel.condition)
             end
         end
@@ -416,7 +408,7 @@ end
 function ArrowBoard.sealablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
-    if item and ArrowBoard.isCracked(part) and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
+    if item and ArrowBoard.crackLookOf(part) ~= nil and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
         return part
     end
     return nil

@@ -190,10 +190,7 @@ local SPOTS = {
         waits = true,
         ready = function(_, spot) return farEnd(spot) ~= nil end,
         refuses = function(square, spot)
-            if not RuralFinds.canPlace("wind", square) then
-                return "no open ground for a wind charger"
-            end
-            return notFreeIndoors(farEnd(spot))
+            return RuralFinds.refusal("wind", square) or notFreeIndoors(farEnd(spot))
         end,
         place = function(square, spot)
             local bankSquare = farEnd(spot)
@@ -213,8 +210,9 @@ local SPOTS = {
         waits = true,
         ready = function(_, spot) return farEnd(spot) ~= nil end,
         refuses = function(square, spot)
-            if not RuralFinds.canPlace(spot.source, square) then
-                return "no open ground for a " .. spot.source
+            local why = RuralFinds.refusal(spot.source, square)
+            if why then
+                return why
             end
             if not RuralFinds.canStand(farEnd(spot)) then
                 return "no open ground for the generator"
@@ -373,10 +371,7 @@ local function placeChunk(wx, wy)
         local object = objects:get(i)
         local x, y, z = object:getX(), object:getY(), object:getZ()
         -- A copy: removeObject wipes the object's modData (GlobalObject.Reset).
-        local spot = {}
-        for key, value in pairs(object:getModData()) do
-            spot[key] = value
-        end
+        local spot = copyTable(object:getModData())
         local square = getSquare(x, y, z)
         if SPOTS[spot.what].waits then
             table.insert(waiting, { x = x, y = y, z = z, spot = spot })

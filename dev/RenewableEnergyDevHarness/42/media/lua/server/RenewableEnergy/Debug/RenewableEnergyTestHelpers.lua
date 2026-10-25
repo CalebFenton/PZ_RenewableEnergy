@@ -310,7 +310,7 @@ end
 
 --- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
 --- "barrel.MetalDrum", "standard") on `square` as the build menu does, through the builder rural
---- finds use (RuralFinds.build), which sends it to the clients. Returns the thumpable, or nil and
+--- finds use (WorldSpawns.buildEntity), which sends it to the clients. Returns the thumpable, or nil and
 --- what is missing.
 function Helpers.placeRecord(kind, tile, square)
     local spec = KINDS[kind]
@@ -324,7 +324,7 @@ function Helpers.placeRecord(kind, tile, square)
     if type(sprite) ~= "string" then
         return nil, "the " .. kind .. " tile " .. tostring(tile)
     end
-    return RenewableEnergy.RuralFinds.build(square, sprite, spec.system().OnCreate)
+    return RenewableEnergy.WorldSpawns.buildEntity(square, sprite, spec.system().OnCreate)
 end
 
 --- The record of kind `kind` as plain values: its saved fields, its kind's extras and, while its

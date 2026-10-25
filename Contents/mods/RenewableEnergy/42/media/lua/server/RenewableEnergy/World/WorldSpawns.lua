@@ -52,7 +52,7 @@ WorldSpawns.BATTERY_WEAR = {
 -- battery's case, plates and acid for a rebuild.
 WorldSpawns.DUD = { min = 5, max = 20, repairs = 5 }
 -- Found inverters and charge controllers, worn as a BATTERY_WEAR profile: solid-state boxes seldom
--- wear out on a shelf, so they come at about 85 and never below 70, but one in twenty is a dud.
+-- wear out on a shelf, so they come near new and bunched close, with the odd dud.
 WorldSpawns.PART_WEAR = { mean = 85, halfWidth = 15, dud = 0.05 }
 -- A part dud: broken (0) or a scrap's repair from it (Specs.partRepair), so it needs mending first.
 WorldSpawns.PART_DUD = { min = 0, max = 10 }
@@ -218,13 +218,16 @@ function WorldSpawns.siteModules(count)
     return modules
 end
 
+--- A factory module at `condition`.
+function WorldSpawns.newModule(condition)
+    local item = instanceItem(MODULE)
+    RenewableEnergy.Wear.setCondition(item, condition)
+    return item
+end
+
 --- Adds a factory module at `condition` to the container.
 function WorldSpawns.addModule(container, condition)
-    local item = container:AddItem(MODULE)
-    if item then
-        RenewableEnergy.Wear.setCondition(item, condition)
-    end
-    return item
+    return container:AddItem(WorldSpawns.newModule(condition))
 end
 
 -- Stocking
@@ -250,17 +253,21 @@ local function setPercent(item, percent)
     RenewableEnergy.Wear.setCondition(item, math.floor(item:getConditionMax() * percent / 100 + 0.5))
 end
 
+-- A found item's percent of new by the wear profile `wear`: a dud's from `dud`, if its chance
+-- comes up, or WorldSpawns.foundPercent. Also returns whether it is a dud.
+local function foundOrDud(wear, dud)
+    if wear.dud and Chance.hit(wear.dud) then
+        return Chance.between(dud.min, dud.max), true
+    end
+    return WorldSpawns.foundPercent(wear, Chance.roll(), Chance.roll(), Chance.roll()), false
+end
+
 --- Wears the found battery `item` as the BATTERY_WEAR profile `wearName` says: a dud at DUD's
 --- condition with its repairs, or at WorldSpawns.foundPercent. Sends nothing.
 function WorldSpawns.wearFoundBattery(item, wearName)
-    local wear = WorldSpawns.BATTERY_WEAR[wearName]
-    local percent
-    if wear.dud and Chance.hit(wear.dud) then
-        local dud = WorldSpawns.DUD
-        percent = Chance.between(dud.min, dud.max)
-        item:setHaveBeenRepaired(dud.repairs)
-    else
-        percent = WorldSpawns.foundPercent(wear, Chance.roll(), Chance.roll(), Chance.roll())
+    local percent, isDud = foundOrDud(WorldSpawns.BATTERY_WEAR[wearName], WorldSpawns.DUD)
+    if isDud then
+        item:setHaveBeenRepaired(WorldSpawns.DUD.repairs)
     end
     setPercent(item, percent)
 end
@@ -275,13 +282,7 @@ end
 --- Wears the found inverter or controller `item` as PART_WEAR says, a dud at PART_DUD's
 --- condition, and marks it as having a condition of its own. Sends nothing.
 function WorldSpawns.wearFoundPart(item)
-    local wear = WorldSpawns.PART_WEAR
-    if Chance.hit(wear.dud) then
-        local dud = WorldSpawns.PART_DUD
-        setPercent(item, Chance.between(dud.min, dud.max))
-    else
-        setPercent(item, WorldSpawns.foundPercent(wear, Chance.roll(), Chance.roll(), Chance.roll()))
-    end
+    setPercent(item, (foundOrDud(WorldSpawns.PART_WEAR, WorldSpawns.PART_DUD)))
     RenewableEnergy.Wear.markOwnCondition(item)
 end
 
@@ -436,6 +437,23 @@ function WorldSpawns.placePanel(square, spriteName, modules)
     WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES_KEY] = modules })
 end
 
+--- Builds the entity of the tile `sprite` (RenewableEnergy.tileEntity) as ISBuildIsoEntity:create
+--- does: a thumpable with its entity's components on the square, then the entity's OnCreate, and
+--- sends it to the clients. `wear(thumpable)`, if given, sets its worn state before they get it.
+function WorldSpawns.buildEntity(square, sprite, onCreate, wear)
+    local thumpable = IsoThumpable.new(square:getCell(), square, sprite, false, nil)
+    GameEntityFactory.CreateIsoObjectEntity(thumpable, RenewableEnergy.tileEntity(sprite), true)
+    square:AddSpecialObject(thumpable)
+    thumpable:setExplored(true)
+    onCreate({ thumpable = thumpable })
+    if wear then
+        wear(thumpable)
+    end
+    square:RecalcAllWithNeighbours(true)
+    thumpable:transmitCompleteItemToClients()
+    return thumpable
+end
+
 -- Rooms seen for the first time
 
 local function oneIn(n)
@@ -473,8 +491,7 @@ function WorldSpawns.layModulesBeside(square, stockName)
     end)
     local count = WorldSpawns.scaled(Chance.between(spec.min, spec.max), SandboxVars.RenewableEnergy.LRMSolarPanels)
     for i = 1, count do
-        local item = instanceItem(MODULE)
-        RenewableEnergy.Wear.setCondition(item, siteModuleCondition())
+        local item = WorldSpawns.newModule(siteModuleCondition())
         local floor = beside[(i - 1) % math.max(1, #beside) + 1] or square
         RenewableEnergy.dropOn(floor, item)
     end

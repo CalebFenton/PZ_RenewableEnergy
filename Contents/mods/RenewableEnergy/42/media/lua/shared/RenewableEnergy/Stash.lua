@@ -65,8 +65,7 @@ local HOUSES = {
         crateX = 7985, crateY = 12341, crateZ = 0,
         barricades = 90,
         traps = "1-3",
-        mapLoot = RenewableEnergy.weightedEntries(1, PREPPER_CACHES,
-            RenewableEnergy.weightedEntries(2, SURVIVALISTS_AND_BANDITS)),
+        mapLoot = RenewableEnergy.weightedEntries({ { 2, SURVIVALISTS_AND_BANDITS }, { 1, PREPPER_CACHES } }),
         marks = {
             { symbol = "X", x = 7984, y = 12342, color = RED_MARKER },
             { note = 1, x = 7993, y = 12331 },

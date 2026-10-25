@@ -6,6 +6,9 @@
 
 RenewableEnergy = RenewableEnergy or {}
 
+-- Slack for float comparisons of kg, litres and m³, which sums and shares leave a hair off.
+RenewableEnergy.EPSILON = 1e-4
+
 --- The first object on `square` for which `matches(object)` is true, or nil. Takes a nil square.
 function RenewableEnergy.findObjectOn(square, matches)
     local objects = square and square:getObjects()
@@ -85,17 +88,22 @@ function RenewableEnergy.notBroken(item)
     return not item:isBroken()
 end
 
---- Whether `character` carries a working tool with `tag` (an ItemTag value), bags included.
-function RenewableEnergy.hasWorkingTool(character, tag)
-    return character:getInventory():containsTagEvalRecurse(tag, RenewableEnergy.notBroken)
+--- Whether the door part `partId` of `vehicle` leaves what it covers open: the door open, taken
+--- off, or no such part or door at all.
+function RenewableEnergy.isPartOpen(vehicle, partId)
+    local part = vehicle:getPartById(partId)
+    local door = part and part:getDoor()
+    return not (door and part:getInventoryItem()) or door:isOpen()
 end
 
---- Appends a loot entry { weight, list } to `entries` (a new table when nil) for each list of
---- `lists`, and returns `entries`.
-function RenewableEnergy.weightedEntries(weight, lists, entries)
+--- Appends to `entries` (a new table when nil) a loot entry { weight, list } for each list of
+--- each group { weight, lists } of `groups`, in order, and returns `entries`.
+function RenewableEnergy.weightedEntries(groups, entries)
     entries = entries or {}
-    for _, list in ipairs(lists) do
-        table.insert(entries, { weight, list })
+    for _, group in ipairs(groups) do
+        for _, list in ipairs(group[2]) do
+            table.insert(entries, { group[1], list })
+        end
     end
     return entries
 end

@@ -42,18 +42,15 @@ function SolarCellCharger.findOn(square)
     return RenewableEnergy.findObjectOn(square, SolarCellCharger.isCharger)
 end
 
-local function setFilter(isoObject)
-    local container = isoObject:getContainer()
-    if container then
-        container:setAcceptItemFunction(ACCEPT_FUNCTION)
-    end
+local function adoptContainer(isoObject)
+    RenewableEnergy.adoptContainer(isoObject:getContainer(), ACCEPT_FUNCTION)
 end
 
 -- Every side needs the filter, but only the authority charges, so only it keeps places.
 local chargers = RenewableEnergy.PlaceTracker.new({
     sprites = { Sprites.cellCharger },
     matches = SolarCellCharger.isCharger,
-    onFound = setFilter,
+    onFound = adoptContainer,
     keepPlaces = not isClient(),
 })
 

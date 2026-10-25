@@ -105,7 +105,7 @@ handler("placeBank", function(_, args, defer)
     defer(function()
         local current = PowerBank.findOn(squareAt(args))
         if current then
-            PowerBank.remove(current)
+            current:getSquare():transmitRemoveItemFromSquare(current)
         end
     end)
     if bank:getContainer():getItems():size() ~= #items then
@@ -125,7 +125,7 @@ end)
 -- the way the moveables cursor places it (WorldSpawns.placePanel), carrying `args.modules`. A wind
 -- charger is built in place and a treadmill is vanilla furniture, neither from an item of the mod,
 -- so their tile is put down bare, unless `args.built` builds the charger as its build-menu entity,
--- as the world builds its finds (RuralFinds.build); its blades come broken when `args.broken`. A
+-- as the world builds its finds (WorldSpawns.buildEntity); its blades come broken when `args.broken`. A
 -- treadmill's comes wired by its wiring's owner when `args.wired`. Answers whether the source
 -- connected and the refusal.
 handler("placePanel", function(player, args, defer)
@@ -143,7 +143,7 @@ handler("placePanel", function(player, args, defer)
             return nil, "a placed " .. args.sprite .. " on the server"
         end
     elseif args.built then
-        panel = RenewableEnergy.RuralFinds.build(square, args.sprite, RenewableEnergy.Wind.OnCreate)
+        panel = RenewableEnergy.WorldSpawns.buildEntity(square, args.sprite, RenewableEnergy.Wind.OnCreate)
     else
         panel = IsoObject.new(square, args.sprite, "RenewableEnergy")
         square:AddTileObject(panel)
@@ -483,7 +483,7 @@ end)
 
 -- Takes the bank at `args.bank` away the way picking it up or destroying it does.
 onBank("removeBank", function(_, bank, args)
-    RenewableEnergy.PowerBank.remove(bank)
+    bank:getSquare():transmitRemoveItemFromSquare(bank)
     local square = squareAt(args.bank)
     return { powered = square:haveElectricity(),
         registered = RenewableEnergy.PowerBank.serverSystem:getLuaObjectOnSquare(square) ~= nil }
@@ -688,7 +688,7 @@ handler("cellCharge", function(_, args)
         sendAddItemToContainer(container, battery)
     end
     local reply = { added = SolarCellCharger.charge(charger, args.hours), after = usesOf(container),
-        flatWh = RenewableEnergy.Sun.panelWatts(1, "flat") }
+        flatWh = RenewableEnergy.Sun.wattsFrom(1, RenewableEnergy.Sun.skyNow().flat) }
     local items, full = container:getItems(), true
     for i = 0, items:size() - 1 do
         full = full and items:get(i):getCurrentUses() == items:get(i):getMaxUses()
@@ -806,7 +806,7 @@ onCar("maintainerCharge", function(vehicle, args)
     battery:setCurrentUsesFloat(args.uses)
     local wh = RenewableEnergy.SolarMaintainer.charge(vehicle, args.hours)
     return { wh = wh, after = battery:getCurrentUsesFloat(), capacityWh = RenewableEnergy.Battery.nominalWh(battery),
-        flatWh = RenewableEnergy.Sun.panelWatts(1, "flat") }
+        flatWh = RenewableEnergy.Sun.wattsFrom(1, RenewableEnergy.Sun.skyNow().flat) }
 end)
 
 -- Marks a maintainer attached in the shape older saves hold, with the condition it went on with,
