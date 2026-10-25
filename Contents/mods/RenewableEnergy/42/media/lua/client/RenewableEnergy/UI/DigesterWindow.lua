@@ -9,6 +9,7 @@ RenewableEnergy = RenewableEnergy or {}
 local SummaryWindow = RenewableEnergy.SummaryWindow
 local DigesterWindow = SummaryWindow:derive("RenewableEnergyDigesterWindow")
 RenewableEnergy.DigesterWindow = DigesterWindow
+DigesterWindow.owner = RenewableEnergy.Digester
 
 local Digester, GasHeater, Format = RenewableEnergy.Digester, RenewableEnergy.GasHeater, RenewableEnergy.Format
 local row = SummaryWindow.row
@@ -59,44 +60,31 @@ local function holderText(summary)
     return name
 end
 
-function DigesterWindow:titleOf(summary)
-    return getText(Digester.nameKey(summary.tier))
-end
-
-function DigesterWindow:summaryNow()
-    return Digester.summaryOf(self.object)
-end
-
 --- The rows the window shows for `summary`: { label, value, color }.
 function DigesterWindow:rowsOf(summary)
     local rows = {}
-    row(rows, "IGUI_RenewableEnergy_DigesterState", stateText(summary), (summary.sour or not summary.started) and "warn" or nil)
-    row(rows, "IGUI_RenewableEnergy_DigesterTemp", Format.temperature(summary.temp), summary.temp < COLD_C and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_State", stateText(summary), (summary.sour or not summary.started) and "bad" or nil)
+    row(rows, "IGUI_RenewableEnergy_DigesterTemp", Format.temperature(summary.temp), summary.temp < COLD_C and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterGas", Format.cubicMetres(summary.gas, 2) .. " / " .. Format.cubicMetres(summary.capacity, 2))
     row(rows, "IGUI_RenewableEnergy_DigesterMaking", getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(summary.madePerDay, 2)))
-    row(rows, "IGUI_RenewableEnergy_DigesterHolder", holderText(summary), (summary.torn or summary.leaking) and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_DigesterHolder", holderText(summary), (summary.torn or summary.leaking) and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterFill", Format.percent(summary.fill))
     row(rows, "IGUI_RenewableEnergy_DigesterHopper", tostring(summary.hopper))
-    row(rows, "IGUI_RenewableEnergy_DigesterSludge", Format.percent(summary.sludge / 100), summary.sludge >= Digester.SLUDGE_SLOW and "warn" or nil)
-    row(rows, "IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= Digester.SMELL_SCORES[2] and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_DigesterSludge", Format.percent(summary.sludge / 100), summary.sludge >= Digester.SLUDGE_SLOW and "bad" or nil)
+    row(rows, "IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= Digester.SMELL_SCORES[2] and "bad" or nil)
     if summary.scrubber then
         row(rows, "IGUI_RenewableEnergy_DigesterScrubber", getText("IGUI_RenewableEnergy_ScrubberState",
             Format.number(summary.scrubCO2, 1), Format.number(summary.scrubWool, 1)),
-            (summary.scrubCO2 <= 0 or summary.scrubWool <= 0) and "warn" or nil)
+            (summary.scrubCO2 <= 0 or summary.scrubWool <= 0) and "bad" or nil)
     end
     if summary.heaterLit then
         row(rows, "IGUI_RenewableEnergy_DigesterHeater", getText("IGUI_RenewableEnergy_HeaterBurning",
             getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(GasHeater.m3PerHour() * 24, 2))))
     end
     if summary.leaking then
-        row(rows, "IGUI_RenewableEnergy_DigesterLeak", getText("IGUI_RenewableEnergy_DigesterLeaking"), "warn")
+        row(rows, "IGUI_RenewableEnergy_DigesterLeak", getText("IGUI_RenewableEnergy_DigesterLeaking"), "bad")
     end
     return rows
-end
-
---- Opens `playerNum`'s window on the digester `digester`.
-function DigesterWindow.open(playerNum, digester)
-    return DigesterWindow:openOn(playerNum, digester)
 end
 
 return DigesterWindow

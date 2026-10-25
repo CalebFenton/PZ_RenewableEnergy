@@ -51,8 +51,8 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, getText(Gasifier.nameKey(summary.tier)))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_GasifierStatus"), playerNum, RenewableEnergy.InfoAction.queue, gasifier,
-        GasifierWindow.open)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, gasifier,
+        GasifierWindow)
     GasJobMenu.add(menu, playerNum, "gasifier", summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT, gasifier)
     GasJobMenu.add(menu, playerNum, "gasifier", GasifierJobs.CLEAN_ASH, gasifier)
     addDrain(menu, character, playerNum, gasifier, summary)

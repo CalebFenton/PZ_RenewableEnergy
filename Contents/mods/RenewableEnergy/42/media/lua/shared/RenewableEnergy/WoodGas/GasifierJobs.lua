@@ -37,7 +37,7 @@ GasifierJobs.JOBS = {
         doneSound = "CampfireLight",
         blocker = function(summary)
             if summary.lit then
-                return "Tooltip_RenewableEnergy_GasifierLit"
+                return "Tooltip_RenewableEnergy_AlreadyLit"
             end
             return summary.hopperKg <= 0 and "Tooltip_RenewableEnergy_NoWood" or nil
         end,
@@ -52,7 +52,7 @@ GasifierJobs.JOBS = {
     [GasifierJobs.PUT_OUT] = {
         minutes = 1,
         blocker = function(summary)
-            return not summary.lit and "Tooltip_RenewableEnergy_GasifierOut" or nil
+            return not summary.lit and "Tooltip_RenewableEnergy_NotLit" or nil
         end,
     },
     [GasifierJobs.CLEAN_ASH] = {

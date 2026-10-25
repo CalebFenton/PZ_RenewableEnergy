@@ -725,7 +725,7 @@ local function useDrumDigester(self, handle, tile, label)
         local config = object:getSpriteConfig()
         -- Where the menu's Status walks them: the window closes once they are out of reach.
         T.standNextTo(getSquare(handle.x, handle.y, handle.z))
-        local window = RenewableEnergy.DigesterWindow.open(0, object)
+        local window = RenewableEnergy.DigesterWindow:openOn(0, object)
         window:prerender()
         self.views[label] = { title = window.title, configValid = config ~= nil and config:isValid(),
             master = object:getMasterObject() == object }
@@ -837,7 +837,7 @@ test("renewable_energy_biogas_digester_menu", {
             local function option(job)
                 return submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_" .. job))
             end
-            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_DigesterStatus")) ~= nil, "no Status option")
+            T.expect(submenu:getOptionFromName(getText("ContextMenu_RenewableEnergy_Status")) ~= nil, "no Status option")
             local sludge = option(DigesterJobs.TAKE_SLUDGE)
             T.expect(sludge and sludge.notAvailable and sludge.toolTip.description == getText("Tooltip_RenewableEnergy_NoSludge"),
                 "Take Sludge isn't greyed out for an empty digester")
@@ -851,7 +851,7 @@ test("renewable_energy_biogas_digester_menu", {
             context:hideAndChildren()
         end
         T.standNextTo(object:getSquare())
-        local window = RenewableEnergy.DigesterWindow.open(0, object)
+        local window = RenewableEnergy.DigesterWindow:openOn(0, object)
         window:prerender()
         T.expect(window.title == getText("IGUI_RenewableEnergy_Digester_barrel"), "the status window's title is " .. tostring(window.title))
         T.expect(window.rowsToDraw and window.rowsToDraw[1].value == getText("IGUI_RenewableEnergy_DigesterEmpty"),

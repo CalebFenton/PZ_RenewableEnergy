@@ -1492,7 +1492,7 @@ repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lowe
 -- What the trailer's menu shows of Seal Cracked Panel (T.optionState).
 local function sealPanelOption(vehicle)
     local context = T.newContext()
-    RenewableEnergy.Menu.addSealPanelOptions(0, context, vehicle)
+    RenewableEnergy.VehicleMenu.addSealPanelOptions(0, context, vehicle)
     local shown = T.optionState(context.options[1])
     context:closeAll()
     return shown
@@ -1570,7 +1570,7 @@ test("renewable_energy_world_arrow_board_frame_welds", {
         -- The frame's options, and the first fix under each.
         local function frameOptions()
             local context = T.newContext()
-            RenewableEnergy.Menu.addFrameRepairOptions(0, context, trailer.vehicle)
+            RenewableEnergy.VehicleMenu.addFrameRepairOptions(0, context, trailer.vehicle)
             local found = {}
             for _, option in ipairs(context.options) do
                 local submenu = T.subMenu(context, option)

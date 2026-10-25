@@ -32,26 +32,26 @@ function InfoAction:waitToStart()
 end
 
 function InfoAction:perform()
-    self.open(self.character:getPlayerNum(), self.object)
+    self.window:openOn(self.character:getPlayerNum(), self.object)
     -- Removes the action from the queue and starts the next.
     ISBaseTimedAction.perform(self)
 end
 
--- `open(playerNum, object)` opens the window.
-function InfoAction:new(character, object, open)
+-- `window` is the window's class (ObjectWindow:openOn).
+function InfoAction:new(character, object, window)
     local o = ISBaseTimedAction.new(self, character)
     o.object = object
-    o.open = open
+    o.window = window
     o.maxTime = 0
     return o
 end
 
---- Walks `playerNum`'s character over to `object` and opens its window there with
---- `open(playerNum, object)`.
-function InfoAction.queue(playerNum, object, open)
+--- Walks `playerNum`'s character over to `object` and opens its window of the class `window`
+--- there.
+function InfoAction.queue(playerNum, object, window)
     local character = RenewableEnergy.walkTo(playerNum, object:getSquare())
     if character then
-        ISTimedActionQueue.add(InfoAction:new(character, object, open))
+        ISTimedActionQueue.add(InfoAction:new(character, object, window))
     end
 end
 

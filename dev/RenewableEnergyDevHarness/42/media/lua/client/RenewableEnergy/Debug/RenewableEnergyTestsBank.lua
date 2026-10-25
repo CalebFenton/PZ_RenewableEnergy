@@ -11,6 +11,7 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
+require "RenewableEnergy/UI/StatusRows"
 require "RenewableEnergy/UI/StatusWindow"
 require "RenewableEnergy/Recipes"
 
@@ -25,6 +26,7 @@ local Specs, Sprites, Sun, Recipes = RenewableEnergy.Specs, RenewableEnergy.Spri
 local PowerBank = RenewableEnergy.PowerBank
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Format, Menu, StatusWindow = RenewableEnergy.Format, RenewableEnergy.Menu, RenewableEnergy.StatusWindow
+local StatusRows = RenewableEnergy.StatusRows
 local FRIDGE = "appliances_refrigeration_01_0"
 local MINI_FRIDGE = "appliances_refrigeration_01_25"
 local PLUG_IN_INVERTER = "RenewableEnergy.PlugInInverter"
@@ -498,7 +500,7 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
         local button = self.window.switchButton
         expect(not button.enable and button.tooltip == getText(key),
             "the window's switch isn't greyed out saying there are no batteries (" .. tostring(button.tooltip) .. ")")
-        expect(hasLine(StatusWindow.summary(self.dead.state.status), getText("IGUI_RenewableEnergy_NoBatteries")),
+        expect(hasLine(StatusRows.summary(self.dead.state.status), getText("IGUI_RenewableEnergy_NoBatteries")),
             "the window of the bank whose only battery is dead doesn't say it has no working batteries")
     end,
 })
@@ -907,7 +909,7 @@ test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
         local status = self.generatorStatus
         expectNear("charger watts from a running generator", status.chargerW, self.chargersW, 0)
         expect(self.generatorSource == "generator", "a charger says it charges from " .. tostring(self.generatorSource))
-        local shown = rowLabelled((StatusWindow.rows(status, self.at)), getText("IGUI_RenewableEnergy_GeneratorPower"))
+        local shown = rowLabelled((StatusRows.rows(status, self.at)), getText("IGUI_RenewableEnergy_GeneratorPower"))
         expect(shown ~= nil and shown.value == getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)),
             "a bank charging from a generator reads " .. tostring(shown and shown.value))
         expect(self.fromGrid == "grid", "with the grid on the chargers charge from " .. tostring(self.fromGrid))
@@ -1041,7 +1043,7 @@ end
 -- nil without one.
 local function failsafeRow(status, bank)
     local label = getText("IGUI_RenewableEnergy_Failsafe")
-    local left, right = StatusWindow.rows(status, bank.position)
+    local left, right = StatusRows.rows(status, bank.position)
     local row = rowLabelled(left, label) or rowLabelled(right, label)
     return row and row.value
 end
@@ -2206,7 +2208,7 @@ test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
             T.waitFor(self, function() return Menu.bankLabel(bank.object) == "Cellar" end, "this client's label of the renamed bank")
             T.step(function()
                 -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
-                local window = StatusWindow.open(0, bank.object)
+                local window = StatusWindow:openOn(0, bank.object)
                 T.defer(self, function() window:close() end)
                 T.waitFor(self, function() return window.status ~= nil end, "the window's status of the renamed bank")
                 T.step(function()
@@ -2334,7 +2336,7 @@ test("renewable_energy_bank_window_shows_grid_power", {
     validate = function(self)
         local label = getText("IGUI_RenewableEnergy_Grid")
         local function gridRow(status)
-            return status and rowLabelled((StatusWindow.rows(status, self.at)), label)
+            return status and rowLabelled((StatusRows.rows(status, self.at)), label)
         end
         local bare = gridRow(self.bareStatus)
         expect(bare ~= nil and bare.value == getText("IGUI_RenewableEnergy_GridNoCharger"),
@@ -2387,7 +2389,7 @@ test("renewable_energy_bank_window_reflects_status", {
             local status = T.clientStatus(bank)
             return status ~= nil and #status.sources == self.panelCount
         end, "this client's status listing the panels")
-        T.step(function() self.withControllerSummary = StatusWindow.summary(T.clientStatus(bank)) end)
+        T.step(function() self.withControllerSummary = StatusRows.summary(T.clientStatus(bank)) end)
         T.batch(function()
             T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
             T.perform(self, "setBankOn", { bank = bank.position, on = true })
@@ -2403,13 +2405,13 @@ test("renewable_energy_bank_window_reflects_status", {
             "the slots line doesn't read " .. inputs .. " inputs of " .. (Specs.freeSlots + Specs.slotsPerController) .. " with 1 controller")
         local status = T.clientStatus(self.bank)
         if not expect(status ~= nil, "the bank sent no status") then return end
-        local summary = StatusWindow.summary(status)
+        local summary = StatusRows.summary(status)
         local load, limit = T.applianceWatts(self.load), Specs.inverters[PLUG_IN_INVERTER].watts
         expect(hasLine(summary, getText("IGUI_RenewableEnergy_Overloaded", Format.watts(load), Format.watts(limit))),
             "the window doesn't say the bank is overloaded with " .. load .. " W on " .. limit .. " W")
         expect(hasLine(summary, getText("IGUI_RenewableEnergy_InputSlots", inputs, Specs.freeSlots)),
             "without its controller the slots line doesn't read " .. inputs .. " inputs of " .. Specs.freeSlots)
-        local left, right = StatusWindow.rows(status, self.bank.position)
+        local left, right = StatusRows.rows(status, self.bank.position)
         local lights = rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
         expect(lights ~= nil and lights.value == Format.watts(T.applianceWatts({ "light", "light" })), "the window doesn't list 2 lights and their watts")
         local charger = rowLabelled(left, getItemNameFromFullType(Specs.charger))

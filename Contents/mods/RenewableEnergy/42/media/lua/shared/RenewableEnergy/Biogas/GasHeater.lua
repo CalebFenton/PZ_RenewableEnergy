@@ -71,7 +71,7 @@ GasHeater.JOBS = {
         minutes = 1, lit = true, doneSound = "CampfireLight",
         blocker = function(heater)
             if GasHeater.isLit(heater) then
-                return "Tooltip_RenewableEnergy_HeaterLit"
+                return "Tooltip_RenewableEnergy_AlreadyLit"
             end
             local digester = GasHeater.digesterNear(heater)
             local summary = digester and Digester.currentSummary(digester)
@@ -82,7 +82,7 @@ GasHeater.JOBS = {
     [GasHeater.OFF] = {
         minutes = 1, lit = false,
         blocker = function(heater)
-            return not GasHeater.isLit(heater) and "Tooltip_RenewableEnergy_HeaterOut" or nil
+            return not GasHeater.isLit(heater) and "Tooltip_RenewableEnergy_NotLit" or nil
         end,
     },
 }

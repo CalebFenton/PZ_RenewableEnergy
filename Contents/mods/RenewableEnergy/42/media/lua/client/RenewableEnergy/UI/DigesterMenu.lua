@@ -29,8 +29,8 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, getText(Digester.nameKey(summary.tier)))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_DigesterStatus"), playerNum, RenewableEnergy.InfoAction.queue, digester,
-        DigesterWindow.open)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, digester,
+        DigesterWindow)
 
     addJob(menu, playerNum, DigesterJobs.TAKE_SLUDGE, digester, DigesterJobs.sludgeBag(character))
     for _, job in ipairs({ DigesterJobs.VENT, DigesterJobs.REPLACE_BAGS, DigesterJobs.SEW_TARP, DigesterJobs.UPGRADE }) do

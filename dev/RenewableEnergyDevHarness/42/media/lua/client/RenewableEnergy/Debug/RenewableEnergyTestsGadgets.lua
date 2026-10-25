@@ -6,13 +6,14 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/UI/VehicleBatteryMenu"
+require "RenewableEnergy/UI/VehicleMechanicsMenu"
 require "RenewableEnergy/UI/Menu"
+require "RenewableEnergy/UI/VehicleMenu"
 require "Moveables/ISMoveableSpriteProps"
 require "TimedActions/ISInventoryTransferAction"
 
 -- Gadgets: the solar battery maintainer, the solar battery charger, the deep cycle vehicle battery
--- and the solar garden light (Gadgets/*, UI/VehicleBatteryMenu.lua, the maintainer and garden light
+-- and the solar garden light (Gadgets/*, UI/VehicleMechanicsMenu.lua, the maintainer and garden light
 -- options of UI/Menu.lua). The authority runs them, so the tests drive them through T.server and
 -- check this client's copies.
 
@@ -49,7 +50,7 @@ end
 local function chooseMaintainerOption(self, car, attached, key)
     T.step(function()
         local context = T.newContext()
-        local option = RenewableEnergy.Menu.addVehicleOptions(0, context, car.vehicle)
+        local option = RenewableEnergy.VehicleMenu.addVehicleOptions(0, context, car.vehicle)
         context:hideAndChildren()
         self[key] = option ~= nil
         if not T.need(self, option, "the maintainer option on the car's menu") then return end
@@ -155,7 +156,7 @@ test("renewable_energy_gadgets_maintainer_menu_needs_carried_maintainer", {
         self.truck = T.placeVehicle(self, "Base.PickUpTruck")
         T.step(function()
             local context = T.newContext()
-            self.offeredEmptyHanded = RenewableEnergy.Menu.addVehicleOptions(0, context, self.truck.vehicle) ~= nil
+            self.offeredEmptyHanded = RenewableEnergy.VehicleMenu.addVehicleOptions(0, context, self.truck.vehicle) ~= nil
             context:hideAndChildren()
         end)
         T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })
@@ -165,7 +166,7 @@ test("renewable_energy_gadgets_maintainer_menu_needs_carried_maintainer", {
         local Action = RenewableEnergyAction
         expect(not self.offeredEmptyHanded, "a vehicle offers a maintainer to someone without one")
         local context = T.newContext()
-        local option = RenewableEnergy.Menu.addVehicleOptions(0, context, vehicle)
+        local option = RenewableEnergy.VehicleMenu.addVehicleOptions(0, context, vehicle)
         expect(option ~= nil and option.param1 == Action.ATTACH_MAINTAINER,
             "carrying a maintainer offers no Attach option on a vehicle")
         expect(not Action:new(p, Action.DETACH_MAINTAINER, nil, nil, vehicle):canPerform(),

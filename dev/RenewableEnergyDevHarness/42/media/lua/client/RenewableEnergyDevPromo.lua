@@ -1123,7 +1123,7 @@ end
 local function addWindowShot(name, windowClass, objectOf, ready)
     Harness.addWindowShot(run, name, {
         open = function()
-            return windowClass.open(0, objectOf())
+            return windowClass:openOn(0, objectOf())
         end,
         ready = ready,
         near = function()

@@ -8,6 +8,7 @@ RenewableEnergy = RenewableEnergy or {}
 local SummaryWindow = RenewableEnergy.SummaryWindow
 local GasifierWindow = SummaryWindow:derive("RenewableEnergyGasifierWindow")
 RenewableEnergy.GasifierWindow = GasifierWindow
+GasifierWindow.owner = RenewableEnergy.Gasifier
 
 local Gasifier, Format = RenewableEnergy.Gasifier, RenewableEnergy.Format
 local row = SummaryWindow.row
@@ -24,36 +25,23 @@ local function stateText(summary)
     return getText("IGUI_RenewableEnergy_GasifierOut")
 end
 
-function GasifierWindow:titleOf(summary)
-    return getText(Gasifier.nameKey(summary.tier))
-end
-
-function GasifierWindow:summaryNow()
-    return Gasifier.summaryOf(self.object)
-end
-
 --- The rows the window shows for `summary`: { label, value, color }.
 function GasifierWindow:rowsOf(summary)
     local rows = {}
-    row(rows, "IGUI_RenewableEnergy_GasifierState", stateText(summary))
-    row(rows, "IGUI_RenewableEnergy_GasifierWood", Format.kilograms(summary.hopperKg), summary.hopperKg <= 0 and "warn" or nil)
-    row(rows, "IGUI_RenewableEnergy_GasifierAsh", Format.percent(summary.ash / 100), summary.ash >= ASH_WARN and "warn" or nil)
+    row(rows, "IGUI_RenewableEnergy_State", stateText(summary))
+    row(rows, "IGUI_RenewableEnergy_GasifierWood", Format.kilograms(summary.hopperKg), summary.hopperKg <= 0 and "bad" or nil)
+    row(rows, "IGUI_RenewableEnergy_GasifierAsh", Format.percent(summary.ash / 100), summary.ash >= ASH_WARN and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_GasifierFilter", getText("IGUI_RenewableEnergy_FilterState", summary.clean, summary.tarry),
-        summary.clean == 0 and "warn" or nil)
+        summary.clean == 0 and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_GasifierCondensate",
         Format.number(summary.condensate, 1) .. " / " .. Format.litres(Gasifier.CONDENSATE_MAX, 0),
-        summary.condensate >= Gasifier.CONDENSATE_MAX and "warn" or nil)
-    row(rows, "IGUI_RenewableEnergy_GasifierOutput", Format.percent(summary.output), summary.output < 1 and "warn" or nil)
+        summary.condensate >= Gasifier.CONDENSATE_MAX and "bad" or nil)
+    row(rows, "IGUI_RenewableEnergy_GasifierOutput", Format.percent(summary.output), summary.output < 1 and "bad" or nil)
     if summary.wear > 1 then
-        row(rows, "IGUI_RenewableEnergy_GasifierWear", getText("IGUI_RenewableEnergy_WearTimes", Format.number(summary.wear, 1)), "warn")
+        row(rows, "IGUI_RenewableEnergy_GasifierWear", getText("IGUI_RenewableEnergy_WearTimes", Format.number(summary.wear, 1)), "bad")
     end
     row(rows, "IGUI_RenewableEnergy_GasifierLine", getText(summary.piped and "IGUI_RenewableEnergy_Piped" or "IGUI_RenewableEnergy_NotPiped"))
     return rows
-end
-
---- Opens `playerNum`'s window on the gasifier `gasifier`.
-function GasifierWindow.open(playerNum, gasifier)
-    return GasifierWindow:openOn(playerNum, gasifier)
 end
 
 return GasifierWindow

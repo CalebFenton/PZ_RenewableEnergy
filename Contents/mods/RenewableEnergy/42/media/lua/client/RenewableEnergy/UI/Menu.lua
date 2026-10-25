@@ -1,4 +1,4 @@
--- Right-click menus for battery banks, their sources, garden lights and vehicles. Options are
+-- Right-click menus for battery banks, their sources, treadmills and garden lights. Options are
 -- greyed out by the same refusal functions the job's action and the authority ask, so the menu
 -- refuses exactly what they would. Parts enter and leave a bank only through Wire In and Unwire
 -- (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
@@ -6,15 +6,12 @@
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
 require "ISUI/ISTextBox"
-require "Vehicles/TimedActions/ISPathFindAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Wind"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 require "RenewableEnergy/TimedActions/InfoAction"
@@ -29,7 +26,7 @@ RenewableEnergy.Menu = Menu
 local Action = RenewableEnergyAction
 local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
-local SolarGardenLight, SolarMaintainer = RenewableEnergy.SolarGardenLight, RenewableEnergy.SolarMaintainer
+local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Format = RenewableEnergy.Format
 local Needs = RenewableEnergy.Needs
 local StatusWindow = RenewableEnergy.StatusWindow
@@ -61,10 +58,10 @@ local function lightOr(character, job, blocker)
     return Needs.tooDark(character, Action.needsLight(job)) or blocker
 end
 
-local function queueAt(playerNum, square, job, object, bank, item, bankName)
+local function queueAt(playerNum, square, job, object, bank, item, bankName, slot)
     local character = RenewableEnergy.walkTo(playerNum, square)
     if character then
-        ISTimedActionQueue.add(Action:new(character, job, object, bank, nil, item, bankName))
+        ISTimedActionQueue.add(Action:new(character, job, object, bank, nil, item, bankName, nil, slot))
     end
 end
 
@@ -109,10 +106,7 @@ local function queueBlades(playerNum, source, blades)
 end
 
 local function queueSeal(playerNum, source, slot)
-    local character = RenewableEnergy.walkTo(playerNum, source:getSquare())
-    if character then
-        ISTimedActionQueue.add(Action:new(character, Action.SEAL_MODULE, source, nil, nil, nil, nil, nil, slot))
-    end
+    queueAt(playerNum, source:getSquare(), Action.SEAL_MODULE, source, nil, nil, nil, slot)
 end
 
 local function queueBulb(playerNum, job, light, bulb)
@@ -124,32 +118,6 @@ local function queueBulb(playerNum, job, light, bulb)
         ISInventoryPaneContextMenu.transferIfNeeded(character, bulb)
     end
     ISTimedActionQueue.add(Action:new(character, job, light, nil, nil, bulb))
-end
-
--- Walks to the vehicle's battery, where a maintainer clips on.
-local function queueVehicle(playerNum, job, vehicle, item)
-    local character = getSpecificPlayer(playerNum)
-    if item then
-        ISInventoryPaneContextMenu.transferIfNeeded(character, item)
-    end
-    local battery = RenewableEnergy.VehicleBattery.partOf(vehicle)
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, battery:getArea()))
-    ISTimedActionQueue.add(Action:new(character, job, nil, nil, vehicle, item))
-end
-
--- Walks to the panel's side of the trailer and mends it there.
-local function queueSealPanel(playerNum, vehicle, partId)
-    local character = getSpecificPlayer(playerNum)
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, vehicle:getPartById(partId):getArea()))
-    ISTimedActionQueue.add(Action:new(character, Action.SEAL_PANEL, nil, nil, vehicle, nil, nil, partId))
-end
-
--- Walks to the frame part's end of the trailer, then fixes it as the mechanics window's Repair
--- menu does (ISInventoryPaneContextMenu.onFix), which walks nowhere.
-local function queueFixFrame(item, playerNum, fixingNum, fixerNum, part)
-    local character = getSpecificPlayer(playerNum)
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, part:getVehicle(), part:getArea()))
-    ISInventoryPaneContextMenu.onFix(item, playerNum, fixingNum, fixerNum, part)
 end
 
 local function queueRun(playerNum, treadmill)
@@ -352,20 +320,27 @@ local function slotsRefusal(sources, freeSlots)
     return refusal
 end
 
+--- Turn On or Turn Off for a bank in `summary`'s state: its label key, its job, and why it is
+--- refused (nil when it isn't). The menu and the status window both offer it.
+function Menu.switchOf(summary)
+    local on = summary.on == true
+    return on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On", on and Action.TURN_OFF or Action.TURN_ON,
+        PowerBank.switchRefusal(summary, not on)
+end
+
 function Menu.addBankOptions(playerNum, context, bank)
     local character = getSpecificPlayer(playerNum)
     local menu = Needs.addSubMenu(context, Menu.bankLabel(bank))
-    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, bank, StatusWindow.open)
+    menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, RenewableEnergy.InfoAction.queue, bank, StatusWindow)
 
     local summary = PowerBank.summaryOf(bank)
     if not summary then
         -- The server has not sent this bank's summary yet; switching it needs to know its state.
         return menu
     end
+    local switchKey, switchJob, refusal = Menu.switchOf(summary)
+    Needs.refuse(menu:addOption(getText(switchKey), playerNum, Menu.queueBank, switchJob, bank), refusal)
     local on = summary.on == true
-    local switch = menu:addOption(getText(on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On"), playerNum, Menu.queueBank,
-        on and Action.TURN_OFF or Action.TURN_ON, bank)
-    Needs.refuse(switch, PowerBank.switchRefusal(summary, not on))
     -- As vanilla's generator menu: Disconnect only while switched off.
     local connected = bank:isConnected()
     if not (connected and on) then
@@ -515,23 +490,17 @@ local function addRunOption(playerNum, menu, treadmill)
     Needs.refuse(run, Treadmill.runRefusal(treadmill))
 end
 
--- Run on Treadmill and Unwire, for a wired treadmill, into its menu.
-local function addWiredTreadmillOptions(playerNum, menu, treadmill)
+-- Run on Treadmill, then Unwire for a wired treadmill or Wire the Motor for one neither of whose
+-- tiles is wired yet.
+local function addTreadmillJobs(playerNum, menu, treadmill, wired)
     addRunOption(playerNum, menu, treadmill)
     local character = getSpecificPlayer(playerNum)
-    local unwire = menu:addOption(getText("ContextMenu_RenewableEnergy_UnwireTreadmill"), playerNum, queueSource,
-        Action.UNWIRE_TREADMILL, treadmill)
-    Needs.show(unwire, Treadmill.unwiringNeeds(character), lightOr(character, Action.UNWIRE_TREADMILL))
-end
-
--- Run on Treadmill and Wire the Motor, for a treadmill neither of whose tiles is wired yet.
-function Menu.addTreadmillOptions(playerNum, context, treadmill)
-    local character = getSpecificPlayer(playerNum)
-    local menu = Needs.addSubMenu(context, Menu.nameOf(treadmill))
-    addRunOption(playerNum, menu, treadmill)
-    local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireTreadmill"), playerNum, queueSource,
-        Action.WIRE_TREADMILL, treadmill)
-    Needs.show(option, Treadmill.wiringNeeds(character), lightOr(character, Action.WIRE_TREADMILL))
+    local key, job, needs = "ContextMenu_RenewableEnergy_WireTreadmill", Action.WIRE_TREADMILL, Treadmill.wiringNeeds
+    if wired then
+        key, job, needs = "ContextMenu_RenewableEnergy_UnwireTreadmill", Action.UNWIRE_TREADMILL, Treadmill.unwiringNeeds
+    end
+    local option = menu:addOption(getText(key), playerNum, queueSource, job, treadmill)
+    Needs.show(option, needs(character), lightOr(character, job))
 end
 
 --- Remove Light Bulb for a light that has one, else Add Light Bulb with one option for each type
@@ -558,96 +527,6 @@ function Menu.addGardenLightOptions(playerNum, context, light)
     return menu
 end
 
---- Seal Cracked Panel for each cracked panel of an arrow board trailer that the seal can
---- help, listing what the seal takes and greyed out when the character can't do it.
-function Menu.addSealPanelOptions(playerNum, context, vehicle)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
-    if not ArrowBoard.isTrailer(vehicle) then
-        return
-    end
-    local character = getSpecificPlayer(playerNum)
-    local needs = RenewableEnergy.Recipes.sealInPlaceNeeds(character)
-    local blocker = lightOr(character, Action.SEAL_PANEL)
-    for _, partId in ipairs(ArrowBoard.PANELS) do
-        local part = ArrowBoard.sealablePanel(vehicle, partId)
-        if part then
-            local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairPanel",
-                getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueSealPanel, vehicle, partId)
-            Needs.show(option, needs, blocker)
-        end
-    end
-end
-
---- Repair Frame for each dented end of an arrow board trailer's frame: vanilla's fixing menu for
---- the part, the one the mechanics window gives a car's body.
-function Menu.addFrameRepairOptions(playerNum, context, vehicle)
-    for _, frame in ipairs(RenewableEnergy.ArrowBoard.damagedFrame(vehicle)) do
-        local part = frame.part
-        local item = part:getInventoryItem()
-        local submenu, option = Needs.addSubMenu(context, getText("ContextMenu_RenewableEnergy_RepairFrame", getText(frame.name),
-            part:getCondition()))
-        local fixes = FixingManager.getFixes(item)
-        for i = 0, fixes:size() - 1 do
-            ISInventoryPaneContextMenu.buildFixingMenu(item, playerNum, fixes:get(i), i, option, submenu, part)
-        end
-        for _, fix in ipairs(submenu.options) do
-            fix.onSelect = queueFixFrame
-        end
-    end
-end
-
---- The arrow board's repairs, and Attach or Detach Solar Maintainer. Returns the maintainer's
---- option, or nil when there is none to offer.
-function Menu.addVehicleOptions(playerNum, context, vehicle)
-    Menu.addSealPanelOptions(playerNum, context, vehicle)
-    Menu.addFrameRepairOptions(playerNum, context, vehicle)
-    if SolarMaintainer.isAttached(vehicle) then
-        return context:addOption(getText("ContextMenu_RenewableEnergy_DetachMaintainer"), playerNum, queueVehicle,
-            Action.DETACH_MAINTAINER, vehicle)
-    end
-    local maintainer = getSpecificPlayer(playerNum):getInventory():getFirstTypeRecurse(SolarMaintainer.ITEM)
-    if maintainer and SolarMaintainer.canAttach(vehicle) then
-        return context:addOption(getText("ContextMenu_RenewableEnergy_AttachMaintainer"), playerNum, queueVehicle,
-            Action.ATTACH_MAINTAINER, vehicle, maintainer)
-    end
-end
-
--- The generator vanilla would have offered its menu on had the bank not been there.
---
--- fetchVars.generator holds only the last IsoGenerator the fetch walked, and a bank is one.
--- Clearing the slot would also hide the menu of a real generator beside the bank, where a backup
--- generator stands. This walks the objects in the fetch's order (each entry, then its square once;
--- ISWorldObjectContextMenuLogic.fetch) so the generator handed back is the one vanilla would pick.
-local function otherGenerator(worldobjects)
-    local found, seen = nil, {}
-    local function consider(object)
-        if RenewableEnergy.isGenerator(object) then
-            found = object
-        end
-    end
-    for _, object in ipairs(worldobjects or {}) do
-        consider(object)
-        local square = object:getSquare()
-        if square and not seen[square] then
-            seen[square] = true
-            local objects = square:getObjects()
-            for i = 0, objects:size() - 1 do
-                consider(objects:get(i))
-            end
-        end
-    end
-    return found
-end
-
--- Runs before vanilla reads fetchVars, so vanilla offers no generator options (fuel, plug in) for
--- the bank itself.
-function Menu.onPreFill(playerNum, context, worldobjects, test)
-    local generator = ISWorldObjectContextMenu.fetchVars.generator
-    if generator and PowerBank.isBank(generator) then
-        ISWorldObjectContextMenu.fetchVars.generator = otherGenerator(worldobjects)
-    end
-end
-
 function Menu.onFill(playerNum, context, worldobjects, test)
     local bank = Needs.findClicked(worldobjects, PowerBank.isBank)
     local source = Needs.findClicked(worldobjects, Sources.kindOf)
@@ -656,9 +535,7 @@ function Menu.onFill(playerNum, context, worldobjects, test)
     if treadmill and not source then
         source = Treadmill.wiredHalf(treadmill)
     end
-    local character = getSpecificPlayer(playerNum)
-    local vehicle = not character:getVehicle() and IsoObjectPicker.Instance:PickVehicle(getMouseXScaled(), getMouseYScaled())
-    if not (bank or source or light or treadmill or vehicle) then
+    if not (bank or source or light or treadmill) then
         return
     end
     if test then
@@ -671,21 +548,17 @@ function Menu.onFill(playerNum, context, worldobjects, test)
     if source then
         local menu = Menu.addSourceOptions(playerNum, context, source)
         if wiredTreadmill then
-            addWiredTreadmillOptions(playerNum, menu, source)
+            addTreadmillJobs(playerNum, menu, source, true)
         end
     end
     if treadmill and not wiredTreadmill then
-        Menu.addTreadmillOptions(playerNum, context, treadmill)
+        addTreadmillJobs(playerNum, Needs.addSubMenu(context, Menu.nameOf(treadmill)), treadmill, false)
     end
     if light then
         Menu.addGardenLightOptions(playerNum, context, light)
     end
-    if vehicle then
-        Menu.addVehicleOptions(playerNum, context, vehicle)
-    end
 end
 
-Events.OnPreFillWorldObjectContextMenu.Add(Menu.onPreFill)
 Events.OnFillWorldObjectContextMenu.Add(Menu.onFill)
 
 return Menu

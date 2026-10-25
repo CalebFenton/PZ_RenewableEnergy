@@ -490,7 +490,7 @@ end
 --- them, as the window closes once they are out of reach.
 function T.openWindow(self)
     T.standNextTo(self.bank.square)
-    local window = RenewableEnergy.StatusWindow.open(0, self.bank.object)
+    local window = RenewableEnergy.StatusWindow:openOn(0, self.bank.object)
     self.window = window
     T.defer(self, function() window:close() end)
     T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
