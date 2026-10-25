@@ -268,6 +268,81 @@ test("renewable_energy_solar_seal_module_in_place", {
     end,
 })
 
+-- The Seal Cracked Module option for each module of the placed panel `object`, by slot, as its
+-- menu offers them now; nil for a module not offered.
+local function sealOptions(object)
+    local context = T.newContext()
+    local menu = Menu.addSourceOptions(0, context, object)
+    local options = {}
+    for slot, module in ipairs(object:getModData()[MODULES_KEY] or {}) do
+        options[slot] = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", slot, math.floor(module.condition)))
+    end
+    context:hideAndChildren()
+    return options
+end
+
+-- A rack with both modules cracked offers to seal each. Once one is sealed as far as sealing goes
+-- the menu built again still offers the other, which seals in turn, and keeps the sealed one's
+-- option greyed out saying to reglaze it, since its glass still looks cracked: each module keeps
+-- its own option. The tooltip keeps a gap on both sides of the "or" between the adhesives.
+test("renewable_energy_solar_seal_each_module_in_place", {
+    instant = true,
+    run = function(self)
+        self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
+        self.conditions, self.order = { 30, 40 }, { 2, 1 }
+        self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
+            modules = T.factoryModules(self.conditions[1], self.conditions[2]) })
+        if not self.panel then return end
+        T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
+        -- The options before each seal, and after the last.
+        self.offers = {}
+        for round = 1, #self.order + 1 do
+            T.step(function()
+                local options = sealOptions(self.panel.object)
+                self.offers[round] = { T.optionState(options[1]), T.optionState(options[2]) }
+                local slot = self.order[round]
+                local option = slot and options[slot]
+                if not (option and not option.notAvailable) then return end
+                T.standNextTo(self.panel.square)
+                T.choose(option)
+                T.waitFor(self, function()
+                    local modules = self.panel.object:getModData()[MODULES_KEY]
+                    return modules and modules[slot] and modules[slot].condition ~= self.conditions[slot]
+                end, "this client's copy of sealed module " .. slot)
+            end)
+        end
+        T.server(self, "panelState", self.panel.position)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        local sealedFully, sealed = getText("Tooltip_RenewableEnergy_ModuleSealedFully"), {}
+        for round = 1, #self.order + 1 do
+            for slot = 1, #self.conditions do
+                local offer = self.offers[round] and self.offers[round][slot] or { shown = false }
+                local what = "module " .. slot .. (sealed[slot] and ", sealed," or "") .. " before seal " .. round .. ": "
+                if not expect(offer.shown, what .. "no Seal Cracked Module") then return end
+                if sealed[slot] then
+                    expect(offer.greyed and offer.reason == sealedFully, what .. "not greyed out saying to reglaze ("
+                        .. tostring(offer.reason) .. ")")
+                else
+                    expect(not offer.greyed, what .. "greyed out (" .. tostring(offer.reason) .. ")")
+                    local touching = T.runTogether(offer.reason or "")
+                    expect(#touching == 0, what .. "the tooltip runs words together: " .. table.concat(touching, ", "))
+                end
+            end
+            sealed[self.order[round] or 0] = true
+        end
+        local modules = self.server.panelState.modules
+        for slot, condition in ipairs(self.conditions) do
+            local to = math.min(T.sealCap(FACTORY, 0), condition + Recipes.MODULE_REPAIR)
+            expect(to >= T.sealCap(FACTORY, 1), "a seal leaves module " .. slot .. " sealable again: pick a higher condition")
+            expectNear("sealed module " .. slot, modules[slot].condition, to, 0)
+            expect(modules[slot].repaired == 1, "module " .. slot .. " reads repaired " .. tostring(modules[slot].repaired) .. "x, expected 1")
+        end
+    end,
+})
+
 -- The Clear Snow option on `panel`'s menu: whether it shows, whether it is greyed out, and why.
 local function clearSnowOption(panel)
     return T.optionState(T.menuOption(Menu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_ClearSnow")))

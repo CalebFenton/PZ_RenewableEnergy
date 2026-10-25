@@ -42,8 +42,9 @@ local function queueFixFrame(item, playerNum, fixingNum, fixerNum, part)
     ISInventoryPaneContextMenu.onFix(item, playerNum, fixingNum, fixerNum, part)
 end
 
---- Seal Cracked Panel for each cracked panel of an arrow board trailer that the seal can
---- help, listing what the seal takes and greyed out when the character can't do it.
+--- Seal Cracked Panel for each cracked panel of an arrow board trailer, listing what the seal
+--- takes and greyed out when the character can't do it; a panel sealed as far as sealing goes,
+--- greyed out saying to reglaze its module, as a placed panel's Seal Cracked Module.
 function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     if not ArrowBoard.isTrailer(vehicle) then
@@ -53,11 +54,15 @@ function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     local needs = RenewableEnergy.Recipes.sealInPlaceNeeds(character)
     local blocker = Needs.tooDark(character, Action.needsLight(Action.SEAL_PANEL), Action.TOO_DARK)
     for _, partId in ipairs(ArrowBoard.PANELS) do
-        local part = ArrowBoard.sealablePanel(vehicle, partId)
-        if part then
+        local part = vehicle:getPartById(partId)
+        if part and ArrowBoard.crackLookOf(part) then
             local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairPanel",
                 getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueSealPanel, vehicle, partId)
-            Needs.show(option, needs, blocker)
+            if ArrowBoard.sealablePanel(vehicle, partId) then
+                Needs.show(option, needs, blocker)
+            else
+                Needs.refuse(option, "Tooltip_RenewableEnergy_PanelSealedFully")
+            end
         end
     end
 end

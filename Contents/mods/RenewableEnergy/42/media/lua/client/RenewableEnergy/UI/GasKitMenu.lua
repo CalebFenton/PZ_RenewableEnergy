@@ -104,11 +104,13 @@ function ISGeneratorInfoWindow.getRichText(object, displayStats)
             text = string.sub(text, 1, at - 1) .. tank .. string.sub(text, at + #shown)
         end
     end
+    -- Rich text drops the space before a tag (ISRichTextPanel.paginate): <SPACE> keeps the red
+    -- words apart from the label.
     local line
     if state.stalled then
-        line = " <RED> " .. getText("IGUI_RenewableEnergy_GasStalled")
+        line = " <SPACE> <RED> " .. getText("IGUI_RenewableEnergy_GasStalled")
     elseif state.outOfGas then
-        line = " <RED> " .. getText("IGUI_RenewableEnergy_GasOut")
+        line = " <SPACE> <RED> " .. getText("IGUI_RenewableEnergy_GasOut")
     elseif state.mode == "petrol" then
         line = getText("IGUI_RenewableEnergy_GasPetrol")
     elseif state.onGas then

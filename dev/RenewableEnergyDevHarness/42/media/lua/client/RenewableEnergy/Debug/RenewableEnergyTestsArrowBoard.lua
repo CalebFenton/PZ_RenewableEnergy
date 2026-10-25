@@ -281,9 +281,24 @@ local function sealEpoxyUses()
     return 0
 end
 
+-- What the trailer's menu shows of Seal Cracked Panel for its left panel (T.optionState): the
+-- trailer may hold a cracked right panel too.
+local function sealPanelOption(vehicle)
+    local context = T.newContext()
+    RenewableEnergy.VehicleMenu.addSealPanelOptions(0, context, vehicle)
+    local left = nil
+    for _, option in ipairs(context.options) do
+        left = left or (option.param2 == LEFT and option or nil)
+    end
+    local shown = T.optionState(left)
+    context:closeAll()
+    return shown
+end
+
 -- Seal Cracked Panel takes Seal Cracked Module's inputs (keeping the screwdriver), skill and XP,
 -- and seals the module, sealed `repaired` times before, from `from(cap)` by Recipes.MODULE_REPAIR
--- up to its cap, still cracked, counting the seal; an uncracked module can't be sealed.
+-- up to its cap, still cracked, counting the seal; an uncracked module can't be sealed. The sealed
+-- panel keeps its option, greyed out saying to reglaze it once a seal can't bring it further.
 local function repairTest(name, repaired, fromBelowCap)
     test(name, {
         instant = true,
@@ -315,6 +330,7 @@ local function repairTest(name, repaired, fromBelowCap)
             -- What CraftRecipe.addXP gives this character for the recipe's xpAward.
             T.server(self, "electricityAward", { xp = RenewableEnergy.Recipes.moduleRepairRecipe():getXPAward(0):getAmount() })
             waitForPanelsCopy(self, trailer)
+            T.step(function() self.after = sealPanelOption(trailer.vehicle) end)
         end,
         validate = function(self)
             local left, from, to = self.counts.left, self.from, self.to
@@ -324,6 +340,12 @@ local function repairTest(name, repaired, fromBelowCap)
             expect(panelShown(self.trailer.state, LEFT) ~= "Whole", "the sealed panel at " .. tostring(condition) .. " shows whole")
             local sealed = self.trailer.state.panels[LEFT].repaired
             expect(sealed == repaired + 1, "the sealed panel reads repaired " .. tostring(sealed) .. "x, expected " .. repaired + 1)
+            local fully = to >= T.sealCap(MODULE, repaired + 1)
+            expect(self.after.shown and self.after.greyed == fully
+                and (not fully or self.after.reason == getText("Tooltip_RenewableEnergy_PanelSealedFully")),
+                "the sealed panel at " .. tostring(condition) .. (fully and ", sealed as far as it goes," or "")
+                .. " shows Seal Cracked Panel " .. (self.after.shown and (self.after.greyed and "greyed out" or "offered") or "not at all")
+                .. " (" .. tostring(self.after.reason) .. ")")
             expect(left["Base.Screwdriver"] == 1, "the seal used up the screwdriver")
             local epoxy = T.carried("Base.Epoxy")
             local epoxyLeft = epoxy and epoxy:getCurrentUses() or 0
@@ -339,15 +361,6 @@ repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 0,
     function(cap) return cap - RenewableEnergy.Recipes.MODULE_REPAIR - 1 end)
 repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 0, function(cap) return cap - 1 end)
 repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lower", 2, function(cap) return cap - 1 end)
-
--- What the trailer's menu shows of Seal Cracked Panel (T.optionState).
-local function sealPanelOption(vehicle)
-    local context = T.newContext()
-    RenewableEnergy.VehicleMenu.addSealPanelOptions(0, context, vehicle)
-    local shown = T.optionState(context.options[1])
-    context:closeAll()
-    return shown
-end
 
 -- The menu offers Seal Cracked Panel to a character with everything it needs, and greys it out
 -- in the dark, saying why, as the action's light rule refuses it

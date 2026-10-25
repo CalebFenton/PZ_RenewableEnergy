@@ -274,7 +274,7 @@ The glass shows how worn a module is: whole down to 85% of its best condition, a
 
 Sealing is the cheap fix, reglazing the good one.
 
-- **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue. Seal a loose module in the crafting window (with glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. It brings back some condition, but only up to a ceiling that drops with every seal, and the glass still looks cracked.
+- **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue. Seal a loose module in the crafting window (with glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. It brings back some condition, but only up to a ceiling that drops with every seal, and the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
 - **Reglaze Module** puts on a new pane of glass. **Unmount** the module first. It looks whole again, and its seal count clears. If its cracks were light, it's as good as new; if they were heavy, or you'd sealed it, the cells underneath cracked too and it comes back to 90% of new.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.

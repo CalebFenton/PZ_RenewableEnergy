@@ -140,8 +140,9 @@ test("renewable_energy_gasline_kit_refused_in_the_dark", {
 
 -- On a digester's line an empty-tanked generator runs: the gas pays for what vanilla bills it as the
 -- hours pass and the fuel is put back, and petrol poured in goes into its tank. On petrol it runs on
--- its tank and leaves the gas; back on gas, out of gas it stops, holding only its tank, and switched
--- to petrol it says so rather than that it is out of gas. The line's hoses come back when it is cut.
+-- its tank and leaves the gas; back on gas, out of gas it stops, holding only its tank, its info
+-- window saying so in words kept apart from the label, and switched to petrol it says so rather
+-- than that it is out of gas. The line's hoses come back when it is cut.
 test("renewable_energy_gasline_generator_runs_on_gas", {
     hour = 12,
     instant = true,
@@ -183,6 +184,11 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
             T.gasPass(self, generator, 0.5)
             T.readGenerator(self, generator, "out")
         end)
+        T.waitFor(self, function()
+            local state = GasKit.stateOf(generator.object)
+            self.outText = state and state.outOfGas and ISGeneratorInfoWindow.getRichText(generator.object, true) or nil
+            return self.outText ~= nil
+        end, "this client's copy of the generator out of gas")
         T.kitJob(self, generator, GasKit.TO_PETROL)
         T.readGenerator(self, generator, "petrolAfterOut")
         T.step(function() self.petrolText = ISGeneratorInfoWindow.getRichText(generator.object, true) end)
@@ -218,6 +224,8 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
         T.expectNear("gas burned on petrol", reads.afterPetrol.gas, reads.beforePetrol.gas, 0.001)
         T.expect(not out.running and out.state ~= nil and out.state.outOfGas, "the generator kept running with no gas")
         T.expectNear("fuel once the gas ran out", out.fuel, self.poured, 0.05)
+        local touching = T.runTogether(self.outText)
+        T.expect(#touching == 0, "out of gas, the info window runs words together: " .. table.concat(touching, ", "))
         local afterOut = reads.petrolAfterOut.state
         T.expect(afterOut ~= nil and not afterOut.outOfGas, "switched to petrol, the generator still says it is out of gas")
         local text = self.petrolText or ""

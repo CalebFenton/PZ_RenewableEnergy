@@ -423,26 +423,32 @@ local function addBladesOption(playerNum, menu, source)
     end
 end
 
--- Seal Cracked Module for each module of a placed panel that the seal can help, listing what the
--- seal takes and greyed out when the character can't do it, as a trailer's Seal Cracked Panel.
+-- Seal Cracked Module for each cracked module of a placed panel, listing what the seal takes and
+-- greyed out when the character can't do it, as a trailer's Seal Cracked Panel. A module sealed
+-- as far as sealing goes still looks cracked, so it keeps its option, greyed out saying to reglaze
+-- it, rather than vanishing from the menu.
 local function addSealOptions(playerNum, menu, source)
     local Recipes = RenewableEnergy.Recipes
-    local sealable = {}
+    local cracked = {}
     for slot, module in ipairs(Recipes.panelModules(source) or {}) do
-        if Recipes.canSealRecord(module) then
-            table.insert(sealable, { slot = slot, condition = module.condition })
+        if RenewableEnergy.crackLookOf(module.type, module.condition) then
+            table.insert(cracked, { slot = slot, module = module })
         end
     end
-    if #sealable == 0 then
+    if #cracked == 0 then
         return
     end
     local character = getSpecificPlayer(playerNum)
     local needs = Recipes.sealInPlaceNeeds(character)
     local blocker = lightOr(character, Action.SEAL_MODULE)
-    for _, entry in ipairs(sealable) do
-        local option = menu:addOption(getText("ContextMenu_RenewableEnergy_SealModule", entry.slot, math.floor(entry.condition)),
+    for _, entry in ipairs(cracked) do
+        local option = menu:addOption(getText("ContextMenu_RenewableEnergy_SealModule", entry.slot, math.floor(entry.module.condition)),
             playerNum, queueSeal, source, entry.slot)
-        Needs.show(option, needs, blocker)
+        if Recipes.canSealRecord(entry.module) then
+            Needs.show(option, needs, blocker)
+        else
+            Needs.refuse(option, "Tooltip_RenewableEnergy_ModuleSealedFully")
+        end
     end
 end
 
