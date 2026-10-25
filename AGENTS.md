@@ -16,6 +16,7 @@
 - Give a new file under `Contents/` or the dev mod a `TEST_MAP` line in `dev/harness.conf` naming the tests that reach its code; without one, `--changed` runs every test.
 - Comments say why, without repeating values from the code: a copied value goes stale when the code changes and nothing fails.
 - When a test or check contradicts what you were asked to do, or fails on uncommitted work that isn't yours, stop and report it. Don't edit the test, or the other person's work, to make it pass.
+- What Renewable Energy shares with Caleb's other mods lives in the library mod cf_commonlib (`../cf_commonlib`, which `mod.info` requires): the Global Object System plumbing (`GlobalObjects`, `ClientObjects`, `ObjectSystem`), jobs, materials and their menus (`Jobs`, `Materials`, `JobAction`, `JobOptions`, `Needs`, `OpenAction`), items, tiles, squares, the clock, generator reach, loot and recipe learning. Use it through `require "cf_commonlib/<Module>"`, never a copy here. Whenever a change here alters one of those, or writes code another mod would want, make the change in the library: give it its next version and changelog entry (`../cf_commonlib/AGENTS.md`, Versions), and update every mod that requires it in the same change.
 
 ## STOP
 
@@ -26,6 +27,7 @@
 
 - Before running in-game tests, handing them to subagents, or debugging a failure or a `LEAK`, read `dev/harness/docs/debugging.md`: which run answers which question, and the traps that cost reruns.
 - Before changing anything under `dev/harness`, read `dev/harness/AGENTS.md`: other mods share it.
+- Before changing anything in `../cf_commonlib`, read its `AGENTS.md`: the mods that require it, and how its version moves.
 - Before changing scripts, translations, multiplayer sync, loot, tests, art or the promo shots, read `DEVELOPMENT.md` for the Build 42 behavior that fails silently, the command to decompile the game, and the art, promo and loot commands. Before editing `DEVELOPMENT.md`, read its opening on what belongs there.
 - Before changing `README.md`, the Workshop page, read `dev/harness/docs/workshop-page.md`.
 - Before designing or balancing a feature, read `docs/design.md`: the principles every cost, payoff and repair is weighed against.
