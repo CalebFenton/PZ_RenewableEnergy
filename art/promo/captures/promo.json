@@ -4324,6 +4324,20 @@
       "id": "RenewableEnergy_RecastBatteryPlates",
       "inputs": [
         {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlateMold",
+              "icon": "icon_RenewableEnergy_BatteryPlateMold",
+              "name": "Battery Plate Mold"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
           "count": 2,
           "items": [
             {
@@ -4369,20 +4383,6 @@
           ],
           "keep": false,
           "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.BatteryPlateMold",
-              "icon": "icon_RenewableEnergy_BatteryPlateMold",
-              "name": "Battery Plate Mold"
-            }
-          ],
-          "keep": true,
-          "tag": false,
           "uses": false
         }
       ],
@@ -4629,34 +4629,6 @@
       "id": "RenewableEnergy_ForgeSteelBlades",
       "inputs": [
         {
-          "count": 3,
-          "items": [
-            {
-              "count": 3,
-              "fullType": "Base.Charcoal",
-              "icon": "icon_Base_Charcoal",
-              "name": "Charcoal"
-            }
-          ],
-          "keep": false,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.SheetMetal",
-              "icon": "icon_Base_SheetMetal",
-              "name": "Steel Sheet"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
           "count": 1,
           "items": [
             {
@@ -4682,6 +4654,34 @@
           ],
           "keep": true,
           "tag": true,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Charcoal",
+              "icon": "icon_Base_Charcoal",
+              "name": "Charcoal"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.SheetMetal",
+              "icon": "icon_Base_SheetMetal",
+              "name": "Steel Sheet"
+            }
+          ],
+          "keep": false,
+          "tag": false,
           "uses": false
         }
       ],
@@ -5222,6 +5222,20 @@
       "id": "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
       "inputs": [
         {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlateMold",
+              "icon": "icon_RenewableEnergy_BatteryPlateMold",
+              "name": "Battery Plate Mold"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
           "count": 3,
           "items": [
             {
@@ -5247,20 +5261,6 @@
           ],
           "keep": false,
           "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.BatteryPlateMold",
-              "icon": "icon_RenewableEnergy_BatteryPlateMold",
-              "name": "Battery Plate Mold"
-            }
-          ],
-          "keep": true,
-          "tag": false,
           "uses": false
         }
       ],
