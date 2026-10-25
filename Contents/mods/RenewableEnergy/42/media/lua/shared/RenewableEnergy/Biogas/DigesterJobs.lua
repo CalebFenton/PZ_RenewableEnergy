@@ -25,6 +25,7 @@ DigesterJobs.REFILL_WATER = "RefillScrubberWater"
 DigesterJobs.REFILL_ASH = "RefillScrubberAsh"
 DigesterJobs.REFILL_LIME = "RefillScrubberLime"
 DigesterJobs.REFILL_WOOL = "RefillScrubberWool"
+DigesterJobs.REFILL_SPONGE = "RefillScrubberSponge"
 
 DigesterJobs.COMPOST_BAG = "Base.CompostBag"
 local STEEL_WOOL = "Base.SteelWool"
@@ -85,43 +86,63 @@ function DigesterJobs.tarpBags(character)
     return bags
 end
 
---- The propane tank the character would fill: the emptiest they carry, or nil.
-function DigesterJobs.tankToFill(character)
-    local tanks = character:getInventory():getAllTypeRecurse(Digester.TANK)
-    local best
-    for i = 0, tanks:size() - 1 do
-        local tank = tanks:get(i)
-        if not best or tank:getCurrentUses() < best:getCurrentUses() then
-            best = tank
+--- The Iron Sponge the character would pack a scrubber with: the one with the most packings left,
+--- or nil.
+function DigesterJobs.spongeToPack(character)
+    local sponges, best = character:getInventory():getAllTypeRecurse(Digester.IRON_SPONGE), nil
+    for i = 0, sponges:size() - 1 do
+        local sponge = sponges:get(i)
+        if not best or sponge:getCondition() > best:getCondition() then
+            best = sponge
         end
     end
     return best
 end
 
--- The whole uses of `tank` that make `share` of it. A tank holds whole uses, read back as a float
--- that may fall a hair short (InventoryItem.getCurrentUsesFloat), so fills count in uses.
-local function usesAt(tank, share)
-    return round(share / tank:getUseDelta())
+--- What the character could fill (Digester.FILL_SHARES): the emptiest they carry of each kind, a
+--- propane tank, a blowtorch and a lantern bottle, in that order.
+function DigesterJobs.toFill(character)
+    local inventory, found = character:getInventory(), {}
+    for _, fullType in ipairs({ Digester.TANK, "Base.BlowTorch", Digester.BOTTLE }) do
+        local items, best = inventory:getAllTypeRecurse(fullType), nil
+        for i = 0, items:size() - 1 do
+            local item = items:get(i)
+            if not best or item:getCurrentUsesFloat() < best:getCurrentUsesFloat() then
+                best = item
+            end
+        end
+        if best then
+            table.insert(found, best)
+        end
+    end
+    return found
 end
 
---- The uses of `tank` a fill (a fill job's row.fill) would add now from a digester whose summary
---- (or record) is `summary`: unscrubbed gas up to the pump's share, and for a fill that takes
---- scrubbed gas, that beyond it. Returns the unscrubbed and the scrubbed uses, and the m³ in a use.
-function DigesterJobs.fillUses(fill, summary, tank)
-    local perUse = Digester.M3_PER_TANK * tank:getUseDelta()
-    local filled, pumped = tank:getCurrentUses(), usesAt(tank, Digester.PUMP_FILL)
+-- The whole uses of `vessel` that make `share` of it. It holds whole uses, read back as a float
+-- that may fall a hair short (InventoryItem.getCurrentUsesFloat), so fills count in uses.
+local function usesAt(vessel, share)
+    return round(share / vessel:getUseDelta())
+end
+
+--- The uses of `vessel`, a tank, torch or bottle, a fill (a fill job's row.fill) would add now
+--- from a digester whose summary (or record) is `summary`: unscrubbed gas up to the pump's share,
+--- and for a fill that takes scrubbed gas, that beyond it. Returns the unscrubbed and the scrubbed
+--- uses, and the m³ in a use.
+function DigesterJobs.fillUses(fill, summary, vessel)
+    local perUse = Digester.M3_PER_TANK * Digester.FILL_SHARES[vessel:getFullType()] * vessel:getUseDelta()
+    local filled, pumped = vessel:getCurrentUses(), usesAt(vessel, Digester.PUMP_FILL)
     local gasUses = math.floor(summary.gas / perUse)
     local plain = math.min(gasUses, math.max(0, pumped - filled))
     local scrubbed = 0
     if fill.scrubbed then
         local clean = math.floor(math.min(summary.scrubCO2 or 0, summary.scrubWool or 0) / perUse)
-        scrubbed = math.max(0, math.min(gasUses - plain, tank:getMaxUses() - math.max(filled, pumped), clean))
+        scrubbed = math.max(0, math.min(gasUses - plain, vessel:getMaxUses() - math.max(filled, pumped), clean))
     end
     return plain, scrubbed, perUse
 end
 
-local function fillAmount(fill, summary, tank)
-    local plain, scrubbed, perUse = DigesterJobs.fillUses(fill, summary, tank)
+local function fillAmount(fill, summary, vessel)
+    local plain, scrubbed, perUse = DigesterJobs.fillUses(fill, summary, vessel)
     return (plain + scrubbed) * perUse
 end
 
@@ -142,30 +163,30 @@ local function bagBlocker(character, summary)
     return summary.gas > 0 and "Tooltip_RenewableEnergy_VentFirst" or nil
 end
 
--- Completes the row of a job that fills the propane tank `with` from the holder. `fields.fill`:
--- limit, the share of a full tank it stops at, and `full`, the key that says it got there;
--- scrubbed, it takes scrubbed gas beyond the pump's share; power, it needs the square powered;
--- minutesPerM3, its minutes per m³ moved, at least `fields.baseMinutes` in all; endurancePerM3,
--- what each m³ costs the character.
+-- Completes the row of a job that fills `with`, a tank, torch or bottle, from the holder.
+-- `fields.fill`: limit, the share of it a fill stops at, and `full`, the key that says it got
+-- there; scrubbed, it takes scrubbed gas beyond the pump's share; power, it needs the square
+-- powered; minutesPerM3, its minutes per m³ moved, at least `fields.baseMinutes` in all;
+-- endurancePerM3, what each m³ costs the character.
 local function fillJob(fields)
     local fill = fields.fill
     fields.blocker = noGas
-    fields.minutes = function(digester, tank)
+    fields.minutes = function(digester, vessel)
         local summary = Digester.currentSummary(digester)
-        if not (summary and tank) then
+        if not (summary and vessel) then
             return fields.baseMinutes
         end
-        return math.max(fields.baseMinutes, fillAmount(fill, summary, tank) * fill.minutesPerM3)
+        return math.max(fields.baseMinutes, fillAmount(fill, summary, vessel) * fill.minutesPerM3)
     end
-    fields.withRefusal = function(character, summary, tank)
-        if not (tank and tank:getFullType() == Digester.TANK and character:getInventory():containsRecursive(tank)) then
-            return "Tooltip_RenewableEnergy_NeedsTank"
+    fields.withRefusal = function(character, summary, vessel)
+        if not Jobs.carries(character, vessel, function(item) return Digester.FILL_SHARES[item:getFullType()] ~= nil end) then
+            return "Tooltip_RenewableEnergy_NeedsGasBottle"
         end
         if fill.power and not Digester.compressorPowered(character) then
             return "Tooltip_RenewableEnergy_NoPower"
         end
-        if fillAmount(fill, summary, tank) <= 0 then
-            if tank:getCurrentUses() >= usesAt(tank, fill.limit) then
+        if fillAmount(fill, summary, vessel) <= 0 then
+            if vessel:getCurrentUses() >= usesAt(vessel, fill.limit) then
                 return fill.full
             end
             return "Tooltip_RenewableEnergy_NeedsScrubbed"
@@ -251,7 +272,7 @@ DigesterJobs.JOBS = {
         baseMinutes = 2, position = "Mid", tooltip = "Tooltip_RenewableEnergy_FillByCompressor",
         materials = { { item = Digester.COMPRESSOR, keep = true } },
         fill = {
-            limit = 1, full = "Tooltip_RenewableEnergy_TankFull", scrubbed = true, power = true,
+            limit = 1, full = "Tooltip_RenewableEnergy_Full", scrubbed = true, power = true,
             minutesPerM3 = Digester.COMPRESSOR_MINUTES_PER_M3,
         },
     }),
@@ -269,8 +290,9 @@ DigesterJobs.JOBS = {
         },
         xp = { perk = "Mechanics", amount = 10 },
     },
-    -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3). The steel wool and the
-    -- water wear out apart, so each is refilled on its own.
+    -- `charge`: the alkali that goes in with the water (Digester.SCRUB_M3). The water and the
+    -- packing wear out apart, so each is refilled on its own; `packing` puts in steel wool, or the
+    -- Iron Sponge `with`.
     [DigesterJobs.REFILL_WATER] = {
         minutes = 5, position = "Mid", charge = "water", blocker = noScrubber, hideBlocked = true,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberWater",
@@ -287,9 +309,19 @@ DigesterJobs.JOBS = {
         materials = { SCRUB_WATER, { item = "Base.Quicklime", need = 1 } },
     },
     [DigesterJobs.REFILL_WOOL] = {
-        minutes = 5, position = "Mid", blocker = noScrubber, hideBlocked = true,
+        minutes = 5, position = "Mid", packing = "wool", blocker = noScrubber, hideBlocked = true,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberWool",
         materials = { { item = STEEL_WOOL, uses = 1 } },
+    },
+    [DigesterJobs.REFILL_SPONGE] = {
+        minutes = 5, position = "Mid", packing = "sponge", blocker = noScrubber, hideBlocked = true,
+        tooltip = "Tooltip_RenewableEnergy_RefillScrubberSponge",
+        withRefusal = function(character, summary, sponge)
+            if not Jobs.carries(character, sponge, function(item) return item:getFullType() == Digester.IRON_SPONGE end) then
+                return "Tooltip_RenewableEnergy_NeedsIronSponge"
+            end
+            return nil
+        end,
     },
 }
 

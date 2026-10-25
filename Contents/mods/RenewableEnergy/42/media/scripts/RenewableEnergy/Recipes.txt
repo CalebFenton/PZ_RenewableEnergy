@@ -1276,6 +1276,52 @@ module Base
         Fixer = Base.TarpPiece; Tailoring=2,
     }
 
+    /* The scrubber's packing a farm can make (DigesterJobs): small iron scrap or nails filed into
+       filings, mixed with splinters and damped to rust together, as gas works' iron sponge is
+       wood shavings and iron oxide. Free to all, as the scrubber is. */
+    craftRecipe RenewableEnergy_MakeIronSponge
+    {
+        timedAction = Making,
+        time = 300,
+        Tags = AnySurfaceCraft,
+        category = Metalworking,
+        SkillRequired = MetalWelding:1,
+        xpAward = MetalWelding:5,
+        inputs
+        {
+            item 1 tags[base:file] mode:keep flags[Prop1;MayDegradeLight],
+            item 10 [2:Base.IronScrap;2:Base.SteelScrap;2:Base.ScrapMetal;2:Base.UnusableMetal;Base.Nails] flags[IsExclusive],
+            item 3 [Base.Splinters],
+            item 1 [*],
+            -fluid 0.5 [Water],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.IronSponge,
+        }
+    }
+
+    /* A spent Iron Sponge spread out, damped and turned until it rusts again, as gas works revived
+       theirs in the air; it comes back with one packing fewer left (OnCreate). */
+    craftRecipe RenewableEnergy_AirOutIronSponge
+    {
+        timedAction = Making,
+        time = 400,
+        Tags = AnySurfaceCraft,
+        category = Metalworking,
+        OnCreate = RenewableEnergy.Recipes.airOutIronSponge,
+        inputs
+        {
+            item 1 [RenewableEnergy.SpentIronSponge],
+            item 1 [*],
+            -fluid 0.25 [Water],
+        }
+        outputs
+        {
+            item 1 RenewableEnergy.IronSponge,
+        }
+    }
+
     /* A lantern's propane bottle topped up from a tank, as Refill Blow Torch does (OnCreate moves
        the propane). Free to all: decanting needs no book. */
     craftRecipe RenewableEnergy_RefillPropaneBottle

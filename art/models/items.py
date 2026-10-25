@@ -94,6 +94,8 @@ ITEMS = {
     "WoodAsh": {"model": woodgas.wood_ash, "icon_elevation": 25},
     "GasConversionKit": {"model": biogas.gas_conversion_kit, "icon_elevation": 45},
     "TarpGasBag": {"model": biogas.tarp_gas_bag, "icon_elevation": 50},
+    "IronSponge": {"model": biogas.iron_sponge, "icon_elevation": 40},
+    "SpentIronSponge": {"model": lambda col: biogas.iron_sponge(col, spent=True), "icon_elevation": 40},
     "FridgeCompressor": {"model": biogas.fridge_compressor},
     "GasHeater": {"model": biogas.gas_heater},
     "TarryPacking": {"model": woodgas.tarry_packing, "icon_elevation": 35},

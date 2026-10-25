@@ -135,6 +135,36 @@ def tarp_gas_bag(col):
     _tarp_bag(col, 1, False, centre=(0, 0), barb=(-rx - 0.06, -ry - 0.06, 0.03))
 
 
+def iron_sponge(col, spent=False):
+    """A handful of iron sponge, a gas scrubber's packing: a loose wad of wood chips and curled
+    shavings rusted together with filed iron scrap, crusted orange-brown with darker iron flecks;
+    or `spent`, the same wad blackened with iron sulphide and a few faint specks of sulphur."""
+    body = M("ironsulphide" if spent else "rustchips")
+    fleck = M("sulphur" if spent else "charcoal")
+    rx, ry, height = 0.08, 0.07, 0.045
+    mound(col, "Sponge_Wad", body, (rx, ry, height), lumps=0.3, seed=70, segments=16, rings=5)
+    rng = random.Random(71)
+    for i in range(14):
+        angle, reach = rng.uniform(0, 360), rng.uniform(0.3, 0.95)
+        ux, uy = around((0, 0), angle, 1)
+        z = height * math.sqrt(1 - reach * reach) + 0.002
+        at = (ux * rx * reach, uy * ry * reach, z)
+        if i % 2:
+            # A wood chip lying on the wad, tipped up at a slant.
+            box(col, "Sponge_Chip", body, (rng.uniform(0.025, 0.04), rng.uniform(0.012, 0.018), 0.005), at=at,
+                rotate=(rng.uniform(-30, 30), rng.uniform(-30, 30), rng.uniform(0, 180)))
+        else:
+            # A curled shaving sticking out of the edge.
+            length = rng.uniform(0.03, 0.05)
+            end = (at[0] + ux * length, at[1] + uy * length, max(0.004, z + rng.uniform(-0.02, 0.01)))
+            beam(col, "Sponge_Shaving", body, at, end, (0.008, 0.003))
+    for i in range(6):
+        spread = rng.uniform(0.1, 0.7)
+        u, v = around((0, 0), rng.uniform(0, 360), spread)
+        mound(col, "Sponge_Fleck", fleck, (0.006, 0.005, 0.004),
+              at=(u * rx, v * ry, height * math.sqrt(1 - spread * spread)), segments=8, rings=2)
+
+
 def _tarp_bag(col, fill, torn, centre=TARP_AT, barb=None):
     """A pillow sewn from a blue poly tarp, a hem round it with a grommet at each corner and a hose
     barb in the corner nearest the barrel (reaching to `barb`, the holder's inlet by default), centred

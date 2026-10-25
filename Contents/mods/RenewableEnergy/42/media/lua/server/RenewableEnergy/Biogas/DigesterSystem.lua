@@ -98,14 +98,14 @@ local function upgrade(character, record, row, isoObject)
     return true
 end
 
--- Fills `tank` as far as the row's fill goes.
-local function fill(character, record, row, isoObject, tank)
-    local plain, scrubbed, perUse = DigesterJobs.fillUses(row.fill, record, tank)
+-- Fills `vessel`, a tank, torch or bottle, as far as the row's fill goes.
+local function fill(character, record, row, isoObject, vessel)
+    local plain, scrubbed, perUse = DigesterJobs.fillUses(row.fill, record, vessel)
     if plain + scrubbed <= 0 then
         return false
     end
-    tank:setCurrentUses(tank:getCurrentUses() + plain + scrubbed)
-    tank:syncItemFields()
+    vessel:setCurrentUses(vessel:getCurrentUses() + plain + scrubbed)
+    vessel:syncItemFields()
     local m3 = (plain + scrubbed) * perUse
     record:takeGas(m3)
     if scrubbed > 0 then
@@ -122,20 +122,35 @@ local function fitScrubber(character, record)
     record.scrubber = true
     record.scrubCO2 = 0
     record.scrubWool = Digester.WOOL_M3
+    record.scrubSponge = 0
     return true
 end
 
-local function refill(character, record, row)
+-- Refills the water with the row's charge, or the packing: out comes an Iron Sponge packed before,
+-- spent, with the packings it had left as its condition, or nothing once that was its last; in
+-- goes steel wool or the Iron Sponge `sponge`, whose condition the scrubber keeps.
+local function refill(character, record, row, isoObject, sponge)
     if row.charge then
         record.scrubCO2 = Digester.SCRUB_M3[row.charge]
-    else
-        record.scrubWool = Digester.WOOL_M3
+        return true
     end
+    if (record.scrubSponge or 0) > 1 then
+        local spent = instanceItem(Digester.SPENT_SPONGE)
+        spent:setCondition(record.scrubSponge)
+        Items.giveItems(character, spent)
+    end
+    record.scrubSponge = 0
+    if sponge then
+        Items.takeItem(character, sponge)
+        record.scrubSponge = sponge:getCondition()
+    end
+    record.scrubWool = Digester.WOOL_M3
     return true
 end
 
 -- What each job does to the digester's record `record` (its tile `isoObject`) beyond taking its
--- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag, tank or Tarp Gas Bag.
+-- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag, tank, torch, bottle, Tarp
+-- Gas Bag or Iron Sponge.
 -- Returns whether it was done.
 local DO = {
     [DigesterJobs.TAKE_SLUDGE] = takeSludge,
@@ -151,10 +166,10 @@ local DO = {
     [DigesterJobs.REFILL_ASH] = refill,
     [DigesterJobs.REFILL_LIME] = refill,
     [DigesterJobs.REFILL_WOOL] = refill,
+    [DigesterJobs.REFILL_SPONGE] = refill,
 }
 
---- The authority's side of the jobs at a digester (Jobs.perform), whose `with` is the job's bag
---- or tank.
+--- The authority's side of the jobs at a digester (Jobs.perform), whose `with` is the job's item.
 DigesterSystem.jobSite = LibObjectSystem.jobSite(Digester, DO)
 
 --- The authority's side of the jobs at a gas heater (Jobs.perform), which light it or put it

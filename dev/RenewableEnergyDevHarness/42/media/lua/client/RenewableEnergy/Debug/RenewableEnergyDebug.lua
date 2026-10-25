@@ -32,7 +32,8 @@ Debug.ITEMS = {
     "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
     "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
     "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
-    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.TarpGasBag", "RenewableEnergy.FridgeCompressor",
+    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.TarpGasBag", "RenewableEnergy.IronSponge",
+    "RenewableEnergy.SpentIronSponge", "RenewableEnergy.FridgeCompressor",
     "RenewableEnergy.GasHeater", "RenewableEnergy.TarryPacking", "RenewableEnergy.FemaPamphlet",
     "RenewableEnergy.TreadmillMotor", "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades",
     "RenewableEnergy.SteelBlades", "RenewableEnergy.BrokenWoodenBlades", "RenewableEnergy.BrokenPipeBlades",
@@ -48,7 +49,7 @@ Debug.PREFERRED_INPUTS = {
     "Base.EmptyJar", "Base.MetalDrum", "Base.Bucket", "Base.WaterBottle", "Base.Charcoal", "Base.HandDrill",
     "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.SmithingHammer", "Base.Saw", "Base.KitchenKnife",
     "Base.Pliers", "Base.Tongs", "Base.WeldingMask", "Base.Shovel2", "Base.MasonsTrowel", "Base.Matches",
-    "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1",
+    "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1", "Base.Needle", "Base.Thread", "Base.File",
 }
 
 local function isContainerGeneratorOrSource(object)

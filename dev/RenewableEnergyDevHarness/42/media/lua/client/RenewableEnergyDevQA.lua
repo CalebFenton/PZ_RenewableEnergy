@@ -38,6 +38,8 @@ local JOB_ITEMS = {
     { "Base.LargeBranch", 4 }, { "Base.Pinecone", 10 }, { "Base.Splinters", 10 }, { "Base.Charcoal", 10 },
     { "Base.SteelWool", 4 }, { "Base.Straw2", 10 }, { "Base.Matches", 2 },
     { "Base.Tarp", 2 }, { "Base.Garbagebag", 4 }, { "Base.EmptySandbag", 4 }, { "RenewableEnergy.TarpGasBag", 1 },
+    { "RenewableEnergy.IronSponge", 1 }, { "RenewableEnergy.SpentIronSponge", 1 }, { "Base.IronScrap", 4 },
+    { "Base.Splinters", 6 }, { "Base.BlowTorch", 1 },
     { "Base.LightBulb", 4 }, { "Base.Battery", 6 }, { "Base.BakingSoda", 2 }, { "Base.Thread", 2 },
 }
 
@@ -100,6 +102,8 @@ local GROUP_TYPES = {
         "Base.Funnel", "Base.ClayBrick", "Base.BucketConcreteFull", "Base.MasonsTrowel", "Base.TirePump",
         "Base.PropaneTank", "Base.Propane_Refill", "Base.Generator", "RenewableEnergy.FridgeCompressor",
         "RenewableEnergy.GasConversionKit", "RenewableEnergy.GasHeater", "RenewableEnergy.TarpGasBag",
+        "RenewableEnergy.IronSponge", "RenewableEnergy.SpentIronSponge", "Base.IronScrap", "Base.Splinters", "Base.File",
+        "Base.BlowTorch",
     },
     -- Gasifiers, their fuel and filter, cleaning them out, and wood vinegar.
     woodgas = {

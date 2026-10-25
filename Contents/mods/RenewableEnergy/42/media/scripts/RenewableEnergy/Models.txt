@@ -265,6 +265,18 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_TarpGasBag,
         scale = 0.666667,
     }
+    model IronSponge_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_IronSponge,
+        texture = WorldItems/RenewableEnergy_IronSponge,
+        scale = 0.666667,
+    }
+    model SpentIronSponge_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SpentIronSponge,
+        texture = WorldItems/RenewableEnergy_SpentIronSponge,
+        scale = 0.666667,
+    }
     model FridgeCompressor_Ground
     {
         mesh = WorldItems/RenewableEnergy_FridgeCompressor,

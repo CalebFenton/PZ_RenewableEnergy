@@ -236,9 +236,73 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
     end,
 })
 
+-- A tire pump fills a welding torch straight from the digester, to the pump's share of the torch,
+-- at what vanilla's Refill Blow Torch takes of a tank for it, so a torch costs the same gas filled
+-- directly as through a tank.
+test("renewable_energy_biogas_pump_fills_torch", {
+    instant = true,
+    run = function(self)
+        local handle = T.placeRecord(self, "digester", "dome")
+        if not handle then return end
+        self.gas = Digester.HOLDERS.dome.capacity
+        T.setRecord(self, handle, T.matureDigester("dome", { gas = self.gas }))
+        T.waitForGas(self, handle, self.gas)
+        T.give(self, "tools", { { type = Digester.PUMP }, { type = "Base.BlowTorch", uses = 0 } })
+        T.gasJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
+        T.batch(function()
+            T.readRecord(self, handle, "after")
+            T.readCarried(self, { "Base.BlowTorch" })
+        end)
+    end,
+    validate = function(self)
+        local torch = T.carriedFirst(self, "Base.BlowTorch")
+        if not T.expect(torch ~= nil, "the torch is gone") then return end
+        local script = getScriptManager():FindItem("Base.BlowTorch")
+        local uses = round(Digester.PUMP_FILL / script:getUseDelta()) * script:getUseDelta()
+        T.expectNear("torch after pumping", torch.uses, uses, 0.001)
+        -- Vanilla's refill: 70 tank uses of a 5000-use tank per torch use.
+        local m3 = uses / script:getUseDelta() * 70 / 5000 * Digester.M3_PER_TANK
+        T.expectNear("gas the torch took", self.gas - self.reads.after.gas, m3, 0.02)
+    end,
+})
+
+-- An Iron Sponge packs the scrubber, taken whole; the next packing gives it back spent with the
+-- packings it had left, and one packed on its last crumbles to nothing.
+test("renewable_energy_biogas_iron_sponge_packing", {
+    instant = true,
+    run = function(self)
+        local handle = T.placeRecord(self, "digester", "dome")
+        if not handle then return end
+        T.setRecord(self, handle, T.matureDigester("dome", { scrubber = true, scrubWool = 0, scrubSponge = 0 }))
+        T.waitForSummary(self, handle, function(summary) return summary.scrubber end, "this client's summary of the scrubber")
+        T.give(self, "sponges", { { type = Digester.IRON_SPONGE, condition = 3 }, { type = Digester.IRON_SPONGE, condition = 1 } })
+        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_SPONGE, function() return self.items.sponges[1] end)
+        T.readRecord(self, handle, "first")
+        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_SPONGE, function() return self.items.sponges[2] end)
+        T.readCarried(self, { Digester.SPENT_SPONGE, Digester.IRON_SPONGE }, nil, "second")
+        T.giveMaterials(self, "wool", DigesterJobs.materials(T.player(), DigesterJobs.REFILL_WOOL))
+        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_WOOL)
+        T.batch(function()
+            T.readRecord(self, handle, "wool")
+            T.readCarried(self, { Digester.SPENT_SPONGE }, nil, "third")
+        end)
+    end,
+    validate = function(self)
+        local first, wool = self.reads.first, self.reads.wool
+        T.expect(first.scrubSponge == 3, "the packed sponge's packings: " .. tostring(first.scrubSponge))
+        T.expectNear("packing from a sponge", first.scrubWool, Digester.WOOL_M3, 0.01)
+        local spent = T.carriedItems(self, Digester.SPENT_SPONGE, "second")
+        T.expect(#spent == 1 and spent[1].condition == 3, "repacking gave back " .. #spent .. " spent sponges, the first at "
+            .. tostring(spent[1] and spent[1].condition))
+        T.expect(#T.carriedItems(self, Digester.IRON_SPONGE, "second") == 0, "packing left an Iron Sponge in the inventory")
+        T.expect(#T.carriedItems(self, Digester.SPENT_SPONGE, "third") == 1 and wool.scrubSponge == 0,
+            "a sponge on its last packing didn't crumble")
+    end,
+})
+
 -- Refill Propane Bottle moves propane from a tank into a lantern bottle and makes none: what the
 -- bottle gains is what the tank loses. Each case's start is (tank use) → tank, bottle.
-local SHARE = RenewableEnergy.Recipes.PROPANE_BOTTLE_SHARE
+local SHARE = Digester.BOTTLE_SHARE
 local REFILLS = {
     propane_refill_fills_bottle = { start = function() return 0.5, 0.5 end, check = function(bottle)
         T.expectNear("bottle refilled from a half tank", bottle, 1, 0.001)
@@ -284,6 +348,45 @@ for name, case in pairs(REFILLS) do
         end,
     })
 end
+
+-- Ten nails, as much iron as two pieces of scrap, file into a fresh Iron Sponge with all its
+-- packings left.
+T.craftTest("renewable_energy_biogas_make_iron_sponge_from_nails", {
+    recipe = "RenewableEnergy_MakeIronSponge",
+    from = "Base.Splinters",
+    -- The water's any-item input takes the bottle, which the setup fills.
+    prefer = { "Base.PopBottle", "Base.Nails" },
+    setup = function(self)
+        T.fillCarried(self, "Base.PopBottle", "Water", 1)
+    end,
+    counts = { [Digester.IRON_SPONGE] = 1, ["Base.Nails"] = 0 },
+    after = function(self)
+        T.readCarried(self, { Digester.IRON_SPONGE })
+    end,
+    validate = function(self)
+        local sponge = T.carriedFirst(self, Digester.IRON_SPONGE)
+        T.expect(sponge ~= nil and sponge.condition == 3, "the new sponge's packings: " .. tostring(sponge and sponge.condition))
+    end,
+})
+
+-- Airing out a spent Iron Sponge gives an Iron Sponge with one packing fewer left.
+T.craftTest("renewable_energy_biogas_air_out_iron_sponge", {
+    recipe = "RenewableEnergy_AirOutIronSponge",
+    from = Digester.SPENT_SPONGE,
+    prefer = { "Base.PopBottle" },
+    setup = function(self)
+        T.changeItem(self, T.inputsOf(self, Digester.SPENT_SPONGE)[1], { condition = 3 })
+        T.fillCarried(self, "Base.PopBottle", "Water", 1)
+    end,
+    counts = { [Digester.IRON_SPONGE] = 1, [Digester.SPENT_SPONGE] = 0 },
+    after = function(self)
+        T.readCarried(self, { Digester.IRON_SPONGE })
+    end,
+    validate = function(self)
+        local sponge = T.carriedFirst(self, Digester.IRON_SPONGE)
+        T.expect(sponge ~= nil and sponge.condition == 2, "the aired sponge's packings: " .. tostring(sponge and sponge.condition))
+    end,
+})
 
 -- The propane tank on the character's square, this client's copy, or nil.
 local function floorTank(square)

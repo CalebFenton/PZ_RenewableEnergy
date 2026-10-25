@@ -31,7 +31,7 @@ DigesterObject.SAVED_FIELDS = {
     "tier", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
     "seedHours", "started", "gasHours", "sludge", "acid", "sour", "leakHours", "indoors", "inRoom",
     "meterHours", "madePerDay", "hopper", "eaten", "lastHour", "scrubber", "scrubCO2", "scrubWool",
-    "heaterLit",
+    "scrubSponge", "heaterLit",
 }
 
 -- Sour slows digestion to this share.
@@ -72,6 +72,7 @@ function DigesterObject:initNew()
     self.scrubber = false
     self.scrubCO2 = 0
     self.scrubWool = 0
+    self.scrubSponge = 0
     self.heaterLit = false
     self.lastHour = getGameTime():getWorldAgeHours()
 end

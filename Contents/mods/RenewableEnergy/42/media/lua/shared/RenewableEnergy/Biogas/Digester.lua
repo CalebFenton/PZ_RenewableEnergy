@@ -73,12 +73,21 @@ Digester.SLUDGE_PER_BAG = 10
 -- MaximumGeneratorFuel) at GasKit.M3_PER_LITRE.
 Digester.TANK = "Base.PropaneTank"
 Digester.M3_PER_TANK = 16
--- A tire pump fills a tank this far at most, and it is hard work: minutes and endurance per m³.
+-- A lantern's propane bottle holds this share of a full tank: a one-pound bottle off a twenty.
+Digester.BOTTLE = "Base.Propane_Refill"
+Digester.BOTTLE_SHARE = 0.05
+-- What a digester fills directly, by full type: the share of a full tank each holds when full. A
+-- blowtorch's is what vanilla's Refill Blow Torch takes of a tank for a full torch
+-- (RecipeCodeOnCreate.refillBlowTorch: 70 tank uses per torch use, 10 uses of 5000), so filling a
+-- torch here costs the gas going through a tank would.
+Digester.FILL_SHARES = { [Digester.TANK] = 1, ["Base.BlowTorch"] = 0.14, [Digester.BOTTLE] = Digester.BOTTLE_SHARE }
+-- A tire pump fills what it fills this far at most, and it is hard work: minutes and endurance per
+-- m³.
 Digester.PUMP = "Base.TirePump"
 Digester.PUMP_FILL = 0.25
 Digester.PUMP_MINUTES_PER_M3 = 15
 Digester.PUMP_ENDURANCE_PER_M3 = 0.06
--- A fridge compressor, on power, fills a tank all the way, but only with scrubbed gas.
+-- A fridge compressor, on power, fills it all the way, but only with scrubbed gas past the pump's.
 Digester.COMPRESSOR = "RenewableEnergy.FridgeCompressor"
 Digester.COMPRESSOR_MINUTES_PER_M3 = 2
 
@@ -89,9 +98,12 @@ function Digester.compressorPowered(character)
 end
 
 -- What the scrubber's water takes out before it is spent, in m³ of gas: plain water, lye from
--- wood ash, or lime; and what one use of steel wool takes the rotten-egg gas out of.
+-- wood ash, or lime; and what its packing, one use of steel wool or an Iron Sponge, takes the
+-- rotten-egg gas out of.
 Digester.SCRUB_M3 = { water = 5, ash = 15, lime = 30 }
 Digester.WOOL_M3 = 10
+Digester.IRON_SPONGE = "RenewableEnergy.IronSponge"
+Digester.SPENT_SPONGE = "RenewableEnergy.SpentIronSponge"
 -- Litres of water a scrubber charge takes.
 Digester.SCRUB_WATER = 4
 

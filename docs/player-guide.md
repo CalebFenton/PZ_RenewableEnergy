@@ -459,13 +459,14 @@ A barrel or insulated digester inside a building poisons the whole building whil
 
 ### Bottling
 
-Generators burn raw gas, but bottling it needs it cleaned first.
+A digester fills propane tanks, welding torches and propane lantern bottles. Generators burn raw gas, but bottling past a quarter needs it cleaned first.
 
-- **Fit Scrubber**, then keep it going from **Refill Scrubber**. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its steel wool cleans about 10 m³ before it needs fresh **Steel Wool**. The two wear out separately.
-- **Fill Propane Tank** with a **Tire Pump** fills a tank only a quarter of the way, and it's tiring work.
-- **Fill Propane Tank** with a **Compressor** fills it all the way where there's power, using scrubbed gas past the first quarter. Salvage a **Fridge Compressor** by cutting up a fridge.
+- **Fill With Tire Pump** fills a tank, torch or bottle only a quarter of the way, and it's tiring work. That's enough to keep a torch going: weld, then pump it up again.
+- **Fill With Compressor** fills it all the way where there's power, using scrubbed gas past the first quarter. Salvage a **Fridge Compressor** by cutting up a fridge.
+- **Fit Scrubber**, then keep it going from **Refill Scrubber**. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its packing cleans about 10 m³ before it needs more: a use of **Steel Wool**, or an **Iron Sponge**. The water and the packing wear out separately.
+- **Make Iron Sponge** (Metalworking 1, with a file) from two pieces of any kind of scrap metal or ten nails, three wood splinters and half a litre of water. A spent sponge comes back out at the next packing; **Air Out Iron Sponge** with a little water revives it, twice before it crumbles.
 
-A propane tank refills lantern bottles. Where there's power, a carried Fridge Compressor inflates tires too.
+A full torch takes about 2.2 m³ and a lantern bottle 0.8 m³, what refilling them from a tank would. A propane tank still refills lantern bottles and torches the vanilla way. Where there's power, a carried Fridge Compressor inflates tires too.
 
 Digesters keep digesting, and eating from their hoppers, while you're away.
 

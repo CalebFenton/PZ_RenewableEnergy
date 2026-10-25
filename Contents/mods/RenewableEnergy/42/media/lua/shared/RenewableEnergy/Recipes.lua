@@ -15,6 +15,7 @@ require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
+require "RenewableEnergy/Biogas/Digester"
 local Items = require "cf_commonlib/Items"
 local Materials = require "cf_commonlib/Materials"
 local RecipeLearning = require "cf_commonlib/RecipeLearning"
@@ -504,9 +505,6 @@ function Recipes.takeApartGardenLight(craftRecipeData, character)
     end
 end
 
--- What a full lantern bottle holds, as a share of a full tank: a one-pound bottle off a twenty.
-Recipes.PROPANE_BOTTLE_SHARE = 0.05
-
 -- OnCreate of Refill Propane Bottle, as vanilla's Refill Blow Torch moves its propane
 -- (RecipeCodeOnCreate.refillBlowTorch): the new bottle starts as the old one was and takes what
 -- it has room for from the tank. The propane moves in whole uses of the tank, the coarser of the
@@ -515,13 +513,28 @@ function Recipes.refillPropaneBottle(craftRecipeData, character)
     local bottle = craftRecipeData:getFirstCreatedItem()
     local old = craftRecipeData:getAllConsumedItems():get(0)
     local tank = craftRecipeData:getAllKeepInputItems():get(0)
-    local share, tankUse = Recipes.PROPANE_BOTTLE_SHARE, tank:getUseDelta()
+    local share, tankUse = RenewableEnergy.Digester.BOTTLE_SHARE, tank:getUseDelta()
     local room = round((1 - old:getCurrentUsesFloat()) * share / tankUse)
     local taken = math.min(room, tank:getCurrentUses())
     bottle:setCurrentUsesFloat(old:getCurrentUsesFloat() + taken * tankUse / share)
     tank:setCurrentUses(tank:getCurrentUses() - taken)
     bottle:syncItemFields()
     sendItemStats(tank)
+end
+
+-- OnCreate of Air Out Iron Sponge: the sponge comes back with one packing fewer left than the
+-- spent one had (its condition), as each airing leaves less iron to rust.
+function Recipes.airOutIronSponge(craftRecipeData, character)
+    local sponge = craftRecipeData:getFirstCreatedItem()
+    local consumed = craftRecipeData:getAllConsumedItems()
+    for i = 0, consumed:size() - 1 do
+        local spent = consumed:get(i)
+        if spent:getFullType() == RenewableEnergy.Digester.SPENT_SPONGE then
+            sponge:setCondition(spent:getCondition() - 1)
+            sponge:syncItemFields()
+            return
+        end
+    end
 end
 
 return Recipes

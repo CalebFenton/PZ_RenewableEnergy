@@ -188,6 +188,13 @@ PALETTE = {
     # The flat belt a car alternator wind charger's rotor drives its alternator with, cut from
     # leather the brown of the game's own leather belt (Belt2).
     "leather": lambda: material("RE_Leather", "#6e4a2c", roughness=0.7, grime=0.2, scale=14),
+    # Iron sponge: wood shavings crusted orange-brown with rust, flecked with filed iron; spent, it
+    # is blackened by iron sulphide with a few specks of yellow sulphur.
+    "rustchips": lambda: material("RE_RustChips", "#a0582a", roughness=0.95, grime=0.3, scale=25,
+                                  speckle=("#6a3418", 0.45)),
+    "ironsulphide": lambda: material("RE_IronSulphide", "#262524", roughness=0.85, grime=0.15, scale=25,
+                                     speckle=("#121212", 0.4)),
+    "sulphur": lambda: material("RE_Sulphur", "#d6c34a", roughness=0.9, grime=0.1),
 }
 
 

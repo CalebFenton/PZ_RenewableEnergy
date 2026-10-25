@@ -846,6 +846,34 @@ module RenewableEnergy
         Tags = base:ignorezombiedensity,
     }
 
+    /* Splinters and filed iron scrap rusted together, a scrubber's packing in place of steel wool
+       (DigesterJobs). Its condition is the packings it has left: each airing out costs one. */
+    item IronSponge
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 1.0,
+        ConditionMax = 3,
+        Icon = RenewableEnergy_IronSponge,
+        WorldStaticModel = RenewableEnergy.IronSponge_Ground,
+        Tooltip = Tooltip_RenewableEnergy_IronSponge,
+        Tags = base:ignorezombiedensity,
+    }
+
+    /* An Iron Sponge out of a scrubber, black with what it took from the gas; aired out, it is an
+       Iron Sponge again (Recipes.airOutIronSponge). */
+    item SpentIronSponge
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 1.0,
+        ConditionMax = 3,
+        Icon = RenewableEnergy_SpentIronSponge,
+        WorldStaticModel = RenewableEnergy.SpentIronSponge_Ground,
+        Tooltip = Tooltip_RenewableEnergy_SpentIronSponge,
+        Tags = base:ignorezombiedensity,
+    }
+
     /* The compressor a fridge gives when cut up; presses scrubbed biogas into propane tanks. */
     item FridgeCompressor
     {

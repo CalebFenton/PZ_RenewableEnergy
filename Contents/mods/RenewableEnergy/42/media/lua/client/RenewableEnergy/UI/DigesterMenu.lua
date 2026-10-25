@@ -80,10 +80,13 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     end
     addJob(menu, playerNum, "digester", DigesterJobs.UPGRADE, digester)
 
-    local tank = DigesterJobs.tankToFill(character)
-    local fillMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_FillPropaneTank"))
+    -- Each way of filling, then what to fill: the emptiest tank, torch and bottle carried, each
+    -- with how full it is.
+    local vessels = DigesterJobs.toFill(character)
     for _, job in ipairs({ DigesterJobs.FILL_PUMP, DigesterJobs.FILL_COMPRESSOR }) do
-        addJob(fillMenu, playerNum, "digester", job, digester, tank)
+        JobOptions.addEach(menu, playerNum, Action, "digester", job, digester, vessels, label(job), function(vessel)
+            return vessel:getDisplayName() .. " (" .. Format.percent(vessel:getCurrentUsesFloat()) .. ")"
+        end)
     end
     if not summary.scrubber then
         addJob(menu, playerNum, "digester", DigesterJobs.FIT_SCRUBBER, digester)
@@ -93,6 +96,7 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     for _, job in ipairs({ DigesterJobs.REFILL_WATER, DigesterJobs.REFILL_ASH, DigesterJobs.REFILL_LIME, DigesterJobs.REFILL_WOOL }) do
         addJob(refillMenu, playerNum, "digester", job, digester)
     end
+    addJob(refillMenu, playerNum, "digester", DigesterJobs.REFILL_SPONGE, digester, DigesterJobs.spongeToPack(character))
     return menu
 end
 
