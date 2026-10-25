@@ -141,7 +141,7 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
         if not (indoor and outdoor) then return end
         self.indoors = Sun.squareWatts(indoor, 50)
         self.outdoors = Sun.squareWatts(outdoor, 50)
-        self.flatWatts = Sun.panelWatts(50, "flat")
+        self.flatWatts = Sun.wattsFrom(50, Sun.skyNow().flat)
     end,
     validate = function(self)
         expect(self.real > 0 and self.real <= 50, "a 50 W module in full sun makes " .. self.real .. " W")

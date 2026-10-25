@@ -71,10 +71,6 @@ local function resetToday(bank)
     bank.backupWhToday = 0
 end
 
-function Bank:new(luaSystem, globalObject)
-    return SGlobalObject.new(self, luaSystem, globalObject)
-end
-
 function Bank:initNew()
     self.on = false
     self.overloaded = false
@@ -162,7 +158,6 @@ function Bank:recount()
     for kind in pairs(PowerBank.PARTS) do
         parts[kind] = {}
     end
-    local nominalWh, storedWh = 0, 0
     local items = container:getItems()
     for i = items:size() - 1, 0, -1 do
         local item = items:get(i)
@@ -173,8 +168,6 @@ function Bank:recount()
                 entry.nominalWh = Battery.nominalWh(item)
                 -- The status window's repair hint depends on the repair limit.
                 entry.repaired = item:getHaveBeenRepaired()
-                nominalWh = nominalWh + entry.nominalWh
-                storedWh = storedWh + entry.nominalWh * Battery.getCharge(item)
             end
             table.insert(parts[kind], entry)
         end
@@ -182,8 +175,7 @@ function Bank:recount()
     for kind, part in pairs(PowerBank.PARTS) do
         self[part.field] = parts[kind]
     end
-    self.nominalWh = nominalWh
-    self.charge = nominalWh > 0 and storedWh / nominalWh or 0
+    self.charge, self.nominalWh = Battery.containerCharge(container)
 end
 
 --- Put the bank's charge into every battery it holds: the batteries are wired in parallel,
@@ -443,7 +435,7 @@ function Bank:chargeFrom(generators, hours, roomWh)
     elseif not (self.chargeSource == "grid" and self.gridPowered) then
         self.chargeSource = false
     end
-    local charging = self.chargeSource and hours > 0 and roomWh > 0
+    local charging = self.chargeSource and roomWh > 0
     self.chargeWantW = charging and math.min(self:chargerMaxW(), roomWh / hours) or 0
     if self.chargeSource ~= wasSource or math.abs(self.chargeWantW - (wasWantW or 0)) > 0.01 then
         Payers.billGenerators()

@@ -145,17 +145,6 @@ function Sun.elevation()
     return math.deg(math.asin(max(-1, min(1, Sun.positionNow().up))))
 end
 
---- Light on a panel now, in W/m², weather included.
-function Sun.irradiance(kind, facing)
-    return Sun.planeIrradiance(Sun.positionNow(), kind, facing, Sun.weatherNow())
-end
-
---- Watts a panel rated `ratedWatts` on a `kind` mount facing `facing` makes now, under
---- `snow` cover from 0 to 1.
-function Sun.panelWatts(ratedWatts, kind, facing, snow)
-    return Sun.wattsFrom(ratedWatts, Sun.irradiance(kind, facing), snow)
-end
-
 --- The sun now as a flat cell sees it, { up, flat }: the sun's `up` as Sun.position gives it,
 --- below 0 at night, and `flat`, the light on open flat ground in W/m², weather included. A pass
 --- over many gadgets works it out once.

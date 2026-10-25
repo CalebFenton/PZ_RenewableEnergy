@@ -57,10 +57,6 @@ end
 --- the rest carried to the next pass, so a finished run reads as a runner's watts for as long as
 --- it lasted rather than all at once. Runs past the bank's input slots are lost.
 function TreadmillSource.update(source, object, inSlot, hours)
-    if hours <= 0 then
-        source.watts = 0
-        return
-    end
     local wh = source.pendingWh or 0
     local watts = inSlot and math.min(wh / hours, Specs.treadmill.watts) or 0
     local left = inSlot and wh - watts * hours or 0

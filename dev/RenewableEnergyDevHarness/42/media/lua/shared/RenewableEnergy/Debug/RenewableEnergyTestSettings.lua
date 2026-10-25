@@ -21,7 +21,7 @@ PZHarness.registerTests({
         if not RenewableEnergy.PowerBank.isBank(object) then
             return false
         end
-        RenewableEnergy.PowerBank.remove(object)
+        object:getSquare():transmitRemoveItemFromSquare(object)
         return true
     end,
     spawnVehicle = function(script, square, facing, args)

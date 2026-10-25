@@ -281,14 +281,14 @@ function Menu.addWireInOptions(playerNum, menu, bank)
     if #batteries > 1 then
         local all = submenu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum,
             queueParts, Action.WIRE_IN, bank, batteries)
-        Needs.show(all, PowerBank.jobNeeds(character, allWiring(batteries)),
+        Needs.show(all, PowerBank.wiringNeeds(character, allWiring(batteries)),
             lightOr(character, Action.WIRE_IN, PowerBank.wiringBlocker(bank, batteries[1])))
     end
     for _, group in ipairs(groups) do
         local script = getScriptManager():FindItem(group.fullType)
         local itemsMenu, typeOption = Needs.addSubMenu(submenu, getItemNameFromFullType(group.fullType))
         typeOption.iconTexture = script and script:getNormalTexture()
-        local needs = PowerBank.wiringNeeds(character, group.fullType)
+        local needs = PowerBank.wiringNeeds(character, PowerBank.wiringFor(group.fullType))
         for _, item in ipairs(group.items) do
             local option = itemsMenu:addOption(partLabel(item), playerNum, queuePart, Action.WIRE_IN, bank, item)
             option.itemForTexture = item

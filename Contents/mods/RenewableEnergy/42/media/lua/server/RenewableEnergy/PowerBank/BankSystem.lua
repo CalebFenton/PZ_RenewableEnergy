@@ -9,6 +9,7 @@ if isClient() then return end
 
 require "Map/SGlobalObjectSystem"
 require "TimedActions/ISDestroyStuffAction"
+require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -26,7 +27,7 @@ local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, Re
 local Sources, PanelSource, Treadmill = RenewableEnergy.Sources, RenewableEnergy.PanelSource, RenewableEnergy.Treadmill
 local Bank = RenewableEnergy.Bank
 
-local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
+local BankSystem = RenewableEnergy.ObjectSystem.deriveSystem("Bank", PowerBank, Bank, PowerBank.isBank)
 RenewableEnergy.BankSystem = BankSystem
 
 -- Values of the ChargeFreq sandbox option.
@@ -38,14 +39,10 @@ local SUN_STEP = 1 / 6
 -- this long, so one pass never swings the charge by days of sun.
 BankSystem.LONGEST_PASS = 24
 
-function BankSystem:new()
-    return SGlobalObjectSystem.new(self, PowerBank.SYSTEM_NAME)
-end
+local deriveInitSystem, deriveInitLuaObjects = BankSystem.initSystem, BankSystem.initLuaObjects
 
 function BankSystem:initSystem()
-    PowerBank.serverSystem = self
-    self.system:setObjectModDataKeys(Bank.SAVED_FIELDS)
-    self.system:setObjectSyncKeys({ "summary" })
+    deriveInitSystem(self)
     if SandboxVars.RenewableEnergy.ChargeFreq == EVERY_TEN_MINUTES then
         Events.EveryTenMinutes.Add(BankSystem.updateAll)
     else
@@ -56,23 +53,12 @@ function BankSystem:initSystem()
     Events.EveryTenMinutes.Add(RenewableEnergy.Payers.billGenerators)
 end
 
--- Each loaded bank gets the summary the clients are sent, which isn't saved, before any client
--- connects. A status left in older saves is dropped.
+-- A status left in older saves is dropped.
 function BankSystem:initLuaObjects()
-    SGlobalObjectSystem.initLuaObjects(self)
+    deriveInitLuaObjects(self)
     for i = 1, self:getLuaObjectCount() do
-        local bank = self:getLuaObjectByIndex(i)
-        bank.status = nil
-        bank.summary = bank:buildSummary()
+        self:getLuaObjectByIndex(i).status = nil
     end
-end
-
-function BankSystem:isValidIsoObject(isoObject)
-    return PowerBank.isBank(isoObject)
-end
-
-function BankSystem:newLuaObject(globalObject)
-    return Bank:new(self, globalObject)
 end
 
 -- Set while makeBank takes away a working bank to rebuild it: the bank's state on the global
@@ -133,14 +119,6 @@ function PowerBank.place(square, spriteName, index)
     return makeBank(square, spriteName, (index and index >= 0) and index or top, nil)
 end
 
---- Switch a bank off, forget it and take its tile away, contents and all. Authority only.
-function PowerBank.remove(isoObject)
-    local square = isoObject and isoObject:getSquare()
-    if square then
-        square:transmitRemoveItemFromSquare(isoObject)
-    end
-end
-
 function BankSystem:OnObjectAdded(isoObject)
     local name = Sprites.nameOf(isoObject)
     if PowerBank.bankOfSprite(name) and not PowerBank.isBank(isoObject) then
@@ -172,8 +150,7 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
         end
     elseif Sources.kindOf(isoObject) then
         local x, y, z = isoObject:getX(), isoObject:getY(), isoObject:getZ()
-        local found = PowerBank.bankOfSource(x, y, z)
-        local bank = found and self:getLuaObjectAt(found.x, found.y, found.z)
+        local bank = BankSystem.bankOfSourceAt(x, y, z)
         if bank then
             BankSystem.dropSource(bank, x, y, z)
         end
@@ -210,6 +187,12 @@ function BankSystem.bankAt(position)
         return nil
     end
     return system:getLuaObjectAt(position.x, position.y, position.z)
+end
+
+--- The bank the source at x, y, z feeds, or nil.
+function BankSystem.bankOfSourceAt(x, y, z)
+    local found = PowerBank.bankOfSource(x, y, z)
+    return found and BankSystem.bankAt(found) or nil
 end
 
 local function mayRefresh(bank, player)

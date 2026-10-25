@@ -1,7 +1,7 @@
 -- Ratings for the mod's power hardware, in watts and watt-hours, and its wear and repair figures.
 -- Appliances draw what vanilla bills a generator for them (Specs.wattsPerFuel); everything else is
 -- rated against those draws.
--- Names: a rating ends in Watts (chargerWatts, Sun.panelWatts), a live quantity the bank or gas
+-- Names: a rating ends in Watts (chargerWatts, ArrowBoard.panelWatts), a live quantity the bank or gas
 -- line works out each pass ends in W (Bank:limitW, loadW), and watt-hours end in Wh. Saved fields
 -- (loadW, chargeWantW, a source's watts) keep their names.
 
@@ -16,9 +16,8 @@ local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
 
 -- Batteries by item type. wh is capacity at full condition; cyclesAt50 is how many discharges of
 -- half the new capacity use up a battery's condition (Battery.cycleWear), so one carrying such a
--- load every night is at half capacity after cyclesAt50 / 2 nights: a car battery in about five
--- months, a deep cycle in a year, an L-16 in about two. A long game outlives a bank or two. wiring
--- overrides Specs.wiring.battery: an L-16's cable lugs bolt onto its studs.
+-- load every night is at half capacity after cyclesAt50 / 2 nights. A long game outlives a bank or
+-- two. wiring overrides Specs.wiring.battery: an L-16's cable lugs bolt onto its studs.
 Specs.batteries = {
     ["Base.CarBattery1"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 300 },
@@ -154,7 +153,7 @@ Specs.mounts = {
     rack = { slots = 1, modules = 2, tilt = 38, stormShare = 1, holdsSnow = true, shedsSnow = true },
 }
 -- A wooden mount flexes and lets modules crack; a welded one holds them. A wooden rack is the
--- weakest panel, at a stormShare of 1.
+-- weakest panel.
 Specs.materials = {
     wood = { stormShare = 1 },
     metal = { stormShare = 0.25 },

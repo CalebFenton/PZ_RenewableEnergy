@@ -69,21 +69,19 @@ function Object:aboutToRemoveFromSystem()
     Fumes.set(self:key(), nil, false)
 end
 
---- Defines and registers a feature's system. `spec`: name (the class is RenewableEnergy_<name>System),
---- kind (its tiles' Sprites kind), owner (its shared module: SYSTEM_NAME, TIERS, and the
---- accessors of GlobalObjects.addAccessors), Object (its record class), isObject(isoObject).
---- Returns the class, whose System.OnCreate(params) is the build menu's for its tiles.
-function ObjectSystem.define(spec)
-    local System = SGlobalObjectSystem:derive("RenewableEnergy_" .. spec.name .. "System")
-    System.kind, System.owner = spec.kind, spec.owner
+--- A system class RenewableEnergy_<name>System keeping the records of `owner` (its shared module:
+--- SYSTEM_NAME) in class `Record`, for the isoObjects `isObject` says are its: each record is
+--- saved by Record.SAVED_FIELDS and sends clients its summary.
+function ObjectSystem.deriveSystem(name, owner, Record, isObject)
+    local System = SGlobalObjectSystem:derive("RenewableEnergy_" .. name .. "System")
 
     function System:new()
-        return SGlobalObjectSystem.new(self, spec.owner.SYSTEM_NAME)
+        return SGlobalObjectSystem.new(self, owner.SYSTEM_NAME)
     end
 
     function System:initSystem()
-        spec.owner.serverSystem = self
-        self.system:setObjectModDataKeys(spec.Object.SAVED_FIELDS)
+        owner.serverSystem = self
+        self.system:setObjectModDataKeys(Record.SAVED_FIELDS)
         self.system:setObjectSyncKeys({ "summary" })
     end
 
@@ -97,12 +95,23 @@ function ObjectSystem.define(spec)
     end
 
     function System:isValidIsoObject(isoObject)
-        return spec.isObject(isoObject)
+        return isObject(isoObject)
     end
 
     function System:newLuaObject(globalObject)
-        return spec.Object:new(self, globalObject)
+        return Record:new(self, globalObject)
     end
+
+    return System
+end
+
+--- Defines and registers a feature's system. `spec`: name (the class is RenewableEnergy_<name>System),
+--- kind (its tiles' Sprites kind), owner (its shared module: SYSTEM_NAME, TIERS, and the
+--- accessors of GlobalObjects.addAccessors), Object (its record class), isObject(isoObject).
+--- Returns the class, whose System.OnCreate(params) is the build menu's for its tiles.
+function ObjectSystem.define(spec)
+    local System = ObjectSystem.deriveSystem(spec.name, spec.owner, spec.Object, spec.isObject)
+    System.kind, System.owner = spec.kind, spec.owner
 
     -- The build menu's OnCreate (scripts/RenewableEnergy/Entities.txt), on the authority: the new
     -- tile gets its record. The build adds it to the square before this runs and sends it to the

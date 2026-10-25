@@ -328,7 +328,7 @@ onVehicle("arrowBoardCharge", function(vehicle, args)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     local watts = ArrowBoard.panelWatts(vehicle)
     local stored = ArrowBoard.charge(vehicle, args.hours)
-    return { stored = stored, watts = watts, flatWh = RenewableEnergy.Sun.panelWatts(1, "flat"),
+    return { stored = stored, watts = watts, flatWh = RenewableEnergy.Sun.wattsFrom(1, RenewableEnergy.Sun.skyNow().flat),
         state = Trailer.vehicleState(vehicle) }
 end)
 

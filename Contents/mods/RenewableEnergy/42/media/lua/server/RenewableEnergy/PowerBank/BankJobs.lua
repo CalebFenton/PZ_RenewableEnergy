@@ -44,15 +44,15 @@ local function sourceAt(position)
     return objectAt(position, Sources.findOn)
 end
 
-local function bankOfSource(position)
-    local found = isPosition(position) and PowerBank.bankOfSource(position.x, position.y, position.z)
-    return found and bankAt(found) or nil
+-- The bank the source at `position` feeds, or nil, also when `position` isn't a { x, y, z } place.
+local function bankFedBy(position)
+    return isPosition(position) and BankSystem.bankOfSourceAt(position.x, position.y, position.z) or nil
 end
 
 -- The bank `position` names a source of, and its record of that source; nil for a source that
 -- feeds no bank.
 local function sourceRecordAt(position)
-    local bank = bankOfSource(position)
+    local bank = bankFedBy(position)
     return bank, bank and bank:findSource(position.x, position.y, position.z)
 end
 
@@ -116,7 +116,7 @@ function BankJobs.connectSource(player, args)
     bank:recount()
     refusal = Sources.slotRefusal(Sources.kindOf(object), bank:inputSlots() - bank:slotsUsed())
     if refusal then return false, refusal end
-    local previous = bankOfSource(args.source)
+    local previous = bankFedBy(args.source)
     if previous then
         BankSystem.dropSource(previous, object:getX(), object:getY(), object:getZ())
     end
@@ -127,7 +127,7 @@ function BankJobs.connectSource(player, args)
 end
 
 function BankJobs.disconnectSource(player, args)
-    local bank = bankOfSource(args.source)
+    local bank = bankFedBy(args.source)
     if not bank then return false, "not connected" end
     BankSystem.dropSource(bank, args.source.x, args.source.y, args.source.z)
     return true
@@ -232,7 +232,7 @@ function BankJobs.unwireTreadmill(player, args)
     if not (player and object) then return false, "no treadmill" end
     local refusal = Treadmill.unwiringRefusal(player, object)
     if refusal then return false, refusal end
-    local bank = bankOfSource(args.source)
+    local bank = bankFedBy(args.source)
     if bank then
         -- What its runs banked up to now counts.
         BankSystem.dropSource(bank, args.source.x, args.source.y, args.source.z)
@@ -254,12 +254,21 @@ function BankJobs.runTreadmill(player, args)
     return true
 end
 
+-- The bank `args.bank` and its container, for a job by `player` on the part `args.itemId` in it or
+-- going in; nil when any of them is missing.
+local function bankWithPart(player, args)
+    local bank = bankAt(args.bank)
+    local container = bank and bank:container()
+    if player and container and type(args.itemId) == "number" then
+        return bank, container
+    end
+end
+
 --- Wire the part `itemId` from the player's inventory into the bank. The bank's container
 --- filter refuses every transfer, so the part is moved here, past it.
 function BankJobs.wireIn(player, args)
-    local bank = bankAt(args.bank)
-    local container = bank and bank:container()
-    if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
+    local bank, container = bankWithPart(player, args)
+    if not bank then return false, "no bank" end
     local item = player:getInventory():getItemWithIDRecursiv(args.itemId)
     local refusal = PowerBank.wiringRefusal(player, bank:getIsoObject(), item)
     if refusal then return false, refusal end
@@ -275,9 +284,8 @@ end
 
 --- Unwire the part `itemId` from the bank: the player gets it back with its wire.
 function BankJobs.unwire(player, args)
-    local bank = bankAt(args.bank)
-    local container = bank and bank:container()
-    if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
+    local bank, container = bankWithPart(player, args)
+    if not bank then return false, "no bank" end
     local item = container:getItemWithID(args.itemId)
     local refusal = PowerBank.unwiringRefusal(player, bank:getIsoObject(), item)
     if refusal then return false, refusal end
@@ -293,9 +301,8 @@ end
 
 --- Repair the inverter or controller `itemId` in the bank with Electronics Scrap.
 function BankJobs.repairPart(player, args)
-    local bank = bankAt(args.bank)
-    local container = bank and bank:container()
-    if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
+    local bank, container = bankWithPart(player, args)
+    if not bank then return false, "no bank" end
     local item = container:getItemWithID(args.itemId)
     local refusal = PowerBank.repairRefusal(player, item)
     if refusal then return false, refusal end

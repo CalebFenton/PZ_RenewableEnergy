@@ -4,12 +4,15 @@
 if isClient() then return end
 
 require "RenewableEnergy/Utilities"
+require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Bank"
 
 RenewableEnergy = RenewableEnergy or {}
 local PowerBank, Sources, Bank = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Bank
+
+Bank.sendSummary = RenewableEnergy.ObjectSystem.Object.sendSummary
 
 --- What the bank is doing, for the status window.
 function Bank:state()
@@ -170,11 +173,7 @@ end
 --- watching the bank its whole status. Single player has no network to send on; its status
 --- window reads the status the bank keeps while someone watches.
 function Bank:sendStatus()
-    local summary = self:buildSummary()
-    if not RenewableEnergy.sameValue(summary, self.summary) then
-        self.summary = summary
-        self:updateOnClient()
-    end
+    self:sendSummary()
     local players = watchersOf(self)
     self.status = #players > 0 and self:buildStatus() or nil
     for _, player in ipairs(players) do

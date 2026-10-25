@@ -219,7 +219,7 @@ end
 
 --- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`, for
 --- RenewableEnergy.firstUnmet.
-function PowerBank.jobNeeds(character, wiring)
+function PowerBank.wiringNeeds(character, wiring)
     return Materials.needs(character, PowerBank.wiringMaterials(wiring))
 end
 
@@ -227,12 +227,6 @@ end
 --- part's install tools to uninstall it. For RenewableEnergy.firstUnmet.
 function PowerBank.unwiringNeeds(character, wiring)
     return Materials.needs(character, wiring.tools)
-end
-
---- What wiring a part of type `fullType` into a bank takes of `character`, for
---- RenewableEnergy.firstUnmet.
-function PowerBank.wiringNeeds(character, fullType)
-    return PowerBank.jobNeeds(character, PowerBank.wiringFor(fullType))
 end
 
 --- How many more parts of `kind` (a PARTS key) the bank `bank` takes; 0 for no bank.
@@ -259,13 +253,10 @@ function PowerBank.wiringBlocker(bank, item)
 end
 
 --- Why `character` can't wire `item` into the bank `bank` now, or nil if they can: what
---- wiringBlocker says, else the kind of the first of wiringNeeds they are short of.
+--- wiringBlocker says, else the kind of the first of the part's wiringNeeds they are short of.
 function PowerBank.wiringRefusal(character, bank, item)
-    local blocker = PowerBank.wiringBlocker(bank, item)
-    if blocker then
-        return blocker
-    end
-    return RenewableEnergy.unmetKind(PowerBank.wiringNeeds(character, item:getFullType()))
+    return PowerBank.wiringBlocker(bank, item)
+        or RenewableEnergy.unmetKind(PowerBank.wiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
 end
 
 -- What repairing an inverter or controller takes, as a materials list (RenewableEnergy.Materials).
@@ -295,11 +286,7 @@ end
 --- Why `character` can't repair the inverter or controller `item` now, or nil if they can: what
 --- repairBlocker says, else the kind of the first of repairNeeds they are short of.
 function PowerBank.repairRefusal(character, item)
-    local blocker = PowerBank.repairBlocker(item)
-    if blocker then
-        return blocker
-    end
-    return RenewableEnergy.unmetKind(PowerBank.repairNeeds(character))
+    return PowerBank.repairBlocker(item) or RenewableEnergy.unmetKind(PowerBank.repairNeeds(character))
 end
 
 --- What keeps anyone from unwiring `item` from the bank `bank` now whatever they carry, as a
@@ -317,11 +304,8 @@ end
 --- Why `character` can't unwire `item` from the bank `bank` now, or nil if they can: what
 --- unwiringBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
 function PowerBank.unwiringRefusal(character, bank, item)
-    local blocker = PowerBank.unwiringBlocker(bank, item)
-    if blocker then
-        return blocker
-    end
-    return RenewableEnergy.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
+    return PowerBank.unwiringBlocker(bank, item)
+        or RenewableEnergy.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
 end
 
 --- The failsafe's thresholds, in percent of a bank's charge: below `start` it starts its generator,

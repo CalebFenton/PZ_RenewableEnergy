@@ -22,9 +22,12 @@ RenewableEnergy.WindSource = WindSource
 
 -- A charger losing more than this share of its watts to shelter says so in the status.
 local SHELTERED_LOSS = 0.3
--- A charger losing at least this share to other chargers near it says so, when shelter doesn't:
--- a neighbour two squares off costs about this much (Wind.crowdShare).
+-- A charger losing at least this share to other chargers near it says so, when shelter doesn't.
 local CROWDED_LOSS = 0.15
+
+local function hasWallFlag(properties)
+    return properties:has(IsoFlagType.WallN) or properties:has(IsoFlagType.WallW) or properties:has(IsoFlagType.WallNW)
+end
 
 -- Whether `properties` (a tile's) carry a wall flag and no fence's: window and door frames
 -- (WindowN, DoorWallN and their W twins) and see-through fences (WallNTrans, WallWTrans) carry no
@@ -32,7 +35,7 @@ local CROWDED_LOSS = 0.15
 -- Hoppable and TallHoppable flags, as vanilla's own wall checks tell them (IsoGridSquare, beside
 -- its WallN tests).
 local function isSolidWall(properties)
-    return (properties:has(IsoFlagType.WallN) or properties:has(IsoFlagType.WallW) or properties:has(IsoFlagType.WallNW))
+    return hasWallFlag(properties)
         and not (properties:has(IsoFlagType.HoppableN) or properties:has(IsoFlagType.HoppableW)
             or properties:has(IsoFlagType.TallHoppableN) or properties:has(IsoFlagType.TallHoppableW))
 end
@@ -42,8 +45,7 @@ end
 -- once the square's flags show a wall there at all.
 local function hasSolidWall(square)
     local properties = square and square:getProperties()
-    if not (properties and (properties:has(IsoFlagType.WallN) or properties:has(IsoFlagType.WallW)
-            or properties:has(IsoFlagType.WallNW))) then
+    if not (properties and hasWallFlag(properties)) then
         return false
     end
     local objects = square:getObjects()
@@ -75,31 +77,37 @@ local function blocks(x, y, level)
     return hasSolidWall(level == 0 and ground or getSquare(x, y, level)) and 1 or 0
 end
 
--- The share of the ring of squares around (x, y) on the ground, out to Specs.wind.shelterRadius,
--- that shelters the rotor of a turbine of `spec` standing on level `z`, which turns rotorAbove
--- levels higher: 0 in the open, 1 hemmed in. Shelter has no direction: the game's wind angle is a
--- screen-space value for weather effects (ClimateManager.getWindAngleDegrees), so every side counts.
-local function shelterAt(spec, x, y, z)
-    local radius = Specs.wind.shelterRadius
-    local level = z + spec.rotorAbove
-    local blocked, count = 0, 0
+-- Calls fn(dx, dy, distance) for each offset of the ring of squares from 1 to `radius` around one.
+local function eachInRing(radius, fn)
     for dx = -radius, radius do
         for dy = -radius, radius do
             local distance = math.sqrt(dx * dx + dy * dy)
             if distance >= 1 and distance <= radius then
-                -- Nearer obstacles count for more.
-                local weight = 1 - (distance - 1) / radius
-                blocked = blocked + weight * blocks(x + dx, y + dy, level)
-                count = count + weight
+                fn(dx, dy, distance)
             end
         end
     end
-    return count > 0 and blocked / count or 0
 end
 
 -- The level the rotor of a charger of `kind` standing on level `z` turns on.
 local function rotorLevel(kind, z)
     return z + Specs.wind.turbines[kind].rotorAbove
+end
+
+-- The share of the ring of squares around (x, y) on the ground, out to Specs.wind.shelterRadius,
+-- that shelters the rotor of a charger of `kind` standing on level `z`: 0 in the open, 1 hemmed
+-- in. Shelter has no direction: the game's wind angle is a screen-space value for weather effects
+-- (ClimateManager.getWindAngleDegrees), so every side counts.
+local function shelterAt(kind, x, y, z)
+    local radius, level = Specs.wind.shelterRadius, rotorLevel(kind, z)
+    local blocked, count = 0, 0
+    eachInRing(radius, function(dx, dy, distance)
+        -- Nearer obstacles count for more.
+        local weight = 1 - (distance - 1) / radius
+        blocked = blocked + weight * blocks(x + dx, y + dy, level)
+        count = count + weight
+    end)
+    return count > 0 and blocked / count or 0
 end
 
 -- The share of its wind the rotor of a charger of `kind` at x, y, z loses to the other chargers
@@ -109,16 +117,13 @@ local function crowdingAt(kind, x, y, z)
     local radius, level = Specs.wind.crowdRadius, rotorLevel(kind, z)
     local distances = {}
     for floor = level - 1, level do
-        for dx = -radius, radius do
-            for dy = -radius, radius do
-                local distance = math.sqrt(dx * dx + dy * dy)
-                local other = distance >= 1 and distance <= radius and Sources.findOn(getSquare(x + dx, y + dy, floor))
-                local otherKind = other and Sources.kindOf(other)
-                if otherKind and Sources.familyOf(otherKind) == "wind" and rotorLevel(otherKind, floor) == level then
-                    table.insert(distances, distance)
-                end
+        eachInRing(radius, function(dx, dy, distance)
+            local other = Sources.findOn(getSquare(x + dx, y + dy, floor))
+            local otherKind = other and Sources.kindOf(other)
+            if otherKind and Sources.familyOf(otherKind) == "wind" and rotorLevel(otherKind, floor) == level then
+                table.insert(distances, distance)
             end
-        end
+        end)
     end
     return Wind.crowding(distances)
 end
@@ -199,7 +204,7 @@ function WindSource.connect(player, source, isoObject, _, material)
     source.braked = Wind.isBraked(isoObject)
     source.broken = Wind.isBroken(isoObject)
     source.blades = Wind.bladesOf(source.kind, material)
-    source.shelter = shelterAt(Specs.wind.turbines[source.kind], source.x, source.y, source.z)
+    source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
     source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
     if player and RenewableEnergy.teachOnce(player, isoObject, PowerBank.CONNECTED_ONCE_KEY, Perks.Electricity,
         Specs.connectXp * Sources.slotsOf(source.kind)) then
@@ -218,7 +223,7 @@ function WindSource.update(source, object, inSlot, hours, context)
     if object then
         source.braked = Wind.isBraked(object)
         source.blades = Wind.bladesOfObject(object)
-        source.shelter = shelterAt(spec, source.x, source.y, source.z)
+        source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
         source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
     end
     if breaks(source, context.windKph, hours) then

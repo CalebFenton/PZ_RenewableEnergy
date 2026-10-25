@@ -80,7 +80,7 @@ end
 --- What wiring a treadmill to feed a bank takes of `character` (RenewableEnergy.firstUnmet), as
 --- PowerBank.wiringNeeds does for a part.
 function Treadmill.wiringNeeds(character)
-    return PowerBank.jobNeeds(character, Specs.treadmill.wiring)
+    return PowerBank.wiringNeeds(character, Specs.treadmill.wiring)
 end
 
 --- Why `character` can't wire the treadmill of `tile` now, or nil if they can: "already wired"
