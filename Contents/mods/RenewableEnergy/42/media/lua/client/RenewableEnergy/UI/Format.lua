@@ -129,8 +129,8 @@ function Format.windOutput(watts, kph)
 end
 
 --- A bank's name from its summary or status: the one a player gave it, else its tier's.
-function Format.bankName(bank)
-    return bank.name or getItemNameFromFullType(bank.bankType)
+function Format.bankName(summary)
+    return summary.name or getItemNameFromFullType(summary.bankType)
 end
 
 return Format

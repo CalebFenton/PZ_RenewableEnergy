@@ -1,13 +1,3 @@
-require "Vehicles/VehicleDistributions"
-require "VehicleZoneDefinition"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Recipes"
-require "RenewableEnergy/StormNotice"
-require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/World/WorldSpawns"
-
 -- The solar arrow board trailer (scripts/RenewableEnergy/Vehicles.txt): a highway work-zone
 -- trailer whose panels charge the batteries in a padlocked box on its tongue, which light an
 -- arrow on its lamp board.
@@ -23,6 +13,16 @@ require "RenewableEnergy/World/WorldSpawns"
 -- changing, so every change this file makes shows the model at once, and each charge pass shows
 -- every loaded trailer's panels again for the changes it didn't make (a failed uninstall, a debug
 -- tool).
+
+require "Vehicles/VehicleDistributions"
+require "VehicleZoneDefinition"
+require "RenewableEnergy/Chance"
+require "RenewableEnergy/Specs"
+require "RenewableEnergy/Recipes"
+require "RenewableEnergy/StormNotice"
+require "RenewableEnergy/PowerBank/Wear"
+require "RenewableEnergy/PowerBank/PanelSource"
+require "RenewableEnergy/World/WorldSpawns"
 
 RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
@@ -62,7 +62,7 @@ ArrowBoard.STOCK = {
 
 -- Vehicle modData: its panels have been stocked, at spawn or, on a trailer saved before the panels
 -- were parts, at its first load.
-ArrowBoard.PANELS_STOCKED = "RenewableEnergy_panelsStocked"
+ArrowBoard.PANELS_STOCKED_KEY = "RenewableEnergy_panelsStocked"
 
 for zone, weight in pairs(ZONE_WEIGHTS) do
     VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] = { index = -1, spawnChance = weight }
@@ -279,10 +279,10 @@ local justStocked = {}
 -- Once per trailer. Authority only.
 local function stockPanels(vehicle)
     local modData = vehicle:getModData()
-    if modData[ArrowBoard.PANELS_STOCKED] then
+    if modData[ArrowBoard.PANELS_STOCKED_KEY] then
         return
     end
-    modData[ArrowBoard.PANELS_STOCKED] = true
+    modData[ArrowBoard.PANELS_STOCKED_KEY] = true
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local stock = ArrowBoard.STOCK
     local count = WorldSpawns.scaled(stock.modules, SandboxVars.RenewableEnergy.LRMSolarPanels)
@@ -388,7 +388,7 @@ function ArrowBoard.stormCrack(vehicle, stormHours)
         end
     end
     if cracked > 0 then
-        StormNotice.tell(StormNotice.MODULE, math.floor(vehicle:getX()), math.floor(vehicle:getY()), math.floor(vehicle:getZ()))
+        StormNotice.tell(StormNotice.CRACKED_MODULE, math.floor(vehicle:getX()), math.floor(vehicle:getY()), math.floor(vehicle:getZ()))
     end
     return cracked
 end
@@ -413,7 +413,7 @@ function ArrowBoard.panelWatts(vehicle)
 end
 
 --- The trailer's panel `partId` if it holds a module that Seal Cracked Panel can seal, else nil.
-function ArrowBoard.repairablePanel(vehicle, partId)
+function ArrowBoard.sealablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
     if item and ArrowBoard.isCracked(part) and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
@@ -424,10 +424,10 @@ end
 
 --- Seal Cracked Panel: Seal Cracked Module's inputs, skill, XP and effect on a module still
 --- on the trailer. Authority only; returns whether it sealed.
-function ArrowBoard.repairPanel(character, vehicle, partId)
+function ArrowBoard.sealPanel(character, vehicle, partId)
     local Recipes = RenewableEnergy.Recipes
-    local part = ArrowBoard.repairablePanel(vehicle, partId)
-    local inputs = part and Recipes.panelRepairRefusal(character) == nil and Recipes.panelRepairInputs(character)
+    local part = ArrowBoard.sealablePanel(vehicle, partId)
+    local inputs = part and Recipes.sealInPlaceRefusal(character) == nil and Recipes.sealInPlaceInputs(character)
     if not inputs then
         return false
     end

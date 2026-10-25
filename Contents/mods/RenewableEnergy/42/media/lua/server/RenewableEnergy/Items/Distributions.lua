@@ -1,3 +1,6 @@
+-- Where the mod's items spawn, 1993 style. apply() puts Distributions.items into the game's loot
+-- tables in OnInitGlobalModData, scaled by the save's loot rarity options.
+
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
@@ -5,7 +8,7 @@ require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/StashHouses"
+require "RenewableEnergy/Stash"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/ArrowBoard"
 require "RenewableEnergy/World/ArrowBoardPower"
@@ -13,9 +16,6 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/CarAlternator"
-
--- Where the mod's items spawn, 1993 style. apply() puts Distributions.items into the game's loot
--- tables in OnInitGlobalModData, scaled by the save's loot rarity options.
 
 RenewableEnergy = RenewableEnergy or {}
 local Distributions = {}
@@ -73,7 +73,7 @@ for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
     subDist.all[containerType] = { rolls = 0, items = {} }
 end
 
--- The spawn table of the mod's stash houses (StashHouses.lua). StashSystem.doBuildingStash
+-- The spawn table of the mod's stash houses (Stash.lua). StashSystem.doBuildingStash
 -- refills each container of the house whose type is a key here; the house's other containers keep
 -- the loot of their own rooms. The crate the stash places rolls the kit's lists, more times.
 local stashCache = copyTable(subDist.electronicsstorage)
@@ -646,7 +646,7 @@ function Distributions.resolveItemList(reference)
 end
 
 -- Items lists are flat name, weight pairs.
-local function removeItem(items, fullType)
+local function unlist(items, fullType)
     for i = #items - 1, 1, -2 do
         if items[i] == fullType then
             table.remove(items, i + 1)
@@ -663,7 +663,7 @@ local function applyStashMaps()
         for _, entry in ipairs(extra.loot or {}) do
             local items = Distributions.resolveItemList(entry[2])
             if items then
-                removeItem(items, description.item)
+                unlist(items, description.item)
                 if inLoot then
                     table.insert(items, description.item)
                     table.insert(items, entry[1])
@@ -686,7 +686,7 @@ function Distributions.apply()
         for _, entry in ipairs(spec.entries) do
             local items = Distributions.resolveItemList(entry[2])
             if items then
-                removeItem(items, spec.fullType)
+                unlist(items, spec.fullType)
                 if multiplier > 0 then
                     table.insert(items, spec.fullType)
                     table.insert(items, entry[1] * multiplier)

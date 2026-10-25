@@ -1,3 +1,7 @@
+-- Every hands-on job at a digester, gas heater, gasifier or a generator's Gas Conversion Kit
+-- (RenewableEnergy.JobAction); the authority's complete() does the job. A global, as the server
+-- finds the class by its Type (NetTimedAction.parse).
+
 require "Util/BuildingHelper"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/TimedActions/JobAction"
@@ -9,9 +13,6 @@ require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
 
--- Every hands-on job at a digester, gas heater, gasifier or a generator's Gas Conversion Kit
--- (RenewableEnergy.JobAction); the authority's complete() does the job. A global, as the server
--- finds the class by its Type (NetTimedAction.parse).
 RenewableEnergyGasAction = RenewableEnergy.JobAction:derive("RenewableEnergyGasAction")
 
 local Action = RenewableEnergyGasAction

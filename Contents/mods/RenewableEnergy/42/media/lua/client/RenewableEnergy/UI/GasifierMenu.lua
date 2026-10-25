@@ -7,7 +7,7 @@ require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/GasJobMenu"
 require "RenewableEnergy/UI/GasifierWindow"
-require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
+require "RenewableEnergy/TimedActions/InfoAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local GasifierMenu = {}

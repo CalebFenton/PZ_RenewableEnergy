@@ -1,12 +1,12 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Sprites"
-local Stash = require "RenewableEnergy/StashHouses"
+local Stash = require "RenewableEnergy/Stash"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/Wind"
 
--- World systems that live on the authority: stash houses (StashHouses.lua, MapDefinitions.lua),
+-- World systems that live on the authority: stash houses (Stash.lua, MapDefinitions.lua),
 -- world spawns (WorldSpawns.lua, Distributions.lua), solar sites, garden lights and rural finds
 -- (World/*). Arrow boards are in RenewableEnergyTestsArrowBoard.lua.
 

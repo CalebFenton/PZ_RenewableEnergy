@@ -1,6 +1,9 @@
-if isClient() then
-    return
-end
+-- Battery banks, crates of solar gear and panels that the mod places in the world: in sheds,
+-- garages and storage rooms the first time someone sees them, and at the named solar sites of
+-- SolarSites.lua. Each container is stocked once, when it appears, and is explored, so neither
+-- the room's loot nor loot respawn ever fills it.
+
+if isClient() then return end
 
 require "Moveables/ISMoveableSpriteProps"
 require "RenewableEnergy/Utilities"
@@ -11,12 +14,7 @@ require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/BankSystem"
-require "RenewableEnergy/PowerBank/Commands"
-
--- Battery banks, crates of solar gear and panels that the mod places in the world: in sheds,
--- garages and storage rooms the first time someone sees them, and at the named solar sites of
--- SolarSites.lua. Each container is stocked once, when it appears, and is explored, so neither
--- the room's loot nor loot respawn ever fills it.
+require "RenewableEnergy/PowerBank/BankJobs"
 
 RenewableEnergy = RenewableEnergy or {}
 local WorldSpawns = {}
@@ -211,7 +209,7 @@ local function siteModuleCondition()
     return WorldSpawns.weatheredCondition()
 end
 
---- `count` factory modules at site conditions, as a mount's PowerBank.MODULES list.
+--- `count` factory modules at site conditions, as a mount's PowerBank.MODULES_KEY list.
 function WorldSpawns.siteModules(count)
     local modules = {}
     for i = 1, count do
@@ -237,21 +235,6 @@ function WorldSpawns.scaled(count, multiplier)
     local expected = count * multiplier
     local whole = math.floor(expected)
     return Chance.hit(expected - whole) and whole + 1 or whole
-end
-
-local function pickByWeight(types)
-    local total = 0
-    for _, entry in ipairs(types) do
-        total = total + entry[2]
-    end
-    local roll = Chance.roll() * total
-    for _, entry in ipairs(types) do
-        roll = roll - entry[2]
-        if roll < 0 then
-            return entry[1]
-        end
-    end
-    return types[#types][1]
 end
 
 --- The condition, in percent of new, that the wear profile `wear` (a BATTERY_WEAR profile or
@@ -321,7 +304,7 @@ end
 -- Adds one of `part`'s types with its chance × `multiplier`, if the bank has a slot for it.
 local function maybeAddPart(container, part, multiplier, slots)
     if part and slots > 0 and Chance.hit(part.chance * multiplier) then
-        addFound(container, pickByWeight(part.types))
+        addFound(container, Chance.pickWeighted(part.types))
     end
 end
 
@@ -335,7 +318,7 @@ function WorldSpawns.stockBank(container, stockName)
     local options = SandboxVars.RenewableEnergy
     local batteries = WorldSpawns.scaled(Chance.between(stock.batteries.min, stock.batteries.max), options.LRMBatteries)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
-        addFound(container, pickByWeight(stock.batteries.types), stock.batteries.wear)
+        addFound(container, Chance.pickWeighted(stock.batteries.types), stock.batteries.wear)
     end
     maybeAddPart(container, stock.inverter, options.LRMMisc, spec.maxInverters)
     maybeAddPart(container, stock.controller, options.LRMMisc, spec.maxControllers)
@@ -448,9 +431,9 @@ function WorldSpawns.placeMoveable(square, spriteName, modData)
     ISMoveableSpriteProps.new(sprite):placeMoveableInternal(nil, square, item, spriteName)
 end
 
---- Places a panel mount holding `modules` (a PowerBank.MODULES list).
+--- Places a panel mount holding `modules` (a PowerBank.MODULES_KEY list).
 function WorldSpawns.placePanel(square, spriteName, modules)
-    WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES] = modules })
+    WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES_KEY] = modules })
 end
 
 -- Rooms seen for the first time
@@ -493,7 +476,7 @@ function WorldSpawns.layModulesBeside(square, stockName)
         local item = instanceItem(MODULE)
         RenewableEnergy.Wear.setCondition(item, siteModuleCondition())
         local floor = beside[(i - 1) % math.max(1, #beside) + 1] or square
-        floor:AddWorldInventoryItem(item, ZombRandFloat(0.2, 0.8), ZombRandFloat(0.2, 0.8), 0)
+        RenewableEnergy.dropOn(floor, item)
     end
     return count
 end

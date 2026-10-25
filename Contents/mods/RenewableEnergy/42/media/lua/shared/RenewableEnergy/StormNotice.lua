@@ -10,9 +10,9 @@ RenewableEnergy.StormNotice = StormNotice
 
 local Specs = RenewableEnergy.Specs
 
-StormNotice.COMMAND_MODULE, StormNotice.COMMAND = "RenewableEnergyStorm", "damage"
+StormNotice.COMMAND_MODULE, StormNotice.DAMAGE_COMMAND = "RenewableEnergyStorm", "damage"
 -- What `what` names for a cracked module; any other is the material of blades that broke.
-StormNotice.MODULE = "module"
+StormNotice.CRACKED_MODULE = "module"
 
 -- Squares within which a player is told of the damage: about as far as the sound carries.
 local EARSHOT = 30
@@ -43,11 +43,11 @@ local function hear(args)
 end
 
 --- On the authority: a storm did `what` at x, y, z, breaking the blades of that material
---- (Specs.wind.blades) or cracking a module (StormNotice.MODULE).
+--- (Specs.wind.blades) or cracking a module (StormNotice.CRACKED_MODULE).
 function StormNotice.tell(what, x, y, z)
     local args = { what = what, x = x, y = y, z = z }
     if isServer() then
-        sendServerCommand(StormNotice.COMMAND_MODULE, StormNotice.COMMAND, args)
+        sendServerCommand(StormNotice.COMMAND_MODULE, StormNotice.DAMAGE_COMMAND, args)
     else
         hear(args)
     end
@@ -55,7 +55,7 @@ end
 
 if isClient() then
     Events.OnServerCommand.Add(function(module, command, args)
-        if module == StormNotice.COMMAND_MODULE and command == StormNotice.COMMAND then
+        if module == StormNotice.COMMAND_MODULE and command == StormNotice.DAMAGE_COMMAND then
             hear(args)
         end
     end)

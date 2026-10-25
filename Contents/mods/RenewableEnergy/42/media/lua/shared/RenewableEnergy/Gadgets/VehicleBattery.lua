@@ -1,5 +1,3 @@
-require "RenewableEnergy/Specs"
-
 -- The deep cycle battery as a vehicle's battery.
 --
 -- The game picks a new vehicle's battery at random from the items its Battery part's script lists
@@ -10,6 +8,9 @@ require "RenewableEnergy/Specs"
 -- Vanilla charges and drains a vehicle battery by a fraction of its charge, sized for a car
 -- battery; VehicleBatteryCharging scales those fractions by capacity, so the bigger battery holds
 -- the same loads for longer and takes longer to fill.
+
+require "RenewableEnergy/Specs"
+
 RenewableEnergy = RenewableEnergy or {}
 local VehicleBattery = {}
 RenewableEnergy.VehicleBattery = VehicleBattery

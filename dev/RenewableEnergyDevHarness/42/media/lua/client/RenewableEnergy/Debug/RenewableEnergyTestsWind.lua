@@ -478,8 +478,8 @@ test("renewable_energy_wind_any_charger_takes_any_blades", {
             -- Broken on this client's copies only: Replace Blades is the menu's to offer.
             for _, charger in ipairs(self.chargers) do
                 local modData = charger.object:getModData()
-                modData[Wind.BROKEN] = true
-                T.defer(self, function() modData[Wind.BROKEN] = nil end)
+                modData[Wind.BROKEN_KEY] = true
+                T.defer(self, function() modData[Wind.BROKEN_KEY] = nil end)
             end
         end)
     end,
@@ -528,7 +528,7 @@ local function swapTest(name, what, bank, from, to, newBlades, brokenBlades)
             self.texture = getScriptManager():getSpriteModel(Sprites.windModelOf(to) .. "0"):getTextureName()
             -- The new tile's entity, or each load of it logs "Invalid SpriteConfig object!".
             T.waitFor(self, function()
-                local object = RenewableEnergy.Sources.on(self.charger.square)
+                local object = RenewableEnergy.Sources.findOn(self.charger.square)
                 local config = object and object:getSpriteConfig()
                 local model = object and object:getSpriteModel()
                 self.object = object

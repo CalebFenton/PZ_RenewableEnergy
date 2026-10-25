@@ -361,7 +361,7 @@ onVehicle("arrowBoardOldPanels", function(vehicle)
         end
     end
     empty()
-    vehicle:getModData()[ArrowBoard.PANELS_STOCKED] = nil
+    vehicle:getModData()[ArrowBoard.PANELS_STOCKED_KEY] = nil
     load()
     local first = Trailer.vehicleState(vehicle)
     empty()
@@ -449,7 +449,7 @@ onVehicle("arrowBoardPanelStockRolls", function(vehicle, args, _, defer)
         for _, id in ipairs(ArrowBoard.PANELS) do
             putPanel(vehicle, id, {})
         end
-        vehicle:getModData()[ArrowBoard.PANELS_STOCKED] = nil
+        vehicle:getModData()[ArrowBoard.PANELS_STOCKED_KEY] = nil
         local restoreRoll = Helpers.forceRolls(defer, trialRoll(roll, ArrowBoard.STOCK.secondCrackedChance))
         ArrowBoard.createPanel(vehicle, vehicle:getPartById(ArrowBoard.PANELS[1]))
         restoreRoll()

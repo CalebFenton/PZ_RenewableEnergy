@@ -1,7 +1,3 @@
-if isClient() then
-    return
-end
-
 -- Stink through the game's own corpse smell. The game counts corpses per chunk (CorpseCount, out of
 -- Lua's reach) and each player's update turns the count around them into the noxious smell moodle
 -- and food sickness, honouring gas masks, traits and the corpse sandbox option. The count changes
@@ -21,6 +17,8 @@ end
 -- A chunk zeroes its counts on unload (no event) and again on load before LoadChunk, which re-adds
 -- its ghosts. Removing a ghost from a zeroed count would cancel a real corpse, so ghosts are only
 -- removed while their chunk is loaded. Ghosts last the session; owners set them again after a load.
+
+if isClient() then return end
 
 RenewableEnergy = RenewableEnergy or {}
 local Stink = {}

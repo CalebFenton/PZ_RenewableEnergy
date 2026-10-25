@@ -22,7 +22,7 @@ local Action = RenewableEnergyAction
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 local PowerBank, Sources, Recipes = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Recipes
 local Format, Menu = RenewableEnergy.Format, RenewableEnergy.Menu
-local MODULES_KEY = PowerBank.MODULES
+local MODULES_KEY = PowerBank.MODULES_KEY
 local CAR_BATTERY = "Base.CarBattery1"
 local FACTORY, HOMEMADE = "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule"
 local function craftName(recipe, behavior) return T.craftName("solar", recipe, behavior) end
@@ -1096,14 +1096,14 @@ for _, entry in ipairs(MOUNTS) do
                 local data = homemade.modData
                 expect(homemade.condition == MOUNTED_HOMEMADE.condition, "the homemade module came back at " .. homemade.condition)
                 expect(homemade.repaired == MOUNTED_HOMEMADE.repaired, "the homemade module came back sealed " .. homemade.repaired .. "x")
-                expect(data[PowerBank.MOUNTED_ONCE] == true and data[PowerBank.CONNECTED_ONCE] == true,
+                expect(data[PowerBank.MOUNTED_ONCE_KEY] == true and data[PowerBank.CONNECTED_ONCE_KEY] == true,
                     "the homemade module came back without its mounted and connected marks")
             end
             local factory = T.carriedFirst(self, FACTORY)
             if count == 2 and expect(factory ~= nil, "no factory module came back") then
                 expect(factory.condition == PLAIN_FACTORY.condition, "the factory module came back at " .. factory.condition)
                 expect(factory.repaired == 0, "the factory module came back sealed " .. factory.repaired .. "x")
-                expect(factory.modData[PowerBank.MOUNTED_ONCE] ~= true, "the factory module came back marked as mounted before")
+                expect(factory.modData[PowerBank.MOUNTED_ONCE_KEY] ~= true, "the factory module came back marked as mounted before")
             end
         end,
     })

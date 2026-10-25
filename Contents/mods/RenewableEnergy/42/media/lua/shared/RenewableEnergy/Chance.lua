@@ -34,6 +34,34 @@ function Chance.pick(list)
     return list[Chance.between(1, #list)]
 end
 
+--- One value of the non-empty `entries`, { value, weight } pairs, each as likely as its weight.
+function Chance.pickWeighted(entries)
+    local total = 0
+    for _, entry in ipairs(entries) do
+        total = total + entry[2]
+    end
+    local roll = Chance.roll() * total
+    for _, entry in ipairs(entries) do
+        roll = roll - entry[2]
+        if roll < 0 then
+            return entry[1]
+        end
+    end
+    return entries[#entries][1]
+end
+
+--- `count` of the entries of `list`, all of them if it has fewer, each picked at random.
+function Chance.pickSome(list, count)
+    local left, picked = {}, {}
+    for i, entry in ipairs(list) do
+        left[i] = entry
+    end
+    for _ = 1, math.min(count, #left) do
+        table.insert(picked, table.remove(left, Chance.between(1, #left)))
+    end
+    return picked
+end
+
 --- The chance that something with a chance of `perHour` in each hour happens in `hours`.
 function Chance.overHours(perHour, hours)
     return 1 - (1 - math.min(1, perHour)) ^ hours
@@ -67,3 +95,5 @@ end
 function Chance.stormPerHour(share)
     return WORST_PER_HOUR * share
 end
+
+return Chance

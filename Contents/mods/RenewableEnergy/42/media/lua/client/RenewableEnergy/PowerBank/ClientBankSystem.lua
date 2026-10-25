@@ -85,7 +85,7 @@ end
 -- A multiplayer server sends a bank's status to the players watching it. Single player has no such
 -- message: there the status window reads the bank on the authority.
 Events.OnServerCommand.Add(function(module, command, args)
-    if module ~= PowerBank.STATUS_MODULE or command ~= "status" then return end
+    if module ~= PowerBank.COMMAND_MODULE or command ~= PowerBank.STATUS_COMMAND then return end
     local copy = watching[keyOf(args)] and copyAt(args)
     if copy then
         copy.status = args.status
@@ -100,7 +100,7 @@ local CHUNK_SQUARES = getChunkSizeInSquares()
 --- switching off does (IsoGenerator.setSurroundingElectricity); otherwise they stay powered here
 --- until their chunks reload.
 function PowerBank.releaseGeneratorPower(x, y, z)
-    local radius = SandboxVars.GeneratorTileRange
+    local radius = RenewableEnergy.generatorReach()
     local cell = getCell()
     for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
         for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do

@@ -17,13 +17,14 @@ require "RenewableEnergy/PowerBank/PanelSource"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/PowerBank/TreadmillSource"
 require "RenewableEnergy/PowerBank/Payers"
-local Bank = require "RenewableEnergy/PowerBank/Bank"
+require "RenewableEnergy/PowerBank/Bank"
 require "RenewableEnergy/PowerBank/Backup"
 require "RenewableEnergy/PowerBank/BankStatus"
 
 RenewableEnergy = RenewableEnergy or {}
 local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
 local Sources, PanelSource, Treadmill = RenewableEnergy.Sources, RenewableEnergy.PanelSource, RenewableEnergy.Treadmill
+local Bank = RenewableEnergy.Bank
 
 local BankSystem = SGlobalObjectSystem:derive("RenewableEnergy_BankSystem")
 RenewableEnergy.BankSystem = BankSystem
@@ -189,13 +190,13 @@ end
 -- it empty, ISMoveableSpriteProps), and it dumps them on the floor before it takes the tile
 -- (ISDestroyStuffAction.complete, IsoObject.dumpContentsInSquare). The bank comes up to now first,
 -- so they leave with what the time since its last pass gave and took.
-local destroyComplete = ISDestroyStuffAction.complete
+local vanillaDestroyComplete = ISDestroyStuffAction.complete
 function ISDestroyStuffAction:complete()
     local bank = self.item and PowerBank.isBank(self.item) and BankSystem.instance:getLuaObjectOnSquare(self.item:getSquare())
     if bank then
         BankSystem.updateBank(bank)
     end
-    return destroyComplete(self)
+    return vanillaDestroyComplete(self)
 end
 
 -- Real milliseconds a player waits between refreshes of one bank, since each refresh makes the

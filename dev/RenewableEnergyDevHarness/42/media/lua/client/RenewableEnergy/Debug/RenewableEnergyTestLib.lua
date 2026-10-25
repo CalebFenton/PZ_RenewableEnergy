@@ -95,7 +95,7 @@ end
 
 -- This client's copy of the bank on `square` once it holds `count` items and has a summary.
 local function bankCopy(square, count)
-    local bank = PowerBank.bankOn(square)
+    local bank = PowerBank.findOn(square)
     local container = bank and bank:getContainer()
     if container and container:getItems():size() >= count and PowerBank.summaryOf(bank) then
         return bank
@@ -130,7 +130,7 @@ end
 
 -- A source on the square, or a treadmill not yet wired to be one.
 local function placedOn(square)
-    return Sources.on(square) or Treadmill.on(square)
+    return Sources.findOn(square) or Treadmill.findOn(square)
 end
 
 -- Whether this client has its copy of the panel and, if it was connected, sees the bank's summary

@@ -617,7 +617,7 @@ local SPOT_CHECKS = {
         if not expect(mount ~= nil, "no " .. spot.mount .. " mount on the panel spot") then
             return
         end
-        local modules = mount:getModData()[RenewableEnergy.PowerBank.MODULES] or {}
+        local modules = mount:getModData()[RenewableEnergy.PowerBank.MODULES_KEY] or {}
         local range = SolarSites.KINDS[spot.siteKind].modules
         if range then
             expect(inRange(#modules, range), #modules .. " modules on the " .. spot.siteKind .. "'s mount, expected "
@@ -631,7 +631,7 @@ local SPOT_CHECKS = {
         end
     end,
     bank = function(expect, _, square, spot)
-        local bank = RenewableEnergy.PowerBank.bankOn(square)
+        local bank = RenewableEnergy.PowerBank.findOn(square)
         local stock = RenewableEnergy.WorldSpawns.BANK_STOCK[spot.stock]
         expect(bank ~= nil and Sprites.kindOfObject(bank) == stock.sprite, "no " .. spot.stock .. " bank on the bank spot")
     end,
@@ -642,7 +642,7 @@ local SPOT_CHECKS = {
     windCharger = function(expect, _, at, spot, far)
         local Wind, PowerBank, WorldSpawns = RenewableEnergy.Wind, RenewableEnergy.PowerBank, RenewableEnergy.WorldSpawns
         local charger = RenewableEnergy.findObjectOn(at, Wind.isCharger)
-        local bank = PowerBank.bankOn(far)
+        local bank = PowerBank.findOn(far)
         if not (expect(charger ~= nil, "no wind charger on the site's square") and expect(bank ~= nil, "no bank on the site's bank square")) then
             return
         end

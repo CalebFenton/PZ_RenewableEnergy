@@ -9,7 +9,7 @@ require "RenewableEnergy/Sprites"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
-local Stash = require "RenewableEnergy/StashHouses"
+local Stash = require "RenewableEnergy/Stash"
 
 local handler, check, saveOptions = PZHarness.serverHandler, Helpers.check, Helpers.saveOptions
 local deferOnce = Helpers.deferOnce

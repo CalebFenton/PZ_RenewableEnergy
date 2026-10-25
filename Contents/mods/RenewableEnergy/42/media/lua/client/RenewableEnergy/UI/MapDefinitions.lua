@@ -1,10 +1,10 @@
 -- How the mod's own map items draw (LootMaps.callLua looks them up by stash name first, then by
 -- the item's Map id; the two are the same). Each shows only its stash house's mapArea
--- (StashHouses.lua), in the style of vanilla's stash maps. Houses drawn on vanilla town maps have
+-- (Stash.lua), in the style of vanilla's stash maps. Houses drawn on vanilla town maps have
 -- no mapArea and keep the town map's own look.
 
 require "ISUI/Maps/ISMapDefinitions"
-require "RenewableEnergy/StashHouses"
+require "RenewableEnergy/Stash"
 
 local function drawArea(area)
     return function(mapUI)

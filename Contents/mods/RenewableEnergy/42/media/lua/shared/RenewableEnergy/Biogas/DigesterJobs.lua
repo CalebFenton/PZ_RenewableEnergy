@@ -118,7 +118,7 @@ local function fillJob(fields)
         end
         return math.max(fields.baseMinutes, fillAmount(fill, summary, tank) * fill.minutesPerM3)
     end
-    fields.check = function(character, summary, tank)
+    fields.withRefusal = function(character, summary, tank)
         if not (tank and tank:getFullType() == Digester.TANK and character:getInventory():containsRecursive(tank)) then
             return "Tooltip_RenewableEnergy_NeedsTank"
         end
@@ -149,7 +149,7 @@ DigesterJobs.JOBS = {
         blocker = function(summary)
             return summary.sludge < DigesterJobs.sludgePerUse() and "Tooltip_RenewableEnergy_NoSludge" or nil
         end,
-        check = function(character, summary, bag)
+        withRefusal = function(character, summary, bag)
             if not (bag and character:getInventory():containsRecursive(bag) and takesSludge(bag)) then
                 return "Tooltip_RenewableEnergy_NeedsSandbag"
             end

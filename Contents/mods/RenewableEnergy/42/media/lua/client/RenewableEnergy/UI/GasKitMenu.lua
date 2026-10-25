@@ -80,16 +80,16 @@ Events.OnFillWorldObjectContextMenu.Add(GasKitMenu.onFill)
 
 -- Take Generator is refused while a kit is fitted.
 
-local isValid = ISTakeGenerator.isValid
+local vanillaIsValid = ISTakeGenerator.isValid
 function ISTakeGenerator:isValid()
-    return not GasKit.hasKit(self.generator) and isValid(self)
+    return not GasKit.hasKit(self.generator) and vanillaIsValid(self)
 end
 
 -- Generator info window: fuel and gas lines.
 
-local getRichText = ISGeneratorInfoWindow.getRichText
+local vanillaGetRichText = ISGeneratorInfoWindow.getRichText
 function ISGeneratorInfoWindow.getRichText(object, displayStats)
-    local text = getRichText(object, displayStats)
+    local text = vanillaGetRichText(object, displayStats)
     local state = GasKit.stateOf(object)
     if not (state and displayStats) then
         return text

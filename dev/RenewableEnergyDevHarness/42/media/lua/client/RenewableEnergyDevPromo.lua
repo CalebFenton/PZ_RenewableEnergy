@@ -713,13 +713,13 @@ end
 
 -- Places a panel on each of `spots` ({ along, out, material }) of `place` and connects it to
 -- `bank`, in order: a `mount` ("wall" or "rack") of the spot's material facing the place's way, or
--- without one a flat panel. A mount holds the modules (a PowerBank.MODULES list) of its index in
+-- without one a flat panel. A mount holds the modules (a PowerBank.MODULES_KEY list) of its index in
 -- `modules` if given, else whole factory modules.
 local function placePanels(bank, place, spots, mount, modules)
     for i, spot in ipairs(spots) do
         local sprite = mount and Sprites[mount][spot[3]][place.frame.facing] or Sprites.flat
         local held = modules and modules[i]
-        connect(bank, Stage.placeTile(at(place, spot), sprite, held and { [PowerBank.MODULES] = held } or nil))
+        connect(bank, Stage.placeTile(at(place, spot), sprite, held and { [PowerBank.MODULES_KEY] = held } or nil))
     end
 end
 
@@ -1135,7 +1135,7 @@ end
 -- The homestead bank's status window, which lays its rows out from the bank's status as it draws.
 local function addStatus()
     addWindowShot("status", RenewableEnergy.StatusWindow, function()
-        return PowerBank.bankOn(places.homestead.bank)
+        return PowerBank.findOn(places.homestead.bank)
     end, function(window)
         return (window.renderedFrames or 0) >= 2
     end)
@@ -1467,7 +1467,7 @@ local function addTreadmill()
         fillBank(box, STAGE0_BOX, MORNING_CHARGE)
         local tiles = Sprites.treadmill[layout.facing]
         Stage.placeTile(here("rear"), tiles.rear)
-        shown.treadmill = Stage.placeTile(here("console"), tiles.console, { [RenewableEnergy.Treadmill.WIRED] = true })
+        shown.treadmill = Stage.placeTile(here("console"), tiles.console, { [RenewableEnergy.Treadmill.WIRED_KEY] = true })
         connect(box, shown.treadmill)
         setBankOn(box, true)
         return DRAW_FRAMES

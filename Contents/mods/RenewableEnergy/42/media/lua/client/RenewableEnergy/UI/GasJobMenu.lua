@@ -36,7 +36,7 @@ function GasJobMenu.add(menu, playerNum, feature, job, target, with, label)
     local option = menu:addOption(label or getText(GasJobMenu.labelKey(job)), playerNum,
         RenewableEnergyGasAction.queue, feature, job, target, with)
     Needs.show(option, Jobs.needs(character, job, subject, with), blocker)
-    Needs.refuse(option, not option.notAvailable and Jobs.check(character, job, subject, with))
+    Needs.refuse(option, not option.notAvailable and Jobs.withRefusal(character, job, subject, with))
     return option
 end
 

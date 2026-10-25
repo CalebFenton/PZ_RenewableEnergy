@@ -20,14 +20,14 @@ RenewableEnergy.TreadmillSource = TreadmillSource
 -- Watt-hours left over below this are rounding, not a run.
 local LEFT_WH = 0.001
 -- Tile modData: the tile was wired once, which taught its Electricity XP, so wiring it again after
--- unwiring teaches nothing, as a bank's part teaches only its first wiring (PowerBank.WIRED_ONCE).
-local WIRED_ONCE = "RenewableEnergy_treadmillWiredOnce"
+-- unwiring teaches nothing, as a bank's part teaches only its first wiring (PowerBank.WIRED_ONCE_KEY).
+local WIRED_ONCE_KEY = "RenewableEnergy_treadmillWiredOnce"
 
 --- Wires the treadmill tile `object` to feed a bank, teaching `player` (if any) the wiring the
 --- first time the tile is ever wired.
 function TreadmillSource.wire(object, player)
-    object:getModData()[Treadmill.WIRED] = true
-    RenewableEnergy.teachOnce(player, object, WIRED_ONCE, Perks.Electricity, Specs.treadmill.wiring.xp)
+    object:getModData()[Treadmill.WIRED_KEY] = true
+    RenewableEnergy.teachOnce(player, object, WIRED_ONCE_KEY, Perks.Electricity, Specs.treadmill.wiring.xp)
     object:transmitModData()
 end
 
@@ -35,7 +35,7 @@ end
 --- into `player`'s hands, or, with no player (the tile picked up or destroyed), onto its square.
 --- The electronics scrap stays spent. The caller takes the tile out of its bank first.
 function TreadmillSource.unwire(object, player)
-    object:getModData()[Treadmill.WIRED] = nil
+    object:getModData()[Treadmill.WIRED_KEY] = nil
     object:transmitModData()
     local wire = Specs.treadmill.wiring.wire
     if player then
@@ -44,7 +44,7 @@ function TreadmillSource.unwire(object, player)
     end
     local square = object:getSquare()
     for _ = 1, wire do
-        square:AddWorldInventoryItem(PowerBank.WIRE, ZombRandFloat(0.1, 0.9), ZombRandFloat(0.1, 0.9), 0)
+        RenewableEnergy.dropOn(square, PowerBank.WIRE)
     end
 end
 

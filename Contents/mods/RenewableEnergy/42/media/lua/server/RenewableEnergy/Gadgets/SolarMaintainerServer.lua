@@ -1,6 +1,7 @@
-if isClient() then
-    return
-end
+-- The Solar Battery Maintainer on the authority: attach and detach, from a timed action's
+-- complete(), and the charge GadgetCharging's pass gives.
+
+if isClient() then return end
 
 require "Vehicles/Vehicles"
 require "RenewableEnergy/Utilities"
@@ -9,8 +10,6 @@ require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarMaintainer"
 
--- The Solar Battery Maintainer on the authority: attach and detach, from a timed action's
--- complete(), and the charge GadgetCharging's pass gives.
 local SolarMaintainer, VehicleBattery = RenewableEnergy.SolarMaintainer, RenewableEnergy.VehicleBattery
 local Battery, Specs, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun
 local ATTACHED_KEY = SolarMaintainer.ATTACHED_KEY

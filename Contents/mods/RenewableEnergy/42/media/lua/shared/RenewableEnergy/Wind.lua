@@ -12,8 +12,8 @@ RenewableEnergy.Wind = Wind
 local Specs, Sources = RenewableEnergy.Specs, RenewableEnergy.Sources
 
 -- Placed wind charger modData: its brake is on; its blades are broken.
-Wind.BRAKED = "RenewableEnergy_braked"
-Wind.BROKEN = "RenewableEnergy_bladesBroken"
+Wind.BRAKED_KEY = "RenewableEnergy_braked"
+Wind.BROKEN_KEY = "RenewableEnergy_bladesBroken"
 
 --- Whether `isoObject` is a placed wind charger.
 function Wind.isCharger(isoObject)
@@ -21,11 +21,11 @@ function Wind.isCharger(isoObject)
 end
 
 function Wind.isBraked(isoObject)
-    return isoObject:getModData()[Wind.BRAKED] == true
+    return isoObject:getModData()[Wind.BRAKED_KEY] == true
 end
 
 function Wind.isBroken(isoObject)
-    return isoObject:getModData()[Wind.BROKEN] == true
+    return isoObject:getModData()[Wind.BROKEN_KEY] == true
 end
 
 --- The blades (a Specs.wind.blades material) a wind charger of `kind` built of `material` (its

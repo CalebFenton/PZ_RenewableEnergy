@@ -17,7 +17,7 @@ require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
-require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
+require "RenewableEnergy/TimedActions/InfoAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/StatusWindow"
@@ -57,35 +57,35 @@ end
 
 -- "Too dark" for a job that needs light to see by (RenewableEnergyAction.needsLight) while the
 -- character stands in the dark, else `blocker`.
-local function lightOr(character, mode, blocker)
-    return Needs.tooDark(character, Action.needsLight(mode)) or blocker
+local function lightOr(character, job, blocker)
+    return Needs.tooDark(character, Action.needsLight(job)) or blocker
 end
 
-local function queueAt(playerNum, square, mode, object, bank, item, bankName)
+local function queueAt(playerNum, square, job, object, bank, item, bankName)
     local character = RenewableEnergy.walkTo(playerNum, square)
     if character then
-        ISTimedActionQueue.add(Action:new(character, mode, object, bank, nil, item, bankName))
+        ISTimedActionQueue.add(Action:new(character, job, object, bank, nil, item, bankName))
     end
 end
 
-local function queueSource(playerNum, mode, source, bank)
-    queueAt(playerNum, source:getSquare(), mode, source, bank)
+local function queueSource(playerNum, job, source, bank)
+    queueAt(playerNum, source:getSquare(), job, source, bank)
 end
 
---- Walks a local player over to `bank` and queues the job `mode` there; `bankName` is Rename's new
+--- Walks a local player over to `bank` and queues the job `job` there; `bankName` is Rename's new
 --- name.
-function Menu.queueBank(playerNum, mode, bank, bankName)
-    queueAt(playerNum, bank:getSquare(), mode, nil, bank, nil, bankName)
+function Menu.queueBank(playerNum, job, bank, bankName)
+    queueAt(playerNum, bank:getSquare(), job, nil, bank, nil, bankName)
 end
 
-local function queuePart(playerNum, mode, bank, item)
-    queueAt(playerNum, bank:getSquare(), mode, nil, bank, item)
+local function queuePart(playerNum, job, bank, item)
+    queueAt(playerNum, bank:getSquare(), job, nil, bank, item)
 end
 
 -- One job per item, queued in order: each is refused or not on its own.
-local function queueParts(playerNum, mode, bank, items)
+local function queueParts(playerNum, job, bank, items)
     for _, item in ipairs(items) do
-        queuePart(playerNum, mode, bank, item)
+        queuePart(playerNum, job, bank, item)
     end
 end
 
@@ -115,7 +115,7 @@ local function queueSeal(playerNum, source, slot)
     end
 end
 
-local function queueBulb(playerNum, mode, light, bulb)
+local function queueBulb(playerNum, job, light, bulb)
     local character = RenewableEnergy.walkTo(playerNum, light:getSquare())
     if not character then
         return
@@ -123,25 +123,25 @@ local function queueBulb(playerNum, mode, light, bulb)
     if bulb then
         ISInventoryPaneContextMenu.transferIfNeeded(character, bulb)
     end
-    ISTimedActionQueue.add(Action:new(character, mode, light, nil, nil, bulb))
+    ISTimedActionQueue.add(Action:new(character, job, light, nil, nil, bulb))
 end
 
 -- Walks to the vehicle's battery, where a maintainer clips on.
-local function queueVehicle(playerNum, mode, vehicle, item)
+local function queueVehicle(playerNum, job, vehicle, item)
     local character = getSpecificPlayer(playerNum)
     if item then
         ISInventoryPaneContextMenu.transferIfNeeded(character, item)
     end
     local battery = RenewableEnergy.VehicleBattery.partOf(vehicle)
     ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, battery:getArea()))
-    ISTimedActionQueue.add(Action:new(character, mode, nil, nil, vehicle, item))
+    ISTimedActionQueue.add(Action:new(character, job, nil, nil, vehicle, item))
 end
 
 -- Walks to the panel's side of the trailer and mends it there.
-local function queueRepairPanel(playerNum, vehicle, partId)
+local function queueSealPanel(playerNum, vehicle, partId)
     local character = getSpecificPlayer(playerNum)
     ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, vehicle:getPartById(partId):getArea()))
-    ISTimedActionQueue.add(Action:new(character, Action.REPAIR_PANEL, nil, nil, vehicle, nil, nil, partId))
+    ISTimedActionQueue.add(Action:new(character, Action.SEAL_PANEL, nil, nil, vehicle, nil, nil, partId))
 end
 
 -- Walks to the frame part's end of the trailer, then fixes it as the mechanics window's Repair
@@ -391,7 +391,7 @@ end
 
 -- The entry for the source at `here` in its bank's summary.
 local function sourceSummary(bankPosition, here)
-    local summary = PowerBank.getSummary(bankPosition.x, bankPosition.y, bankPosition.z)
+    local summary = PowerBank.summaryAt(bankPosition.x, bankPosition.y, bankPosition.z)
     for _, entry in ipairs(summary and summary.sources or {}) do
         if PowerBank.samePosition(entry, here) then
             return entry
@@ -400,7 +400,7 @@ local function sourceSummary(bankPosition, here)
 end
 
 local function bankNameAt(at)
-    local summary = PowerBank.getSummary(at.x, at.y, at.z)
+    local summary = PowerBank.summaryAt(at.x, at.y, at.z)
     return summary and Format.bankName(summary) or getText("IGUI_RenewableEnergy_StatusTitle")
 end
 
@@ -462,7 +462,7 @@ local function addSealOptions(playerNum, menu, source)
         return
     end
     local character = getSpecificPlayer(playerNum)
-    local needs = Recipes.panelRepairNeeds(character)
+    local needs = Recipes.sealInPlaceNeeds(character)
     local blocker = lightOr(character, Action.SEAL_MODULE)
     for _, entry in ipairs(sealable) do
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_SealModule", entry.slot, math.floor(entry.condition)),
@@ -491,7 +491,7 @@ function Menu.addSourceOptions(playerNum, context, source)
     local offered = false
     local kind = Sources.kindOf(source)
     for _, bankPosition in ipairs(Sources.banksInReach(here.x, here.y, here.z, kind)) do
-        local bank = PowerBank.bankOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
+        local bank = PowerBank.findOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
         if bank and not Sources.connectRefusal(source, bankPosition) then
             local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank),
                 Format.away(here, bankPosition)), playerNum, queueSource, Action.CONNECT_SOURCE, source, bank)
@@ -560,19 +560,19 @@ end
 
 --- Seal Cracked Panel for each cracked panel of an arrow board trailer that the seal can
 --- help, listing what the seal takes and greyed out when the character can't do it.
-function Menu.addPanelRepairOptions(playerNum, context, vehicle)
+function Menu.addSealPanelOptions(playerNum, context, vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
     if not ArrowBoard.isTrailer(vehicle) then
         return
     end
     local character = getSpecificPlayer(playerNum)
-    local needs = RenewableEnergy.Recipes.panelRepairNeeds(character)
-    local blocker = lightOr(character, Action.REPAIR_PANEL)
+    local needs = RenewableEnergy.Recipes.sealInPlaceNeeds(character)
+    local blocker = lightOr(character, Action.SEAL_PANEL)
     for _, partId in ipairs(ArrowBoard.PANELS) do
-        local part = ArrowBoard.repairablePanel(vehicle, partId)
+        local part = ArrowBoard.sealablePanel(vehicle, partId)
         if part then
             local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairPanel",
-                getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueRepairPanel, vehicle, partId)
+                getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueSealPanel, vehicle, partId)
             Needs.show(option, needs, blocker)
         end
     end
@@ -599,7 +599,7 @@ end
 --- The arrow board's repairs, and Attach or Detach Solar Maintainer. Returns the maintainer's
 --- option, or nil when there is none to offer.
 function Menu.addVehicleOptions(playerNum, context, vehicle)
-    Menu.addPanelRepairOptions(playerNum, context, vehicle)
+    Menu.addSealPanelOptions(playerNum, context, vehicle)
     Menu.addFrameRepairOptions(playerNum, context, vehicle)
     if SolarMaintainer.isAttached(vehicle) then
         return context:addOption(getText("ContextMenu_RenewableEnergy_DetachMaintainer"), playerNum, queueVehicle,

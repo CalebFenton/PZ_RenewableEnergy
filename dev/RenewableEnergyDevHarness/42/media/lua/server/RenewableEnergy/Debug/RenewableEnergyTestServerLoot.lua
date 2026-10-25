@@ -4,7 +4,7 @@
 
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/StashHouses"
+require "RenewableEnergy/Stash"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 

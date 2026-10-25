@@ -406,8 +406,8 @@ local MODULES = {
     { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
 }
 local CARRIED = {
-    ["RenewableEnergy.SolarRackWood"] = { key = PowerBank.MODULES, value = MODULES },
-    ["RenewableEnergy.SolarFlat"] = { key = PowerBank.MODULES, value = { MODULES[1] } },
+    ["RenewableEnergy.SolarRackWood"] = { key = PowerBank.MODULES_KEY, value = MODULES },
+    ["RenewableEnergy.SolarFlat"] = { key = PowerBank.MODULES_KEY, value = { MODULES[1] } },
     [SolarGardenLight.ITEM] = { key = SolarGardenLight.CHARGE_KEY, value = 2.5 },
 }
 
@@ -518,7 +518,7 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
             table.insert(self.results, result)
             placeTurned(self, square, item, facing)
             T.waitFor(self, function()
-                local bank = PowerBank.bankOn(square)
+                local bank = PowerBank.findOn(square)
                 return bank ~= nil and Sprites.nameOf(bank) == tile and PowerBank.summaryOf(bank) ~= nil
             end, "this client's copy of the bank placed facing " .. facing .. ", working")
             -- Taken away when the test ends if the pick-up leaves it.

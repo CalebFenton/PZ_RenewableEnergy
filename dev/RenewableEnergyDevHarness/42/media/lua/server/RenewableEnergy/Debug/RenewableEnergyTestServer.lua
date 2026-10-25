@@ -103,7 +103,7 @@ handler("placeBank", function(_, args, defer)
     -- Whatever bank stands on the square when the test ends: a chunk loaded again, or a bank
     -- rebuilt, brings a new object.
     defer(function()
-        local current = PowerBank.bankOn(squareAt(args))
+        local current = PowerBank.findOn(squareAt(args))
         if current then
             PowerBank.remove(current)
         end
@@ -338,7 +338,7 @@ handler("saveAndLoadBank", function(_, args)
         return nil, "the bank's record and the generator on the server"
     end
     local GasLines = RenewableEnergy.GasLines
-    local reply = { loadBefore = GasLines.loadOf(generator), chargerW = record:chargerW() }
+    local reply = { loadBefore = GasLines.loadOf(generator), chargerW = record:chargerMaxW() }
     local saved, gone = {}, {}
     for _, key in ipairs(RenewableEnergy.Bank.SAVED_FIELDS) do
         saved[key] = true
@@ -524,7 +524,7 @@ onBank("rebuildBank", function(_, bank, args)
     bank:removeAllContainers()
     local square = squareAt(args.bank)
     MapObjects.loadGridSquare(square)
-    local rebuilt = RenewableEnergy.PowerBank.bankOn(square)
+    local rebuilt = RenewableEnergy.PowerBank.findOn(square)
     if not (rebuilt and rebuilt ~= bank and rebuilt:getContainer()) then
         return nil, "a rebuilt bank with a container on the server"
     end
@@ -620,11 +620,11 @@ end)
 -- The modules the panel on the square at `args` records, and the overlays its tile shows.
 handler("panelState", function(_, args)
     local PowerBank = RenewableEnergy.PowerBank
-    local panel = RenewableEnergy.Sources.on(squareAt(args))
+    local panel = RenewableEnergy.Sources.findOn(squareAt(args))
     if not panel then
         return nil, "the panel on the server"
     end
-    return { modules = panel:getModData()[PowerBank.MODULES], overlays = overlaysOf(panel) }
+    return { modules = panel:getModData()[PowerBank.MODULES_KEY], overlays = overlaysOf(panel) }
 end)
 
 -- `args.hours` of storm over the world's panels that no bank runs (PanelStorms.pass), at the save's
@@ -633,11 +633,11 @@ handler("panelStorm", function(_, args)
     RenewableEnergy.PanelStorms.pass(args.hours)
     local modules = {}
     for i, position in ipairs(args.panels) do
-        local panel = RenewableEnergy.Sources.on(squareAt(position))
+        local panel = RenewableEnergy.Sources.findOn(squareAt(position))
         if not panel then
             return nil, "the panel at " .. position.x .. "," .. position.y .. "," .. position.z .. " on the server"
         end
-        modules[i] = panel:getModData()[RenewableEnergy.PowerBank.MODULES]
+        modules[i] = panel:getModData()[RenewableEnergy.PowerBank.MODULES_KEY]
     end
     return { modules = modules }
 end)
@@ -964,7 +964,7 @@ local treadmillRuns = {}
 -- multiplayer server starts a client's action (serverStart), and leaves it running until
 -- completeStartedTreadmillRun or the end of the test.
 handler("startTreadmillRun", function(player, args, defer)
-    local tile = RenewableEnergy.Treadmill.on(squareAt(args))
+    local tile = RenewableEnergy.Treadmill.findOn(squareAt(args))
     if not tile then
         return nil, "a treadmill on the server"
     end

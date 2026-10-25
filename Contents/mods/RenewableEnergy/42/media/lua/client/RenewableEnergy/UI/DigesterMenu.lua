@@ -8,7 +8,7 @@ require "RenewableEnergy/Biogas/GasHeater"
 require "RenewableEnergy/UI/Needs"
 require "RenewableEnergy/UI/GasJobMenu"
 require "RenewableEnergy/UI/DigesterWindow"
-require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
+require "RenewableEnergy/TimedActions/InfoAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local DigesterMenu = {}

@@ -335,7 +335,7 @@ test("renewable_energy_bank_removed_bank_leaves_no_power", {
         T.bankState(self, bank)
         T.waitFor(self, function() return bank.square:haveElectricity() end, "power on the switched-on bank's square here")
         T.server(self, "removeBank", { bank = bank.position })
-        T.waitFor(self, function() return not bank.square:haveElectricity() and PowerBank.bankOn(bank.square) == nil end,
+        T.waitFor(self, function() return not bank.square:haveElectricity() and PowerBank.findOn(bank.square) == nil end,
             "the removed bank and its power gone from this client")
     end,
     validate = function(self)
@@ -635,7 +635,7 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
             { type = "RenewableEnergy.WoodenBlades" } })
         T.step(function()
             -- Broken on this client's copy only: Replace Blades is the menu's to offer.
-            local modData, broken = self.charger.object:getModData(), RenewableEnergy.Wind.BROKEN
+            local modData, broken = self.charger.object:getModData(), RenewableEnergy.Wind.BROKEN_KEY
             modData[broken] = true
             T.defer(self, function() modData[broken] = nil end)
             -- Beside the panel, so its Connect action is refused for the dark rather than the distance.
@@ -1553,7 +1553,7 @@ test("renewable_energy_bank_rebuilt_bank_keeps_its_record", {
             T.server(self, "rebuildBank", { bank = bank.position })
         end)
         T.waitFor(self, function()
-            local rebuilt, summary = PowerBank.bankOn(bank.square), PowerBank.summaryOf(bank.square)
+            local rebuilt, summary = PowerBank.findOn(bank.square), PowerBank.summaryOf(bank.square)
             return rebuilt ~= nil and rebuilt ~= bank.object and summary ~= nil and summary.name == "Cellar"
         end, "this client's copy of the rebuilt bank, named")
     end,
@@ -1666,7 +1666,7 @@ test("renewable_energy_bank_sledgehammer_settles_batteries", {
         end)
         T.step(function() self.before = bank.state end)
         T.doJob(self, bank.square, function() return ISDestroyStuffAction:new(T.player(), bank.object) end)
-        T.waitFor(self, function() return PowerBank.bankOn(bank.square) == nil end, "the destroyed bank gone from this client")
+        T.waitFor(self, function() return PowerBank.findOn(bank.square) == nil end, "the destroyed bank gone from this client")
         T.server(self, "takeFloorItems", { squares = { T.at(bank.square) } })
     end,
     validate = function(self)
@@ -1753,7 +1753,7 @@ local PRIMED_WEAR = math.max(0, 1.1 - Specs.partWear.perHour.inverter * AWAY_HOU
 -- This client's copy of the bank at `position`, found afresh: a chunk loaded again brings new
 -- objects.
 local function bankHere(position)
-    return PowerBank.bankOn(getSquare(position.x, position.y, position.z))
+    return PowerBank.findOn(getSquare(position.x, position.y, position.z))
 end
 
 -- While its chunk is unloaded a switched-on bank carries on from what it last knew: a pass across
@@ -2556,12 +2556,12 @@ test("renewable_energy_bank_placed_bank_starts_unconnected", {
         T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
         T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood.S)
         T.waitFor(self, function()
-            local bank = PowerBank.bankOn(square)
+            local bank = PowerBank.findOn(square)
             return bank ~= nil and PowerBank.summaryOf(bank) ~= nil
         end, "this client's copy of the placed bank, working")
     end,
     validate = function(self)
-        local bank = PowerBank.bankOn(self.square)
+        local bank = PowerBank.findOn(self.square)
         expect(not bank:isConnected(), "a bank the player placed starts connected")
     end,
 })

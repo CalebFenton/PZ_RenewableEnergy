@@ -1,6 +1,13 @@
-if isClient() then
-    return
-end
+-- The named sites (SolarSiteLocations.lua): solar, and the homestead power of wind farms, dairy
+-- farms and preppers. A world rolls each site once, by its name, against the Solar Sites option,
+-- picks which of its spots the site uses, and keeps each of them as a global object, which the
+-- game saves and hands back when its chunk loads (SGlobalObjects.chunkLoaded). The object goes
+-- down then, stocked, and the spot is forgotten, so nothing is ever placed twice. A spot whose
+-- square no longer takes what it places, such as a tree grown or a player's things there, is kept
+-- and tried again each time its chunk loads. A site added to the list later is rolled the first
+-- time a world that lacks it loads.
+
+if isClient() then return end
 
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/Sprites"
@@ -11,18 +18,9 @@ require "RenewableEnergy/World/BuildingWatch"
 require "RenewableEnergy/World/GardenLights"
 require "RenewableEnergy/World/ArrowBoard"
 require "RenewableEnergy/World/RuralFinds"
-require "RenewableEnergy/PowerBank/Commands"
+require "RenewableEnergy/PowerBank/BankJobs"
 require "RenewableEnergy/GasLine/GasLines"
 local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
-
--- The named sites (SolarSiteLocations.lua): solar, and the homestead power of wind farms, dairy
--- farms and preppers. A world rolls each site once, by its name, against the Solar Sites option,
--- picks which of its spots the site uses, and keeps each of them as a global object, which the
--- game saves and hands back when its chunk loads (SGlobalObjects.chunkLoaded). The object goes
--- down then, stocked, and the spot is forgotten, so nothing is ever placed twice. A spot whose
--- square no longer takes what it places, such as a tree grown or a player's things there, is kept
--- and tried again each time its chunk loads. A site added to the list later is rolled the first
--- time a world that lacks it loads.
 
 RenewableEnergy = RenewableEnergy or {}
 local SolarSites = {}
@@ -201,7 +199,7 @@ local SPOTS = {
             local bankSquare = farEnd(spot)
             RuralFinds.placeAt("wind", square)
             if WorldSpawns.placeBank(bankSquare, spot.stock) then
-                local ok, why = RenewableEnergy.Commands.connectSource(nil,
+                local ok, why = RenewableEnergy.BankJobs.connectSource(nil,
                     { bank = PowerBank.positionOf(bankSquare), source = PowerBank.positionOf(square) })
                 if not ok then
                     print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. tostring(why))
@@ -270,18 +268,6 @@ local function addSpot(x, y, z, fields)
     end
 end
 
--- `count` of the list's entries, picked at random.
-local function pickSome(list, count)
-    local left, picked = {}, {}
-    for i, entry in ipairs(list) do
-        left[i] = entry
-    end
-    for _ = 1, math.min(count, #left) do
-        table.insert(picked, table.remove(left, Chance.between(1, #left)))
-    end
-    return picked
-end
-
 --- Keeps the spots a site uses as global objects, to be placed when their chunks load. A find
 --- counts as the find of the buildings it stands by, and a wind charger also of the building its
 --- bank stands in, from now on (RuralFinds.claim), since their own roll can come before the spot
@@ -290,7 +276,7 @@ function SolarSites.addSite(site)
     local kind = SolarSites.KINDS[site.kind]
     if kind.panels then
         local count = Chance.between(kind.panels.min, kind.panels.max)
-        for _, panel in ipairs(pickSome(site.panels, count)) do
+        for _, panel in ipairs(Chance.pickSome(site.panels, count)) do
             addSpot(panel[1], panel[2], panel[3], { what = "panel", siteKind = site.kind, mount = panel[4], facing = panel[5] })
         end
     end

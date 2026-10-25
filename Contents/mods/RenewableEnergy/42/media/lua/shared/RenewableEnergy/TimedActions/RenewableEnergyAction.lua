@@ -1,3 +1,8 @@
+-- Every hands-on job at a battery bank, a source, a garden light or a vehicle
+-- (RenewableEnergy.JobAction); the authority's complete() makes the change. The server finds the
+-- class by its Type with a plain global lookup (NetTimedAction.parse), which is why the class is a
+-- global outside the RenewableEnergy table.
+
 require "Util/BuildingHelper"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/TimedActions/JobAction"
@@ -11,10 +16,6 @@ require "RenewableEnergy/Gadgets/SolarMaintainer"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/CarAlternator"
 
--- Every hands-on job at a battery bank, a source, a garden light or a vehicle
--- (RenewableEnergy.JobAction); the authority's complete() makes the change. The server finds the
--- class by its Type with a plain global lookup (NetTimedAction.parse), which is why the class is a
--- global outside the RenewableEnergy table.
 RenewableEnergyAction = RenewableEnergy.JobAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
@@ -22,6 +23,8 @@ local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
 local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
 local positionOf, onSquare = PowerBank.positionOf, RenewableEnergy.onSquare
 local CarAlternator = RenewableEnergy.CarAlternator
+local Recipes, SolarMaintainer = RenewableEnergy.Recipes, RenewableEnergy.SolarMaintainer
+local SolarGardenLight = RenewableEnergy.SolarGardenLight
 
 Action.CONNECT_SOURCE = "ConnectSource"
 Action.DISCONNECT_SOURCE = "DisconnectSource"
@@ -34,7 +37,7 @@ Action.WIRE_IN = "WireIn"
 Action.UNWIRE = "Unwire"
 Action.REPAIR_PART = "RepairPart"
 Action.RENAME = "Rename"
-Action.REPAIR_PANEL = "RepairPanel"
+Action.SEAL_PANEL = "RepairPanel"
 Action.SEAL_MODULE = "SealModule"
 Action.REMOVE_BULB = "RemoveBulb"
 Action.ADD_BULB = "AddBulb"
@@ -80,7 +83,7 @@ local function isWindCharger(object)
 end
 
 local function isGardenLight(object)
-    return onSquare(object) and RenewableEnergy.SolarGardenLight.isLight(object)
+    return onSquare(object) and SolarGardenLight.isLight(object)
 end
 
 local function inWorld(vehicle)
@@ -132,7 +135,7 @@ local JOBS
 -- Whether the action's item is where its job needs it: in the bank for a part already wired
 -- in, else anywhere in the character's inventory.
 local function holdsItem(self)
-    if JOBS[self.mode].partInBank then
+    if self:row().partInBank then
         local container = isBank(self.bank) and self.bank:getContainer()
         return container and container:contains(self.item) or false
     end
@@ -193,13 +196,13 @@ local function brakeJob(braked)
     }
 end
 
--- Every job, by mode:
+-- Every job, by name:
 -- - keeps(self): what the job needs from moment to moment (JobAction): its target still in the
 --   world and its item still where the job needs it.
 -- - check(self), if any: the rest of its rules, the state of its target and its bank, which a
 --   multiplayer client's copy can show late, and the checks too dear for every tick. Single player
 --   asks them before the job starts, and the authority again in complete().
--- - command(self): the bank command (Commands.lua) and its args that complete() runs on the
+-- - command(self): the bank job (BankJobs.lua) and its args that complete() runs on the
 --   authority; or run(self), the job itself for one that isn't the bank's.
 -- - minutes: the in-game minutes it takes (a number, or a function of the action); or units, its
 --   length in action units.
@@ -251,18 +254,18 @@ JOBS = {
     [Action.DISCONNECT_BANK] = bankConnectJob(false),
     [Action.ATTACH_MAINTAINER] = {
         keeps = function(self)
-            return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == RenewableEnergy.SolarMaintainer.ITEM
+            return inWorld(self.vehicle) and self.item ~= nil and self.item:getFullType() == SolarMaintainer.ITEM
                 and holdsItem(self)
         end,
-        check = function(self) return RenewableEnergy.SolarMaintainer.canAttach(self.vehicle) end,
-        run = function(self) return RenewableEnergy.SolarMaintainer.attach(self.character, self.vehicle, self.item) end,
+        check = function(self) return SolarMaintainer.canAttach(self.vehicle) end,
+        run = function(self) return SolarMaintainer.attach(self.character, self.vehicle, self.item) end,
         minutes = 1,
         sound = "GeneratorConnect",
     },
     [Action.DETACH_MAINTAINER] = {
         keeps = function(self) return inWorld(self.vehicle) end,
-        check = function(self) return RenewableEnergy.SolarMaintainer.isAttached(self.vehicle) end,
-        run = function(self) return RenewableEnergy.SolarMaintainer.detach(self.character, self.vehicle) end,
+        check = function(self) return SolarMaintainer.isAttached(self.vehicle) end,
+        run = function(self) return SolarMaintainer.detach(self.character, self.vehicle) end,
         minutes = 1,
     },
     [Action.WIRE_IN] = {
@@ -297,19 +300,19 @@ JOBS = {
         command = function(self) return "rename", { bank = positionOf(self.bank), name = self.bankName } end,
         minutes = 0.5,
     },
-    [Action.REPAIR_PANEL] = {
+    [Action.SEAL_PANEL] = {
         keeps = function(self)
             local part = inWorld(self.vehicle) and self.vehicle:getPartById(self.partId)
             return part and part:getInventoryItem() ~= nil or false
         end,
         check = function(self)
             local ArrowBoard = arrowBoard()
-            return ArrowBoard ~= nil and ArrowBoard.repairablePanel(self.vehicle, self.partId) ~= nil
-                and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
+            return ArrowBoard ~= nil and ArrowBoard.sealablePanel(self.vehicle, self.partId) ~= nil
+                and Recipes.sealInPlaceRefusal(self.character) == nil
         end,
-        run = function(self) return arrowBoard().repairPanel(self.character, self.vehicle, self.partId) end,
+        run = function(self) return arrowBoard().sealPanel(self.character, self.vehicle, self.partId) end,
         -- As the crafting window times Seal Cracked Module (ISHandcraftAction).
-        units = function(self) return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
+        units = function(self) return Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
         light = true,
         sound = "GeneratorRepair",
     },
@@ -317,27 +320,27 @@ JOBS = {
     [Action.SEAL_MODULE] = {
         keeps = function(self) return isSource(self.object) end,
         check = function(self)
-            return RenewableEnergy.Recipes.sealableModule(self.object, self.slot) ~= nil
-                and RenewableEnergy.Recipes.panelRepairRefusal(self.character) == nil
+            return Recipes.sealableModule(self.object, self.slot) ~= nil
+                and Recipes.sealInPlaceRefusal(self.character) == nil
         end,
         command = function(self) return "sealModule", { source = positionOf(self.object), slot = self.slot } end,
-        units = function(self) return RenewableEnergy.Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
+        units = function(self) return Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
         light = true,
         sound = "GeneratorRepair",
     },
     -- As long as vanilla's for a lamp's bulb at the default day length (ISLightActions).
     [Action.REMOVE_BULB] = {
         keeps = function(self) return isGardenLight(self.object) end,
-        check = function(self) return RenewableEnergy.SolarGardenLight.getBulb(self.object) ~= nil end,
-        run = function(self) return RenewableEnergy.SolarGardenLight.removeBulb(self.character, self.object) end,
+        check = function(self) return SolarGardenLight.getBulb(self.object) ~= nil end,
+        run = function(self) return SolarGardenLight.removeBulb(self.character, self.object) end,
         minutes = 1,
     },
     [Action.ADD_BULB] = {
         keeps = function(self)
-            return isGardenLight(self.object) and RenewableEnergy.SolarGardenLight.isBulb(self.item) and holdsItem(self)
+            return isGardenLight(self.object) and SolarGardenLight.isBulb(self.item) and holdsItem(self)
         end,
-        check = function(self) return RenewableEnergy.SolarGardenLight.getBulb(self.object) == nil end,
-        run = function(self) return RenewableEnergy.SolarGardenLight.addBulb(self.character, self.object, self.item) end,
+        check = function(self) return SolarGardenLight.getBulb(self.object) == nil end,
+        run = function(self) return SolarGardenLight.addBulb(self.character, self.object, self.item) end,
         minutes = 1,
     },
     -- Cut Padlock: the lid unlocked, its lock broken (ArrowBoard.cutPadlock). The cutters wear as
@@ -431,23 +434,23 @@ JOBS = {
 
 --- Whether the job applies to the world as it is now, every rule of it.
 function Action:canPerform()
-    local job = JOBS[self.mode]
-    return job ~= nil and job.keeps(self) and (job.check == nil or job.check(self))
+    local row = self:row()
+    return row ~= nil and row.keeps(self) and (row.check == nil or row.check(self))
 end
 
---- Whether the job of `mode` needs light to see by: isValid stops it in the dark, and the menu
+--- Whether the job `job` needs light to see by: isValid stops it in the dark, and the menu
 --- greys it there.
-function Action.needsLight(mode)
-    return JOBS[mode].light == true
+function Action.needsLight(job)
+    return JOBS[job].light == true
 end
 
 function Action:keeps()
-    local job = JOBS[self.mode]
-    return job ~= nil and job.keeps(self)
+    local row = self:row()
+    return row ~= nil and row.keeps(self)
 end
 
 function Action:row()
-    return JOBS[self.mode]
+    return JOBS[self.job]
 end
 
 -- A job field that is a value or a function of the action.
@@ -459,11 +462,11 @@ local function valueOf(field, self)
 end
 
 function Action:units()
-    local job = JOBS[self.mode]
-    if job.units then
-        return valueOf(job.units, self)
+    local row = self:row()
+    if row.units then
+        return valueOf(row.units, self)
     end
-    return valueOf(job.minutes, self) * RenewableEnergy.unitsPerMinute()
+    return valueOf(row.minutes, self) * RenewableEnergy.unitsPerMinute()
 end
 
 function Action:target()
@@ -472,7 +475,7 @@ end
 
 function Action:update()
     self.character:faceThisObject(self:target())
-    local metabolics = JOBS[self.mode].metabolics
+    local metabolics = self:row().metabolics
     if metabolics then
         self.character:setMetabolicTarget(metabolics)
     end
@@ -484,23 +487,23 @@ function Action:findItems()
         return
     end
     local container = self.character:getInventory()
-    if JOBS[self.mode].partInBank then
+    if self:row().partInBank then
         container = isBank(self.bank) and self.bank:getContainer()
     end
     self.item = container and container:getItemWithIDRecursiv(self.item:getID()) or nil
 end
 
 function Action:startJob()
-    local job = JOBS[self.mode]
-    if job.begin then
-        job.begin(self)
+    local row = self:row()
+    if row.begin then
+        row.begin(self)
         return
     end
     self:setActionAnim("Loot")
     self.character:SetVariable("LootPosition", self.vehicle and "Mid" or "Low")
     self.character:reportEvent("EventLootItem")
-    if job.sound then
-        self.sound = self.character:playSound(job.sound)
+    if row.sound then
+        self.sound = self.character:playSound(row.sound)
     end
 end
 
@@ -508,11 +511,11 @@ function Action:complete()
     if not (self:canPerform() and self:atJobForAuthority()) then
         return false
     end
-    local job = JOBS[self.mode]
-    if job.run then
-        return job.run(self)
+    local row = self:row()
+    if row.run then
+        return row.run(self)
     end
-    local ok = PowerBank.perform(self.character, job.command(self))
+    local ok = PowerBank.perform(self.character, row.command(self))
     return ok == true
 end
 
@@ -522,9 +525,9 @@ end
 -- the bank's new name, `partId` the vehicle part worked on, `slot` the panel's module; unused
 -- ones are nil. The name can't be a field called `name`, which NetTimedAction reads as the
 -- action's own name.
-function Action:new(character, mode, object, bank, vehicle, item, bankName, partId, slot)
+function Action:new(character, job, object, bank, vehicle, item, bankName, partId, slot)
     local o = ISBaseTimedAction.new(self, character)
-    o.mode = mode
+    o.job = job
     o.object = object
     o.bank = bank
     o.vehicle = vehicle

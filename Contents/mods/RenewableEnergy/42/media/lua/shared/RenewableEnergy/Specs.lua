@@ -1,6 +1,9 @@
 -- Ratings for the mod's power hardware, in watts and watt-hours, and its wear and repair figures.
 -- Appliances draw what vanilla bills a generator for them (Specs.wattsPerFuel); everything else is
 -- rated against those draws.
+-- Names: a rating ends in Watts (chargerWatts, Sun.panelWatts), a live quantity the bank or gas
+-- line works out each pass ends in W (Bank:limitW, loadW), and watt-hours end in Wh. Saved fields
+-- (loadW, chargeWantW, a source's watts) keep their names.
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs = {}

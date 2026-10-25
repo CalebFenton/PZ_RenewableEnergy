@@ -1,12 +1,10 @@
-if isClient() then
-    return
-end
-
-require "RenewableEnergy/StashHouses"
-require "RenewableEnergy/Chance"
-
--- The authority's part of the stash houses (shared StashHouses.lua): stocking some from the start
+-- The authority's part of the stash houses (shared Stash.lua): stocking some from the start
 -- and listing them again in older saves. A multiplayer client keeps no stash state.
+
+if isClient() then return end
+
+require "RenewableEnergy/Stash"
+require "RenewableEnergy/Chance"
 
 local Stash, Chance = RenewableEnergy.Stash, RenewableEnergy.Chance
 

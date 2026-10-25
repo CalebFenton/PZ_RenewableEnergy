@@ -1,12 +1,13 @@
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-
 -- The places of one kind of placed tile, for code that runs each loaded tile now and then.
 --
 -- MapObjects reports a tile when its chunk loads, and OnObjectAdded when one is placed (vanilla's
 -- moveables fire it in single player too). Nothing reports a chunk unloading, so a place whose
 -- tile isn't there any more is dropped while the places are walked; MapObjects reports the tile
 -- again when its chunk loads. A tile leaving its square is dropped at once.
+
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Sprites"
+
 RenewableEnergy = RenewableEnergy or {}
 local PlaceTracker = {}
 PlaceTracker.__index = PlaceTracker

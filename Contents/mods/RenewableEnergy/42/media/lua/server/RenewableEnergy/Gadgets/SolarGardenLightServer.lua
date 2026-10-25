@@ -1,6 +1,7 @@
-if isClient() then
-    return
-end
+-- The Solar Garden Light on the authority, the one writer of its charge, bulb and tile: the
+-- night and day GadgetCharging's pass runs, and the bulb jobs from a timed action's complete().
+
+if isClient() then return end
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
@@ -8,8 +9,6 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 
--- The Solar Garden Light on the authority, the one writer of its charge, bulb and tile: the
--- night and day GadgetCharging's pass runs, and the bulb jobs from a timed action's complete().
 local SolarGardenLight = RenewableEnergy.SolarGardenLight
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 

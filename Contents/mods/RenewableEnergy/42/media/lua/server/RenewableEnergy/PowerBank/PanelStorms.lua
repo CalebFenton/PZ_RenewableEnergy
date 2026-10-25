@@ -29,7 +29,7 @@ RenewableEnergy.PanelStorms = PanelStorms
 -- last pass.
 local MOD_DATA = "RenewableEnergy_storms"
 -- Panel modData: the world's storm hours the panel has weathered.
-local WEATHERED = "RenewableEnergy_stormHours"
+local WEATHERED_KEY = "RenewableEnergy_stormHours"
 
 local function store()
     return ModData.getOrCreate(MOD_DATA)
@@ -45,13 +45,13 @@ end
 function PanelStorms.weather(isoObject)
     local total = store().hours or 0
     local data = isoObject:getModData()
-    local weathered = data[WEATHERED]
+    local weathered = data[WEATHERED_KEY]
     if weathered == total then
         return false
     end
     -- A connected panel keeps up too, so the storms its bank cracked it for don't count again
     -- once it is disconnected.
-    data[WEATHERED] = total
+    data[WEATHERED_KEY] = total
     if not weathered or PowerBank.connectedBank(isoObject) or not isoObject:getSquare():isOutside() then
         return false
     end
@@ -62,7 +62,7 @@ function PanelStorms.weather(isoObject)
     end
     PanelSource.writeModules(isoObject, source.modules)
     PanelSource.showCracks(isoObject)
-    StormNotice.tell(StormNotice.MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    StormNotice.tell(StormNotice.CRACKED_MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
     return true
 end
 

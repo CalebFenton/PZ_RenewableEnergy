@@ -1,5 +1,3 @@
-require "RenewableEnergy/Sprites"
-
 -- The failsafe shares its square with the generator it watches. It is placed as a floor rug, the
 -- one kind of object allowed onto a square that already holds something solid, which files it
 -- under the generator. So it is moved to the end of the square's objects, to draw over the
@@ -10,6 +8,8 @@ require "RenewableEnergy/Sprites"
 -- object by its index on the square (IsoGenerator.syncIsoObjectSend), agree everywhere.
 -- RemoveTileObject fires OnObjectAboutToBeRemoved and OnTileRemoved for the failsafe, so their
 -- handlers must leave it alone.
+
+require "RenewableEnergy/Sprites"
 
 local Sprites = RenewableEnergy.Sprites
 local FAILSAFE = Sprites.failsafe

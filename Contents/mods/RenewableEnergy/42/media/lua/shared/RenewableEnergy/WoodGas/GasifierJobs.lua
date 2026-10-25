@@ -68,7 +68,7 @@ GasifierJobs.JOBS = {
         blocker = function(summary)
             return summary.condensate < MIN_CONDENSATE and "Tooltip_RenewableEnergy_NoCondensate" or nil
         end,
-        check = function(character, summary, item)
+        withRefusal = function(character, summary, item)
             if item and not (character:getInventory():containsRecursive(item) and Gasifier.takesCondensate(item, summary.lit)) then
                 return "Tooltip_RenewableEnergy_WontTakeCondensate"
             end

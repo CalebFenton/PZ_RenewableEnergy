@@ -1,5 +1,3 @@
-if isClient() then return end
-
 -- Generators running on gas, on the authority: the Gas Conversion Kit's jobs and the pass that
 -- feeds each kitted generator from its digester or gasifier.
 --
@@ -9,6 +7,9 @@ if isClient() then return end
 -- Its real tank is kept apart (`tank`) and restored once gas stops, the kit comes off or the line is
 -- cut. A kitted generator can't be picked up, so the phantom fuel never leaves with it.
 
+if isClient() then return end
+
+require "TimedActions/ISTakeGenerator"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/GasLine/GasKit"
@@ -62,7 +63,7 @@ end
 -- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
 -- canSupply(), supply(litres), capW(), wearFactor() and afterChange(), and a piped one
 -- (GasKit.SOURCES) setPipe(side).
-local function sourceOf(position)
+local function recordAt(position)
     return position and GasKit.SOURCES[position.kind].owner.recordAt(position.x, position.y, position.z)
 end
 
@@ -71,7 +72,7 @@ local function isPiped(position)
 end
 
 local isKitOverlay = Sprites.matcher(Sprites.gasKit)
-local isGeneratorPipe = Sprites.matcher(Sprites.gasifierPipeGen)
+local isGeneratorPipeOverlay = Sprites.matcher(Sprites.gasifierPipeGen)
 
 -- Sets the line's source, in the generator's state and its entry in the list.
 local function setSource(generator, state, source)
@@ -81,7 +82,7 @@ end
 
 -- Takes the pipe off the piped source at `position`: its half of it.
 local function unpipeSource(position)
-    local record = isPiped(position) and sourceOf(position)
+    local record = isPiped(position) and recordAt(position)
     if record then
         record:setPipe(nil)
     end
@@ -90,7 +91,7 @@ end
 -- Lays a pipe between `generator` and the piped source `source`, each half on its own tile.
 local function pipe(generator, source)
     local gx, gy, x, y = generator:getX(), generator:getY(), source:getX(), source:getY()
-    RenewableEnergy.showOverlay(generator, isGeneratorPipe,
+    RenewableEnergy.showOverlay(generator, isGeneratorPipeOverlay,
         Sprites.gasifierPipeGenFor(Sprites.nameOf(generator), Gasifier.sideOf(gx, gy, x, y)))
     local record = Gasifier.recordOf(source)
     if record then
@@ -110,7 +111,7 @@ end
 -- took ({ item, count }), or nil.
 local function cutLine(generator, state)
     if isPiped(state.source) then
-        RenewableEnergy.showOverlay(generator, isGeneratorPipe, nil)
+        RenewableEnergy.showOverlay(generator, isGeneratorPipeOverlay, nil)
         unpipeSource(state.source)
     end
     local line = state.line
@@ -135,8 +136,8 @@ local function capOf(state)
     if not (state and state.onGas) then
         return nil
     end
-    local source = sourceOf(state.source)
-    return source and source:capW() or GasKit.CAP_W
+    local record = recordAt(state.source)
+    return record and record:capW() or GasKit.CAP_W
 end
 
 -- The banks whose chargers charge from `generator`, in the order they share what it can give:
@@ -313,27 +314,27 @@ end
 --- vanilla for fuel while on gas, it ran those hours on gas: the source pays for them and it starts
 --- again. A line whose source is gone is lost with it, on petrol too: nothing comes back from it.
 function GasLines.run(generator, state, hours)
-    local source = sourceOf(state.source)
-    if state.source and not source then
+    local record = recordAt(state.source)
+    if state.source and not record then
         cutLine(generator, state)
     end
     if state.mode == "petrol" then
-        source = nil
+        record = nil
     end
-    local hasGas = source and source:canSupply()
+    local hasGas = record and record:canSupply()
     local litres = burnedSince(generator, state)
     local ranDry = stoppedForFuel(generator, state)
     if ranDry then
         litres = math.max(litres, dryBill(generator, state, hours))
     end
     if hasGas and litres > 0 then
-        hasGas = source:supply(litres)
-        source:afterChange()
+        hasGas = record:supply(litres)
+        record:afterChange()
     end
     if ranDry and hasGas then
         generator:setActivated(true)
     end
-    if source and state.onGas and not hasGas and (ranDry or generator:isActivated()) then
+    if record and state.onGas and not hasGas and (ranDry or generator:isActivated()) then
         stop(generator)
         state.outOfGas = true
     end
@@ -343,13 +344,13 @@ function GasLines.run(generator, state, hours)
         if watts > capOf(state) then
             stop(generator)
             state.stalled = true
-        elseif source then
-            wear(generator, state, source:wearFactor(), hours)
+        elseif record then
+            wear(generator, state, record:wearFactor(), hours)
         end
     elseif state.stalled and hasGas and not generator:isActivated() then
         local watts = GasLines.loadOf(generator)
         state.watts = watts
-        if watts <= source:capW() then
+        if watts <= record:capW() then
             generator:setActivated(true)
             state.stalled = false
         end
@@ -418,7 +419,7 @@ end
 -- materials, by its row of GasKit.JOBS; `source` is Connect's. Returns whether it was done.
 local DO = {
     [GasKit.INSTALL] = function(character, state, row, generator)
-        generator:getModData()[GasKit.MOD_DATA] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
+        generator:getModData()[GasKit.STATE_KEY] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
         store()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
         RenewableEnergy.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
@@ -426,7 +427,7 @@ local DO = {
     end,
     [GasKit.REMOVE] = function(character, state, row, generator)
         disconnect(character, generator, state)
-        generator:getModData()[GasKit.MOD_DATA] = nil
+        generator:getModData()[GasKit.STATE_KEY] = nil
         GasLines.unlist(generator)
         RenewableEnergy.showOverlay(generator, isKitOverlay, nil)
         RenewableEnergy.giveItems(character, GasKit.ITEM)
@@ -493,13 +494,12 @@ end
 
 -- Taking up a kitted generator is refused: the kit would fall off (ISTakeGenerator copies only
 -- fuel and condition to the item) and with it what the tank really holds.
-require "TimedActions/ISTakeGenerator"
-local complete = ISTakeGenerator.complete
+local vanillaTakeComplete = ISTakeGenerator.complete
 function ISTakeGenerator:complete()
     if GasKit.hasKit(self.generator) then
         return false
     end
-    return complete(self)
+    return vanillaTakeComplete(self)
 end
 
 return GasLines

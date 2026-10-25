@@ -1,9 +1,8 @@
 -- Runs the small solar gadgets and the arrow board trailers' panels, on the authority: single
 -- player or the server. Only loaded vehicles, chargers and garden lights run, as vanilla's own
 -- battery chargers do.
-if isClient() then
-    return
-end
+
+if isClient() then return end
 
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/Gadgets/SolarMaintainerServer"

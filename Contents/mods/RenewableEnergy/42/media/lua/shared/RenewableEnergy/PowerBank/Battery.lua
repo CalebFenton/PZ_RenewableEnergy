@@ -39,7 +39,7 @@ end
 
 -- Item modData key: the battery has a charge of its own (found, crafted, or used in a bank), so a
 -- container refill such as loot respawn must leave it alone. The legacy name keeps saves marked.
-local HAS_CHARGE = "RenewableEnergy_found"
+local HAS_CHARGE_KEY = "RenewableEnergy_found"
 
 function Battery.getCharge(item)
     return item:getCurrentUsesFloat()
@@ -47,13 +47,13 @@ end
 
 function Battery.setCharge(item, charge)
     item:setCurrentUsesFloat(math.max(0, math.min(1, charge)))
-    item:getModData()[HAS_CHARGE] = true
+    item:getModData()[HAS_CHARGE_KEY] = true
 end
 
 --- Whether the battery's charge was ever set (Battery.setCharge), rather than being what the
 --- item spawned with.
 function Battery.hasCharge(item)
-    return item:getModData()[HAS_CHARGE] == true
+    return item:getModData()[HAS_CHARGE_KEY] == true
 end
 
 --- Give a battery found in the world a random part charge, and send it to the clients that

@@ -1,3 +1,12 @@
+-- Callbacks of the mod's craftRecipes. Shared: OnTest runs wherever the craft is checked, and every
+-- side resolves all of a recipe's Lua calls when it sets up a craft (CraftRecipeData). OnCreate runs
+-- once on the authority, after the outputs were already sent to an MP client, so item changes are
+-- re-sent: outputs (in the inventory) with syncItemFields, inputs (maybe in a nearby container or on
+-- the floor) with sendItemStats.
+--
+-- OnTest is asked about every candidate item of every input, tools included, so each one
+-- answers only for the items it is about and lets the rest through.
+
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/Battery"
@@ -7,14 +16,6 @@ require "RenewableEnergy/PowerBank/Wear"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 
--- Callbacks of the mod's craftRecipes. Shared: OnTest runs wherever the craft is checked, and every
--- side resolves all of a recipe's Lua calls when it sets up a craft (CraftRecipeData). OnCreate runs
--- once on the authority, after the outputs were already sent to an MP client, so item changes are
--- re-sent: outputs (in the inventory) with syncItemFields, inputs (maybe in a nearby container or on
--- the floor) with sendItemStats.
---
--- OnTest is asked about every candidate item of every input, tools included, so each one
--- answers only for the items it is about and lets the rest through.
 RenewableEnergy = RenewableEnergy or {}
 local Recipes = {}
 RenewableEnergy.Recipes = Recipes
@@ -162,7 +163,7 @@ function Recipes.mountModules(craftRecipeData, character)
         end
     end
     local mount = craftRecipeData:getFirstCreatedItem()
-    mount:getModData()[PowerBank.MODULES] = modules
+    mount:getModData()[PowerBank.MODULES_KEY] = modules
     mount:syncItemFields()
     if new > 0 then
         for perk, xp in pairs(Recipes.MOUNTS[mount:getFullType()].xp) do
@@ -262,7 +263,7 @@ end
 local PAID_TOLERANCE = 1e-5
 
 -- What `recipe` takes of the character's inventory, bags included, but the module: the items that
--- pay its inputs, nil when one is missing, and each input as a need (see panelRepairInputs).
+-- pay its inputs, nil when one is missing, and each input as a need (see sealInPlaceInputs).
 local function recipeInputs(recipe, inventory)
     local inputs = recipe:getInputs()
     local picks, taken, needs, complete = {}, {}, {}, true
@@ -321,7 +322,7 @@ end
 --- theirs meets. Since they differ only in the adhesive, that need is met exactly when a twin is.
 --- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
 --- drainables add up to one input, each giving the uses it has until the input is paid.
-function Recipes.panelRepairInputs(character)
+function Recipes.sealInPlaceInputs(character)
     local inventory = character:getInventory()
     local paid, byRecipe = nil, {}
     for _, name in ipairs(MODULE_REPAIR_RECIPES) do
@@ -345,14 +346,14 @@ end
 
 --- What Seal Cracked Panel takes of `character` (RenewableEnergy.firstUnmet): the recipe
 --- known, its skills, and its inputs but the module.
-function Recipes.panelRepairNeeds(character)
+function Recipes.sealInPlaceNeeds(character)
     local recipe = Recipes.moduleRepairRecipe()
     local needs = { { kind = "recipe", recipe = recipe, have = character:isRecipeKnown(recipe) and 1 or 0, need = 1 } }
     for i = 0, recipe:getRequiredSkillCount() - 1 do
         local skill = recipe:getRequiredSkill(i)
         table.insert(needs, { kind = "skill", perk = skill:getPerk(), have = character:getPerkLevel(skill:getPerk()), need = skill:getLevel() })
     end
-    local _, inputs = Recipes.panelRepairInputs(character)
+    local _, inputs = Recipes.sealInPlaceInputs(character)
     for _, need in ipairs(inputs) do
         table.insert(needs, need)
     end
@@ -360,12 +361,12 @@ function Recipes.panelRepairNeeds(character)
 end
 
 --- Why the character can't do Seal Cracked Panel, or nil when they can: the kind of the first
---- of panelRepairNeeds they are short of.
-function Recipes.panelRepairRefusal(character)
-    return RenewableEnergy.unmetKind(Recipes.panelRepairNeeds(character))
+--- of sealInPlaceNeeds they are short of.
+function Recipes.sealInPlaceRefusal(character)
+    return RenewableEnergy.unmetKind(Recipes.sealInPlaceNeeds(character))
 end
 
---- Uses up what Recipes.panelRepairInputs picked; tools are kept and may wear as the recipe's
+--- Uses up what Recipes.sealInPlaceInputs picked; tools are kept and may wear as the recipe's
 --- craft wears them. Authority only.
 function Recipes.useInputs(picks, character)
     local recipe = Recipes.moduleRepairRecipe()

@@ -1,6 +1,3 @@
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Materials"
-
 -- The Car Alternator: the generator of the car alternator wind charger, taken out of a car or cut
 -- from a smashed wreck.
 --
@@ -9,6 +6,10 @@ require "RenewableEnergy/Materials"
 -- that to multiplayer clients, and the part saves it with the vehicle; the vehicle's own modData
 -- has no such send (DEVELOPMENT.md, Vehicles). Taking it out, putting it back and the wreck's drop
 -- are the authority's: server/RenewableEnergy/Gadgets/CarAlternatorServer.lua.
+
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Materials"
+
 RenewableEnergy = RenewableEnergy or {}
 local CarAlternator = {}
 RenewableEnergy.CarAlternator = CarAlternator

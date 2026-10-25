@@ -112,7 +112,7 @@ local function crowdingAt(kind, x, y, z)
         for dx = -radius, radius do
             for dy = -radius, radius do
                 local distance = math.sqrt(dx * dx + dy * dy)
-                local other = distance >= 1 and distance <= radius and Sources.on(getSquare(x + dx, y + dy, floor))
+                local other = distance >= 1 and distance <= radius and Sources.findOn(getSquare(x + dx, y + dy, floor))
                 local otherKind = other and Sources.kindOf(other)
                 if otherKind and Sources.familyOf(otherKind) == "wind" and rotorLevel(otherKind, floor) == level then
                     table.insert(distances, distance)
@@ -131,7 +131,7 @@ end
 --- Sets the brake of the wind charger `isoObject`, and of `source`, its bank's record, if it feeds
 --- one (else nil).
 function WindSource.setBraked(isoObject, braked, source)
-    setFlag(isoObject, Wind.BRAKED, braked)
+    setFlag(isoObject, Wind.BRAKED_KEY, braked)
     if source then
         source.braked = braked
     end
@@ -140,7 +140,7 @@ end
 --- Marks the blades of the wind charger `isoObject` broken or whole, and of `source`, its bank's
 --- record, if it feeds one (else nil).
 function WindSource.setBroken(isoObject, broken, source)
-    setFlag(isoObject, Wind.BROKEN, broken)
+    setFlag(isoObject, Wind.BROKEN_KEY, broken)
     if source then
         source.broken = broken
     end
@@ -201,7 +201,7 @@ function WindSource.connect(player, source, isoObject, _, material)
     source.blades = Wind.bladesOf(source.kind, material)
     source.shelter = shelterAt(Specs.wind.turbines[source.kind], source.x, source.y, source.z)
     source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
-    if player and RenewableEnergy.teachOnce(player, isoObject, PowerBank.CONNECTED_ONCE, Perks.Electricity,
+    if player and RenewableEnergy.teachOnce(player, isoObject, PowerBank.CONNECTED_ONCE_KEY, Perks.Electricity,
         Specs.connectXp * Sources.slotsOf(source.kind)) then
         isoObject:transmitModData()
     end

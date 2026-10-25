@@ -18,18 +18,18 @@ local function compressorFor(player)
     return nil
 end
 
-local getTirePump = ISVehicleMechanics.getTirePump
+local vanillaGetTirePump = ISVehicleMechanics.getTirePump
 function ISVehicleMechanics:getTirePump(player)
-    return getTirePump(self, player) or compressorFor(player)
+    return vanillaGetTirePump(self, player) or compressorFor(player)
 end
 
 -- Vanilla's option equips and uses a TirePump only, so with none this queues the same with the
 -- compressor.
-local onInflateTire = ISVehiclePartMenu.onInflateTire
+local vanillaOnInflateTire = ISVehiclePartMenu.onInflateTire
 function ISVehiclePartMenu.onInflateTire(playerObj, part)
     local compressor = not playerObj:getInventory():contains("TirePump", true) and compressorFor(playerObj)
     if not compressor then
-        return onInflateTire(playerObj, part)
+        return vanillaOnInflateTire(playerObj, part)
     end
     local vehicle = part:getVehicle()
     if playerObj:getVehicle() then

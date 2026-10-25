@@ -8,11 +8,11 @@ require "RenewableEnergy/ObjectSystem"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Biogas/DigesterJobs"
 require "RenewableEnergy/Biogas/GasHeater"
-local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
+require "RenewableEnergy/Biogas/DigesterObject"
 
 RenewableEnergy = RenewableEnergy or {}
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local ObjectSystem, Sprites = RenewableEnergy.ObjectSystem, RenewableEnergy.Sprites
+local ObjectSystem, Sprites, DigesterObject = RenewableEnergy.ObjectSystem, RenewableEnergy.Sprites, RenewableEnergy.DigesterObject
 
 local DigesterSystem = ObjectSystem.define({
     name = "Digester", kind = "digester", owner = Digester, Object = DigesterObject, isObject = Digester.isDigester,
@@ -38,9 +38,9 @@ end
 
 -- Take Sludge, as vanilla's ISGetCompost fills compost bags from a composter: into the part-filled
 -- compost bag `item`, or a new one for the empty sandbag `item`.
-local function takeSludge(character, digester, row, isoObject, item)
+local function takeSludge(character, record, row, isoObject, item)
     local perUse = DigesterJobs.sludgePerUse()
-    local uses = math.floor(digester.sludge / perUse)
+    local uses = math.floor(record.sludge / perUse)
     if item:getFullType() == DigesterJobs.COMPOST_BAG then
         uses = math.min(uses, item:getMaxUses() - item:getCurrentUses())
         if uses <= 0 then
@@ -58,44 +58,44 @@ local function takeSludge(character, digester, row, isoObject, item)
         bag:setCurrentUses(uses)
         RenewableEnergy.giveItems(character, bag)
     end
-    digester.sludge = math.max(0, digester.sludge - uses * perUse)
+    record.sludge = math.max(0, record.sludge - uses * perUse)
     return true
 end
 
-local function vent(character, digester)
-    digester.gas = 0
-    if digester.indoors then
-        digester.leakHours = math.max(digester.leakHours, 1)
+local function vent(character, record)
+    record.gas = 0
+    if record.indoors then
+        record.leakHours = math.max(record.leakHours, 1)
     end
     return true
 end
 
 -- A new holder of the row's kind, empty.
-local function newHolder(character, digester, row)
-    digester.holder = row.holder
-    digester.holderCondition = 100
-    digester.gas = 0
+local function newHolder(character, record, row)
+    record.holder = row.holder
+    record.holderCondition = 100
+    record.gas = 0
     return true
 end
 
-local function upgrade(character, digester, row, isoObject)
-    digester:upgrade(isoObject)
+local function upgrade(character, record, row, isoObject)
+    record:upgrade(isoObject)
     return true
 end
 
 -- Fills `tank` as far as the row's fill goes.
-local function fill(character, digester, row, isoObject, tank)
-    local plain, scrubbed, perUse = DigesterJobs.fillUses(row.fill, digester, tank)
+local function fill(character, record, row, isoObject, tank)
+    local plain, scrubbed, perUse = DigesterJobs.fillUses(row.fill, record, tank)
     if plain + scrubbed <= 0 then
         return false
     end
     tank:setCurrentUses(tank:getCurrentUses() + plain + scrubbed)
     tank:syncItemFields()
     local m3 = (plain + scrubbed) * perUse
-    digester.gas = math.max(0, digester.gas - m3)
+    record:takeGas(m3)
     if scrubbed > 0 then
-        digester.scrubCO2 = math.max(0, digester.scrubCO2 - scrubbed * perUse)
-        digester.scrubWool = math.max(0, digester.scrubWool - scrubbed * perUse)
+        record.scrubCO2 = math.max(0, record.scrubCO2 - scrubbed * perUse)
+        record.scrubWool = math.max(0, record.scrubWool - scrubbed * perUse)
     end
     if row.fill.endurancePerM3 then
         character:getStats():remove(CharacterStat.ENDURANCE, m3 * row.fill.endurancePerM3)
@@ -103,24 +103,24 @@ local function fill(character, digester, row, isoObject, tank)
     return true
 end
 
-local function fitScrubber(character, digester)
-    digester.scrubber = true
-    digester.scrubCO2 = 0
-    digester.scrubWool = Digester.WOOL_M3
+local function fitScrubber(character, record)
+    record.scrubber = true
+    record.scrubCO2 = 0
+    record.scrubWool = Digester.WOOL_M3
     return true
 end
 
-local function charge(character, digester, row)
-    digester.scrubCO2 = Digester.SCRUB_M3[row.charge]
+local function charge(character, record, row)
+    record.scrubCO2 = Digester.SCRUB_M3[row.charge]
     return true
 end
 
-local function repackWool(character, digester)
-    digester.scrubWool = Digester.WOOL_M3
+local function repackWool(character, record)
+    record.scrubWool = Digester.WOOL_M3
     return true
 end
 
--- What each job does to the digester `digester` (its tile `isoObject`) beyond taking its
+-- What each job does to the digester's record `record` (its tile `isoObject`) beyond taking its
 -- materials, by its row of DigesterJobs.JOBS. `item` is the job's bag or tank. Returns whether it
 -- was done.
 local DO = {

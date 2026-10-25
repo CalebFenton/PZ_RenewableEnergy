@@ -1,11 +1,3 @@
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/World/ArrowBoard"
-
 -- The arrow board trailer's power: its panels charge the batteries in its box, and the lamps run
 -- off them through the controller: lit while the switch is on, the lamp board isn't wrecked and a
 -- battery is above the controller's cutoff; after dark they also light the ground. Once every
@@ -18,14 +10,24 @@ require "RenewableEnergy/World/ArrowBoard"
 -- sets and which lights the board's zone of the lamps texture. After dark the board also gets a
 -- steady lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
+require "RenewableEnergy/Chance"
+require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sun"
+require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/Gadgets/VehicleBattery"
+require "RenewableEnergy/PowerBank/PanelSource"
+require "RenewableEnergy/World/ArrowBoard"
+
 local ArrowBoard = RenewableEnergy.ArrowBoard
 local Chance, Specs = RenewableEnergy.Chance, RenewableEnergy.Specs
+local Sun, Battery, PanelSource = RenewableEnergy.Sun, RenewableEnergy.Battery, RenewableEnergy.PanelSource
+local VehicleBattery = RenewableEnergy.VehicleBattery
 
 -- Battery box part modData. The box tracks its discharge cycle of the day as a bank tracks its
 -- own (Battery.trackCycle).
 ArrowBoard.SWITCH_KEY = "RenewableEnergy_switchOn"
 local LAMPS_KEY, CUT_OFF_KEY = "RenewableEnergy_lamps", "RenewableEnergy_cutOff"
-local CYCLE_DAY, CYCLE_HIGH, CYCLE_DEPTH = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
+local CYCLE_DAY_KEY, CYCLE_HIGH_KEY, CYCLE_DEPTH_KEY = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
 local LAMPS_DAY, LAMPS_NIGHT = "day", "night"
 
 -- The lamps' amber, halved, since the native lighting doubles a lamp's colour (SolarGardenLight).
@@ -39,7 +41,7 @@ end
 
 -- A battery in the box that can still hold a charge.
 local function holdsCharge(item)
-    return RenewableEnergy.Battery.nominalWh(item) > 0
+    return Battery.nominalWh(item) > 0
 end
 
 -- `charge` in whole uses of the battery. The game keeps a charge in uses and rounds a charge it is
@@ -70,7 +72,6 @@ end
 -- the controller's cutoff to drain them. The one furthest from it goes first, so that a mixed set
 -- evens out. Authority only. Returns the watt-hours moved.
 local function shift(container, wh, target, direction)
-    local Battery = RenewableEnergy.Battery
     local moved = 0
     local battery, gap = furthestFrom(container, target, direction)
     while battery and wh > 0 do
@@ -120,7 +121,7 @@ function ArrowBoard.charge(vehicle, hours, sky)
     if not container then
         return 0
     end
-    local wh = RenewableEnergy.Sun.squareWatts(vehicle:getSquare(), ArrowBoard.panelWatts(vehicle), sky) * hours
+    local wh = Sun.squareWatts(vehicle:getSquare(), ArrowBoard.panelWatts(vehicle), sky) * hours
     return shift(container, wh, 1, 1)
 end
 
@@ -171,23 +172,22 @@ end
 
 -- The lit lamps' draw in watts, day or night: vanilla's lightbar share of a car battery an hour.
 local function lampWatts()
-    return Specs.arrowBoard.lampShare * Specs.batteries[RenewableEnergy.VehicleBattery.CAR_BATTERY].wh
+    return Specs.arrowBoard.lampShare * Specs.batteries[VehicleBattery.CAR_BATTERY].wh
 end
 
 -- Follows the box's discharge cycle, and on a new day wears its batteries by the day before's
 -- deepest discharge, as a bank does.
 local function trackCycle(box, container)
-    local Battery = RenewableEnergy.Battery
     local charge, nominalWh = Battery.containerCharge(container)
     if nominalWh <= 0 then
         return
     end
     local modData, day = box:getModData(), Battery.today()
-    local high, depth, finished = Battery.trackCycle(modData[CYCLE_DAY], modData[CYCLE_HIGH], modData[CYCLE_DEPTH], charge, day)
+    local high, depth, finished = Battery.trackCycle(modData[CYCLE_DAY_KEY], modData[CYCLE_HIGH_KEY], modData[CYCLE_DEPTH_KEY], charge, day)
     if finished and finished > 0 then
         Battery.wearAll(container, finished)
     end
-    modData[CYCLE_DAY], modData[CYCLE_HIGH], modData[CYCLE_DEPTH] = day, high, depth
+    modData[CYCLE_DAY_KEY], modData[CYCLE_HIGH_KEY], modData[CYCLE_DEPTH_KEY] = day, high, depth
 end
 
 -- Sets the lamps by the switch, the board, the batteries and the photocell, which sees dark at
@@ -222,7 +222,7 @@ function ArrowBoard.runLamps(vehicle, hours, night)
     local drawn = lamps and shift(container, lampWatts() * hours, Specs.arrowBoard.cutoff, -1) or 0
     trackCycle(box, container)
     if night == nil then
-        night = RenewableEnergy.Sun.isDark()
+        night = Sun.isDark()
     end
     setLamps(vehicle, box, night)
     return drawn
@@ -237,7 +237,7 @@ function ArrowBoard.setSwitch(vehicle, on)
     end
     box:getModData()[ArrowBoard.SWITCH_KEY] = on
     vehicle:transmitPartModData(box)
-    setLamps(vehicle, box, RenewableEnergy.Sun.isDark())
+    setLamps(vehicle, box, Sun.isDark())
     return true
 end
 
@@ -248,11 +248,11 @@ function ArrowBoard.update(vehicle, hours, sky)
     if not ArrowBoard.isTrailer(vehicle) then
         return 0
     end
-    sky = sky or RenewableEnergy.Sun.skyNow()
-    ArrowBoard.stormCrack(vehicle, RenewableEnergy.PanelSource.stormHours(hours))
+    sky = sky or Sun.skyNow()
+    ArrowBoard.stormCrack(vehicle, PanelSource.stormHours(hours))
     ArrowBoard.showPanels(vehicle)
     local stored = ArrowBoard.charge(vehicle, hours, sky)
-    ArrowBoard.runLamps(vehicle, hours, RenewableEnergy.Sun.isDark(sky))
+    ArrowBoard.runLamps(vehicle, hours, Sun.isDark(sky))
     return stored
 end
 

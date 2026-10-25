@@ -1,8 +1,3 @@
-require "Vehicles/Vehicles"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/Gadgets/CarAlternator"
-
 -- Scales vanilla's vehicle battery charging and draining by the installed battery's capacity
 -- (RenewableEnergy.VehicleBattery.chargeScale), so a deep cycle battery's charge moves slower
 -- than a car battery's for the same watts: the lights and radio run longer with the engine off,
@@ -12,6 +7,11 @@ require "RenewableEnergy/Gadgets/CarAlternator"
 -- Vehicles.Update.Battery; parts call their update functions by name each time
 -- (VehiclePart.getLuaFunction), so the wrapped ones are the ones that run. What a start takes is
 -- Java's (BaseVehicle.tryStartEngine) and stays unscaled.
+
+require "Vehicles/Vehicles"
+require "RenewableEnergy/PowerBank/Battery"
+require "RenewableEnergy/Gadgets/VehicleBattery"
+require "RenewableEnergy/Gadgets/CarAlternator"
 
 local Battery, VehicleBattery = RenewableEnergy.Battery, RenewableEnergy.VehicleBattery
 local CarAlternator = RenewableEnergy.CarAlternator

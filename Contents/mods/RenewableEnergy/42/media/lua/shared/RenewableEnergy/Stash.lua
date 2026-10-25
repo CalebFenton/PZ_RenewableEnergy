@@ -1,10 +1,10 @@
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-
 -- Stash houses: buildings of the Muldraugh, KY map that the game's StashSystem stocks with a crate
 -- of solar gear, once someone reads an annotated map leading there or, for some, from the first
 -- day, as the Stash Houses option chooses. StashSystem reads StashDescriptions on the server and
 -- in single player.
+
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Sprites"
 
 RenewableEnergy = RenewableEnergy or {}
 local Stash = {}

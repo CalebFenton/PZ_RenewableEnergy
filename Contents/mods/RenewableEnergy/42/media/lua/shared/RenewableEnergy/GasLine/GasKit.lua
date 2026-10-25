@@ -2,7 +2,7 @@
 -- digester or gasifier (its source) that feeds it, and what each job at the generator takes. The
 -- authority does the jobs and runs the line (GasLines).
 --
--- A generator's kit and line live in its modData (GasKit.MOD_DATA), which the authority sends to
+-- A generator's kit and line live in its modData (GasKit.STATE_KEY), which the authority sends to
 -- the clients. On gas the generator runs on vanilla's own update on fuel the gas pays for: its tank
 -- (`tank`) stays what it was, and an empty one shows a little fuel so the game lets it run (`set`,
 -- what the authority last put in).
@@ -21,7 +21,7 @@ RenewableEnergy.GasKit = GasKit
 local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
 local Sprites = RenewableEnergy.Sprites
 
-GasKit.MOD_DATA = "RenewableEnergy_gas"
+GasKit.STATE_KEY = "RenewableEnergy_gas"
 GasKit.ITEM = "RenewableEnergy.GasConversionKit"
 GasKit.HOSE = "Base.RubberHose"
 -- A gasifier's gas leaves it hot, so its line is a metal pipe, and it stands beside the generator.
@@ -58,7 +58,7 @@ end
 --- watts, stalled, outOfGas, and while it runs on gas billedHour and billLitres, vanilla's last bill
 --- as the gas line sees it (GasLines.run) }.
 function GasKit.stateOf(generator)
-    local state = RenewableEnergy.isGenerator(generator) and generator:getModData()[GasKit.MOD_DATA]
+    local state = RenewableEnergy.isGenerator(generator) and generator:getModData()[GasKit.STATE_KEY]
     return state and state.kit and state or nil
 end
 

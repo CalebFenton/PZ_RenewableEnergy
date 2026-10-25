@@ -11,11 +11,11 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/GasLine/GasKit"
 require "RenewableEnergy/GasLine/GasLines"
-local Bank = require "RenewableEnergy/PowerBank/Bank"
+require "RenewableEnergy/PowerBank/Bank"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
-local Payers, PlaceTracker = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker
+local Payers, PlaceTracker, Bank = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker, RenewableEnergy.Bank
 
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
 -- (IsoGenerator.update), so a relay, which nobody stands by, never starts one that worn.

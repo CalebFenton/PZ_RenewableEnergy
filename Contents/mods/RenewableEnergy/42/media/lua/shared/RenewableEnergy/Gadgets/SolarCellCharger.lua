@@ -1,7 +1,3 @@
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-
 -- The Solar Battery Charger: a small panel over a tray of vanilla batteries (Base.Battery), the
 -- only cell that lamps, radios and flashlights take. Placed outdoors, it charges them in daylight.
 --
@@ -9,6 +5,11 @@ require "RenewableEnergy/Sprites"
 -- set again whenever the tile loads or is placed, on every side; the authority also keeps the
 -- places of the chargers it has seen, and charges them
 -- (server/RenewableEnergy/Gadgets/SolarCellChargerServer.lua).
+
+require "RenewableEnergy/PlaceTracker"
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Sprites"
+
 RenewableEnergy = RenewableEnergy or {}
 local SolarCellCharger = {}
 RenewableEnergy.SolarCellCharger = SolarCellCharger

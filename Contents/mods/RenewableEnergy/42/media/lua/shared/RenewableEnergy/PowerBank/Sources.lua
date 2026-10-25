@@ -84,7 +84,7 @@ local function isSource(isoObject)
 end
 
 --- The source on a square, or nil.
-function Sources.on(square)
+function Sources.findOn(square)
     return RenewableEnergy.findObjectOn(square, isSource)
 end
 
@@ -108,29 +108,29 @@ function Sources.banksInReach(x, y, z, kind)
     return found
 end
 
---- Why the source `isoObject` can't be connected to the bank at `bank` ({ x, y, z }) now, or nil:
---- "out of reach" (or a square it can't work from), or "already connected" to that bank. Whether
---- the bank has the input slots is the authority's to say (Commands.connectSource).
-function Sources.connectRefusal(isoObject, bank)
+--- Why the source `isoObject` can't be connected to the bank at `bankPosition` ({ x, y, z }) now,
+--- or nil: "out of reach" (or a square it can't work from), or "already connected" to that bank.
+--- Whether the bank has the input slots is the authority's to say (BankJobs.connectSource).
+function Sources.connectRefusal(isoObject, bankPosition)
     local kind = Sources.kindOf(isoObject)
     if not (kind and Sources.squareOk(isoObject:getSquare(), kind)
-        and PowerBank.isInReach(bank, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
+        and PowerBank.isInReach(bankPosition, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
         return "out of reach"
-    elseif PowerBank.samePosition(PowerBank.connectedBank(isoObject), bank) then
+    elseif PowerBank.samePosition(PowerBank.connectedBank(isoObject), bankPosition) then
         return "already connected"
     end
     return nil
 end
 
---- The loaded sources the bank at `bank` ({ x, y, z }) could take now (Sources.connectRefusal),
---- those connected to another bank included.
-function Sources.sourcesInReach(bank)
+--- The loaded sources the bank at `bankPosition` ({ x, y, z }) could take now
+--- (Sources.connectRefusal), those connected to another bank included.
+function Sources.sourcesInReach(bankPosition)
     local reach = Specs.sourceReach
     local found = {}
-    for z = bank.z - reach.levels, bank.z + reach.levels do
-        RenewableEnergy.eachSquareAround(bank.x, bank.y, z, reach.tiles, function(square)
-            local source = Sources.on(square)
-            if source and not Sources.connectRefusal(source, bank) then
+    for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
+        RenewableEnergy.eachSquareAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)
+            local source = Sources.findOn(square)
+            if source and not Sources.connectRefusal(source, bankPosition) then
                 table.insert(found, source)
             end
         end)

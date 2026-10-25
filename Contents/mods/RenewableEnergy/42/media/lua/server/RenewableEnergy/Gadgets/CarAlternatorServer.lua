@@ -1,14 +1,13 @@
-if isClient() then
-    return
-end
+-- The Car Alternator on the authority: taking it out of a car and putting it back, from a timed
+-- action's complete(), and the one a smashed wreck may give when it is scrapped.
+
+if isClient() then return end
 
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Chance"
 require "RenewableEnergy/Gadgets/CarAlternator"
 
--- The Car Alternator on the authority: taking it out of a car and putting it back, from a timed
--- action's complete(), and the one a smashed wreck may give when it is scrapped.
 local CarAlternator, Chance = RenewableEnergy.CarAlternator, RenewableEnergy.Chance
 
 --- Takes the alternator out of `vehicle` and gives it to `character`, teaching Mechanics the
@@ -55,7 +54,7 @@ function ISRemoveBurntVehicle:complete()
         return done
     end
     if Chance.hit(chance) then
-        square:AddWorldInventoryItem(CarAlternator.ITEM, ZombRandFloat(0, 0.9), ZombRandFloat(0, 0.9), 0)
+        RenewableEnergy.dropOn(square, CarAlternator.ITEM)
         addXp(character, Perks.MetalWelding, 1)
     end
     return done

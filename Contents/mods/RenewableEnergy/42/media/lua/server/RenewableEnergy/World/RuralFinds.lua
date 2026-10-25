@@ -1,6 +1,14 @@
-if isClient() then
-    return
-end
+-- Worn homestead installations left by rural buildings: an old wind charger by a barn, a barrel
+-- digester by livestock buildings, a primitive gasifier by a hunting shack. Each is built the way
+-- the build menu builds it, then put in worn states the mod already has, so the player repairs it
+-- with the existing jobs. Each qualifying building is rolled once, as GardenLights rolls houses:
+-- when its chunk first loads and the squares around it with it (BuildingWatch), kept in global
+-- ModData. The odds follow the Solar Sites option (0 turns them off). A solar site's find counts
+-- as the find of the buildings it stands by, so they aren't rolled for a second one.
+--
+-- Also adds RE's books and gadgets to vanilla's barn and survivalist camp story clutter.
+
+if isClient() then return end
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/Chance"
@@ -14,16 +22,6 @@ require "RenewableEnergy/WoodGas/GasifierSystem"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/BuildingWatch"
 require "RandomizedWorldContent/StoryTable_Initialization"
-
--- Worn homestead installations left by rural buildings: an old wind charger by a barn, a barrel
--- digester by livestock buildings, a primitive gasifier by a hunting shack. Each is built the way
--- the build menu builds it, then put in worn states the mod already has, so the player repairs it
--- with the existing jobs. Each qualifying building is rolled once, as GardenLights rolls houses:
--- when its chunk first loads and the squares around it with it (BuildingWatch), kept in global
--- ModData. The odds follow the Solar Sites option (0 turns them off). A solar site's find counts
--- as the find of the buildings it stands by, so they aren't rolled for a second one.
---
--- Also adds RE's books and gadgets to vanilla's barn and survivalist camp story clutter.
 
 RenewableEnergy = RenewableEnergy or {}
 local RuralFinds = {}
@@ -140,7 +138,7 @@ function RuralFinds.leaveReading(def, fullType)
     if #floors == 0 then
         return false
     end
-    return Chance.pick(floors):AddWorldInventoryItem(fullType, ZombRandFloat(0.2, 0.8), ZombRandFloat(0.2, 0.8), 0) ~= nil
+    return RenewableEnergy.dropOn(Chance.pick(floors), fullType) ~= nil
 end
 
 -- Finds

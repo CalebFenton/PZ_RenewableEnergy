@@ -1,6 +1,11 @@
-if isClient() then
-    return
-end
+-- Solar garden lights along the front paths of houses. Each house is rolled once, when its
+-- chunk first loads and its surroundings with it (BuildingWatch), so the lights differ between
+-- playthroughs and a house never gets them twice. How likely a house is to have them depends on
+-- its neighbourhood: the map zones that vanilla's loot reads (ItemPickerJava forceForZones
+-- matches a zone's type or name). A solar site promises its house lights, which the house then
+-- gets for certain when it is rolled.
+
+if isClient() then return end
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sprites"
@@ -8,13 +13,6 @@ require "RenewableEnergy/Chance"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/World/WorldSpawns"
 require "RenewableEnergy/World/BuildingWatch"
-
--- Solar garden lights along the front paths of houses. Each house is rolled once, when its
--- chunk first loads and its surroundings with it (BuildingWatch), so the lights differ between
--- playthroughs and a house never gets them twice. How likely a house is to have them depends on
--- its neighbourhood: the map zones that vanilla's loot reads (ItemPickerJava forceForZones
--- matches a zone's type or name). A solar site promises its house lights, which the house then
--- gets for certain when it is rolled.
 
 RenewableEnergy = RenewableEnergy or {}
 local GardenLights = {}

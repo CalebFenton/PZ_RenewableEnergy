@@ -1,13 +1,12 @@
-if isClient() then
-    return
-end
+-- The Solar Battery Charger on the authority: the charge GadgetCharging's pass gives.
+
+if isClient() then return end
 
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/Gadgets/SolarCellCharger"
 
--- The Solar Battery Charger on the authority: the charge GadgetCharging's pass gives.
 local SolarCellCharger = RenewableEnergy.SolarCellCharger
 local Battery, Specs, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun
 

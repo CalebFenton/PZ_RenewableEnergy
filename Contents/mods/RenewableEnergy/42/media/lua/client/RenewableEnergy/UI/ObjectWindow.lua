@@ -7,7 +7,7 @@
 -- returns false when there is nothing left to show.
 
 require "ISUI/ISCollapsableWindow"
-require "RenewableEnergy/TimedActions/RenewableEnergyInfoAction"
+require "RenewableEnergy/TimedActions/InfoAction"
 
 RenewableEnergy = RenewableEnergy or {}
 local ObjectWindow = ISCollapsableWindow:derive("RenewableEnergyObjectWindow")

@@ -13,7 +13,7 @@ RenewableEnergy.Treadmill = Treadmill
 local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
 
 -- Tile modData: the tile wired to feed a bank (one of the treadmill's two tiles).
-Treadmill.WIRED = "RenewableEnergy_treadmillWired"
+Treadmill.WIRED_KEY = "RenewableEnergy_treadmillWired"
 -- The item dismantling a treadmill gives.
 Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
 
@@ -31,7 +31,7 @@ end
 
 --- Whether the treadmill tile `tile` is the one wired to feed a bank.
 function Treadmill.isWired(tile)
-    return tile:getModData()[Treadmill.WIRED] == true
+    return tile:getModData()[Treadmill.WIRED_KEY] == true
 end
 
 --- Whether `isoObject` is a treadmill's tile wired to feed a bank.
@@ -40,7 +40,7 @@ function Treadmill.isWiredTile(isoObject)
 end
 
 --- A treadmill's tile on `square`, wired or not, or nil.
-function Treadmill.on(square)
+function Treadmill.findOn(square)
     return RenewableEnergy.findObjectOn(square, Treadmill.isTreadmill)
 end
 
@@ -66,7 +66,7 @@ function Treadmill.wiredHalf(tile)
     local rear, console = Treadmill.ends(tile)
     local square = tile:getSquare()
     local other = (square:getX() == rear.x and square:getY() == rear.y) and console or rear
-    local found = Treadmill.on(getSquare(other.x, other.y, square:getZ()))
+    local found = Treadmill.findOn(getSquare(other.x, other.y, square:getZ()))
     if not (found and Treadmill.isWired(found)) then
         return nil
     end

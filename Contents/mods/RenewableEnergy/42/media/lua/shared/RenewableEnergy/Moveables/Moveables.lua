@@ -1,3 +1,9 @@
+-- How the mod's placed objects move: what dismantling a bank gives back, where each may be
+-- placed, and what an object's modData carries into its item when picked up.
+--
+-- Shared, not client: picking up, placing and scrapping complete on the server
+-- (ISMoveablesAction:complete), and a dedicated server never loads client Lua.
+
 require "Moveables/ISMoveableDefinitions"
 require "Moveables/ISMoveableSpriteProps"
 require "RenewableEnergy/Specs"
@@ -7,12 +13,6 @@ require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/Chance"
-
--- How the mod's placed objects move: what dismantling a bank gives back, where each may be
--- placed, and what an object's modData carries into its item when picked up.
---
--- Shared, not client: picking up, placing and scrapping complete on the server
--- (ISMoveablesAction:complete), and a dedicated server never loads client Lua.
 
 local Specs, PowerBank = RenewableEnergy.Specs, RenewableEnergy.PowerBank
 local Treadmill, SolarGardenLight = RenewableEnergy.Treadmill, RenewableEnergy.SolarGardenLight
@@ -161,7 +161,7 @@ end
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
 -- conditions and a garden light its charge and bulb.
 
-local CARRIED_KEYS = { PowerBank.MODULES, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
+local CARRIED_KEYS = { PowerBank.MODULES_KEY, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
 
 -- The object being picked up, until vanilla makes its item. Each pick-up makes one item, which
 -- takes it, so an error in vanilla's pick-up can't leave it for an unrelated item later.

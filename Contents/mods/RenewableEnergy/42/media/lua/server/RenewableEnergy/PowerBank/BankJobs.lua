@@ -1,9 +1,9 @@
 -- What players do to banks, run on the authority: from a timed action's complete(), or the refresh
--- of a bank whose status window a client opened (BankSystem:OnClientCommand). Every command
+-- of a bank whose status window a client opened (BankSystem:OnClientCommand). Every job
 -- checks the world again, since a client's view can be stale or forged. Each returns whether it
 -- did anything and, if not, why (a translation key where the player is told).
 --
--- A bank runs in passes, each billing the hours since the last at the bank's state now. A command
+-- A bank runs in passes, each billing the hours since the last at the bank's state now. A job
 -- that changes that state first brings the bank up to now (settle), so the change counts from the
 -- moment it was made rather than from the last pass.
 
@@ -28,10 +28,11 @@ local Specs, Wind, PowerBank, Wear = RenewableEnergy.Specs, RenewableEnergy.Wind
 local Sources, Treadmill, BankSystem = RenewableEnergy.Sources, RenewableEnergy.Treadmill, RenewableEnergy.BankSystem
 local PanelSource, WindSource = RenewableEnergy.PanelSource, RenewableEnergy.WindSource
 local Recipes = RenewableEnergy.Recipes
+local Materials, TreadmillSource = RenewableEnergy.Materials, RenewableEnergy.TreadmillSource
 local isPosition, bankAt = PowerBank.isPosition, BankSystem.bankAt
 
-local Commands = {}
-RenewableEnergy.Commands = Commands
+local BankJobs = {}
+RenewableEnergy.BankJobs = BankJobs
 
 -- What `find(square)` finds on the square `position` names, or nil, also when `position` isn't a
 -- { x, y, z } place.
@@ -40,7 +41,7 @@ local function objectAt(position, find)
 end
 
 local function sourceAt(position)
-    return objectAt(position, Sources.on)
+    return objectAt(position, Sources.findOn)
 end
 
 local function bankOfSource(position)
@@ -50,7 +51,7 @@ end
 
 -- The bank `position` names a source of, and its record of that source; nil for a source that
 -- feeds no bank.
-local function recordOf(position)
+local function sourceRecordAt(position)
     local bank = bankOfSource(position)
     return bank, bank and bank:findSource(position.x, position.y, position.z)
 end
@@ -64,7 +65,7 @@ end
 
 -- Takes from `player` what a wiring job of `wiring` (as Specs.wiring's) uses.
 local function takeWiring(player, wiring)
-    RenewableEnergy.Materials.consume(player, PowerBank.wiringMaterials(wiring))
+    Materials.consume(player, PowerBank.wiringMaterials(wiring))
 end
 
 -- The bank looks at itself again after its parts changed.
@@ -74,7 +75,7 @@ local function partsChanged(bank)
     bank:sendStatus()
 end
 
-function Commands.setBankOn(player, args)
+function BankJobs.setBankOn(player, args)
     local bank = bankAt(args.bank)
     if not bank then return false, "no bank" end
     local on = args.on == true
@@ -87,7 +88,7 @@ function Commands.setBankOn(player, args)
     return true
 end
 
-function Commands.setBankConnected(player, args)
+function BankJobs.setBankConnected(player, args)
     local bank = bankAt(args.bank)
     local isoObject = bank and bank:getIsoObject()
     if not isoObject then return false, "no bank" end
@@ -103,37 +104,37 @@ function Commands.setBankConnected(player, args)
     return true
 end
 
-function Commands.connectSource(player, args)
+function BankJobs.connectSource(player, args)
     local bank = bankAt(args.bank)
-    local source = sourceAt(args.source)
-    if not (bank and source) then return false, "no bank or source" end
+    local object = sourceAt(args.source)
+    if not (bank and object) then return false, "no bank or source" end
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
     -- snow and all.
-    local refusal = Sources.connectRefusal(source, bank) or Sources.bankRefusal(bank.connected)
+    local refusal = Sources.connectRefusal(object, bank) or Sources.bankRefusal(bank.connected)
     if refusal then return false, refusal end
     -- The container is the truth about the controllers, whatever filled it since the last pass.
     bank:recount()
-    refusal = Sources.slotRefusal(Sources.kindOf(source), bank:inputSlots() - bank:slotsUsed())
+    refusal = Sources.slotRefusal(Sources.kindOf(object), bank:inputSlots() - bank:slotsUsed())
     if refusal then return false, refusal end
     local previous = bankOfSource(args.source)
     if previous then
-        BankSystem.dropSource(previous, source:getX(), source:getY(), source:getZ())
+        BankSystem.dropSource(previous, object:getX(), object:getY(), object:getZ())
     end
     settle(bank)
-    bank:addSource(source, player)
+    bank:addSource(object, player)
     bank:sendStatus()
     return true
 end
 
-function Commands.disconnectSource(player, args)
+function BankJobs.disconnectSource(player, args)
     local bank = bankOfSource(args.source)
     if not bank then return false, "not connected" end
     BankSystem.dropSource(bank, args.source.x, args.source.y, args.source.z)
     return true
 end
 
-function Commands.clearSnow(player, args)
-    local bank, source = recordOf(args.source)
+function BankJobs.clearSnow(player, args)
+    local bank, source = sourceRecordAt(args.source)
     if not source then return false, "not connected" end
     settle(bank)
     PanelSource.clearSnow(source, sourceAt(args.source))
@@ -144,10 +145,10 @@ end
 --- Seals the module in `args.slot` of the placed panel at `args.source` with what the player
 --- carries, as Seal Cracked Module seals one in hand. Its bank's record, if it feeds one, takes the
 --- sealed modules at once.
-function Commands.sealModule(player, args)
+function BankJobs.sealModule(player, args)
     local object = sourceAt(args.source)
     if not object then return false, "no panel" end
-    local bank, source = recordOf(args.source)
+    local bank, source = sourceRecordAt(args.source)
     settle(bank)
     -- A storm may have cracked the bank's record while the panel's square was unloaded.
     if source then
@@ -155,9 +156,9 @@ function Commands.sealModule(player, args)
     end
     local module, modules = Recipes.sealableModule(object, args.slot)
     if not module then return false, "nothing to seal" end
-    local refusal = Recipes.panelRepairRefusal(player)
+    local refusal = Recipes.sealInPlaceRefusal(player)
     if refusal then return false, refusal end
-    Recipes.useInputs(Recipes.panelRepairInputs(player), player)
+    Recipes.useInputs(Recipes.sealInPlaceInputs(player), player)
     Recipes.sealRecord(module)
     PanelSource.writeModules(object, modules)
     PanelSource.showCracks(object)
@@ -170,10 +171,10 @@ function Commands.sealModule(player, args)
 end
 
 -- Brakes a wind charger, or lets it go, and the record of the bank it feeds with it.
-function Commands.setBrake(player, args)
+function BankJobs.setBrake(player, args)
     local object = sourceAt(args.source)
     if not (object and Wind.isCharger(object)) then return false, "no wind charger" end
-    local bank, source = recordOf(args.source)
+    local bank, source = sourceRecordAt(args.source)
     settle(bank)
     WindSource.setBraked(object, args.braked == true, source)
     if bank then
@@ -186,10 +187,10 @@ end
 --- whose blades a storm broke, and hands the player what is left of the broken ones. Blades of
 --- another material its kind takes make it a charger of those (WindSource.fitBlades). Its bank's
 --- record, if it feeds one, mends with the object.
-function Commands.replaceBlades(player, args)
+function BankJobs.replaceBlades(player, args)
     local object = sourceAt(args.source)
     if not (object and Wind.isCharger(object)) then return false, "no wind charger" end
-    local bank, source = recordOf(args.source)
+    local bank, source = sourceRecordAt(args.source)
     settle(bank)
     -- A gale may have broken the record since the last pass brought it to the object.
     if source and source.broken and not Wind.isBroken(object) then
@@ -210,23 +211,23 @@ function Commands.replaceBlades(player, args)
 end
 
 local function treadmillAt(position)
-    return objectAt(position, Treadmill.on)
+    return objectAt(position, Treadmill.findOn)
 end
 
 --- Wires the treadmill tile at `args.source` to feed a bank, from the player's wire and scrap.
-function Commands.wireTreadmill(player, args)
+function BankJobs.wireTreadmill(player, args)
     local object = treadmillAt(args.source)
     if not (player and object) then return false, "no treadmill" end
     local refusal = Treadmill.wiringRefusal(player, object)
     if refusal then return false, refusal end
     takeWiring(player, Specs.treadmill.wiring)
-    RenewableEnergy.TreadmillSource.wire(object, player)
+    TreadmillSource.wire(object, player)
     return true
 end
 
 --- Unwires the wired treadmill tile at `args.source`: it stops feeding its bank, and the player
 --- gets its wire back.
-function Commands.unwireTreadmill(player, args)
+function BankJobs.unwireTreadmill(player, args)
     local object = treadmillAt(args.source)
     if not (player and object) then return false, "no treadmill" end
     local refusal = Treadmill.unwiringRefusal(player, object)
@@ -236,26 +237,26 @@ function Commands.unwireTreadmill(player, args)
         -- What its runs banked up to now counts.
         BankSystem.dropSource(bank, args.source.x, args.source.y, args.source.z)
     end
-    RenewableEnergy.TreadmillSource.unwire(object, player)
+    TreadmillSource.unwire(object, player)
     return true
 end
 
 --- Banks `args.hours` of running on the wired treadmill at `args.source` with the bank it feeds,
 --- for its next passes. Runs from the treadmill action's own clock on the authority.
-function Commands.runTreadmill(player, args)
+function BankJobs.runTreadmill(player, args)
     local object = sourceAt(args.source)
-    local _, source = recordOf(args.source)
+    local _, source = sourceRecordAt(args.source)
     if not (object and source and Treadmill.isWiredTile(object)) then
         return false, "Tooltip_RenewableEnergy_TreadmillNotConnected"
     end
     local hours = math.max(0, math.min(tonumber(args.hours) or 0, Specs.treadmill.runMinutes / 60))
-    RenewableEnergy.TreadmillSource.credit(source, Specs.treadmill.watts * hours)
+    TreadmillSource.credit(source, Specs.treadmill.watts * hours)
     return true
 end
 
 --- Wire the part `itemId` from the player's inventory into the bank. The bank's container
 --- filter refuses every transfer, so the part is moved here, past it.
-function Commands.wireIn(player, args)
+function BankJobs.wireIn(player, args)
     local bank = bankAt(args.bank)
     local container = bank and bank:container()
     if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
@@ -267,13 +268,13 @@ function Commands.wireIn(player, args)
     takeWiring(player, wiring)
     RenewableEnergy.takeItem(player, item)
     RenewableEnergy.addItem(container, item)
-    RenewableEnergy.teachOnce(player, item, PowerBank.WIRED_ONCE, Perks.Electricity, wiring.xp)
+    RenewableEnergy.teachOnce(player, item, PowerBank.WIRED_ONCE_KEY, Perks.Electricity, wiring.xp)
     partsChanged(bank)
     return true
 end
 
 --- Unwire the part `itemId` from the bank: the player gets it back with its wire.
-function Commands.unwire(player, args)
+function BankJobs.unwire(player, args)
     local bank = bankAt(args.bank)
     local container = bank and bank:container()
     if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
@@ -291,7 +292,7 @@ function Commands.unwire(player, args)
 end
 
 --- Repair the inverter or controller `itemId` in the bank with Electronics Scrap.
-function Commands.repairPart(player, args)
+function BankJobs.repairPart(player, args)
     local bank = bankAt(args.bank)
     local container = bank and bank:container()
     if not (player and container and type(args.itemId) == "number") then return false, "no bank" end
@@ -308,7 +309,7 @@ function Commands.repairPart(player, args)
 end
 
 --- Name the bank; an empty name gives it back its tier's name.
-function Commands.rename(player, args)
+function BankJobs.rename(player, args)
     local bank = bankAt(args.bank)
     if not (bank and type(args.name) == "string") then return false, "no bank" end
     local name = args.name:gsub("^%s+", ""):gsub("%s+$", "")
@@ -319,7 +320,7 @@ function Commands.rename(player, args)
     return true
 end
 
-function Commands.refresh(player, args)
+function BankJobs.refresh(player, args)
     local bank = bankAt(args.bank)
     if not bank then return false, "no bank" end
     bank:refresh()
@@ -328,11 +329,11 @@ end
 
 --- Run command `name` now. Returns whether it did anything, and why not.
 function PowerBank.perform(player, name, args)
-    local command = Commands[name]
+    local command = BankJobs[name]
     if not (command and type(args) == "table") then
         return false, "unknown command"
     end
     return command(player, args)
 end
 
-return Commands
+return BankJobs

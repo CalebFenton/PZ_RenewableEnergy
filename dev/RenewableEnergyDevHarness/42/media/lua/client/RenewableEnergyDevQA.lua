@@ -305,7 +305,7 @@ local function lay(layout, summary, fullType, count, fluid, worn)
     end
     for _ = 1, count do
         local item = newItem(fullType, fluid, worn)
-        square:AddWorldInventoryItem(item, ZombRandFloat(0.2, 0.8), ZombRandFloat(0.2, 0.8), 0)
+        RenewableEnergy.dropOn(square, item)
         summary.items = summary.items + 1
     end
     summary.types = summary.types + 1

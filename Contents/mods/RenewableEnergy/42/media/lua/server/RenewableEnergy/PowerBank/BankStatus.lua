@@ -6,10 +6,10 @@ if isClient() then return end
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
-local Bank = require "RenewableEnergy/PowerBank/Bank"
+require "RenewableEnergy/PowerBank/Bank"
 
 RenewableEnergy = RenewableEnergy or {}
-local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
+local PowerBank, Sources, Bank = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Bank
 
 --- What the bank is doing, for the status window.
 function Bank:state()
@@ -93,7 +93,7 @@ function Bank:buildStatus()
         sunElevation = now.elevation or 0,
         irradiance = now.irradiance or 0,
         windKph = now.windKph or 0,
-        chargerW = now.chargerW or 0, chargerMaxW = self:chargerW(), chargeSource = chargeSource, inW = inW,
+        chargerW = now.chargerW or 0, chargerMaxW = self:chargerMaxW(), chargeSource = chargeSource, inW = inW,
         gridPowered = self.gridPowered,
         loadWhToday = self.loadWhToday, backupWhToday = self.backupWhToday or 0,
         loadW = self.loadW, drawW = drawW, limitW = self:limitW(), overloaded = self.overloaded,
@@ -163,7 +163,7 @@ local function watchersOf(bank)
 end
 
 local function sendTo(bank, player)
-    sendServerCommand(player, PowerBank.STATUS_MODULE, "status", { x = bank.x, y = bank.y, z = bank.z, status = bank.status })
+    sendServerCommand(player, PowerBank.COMMAND_MODULE, PowerBank.STATUS_COMMAND, { x = bank.x, y = bank.y, z = bank.z, status = bank.status })
 end
 
 --- Tell the clients what changed: every client the summary, when it changed, and the players

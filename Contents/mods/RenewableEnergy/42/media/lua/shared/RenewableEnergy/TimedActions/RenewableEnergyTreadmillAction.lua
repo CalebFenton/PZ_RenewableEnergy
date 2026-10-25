@@ -1,3 +1,10 @@
+-- Run on Treadmill: the character runs in place on a treadmill. On one wired to a bank the belt
+-- turns its motor, and the run banks watt-hours; on an unwired one the motor turns the belt, on
+-- power, which the run draws from start to end (Treadmill.startDrawing). A run lasts
+-- Specs.treadmill.runMinutes and stopping early counts the share run. The authority settles it:
+-- complete() a whole run, serverStop() (stop() in single player) part of one.
+-- A global, as the server finds the class by its Type (NetTimedAction.parse).
+
 require "TimedActions/ISBaseTimedAction"
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/TimedActions/JobAction"
@@ -6,12 +13,6 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Treadmill"
 
--- Run on Treadmill: the character runs in place on a treadmill. On one wired to a bank the belt
--- turns its motor, and the run banks watt-hours; on an unwired one the motor turns the belt, on
--- power, which the run draws from start to end (Treadmill.startDrawing). A run lasts
--- Specs.treadmill.runMinutes and stopping early counts the share run. The authority settles it:
--- complete() a whole run, serverStop() (stop() in single player) part of one.
--- A global, as the server finds the class by its Type (NetTimedAction.parse).
 RenewableEnergyTreadmillAction = ISBaseTimedAction:derive("RenewableEnergyTreadmillAction")
 
 local Action = RenewableEnergyTreadmillAction

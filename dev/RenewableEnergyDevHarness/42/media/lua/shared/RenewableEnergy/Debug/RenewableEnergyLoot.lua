@@ -12,7 +12,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Sun"
 require "PZHarness/Fixtures"
-local Stash = require "RenewableEnergy/StashHouses"
+local Stash = require "RenewableEnergy/Stash"
 
 RenewableEnergy = RenewableEnergy or {}
 local Loot = {}

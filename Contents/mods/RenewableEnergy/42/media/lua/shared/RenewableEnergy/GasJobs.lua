@@ -18,7 +18,7 @@ local Materials = RenewableEnergy.Materials
 -- then what is wrong with `with`, then "short" for the first unmet need.
 local function refusalAt(Jobs, character, job, subject, with)
     return Jobs.blocker(job, subject, with)
-        or Jobs.check(character, job, subject, with)
+        or Jobs.withRefusal(character, job, subject, with)
         or (RenewableEnergy.firstUnmet(Jobs.needs(character, job, subject, with)) and "short")
         or nil
 end
@@ -27,7 +27,7 @@ end
 --- - blocker(subject, with): the state of the target that refuses the job, as a translation key,
 ---   or nil. hideBlocked: a menu leaves the job out, rather than greyed, while its blocker refuses
 ---   it, as it belongs to another state of the target.
---- - check(character, subject, with), if any: what refuses `with`, what the character brings.
+--- - withRefusal(character, subject, with), if any: what refuses `with`, what the character brings.
 --- - materials: what it takes of the character (RenewableEnergy.Materials), or a
 ---   function(subject, with) of them.
 --- - xp: { perk, amount }, what it gives once done.
@@ -65,9 +65,9 @@ function GasJobs.define(Jobs, spec)
     end
 
     --- What refuses `with`, what `character` brings to `job`, as a translation key, or nil.
-    function Jobs.check(character, job, subject, with)
-        local check = Jobs.JOBS[job].check
-        return check and check(character, subject, with) or nil
+    function Jobs.withRefusal(character, job, subject, with)
+        local withRefusal = Jobs.JOBS[job].withRefusal
+        return withRefusal and withRefusal(character, subject, with) or nil
     end
 
     --- What refuses `character` doing `job` at `target` with `with`, as this side knows it now: a

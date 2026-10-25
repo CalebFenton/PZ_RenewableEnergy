@@ -25,13 +25,13 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Payers"
 require "RenewableEnergy/GasLine/GasLines"
 require "RenewableEnergy/Fumes"
-local Loads = require "RenewableEnergy/PowerBank/Loads"
+require "RenewableEnergy/PowerBank/Loads"
 
 RenewableEnergy = RenewableEnergy or {}
 local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 local Battery, Wear, PowerBank, Sources = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank,
     RenewableEnergy.Sources
-local Payers, PlaceTracker = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker
+local Payers, PlaceTracker, Loads = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker, RenewableEnergy.Loads
 
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
 RenewableEnergy.Bank = Bank
@@ -243,7 +243,7 @@ end
 
 --- The watts the bank's working chargers, and the chargers built into its inverters, put in
 --- while grid or generator power reaches it.
-function Bank:chargerW()
+function Bank:chargerMaxW()
     local watts = sumInverters(self, "chargerWatts")
     for _, charger in ipairs(self.chargers) do
         if working(charger) then
@@ -368,7 +368,7 @@ function Bank:updateSources(hours, context)
     while i <= #self.sources do
         local source = self.sources[i]
         local square = getSquare(source.x, source.y, source.z)
-        local object = Sources.on(square)
+        local object = Sources.findOn(square)
         if square and not (object and Sources.squareOk(square, source.kind)
             and PowerBank.isInReach(self, source.x, source.y, source.z)) then
             dropSource(self, i)
@@ -406,7 +406,7 @@ function Bank:measure()
         return {}
     end
     self.gridPowered = square:hasGridPower()
-    local load = (self.on or self:chargerW() > 0) and Loads.scan(square, Payers.ofBank(self), Payers.running(), true)
+    local load = (self.on or self:chargerMaxW() > 0) and Loads.scan(square, Payers.ofBank(self), Payers.running(), true)
         or Loads.new()
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)
@@ -422,12 +422,12 @@ local function fueled(bank, generators)
     return PlaceTracker.nearest(generators, bank.x, bank.y, bank.z, PlaceTracker.objectPlace, hasFuel)
 end
 
--- The place of `generator`, as chargeSource names a charging generator.
-local function placeOf(generator)
-    return PlaceTracker.key(generator:getX(), generator:getY(), generator:getZ())
+-- The place key of `generator`, as chargeSource names a charging generator.
+local function keyOf(generator)
+    return PlaceTracker.key(PlaceTracker.objectPlace(generator))
 end
 
---- What the chargers charge from, saved as `chargeSource`: "grid", the place (placeOf) of the
+--- What the chargers charge from, saved as `chargeSource`: "grid", the place key (keyOf) of the
 --- nearest fueled running generator whose reach covers the bank, or false. Saves as `chargeWantW`
 --- their watts, capped so they fill no more than `roomWh` over `hours`: a gas line splits its
 --- cap by these wants (GasLines.chargerLimitW), so it must outlive the pass. Returns the watts put
@@ -439,12 +439,12 @@ function Bank:chargeFrom(generators, hours, roomWh)
     local wasSource, wasWantW = self.chargeSource, self.chargeWantW
     if self:getSquare() then
         generator = not self.gridPowered and fueled(self, generators)
-        self.chargeSource = (self.gridPowered and "grid") or (generator and placeOf(generator)) or false
+        self.chargeSource = (self.gridPowered and "grid") or (generator and keyOf(generator)) or false
     elseif not (self.chargeSource == "grid" and self.gridPowered) then
         self.chargeSource = false
     end
     local charging = self.chargeSource and hours > 0 and roomWh > 0
-    self.chargeWantW = charging and math.min(self:chargerW(), roomWh / hours) or 0
+    self.chargeWantW = charging and math.min(self:chargerMaxW(), roomWh / hours) or 0
     if self.chargeSource ~= wasSource or math.abs(self.chargeWantW - (wasWantW or 0)) > 0.01 then
         Payers.billGenerators()
     end
@@ -461,7 +461,7 @@ end
 --- Whether the bank's chargers charge from `generator`. An older save's "generator" names none;
 --- the bank's next pass names it.
 function Bank:chargesFrom(generator)
-    return self.chargeSource == placeOf(generator)
+    return self.chargeSource == keyOf(generator)
 end
 
 --- Whether the bank would carry its load now: it can, and no backup generator does it instead.

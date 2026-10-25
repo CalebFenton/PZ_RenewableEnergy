@@ -350,10 +350,11 @@ local REASONS = {
     idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }
 
--- "Wooden rack, 6 tiles north-east": a source from Bank status `sources`, from the bank at `bank`.
-local function sourceLabel(source, bank)
+-- "Wooden rack, 6 tiles north-east": a source from Bank status `sources`, from the bank at
+-- `bankPosition`.
+local function sourceLabel(source, bankPosition)
     local name = SOURCE_NAMES[source.kind .. (source.material or "")]
-    return getText("IGUI_RenewableEnergy_SourceWhere", getText(name), Format.away(bank, source))
+    return getText("IGUI_RenewableEnergy_SourceWhere", getText(name), Format.away(bankPosition, source))
 end
 
 -- A source's output, by family: a panel's with its share of full sun, a wind charger's with the
@@ -377,23 +378,23 @@ local function sourceValue(source, status)
     return getText("IGUI_RenewableEnergy_SourceOutputReason", value, getText(reason.key)), reason.fixable and "bad" or "dim"
 end
 
-local function sourceRows(rows, status, bank)
+local function sourceRows(rows, status, bankPosition)
     header(rows, "IGUI_RenewableEnergy_Sources", #status.sources)
     for _, source in ipairs(status.sources) do
         local value, colorName = sourceValue(source, status)
-        table.insert(rows, { label = sourceLabel(source, bank), value = value, color = colorName, source = source })
+        table.insert(rows, { label = sourceLabel(source, bankPosition), value = value, color = colorName, source = source })
     end
 end
 
---- The rows of both columns for a status snapshot of the bank at `bank` ({ x, y, z }).
-function StatusWindow.rows(status, bank)
+--- The rows of both columns for a status snapshot of the bank at `bankPosition` ({ x, y, z }).
+function StatusWindow.rows(status, bankPosition)
     local left, right = {}, {}
     powerRows(left, status)
     loadRows(left, status)
     storageRows(left, status)
     partRows(left, status)
     batteryRows(right, status)
-    sourceRows(right, status, bank)
+    sourceRows(right, status, bankPosition)
     return left, right
 end
 
@@ -535,7 +536,7 @@ end
 --- square isn't loaded.
 function StatusWindow:highlightSource(source)
     self:clearHighlight()
-    local object = Sources.on(getSquare(source.x, source.y, source.z))
+    local object = Sources.findOn(getSquare(source.x, source.y, source.z))
     if not object then
         return nil
     end

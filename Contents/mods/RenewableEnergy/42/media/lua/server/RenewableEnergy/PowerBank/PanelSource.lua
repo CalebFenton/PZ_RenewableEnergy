@@ -1,6 +1,6 @@
 -- How a bank runs a solar panel (the "panel" family of RenewableEnergy.Sources) on the authority:
 -- its modules' watts in the sun, snow lying on it, and storms cracking its modules. The one
--- writer of a placed panel's module record (PowerBank.MODULES) and of its crack and snow overlays.
+-- writer of a placed panel's module record (PowerBank.MODULES_KEY) and of its crack and snow overlays.
 
 if isClient() then return end
 
@@ -46,7 +46,7 @@ end
 
 --- Records `modules` on a placed panel and sends the record to clients.
 function PanelSource.writeModules(isoObject, modules)
-    isoObject:getModData()[PowerBank.MODULES] = PowerBank.copyModules(modules)
+    isoObject:getModData()[PowerBank.MODULES_KEY] = PowerBank.copyModules(modules)
     isoObject:transmitModData()
 end
 
@@ -208,7 +208,7 @@ end
 function PanelSource.update(source, object, inSlot, hours, context)
     if PanelSource.stormCrack(source, context.stormHours) then
         source.modulesChanged = true
-        StormNotice.tell(StormNotice.MODULE, source.x, source.y, source.z)
+        StormNotice.tell(StormNotice.CRACKED_MODULE, source.x, source.y, source.z)
     end
     if object then
         PanelSource.syncModules(source, object)

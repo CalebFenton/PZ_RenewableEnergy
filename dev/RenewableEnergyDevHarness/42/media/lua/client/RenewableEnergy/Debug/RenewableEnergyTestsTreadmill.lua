@@ -517,7 +517,7 @@ test("renewable_energy_treadmill_pickup_drops_wire", {
         for _, item in ipairs(self.server.takeFloorItems.items) do
             if item.type == PowerBank.WIRE then
                 wire = wire + 1
-            elseif item.modData[Treadmill.WIRED] then
+            elseif item.modData[Treadmill.WIRED_KEY] then
                 wiredItems = wiredItems + 1
             end
         end

@@ -1,8 +1,3 @@
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-
 -- The Solar Garden Light: a cell on a stake that charges its little battery by day, and at
 -- night lights its bulb for as long as the charge lasts.
 --
@@ -11,6 +6,12 @@ require "RenewableEnergy/Sprites"
 -- Light sources exist only where the game draws, so every client, and single player, gives each
 -- lit tile it sees a lamp of its own, in its bulb's colour (this file). A server tells its clients
 -- when a light's lamp changes, so they draw it at once.
+
+require "RenewableEnergy/PlaceTracker"
+require "RenewableEnergy/Utilities"
+require "RenewableEnergy/Specs"
+require "RenewableEnergy/Sprites"
+
 RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
 RenewableEnergy.SolarGardenLight = SolarGardenLight

@@ -18,21 +18,21 @@ RenewableEnergy.PowerBank = PowerBank
 local Specs, Sprites, Materials = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Materials
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
--- The sendServerCommand module that carries a bank's status to the players watching it.
-PowerBank.STATUS_MODULE = "RenewableEnergyBankStatus"
+-- The sendServerCommand module and command that carry a bank's status to the players watching it.
+PowerBank.COMMAND_MODULE, PowerBank.STATUS_COMMAND = "RenewableEnergyBankStatus", "status"
 PowerBank.WIRE = "Base.ElectricWire"
 PowerBank.SCRAP = "Base.ElectronicsScrap"
 -- Item modData: the item was wired into a bank once, which taught its Electricity XP.
-PowerBank.WIRED_ONCE = "RenewableEnergy_wiredOnce"
+PowerBank.WIRED_ONCE_KEY = "RenewableEnergy_wiredOnce"
 -- Item and placed-object modData: the modules a panel mount holds, { { type, condition, repaired,
 -- mounted, connected }, ... }. repaired is the module item's repair count (its seals; nil is 0).
 -- mounted and connected say the module already taught the XP of its first mounting and its first
 -- connection to a bank, so moving modules around teaches nothing new.
-PowerBank.MODULES = "RenewableEnergy_modules"
+PowerBank.MODULES_KEY = "RenewableEnergy_modules"
 -- Solar module item modData: the same two flags, while the module is off its mount. A placed wind
 -- charger keeps CONNECTED_ONCE too.
-PowerBank.MOUNTED_ONCE = "RenewableEnergy_mountedOnce"
-PowerBank.CONNECTED_ONCE = "RenewableEnergy_connectedOnce"
+PowerBank.MOUNTED_ONCE_KEY = "RenewableEnergy_mountedOnce"
+PowerBank.CONNECTED_ONCE_KEY = "RenewableEnergy_connectedOnce"
 
 -- The longest name a bank takes.
 PowerBank.NAME_LENGTH = 32
@@ -70,7 +70,7 @@ function PowerBank.isBank(isoObject)
 end
 
 --- The working bank on a square, or nil.
-function PowerBank.bankOn(square)
+function PowerBank.findOn(square)
     return RenewableEnergy.findObjectOn(square, PowerBank.isBank)
 end
 
@@ -87,7 +87,7 @@ end
 --- `holder` recorded under MODULES or, without a record (a mount spawned by debug), the `mount`
 --- kind's full load of factory modules at full condition.
 function PowerBank.modulesOf(holder, mount)
-    local recorded = holder:getModData()[PowerBank.MODULES]
+    local recorded = holder:getModData()[PowerBank.MODULES_KEY]
     local modules = type(recorded) == "table" and PowerBank.copyModules(recorded) or {}
     if #modules == 0 then
         for i = 1, Specs.mounts[mount].modules do
@@ -101,7 +101,7 @@ end
 function PowerBank.moduleRecord(item)
     local data = item:getModData()
     return { type = item:getFullType(), condition = item:getCondition(), repaired = item:getHaveBeenRepaired(),
-        mounted = data[PowerBank.MOUNTED_ONCE] == true, connected = data[PowerBank.CONNECTED_ONCE] == true }
+        mounted = data[PowerBank.MOUNTED_ONCE_KEY] == true, connected = data[PowerBank.CONNECTED_ONCE_KEY] == true }
 end
 
 --- The watts a module of `fullType` makes in full sun at `condition`, on a mount or a trailer
@@ -115,8 +115,8 @@ end
 function PowerBank.markModule(item, module)
     item:setHaveBeenRepaired(module.repaired or 0)
     local data = item:getModData()
-    data[PowerBank.MOUNTED_ONCE] = module.mounted or nil
-    data[PowerBank.CONNECTED_ONCE] = module.connected or nil
+    data[PowerBank.MOUNTED_ONCE_KEY] = module.mounted or nil
+    data[PowerBank.CONNECTED_ONCE_KEY] = module.connected or nil
 end
 
 --- Where a bank may stand: inside a building, out of the weather. Returns true, or false and
@@ -235,33 +235,33 @@ function PowerBank.wiringNeeds(character, fullType)
     return PowerBank.jobNeeds(character, PowerBank.wiringFor(fullType))
 end
 
---- How many more parts of `kind` (a PARTS key) the bank `bankObject` takes; 0 for no bank.
-function PowerBank.freePartSlots(bankObject, kind)
-    local bank = PowerBank.bankOfSprite(Sprites.nameOf(bankObject))
-    local container = bank and bankObject:getContainer()
+--- How many more parts of `kind` (a PARTS key) the bank `bank` takes; 0 for no bank.
+function PowerBank.freePartSlots(bank, kind)
+    local tier = PowerBank.bankOfSprite(Sprites.nameOf(bank))
+    local container = tier and bank:getContainer()
     if not container then
         return 0
     end
-    return math.max(0, bank.spec[PowerBank.PARTS[kind].max] - countParts(container, kind))
+    return math.max(0, tier.spec[PowerBank.PARTS[kind].max] - countParts(container, kind))
 end
 
---- What keeps anyone from wiring `item` into the bank `bankObject` now whatever they carry, as a
+--- What keeps anyone from wiring `item` into the bank `bank` now whatever they carry, as a
 --- translation key, or nil. The light is the action's to check (RenewableEnergyAction.needsLight):
 --- only the player's own side can see it (IsoPlayer.tooDarkToRead is false for a remote player).
-function PowerBank.wiringBlocker(bankObject, item)
+function PowerBank.wiringBlocker(bank, item)
     local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
-    if not (kind and PowerBank.bankOfSprite(Sprites.nameOf(bankObject)) and bankObject:getContainer()) then
+    if not (kind and PowerBank.bankOfSprite(Sprites.nameOf(bank)) and bank:getContainer()) then
         return "Tooltip_RenewableEnergy_NotAPart"
-    elseif PowerBank.freePartSlots(bankObject, kind) == 0 then
+    elseif PowerBank.freePartSlots(bank, kind) == 0 then
         return "Tooltip_RenewableEnergy_NoSlot"
     end
     return nil
 end
 
---- Why `character` can't wire `item` into the bank `bankObject` now, or nil if they can: what
+--- Why `character` can't wire `item` into the bank `bank` now, or nil if they can: what
 --- wiringBlocker says, else the kind of the first of wiringNeeds they are short of.
-function PowerBank.wiringRefusal(character, bankObject, item)
-    local blocker = PowerBank.wiringBlocker(bankObject, item)
+function PowerBank.wiringRefusal(character, bank, item)
+    local blocker = PowerBank.wiringBlocker(bank, item)
     if blocker then
         return blocker
     end
@@ -302,11 +302,11 @@ function PowerBank.repairRefusal(character, item)
     return RenewableEnergy.unmetKind(PowerBank.repairNeeds(character))
 end
 
---- What keeps anyone from unwiring `item` from the bank `bankObject` now whatever they carry, as a
+--- What keeps anyone from unwiring `item` from the bank `bank` now whatever they carry, as a
 --- translation key, or nil: it must be a part in the bank's container. The light is the action's
 --- to check, as for wiringBlocker.
-function PowerBank.unwiringBlocker(bankObject, item)
-    local container = PowerBank.isBank(bankObject) and bankObject:getContainer()
+function PowerBank.unwiringBlocker(bank, item)
+    local container = PowerBank.isBank(bank) and bank:getContainer()
     if not (container and instanceof(item, "InventoryItem") and container:contains(item)
         and PowerBank.partKind(item:getFullType())) then
         return "Tooltip_RenewableEnergy_NotAPart"
@@ -314,10 +314,10 @@ function PowerBank.unwiringBlocker(bankObject, item)
     return nil
 end
 
---- Why `character` can't unwire `item` from the bank `bankObject` now, or nil if they can: what
+--- Why `character` can't unwire `item` from the bank `bank` now, or nil if they can: what
 --- unwiringBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
-function PowerBank.unwiringRefusal(character, bankObject, item)
-    local blocker = PowerBank.unwiringBlocker(bankObject, item)
+function PowerBank.unwiringRefusal(character, bank, item)
+    local blocker = PowerBank.unwiringBlocker(bank, item)
     if blocker then
         return blocker
     end
@@ -331,15 +331,15 @@ function PowerBank.failsafeRange()
     return options.FailsafeStartCharge, options.FailsafeStopCharge
 end
 
---- Why the bank whose summary or status is `bank` can't be switched `on` (true) or off now, or
+--- Why the bank whose summary or status is `summary` can't be switched `on` (true) or off now, or
 --- nil: "already on" or "already off", or, switching on, no working inverter to carry a load or
 --- no battery capacity to carry it from.
-function PowerBank.switchRefusal(bank, on)
-    if bank.on == on then
+function PowerBank.switchRefusal(summary, on)
+    if summary.on == on then
         return on and "already on" or "already off"
-    elseif on and (bank.limitW or 0) <= 0 then
+    elseif on and (summary.limitW or 0) <= 0 then
         return "Tooltip_RenewableEnergy_NoInverter"
-    elseif on and (bank.capacityWh or 0) <= 0 then
+    elseif on and (summary.capacityWh or 0) <= 0 then
         return "Tooltip_RenewableEnergy_NoBatteries"
     end
     return nil
@@ -356,16 +356,16 @@ function PowerBank.nameRefusal(name)
     return nil
 end
 
---- Why `character` can't connect (`connect` true) or disconnect the bank `bankObject`, whose
---- summary or status is `bank`, or nil. Vanilla's generator rules: connecting needs the generator
+--- Why `character` can't connect (`connect` true) or disconnect the bank `bank`, whose
+--- summary or status is `summary`, or nil. Vanilla's generator rules: connecting needs the generator
 --- Electricity level or the "Generator" recipe (ISWorldObjectContextMenuLogic.doGeneratorMenu), and
 --- only a switched-off one disconnects.
-function PowerBank.connectRefusal(character, bankObject, bank, connect)
-    if bankObject:isConnected() == connect then
+function PowerBank.connectRefusal(character, bank, summary, connect)
+    if bank:isConnected() == connect then
         return connect and "already connected" or "already disconnected"
     elseif connect and character:getPerkLevel(Perks.Electricity) < 3 and not character:isRecipeActuallyKnown("Generator") then
         return "ContextMenu_GeneratorPlugTT"
-    elseif not connect and bank.on then
+    elseif not connect and summary.on then
         return "already on"
     end
     return nil
@@ -388,27 +388,27 @@ function PowerBank.eachBank(fn)
     end
 end
 
-local function bankAt(x, y, z)
+local function recordAt(x, y, z)
     local sys = system()
     local globalObject = sys and sys.system:getObjectAt(x, y, z)
     return globalObject and globalObject:getModData()
 end
 
 --- What every client knows of the bank at x, y, z (see Bank:buildSummary), or nil.
-function PowerBank.getSummary(x, y, z)
-    local bank = bankAt(x, y, z)
+function PowerBank.summaryAt(x, y, z)
+    local bank = recordAt(x, y, z)
     return bank and bank.summary
 end
 
 --- The summary of the bank `isoObject`, or nil.
 function PowerBank.summaryOf(isoObject)
-    return PowerBank.getSummary(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    return PowerBank.summaryAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
 end
 
 --- The whole status of the bank `isoObject` (see Bank:buildStatus), or nil. It reaches only the
 --- players watching it, and the authority keeps it only while someone does.
 function PowerBank.statusOf(isoObject)
-    local bank = bankAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    local bank = recordAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
     return bank and bank.status
 end
 

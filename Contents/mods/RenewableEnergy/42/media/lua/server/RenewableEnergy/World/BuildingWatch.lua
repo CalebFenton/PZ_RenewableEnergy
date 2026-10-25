@@ -1,9 +1,3 @@
-if isClient() then
-    return
-end
-
-require "RenewableEnergy/Sprites"
-
 -- Rolls buildings once their surroundings load, and judges the ground around them. A chunk that
 -- loads brings in parts of buildings, not their surroundings, so a building waits until every
 -- chunk within its watcher's reach of it is loaded. The rules:
@@ -15,6 +9,10 @@ require "RenewableEnergy/Sprites"
 --   rolled. It leaves before its roll, so a building the roll finds already rolled isn't kept.
 -- - The queue lives only in memory. Whatever must outlive a quit, such as a building promised
 --   for certain, is the watcher's own saved state, which `wants` and the roll read.
+
+if isClient() then return end
+
+require "RenewableEnergy/Sprites"
 
 RenewableEnergy = RenewableEnergy or {}
 local BuildingWatch = {}

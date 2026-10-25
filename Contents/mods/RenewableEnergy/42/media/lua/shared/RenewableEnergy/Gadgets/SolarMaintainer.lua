@@ -1,5 +1,3 @@
-require "RenewableEnergy/Gadgets/VehicleBattery"
-
 -- The Solar Battery Maintainer: a small panel clipped to a vehicle that keeps its battery
 -- topped up in daylight.
 --
@@ -7,6 +5,9 @@ require "RenewableEnergy/Gadgets/VehicleBattery"
 -- stays when its battery is swapped, and vehicle:transmitPartModData sends its modData to
 -- multiplayer clients, so the menu there can tell what is attached. Attaching, detaching and
 -- charging are the authority's: server/RenewableEnergy/Gadgets/SolarMaintainerServer.lua.
+
+require "RenewableEnergy/Gadgets/VehicleBattery"
+
 RenewableEnergy = RenewableEnergy or {}
 local SolarMaintainer = {}
 RenewableEnergy.SolarMaintainer = SolarMaintainer

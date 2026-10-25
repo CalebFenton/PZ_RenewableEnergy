@@ -65,6 +65,13 @@ function RenewableEnergy.giveItems(character, itemOrType, count)
     end
 end
 
+--- Drops `itemOrType`, an item or a full type, on `square` at a random spot, as dropped items lie.
+--- Returns the item. The spot isn't a Chance roll, so it eats none of the rolls a test sets.
+--- Authority only.
+function RenewableEnergy.dropOn(square, itemOrType)
+    return square:AddWorldInventoryItem(itemOrType, ZombRandFloat(0.2, 0.8), ZombRandFloat(0.2, 0.8), 0)
+end
+
 --- Gives `container` the AcceptItemFunction `fnName` (a path from the global table, where
 --- ItemContainer finds it) unless it has one. The filter is neither saved nor sent, so every side
 --- sets it on its own copy whenever the object loads or is placed.

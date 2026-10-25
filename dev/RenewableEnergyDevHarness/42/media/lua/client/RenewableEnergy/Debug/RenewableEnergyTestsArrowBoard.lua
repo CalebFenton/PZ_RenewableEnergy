@@ -1399,9 +1399,9 @@ test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
 })
 
 -- Queues a Seal Cracked Panel on the trailer's left panel, as the trailer's menu queues it.
-local function repairPanel(trailer)
+local function sealPanel(trailer)
     T.step(function()
-        ISTimedActionQueue.add(RenewableEnergyAction:new(player(), RenewableEnergyAction.REPAIR_PANEL, nil, nil, trailer.vehicle,
+        ISTimedActionQueue.add(RenewableEnergyAction:new(player(), RenewableEnergyAction.SEAL_PANEL, nil, nil, trailer.vehicle,
             nil, nil, LEFT))
     end)
 end
@@ -1446,7 +1446,7 @@ local function repairTest(name, repaired, fromBelowCap)
             self.wholeAt = conditionAt(RenewableEnergy.Specs.crackLooks.lightBelow)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.wholeAt } } })
             waitForPanelsCopy(self, trailer)
-            T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.repairablePanel(trailer.vehicle, LEFT) ~= nil end)
+            T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.sealablePanel(trailer.vehicle, LEFT) ~= nil end)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = self.from, repaired = repaired } } })
             waitForPanelsCopy(self, trailer)
             T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
@@ -1456,7 +1456,7 @@ local function repairTest(name, repaired, fromBelowCap)
                 self.epoxyUses = self.items.inputs[2]:getCurrentUses()
                 self.xp = self.server.perkXp.value
             end)
-            repairPanel(trailer)
+            sealPanel(trailer)
             T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= self.from end, SERVER_MS)
             T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
             T.server(self, "perkXp", { perk = "Electricity" })
@@ -1490,9 +1490,9 @@ repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 0, func
 repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lower", 2, function(cap) return cap - 1 end)
 
 -- What the trailer's menu shows of Seal Cracked Panel (T.optionState).
-local function repairPanelOption(vehicle)
+local function sealPanelOption(vehicle)
     local context = T.newContext()
-    RenewableEnergy.Menu.addPanelRepairOptions(0, context, vehicle)
+    RenewableEnergy.Menu.addSealPanelOptions(0, context, vehicle)
     local shown = T.optionState(context.options[1])
     context:closeAll()
     return shown
@@ -1510,10 +1510,10 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
         T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = MODULE, condition = sealCap(0) - 1 } } })
         waitForPanelsCopy(self, trailer)
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
-        T.step(function() self.lit = repairPanelOption(trailer.vehicle) end)
+        T.step(function() self.lit = sealPanelOption(trailer.vehicle) end)
         -- T.makeDark sets the clock when called, so it runs in a step.
         T.step(function() T.makeDark(self) end)
-        T.step(function() self.dark = repairPanelOption(trailer.vehicle) end)
+        T.step(function() self.dark = sealPanelOption(trailer.vehicle) end)
     end,
     validate = function(self)
         expect(self.lit.shown and not self.lit.greyed, "in daylight with every input the repair isn't offered")

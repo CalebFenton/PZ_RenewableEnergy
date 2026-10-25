@@ -1,5 +1,3 @@
-require "RenewableEnergy/World/ArrowBoard"
-
 -- Crashes of the arrow board trailer. A crash reaches a towed trailer only as damage to vanilla's
 -- part ids (BaseVehicle.crash), which the panels aren't, and Lua can't read the trailer's own crash
 -- durability. So the game running the trailer's physics watches its velocity: single player every
@@ -7,6 +5,8 @@ require "RenewableEnergy/World/ArrowBoard"
 -- crack the panels. A crash can snap the hitch in the step that jolts the trailer
 -- (Bullet.onVehicleConstraintImpulse), so the client keeps watching, and the server keeps
 -- accepting the crash, for a moment after it comes unhitched nearby (CRASH.unhitched*).
+
+require "RenewableEnergy/World/ArrowBoard"
 
 local ArrowBoard = RenewableEnergy.ArrowBoard
 
