@@ -38,7 +38,7 @@ function DigesterSystem.OnCreate(params)
 end
 
 -- Take Sludge, as vanilla's ISGetCompost fills compost bags from a composter: into the part-filled
--- compost bag `item`, or a new one for the empty sandbag `item`.
+-- compost bag `item`, or a new one for the empty sack `item`.
 local function takeSludge(character, record, row, isoObject, item)
     local perUse = DigesterJobs.sludgePerUse()
     local uses = math.floor(record.sludge / perUse)

@@ -336,9 +336,9 @@ test("renewable_energy_biogas_digester_holder", {
 
 -- Jobs -------------------------------------------------------------------------------------------
 
--- Take Sludge refuses without a bag to fill; it fills an empty sandbag into a compost bag, a use per
--- share of sludge as vanilla's composter does, up to a full bag; less sludge than a bag holds goes
--- into a part-filled bag.
+-- Take Sludge refuses without a bag to fill; it fills an empty sack, of any kind vanilla's composter
+-- takes, into a compost bag, a use per share of sludge as the composter does, up to a full bag; less
+-- sludge than a bag holds goes into a part-filled bag.
 test("renewable_energy_biogas_digester_sludge_into_bags", {
     instant = true,
     run = function(self)
@@ -349,7 +349,7 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
         T.setRecord(self, handle, { sludge = full })
         T.waitForSummary(self, handle, function(summary) return summary.sludge == full end, "this client's summary of the sludge")
         T.step(function() self.noBag = DigesterJobs.refusal(T.player(), DigesterJobs.TAKE_SLUDGE, handle.object) end)
-        T.give(self, "bags", { { type = DigesterJobs.SANDBAG, count = 2 } })
+        T.give(self, "bags", { { type = "Base.EmptySandbag", count = 1 }, { type = "Base.Bag_DeadRats", count = 1 } })
         T.gasJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[1] end)
         T.batch(function()
             T.readRecord(self, handle, "first")
@@ -359,15 +359,16 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
         T.gasJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[2] end)
         T.batch(function()
             T.readRecord(self, handle, "second")
-            T.readCarried(self, { DigesterJobs.COMPOST_BAG, DigesterJobs.SANDBAG })
+            T.readCarried(self, { DigesterJobs.COMPOST_BAG, "Base.EmptySandbag", "Base.Bag_DeadRats" })
         end)
     end,
     validate = function(self)
-        T.expect(self.noBag == "Tooltip_RenewableEnergy_NeedsSandbag", "Take Sludge with no bag: " .. tostring(self.noBag))
+        T.expect(self.noBag == "Tooltip_RenewableEnergy_NeedsSack", "Take Sludge with no bag: " .. tostring(self.noBag))
         T.expectNear("sludge left after a full bag", self.reads.first.sludge, self.full - Digester.SLUDGE_PER_BAG, 0.001)
         T.expectNear("sludge left after a part bag", self.reads.second.sludge, 0, 0.001)
         local bags = T.carriedItems(self, DigesterJobs.COMPOST_BAG)
-        T.expect(#T.carriedItems(self, DigesterJobs.SANDBAG) == 0 and #bags == 2, "the sandbags didn't become compost bags")
+        T.expect(#T.carriedItems(self, "Base.EmptySandbag") + #T.carriedItems(self, "Base.Bag_DeadRats") == 0 and #bags == 2,
+            "the sacks didn't become compost bags")
         if #bags == 2 then
             local fullest, other = math.max(bags[1].uses, bags[2].uses), math.min(bags[1].uses, bags[2].uses)
             T.expectNear("the first bag", fullest, 1, 0.001)

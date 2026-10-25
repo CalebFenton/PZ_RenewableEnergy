@@ -434,7 +434,7 @@ Too much food without manure sours a digester. Output drops to a trickle and the
 
 ### Sludge
 
-Each feeding adds sludge. Output halves once the tank is nearly full of it. **Take Sludge** fills sandbags or compost bags with compost, a tenth of the tank per bag.
+Each feeding adds sludge. Output halves once the tank is nearly full of it. **Take Sludge** fills empty sacks or compost bags with compost, a tenth of the tank per bag, as vanilla's composter does.
 
 ### Gas holders
 

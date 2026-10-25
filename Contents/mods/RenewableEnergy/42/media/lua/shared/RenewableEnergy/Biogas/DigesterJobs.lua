@@ -25,7 +25,6 @@ DigesterJobs.CHARGE_ASH = "ChargeScrubberAsh"
 DigesterJobs.CHARGE_LIME = "ChargeScrubberLime"
 DigesterJobs.REPACK_WOOL = "RepackWool"
 
-DigesterJobs.SANDBAG = "Base.EmptySandbag"
 DigesterJobs.COMPOST_BAG = "Base.CompostBag"
 local STEEL_WOOL = "Base.SteelWool"
 -- The water a scrubber charge takes, named in litres in the tooltip.
@@ -37,14 +36,16 @@ function DigesterJobs.sludgePerUse()
     return Digester.SLUDGE_PER_BAG * script:getUseDelta()
 end
 
--- Whether `bag` takes sludge: an empty sandbag, or a compost bag with room.
+-- Whether `bag` takes sludge: an empty sack, as vanilla's composter takes (every kind it tags as
+-- holding compost), or a compost bag with room.
 local function takesSludge(bag)
-    local fullType = bag:getFullType()
-    return fullType == DigesterJobs.SANDBAG
-        or (fullType == DigesterJobs.COMPOST_BAG and bag:getCurrentUses() < bag:getMaxUses())
+    if bag:getFullType() == DigesterJobs.COMPOST_BAG then
+        return bag:getCurrentUses() < bag:getMaxUses()
+    end
+    return bag:hasTag(ItemTag.HOLD_COMPOST) and bag:getInventory():isEmpty()
 end
 
---- The empty sandbag or part-filled compost bag the character would fill with sludge, or nil.
+--- The part-filled compost bag or empty sack the character would fill with sludge, or nil.
 function DigesterJobs.sludgeBag(character)
     local inventory = character:getInventory()
     local bags = inventory:getAllTypeRecurse(DigesterJobs.COMPOST_BAG)
@@ -53,7 +54,7 @@ function DigesterJobs.sludgeBag(character)
             return bags:get(i)
         end
     end
-    return inventory:getFirstTypeRecurse(DigesterJobs.SANDBAG)
+    return inventory:getFirstEvalRecurse(takesSludge)
 end
 
 --- The propane tank the character would fill: the emptiest they carry, or nil.
@@ -150,7 +151,7 @@ DigesterJobs.JOBS = {
         end,
         withRefusal = function(character, summary, bag)
             if not (bag and character:getInventory():containsRecursive(bag) and takesSludge(bag)) then
-                return "Tooltip_RenewableEnergy_NeedsSandbag"
+                return "Tooltip_RenewableEnergy_NeedsSack"
             end
             return nil
         end,
