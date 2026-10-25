@@ -60,7 +60,7 @@ GLOWING = {"Board_Lamp": (1.0, 0.86, 0.38)}
 # Rust stays off glass, lamps, reflective tape and the board's face. Module parts are named after
 # their module.
 RUST_FREE = ("Board_Back", "Board_Lamp", "Board_Bezel", "Trailer_TailLight", "Trailer_Reflector", "Trailer_Tape",
-             "Trailer_Panel", "Trailer0_", "Trailer1_", "TrailerCracked")
+             "Trailer_Panel", "Trailer0_", "Trailer1_", "TrailerCracked", "TrailerLightCracked")
 # Printed on the battery box, the side rails and the plate: kept clean of blood and rust so it
 # stays legible.
 TRAILER_STENCIL = "Trailer_Stencil"
