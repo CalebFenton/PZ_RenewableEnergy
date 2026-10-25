@@ -53,9 +53,8 @@ end
 -- at it: what luautils.walkAdj counts as there, and a little for drift and a client's lag.
 Action.REACH = 2.6
 
--- A job's row (its JOBS entry) says how the job looks: `anim`, else the "Loot" reach; LootPosition
--- `position`; `shovel`, dug with the shovel in hand; `heavy`, heavy work; `sound` while it runs and
--- `doneSound` once done.
+-- A job's row (its JOBS entry) says how the job looks (JobAction.row), and `shovel`, dug with the
+-- shovel in hand; a job that digs reaches in as "Loot" without one.
 local function rowOf(feature, job)
     return FEATURES[feature].jobs.JOBS[job]
 end
@@ -92,13 +91,6 @@ function Action:canPerform()
     return not FEATURES[self.feature].jobs.refusal(self.character, self.job, self.object, self.with)
 end
 
-function Action:update()
-    self.character:faceThisObject(self.object)
-    if self:row().heavy then
-        self.character:setMetabolicTarget(Metabolics.HeavyWork)
-    end
-end
-
 function Action:findItems()
     if isItem(self.with) then
         self.with = self.character:getInventory():getItemWithIDRecursiv(self.with:getID())
@@ -106,24 +98,12 @@ function Action:findItems()
 end
 
 function Action:startJob()
-    local row = self:row()
-    local shovel = row.shovel and self.character:getPrimaryHandItem()
+    local shovel = self:row().shovel and self.character:getPrimaryHandItem()
     if shovel then
         self:setActionAnim(BuildingHelper.getShovelAnim(shovel))
-    elseif row.anim then
-        self:setActionAnim(row.anim)
-        if row.position then
-            self.character:SetVariable("LootPosition", row.position)
-        end
-    else
-        -- Reaching into the object, down low unless the job says otherwise; a job that digs loots
-        -- so without a shovel in hand.
-        self:setActionAnim("Loot")
-        self.character:SetVariable("LootPosition", row.position or "Low")
+        return
     end
-    if row.sound then
-        self.sound = self.character:playSound(row.sound)
-    end
+    RenewableEnergy.JobAction.startJob(self)
 end
 
 -- The job's own rules are rechecked by GasJobs.perform, after it catches the target up.

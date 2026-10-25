@@ -77,6 +77,13 @@ Digester.PUMP_ENDURANCE_PER_M3 = 0.06
 -- A fridge compressor, on power, fills a tank all the way, but only with scrubbed gas.
 Digester.COMPRESSOR = "RenewableEnergy.FridgeCompressor"
 Digester.COMPRESSOR_MINUTES_PER_M3 = 2
+
+--- Whether a fridge compressor `character` carries can be plugged in where they stand.
+function Digester.compressorPowered(character)
+    local square = character:getCurrentSquare()
+    return square ~= nil and square:haveElectricity()
+end
+
 -- What the scrubber's water takes out before it is spent, in m³ of gas: plain water, lye from
 -- wood ash, or lime; and what one use of steel wool takes the rotten-egg gas out of.
 Digester.SCRUB_M3 = { water = 5, ash = 15, lime = 30 }
@@ -151,16 +158,20 @@ function Digester.adoptContainer(container)
     RenewableEnergy.adoptContainer(container, "RenewableEnergy.Digester.acceptItem")
 end
 
--- How many feeds wait in the hopper `container`.
-local function feedCount(container)
-    local count = 0
-    local items = container and container:getItems()
-    for i = 0, (items and items:size() or 0) - 1 do
-        if Digester.feedOf(items:get(i)) then
-            count = count + 1
+--- The feeds waiting in the hopper `container`, in its order: the items, and each one's feed
+--- (Digester.feedOf).
+function Digester.feedsIn(container)
+    local items, feeds = {}, {}
+    local list = container and container:getItems()
+    for i = 0, (list and list:size() or 0) - 1 do
+        local item = list:get(i)
+        local feed = Digester.feedOf(item)
+        if feed then
+            table.insert(items, item)
+            table.insert(feeds, feed)
         end
     end
-    return count
+    return items, feeds
 end
 
 --- The tier of a digester tile, or nil for any other object.
@@ -218,7 +229,8 @@ end
 -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
 -- copy of the hopper.
 RenewableEnergy.GlobalObjects.addAccessors(Digester, function(summary, isoObject)
-    summary.hopper = feedCount(isoObject:getContainer())
+    local _, feeds = Digester.feedsIn(isoObject:getContainer())
+    summary.hopper = #feeds
 end)
 
 return Digester

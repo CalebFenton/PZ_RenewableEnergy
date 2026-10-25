@@ -133,18 +133,12 @@ end
 -- The hopper's feed as plain values the digester can eat from while its chunk is unloaded, in the
 -- order it eats them.
 function DigesterObject:snapshotHopper(container)
-    local hopper = {}
-    local items = container and container:getItems()
-    for i = 0, (items and items:size() or 0) - 1 do
-        local item = items:get(i)
-        local feed = Digester.feedOf(item)
-        if feed then
-            feed.id = item:getID()
-            feed.uses = not feed.whole and item:getCurrentUses() or nil
-            table.insert(hopper, feed)
-        end
+    local items, feeds = Digester.feedsIn(container)
+    for i, feed in ipairs(feeds) do
+        feed.id = items[i]:getID()
+        feed.uses = not feed.whole and items[i]:getCurrentUses() or nil
     end
-    self.hopper = hopper
+    self.hopper = feeds
 end
 
 -- The next feed to eat: an alkali first while there is acid to take, else the first feed while
@@ -178,16 +172,7 @@ end
 
 -- Takes one feed out of the loaded hopper. Returns whether there was one to take.
 function DigesterObject:feedFromContainer(container)
-    local items, entries = {}, {}
-    local list = container:getItems()
-    for i = 0, list:size() - 1 do
-        local item = list:get(i)
-        local feed = Digester.feedOf(item)
-        if feed then
-            table.insert(items, item)
-            table.insert(entries, feed)
-        end
-    end
+    local items, entries = Digester.feedsIn(container)
     local index = self:pickFeed(entries)
     if not index then
         return false
@@ -531,7 +516,7 @@ end
 --- Gives the gas for `litres` of petrol the generator was billed. Returns whether there was enough.
 function DigesterObject:supply(litres)
     local need = GasKit.M3_PER_LITRE * litres
-    return self:takeGas(need) + 1e-4 >= need
+    return self:takeGas(need) + RenewableEnergy.EPSILON >= need
 end
 
 --- What every client keeps of the digester: what its menu checks and its status window shows,

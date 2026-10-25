@@ -19,6 +19,7 @@ require "RenewableEnergy/Gadgets/CarAlternator"
 RenewableEnergyAction = RenewableEnergy.JobAction:derive("RenewableEnergyAction")
 
 local Action = RenewableEnergyAction
+Action.REPORTS_LOOT = true
 local Specs, Wind = RenewableEnergy.Specs, RenewableEnergy.Wind
 local PowerBank, Sources, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Treadmill
 local positionOf, onSquare = PowerBank.positionOf, RenewableEnergy.onSquare
@@ -181,7 +182,7 @@ local function boardSwitchJob(on)
         keeps = function(self) return inWorld(self.vehicle) end,
         check = function(self) return arrowBoard() ~= nil and arrowBoard().canSwitch(self.vehicle, on) end,
         run = function(self) return arrowBoard().setSwitch(self.vehicle, on) end,
-        minutes = 0.5,
+        minutes = 0.5, position = "Mid",
         doneSound = "LightSwitch",
     }
 end
@@ -207,9 +208,8 @@ end
 -- - minutes: the in-game minutes it takes (a number, or a function of the action); or units, its
 --   length in action units.
 -- - light: it needs light to see by. partInBank: its item is in the bank's container rather than
---   the character's inventory. sound: what it sounds like while it runs; doneSound: when it ends.
---   metabolics: the exertion it keeps the character at.
--- - begin(self), if any, starts its animation in place of the crouch over the target.
+--   the character's inventory. How it looks and its exertion are JobAction's row fields; one at a
+--   vehicle reaches at waist height (`position = "Mid"`).
 JOBS = {
     [Action.CONNECT_SOURCE] = {
         keeps = function(self) return isSource(self.object) and isBank(self.bank) end,
@@ -259,14 +259,14 @@ JOBS = {
         end,
         check = function(self) return SolarMaintainer.canAttach(self.vehicle) end,
         run = function(self) return SolarMaintainer.attach(self.character, self.vehicle, self.item) end,
-        minutes = 1,
+        minutes = 1, position = "Mid",
         sound = "GeneratorConnect",
     },
     [Action.DETACH_MAINTAINER] = {
         keeps = function(self) return inWorld(self.vehicle) end,
         check = function(self) return SolarMaintainer.isAttached(self.vehicle) end,
         run = function(self) return SolarMaintainer.detach(self.character, self.vehicle) end,
-        minutes = 1,
+        minutes = 1, position = "Mid",
     },
     [Action.WIRE_IN] = {
         keeps = function(self) return isBank(self.bank) and self.item ~= nil and holdsItem(self) end,
@@ -313,7 +313,7 @@ JOBS = {
         run = function(self) return arrowBoard().sealPanel(self.character, self.vehicle, self.partId) end,
         -- As the crafting window times Seal Cracked Module (ISHandcraftAction).
         units = function(self) return Recipes.moduleRepairRecipe():getTime(self.character) * 5 end,
-        light = true,
+        light = true, position = "Mid",
         sound = "GeneratorRepair",
     },
     -- Seal Cracked Panel's twin for a module on a placed panel.
@@ -368,7 +368,7 @@ JOBS = {
         -- A squeeze of the handles, far quicker than unbolting the lid.
         units = 100,
         -- As vanilla works on a vehicle part at waist height (ISUninstallVehiclePart).
-        begin = function(self) self:setActionAnim("VehicleWorkOnMid") end,
+        anim = "VehicleWorkOnMid",
         -- The sound of a lock giving way, as when a character forces a locked window
         -- (OpenWindowState).
         doneSound = "BreakLockOnWindow",
@@ -417,7 +417,7 @@ JOBS = {
         run = function(self) return CarAlternator.takeOut(self.character, self.vehicle) end,
         units = function(self) return CarAlternator.units(self.character) end,
         metabolics = Metabolics.MediumWork,
-        begin = function(self) self:setActionAnim("VehicleWorkOnMid") end,
+        anim = "VehicleWorkOnMid",
     },
     [Action.PUT_BACK_ALTERNATOR] = {
         keeps = function(self)
@@ -428,14 +428,14 @@ JOBS = {
         run = function(self) return CarAlternator.putBack(self.character, self.vehicle, self.item) end,
         units = function(self) return CarAlternator.units(self.character) end,
         metabolics = Metabolics.MediumWork,
-        begin = function(self) self:setActionAnim("VehicleWorkOnMid") end,
+        anim = "VehicleWorkOnMid",
     },
 }
 
 --- Whether the job applies to the world as it is now, every rule of it.
 function Action:canPerform()
     local row = self:row()
-    return row ~= nil and row.keeps(self) and (row.check == nil or row.check(self))
+    return row.keeps(self) and (row.check == nil or row.check(self))
 end
 
 --- Whether the job `job` needs light to see by: isValid stops it in the dark, and the menu
@@ -445,8 +445,7 @@ function Action.needsLight(job)
 end
 
 function Action:keeps()
-    local row = self:row()
-    return row ~= nil and row.keeps(self)
+    return self:row().keeps(self)
 end
 
 function Action:row()
@@ -473,14 +472,6 @@ function Action:target()
     return self.vehicle or self.object or self.bank
 end
 
-function Action:update()
-    self.character:faceThisObject(self:target())
-    local metabolics = self:row().metabolics
-    if metabolics then
-        self.character:setMetabolicTarget(metabolics)
-    end
-end
-
 -- A bank gone meanwhile leaves no item, and isValid then stops the job.
 function Action:findItems()
     if not self.item then
@@ -491,20 +482,6 @@ function Action:findItems()
         container = isBank(self.bank) and self.bank:getContainer()
     end
     self.item = container and container:getItemWithIDRecursiv(self.item:getID()) or nil
-end
-
-function Action:startJob()
-    local row = self:row()
-    if row.begin then
-        row.begin(self)
-        return
-    end
-    self:setActionAnim("Loot")
-    self.character:SetVariable("LootPosition", self.vehicle and "Mid" or "Low")
-    self.character:reportEvent("EventLootItem")
-    if row.sound then
-        self.sound = self.character:playSound(row.sound)
-    end
 end
 
 function Action:complete()
@@ -524,8 +501,12 @@ end
 -- garden light, `bank` the bank's IsoGenerator, `item` the tool or part the job uses, `bankName`
 -- the bank's new name, `partId` the vehicle part worked on, `slot` the panel's module; unused
 -- ones are nil. The name can't be a field called `name`, which NetTimedAction reads as the
--- action's own name.
+-- action's own name. Returns nil for a job there is none of, which the server turns down
+-- (NetTimedActionPacket.processServer).
 function Action:new(character, job, object, bank, vehicle, item, bankName, partId, slot)
+    if not JOBS[job] then
+        return nil
+    end
     local o = ISBaseTimedAction.new(self, character)
     o.job = job
     o.object = object

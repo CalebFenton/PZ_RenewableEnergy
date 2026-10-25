@@ -122,11 +122,8 @@ local function fillJob(fields)
         if not (tank and tank:getFullType() == Digester.TANK and character:getInventory():containsRecursive(tank)) then
             return "Tooltip_RenewableEnergy_NeedsTank"
         end
-        if fill.power then
-            local square = character:getCurrentSquare()
-            if not (square and square:haveElectricity()) then
-                return "Tooltip_RenewableEnergy_NoPower"
-            end
+        if fill.power and not Digester.compressorPowered(character) then
+            return "Tooltip_RenewableEnergy_NoPower"
         end
         if fillAmount(fill, summary, tank) <= 0 then
             if tank:getCurrentUses() >= usesAt(tank, fill.limit) then
@@ -145,7 +142,7 @@ end
 -- pump is worked kneeling at a wheel. The rest are reached into at waist height.
 DigesterJobs.JOBS = {
     [DigesterJobs.TAKE_SLUDGE] = {
-        minutes = 10, position = "Mid", heavy = true,
+        minutes = 10, position = "Mid", metabolics = Metabolics.HeavyWork,
         blocker = function(summary)
             return summary.sludge < DigesterJobs.sludgePerUse() and "Tooltip_RenewableEnergy_NoSludge" or nil
         end,
@@ -185,7 +182,8 @@ DigesterJobs.JOBS = {
         xp = { perk = "Tailoring", amount = 10 },
     },
     [DigesterJobs.UPGRADE] = {
-        minutes = 120, anim = CharacterActionAnims.Build, sound = "Hammering", heavy = true, hideBlocked = true,
+        minutes = 120, anim = CharacterActionAnims.Build, sound = "Hammering", metabolics = Metabolics.HeavyWork,
+        hideBlocked = true,
         blocker = function(summary)
             return not Digester.TIERS[summary.tier].upgrade and "Tooltip_RenewableEnergy_NotBarrel" or nil
         end,
@@ -203,7 +201,7 @@ DigesterJobs.JOBS = {
         xp = { perk = "Woodwork", amount = 30 },
     },
     [DigesterJobs.FILL_PUMP] = fillJob({
-        baseMinutes = 5, anim = "VehicleWorkOnTire", heavy = true,
+        baseMinutes = 5, anim = "VehicleWorkOnTire", metabolics = Metabolics.HeavyWork,
         materials = { { item = Digester.PUMP, keep = true } },
         fill = {
             limit = Digester.PUMP_FILL, full = "Tooltip_RenewableEnergy_PumpLimit",

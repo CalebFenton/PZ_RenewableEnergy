@@ -5,14 +5,17 @@
 -- new, and gives:
 -- - REACH: how far from the middle of the target's square, on each axis, the character may work.
 -- - target(): the object or vehicle worked at.
--- - row(): the job's row: `light`, it needs light to see by; `doneSound`, the sound once done.
+-- - row(): the job's row: `light`, it needs light to see by; `metabolics`, the exertion it keeps
+--   the character at; how it looks: `begin(self)`, which starts its animation, else `anim`, else
+--   the "Loot" reach, with LootPosition `position` ("Low" for the reach unless it says); `sound`
+--   while it runs and `doneSound` once done.
 -- - units(): its length in action units.
 -- - keeps(): what the job needs from moment to moment, cheap enough for isValid to ask every tick.
 --   These are what another player or the world can take away mid-job, and the character's own
 --   copy of the world shows them, so a multiplayer client asks them too.
 -- - canPerform(): every rule of the job, as this side knows it.
 -- - findItems(): looks the inventory items the job works with up again by their IDs.
--- - startJob(): its animation and the sound while it runs, left in self.sound.
+-- - REPORTS_LOOT, if set: the "Loot" reach also reports EventLootItem.
 
 require "TimedActions/ISBaseTimedAction"
 require "RenewableEnergy/Utilities"
@@ -66,6 +69,34 @@ end
 function JobAction:waitToStart()
     self.character:faceThisObject(self:target())
     return self.character:shouldBeTurning()
+end
+
+function JobAction:update()
+    self.character:faceThisObject(self:target())
+    local metabolics = self:row().metabolics
+    if metabolics then
+        self.character:setMetabolicTarget(metabolics)
+    end
+end
+
+function JobAction:startJob()
+    local row = self:row()
+    if row.begin then
+        row.begin(self)
+        return
+    end
+    self:setActionAnim(row.anim or "Loot")
+    if not row.anim then
+        self.character:SetVariable("LootPosition", row.position or "Low")
+        if self.REPORTS_LOOT then
+            self.character:reportEvent("EventLootItem")
+        end
+    elseif row.position then
+        self.character:SetVariable("LootPosition", row.position)
+    end
+    if row.sound then
+        self.sound = self.character:playSound(row.sound)
+    end
 end
 
 function JobAction:start()

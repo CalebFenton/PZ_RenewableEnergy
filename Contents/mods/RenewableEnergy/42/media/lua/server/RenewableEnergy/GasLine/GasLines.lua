@@ -33,7 +33,7 @@ GasLines.MOD_DATA = "RenewableEnergyGasKits"
 -- Cap on one pass (a save loaded after the clock jumped). Time a generator spent unloaded is billed
 -- by vanilla to its fuel when it loads (IsoGenerator.update), and the next pass bills that to the gas.
 local LONGEST_PASS = 24
-local EPSILON = 1e-4
+local EPSILON = RenewableEnergy.EPSILON
 -- Vanilla's wear chance for a generator whose item script it can't find (IsoGenerator.update).
 local NO_SCRIPT_ONE_IN = 30
 

@@ -28,7 +28,7 @@ GasifierObject.SAVED_FIELDS = {
     "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "condensate", "outSince", "pipe", "lastHour",
 }
 
-local EPSILON = 1e-4
+local EPSILON = RenewableEnergy.EPSILON
 
 function GasifierObject:initNew()
     self.lit = false

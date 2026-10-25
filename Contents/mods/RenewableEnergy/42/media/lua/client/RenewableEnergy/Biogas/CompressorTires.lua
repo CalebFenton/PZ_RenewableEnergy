@@ -11,8 +11,7 @@ local Digester = RenewableEnergy.Digester
 -- The compressor `player` carries, if it can be plugged in where they stand, else nil. The offer
 -- and the click both ask this, so the click does what the offer promised.
 local function compressorFor(player)
-    local square = player:getCurrentSquare()
-    if square and square:haveElectricity() then
+    if Digester.compressorPowered(player) then
         return player:getInventory():getFirstTypeRecurse(Digester.COMPRESSOR)
     end
     return nil
