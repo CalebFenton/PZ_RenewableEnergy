@@ -51,13 +51,12 @@ function T.placeRecord(self, kind, tile, opts)
     return handle
 end
 
---- Queues building a record of `kind` from the build menu's entry of `entity` on a bare outdoor
---- square (T.build with `prefer`), waiting for this client's copy of the tile `tile`. Its record
---- lands in self.reads.built, the build in self.build, what is left carried in self.counts.left;
+--- Queues building a record of `kind` from the build menu's entry of `entity` on a T.buildSite
+--- (T.build with `prefer`), waiting for this client's copy of the tile `tile`. Its record lands in
+--- self.reads.built, the build in self.build, what is left carried in self.counts.left;
 --- T.expectBuilt checks them. Returns the handle, or nil.
 function T.buildRecord(self, kind, entity, tile, prefer)
-    -- Bare: grass and the like block placing anything built (BlocksPlacement), as for vanilla's.
-    local square = T.square(self, { bare = true }, "a bare outdoor square for a " .. kind)
+    local square = T.buildSite(self)
     if not square then return nil end
     local handle = T.at(square, { square = square, kind = kind })
     T.server(self, "recordTrack", T.recordArgs(handle))

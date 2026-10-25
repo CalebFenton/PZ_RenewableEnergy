@@ -584,10 +584,8 @@ local function buildsCharger(design, material)
     return {
         instant = true,
         run = function(self)
-            -- Bare: grass and the like block placing anything built (BlocksPlacement).
-            local squares = T.need(self, T.squares(self, 1, { bare = true }), "a bare outdoor square")
-            if not squares then return end
-            local square = squares[1]
+            local square = T.buildSite(self)
+            if not square then return end
             T.server(self, "sourceTrack", T.at(square))
             self.build = T.build(self, design.entry, square, { Specs.wind.blades[material].item }, function()
                 self.object = RenewableEnergy.Sources.findOn(square)
