@@ -29,9 +29,9 @@ sys.path.insert(0, HERE)
 import items  # noqa: E402
 import kit  # noqa: E402
 import tiles  # noqa: E402
+import trailer  # noqa: E402
+import wind  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(HERE))
-MEDIA = os.path.join(REPO, "Contents/mods/RenewableEnergy/common/media")
 OUT = os.environ.get("PREVIEWS", os.path.join(tempfile.gettempdir(), "renewable-energy-previews"))
 BACKGROUND = np.array([0.3, 0.3, 0.3, 1.0], dtype=np.float32)
 # index.html's sections in order: the width each image shows at (a click opens it whole), and a
@@ -49,8 +49,8 @@ def keep(section, folder, name, pixels, caption):
 def layer_caption(layer):
     """What a tile layer draws: its build's name, its options, and how it's turned and placed."""
     build = layer["build"]
-    words = [getattr(build, "__name__", None) or getattr(getattr(build, "func", None), "__name__", "?")]
-    words += ["%s=%s" % item for item in sorted(layer["options"].items())]
+    words = [getattr(build, "func", build).__name__]
+    words += ["%s=%s" % item for item in sorted({**getattr(build, "keywords", {}), **layer["options"]}.items())]
     if layer["turn"]:
         words.append("turn %s" % layer["turn"])
     if layer["holdout"]:
@@ -110,7 +110,6 @@ def floor_diamond(width, height):
 
 
 def tile_sheet(tileset, out):
-    path = os.path.join(REPO, "tools/tiles/%s_%d.png")
     cells = []
     for index, layers in sorted(tiles.TILESETS[tileset].items()):
         cell = floor_diamond(128, 256)
@@ -120,8 +119,8 @@ def tile_sheet(tileset, out):
                         if len(other) == 1 and other[0]["build"] is layers[0]["build"]
                         and other[0]["turn"] == layers[0]["turn"] and other[0]["at"] == layers[0]["at"]
                         and other[0]["options"] == layers[0]["options"])
-            over(cell, kit.load_pixels(path % base), 0, 0)
-        over(cell, kit.load_pixels(path % (tileset, index)), 0, 0)
+            over(cell, kit.load_pixels(kit.TILE_FILE % base), 0, 0)
+        over(cell, kit.load_pixels(kit.TILE_FILE % (tileset, index)), 0, 0)
         cells.append(enlarge(cell, 2))
         keep("Tiles", "tiles", "%s_%d" % (tileset, index), cells[-1],
              "%s_%d: %s" % (tileset, index, ", ".join(layer_caption(layer) for layer in layers)))
@@ -131,12 +130,12 @@ def tile_sheet(tileset, out):
 def icon_sheet():
     cells = []
     for name in items.ITEMS:
-        cells.append(enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/Item_RenewableEnergy_%s.png" % name)), 4))
+        cells.append(enlarge(kit.load_pixels(os.path.join(kit.ICON_DIR, kit.ICON_PREFIX + name + ".png")), 4))
         keep("Item icons", "icons", name, cells[-1], name)
     kit.save_pixels(os.path.join(OUT, "icons.png"), grid(cells, 8, 136, 136))
     cells = []
     for name in tiles.BUILD_ICONS:
-        cells.append(enlarge(kit.load_pixels(os.path.join(REPO, "tools/textures/RenewableEnergy_Build_%s.png" % name)), 4))
+        cells.append(enlarge(kit.load_pixels(os.path.join(kit.ICON_DIR, kit.BUILD_ICON_PREFIX + name + ".png")), 4))
         keep("Build-menu icons", "build_icons", name, cells[-1], name)
     kit.save_pixels(os.path.join(OUT, "build_icons.png"), grid(cells, 4, 200, 200))
 
@@ -155,32 +154,33 @@ def model_sheet():
     scene.collection.objects.link(camera)
     scene.camera = camera
     cells = []
-    # A vehicle shows as its body with its part models, once whole and once with every cracked
-    # variant in place of the part it replaces. A sprite model shows from one side: one mesh at each
-    # of its yaws, as the game spins it whole, or the first skin's each spin step, then each other
-    # skin's first step.
+    # A vehicle shows as its body with its part models, once whole and once with each look of
+    # cracks, heavy then light, in place of the parts it replaces. A sprite model shows from one
+    # side: one mesh at each of its yaws, as the game spins it whole, or the first skin's each spin
+    # step, then each other skin's first step.
     models = [("WorldItems", name, name, [name], None) for name in {**items.ITEMS, **items.GROUND_MODELS}]
-    for name, spec in items.SPRITE_MODELS.items():
-        (texture, meshes), *others = items.sprite_model_names(name)[0]
+    for name, spec in wind.SPRITE_MODELS.items():
+        (texture, meshes), *others = wind.sprite_model_names(name)[0]
         if len(meshes) == 1:
             models.append(("WorldItems", name, texture, meshes, list(spec["yaws"].values())))
             continue
         models += [("WorldItems", mesh, texture, [mesh], [0]) for mesh in meshes]
         models += [("WorldItems", texture, texture, meshes[:1], [0]) for texture, meshes in others]
-    for name, spec in items.VEHICLES.items():
+    for name, spec in trailer.VEHICLES.items():
         whole = [s for s in spec["pieces"] if not s.endswith("Cracked")]
-        cracked = [s + "Cracked" if s + "Cracked" in spec["pieces"] else s for s in whole]
         models.append(("vehicles", name, name, [name + s for s in [""] + whole], None))
-        if cracked != whole:
-            models.append(("vehicles", name + "Cracked", name, [name + s for s in [""] + cracked], None))
+        for variant in ("Cracked", "LightCracked"):
+            swapped = [s + variant if s + variant in spec["pieces"] else s for s in whole]
+            if swapped != whole:
+                models.append(("vehicles", name + variant, name, [name + s for s in [""] + swapped], None))
     for folder, name, texture_name, files, steps in models:
         bpy.ops.object.select_all(action="DESELECT")
         imported = []
         for file in files:
-            bpy.ops.import_scene.fbx(filepath=os.path.join(MEDIA, "models_X/%s/RenewableEnergy_%s.fbx" % (folder, file)))
+            bpy.ops.import_scene.fbx(filepath=os.path.join(kit.MEDIA, "models_X/%s/RenewableEnergy_%s.fbx" % (folder, file)))
             imported += list(bpy.context.selected_objects)
         texture_folder = "Vehicles" if folder == "vehicles" else folder
-        texture = bpy.data.images.load(os.path.join(MEDIA, "textures/%s/RenewableEnergy_%s.png" % (texture_folder, texture_name)))
+        texture = bpy.data.images.load(os.path.join(kit.MEDIA, "textures/%s/RenewableEnergy_%s.png" % (texture_folder, texture_name)))
         # A hinged piece comes with its armature, which shows it shut at rest.
         for obj in imported:
             if obj.type == "ARMATURE":

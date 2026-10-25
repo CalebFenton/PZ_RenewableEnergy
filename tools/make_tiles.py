@@ -3,8 +3,8 @@ renewable_energy_02, and tileGeometry.txt.
 
     python3 tools/make_tiles.py
 
-Tile numbers match art/models/tiles.py, which renders them, and
-media/lua/shared/RenewableEnergy/Sprites.lua, which names them for Lua. Overlay tiles (snow, cracked
+Tile numbers come from art/models/tile_numbers.py, which art/models/tiles.py renders from and
+media/lua/shared/RenewableEnergy/Sprites.lua names for Lua. Overlay tiles (snow, cracked
 glass, batteries, the charge meter, the crate's contents and lid, the digesters' gas holders and
 scrubbers, the generator's gas kit, the gasifiers' glow and gas pipes, and all of
 renewable_energy_02) are only ever attached to another tile, so they have no properties. Property
@@ -30,14 +30,18 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "dev", "harness", "check"))
+sys.path.insert(0, os.path.join(HERE, "..", "art", "models"))
 import tiledefs  # noqa: E402
+from tile_numbers import (BARREL_DIGESTERS, COLUMNS, DOME_DIGESTER, FACINGS, GARDEN_LIGHT, GARDEN_LIGHT_LIT,  # noqa: E402
+                          GASIFIERS, HEATER, HEATER_LIT, INSULATED_DIGESTER, MOUNTS, SCOOP_ROTOR, SOLAR_CELL_CHARGER,
+                          SOLAR_CRATE, SOLAR_FAILSAFE, SOLAR_FLAT, STORAGE_TILES, TURNED_HEATER_FIRST,
+                          TURNED_STORAGE_FIRST, WIND_TILES)
 
 MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common", "media")
 TILES_FILE = os.path.join(MEDIA, "renewable_energy.tiles")
 GEOMETRY_FILE = os.path.join(MEDIA, "tileGeometry.txt")
-# Each tileset's name and rows, eight tiles to a row; the file numbers them from 1 in this order.
+# Each tileset's name and rows, COLUMNS tiles to a row; the file numbers them from 1 in this order.
 TILESETS = (("renewable_energy_01", 53), ("renewable_energy_02", 56))
-COLUMNS = 8
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -64,8 +68,15 @@ def facings(tiles, facing):
     return {"Facing": facing, **{other + "offset": str(index - own) for other, index in tiles.items() if other != facing}}
 
 
-def rack(item, tiles, facing):
-    return panel("Ground Rack", item, 3, BlocksPlacement="", solidtrans="", **facings(tiles, facing))
+def turned(first, make):
+    """Four tiles from `first`, one per facing in FACINGS' order, each make(**its rotation)."""
+    tiles = {facing: first + f for f, facing in enumerate(FACINGS)}
+    for facing, index in tiles.items():
+        TILES[index] = make(**facings(tiles, facing))
+
+
+def rack(item, **props):
+    return panel("Ground Rack", item, 3, BlocksPlacement="", solidtrans="", **props)
 
 
 def storage(item, group, name, level, capacity, **props):
@@ -103,78 +114,60 @@ def wind_charger(name, material, material2):
 
 
 TILES = {
-    0: panel("Flat", "SolarFlat", 2, RenderLayer="Floor", IsLow=""),
+    SOLAR_FLAT: panel("Flat", "SolarFlat", 2, RenderLayer="Floor", IsLow=""),
     # Sits on the generator's square, which a floor rug's move type allows.
-    7: moveable("SolarFailsafe", 3, CustomName="Solar Failsafe", MoveType="FloorRug", Material="Electric"),
+    SOLAR_FAILSAFE: moveable("SolarFailsafe", 3, CustomName="Solar Failsafe", MoveType="FloorRug", Material="Electric"),
     # Small enough for a table or counter, like the vanilla radios.
-    10: moveable("SolarCellCharger", tool=None, CustomName="Solar Battery Charger",
-                 container="RenewableEnergyCellCharger", ContainerCapacity="1", IsTableTop="", IsSurfaceOffset="",
-                 BlocksPlacement="", Material="Electric"),
-    11: {"IsMoveAble": "", "CustomName": "Solar Box", "container": "RenewableEnergySolarBox", "ContainerCapacity": "50",
-         "ContainerPosition": "Low", "Material": "Paper", "CanScrap": "", "PickUpWeight": "10", "BlocksPlacement": "",
-         "solidtrans": "", "IsLow": "", "Surface": "14"},
-    14: garden_light(),
-    15: garden_light(),
-    230: built_in_place("Insulated Digester", "Digester", 50, "Wood", "Nails"),
-    231: built_in_place("Brick Dome Digester", "Digester", 100, "Brick", "Stone", IsLow=""),
-    250: built_in_place("Primitive Gasifier", "Gasifier", 8, "SmallMetalPlates", "MetalPipe"),
-    251: built_in_place("Gasifier", "Gasifier", 20, "MetalPlates", "MetalPipe"),
-    252: built_in_place("Advanced Gasifier", "Gasifier", 30, "MetalPlates", "MetalBars"),
-    264: wind_charger("Scoop Rotor Wind Charger", "MetalPlates", "MetalPipe"),
+    SOLAR_CELL_CHARGER: moveable("SolarCellCharger", tool=None, CustomName="Solar Battery Charger",
+                                 container="RenewableEnergyCellCharger", ContainerCapacity="1", IsTableTop="",
+                                 IsSurfaceOffset="", BlocksPlacement="", Material="Electric"),
+    SOLAR_CRATE: {"IsMoveAble": "", "CustomName": "Solar Box", "container": "RenewableEnergySolarBox", "ContainerCapacity": "50",
+                  "ContainerPosition": "Low", "Material": "Paper", "CanScrap": "", "PickUpWeight": "10", "BlocksPlacement": "",
+                  "solidtrans": "", "IsLow": "", "Surface": "14"},
+    GARDEN_LIGHT: garden_light(),
+    GARDEN_LIGHT_LIT: garden_light(),
+    INSULATED_DIGESTER: built_in_place("Insulated Digester", "Digester", 50, "Wood", "Nails"),
+    DOME_DIGESTER: built_in_place("Brick Dome Digester", "Digester", 100, "Brick", "Stone", IsLow=""),
+    GASIFIERS["primitive"]: built_in_place("Primitive Gasifier", "Gasifier", 8, "SmallMetalPlates", "MetalPipe"),
+    GASIFIERS["standard"]: built_in_place("Gasifier", "Gasifier", 20, "MetalPlates", "MetalPipe"),
+    GASIFIERS["advanced"]: built_in_place("Advanced Gasifier", "Gasifier", 30, "MetalPlates", "MetalBars"),
+    SCOOP_ROTOR: wind_charger("Scoop Rotor Wind Charger", "MetalPlates", "MetalPipe"),
 }
-for material, first_wall, first_rack in (("Metal", 1, 3), ("Wood", 21, 24)):
+for material, first_wall, first_rack, _ in MOUNTS:
     for offset, facing in enumerate("SE"):
-        TILES[first_wall + offset] = wall("SolarWall" + material, facing)
-    tiles = {facing: first_rack + offset for offset, facing in enumerate("SENW")}
-    for facing, index in tiles.items():
-        TILES[index] = rack("SolarRack" + material, tiles, facing)
+        TILES[first_wall + offset] = wall("SolarWall" + material.title(), facing)
+    turned(first_rack, lambda **turn: rack("SolarRack" + material.title(), **turn))
 
-# Battery storage, in art/models/tiles.py's STORAGE_TILES order: the item, its GroupName and
-# CustomName, pick-up level, container capacity, the S tile a save's storage stands on, and its
+# Battery storage by item: its GroupName and CustomName, pick-up level, container capacity, and its
 # other properties. The cursor turns a tile only to numbers at most 96 away (offsets outside -96 to
-# 96 read as -96: IsoWorld.SetCustomPropertyValues), and none near those tiles is free, so they
-# don't turn. Each storage turns through four tiles in FACINGS' order from TURNED_STORAGE_FIRST.
-STORAGE = (
-    ("BatteryBoxWood", "Wooden", "Battery Box", 1, 40, 8, {"ContainerPosition": "Low", "IsLow": ""}),
-    ("BatteryBoxMetal", "Metal", "Battery Box", 1, 40, 23, {"ContainerPosition": "Low", "IsLow": ""}),
-    ("BatteryRackWood", "Wooden", "Battery Rack", 3, 100, 32, {}),
-    ("BatteryRackMetal", "Metal", "Battery Rack", 3, 100, 33, {}),
-    ("BatteryBankWood", "Wooden", "Battery Bank", 4, 100, 34, {}),
-    ("BatteryBankMetal", "Metal", "Battery Bank", 4, 100, 9, {}),
-)
-FACINGS = "SENW"
-TURNED_STORAGE_FIRST = 340
-for i, (item, group, name, level, capacity, fixed, props) in enumerate(STORAGE):
+# 96 read as -96: IsoWorld.SetCustomPropertyValues), and none near the tiles a save's storage
+# stands on is free, so they don't turn; the turned tiles do.
+STORAGE = {
+    "BatteryBoxWood": ("Wooden", "Battery Box", 1, 40, {"ContainerPosition": "Low", "IsLow": ""}),
+    "BatteryBoxMetal": ("Metal", "Battery Box", 1, 40, {"ContainerPosition": "Low", "IsLow": ""}),
+    "BatteryRackWood": ("Wooden", "Battery Rack", 3, 100, {}),
+    "BatteryRackMetal": ("Metal", "Battery Rack", 3, 100, {}),
+    "BatteryBankWood": ("Wooden", "Battery Bank", 4, 100, {}),
+    "BatteryBankMetal": ("Metal", "Battery Bank", 4, 100, {}),
+}
+for i, (item, fixed, *_) in enumerate(STORAGE_TILES):
+    group, name, level, capacity, props = STORAGE[item]
     TILES[fixed] = storage(item, group, name, level, capacity, **props)
-    tiles = {facing: TURNED_STORAGE_FIRST + len(FACINGS) * i + f for f, facing in enumerate(FACINGS)}
-    for facing, index in tiles.items():
-        TILES[index] = storage(item, group, name, level, capacity, **props, **facings(tiles, facing))
+    turned(TURNED_STORAGE_FIRST + len(FACINGS) * i, lambda **turn: storage(item, group, name, level, capacity, **props, **turn))
 
-# The gas heater, off and lit, as a save's heaters stand; then off in each of FACINGS from
-# TURNED_HEATER_FIRST, then lit in each, as the storage turns.
-TURNED_HEATER_FIRST = TURNED_STORAGE_FIRST + len(FACINGS) * len(STORAGE)
-for fixed, first in ((244, TURNED_HEATER_FIRST), (245, TURNED_HEATER_FIRST + len(FACINGS))):
+for fixed, first in ((HEATER, TURNED_HEATER_FIRST), (HEATER_LIT, TURNED_HEATER_FIRST + len(FACINGS))):
     TILES[fixed] = gas_heater()
-    tiles = {facing: first + f for f, facing in enumerate(FACINGS)}
-    for facing, index in tiles.items():
-        TILES[index] = gas_heater(**facings(tiles, facing))
+    turned(first, gas_heater)
 
-# The blade machines, a tile per facing (N, E, S, W), in art/models/tiles.py's WIND_TILES order:
-# the treadmill wind charger with wooden and pipe blades, the homebuilt wind turbine with steel
-# blades, the treadmill charger with steel blades, the turbine with wooden and pipe blades, then
-# the car alternator wind charger with wooden, pipe and steel blades.
+WIND_NAMES = {"Propeller": "Treadmill Wind Charger", "Alternator": "Homebuilt Wind Turbine",
+              "CarAlternator": "Car Alternator Wind Charger"}
 BLADE_MATERIAL = {"wood": "Wood", "pipe": "Plastic", "steel": "MetalScrap"}
-for first, name, blades in ((265, "Treadmill Wind Charger", "wood"), (269, "Treadmill Wind Charger", "pipe"),
-                            (273, "Homebuilt Wind Turbine", "steel"), (372, "Treadmill Wind Charger", "steel"),
-                            (397, "Homebuilt Wind Turbine", "wood"), (401, "Homebuilt Wind Turbine", "pipe"),
-                            (405, "Car Alternator Wind Charger", "wood"), (409, "Car Alternator Wind Charger", "pipe"),
-                            (413, "Car Alternator Wind Charger", "steel")):
+for first, model, blades in WIND_TILES:
     for offset in range(4):
-        TILES[first + offset] = wind_charger(name, "MetalPipe", BLADE_MATERIAL[blades])
+        TILES[first + offset] = wind_charger(WIND_NAMES[model], "MetalPipe", BLADE_MATERIAL[blades])
 
-# The barrel digester, a tile per barrel it can be built from: the Metal Drum, then the orange, dark
-# green and light green barrels, all steel like the game's own.
-for index in (228, 229, 277, 278):
+# The barrel digester's tiles, one per barrel it can be built from, all steel like the game's own.
+for index in BARREL_DIGESTERS.values():
     TILES[index] = built_in_place("Barrel Digester", "Digester", 30, "MetalPlates", "MetalScrap")
 
 

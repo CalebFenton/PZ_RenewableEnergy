@@ -1,5 +1,5 @@
 """Renders the tile sprites, their depth map, the inventory icons and the build-menu icons from the
-models in items.py.
+models in items.py and tiles.py.
 
     blender -b --factory-startup -P art/models/render.py [-- tiles|icons ...]
 
@@ -26,17 +26,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import items  # noqa: E402
 import kit  # noqa: E402
+import tile_numbers  # noqa: E402
 import tiles  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(HERE))
-MEDIA = os.path.join(REPO, "Contents/mods/RenewableEnergy/common/media")
-TILE_DIR = os.path.join(REPO, "tools/tiles")
-ICON_DIR = os.path.join(REPO, "tools/textures")
-DEPTH_FILE = os.path.join(MEDIA, "depthmaps/DEPTH_%s.png")
+DEPTH_FILE = os.path.join(kit.MEDIA, "depthmaps/DEPTH_%s.png")
 SCRATCH = os.path.join(tempfile.gettempdir(), "renewable-energy-render")
 
 TILE_W, TILE_H = 128, 256
-COLUMNS = 8  # the game reads tilesets and their depth maps eight tiles wide
 PIXELS_PER_METRE = 64 * math.sqrt(2)
 STOREY = 2.44949
 ICON_SIZE = 32
@@ -54,11 +50,8 @@ def view_direction(elevation=30.0):
 
 
 def setup():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+    stage = kit.new_stage(96, (0.55, 0.56, 0.6, 1))
     scene = bpy.context.scene
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = 96
     scene.cycles.use_denoising = False
     scene.cycles.pixel_filter_type = "BLACKMAN_HARRIS"
     scene.cycles.filter_width = 1.2
@@ -68,11 +61,6 @@ def setup():
     scene.render.resolution_percentage = 100
     scene.view_settings.view_transform = "Standard"
     scene.view_settings.look = "None"
-    world = bpy.data.worlds.new("Ambient")
-    world.use_nodes = True
-    world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.55, 0.56, 0.6, 1)
-    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.0
-    scene.world = world
     # The game's own tiles are lit from the upper left of the screen: west, a little south. A sun
     # shines down its -Z axis, so that is the axis turned along the light's way.
     sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
@@ -86,16 +74,12 @@ def setup():
     camera.data.clip_start, camera.data.clip_end = 0.1, 60
     scene.collection.objects.link(camera)
     scene.camera = camera
-    stage = bpy.data.collections.new("Stage")
-    scene.collection.children.link(stage)
     return camera, stage
 
 
 def build(stage, layers):
     for spec in layers:
-        before = set(stage.objects)
-        spec["build"](stage, **spec["options"])
-        new = [obj for obj in stage.objects if obj not in before]
+        new = kit.added(stage, spec["build"], **spec["options"])
         placed = kit.group(stage, "Layer", [obj for obj in new if obj.parent is None], at=spec["at"], rotate=(0, 0, spec["turn"]))
         placed.scale = (spec["scale"],) * 3
         if spec["holdout"]:
@@ -172,14 +156,14 @@ def depth_map(camera, alpha):
 
 
 def render_tiles(camera, stage):
-    os.makedirs(TILE_DIR, exist_ok=True)
-    for stale in os.listdir(TILE_DIR):
+    os.makedirs(kit.TILE_DIR, exist_ok=True)
+    for stale in os.listdir(kit.TILE_DIR):
         if stale.endswith(".png"):
-            os.remove(os.path.join(TILE_DIR, stale))
+            os.remove(os.path.join(kit.TILE_DIR, stale))
     tile_camera(camera)
     for tileset, tileset_tiles in tiles.TILESETS.items():
-        rows = max(tileset_tiles) // COLUMNS + 1
-        atlas = np.zeros((rows * TILE_H, COLUMNS * TILE_W, 4), dtype=np.float32)
+        rows = max(tileset_tiles) // tile_numbers.COLUMNS + 1
+        atlas = np.zeros((rows * TILE_H, tile_numbers.COLUMNS * TILE_W, 4), dtype=np.float32)
         for index, layers in sorted(tileset_tiles.items()):
             kit.clear(stage)
             build(stage, layers)
@@ -187,10 +171,10 @@ def render_tiles(camera, stage):
             raw = os.path.join(SCRATCH, "tile.png")
             render(raw, TILE_W, TILE_H)
             pixels = kit.load_pixels(raw)
-            kit.save_pixels(os.path.join(TILE_DIR, "%s_%d.png" % (tileset, index)), pixels)
+            kit.save_pixels(kit.TILE_FILE % (tileset, index), pixels)
             depth = depth_map(camera, pixels[..., 3])
-            cell = atlas[index // COLUMNS * TILE_H:(index // COLUMNS + 1) * TILE_H,
-                         index % COLUMNS * TILE_W:(index % COLUMNS + 1) * TILE_W]
+            cell = atlas[index // tile_numbers.COLUMNS * TILE_H:(index // tile_numbers.COLUMNS + 1) * TILE_H,
+                         index % tile_numbers.COLUMNS * TILE_W:(index % tile_numbers.COLUMNS + 1) * TILE_W]
             covered = depth >= 0
             cell[covered, :3] = np.maximum(depth[covered], 1 / 255)[:, None]
             cell[covered, 3] = 1
@@ -246,15 +230,15 @@ def render_icon(camera, stage, layers, elevation, size, path):
 
 def render_icons(camera, stage):
     # Only this script's icons: an item or build icon that's gone leaves none behind.
-    for stale in os.listdir(ICON_DIR):
-        if stale.startswith(("Item_RenewableEnergy_", "RenewableEnergy_Build_")):
-            os.remove(os.path.join(ICON_DIR, stale))
+    for stale in os.listdir(kit.ICON_DIR):
+        if stale.startswith((kit.ICON_PREFIX, kit.BUILD_ICON_PREFIX)):
+            os.remove(os.path.join(kit.ICON_DIR, stale))
     for name, spec in items.ITEMS.items():
         render_icon(camera, stage, [tiles.layer(spec.get("icon", spec["model"]))], spec.get("icon_elevation", 30), ICON_SIZE,
-                    os.path.join(ICON_DIR, "Item_RenewableEnergy_%s.png" % name))
+                    os.path.join(kit.ICON_DIR, kit.ICON_PREFIX + name + ".png"))
         print("icon %s" % name)
     for name, layers in tiles.BUILD_ICONS.items():
-        render_icon(camera, stage, layers, 30, BUILD_ICON_SIZE, os.path.join(ICON_DIR, "RenewableEnergy_Build_%s.png" % name))
+        render_icon(camera, stage, layers, 30, BUILD_ICON_SIZE, os.path.join(kit.ICON_DIR, kit.BUILD_ICON_PREFIX + name + ".png"))
         print("build icon %s" % name)
 
 

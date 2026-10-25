@@ -1,5 +1,6 @@
-"""Geometry and material helpers shared by the item builders in items.py, and the stage and pixel
-helpers that models.py, render.py and preview.py share.
+"""Geometry and material helpers shared by the item builders (solar.py, batteries.py and the other
+families items.py lists), and the paths, stage and pixel helpers that models.py, render.py and
+preview.py share.
 
 Units are metres and the scene is Blender's: +Z up. An item is built standing on z = 0, centred on
 the origin, with its front facing -Y. In a tile, -Y is south and +X east (Blender's +Y is the
@@ -13,6 +14,18 @@ import bmesh
 import bpy
 import numpy as np
 from mathutils import Vector
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MOD = os.path.join(REPO, "Contents/mods/RenewableEnergy")
+MEDIA = os.path.join(MOD, "common/media")
+# render.py's tile sprites and icons, which tools/pack_textures.py packs.
+TILE_DIR = os.path.join(REPO, "tools/tiles")
+TILE_FILE = os.path.join(TILE_DIR, "%s_%d.png")
+ICON_DIR = os.path.join(REPO, "tools/textures")
+ICON_PREFIX, BUILD_ICON_PREFIX = "Item_RenewableEnergy_", "RenewableEnergy_Build_"
+
+# Turning an object whose front faces south (-Y) to face each direction.
+FACING_TURN = {"S": 0, "E": 90, "N": 180, "W": -90}
 
 # Materials ----------------------------------------------------------------------------------------
 
@@ -60,14 +73,37 @@ def _math(nodes, links, operation, a, b=None, c=None, clamp=False):
     return node.outputs[0]
 
 
-def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None,
+def _noise(nodes, links, vector, scale, detail):
+    """A noise texture over `vector`, returning its Fac."""
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = scale
+    noise.inputs["Detail"].default_value = detail
+    links.new(vector, noise.inputs["Vector"])
+    return noise.outputs["Fac"]
+
+
+def _mix(nodes, links, factor, a, b, blend="MIX"):
+    """A colour mix from `a` to `b` by `factor`, each a socket, a number, an RGBA tuple or a
+    '#rrggbb' colour, returning its result."""
+    node = nodes.new("ShaderNodeMix")
+    node.data_type = "RGBA"
+    node.blend_type = blend
+    for socket, value in ((node.inputs["Factor"], factor), (node.inputs[6], a), (node.inputs[7], b)):
+        if isinstance(value, bpy.types.NodeSocket):
+            links.new(value, socket)
+        else:
+            socket.default_value = (*hex_rgb(value), 1.0) if isinstance(value, str) else value
+    return node.outputs[2]
+
+
+def material(name, colour, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, emission=None, speckle=None, grain=None,
              streaks=None, scorch=None, turf=None, fade=None, shine=0.5):
     """A painted, plastic or metal surface. `grime` darkens it in blotches, so flat colours don't
     look like a render. `speckle` = (colour, amount) mottles it with a second colour in a web of
     flakes, the base colour left at each flake's centre and less of it the higher `amount`: the way
     multicrystalline cells sparkle, or rust on scrap steel. `streaks` = (colour, amount) runs that
     colour down its sides in thin streaks, as rust and soot run down a drum left out in the rain.
-    `scorch` = (soot, tint, height) blackens it from its foot up to a ragged line `height` metres
+    `scorch` = (soot, heat, height) blackens it from its foot up to a ragged line `height` metres
     up, with a band of heat tint above, as a fire inside leaves a stove. `emission` makes it glow,
     for lit LEDs. `grain`, a kind in GRAIN, draws dark grain lines along each part's longest side,
     as `_object` laid them out. `turf` = (colour, start, end) turns it to that colour from `start`
@@ -76,32 +112,22 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
     whatever ground the game draws round it. Only a tile sprite keeps a faded part's transparency;
     a baked texture doesn't. `shine` is the strength of its reflection of the sky, as Principled
     BSDF's Specular IOR Level: soil hardly has any, and with it greys like the game's grass never does."""
-    key = name
-    if key in _MATERIALS:
-        return _MATERIALS[key]
+    if name in _MATERIALS:
+        return _MATERIALS[name]
     mat = bpy.data.materials.new(name)
     nodes, bsdf = _principled(mat)
     links = mat.node_tree.links
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Specular IOR Level"].default_value = shine
-    base = (*hex_rgb(color), 1.0)
+    paint = (*hex_rgb(colour), 1.0)
     coords = nodes.new("ShaderNodeTexCoord")
-    noise = nodes.new("ShaderNodeTexNoise")
-    noise.inputs["Scale"].default_value = scale / 8
-    noise.inputs["Detail"].default_value = 6.0
-    links.new(coords.outputs["Object"], noise.inputs["Vector"])
     ramp = nodes.new("ShaderNodeValToRGB")
     ramp.color_ramp.elements[0].position = 0.35
     ramp.color_ramp.elements[0].color = (1 - grime, 1 - grime, 1 - grime, 1)
     ramp.color_ramp.elements[1].position = 0.7
     ramp.color_ramp.elements[1].color = (1, 1, 1, 1)
-    links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
-    tint = nodes.new("ShaderNodeMix")
-    tint.data_type = "RGBA"
-    tint.blend_type = "MULTIPLY"
-    tint.inputs["Factor"].default_value = 1.0
-    tint.inputs[6].default_value = base
+    links.new(_noise(nodes, links, coords.outputs["Object"], scale / 8, 6.0), ramp.inputs["Fac"])
     reach = None
     if turf or fade:
         # How far out from the part's centre, give or take a ragged few centimetres.
@@ -113,52 +139,31 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         length = nodes.new("ShaderNodeVectorMath")
         length.operation = "LENGTH"
         links.new(flat.outputs[0], length.inputs[0])
-        ragged = nodes.new("ShaderNodeTexNoise")
-        ragged.inputs["Scale"].default_value = 7.0
-        ragged.inputs["Detail"].default_value = 4.0
-        links.new(coords.outputs["Object"], ragged.inputs["Vector"])
-        reach = _math(nodes, links, "ADD", length.outputs["Value"], _math(nodes, links, "MULTIPLY_ADD", ragged.outputs["Fac"], 0.1, -0.05))
+        ragged = _noise(nodes, links, coords.outputs["Object"], 7.0, 4.0)
+        reach = _math(nodes, links, "ADD", length.outputs["Value"], _math(nodes, links, "MULTIPLY_ADD", ragged, 0.1, -0.05))
     if turf:
-        colour, start, end = turf
-        grassed = nodes.new("ShaderNodeMix")
-        grassed.data_type = "RGBA"
-        links.new(_math(nodes, links, "MULTIPLY_ADD", reach, 1 / (end - start), -start / (end - start), clamp=True),
-                  grassed.inputs["Factor"])
-        grassed.inputs[6].default_value = base
-        grassed.inputs[7].default_value = (*hex_rgb(colour), 1.0)
-        links.new(grassed.outputs[2], tint.inputs[6])
-    links.new(ramp.outputs["Color"], tint.inputs[7])
-    color_out = tint.outputs[2]
+        grass, start, end = turf
+        paint = _mix(nodes, links, _math(nodes, links, "MULTIPLY_ADD", reach, 1 / (end - start), -start / (end - start), clamp=True),
+                     paint, grass)
+    colour_out = _mix(nodes, links, 1.0, paint, ramp.outputs["Color"], "MULTIPLY")
     if speckle:
         flakes = nodes.new("ShaderNodeTexVoronoi")
         flakes.inputs["Scale"].default_value = scale * 6
         links.new(coords.outputs["Object"], flakes.inputs["Vector"])
-        mix = nodes.new("ShaderNodeMix")
-        mix.data_type = "RGBA"
-        steps = nodes.new("ShaderNodeMath")
-        steps.operation = "MULTIPLY"
-        steps.inputs[1].default_value = speckle[1]
-        links.new(flakes.outputs["Distance"], steps.inputs[0])
-        links.new(steps.outputs[0], mix.inputs["Factor"])
-        links.new(color_out, mix.inputs[6])
-        mix.inputs[7].default_value = (*hex_rgb(speckle[0]), 1.0)
-        color_out = mix.outputs[2]
+        colour_out = _mix(nodes, links, _math(nodes, links, "MULTIPLY", flakes.outputs["Distance"], speckle[1]), colour_out, speckle[0])
     if streaks:
         # Noise squeezed tall: its features run down the part's local Z, and only its peaks show.
         squeeze = nodes.new("ShaderNodeVectorMath")
         squeeze.operation = "MULTIPLY"
         squeeze.inputs[1].default_value = (1.0, 1.0, 0.06)
         links.new(coords.outputs["Object"], squeeze.inputs[0])
-        runs = nodes.new("ShaderNodeTexNoise")
-        runs.inputs["Scale"].default_value = scale * 1.5
-        runs.inputs["Detail"].default_value = 4.0
-        links.new(squeeze.outputs[0], runs.inputs["Vector"])
+        runs = _noise(nodes, links, squeeze.outputs[0], scale * 1.5, 4.0)
         peaks = nodes.new("ShaderNodeValToRGB")
         peaks.color_ramp.elements[0].position = 0.5
         peaks.color_ramp.elements[0].color = (0, 0, 0, 1)
         peaks.color_ramp.elements[1].position = 0.75
         peaks.color_ramp.elements[1].color = (streaks[1], streaks[1], streaks[1], 1)
-        links.new(runs.outputs["Fac"], peaks.inputs["Fac"])
+        links.new(runs, peaks.inputs["Fac"])
         # Only down the sides: rain runs down a wall, not across a lid.
         normal = nodes.new("ShaderNodeNewGeometry")
         axes = nodes.new("ShaderNodeSeparateXYZ")
@@ -166,35 +171,21 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         flat = _math(nodes, links, "ABSOLUTE", axes.outputs["Z"])
         side = _math(nodes, links, "SUBTRACT", 1.0, flat)
         amount = _math(nodes, links, "MULTIPLY", peaks.outputs["Color"], side)
-        run = nodes.new("ShaderNodeMix")
-        run.data_type = "RGBA"
-        links.new(amount, run.inputs["Factor"])
-        links.new(color_out, run.inputs[6])
-        run.inputs[7].default_value = (*hex_rgb(streaks[0]), 1.0)
-        color_out = run.outputs[2]
+        colour_out = _mix(nodes, links, amount, colour_out, streaks[0])
     if scorch:
         # Soot up to a ragged line `scorch[2]` above the part's foot, and a band of heat tint above it.
-        soot, tint, height = scorch
+        soot, heat, height = scorch
         axes = nodes.new("ShaderNodeSeparateXYZ")
         links.new(coords.outputs["Object"], axes.inputs[0])
-        ragged = nodes.new("ShaderNodeTexNoise")
-        ragged.inputs["Scale"].default_value = 9.0
-        ragged.inputs["Detail"].default_value = 3.0
-        links.new(coords.outputs["Object"], ragged.inputs["Vector"])
-        wobble = _math(nodes, links, "MULTIPLY_ADD", ragged.outputs["Fac"], 0.16, -0.08)
+        wobble = _math(nodes, links, "MULTIPLY_ADD", _noise(nodes, links, coords.outputs["Object"], 9.0, 3.0), 0.16, -0.08)
         level = _math(nodes, links, "ADD", axes.outputs["Z"], wobble)
         below = _math(nodes, links, "SUBTRACT", height, level)
         sooted = _math(nodes, links, "MULTIPLY", below, 20.0, clamp=True)
         above = _math(nodes, links, "SUBTRACT", level, height + 0.05)
         band = _math(nodes, links, "ABSOLUTE", above)
         tinted = _math(nodes, links, "MULTIPLY_ADD", band, -12.0, 0.7, clamp=True)
-        for factor, colour in ((tinted, tint), (sooted, soot)):
-            mix = nodes.new("ShaderNodeMix")
-            mix.data_type = "RGBA"
-            links.new(factor, mix.inputs["Factor"])
-            links.new(color_out, mix.inputs[6])
-            mix.inputs[7].default_value = (*hex_rgb(colour), 1.0)
-            color_out = mix.outputs[2]
+        for factor, over in ((tinted, heat), (sooted, soot)):
+            colour_out = _mix(nodes, links, factor, colour_out, over)
     if grain:
         across, stretch, lines, line = GRAIN[grain]
         attribute = nodes.new("ShaderNodeAttribute")
@@ -203,20 +194,10 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         along.operation = "MULTIPLY"
         along.inputs[1].default_value = (1 / stretch, 1, 1)
         links.new(attribute.outputs["Vector"], along.inputs[0])
-        figure = nodes.new("ShaderNodeTexNoise")
-        figure.inputs["Scale"].default_value = 1 / across
-        figure.inputs["Detail"].default_value = 2.0
-        links.new(along.outputs[0], figure.inputs["Vector"])
+        figure = _noise(nodes, links, along.outputs[0], 1 / across, 2.0)
         # The figure's contour lines: up and down `lines` times over its range, a dark line at each
         # low.
-        count = nodes.new("ShaderNodeMath")
-        count.operation = "MULTIPLY"
-        count.inputs[1].default_value = lines * 2
-        links.new(figure.outputs["Fac"], count.inputs[0])
-        wave = nodes.new("ShaderNodeMath")
-        wave.operation = "PINGPONG"
-        wave.inputs[1].default_value = 1.0
-        links.new(count.outputs[0], wave.inputs[0])
+        wave = _math(nodes, links, "PINGPONG", _math(nodes, links, "MULTIPLY", figure, lines * 2), 1.0)
         shade = nodes.new("ShaderNodeValToRGB")
         shade.color_ramp.elements[0].position = 0.0
         shade.color_ramp.elements[0].color = (line, line, line, 1)
@@ -224,15 +205,9 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
         shade.color_ramp.elements[1].color = (1, 1, 1, 1)
         early = shade.color_ramp.elements.new(1.0)
         early.color = (GRAIN_EARLY, GRAIN_EARLY, GRAIN_EARLY, 1)
-        links.new(wave.outputs[0], shade.inputs["Fac"])
-        streaked = nodes.new("ShaderNodeMix")
-        streaked.data_type = "RGBA"
-        streaked.blend_type = "MULTIPLY"
-        streaked.inputs["Factor"].default_value = 1.0
-        links.new(color_out, streaked.inputs[6])
-        links.new(shade.outputs["Color"], streaked.inputs[7])
-        color_out = streaked.outputs[2]
-    links.new(color_out, bsdf.inputs["Base Color"])
+        links.new(wave, shade.inputs["Fac"])
+        colour_out = _mix(nodes, links, 1.0, colour_out, shade.outputs["Color"], "MULTIPLY")
+    links.new(colour_out, bsdf.inputs["Base Color"])
     if fade:
         # Thinned to a holdout, not a transparent shader, so the parts it buries stay hidden where it
         # thins: only the game's ground shows through.
@@ -246,7 +221,7 @@ def material(name, color, roughness=0.6, metallic=0.0, grime=0.12, scale=40.0, e
     if emission:
         bsdf.inputs["Emission Color"].default_value = (*hex_rgb(emission), 1.0)
         bsdf.inputs["Emission Strength"].default_value = 6.0
-    _MATERIALS[key] = mat
+    _MATERIALS[name] = mat
     return mat
 
 
@@ -499,7 +474,36 @@ def group(collection, name, objects, at=(0, 0, 0), rotate=None):
     return empty
 
 
+def around(centre, angle, distance):
+    """The point `distance` from `centre`, (x, y), `angle` degrees round from +X."""
+    a = math.radians(angle)
+    return centre[0] + math.cos(a) * distance, centre[1] + math.sin(a) * distance
+
+
+def ring(collection, name, mat, centre, radius, z, thickness):
+    """A ring of tube lying flat round `centre` at height `z`, as a drum's rolled rim, a seam or a
+    coil: a solid cap there would lie in the plane of what it rings and shade it black."""
+    tube(collection, name, mat, [(*around(centre, 360 * k / 28, radius), z) for k in range(29)], thickness, 6)
+
+
 # Stage and pixels ---------------------------------------------------------------------------------
+
+
+def new_stage(samples, background):
+    """A factory-fresh Cycles scene on the CPU, `samples` a pixel, lit by a world of `background`
+    colour, and its collection the builds go in."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = samples
+    world = bpy.data.worlds.new("Ambient")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs["Color"].default_value = background
+    scene.world = world
+    stage = bpy.data.collections.new("Stage")
+    scene.collection.children.link(stage)
+    return stage
 
 
 def clear(stage):
@@ -513,6 +517,33 @@ def clear(stage):
             bpy.data.meshes.remove(mesh)
 
 
+def added(collection, build, *args, **options):
+    """Runs `build(collection, *args, **options)` and returns the objects it added, in the
+    collection's order."""
+    before = set(collection.objects)
+    build(collection, *args, **options)
+    return [obj for obj in collection.objects if obj not in before]
+
+
+def part_name(obj):
+    """An object's name as its builder gave it, without the number Blender adds to a repeat."""
+    return obj.name.split(".")[0]
+
+
+def edited_copy(obj, edit=None):
+    """A copy of `obj` with a mesh of its own, in the scene, `edit(bm)` applied to that mesh."""
+    piece = obj.copy()
+    piece.data = obj.data.copy()
+    bpy.context.scene.collection.objects.link(piece)
+    if edit:
+        bm = bmesh.new()
+        bm.from_mesh(piece.data)
+        edit(bm)
+        bm.to_mesh(piece.data)
+        bm.free()
+    return piece
+
+
 def load_pixels(path):
     """An image file as a float array of rows from the top, RGBA."""
     image = bpy.data.images.load(path)
@@ -522,10 +553,11 @@ def load_pixels(path):
     return pixels
 
 
-def save_pixels(path, pixels):
-    """Writes a load_pixels array as a PNG, its values as they are, without a colour transform."""
+def save_pixels(path, pixels, alpha=True):
+    """Writes a load_pixels array as a PNG, its values as they are, without a colour transform;
+    without `alpha`, opaque."""
     height, width, _ = pixels.shape
-    image = bpy.data.images.new("out", width, height, alpha=True)
+    image = bpy.data.images.new("out", width, height, alpha=alpha)
     image.colorspace_settings.name = "Non-Color"
     image.pixels[:] = np.clip(pixels[::-1], 0, 1).ravel()
     image.filepath_raw = path

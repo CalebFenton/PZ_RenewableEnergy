@@ -61,7 +61,7 @@ Specs.slotsPerController = 7
 -- ClimateManager's windPower × 120 km/h. The generator alone sets the power: `blades` lists the
 -- blade materials (Specs.wind.blades) it takes, the first for a charger whose sprite names none,
 -- and they decide only when it breaks. rotorAbove is how many levels above its own the rotor turns
--- (each mast charger's hub is a storey and a half up, art/models/items.py), where its shelter is
+-- (each mast charger's hub is a storey and a half up, art/models/wind.py), where its shelter is
 -- counted. A turbine with furlKph swings its tail-hinged head out of strong wind and holds
 -- furledShare of its rating, as a furling tail governs the rotor near its rated speed; turned
 -- aside, its blades take less of the gale and break only furledBladeKph above their break speed.
@@ -100,7 +100,7 @@ Specs.wind = {
     -- Another charger whose rotor turns on the same level within crowdRadius squares takes wind
     -- from this one, crowdLoss of it right beside it and less with each square further, none
     -- beyond: a rotor's wake takes a few rotor widths to fill back in, and these rotors are about
-    -- two squares across (art/models/items.py blade lengths). Each such neighbour takes its share
+    -- two squares across (art/models/wind.py blade lengths). Each such neighbour takes its share
     -- of what the others leave. Not shelter: a mast and a turning rotor stop far less wind than a wall.
     crowdRadius = 3,
     crowdLoss = 0.25,

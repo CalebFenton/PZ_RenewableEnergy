@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Rebuilds every model, texture, icon and tile of the mod, with Blender (made with 5.2) but for the
-# mod list icon, from the parts in items.py and the tile layout in tiles.py:
+# mod list icon, from the builders items.py gathers and the tile layout in tiles.py and
+# tile_numbers.py:
 #
 #   models.py    ground and sprite models and their baked textures (common/media/models_X and
-#                textures/WorldItems), scripts/RenewableEnergy/Models.txt and SpriteModels.txt
+#                textures/WorldItems), scripts/RenewableEnergy/Models.txt and SpriteModels.txt,
+#                and the trailer's body, part models and shader textures, with vehicles.py
 #   render.py    tile sprites (tools/tiles), their depth maps (common/media/depthmaps), the
 #                32 x 32 item icons and the 48 x 48 build-menu icons (tools/textures)
 #   mod_icon.py  the mod list icon, drawn pixel by pixel with Pillow (the poster and the Workshop

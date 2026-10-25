@@ -33,12 +33,10 @@ TITLE = CAPTURES.strings["modName"]
 TAGLINE = "Off-grid power, 1993"
 
 SOLAR = (86, 140, 214)
-FIRST_BOX = "A first battery box"
-HOMESTEAD = "A homestead"
-# Where each world shot is cropped, in capture pixels, around what the promo run built in it; a
-# reshoot that frames a shot differently needs its box moved. The setup shots share a shape so
-# that they line up side by side.
-SETUP_CROPS = {"stage0": (230, 0, 1230, 847), "homestead": (190, 80, 1190, 927)}
+# Each setup shot's caption, and where it is cropped, in capture pixels, around what the promo run
+# built in it; a reshoot that frames a shot differently needs its box moved. The setup shots share a
+# shape so that they line up side by side.
+SETUP_SHOTS = {"stage0": ("A first battery box", (230, 0, 1230, 847)), "homestead": ("A homestead", (190, 80, 1190, 927))}
 BANK_CROP = (80, 222, 552, 704)
 MENU_CROP = (206, 105, 726, 385)
 TRAILER_CROP = (0, 140, 1260, 660)
@@ -91,48 +89,41 @@ ITEM_ROWS = [
                              "RenewableEnergy.BrokenSteelBlades", "RenewableEnergy.HomesteadPowerMag4"]),
 ]
 ITEM_COLUMNS = 6
-# recipes.png: the recipes by what they're for.
+# recipes.png: the recipes by what they're for, under these titles.
+STORAGE, MOUNTS = "Battery storage", "Panel mounts, and taking them down"
+MODULES, CARE, ELECTRONICS = "Modules: repair, homemade, and solar cells", "Battery care and rebuilding", "Electronics"
+BIOGAS = "Biogas: digesters in the build menu, the gas kit and the heater"
+WOODGAS = "Wood gas: gasifiers in the build menu, drums and sprays"
+WIND = "Wind: chargers in the build menu, blades and the alternator"
 RECIPE_SECTIONS = [
-    ("Battery storage", ["RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
-                         "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal",
-                         "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal"]),
-    ("Panel mounts, and taking them down", ["RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood",
-                                            "RenewableEnergy_MakeSolarWallMetal", "RenewableEnergy_MakeSolarRackWood",
-                                            "RenewableEnergy_MakeSolarRackMetal", "RenewableEnergy_UnmountSolarFlat",
-                                            "RenewableEnergy_UnmountSolarWallWood",
-                                            "RenewableEnergy_UnmountSolarWallMetal",
-                                            "RenewableEnergy_UnmountSolarRackWood",
-                                            "RenewableEnergy_UnmountSolarRackMetal"]),
-    ("Modules: repair, homemade, and solar cells", ["RenewableEnergy_RepairCrackedModule",
-                                                    "RenewableEnergy_RepairCrackedModuleWithGlue",
-                                                    "RenewableEnergy_ReglazeModule",
-                                                    "RenewableEnergy_MakeHomemadeSolarModule",
-                                                    "RenewableEnergy_TakeApartCalculator",
-                                                    "RenewableEnergy_TakeApartSolarGardenLight",
-                                                    "RenewableEnergy_TakeApartSolarCellCharger",
-                                                    "RenewableEnergy_TakeApartSolarMaintainer",
-                                                    "RenewableEnergy_TakeApartShatteredModule"]),
-    ("Battery care and rebuilding", ["RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery",
-                                     "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery",
-                                     "RenewableEnergy_StripL16Battery",
-                                     "RenewableEnergy_MakeBatteryPlatePattern",
-                                     "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
-                                     "RenewableEnergy_RecastBatteryPlates",
-                                     "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
-                                     "RenewableEnergy_RebuildCarBattery",
-                                     "RenewableEnergy_RebuildDeepCycleBattery", "RenewableEnergy_RebuildL16Battery",
-                                     "RenewableEnergy_MakeJarBattery", "RenewableEnergy_StripJarBattery"]),
-    ("Electronics", ["RenewableEnergy_MakeMakeshiftInverter", "RenewableEnergy_MakeHomemadeInverter",
-                     "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe"]),
-    ("Biogas: digesters in the build menu, the gas kit and the heater",
-     ["RenewableEnergy_BarrelDigester",
-      "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome", "RenewableEnergy_MakeGasConversionKit",
-      "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle"]),
-    ("Wood gas: gasifiers in the build menu, drums and sprays",
-     ["RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
-      "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray",
-      "RenewableEnergy_MakeVinegarAphidSpray"]),
-    ("Wind: chargers in the build menu, blades and the alternator",
+    (STORAGE, ["RenewableEnergy_MakeBatteryBoxWood", "RenewableEnergy_MakeBatteryBoxMetal",
+               "RenewableEnergy_BuildBatteryRackWood", "RenewableEnergy_BuildBatteryRackMetal",
+               "RenewableEnergy_BuildBatteryBankWood", "RenewableEnergy_BuildBatteryBankMetal"]),
+    (MOUNTS, ["RenewableEnergy_MakeSolarFlat", "RenewableEnergy_MakeSolarWallWood",
+              "RenewableEnergy_MakeSolarWallMetal", "RenewableEnergy_MakeSolarRackWood",
+              "RenewableEnergy_MakeSolarRackMetal", "RenewableEnergy_UnmountSolarFlat",
+              "RenewableEnergy_UnmountSolarWallWood", "RenewableEnergy_UnmountSolarWallMetal",
+              "RenewableEnergy_UnmountSolarRackWood", "RenewableEnergy_UnmountSolarRackMetal"]),
+    (MODULES, ["RenewableEnergy_RepairCrackedModule", "RenewableEnergy_RepairCrackedModuleWithGlue",
+               "RenewableEnergy_ReglazeModule", "RenewableEnergy_MakeHomemadeSolarModule",
+               "RenewableEnergy_TakeApartCalculator", "RenewableEnergy_TakeApartSolarGardenLight",
+               "RenewableEnergy_TakeApartSolarCellCharger", "RenewableEnergy_TakeApartSolarMaintainer",
+               "RenewableEnergy_TakeApartShatteredModule"]),
+    (CARE, ["RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery",
+            "RenewableEnergy_StripCarBattery", "RenewableEnergy_StripDeepCycleBattery",
+            "RenewableEnergy_StripL16Battery", "RenewableEnergy_MakeBatteryPlatePattern",
+            "RenewableEnergy_PressBatteryPlateMold", "RenewableEnergy_FireBatteryPlateMold",
+            "RenewableEnergy_RecastBatteryPlates", "RenewableEnergy_CastBatteryPlatesFromLeadPipe",
+            "RenewableEnergy_RebuildCarBattery", "RenewableEnergy_RebuildDeepCycleBattery",
+            "RenewableEnergy_RebuildL16Battery", "RenewableEnergy_MakeJarBattery", "RenewableEnergy_StripJarBattery"]),
+    (ELECTRONICS, ["RenewableEnergy_MakeMakeshiftInverter", "RenewableEnergy_MakeHomemadeInverter",
+                   "RenewableEnergy_MakeChargeController", "RenewableEnergy_MakeSolarFailsafe"]),
+    (BIOGAS, ["RenewableEnergy_BarrelDigester", "RenewableEnergy_InsulatedDigester", "RenewableEnergy_BrickDome",
+              "RenewableEnergy_MakeGasConversionKit", "RenewableEnergy_MakeGasHeater", "RenewableEnergy_RefillPropaneBottle"]),
+    (WOODGAS, ["RenewableEnergy_PrimitiveGasifier", "RenewableEnergy_Gasifier", "RenewableEnergy_AdvancedGasifier",
+               "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray",
+               "RenewableEnergy_MakeVinegarAphidSpray"]),
+    (WIND,
      ["RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_PropellerPipe",
       "RenewableEnergy_PropellerSteel", "RenewableEnergy_CarAlternatorWood", "RenewableEnergy_CarAlternatorPipe",
       "RenewableEnergy_CarAlternatorSteel", "RenewableEnergy_TurbineWood", "RenewableEnergy_TurbinePipe",
@@ -140,8 +131,6 @@ RECIPE_SECTIONS = [
       "RenewableEnergy_CutPipeBlades", "RenewableEnergy_ForgeSteelBlades",
       "RenewableEnergy_MakeHomemadeAlternator"]),
 ]
-MOUNTS, CARE = "Panel mounts, and taking them down", "Battery care and rebuilding"
-BIOGAS, WOODGAS, WIND = (title for title, _ in RECIPE_SECTIONS[-3:])
 # The accent along the top of each section's recipe cards; the solar recipes take the panels' blue.
 SECTION_ACCENTS = {BIOGAS: (112, 168, 92), WOODGAS: (214, 132, 64), WIND: (120, 196, 204)}
 # The result shown for a recipe whose OnCreate gives it, which no output line names. A recipe that
@@ -174,16 +163,14 @@ GALLERY_ITEMS = [
 # The recipe sheet over as few pictures as its cards fit at RECIPE_K: for each picture, the
 # sections it shows by title, and which of each section's recipes.
 GALLERY_RECIPES = [
-    ("recipes-storage", "Recipes: battery boxes and racks", [("Battery storage", slice(0, 4))]),
+    ("recipes-storage", "Recipes: battery boxes and racks", [(STORAGE, slice(0, 4))]),
     ("recipes-mounts", "Recipes: flat and wall panel mounts", [(MOUNTS, slice(0, 3))]),
     ("recipes-banks-racks", "Recipes: battery banks and panel racks",
-     [("Battery storage", slice(4, None)), (MOUNTS, slice(3, 5))]),
+     [(STORAGE, slice(4, None)), (MOUNTS, slice(3, 5))]),
     ("recipes-unmounting", "Recipes: taking panels down", [(MOUNTS, slice(5, None))]),
-    ("recipes-electronics", "Recipes: homemade inverters, the controller, the failsafe", [("Electronics", slice(None))]),
-    ("recipes-modules", "Recipes: sealing, reglazing and homemade modules",
-     [("Modules: repair, homemade, and solar cells", slice(0, 4))]),
-    ("recipes-solar-cells", "Recipes: solar cells from what you take apart",
-     [("Modules: repair, homemade, and solar cells", slice(4, None))]),
+    ("recipes-electronics", "Recipes: homemade inverters, the controller, the failsafe", [(ELECTRONICS, slice(None))]),
+    ("recipes-modules", "Recipes: sealing, reglazing and homemade modules", [(MODULES, slice(0, 4))]),
+    ("recipes-solar-cells", "Recipes: solar cells from what you take apart", [(MODULES, slice(4, None))]),
     ("recipes-battery-care", "Recipes: servicing and stripping batteries", [(CARE, slice(0, 5))]),
     ("recipes-plates", "Recipes: casting battery plates", [(CARE, slice(5, 10))]),
     ("recipes-rebuilding", "Recipes: rebuilding batteries, jar batteries", [(CARE, slice(10, None))]),
@@ -213,15 +200,17 @@ def banner():
     return image
 
 
+def setup_shots():
+    """The setup's shots, each cropped to its SETUP_SHOTS box, with their captions."""
+    return [(CAPTURES(name).crop(crop), label) for name, (label, crop) in SETUP_SHOTS.items()]
+
+
 def setup():
-    """The first battery box and the homestead side by side, each under its caption. Each shot is
-    cropped to SETUP_CROPS around what was built, then both are scaled to share the width."""
+    """The first battery box and the homestead side by side, each under its caption, scaled to share
+    the width."""
     gap = 12
     width = (WIDTH - gap) // 2
-    shots = []
-    for name, label in [("stage0", FIRST_BOX), ("homestead", HOMESTEAD)]:
-        crop = CAPTURES(name).crop(SETUP_CROPS[name])
-        shots.append((promo.scaled(crop, width / crop.width), label))
+    shots = [(promo.scaled(crop, width / crop.width), label) for crop, label in setup_shots()]
     image = promo.canvas(max(shot.height for shot, _ in shots))
     for i, (shot, label) in enumerate(shots):
         left = i * (width + gap)
@@ -304,8 +293,7 @@ def progression():
     """The setup's two shots, an arrow leading from the first battery box to the homestead, both as
     large as fit the page side by side, no larger than captured."""
     image = promo.canvas(PAGE[1], PAGE[0])
-    shots = [(CAPTURES(name).crop(SETUP_CROPS[name]), label) for name, label in [("stage0", FIRST_BOX),
-                                                                                 ("homestead", HOMESTEAD)]]
+    shots = setup_shots()
     gap, margin = 72, 40
     factor = min(1, (PAGE[0] - gap - 2 * margin) / sum(shot.width for shot, _ in shots),
                  (PAGE[1] - 2 * margin) / max(shot.height for shot, _ in shots))
