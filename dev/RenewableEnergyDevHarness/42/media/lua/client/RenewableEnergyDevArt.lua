@@ -176,25 +176,25 @@ end
 -- Where the character stands for each shot, and how far it zooms out from the closest zoom. For
 -- the tiles it stands in front of a wall panel, which the depth map must draw behind it.
 local SHOTS = {
-    tiles = { name = "art_tiles", x = 2, y = 1, zoomSteps = 3 },
-    overlays = { name = "art_overlays", x = 4, y = 10, zoomSteps = 2 },
-    items = { name = "art_items", x = 4, y = 5, zoomSteps = 1 },
+    tiles = { name = "tiles", x = 2, y = 1, zoomSteps = 3 },
+    overlays = { name = "overlays", x = 4, y = 10, zoomSteps = 2 },
+    items = { name = "items", x = 4, y = 5, zoomSteps = 1 },
     -- A shot of the bank fill tiles (fillTiles) for each facing.
     fill = {
-        S = { name = "art_fill", x = 6, y = 12, zoomSteps = 3 },
-        E = { name = "art_fill_e", x = 6, y = 12, zoomSteps = 3 },
-        N = { name = "art_fill_n", x = 6, y = 12, zoomSteps = 3 },
-        W = { name = "art_fill_w", x = 6, y = 12, zoomSteps = 3 },
+        S = { name = "fill", x = 6, y = 12, zoomSteps = 3 },
+        E = { name = "fill_e", x = 6, y = 12, zoomSteps = 3 },
+        N = { name = "fill_n", x = 6, y = 12, zoomSteps = 3 },
+        W = { name = "fill_w", x = 6, y = 12, zoomSteps = 3 },
     },
-    trailer = { name = "art_trailer", x = 8, y = 7, zoomSteps = 2 },
-    trailerFront = { name = "art_trailer_front", x = 3, y = 6, zoomSteps = 2 },
-    digesters = { name = "art_digesters", x = 5, y = 8, zoomSteps = 2 },
+    trailer = { name = "trailer", x = 8, y = 7, zoomSteps = 2 },
+    trailerFront = { name = "trailer_front", x = 3, y = 6, zoomSteps = 2 },
+    digesters = { name = "digesters", x = 5, y = 8, zoomSteps = 2 },
     -- Beside the second row's middle turbine, for its size against a person.
-    wind = { name = "art_wind", x = 5, y = 5, zoomSteps = 2 },
+    wind = { name = "wind", x = 5, y = 5, zoomSteps = 2 },
     -- In front of the tall chargers, all in view; then just behind the east-facing alternator, which
     -- stands between the character and the camera.
-    windTall = { name = "art_wind_tall", x = 5, y = 12, zoomSteps = 3 },
-    windBehind = { name = "art_wind_behind", x = 3, y = 9, zoomSteps = 1 },
+    windTall = { name = "wind_tall", x = 5, y = 12, zoomSteps = 3 },
+    windBehind = { name = "wind_behind", x = 3, y = 9, zoomSteps = 1 },
 }
 
 -- Damage stage 1 is a condition from 40 to 59, stage 2 below 40 (BaseVehicle.doDamageOverlay).
@@ -280,12 +280,12 @@ end
 -- The hitched trailer shows its rear; the lone one, facing the other way, its front and the lid.
 -- A state's `set` may return how to wait before the shot, as a runSteps step does.
 local HITCHED_STATES = {
-    { name = "art_trailer_rust", set = function(pair) pair.trailer:setRust(1) end },
+    { name = "trailer_rust", set = function(pair) pair.trailer:setRust(1) end },
     -- One side alone settles which side is which.
-    { name = "art_trailer_blood_right", set = function(pair) setBlood(pair.trailer, { "Right" }) end },
-    { name = "art_trailer_blood", set = function(pair) setBlood(pair.trailer, BLOOD_SIDES) end },
+    { name = "trailer_blood_right", set = function(pair) setBlood(pair.trailer, { "Right" }) end },
+    { name = "trailer_blood", set = function(pair) setBlood(pair.trailer, BLOOD_SIDES) end },
     {
-        name = "art_trailer_brake",
+        name = "trailer_brake",
         set = function(pair)
             -- A towed trailer's brake lights follow its car's, which need charge in the car's battery.
             local part = RenewableEnergy.VehicleBattery.partOf(pair.car)
@@ -297,50 +297,50 @@ local HITCHED_STATES = {
         end,
     },
     {
-        name = "art_trailer_panel_cracked",
+        name = "trailer_panel_cracked",
         set = function(pair)
             pair.trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[RIGHT]):setCondition(30)
             RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
         end,
     },
     {
-        name = "art_trailer_panel_removed",
+        name = "trailer_panel_removed",
         set = function(pair)
             pair.trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[LEFT]):setInventoryItem(nil)
             RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
         end,
     },
-    { name = "art_trailer_rear_damage1", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_1) end },
-    { name = "art_trailer_rear_damage2", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_2) end },
-    { name = "art_trailer_lit", set = function(pair) return setLamps(pair, true, false) end },
-    { name = "art_trailer_dark", set = function(pair) return setLamps(pair, false, false) end },
+    { name = "trailer_rear_damage1", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_1) end },
+    { name = "trailer_rear_damage2", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_2) end },
+    { name = "trailer_lit", set = function(pair) return setLamps(pair, true, false) end },
+    { name = "trailer_dark", set = function(pair) return setLamps(pair, false, false) end },
     -- The last of them: the lone trailer's shots put the clock back to noon.
-    { name = "art_trailer_lit_night", set = function(pair) return setLamps(pair, true, true) end },
+    { name = "trailer_lit_night", set = function(pair) return setLamps(pair, true, true) end },
 }
 local LONE_STATES = {
-    { name = "art_trailer_damage1", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_1) end },
-    { name = "art_trailer_damage2", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_2) end },
+    { name = "trailer_damage1", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_1) end },
+    { name = "trailer_damage2", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_2) end },
     {
-        name = "art_trailer_lid_removed",
+        name = "trailer_lid_removed",
         set = function(pair) pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):setInventoryItem(nil) end,
     },
     {
-        name = "art_trailer_washed",
+        name = "trailer_washed",
         set = function(pair)
             setBlood(pair.trailer, BLOOD_SIDES)
             wash(pair.trailer)
         end,
     },
-    { name = "art_trailer_lid_open", set = function(pair) return swingLid(pair, true) end },
-    { name = "art_trailer_lid_shut", set = function(pair) return swingLid(pair, false) end },
-    { name = "art_trailer_lid_locked", set = function(pair) lockLid(pair, true) end },
-    { name = "art_trailer_lid_unlocked", set = function(pair) lockLid(pair, false) end },
+    { name = "trailer_lid_open", set = function(pair) return swingLid(pair, true) end },
+    { name = "trailer_lid_shut", set = function(pair) return swingLid(pair, false) end },
+    { name = "trailer_lid_locked", set = function(pair) lockLid(pair, true) end },
+    { name = "trailer_lid_unlocked", set = function(pair) lockLid(pair, false) end },
 }
 
 -- `art.pair` is spawned by an earlier step, so the steps read it only as they run.
-local function addStates(steps, art, states)
+local function addStates(run, art, states)
     for _, state in ipairs(states) do
-        table.insert(steps, function()
+        run:add(function()
             local pair = art.pair
             pair.trailer:repair()
             -- repair() mends the panels without anything showing their models again.
@@ -351,22 +351,21 @@ local function addStates(steps, art, states)
             -- A part's new condition reaches the overlay on the vehicle's next update, once a frame.
             return state.set(pair) or Capture.DRAW_FRAMES
         end)
-        table.insert(steps, function()
-            Capture.screenshot(MARK, state.name)
+        run:add(function()
+            run:screenshot(run.prefix .. state.name)
         end)
     end
 end
 
-local function isOpen(square)
+local function isBareGround(square)
     return square ~= nil and square:isOutside() and square:isSolidFloor() and square:getObjects():size() == 1
-        and not square:HasTree() and square:getWall(true) == nil and square:getWall(false) == nil
         and square:getVehicleContainer() == nil
 end
 
 -- The north-west corner of the closest open lot that takes the whole stage.
 local function findLot(player)
     local corner = Harness.closestSquare(player, function(square)
-        return Stage.isAreaOpen(square, AREA.w, AREA.h, isOpen)
+        return Stage.isAreaOpen(square, AREA.w, AREA.h, isBareGround)
     end)
     return corner and { x = corner:getX(), y = corner:getY(), z = corner:getZ() }
 end
@@ -389,13 +388,7 @@ local function clearLot(lot)
         for y = 0, AREA.h - 1 do
             local square = lotSquare(lot, x, y)
             square:removeAllWorldObjects()
-            local objects = square:getObjects()
-            for i = objects:size() - 1, 0, -1 do
-                local object = objects:get(i)
-                if not object:isFloor() then
-                    square:RemoveTileObject(object)
-                end
-            end
+            Stage.clearToFloor(square)
         end
     end
     recalcLot(lot)
@@ -484,17 +477,12 @@ function IconSheet:new()
 end
 
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
-local function addShot(steps, player, lot, shot)
-    Harness.addLookAround(steps, player, lotSquare(lot, shot.x, shot.y))
-    table.insert(steps, function()
+local function addShot(run, player, lot, shot)
+    Harness.addLookAround(run.steps, player, lotSquare(lot, shot.x, shot.y))
+    run:add(function()
         return Harness.zoomOut(shot.zoomSteps)
     end)
-    table.insert(steps, function()
-        return Capture.DRAW_FRAMES
-    end)
-    table.insert(steps, function()
-        Capture.screenshot(MARK, shot.name)
-    end)
+    run:addOpaque(shot.name, function() return {} end)
 end
 
 -- Cracked mounts, by lot square, and their modules' conditions in slot order: the metal walls and
@@ -515,10 +503,10 @@ local CRACKED_PANELS = {
 }
 -- The squares east of the mounts stay open for a trailer with a cracked panel. The character
 -- stands south-east of the mounts and south-west of the open ground, hiding neither.
-local CRACKED_SHOT = { name = "art_cracked", x = 7, y = 7, zoomSteps = 2 }
+local CRACKED_SHOT = { name = "cracked", x = 7, y = 7, zoomSteps = 2 }
 
-local function addCrackedShot(steps, player, lot)
-    table.insert(steps, function()
+local function addCrackedShot(run, player, lot)
+    run:add(function()
         clearLot(lot)
         clearVehicles(lot)
         placeTiles(lot, CRACKED_WALLS)
@@ -535,12 +523,12 @@ local function addCrackedShot(steps, player, lot)
     -- The tick after stocking puts the stock conditions back over any set in the same tick
     -- (ArrowBoard.lua's keepStockConditions), so they're set a step later.
     local trailer
-    table.insert(steps, function()
+    run:add(function()
         -- Row 4 keeps all of it on the cleared lot.
         trailer = addVehicleDebug(RenewableEnergy.ArrowBoard.SCRIPT, IsoDirections.N, 0, lotSquare(lot, 6, 4))
         return 1
     end)
-    table.insert(steps, function()
+    run:add(function()
         trailer:repair()
         trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[LEFT]):setCondition(30)
         trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[RIGHT]):setCondition(100)
@@ -549,86 +537,86 @@ local function addCrackedShot(steps, player, lot)
         RenewableEnergy.ArrowBoard.setSwitch(trailer, false)
         return Stage.vehiclesAtRest({ trailer = trailer }, false)
     end)
-    addShot(steps, player, lot, CRACKED_SHOT)
+    addShot(run, player, lot, CRACKED_SHOT)
 end
 
 -- The tile, overlay, item, icon, fill, digester and wind shots, each on the lot cleared of the one
 -- before.
-local function addTileAndItemShots(steps, player, lot)
+local function addTileAndItemShots(run, player, lot)
     local iconSheet = IconSheet:new()
-    table.insert(steps, function()
+    run:add(function()
         getGameTime():setTimeOfDay(NOON)
         Harness.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
     end)
-    addShot(steps, player, lot, SHOTS.tiles)
-    addShot(steps, player, lot, SHOTS.overlays)
-    table.insert(steps, function()
+    addShot(run, player, lot, SHOTS.tiles)
+    addShot(run, player, lot, SHOTS.overlays)
+    run:add(function()
         clearLot(lot)
         dropItems(lot)
     end)
-    addShot(steps, player, lot, SHOTS.items)
-    table.insert(steps, function()
+    addShot(run, player, lot, SHOTS.items)
+    run:add(function()
         iconSheet:addToUIManager()
         return Capture.drawn(Capture.DRAW_FRAMES)
     end)
-    table.insert(steps, function()
-        Capture.screenshot(MARK, "art_icons")
+    run:add(function()
+        run:screenshot(run.prefix .. "icons")
     end)
-    table.insert(steps, function()
+    run:add(function()
         iconSheet:removeFromUIManager()
         return 1
     end)
     for _, facing in ipairs({ "S", "E", "N", "W" }) do
-        table.insert(steps, function()
+        run:add(function()
             clearLot(lot)
             placeTiles(lot, fillTiles(facing))
         end)
-        addShot(steps, player, lot, SHOTS.fill[facing])
+        addShot(run, player, lot, SHOTS.fill[facing])
     end
-    table.insert(steps, function()
+    run:add(function()
         clearLot(lot)
         placeTiles(lot, digesterTiles())
     end)
-    addShot(steps, player, lot, SHOTS.digesters)
-    table.insert(steps, function()
+    addShot(run, player, lot, SHOTS.digesters)
+    run:add(function()
         clearLot(lot)
         placeTiles(lot, windTiles())
     end)
-    addShot(steps, player, lot, SHOTS.wind)
-    table.insert(steps, function()
+    addShot(run, player, lot, SHOTS.wind)
+    run:add(function()
         clearLot(lot)
         placeTiles(lot, tallWindTiles())
     end)
-    addShot(steps, player, lot, SHOTS.windTall)
-    addShot(steps, player, lot, SHOTS.windBehind)
+    addShot(run, player, lot, SHOTS.windTall)
+    addShot(run, player, lot, SHOTS.windBehind)
 end
 
 -- The trailer hitched to its car, then the rear in each of its states. The steps spawn the pair
 -- into `art.pair`.
-local function addHitchedTrailerShots(steps, player, lot, art)
-    table.insert(steps, function()
+local function addHitchedTrailerShots(run, player, lot, art)
+    run:add(function()
         clearLot(lot)
         clearVehicles(lot)
         art.pair = Stage.spawnTrailer(lotSquare(lot, 5, 3), "N")
         return Stage.vehiclesAtRest(art.pair, false)
     end)
-    table.insert(steps, function()
+    run:add(function()
         Stage.hitchTrailer(art.pair, player, MARK)
         return Stage.vehiclesAtRest(art.pair, true)
     end)
-    addShot(steps, player, lot, SHOTS.trailer)
-    addStates(steps, art, HITCHED_STATES)
+    addShot(run, player, lot, SHOTS.trailer)
+    addStates(run, art, HITCHED_STATES)
 end
 
 -- A second trailer alone, facing the other way, in each of its states, then the cracked panels.
-local function addLoneAndCrackedShots(steps, player, lot, art)
+local function addLoneAndCrackedShots(run, player, lot, art)
     -- Back to noon after the hitched trailer's night shot.
-    table.insert(steps, function()
+    run:add(function()
         getGameTime():setTimeOfDay(NOON)
         return Harness.lightingSettled(player, true)
     end)
-    table.insert(steps, function()
+    run:add(function()
         clearVehicles(lot)
         art.pair = Stage.spawnTrailer(lotSquare(lot, 5, 9), "S")
         -- From the camera's side a car facing this way would hide its trailer.
@@ -637,9 +625,9 @@ local function addLoneAndCrackedShots(steps, player, lot, art)
         setBlood(art.pair.trailer, BLOOD_SIDES)
         return Stage.vehiclesAtRest(art.pair, false)
     end)
-    addShot(steps, player, lot, SHOTS.trailerFront)
-    addStates(steps, art, LONE_STATES)
-    addCrackedShot(steps, player, lot)
+    addShot(run, player, lot, SHOTS.trailerFront)
+    addStates(run, art, LONE_STATES)
+    addCrackedShot(run, player, lot)
 end
 
 function Art.capture(_, onDone)
@@ -652,9 +640,9 @@ function Art.capture(_, onDone)
     end
     print(string.format("%s stage at %d,%d", MARK, lot.x, lot.y))
     local art = {}
-    addTileAndItemShots(run.steps, player, lot)
-    addHitchedTrailerShots(run.steps, player, lot, art)
-    addLoneAndCrackedShots(run.steps, player, lot, art)
+    addTileAndItemShots(run, player, lot)
+    addHitchedTrailerShots(run, player, lot, art)
+    addLoneAndCrackedShots(run, player, lot, art)
     run:run(nil, onDone)
 end
 

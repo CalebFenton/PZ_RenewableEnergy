@@ -1,6 +1,7 @@
 -- Development only. What the dev mod's captures and scenarios need besides the harness's staging
--- (PZHarness/Stage.lua): testing an area for room, placing a tile so it draws at once, and setting
--- out the arrow board trailer; PZHarness/Capture.lua runs the steps.
+-- (PZHarness/Stage.lua): testing an area for room, placing a tile so it draws at once, clearing a
+-- square down to its floor, and setting out the arrow board trailer; PZHarness/Capture.lua runs the
+-- steps.
 
 require "PZHarness/Fixtures"
 
@@ -36,6 +37,18 @@ function Stage.placeTile(square, spriteName, modData)
     local object = PZHarness.Fixtures.newTile(square, spriteName, modData)
     square:RecalcAllWithNeighbours(true)
     return object
+end
+
+--- Takes every object off `square` but its floor and those `keeps(object)` accepts, from the top
+--- down.
+function Stage.clearToFloor(square, keeps)
+    local floor, objects = square:getFloor(), square:getObjects()
+    for i = objects:size() - 1, 0, -1 do
+        local object = objects:get(i)
+        if object ~= floor and not (keeps and keeps(object)) then
+            square:RemoveTileObject(object)
+        end
+    end
 end
 
 --- Spawns a car on `square` facing `facing` ("N", "E", "S" or "W") and the arrow board trailer

@@ -10,9 +10,7 @@ dev/RenewableEnergyDevHarness/42/media/lua/client/RenewableEnergyDevTownCensus.l
 The media folder defaults to the macOS Steam install. Rerun it after a game update changes the
 map. It reads the files IsoMetaGrid and IsoLot read:
 
-- <map>/<cx>_<cy>.lotheader: "LOTH", int32 version, the cell's tile names (one per line), its
-  size and levels, then its rooms: a name line, level, rects (x, y, w, h in the cell, which can
-  run into the next cell), and objects.
+- <map>/<cx>_<cy>.lotheader: the cell's tile names, its levels and its rooms (dev/check/lotheader.py).
 - <map>/world_<cx>_<cy>.lotpack: "LOTP", int32 version, int32 chunk count, then an int64 offset
   per 8 x 8 chunk (index x * 32 + y). Each chunk lists its squares level by level, x then y: an
   int32 count; -1 and a count of squares to skip; or an int32 the game skips (-1 in Build 42
@@ -34,6 +32,8 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "harness", "check"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "check"))
+import lotheader  # noqa: E402
 import tiledefs  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -42,7 +42,7 @@ OUT = os.path.join(REPO, "dev", "RenewableEnergyDevHarness", "42", "media", "lua
 DEFAULT_MEDIA = os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/ProjectZomboid/"
                                    "Project Zomboid.app/Contents/Java/media")
 MAP = "Muldraugh, KY"
-CELL = 256
+CELL = lotheader.CELL
 CHUNK = 8
 
 # Town bounds, x1, y1, x2, y2 inclusive, drawn around each town's built-up area.
@@ -77,43 +77,8 @@ def read_header(path, cell):
     """The cell's tile names, its lowest and highest level, and its rooms as (name, level, rects),
     with the rects in world squares."""
     with open(path, "rb") as f:
-        data = f.read()
-    at = 4 if data[:4] == b"LOTH" else 0
-    (version,) = struct.unpack_from("<i", data, at)
-    at += 4
-    (count,) = struct.unpack_from("<i", data, at)
-    at += 4
-    tiles = []
-    for _ in range(count):
-        end = data.index(b"\n", at)
-        tiles.append(data[at:end].decode("latin-1"))
-        at = end + 1
-    if version == 0:
-        _w, _h, levels = struct.unpack_from("<3i", data, at + 1)
-        at += 13
-        min_level, max_level = 0, levels - 1
-    else:
-        _w, _h, min_level, max_level = struct.unpack_from("<4i", data, at)
-        at += 16
-    (room_count,) = struct.unpack_from("<i", data, at)
-    at += 4
-    rooms = []
-    ox, oy = cell
-    for _ in range(room_count):
-        end = data.index(b"\n", at)
-        name = data[at:end].decode("latin-1")
-        at = end + 1
-        level, rect_count = struct.unpack_from("<2i", data, at)
-        at += 8
-        rects = []
-        for _ in range(rect_count):
-            x, y, w, h = struct.unpack_from("<4i", data, at)
-            at += 16
-            rects.append((x + ox * CELL, y + oy * CELL, w, h))
-        (objects,) = struct.unpack_from("<i", data, at)
-        at += 4 + 12 * objects
-        rooms.append((name, level, rects))
-    return tiles, min_level, max_level, rooms
+        tiles, min_level, max_level, rooms = lotheader.parse(f.read(), *cell)
+    return tiles, min_level, max_level, [(name, level, rects) for name, level, rects, _building in rooms]
 
 
 def chunk_squares(pack, index, levels):

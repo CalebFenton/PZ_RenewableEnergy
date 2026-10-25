@@ -190,7 +190,7 @@ end
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
 --- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
 --- beside it if `opts.failsafe`. When the test ends the server removes it and this client lets go
---- of its squares (RenewableEnergy.Debug.releaseGeneratorPower). Returns { x, y, z, square, object }.
+--- of its squares (RenewableEnergy.PowerBank.releaseGeneratorPower). Returns { x, y, z, square, object }.
 function T.generator(self, opts)
     opts = opts or {}
     local square = opts.square
@@ -204,7 +204,16 @@ function T.generator(self, opts)
     args.fuel, args.running, args.failsafe = opts.fuel, opts.running, opts.failsafe
     T.server(self, "placeGenerator", args)
     T.step(function()
-        T.defer(self, function() RenewableEnergy.Debug.releaseGeneratorPower(handle.x, handle.y, handle.z) end)
+        -- A multiplayer client lets its chunks go of the squares the generator powered before the
+        -- server's undo switches it off and removes it. That switch-off can miss this client's copy:
+        -- it names the generator by its place on the square and isn't ordered with the removal that
+        -- follows (SyncIsoObject against RemoveItemFromSquare), and the chunks then keep its squares
+        -- powered until they load again.
+        T.defer(self, function()
+            if isClient() then
+                RenewableEnergy.PowerBank.releaseGeneratorPower(handle.x, handle.y, handle.z)
+            end
+        end)
     end)
     T.waitFor(self, function()
         handle.object = square:getGenerator()

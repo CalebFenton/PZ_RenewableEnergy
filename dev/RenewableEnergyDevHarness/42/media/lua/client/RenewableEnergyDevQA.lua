@@ -23,15 +23,6 @@ local LOT_ROWS = 20
 local SKILL = 10
 -- The batteries and modules among the materials come worn, so that every repair recipe takes them.
 local WORN_BATTERY, CRACKED_MODULE = 40, 30
--- Inputs naming several items take the first listed here, else the harness's pick (T.inputItem),
--- which for a tag can differ from run to run; so every tag input the recipes have is listed, and
--- the layout and the toolboxes come out the same each run.
-local PREFER = {
-    "Base.EmptyJar", "Base.MetalDrum", "Base.Bucket", "Base.WaterBottle", "Base.Charcoal", "Base.HandDrill",
-    "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.SmithingHammer", "Base.Saw", "Base.KitchenKnife",
-    "Base.Pliers", "Base.Tongs", "Base.WeldingMask", "Base.Shovel", "Base.MasonsTrowel", "Base.Matches",
-    "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1",
-}
 
 -- What the mod's menu jobs take, beyond its recipes and tools, and what they work on.
 local JOB_ITEMS = {
@@ -155,18 +146,18 @@ local STATIONS = {
     { entity = "Base.Forge", sprites = { "crafted_01_42", "crafted_01_116", "crafted_01_38" } },
 }
 
-local function isOpen(square)
+local function isWalkableGround(square)
     return square ~= nil and square:isOutside() and square:isSolidFloor() and square:isFree(false)
         and not square:HasTree() and square:getWall(true) == nil and square:getWall(false) == nil
         and square:getVehicleContainer() == nil and not square:getProperties():has(IsoFlagType.water)
 end
 
 local function rowOpen(square, length)
-    return Stage.isAreaOpen(square, length, 1, isOpen)
+    return Stage.isAreaOpen(square, length, 1, isWalkableGround)
 end
 
 local function lotOpen(square)
-    return Stage.isAreaOpen(square, ROW, LOT_ROWS, isOpen)
+    return Stage.isAreaOpen(square, ROW, LOT_ROWS, isWalkableGround)
 end
 
 -- The layout's north-west corner: the closest whose whole lot is open, else the closest open row,
@@ -189,7 +180,7 @@ local function nextSquare(layout)
         if layout.column == ROW then
             layout.column, layout.row = 0, layout.row + 1
         end
-        if isOpen(square) then
+        if isWalkableGround(square) then
             -- Out of the long grass and bushes, so what lies there shows.
             Harness.clearGroundCover(square)
             return square
@@ -202,6 +193,19 @@ end
 local function nextGroup(layout)
     layout.row = layout.row + (layout.column > 0 and 2 or 1)
     layout.column = 0
+end
+
+-- The first square of the layout's next run of `length` open squares east along the world, with
+-- the layout moved past the run's other squares so nothing is laid on them; nil if none is left.
+local function nextRun(layout, length)
+    local first
+    repeat
+        first = nextSquare(layout)
+    until not first or rowOpen(first, length)
+    for _ = 2, length do
+        nextSquare(layout)
+    end
+    return first
 end
 
 local function isKnown(fullType)
@@ -230,7 +234,7 @@ local function materials()
         for i = 0, inputs:size() - 1 do
             local input = inputs:get(i)
             if input:getResourceType() == ResourceType.Item then
-                local item = PZHarness.Test.inputItem(input, PREFER)
+                local item = PZHarness.Test.inputItem(input, RenewableEnergy.Debug.PREFERRED_INPUTS)
                 if item then
                     local count = input:getIntAmount()
                     if item:isItemType(ItemType.DRAINABLE) and not input:isItemCount() then
@@ -384,10 +388,7 @@ end
 
 local function placeStations(layout, summary)
     for _, station in ipairs(STATIONS) do
-        local first
-        repeat
-            first = nextSquare(layout)
-        until not first or rowOpen(first, #station.sprites)
+        local first = nextRun(layout, #station.sprites)
         if not first then
             table.insert(summary.unplaced, station.entity)
         else
@@ -399,10 +400,6 @@ local function placeStations(layout, summary)
                     table.insert(summary.unplaced, station.entity .. " (" .. missing .. ")")
                 end
             end
-            -- Past the station's other tiles, so nothing is laid on them.
-            for _ = 2, #station.sprites do
-                nextSquare(layout)
-            end
             summary.stations = summary.stations + 1
         end
     end
@@ -410,15 +407,13 @@ end
 
 -- A treadmill, its console west of its rear as the game lays it out facing west (Sprites.treadmill).
 local function placeTreadmill(layout, summary)
-    local console
-    repeat
-        console = nextSquare(layout)
-    until not console or rowOpen(console, 2)
+    local console = nextRun(layout, 2)
     if not console then
         table.insert(summary.unplaced, "treadmill")
         return
     end
-    local rear = nextSquare(layout)
+    local rear = getCell():getGridSquare(console:getX() + 1, console:getY(), console:getZ())
+    Harness.clearGroundCover(rear)
     Stage.placeTile(console, RenewableEnergy.Sprites.treadmill.W.console)
     Stage.placeTile(rear, RenewableEnergy.Sprites.treadmill.W.rear)
 end

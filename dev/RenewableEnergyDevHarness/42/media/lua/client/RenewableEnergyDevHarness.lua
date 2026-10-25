@@ -3,13 +3,15 @@
 -- debug scenario, prints its result lines to console.txt for run-debug-client.sh, and quits:
 -- --test runs every renewable_energy_* test (on a dedicated server's client with --mp), --promo
 -- and --art save art (RenewableEnergyDevPromo, RenewableEnergyDevArt), and --loot measures the
--- loot lists and each town's module and battery haul (RenewableEnergyDevTownCensus).
+-- loot lists and each town's module and battery haul (RenewableEnergyDevTownReport, from
+-- RenewableEnergyDevTownCensus).
 
 require "PZHarness/Runner"
 require "RenewableEnergy/Debug/RenewableEnergyDebugScenario"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Promo = require "RenewableEnergyDevPromo"
 local Art = require "RenewableEnergyDevArt"
+local TownReport = require "RenewableEnergyDevTownReport"
 
 -- Samples per list: enough to measure a rare drop to a fraction of a percentage point.
 local LOOT_SAMPLES = 10000
@@ -34,7 +36,7 @@ local function hauled(haul)
 end
 
 local function reportModules(census)
-    local report = RenewableEnergy.Loot.moduleReport(census)
+    local report = TownReport.moduleReport(census)
     print("RELootReport modules a thorough player finds, as count (watts as found / after Seal Cracked Module)")
     for _, town in ipairs(report.towns) do
         print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, beside world banks %s, vehicles %s, sites %s; total %s",
@@ -56,9 +58,8 @@ local function stored(haul)
 end
 
 local function reportBatteries(census, modules)
-    local Loot = RenewableEnergy.Loot
     local options = SandboxVars.RenewableEnergy
-    local report = Loot.batteryReport(census)
+    local report = TownReport.batteryReport(census)
     print(string.format("RELootReport batteries a thorough player finds, as count (kWh as found); Battery Bank Spawn %d, Solar Sites %d%%",
         options.BatteryBankSpawn, options.SolarSites))
     for _, town in ipairs(report.towns) do
@@ -80,7 +81,7 @@ local function reportBatteries(census, modules)
     for _, name in ipairs(names) do
         print(string.format("RELootReport batteries in a %s bank: %s", name, stored(report.stocks[name])))
     end
-    local sticks = Loot.yardsticks()
+    local sticks = TownReport.yardsticks()
     for _, month in ipairs({ "july", "december" }) do
         local wh = sticks.moduleWh[month]
         print(string.format("RELootReport yardstick: a new module banks a day in mid-%s, average (clear): flat %.0f (%.0f), south rack %.0f (%.0f), south wall %.0f (%.0f) Wh at Sunlight Multiplier %.2f",

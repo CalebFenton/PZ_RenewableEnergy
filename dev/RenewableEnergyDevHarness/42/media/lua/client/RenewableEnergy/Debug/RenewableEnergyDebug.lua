@@ -39,6 +39,15 @@ Debug.ITEMS = {
 }
 -- Items that only ever sit in a vehicle part.
 Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
+-- Inputs naming several items take the first listed here, else the harness's pick (T.inputItem),
+-- which for a tag can differ from run to run; so every tag input the recipes have is listed, and
+-- the QA layout, its toolboxes and the promo's recipe sheet come out the same each run.
+Debug.PREFERRED_INPUTS = {
+    "Base.EmptyJar", "Base.MetalDrum", "Base.Bucket", "Base.WaterBottle", "Base.Charcoal", "Base.HandDrill",
+    "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.SmithingHammer", "Base.Saw", "Base.KitchenKnife",
+    "Base.Pliers", "Base.Tongs", "Base.WeldingMask", "Base.Shovel2", "Base.MasonsTrowel", "Base.Matches",
+    "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1",
+}
 
 --- Teaches `player` every recipe of the mod, the build menu's included.
 function Debug.learnRecipes(player)
@@ -58,17 +67,6 @@ function Debug.isFreeSquare(square, indoors)
     return square ~= nil and square:isFree(false) and square:getVehicleContainer() == nil
         and RenewableEnergy.PowerBank.canPlaceBank(square) == indoors and (indoors or square:isOutside())
         and not RenewableEnergy.findObjectOn(square, isContainerGeneratorOrSource)
-end
-
--- Lets this multiplayer client's chunks go of the squares a test generator at x, y, z powered,
--- before the server's undo switches it off and removes it. That switch-off can miss this client's
--- copy: it names the generator by its place on the square and isn't ordered with the removal that
--- follows (SyncIsoObject against RemoveItemFromSquare), and the chunks then keep its squares
--- powered until they load again.
-function Debug.releaseGeneratorPower(x, y, z)
-    if isClient() then
-        RenewableEnergy.PowerBank.releaseGeneratorPower(x, y, z)
-    end
 end
 
 -- A character with the electrical and building skills the mod gates on, every recipe, a

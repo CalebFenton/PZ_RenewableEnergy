@@ -7,23 +7,19 @@
 | `stash-crate` | A stash crate outside every room of that building: `doBuildingStash` stocks only containers in the house's rooms. |
 """
 import os
-import struct
+import sys
 
 from rules import check
 
+# check.py loads plugins by path, which leaves their folder off the import path.
+sys.path.insert(0, os.path.dirname(__file__))
+import lotheader  # noqa: E402
+
 
 class WorldMap:
-    """Rooms and buildings of the world map, read from its .lotheader files on demand.
+    """Rooms and buildings of the world map, read from its .lotheader files on demand."""
 
-    The layout is IsoMetaGrid's loader: optional "LOTH", int32 version (0 or 1), a tile count and
-    that many newline-terminated tile names (version 0 then has one stray byte), width and height
-    in chunks, version 0's level count or version 1's min and max level, then the rooms: a name
-    line, the level, a rect count and x, y, w, h per rect (in the cell, though a rect can run past
-    its edge into the next cell), and a count of three-int objects. Last come the buildings, each
-    a count and that many room indexes. Integers are little endian.
-    """
-
-    CELL = 256
+    CELL = lotheader.CELL
 
     def __init__(self, media):
         maps = os.path.join(media, "maps")
@@ -50,47 +46,9 @@ class WorldMap:
                 path = os.path.join(folder, "%d_%d.lotheader" % (cx, cy))
                 if os.path.exists(path):
                     with open(path, "rb") as f:
-                        self.cells[cx, cy] = self._parse(f.read(), cx, cy)
+                        self.cells[cx, cy] = lotheader.parse(f.read(), cx, cy)[3]
                     break
         return self.cells[cx, cy]
-
-    def _parse(self, data, cx, cy):
-        at = 4 if data[:4] == b"LOTH" else 0
-
-        def ints(n):
-            nonlocal at
-            values = struct.unpack_from("<%di" % n, data, at)
-            at += 4 * n
-            return values
-
-        def line():
-            nonlocal at
-            end = data.index(b"\n", at)
-            text = data[at:end].decode("latin-1")
-            at = end + 1
-            return text
-
-        (version,) = ints(1)
-        if version not in (0, 1):
-            raise ValueError("lotheader %d,%d has version %d" % (cx, cy, version))
-        for _ in range(ints(1)[0]):
-            line()
-        at += 1 if version == 0 else 0
-        ints(3 if version == 0 else 4)
-        rooms = []
-        for _ in range(ints(1)[0]):
-            name = line()
-            level, count = ints(2)
-            rects = [(x + cx * self.CELL, y + cy * self.CELL, w, h) for x, y, w, h in
-                     (ints(4) for _ in range(count))]
-            # Not `at += 12 * ints(1)[0]`: that reads at before ints moves it past the count.
-            (objects,) = ints(1)
-            at += 12 * objects
-            rooms.append([name, level, rects, None])
-        for building in range(ints(1)[0]):
-            for room in ints(ints(1)[0]):
-                rooms[room][3] = (cx, cy, building)
-        return [tuple(room) for room in rooms]
 
 
 @check
