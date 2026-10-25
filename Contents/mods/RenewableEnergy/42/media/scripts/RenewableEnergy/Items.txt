@@ -572,7 +572,8 @@ module RenewableEnergy
         Tags = base:magazine;base:ignorezombiedensity,
     }
 
-    /* Biogas: the digesters (build menu recipes), the Gas Conversion Kit and the gas heater. */
+    /* Biogas: the digesters (build menu recipes), the Gas Conversion Kit, the gas heater and the
+       welded drum the digesters take. */
     item HomesteadPowerMag3
     {
         DisplayCategory = RecipeResource,
@@ -583,12 +584,13 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag3_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_BarrelDigester;RenewableEnergy_InsulatedDigester;RenewableEnergy_BrickDome;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeGasHeater,
+        LearnedRecipes = RenewableEnergy_BarrelDigester;RenewableEnergy_InsulatedDigester;RenewableEnergy_BrickDome;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeGasHeater;RenewableEnergy_WeldMetalDrum,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }
 
-    /* Wind and the treadmill: the wind chargers (build menu recipes), their blades and the homemade alternator. */
+    /* Wind and the treadmill: the wind chargers (build menu recipes), their blades, the homemade
+       alternator and the welded drum the scoop rotor takes. */
     item HomesteadPowerMag4
     {
         DisplayCategory = RecipeResource,
@@ -599,14 +601,15 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag4_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_CarAlternatorWood;RenewableEnergy_TurbineWood;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator,
+        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_CarAlternatorWood;RenewableEnergy_TurbineWood;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator;RenewableEnergy_WeldMetalDrum,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }
 
     /*
         FEMA's 1989 wood gas generator plans: the gasifiers (build menu recipes), the Gas
-        Conversion Kit and the wood vinegar sprays. Found where the government kept its paper.
+        Conversion Kit, the wood vinegar sprays and the welded drum the gasifier takes. Found where
+        the government kept its paper.
     */
     item FemaPamphlet
     {
@@ -618,7 +621,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.FemaPamphlet_Ground,
         BoredomChange = -10,
         StressChange = -5,
-        LearnedRecipes = RenewableEnergy_PrimitiveGasifier;RenewableEnergy_Gasifier;RenewableEnergy_AdvancedGasifier;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeVinegarMildewSpray;RenewableEnergy_MakeVinegarAphidSpray,
+        LearnedRecipes = RenewableEnergy_PrimitiveGasifier;RenewableEnergy_Gasifier;RenewableEnergy_AdvancedGasifier;RenewableEnergy_MakeGasConversionKit;RenewableEnergy_MakeVinegarMildewSpray;RenewableEnergy_MakeVinegarAphidSpray;RenewableEnergy_WeldMetalDrum,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

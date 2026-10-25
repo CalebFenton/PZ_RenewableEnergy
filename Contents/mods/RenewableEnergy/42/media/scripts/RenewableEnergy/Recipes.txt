@@ -1263,8 +1263,9 @@ module Base
         }
     }
 
-    /* A drum rolled and welded from sheet metal, once the found ones run out: the Gasifier and the
-       digesters take one. Vanilla has no drum recipe. */
+    /* A drum rolled and welded from sheet metal, once the found ones run out: the barrel and
+       insulated digesters, the Gasifier and the scoop rotor take one, so the literature that teaches
+       each of them teaches this too. Vanilla has no drum recipe. */
     craftRecipe RenewableEnergy_WeldMetalDrum
     {
         timedAction = Welding,

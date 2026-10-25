@@ -525,9 +525,9 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 |---|---|
 | Homestead Power #1: Sun & Batteries | Battery boxes and racks, every panel mount, sealing, the makeshift inverter |
 | Homestead Power #2: Inverters & Control | Battery banks, the homemade inverter, the charge controller, the failsafe, homemade modules, reglazing, reconditioning, the whole battery rebuild |
-| Homestead Power #3 | Digesters, the Gas Conversion Kit, the Gas Heater |
-| Homestead Power #4 | Every wind charger, their blades, the homemade alternator |
-| FEMA Wood Gas Generator Plans | The three gasifiers, the Gas Conversion Kit, the wood vinegar sprays |
+| Homestead Power #3 | Digesters, the Gas Conversion Kit, the Gas Heater, Weld Metal Drum |
+| Homestead Power #4 | Every wind charger, their blades, the homemade alternator, Weld Metal Drum |
+| FEMA Wood Gas Generator Plans | The three gasifiers, the Gas Conversion Kit, the wood vinegar sprays, Weld Metal Drum |
 
 ### Other ways to learn
 
