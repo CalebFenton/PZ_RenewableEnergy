@@ -844,10 +844,10 @@ module Base
         Tooltip = Tooltip_RenewableEnergy_RecastBatteryPlates,
         inputs
         {
+            item 1 [RenewableEnergy.BatteryPlateMold] mode:keep,
             item 2 [RenewableEnergy.WornBatteryPlates],
             item 1 [RenewableEnergy.WornBatteryPlates;Base.LeadPipe],
             item 8 tags[base:charcoal],
-            item 1 [RenewableEnergy.BatteryPlateMold] mode:keep,
         }
         outputs
         {
@@ -870,9 +870,9 @@ module Base
         Tooltip = Tooltip_RenewableEnergy_CastBatteryPlatesFromLeadPipe,
         inputs
         {
+            item 1 [RenewableEnergy.BatteryPlateMold] mode:keep,
             item 3 [Base.LeadPipe],
             item 8 tags[base:charcoal],
-            item 1 [RenewableEnergy.BatteryPlateMold] mode:keep,
         }
         outputs
         {
@@ -1023,7 +1023,7 @@ module Base
         inputs
         {
             item 1 tags[base:hammer] mode:keep flags[MayDegradeVeryLight],
-            item 1 tags[base:saw;base:smallsaw;base:crudesaw] mode:keep flags[MayDegradeLight;Prop1],
+            item 1 tags[base:saw;base:smallsaw;base:crudesaw] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [Base.Plank] flags[Prop2],
             item 1 [Base.Nails],
         }
@@ -1035,8 +1035,8 @@ module Base
 
     craftRecipe RenewableEnergy_PressBatteryPlateMold
     {
-        time = 100,
         timedAction = UseHandPress,
+        time = 100,
         Tags = HandPress,
         category = Pottery,
         NeedToBeLearn = true,
@@ -1055,8 +1055,8 @@ module Base
 
     craftRecipe RenewableEnergy_FireBatteryPlateMold
     {
-        time = 20,
         timedAction = Making_With_Kiln,
+        time = 20,
         Tags = KilnSmall;KilnLarge,
         category = Pottery,
         NeedToBeLearn = true,
@@ -1249,13 +1249,13 @@ module Base
     {
         timedAction = Making,
         time = 50,
-        OnCreate = RenewableEnergy.Recipes.refillPropaneBottle,
         Tags = InHandCraft,
         category = Miscellaneous,
+        OnCreate = RenewableEnergy.Recipes.refillPropaneBottle,
         inputs
         {
             item 1 [Base.Propane_Refill] mode:destroy flags[NotFull;ItemCount],
-            item 1 [Base.PropaneTank] flags[NotEmpty;ItemCount] mode:keep,
+            item 1 [Base.PropaneTank] mode:keep flags[NotEmpty;ItemCount],
         }
         outputs
         {
@@ -1289,14 +1289,14 @@ module Base
     }
 
     /* Wood vinegar from a gasifier's filter, cut with water, into the game's own mildew and aphid
-       sprays: it is antifungal and keeps insects off. Taught by the FEMA pamphlet. */
+       sprays: it is antifungal and keeps insects off. */
     craftRecipe RenewableEnergy_MakeVinegarMildewSpray
     {
         timedAction = Making,
         time = 40,
-        NeedToBeLearn = true,
         Tags = InHandCraft;Farming,
         category = Farming,
+        NeedToBeLearn = true,
         AutoLearnAny = Farming:7,
         inputs
         {
@@ -1316,9 +1316,9 @@ module Base
     {
         timedAction = Making,
         time = 40,
-        NeedToBeLearn = true,
         Tags = InHandCraft;Farming,
         category = Farming,
+        NeedToBeLearn = true,
         AutoLearnAny = Farming:7,
         inputs
         {
@@ -1336,8 +1336,7 @@ module Base
 
     /******************************* Wind chargers ********************************/
 
-    /* Wind charger blades carved from planks, each a long twisted airfoil. Taught by Homestead
-       Power #4. */
+    /* Wind charger blades carved from planks, each a long twisted airfoil. */
     craftRecipe RenewableEnergy_CarveWoodenBlades
     {
         timedAction = SharpenStakeWood,
@@ -1350,7 +1349,7 @@ module Base
         xpAward = Carving:30,
         inputs
         {
-            item 1 tags[base:sharpknife] mode:keep flags[IsNotDull;MayDegradeLight;Prop1],
+            item 1 tags[base:sharpknife] mode:keep flags[Prop1;IsNotDull;MayDegradeLight],
             item 1 tags[base:saw;base:smallsaw;base:crudesaw] mode:keep flags[MayDegradeLight],
             item 3 [Base.Plank],
         }
@@ -1398,10 +1397,10 @@ module Base
         xpAward = Blacksmith:30,
         inputs
         {
-            item 3 tags[base:charcoal],
-            item 1 [Base.SheetMetal],
             item 1 tags[base:smithinghammer] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:tongs] mode:keep flags[Prop2;MayDegradeLight],
+            item 3 tags[base:charcoal],
+            item 1 [Base.SheetMetal],
         }
         outputs
         {

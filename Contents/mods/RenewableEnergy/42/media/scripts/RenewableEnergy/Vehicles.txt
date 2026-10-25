@@ -15,8 +15,6 @@ module Base
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
 
     /* Part models cut from the same bake as the body, in the body's frame, so they sit in place at
@@ -29,58 +27,42 @@ module Base
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_Lid,
         shader = vehicle_multiuv_noreflect,
         static = false,
-        invertX = false,
-        scale = 1.0,
     }
     /* The padlock draws only on a shut lid, so it needs no bone and stays static. */
     model RenewableEnergyArrowBoardTrailerPadlock
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_Padlock,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelLeft
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeft,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelLeftCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeftCracked,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelLeftLightCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelLeftLightCracked,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelRight
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRight,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelRightCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRightCracked,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
     model RenewableEnergyArrowBoardTrailerPanelRightLightCracked
     {
         mesh = vehicles/RenewableEnergy_ArrowBoardTrailer_PanelRightLightCracked,
         shader = vehicle_multiuv_noreflect,
-        invertX = false,
-        scale = 1.0,
     }
 
     vehicle RenewableEnergyArrowBoardTrailer

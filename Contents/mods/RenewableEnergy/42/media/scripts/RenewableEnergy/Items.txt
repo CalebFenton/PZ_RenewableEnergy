@@ -303,7 +303,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.MicrowaveTransformer_Ground,
         MetalValue = 2.0,
         Tooltip = Tooltip_RenewableEnergy_MicrowaveTransformer,
-        Tags = base:hasmetal;base:heavyitem;base:ignorezombiedensity,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
 
     item ChargeController
@@ -340,8 +340,8 @@ module RenewableEnergy
         UseWhileEquipped = false,
         cantBeConsolided = true,
         KeepOnDeplete = true,
-        ConditionMax = 100,
         MetalValue = 1.0,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_DeepCycleBattery,
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
@@ -357,16 +357,16 @@ module RenewableEnergy
         UseWhileEquipped = false,
         cantBeConsolided = true,
         KeepOnDeplete = true,
-        ConditionMax = 100,
         MetalValue = 2.0,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_L16Battery,
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     /*
         Six 2 V glass-jar cells standing in a sand tray, wired as one 12 V battery: the farm
-        light plant's battery, made at home. Open jars spill, so it never goes in a vehicle (no
-        VehicleType).
+        light plant's battery, made at home. Open jars spill, so it never goes in a vehicle: only the
+        deep cycle battery is offered for one (RenewableEnergy.VehicleBattery).
     */
     item JarBattery
     {
@@ -660,9 +660,9 @@ module RenewableEnergy
         ItemType = base:normal,
         Weight = 40.0,
         Icon = EngineDoor,
+        WorldStaticModel = CarHood,
         ConditionMax = 100,
         MechanicsItem = true,
-        WorldStaticModel = CarHood,
     }
 
     /************************ Biogas, wood gas and wind ***********************/
@@ -677,9 +677,9 @@ module RenewableEnergy
         DisplayCategory = Junk,
         ItemType = base:food,
         Weight = 0.5,
-        CantEat = true,
         Icon = RenewableEnergy_WoodAsh,
         WorldStaticModel = RenewableEnergy.WoodAsh_Ground,
+        CantEat = true,
         Tooltip = Tooltip_RenewableEnergy_WoodAsh,
         Tags = base:iscompostable;base:ignorezombiedensity,
     }
@@ -838,7 +838,7 @@ module RenewableEnergy
         Icon = RenewableEnergy_FridgeCompressor,
         WorldStaticModel = RenewableEnergy.FridgeCompressor_Ground,
         Tooltip = Tooltip_RenewableEnergy_FridgeCompressor,
-        Tags = base:hasmetal;base:heavyitem;base:ignorezombiedensity,
+        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
 
     /* Placed beside a digester, burns its gas to keep it warm (RenewableEnergy.GasHeater). */
