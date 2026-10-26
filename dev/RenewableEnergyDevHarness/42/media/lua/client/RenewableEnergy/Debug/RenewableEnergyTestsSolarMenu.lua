@@ -116,41 +116,19 @@ test("renewable_energy_solar_menu_panel_wired_to", {
     end,
 })
 
--- The option's minimum; the timing's tolerance still dwarfs a round trip to a local server.
-local CONNECT_MINUTES = 1
--- A multiplayer server times actions in real milliseconds whatever the game speed
--- (NetTimedAction.getDuration); in single player the action and the clock speed up alike.
-local function connectSpeed()
-    return isClient() and 1 or 10
-end
-
-local function worldMinutes()
-    return getGameTime():getWorldAgeHours() * 60
-end
-
--- Connecting a panel takes the ConnectPanelMin sandbox option's in-game minutes, from the action's
--- start to its end, and leaves the bank listing the panel, on the server and in this client's status.
+-- The queued connection completes on the authority and reaches this client's bank state.
+-- The mod's duration/skill rule is checked separately, without timing the game's action runner.
 test("renewable_energy_solar_connect_panel", {
-    sandbox = { ConnectPanelMin = CONNECT_MINUTES },
+    instant = true,
     run = function(self)
         local p = player()
-        if not T.needActionTime(self) then return end
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
         if not self.panel then return end
-        -- At this level the option's minutes are taken as they are; skill shortens or lengthens them.
         T.setPerk(self, Perks.Electricity, 3)
         T.step(function()
-            T.setMultiplier(self, connectSpeed())
             local action = RenewableEnergyAction:new(p, "source", SourceJobs.CONNECT, self.panel.object, self.bank.object)
             self.action, self.valid = action, action:canPerform()
-            T.onTick(self, function()
-                if not self.started and action:isStarted() then
-                    self.started = worldMinutes()
-                elseif self.started and not self.ended and ISTimedActionQueue.getTimedActionQueue(p).queue[1] ~= action then
-                    self.ended = worldMinutes()
-                end
-            end)
             if not T.walkTo(self, self.panel.square, "the panel") then return end
             ISTimedActionQueue.add(action)
             T.waitFor(self, function()
@@ -165,10 +143,6 @@ test("renewable_energy_solar_connect_panel", {
         expect(PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position),
             "this client's status of the bank does not list the connected panel")
         expect(not self.action:canPerform(), "a panel already on this bank can be connected again")
-        if not expect(self.started ~= nil and self.ended ~= nil, "the connect action never started or ended") then return end
-        local elapsed = self.ended - self.started
-        expect(elapsed >= CONNECT_MINUTES * 0.95 and elapsed <= CONNECT_MINUTES * 1.05,
-            string.format("connecting took %.2f in-game minutes, expected %d", elapsed, CONNECT_MINUTES))
     end,
 })
 
