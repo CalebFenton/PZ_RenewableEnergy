@@ -365,3 +365,15 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
             "the window of the bank whose only battery is dead doesn't say it has no working batteries")
     end,
 })
+
+test("renewable_energy_bank_scan_floor_probe", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", {})
+        if not bank then return end
+        local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }),
+            "two free indoor squares for the floor-loot measurement")
+        if not squares then return end
+        T.read(self, "probeFloorScan", T.at(bank.square, { fridge = T.at(squares[1]), loot = T.at(squares[2]) }), "probe")
+    end,
+})

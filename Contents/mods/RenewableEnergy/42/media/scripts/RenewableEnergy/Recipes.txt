@@ -1218,7 +1218,8 @@ module Base
         }
     }
 
-    /* A welded sheet-metal box round a burner, for keeping a digester warm through the winter. */
+    /* A welded sheet-metal box round a burner, for keeping a digester warm through the winter. The
+       burner's pipe stands in the flame: iron or fired clay, not lead or plastic, which melt. */
     craftRecipe RenewableEnergy_MakeGasHeater
     {
         timedAction = Welding,
@@ -1234,7 +1235,7 @@ module Base
             item 1 tags[base:weldingmask] mode:keep,
             item 2 [Base.BlowTorch],
             item 1 [Base.SheetMetal],
-            item 1 [Base.Pipe],
+            item 1 [Base.MetalPipe;Base.ClayPipeSegment],
             item 1 [Base.RubberHose],
         }
         outputs
