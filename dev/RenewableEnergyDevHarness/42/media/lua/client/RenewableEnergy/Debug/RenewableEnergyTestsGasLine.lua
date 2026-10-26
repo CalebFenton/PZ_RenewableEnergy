@@ -280,6 +280,8 @@ test("renewable_energy_gasline_generator_runs_on_after_absence", {
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         T.server(self, "trackAt", T.at(generator, { kind = "generator" }))
+        -- The adjacent working square may be shaded; this test is about fuel, not light.
+        T.holdLight(self)
         T.fitAndConnect(self, generator, digester)
         T.setGenerator(self, generator, { running = true })
         T.readGenerator(self, generator, "bill")
