@@ -1,10 +1,13 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local Materials = require "cf_commonlib/Materials"
+local Squares = require "cf_commonlib/Squares"
+local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
 
 -- Wood gas: the gasifier, built from the build menu, burning wood for the generator it is piped to
 -- or idling, leaving ash, tar and condensate, and the jobs at it (WoodGas/Gasifier.lua,
 -- WoodGas/GasifierJobs.lua, WoodGas/GasifierObject.lua, WoodGas/GasifierSystem.lua,
--- UI/GasifierMenu.lua).
+-- UI/GasifierMenu.lua); and the Wood Ash of vanilla's wood fires (WoodGas/FireAsh.lua,
+-- UI/FireMenu.lua).
 
 local T = RenewableEnergyTest
 local test = T.test
@@ -357,6 +360,99 @@ test("renewable_energy_woodgas_clean_out_ash", {
         T.expectEqual("wood ash from cleaning out", self.counts.ash[Gasifier.WOOD_ASH], self.whole)
         T.expectEqual("the refusal of Clean Out Ash one short of an item", self.refusals.short, "Tooltip_RenewableEnergy_LittleAsh")
         T.expectEqual("the refusal of Clean Out Ash with an item's worth", self.refusals.enough, nil)
+    end,
+})
+
+-- Wood fires --------------------------------------------------------------------------------------
+
+-- A propane grill's tile (vanilla's TimedActionsTests.lua's newBBQPropane).
+local PROPANE_GRILL = "appliances_cooking_01_37"
+-- What fire_ash feeds each fire, one at a time: an Add Fuel on a multiplayer client checks the fuel
+-- cap on every tick it runs (ISAddFuelAction:isValid), when the server may have added its fuel
+-- already, so a feed over half the cap stops the queue.
+local FIRE_FUEL, FIRE_FEEDS = "Base.Plank", 2
+-- The whole Wood Ash a fire_ash fire burns before it is cleaned out, and half of the next.
+local FIRE_WHOLE_ASH = 2
+local FIRE_BURN_MINUTES = (FIRE_WHOLE_ASH + 0.5) * FireAsh.MINUTES_PER_ASH
+
+-- The wood fires fire_ash feeds, each through its own vanilla Add Fuel with the fuel minutes
+-- ISCampingMenu gives the item.
+local FIRES = {
+    { name = "campfire", addFuel = function(fire, item, minutes)
+        return ISAddFuelAction:new(T.player(), CCampfireSystem.instance:getLuaObjectOnSquare(fire.square), item, minutes)
+    end },
+    { name = "grill", grill = true, addFuel = function(fire, item, minutes)
+        return ISBBQAddFuel:new(T.player(), fire.object, item, minutes)
+    end },
+}
+
+-- Planks fed to a campfire, and to a charcoal grill, through vanilla's Add Fuel leave a Wood Ash
+-- for each hour of them burned: none before any has, which Clean Out Ash in the fire's menu refuses,
+-- then two and a half hours' worth gives two, the half kept toward the next. A propane grill is no
+-- wood fire.
+test("renewable_energy_woodgas_fire_ash", {
+    instant = true,
+    run = function(self)
+        local squares = T.need(self, T.squares(self, #FIRES), "free outdoor squares for the fires")
+        if not squares then return end
+        T.giveMaterials(self, "shovel", FireAsh.materials(T.player(), FireAsh.CLEAN_ASH))
+        self.fires = {}
+        for i, spec in ipairs(FIRES) do
+            local square, name = squares[i], spec.name
+            local fire = T.at(square, { square = square })
+            self.fires[name] = fire
+            T.server(self, "placeFire", T.at(square, { grill = spec.grill }))
+            T.give(self, name, { { type = FIRE_FUEL, count = FIRE_FEEDS } })
+            T.waitFor(self, function()
+                fire.object = Squares.findObjectOn(square, FireAsh.isFire)
+                return fire.object ~= nil and (spec.grill or CCampfireSystem.instance:getLuaObjectOnSquare(square) ~= nil)
+            end, "this client's copy of the " .. name)
+            fire.fuel = 0
+            for feed = 1, FIRE_FEEDS do
+                T.doJob(self, square, function()
+                    local item = self.items[name][feed]
+                    local minutes = ISCampingMenu.getFuelDurationForItem(item)
+                    fire.fuel = fire.fuel + minutes
+                    return spec.addFuel(fire, item, minutes)
+                end)
+            end
+            T.waitFor(self, function() return T.player():getInventory():getCountTypeRecurse(FIRE_FUEL) == 0 end,
+                "the " .. name .. "'s fuel gone into it")
+            T.step(function()
+                fire.refusal = FireAsh.refusal(T.player(), FireAsh.CLEAN_ASH, fire.object)
+                local submenu, context = T.worldSubmenu(fire.object, fire.object:getTileName())
+                local option = T.optionNamed(submenu, getText(RenewableEnergyAction.labelKey(FireAsh.CLEAN_ASH)))
+                -- Read now: a hidden menu's options go back to be reused.
+                fire.optionRefused = option ~= nil and option.notAvailable == true
+                if context then context:hideAndChildren() end
+            end)
+            T.server(self, "burnFire", T.at(square, { minutes = FIRE_BURN_MINUTES }))
+            T.waitFor(self, function() return FireAsh.ashItems(fire.object) == FIRE_WHOLE_ASH end,
+                "this client's copy of the burned " .. name)
+            T.actionJob(self, "fire", fire, FireAsh.CLEAN_ASH)
+            T.batch(function()
+                T.count(self, name, { Gasifier.WOOD_ASH })
+                T.read(self, "burnFire", T.at(square, { minutes = 0 }), name .. " cleaned")
+                T.read(self, "burnFire", T.at(square, { minutes = FireAsh.MINUTES_PER_ASH / 2 }), name .. " burned on")
+            end)
+        end
+        self.propaneIsFire = FireAsh.isFire(IsoBarbecue.new(getCell(), squares[1], getSprite(PROPANE_GRILL)))
+    end,
+    validate = function(self)
+        local gained = 0
+        for _, spec in ipairs(FIRES) do
+            local name, fire = spec.name, self.fires[spec.name]
+            T.expect(fire.fuel >= FIRE_BURN_MINUTES, "the fuel lasts only " .. fire.fuel .. " minutes in the " .. name)
+            T.expectEqual("the refusal of Clean Out Ash at a " .. name .. " that burned nothing", fire.refusal,
+                "Tooltip_RenewableEnergy_LittleAsh")
+            T.expect(fire.optionRefused, "the " .. name .. "'s menu doesn't show Clean Out Ash refused")
+            local ash = self.counts[name][Gasifier.WOOD_ASH]
+            T.expectEqual("Wood Ash from cleaning out the " .. name, ash - gained, FIRE_WHOLE_ASH)
+            gained = ash
+            T.expectEqual("Wood Ash left in the cleaned " .. name, self.reads[name .. " cleaned"].ash, 0)
+            T.expectEqual("Wood Ash in the " .. name .. " after the kept half hour and another", self.reads[name .. " burned on"].ash, 1)
+        end
+        T.expect(not self.propaneIsFire, "a propane grill counts as a wood fire")
     end,
 })
 

@@ -28,9 +28,22 @@ local function isShovel(tool)
     return tool:hasTag(ItemTag.TAKE_DIRT) and Items.notBroken(tool)
 end
 
+--- The Clean Out Ash row of a feature whose subject holds `ashItems(subject)` Wood Ash: it digs
+--- with the shovel in hand, as vanilla's Clear Ashes does.
+function GasifierJobs.cleanAshRow(ashItems)
+    return {
+        minutes = 10, shovel = true,
+        equip = function() return isShovel end,
+        blocker = function(character, subject)
+            return ashItems(subject) < 1 and "Tooltip_RenewableEnergy_LittleAsh" or nil
+        end,
+        materials = { { tool = "TAKE_DIRT", item = "Base.Shovel" } },
+    }
+end
+
 -- Every job, by name (Jobs.define), read against the gasifier's summary
 -- (Gasifier.currentSummary); `with` is the container Drain Condensate fills, or nil to drain it
--- onto the ground. Clean Out Ash digs with the shovel in hand, as vanilla's Clear Ashes does.
+-- onto the ground.
 GasifierJobs.JOBS = {
     [GasifierJobs.LIGHT] = {
         minutes = function(gasifier)
@@ -58,14 +71,7 @@ GasifierJobs.JOBS = {
             return not summary.lit and "Tooltip_RenewableEnergy_NotLit" or nil
         end,
     },
-    [GasifierJobs.CLEAN_ASH] = {
-        minutes = 10, shovel = true,
-        equip = function() return isShovel end,
-        blocker = function(character, summary)
-            return summary.ash < Gasifier.ASH_PER_ITEM and "Tooltip_RenewableEnergy_LittleAsh" or nil
-        end,
-        materials = { { tool = "TAKE_DIRT", item = "Base.Shovel" } },
-    },
+    [GasifierJobs.CLEAN_ASH] = GasifierJobs.cleanAshRow(Gasifier.ashItems),
     -- Into the carried container `item`, or onto the ground without one.
     [GasifierJobs.DRAIN] = {
         minutes = 2,

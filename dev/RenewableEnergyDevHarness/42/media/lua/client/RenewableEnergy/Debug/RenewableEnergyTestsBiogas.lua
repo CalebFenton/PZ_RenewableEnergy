@@ -614,22 +614,3 @@ test("renewable_energy_biogas_digester_menu", {
         window:close()
     end,
 })
-
--- Wood ash ---------------------------------------------------------------------------------------
-
-test("renewable_energy_biogas_clear_ashes_gives_wood_ash", {
-    instant = true,
-    run = function(self)
-        local square = T.square(self, nil, "a free outdoor square for ashes")
-        if not square then return end
-        local ashes = T.placeTile(self, square, "floors_burnt_01_1")
-        T.step(function()
-            T.standNextTo(square)
-            ISTimedActionQueue.add(ISClearAshes:new(T.player(), ashes.object))
-        end)
-        T.count(self, "ash", { RenewableEnergy.Gasifier.WOOD_ASH })
-    end,
-    validate = function(self)
-        T.expectEqual("wood ash from clearing ashes", self.counts.ash[RenewableEnergy.Gasifier.WOOD_ASH], 1)
-    end,
-})

@@ -1,13 +1,15 @@
 -- The authority's half of the gas line and wood gas tests (RenewableEnergyTestsGasLine.lua,
 -- RenewableEnergyTestsWoodGas.lua): generators with the Gas Conversion Kit, the load they carry,
--- and burning a gasifier's wood. The generator reads, settings and billing serve the bank tests'
--- generators too (RenewableEnergyTestsBankGenerators.lua). The records themselves are
--- RenewableEnergyTestServerBiogas.lua's.
+-- burning a gasifier's wood, and vanilla's wood fires. The generator reads, settings and billing
+-- serve the bank tests' generators too (RenewableEnergyTestsBankGenerators.lua). The records
+-- themselves are RenewableEnergyTestServerBiogas.lua's.
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Squares = require "cf_commonlib/Squares"
+local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
@@ -164,4 +166,45 @@ handler("burnGasifier", function(player, args)
     local burned = record:burn(args.kg)
     record:afterChange()
     return { burned = burned }
+end)
+
+-- Wood fires ------------------------------------------------------------------------------------
+
+-- A charcoal grill's tile, as vanilla's own tests place one (TimedActionsTests.lua's newBBQCharcoal).
+local CHARCOAL_GRILL = "appliances_cooking_01_35"
+
+-- A vanilla wood fire on the square at `args`, empty and unlit: a campfire as building one makes it
+-- (SCampfireSystem:addCampfire), or with `args.grill` a charcoal grill. Whatever fire stands there
+-- when the test ends goes.
+handler("placeFire", function(_, args, defer)
+    local square = Helpers.squareAt(args)
+    if args.grill then
+        local grill = IsoBarbecue.new(getCell(), square, getSprite(CHARCOAL_GRILL))
+        square:AddTileObject(grill)
+        grill:transmitCompleteItemToClients()
+    else
+        SCampfireSystem.instance:addCampfire(square)
+    end
+    defer(function()
+        local fire = Squares.findObjectOn(PZHarness.Fixtures.squareAt(args), FireAsh.isFire)
+        if fire then
+            PZHarness.Fixtures.removePlaced(fire)
+        end
+    end)
+    return {}
+end)
+
+-- Burns `args.minutes` of the fuel in the unlit wood fire at `args`, as the campfire system's
+-- minutes or a grill's update would while it burned. Answers the Wood Ash it then has
+-- (FireAsh.ashItems).
+handler("burnFire", function(_, args)
+    local fire = PZHarness.need(Squares.findObjectOn(Helpers.squareAt(args), FireAsh.isFire), "a wood fire on the server")
+    local campfire = SCampfireSystem.instance:getLuaObjectOnSquare(fire:getSquare())
+    if campfire then
+        SCampfireSystem.instance:lowerFuelAmountSpecific(campfire, args.minutes)
+    else
+        fire:setFuelAmount(fire:getFuelAmount() - args.minutes)
+        fire:sendObjectChange(IsoObjectChange.STATE)
+    end
+    return { ash = FireAsh.ashItems(fire) }
 end)

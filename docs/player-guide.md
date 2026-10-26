@@ -432,6 +432,8 @@ A lit **Gas Heater** placed next to a digester keeps it at 25 °C or warmer, bur
 
 Too much food without manure sours a digester. Output drops to a trickle and the smell gets much worse. A barrel sours on about 4 kg of scraps fed without manure, an insulated digester on about 12 kg and a dome on about 36. Manure offsets food as it goes in: a cow pat cancels about a kilogram and a half of scraps. Wood ash, baking soda or quicklime in the hopper settles a sour digester, and so does time. It's over once the acid falls to half of what soured it.
 
+Any wood fire leaves wood ash: **Clean Out Ash** with a shovel at a campfire, fireplace, wood stove or charcoal grill gives one for each hour of fuel it has burned. A gasifier leaves it too.
+
 ### Sludge
 
 Each feeding adds sludge. Output halves once the tank is nearly full of it. **Take Sludge** fills empty sacks or compost bags with compost, a tenth of the tank per bag, as vanilla's composter does.

@@ -45,7 +45,7 @@ Gasifier.WEAR_DIRTY = 3
 Gasifier.COLD_HOURS = 1
 Gasifier.BELLOWS = { "Base.Bellows", "Base.LargeBellows" }
 -- Clean Out Ash gives one Wood Ash per this much of the pit. Wood Ash also neutralises a digester
--- and charges its scrubber, and a campfire's ashes give it.
+-- and charges its scrubber, and vanilla's wood fires leave it too (FireAsh).
 Gasifier.ASH_PER_ITEM = 25
 Gasifier.WOOD_ASH = "RenewableEnergy.WoodAsh"
 Gasifier.TARRY = "RenewableEnergy.TarryPacking"
@@ -168,6 +168,11 @@ function Gasifier.hopperKg(container)
         kg = kg + (Gasifier.fuelKg(items:get(i)) or 0)
     end
     return kg
+end
+
+--- The Wood Ash Clean Out Ash takes from the pit of a gasifier whose record or summary is `state`.
+function Gasifier.ashItems(state)
+    return math.floor(state.ash / Gasifier.ASH_PER_ITEM)
 end
 
 --- What it carries, as a share of what a generator carries on gas, with `ash` percent in its pit

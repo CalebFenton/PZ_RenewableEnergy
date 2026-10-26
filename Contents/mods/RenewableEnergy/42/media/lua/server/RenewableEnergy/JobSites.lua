@@ -1,7 +1,7 @@
--- The authority's side of the hands-on jobs at banks, sources, treadmills, garden lights and
--- vehicles (cf_commonlib's Jobs.perform), once RenewableEnergyAction's complete() found the
--- character at the job; the rules are each feature's job module's. Gas features keep theirs on
--- their systems.
+-- The authority's side of the hands-on jobs at banks, sources, treadmills, garden lights, vanilla
+-- wood fires and vehicles (cf_commonlib's Jobs.perform), once RenewableEnergyAction's complete()
+-- found the character at the job; the rules are each feature's job module's. Gas features keep
+-- theirs on their systems.
 --
 -- A bank runs in passes, each billing the hours since the last at the bank's state now. A job
 -- that changes that state first brings the bank up to now, so the change counts from the moment
@@ -25,6 +25,7 @@ local WindSource = require "RenewableEnergy/PowerBank/WindSource"
 local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
 local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
@@ -240,6 +241,13 @@ JobSites.light = Jobs.targetSite({
     end,
     [SolarGardenLight.ADD_BULB] = function(character, place, row, light, bulb)
         return SolarGardenLight.addBulb(character, light, bulb)
+    end,
+})
+
+--- The authority's side of the jobs at a vanilla wood fire.
+JobSites.fire = Jobs.targetSite({
+    [FireAsh.CLEAN_ASH] = function(character, place, row, fire)
+        return FireAsh.cleanOut(character, fire)
     end,
 })
 

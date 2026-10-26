@@ -671,7 +671,7 @@ module RenewableEnergy
     /************************ Biogas, wood gas and wind ***********************/
 
     /*
-        Ash from a gasifier's grate or a cleared campfire. Food that can't be eaten, like
+        Ash from a gasifier's pit or a vanilla wood fire (FireAsh). Food that can't be eaten, like
         vanilla's dung, because the composter only takes Food; a digester takes it to fix souring
         (RenewableEnergy.Digester).
     */

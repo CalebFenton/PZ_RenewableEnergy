@@ -28,7 +28,7 @@ local DO = {
         return true
     end,
     [GasifierJobs.CLEAN_ASH] = function(character, record)
-        local count = math.floor(record.ash / Gasifier.ASH_PER_ITEM)
+        local count = Gasifier.ashItems(record)
         Items.giveItems(character, Gasifier.WOOD_ASH, count)
         record.ash = record.ash - count * Gasifier.ASH_PER_ITEM
         return true
