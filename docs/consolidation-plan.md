@@ -55,9 +55,27 @@ Run the affected paths in the real game, including dedicated-server/SP/MP checks
 - Known production custom consumer: Enhanced Irrigation Pump Houses, placed objects. Audit all repository callers before changing the contract.
 - Existing electrical amplification: Bank.measure scans; Payers.bill asks GasLines.chargingW, which can call split -> Payers.loadOf -> Loads.scan, then bill scans again. Bank.chargeFrom can trigger global billing and separately ask chargerLimitW. Periodic billing also occurs. This does NOT mean each solar panel scans independently.
 
+## Electrical operation map
+
+Paths below are under `Contents/mods/RenewableEnergy/42/media/lua/server/RenewableEnergy/`.
+
+| Entry / owner | Reads and work | Mutation boundary that limits reuse |
+| --- | --- | --- |
+| `PowerBank/BankSystem.updateAll` | Shares sun/weather contexts; updates each bank. Billing is separately registered after the bank pass every ten minutes. | Each bank can change the active payer set and charger demand. |
+| `PowerBank/Bank.update` | Recounts parts, updates sources and backup, measures load, calculates charging and discharge, writes batteries, recounts, switches its generator. | Backup activation precedes measurement; empty/full/overload transitions and battery wear happen during the pass. |
+| `Bank.measure` | `Loads.scan(..., Payers.running(), true)` when on or holding chargers; remembers load for unloaded operation. | `gridGone=true` intentionally measures demand even on the grid. Do not reuse a generator's off-grid-only scan here. |
+| `Bank.chargeFrom` | Selects nearest fueled supplier, records source and wanted watts; changes trigger `Payers.billGenerators`; gas charger limit asks for another allocation. | Demand depends on room after solar input and inverter draw; a full bank releases capacity. |
+| `Bank.switchGenerator` | Updates real generator activation and restores toxicity; changed activation immediately calls `Payers.billGenerators`. | Activation changes payer ownership; unchanged active banks still repower newly loaded squares. |
+| `PowerBank/Payers.billGenerators` | Builds running-payer list; for each generator checks overlap/backup/chargers/treadmills, measures its load and applies its fuel bill. | Plain unshared generators with no extra demand retain vanilla billing; preserve that no-scan fast path. |
+| `GasLine/GasLines.split` | Measures generator load, finds/sorts charging banks, builds per-bank shares. `chargingW` and `loadOf` sum those shares; `chargerLimitW` reads one. | No yield or state mutation between measurement and allocation, except discovery tracking inside the scan. Candidate for operation-local reuse. |
+| `Payers.keepShares` | OnTick corrects native bill rebuilds from stored base/others/extra fuel. | Necessary engine integration, not a redundant periodic scan; preserve it. |
+| `GasLines.updateAll/run` | Every ten minutes settles real/phantom fuel, measures gas load, can stall/restart generators. | Running state and gas supply can change; no cross-pass cache without a complete invalidation contract. |
+
+Native source checked: `IsoGridSquare.java:getNextNonItemObjectIndex` excludes only `IsoWorldInventoryObject`; vanilla `ISBBQMenu.lua` and `ISShovelGroundCursor.lua` use it. Repository consumer search found PumpHouse.bankDraw and the test floor-tile consumer; neither requires dropped-item callbacks.
+
 ## Live checkpoint
 
-- Plan persisted; implementation not yet started.
-- Immediate step: inspect native traversal source/vanilla usage, all Loads.addConsumer references and existing electrical regression fixtures. Implement placed-object traversal and verify real-game accounting before committing.
-- Following step: remove the second load measurement within one generator bill without changing settlement timing. Verify gas allocation and generator/bank accounting; update this checkpoint with exact commits and exercised results.
+- Plan committed as `9100c54`. Native non-item traversal and the explicit placed-consumer contract are implemented. Existing regressions now place real dropped items before/after an appliance and beside a custom floor-tile consumer.
+- Verification: 209/209 Lua files compiled and cross-checks passed; dedicated server started cleanly; bank/gas-line/treadmill scenarios passed 90 SP (1 skip) and 88 MP (3 skips), zero failures. No rerun of the user's performance benchmark; no claim about the freeze's cause. Pump House integration was source-audited; this batch exercised the registered floor-tile consumer, not a combined-mod Pump House scene.
+- Next: remove the second load measurement within one generator bill without changing settlement timing. Verify gas allocation and generator/bank accounting and record actual scan-count evidence.
 - Later layers remain open. No global cache, topology registry, billing cadence change or generic framework is approved merely as an optimization shortcut.

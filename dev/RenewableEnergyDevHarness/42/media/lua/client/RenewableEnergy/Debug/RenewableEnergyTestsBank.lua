@@ -130,10 +130,13 @@ test("renewable_energy_bank_scan_sees_load_while_off", {
         local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
         if not squares then return end
         T.read(self, "scanLoad", bank.position, "without")
+        T.server(self, "floorItem", T.at(squares[1], { type = "Base.Nails" }))
         T.step(function()
             T.placeTile(self, squares[1], FRIDGE)
             T.placeTile(self, squares[2], T.MINI_FRIDGE)
             T.read(self, "scanLoad", bank.position, "with")
+            T.server(self, "floorItem", T.at(squares[1], { type = "Base.Nails" }))
+            T.read(self, "scanLoad", bank.position, "withLoot")
         end)
     end,
     validate = function(self)
@@ -144,6 +147,9 @@ test("renewable_energy_bank_scan_sees_load_while_off", {
         expectEqual("fridge-freezers found, the mini fridge among them",
             count(with, "fridgeFreezer") - count(without, "fridgeFreezer"), 2)
         expect(with.watts > without.watts, "the fridges added no watts to the scan's load")
+        expectEqual("fridge-freezers with loot before and after the appliance",
+            count(self.reads.withLoot, "fridgeFreezer"), count(with, "fridgeFreezer"))
+        expectNear("the load with additional ground loot", self.reads.withLoot.watts, with.watts, 0.01)
     end,
 })
 
@@ -161,6 +167,7 @@ test("renewable_energy_bank_bills_another_mods_appliance", {
         local square = bank and T.square(self, { indoors = true, near = bank.square }, "a free indoor square for the appliance")
         if not square then return end
         T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = 0 }))
+        T.server(self, "floorItem", T.at(square, { type = "Base.Nails" }))
         T.read(self, "scanLoad", bank.position, "off")
         T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = CONSUMER_FUEL }))
         T.read(self, "scanLoad", bank.position, "on")
@@ -363,17 +370,5 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
         expectEqual("the tooltip of the window's switch", button.tooltip, getText(key))
         expect(T.hasLine(StatusRows.summary(self.dead.state.status), getText("IGUI_RenewableEnergy_NoBatteries")),
             "the window of the bank whose only battery is dead doesn't say it has no working batteries")
-    end,
-})
-
-test("renewable_energy_bank_scan_floor_probe", {
-    run = function(self)
-        T.setGrid(self, false)
-        local bank = T.bank(self, "batteryBoxWood", {})
-        if not bank then return end
-        local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }),
-            "two free indoor squares for the floor-loot measurement")
-        if not squares then return end
-        T.read(self, "probeFloorScan", T.at(bank.square, { fridge = T.at(squares[1]), loot = T.at(squares[2]) }), "probe")
     end,
 })

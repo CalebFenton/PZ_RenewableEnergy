@@ -28,10 +28,11 @@ RenewableEnergy.Loads = Loads
 -- The other mods' consumers (Loads.addConsumer), in the order added.
 local consumers = {}
 
---- Bills another mod's appliances on a bank: `consumer(object)` is asked of every object in a
---- bank's reach that isn't a vanilla appliance, a treadmill or a generator, and answers the kind
---- the status lists it as and the generator fuel an hour it would draw now, in vanilla's units
---- (getGeneratorPowerConsumption's), powered or not, as an appliance's switch answers; or nil while
+--- Bills another mod's placed appliances on a bank: `consumer(object)` is asked of every placed
+--- object in a bank's reach that isn't a vanilla appliance, a treadmill or a generator. Floor tiles
+--- are included, dropped inventory objects are not. It answers the kind the status lists it as and
+--- the generator fuel an hour it would draw now, in vanilla's units (getGeneratorPowerConsumption's),
+--- powered or not, as an appliance's switch answers; or nil while
 --- it draws nothing. The kind is a key of StatusWindow's LOAD_KINDS or a translation key of the
 --- mod's own (IGUI_...). A vanilla generator's scan doesn't ask: its bill is vanilla's own total,
 --- which knows nothing of another mod's machines, so that mod bills a generator itself. Server
@@ -160,7 +161,8 @@ function Loads.scan(square, payer, payers, gridGone)
     end
     GeneratorReach.eachSquare(square:getX(), square:getY(), square:getZ(), function(scanned)
         local objects = scanned:getObjects()
-        for i = 0, objects:size() - 1 do
+        local i = scanned:getNextNonItemObjectIndex(0)
+        while i ~= -1 do
             local object = objects:get(i)
             if drawsFromGenerator(object, allowExterior, gridGone) then
                 if pays(object) then
@@ -181,6 +183,7 @@ function Loads.scan(square, payer, payers, gridGone)
                     Loads.add(load, kind, Specs.wattsFromFuel(fuel))
                 end
             end
+            i = scanned:getNextNonItemObjectIndex(i + 1)
         end
     end)
     return load
