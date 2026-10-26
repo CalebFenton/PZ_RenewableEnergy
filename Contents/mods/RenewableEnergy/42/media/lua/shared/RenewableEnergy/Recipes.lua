@@ -302,20 +302,6 @@ local function recipeInputs(recipe, character)
     return complete and picks or nil, needs
 end
 
--- Whether two input lines take the same amount of the same items.
-local function sameInput(a, b)
-    local itemsA, itemsB = a:getPossibleInputItems(), b:getPossibleInputItems()
-    if a:getIntAmount() ~= b:getIntAmount() or itemsA:size() ~= itemsB:size() then
-        return false
-    end
-    for i = 0, itemsA:size() - 1 do
-        if itemsA:get(i):getFullName() ~= itemsB:get(i):getFullName() then
-            return false
-        end
-    end
-    return true
-end
-
 --- The inventory items, bags included, that pay for a Seal Cracked Panel's inputs but the
 --- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
 --- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; they pay the
@@ -339,7 +325,7 @@ function Recipes.sealInPlaceInputs(character)
             local option = recipeNeeds[i]
             table.insert(options, option)
             met = met or option.have >= option.need
-            same = same and sameInput(option.input, need.input)
+            same = same and option.input:getOriginalLine() == need.input:getOriginalLine()
         end
         table.insert(needs, same and need or { kind = "item", anyOf = options, have = met and 1 or 0, need = 1 })
     end
