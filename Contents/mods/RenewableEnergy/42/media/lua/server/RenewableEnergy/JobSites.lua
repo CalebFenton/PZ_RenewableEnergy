@@ -124,28 +124,18 @@ JobSites.bank = {
     end,
 }
 
---- Connects the source `object` to the bank `isoObject`, off the bank it fed before if any, with
---- `character` (nil for the world) as its wiring's owner. Authority only; the caller checked the
---- job (SourceJobs).
-function JobSites.connectSource(character, object, isoObject)
-    local previous = bankFedBy(object)
-    if previous then
-        BankSystem.dropSource(previous, object:getX(), object:getY(), object:getZ())
-    end
-    local bank = settledBank(isoObject)
-    bank:addSource(object, character)
-    bank:sendStatus()
-end
-
 -- What each source job does to the source `object` and the record `bank` keeps of it, if it feeds
 -- one, beyond taking its materials, by its row of SourceJobs.JOBS. Returns whether it was done.
 local SOURCE = {
-    [SourceJobs.CONNECT] = function(character, bank, row, object, isoObject)
-        JobSites.connectSource(character, object, isoObject)
+    [SourceJobs.CONNECT] = function(character, bank, row, object, target)
+        if bank then
+            bank:removeSource(object:getX(), object:getY(), object:getZ())
+        end
+        target:addSource(object, character)
         return true
     end,
     [SourceJobs.DISCONNECT] = function(character, bank, row, object)
-        BankSystem.dropSource(bank, object:getX(), object:getY(), object:getZ())
+        bank:removeSource(object:getX(), object:getY(), object:getZ())
         return true
     end,
     [SourceJobs.CLEAR_SNOW] = function(character, bank, row, object)
@@ -190,38 +180,54 @@ SOURCE[SourceJobs.RELEASE_BRAKE] = SOURCE[SourceJobs.BRAKE]
 --- its container, whatever filled it since the last pass. Each bank tells the clients after.
 JobSites.source = {
     open = function(object, with)
+        local place = {}
         if PowerBank.isBank(with) then
             local target = settledBank(with)
+            place.target = target
             if target then
                 target:recount()
             end
         end
         local bank = bankFedBy(object)
+        place.bank = bank
         if not bank then
-            return nil
+            return place
         end
-        BankSystem.updateBank(bank)
+        if bank ~= place.target then BankSystem.updateBank(bank) end
         local source = recordOf(bank, object)
         -- Catch-up can disconnect a source whose square no longer works.
         if not source then
-            return bank
+            return place
         end
         if Sources.familyOf(source.kind) == "panel" then
             PanelSource.syncModules(source, object)
         elseif source.broken and not Wind.isBroken(object) then
             WindSource.setBroken(object, true, source)
         end
-        return bank
+        return place
     end,
-    act = function(character, job, bank, row, object, with)
-        return SOURCE[job](character, bank, row, object, with)
+    act = function(character, job, place, row, object, with)
+        if job == SourceJobs.CONNECT then with = place.target end
+        return SOURCE[job](character, place.bank, row, object, with)
     end,
-    tell = function(bank)
-        if bank then
-            bank:sendStatus()
+    tell = function(place)
+        if place.bank then
+            place.bank:sendStatus()
+        end
+        if place.target and place.target ~= place.bank then
+            place.target:sendStatus()
         end
     end,
 }
+
+--- Connects a world source through the same preparation, mutation and publication as a source
+--- job, without charging materials. The caller checked the placement and connection rules.
+function JobSites.connectSource(character, object, isoObject)
+    local site = JobSites.source
+    local place = site.open(object, isoObject)
+    site.act(character, SourceJobs.CONNECT, place, SourceJobs.JOBS[SourceJobs.CONNECT], object, isoObject)
+    site.tell(place)
+end
 
 --- The authority's side of the jobs at a treadmill's tile.
 JobSites.treadmill = Jobs.targetSite({

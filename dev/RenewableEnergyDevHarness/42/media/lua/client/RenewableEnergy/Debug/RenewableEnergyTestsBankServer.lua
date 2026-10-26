@@ -234,6 +234,45 @@ test("renewable_energy_bank_connect_credits_from_connection", {
     end,
 })
 
+-- Moving a live source settles both old topologies first and publishes both ends. Its earlier
+-- output belongs to the old bank; only a later pass can credit the destination.
+test("renewable_energy_bank_source_transfer_settles_both_ends", {
+    hour = 12,
+    run = function(self)
+        local old = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.1 })
+        local new = old and T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { near = old, charge = 0.1 })
+        local panel = new and T.panel(self, Sprites.flat, { near = old, connect = true })
+        if not panel then return end
+        self.old, self.new, self.panel = old, new, panel
+        T.watch(self, old)
+        T.watch(self, new)
+        T.batch(function()
+            T.bankState(self, old, nil, 1)
+            T.bankState(self, new, nil, 1)
+            T.job(self, "source", SourceJobs.CONNECT, panel.position, new.position, "transfer")
+            T.bankState(self, old, "oldTransferred")
+            T.bankState(self, new, "newTransferred")
+        end)
+        T.waitForStatus(self, old, function(status) return #status.sources == 0 end,
+            "the watched old bank without the transferred panel")
+        T.waitForStatus(self, new, function(status)
+            return T.stateSource({ status = status }, panel.position) ~= nil
+        end, "the watched destination with the transferred panel")
+        T.bankPass(self, new, 1000)
+        T.bankState(self, old, "oldAfter")
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) or not T.expectOk(self.reads.transfer, "transferring the panel") then return end
+        local old, new = self.reads.oldTransferred, self.reads.newTransferred
+        expectEqual("sources left at the old bank", old.sources, 0)
+        expectEqual("sources at the destination", new.sources, 1)
+        expect(old.solarWhToday > 0, "the old bank lost the panel's output before the transfer")
+        expectEqual("destination's solar Wh before it owned the panel", new.solarWhToday, 0)
+        expect(self.new.state.solarWhToday > 0, "the destination earned nothing after the transfer")
+        expectEqual("old bank's solar Wh after the destination ran", self.reads.oldAfter.solarWhToday, old.solarWhToday)
+    end,
+})
+
 -- Switching a bank on brings it up to now first: the hour it stood off bills no load, the pass
 -- after does. The Inverter/Charger carries whatever the house around switches on.
 test("renewable_energy_bank_switch_on_bills_from_switch", {
