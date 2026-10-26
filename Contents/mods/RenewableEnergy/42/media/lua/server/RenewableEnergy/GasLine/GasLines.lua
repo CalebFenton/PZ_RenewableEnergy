@@ -159,8 +159,8 @@ end
 -- powers and the banks before it (chargingBanks), as an inverter-charger turns down to what its
 -- generator can give. So chargers alone never take a line past its cap, and a full bank holds
 -- none of it back from the banks behind it.
-local function split(generator)
-    local load = Payers.loadOf(generator)
+local function split(generator, payers)
+    local load = Payers.loadOf(generator, payers)
     local powered = load.watts + load.backedW
     local cap = capOf(GasKit.stateOf(generator))
     local left = cap and math.max(0, cap - powered)
@@ -173,7 +173,7 @@ local function split(generator)
         end
         shares[bank] = watts
     end
-    return powered, shares
+    return powered, shares, load
 end
 
 local function total(shares)
@@ -185,11 +185,13 @@ local function total(shares)
 end
 
 --- The watts the chargers of the battery banks that charge from `generator` draw: their wants,
---- and on gas their shares of what the cap leaves (split).
-function GasLines.chargingW(generator)
+--- and on gas their shares of what the cap leaves (split). Also returns the load measured to
+--- allocate a gas line, so billing reuses it with the same running `payers` rather than scanning
+--- again. Off gas, no load measurement is needed.
+function GasLines.chargingW(generator, payers)
     if capOf(GasKit.stateOf(generator)) then
-        local _, shares = split(generator)
-        return total(shares)
+        local _, shares, load = split(generator, payers)
+        return total(shares), load
     end
     local watts = 0
     for _, bank in ipairs(chargingBanks(generator)) do

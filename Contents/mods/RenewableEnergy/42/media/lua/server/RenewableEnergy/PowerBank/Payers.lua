@@ -163,13 +163,13 @@ end
 local function bill(generator, payers, consumption)
     local payer = ofGenerator(generator)
     local shared = #Payers.sharers(payer, payers) > 1
-    local backed = backedW(payer)
-    local charging = RenewableEnergy.GasLines.chargingW(generator)
+    local charging, load = RenewableEnergy.GasLines.chargingW(generator, payers)
+    local backed = load and load.backedW or backedW(payer)
     if not shared and backed == 0 and charging == 0 and not treadmillInReach(payer) then
         if billed[payer.key] then unbill(payer.key) end
         return
     end
-    local load = RenewableEnergy.Loads.scan(generator:getSquare(), payer, payers)
+    load = load or RenewableEnergy.Loads.scan(generator:getSquare(), payer, payers)
     local treadmillW = load.kinds.treadmill and load.kinds.treadmill.watts or 0
     local entry = billed[payer.key] or {}
     billed[payer.key] = entry
