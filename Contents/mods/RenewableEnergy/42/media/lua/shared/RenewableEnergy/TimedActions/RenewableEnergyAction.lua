@@ -108,12 +108,12 @@ function Action.labelKey(job)
     return "ContextMenu_RenewableEnergy_" .. job
 end
 
--- A row with `shovel` digs with the shovel its `equip` put in hand, as vanilla's Clear Ashes does;
--- without one it reaches in as "Loot".
+-- A row with `clearsAsh` works with the tool its `equip` put in hand as vanilla's Clear Ashes does:
+-- a broom sweeps, anything else digs; without one it reaches in as "Loot".
 function Action:startJob()
-    local shovel = self:row().shovel and self.character:getPrimaryHandItem()
-    if shovel then
-        self:setActionAnim(BuildingHelper.getShovelAnim(shovel))
+    local tool = self:row().clearsAsh and self.character:getPrimaryHandItem()
+    if tool then
+        self:setActionAnim(tool:getType() == "Broom" and "Rake" or BuildingHelper.getShovelAnim(tool))
         return
     end
     JobAction.startJob(self)

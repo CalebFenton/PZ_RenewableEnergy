@@ -432,7 +432,7 @@ A lit **Gas Heater** placed next to a digester keeps it at 25 °C or warmer, bur
 
 Too much food without manure sours a digester. Output drops to a trickle and the smell gets much worse. A barrel sours on about 4 kg of scraps fed without manure, an insulated digester on about 12 kg and a dome on about 36. Manure offsets food as it goes in: a cow pat cancels about a kilogram and a half of scraps. Wood ash, baking soda or quicklime in the hopper settles a sour digester, and so does time. It's over once the acid falls to half of what soured it.
 
-Any wood fire leaves wood ash: **Clean Out Ash** with a shovel at a campfire, fireplace, wood stove or charcoal grill gives one for each hour of fuel it has burned. A gasifier leaves it too.
+Any wood fire leaves wood ash: **Clean Out Ash** with a shovel, trowel or broom at a campfire, fireplace, wood stove or charcoal grill gives one for each hour of fuel it has burned. A gasifier leaves it too.
 
 ### Sludge
 
@@ -494,7 +494,7 @@ Logs, branches, planks, firewood, twigs, pinecones, charcoal, and anything a cha
 
 ### Upkeep
 
-- **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel gives **Wood Ash**, which settles a sour digester or goes in a scrubber's water.
+- **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel, trowel or broom gives **Wood Ash**, which settles a sour digester or goes in a scrubber's water.
 - **Filter.** The filter holds hay, straw, grass or splinters, which turn into **Tarry Packing** as it burns. Change the packing in time: once no clean packing is left, tar reaches the engine, for half the gas and fast wear. Tarry packing wears the generator faster even before then.
 - **Condensate.** Burning fills a condensate drain, and while it's full, tar builds up twice as fast. **Drain Condensate** into a metal or glass container while the gasifier is lit. It's wood vinegar: poisonous to drink, but mixed with water it makes mildew spray and aphid spray.
 

@@ -23,21 +23,22 @@ local LIGHT_MINUTES, COLD_LIGHT_MINUTES = 2, 10
 
 local BELLOWS = { item = Gasifier.BELLOWS[1], types = Gasifier.BELLOWS, keep = true }
 
--- A tool Clean Out Ash digs with.
-local function isShovel(tool)
-    return tool:hasTag(ItemTag.TAKE_DIRT) and Items.notBroken(tool)
+-- A tool Clean Out Ash works with: what vanilla's Clear Ashes takes, a shovel, spade, trowel or
+-- broom.
+local function isAshTool(tool)
+    return tool:hasTag(ItemTag.CLEAR_ASHES) and Items.notBroken(tool)
 end
 
---- The Clean Out Ash row of a feature whose subject holds `ashItems(subject)` Wood Ash: it digs
---- with the shovel in hand, as vanilla's Clear Ashes does.
+--- The Clean Out Ash row of a feature whose subject holds `ashItems(subject)` Wood Ash: it works
+--- with the tool in hand, as vanilla's Clear Ashes does.
 function GasifierJobs.cleanAshRow(ashItems)
     return {
-        minutes = 10, shovel = true,
-        equip = function() return isShovel end,
+        minutes = 10, clearsAsh = true,
+        equip = function() return isAshTool end,
         blocker = function(character, subject)
             return ashItems(subject) < 1 and "Tooltip_RenewableEnergy_LittleAsh" or nil
         end,
-        materials = { { tool = "TAKE_DIRT", item = "Base.Shovel" } },
+        materials = { { tool = "CLEAR_ASHES", item = "Base.Shovel", labelKey = "IGUI_RenewableEnergy_AshTool" } },
     }
 end
 
