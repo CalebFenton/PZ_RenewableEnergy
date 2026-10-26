@@ -1,4 +1,4 @@
-# Production mechanism audit
+# Structural mechanism audit
 
 ## Purpose and selection rule
 
@@ -21,7 +21,81 @@ Paths below are relative to `Contents/mods/RenewableEnergy/42/media/lua/`.
 | Source ownership changes | `server/.../JobSites.lua`: source.open prepares the distinct affected banks -> Jobs revalidates -> source.act mutates attachments -> source.tell publishes each affected bank. World wiring enters the same operation. | M2 removed nested connection/drop orchestration from player jobs. Standalone destruction/unwiring still needs BankSystem.dropSource. |
 | Trailer initialization | Native vehicle create/init -> stock panel conditions -> native post-create condition overwrite -> next-tick correction. | The correction is not proven obsolete. OnSpawnVehicleEnd is too early for addVehicleDebug and world-story condition overrides. |
 
-## Ranked cutovers
+## Re-ranked teardown audit
+
+This pass followed complete operations through RE development code, RE/commonlib jobs and device lifecycles, and equivalent RE/EI/HA mechanisms. It did not establish a large removable production framework. That is a scoped negative result, not a declaration that the repository is clean. The strongest new finding is a development pipeline that maintains an altered loot universe alongside a second implementation of native loot mathematics.
+
+The inventories below count **existing physical lines at audit time**, including comments/blanks, not net savings. Replacement code is still needed. No production or permanent test changes were made in this audit; the native probes were removed.
+
+| Priority | Whole operation | Decision |
+| --- | --- | --- |
+| T1 | `--loot`: native list measurements → town resource estimates | Next cutover. Retire pre-roll filtering, then make the two reports share measured list yields rather than independently model the picker. Accuracy and full-report resource use are gates, not assumed solved. |
+| T2 | HA sandbox-dependent loot installation → native reparse | Real duplicate lifecycle, but bounded and conditional. HA currently has no commonlib dependency; weigh that cost against the complete cutover, not a twelve-line wrapper. |
+| T3 | Test expectations and definition-only checks | Batch only proven redundancies. Do not replace the main mission with scattered assertion deletion. |
+| M1 / M4 | Initial bank publication / site tickets | M1 remains capability-blocked; M4 remains bounded cleanup. Neither becomes the next project merely because its files are familiar. |
+
+### T1. One native loot-measurement pipeline, not a filtered world plus a picker model
+
+**Entry and consumers.** Under `dev/RenewableEnergyDevHarness/42/media/lua/`, `client/RenewableEnergyDevHarness.lua:16-17,28-32` runs `RenewableEnergy.Loot.printReport(10000)` and then `TownReport.print()`. The first reports per-list and selected room-container yields; the second estimates town modules, batteries, repair value and energy using the generated census. Keep both outputs. `shared/RenewableEnergy/Debug/RenewableEnergyLoot.lua` is 297 lines and `client/RenewableEnergyDevTownReport.lua` is 613; their combined 910 lines are NOT a deletion estimate.
+
+**Two competing models.** RenewableEnergyLoot copies lists with vanilla items removed, creates renamed procedural lists and measures that synthetic universe. TownReport separately computes per-entry probabilities and junk weights, then models procedural choice, vehicle distributions and vehicle spawning. The former documents filtering as a memory workaround; the latter calls per-list expectations exact. Neither model accounts for native capacity rejection correctly. Filtering before a roll is not equivalent to filtering the resulting counts.
+
+**Existing replacement owner.** Canonical `PZ_DevHarness` already provides `PZHarness/Loot.lua:196-238`: `fillOnce` invokes native filling, reads the result, recursively removes created items from the cell's process list and empties the container; `sample` aggregates those results. Its `perContainer` is conditional on finding the item: unconditional expected count is `share * perContainer`. RE's existing `countModItems` can filter observations AFTER the complete native roll. Use the existing owner; do not add another loot simulator or memory-management layer.
+
+**Discriminating runtime evidence.** A temporary SP authority probe used the installed native parser and sampler:
+
+- Capacity-one scratch crate; a guaranteed 9-weight `Base.Log` entry before a guaranteed controller: full list produced **0 controllers**, controller-only list produced **1**. This proves a filtering counterexample, not the size of the error in every production list.
+- Real full `proc:ElectronicStoreMagazines`: **1,000 fills, 19 observed item types, process-list delta 0, 51 ms**. An earlier run measured 48 ms and the same zero delta. This supports replacing the old workaround; it does not prove bounded memory or acceptable duration for every list or the entire report.
+- The first capacity fixture used `Base.Generator` and did not discriminate: harness `QUIET_WORLD` sets `GeneratorSpawning=1` (None), so it never blocked the target. Replacing only that fixture item with Log made the probe pass. No production fix is claimed from the first failure.
+- Corrected probe passed 1/1 in 0.48 s; its launch compiled 209/209 Lua files and passed cross-checks. Both temporary registrations were removed. No native-conformance test was retained.
+
+**Native explanation.** Installed `ItemPickerJava.tryAddItemToContainer:696-719` checks weight/capacity; `doRollItemInternal:1017-1043` aborts the remaining entries when insertion fails. `getActualSpawnChance:2091-2110` also applies native loot modifiers and world context. Recreating only the weight formula is not a replacement for rolling the container.
+
+**Concrete deletion inventory and order.**
+
+1. **Retire the filtered universe as one cutover:** RenewableEnergyLoot's `modItemsOnly` (`98-113`, 16 lines), `modOnlyTables` (`129-141`, 13), `roomContainersModOnly` (`143-166`, 24) and `PROBE_LIST` declaration/comment (`20-21`, 2): **55 existing lines**. Replace their callers in `printReport:240-271` with full-list resolution and original procedural choices through the existing parser. Some list-collection code remains necessary. Retain option restoration/reparse in `withLoot`, world-stock measurements, output rows and post-roll counting.
+2. **Make those native observations serve town estimates:** remove TownReport's `JUNK_WEIGHT_MULTIPLIER`, `chancePerRoll`, `expectedInItems` and `expectedIn` (`98-133`, **36 existing lines**) after a measured-yield interface covers the lists and item types needed by `roomFinds` and `vehicleExpected`. Include vanilla car batteries and nested loot where needed, not just RE-prefixed items. Reuse each measurement within this report operation, not a persistent cache. Preserve census aggregation, mod repair/stock calculations and all report sections.
+3. **Challenge the remaining native selection models separately:** `isForced/pickWeight/expectedInContainers:135-171`, `distributionOf/vehicleExpected:282-320`, and `zoneVehicles` with its constants at `322-364`. No supported drop-in replacement was established for room limits/forced context or whole-map vehicle spawning. These are NOT approved deletions or part of the 91-line inventory above. A roomless scratch roll is not an exact simulated town.
+
+**Preservation and rejection gates.** Run the actual `--loot` surface before/after the integrated cutover, not just a synthetic probability test. Preserve list/room/world-stock rows, town/site/vehicle totals and energy yardsticks; restore sandbox options and native parsed tables on exit. Measure full-report duration and retained process items, including nested containers. Explicitly retain scratch-capacity and room-context assumptions. Replacing deterministic leaf estimates with sampled estimates introduces rare-item uncertainty: a zero observation is not proof of absence, and the current 10,000 samples are not automatically adequate for town totals. Establish useful precision/cost before deleting the formula; if that gate fails, finish the full-list sampling correction but mark the estimator cutover blocked rather than silently degrade or omit rare results. Do not tune gameplay weights to make the reports agree.
+
+This is a genuine ownership/correctness target, but **91 existing lines plus caller changes are the established initial inventory, not hundreds or thousands of proven net deletions**. The unresolved selection layers explain why this is a pipeline investigation rather than another helper extraction.
+
+### T2. HA's independent loot startup/application
+
+**Same operation, existing owner.** HA `server/HearingAid/HearingAidDistributions.lua:50-93` applies sandbox-scaled flat-list entries after saved options load and reparses native loot. RE and EI already use commonlib `server/cf_commonlib/Loot.lua:77-111` (`place`, `register`) for that lifecycle.
+
+**Inventory.** HA's private `onInitGlobalModData`/client guard/Parse/event block at `82-93` is **12 existing lines**; the broader insertion/application region at `50-93` is **44 existing lines**, including substantive setup that must remain. Replace `addItem/addAids/addToLists` and private startup ownership, not the loot weights. The broader count includes the smaller one; do not add them together.
+
+**Gates before selecting it.** HA's manifest has no commonlib dependency. A cutover needs manifest, development library loading and installation documentation together, not a fallback local copy. Preserve broken versus working multipliers, skip base-weight-zero entries (commonlib currently gates only the multiplier), and retain missing `Outfit_Retiree` creation. HA appends; `Loot.place` removes prior same-item entries before insertion. Repeated worlds and third-party same-item additions can therefore behave differently. Resolve that ownership contract before full migration; scheduling alone can preserve append semantics but is too small to justify a new dependency by itself.
+
+**Discriminator, not yet run.** Fresh/continued SP and real MP with late saved options, zero/nonzero multipliers, ordinary/retiree corpses and missing retiree table; then two worlds in one process and a foreign same-item contribution. With all three mods enabled, native parsed lists must contain all intended entries without HA's separate Parse. No runtime equivalence is claimed by this source audit.
+
+### T3. Test-policy audit: remove duplicate reasoning, retain mod outcomes
+
+- `RenewableEnergyTestsGasLineLoad.lua:55-85` contains **31 existing lines** of `shareOrder/expectedShares` that reimplement nearest-bank greedy allocation. Replace that oracle with an explicitly arranged scene and hand-derived allocations while retaining actual load, full-nearest-bank handoff and overload checks at `92-197`. Do not use the production allocator to compute expected answers. Fixture replacement cost is not yet measured; this is bounded suite cleanup.
+- `RenewableEnergyTestsTiles.lua` has picture/definition checks (`42-50`), native face expectations (`63-97`) and scrap-definition checks (`187-208`). The shared static checker already covers declared tile images and reciprocal tile/item mappings, but equivalence for every dynamically collected sprite and Lua scrap result is NOT established. Classify and remove definition echoes, rather than migrating them into a new permanent runtime conformance framework. Keep mod classification, fixed-tile migration, battery overlays and actual pickup/placement behavior. Do not delete the entire 498-line file.
+- Native calls do not make a test an engine test. Loot marking/refill preservation/player-container exclusion, visible solar-light power/color, actual menu payment and crash-classifier boundaries exercise mod-owned behavior. Retain them. The bank-menu scenario named `wire_in_and_unwire` actually executes Wire In and only checks that Unwire is offered; do not cite it as exercised Unwire coverage.
+- The native elapsed-action timing case is already removed. Do not rediscover it as future savings, reintroduce normal-speed waits or count the harness submodule checkouts as authored duplicates.
+
+### Production teardown proposals rejected by this pass
+
+Source traces covered digester vessel filling and bank Wire In from menu → common action → authority revalidation → mutation/payment → inventory, overlay and summary publication; source connection was the topology-changing contrast. The seven initial RE/commonlib files total 1,741 lines, but the trace establishes no second job engine. `Jobs.perform:124-142` already owns catch-up, revalidation, successful-only payment/XP and publication even after refusal. Digester filling reuses `DigesterJobs.fillUses`; putting server handlers into policy rows would move code, not remove another implementation.
+
+| Apparent duplicate | Necessary difference / actual existing owner | Decision |
+| --- | --- | --- |
+| RE treadmill (209 lines) versus EI HeldAction (202) | Treadmill settles proportional energy/stats at completion/cancellation and handles belt positioning. EI transfers water incrementally under an exclusive expiring record hold, then delivers the last interval. EI Pump/Water already share HeldAction. | No universal action base. Callback-name similarity is not an operation match. |
+| EI Link/Line/Pump/Treatment Jobs (1,018 lines) | Six EI feature registrations and ten RE registrations already use common JobAction/Jobs. Geometry, topology, materials and device rules are the remaining content. PUMP/WATER rows are live refusal policy used by held actions. | No removable second framework; do not delete rows lacking fixed-action handlers. |
+| RE/EI device lifecycles | commonlib ObjectSystem already owns native registration/catch-up/publication. Digester inventory debt, bank nonlinear wear, loaded-only gasifier stoking, deferred EI pump/treatment dependencies and buried links without world records have different contracts. | Preserve these state owners; no universal simulator or debt deletion. |
+| EI HousePower versus RE Payers | Native reach geometry is already shared. EI keeps a qualifying vanilla payer and unloaded fuel debt; RE has different eligibility/ties and native bill correction. EI must work without RE. | No drop-in payer merger; combined-mod fuel/water/charge behavior would need its own discriminator. |
+| HA action and hearing lifecycle versus RE/EI jobs | Inventory/worn-item operations, original/applied trait ledger, battery absence versus zero, clothing replacement and active-only drain are not spatial device jobs or persistent unloaded simulation. | Keep native completion hooks and trait bookkeeping. |
+| Rounded global summaries versus detailed watched status | Different recipients, freshness, payload and cost; authority rebuilds summaries after catch-up. | Repeated reads are not two independently maintained implementations. |
+
+Small reachability findings are not a new project: commonlib `Materials.unmetKind:167-171` has no workspace caller (fix its stale Jobs comment if removed); HA `setBaseLevel:269-274` is dev-only but touches private authority bookkeeping; RE `Stink.counted:212-221` is a dev observation seam into private ghost accounting. Do not relocate either private-state adapter by replacing it with an incomplete direct field write.
+
+Unverified lifecycle leads, not diagnosed bugs: **[INFERENCE]** an unwired treadmill disconnect may leave a drawing marker unless native stop callbacks clear it; a real MP disconnect is the discriminator. EI HeldAction's final `letGo` runs the last interval without `runHeld`'s reach check; changing that to treadmill's final-position contract is not behavior-preserving consolidation. Neither lead justifies a new generic lease framework.
+
+## Earlier cutovers and capability gates
 
 ### M1. Complete initial publication instead of publish-then-resync
 
@@ -35,7 +109,7 @@ Paths below are relative to `Contents/mods/RenewableEnergy/42/media/lua/`.
 
 **Status: blocked for deletion, not approved for a setter-reordering patch.** Moving setters before publication can leave older intermediate snapshots arriving after the final object; suppressing packets globally, debug reflection, or hand-building native serialized/network state would replace a small workaround with more fragile machinery. Keep resync until a supported initialization contract covers final flags AND restored-record reconciliation. The source evidence is in installed `IsoGenerator`, `IsoObject.syncIsoObject`, and `LuaJavaClassExposer`; the first-copy evidence is from the real MP run above.
 
-**Acceptance if unblocked:** observe first client availability, not just eventual convergence, for new stocked banks, player-placed tiles and rebuilt active banks. Verify initial stock/flags, restored charge/wear, power/toxicity, overlays and later normal switching in SP/MP. Remove the whole request/response path and its documentation together. This is the highest-value deletion lead, not a promised line reduction.
+**Acceptance if unblocked:** observe first client availability, not just eventual convergence, for new stocked banks, player-placed tiles and rebuilt active banks. Verify initial stock/flags, restored charge/wear, power/toxicity, overlays and later normal switching in SP/MP. Remove the whole request/response path and its documentation together. This remains a blocked lifecycle-deletion lead, not a promised line reduction or the current next cutover.
 
 ### M2. One source-change operation across player jobs and world wiring
 
@@ -86,4 +160,4 @@ Native IsoMetaChunk exposes building/room intersection queries, but metadata roo
 3. Land complete behavior-preserving cutovers with all callers migrated. Batch related real-game checks after integration; do not run full suites after individual edits.
 4. Update this audit's status and the consolidation checkpoint with actual deleted mechanisms, production/development line changes and exercised evidence. No estimated savings presented as results.
 
-The world/device audit and M1 feasibility investigation are committed as `6fd2f43`; M2 as `32687fd`. M3 is complete with the evidence above. M1 remains blocked, M4 remains bounded cleanup, and the larger reduction mission remains open: re-rank complete mechanisms before promoting an adjacent helper change. Full process save/restart is not claimed. The earlier intermittent sealing and gas-site-copy failures remain undiagnosed. Native engine timing is not a mod acceptance criterion; completion scenarios should use instant actions and test the mod's duration policy separately.
+The world/device audit and M1 feasibility investigation are committed as `6fd2f43`; M2 as `32687fd`; M3 as `a0a942e`. The expanded teardown audit above selects T1's complete loot-analysis pipeline next, with full-report resource use and sampled-estimate accuracy still to establish. T2 is conditional, T3/M4 are bounded cleanup, and M1 remains blocked. No large new production teardown was proved by these traces; the larger reduction mission remains open. Full process save/restart is not claimed. The earlier intermittent sealing and gas-site-copy failures remain undiagnosed. Native engine timing is not a mod acceptance criterion; completion scenarios should use instant actions and test the mod's duration policy separately.
