@@ -48,10 +48,10 @@ function BankSystem:initSystem()
         Events.EveryTenMinutes.Add(BankSystem.updateAll)
     else
         Events.EveryHours.Add(BankSystem.updateAll)
+        -- Hourly bank passes settle before the gas pass. Keep ten-minute billing too:
+        -- gas settlement can change running generators between those hourly updates.
+        Events.EveryTenMinutes.Add(Payers.billGenerators)
     end
-    -- Billing comes after the pass, so it counts the banks as the pass left them: handlers run in
-    -- the order added, and GameTime.update fires EveryHours before EveryTenMinutes.
-    Events.EveryTenMinutes.Add(Payers.billGenerators)
 end
 
 -- A status left in older saves is dropped.
@@ -314,11 +314,11 @@ local function sharedContexts()
 end
 
 --- Bring one bank up to now. `contextFor(hours)`, optional, gives the pass context for the span
---- (BankSystem.passContext unless given).
-function BankSystem.updateBank(bank, contextFor)
+--- (BankSystem.passContext unless given). Only updateAll defers billing to the end of its pass.
+function BankSystem.updateBank(bank, contextFor, deferBilling)
     local hours = Clock.hoursSince(bank, BankSystem.LONGEST_PASS)
     if hours > 0 then
-        bank:update(hours, (contextFor or BankSystem.passContext)(hours))
+        bank:update(hours, (contextFor or BankSystem.passContext)(hours), deferBilling)
     end
 end
 
@@ -333,8 +333,9 @@ end
 function BankSystem.updateAll()
     local contextFor = sharedContexts()
     PowerBank.eachBank(function(bank)
-        BankSystem.updateBank(bank, contextFor)
+        BankSystem.updateBank(bank, contextFor, true)
     end)
+    Payers.billGenerators()
 end
 
 SGlobalObjectSystem.RegisterSystemClass(BankSystem)

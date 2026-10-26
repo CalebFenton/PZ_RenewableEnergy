@@ -310,11 +310,6 @@ test("renewable_energy_bank_sledgehammer_settles_batteries", {
     end,
 })
 
--- How far the clock jumps. EveryTenMinutes fires on the next tick when the minute of the hour
--- lands in another ten (GameTime.update), which a jump of more than ten minutes past whole hours
--- always does; the gadget pass makes up for at most an hour.
-local CLOCK_JUMP_HOURS = 1.25
-
 -- The game's clock runs banks and gadgets on the authority: each fixture charges by more than
 -- nothing and no more than full sun on its rating over the time its passes covered.
 test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
@@ -338,11 +333,14 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
         T.read(self, "stockGadgets", fixtures, "before")
         T.step(function()
             if not T.need(self, panel.connected, "a panel connected to the bank") then return end
-            T.setTime(self, getGameTime():getTimeOfDay() + CLOCK_JUMP_HOURS)
+            self.nextHour = math.floor(self.reads.before.bankPassAge) + 2
+            -- Jumping fires EveryTenMinutes, but EveryHours needs a native clock crossing.
+            T.setTime(self, 14 - 1 / 60)
+            T.setMultiplier(self, 10)
         end)
         -- The bank's pass and the gadgets' run on the same tick; the bank's status coming back an
         -- hour on from its last pass says both have.
-        T.waitForStatus(self, bank, function(status) return status.hour >= self.reads.before.bankPassAge + 1 end,
+        T.waitForStatus(self, bank, function(status) return status.hour >= self.nextHour end,
             "this client's status of the bank's pass an hour on")
         T.read(self, "gadgetCharges", fixtures, "after")
     end,

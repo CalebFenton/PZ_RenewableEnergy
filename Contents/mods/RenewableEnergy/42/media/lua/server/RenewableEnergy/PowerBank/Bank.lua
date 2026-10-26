@@ -266,7 +266,6 @@ end
 --- Unloaded, only the grid carries on, until it shuts down.
 function Bank:chargeFrom(generators, hours, roomWh)
     local generator
-    local wasSource, wasWantW = self.chargeSource, self.chargeWantW
     if self:getSquare() then
         generator = not self.gridPowered and fueled(self, generators)
         self.chargeSource = (self.gridPowered and "grid") or (generator and keyOf(generator)) or false
@@ -275,9 +274,6 @@ function Bank:chargeFrom(generators, hours, roomWh)
     end
     local charging = self.chargeSource and roomWh > 0
     self.chargeWantW = charging and math.min(self:chargerMaxW(), roomWh / hours) or 0
-    if self.chargeSource ~= wasSource or math.abs(self.chargeWantW - (wasWantW or 0)) > 0.01 then
-        Payers.billGenerators()
-    end
     if not charging then
         return 0
     end
@@ -316,8 +312,9 @@ function Bank:shouldPower()
     return self:canCarryLoad() and not self.overloaded and not self.empty
 end
 
---- Run the bank's generator, which is what powers the squares, while the bank should.
-function Bank:switchGenerator()
+--- Run the bank's generator while the bank should; return whether activation changed. Outside a
+--- bank pass, bill the changed payer set immediately. A pass settles once after all its changes.
+function Bank:switchGenerator(deferBilling)
     local generator = self:getIsoObject()
     if not generator then return end
     local run = self:shouldPower()
@@ -330,8 +327,8 @@ function Bank:switchGenerator()
         if building and building:isToxic() ~= wasToxic then
             building:setToxic(wasToxic)
         end
-        -- The generators sharing its reach pay for more or less now.
-        Payers.billGenerators()
+        if not deferBilling then Payers.billGenerators() end
+        return true
     elseif run then
         -- Chunks that loaded in reach since the last pass get their power here, which
         -- IsoGenerator.update does for generators it still processes.
@@ -373,9 +370,10 @@ function Bank:drawW()
     return self:inverterDrawW()
 end
 
---- One pass: `hours` of sun, load and charging up to now.
+--- One pass: `hours` of sun, load and charging up to now. Settle its changes before returning,
+--- unless updateAll owns settlement for the whole bank pass.
 ---@param context table see BankSystem.passContext
-function Bank:update(hours, context)
+function Bank:update(hours, context, deferBilling)
     local container = self:container()
     self:recount()
 
@@ -397,6 +395,7 @@ function Bank:update(hours, context)
     local before = self.charge * capacity
     -- The chargers fill what the sources and the load leave; with no batteries there is nothing to fill.
     local roomWh = capacity > 0 and capacity - before - (sourcesW - drawW) * hours or 0
+    local wasSource, wasWantW = self.chargeSource, self.chargeWantW
     local chargerW = self:chargeFrom(generators, hours, roomWh)
     local inW = sourcesW + chargerW
     local availableWh = before + inW * hours
@@ -426,7 +425,11 @@ function Bank:update(hours, context)
         self:writeBatteries(container, false)
         self:recount()
     end
-    self:switchGenerator()
+    local switched = self:switchGenerator(true)
+    if not deferBilling and (switched or self.chargeSource ~= wasSource
+            or math.abs(self.chargeWantW - (wasWantW or 0)) > 0.01) then
+        Payers.billGenerators()
+    end
     self:showBatteries()
 
     self.now = { chargerW = chargerW, drawW = drawW, irradiance = context.irradiance("flat"), elevation = context.elevation,

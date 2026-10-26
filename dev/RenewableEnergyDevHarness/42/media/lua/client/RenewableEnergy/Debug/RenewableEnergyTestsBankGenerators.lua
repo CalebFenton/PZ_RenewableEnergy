@@ -144,6 +144,48 @@ test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
     end,
 })
 
+-- The native clock's whole-bank pass must leave a fuel bill for the final charger demand,
+-- without a player action or a standalone bank pass to settle it afterward.
+test("renewable_energy_bank_clock_settles_generator_chargers", {
+    -- Start in the same ten-minute bucket as advance, so jumping doesn't bill before the hour.
+    hour = 12 + 59 / 60,
+    sandbox = { GeneratorFuelConsumption = 0.1 },
+    run = function(self)
+        T.setMultiplier(self, 0)
+        local bank, backup = chargerBank(self, { charge = 0.2 })
+        if not bank then return end
+        T.generator(self, { square = backup, running = true })
+        T.watch(self, bank)
+        T.step(function() self.dayAge = math.floor(T.clientStatus(bank).hour) - 12 end)
+        T.readGenerator(self, backup, "before")
+        self.chargerW = {}
+        local function advance(key, hour)
+            T.step(function()
+                self.nextHour = self.dayAge + hour
+                -- Use fixed fixture hours: the client's clock can lag the bank's server status.
+                -- EveryHours requires the clock to cross the hour inside GameTime.update.
+                T.setTime(self, hour - 1 / 60)
+                T.setMultiplier(self, 10)
+            end)
+            T.waitForStatus(self, bank, function(status) return status.hour >= self.nextHour end,
+                "the bank's clock-driven " .. key .. " pass")
+            T.step(function() self.chargerW[key] = T.clientStatus(bank).chargerW end)
+            T.readGenerator(self, backup, key)
+            T.step(function() T.setMultiplier(self, 0) end)
+        end
+        advance("charging", 14)
+        T.setCharge(self, bank, 1)
+        advance("full", 16)
+    end,
+    validate = function(self)
+        expect(self.chargerW.charging > 0, "the clock-driven pass did not charge the bank")
+        expectNear("the clock-driven chargers' fuel bill", self.reads.charging.bill - self.reads.before.bill,
+            fuelPerHour(self.chargerW.charging), 0.0001)
+        expectEqual("charger watts after the clock sees full batteries", self.chargerW.full, 0)
+        expectNear("the fuel bill after the clock sees full batteries", self.reads.full.bill, self.reads.before.bill, 0.0001)
+    end,
+})
+
 -- A gas line counts the chargers of a bank charging from its generator into what the generator
 -- delivers (GasLines.loadOf), and still does once the world is saved and loaded again, which keeps
 -- only a bank's saved fields: otherwise, until the bank's next pass, the line would give the share
