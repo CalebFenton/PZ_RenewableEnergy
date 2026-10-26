@@ -277,11 +277,7 @@ function Bank:chargeFrom(generators, hours, roomWh)
     if not charging then
         return 0
     end
-    local watts = self.chargeWantW
-    if generator then
-        watts = math.min(watts, GasLines.chargerLimitW(generator, self) or watts)
-    end
-    return watts
+    return (generator and GasLines.chargerLimitW(generator, self)) or self.chargeWantW
 end
 
 --- Whether the bank's chargers charge from `generator`. An older save's "generator" names none;

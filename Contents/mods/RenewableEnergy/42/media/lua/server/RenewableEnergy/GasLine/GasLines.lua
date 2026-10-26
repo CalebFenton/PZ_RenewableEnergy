@@ -255,12 +255,6 @@ local function burnedSince(generator, state)
     return state.onGas and math.max(0, (state.set or 0) - generator:getFuel()) or 0
 end
 
--- Litres an hour vanilla bills the running generator (IsoGenerator.update): getTotalPowerUsing is
--- its bill for what it powers with the GeneratorFuelConsumption option already applied.
-local function hourlyLitres(generator)
-    return generator:getTotalPowerUsing()
-end
-
 -- Whether vanilla stopped the generator for fuel: its hourly bill took all it showed. Every pass on
 -- gas leaves at least PHANTOM_FUEL, and neither a stall nor a player switching it off empties it,
 -- so on gas only that bill does, an hour's, or every hour of a long absence at once when its chunk
@@ -275,7 +269,7 @@ end
 -- any pass saw it run, the pass's `hours` at its bill now.
 local function dryBill(generator, state, hours)
     if not state.billedHour then
-        return hours * hourlyLitres(generator)
+        return hours * generator:getTotalPowerUsing()
     end
     return (math.floor(getGameTime():getWorldAgeHours()) - state.billedHour) * state.billLitres
 end
@@ -283,12 +277,13 @@ end
 -- Keeps track of vanilla's last bill of the generator running on gas, which Lua can't read: fuel
 -- taken since the last pass means this hour's came, and a pass that comes between a new hour and
 -- vanilla's bill of it keeps the last.
+-- getTotalPowerUsing already includes GeneratorFuelConsumption (IsoGenerator).
 local function trackBill(generator, state, litres)
     if generator:isActivated() and state.onGas then
         if not state.billedHour or litres > 0 then
             state.billedHour = math.floor(getGameTime():getWorldAgeHours())
         end
-        state.billLitres = hourlyLitres(generator)
+        state.billLitres = generator:getTotalPowerUsing()
     else
         state.billedHour, state.billLitres = nil, nil
     end

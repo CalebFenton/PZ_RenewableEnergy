@@ -56,7 +56,7 @@ end
 
 --- The payer a bank is.
 function Payers.ofBank(bank)
-    return newPayer(bank.x, bank.y, bank.z, { bank = bank })
+    return newPayer(bank.x, bank.y, bank.z, {})
 end
 
 local function ofGenerator(generator)

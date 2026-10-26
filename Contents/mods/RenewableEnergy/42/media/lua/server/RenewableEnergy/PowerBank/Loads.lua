@@ -87,8 +87,8 @@ local function kindOf(object)
 end
 
 -- Adds to `load` each appliance `object` runs now, at vanilla's figure for it.
-local function addAppliances(load, object)
-    local watts = Specs.wattsFromFuel(object:getGeneratorPowerConsumption())
+local function addAppliances(load, object, fuel)
+    local watts = Specs.wattsFromFuel(fuel)
     if instanceof(object, "IsoStackedWasherDryer") then
         -- Vanilla bills the two halves together, the same for each.
         local washer, dryer = object:isWasherActivated(), object:isDryerActivated()
@@ -137,11 +137,10 @@ local function offGrid(object, allowExterior, gridGone)
         and (allowExterior or not object:getSquare():isOutside())
 end
 
--- Objects the engine would bill a generator here for (IsoGenerator.setSurroundingElectricity).
-local function drawsFromGenerator(object, allowExterior, gridGone)
-    return object:couldBePoweredByGenerator()
-        and object:getGeneratorPowerConsumption() > 0
-        and offGrid(object, allowExterior, gridGone)
+-- Positive native fuel demand when the engine would bill this generator, otherwise false.
+local function generatorFuel(object, allowExterior, gridGone)
+    local fuel = object:couldBePoweredByGenerator() and object:getGeneratorPowerConsumption()
+    return fuel and fuel > 0 and offGrid(object, allowExterior, gridGone) and fuel
 end
 
 local function isRunningGenerator(object)
@@ -164,11 +163,12 @@ function Loads.scan(square, payer, payers, gridGone)
         local i = scanned:getNextNonItemObjectIndex(0)
         while i ~= -1 do
             local object = objects:get(i)
-            if drawsFromGenerator(object, allowExterior, gridGone) then
+            local fuel = generatorFuel(object, allowExterior, gridGone)
+            if fuel then
                 if pays(object) then
-                    addAppliances(load, object)
+                    addAppliances(load, object, fuel)
                 else
-                    load.othersFuel = load.othersFuel + object:getGeneratorPowerConsumption()
+                    load.othersFuel = load.othersFuel + fuel
                 end
             elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior, gridGone) then
                 if pays(object) then
