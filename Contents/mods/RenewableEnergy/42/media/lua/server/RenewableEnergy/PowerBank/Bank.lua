@@ -115,9 +115,7 @@ function Bank:loaded(isoObject)
     self.indoors = PowerBank.canPlaceBank(isoObject:getSquare())
     -- The truth is the generator's own connected flag; the record keeps it for while it's unloaded.
     self.connected = isoObject:isConnected()
-    self:recount()
-    self:switchGenerator()
-    self:sendStatus()
+    self:refresh()
 end
 
 --- Look at the container again, whatever filled or emptied it: the parts it holds, whether the

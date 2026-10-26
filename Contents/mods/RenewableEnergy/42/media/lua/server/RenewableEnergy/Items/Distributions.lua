@@ -219,6 +219,7 @@ local function readyItems(container, wearParts)
         elseif item:getModule() == "RenewableEnergy" then
             if Battery.isBattery(item) and not Battery.hasCharge(item) then
                 Battery.setFoundCharge(item)
+                sendItemStats(item)
             elseif wearParts and isFreshPart(item) then
                 WorldSpawns.wearFoundPart(item)
             end

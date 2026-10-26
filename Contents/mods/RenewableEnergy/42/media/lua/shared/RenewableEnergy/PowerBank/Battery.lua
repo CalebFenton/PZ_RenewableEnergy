@@ -54,12 +54,10 @@ function Battery.hasCharge(item)
     return item:getModData()[HAS_CHARGE_KEY] == true
 end
 
---- Give a battery found in the world a random part charge, and send it to the clients that
---- see it. Authority only.
+--- Gives a found battery a random part charge. Sends nothing: stocking callers publish the item.
 function Battery.setFoundCharge(item)
     local range = Specs.foundCharge
     Battery.setCharge(item, Chance.within(range.min, range.max))
-    sendItemStats(item)
 end
 
 --- The item in `container` with the lowest charge that isn't full, of those `accepts(item)`

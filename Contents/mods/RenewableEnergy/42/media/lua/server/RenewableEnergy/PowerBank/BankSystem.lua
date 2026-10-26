@@ -71,7 +71,7 @@ local rebuilding = false
 --- tile that isn't a generator yet, hands over its container and modData.
 --- A bank the world spawns (no `from`) was installed, so it comes connected; a tile a player
 --- placed must be connected like a generator, and a bank rebuilt keeps its flag.
-local function makeBank(square, spriteName, index, from)
+local function makeBank(square, spriteName, index, from, fill)
     local connected = from == nil or (instanceof(from, "IsoGenerator") and from:isConnected())
     local container = from and from:getContainer()
     local modData = {}
@@ -103,6 +103,9 @@ local function makeBank(square, spriteName, index, from)
         container:setExplored(true)
         PowerBank.adoptContainer(container)
     end
+    if fill then
+        fill(container)
+    end
     generator:transmitCompleteItemToClients()
     -- On a server each of these syncs the generator by its index on the square; a sync can reach a
     -- client before the generator does and be dropped there, so a client asks again ("resync").
@@ -114,10 +117,11 @@ local function makeBank(square, spriteName, index, from)
 end
 
 --- A working bank of tile `spriteName` (a bank's tile in any facing) at `index` on the square, or
---- on top when `index` is nil or negative. Authority only.
-function PowerBank.place(square, spriteName, index)
+--- on top when `index` is nil or negative. `fill(container)`, if given, stocks it before the
+--- complete object is sent and its record first reads the parts. Authority only.
+function PowerBank.place(square, spriteName, index, fill)
     local top = square:getObjects():size()
-    return makeBank(square, spriteName, (index and index >= 0) and index or top, nil)
+    return makeBank(square, spriteName, (index and index >= 0) and index or top, nil, fill)
 end
 
 function BankSystem:OnObjectAdded(isoObject)

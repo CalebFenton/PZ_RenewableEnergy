@@ -223,7 +223,7 @@ Acid can't be made. It comes from auto parts stores and garages, or from batteri
 
 ### Found batteries
 
-Batteries in a bank you find have been used, and the riskier the place, the better they are. Sheds and farm storerooms hold well-worn ones that are worth reconditioning. Homesteads, storage units and utility sites hold batteries at around four fifths, a few as good as new, and an electronics store's backroom stock is nearly new. Now and then one is a dud: nearly dead, and repaired too often for reconditioning to help. Strip it for a rebuild instead.
+A bank found in a room comes stocked, connected and switched off. Its batteries have been used, and the riskier the place, the better they are. Sheds and farm storerooms hold well-worn ones that are worth reconditioning. Homesteads, storage units and utility sites hold batteries at around four fifths, a few as good as new, and an electronics store's backroom stock is nearly new. Now and then one is a dud: nearly dead, and repaired too often for reconditioning to help. Strip it for a rebuild instead.
 
 ### Jar battery
 

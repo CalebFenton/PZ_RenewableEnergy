@@ -142,7 +142,7 @@ end
 
 -- Places a bank and puts the parts straight into its container, as world spawns stock a bank.
 local function placeBank(square, sprite, items, charge)
-    return RenewableEnergy.WorldSpawns.placeBankWith(square, sprite, function(container)
+    return RenewableEnergy.PowerBank.place(square, sprite, nil, function(container)
         for _, fullType in ipairs(items) do
             local item = container:AddItem(fullType)
             if RenewableEnergy.Battery.isBattery(item) then

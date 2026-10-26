@@ -13,7 +13,7 @@ local Chance = require "RenewableEnergy/Chance"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
-local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
+require "RenewableEnergy/PowerBank/BankSystem"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
@@ -367,26 +367,9 @@ function WorldSpawns.placeBank(square, stockName)
         return nil
     end
     local sprite = Sprites[WorldSpawns.BANK_STOCK[stockName].sprite][WorldSpawns.bankFacing(square)]
-    return WorldSpawns.placeBankWith(square, sprite, function(container)
+    return PowerBank.place(square, sprite, nil, function(container)
         WorldSpawns.stockBank(container, stockName)
     end)
-end
-
---- Places a connected, switched-off bank of tile `spriteName` (a bank's tile in one facing) on
---- `square`, its container filled by `fill(container)` and sent to the clients, wherever the
---- square is: placeBank decides where a world bank may stand.
----@return IsoGenerator
-function WorldSpawns.placeBankWith(square, spriteName, fill)
-    local bank = PowerBank.place(square, spriteName, -1)
-    local container = bank:getContainer()
-    fill(container)
-    -- PowerBank.place sent the bank to the clients while it was empty.
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        sendAddItemToContainer(container, items:get(i))
-    end
-    BankSystem.instance:getLuaObjectOnSquare(square):refresh()
-    return bank
 end
 
 --- Places a crate of solar gear stocked as CRATE_STOCK[stockName] says, with the lid overlay

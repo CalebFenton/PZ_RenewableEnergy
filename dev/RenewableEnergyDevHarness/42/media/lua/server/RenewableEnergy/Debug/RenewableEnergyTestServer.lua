@@ -45,7 +45,7 @@ end
 
 -- Fixtures ---------------------------------------------------------------------------------------
 
--- RenewableEnergyTest.bank's handler: the bank the world places (WorldSpawns.placeBankWith), of the
+-- RenewableEnergyTest.bank's handler: a bank built and stocked by PowerBank.place, of the
 -- Sprites field `args.kind` facing `args.facing` (S if nil), holding `args.items` with its
 -- batteries at `args.charge`, and disconnected by the server's character's Disconnect Bank when
 -- `args.connected == false`. Answers the bank's position.
@@ -54,7 +54,7 @@ handler("placeBank", function(player, args, defer)
     local square = squareAt(args)
     local items = args.items or {}
     local sprite = RenewableEnergy.Sprites[args.kind][args.facing or "S"]
-    local bank = RenewableEnergy.WorldSpawns.placeBankWith(square, sprite, function(container)
+    local bank = PowerBank.place(square, sprite, nil, function(container)
         for _, fullType in ipairs(items) do
             local item = container:AddItem(fullType)
             if item and Battery.isBattery(item) then
