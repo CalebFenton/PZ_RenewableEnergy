@@ -1,4 +1,4 @@
-require "PZHarness/TestLib"
+require "PZHarness/TestCraft"
 require "PZHarness/TestMenus"
 require "PZHarness/TestChunks"
 require "PZHarness/TestBuild"
@@ -28,42 +28,6 @@ local T = RenewableEnergyTest
 
 local PowerBank = RenewableEnergy.PowerBank
 local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
-
--- The square a fixture handle, an object or a square stands on.
-local function squareOf(near)
-    if type(near) == "table" then
-        return near.square
-    end
-    return near
-end
-
---- The { x, y, z } of a handle (its x, y, z, else its square) or a square, the form the server
---- handlers take, with `fields`' fields added.
-function T.at(handleOrSquare, fields)
-    local at
-    if type(handleOrSquare) == "table" and handleOrSquare.x then
-        at = { x = handleOrSquare.x, y = handleOrSquare.y, z = handleOrSquare.z }
-    else
-        local square = squareOf(handleOrSquare)
-        at = { x = square:getX(), y = square:getY(), z = square:getZ() }
-    end
-    for key, value in pairs(fields or {}) do
-        at[key] = value
-    end
-    return at
-end
-
---- A free square as T.squares picks one by `opts`, whose `near` may also be a fixture handle; nil,
---- and missing `what`, without one.
-function T.square(self, opts, what)
-    opts = opts or {}
-    local picked = {}
-    for key, value in pairs(opts) do
-        picked[key] = value
-    end
-    picked.near = squareOf(opts.near)
-    return (T.need(self, T.squares(self, 1, picked), what) or {})[1]
-end
 
 --- Queues setting the authority's Chance.roll until the test ends: `rolls` a number, every roll;
 --- or a list, the next rolls in order, failing the call that draws one more. So a test checks
@@ -141,8 +105,7 @@ function T.bank(self, kind, items, opts)
     local count = #(items or {})
     local connected = opts.connected ~= false
     T.server(self, "placeBank",
-        T.at(square, { kind = kind, facing = opts.facing, items = items, charge = opts.charge, connected = connected }))
-    T.waitFor(self, function()
+        T.at(square, { kind = kind, facing = opts.facing, items = items, charge = opts.charge, connected = connected }), function()
         bank.object = bankCopy(square, count)
         return bank.object ~= nil and bank.object:isConnected() == connected
     end, "this client's copy of the bank, with its parts and summary")
@@ -177,11 +140,8 @@ function T.panel(self, sprite, opts)
     local panel = { square = square, position = T.at(square) }
     local bank = opts.connect and opts.near
     T.server(self, "placePanel", T.at(square, { sprite = sprite, modules = opts.modules, bank = bank and bank.position,
-        wired = opts.wired, built = opts.built, broken = opts.broken }))
-    T.step(function()
-        panel.connected, panel.reason = self.server.placePanel.connected, self.server.placePanel.reason
-    end)
-    T.waitFor(self, function()
+        wired = opts.wired, built = opts.built, broken = opts.broken }), function(reply)
+        panel.connected, panel.reason = reply.connected, reply.reason
         panel.object = panelArrived(panel, bank) and placedOn(square) or nil
         return panel.object ~= nil
     end, "this client's copy of the panel")

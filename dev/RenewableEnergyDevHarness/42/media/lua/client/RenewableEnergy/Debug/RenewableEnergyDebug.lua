@@ -6,7 +6,7 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/ClientBankSystem"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/UI/StatusWindow"
-require "PZHarness/TestLib"
+require "PZHarness/TestCraft"
 require "PZHarness/QA"
 local Squares = require "cf_commonlib/Squares"
 
