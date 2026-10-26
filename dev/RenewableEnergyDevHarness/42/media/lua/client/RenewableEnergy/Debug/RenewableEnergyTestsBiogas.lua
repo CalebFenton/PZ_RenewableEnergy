@@ -184,6 +184,8 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
         end
         -- An hour's decay takes far less acid than the step, so each side stays on its side.
         local step = 0.01
+        local soda = instanceItem("Base.BakingSoda")
+        local usesLeft = soda:getCurrentUses() - 3
         local recover = Digester.ACID_RECOVER
         T.batch(function()
             for _, case in ipairs({ { "over", 1 + step, false }, { "under", 1 - step, false },
@@ -200,7 +202,13 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
             T.fillRecord(self, handle, { hopper = { { type = "Base.BakingSoda" } } })
             T.runDigester(self, handle, 1, 30)
             T.readRecord(self, handle, "soda")
+            T.setRecord(self, handle, { acid = 1 - 2 * Digester.feedOf(soda).acid })
+            T.runDigester(self, handle, 2, 30)
         end)
+        T.waitFor(self, function()
+            local item = handle.object:getContainer():getFirstType("Base.BakingSoda")
+            return item ~= nil and item:getCurrentUses() == usesLeft
+        end, "three uses taken from this client's box of baking soda")
     end,
     validate = function(self)
         local reads = self.reads

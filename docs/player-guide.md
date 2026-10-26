@@ -390,7 +390,7 @@ A digester turns manure and rotten food into gas, slowly and steadily, for weeks
 
 ### How it works
 
-1. **Feed it.** Put feed in the hopper. One item goes into the tank each hour, while there's room; the rest waits in the hopper.
+1. **Feed it.** Put feed in the hopper. One item goes into the tank each hour, while there's room; the rest waits in the hopper. It keeps feeding while you're away, and what it ate is gone when you return.
 2. **Wait for it to start.** A new digester takes as long as vanilla compost (two weeks by default) before it makes any gas. The clock runs only while it's fed and warmer than 10 °C. Cow and pig manure bring their own bacteria: each cow pat takes a day off and each pig dropping half a day, down to at most seven tenths of the wait.
 3. **Keep it warm.** It digests what's in the tank a little each day, faster the warmer it is, so gas keeps coming for weeks after a feeding.
 4. **Pipe it to a generator**, or bottle it.

@@ -169,26 +169,7 @@ function DigesterObject:eat(feed)
     end
 end
 
--- Takes one feed out of the loaded hopper. Returns whether there was one to take.
-function DigesterObject:feedFromContainer(container)
-    local items, entries = Digester.feedsIn(container)
-    local index = self:pickFeed(entries)
-    if not index then
-        return false
-    end
-    local item, feed = items[index], entries[index]
-    if feed.whole or item:getCurrentUses() <= 1 then
-        Items.removeItem(item)
-    else
-        item:setCurrentUses(item:getCurrentUses() - 1)
-        sendItemStats(item)
-    end
-    self:eat(feed)
-    return true
-end
-
--- The same from the snapshot, while the chunk is unloaded; what it eats is taken from the hopper
--- when the chunk loads.
+-- Eats from the hopper's snapshot; takeEaten applies its deductions to the real container.
 function DigesterObject:feedFromSnapshot()
     local index = self:pickFeed(self.hopper)
     if not index then
@@ -220,19 +201,6 @@ function DigesterObject:takeEaten(container)
         end
     end
     self.eaten = {}
-end
-
--- One feed an hour goes in, from the hopper while loaded or from its snapshot while not.
-function DigesterObject:meter(hours, container)
-    self.meterHours = self.meterHours + hours
-    while self.meterHours >= 1 do
-        self.meterHours = self.meterHours - 1
-        if container then
-            self:feedFromContainer(container)
-        else
-            self:feedFromSnapshot()
-        end
-    end
 end
 
 local function kAt(temp)
@@ -351,18 +319,25 @@ function DigesterObject:step(hours, air)
     end
 end
 
---- Runs `hours` of the digester, an hour at a time, at the air temperature `air`: feeding from
---- `container` (its loaded hopper, or nil for the snapshot) and digesting, then snapshots the
---- hopper.
+--- Runs `hours` of the digester, an hour at a time, at the air temperature `air`. Loaded and
+--- unloaded feeding use the same snapshot; a loaded pass refreshes it before eating and applies
+--- the deductions before returning.
 function DigesterObject:run(hours, container, air)
+    if container then
+        self:snapshotHopper(container)
+    end
     while hours > 0 do
         local step = math.min(1, hours)
-        self:meter(step, container)
+        self.meterHours = self.meterHours + step
+        while self.meterHours >= 1 do
+            self.meterHours = self.meterHours - 1
+            self:feedFromSnapshot()
+        end
         self:step(step, air)
         hours = hours - step
     end
     if container then
-        self:snapshotHopper(container)
+        self:takeEaten(container)
     end
 end
 
