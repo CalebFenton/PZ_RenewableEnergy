@@ -10,6 +10,8 @@ local test = T.test
 local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
 local Sprites = RenewableEnergy.Sprites
 
+T.serverCheck("renewable_energy_biogas_water_in_nested_bags", "baggedWaterMaterials")
+
 -- Heater -----------------------------------------------------------------------------------------
 
 -- The sprite this client shows of the gas heater on `square`, or nil.

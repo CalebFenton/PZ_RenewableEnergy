@@ -13,6 +13,36 @@ local removePlaced = PZHarness.Fixtures.removePlaced
 local need = PZHarness.need
 local Items = require "cf_commonlib/Items"
 
+-- Carried bags count as inventory for jobs, including water split across nested bags. The same
+-- selection must satisfy the menu's needs and consume fullest first without taking tainted water.
+PZHarness.checkHandler("baggedWaterMaterials", function(expect, expectNear, player)
+    local Materials = require "cf_commonlib/Materials"
+    local inventory = player:getInventory()
+    local outer = inventory:AddItem("Base.Bag_DuffelBag")
+    local inner = outer:getInventory():AddItem("Base.Bag_DuffelBag")
+    local function water(container, litres, tainted)
+        local item = container:AddItem("Base.Bucket")
+        local fluid = item:getFluidContainer()
+        fluid:Empty()
+        fluid:addFluid(tainted and FluidType.TaintedWater or FluidType.Water, litres)
+        return fluid
+    end
+    local main = water(inventory, 1)
+    local bagged = water(inner:getInventory(), 4)
+    local tainted = water(outer:getInventory(), 6, true)
+    local materials = { { water = 3, labelKey = "IGUI_RenewableEnergy_WaterLitres" } }
+    expectNear("clean water available across carried bags", Materials.needs(player, materials)[1].have, 5)
+    Materials.consume(player, materials)
+    expectNear("water left in the fullest bagged bucket", bagged:getAmount(), 1)
+    expectNear("water left in the smaller main-inventory bucket", main:getAmount(), 1)
+    expectNear("tainted water after consuming clean water", tainted:getAmount(), 6)
+    materials[1].water = 2
+    Materials.consume(player, materials)
+    expectNear("water left after consuming across containers", main:getAmount() + bagged:getAmount(), 0)
+    expectNear("clean water available after consumption", Materials.needs(player, materials)[1].have, 0)
+    expectNear("tainted water after consuming across containers", tainted:getAmount(), 6)
+end)
+
 -- Stink ------------------------------------------------------------------------------------------
 
 -- Makes the source `args.key` at x, y, z smell like `args.count` corpses (RenewableEnergy.Stink),
