@@ -262,7 +262,7 @@ module Base
                 item 40 [Base.ClayBrick],
                 item 4 tags[base:concrete] flags[DontRecordInput],
                 item 2 [Base.RubberHose],
-                item 1 [Base.Pipe;Base.ClayPipeSegment],
+                item 1 [Base.Pipe;Base.ClayPipeSegment;Base.LeadPipe;Base.MetalPipe],
             }
         }
     }

@@ -194,6 +194,32 @@ test("renewable_energy_solar_disconnect_panel", {
     end,
 })
 
+-- Catching up for Disconnect can itself drop a panel roofed over since the last pass.
+-- The job must then refuse the stale connection and publish the bank's updated sources.
+test("renewable_energy_solar_disconnect_panel_dropped_during_catchup", {
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
+        if not self.panel then return end
+        T.batch(function()
+            T.read(self, "roofOver", self.panel.position, "roof")
+            T.bankState(self, self.bank, "before", 1)
+            T.job(self, "source", SourceJobs.DISCONNECT, self.panel.position, nil, "disconnect")
+            T.bankState(self, self.bank, "after")
+        end)
+        T.waitForSummary(self, self.bank, function(summary) return #summary.sources == 0 end,
+            "this client's summary after catch-up disconnected the roofed panel")
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        expectEqual("whether the panel is still outdoors", self.reads.roof.outside, false)
+        expectEqual("sources before the action catches up", self.reads.before.sources, 1)
+        expectEqual("whether Disconnect acted on the removed connection", self.reads.disconnect.ok, false)
+        expectEqual("Disconnect's refusal after catch-up", self.reads.disconnect.reason, "not connected")
+        expectEqual("sources after the action catches up", self.reads.after.sources, 0)
+    end,
+})
+
 -- Seal Cracked Module, chosen from a connected rack's menu, seals the one cracked module still on
 -- its mount as the recipe seals one in hand: up to its cap, lowered by the seal it already had,
 -- counting the seal and still showing cracked. The whole module isn't offered, and the bank's

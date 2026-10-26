@@ -28,6 +28,9 @@ DigesterJobs.REFILL_SPONGE = "RefillScrubberSponge"
 
 DigesterJobs.COMPOST_BAG = "Base.CompostBag"
 local STEEL_WOOL = "Base.SteelWool"
+-- The scrubber's packing column: any length of pipe holds the steel wool, the junk kinds taken
+-- first and the iron pipe, a good weapon, last.
+local PIPES = { "Base.Pipe", "Base.ClayPipeSegment", "Base.LeadPipe", "Base.MetalPipe" }
 -- The water a scrubber charge takes, named in litres in the tooltip.
 local SCRUB_WATER = { water = Digester.SCRUB_WATER, labelKey = "IGUI_RenewableEnergy_WaterLitres" }
 
@@ -264,7 +267,7 @@ DigesterJobs.JOBS = {
         materials = {
             { perk = "Mechanics", need = 1 },
             { tag = "BUCKET", item = "Base.Bucket" },
-            { item = "Base.Pipe", need = 1 },
+            { item = PIPES[1], types = PIPES, need = 1 },
             { item = "Base.RubberHose", need = 1 },
             { item = STEEL_WOOL, uses = 1 },
         },

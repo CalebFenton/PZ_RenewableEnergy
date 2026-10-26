@@ -166,6 +166,8 @@ Inputs go in the order you connected the sources. Sources past the last input st
 
 **Connect Sources in Reach** picks up every source within 20 squares and 3 floors of the bank. A bank takes sources only once it's connected itself (**Connect Bank**). Panels and wind chargers must stand outdoors; a treadmill can be under a roof. Move a source and it drops off its bank, so connect it again.
 
+Roofing over a panel or wind charger also drops its connection at the next bank update. Move it back outdoors and connect it again.
+
 ### Chargers and generators
 
 A wired-in vanilla **Car Battery Charger** (100 W), or the charger built into an **Inverter/Charger** (1000 W), fills the batteries from the grid, or from a running generator whose reach covers the bank. That generator burns fuel for the charging as it would for an appliance of those watts. Chargers only top up what your sources leave unfilled. Without one, grid and generator power charge nothing.

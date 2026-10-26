@@ -200,6 +200,10 @@ JobSites.source = {
         end
         BankSystem.updateBank(bank)
         local source = recordOf(bank, object)
+        -- Catch-up can disconnect a source whose square no longer works.
+        if not source then
+            return bank
+        end
         if Sources.familyOf(source.kind) == "panel" then
             PanelSource.syncModules(source, object)
         elseif source.broken and not Wind.isBroken(object) then
