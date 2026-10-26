@@ -21,7 +21,6 @@ local StatusWindow = require "RenewableEnergy/UI/StatusWindow"
 local Recipes = require "RenewableEnergy/Recipes"
 local Items = require "cf_commonlib/Items"
 local JobOptions = require "cf_commonlib/JobOptions"
-local Materials = require "cf_commonlib/Materials"
 local Needs = require "cf_commonlib/Needs"
 local Squares = require "cf_commonlib/Squares"
 local Tables = require "cf_commonlib/Tables"
@@ -115,70 +114,14 @@ local function wiredParts(bank, matches)
     return Tables.fromList(bank:getContainer():getItems(), function(item) return matches(item:getFullType()) end)
 end
 
--- Every item the character carries for which `matches(item)` holds, bags included, grouped by
--- type: { { fullType, items }, ... }, types and items in inventory order.
-local function carriedByType(character, matches)
-    local groups, byType = {}, {}
-    local items = character:getInventory():getAllEvalRecurse(matches)
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        local fullType = item:getFullType()
-        if not byType[fullType] then
-            byType[fullType] = { fullType = fullType, items = {} }
-            table.insert(groups, byType[fullType])
-        end
-        table.insert(byType[fullType].items, item)
-    end
-    return groups
-end
-
-local function isBattery(fullType)
-    return PowerBank.partKind(fullType) == "battery"
-end
-
--- The carried batteries All Batteries wires in: as many as the bank has room for, best condition
--- first; all of them when it has none, for the option to be refused.
-local function batteriesToWire(groups, bank)
-    local batteries = {}
-    for _, group in ipairs(groups) do
-        if isBattery(group.fullType) then
-            for _, item in ipairs(group.items) do
-                table.insert(batteries, item)
-            end
-        end
-    end
-    table.sort(batteries, function(a, b) return conditionOf(a) > conditionOf(b) end)
-    local free = PowerBank.freePartSlots(bank, "battery")
-    while free > 0 and #batteries > free do
-        table.remove(batteries)
-    end
-    return batteries
-end
-
--- What wiring `items` in one after another takes: the wire and scrap of them all, the highest
--- skill, and every tool any of them takes.
-local function allWiring(items)
-    local wiring, seen = { skill = 0, wire = 0, scrap = 0, tools = {} }, {}
-    for _, item in ipairs(items) do
-        local each = PowerBank.wiringFor(item:getFullType())
-        wiring.wire, wiring.scrap = wiring.wire + each.wire, wiring.scrap + each.scrap
-        wiring.skill = math.max(wiring.skill, each.skill or 0)
-        for _, tool in ipairs(each.tools) do
-            if not seen[tool] then
-                seen[tool] = true
-                table.insert(wiring.tools, tool)
-            end
-        end
-    end
-    return wiring
-end
-
--- All Batteries: `job` with each of `batteries`, listing what they take together.
-local function addAllBatteries(playerNum, menu, job, bank, batteries, materials, blocker)
+-- Rendering and queueing only; the jobs select the batch and derive its combined requirements.
+local function addAllBatteries(playerNum, menu, job, bank, parts)
     local character = getSpecificPlayer(playerNum)
+    local batteries, needs, blocker = BankJobs.batteryBatch(character, job, bank, parts)
+    if not batteries then return end
     local all = menu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum, queueEach, job,
         bank, batteries)
-    Needs.show(all, Materials.needs(character, materials), tooDark(character, BankJobs, job) or blocker)
+    Needs.show(all, needs, tooDark(character, BankJobs, job) or blocker)
 end
 
 --- Wire In, as vanilla's mechanics menu offers parts to install: a submenu for each type of part
@@ -187,27 +130,28 @@ end
 --- battery. Returns the submenu, or the unavailable option when the character carries no part.
 function Menu.addWireInOptions(playerNum, menu, bank)
     local character = getSpecificPlayer(playerNum)
-    local groups = carriedByType(character, isPart)
-    if #groups == 0 then
+    local parts = Tables.fromList(character:getInventory():getAllEvalRecurse(isPart))
+    if #parts == 0 then
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireIn"))
         Needs.refuse(option, "Tooltip_RenewableEnergy_NothingToWire")
         return option
     end
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_WireIn"))
-    local batteries = batteriesToWire(groups, bank)
-    if #batteries > 1 then
-        addAllBatteries(playerNum, submenu, BankJobs.WIRE_IN, bank, batteries, PowerBank.wiringMaterials(allWiring(batteries)),
-            BankJobs.blocker(character, BankJobs.WIRE_IN, bank, batteries[1]))
-    end
-    for _, group in ipairs(groups) do
-        local script = getScriptManager():FindItem(group.fullType)
-        local itemsMenu, typeOption = Needs.addSubMenu(submenu, getItemNameFromFullType(group.fullType))
-        typeOption.iconTexture = script and script:getNormalTexture()
-        for _, item in ipairs(group.items) do
-            local option = JobOptions.add(itemsMenu, playerNum, Action, "bank", BankJobs.WIRE_IN, bank, item, partLabel(item))
-            if option then
-                option.itemForTexture = item
-            end
+    addAllBatteries(playerNum, submenu, BankJobs.WIRE_IN, bank, parts)
+    local byType = {}
+    for _, item in ipairs(parts) do
+        local fullType = item:getFullType()
+        local itemsMenu = byType[fullType]
+        if not itemsMenu then
+            local script = getScriptManager():FindItem(fullType)
+            local typeOption
+            itemsMenu, typeOption = Needs.addSubMenu(submenu, getItemNameFromFullType(fullType))
+            typeOption.iconTexture = script and script:getNormalTexture()
+            byType[fullType] = itemsMenu
+        end
+        local option = JobOptions.add(itemsMenu, playerNum, Action, "bank", BankJobs.WIRE_IN, bank, item, partLabel(item))
+        if option then
+            option.itemForTexture = item
         end
     end
     return submenu
@@ -223,10 +167,7 @@ function Menu.addUnwireOptions(playerNum, menu, bank)
         return nil
     end
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Unwire"))
-    local batteries = wiredParts(bank, isBattery)
-    if #batteries > 1 then
-        addAllBatteries(playerNum, submenu, BankJobs.UNWIRE, bank, batteries, allWiring(batteries).tools)
-    end
+    addAllBatteries(playerNum, submenu, BankJobs.UNWIRE, bank, parts)
     for _, item in ipairs(parts) do
         JobOptions.add(submenu, playerNum, Action, "bank", BankJobs.UNWIRE, bank, item, partLabel(item))
     end
@@ -245,18 +186,6 @@ function Menu.addRepairOptions(playerNum, menu, bank)
         JobOptions.add(submenu, playerNum, Action, "bank", BankJobs.REPAIR, bank, item, partLabel(item))
     end
     return submenu
-end
-
--- Why none of `sources` fits in `freeSlots` input slots, or nil when one does.
-local function slotsRefusal(sources, freeSlots)
-    local refusal
-    for _, source in ipairs(sources) do
-        refusal = Sources.slotRefusal(Sources.kindOf(source), freeSlots)
-        if not refusal then
-            return nil
-        end
-    end
-    return refusal
 end
 
 --- Turn On or Turn Off for a bank in `summary`'s state: its label key, its job, and why it is
@@ -285,14 +214,10 @@ function Menu.addBankOptions(playerNum, context, bank)
         JobOptions.add(menu, playerNum, Action, "bank", connected and BankJobs.DISCONNECT or BankJobs.CONNECT, bank)
     end
 
-    -- Sources go only on a connected bank. The generator's flag, which Connect Bank above reads
-    -- too, rather than the summary, so the two options never disagree (Sources.bankRefusal).
-    local sources = Sources.sourcesInReach(PowerBank.positionOf(bank))
+    local sources, refusal = SourceJobs.connectBatch(character, bank)
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
         queueConnectAll, bank, sources)
-    Needs.refuse(connect, #sources == 0 and "Tooltip_RenewableEnergy_NoSourcesInReach"
-        or tooDark(character, SourceJobs, SourceJobs.CONNECT) or Sources.bankRefusal(connected)
-        or slotsRefusal(sources, summary.freeSlots))
+    Needs.refuse(connect, (#sources > 0 and tooDark(character, SourceJobs, SourceJobs.CONNECT)) or refusal)
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)
@@ -412,18 +337,23 @@ function Menu.addGardenLightOptions(playerNum, context, light)
             getText("ContextMenu_RemoveLightbulb"))
         return menu
     end
-    local bulbTypes = carriedByType(getSpecificPlayer(playerNum), SolarGardenLight.isBulb)
-    if #bulbTypes == 0 then
+    local bulbs = getSpecificPlayer(playerNum):getInventory():getAllEvalRecurse(SolarGardenLight.isBulb)
+    if bulbs:isEmpty() then
         JobOptions.add(menu, playerNum, Action, "light", SolarGardenLight.ADD_BULB, light, nil, getText("ContextMenu_AddLightbulb"))
         return menu
     end
     local submenu = Needs.addSubMenu(menu, getText("ContextMenu_AddLightbulb"))
-    for _, group in ipairs(bulbTypes) do
-        local bulb = group.items[1]
-        local option = JobOptions.add(submenu, playerNum, Action, "light", SolarGardenLight.ADD_BULB, light, bulb,
-            bulb:getDisplayName())
-        option.iconTexture = bulb:getTex()
-        option.color = { r = bulb:getColorRed(), g = bulb:getColorGreen(), b = bulb:getColorBlue() }
+    local seen = {}
+    for i = 0, bulbs:size() - 1 do
+        local bulb = bulbs:get(i)
+        local fullType = bulb:getFullType()
+        if not seen[fullType] then
+            seen[fullType] = true
+            local option = JobOptions.add(submenu, playerNum, Action, "light", SolarGardenLight.ADD_BULB, light, bulb,
+                bulb:getDisplayName())
+            option.iconTexture = bulb:getTex()
+            option.color = { r = bulb:getColorRed(), g = bulb:getColorGreen(), b = bulb:getColorBlue() }
+        end
     end
     return menu
 end

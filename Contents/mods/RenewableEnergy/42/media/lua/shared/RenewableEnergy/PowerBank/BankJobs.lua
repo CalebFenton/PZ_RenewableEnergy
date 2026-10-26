@@ -116,4 +116,46 @@ Jobs.define(BankJobs, {
     subjectOf = function(bank) return PowerBank.currentSummary(bank) and bank end, missing = "no bank",
 })
 
+--- All Batteries uses the same jobs as individual wiring. Select before totaling needs: best
+--- condition first up to the free slots for Wire In, container order for Unwire. With no free
+--- slots keep the candidates so the ordinary blocker explains why the batch is unavailable.
+--- Returns items, combined needs and blocker, or nil when fewer than two batteries qualify.
+function BankJobs.batteryBatch(character, job, bank, parts)
+    local batteries = {}
+    for _, item in ipairs(parts) do
+        if PowerBank.partKind(item:getFullType()) == "battery" then
+            table.insert(batteries, item)
+        end
+    end
+    if job == BankJobs.WIRE_IN then
+        table.sort(batteries, function(a, b)
+            return a:getCondition() / a:getConditionMax() > b:getCondition() / b:getConditionMax()
+        end)
+        local free = PowerBank.freePartSlots(bank, "battery")
+        while free > 0 and #batteries > free do
+            table.remove(batteries)
+        end
+    end
+    if #batteries < 2 then return nil end
+    local needs, byKind, blocker = {}, {}, nil
+    for _, item in ipairs(batteries) do
+        blocker = blocker or BankJobs.blocker(character, job, bank, item)
+        for _, need in ipairs(BankJobs.needs(character, job, bank, item)) do
+            local kind = byKind[need.kind] or {}
+            byKind[need.kind] = kind
+            local key = need.perk or need.tool or need.item
+            local previous = kind[key]
+            if previous then
+                -- Wiring's item needs are consumed; its tools and skills are reused.
+                previous.need = need.kind == "item" and previous.need + need.need
+                    or math.max(previous.need, need.need)
+            else
+                kind[key] = need
+                table.insert(needs, need)
+            end
+        end
+    end
+    return batteries, needs, blocker
+end
+
 return BankJobs

@@ -118,4 +118,16 @@ Jobs.define(SourceJobs, {
     subjectOf = function(source) return Sources.kindOf(source) and source end, missing = "no source",
 })
 
+--- Offer connecting all sources in reach if any single Connect job can proceed. Queueing still
+--- attempts each source in discovery order; later jobs see slots consumed by earlier ones.
+function SourceJobs.connectBatch(character, bank)
+    local sources = Sources.sourcesInReach(PowerBank.positionOf(bank))
+    local refusal = "Tooltip_RenewableEnergy_NoSourcesInReach"
+    for _, source in ipairs(sources) do
+        refusal = SourceJobs.blocker(character, SourceJobs.CONNECT, source, bank)
+        if not refusal then break end
+    end
+    return sources, refusal
+end
+
 return SourceJobs

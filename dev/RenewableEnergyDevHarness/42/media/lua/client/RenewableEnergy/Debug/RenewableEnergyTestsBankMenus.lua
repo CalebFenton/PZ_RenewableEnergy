@@ -265,9 +265,8 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
     end,
 })
 
--- Wire In's All Batteries fills the bank's free battery slots from what the character carries,
--- best condition first, taking a battery's wire for each: three batteries for a box's two slots
--- leave the worst one carried.
+-- All Batteries selects the best two, combines their wire, and requires the L-16's extra wrench
+-- without demanding a screwdriver for each battery. The worst carried battery stays out.
 test("renewable_energy_bank_menu_wire_in_all_batteries", {
     instant = true,
     run = function(self)
@@ -278,19 +277,25 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
         if not T.need(self, self.slots == 2, "a battery box of two slots, which the three batteries overfill by one") then return end
         T.watch(self, bank)
         T.give(self, "parts", { { type = T.CAR_BATTERY, condition = 60 }, { type = T.CAR_BATTERY, condition = 20 },
-            { type = T.CAR_BATTERY, condition = 90 }, { type = "Base.Screwdriver" },
-            { type = PowerBank.WIRE, count = 3 * PowerBank.wiringFor(T.CAR_BATTERY).wire } })
+            { type = T.L16, condition = 90 }, { type = "Base.Screwdriver" },
+            { type = PowerBank.WIRE, count = 1 + PowerBank.wiringFor(T.CAR_BATTERY).wire + PowerBank.wiringFor(T.L16).wire } })
+        T.step(function()
+            T.noteOption(self, "without wrench", T.menuOption(Menu.addWireInOptions, bank.object,
+                getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots)))
+        end)
+        T.give(self, "wrench", { { type = "Base.Wrench" } })
         T.step(function()
             local all = T.menuOption(Menu.addWireInOptions, bank.object, getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots))
             if not T.chooseOption(self, "Wire In > All Batteries", all) then return end
             T.waitForStatus(self, bank, function(status) return #status.batteries == self.slots end,
                 "this client's status of the bank with its battery slots full")
             T.bankState(self, bank)
-            T.count(self, "left", { T.CAR_BATTERY, PowerBank.WIRE })
+            T.count(self, "left", { T.CAR_BATTERY, T.L16, PowerBank.WIRE, "Base.Screwdriver", "Base.Wrench" })
         end)
     end,
     validate = function(self)
         if not T.expectOffered(self, "Wire In > All Batteries") then return end
+        T.expectOptionRefused(self, "without wrench")
         local wired = {}
         for _, item in ipairs(self.bank.state.items) do
             table.insert(wired, item.condition)
@@ -298,7 +303,39 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
         table.sort(wired)
         expectEqual("the conditions of the batteries All Batteries wired in", table.concat(wired, ", "), "60, 90")
         expectEqual("batteries left carried", self.counts.left[T.CAR_BATTERY], 1)
-        expectEqual("wire left", self.counts.left[PowerBank.WIRE], PowerBank.wiringFor(T.CAR_BATTERY).wire)
+        expectEqual("L-16 batteries left carried", self.counts.left[T.L16], 0)
+        expectEqual("wire left after both jobs", self.counts.left[PowerBank.WIRE], 1)
+        expectEqual("screwdrivers kept", self.counts.left["Base.Screwdriver"], 1)
+        expectEqual("wrenches kept", self.counts.left["Base.Wrench"], 1)
+    end,
+})
+
+-- Connect All is a sequence, not an atomic demand for enough slots for every candidate.
+test("renewable_energy_bank_menu_connects_sources_that_fit", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        if not bank then return end
+        self.bank = bank
+        local sprites = RenewableEnergy.Sprites
+        self.large = T.panel(self, sprites.windCharger.alternator.steel.N, { near = bank })
+        self.small = T.panel(self, sprites.flat, { near = bank })
+        if not (self.large and self.small) then return end
+        T.watch(self, bank)
+        T.holdLight(self)
+        T.step(function()
+            local option = T.menuOption(Menu.addBankOptions, bank.object,
+                getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", 2))
+            if not T.chooseOption(self, "connect what fits", option) then return end
+            T.waitForStatus(self, bank, function(status) return status.inputSlots.used == 1 end,
+                "the panel connected without the oversized turbine")
+            T.bankState(self, bank)
+        end)
+    end,
+    validate = function(self)
+        if not T.expectOffered(self, "connect what fits") then return end
+        expect(T.stateSource(self.bank.state, self.small.position) ~= nil, "the fitting panel was not connected")
+        expect(T.stateSource(self.bank.state, self.large.position) == nil, "the oversized turbine was connected")
     end,
 })
 
