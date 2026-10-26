@@ -170,7 +170,7 @@ Roofing over a panel or wind charger also drops its connection at the next bank 
 
 ### Chargers and generators
 
-A wired-in vanilla **Car Battery Charger** (100 W), or the charger built into an **Inverter/Charger** (1000 W), fills the batteries from the grid, or from a running generator whose reach covers the bank. That generator burns fuel for the charging as it would for an appliance of those watts. Chargers only top up what your sources leave unfilled. Without one, grid and generator power charge nothing.
+A wired-in vanilla **Car Battery Charger** (100 W), or the charger built into an **Inverter/Charger** (1000 W), fills the batteries from the grid, or from a running generator whose reach covers the bank. That generator burns fuel for the charging as it would for an appliance of those watts. Chargers only top up what your sources leave unfilled. Without one, grid and generator power charge nothing. Unwiring the last charger removes its demand from the generator's fuel bill immediately.
 
 A running generator within 3 squares of the bank, on its floor, takes over the load while it runs, and the batteries rest.
 
