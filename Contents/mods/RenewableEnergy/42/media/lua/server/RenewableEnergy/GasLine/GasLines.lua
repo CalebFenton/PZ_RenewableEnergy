@@ -449,8 +449,8 @@ local DO = {
 
 --- The authority's side of the jobs at a generator (Jobs.perform), whose `with` is the far end
 --- of Connect Gas Line. They work on its kit state, the line caught up first so the time before
---- bills at the old state; the state goes to the clients when a job was done or there was one to
---- catch up.
+--- bills at the old state. Settle once after catch-up and mutation, including a refused job whose
+--- catch-up started or stopped a generator; the periodic gas pass has its own following settlement.
 GasLines.jobSite = {
     open = function(generator)
         local state = GasKit.stateOf(generator)
@@ -464,6 +464,7 @@ GasLines.jobSite = {
     end,
     tell = function(state, generator, done)
         if done or state then
+            Payers.billGenerators()
             generator:transmitModData()
         end
     end,

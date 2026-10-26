@@ -336,13 +336,16 @@ function Bank:switchGenerator(deferBilling)
     end
 end
 
---- The player's switch, or parts wired in or out: look at the load again now.
+--- Reconcile a bank job's switch or parts mutation; JobSites.bank.tell owns its settlement.
 function Bank:powerUp()
     self.empty = false
     self:recount()
+    -- Keep the pass's room-limited demand, bounded by the hardware still present. New capacity
+    -- takes effect at the next elapsed pass; do not integrate that time twice to refresh a bill.
+    self.chargeWantW = self.nominalWh > 0 and math.min(self.chargeWantW or 0, self:chargerMaxW()) or 0
     self:measure()
     self:checkOverload()
-    self:switchGenerator()
+    self:switchGenerator(true)
 end
 
 -- Follows the day's discharge cycle (Battery.trackCycle). A new day wears the batteries by the
@@ -371,7 +374,7 @@ function Bank:drawW()
 end
 
 --- One pass: `hours` of sun, load and charging up to now. Settle its changes before returning,
---- unless updateAll owns settlement for the whole bank pass.
+--- unless updateAll or a bank job owns the enclosing settlement.
 ---@param context table see BankSystem.passContext
 function Bank:update(hours, context, deferBilling)
     local container = self:container()
@@ -395,7 +398,6 @@ function Bank:update(hours, context, deferBilling)
     local before = self.charge * capacity
     -- The chargers fill what the sources and the load leave; with no batteries there is nothing to fill.
     local roomWh = capacity > 0 and capacity - before - (sourcesW - drawW) * hours or 0
-    local wasSource, wasWantW = self.chargeSource, self.chargeWantW
     local chargerW = self:chargeFrom(generators, hours, roomWh)
     local inW = sourcesW + chargerW
     local availableWh = before + inW * hours
@@ -425,9 +427,8 @@ function Bank:update(hours, context, deferBilling)
         self:writeBatteries(container, false)
         self:recount()
     end
-    local switched = self:switchGenerator(true)
-    if not deferBilling and (switched or self.chargeSource ~= wasSource
-            or math.abs(self.chargeWantW - (wasWantW or 0)) > 0.01) then
+    self:switchGenerator(true)
+    if not deferBilling then
         Payers.billGenerators()
     end
     self:showBatteries()

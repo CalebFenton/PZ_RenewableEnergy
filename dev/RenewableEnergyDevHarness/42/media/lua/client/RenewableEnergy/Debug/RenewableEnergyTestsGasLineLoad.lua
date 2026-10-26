@@ -195,3 +195,94 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
         end
     end,
 })
+
+-- Disconnecting the nearer payer must transfer its appliances' bill in the job itself. The area
+-- has native appliances too, so the far generator's solo baseline is taken before adding our fridge.
+test("renewable_energy_settlement_gas_disconnect_pays_surviving_generator", {
+    instant = true,
+    sandbox = { GeneratorFuelConsumption = 0.1 },
+    run = function(self)
+        T.setGrid(self, false)
+        local fridge = T.square(self, { indoors = true }, "a free indoor square for a fridge")
+        local nearSquare = fridge and T.square(self, { near = fridge }, "a free outdoor square for the gas generator")
+        if not nearSquare then return end
+        local function distance(square)
+            return IsoUtils.DistanceToSquared(square:getX(), square:getY(), fridge:getX(), fridge:getY())
+        end
+        local farSquare = T.square(self,
+            { near = fridge, minDistance = math.max(6, math.sqrt(distance(nearSquare)) + 1) },
+            "a free outdoor square for the surviving generator")
+        if not T.need(self, farSquare and distance(farSquare) > distance(nearSquare)
+            and distance(farSquare) <= SandboxVars.GeneratorTileRange ^ 2,
+            "two overlapping generators, with the gas generator strictly nearer the fridge") then return end
+        local source = T.digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity, { near = nearSquare })
+        if not source then return end
+        local near = T.generator(self, { square = nearSquare, fuel = 0 })
+        local far = T.generator(self, { square = farSquare, fuel = 10, running = true })
+        T.fitAndConnect(self, near, source)
+        T.goNextTo(self, near.square)
+        -- Freeze only after walking: movement can reset the multiplier. Native frames still run,
+        -- but no clock-driven gas/bank settlement can repair the missing job boundary.
+        T.step(function() T.setMultiplier(self, 0) end)
+        T.setGenerator(self, far, { rebuild = true })
+        T.server(self, "billGenerators", {})
+        T.readGenerator(self, near, "stopped")
+        T.readGenerator(self, far, "solo")
+        T.setGenerator(self, near, { running = true })
+        T.gasPass(self, near, 0)
+        T.setGenerator(self, near, { rebuild = true })
+        T.server(self, "billGenerators", {})
+        T.readGenerator(self, near, "nearEmpty")
+        T.readGenerator(self, far, "farEmpty")
+        T.step(function() T.placeTile(self, fridge, T.MINI_FRIDGE) end)
+        T.gasPass(self, near, 0)
+        T.server(self, "billGenerators", {})
+        T.readGenerator(self, near, "nearShared")
+        T.readGenerator(self, far, "farShared")
+        T.setGenerator(self, near, { rebuild = true })
+        -- This is the real action's authority completion (Jobs.perform), not a fixture mutation.
+        -- Its before/after snapshots cannot be separated by a periodic settlement, even in MP.
+        T.read(self, "kitJobComplete", T.at(near, { job = GasKit.DISCONNECT, payer = T.at(far) }), "disconnect")
+        T.setGenerator(self, far, { rebuild = true })
+        T.readGenerator(self, near, "nearRebuilt")
+        T.readGenerator(self, far, "farRebuilt")
+    end,
+    validate = function(self)
+        local reads = self.reads
+        local result = reads.disconnect
+        if not T.expect(result ~= nil and result.before ~= nil and result.after ~= nil,
+            "no authority snapshots of Disconnect Gas Line") then return end
+        local before, after = result.before, result.after
+        local fridgeFuel = Specs.fuelFromWatts(T.fridgeW()) * SandboxVars.GeneratorFuelConsumption
+        T.expect(not reads.stopped.running and reads.solo.running,
+            "the far generator's solo baseline included a running gas generator")
+        for _, pair in ipairs({
+            { near = reads.nearShared, far = reads.farShared, label = "initial settlement" },
+            { near = before.generator, far = before.payer, label = "native rebuild before disconnect" },
+        }) do
+            T.expect(pair.near.running and pair.far.running, pair.label .. " did not have both generators running")
+            T.expect(pair.near.state ~= nil and pair.near.state.mode == "gas"
+                and pair.near.state.onGas and pair.near.state.connected,
+                pair.label .. " did not have the nearer generator supplied by gas")
+            T.expectNear("fridge fuel billed to the nearer generator at " .. pair.label,
+                pair.near.bill - reads.nearEmpty.bill, fridgeFuel, 0.0001)
+            T.expectNear("fridge fuel excluded from the farther generator at " .. pair.label,
+                pair.far.bill - reads.farEmpty.bill, 0, 0.0001)
+        end
+        T.expectNear("fridge watts carried by the gas line",
+            (reads.nearShared.state and reads.nearShared.state.watts or -1)
+                - (reads.nearEmpty.state and reads.nearEmpty.state.watts or 0), T.fridgeW(), 0.01)
+        T.expect(result.done, "the authority refused Disconnect Gas Line")
+        for _, pair in ipairs({
+            { near = after.generator, far = after.payer, label = "immediately after disconnect" },
+            { near = reads.nearRebuilt, far = reads.farRebuilt, label = "after the native bill rebuild" },
+        }) do
+            T.expect(not pair.near.running and pair.near.state ~= nil and not pair.near.state.connected,
+                "the gas generator remained running or connected " .. pair.label)
+            T.expect(pair.far.running, "the surviving generator stopped " .. pair.label)
+            T.expectNear("surviving generator fuel bill " .. pair.label,
+                pair.far.bill, reads.solo.bill + fridgeFuel, 0.0001)
+            T.expectEqual("frozen authority hour " .. pair.label, pair.far.hours, reads.solo.hours)
+        end
+    end,
+})

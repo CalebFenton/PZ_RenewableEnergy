@@ -314,7 +314,7 @@ local function sharedContexts()
 end
 
 --- Bring one bank up to now. `contextFor(hours)`, optional, gives the pass context for the span
---- (BankSystem.passContext unless given). Only updateAll defers billing to the end of its pass.
+--- (BankSystem.passContext unless given). updateAll and bank jobs defer billing to their boundary.
 function BankSystem.updateBank(bank, contextFor, deferBilling)
     local hours = Clock.hoursSince(bank, BankSystem.LONGEST_PASS)
     if hours > 0 then

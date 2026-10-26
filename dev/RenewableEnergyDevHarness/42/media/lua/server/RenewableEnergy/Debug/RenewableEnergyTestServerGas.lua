@@ -25,8 +25,7 @@ end
 -- line is connected and to what kind of source, whether the gas pass lists it, its overlays and its
 -- sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor), whether its building is
 -- toxic, and the world hour on the server as it was read (`hours`).
-handler("generatorRead", function(player, args)
-    local generator = generatorOn(args)
+local function generatorRead(generator)
     local GasKit = RenewableEnergy.GasKit
     local state = GasKit.stateOf(generator)
     local plain
@@ -47,6 +46,40 @@ handler("generatorRead", function(player, args)
         overlays = PZHarness.Fixtures.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
         toxic = building ~= nil and building:isToxic(), hours = getGameTime():getWorldAgeHours(),
     }
+end
+
+handler("generatorRead", function(player, args)
+    return generatorRead(generatorOn(args))
+end)
+
+-- Reads a bank's charging demand and its generators' native bills on either side of a real job.
+-- The completion and snapshots share one authority call; no tick or explicit billing can repair
+-- a missing job-boundary settlement between them. Without a job this is a read-only snapshot.
+handler("bankSettlement", function(player, args)
+    local record, bank = Helpers.bankAt(args.bank)
+    local function snapshot()
+        local generators = {}
+        for i, at in ipairs(args.generators or {}) do
+            local generator = generatorOn(at)
+            generators[i] = generatorRead(generator)
+            generators[i].chargesBank = record:chargesFrom(generator)
+        end
+        return {
+            activated = bank:isActivated(), on = record.on == true, name = record.name or "",
+            charge = record.charge, chargeWantW = record.chargeWantW, chargeSource = record.chargeSource,
+            chargerMaxW = record:chargerMaxW(), lastHour = record.lastHour, age = getGameTime():getWorldAgeHours(),
+            batteries = #record.batteries, items = Helpers.itemsOf(bank:getContainer()), generators = generators,
+        }
+    end
+    if not args.job then return snapshot() end
+    local with = args.part and PZHarness.need(bank:getContainer():getFirstType(args.part),
+        "a " .. args.part .. " in the bank on the server") or args.name
+    local before = snapshot()
+    local Action = RenewableEnergyAction
+    local done = Action.completeJob(player, "bank", args.job, bank, with)
+    local after = snapshot()
+    return { before = before, after = after, ok = done,
+        reason = not done and Action.jobsOf("bank").refusal(player, args.job, bank, with) or nil }
 end)
 
 -- Pours `args.pour` litres into the generator at x, y, z, as a player pouring petrol does (onto
@@ -114,10 +147,18 @@ end)
 
 -- Does the kit job `args.job` at the generator at x, y, z for the character as the authority does
 -- the one a client's action asks for once it ends: the action's complete(). Answers whether it was
--- done; a client's own action that the server turns down stops its whole queue.
+-- done; a client's own action that the server turns down stops its whole queue. With `args.payer`,
+-- snapshots bracket complete in the same authority call, before any native update or periodic pass.
 handler("kitJobComplete", function(player, args)
     local generator = generatorOn(args)
     local action = RenewableEnergyAction:new(player, "kit", args.job, generator)
+    if args.payer then
+        local payer = generatorOn(args.payer)
+        local before = { generator = generatorRead(generator), payer = generatorRead(payer) }
+        local done = action:complete()
+        return { done = done, before = before,
+            after = { generator = generatorRead(generator), payer = generatorRead(payer) } }
+    end
     return { done = action:complete() }
 end)
 

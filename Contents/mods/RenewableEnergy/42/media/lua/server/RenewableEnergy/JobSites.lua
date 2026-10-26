@@ -21,6 +21,7 @@ local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
 local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
 local WindSource = require "RenewableEnergy/PowerBank/WindSource"
 local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
@@ -35,11 +36,11 @@ local Jobs = require "cf_commonlib/Jobs"
 local JobSites = {}
 RenewableEnergy.JobSites = JobSites
 
--- The record of the bank `isoObject`, brought up to now; nil for none.
-local function settledBank(isoObject)
+-- The bank brought up to now; bank jobs defer its bill until tell, after their mutation too.
+local function settledBank(isoObject, deferBilling)
     local bank = BankSystem.bankAt(PowerBank.positionOf(isoObject))
     if bank then
-        BankSystem.updateBank(bank)
+        BankSystem.updateBank(bank, nil, deferBilling)
     end
     return bank
 end
@@ -108,15 +109,16 @@ local BANK = {
 BANK[BankJobs.TURN_OFF] = BANK[BankJobs.TURN_ON]
 BANK[BankJobs.DISCONNECT] = BANK[BankJobs.CONNECT]
 
---- The authority's side of the jobs at a bank: they work on its record, brought up to now, which
---- tells the clients after, done or not.
+--- Bank jobs catch up at the old state, mutate, then settle once, even when the job was refused:
+--- catch-up alone can change the live payer set. Activation never waits for the settlement.
 JobSites.bank = {
-    open = settledBank,
+    open = function(isoObject) return settledBank(isoObject, true) end,
     act = function(character, job, bank, row, isoObject, with)
         return bank ~= nil and BANK[job](character, bank, row, isoObject, with)
     end,
     tell = function(bank)
         if bank then
+            Payers.billGenerators()
             bank:sendStatus()
         end
     end,
