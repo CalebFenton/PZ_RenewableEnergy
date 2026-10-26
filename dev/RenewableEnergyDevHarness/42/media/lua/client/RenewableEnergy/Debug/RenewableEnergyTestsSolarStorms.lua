@@ -117,6 +117,55 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
     end,
 })
 
+-- Pending damage wins over the older object on reload, even when a repair precedes the next
+-- simulation pass. The repair must then become the bank's truth, without removing its snow.
+test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
+    spOnly = T.CHUNK_RELOAD_SP_ONLY,
+    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
+    sandbox = { StormDamage = true, StormDamageRate = 100 },
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true,
+            modules = { { type = T.FACTORY_MODULE, condition = 20 + Specs.storm.crack, repaired = 1, mounted = true } } })
+        if not panel then return end
+        self.bank, self.panel = bank, panel
+        T.server(self, "trackAt", T.at(panel, { kind = "source" }))
+        T.setRecipeSkills(self, RenewableEnergy.Recipes.moduleRepairRecipe())
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
+        T.snowfall(self, bank, 2)
+        T.forceRoll(self, 0)
+        T.reloadChunk(self, bank.position, function()
+            T.step(function()
+                expect(getSquare(panel.position.x, panel.position.y, panel.position.z) == nil,
+                    "the panel's square stayed loaded during the storm")
+            end)
+            T.bankPass(self, bank, 0, { stormHours = 1, airC = -10, label = "away" })
+        end)
+        T.batch(function()
+            T.bankState(self, bank, nil, 0)
+            T.job(self, "source", RenewableEnergy.SourceJobs.SEAL_MODULE, panel.position, 1, "sealed")
+            T.read(self, "panelState", panel.position, "panel")
+            T.bankState(self, bank, "sealedBank")
+            T.bankPass(self, bank, 1000, { airC = -10, label = "later" })
+        end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) or not T.expectOk(self.reads.sealed, "sealing after the unloaded storm") then return end
+        local away = self.reads.away
+        expectEqual("bank items while its chunk was unloaded", #away.items, 0)
+        expectEqual("module condition after the unloaded storm", away.status.sources[1].modules[1].condition, 20)
+        expect(away.status.sources[1].snow > 0.5, "the panel lost its snow cover before the repair")
+        local module = self.reads.panel.modules[1]
+        expectEqual("sealed module condition", module.condition, 40)
+        expectEqual("seals after repairing the storm damage", module.repaired, 2)
+        expect(module.mounted and module.connected, "the repair lost the module's earned-XP markers")
+        expectEqual("bank's module immediately after repair", self.reads.sealedBank.status.sources[1].modules[1].condition, 40)
+        expectEqual("bank's module after another pass", self.reads.later.status.sources[1].modules[1].condition, 40)
+        expectEqual("cracks below the snow after repair", table.concat(self.reads.panel.overlays, ","),
+            Sprites.cracks.heavy.flat .. "," .. Sprites.snow.flat)
+    end,
+})
+
 -- A storm cracks a panel out in the weather whether or not it feeds a bank: a loose panel outdoors
 -- cracks, one indoors doesn't, and a connected one is its bank's to crack until it is
 -- disconnected, after which the next storm cracks it too.

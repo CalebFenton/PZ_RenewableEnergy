@@ -147,13 +147,8 @@ local SOURCE = {
         local module, modules = Recipes.sealableModule(object, slot)
         Recipes.useInputs(Recipes.sealInPlaceInputs(character), character)
         Recipes.sealRecord(module)
-        PanelSource.writeModules(object, modules)
-        PanelSource.showCracks(object)
+        PanelSource.writeModules(object, modules, bank and recordOf(bank, object))
         Recipes.moduleRepairRecipe():addXP(character)
-        local source = bank and recordOf(bank, object)
-        if source then
-            source.modules = PowerBank.copyModules(modules)
-        end
         return true
     end,
     [SourceJobs.BRAKE] = function(character, bank, row, object)

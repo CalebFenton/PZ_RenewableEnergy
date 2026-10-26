@@ -59,7 +59,6 @@ function PanelStorms.weather(isoObject)
         return false
     end
     PanelSource.writeModules(isoObject, source.modules)
-    PanelSource.showCracks(isoObject)
     StormNotice.tell(StormNotice.CRACKED_MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
     return true
 end

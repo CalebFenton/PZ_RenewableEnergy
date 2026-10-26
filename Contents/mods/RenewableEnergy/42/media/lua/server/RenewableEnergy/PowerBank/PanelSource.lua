@@ -40,10 +40,15 @@ local function ratedWatts(source)
     return now, best
 end
 
---- Records `modules` on a placed panel and sends the record to clients.
-function PanelSource.writeModules(isoObject, modules)
+--- Commits detached `modules` to a placed panel and its cracks, and adopts them in `source` when
+--- connected. The object's copy stays independent of the bank's simulated module records.
+function PanelSource.writeModules(isoObject, modules, source)
     isoObject:getModData()[PowerBank.MODULES_KEY] = PowerBank.copyModules(modules)
+    if source then
+        source.modules, source.modulesChanged = modules, nil
+    end
     isoObject:transmitModData()
+    PanelSource.showCracks(isoObject, modules)
 end
 
 -- Cracks and snow draw over a panel's tile; snow lies on the glass, so it draws last.
@@ -66,10 +71,10 @@ end
 --- Shows each of a placed panel's modules' cracked glass, light or heavy as
 --- RenewableEnergy.crackLookOf has it, and none over the others, keeping the snow it shows on
 --- top, and sends the overlays to clients if they changed. Does nothing for an object that is no panel.
-function PanelSource.showCracks(isoObject)
+function PanelSource.showCracks(isoObject, modules)
     local kind, facing, material = Sources.kindOf(isoObject)
     if Sources.familyOf(kind) ~= "panel" then return end
-    showCracksOf(isoObject, kind, facing, material, PowerBank.modulesOf(isoObject, kind))
+    showCracksOf(isoObject, kind, facing, material, modules or PowerBank.modulesOf(isoObject, kind))
 end
 
 -- Snow cover after `hours` of the weather in `context`.
@@ -153,8 +158,8 @@ end
 --- repairs change) is the truth. Either way the tile shows the cracks the record now holds.
 function PanelSource.syncModules(source, object)
     if source.modulesChanged then
-        PanelSource.writeModules(object, source.modules)
-        source.modulesChanged = nil
+        PanelSource.writeModules(object, source.modules, source)
+        return
     else
         source.modules = PowerBank.modulesOf(object, source.kind)
     end

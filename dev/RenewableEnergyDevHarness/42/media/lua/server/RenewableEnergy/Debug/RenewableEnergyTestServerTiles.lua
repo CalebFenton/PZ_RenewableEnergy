@@ -23,8 +23,9 @@ handler("panelCracks", function(_, args)
             panel:addAttachedAnimSpriteByName(Sprites.snow.flat)
         end
         PanelSource.writeModules(panel, change.modules)
+    else
+        PanelSource.showCracks(panel)
     end
-    PanelSource.showCracks(panel)
     return { overlays = Fixtures.overlaysOf(panel) }
 end)
 
