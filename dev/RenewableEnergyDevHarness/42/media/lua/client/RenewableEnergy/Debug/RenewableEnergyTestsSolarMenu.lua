@@ -213,6 +213,7 @@ test("renewable_energy_solar_seal_module_in_place", {
         T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
         T.step(function()
+            self.items.inputs[1]:setFavorite(true, true)
             local context = T.newContext()
             local menu = Menu.addSourceOptions(0, context, self.panel.object)
             local whole = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 1, 100))
@@ -264,6 +265,32 @@ local function sealOptions(object)
     context:hideAndChildren()
     return options
 end
+
+-- Repair inputs follow the crafting window's protection flags. A favorite kept tool is legal;
+-- a favorite adhesive or a tool excluded from recipes must disable the actual repair option.
+test("renewable_energy_solar_seal_respects_protected_inputs", {
+    run = function(self)
+        local panel = T.panel(self, Sprites.flat, { modules = T.factoryModules(20) })
+        if not panel then return end
+        T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
+        T.step(function()
+            local tool, epoxy = self.items.inputs[1], self.items.inputs[2]
+            tool:setFavorite(true)
+            self.kept = T.optionState(sealOptions(panel.object)[1])
+            epoxy:setFavorite(true)
+            self.protected = T.optionState(sealOptions(panel.object)[1])
+            epoxy:setFavorite(false)
+            tool:setNoRecipes(player(), true)
+            self.excluded = T.optionState(sealOptions(panel.object)[1])
+        end)
+    end,
+    validate = function(self)
+        expect(self.kept.shown and not self.kept.greyed, "a favorite kept screwdriver disables sealing")
+        expect(self.protected.shown and self.protected.greyed, "sealing offers to consume favorite epoxy")
+        expect(self.excluded.shown and self.excluded.greyed, "sealing uses a screwdriver excluded from recipes")
+    end,
+})
 
 -- A rack with both modules cracked offers to seal each. Once one is sealed as far as sealing goes
 -- the menu built again still offers the other, which seals in turn, and keeps the sealed one's

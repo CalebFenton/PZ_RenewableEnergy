@@ -320,10 +320,14 @@ local REFILLS = {
         T.expectNear("low tank after refilling", tank, 0, 0.0001)
     end },
     -- A bottle with less room than a tank use takes nothing.
-    propane_refill_skips_bottle_without_room = { start = function(use) return 0.5, 1 - use / SHARE / 4 end,
+    propane_refill_skips_bottle_without_room = { start = function(use) return 0.5, 1 - 3 * use / SHARE / 4 end,
         check = function(bottle, tank, self)
             T.expectNear("nearly full bottle after refilling", bottle, self.bottleStart, 0.00001)
             T.expectNear("tank after refilling a nearly full bottle", tank, self.tankStart, 0.0001)
+        end },
+    propane_refill_fits_one_tank_use = { start = function(use) return 0.5, 1 - use / SHARE end,
+        check = function(bottle)
+            T.expectNear("bottle after taking exactly one tank use", bottle, 1, 0.00001)
         end },
 }
 for name, case in pairs(REFILLS) do
@@ -349,7 +353,7 @@ for name, case in pairs(REFILLS) do
             local bottle, tank = T.carriedFirst(self, "Base.Propane_Refill"), T.carriedFirst(self, Digester.TANK)
             if not T.expect(bottle and tank, "the bottle or the tank is gone") then return end
             T.expectNear("propane the bottle gained, in tanks, against what the tank lost",
-                (bottle.uses - self.bottleStart) * SHARE, self.tankStart - tank.uses, 0.0001)
+                (bottle.uses - self.bottleStart) * SHARE, self.tankStart - tank.uses, 0.0000001)
             case.check(bottle.uses, tank.uses, self)
         end,
     })

@@ -279,6 +279,8 @@ Sealing is the cheap fix, reglazing the good one.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
+Sealing in place follows the crafting window's item protections: favorite adhesives and items excluded from recipes are not used. A favorite screwdriver is allowed because the job keeps it.
+
 ### Homemade modules
 
 A **Homemade Solar Module** is 16 solar cells under glass. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered modules (only at zero condition). A homemade module tops out at 60% of a factory one, so its glass cracks at 51 and 30.
@@ -468,9 +470,7 @@ A digester fills propane tanks, welding torches and propane lantern bottles. Gen
 - **Fit Scrubber**, then keep it going from **Refill Scrubber**. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its packing cleans about 10 m³ before it needs more: a use of **Steel Wool**, or an **Iron Sponge**. The water and the packing wear out separately.
 - **Make Iron Sponge** (Metalworking 1, with a file) from two pieces of any kind of scrap metal or ten nails, three wood splinters and half a litre of water. A spent sponge comes back out at the next packing; **Air Out Iron Sponge** with a little water revives it, twice before it crumbles.
 
-A full torch takes about 2.2 m³ and a lantern bottle 0.8 m³, what refilling them from a tank would. A propane tank still refills lantern bottles and torches the vanilla way. Where there's power, a carried Fridge Compressor inflates tires too.
-
-Digesters keep digesting, and eating from their hoppers, while you're away.
+A full torch takes about 2.2 m³ and a lantern bottle 0.8 m³, what refilling them from a tank would. A propane tank still refills lantern bottles and torches the vanilla way. Bottle refills transfer whole uses of the tank; if the bottle has less room than one tank use, neither store changes. Where there's power, a carried Fridge Compressor inflates tires too.
 
 ## Wood gas
 

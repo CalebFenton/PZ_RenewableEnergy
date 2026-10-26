@@ -267,7 +267,7 @@ local PAID_TOLERANCE = 1e-5
 
 -- What `recipe` takes of the character's inventory, bags included, but the module: the items that
 -- pay its inputs, nil when one is missing, and each input as a need (see sealInPlaceInputs).
-local function recipeInputs(recipe, inventory)
+local function recipeInputs(recipe, character)
     local inputs = recipe:getInputs()
     local picks, taken, needs, complete = {}, {}, {}, true
     for i = 0, inputs:size() - 1 do
@@ -275,8 +275,8 @@ local function recipeInputs(recipe, inventory)
         if not isModuleInput(input) then
             local amount = input:getIntAmount()
             local needed = amount
-            local candidates = inventory:getAllEvalRecurse(function(item)
-                return not taken[item] and Items.notBroken(item) and input:containsItem(item:getScriptItem())
+            local candidates = character:getInventory():getAllEvalRecurse(function(item)
+                return not taken[item] and CraftRecipeManager.isItemValidForInputScript(input, item, character)
             end)
             for j = 0, candidates:size() - 1 do
                 if needed <= PAID_TOLERANCE then break end
@@ -326,10 +326,9 @@ end
 --- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
 --- drainables add up to one input, each giving the uses it has until the input is paid.
 function Recipes.sealInPlaceInputs(character)
-    local inventory = character:getInventory()
     local paid, byRecipe = nil, {}
     for _, name in ipairs(MODULE_REPAIR_RECIPES) do
-        local picks, needs = recipeInputs(getScriptManager():getCraftRecipe(name), inventory)
+        local picks, needs = recipeInputs(getScriptManager():getCraftRecipe(name), character)
         paid = paid or picks
         table.insert(byRecipe, needs)
     end
@@ -508,10 +507,10 @@ function Recipes.refillPropaneBottle(craftRecipeData, character)
     local bottle = craftRecipeData:getFirstCreatedItem()
     local old = craftRecipeData:getAllConsumedItems():get(0)
     local tank = craftRecipeData:getAllKeepInputItems():get(0)
-    local share, tankUse = Digester.BOTTLE_SHARE, tank:getUseDelta()
-    local room = round((1 - old:getCurrentUsesFloat()) * share / tankUse)
+    local bottlePerTankUse = tank:getUseDelta() / (Digester.BOTTLE_SHARE * bottle:getUseDelta())
+    local room = math.floor((old:getMaxUses() - old:getCurrentUses()) / bottlePerTankUse + RenewableEnergy.EPSILON)
     local taken = math.min(room, tank:getCurrentUses())
-    bottle:setCurrentUsesFloat(old:getCurrentUsesFloat() + taken * tankUse / share)
+    bottle:setCurrentUses(old:getCurrentUses() + round(taken * bottlePerTankUse))
     tank:setCurrentUses(tank:getCurrentUses() - taken)
     bottle:syncItemFields()
     sendItemStats(tank)
