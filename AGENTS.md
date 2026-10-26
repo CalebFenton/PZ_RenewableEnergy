@@ -23,6 +23,8 @@
 
 ## Read when needed
 
+- Before consolidation or optimization work, including after compaction, read `docs/consolidation-plan.md`. Follow its layers and preservation gates; update its live checkpoint and verification evidence with each logical commit. The latest finding is one step, not a replacement for the accepted mission.
+
 - Before running in-game tests, handing them to subagents, or debugging a failure or a `LEAK`, read `dev/harness/docs/debugging.md`: which run answers which question, and the traps that cost reruns.
 - Before changing scripts, translations, multiplayer sync, loot, tests, art or the promo shots, read `DEVELOPMENT.md`: the Build 42 behaviour that fails silently, the command to decompile the game, and the art, promo and loot commands.
 - Before changing anything under `dev/harness`, read `dev/harness/AGENTS.md`; before changing anything in `../cf_commonlib`, read its `AGENTS.md`. Other mods use both.
