@@ -153,69 +153,52 @@ local function chargingBanks(generator)
     return list
 end
 
--- What `generator` powers (its share of what it reaches, Payers.loadOf), and the watts each bank
--- charging from it draws, by bank: what its chargers would take at its last pass (Bank.chargeFrom's
--- `chargeWantW`, nothing for a full bank), but on gas no more than the cap leaves after what it
--- powers and the banks before it (chargingBanks), as an inverter-charger turns down to what its
--- generator can give. So chargers alone never take a line past its cap, and a full bank holds
--- none of it back from the banks behind it.
-local function split(generator, payers)
-    local load = Payers.loadOf(generator, payers)
-    local powered = load.watts + load.backedW
-    local cap = capOf(GasKit.stateOf(generator))
-    local left = cap and math.max(0, cap - powered)
-    local shares = {}
-    for _, bank in ipairs(chargingBanks(generator)) do
-        local watts = bank.chargeWantW or 0
-        if left then
-            watts = math.min(watts, left)
-            left = left - watts
+-- Allocate the chargers' wants from the headroom after appliances and backup loads. A total is
+-- independent of priority, so only a request for one bank's share needs the nearest-first list.
+-- Both queries use the same capped allocation; neither builds a table of everyone's shares.
+local function allocate(generator, cap, load, target)
+    local left = cap and math.max(0, cap - load.watts - load.backedW) or math.huge
+    local total, share = 0, 0
+    local function take(bank)
+        if not bank:chargesFrom(generator) then return end
+        local watts = math.min(bank.chargeWantW or 0, left)
+        left, total = left - watts, total + watts
+        if bank == target then share = watts end
+    end
+    if target then
+        for _, bank in ipairs(chargingBanks(generator)) do
+            take(bank)
+            if bank == target then return share end
         end
-        shares[bank] = watts
+        return 0
     end
-    return powered, shares, load
+    PowerBank.eachBank(take)
+    return total
 end
 
-local function total(shares)
-    local watts = 0
-    for _, share in pairs(shares) do
-        watts = watts + share
-    end
-    return watts
-end
-
---- The watts the chargers of the battery banks that charge from `generator` draw: their wants,
---- and on gas their shares of what the cap leaves (split). Also returns the load measured to
---- allocate a gas line, so billing reuses it with the same running `payers` rather than scanning
---- again. Off gas, no load measurement is needed.
+--- The watts the chargers of the battery banks that charge from `generator` draw (allocate).
+--- Also returns the load measured for a gas cap, so billing reuses it with the same running
+--- `payers` rather than scanning again. Off gas, no load measurement is needed.
 function GasLines.chargingW(generator, payers)
-    if capOf(GasKit.stateOf(generator)) then
-        local _, shares, load = split(generator, payers)
-        return total(shares), load
-    end
-    local watts = 0
-    for _, bank in ipairs(chargingBanks(generator)) do
-        watts = watts + (bank.chargeWantW or 0)
-    end
-    return watts
+    local cap = capOf(GasKit.stateOf(generator))
+    local load = cap and Payers.loadOf(generator, payers)
+    return allocate(generator, cap, load), load
 end
 
---- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and what the
---- chargers of the battery banks that charge from it draw (split).
+--- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and the
+--- chargers of the battery banks that charge from it.
 function GasLines.loadOf(generator)
-    local watts, shares = split(generator)
-    return watts + total(shares)
+    local load = Payers.loadOf(generator)
+    return load.watts + load.backedW + allocate(generator, capOf(GasKit.stateOf(generator)), load)
 end
 
 --- The most watts `bank`'s chargers draw from `generator`: its share of what the line's cap
---- leaves (split), nothing once the generator's own load takes it all. Nil when the generator
+--- leaves (allocate), nothing once the generator's own load takes it all. Nil when the generator
 --- isn't on gas, so nothing but the chargers' rating limits them.
 function GasLines.chargerLimitW(generator, bank)
-    if not capOf(GasKit.stateOf(generator)) then
-        return nil
-    end
-    local _, shares = split(generator)
-    return shares[bank] or 0
+    local cap = capOf(GasKit.stateOf(generator))
+    if not cap then return nil end
+    return allocate(generator, cap, Payers.loadOf(generator), bank)
 end
 
 -- Fuel the generator holds now: on gas, its tank or PHANTOM_FUEL, whichever is more; else its
