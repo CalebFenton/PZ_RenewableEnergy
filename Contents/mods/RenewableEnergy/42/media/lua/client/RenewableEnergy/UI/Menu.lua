@@ -214,10 +214,10 @@ function Menu.addBankOptions(playerNum, context, bank)
         JobOptions.add(menu, playerNum, Action, "bank", connected and BankJobs.DISCONNECT or BankJobs.CONNECT, bank)
     end
 
-    local sources, refusal = SourceJobs.connectBatch(character, bank)
-    local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", #sources), playerNum,
+    local sources, refusal, count = SourceJobs.connectBatch(character, bank)
+    local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", count), playerNum,
         queueConnectAll, bank, sources)
-    Needs.refuse(connect, (#sources > 0 and tooDark(character, SourceJobs, SourceJobs.CONNECT)) or refusal)
+    Needs.refuse(connect, (count > 0 and tooDark(character, SourceJobs, SourceJobs.CONNECT)) or refusal)
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)

@@ -118,16 +118,23 @@ Jobs.define(SourceJobs, {
     subjectOf = function(source) return Sources.kindOf(source) and source end, missing = "no source",
 })
 
---- Offer connecting all sources in reach if any single Connect job can proceed. Queueing still
---- attempts each source in discovery order; later jobs see slots consumed by earlier ones.
+--- Select currently eligible Connect jobs in discovery order. An already-refused action would
+--- clear the whole queue, losing the sources that fit. Later jobs still recheck live slots.
+--- Also returns the refusal when none fit, and the total nearby count for the menu's label.
 function SourceJobs.connectBatch(character, bank)
     local sources = Sources.sourcesInReach(PowerBank.positionOf(bank))
-    local refusal = "Tooltip_RenewableEnergy_NoSourcesInReach"
+    local count, ready, refusal = #sources, 0, "Tooltip_RenewableEnergy_NoSourcesInReach"
     for _, source in ipairs(sources) do
-        refusal = SourceJobs.blocker(character, SourceJobs.CONNECT, source, bank)
-        if not refusal then break end
+        local blocker = SourceJobs.blocker(character, SourceJobs.CONNECT, source, bank)
+        if blocker then
+            refusal = blocker
+        else
+            ready = ready + 1
+            sources[ready] = source
+        end
     end
-    return sources, refusal
+    for i = count, ready + 1, -1 do sources[i] = nil end
+    return sources, ready == 0 and refusal or nil, count
 end
 
 return SourceJobs

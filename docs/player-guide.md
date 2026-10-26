@@ -164,7 +164,7 @@ Inputs go in the order you connected the sources. Sources past the last input st
 
 ### Reach
 
-**Connect Sources in Reach** picks up every source within 20 squares and 3 floors of the bank. A bank takes sources only once it's connected itself (**Connect Bank**). Panels and wind chargers must stand outdoors; a treadmill can be under a roof. Move a source and it drops off its bank, so connect it again.
+**Connect Sources in Reach** picks up every source within 20 squares and 3 floors of the bank. Sources too large for its free inputs are skipped; each queued connection still needs room when its turn arrives. A bank takes sources only once it's connected itself (**Connect Bank**). Panels and wind chargers must stand outdoors; a treadmill can be under a roof. Move a source and it drops off its bank, so connect it again.
 
 Roofing over a panel or wind charger also drops its connection at the next bank update. Move it back outdoors and connect it again.
 
