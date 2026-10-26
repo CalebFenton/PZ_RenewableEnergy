@@ -5,28 +5,22 @@
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Stash"
-require "RenewableEnergy/World/WorldSpawns"
-require "RenewableEnergy/World/ArrowBoard"
-require "RenewableEnergy/World/ArrowBoardPower"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Chance = require "RenewableEnergy/Chance"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Stash = require "RenewableEnergy/Stash"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local ArrowBoard = require "RenewableEnergy/World/ArrowBoardPower"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
 local Loot = require "cf_commonlib/Loot"
 
-RenewableEnergy = RenewableEnergy or {}
 local Distributions = {}
 RenewableEnergy.Distributions = Distributions
 
 local subDist = SuburbsDistributions
 local procLists = ProceduralDistributions.list
 local vehDist = VehicleDistributions
-local Battery, Specs = RenewableEnergy.Battery, RenewableEnergy.Specs
-local Stash = RenewableEnergy.Stash
-local WorldSpawns = RenewableEnergy.WorldSpawns
-local ArrowBoard = RenewableEnergy.ArrowBoard
-local Chance = RenewableEnergy.Chance
 
 -- The mod's own lists
 
@@ -213,7 +207,7 @@ end
 -- anything: the game rolls a uniform one for 40% of the tools it puts outside shops
 -- (ItemPickerJava.doRollItemInternal, randomizeGeneralCondition), which PART_WEAR replaces.
 local function isFreshPart(item)
-    return WorldSpawns.isWornPart(item:getFullType()) and not RenewableEnergy.Wear.hasOwnCondition(item)
+    return WorldSpawns.isWornPart(item:getFullType()) and not Wear.hasOwnCondition(item)
 end
 
 local function readyItems(container, wearParts)

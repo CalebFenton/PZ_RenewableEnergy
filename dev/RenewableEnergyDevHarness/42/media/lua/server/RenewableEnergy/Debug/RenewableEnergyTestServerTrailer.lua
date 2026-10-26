@@ -1,15 +1,17 @@
--- The authority's half of the arrow board tests: the trailer's panels, box and frame change only
--- where the authority runs them. Only registers handlers, so a --stay rerun loads it again
--- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work. The module's
--- readers serve the client's half too, which requires this file when a test runs, since it loads
--- after client Lua.
+-- The authority's half of the arrow board tests, and the vehicle state every vehicle test reads:
+-- the trailer's panels, box and frame change only where the authority runs them. Only registers
+-- handlers, so a --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says
+-- how these handlers work. The module's readers serve the client's half too, which requires this
+-- file when a test runs, since it loads after client Lua.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Items = require "cf_commonlib/Items"
 
 local handler = PZHarness.serverHandler
-local deferOnce, onVehicle, trialRoll = PZHarness.Fixtures.deferOnce, Helpers.onVehicle, Helpers.trialRoll
+local need, deferOnce, trialRoll = PZHarness.need, PZHarness.Fixtures.deferOnce, Helpers.trialRoll
 
 local Trailer = {}
 
@@ -127,12 +129,18 @@ local function partState(vehicle, partId)
         repaired = item and item:getHaveBeenRepaired() }
 end
 
---- What the tests read of a vehicle on either side: each panel's module, condition and shown
---- models, the frame's parts and the lamp board, what the battery box holds, the lid, the switch,
---- the lamps and the colour.
+--- What the tests read of a vehicle on either side: its battery and whether a maintainer is
+--- attached, whether its alternator is out, its colour, and an arrow board's panels' module,
+--- condition and shown models, the frame's parts and the lamp board, what the battery box holds,
+--- the lid, the switch and the lamps.
 function Trailer.vehicleState(vehicle)
     local ArrowBoard = RenewableEnergy.ArrowBoard
-    local state = { panels = {}, frame = {}, colorSat = vehicle:getColorSaturation(), colorVal = vehicle:getColorValue() }
+    local slot = RenewableEnergy.VehicleBattery.partOf(vehicle)
+    local battery = slot and slot:getInventoryItem()
+    local state = { panels = {}, frame = {}, colorSat = vehicle:getColorSaturation(), colorVal = vehicle:getColorValue(),
+        battery = battery and { type = battery:getFullType(), uses = battery:getCurrentUsesFloat() } or nil,
+        attached = RenewableEnergy.SolarMaintainer.isAttached(vehicle),
+        alternatorOut = RenewableEnergy.CarAlternator.isOut(vehicle) }
     if not ArrowBoard.isTrailer(vehicle) then
         return state
     end
@@ -146,13 +154,7 @@ function Trailer.vehicleState(vehicle)
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local container = box and box:getItemContainer()
     if container then
-        state.box = { items = {} }
-        local items = container:getItems()
-        for i = 0, items:size() - 1 do
-            local item = items:get(i)
-            table.insert(state.box.items, { type = item:getFullType(), condition = item:getCondition(),
-                charge = RenewableEnergy.Battery.isBattery(item) and RenewableEnergy.Battery.getCharge(item) or nil })
-        end
+        state.box = { items = Helpers.itemsOf(container) }
     end
     local lid = vehicle:getPartById(ArrowBoard.LID)
     local door = lid and lid:getDoor()
@@ -162,21 +164,19 @@ function Trailer.vehicleState(vehicle)
             shown = shownModels(vehicle, ArrowBoard.LID) }
     end
     state.switchOn = ArrowBoard.isSwitchedOn(vehicle)
-    state.lamps = ArrowBoard.lamps(vehicle)
+    state.lamps = box and box:getModData()[ArrowBoard.LAMPS_KEY]
     return state
 end
 
-onVehicle("arrowBoardState", function(vehicle)
-    return { state = Trailer.vehicleState(vehicle) }
+handler("vehicleState", function(_, args)
+    return { state = Trailer.vehicleState(Helpers.vehicleAt(args)) }
 end)
 
 -- The stock conditions of the panels of a trailer spawned with `args.recordStock`, and its state.
-onVehicle("arrowBoardStock", function(vehicle, args)
-    local stock = stockedPanels[vehicle:getId()]
-    if not stock then
-        return nil, "the stock conditions of vehicle " .. tostring(args.id)
-    end
-    return { stock = stock, state = Trailer.vehicleState(vehicle) }
+handler("arrowBoardStock", function(_, args)
+    local vehicle = Helpers.vehicleAt(args)
+    return { stock = need(stockedPanels[vehicle:getId()], "the stock conditions of vehicle " .. tostring(args.id)),
+        state = Trailer.vehicleState(vehicle) }
 end)
 
 -- Puts a module of spec.type at spec.condition, repaired spec.repaired times, on the panel, or
@@ -201,8 +201,8 @@ end
 -- `args.lidInstalled` is set, open or shut if `args.lidOpen` is, locked or not if `args.lidLocked`
 -- is, and its lock cut or whole if `args.lidLockBroken` is; the switch on or off if
 -- `args.switchOn` is set, as the switch action does. Answers its state.
-onVehicle("setTrailer", function(vehicle, args)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
+handler("setTrailer", function(_, args)
+    local ArrowBoard, vehicle = RenewableEnergy.ArrowBoard, Helpers.vehicleAt(args)
     for partId, spec in pairs(args.panels or {}) do
         putPanel(vehicle, partId, spec)
     end
@@ -215,11 +215,11 @@ onVehicle("setTrailer", function(vehicle, args)
         local container = vehicle:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
         Helpers.emptyContainer(container)
         for _, spec in ipairs(args.box) do
-            local item = container:AddItem(spec.type)
+            local item = instanceItem(spec.type)
             if spec.charge then
                 RenewableEnergy.Battery.setCharge(item, spec.charge)
             end
-            sendAddItemToContainer(container, item)
+            Items.addItem(container, item)
         end
     end
     local lid = vehicle:getPartById(ArrowBoard.LID)
@@ -248,81 +248,46 @@ onVehicle("setTrailer", function(vehicle, args)
     return { state = Trailer.vehicleState(vehicle) }
 end)
 
--- `args.hours` of the trailer's lamps as they were lit, then the lamps set again with the
--- photocell seeing dark if `args.night` (ArrowBoard.runLamps). Answers the watt-hours they drew
--- and the trailer's state.
-onVehicle("arrowBoardLamps", function(vehicle, args)
-    local drawn = RenewableEnergy.ArrowBoard.runLamps(vehicle, args.hours, args.night == true)
-    return { drawn = drawn, state = Trailer.vehicleState(vehicle) }
-end)
-
--- The trailer's whole charge pass of `args.hours` at the sun of the moment, as the clock runs it
--- (ArrowBoard.update). Answers the watt-hours its panels stored and its state.
-onVehicle("arrowBoardUpdate", function(vehicle, args)
-    local stored = RenewableEnergy.ArrowBoard.update(vehicle, args.hours)
-    return { stored = stored, state = Trailer.vehicleState(vehicle) }
-end)
-
--- Whether the switch could be set to `args.on` on the authority, which the switch action asks
--- before it flips it. Answers that and the trailer's state.
-onVehicle("arrowBoardCanSwitch", function(vehicle, args)
-    return { can = RenewableEnergy.ArrowBoard.canSwitch(vehicle, args.on), state = Trailer.vehicleState(vehicle) }
+-- ArrowBoard[args.call] on the trailer with the arguments `args.with`, or with the panel
+-- `args.part`, as the clock, the switch action or a storm runs it. Answers what it returned, the
+-- panels' rating before it, what a flat watt of panel makes in an hour now, and the trailer's
+-- state.
+handler("arrowBoardRun", function(_, args)
+    local ArrowBoard, Sun, vehicle = RenewableEnergy.ArrowBoard, RenewableEnergy.Sun, Helpers.vehicleAt(args)
+    local watts = ArrowBoard.panelWatts(vehicle)
+    local result = ArrowBoard[args.call](vehicle, unpack(args.part and { vehicle:getPartById(args.part) } or args.with))
+    return { result = result, watts = watts, flatWh = Sun.wattsFrom(1, Sun.skyNow().flat), state = Trailer.vehicleState(vehicle) }
 end)
 
 -- Rolls the trailer's switch as stocking does for each trial { was, roll }: the switch at `was`
 -- (nil for none yet), and the one roll it may draw `roll`, or "under"/"at" for just under or at
 -- STOCK.switchedOnChance, worked out here so the roll is exactly the chance. Then puts its own
 -- switch back. Answers whether each came out on.
-onVehicle("arrowBoardSwitchRolls", function(vehicle, args, _, defer)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
+handler("arrowBoardSwitchRolls", function(_, args, defer)
+    local ArrowBoard, vehicle = RenewableEnergy.ArrowBoard, Helpers.vehicleAt(args)
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
-    local modData = box:getModData()
-    local key, chance = ArrowBoard.SWITCH_KEY, ArrowBoard.STOCK.switchedOnChance
-    local own, on = modData[key], {}
+    local modData, key = box:getModData(), ArrowBoard.SWITCH_KEY
+    local own = modData[key]
     local restore = deferOnce(defer, function()
         modData[key] = own
         vehicle:transmitPartModData(box)
     end)
-    for i, trial in ipairs(args.trials) do
+    local on = Helpers.eachTrial(defer, args.trials, function(trial)
+        return { trialRoll(trial.roll, ArrowBoard.STOCK.switchedOnChance) }
+    end, function(trial)
         modData[key] = trial.was
-        local restoreRoll = Helpers.forceRolls(defer, { trialRoll(trial.roll, chance) })
         ArrowBoard.rollSwitch(vehicle)
-        restoreRoll()
-        on[i] = ArrowBoard.isSwitchedOn(vehicle)
-    end
+        return ArrowBoard.isSwitchedOn(vehicle)
+    end)
     restore()
     return { on = on }
-end)
-
--- `args.hours` of the trailer's panels charging its box at the sun of the moment. Answers the
--- watt-hours stored, the panels' rating, what a flat watt of panel makes in an hour now, and the
--- trailer's state.
-onVehicle("arrowBoardCharge", function(vehicle, args)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
-    local watts = ArrowBoard.panelWatts(vehicle)
-    local stored = ArrowBoard.charge(vehicle, args.hours)
-    return { stored = stored, watts = watts, flatWh = RenewableEnergy.Sun.wattsFrom(1, RenewableEnergy.Sun.skyNow().flat),
-        state = Trailer.vehicleState(vehicle) }
-end)
-
--- A crack on the panel `args.part`. Answers the trailer's state.
-onVehicle("arrowBoardCrack", function(vehicle, args)
-    RenewableEnergy.ArrowBoard.crackPanel(vehicle, vehicle:getPartById(args.part))
-    return { state = Trailer.vehicleState(vehicle) }
-end)
-
--- `args.hours` of thunderstorm over the trailer at the save's storm options. Answers how many
--- panels cracked and the trailer's state.
-onVehicle("arrowBoardStorm", function(vehicle, args)
-    local cracked = RenewableEnergy.ArrowBoard.stormCrack(vehicle, args.hours)
-    return { cracked = cracked, state = Trailer.vehicleState(vehicle) }
 end)
 
 -- The trailer loads as one from a save made before its panels were parts: empty panels and no
 -- record of stocking them, then the panels' init. Then its panels are taken off and it loads
 -- again. Answers its state after each load.
-onVehicle("arrowBoardOldPanels", function(vehicle)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
+handler("arrowBoardOldPanels", function(_, args)
+    local ArrowBoard, vehicle = RenewableEnergy.ArrowBoard, Helpers.vehicleAt(args)
     local function load()
         for _, id in ipairs(ArrowBoard.PANELS) do
             ArrowBoard.initPanel(vehicle, vehicle:getPartById(id))
@@ -345,7 +310,8 @@ end)
 -- The trailer loads as one from a save made before its frame was parts: frame parts empty and the
 -- random colour of `args.hsv`, then the frame's init. Answers its state and its script's forced
 -- colour.
-onVehicle("arrowBoardOldFrame", function(vehicle, args)
+handler("arrowBoardOldFrame", function(_, args)
+    local vehicle = Helpers.vehicleAt(args)
     vehicle:setColorHSV(args.hsv[1], args.hsv[2], args.hsv[3])
     for _, frame in ipairs(RenewableEnergy.ArrowBoard.FRAME) do
         local part = vehicle:getPartById(frame.id)
@@ -358,16 +324,16 @@ end)
 
 -- Gives the character a key to the vehicle `args`, which no arrow board ever spawns with, so a
 -- test can show what a key holder could do to its lid.
-onVehicle("arrowBoardKey", function(vehicle, _, player)
-    return { given = { PZHarness.giveItem(player, vehicle:createVehicleKey()) } }
+handler("arrowBoardKey", function(player, args)
+    return { given = { PZHarness.giveItem(player, Helpers.vehicleAt(args):createVehicleKey()) } }
 end)
 
 -- Makes the trailer's lid as its part `create` does (ArrowBoard.createLid) for each trial
 -- { was, roll, easyUse }: the lid locked or not as `was`, every roll at `roll` (trialRoll of
 -- STOCK.lockedChance) and the game's VehicleEasyUse option at `easyUse`. Then puts the lid and the
 -- option back. Answers whether each left the lid locked.
-onVehicle("arrowBoardLidRolls", function(vehicle, args, _, defer)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
+handler("arrowBoardLidRolls", function(_, args, defer)
+    local ArrowBoard, vehicle = RenewableEnergy.ArrowBoard, Helpers.vehicleAt(args)
     local lid = vehicle:getPartById(ArrowBoard.LID)
     local door = lid:getDoor()
     local wasOpen, wasLocked, wasBroken, easyUse = door:isOpen(), door:isLocked(), door:isLockBroken(), SandboxVars.VehicleEasyUse
@@ -378,15 +344,14 @@ onVehicle("arrowBoardLidRolls", function(vehicle, args, _, defer)
         door:setLockBroken(wasBroken)
         vehicle:transmitPartDoor(lid)
     end)
-    local locked = {}
-    for i, trial in ipairs(args.trials) do
+    local locked = Helpers.eachTrial(defer, args.trials, function(trial)
+        return trialRoll(trial.roll, ArrowBoard.STOCK.lockedChance)
+    end, function(trial)
         door:setLocked(trial.was)
         SandboxVars.VehicleEasyUse = trial.easyUse == true
-        local restoreRoll = Helpers.forceRolls(defer, trialRoll(trial.roll, ArrowBoard.STOCK.lockedChance))
         ArrowBoard.createLid(vehicle, lid)
-        restoreRoll()
-        locked[i] = door:isLocked()
-    end
+        return door:isLocked()
+    end)
     restore()
     return { locked = locked }
 end)
@@ -395,24 +360,24 @@ end)
 -- of `args.rolls` (trialRoll of STOCK.secondCrackedChance), every roll at it, with the Solar Panels
 -- loot option at 1. Answers each panel's condition after each stocking, and WorldSpawns' cracked
 -- and weathered ranges.
-onVehicle("arrowBoardPanelStockRolls", function(vehicle, args, _, defer)
-    local ArrowBoard, WorldSpawns = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns
+handler("arrowBoardPanelStockRolls", function(_, args, defer)
+    local ArrowBoard, WorldSpawns, vehicle = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns, Helpers.vehicleAt(args)
     local restoreOptions = PZHarness.Fixtures.saveOptions(defer, { "LRMSolarPanels" })
     SandboxVars.RenewableEnergy.LRMSolarPanels = 1
-    local stocked = {}
-    for i, roll in ipairs(args.rolls) do
+    local stocked = Helpers.eachTrial(defer, args.rolls, function(roll)
+        return trialRoll(roll, ArrowBoard.STOCK.secondCrackedChance)
+    end, function()
         for _, id in ipairs(ArrowBoard.PANELS) do
             putPanel(vehicle, id, {})
         end
         vehicle:getModData()[ArrowBoard.PANELS_STOCKED_KEY] = nil
-        local restoreRoll = Helpers.forceRolls(defer, trialRoll(roll, ArrowBoard.STOCK.secondCrackedChance))
         ArrowBoard.createPanel(vehicle, vehicle:getPartById(ArrowBoard.PANELS[1]))
-        restoreRoll()
-        stocked[i] = {}
+        local conditions = {}
         for _, id in ipairs(ArrowBoard.PANELS) do
-            stocked[i][id] = partState(vehicle, id).condition
+            conditions[id] = partState(vehicle, id).condition
         end
-    end
+        return conditions
+    end)
     restoreOptions()
     return { stocked = stocked, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }
 end)
@@ -426,15 +391,16 @@ handler("arrowBoardControllerRolls", function(_, args, defer)
     local controller = RenewableEnergy.Specs.controller
     local restoreOptions = PZHarness.Fixtures.saveOptions(defer, { "LRMBatteries", "LRMMisc" })
     options.LRMBatteries = 0
-    local container, controllers = ItemContainer.new("crate", nil, nil), {}
-    for i, trial in ipairs(args.trials) do
+    local container = RenewableEnergy.Loot.newContainer(nil)
+    local controllers = Helpers.eachTrial(defer, args.trials, function(trial)
+        return trialRoll(trial.roll, ArrowBoard.STOCK.controllerChance * trial.misc)
+    end, function(trial)
         options.LRMMisc = trial.misc
-        local restoreRoll = Helpers.forceRolls(defer, trialRoll(trial.roll, ArrowBoard.STOCK.controllerChance * trial.misc))
         ArrowBoard.stockBatteryBox(container)
-        restoreRoll()
-        controllers[i] = container:getCountType(controller)
+        local count = container:getCountType(controller)
         container:removeAllItems()
-    end
+        return count
+    end)
     restoreOptions()
     return { controllers = controllers }
 end)

@@ -1,16 +1,13 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
-require "RenewableEnergy/Sprites"
 
 -- World spawns (WorldSpawns.lua, Distributions.lua): banks, crates and cracked modules the world
 -- places and stocks on the authority (RenewableEnergyTestServerSpawns.lua). Arrow boards are in
 -- RenewableEnergyTestsArrowBoard*.lua.
 
 local T = RenewableEnergyTest
-local test, expect, serverCheck = T.test, T.expect, T.serverCheck
+local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, T.serverCheck
 
 local Sprites = RenewableEnergy.Sprites
-
-local MODULE = RenewableEnergy.Specs.factoryModule
 
 -- This client's copy of the first object of `sprite` on `square`, and how many items its
 -- container holds (nil without one).
@@ -31,23 +28,18 @@ test("renewable_energy_world_bank_spawns_stocked", {
     run = function(self)
         local squares = T.need(self, T.squares(self, #SPAWNED_BANKS, { indoors = true }), "free indoor squares for banks")
         if not squares then return end
-        self.banks = {}
+        self.squares = squares
         T.batch(function()
             for i, stockName in ipairs(SPAWNED_BANKS) do
-                local square = squares[i]
-                T.server(self, "worldBank", T.at(square, { stock = stockName }))
-                T.step(function()
-                    local bank = self.server.worldBank
-                    bank.square, bank.stockName = square, stockName
-                    self.banks[i] = bank
-                    T.need(self, bank.placed, "a " .. stockName .. " bank")
-                end)
+                T.read(self, "worldBank", T.at(squares[i], { stock = stockName }), stockName)
+                T.step(function() T.need(self, self.reads[stockName].placed, "a " .. stockName .. " bank") end)
             end
-            T.server(self, "worldSpawnStock", { names = SPAWNED_BANKS })
+            T.read(self, "worldSpawnStock", { names = SPAWNED_BANKS }, "stock")
         end)
         T.waitFor(self, function()
-            for _, bank in ipairs(self.banks) do
-                if select(2, copyOf(bank.square, bank.sprite)) ~= bank.stock.items then
+            for i, stockName in ipairs(SPAWNED_BANKS) do
+                local bank = self.reads[stockName]
+                if select(2, copyOf(squares[i], bank.sprite)) ~= bank.stock.items then
                     return false
                 end
             end
@@ -55,14 +47,14 @@ test("renewable_energy_world_bank_spawns_stocked", {
         end, "this client's copies of the banks with all they hold")
     end,
     validate = function(self)
-        local stocks = self.server.worldSpawnStock.banks
-        for _, bank in ipairs(self.banks) do
-            local stock = stocks[bank.stockName]
-            local what = "the " .. bank.stockName .. " bank"
+        local stocks = self.reads.stock.banks
+        for i, stockName in ipairs(SPAWNED_BANKS) do
+            local bank, stock = self.reads[stockName], stocks[stockName]
+            local what = "the " .. stockName .. " bank"
             local count = #bank.stock.charges
             expect(Sprites.kindOf(bank.sprite) == stock.sprite, what .. " has the wrong tile")
             expect(bank.stock.explored, what .. " is not explored")
-            local copy = copyOf(bank.square, bank.sprite)
+            local copy = copyOf(self.squares[i], bank.sprite)
             expect(copy ~= nil and copy:isConnected(), what .. " isn't connected on this client")
             T.expectSaneRange(stock.batteries, "the battery count of " .. what)
             expect(T.inRange(count, stock.batteries),
@@ -78,11 +70,11 @@ test("renewable_energy_world_bank_spawn_refused_outdoors", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        T.server(self, "worldBank", T.at(square, { stock = "shed" }))
+        T.read(self, "worldBank", T.at(square, { stock = "shed" }), "bank")
     end,
     validate = function(self)
-        expect(not self.server.worldBank.placed, "a bank was placed outdoors")
-        expect(not self.server.worldBank.boxOnSquare, "a bank's tile stands outdoors")
+        expect(not self.reads.bank.placed, "a bank was placed outdoors")
+        expect(not self.reads.bank.boxOnSquare, "a bank's tile stands outdoors")
     end,
 })
 
@@ -126,21 +118,18 @@ test("renewable_energy_world_bank_backs_onto_wall", {
             end
         end
         if not T.need(self, #picked == #BACKS and picked, #BACKS .. " unwalled indoor squares apart") then return end
-        self.placed = {}
         for i, back in ipairs(BACKS) do
             local square = picked[i]
             T.placeTile(self, getSquare(square:getX() + back.dx, square:getY() + back.dy, square:getZ()), back.wall)
-            T.server(self, "worldBank", T.at(square, { stock = "shed" }))
-            T.step(function() self.placed[i] = self.server.worldBank.sprite end)
+            T.read(self, "worldBank", T.at(square, { stock = "shed" }), back.facing)
         end
     end,
     validate = function(self)
-        for i, back in ipairs(BACKS) do
-            local sprite = self.placed[i]
-            local kind, facing = Sprites.kindOf(sprite)
-            expect(kind == "batteryBoxWood" and facing == back.facing, "the bank with a wall on the "
-                .. ({ S = "north", E = "west", N = "south", W = "east" })[back.facing] .. " edge stands as "
-                .. tostring(sprite) .. ", facing " .. tostring(facing) .. ", not " .. back.facing)
+        for _, back in ipairs(BACKS) do
+            local kind, facing = Sprites.kindOf(self.reads[back.facing].sprite)
+            local what = "the bank with a wall on the " .. ({ S = "north", E = "west", N = "south", W = "east" })[back.facing] .. " edge"
+            expectEqual(what .. "'s kind", kind, "batteryBoxWood")
+            expectEqual(what .. "'s facing", facing, back.facing)
         end
     end,
 })
@@ -157,10 +146,9 @@ serverCheck("renewable_energy_world_bank_stock_parts", "bankStockParts", { stock
 -- there is.
 test("renewable_energy_world_bank_stock_option_zero", {
     sandbox = { LRMBatteries = 0, LRMMisc = 0 },
-    run = function(self) T.server(self, "bankStockCount", { stock = "electronicsStorage", roll = 0 }) end,
+    run = function(self) T.read(self, "bankStockCount", { stock = "electronicsStorage", roll = 0 }, "count") end,
     validate = function(self)
-        local items = self.server.bankStockCount.items
-        expect(items == 0, items .. " items in a bank with the options at 0")
+        expectEqual("items in a bank with the options at 0", self.reads.count.items, 0)
     end,
 })
 
@@ -179,27 +167,22 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
     run = function(self)
         local squares = T.need(self, T.squares(self, #WORN_STOCKS, { indoors = true }), "free indoor squares for banks")
         if not squares then return end
-        self.banks = {}
         T.batch(function()
             for i, stockName in ipairs(WORN_STOCKS) do
-                local square = squares[i]
-                T.server(self, "worldBank", T.at(square, { stock = stockName, roll = 0.5 }))
-                T.step(function()
-                    self.banks[stockName] = self.server.worldBank
-                    T.need(self, self.server.worldBank.placed, "a " .. stockName .. " bank")
-                end)
+                T.read(self, "worldBank", T.at(squares[i], { stock = stockName, roll = 0.5 }), stockName)
+                T.step(function() T.need(self, self.reads[stockName].placed, "a " .. stockName .. " bank") end)
             end
-            T.server(self, "worldSpawnStock", { names = WORN_STOCKS })
+            T.read(self, "worldSpawnStock", { names = WORN_STOCKS }, "stock")
         end)
     end,
     validate = function(self)
-        local answer = self.server.worldSpawnStock
+        local answer = self.reads.stock
         local means = {}
         for _, stockName in ipairs(WORN_STOCKS) do
             local wearName = answer.banks[stockName].wear
             local condition = answer.batteryWear[wearName].mean
             means[stockName] = condition
-            local conditions = self.banks[stockName].stock.batteryConditions
+            local conditions = self.reads[stockName].stock.batteryConditions
             local wrong = {}
             for _, found in ipairs(conditions) do
                 if found ~= condition then table.insert(wrong, found) end
@@ -221,29 +204,27 @@ test("renewable_energy_world_bank_modules_beside", {
     run = function(self)
         local squares = T.need(self, T.squares(self, 2, { indoors = true }), "free indoor squares for banks")
         if not squares then return end
-        T.server(self, "worldSpawnStock", { names = { "shed" } })
+        T.read(self, "worldSpawnStock", { names = { "shed" } }, "stock")
         T.step(function()
-            local chance = self.server.worldSpawnStock.banks.shed.modules.chance
-            self.cases = {}
-            for i, roll in ipairs({ chance - T.UNDER, chance }) do
-                local square = squares[i]
-                T.server(self, "bankModulesBeside", T.at(square, { stock = "shed", roll = roll }))
-                T.step(function() self.cases[i] = self.server.bankModulesBeside end)
-            end
+            local chance = self.reads.stock.banks.shed.modules.chance
+            T.read(self, "bankModulesBeside", T.at(squares[1], { stock = "shed", roll = chance - T.UNDER }), "under")
+            T.read(self, "bankModulesBeside", T.at(squares[2], { stock = "shed", roll = chance }), "at")
         end)
     end,
     validate = function(self)
-        local answer = self.server.worldSpawnStock
+        local answer = self.reads.stock
         local spec, weathered = answer.banks.shed.modules, answer.weathered
-        local under, at = self.cases[1], self.cases[2]
+        local under, at = self.reads.under, self.reads.at
         local found = #under.conditions
-        expect(under.laid == found and T.inRange(found, spec), string.format("under the chance it laid %d and %d lie by the bank, expected %d to %d",
-            under.laid, found, spec.min, spec.max))
+        expectEqual("modules lying by the bank under the chance", found, under.laid)
+        expect(T.inRange(found, spec), string.format("under the chance %d modules lie by the bank, expected %d to %d",
+            found, spec.min, spec.max))
         expect(under.inRoom, "a module lies outside the bank's room")
         for _, condition in ipairs(under.conditions) do
             expect(T.inRange(condition, weathered), "a module beside the bank is at condition " .. condition)
         end
-        expect(at.laid == 0 and #at.conditions == 0, "at the chance " .. #at.conditions .. " modules lie by the bank")
+        expectEqual("modules laid at the chance", at.laid, 0)
+        expectEqual("modules lying by the bank at the chance", #at.conditions, 0)
     end,
 })
 
@@ -260,31 +241,31 @@ test("renewable_energy_world_crate_spawns_stocked", {
         local square = T.square(self, { indoors = true }, "a free indoor square")
         if not square then return end
         T.batch(function()
-            T.server(self, "worldCrate", T.at(square, { stock = "kit" }))
-            T.server(self, "worldSpawnStock", { names = {}, crate = "kit" })
+            T.read(self, "worldCrate", T.at(square, { stock = "kit" }), "crate")
+            T.read(self, "worldSpawnStock", { names = {}, crate = "kit" }, "stock")
         end)
         T.waitFor(self, function()
-            local crate = self.server.worldCrate
+            local crate = self.reads.crate
             local copy, items = copyOf(square, Sprites.crate)
             local overlay = copy and copy:getOverlaySprite()
             return items == crate.stock.items and overlay ~= nil and overlay:getName() == crate.overlay
         end, "this client's copy of the crate with all it holds and its lid")
     end,
     validate = function(self)
-        local crate, ranges = self.server.worldCrate, self.server.worldSpawnStock
+        local crate, ranges = self.reads.crate, self.reads.stock
         local lines = ranges.crate
         expect(crate.stock.explored, "the crate is not explored")
         local conditions = crate.stock.modules
-        expect(T.inRange(#conditions, lines[MODULE]), #conditions .. " modules in the crate")
+        expect(T.inRange(#conditions, lines[T.FACTORY_MODULE]), #conditions .. " modules in the crate")
         for _, condition in ipairs(conditions) do
             expect(T.inRange(condition, ranges.cracked) or T.inRange(condition, ranges.weathered), "a crate module is at condition " .. condition)
         end
         local charges = crate.stock.charges
-        expect(T.inRange(#charges, lines["RenewableEnergy.DeepCycleBattery"]), #charges .. " batteries in the crate")
+        expect(T.inRange(#charges, lines[T.DEEP_CYCLE]), #charges .. " batteries in the crate")
         T.expectFoundCharges(charges, "the crate")
         local overlays = Sprites.crateOverlays
         local lid = crate.stock.items < FEW_ITEMS and overlays.closed or overlays.full
-        expect(crate.overlay == lid, "the crate holding " .. crate.stock.items .. " items shows " .. tostring(crate.overlay))
+        expectEqual("the lid of the crate holding " .. crate.stock.items .. " items", crate.overlay, lid)
     end,
 })
 
@@ -318,13 +299,13 @@ test("renewable_energy_world_bank_rooms_seen_first_time", {
         for i, entry in ipairs(SEEN_ROOMS) do
             trials[i] = entry.trial
         end
-        T.server(self, "seenRoom", T.at(square, { trials = trials }))
+        T.read(self, "seenRoom", T.at(square, { trials = trials }), "seen")
     end,
     validate = function(self)
         for i, entry in ipairs(SEEN_ROOMS) do
             local trial, tiles = entry.trial, {}
             -- By kind: a bank stands in whichever facing puts its back to a wall.
-            for _, tile in ipairs(self.server.seenRoom.results[i].tiles) do
+            for _, tile in ipairs(self.reads.seen.results[i].tiles) do
                 table.insert(tiles, Sprites.kindOf(tile) or tile)
             end
             local wanted = {}
@@ -332,10 +313,9 @@ test("renewable_energy_world_bank_rooms_seen_first_time", {
             if entry.crate then table.insert(wanted, "crate") end
             table.sort(wanted)
             table.sort(tiles)
-            expect(table.concat(tiles, ",") == table.concat(wanted, ","), string.format(
-                "a %s seen at setting %d with roll %s placed '%s', expected '%s'", trial.room, trial.setting,
-                tostring(trial.roll) .. (trial.edge and " " .. trial.edge .. " odds" or ""), table.concat(tiles, ","),
-                table.concat(wanted, ",")))
+            expectEqual(string.format("what a %s seen at setting %d with roll %s placed", trial.room, trial.setting,
+                tostring(trial.roll) .. (trial.edge and " " .. trial.edge .. " odds" or "")), table.concat(tiles, ","),
+                table.concat(wanted, ","))
         end
     end,
 })

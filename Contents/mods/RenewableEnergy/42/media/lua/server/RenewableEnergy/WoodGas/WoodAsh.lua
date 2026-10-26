@@ -4,15 +4,14 @@
 if isClient() then return end
 
 require "TimedActions/ISClearAshes"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/WoodGas/Gasifier"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
 
 local vanillaClearAshesComplete = ISClearAshes.complete
 function ISClearAshes:complete()
     local done = vanillaClearAshesComplete(self)
     if done then
-        Items.giveItems(self.character, RenewableEnergy.Gasifier.WOOD_ASH)
+        Items.giveItems(self.character, Gasifier.WOOD_ASH)
     end
     return done
 end

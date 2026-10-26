@@ -40,7 +40,7 @@ function T.placeRecord(self, kind, tile, opts)
         "a free square for a " .. kind)
     if not square then return nil end
     local handle = T.at(square, { square = square, kind = kind })
-    T.server(self, "recordPlace", T.recordArgs(handle, { tile = tile }))
+    T.server(self, "placeRecord", T.recordArgs(handle, { tile = tile }))
     local spec = kindOf(handle)
     local owner = spec.owner()
     T.waitFor(self, function()
@@ -58,7 +58,7 @@ function T.buildRecord(self, kind, entity, tile, prefer)
     local square = T.buildSite(self)
     if not square then return nil end
     local handle = T.at(square, { square = square, kind = kind })
-    T.server(self, "recordTrack", T.recordArgs(handle))
+    T.server(self, "trackAt", T.recordArgs(handle))
     if not T.build(self, entity, square, prefer, function() return T.objectWithSprite(square, tile) ~= nil end,
         "this client's copy of the " .. tostring(tile) .. " " .. kind) then
         return nil
@@ -70,57 +70,29 @@ end
 --- Queues setting the record's saved fields `fields` as of now, and those of `ago` ({ [field] =
 --- hours }) to the world hour that many hours before the server runs it.
 function T.setRecord(self, handle, fields, ago)
-    T.server(self, "recordSet", T.recordArgs(handle, { fields = fields, ago = ago }))
+    T.server(self, "setRecord", T.recordArgs(handle, { fields = fields, ago = ago }))
 end
 
 --- Queues putting `items` in the record's containers as a player's transfer does: { hopper = { {
 --- type, count, rotten } }, filter = ... }.
 function T.fillRecord(self, handle, items)
-    T.server(self, "recordFill", T.recordArgs(handle, { items = items }))
+    T.server(self, "fillRecord", T.recordArgs(handle, { items = items }))
 end
 
 --- Queues the record's own pass, as though `hours` had passed since its last; its state lands in
 --- self.reads[label] if given.
 function T.ageRecord(self, handle, hours, label)
-    T.read(self, "recordAge", T.recordArgs(handle, { hours = hours }), label)
+    T.read(self, "ageRecord", T.recordArgs(handle, { hours = hours }), label)
 end
 
 --- Queues a read of the record's state (the server's Helpers.recordState) into self.reads[label].
 function T.readRecord(self, handle, label)
-    T.read(self, "recordRead", T.recordArgs(handle), label)
+    T.read(self, "readRecord", T.recordArgs(handle), label)
 end
 
---- Queues taking the record's tile away the way the game does (a sledgehammer, a pickup).
-function T.removeRecord(self, handle)
-    T.server(self, "recordRemove", T.recordArgs(handle))
-end
-
---- The record's summary as this client has it, or nil.
+--- The record's summary as this client has it, or nil; T.clientSummary's for a record handle.
 function T.recordSummary(handle)
     return handle.object and kindOf(handle).owner().summaryOf(handle.object)
-end
-
---- Queues a wait until this client's summary of the record satisfies `check(summary)`; missing
---- `what` if it never does.
-function T.waitForSummary(self, handle, check, what)
-    T.waitFor(self, function()
-        local summary = T.recordSummary(handle)
-        return summary ~= nil and check(summary)
-    end, what)
-end
-
---- Queues the gas job `job` of `feature` ("digester", "gasifier", "heater", "kit") at the tile of
---- `handle`, as its menu queues it (RenewableEnergyGasAction). `with` is what the job works with:
---- the bag, tank or container it fills, or a record handle at the far end of a gas line; or a
---- function, called when the job is queued, returning one, for what the queue gives first.
-function T.gasJob(self, feature, handle, job, with)
-    T.doJob(self, handle.square, function()
-        local what = type(with) == "function" and with() or with
-        if type(what) == "table" then
-            what = what.object
-        end
-        return RenewableEnergyGasAction:new(T.player(), feature, job, handle.object, what)
-    end)
 end
 
 -- Materials -------------------------------------------------------------------------------------
@@ -200,7 +172,7 @@ end
 --- Queues running the digester for `hours` at the air temperature `air` (°C), without moving the
 --- clock, through its own pass (DigesterObject:run).
 function T.runDigester(self, handle, hours, air)
-    T.server(self, "digesterRun", T.recordArgs(handle, { hours = hours, air = air }))
+    T.server(self, "runDigester", T.recordArgs(handle, { hours = hours, air = air }))
 end
 
 --- Queues a wait until this client's summary of the record shows `gas` m³, to the hundredth the
@@ -246,14 +218,14 @@ end
 function T.lightGasifier(self, gasifier)
     T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
     T.step(function()
-        T.giveMaterials(self, "light", GasifierJobs.materials(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
+        T.giveMaterials(self, "light", GasifierJobs.materials(T.player(), GasifierJobs.LIGHT, T.clientSummary(gasifier)))
     end)
-    T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
+    T.actionJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
 end
 
 --- Queues the gasifier burning `kg` of its wood at once.
 function T.burnGasifier(self, gasifier, kg)
-    T.server(self, "gasifierBurn", T.recordArgs(gasifier, { kg = kg }))
+    T.server(self, "burnGasifier", T.recordArgs(gasifier, { kg = kg }))
 end
 
 -- Generators -----------------------------------------------------------------------------------
@@ -271,7 +243,7 @@ end
 --- from it take it, but at once and with no pass running; the next gas pass or job bills them to a
 --- line on gas.
 function T.burnFuel(self, generator, litres)
-    T.server(self, "generatorBurn", T.at(generator, { litres = litres }))
+    T.server(self, "burnFuel", T.at(generator, { litres = litres }))
 end
 
 --- Queues the gas pass, as though `hours` had passed since the generator's last.
@@ -335,7 +307,7 @@ local KIT_DONE = {
 --- Queues the kit job `job` at `generator` (to the record `source` for Connect Gas Line), then a
 --- wait until this client's copy shows it done, since the next job's action checks that copy.
 function T.kitJob(self, generator, job, source)
-    T.gasJob(self, "kit", generator, job, source)
+    T.actionJob(self, "kit", generator, job, source)
     T.waitFor(self, function() return KIT_DONE[job](GasKit.stateOf(generator.object)) end,
         "this client's copy of the generator after " .. job)
 end

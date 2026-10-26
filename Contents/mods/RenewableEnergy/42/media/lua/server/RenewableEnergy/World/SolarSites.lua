@@ -9,26 +9,24 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/World/WorldSpawns"
-require "RenewableEnergy/World/BuildingWatch"
-require "RenewableEnergy/World/GardenLights"
-require "RenewableEnergy/World/ArrowBoard"
-require "RenewableEnergy/World/RuralFinds"
-require "RenewableEnergy/PowerBank/BankJobs"
-require "RenewableEnergy/GasLine/GasLines"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local Sprites = require "RenewableEnergy/Sprites"
+local Specs = require "RenewableEnergy/Specs"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
+local GardenLights = require "RenewableEnergy/World/GardenLights"
+local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
+local RuralFinds = require "RenewableEnergy/World/RuralFinds"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
+local JobSites = require "RenewableEnergy/JobSites"
+local GasLines = require "RenewableEnergy/GasLine/GasLines"
 local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
 
-RenewableEnergy = RenewableEnergy or {}
 local SolarSites = {}
 RenewableEnergy.SolarSites = SolarSites
-
-local WorldSpawns, RuralFinds = RenewableEnergy.WorldSpawns, RenewableEnergy.RuralFinds
-local BuildingWatch, PowerBank = RenewableEnergy.BuildingWatch, RenewableEnergy.PowerBank
-local Chance = RenewableEnergy.Chance
 
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 
@@ -101,7 +99,7 @@ end
 --- The tile of a SolarSiteLocations mount facing `facing`.
 function SolarSites.mountSprite(mount, facing)
     local spec = MOUNTS[mount]
-    local sprite = RenewableEnergy.Sprites[spec.kind]
+    local sprite = Sprites[spec.kind]
     return spec.material and sprite[spec.material][facing] or sprite
 end
 
@@ -110,7 +108,7 @@ local function moduleCount(kind, mount)
     if range then
         return Chance.between(range.min, range.max)
     end
-    return RenewableEnergy.Specs.mounts[SolarSites.mountKind(mount)].modules
+    return Specs.mounts[SolarSites.mountKind(mount)].modules
 end
 
 -- Placing
@@ -176,14 +174,14 @@ local SPOTS = {
         place = function(square)
             local building = square:getBuilding()
             if building then
-                RenewableEnergy.GardenLights.promise(building:getDef())
+                GardenLights.promise(building:getDef())
             end
             return true
         end,
     },
     arrowBoard = {
         waits = true,
-        place = function(square, spot) return RenewableEnergy.ArrowBoard.spawn(square, spot.facing) ~= nil end,
+        place = function(square, spot) return ArrowBoard.spawn(square, spot.facing) ~= nil end,
     },
     -- The wind charger on its square and the bank it is wired to at the far end.
     windCharger = {
@@ -195,11 +193,14 @@ local SPOTS = {
         place = function(square, spot)
             local bankSquare = farEnd(spot)
             RuralFinds.placeAt("wind", square)
-            if WorldSpawns.placeBank(bankSquare, spot.stock) then
-                local ok, why = RenewableEnergy.BankJobs.connectSource(nil,
-                    { bank = PowerBank.positionOf(bankSquare), source = PowerBank.positionOf(square) })
-                if not ok then
-                    print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. tostring(why))
+            local bank = WorldSpawns.placeBank(bankSquare, spot.stock)
+            if bank then
+                local charger = Sources.findOn(square)
+                local why = not charger and "no charger" or SourceJobs.blocker(nil, SourceJobs.CONNECT, charger, bank)
+                if why then
+                    print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
+                else
+                    JobSites.connectSource(nil, charger, bank)
                 end
             end
             return true
@@ -220,7 +221,7 @@ local SPOTS = {
         end,
         place = function(square, spot)
             local source = RuralFinds.placeAt(spot.source, square)
-            RenewableEnergy.GasLines.fit(placeGenerator(farEnd(spot)), source)
+            GasLines.fit(placeGenerator(farEnd(spot)), source)
             return true
         end,
     },
@@ -380,12 +381,6 @@ local function placeChunk(wx, wy)
         end
     end
     system:finishedWithList(objects)
-end
-
---- The spot waiting at a square, or nil: its global object's modData.
-function SolarSites.spotAt(x, y, z)
-    local object = system:getObjectAt(x, y, z)
-    return object and object:getModData()
 end
 
 -- Called by SGlobalObjectSystem.chunkLoaded with the system's modData as self.

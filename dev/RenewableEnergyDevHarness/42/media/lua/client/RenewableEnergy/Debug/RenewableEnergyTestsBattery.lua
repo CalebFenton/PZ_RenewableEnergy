@@ -1,15 +1,14 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Recipes"
-require "RenewableEnergy/PowerBank/Battery"
 require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/PowerBank"
 
 -- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua) and the battery recipes
 -- that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
 -- PZHarness/TestLib.lua for the runner and RenewableEnergyTestLib.lua for the helpers.
 
 local T = RenewableEnergyTest
-local test, craftTest, expect, expectNear, player, stateItem = T.test, T.craftTest, T.expect, T.expectNear, T.player, T.stateItem
+local test, craftTest, expect, expectNear, expectEqual, player, stateItem = T.test, T.craftTest, T.expect, T.expectNear,
+    T.expectEqual, T.player, T.stateItem
 local Battery, Wear, Recipes = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.Recipes
 local function craftName(recipe, behavior) return T.craftName("battery", recipe, behavior) end
 
@@ -19,8 +18,8 @@ local function craftName(recipe, behavior) return T.craftName("battery", recipe,
 -- under a point waits in the item until it makes one, which a repair forgets.
 test("renewable_energy_battery_wear", {
     run = function(self)
-        local battery = T.need(self, instanceItem("Base.CarBattery1"), "a Base.CarBattery1")
-        local worn = T.need(self, instanceItem("Base.CarBattery1"), "a Base.CarBattery1")
+        local battery = T.need(self, instanceItem(T.CAR_BATTERY), "a " .. T.CAR_BATTERY)
+        local worn = T.need(self, instanceItem(T.CAR_BATTERY), "a " .. T.CAR_BATTERY)
         if not (battery and worn) then return end
         -- A half-worn battery run flat gives up what a new one does at half: the same watt-hours.
         Wear.setCondition(worn, 50)
@@ -45,9 +44,9 @@ test("renewable_energy_battery_wear", {
     validate = function(self)
         expectNear("wear of a half-worn battery run flat, against a new one at half", self.wornFlat, self.newHalf, 1e-9)
         expectNear("wear of a flat night, against a half one", self.newFlat, 4 * self.newHalf, 1e-9)
-        expectNear("condition the day before the wear makes a point", self.dayBefore, self.full, 0)
-        expectNear("condition the day the wear makes a point", self.lastDay, self.full - 1, 0)
-        expectNear("condition after a repair and less than a point of wear", self.repaired, self.setTo, 0)
+        expectEqual("condition the day before the wear makes a point", self.dayBefore, self.full)
+        expectEqual("condition the day the wear makes a point", self.lastDay, self.full - 1)
+        expectEqual("condition after a repair and less than a point of wear", self.repaired, self.setTo)
     end,
 })
 
@@ -57,41 +56,40 @@ test("renewable_energy_battery_wear", {
 test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
     sandbox = { BatteryWear = 100 },
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { "Base.CarBattery1" })
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
         if not bank then return end
         self.bank = bank
         T.step(function() T.setTime(self, 23.5) end)
         T.batch(function()
             T.bankPass(self, bank, 0, { hours = 0.1 })
             T.setCharge(self, bank, 0.1)
-            T.bankPass(self, bank, 0, { hours = 0.1 })
-            T.step(function() self.evening = bank.state end)
+            T.bankPass(self, bank, 0, { hours = 0.1, label = "evening" })
         end)
         -- Past midnight: the clock's next step turns the day (GameTime.update).
         T.step(function() T.setTime(self, 24.01) end)
-        T.serverUntil(self, "bankState", bank.position, function(state)
-            return state ~= nil and state.calendarDay ~= self.evening.calendarDay
+        T.serverUntil(self, "bankState", { bank = bank.position }, function(state)
+            return state ~= nil and state.calendarDay ~= self.reads.evening.calendarDay
         end)
         T.bankPass(self, bank, 0, { hours = 0.1 })
         T.waitFor(self, function()
-            local battery = T.copyItem(bank, "Base.CarBattery1")
-            local served = stateItem(bank.state, "Base.CarBattery1")
+            local battery = T.copyItem(bank, T.CAR_BATTERY)
+            local served = stateItem(bank.state, T.CAR_BATTERY)
             return battery ~= nil and served ~= nil and battery:getCondition() == served.condition
         end, "this client's copy of the worn battery")
     end,
     validate = function(self)
-        local evening, morning = self.evening, self.bank.state
+        local evening, morning = self.reads.evening, self.bank.state
         expect(morning.calendarDay ~= evening.calendarDay, "the day never turned")
         -- The charge comes back from whole battery uses, a hair off the tenth it was set to.
         expectNear("the evening's cycle depth", evening.cycleDepth, 0.9, 0.01)
-        local max = instanceItem("Base.CarBattery1"):getConditionMax()
-        local expected = T.conditionAfterDischarge("Base.CarBattery1", evening.cycleDepth)
+        local max = instanceItem(T.CAR_BATTERY):getConditionMax()
+        local expected = T.conditionAfterDischarge(T.CAR_BATTERY, evening.cycleDepth)
         if not expect(expected < max, "a " .. evening.cycleDepth .. " deep day wears a car battery less than a point,"
             .. " so its wear can't show") then return end
-        local battery = stateItem(morning, "Base.CarBattery1")
-        expectNear("car battery condition after the deep day", battery and battery.condition, expected, 0)
+        local battery = stateItem(morning, T.CAR_BATTERY)
+        expectEqual("car battery condition after the deep day", battery and battery.condition, expected)
         -- The run's last wait already failed the test if this client's copy differs.
-        expectNear("cycle depth on the new day", morning.cycleDepth, 0, 0)
+        expectEqual("cycle depth on the new day", morning.cycleDepth, 0)
     end,
 })
 
@@ -99,7 +97,6 @@ local WORN, PLATES = "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.Batte
 
 -- The jar battery comes out new and empty (Recipes.rebuildBattery), where a new item would be
 -- full.
-local JAR_BATTERY = "RenewableEnergy.JarBattery"
 craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
     recipe = "RenewableEnergy_MakeJarBattery",
     from = PLATES,
@@ -108,13 +105,12 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
         T.give(self, "water", { { type = "Base.PopBottle" } })
         T.fillCarried(self, "Base.PopBottle", "Water", 2)
     end,
-    counts = { [JAR_BATTERY] = 1 },
-    after = function(self) T.readCarried(self, { JAR_BATTERY }) end,
+    counts = { [T.JAR_BATTERY] = 1 },
+    after = function(self) T.readCarried(self, { T.JAR_BATTERY }) end,
     validate = function(self)
-        local battery = T.carriedFirst(self, JAR_BATTERY)
+        local battery = T.carriedFirst(self, T.JAR_BATTERY)
         if not expect(battery ~= nil, "no jar battery was made") then return end
-        local full = instanceItem(JAR_BATTERY):getConditionMax()
-        expect(battery.condition == full, "the new jar battery is at " .. battery.condition .. ", expected " .. full)
+        expectEqual("the new jar battery's condition", battery.condition, instanceItem(T.JAR_BATTERY):getConditionMax())
         expectNear("the new jar battery's charge", battery.uses, 0, 0.001)
     end,
 })
@@ -124,8 +120,9 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
 -- A repair brings a battery at most to its repair limit, which falls with each earlier repair:
 -- Service adds a step and keeps the charge, Recondition sets the limit and empties the battery,
 -- and both are refused at the limit. A repair counts once, on this client's copy too.
--- Rows: recipe, behaviour, condition and repairs before, condition and charge after, refused.
-local CAR_BATTERY = "Base.CarBattery2"
+-- Rows: recipe, behaviour, then T.repairCraftTest's fields and the charge after.
+-- A CarBattery2, unlike the T.CAR_BATTERY other tests use: the rebuild below proves a case keeps its type.
+local CAR_BATTERY2 = "Base.CarBattery2"
 local START_CHARGE = 0.7
 local limit, step = Recipes.repairLimit, Recipes.SERVICE_REPAIR
 -- The fewest repairs that leave no room for another, even at condition 1.
@@ -133,45 +130,24 @@ local SPENT = 0
 while limit(SPENT) > 1 do SPENT = SPENT + 1 end
 local SERVICE, RECONDITION = "RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery"
 local BATTERY_REPAIRS = {
-    { SERVICE, "adds_a_step", limit(0) - 2 * step, 0, limit(0) - step, START_CHARGE },
-    { SERVICE, "below_limit_stops_at_limit", limit(0) - 1, 0, limit(0), START_CHARGE },
-    { SERVICE, "after_two_repairs_stops_at_lower_limit", limit(2) - 1, 2, limit(2), START_CHARGE },
-    { SERVICE, "at_limit_refused", limit(0), 0, limit(0), START_CHARGE, true },
-    { RECONDITION, "restores_and_empties", limit(0) - 2 * step, 0, limit(0), 0 },
-    { RECONDITION, "after_two_repairs_gives_lower_limit", limit(2) - 2 * step, 2, limit(2), 0 },
-    { RECONDITION, "at_limit_refused", limit(2), 2, limit(2), START_CHARGE, true },
-    { RECONDITION, "past_last_repair_refused", 1, SPENT, 1, START_CHARGE, true },
+    { SERVICE, "adds_a_step", before = limit(0) - 2 * step, repaired = 0, after = limit(0) - step, charge = START_CHARGE },
+    { SERVICE, "below_limit_stops_at_limit", before = limit(0) - 1, repaired = 0, after = limit(0), charge = START_CHARGE },
+    { SERVICE, "after_two_repairs_stops_at_lower_limit", before = limit(2) - 1, repaired = 2, after = limit(2),
+        charge = START_CHARGE },
+    { SERVICE, "at_limit_refused", before = limit(0), repaired = 0, after = limit(0), charge = START_CHARGE, refused = true },
+    { RECONDITION, "restores_and_empties", before = limit(0) - 2 * step, repaired = 0, after = limit(0), charge = 0 },
+    { RECONDITION, "after_two_repairs_gives_lower_limit", before = limit(2) - 2 * step, repaired = 2, after = limit(2),
+        charge = 0 },
+    { RECONDITION, "at_limit_refused", before = limit(2), repaired = 2, after = limit(2), charge = START_CHARGE, refused = true },
+    { RECONDITION, "past_last_repair_refused", before = 1, repaired = SPENT, after = 1, charge = START_CHARGE, refused = true },
 }
-for _, entry in ipairs(BATTERY_REPAIRS) do
-    local recipe, behavior, before, repaired, after, charge, refused = entry[1], entry[2], entry[3], entry[4], entry[5],
-        entry[6], entry[7]
-    local repairedAfter = refused and repaired or repaired + 1
-    craftTest(craftName(recipe, behavior), {
-        recipe = recipe,
-        from = CAR_BATTERY,
-        prefer = { CAR_BATTERY, "RenewableEnergy.BatteryElectrolyte" },
-        setup = function(self)
-            T.changeItem(self, T.inputsOf(self, CAR_BATTERY)[1], { condition = before, uses = START_CHARGE })
-            T.setRepaired(self, CAR_BATTERY, repaired)
-            T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte", "Water", 1)
-        end,
-        counts = { [CAR_BATTERY] = 1 },
-        after = function(self)
-            T.readCarried(self, { CAR_BATTERY })
-            -- The tooltip's "Repaired: Nx" reads this client's copy.
-            T.waitForRepaired(self, CAR_BATTERY, repairedAfter)
-        end,
-        validate = function(self)
-            local battery = T.carriedFirst(self, CAR_BATTERY)
-            if not expect(battery ~= nil, "the battery is gone") then return end
-            expect(battery.condition == after, "the battery is at " .. battery.condition .. ", expected " .. after)
-            expect(battery.repaired == repairedAfter, "the battery reads repaired " .. battery.repaired .. "x, expected " .. repairedAfter)
-            expectNear("the battery's charge", battery.uses, charge, 0.001)
-            if refused then
-                expect(self.refusal ~= nil, "the game would start the repair")
-            end
-        end,
-    })
+for _, row in ipairs(BATTERY_REPAIRS) do
+    row.repairedAfter = row.refused and row.repaired or row.repaired + 1
+    row.uses = START_CHARGE
+    row.prefer = { "RenewableEnergy.BatteryElectrolyte" }
+    row.setup = function(self) T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte", "Water", 1) end
+    row.validate = function(_, battery) expectNear("the battery's charge", battery.uses, row.charge, 0.001) end
+    T.repairCraftTest(craftName(row[1], row[2]), row[1], CAR_BATTERY2, row)
 end
 
 -- Stripping a car battery past its last repair and rebuilding it from its own case, with new
@@ -192,25 +168,23 @@ test(craftName(REBUILD, "from_its_stripped_case"), {
         T.setPerk(self, Perks.Electricity, 5)
         -- An empty acid bottle to take the stripped acid.
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Gloves_Dish" },
-            { type = CAR_BATTERY, condition = 20, uses = 0.6 }, { type = "RenewableEnergy.BatteryElectrolyte" } })
-        T.setRepaired(self, CAR_BATTERY, SPENT)
+            { type = CAR_BATTERY2, condition = 20, uses = 0.6, repaired = SPENT }, { type = "RenewableEnergy.BatteryElectrolyte" } })
         T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte")
-        T.step(function() T.startCraft(self, strip, T.inputsOf(self, CAR_BATTERY)[1]) end)
+        T.step(function() T.startCraft(self, strip, T.inputsOf(self, CAR_BATTERY2)[1]) end)
         -- New plates in place of the worn, and water to top up.
         T.server(self, "takeItems", { type = WORN })
         T.give(self, "rebuild", { { type = PLATES }, { type = "Base.WaterBottle" } })
         T.fillCarried(self, "Base.WaterBottle", "Water", 1)
         T.waitForCarried(self, CASE, "this client's " .. CASE)
         T.step(function() T.startCraft(self, rebuild, T.carried(CASE)) end)
-        T.readCarried(self, { CAR_BATTERY })
+        T.readCarried(self, { CAR_BATTERY2 })
     end,
     validate = function(self)
-        local battery = T.carriedFirst(self, CAR_BATTERY)
-        if not expect(battery ~= nil, "no " .. CAR_BATTERY .. " was rebuilt") then return end
-        local full = instanceItem(CAR_BATTERY):getConditionMax()
-        expect(battery.condition == full, "the rebuilt battery is at " .. battery.condition .. ", expected " .. full)
+        local battery = T.carriedFirst(self, CAR_BATTERY2)
+        if not expect(battery ~= nil, "no " .. CAR_BATTERY2 .. " was rebuilt") then return end
+        expectEqual("the rebuilt battery's condition", battery.condition, instanceItem(CAR_BATTERY2):getConditionMax())
         expectNear("the rebuilt battery's charge", battery.uses, 0, 0.001)
-        expect(battery.repaired == 0, "the rebuilt battery reads repaired " .. battery.repaired .. "x")
+        expectEqual("the rebuilt battery's repairs", battery.repaired, 0)
     end,
 })
 
@@ -230,10 +204,9 @@ test(craftName(REBUILD, "from_a_case_with_no_record"), {
         T.fillCarried(self, "Base.WaterBottle", "Water", 1)
         T.waitForFluid(self, "RenewableEnergy.BatteryElectrolyte", 1)
         T.step(function() T.startCraft(self, rebuild, T.carried(CASE)) end)
-        T.readCarried(self, { RenewableEnergy.VehicleBattery.CAR_BATTERY })
+        T.readCarried(self, { T.CAR_BATTERY })
     end,
     validate = function(self)
-        local carBattery = RenewableEnergy.VehicleBattery.CAR_BATTERY
-        expect(T.carriedFirst(self, carBattery) ~= nil, "a case with no record rebuilt no " .. carBattery)
+        expect(T.carriedFirst(self, T.CAR_BATTERY) ~= nil, "a case with no record rebuilt no " .. T.CAR_BATTERY)
     end,
 })

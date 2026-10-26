@@ -3,10 +3,9 @@
 -- day, as the Stash Houses option chooses. StashSystem reads StashDescriptions on the server and
 -- in single player.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
 
-RenewableEnergy = RenewableEnergy or {}
 local Stash = {}
 RenewableEnergy.Stash = Stash
 
@@ -168,7 +167,7 @@ local function describe(house)
         traps = house.traps,
         containers = { {
             containerType = Stash.CRATE_TYPE,
-            containerSprite = RenewableEnergy.Sprites.crate,
+            containerSprite = Sprites.crate,
             contX = house.crateX, contY = house.crateY, contZ = house.crateZ,
         } },
         annotations = {},

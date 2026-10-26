@@ -24,8 +24,8 @@ test("renewable_energy_biogas_digester_stink_levels", {
         local worst = T.sourDigester("dome", { started = false, startupHours = getSandboxOptions():getCompostHours() / 2, seedHours = 0,
             sludge = 100 })
         T.batch(function()
-            T.server(self, "stinkRead", T.at(barrel))
-            T.server(self, "digesterCorpsesFor", {})
+            T.read(self, "stinkRead", T.at(barrel), "stink")
+            T.read(self, "digesterCorpsesFor", {}, "corpses")
             T.setRecord(self, barrel, T.matureDigester("barrel"))
             T.readRecord(self, barrel, "mature")
             T.setRecord(self, barrel, T.sourDigester("barrel"))
@@ -37,9 +37,9 @@ test("renewable_energy_biogas_digester_stink_levels", {
         end)
     end,
     validate = function(self)
-        T.expectNoFailures(self.server.digesterCorpsesFor)
-        local levels = self.server.stinkRead.levels
         local reads = self.reads
+        T.expectNoFailures(reads.corpses)
+        local levels = reads.stink.levels
         local function within(label, lowest, below)
             local ghosts = reads[label].ghosts
             T.expect(ghosts >= lowest and (not below or ghosts < below), "the " .. label .. " digester counts as " .. ghosts .. " corpses")
@@ -241,10 +241,10 @@ test("renewable_energy_biogas_digester_hopper_meters", {
     end,
     validate = function(self)
         local metered, after = self.reads.metered, self.reads.after
-        T.expect(metered.hopperItems == self.count - self.firstHours,
-            "in " .. self.firstHours .. " hours it ate " .. (self.count - metered.hopperItems) .. " items, not one an hour")
+        T.expectEqual("items left in the hopper after " .. self.firstHours .. " hours, at one an hour", metered.hopperItems,
+            self.count - self.firstHours)
         T.expectNear("undigested potential", after.potential, Digester.TIERS.barrel.potentialCap, 0.001)
-        T.expect(after.hopperItems == self.left, "the hopper holds " .. tostring(after.hopperItems) .. " items, not " .. self.left)
+        T.expectEqual("items left in the hopper", after.hopperItems, self.left)
         T.expectNear("startup the manure seeded", after.seedHours, self.fits * self.cow.seedHours, 0.001)
         local container = self.digester.object:getContainer()
         local function allowed(fullType)
@@ -272,7 +272,7 @@ test("renewable_energy_biogas_digester_hopper_meters", {
 -- test.
 test("renewable_energy_biogas_digester_eats_while_unloaded", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 120,
+    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
     run = function(self)
         local stand = T.square(self, nil, "a free outdoor square to stand on")
         local handle = stand and T.placeRecord(self, "digester", "barrel.MetalDrum", { near = stand, minDistance = 2 })
@@ -289,9 +289,10 @@ test("renewable_energy_biogas_digester_eats_while_unloaded", {
         local away, back = self.reads.away, self.reads.back
         local cow = Digester.feedOf(instanceItem(FEED))
         T.expect(not away.loaded, "the digester's tile stayed loaded")
-        T.expect(away.eaten == 3 and away.snapshot == 1, "unloaded, it ate " .. away.eaten .. " and left " .. away.snapshot)
+        T.expectEqual("items eaten while unloaded", away.eaten, 3)
+        T.expectEqual("items left in the unloaded hopper's snapshot", away.snapshot, 1)
         T.expectNear("potential eaten while unloaded", away.potential, 3 * cow.potential, 0.001)
-        T.expect(back.hopperItems == 1, "back, the hopper holds " .. back.hopperItems .. " items, not 1")
+        T.expectEqual("items in the hopper once back", back.hopperItems, 1)
     end,
 })
 
@@ -318,7 +319,7 @@ test("renewable_energy_biogas_digester_holder", {
         T.waitForSummary(self, handle, function(summary) return summary.torn end, "this client's summary of the torn bags")
         self.replace = DigesterJobs.materials(T.player(), DigesterJobs.FIT_BAGS)
         T.giveMaterials(self, "bags", self.replace)
-        T.gasJob(self, "digester", handle, DigesterJobs.FIT_BAGS)
+        T.actionJob(self, "digester", handle, DigesterJobs.FIT_BAGS)
         T.batch(function()
             T.readRecord(self, handle, "mended")
             T.countMaterials(self, "left", self.replace)
@@ -350,15 +351,15 @@ test("renewable_energy_biogas_digester_tarp_gas_bag", {
         T.step(function()
             self.gassy = DigesterJobs.refusal(T.player(), DigesterJobs.FIT_TARP, handle.object, self.items.tarp[1])
         end)
-        T.gasJob(self, "digester", handle, DigesterJobs.VENT)
+        T.actionJob(self, "digester", handle, DigesterJobs.VENT)
         T.waitForGas(self, handle, 0)
-        T.gasJob(self, "digester", handle, DigesterJobs.FIT_TARP, function() return self.items.tarp[1] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.FIT_TARP, function() return self.items.tarp[1] end)
         T.batch(function()
             T.readRecord(self, handle, "fitted")
             T.readCarried(self, { self.tarp }, nil, "fittedCarried")
         end)
         T.waitForSummary(self, handle, function(summary) return summary.holder == "tarp" end, "this client's summary of the tarp")
-        T.gasJob(self, "digester", handle, DigesterJobs.TAKE_OFF_BAG)
+        T.actionJob(self, "digester", handle, DigesterJobs.TAKE_OFF_BAG)
         T.batch(function()
             T.readRecord(self, handle, "off")
             T.readCarried(self, { self.tarp }, nil, "offCarried")
@@ -366,14 +367,14 @@ test("renewable_energy_biogas_digester_tarp_gas_bag", {
     end,
     validate = function(self)
         local fitted, off = self.reads.fitted, self.reads.off
-        T.expect(self.gassy == "Tooltip_RenewableEnergy_VentFirst", "Fit Tarp Gas Bag with gas in the bags: " .. tostring(self.gassy))
-        T.expect(fitted.holder == "tarp", "the fitted holder is " .. tostring(fitted.holder))
+        T.expectEqual("Fit Tarp Gas Bag's refusal with gas in the bags", self.gassy, "Tooltip_RenewableEnergy_VentFirst")
+        T.expectEqual("the fitted holder", fitted.holder, "tarp")
         T.expectNear("the fitted tarp's wear left, in percent", fitted.holderCondition,
             100 * 6 / instanceItem(self.tarp):getConditionMax(), 0.5)
         T.expect(#T.carriedItems(self, self.tarp, "fittedCarried") == 0, "fitting left the Tarp Gas Bag in the inventory")
-        T.expect(off.holder == "none", "taking it off left " .. tostring(off.holder))
+        T.expectEqual("the holder after taking it off", off.holder, "none")
         local back = T.carriedFirst(self, self.tarp, "offCarried")
-        T.expect(back ~= nil and back.condition == 6, "the Tarp Gas Bag came back at " .. tostring(back and back.condition))
+        T.expectEqual("the returned Tarp Gas Bag's condition", back and back.condition, 6)
     end,
 })
 
@@ -393,20 +394,20 @@ test("renewable_energy_biogas_digester_sludge_into_bags", {
         T.waitForSummary(self, handle, function(summary) return summary.sludge == full end, "this client's summary of the sludge")
         T.step(function() self.noBag = DigesterJobs.refusal(T.player(), DigesterJobs.TAKE_SLUDGE, handle.object) end)
         T.give(self, "bags", { { type = "Base.EmptySandbag", count = 1 }, { type = "Base.Bag_DeadRats", count = 1 } })
-        T.gasJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[1] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[1] end)
         T.batch(function()
             T.readRecord(self, handle, "first")
             T.setRecord(self, handle, { sludge = part })
         end)
         T.waitForSummary(self, handle, function(summary) return summary.sludge == part end, "this client's summary of the sludge")
-        T.gasJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[2] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.TAKE_SLUDGE, function() return self.items.bags[2] end)
         T.batch(function()
             T.readRecord(self, handle, "second")
             T.readCarried(self, { DigesterJobs.COMPOST_BAG, "Base.EmptySandbag", "Base.Bag_DeadRats" })
         end)
     end,
     validate = function(self)
-        T.expect(self.noBag == "Tooltip_RenewableEnergy_NeedsSack", "Take Sludge with no bag: " .. tostring(self.noBag))
+        T.expectEqual("Take Sludge's refusal with no bag", self.noBag, "Tooltip_RenewableEnergy_NeedsSack")
         T.expectNear("sludge left after a full bag", self.reads.first.sludge, self.full - Digester.SLUDGE_PER_BAG, 0.001)
         T.expectNear("sludge left after a part bag", self.reads.second.sludge, 0, 0.001)
         local bags = T.carriedItems(self, DigesterJobs.COMPOST_BAG)
@@ -436,14 +437,14 @@ test("renewable_energy_biogas_digester_upgrade", {
         T.batch(function()
             T.setRecord(self, handle, T.matureDigester("barrel"))
             T.fillRecord(self, handle, { hopper = { { type = FEED, count = self.dung } } })
-            T.read(self, "perkXp", { perk = "Woodwork" }, "xpBefore")
+            T.read(self, "character", { perks = { "Woodwork" } }, "xpBefore")
         end)
         T.giveMaterials(self, "materials", self.upgrade)
-        T.gasJob(self, "digester", handle, DigesterJobs.UPGRADE)
+        T.actionJob(self, "digester", handle, DigesterJobs.UPGRADE)
         T.batch(function()
             T.readRecord(self, handle, "after")
             T.countMaterials(self, "left", self.upgrade)
-            T.read(self, "perkXp", { perk = "Woodwork" }, "xpAfter")
+            T.read(self, "character", { perks = { "Woodwork" } }, "xpAfter")
         end)
         T.waitFor(self, function()
             local container = handle.object:getContainer()
@@ -457,13 +458,14 @@ test("renewable_energy_biogas_digester_upgrade", {
     end,
     validate = function(self)
         local after = self.reads.after
-        T.expect(after.tier == "insulated" and after.holder == "drum", "the tier is " .. tostring(after.tier) .. " with " .. tostring(after.holder))
-        T.expect(after.sprite == Sprites.digester.insulated, "the tile is " .. tostring(after.sprite))
-        T.expect(after.containerCapacity == self.capacity, "the hopper holds " .. tostring(after.containerCapacity) .. ", not " .. tostring(self.capacity))
-        T.expect(after.hopperItems == self.dung, "the hopper holds " .. tostring(after.hopperItems) .. " of its " .. self.dung .. " manures")
+        T.expectEqual("the tier", after.tier, "insulated")
+        T.expectEqual("the holder", after.holder, "drum")
+        T.expectEqual("the tile", after.sprite, Sprites.digester.insulated)
+        T.expectEqual("the hopper's capacity", after.containerCapacity, self.capacity)
+        T.expectEqual("manures in the hopper", after.hopperItems, self.dung)
         T.expectNear("potential kept", after.potential, Digester.TIERS.barrel.potentialCap, 0.01)
         T.expectMaterialsUsed(self, "left", self.upgrade, "Upgrade")
-        local xpBefore, xpAfter = self.reads.xpBefore.value, self.reads.xpAfter.value
+        local xpBefore, xpAfter = self.reads.xpBefore.xp.Woodwork, self.reads.xpAfter.xp.Woodwork
         T.expect(xpAfter > xpBefore, "upgrading gave no Woodwork XP: " .. xpBefore .. " before, " .. xpAfter .. " after")
     end,
 })
@@ -501,9 +503,9 @@ end
 local function expectBarrelDigester(self, label)
     local view, read = self.views[label], self.reads[label]
     if not T.expect(view ~= nil and read ~= nil, label .. ": never saw the digester") then return end
-    T.expect(view.title == getText("IGUI_RenewableEnergy_Digester_barrel"), label .. ": the status window's title is " .. tostring(view.title))
+    T.expectEqual(label .. ": the status window's title", view.title, getText("IGUI_RenewableEnergy_Digester_barrel"))
     T.expect(view.configValid and view.master, label .. ": its SpriteConfig refused its tile")
-    T.expect(read.hopperItems == 1, label .. ": the hopper holds " .. tostring(read.hopperItems) .. " items, not the dung dragged in")
+    T.expectEqual(label .. ": items in the hopper, the dung dragged in", read.hopperItems, 1)
 end
 
 -- The build menu builds a barrel digester on the Metal Drum's tile, from any of the game's drums;
@@ -520,8 +522,8 @@ test("renewable_energy_biogas_build_menu_builds_digester", {
     end,
     validate = function(self)
         local built = self.reads.built or {}
-        T.expect(built.tier == "barrel" and built.sprite == self.tile, "the build menu built " .. tostring(built.tier)
-            .. " on " .. tostring(built.sprite))
+        T.expectEqual("the built tier", built.tier, "barrel")
+        T.expectEqual("the built tile", built.sprite, self.tile)
         expectBarrelDigester(self, "fed")
     end,
 })
@@ -545,8 +547,8 @@ test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
         self.indoors = T.placeable("Base.RenewableEnergy_BrickDome", indoors)
     end,
     validate = function(self)
-        T.expect(self.onGround == true, "the cursor refuses natural ground: " .. tostring(self.onGround))
-        T.expect(self.indoors == false, "the cursor takes a building's floor: " .. tostring(self.indoors))
+        T.expectEqual("the cursor taking natural ground", self.onGround, true)
+        T.expectEqual("the cursor taking a building's floor", self.indoors, false)
     end,
 })
 
@@ -554,7 +556,7 @@ test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
 -- still opens and takes feed. Single player only, as the chunk reload test.
 test("renewable_energy_biogas_barrel_digester_reloads_whole", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 120,
+    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
     instant = true,
     run = function(self)
         self.views = {}
@@ -606,7 +608,7 @@ test("renewable_energy_biogas_digester_menu", {
         T.standNextTo(object:getSquare())
         local window = RenewableEnergy.DigesterWindow:openOn(0, object)
         window:prerender()
-        T.expect(window.title == getText("IGUI_RenewableEnergy_Digester_barrel"), "the status window's title is " .. tostring(window.title))
+        T.expectEqual("the status window's title", window.title, getText("IGUI_RenewableEnergy_Digester_barrel"))
         T.expect(window.rowsToDraw and window.rowsToDraw[1].value == getText("IGUI_RenewableEnergy_DigesterEmpty"),
             "the status window doesn't say the digester is empty")
         window:close()
@@ -628,7 +630,6 @@ test("renewable_energy_biogas_clear_ashes_gives_wood_ash", {
         T.count(self, "ash", { RenewableEnergy.Gasifier.WOOD_ASH })
     end,
     validate = function(self)
-        local ash = self.counts.ash[RenewableEnergy.Gasifier.WOOD_ASH]
-        T.expect(ash == 1, "clearing ashes gave " .. tostring(ash) .. " wood ash")
+        T.expectEqual("wood ash from clearing ashes", self.counts.ash[RenewableEnergy.Gasifier.WOOD_ASH], 1)
     end,
 })

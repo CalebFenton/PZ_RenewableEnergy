@@ -7,17 +7,15 @@
 -- lit tile it sees a lamp of its own, in its bulb's colour (this file). A server tells its clients
 -- when a light's lamp changes, so they draw it at once.
 
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local SolarGardenLight = {}
 RenewableEnergy.SolarGardenLight = SolarGardenLight
-
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 SolarGardenLight.ITEM = "RenewableEnergy.SolarGardenLight"
 -- Object modData: watt-hours in the light's battery. Picking the light up carries it along
@@ -88,6 +86,30 @@ function SolarGardenLight.lampBulb(light)
     return SolarGardenLight.isLit(light) and SolarGardenLight.getBulb(light) or nil
 end
 
+SolarGardenLight.REMOVE_BULB = "RemoveBulb"
+SolarGardenLight.ADD_BULB = "AddBulb"
+
+-- The jobs at a light, by name (cf_commonlib's Jobs), each as long as vanilla's for a lamp's bulb
+-- at the default day length (ISLightActions); `with` is the bulb Add Light Bulb puts in.
+-- RenewableEnergy.JobSites.light does them.
+SolarGardenLight.JOBS = {
+    [SolarGardenLight.REMOVE_BULB] = {
+        minutes = 1,
+        blocker = function(character, light) return not SolarGardenLight.getBulb(light) and "no bulb" or nil end,
+    },
+    [SolarGardenLight.ADD_BULB] = {
+        minutes = 1,
+        blocker = function(character, light) return SolarGardenLight.getBulb(light) and "has a bulb" or nil end,
+        withRefusal = function(character, light, bulb)
+            return not Jobs.carries(character, bulb, SolarGardenLight.isBulb) and "ContextMenu_AddLightbulb_RequiresBulb" or nil
+        end,
+    },
+}
+
+Jobs.define(SolarGardenLight, {
+    subjectOf = function(light) return SolarGardenLight.isLight(light) and light or nil end, missing = "no light",
+})
+
 -- Drawing side
 
 -- The colour the lamp of `bulb` is given. The native lighting doubles a lamp's colour and clips
@@ -113,7 +135,7 @@ end
 
 -- Gives the place x, y, z a lamp in the colour of `bulb`, or none if `bulb` is nil.
 local function drawLamp(x, y, z, bulb)
-    local key = RenewableEnergy.PlaceTracker.key(x, y, z)
+    local key = PlaceTracker.key(x, y, z)
     if not bulb then
         removeLamp(key)
         return
@@ -150,7 +172,7 @@ end
 
 -- The lights this side has seen: the authority runs them, the drawing side lights them. A light
 -- that goes takes its lamp with it.
-local lights = RenewableEnergy.PlaceTracker.new({
+local lights = PlaceTracker.new({
     sprites = { Sprites.gardenLight.off, Sprites.gardenLight.lit },
     matches = SolarGardenLight.isLight,
     onFound = SolarGardenLight.syncLamp,

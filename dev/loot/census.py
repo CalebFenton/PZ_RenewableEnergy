@@ -240,14 +240,22 @@ def vehicle_stalls(zones, town):
 
 
 def lua_table(counts, indent):
+    """One line per room's container map; scalar counts packed several to a line, as the file
+    would otherwise run to thousands of lines."""
     pad = " " * indent
-    lines = []
+    lines, packed = [], ""
     for key in sorted(counts):
         value = counts[key]
         if isinstance(value, dict):
             lines.append('%s["%s"] = { %s },' % (pad, key, ", ".join('["%s"] = %d' % (k, value[k]) for k in sorted(value))))
-        else:
-            lines.append('%s["%s"] = %g,' % (pad, key, round(value, 1)))
+            continue
+        entry = '["%s"] = %g,' % (key, round(value, 1))
+        if packed and len(pad) + len(packed) + 1 + len(entry) > 100:
+            lines.append(pad + packed)
+            packed = ""
+        packed = packed + " " + entry if packed else entry
+    if packed:
+        lines.append(pad + packed)
     return "\n".join(lines)
 
 

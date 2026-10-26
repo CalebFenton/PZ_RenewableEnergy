@@ -2,13 +2,12 @@
 -- panel on each mount makes of it. The pure functions take every input as an argument so tests
 -- can integrate a whole year without moving the game clock.
 
-require "RenewableEnergy/Specs"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
 
-RenewableEnergy = RenewableEnergy or {}
 local Sun = {}
 RenewableEnergy.Sun = Sun
 
-local Specs = RenewableEnergy.Specs
 local rad, sin, cos, tan, acos, max, min = math.rad, math.sin, math.cos, math.tan, math.acos, math.max, math.min
 
 -- Clear-sky light on a horizontal surface with the sun overhead (panels are rated at it), and an

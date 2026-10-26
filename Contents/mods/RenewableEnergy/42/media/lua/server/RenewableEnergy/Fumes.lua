@@ -8,11 +8,9 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/PowerBank/Payers"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
 
-RenewableEnergy = RenewableEnergy or {}
 local Fumes = {}
-RenewableEnergy.Fumes = Fumes
 
 -- Source key -> the building it fumes in now. Kept so a source can stop without its tile, which
 -- is gone when its record is removed after its chunk loads.
@@ -37,7 +35,7 @@ end
 -- Whether a generator runs inside `building`, which vanilla keeps toxic itself.
 local function generatorRunsIn(building)
     local id = building:getID()
-    for _, payer in ipairs(RenewableEnergy.Payers.running()) do
+    for _, payer in ipairs(Payers.running()) do
         local square = payer.generator and payer.generator:getSquare()
         local inside = square and Fumes.buildingOf(square)
         if inside and inside:getID() == id then

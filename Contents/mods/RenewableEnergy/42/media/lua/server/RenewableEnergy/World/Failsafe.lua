@@ -9,9 +9,8 @@
 -- RemoveTileObject fires OnObjectAboutToBeRemoved and OnTileRemoved for the failsafe, so their
 -- handlers must leave it alone.
 
-require "RenewableEnergy/Sprites"
+local Sprites = require "RenewableEnergy/Sprites"
 
-local Sprites = RenewableEnergy.Sprites
 local FAILSAFE = Sprites.failsafe
 
 local function moveToTop(failsafe)

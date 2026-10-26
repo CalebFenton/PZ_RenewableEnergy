@@ -7,15 +7,13 @@
 -- Units: gas and the feed's potential in cubic metres of biogas, temperatures in degrees Celsius,
 -- time in game hours.
 
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/WoodGas/Gasifier"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GlobalObjects = require "cf_commonlib/GlobalObjects"
 
-RenewableEnergy = RenewableEnergy or {}
 local Digester = {}
 RenewableEnergy.Digester = Digester
-
-local Sprites, Gasifier = RenewableEnergy.Sprites, RenewableEnergy.Gasifier
 
 Digester.SYSTEM_NAME = "renewable_energy_digester"
 

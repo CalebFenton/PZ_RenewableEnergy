@@ -1,21 +1,18 @@
--- The digesters on the authority (RenewableEnergy.ObjectSystem), and the jobs players do at them
+-- The digesters on the authority (ObjectSystem), and the jobs players do at them
 -- and at their gas heaters, whose rules are DigesterJobs' and GasHeater's.
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/ObjectSystem"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/Biogas/DigesterJobs"
-require "RenewableEnergy/Biogas/GasHeater"
-require "RenewableEnergy/Biogas/DigesterObject"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local ObjectSystem = require "RenewableEnergy/ObjectSystem"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
+local Sprites = require "RenewableEnergy/Sprites"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
-
-RenewableEnergy = RenewableEnergy or {}
-local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local ObjectSystem, Sprites, DigesterObject = RenewableEnergy.ObjectSystem, RenewableEnergy.Sprites, RenewableEnergy.DigesterObject
 
 local DigesterSystem = ObjectSystem.define({
     name = "Digester", kind = "digester", owner = Digester, Object = DigesterObject, isObject = Digester.isDigester,

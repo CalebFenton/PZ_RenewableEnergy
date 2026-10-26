@@ -6,27 +6,20 @@
 if isClient() then return end
 
 require "Moveables/ISMoveableSpriteProps"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/BankSystem"
-require "RenewableEnergy/PowerBank/BankJobs"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local Specs = require "RenewableEnergy/Specs"
+local Chance = require "RenewableEnergy/Chance"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
-RenewableEnergy = RenewableEnergy or {}
 local WorldSpawns = {}
 RenewableEnergy.WorldSpawns = WorldSpawns
 
-local Sprites = RenewableEnergy.Sprites
-local Specs = RenewableEnergy.Specs
-local PowerBank = RenewableEnergy.PowerBank
-local Battery = RenewableEnergy.Battery
-local Chance = RenewableEnergy.Chance
 local MODULE = Specs.factoryModule
 
 -- Module conditions. A cracked module lies in a garage with a broken cover glass; a weathered
@@ -223,7 +216,7 @@ end
 --- A factory module at `condition`.
 function WorldSpawns.newModule(condition)
     local item = instanceItem(MODULE)
-    RenewableEnergy.Wear.setCondition(item, condition)
+    Wear.setCondition(item, condition)
     return item
 end
 
@@ -252,7 +245,7 @@ function WorldSpawns.foundPercent(wear, roll1, roll2, roll3)
 end
 
 local function setPercent(item, percent)
-    RenewableEnergy.Wear.setCondition(item, math.floor(item:getConditionMax() * percent / 100 + 0.5))
+    Wear.setCondition(item, math.floor(item:getConditionMax() * percent / 100 + 0.5))
 end
 
 -- A found item's percent of new by the wear profile `wear`: a dud's from `dud`, if its chance
@@ -285,7 +278,7 @@ end
 --- condition, and marks it as having a condition of its own. Sends nothing.
 function WorldSpawns.wearFoundPart(item)
     setPercent(item, (foundOrDud(WorldSpawns.PART_WEAR, WorldSpawns.PART_DUD)))
-    RenewableEnergy.Wear.markOwnCondition(item)
+    Wear.markOwnCondition(item)
 end
 
 -- Adds a found `fullType` to the container; a battery is worn as the BATTERY_WEAR profile
@@ -392,7 +385,7 @@ function WorldSpawns.placeBankWith(square, spriteName, fill)
     for i = 0, items:size() - 1 do
         sendAddItemToContainer(container, items:get(i))
     end
-    RenewableEnergy.BankSystem.instance:getLuaObjectOnSquare(square):refresh()
+    BankSystem.instance:getLuaObjectOnSquare(square):refresh()
     return bank
 end
 

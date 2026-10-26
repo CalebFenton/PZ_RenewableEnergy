@@ -8,10 +8,10 @@
 -- read the model whenever drawn, so drums already on the floor change too. The model is
 -- module-qualified because script names were resolved before Lua ran (Item.resolveModelScripts).
 
-require "RenewableEnergy/Sprites"
+local Sprites = require "RenewableEnergy/Sprites"
 
 Events.OnGameBoot.Add(function()
-    for itemType in pairs(RenewableEnergy.Sprites.digester.barrel) do
+    for itemType in pairs(Sprites.digester.barrel) do
         local item = getScriptManager():getItem("Base." .. itemType)
         if item then
             item:DoParam("WorldStaticModel = RenewableEnergy." .. itemType .. "_Ground")

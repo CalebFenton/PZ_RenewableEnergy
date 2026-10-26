@@ -10,23 +10,21 @@
 -- sets and which lights the board's zone of the lamps texture. After dark the board also gets a
 -- steady lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/World/ArrowBoard"
-
-local ArrowBoard = RenewableEnergy.ArrowBoard
-local Chance, Specs = RenewableEnergy.Chance, RenewableEnergy.Specs
-local Sun, Battery, PanelSource = RenewableEnergy.Sun, RenewableEnergy.Battery, RenewableEnergy.PanelSource
-local VehicleBattery = RenewableEnergy.VehicleBattery
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
+local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
 
 -- Battery box part modData. The box tracks its discharge cycle of the day as a bank tracks its
 -- own (Battery.trackCycle).
 ArrowBoard.SWITCH_KEY = "RenewableEnergy_switchOn"
-local LAMPS_KEY, CUT_OFF_KEY = "RenewableEnergy_lamps", "RenewableEnergy_cutOff"
+-- The lamps as the authority last set them: "day", "night" (lighting the ground), or nil while dark.
+ArrowBoard.LAMPS_KEY = "RenewableEnergy_lamps"
+local CUT_OFF_KEY = "RenewableEnergy_cutOff"
 local CYCLE_DAY_KEY, CYCLE_HIGH_KEY, CYCLE_DEPTH_KEY = "RenewableEnergy_cycleDay", "RenewableEnergy_cycleHigh", "RenewableEnergy_cycleDepth"
 local LAMPS_DAY, LAMPS_NIGHT = "day", "night"
 
@@ -132,12 +130,6 @@ function ArrowBoard.isSwitchedOn(vehicle)
     return box ~= nil and box:getModData()[ArrowBoard.SWITCH_KEY] == true
 end
 
---- The lamps as the authority last set them: "day", "night" (lighting the ground), or nil while dark.
-function ArrowBoard.lamps(vehicle)
-    local box = boxOf(vehicle)
-    return box and box:getModData()[LAMPS_KEY] or nil
-end
-
 -- Whether the lamp board can light: on the trailer, and not beaten to nothing.
 local function boardIntact(vehicle)
     local board = vehicle:getPartById(ArrowBoard.BOARD)
@@ -198,8 +190,8 @@ local function setLamps(vehicle, box, night)
     end
     local lit = modData[ArrowBoard.SWITCH_KEY] == true and not modData[CUT_OFF_KEY] and boardIntact(vehicle)
     local lamps = lit and (night and LAMPS_NIGHT or LAMPS_DAY) or nil
-    if modData[LAMPS_KEY] ~= lamps then
-        modData[LAMPS_KEY] = lamps
+    if modData[ArrowBoard.LAMPS_KEY] ~= lamps then
+        modData[ArrowBoard.LAMPS_KEY] = lamps
         vehicle:transmitPartModData(box)
     end
 end
@@ -213,7 +205,7 @@ function ArrowBoard.runLamps(vehicle, hours, night)
     if not container then
         return 0
     end
-    local lamps = box:getModData()[LAMPS_KEY]
+    local lamps = box:getModData()[ArrowBoard.LAMPS_KEY]
     local drawn = lamps and shift(container, lampWatts() * hours, Specs.arrowBoard.cutoff, -1) or 0
     trackCycle(box, container)
     if night == nil then
@@ -297,7 +289,7 @@ local function flashLamps()
             removeGroundLight(entry)
             boards[vehicle] = nil
         else
-            local lamps = entry.box:getModData()[LAMPS_KEY]
+            local lamps = entry.box:getModData()[ArrowBoard.LAMPS_KEY]
             local show = lamps ~= nil and flashLit
             if vehicle:getWindowLightsOn() ~= show then
                 vehicle:setWindowLightsOn(show)
@@ -327,3 +319,5 @@ end
 if not isServer() then
     Events.OnTick.Add(flashLamps)
 end
+
+return ArrowBoard

@@ -6,14 +6,11 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Treadmill"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Items = require "cf_commonlib/Items"
-
-RenewableEnergy = RenewableEnergy or {}
-local Specs, PowerBank, Treadmill = RenewableEnergy.Specs, RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 local TreadmillSource = {}
 RenewableEnergy.TreadmillSource = TreadmillSource
@@ -49,9 +46,19 @@ function TreadmillSource.unwire(object, player)
     end
 end
 
---- Banks a run's `wh` with the treadmill `source` (its bank's record) for the passes to come.
-function TreadmillSource.credit(source, wh)
-    source.pendingWh = (source.pendingWh or 0) + wh
+--- Banks `hours` of a run, at most one run's, on the wired treadmill tile `tile` with the bank it
+--- feeds, for the passes to come. Returns whether a bank took it.
+function TreadmillSource.credit(tile, hours)
+    local x, y, z = tile:getX(), tile:getY(), tile:getZ()
+    -- BankSystem loads after this file, which its banks' sources need.
+    local bank = Treadmill.isWired(tile) and RenewableEnergy.BankSystem.bankOfSourceAt(x, y, z)
+    local source = bank and bank:findSource(x, y, z)
+    if not source then
+        return false
+    end
+    local spec = Specs.treadmill
+    source.pendingWh = (source.pendingWh or 0) + spec.watts * math.max(0, math.min(hours, spec.runMinutes / 60))
+    return true
 end
 
 --- The treadmill's output over the pass: what runs banked, at no more than Specs.treadmill.watts,

@@ -3,16 +3,12 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Sun = require "RenewableEnergy/Sun"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
-
-local SolarGardenLight = RenewableEnergy.SolarGardenLight
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 
 -- Swaps the tile to lit or unlit and gives the light the lamp that goes with it here and, on a
 -- server, on every client, when the tile or the bulb (`bulbChanged`) changed.

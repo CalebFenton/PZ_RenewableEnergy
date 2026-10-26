@@ -9,19 +9,16 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/StormNotice"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/PowerBank/BankSystem"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local StormNotice = require "RenewableEnergy/StormNotice"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
+local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
 local Clock = require "cf_commonlib/Clock"
-
-RenewableEnergy = RenewableEnergy or {}
-local PowerBank, Sources, PanelSource = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.PanelSource
-local StormNotice = RenewableEnergy.StormNotice
 
 local PanelStorms = {}
 RenewableEnergy.PanelStorms = PanelStorms
@@ -69,8 +66,8 @@ end
 
 local function panelSprites()
     local names = {}
-    for kind in pairs(RenewableEnergy.Specs.mounts) do
-        for _, name in ipairs(RenewableEnergy.Sprites.namesOf(kind)) do
+    for kind in pairs(Specs.mounts) do
+        for _, name in ipairs(Sprites.namesOf(kind)) do
             table.insert(names, name)
         end
     end
@@ -78,7 +75,7 @@ local function panelSprites()
 end
 
 -- Every loaded panel, each weathered as its chunk loads or it is placed.
-local panels = RenewableEnergy.PlaceTracker.new({ sprites = panelSprites(), matches = isPanel, onFound = PanelStorms.weather })
+local panels = PlaceTracker.new({ sprites = panelSprites(), matches = isPanel, onFound = PanelStorms.weather })
 
 --- Adds `stormHours` to the world's storm hours and weathers every loaded panel. Returns how many
 --- cracked.
@@ -101,7 +98,7 @@ end
 -- the time itself.
 local function update()
     -- As a bank's pass: a save loaded after the clock jumped never counts days of storm at once.
-    local hours = Clock.hoursSince(store(), RenewableEnergy.BankSystem.LONGEST_PASS)
+    local hours = Clock.hoursSince(store(), BankSystem.LONGEST_PASS)
     PanelStorms.pass(PanelSource.stormHours(hours))
 end
 

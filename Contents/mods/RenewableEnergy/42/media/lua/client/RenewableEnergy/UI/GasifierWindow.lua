@@ -1,16 +1,14 @@
 -- A gasifier's status window: its summary (RenewableEnergy.Gasifier.summaryOf) as rows.
 
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/SummaryWindow"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local Format = require "RenewableEnergy/UI/Format"
+local SummaryWindow = require "RenewableEnergy/UI/SummaryWindow"
 
-RenewableEnergy = RenewableEnergy or {}
-local SummaryWindow = RenewableEnergy.SummaryWindow
 local GasifierWindow = SummaryWindow:derive("RenewableEnergyGasifierWindow")
 RenewableEnergy.GasifierWindow = GasifierWindow
-GasifierWindow.owner = RenewableEnergy.Gasifier
+GasifierWindow.owner = Gasifier
 
-local Gasifier, Format = RenewableEnergy.Gasifier, RenewableEnergy.Format
 local row = SummaryWindow.row
 
 -- The ash pit warns from here.

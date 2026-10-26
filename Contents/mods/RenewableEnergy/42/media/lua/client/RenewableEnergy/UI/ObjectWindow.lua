@@ -13,9 +13,7 @@
 require "ISUI/ISCollapsableWindow"
 local OpenAction = require "cf_commonlib/OpenAction"
 
-RenewableEnergy = RenewableEnergy or {}
 local ObjectWindow = ISCollapsableWindow:derive("RenewableEnergyObjectWindow")
-RenewableEnergy.ObjectWindow = ObjectWindow
 
 -- Where a player's first window of a family opens, from their screen's top left corner.
 local FIRST_OFFSET = 100

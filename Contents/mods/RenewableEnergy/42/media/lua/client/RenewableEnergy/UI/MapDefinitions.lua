@@ -4,7 +4,7 @@
 -- no mapArea and keep the town map's own look.
 
 require "ISUI/Maps/ISMapDefinitions"
-require "RenewableEnergy/Stash"
+local Stash = require "RenewableEnergy/Stash"
 
 local function drawArea(area)
     return function(mapUI)
@@ -16,6 +16,6 @@ local function drawArea(area)
     end
 end
 
-for mapId, area in pairs(RenewableEnergy.Stash.mapAreas) do
+for mapId, area in pairs(Stash.mapAreas) do
     LootMaps.Init[mapId] = drawArea(area)
 end

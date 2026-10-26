@@ -4,12 +4,10 @@
 if isClient() then return end
 
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Gadgets/CarAlternator"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 local Items = require "cf_commonlib/Items"
-
-local CarAlternator, Chance = RenewableEnergy.CarAlternator, RenewableEnergy.Chance
 
 --- Takes the alternator out of `vehicle` and gives it to `character`, teaching Mechanics the
 --- first time this car's comes out. Returns whether it did.

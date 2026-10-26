@@ -4,35 +4,17 @@
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
 require "Vehicles/TimedActions/ISPathFindAction"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
+local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
 
-RenewableEnergy = RenewableEnergy or {}
+-- ArrowBoard is server Lua, which loads after this file, so an option looks it up as the menu fills.
+
 local VehicleMenu = {}
 RenewableEnergy.VehicleMenu = VehicleMenu
-
-local Action = RenewableEnergyAction
-local SolarMaintainer = RenewableEnergy.SolarMaintainer
-
--- Walks to the vehicle's battery, where a maintainer clips on.
-local function queueVehicle(playerNum, job, vehicle, item)
-    local character = getSpecificPlayer(playerNum)
-    if item then
-        ISInventoryPaneContextMenu.transferIfNeeded(character, item)
-    end
-    local battery = RenewableEnergy.VehicleBattery.partOf(vehicle)
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, battery:getArea()))
-    ISTimedActionQueue.add(Action:new(character, job, nil, nil, vehicle, item))
-end
-
--- Walks to the panel's side of the trailer and mends it there.
-local function queueSealPanel(playerNum, vehicle, partId)
-    local character = getSpecificPlayer(playerNum)
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, vehicle:getPartById(partId):getArea()))
-    ISTimedActionQueue.add(Action:new(character, Action.SEAL_PANEL, nil, nil, vehicle, nil, nil, partId))
-end
 
 -- Walks to the frame part's end of the trailer, then fixes it as the mechanics window's Repair
 -- menu does (ISInventoryPaneContextMenu.onFix), which walks nowhere.
@@ -50,19 +32,11 @@ function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     if not ArrowBoard.isTrailer(vehicle) then
         return
     end
-    local character = getSpecificPlayer(playerNum)
-    local needs = RenewableEnergy.Recipes.sealInPlaceNeeds(character)
-    local blocker = Needs.tooDark(character, Action.needsLight(Action.SEAL_PANEL), Action.TOO_DARK)
     for _, partId in ipairs(ArrowBoard.PANELS) do
         local part = vehicle:getPartById(partId)
         if part and ArrowBoard.crackLookOf(part) then
-            local option = context:addOption(getText("ContextMenu_RenewableEnergy_RepairPanel",
-                getText("IGUI_VehiclePart" .. partId), part:getCondition()), playerNum, queueSealPanel, vehicle, partId)
-            if ArrowBoard.sealablePanel(vehicle, partId) then
-                Needs.show(option, needs, blocker)
-            else
-                Needs.refuse(option, "Tooltip_RenewableEnergy_PanelSealedFully")
-            end
+            JobOptions.add(context, playerNum, Action, "vehicle", VehicleJobs.SEAL_PANEL, vehicle, partId,
+                getText("ContextMenu_RenewableEnergy_RepairPanel", getText("IGUI_VehiclePart" .. partId), part:getCondition()))
         end
     end
 end
@@ -91,16 +65,15 @@ function VehicleMenu.addVehicleOptions(playerNum, context, vehicle)
     VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     VehicleMenu.addFrameRepairOptions(playerNum, context, vehicle)
     if SolarMaintainer.isAttached(vehicle) then
-        return context:addOption(getText("ContextMenu_RenewableEnergy_DetachMaintainer"), playerNum, queueVehicle,
-            Action.DETACH_MAINTAINER, vehicle)
+        return JobOptions.add(context, playerNum, Action, "vehicle", VehicleJobs.DETACH_MAINTAINER, vehicle)
     end
     local maintainer = getSpecificPlayer(playerNum):getInventory():getFirstTypeRecurse(SolarMaintainer.ITEM)
     if maintainer and SolarMaintainer.canAttach(vehicle) then
-        return context:addOption(getText("ContextMenu_RenewableEnergy_AttachMaintainer"), playerNum, queueVehicle,
-            Action.ATTACH_MAINTAINER, vehicle, maintainer)
+        return JobOptions.add(context, playerNum, Action, "vehicle", VehicleJobs.ATTACH_MAINTAINER, vehicle, maintainer)
     end
 end
 
+-- The vehicle under the mouse, as vanilla's own vehicle menu picks it, rather than a clicked object.
 function VehicleMenu.onFill(playerNum, context, worldobjects, test)
     local character = getSpecificPlayer(playerNum)
     local vehicle = not character:getVehicle() and IsoObjectPicker.Instance:PickVehicle(getMouseXScaled(), getMouseYScaled())

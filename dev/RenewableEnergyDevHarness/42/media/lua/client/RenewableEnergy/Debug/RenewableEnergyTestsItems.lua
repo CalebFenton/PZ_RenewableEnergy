@@ -8,36 +8,14 @@ local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
 local Debug = RenewableEnergy.Debug
 
--- The mod's script items, as the game loaded them.
-local function modItems()
-    local found, items = {}, getScriptManager():getAllItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:getModuleName() == "RenewableEnergy" then
-            table.insert(found, item)
-        end
-    end
-    return found
-end
-
 -- Items -----------------------------------------------------------------------------------------
 
--- Every item of the mod's has a ground model, and is listed for the promo and the art
--- (Debug.ITEMS, Debug.PART_ITEMS), which would otherwise silently leave it out.
-test("renewable_energy_items_have_ground_models_and_debug_listing", {
+-- Every item of the mod's has a ground model.
+test("renewable_energy_items_have_ground_models", {
     validate = function()
-        local listed = {}
-        for _, list in ipairs({ Debug.ITEMS, Debug.PART_ITEMS }) do
-            for _, fullType in ipairs(list) do
-                listed[fullType] = true
-                expect(getScriptManager():getItem(fullType) ~= nil, "Debug lists " .. fullType .. ", which doesn't load")
-            end
-        end
-        for _, item in ipairs(modItems()) do
-            local fullType = item:getFullName()
-            expect(listed[fullType], fullType .. " is in neither Debug.ITEMS nor Debug.PART_ITEMS")
+        for _, fullType in ipairs(Debug.items()) do
             -- The static check proves a named model exists; nothing else asks for one.
-            expect(item:getWorldStaticModel() ~= nil, fullType .. " has no ground model")
+            expect(getScriptManager():getItem(fullType):getWorldStaticModel() ~= nil, fullType .. " has no ground model")
         end
     end,
 })
@@ -86,8 +64,8 @@ test("renewable_energy_items_taught_recipes_need_learning", {
             return recipe ~= nil and recipe:needToBeLearn()
         end
         local taught = 0
-        for _, item in ipairs(modItems()) do
-            local fullType = item:getFullName()
+        for _, fullType in ipairs(Debug.items()) do
+            local item = getScriptManager():getItem(fullType)
             local learned, researchable = item:getLearnedRecipes(), item:getResearchableRecipes()
             for i = 0, (learned and learned:size() or 0) - 1 do
                 local name = learned:get(i)

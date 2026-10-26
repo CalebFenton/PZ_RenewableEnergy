@@ -6,12 +6,11 @@
 -- multiplayer clients, so the menu there can tell what is attached. Attaching, detaching and
 -- charging are the authority's: server/RenewableEnergy/Gadgets/SolarMaintainerServer.lua.
 
-require "RenewableEnergy/Gadgets/VehicleBattery"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 
-RenewableEnergy = RenewableEnergy or {}
 local SolarMaintainer = {}
 RenewableEnergy.SolarMaintainer = SolarMaintainer
-local VehicleBattery = RenewableEnergy.VehicleBattery
 
 SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
 

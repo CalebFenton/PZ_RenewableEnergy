@@ -16,19 +16,18 @@
 
 require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Recipes"
-require "RenewableEnergy/StormNotice"
-require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/World/WorldSpawns"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local Specs = require "RenewableEnergy/Specs"
+local Recipes = require "RenewableEnergy/Recipes"
+local StormNotice = require "RenewableEnergy/StormNotice"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 
-RenewableEnergy = RenewableEnergy or {}
 local ArrowBoard = {}
 RenewableEnergy.ArrowBoard = ArrowBoard
-
-local Chance, Specs, StormNotice = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.StormNotice
 
 -- Script name without its module, as VehicleDistributions and OnFillContainer name it.
 local VEHICLE = "RenewableEnergyArrowBoardTrailer"
@@ -81,14 +80,13 @@ end
 --- Authority only.
 ---@param container ItemContainer
 function ArrowBoard.stockBatteryBox(container)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
     local options = SandboxVars.RenewableEnergy
     local stock = ArrowBoard.STOCK
     local batteries = Chance.between(stock.batteries.min, stock.batteries.max)
     for _ = 1, WorldSpawns.scaled(batteries, options.LRMBatteries) do
         local battery = container:AddItem(stock.battery)
         if battery then
-            RenewableEnergy.Wear.setCondition(battery, Chance.between(stock.batteryCondition.min, stock.batteryCondition.max))
+            Wear.setCondition(battery, Chance.between(stock.batteryCondition.min, stock.batteryCondition.max))
         end
     end
     if Chance.hit(stock.controllerChance * options.LRMMisc) then
@@ -276,7 +274,6 @@ local function stockPanels(vehicle)
         return
     end
     modData[ArrowBoard.PANELS_STOCKED_KEY] = true
-    local WorldSpawns = RenewableEnergy.WorldSpawns
     local stock = ArrowBoard.STOCK
     local count = WorldSpawns.scaled(stock.modules, SandboxVars.RenewableEnergy.LRMSolarPanels)
     local panels = {}
@@ -374,7 +371,7 @@ function ArrowBoard.stormCrack(vehicle, stormHours)
     local cracked = 0
     for _, part in ipairs(installedPanels(vehicle)) do
         local source = { kind = "flat", modules = { { condition = part:getCondition() } } }
-        if RenewableEnergy.PanelSource.stormCrack(source, stormHours) then
+        if PanelSource.stormCrack(source, stormHours) then
             setPanelCondition(vehicle, part, source.modules[1].condition)
             cracked = cracked + 1
         end
@@ -396,7 +393,7 @@ end
 
 --- The watts its panels would make in full sun, as the same modules on a mount make.
 function ArrowBoard.panelWatts(vehicle)
-    local moduleWatts = RenewableEnergy.PowerBank.moduleWatts
+    local moduleWatts = PowerBank.moduleWatts
     local watts = 0
     for _, part in ipairs(installedPanels(vehicle)) do
         watts = watts + moduleWatts(part:getInventoryItem():getFullType(), part:getCondition())
@@ -408,22 +405,17 @@ end
 function ArrowBoard.sealablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
-    if item and ArrowBoard.crackLookOf(part) ~= nil and RenewableEnergy.Recipes.isModuleBelowRepairCap(item) then
+    if item and ArrowBoard.crackLookOf(part) ~= nil and Recipes.isModuleBelowRepairCap(item) then
         return part
     end
     return nil
 end
 
 --- Seal Cracked Panel: Seal Cracked Module's inputs, skill, XP and effect on a module still
---- on the trailer. Authority only; returns whether it sealed.
+--- on the trailer. Authority only, once the job was checked (VehicleJobs).
 function ArrowBoard.sealPanel(character, vehicle, partId)
-    local Recipes = RenewableEnergy.Recipes
-    local part = ArrowBoard.sealablePanel(vehicle, partId)
-    local inputs = part and Recipes.sealInPlaceRefusal(character) == nil and Recipes.sealInPlaceInputs(character)
-    if not inputs then
-        return false
-    end
-    Recipes.useInputs(inputs, character)
+    local part = vehicle:getPartById(partId)
+    Recipes.useInputs(Recipes.sealInPlaceInputs(character), character)
     -- As vanilla's fixPart (VehicleCommands.lua): count the repair on the item, then send it.
     local item = part:getInventoryItem()
     local condition = Recipes.repairedCondition(item)

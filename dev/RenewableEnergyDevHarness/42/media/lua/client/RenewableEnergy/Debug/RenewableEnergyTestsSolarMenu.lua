@@ -2,28 +2,21 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "ISUI/ISContextMenu"
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Recipes"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
-require "RenewableEnergy/UI/StatusWindow"
 local Clock = require "cf_commonlib/Clock"
 
 -- Solar menus: the panel menus, actions and highlight (UI/Menu.lua, UI/StatusWindow.lua) and the
 -- connect action's XP and time (TimedActions/RenewableEnergyAction.lua).
 
 local T = RenewableEnergyTest
-local test, expect, expectNear, player = T.test, T.expect, T.expectNear, T.player
-local Action = RenewableEnergyAction
+local test, expect, expectNear, expectEqual, player = T.test, T.expect, T.expectNear, T.expectEqual, T.player
 local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
 local PowerBank, Sources, Format = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Format
-local Menu = RenewableEnergy.Menu
+local Menu, SourceJobs = RenewableEnergy.Menu, RenewableEnergy.SourceJobs
 local MODULES_KEY = PowerBank.MODULES_KEY
-local CAR_BATTERY = "Base.CarBattery1"
-local FACTORY = "RenewableEnergy.SolarModule"
 
 -- Connecting a panel gives Electricity XP once per module, the first time that module is ever
 -- connected: a rack holding one module connected before gives the other one's share and marks
@@ -36,27 +29,28 @@ test("renewable_energy_solar_connect_xp_once_per_module", {
         local panel = bank and T.panel(self, Sprites.rack.wood.S, { near = bank,
             modules = { { type = module, condition = 90, connected = true }, { type = module, condition = 90 } } })
         if not panel then return end
-        local args = { bank = bank.position, source = panel.position }
+        local function job(name, label) T.job(self, "source", name, panel.position, bank.position, label) end
         T.batch(function()
-            T.performInto(self, "connected", "connectSource", args)
-            T.performInto(self, "disconnected", "disconnectSource", args)
-            T.performInto(self, "reconnected", "connectSource", args)
-            T.server(self, "panelState", panel.position)
+            job(SourceJobs.CONNECT, "connected")
+            job(SourceJobs.DISCONNECT, "disconnected")
+            job(SourceJobs.CONNECT, "reconnected")
+            T.read(self, "panelState", panel.position, "panel")
             -- What the game gives this character for one module's award, through the call
             -- CraftRecipe.addXP makes.
-            T.server(self, "electricityAward", { xp = Specs.connectXp })
+            T.read(self, "electricityAward", { xp = Specs.connectXp }, "award")
         end)
     end,
     validate = function(self)
-        if not T.expectOk(self.connected, "connecting the rack") then return end
-        local award, gained = self.server.electricityAward.gained, self.connected.xpAfter - self.connected.xpBefore
+        local reads = self.reads
+        if not T.expectOk(reads.connected, "connecting the rack") then return end
+        local award, gained = reads.award.gained, reads.connected.xpAfter - reads.connected.xpBefore
         -- An award retuned to nothing would match a connection that gives nothing.
         expect(Specs.connectXp > 0 and award > 0, "a module's first connection is worth " .. award .. " Electricity XP")
         expectNear("Electricity XP from connecting a rack with one new module", gained, award, 0.01)
-        T.expectOk(self.disconnected, "disconnecting the rack")
-        T.expectOk(self.reconnected, "connecting the rack again")
-        expectNear("Electricity XP from connecting the rack again", self.reconnected.xpAfter - self.reconnected.xpBefore, 0, 0)
-        local modules = self.server.panelState.modules or {}
+        T.expectOk(reads.disconnected, "disconnecting the rack")
+        T.expectOk(reads.reconnected, "connecting the rack again")
+        expectEqual("Electricity XP from connecting the rack again", reads.reconnected.xpAfter - reads.reconnected.xpBefore, 0)
+        local modules = reads.panel.modules or {}
         expect(#modules == 2 and modules[1].connected == true and modules[2].connected == true,
             "the rack's record doesn't mark both modules connected")
     end,
@@ -66,7 +60,7 @@ test("renewable_energy_solar_connect_xp_once_per_module", {
 
 local function hasEnabledOption(menu)
     for _, option in ipairs(menu and menu.options or {}) do
-        if option.onSelect and not option.notAvailable then
+        if option.onSelect and T.offered(option) then
             return true
         end
     end
@@ -95,8 +89,7 @@ test("renewable_energy_solar_menu_panel_connect", {
         local panel, alone = self.panel.object, self.alone
         if expect(self.banksBefore == 0, "a bank left by an earlier test is in reach of the panel") then
             expect(alone.shown and alone.greyed, "a panel with no bank in reach shows no unavailable connect option")
-            expect(alone.reason == getText("Tooltip_RenewableEnergy_NoBankInReach"),
-                "the unavailable connect option says " .. tostring(alone.reason))
+            expectEqual("the unavailable connect option's tooltip", alone.reason, getText("Tooltip_RenewableEnergy_NoBankInReach"))
             expect(not alone.enabled, "a panel with no bank in reach offers something to do")
         end
         local connect = T.connectOptions(self.bank, self.panel, 1).one
@@ -112,11 +105,9 @@ test("renewable_energy_solar_menu_panel_wired_to", {
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
         if not self.panel then return end
-        T.perform(self, "rename", { bank = self.bank.position, name = "Shed Bank" })
-        T.waitFor(self, function()
-            local summary = T.clientSummary(self.bank)
-            return summary ~= nil and summary.name == "Shed Bank"
-        end, "this client's summary of the renamed bank")
+        T.job(self, "bank", RenewableEnergy.BankJobs.RENAME, self.bank.position, "Shed Bank")
+        T.waitForSummary(self, self.bank, function(summary) return summary.name == "Shed Bank" end,
+            "this client's summary of the renamed bank")
     end,
     validate = function(self)
         local wiredTo = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
@@ -151,7 +142,7 @@ test("renewable_energy_solar_connect_panel", {
         T.setPerk(self, Perks.Electricity, 3)
         T.step(function()
             T.setMultiplier(self, connectSpeed())
-            local action = Action:new(p, Action.CONNECT_SOURCE, self.panel.object, self.bank.object)
+            local action = RenewableEnergyAction:new(p, "source", SourceJobs.CONNECT, self.panel.object, self.bank.object)
             self.action, self.valid = action, action:canPerform()
             T.onTick(self, function()
                 if not self.started and action:isStarted() then
@@ -170,7 +161,7 @@ test("renewable_energy_solar_connect_panel", {
     end,
     validate = function(self)
         expect(self.valid, "connecting a panel next to a bank is refused")
-        expect(self.bank.state.sources == 1, "the server's bank lists " .. self.bank.state.sources .. " panels")
+        expectEqual("panels the server's bank lists", self.bank.state.sources, 1)
         expect(PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position),
             "this client's status of the bank does not list the connected panel")
         expect(not self.action:canPerform(), "a panel already on this bank can be connected again")
@@ -191,18 +182,14 @@ test("renewable_energy_solar_disconnect_panel", {
         if not self.panel then return end
         T.step(function()
             local option = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_DisconnectSource"))
-            self.offered = option ~= nil and not option.notAvailable
-            if not self.offered then return end
-            T.standNextTo(self.panel.square)
-            T.choose(option)
+            if not T.chooseOption(self, "Disconnect", option, self.panel.square) then return end
             T.waitFor(self, function() return PowerBank.connectedBank(self.panel.object) == nil end, "this client's copy of the disconnection")
             T.bankState(self, self.bank)
         end)
     end,
     validate = function(self)
-        expect(self.panel.connected, "the bank refused to connect a wall panel next to it (" .. tostring(self.panel.reason) .. ")")
-        if not expect(self.offered, "a connected panel's menu offers no Disconnect") then return end
-        expect(self.bank.state.sources == 0, "the server's bank still lists the panel after disconnecting it")
+        if not (T.expectConnected(self.panel) and T.expectOffered(self, "Disconnect")) then return end
+        expectEqual("panels the server's bank lists after disconnecting", self.bank.state.sources, 0)
         expect(PowerBank.connectedBank(self.panel.object) == nil, "this client still sees the panel connected after disconnecting it")
     end,
 })
@@ -217,10 +204,10 @@ test("renewable_energy_solar_seal_module_in_place", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
-        local cracked = { type = FACTORY, condition = 20, repaired = 1 }
-        self.to = math.min(T.sealCap(FACTORY, cracked.repaired), cracked.condition + Recipes.MODULE_REPAIR)
+        local cracked = { type = T.FACTORY_MODULE, condition = 20, repaired = 1 }
+        self.to = math.min(T.sealCap(T.FACTORY_MODULE, cracked.repaired), cracked.condition + Recipes.MODULE_REPAIR)
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
-            modules = { { type = FACTORY, condition = 100 }, cracked } })
+            modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
         if not self.panel then return end
         local bank = self.bank
         T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
@@ -231,15 +218,13 @@ test("renewable_energy_solar_seal_module_in_place", {
             local whole = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 1, 100))
             local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 2, cracked.condition))
             context:hideAndChildren()
-            self.wholeOffered, self.offered = whole ~= nil, T.optionState(option)
-            if not (option and not option.notAvailable) then return end
-            T.standNextTo(self.panel.square)
-            T.choose(option)
+            self.wholeOffered = whole ~= nil
+            if not T.chooseOption(self, "Seal Cracked Module", option, self.panel.square) then return end
             T.waitFor(self, function()
                 local modules = self.panel.object:getModData()[MODULES_KEY]
                 return modules and modules[2] and modules[2].condition ~= cracked.condition
             end, "this client's copy of the sealed module")
-            T.server(self, "panelState", self.panel.position)
+            T.read(self, "panelState", self.panel.position, "panel")
             T.bankState(self, bank)
             T.readCarried(self, { "Base.Glue", "Base.Epoxy" })
         end)
@@ -247,18 +232,17 @@ test("renewable_energy_solar_seal_module_in_place", {
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
         expect(not self.wholeOffered, "the whole module is offered a seal")
-        if not expect(self.offered.shown and not self.offered.greyed, "the cracked module's seal isn't offered ("
-            .. tostring(self.offered.reason) .. ")") then return end
-        local modules = self.server.panelState.modules
-        expectNear("the whole module", modules[1].condition, 100, 0)
-        expectNear("the sealed module", modules[2].condition, self.to, 0)
-        expect(modules[2].repaired == 2, "the sealed module reads repaired " .. tostring(modules[2].repaired) .. "x, expected 2")
-        expect(#self.server.panelState.overlays > 0, "the sealed module shows whole")
+        if not T.expectOffered(self, "Seal Cracked Module") then return end
+        local modules, tooltip = self.reads.panel.modules, self.menu["Seal Cracked Module"].tooltip
+        expectEqual("the whole module's condition", modules[1].condition, 100)
+        expectEqual("the sealed module's condition", modules[2].condition, self.to)
+        expectEqual("the sealed module's seals", modules[2].repaired, 2)
+        expect(#self.reads.panel.overlays > 0, "the sealed module shows whole")
         local listed = self.bank.state.status.sources[1]
-        expectNear("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, self.to, 0)
+        expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, self.to)
         for _, adhesive in ipairs({ "Base.Glue", "Base.Epoxy" }) do
-            expect(tostring(self.offered.reason):find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
-                "the seal's tooltip doesn't name " .. adhesive .. ": " .. tostring(self.offered.reason))
+            expect(tooltip:find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
+                "the seal's tooltip doesn't name " .. adhesive .. ": " .. tooltip)
         end
         -- One full tube of each was given; T.readCarried's `uses` is the fraction of it left.
         local glue, epoxy = T.carriedFirst(self, "Base.Glue"), T.carriedFirst(self, "Base.Epoxy")
@@ -303,16 +287,14 @@ test("renewable_energy_solar_seal_each_module_in_place", {
                 self.offers[round] = { T.optionState(options[1]), T.optionState(options[2]) }
                 local slot = self.order[round]
                 local option = slot and options[slot]
-                if not (option and not option.notAvailable) then return end
-                T.standNextTo(self.panel.square)
-                T.choose(option)
+                if not T.chooseOption(self, "seal " .. round, option, self.panel.square) then return end
                 T.waitFor(self, function()
                     local modules = self.panel.object:getModData()[MODULES_KEY]
                     return modules and modules[slot] and modules[slot].condition ~= self.conditions[slot]
                 end, "this client's copy of sealed module " .. slot)
             end)
         end
-        T.server(self, "panelState", self.panel.position)
+        T.read(self, "panelState", self.panel.position, "panel")
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
@@ -323,8 +305,8 @@ test("renewable_energy_solar_seal_each_module_in_place", {
                 local what = "module " .. slot .. (sealed[slot] and ", sealed," or "") .. " before seal " .. round .. ": "
                 if not expect(offer.shown, what .. "no Seal Cracked Module") then return end
                 if sealed[slot] then
-                    expect(offer.greyed and offer.reason == sealedFully, what .. "not greyed out saying to reglaze ("
-                        .. tostring(offer.reason) .. ")")
+                    expect(offer.greyed, what .. "not greyed out")
+                    expectEqual(what .. "the tooltip", offer.reason, sealedFully)
                 else
                     expect(not offer.greyed, what .. "greyed out (" .. tostring(offer.reason) .. ")")
                     local touching = T.runTogether(offer.reason or "")
@@ -333,12 +315,12 @@ test("renewable_energy_solar_seal_each_module_in_place", {
             end
             sealed[self.order[round] or 0] = true
         end
-        local modules = self.server.panelState.modules
+        local modules = self.reads.panel.modules
         for slot, condition in ipairs(self.conditions) do
-            local to = math.min(T.sealCap(FACTORY, 0), condition + Recipes.MODULE_REPAIR)
-            expect(to >= T.sealCap(FACTORY, 1), "a seal leaves module " .. slot .. " sealable again: pick a higher condition")
-            expectNear("sealed module " .. slot, modules[slot].condition, to, 0)
-            expect(modules[slot].repaired == 1, "module " .. slot .. " reads repaired " .. tostring(modules[slot].repaired) .. "x, expected 1")
+            local to = math.min(T.sealCap(T.FACTORY_MODULE, 0), condition + Recipes.MODULE_REPAIR)
+            expect(to >= T.sealCap(T.FACTORY_MODULE, 1), "a seal leaves module " .. slot .. " sealable again: pick a higher condition")
+            expectEqual("sealed module " .. slot .. "'s condition", modules[slot].condition, to)
+            expectEqual("sealed module " .. slot .. "'s seals", modules[slot].repaired, 1)
         end
     end,
 })
@@ -358,24 +340,22 @@ test("renewable_energy_solar_clear_snow_requirements", {
         self.wall = self.flat and T.panel(self, Sprites.wall.wood.E)
         if not self.wall then return end
         T.snowfall(self, self.bank)
-        T.waitFor(self, function()
-            local summary = T.clientSummary(self.bank)
-            return summary ~= nil and summary.sources[1] ~= nil and summary.sources[1].snowy == true
-        end, "this client's summary with the panel snowy")
+        T.waitForSummary(self, self.bank, function(summary) return summary.sources[1] ~= nil and summary.sources[1].snowy end,
+            "this client's summary with the panel snowy")
         T.step(function() self.withoutTool = clearSnowOption(self.flat) end)
         T.give(self, "tools", { { type = "Base.Broom" }, { type = "Base.SnowShovel" }, { type = "Base.Hammer" } })
         T.step(function() self.withTool = clearSnowOption(self.flat) end)
     end,
     validate = function(self)
-        expect(self.withoutTool.greyed and self.withoutTool.reason == getText("Tooltip_RenewableEnergy_NeedSnowTool"),
-            "with no broom or shovel, Clear Snow on a snowy panel isn't greyed out saying why ("
-            .. tostring(self.withoutTool.shown) .. ", " .. tostring(self.withoutTool.reason) .. ")")
+        expect(self.withoutTool.greyed, "with no broom or shovel, Clear Snow on a snowy panel isn't greyed out")
+        expectEqual("with no broom or shovel, Clear Snow's tooltip", self.withoutTool.reason,
+            getText("Tooltip_RenewableEnergy_NeedSnowTool"))
         expect(self.withTool.shown and not self.withTool.greyed,
             "carrying a broom, Clear Snow isn't offered on a snowy panel (" .. tostring(self.withTool.reason) .. ")")
         local p = player()
         local broom, shovel, hammer = self.items.tools[1], self.items.tools[2], self.items.tools[3]
         local function canClear(panel, tool)
-            return Action:new(p, Action.CLEAR_SNOW, panel.object, nil, nil, tool):canPerform()
+            return RenewableEnergyAction:new(p, "source", SourceJobs.CLEAR_SNOW, panel.object, tool):canPerform()
         end
         expect(not canClear(self.flat, broom), "snow can be cleared with a broom left in the bag")
         p:setPrimaryHandItem(broom)
@@ -422,14 +402,12 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
         end)
         if not self.loose then return end
         local function freeSlots(count)
-            T.waitFor(self, function()
-                local summary = T.clientSummary(bank)
-                return summary ~= nil and summary.freeSlots == count
-            end, "this client's summary with " .. count .. " free input slots")
+            T.waitForSummary(self, bank, function(summary) return summary.freeSlots == count end,
+                "this client's summary with " .. count .. " free input slots")
         end
         freeSlots(0)
         T.step(function() self.full = T.connectOptions(bank, self.loose, 1) end)
-        T.perform(self, "disconnectSource", { bank = bank.position, source = wired[1].position })
+        T.job(self, "source", SourceJobs.DISCONNECT, wired[1].position)
         freeSlots(1)
         -- The disconnected panel is loose in reach now too.
         T.step(function() self.freed = T.connectOptions(bank, self.loose, 2) end)
@@ -437,8 +415,8 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
     validate = function(self)
         local why = getText("Tooltip_RenewableEnergy_NoInputSlot")
         for name, option in pairs(self.full) do
-            expect(option.greyed and option.reason == why, "with every slot taken, the " .. name
-                .. " connect option isn't greyed out saying there's no slot (" .. tostring(option.reason) .. ")")
+            expect(option.greyed, "with every slot taken, the " .. name .. " connect option isn't greyed out")
+            expectEqual("with every slot taken, the " .. name .. " connect option's tooltip", option.reason, why)
         end
         for name, option in pairs(self.freed) do
             expect(option.shown and not option.greyed, "with a slot free, the " .. name
@@ -450,9 +428,9 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
 -- Clicking a panel's row highlights the panel in the world, until the window closes.
 test("renewable_energy_solar_window_highlights_panel", {
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY })
+        self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
-        if self.panel then T.step(function() T.openWindow(self) end) end
+        if self.panel then T.openWindow(self, self.bank) end
     end,
     validate = function(self)
         local window, panel = self.window, self.panel.object
@@ -478,7 +456,7 @@ test("renewable_energy_solar_connect_time_by_electricity", {
         T.step(function()
             for _, level in ipairs({ 0, 3, 10 }) do
                 T.setPerk(self, Perks.Electricity, level)
-                local units = Action:new(player(), Action.CONNECT_SOURCE, nil, nil):units()
+                local units = RenewableEnergyAction:new(player(), "source", SourceJobs.CONNECT, nil, nil):units()
                 self.minutes[level] = units / Clock.unitsPerMinute()
             end
         end)

@@ -10,6 +10,8 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
 local removePlaced = PZHarness.Fixtures.removePlaced
+local need = PZHarness.need
+local Items = require "cf_commonlib/Items"
 
 -- Stink ------------------------------------------------------------------------------------------
 
@@ -82,22 +84,9 @@ end)
 -- Builds the record of kind `args.kind` on the Sprites[kind] tile `args.tile` at x, y, z as the
 -- build menu does (Helpers.placeRecord). Taken away when the test ends, the way the game removes
 -- it, found again by its place, since a chunk that unloaded and loaded meanwhile holds a new copy.
-handler("recordPlace", function(player, args, defer)
-    local thumpable, missing = Helpers.placeRecord(args.kind, args.tile, PZHarness.Fixtures.squareAt(args))
-    if not thumpable then return nil, missing end
-    defer(function() removePlaced(select(2, Helpers.recordAt(args)) or thumpable) end)
-    return {}
-end)
-
--- Takes away, when the test ends, whatever record of kind `args.kind` the test builds at x, y, z by
--- other means (the build menu).
-handler("recordTrack", function(player, args, defer)
-    defer(function()
-        local _, object = Helpers.recordAt(args)
-        if object then
-            removePlaced(object)
-        end
-    end)
+handler("placeRecord", function(player, args, defer)
+    local thumpable = Helpers.placeRecord(args.kind, args.tile, Helpers.squareAt(args))
+    defer(function() removePlaced(Helpers.findOn(args) or thumpable) end)
     return {}
 end)
 
@@ -105,18 +94,15 @@ end)
 -- hours }) to the world hour that many hours before now, then shows and sends what changed. Each
 -- must be one of its SAVED_FIELDS, the record's state: a misspelled one would sit beside the field
 -- the code reads, and change nothing.
-handler("recordSet", function(player, args)
-    local record, _, missing = Helpers.recordAt(args)
-    if not record then return nil, missing end
+handler("setRecord", function(player, args)
+    local record = Helpers.recordAt(args)
     local saved = {}
     for _, field in ipairs(Helpers.RECORD_KINDS[args.kind].object().SAVED_FIELDS) do
         saved[field] = true
     end
     for _, fields in ipairs({ args.fields or {}, args.ago or {} }) do
         for key in pairs(fields) do
-            if not saved[key] then
-                return nil, "a saved field " .. tostring(key) .. " of a " .. args.kind
-            end
+            need(saved[key], "a saved field " .. tostring(key) .. " of a " .. args.kind)
         end
     end
     local now = getGameTime():getWorldAgeHours()
@@ -134,24 +120,18 @@ end)
 -- Puts `args.items` ({ [container name] = { { type, count, rotten } } }, the names of
 -- Helpers.RECORD_KINDS) in the record's containers, past their filters, as a player's transfer
 -- would: the record hears of it only in its next pass.
-handler("recordFill", function(player, args)
-    local _, object, missing = Helpers.recordAt(args)
-    if not object then return nil, missing end
+handler("fillRecord", function(player, args)
+    local _, object = Helpers.recordAt(args)
     local containers = Helpers.RECORD_KINDS[args.kind].containers(object)
     for name, entries in pairs(args.items) do
-        local container = containers[name]
-        if not container then
-            return nil, "a " .. name .. " on the " .. args.kind
-        end
+        local container = need(containers[name], "a " .. name .. " on the " .. args.kind)
         for _, entry in ipairs(entries) do
             for _ = 1, entry.count or 1 do
-                local item = container:AddItem(entry.type)
-                if item and entry.rotten then
+                local item = need(instanceItem(entry.type), "an item " .. tostring(entry.type))
+                if entry.rotten then
                     item:setAge(item:getOffAgeMax() + 1)
                 end
-                if item then
-                    sendAddItemToContainer(container, item)
-                end
+                Items.addItem(container, item)
             end
         end
     end
@@ -161,39 +141,27 @@ end)
 -- Brings the record of kind `args.kind` at x, y, z up to now as its pass does, as though
 -- `args.hours` had passed since its last, its chunk loaded or not. Answers its state
 -- (Helpers.recordState), from the record alone while unloaded.
-handler("recordAge", function(player, args)
+handler("ageRecord", function(player, args)
     local kind = Helpers.RECORD_KINDS[args.kind]
-    local record = kind and kind.owner().recordAt(args.x, args.y, args.z)
-    if not record then
-        return nil, "a " .. tostring(args.kind) .. " record at " .. args.x .. "," .. args.y
-    end
+    local record = need(kind and kind.owner().recordAt(args.x, args.y, args.z),
+        "a " .. tostring(args.kind) .. " record at " .. args.x .. "," .. args.y)
     record.lastHour = getGameTime():getWorldAgeHours() - args.hours
     record:update()
     return Helpers.recordState(args.kind, record, record:getIsoObject())
 end)
 
 -- The record's state (Helpers.recordState).
-handler("recordRead", function(player, args)
-    local record, object, missing = Helpers.recordAt(args)
-    if not record then return nil, missing end
+handler("readRecord", function(player, args)
+    local record, object = Helpers.recordAt(args)
     return Helpers.recordState(args.kind, record, object)
-end)
-
--- Takes the record's tile away the way the game does, as a sledgehammer or a pickup would.
-handler("recordRemove", function(player, args)
-    local _, object, missing = Helpers.recordAt(args)
-    if not object then return nil, missing end
-    removePlaced(object)
-    return {}
 end)
 
 -- Digesters -------------------------------------------------------------------------------------
 
 -- Runs the digester at x, y, z for `args.hours` at the air temperature `args.air` (°C), feeding
 -- from its hopper as its pass does, without moving the clock.
-handler("digesterRun", function(player, args)
-    local record, object, missing = Helpers.recordAt(args)
-    if not record then return nil, missing end
+handler("runDigester", function(player, args)
+    local record, object = Helpers.recordAt(args)
     record:run(args.hours, object:getContainer(), args.air)
     record.lastHour = getGameTime():getWorldAgeHours()
     record:afterChange()
@@ -205,11 +173,8 @@ end)
 -- Drops an `args.type` holding `args.uses` (its share of full) on the floor of the square at x, y,
 -- z, as a player dropping it does, for everyone to see. Taken away when the test ends.
 handler("floorItem", function(player, args, defer)
-    local square = PZHarness.Fixtures.squareAt(args)
-    local item = square and instanceItem(args.type)
-    if not item then
-        return nil, "a loaded square and an item " .. tostring(args.type)
-    end
+    local square = Helpers.squareAt(args)
+    local item = need(instanceItem(args.type), "an item " .. tostring(args.type))
     if args.uses then
         item:setCurrentUsesFloat(args.uses)
     end

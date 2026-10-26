@@ -3,6 +3,7 @@
 -- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
+local Items = require "cf_commonlib/Items"
 
 local handler = PZHarness.serverHandler
 
@@ -30,32 +31,23 @@ handler("takeItems", function(player, args)
         end
     end
     for _, item in ipairs(items) do
-        local container = item:getContainer()
-        container:Remove(item)
-        sendRemoveItemFromContainer(container, item)
+        Items.removeItem(item)
     end
     return { taken = #items }
 end)
 
--- Sets vanilla's repair count of the character's items of `args.type` to `args.repaired`, as a
--- repair does, which the clients then see too.
-handler("setRepaired", function(player, args)
-    local all = player:getInventory():getAllTypeRecurse(args.type)
-    for i = 0, all:size() - 1 do
-        all:get(i):setHaveBeenRepaired(args.repaired)
-        all:get(i):syncItemFields()
-    end
-    return { set = all:size() }
-end)
-
--- The character's stats `args.stats` (CharacterStat field names) as the authority has them, in
--- `values` by name.
-handler("characterStats", function(player, args)
-    local values, stats = {}, player:getStats()
+-- The character as the authority has it: the stats `args.stats` (CharacterStat field names) in
+-- `stats`, and the XP in the perks `args.perks` (Perks field names) in `xp`, by name.
+handler("character", function(player, args)
+    local stats, xp = player:getStats(), player:getXp()
+    local reply = { stats = {}, xp = {} }
     for _, name in ipairs(args.stats or {}) do
-        values[name] = stats:get(CharacterStat[name])
+        reply.stats[name] = stats:get(CharacterStat[name])
     end
-    return { values = values }
+    for _, name in ipairs(args.perks or {}) do
+        reply.xp[name] = xp:getXP(Perks[name])
+    end
+    return reply
 end)
 
 -- Sets the character's stat `args.stat` to `args.value` on the authority, and sends it, until the
@@ -76,9 +68,4 @@ handler("setCharacterStatUntilEnd", function(player, args, defer)
         send()
     end)
     return {}
-end)
-
--- The character's XP in the perk `args.perk` (a Perks field name) as the authority has it.
-handler("perkXp", function(player, args)
-    return { value = player:getXp():getXP(Perks[args.perk]) }
 end)

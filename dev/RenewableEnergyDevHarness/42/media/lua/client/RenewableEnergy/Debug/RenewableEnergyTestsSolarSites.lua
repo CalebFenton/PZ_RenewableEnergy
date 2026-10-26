@@ -1,5 +1,4 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
-require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Biogas/Digester"
 require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/GasLine/GasKit"
@@ -12,7 +11,7 @@ local Squares = require "cf_commonlib/Squares"
 -- away and back unloads the chunk and loads it again, which only single player does.
 
 local T = RenewableEnergyTest
-local test, expect, serverCheck = T.test, T.expect, T.serverCheck
+local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, T.serverCheck
 
 local Sprites = RenewableEnergy.Sprites
 local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
@@ -39,7 +38,7 @@ end
 
 -- The spots siteArm armed, as the arguments of the handlers that read them.
 local function armedSpots(self)
-    return { spots = self.server.siteArm.spots }
+    return { spots = self.reads.arm.spots }
 end
 
 -- A site goes down once, when its chunk loads, and its spot is forgotten, so loading the chunk
@@ -47,27 +46,28 @@ end
 -- conditions, and players see it.
 test("renewable_energy_world_site_placed_once", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 240,
+    timeoutSeconds = 2 * T.CHUNK_RELOAD_SECONDS,
     run = function(self)
         T.setMultiplier(self, T.VISIT_SPEED)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
         local at = T.at(square)
-        T.server(self, "siteArm", { at = at })
+        T.read(self, "siteArm", { at = at }, "arm")
         reloadAndSettle(self, at)
-        T.server(self, "sitePlaced", armedSpots)
-        T.serverInto(self, "first", "siteSpots", armedSpots)
+        T.read(self, "sitePlaced", armedSpots, "placed")
+        T.read(self, "siteSpots", armedSpots, "first")
         T.waitFor(self, function() return T.objectWithSprite(getSquare(at.x, at.y, at.z), Sprites.rack.metal.S) ~= nil end,
             "this client's copy of the site's rack")
         reloadAndSettle(self, at)
-        T.server(self, "siteSpots", armedSpots)
+        T.read(self, "siteSpots", armedSpots, "again")
     end,
     validate = function(self)
-        T.expectNoFailures(self.server.sitePlaced)
-        local first, again = self.first, self.server.siteSpots
-        expect(first.waiting == 0, "the site's spot was not forgotten once placed")
-        expect(again.objects == first.objects, "loading the chunk again left " .. again.objects
-            .. " objects on the site's square, not " .. first.objects)
+        T.expectNoFailures(self.reads.placed)
+        local first, again = self.reads.first, self.reads.again
+        if expect(first.ready and again.ready, "the site's squares weren't loaded on the server: " .. tostring(first.why or again.why)) then
+            expect(first.waiting == 0, "the site's spot was not forgotten once placed")
+            expectEqual("objects on the site's square after loading the chunk again", again.objects, first.objects)
+        end
     end,
 })
 
@@ -77,31 +77,32 @@ test("renewable_energy_world_site_placed_once", {
 -- charger braked with its blades broken and wired to a plugged-in rack of tired batteries.
 test("renewable_energy_world_site_waits_for_a_free_square", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 240,
+    timeoutSeconds = 2 * T.CHUNK_RELOAD_SECONDS,
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
         T.setMultiplier(self, T.VISIT_SPEED)
         local bank = T.square(self, { indoors = true }, "a free indoor square for the bank")
         if not bank then return end
-        T.server(self, "siteArm", { bank = T.at(bank), block = true })
+        T.read(self, "siteArm", { bank = T.at(bank), block = true }, "arm")
         T.step(function()
-            local at = self.server.siteArm.at
+            local at = self.reads.arm.at
             reloadAndSettle(self, at)
-            T.serverInto(self, "blocked", "siteSpots", armedSpots)
-            T.server(self, "siteUnblock", at)
+            T.read(self, "siteSpots", armedSpots, "blocked")
+            T.server(self, "removeAt", T.at(at, { sprite = PZHarness.Fixtures.WORK_TABLE_SPRITE }))
             reloadAndSettle(self, at)
-            T.server(self, "sitePlaced", armedSpots)
+            T.read(self, "sitePlaced", armedSpots, "placed")
             T.waitFor(self, function()
                 return Squares.findObjectOn(getSquare(at.x, at.y, at.z), Wind.isCharger) ~= nil
             end, "this client's copy of the wind charger")
         end)
     end,
     validate = function(self)
-        local blocked = self.blocked
-        expect(blocked.waiting == 1, "the blocked wind charger's spot was " .. (blocked.waiting == 0 and "forgotten" or "kept "
-            .. blocked.waiting .. " times"))
-        expect(blocked.placed == 0, "the blocked site put " .. blocked.placed .. " objects on its squares")
-        T.expectNoFailures(self.server.sitePlaced)
+        local blocked = self.reads.blocked
+        if expect(blocked.ready, "the site's squares weren't loaded on the server: " .. tostring(blocked.why)) then
+            expectEqual("times the blocked wind charger's spot was kept", blocked.waiting, 1)
+            expectEqual("objects the blocked site put on its squares", blocked.placed, 0)
+        end
+        T.expectNoFailures(self.reads.placed)
     end,
 })
 
@@ -119,9 +120,9 @@ test("renewable_energy_world_site_rolled_once", {
         for i, square in ipairs(squares) do
             at[i] = T.at(square)
         end
-        T.server(self, "siteRolledOnce", { squares = at })
+        T.read(self, "siteRolledOnce", { squares = at }, "rolled")
     end,
-    validate = function(self) T.expectNoFailures(self.server.siteRolledOnce) end,
+    validate = function(self) T.expectNoFailures(self.reads.rolled) end,
 })
 
 -- The homestead sites and the outlying towns' solar sites, each with a square of it to go to.
@@ -193,32 +194,27 @@ test("renewable_energy_world_sites_placed_on_visit", {
             names[i] = place[1]
         end
         T.startVisits(self)
-        self.visits = {}
-        T.serverInto(self, "armed", "sitesArm", { names = names })
-        for i, place in ipairs(VISITED_SITES) do
+        T.read(self, "sitesArm", { names = names }, "armed")
+        for _, place in ipairs(VISITED_SITES) do
             local name, x, y = place[1], place[2], place[3]
-            local visit = {}
-            self.visits[i] = visit
-            local function args() return { name = name, spots = self.armed[name].spots } end
-            T.visitUntil(self, x, y, name, "siteVisit", args, function(answer)
-                visit.placing = answer
+            local function args() return { name = name, spots = self.reads.armed[name].spots } end
+            T.visitUntil(self, x, y, name, "siteSpots", args, function(answer)
                 return answer.ready and answer.waiting == 0
             end)
-            T.server(self, "siteVisited", args)
-            T.step(function() visit.check = self.server.siteVisited end)
-            T.waitFor(self, function() return siteCopiesArrived(self.armed[name].spots) end,
+            T.read(self, "siteVisited", args, name .. " checked")
+            T.waitFor(self, function() return siteCopiesArrived(self.reads.armed[name].spots) end,
                 "this client's copies of what " .. name .. " put down")
             T.server(self, "siteClear", args)
         end
         T.returnHome(self)
     end,
     validate = function(self)
-        for i, place in ipairs(VISITED_SITES) do
-            local name, visit, armed = place[1], self.visits[i], self.armed[place[1]]
-            local placing = visit.placing
-            if expect(placing and placing.ready, name .. " never loaded on the server: " .. tostring(placing and placing.why)) then
+        for _, place in ipairs(VISITED_SITES) do
+            local name = place[1]
+            local placing, armed = self.reads[name], self.reads.armed[name]
+            if expect(placing.ready, name .. " never loaded on the server: " .. tostring(placing.why)) then
                 expect(placing.waiting == 0, name .. ": " .. placing.waiting .. " spots never went down (the log says why)")
-                T.expectNoFailures(visit.check)
+                T.expectNoFailures(self.reads[name .. " checked"])
             end
             if armed.find then
                 local buildings = 0
@@ -279,22 +275,24 @@ test("renewable_energy_world_site_garden_lights_promised", {
     run = function(self)
         local name, x, y = PROMISED_HOUSE[1], PROMISED_HOUSE[2], PROMISED_HOUSE[3]
         T.startVisits(self)
-        T.server(self, "gardenLightsForgetHouse", { x = x, y = y })
-        T.server(self, "sitesArm", { names = { name } })
-        T.step(function() self.edge = T.need(self, edgeOfLoaded(self.server.gardenLightsForgetHouse), "a side of the house its reach crosses") end)
+        T.read(self, "gardenLightsForgetHouse", { x = x, y = y }, "house")
+        T.read(self, "sitesArm", { names = { name } }, "armed")
+        T.step(function()
+            self.edge = T.need(self, edgeOfLoaded(self.reads.house), "a side of the house its reach crosses")
+        end)
         T.step(function() self.teleportTo(self.edge.x + 0.5, self.edge.y + 0.5, 0) end)
         T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, "the house loaded at the edge", T.CHUNK_MS)
         waitGameMinutes(self, SETTLE_MINUTES)
-        T.serverInto(self, "atEdge", "gardenLightsHouse", { x = x, y = y })
+        T.read(self, "gardenLightsHouse", { x = x, y = y }, "atEdge")
         T.visitUntil(self, x, y, name, "gardenLightsHouse", { x = x, y = y }, function(answer) return answer.rolled end)
-        local function args() return { name = name, spots = self.server.sitesArm[name].spots } end
-        T.server(self, "siteVisited", args)
+        local function args() return { name = name, spots = self.reads.armed[name].spots } end
+        T.read(self, "siteVisited", args, "visited")
         T.server(self, "gardenLightsClearHouse", { x = x, y = y })
         T.server(self, "siteClear", args)
         T.returnHome(self)
     end,
     validate = function(self)
-        local atEdge, atHouse = self.atEdge, self.server.gardenLightsHouse
+        local atEdge, atHouse = self.reads.atEdge, self.reads[PROMISED_HOUSE[1]]
         if expect(atEdge.loaded and not atEdge.surroundings, "standing at the edge, the house loaded " .. tostring(atEdge.loaded)
             .. " and its surroundings " .. tostring(atEdge.surroundings)) then
             expect(atEdge.promised and not atEdge.rolled and atEdge.lights == 0, "while its surroundings weren't loaded the house held "
@@ -304,6 +302,6 @@ test("renewable_energy_world_site_garden_lights_promised", {
         expect(atHouse.rolled and atHouse.placed >= 1 and atHouse.placed <= atHouse.count.max and atHouse.lights == atHouse.placed,
             "the promised house was rolled " .. tostring(atHouse.rolled) .. " for " .. atHouse.placed .. " lights, and "
             .. atHouse.lights .. " stand around it")
-        T.expectNoFailures(self.server.siteVisited)
+        T.expectNoFailures(self.reads.visited)
     end,
 })

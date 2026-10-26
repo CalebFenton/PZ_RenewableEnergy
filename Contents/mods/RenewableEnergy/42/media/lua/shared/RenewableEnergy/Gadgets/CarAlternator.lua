@@ -7,11 +7,9 @@
 -- has no such send (DEVELOPMENT.md, Vehicles). Taking it out, putting it back and the wreck's drop
 -- are the authority's: server/RenewableEnergy/Gadgets/CarAlternatorServer.lua.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-local Materials = require "cf_commonlib/Materials"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 
-RenewableEnergy = RenewableEnergy or {}
 local CarAlternator = {}
 RenewableEnergy.CarAlternator = CarAlternator
 
@@ -24,13 +22,6 @@ CarAlternator.OUT_KEY = "RenewableEnergy_AlternatorOut"
 -- Engine part modData: set once taking the alternator out of this car has taught Mechanics, so
 -- taking it out and putting it back over and over teaches nothing more.
 CarAlternator.XP_KEY = "RenewableEnergy_AlternatorXp"
-
--- What the job takes, as materials (cf_commonlib's Materials). An alternator hangs on two bolts
--- and a belt tensioner: a wrench, and a little more skill than the battery's screwdriver.
-local SKILL = { perk = "Mechanics", need = 2 }
-local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
-local TAKE_OUT = { SKILL, WRENCH }
-local PUT_BACK = { SKILL, WRENCH, { item = CarAlternator.ITEM, need = 1, keep = true } }
 
 -- Action units at Mechanics 0: as long as vanilla's Take Engine Parts, the other job inside the
 -- engine bay (ISVehicleMechanics.onTakeEngineParts).
@@ -71,7 +62,7 @@ end
 --- battery parts, so the script name rules them out.
 function CarAlternator.isCar(vehicle)
     return vehicle ~= nil and not vehicle:isRemovedFromWorld() and CarAlternator.enginePart(vehicle) ~= nil
-        and RenewableEnergy.VehicleBattery.partOf(vehicle) ~= nil and not CarAlternator.isWreck(vehicle)
+        and VehicleBattery.partOf(vehicle) ~= nil and not CarAlternator.isWreck(vehicle)
 end
 
 --- Whether `vehicle`'s alternator has been taken out.
@@ -93,15 +84,9 @@ function CarAlternator.shutHood(vehicle)
     return vehicle:getPartById(CarAlternator.HOOD)
 end
 
---- What taking the alternator out (`putBack` false) or putting one back takes of `character`,
---- for Materials.firstUnmet and cf_commonlib's Needs.
-function CarAlternator.needs(character, putBack)
-    return Materials.needs(character, putBack and PUT_BACK or TAKE_OUT)
-end
-
 --- What keeps `character` from taking the alternator out of `vehicle` (or putting one back) now
 --- whatever they carry, as a translation key, or nil. A shut hood isn't one: the menu opens it
---- first, as vanilla's engine jobs do.
+--- first, as vanilla's engine jobs do (VehicleJobs refuses it at the job itself).
 function CarAlternator.blocker(character, vehicle, putBack)
     if not CarAlternator.isCar(vehicle) then
         return "Tooltip_RenewableEnergy_NotACar"
@@ -119,18 +104,6 @@ function CarAlternator.blocker(character, vehicle, putBack)
         return "Tooltip_vehicle_keyRequired"
     end
     return nil
-end
-
---- Why `character` can't do the job on `vehicle` now, or nil if they can: the blocker, a shut
---- hood, or the kind of the first need they are short of.
-function CarAlternator.refusal(character, vehicle, putBack)
-    local blocker = CarAlternator.blocker(character, vehicle, putBack)
-    if blocker then
-        return blocker
-    elseif not CarAlternator.hoodOpen(vehicle) then
-        return "Tooltip_RenewableEnergy_HoodShut"
-    end
-    return Materials.unmetKind(CarAlternator.needs(character, putBack))
 end
 
 --- The job's length in action units for `character`: less with Mechanics, as a part's uninstall

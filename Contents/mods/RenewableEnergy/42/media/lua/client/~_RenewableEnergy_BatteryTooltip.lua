@@ -4,11 +4,8 @@
 -- Lua, so it wraps their render rather than being replaced.
 
 require "ISUI/ISToolTipInv"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/UI/Format"
-
-local Battery = RenewableEnergy.Battery
-local Format = RenewableEnergy.Format
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Format = require "RenewableEnergy/UI/Format"
 
 local PAD = 5
 

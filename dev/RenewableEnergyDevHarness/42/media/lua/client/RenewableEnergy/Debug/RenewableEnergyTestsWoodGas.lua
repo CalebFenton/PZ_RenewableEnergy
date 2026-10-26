@@ -1,5 +1,4 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
-require "RenewableEnergy/Specs"
 local Materials = require "cf_commonlib/Materials"
 
 -- Wood gas: the gasifier, built from the build menu, burning wood for the generator it is piped to
@@ -28,8 +27,8 @@ test("renewable_energy_woodgas_build_gasifier", {
     end,
     validate = function(self)
         local built = self.reads.built or {}
-        T.expect(built.tier == "standard", "the build menu built " .. tostring(built.tier))
-        T.expect(built.containers == 2, "the gasifier has " .. tostring(built.containers) .. " containers, not a hopper and a filter")
+        T.expectEqual("the built gasifier's tier", built.tier, "standard")
+        T.expectEqual("the gasifier's containers, a hopper and a filter", built.containers, 2)
     end,
 })
 
@@ -137,7 +136,7 @@ test("renewable_energy_woodgas_full_ash_or_spent_filter_cuts_output", {
         T.expect(reads.ashNearlyFull.running, "an ash pit one short of full stalled a generator at " .. over)
         T.expect(T.isStalled(reads.ashFull), "a full ash pit didn't stall a generator at " .. over)
         T.expect(reads.ashCleared.running, "the generator didn't start again once the ash was cleared")
-        T.expect(reads.spent.clean == 0, "the filter still has " .. tostring(reads.spent.clean) .. " clean packing")
+        T.expectEqual("clean packing left in the filter", reads.spent.clean, 0)
         T.expect(T.isStalled(reads.filterSpent), "a spent filter didn't stall a generator at " .. over)
         T.expect(reads.dirtyRuns.running, "a spent filter didn't run a generator at " .. self.dirtyCap .. " W")
     end,
@@ -234,9 +233,8 @@ test("renewable_energy_woodgas_dirty_gas_wears_generator", {
     end,
     validate = function(self)
         local reads = self.reads
-        local dirtyWear, cleanWear = reads.dirtyGasifier.summary.wear, reads.cleanGasifier.summary.wear
-        T.expect(dirtyWear == Gasifier.WEAR_DIRTY and cleanWear == 1,
-            "the gasifiers' wear factors are " .. tostring(dirtyWear) .. " and " .. tostring(cleanWear))
+        T.expectEqual("the dirty gasifier's wear factor", reads.dirtyGasifier.summary.wear, Gasifier.WEAR_DIRTY)
+        T.expectEqual("the clean gasifier's wear factor", reads.cleanGasifier.summary.wear, 1)
         local function lost(label)
             T.expect(reads[label .. "After"].running, "the generator of the " .. label .. " pass stalled or stopped")
             return reads[label .. "Before"].condition - reads[label .. "After"].condition
@@ -245,8 +243,8 @@ test("renewable_energy_woodgas_dirty_gas_wears_generator", {
         local hit, miss, clean = lost("dirtyHit"), lost("dirtyMiss"), lost("clean")
         T.expect(hit >= self.hours and hit <= 2 * self.hours, "dirty gas rolling under its chance of " .. self.chance
             .. " wore the generator " .. hit .. " condition over " .. self.hours .. " hours")
-        T.expect(miss == 0, "dirty gas rolling over its chance of " .. self.chance .. " wore the generator " .. miss .. " condition")
-        T.expect(clean == 0, "clean gas wore the generator " .. clean .. " condition beyond vanilla's own wear")
+        T.expectEqual("condition dirty gas rolling over its chance of " .. self.chance .. " wore", miss, 0)
+        T.expectEqual("condition clean gas wore beyond vanilla's own wear", clean, 0)
     end,
 })
 
@@ -263,17 +261,17 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
         T.give(self, "matches", { { type = Specs.FIRE_STARTER.item } })
         T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
         T.step(function()
-            self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
+            self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.clientSummary(gasifier)))
         end)
         T.give(self, "bellows", { { type = Gasifier.BELLOWS[1] } })
-        T.gasJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
-        T.gasJob(self, "gasifier", gasifier, GasifierJobs.PUT_OUT)
+        T.actionJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
+        T.actionJob(self, "gasifier", gasifier, GasifierJobs.PUT_OUT)
         T.server(self, "takeItems", { type = Gasifier.BELLOWS[1] })
         T.waitForSummary(self, gasifier, function(summary) return not summary.lit end, "this client's summary of the gasifier put out")
         T.waitFor(self, function() return not T.player():getInventory():containsTypeRecurse(Gasifier.BELLOWS[1]) end,
             "this client's copy of the bellows gone")
         T.step(function()
-            self.outAt = T.recordSummary(gasifier).outSince
+            self.outAt = T.clientSummary(gasifier).outSince
             self.refusals = { justOut = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object) }
         end)
         local step = Gasifier.COLD_HOURS / 20
@@ -284,16 +282,16 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
                 "this client's summary of the gasifier out " .. case[2] .. " hours")
             T.step(function()
                 self.refusals[case[1]] = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object)
-                self.outAt = T.recordSummary(gasifier).outSince
+                self.outAt = T.clientSummary(gasifier).outSince
             end)
         end
     end,
     validate = function(self)
-        T.expect(self.coldNeed and self.coldNeed.item == Gasifier.BELLOWS[1], "a cold gasifier lit without bellows: "
-            .. tostring(self.coldNeed and self.coldNeed.item))
-        T.expect(self.refusals.justOut == nil, "just put out, it still wants something to light: " .. tostring(self.refusals.justOut))
-        T.expect(self.refusals.warm == nil, "out a little less than it stays warm, it wants something to light: " .. tostring(self.refusals.warm))
-        T.expect(self.refusals.cold == "short", "out a little longer than it stays warm, it lit without bellows: " .. tostring(self.refusals.cold))
+        T.expectEqual("what a cold gasifier lacks to light", self.coldNeed and self.coldNeed.item, Gasifier.BELLOWS[1])
+        T.expectEqual("the refusal to light it just put out", self.refusals.justOut, nil)
+        T.expectEqual("the refusal to light it out a little less than it stays warm", self.refusals.warm, nil)
+        -- The bellows are an item need, so lighting without them is refused for an item.
+        T.expectEqual("the refusal to light it out a little longer than it stays warm", self.refusals.cold, "item")
     end,
 })
 
@@ -324,8 +322,8 @@ test("renewable_energy_woodgas_burning_fills_ash_and_tars_packing", {
     validate = function(self)
         local burned, kg = self.reads.burned, self.burns * self.kg
         T.expectNear("ash after burning " .. kg .. " kg", burned.ash, math.min(Gasifier.ASH_FULL, kg * self.spec.ashPerKg), 0.05)
-        T.expect(burned.tarry == self.tarred and burned.clean == self.packing - self.tarred, "packing after burning " .. kg .. " kg: "
-            .. tostring(burned.clean) .. " clean, " .. tostring(burned.tarry) .. " tarry")
+        T.expectEqual("tarry packing after burning " .. kg .. " kg", burned.tarry, self.tarred)
+        T.expectEqual("clean packing after burning " .. kg .. " kg", burned.clean, self.packing - self.tarred)
     end,
 })
 
@@ -342,7 +340,7 @@ test("renewable_energy_woodgas_clean_out_ash", {
         T.giveMaterials(self, "shovel", GasifierJobs.materials(T.player(), GasifierJobs.CLEAN_ASH))
         T.waitForSummary(self, gasifier, function(summary) return summary.ash == math.floor(self.ash) end,
             "this client's summary of the ash pit")
-        T.gasJob(self, "gasifier", gasifier, GasifierJobs.CLEAN_ASH)
+        T.actionJob(self, "gasifier", gasifier, GasifierJobs.CLEAN_ASH)
         T.batch(function()
             T.readRecord(self, gasifier, "cleaned")
             T.count(self, "ash", { Gasifier.WOOD_ASH })
@@ -356,10 +354,9 @@ test("renewable_energy_woodgas_clean_out_ash", {
     end,
     validate = function(self)
         T.expectNear("ash after cleaning out", self.reads.cleaned.ash, self.ash - self.whole * Gasifier.ASH_PER_ITEM, 0.01)
-        T.expect(self.counts.ash[Gasifier.WOOD_ASH] == self.whole,
-            "cleaning out gave " .. tostring(self.counts.ash[Gasifier.WOOD_ASH]) .. " wood ash, not " .. self.whole)
-        T.expect(self.refusals.short == "Tooltip_RenewableEnergy_LittleAsh", "Clean Out Ash one short of an item: " .. tostring(self.refusals.short))
-        T.expect(self.refusals.enough == nil, "Clean Out Ash with an item's worth: " .. tostring(self.refusals.enough))
+        T.expectEqual("wood ash from cleaning out", self.counts.ash[Gasifier.WOOD_ASH], self.whole)
+        T.expectEqual("the refusal of Clean Out Ash one short of an item", self.refusals.short, "Tooltip_RenewableEnergy_LittleAsh")
+        T.expectEqual("the refusal of Clean Out Ash with an item's worth", self.refusals.enough, nil)
     end,
 })
 
@@ -383,15 +380,15 @@ test("renewable_energy_woodgas_drain_condensate", {
             self.potHot = GasifierJobs.refusal(T.player(), GasifierJobs.DRAIN, gasifier.object, pot)
             self.coldBottle = Gasifier.takesCondensate(bottle, false)
         end)
-        T.gasJob(self, "gasifier", gasifier, GasifierJobs.DRAIN, function() return self.items.containers[2] end)
+        T.actionJob(self, "gasifier", gasifier, GasifierJobs.DRAIN, function() return self.items.containers[2] end)
         T.batch(function()
             T.readRecord(self, gasifier, "drained")
             T.readCarried(self, {}, { Gasifier.VINEGAR })
         end)
     end,
     validate = function(self)
-        T.expect(self.bottleHot == "Tooltip_RenewableEnergy_WontTakeCondensate", "a plastic bottle takes the condensate hot: " .. tostring(self.bottleHot))
-        T.expect(self.potHot == nil, "a pot won't take the condensate hot: " .. tostring(self.potHot))
+        T.expectEqual("the refusal of a plastic bottle for hot condensate", self.bottleHot, "Tooltip_RenewableEnergy_WontTakeCondensate")
+        T.expectEqual("the refusal of a pot for hot condensate", self.potHot, nil)
         T.expect(self.coldBottle, "a plastic bottle won't take it cold")
         local poured = math.min(self.condensate, instanceItem("Base.Pot"):getFluidContainer():getCapacity())
         T.expectNear("wood vinegar carried", self.reads.carried and self.reads.carried.fluids[Gasifier.VINEGAR], poured, 0.01)

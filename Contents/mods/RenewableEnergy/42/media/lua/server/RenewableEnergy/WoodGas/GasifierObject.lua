@@ -8,21 +8,17 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/ObjectSystem"
-require "RenewableEnergy/Fumes"
-require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/WoodGas/Gasifier"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local ObjectSystem = require "RenewableEnergy/ObjectSystem"
+local Fumes = require "RenewableEnergy/Fumes"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
-RenewableEnergy = RenewableEnergy or {}
-local Gasifier, GasKit, Sprites = RenewableEnergy.Gasifier, RenewableEnergy.GasKit, RenewableEnergy.Sprites
-local Fumes = RenewableEnergy.Fumes
-
-local GasifierObject = RenewableEnergy.ObjectSystem.Object:derive("RenewableEnergy_Gasifier")
+local GasifierObject = ObjectSystem.Object:derive("RenewableEnergy_Gasifier")
 RenewableEnergy.GasifierObject = GasifierObject
 
 -- The fields the Global Object System saves with the world; a field renamed here is lost from

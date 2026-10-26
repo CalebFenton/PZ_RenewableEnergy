@@ -2,17 +2,14 @@
 -- (cf_commonlib's Jobs). GasifierSystem does them. Loading wood and changing the filter's
 -- packing are the loot window's.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/WoodGas/Gasifier"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
 
-RenewableEnergy = RenewableEnergy or {}
 local GasifierJobs = {}
 RenewableEnergy.GasifierJobs = GasifierJobs
-
-local Gasifier, Specs = RenewableEnergy.Gasifier, RenewableEnergy.Specs
 
 GasifierJobs.LIGHT = "LightGasifier"
 GasifierJobs.PUT_OUT = "PutOutGasifier"
@@ -85,7 +82,7 @@ GasifierJobs.JOBS = {
 }
 
 Jobs.define(GasifierJobs, {
-    short = "short", subjectOf = Gasifier.currentSummary, missing = "Tooltip_RenewableEnergy_NoGasifier",
+    subjectOf = Gasifier.currentSummary, missing = "Tooltip_RenewableEnergy_NoGasifier",
 })
 
 return GasifierJobs

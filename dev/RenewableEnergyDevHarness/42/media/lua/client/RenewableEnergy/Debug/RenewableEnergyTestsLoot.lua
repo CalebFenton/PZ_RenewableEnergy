@@ -38,9 +38,9 @@ test("renewable_energy_loot_found_batteries_part_charged", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        T.server(self, "lootFoundBatteries", T.at(square))
+        T.read(self, "lootFoundBatteries", T.at(square), "batteries")
     end,
-    validate = function(self) T.expectNoFailures(self.server.lootFoundBatteries) end,
+    validate = function(self) T.expectNoFailures(self.reads.batteries) end,
 })
 
 -- Inverters and controllers that rooms hand out come worn, once: a later refill leaves a found or

@@ -9,12 +9,9 @@
 -- Java's (BaseVehicle.tryStartEngine) and stays unscaled.
 
 require "Vehicles/Vehicles"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/Gadgets/CarAlternator"
-
-local Battery, VehicleBattery = RenewableEnergy.Battery, RenewableEnergy.VehicleBattery
-local CarAlternator = RenewableEnergy.CarAlternator
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 
 local vanillaChargeBattery = VehicleUtils.chargeBattery
 

@@ -2,18 +2,15 @@
 -- the power curve, height and shelter; plus the brake and broken-blade modData, written only on
 -- the authority (RenewableEnergy.WindSource).
 
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PowerBank/Sources"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
-RenewableEnergy = RenewableEnergy or {}
 local Wind = {}
 RenewableEnergy.Wind = Wind
-
-local Specs, Sources, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sources, RenewableEnergy.Sprites
 
 -- Placed wind charger modData: its brake is on; its blades are broken.
 Wind.BRAKED_KEY = "RenewableEnergy_braked"
@@ -67,19 +64,6 @@ function Wind.bladesOfItem(kind, item)
         if Specs.wind.blades[material].item == fullType then
             return material
         end
-    end
-    return nil
-end
-
---- Why the blades `item` can't go on the wind charger `isoObject` now, or nil if they can: "not
---- broken" while its blades are whole, "no blades" when `item` (nil for none) isn't blades its
---- kind takes (Specs.wind.turbines blades). Blades of another material it takes swap it to them.
-function Wind.bladesRefusal(isoObject, item)
-    if not Wind.isBroken(isoObject) then
-        return "not broken"
-    end
-    if not Wind.bladesOfItem(Sources.kindOf(isoObject), item) then
-        return "no blades"
     end
     return nil
 end
@@ -164,7 +148,7 @@ end
 
 --- The build menu's OnCreate for every wind charger, on the authority: fits the blades the build
 --- took (fitBuiltBlades). Single player fires no OnObjectAdded for a built object, so this fires
---- it, as vanilla's TrapBO does, letting RenewableEnergy.WindSpin start it turning. MP clients get
+--- it, as vanilla's TrapBO does, letting WindSpin start it turning. MP clients get
 --- it from the server's AddItemToMapPacket.
 function Wind.OnCreate(params)
     local thumpable = params.thumpable

@@ -4,15 +4,14 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/Gadgets/SolarMaintainerServer"
-require "RenewableEnergy/Gadgets/SolarCellChargerServer"
-require "RenewableEnergy/Gadgets/SolarGardenLightServer"
-require "RenewableEnergy/World/ArrowBoard"
-require "RenewableEnergy/World/ArrowBoardPower"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sun = require "RenewableEnergy/Sun"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainerServer"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellChargerServer"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLightServer"
+local ArrowBoard = require "RenewableEnergy/World/ArrowBoardPower"
 local Clock = require "cf_commonlib/Clock"
 
-RenewableEnergy = RenewableEnergy or {}
 local GadgetCharging = {}
 RenewableEnergy.GadgetCharging = GadgetCharging
 
@@ -23,13 +22,13 @@ local LONGEST_PASS = 1
 local clock = {}
 
 function GadgetCharging.chargeVehicles(hours)
-    local sky = RenewableEnergy.Sun.skyNow()
+    local sky = Sun.skyNow()
     -- IsoCell.getVehicles is a Set, which only an iterator walks.
     local vehicles = getCell():getVehicles():iterator()
     while vehicles:hasNext() do
         local vehicle = vehicles:next()
-        RenewableEnergy.SolarMaintainer.charge(vehicle, hours, sky)
-        RenewableEnergy.ArrowBoard.update(vehicle, hours, sky)
+        SolarMaintainer.charge(vehicle, hours, sky)
+        ArrowBoard.update(vehicle, hours, sky)
     end
 end
 
@@ -41,8 +40,8 @@ function GadgetCharging.update()
         return
     end
     GadgetCharging.chargeVehicles(hours)
-    RenewableEnergy.SolarCellCharger.chargeAll(hours)
-    RenewableEnergy.SolarGardenLight.updateAll(hours)
+    SolarCellCharger.chargeAll(hours)
+    SolarGardenLight.updateAll(hours)
 end
 
 Events.EveryTenMinutes.Add(GadgetCharging.update)

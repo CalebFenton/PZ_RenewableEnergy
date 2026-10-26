@@ -1,19 +1,15 @@
--- The gasifiers on the authority (RenewableEnergy.ObjectSystem), and the jobs players do at them,
+-- The gasifiers on the authority (ObjectSystem), and the jobs players do at them,
 -- whose rules are GasifierJobs'.
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/ObjectSystem"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/WoodGas/GasifierJobs"
-require "RenewableEnergy/WoodGas/GasifierObject"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local ObjectSystem = require "RenewableEnergy/ObjectSystem"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
+local GasifierObject = require "RenewableEnergy/WoodGas/GasifierObject"
 local Items = require "cf_commonlib/Items"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
-
-RenewableEnergy = RenewableEnergy or {}
-local Gasifier, GasifierJobs, ObjectSystem = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs, RenewableEnergy.ObjectSystem
-local GasifierObject = RenewableEnergy.GasifierObject
 
 local GasifierSystem = ObjectSystem.define({
     name = "Gasifier", kind = "gasifier", owner = Gasifier, Object = GasifierObject, isObject = Gasifier.isGasifier,

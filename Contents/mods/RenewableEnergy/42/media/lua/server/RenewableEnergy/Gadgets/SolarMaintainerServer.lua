@@ -4,15 +4,13 @@
 if isClient() then return end
 
 require "Vehicles/Vehicles"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local Items = require "cf_commonlib/Items"
 
-local SolarMaintainer, VehicleBattery = RenewableEnergy.SolarMaintainer, RenewableEnergy.VehicleBattery
-local Battery, Specs, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun
 local ATTACHED_KEY = SolarMaintainer.ATTACHED_KEY
 
 --- Takes `item` out of its container and clips it to the vehicle. Returns whether it did.

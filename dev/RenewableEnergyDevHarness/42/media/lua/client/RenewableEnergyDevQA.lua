@@ -152,28 +152,26 @@ local STATIONS = {
 
 -- Where the layout may lay an item: open ground a character can walk onto (Stage.isOpenGround),
 -- whatever stands there but a tree or a wall.
-local function isNotTree(object)
-    return object:getType() ~= IsoObjectType.tree
+local function isLayable(object)
+    local square = object:getSquare()
+    return object:getType() ~= IsoObjectType.tree and object ~= square:getWall(true) and object ~= square:getWall(false)
 end
+local OPEN_GROUND = { free = true, allows = isLayable }
 
 local function isWalkableGround(square)
-    return Harness.isOpenGround(square, { free = true, allows = isNotTree })
-        and square:getWall(true) == nil and square:getWall(false) == nil
+    return Harness.isOpenGround(square, OPEN_GROUND)
 end
 
 local function rowOpen(square, length)
     return Harness.isAreaOpen(square, length, 1, isWalkableGround)
 end
 
-local function lotOpen(square)
-    return Harness.isAreaOpen(square, ROW, LOT_ROWS, isWalkableGround)
-end
-
 -- The layout's north-west corner: the closest whose whole lot is open, else the closest open row,
--- from which the layout skips what stands in its way.
+-- from which the layout skips what stands in its way; and whether the whole lot is open.
 local function layoutOrigin(player)
-    return Harness.closestSquare(player, lotOpen)
-        or Harness.closestSquare(player, function(square) return rowOpen(square, ROW) end)
+    local lot = Harness.findLot(player, ROW, LOT_ROWS, OPEN_GROUND)
+    local row = lot or Harness.findLot(player, ROW, 1, OPEN_GROUND)
+    return row and Harness.lotSquare(row, 0, 0), lot ~= nil
 end
 
 -- The layout: rows ROW squares wide from `origin`, south one after the other, skipping squares
@@ -268,12 +266,14 @@ local function addStock(stock, fullType, used, kept, fluid, worn)
     entry.kept = math.max(entry.kept, kept)
 end
 
--- Everything the scenario hands out: every item of the mod, what the recipes take, the batteries
--- and modules among them worn, and what the menu jobs take.
+-- Everything the scenario hands out: every item of the mod a player can hold, what the recipes
+-- take, the batteries and modules among them worn, and what the menu jobs take.
 local function collectStock(summary)
     local stock = { byKey = {} }
-    for _, fullType in ipairs(RenewableEnergy.Debug.ITEMS) do
-        addStock(stock, fullType, 1, 0)
+    for _, fullType in ipairs(RenewableEnergy.Debug.items()) do
+        if not RenewableEnergy.Debug.PART_ITEMS[fullType] then
+            addStock(stock, fullType, 1, 0)
+        end
     end
     local needs
     needs, summary.unmatched = HarnessQA.materials(HarnessQA.modRecipeNames(), RenewableEnergy.Debug.PREFERRED_INPUTS)
@@ -439,13 +439,12 @@ function QA.setup(player)
         unknown = {}, unplaced = {}, unmatched = {}, unsorted = {} }
     local stock = collectStock(summary)
     packToolboxes(player, stock, summary)
-    local origin = layoutOrigin(player)
+    local origin, wholeLot = layoutOrigin(player)
     if not origin then
         print(MARK .. " no open row of " .. ROW .. " squares within " .. Harness.SEARCH_RADIUS .. " squares")
         return summary
     end
-    summary.lot = lotOpen(origin)
-    summary.origin = origin
+    summary.lot = wholeLot
     layGroups(newLayout(origin), stock, summary)
     -- At the head of the layout, with a table to craft at beside it.
     PZHarness.Fixtures.teleportToMiddle(player, origin:getX(), origin:getY(), origin:getZ())

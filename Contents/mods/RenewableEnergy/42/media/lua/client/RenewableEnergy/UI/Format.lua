@@ -2,9 +2,8 @@
 -- same in every language, so they are not translated (m³ is a translation key only for its
 -- character; see Format.cubicMetres).
 
-require "RenewableEnergy/Utilities"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
 
-RenewableEnergy = RenewableEnergy or {}
 local Format = {}
 RenewableEnergy.Format = Format
 

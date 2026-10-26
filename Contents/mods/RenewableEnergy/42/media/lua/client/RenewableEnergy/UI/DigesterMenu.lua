@@ -2,34 +2,22 @@
 -- Feeding is the loot window's: the hopper is its container. The jobs' options are cf_commonlib's
 -- JobOptions'.
 
-require "ISUI/ISWorldObjectContextMenu"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/Biogas/DigesterJobs"
-require "RenewableEnergy/Biogas/GasHeater"
-require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
-require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/ObjectWindow"
-require "RenewableEnergy/UI/DigesterWindow"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local Format = require "RenewableEnergy/UI/Format"
+local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
+local DigesterWindow = require "RenewableEnergy/UI/DigesterWindow"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
 
-RenewableEnergy = RenewableEnergy or {}
 local DigesterMenu = {}
-RenewableEnergy.DigesterMenu = DigesterMenu
-
-local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local ObjectWindow, DigesterWindow, Format = RenewableEnergy.ObjectWindow, RenewableEnergy.DigesterWindow, RenewableEnergy.Format
-local Action = RenewableEnergyGasAction
 
 -- The job's name, with what it has to go on as an eyeball share, as vanilla's Get Compost (45%).
 local function label(job, share)
     local name = getText(Action.labelKey(job))
     return share and name .. " (" .. Format.percent(share) .. ")" or name
-end
-
--- Adds the option for `feature`'s `job`, with `item` the item it works with.
-local function addJob(menu, playerNum, feature, job, target, item, text)
-    return JobOptions.add(menu, playerNum, Action, feature, job, target, item, text or label(job))
 end
 
 -- Take Sludge, into each bag that takes it, as vanilla's Get Compost lists them with the share of
@@ -47,18 +35,18 @@ end
 -- the one there.
 local function addGasBag(menu, playerNum, digester, summary)
     local bagMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_GasBag"))
-    addJob(bagMenu, playerNum, "digester", DigesterJobs.FIT_BAGS, digester)
+    JobOptions.add(bagMenu, playerNum, Action, "digester", DigesterJobs.FIT_BAGS, digester)
     local tarps = DigesterJobs.tarpBags(getSpecificPlayer(playerNum))
     if #tarps == 0 then
-        addJob(bagMenu, playerNum, "digester", DigesterJobs.FIT_TARP, digester)
+        JobOptions.add(bagMenu, playerNum, Action, "digester", DigesterJobs.FIT_TARP, digester)
     end
     for _, tarp in ipairs(tarps) do
-        local option = addJob(bagMenu, playerNum, "digester", DigesterJobs.FIT_TARP, digester, tarp,
+        local option = JobOptions.add(bagMenu, playerNum, Action, "digester", DigesterJobs.FIT_TARP, digester, tarp,
             label(DigesterJobs.FIT_TARP, tarp:getCondition() / tarp:getConditionMax()))
         option.itemForTexture = tarp
     end
     if summary.holder ~= "none" then
-        addJob(bagMenu, playerNum, "digester", DigesterJobs.TAKE_OFF_BAG, digester)
+        JobOptions.add(bagMenu, playerNum, Action, "digester", DigesterJobs.TAKE_OFF_BAG, digester)
     end
 end
 
@@ -73,12 +61,12 @@ function DigesterMenu.addOptions(playerNum, context, digester)
         DigesterWindow)
 
     addSludge(menu, playerNum, digester, summary)
-    addJob(menu, playerNum, "digester", DigesterJobs.VENT, digester, nil,
+    JobOptions.add(menu, playerNum, Action, "digester", DigesterJobs.VENT, digester, nil,
         label(DigesterJobs.VENT, summary.capacity > 0 and summary.gas / summary.capacity or nil))
     if Digester.TIERS[summary.tier].gasBag then
         addGasBag(menu, playerNum, digester, summary)
     end
-    addJob(menu, playerNum, "digester", DigesterJobs.UPGRADE, digester)
+    JobOptions.add(menu, playerNum, Action, "digester", DigesterJobs.UPGRADE, digester)
 
     -- Each way of filling, then what to fill: the emptiest tank, torch and bottle carried, each
     -- with how full it is.
@@ -89,40 +77,30 @@ function DigesterMenu.addOptions(playerNum, context, digester)
         end)
     end
     if not summary.scrubber then
-        addJob(menu, playerNum, "digester", DigesterJobs.FIT_SCRUBBER, digester)
+        JobOptions.add(menu, playerNum, Action, "digester", DigesterJobs.FIT_SCRUBBER, digester)
         return menu
     end
     local refillMenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_RefillScrubber"))
     for _, job in ipairs({ DigesterJobs.REFILL_WATER, DigesterJobs.REFILL_ASH, DigesterJobs.REFILL_LIME, DigesterJobs.REFILL_WOOL }) do
-        addJob(refillMenu, playerNum, "digester", job, digester)
+        JobOptions.add(refillMenu, playerNum, Action, "digester", job, digester)
     end
-    addJob(refillMenu, playerNum, "digester", DigesterJobs.REFILL_SPONGE, digester, DigesterJobs.spongeToPack(character))
+    JobOptions.add(refillMenu, playerNum, Action, "digester", DigesterJobs.REFILL_SPONGE, digester,
+        DigesterJobs.spongeToPack(character))
     return menu
 end
 
 --- Adds a gas heater's option to `context`: light it, or put it out. Returns the option.
 function DigesterMenu.addHeaterOptions(playerNum, context, heater)
     local job = GasHeater.isLit(heater) and GasHeater.OFF or GasHeater.LIGHT
-    return addJob(context, playerNum, "heater", job, heater)
+    return JobOptions.add(context, playerNum, Action, "heater", job, heater)
 end
 
-function DigesterMenu.onFill(playerNum, context, worldobjects, test)
-    local digester = Needs.findClicked(worldobjects, Digester.isDigester)
-    local heater = Needs.findClicked(worldobjects, GasHeater.isHeater)
-    if not (digester or heater) then
-        return
-    end
-    if test then
-        return ISWorldObjectContextMenu.setTest()
-    end
-    if digester then
-        DigesterMenu.addOptions(playerNum, context, digester)
-    end
-    if heater then
-        DigesterMenu.addHeaterOptions(playerNum, context, heater)
-    end
-end
+JobOptions.onWorldMenu(Digester.isDigester, function(context, playerNum, character, digester)
+    DigesterMenu.addOptions(playerNum, context, digester)
+end)
 
-Events.OnFillWorldObjectContextMenu.Add(DigesterMenu.onFill)
+JobOptions.onWorldMenu(GasHeater.isHeater, function(context, playerNum, character, heater)
+    DigesterMenu.addHeaterOptions(playerNum, context, heater)
+end)
 
 return DigesterMenu

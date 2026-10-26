@@ -5,9 +5,7 @@
 -- World spawns and the server's wiring move items without it.
 
 require "TimedActions/ISInventoryTransferAction"
-require "RenewableEnergy/PowerBank/PowerBank"
-
-local PowerBank = RenewableEnergy.PowerBank
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 
 -- Whether `item` sits wired into a bank's container.
 local function isWiredIn(item, container)

@@ -1,13 +1,11 @@
 -- The mod's chances and random picks. Every one draws on Chance.roll, so a test can set the roll
 -- and check either side of a chance instead of rolling it many times.
 
-require "RenewableEnergy/Specs"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
 
-RenewableEnergy = RenewableEnergy or {}
 local Chance = {}
 RenewableEnergy.Chance = Chance
-
-local Specs = RenewableEnergy.Specs
 
 --- A roll, 0 up to but not including 1.
 function Chance.roll()

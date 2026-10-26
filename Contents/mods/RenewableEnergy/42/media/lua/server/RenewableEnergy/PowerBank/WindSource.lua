@@ -4,19 +4,15 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/StormNotice"
-require "RenewableEnergy/Wind"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local StormNotice = require "RenewableEnergy/StormNotice"
+local Wind = require "RenewableEnergy/Wind"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Tiles = require "cf_commonlib/Tiles"
-
-RenewableEnergy = RenewableEnergy or {}
-local Chance, Specs, StormNotice, Wind = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.StormNotice, RenewableEnergy.Wind
-local PowerBank, Sources, Sprites = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Sprites
 
 local WindSource = {}
 RenewableEnergy.WindSource = WindSource

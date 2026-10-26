@@ -6,11 +6,10 @@
 -- A global, as the server finds the class by its Type (NetTimedAction.parse).
 
 require "TimedActions/ISBaseTimedAction"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Treadmill"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Clock = require "cf_commonlib/Clock"
 local JobAction = require "cf_commonlib/JobAction"
 local Squares = require "cf_commonlib/Squares"
@@ -18,8 +17,6 @@ local Squares = require "cf_commonlib/Squares"
 RenewableEnergyTreadmillAction = ISBaseTimedAction:derive("RenewableEnergyTreadmillAction")
 
 local Action = RenewableEnergyTreadmillAction
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
-local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 -- Endurance below which the runner gives up, as vanilla stops a sprint (IsoPlayer, exhausted).
 local GIVE_UP_ENDURANCE = 0.1
@@ -156,7 +153,8 @@ local function settle(self, share)
     end
     local spec, character = Specs.treadmill, self.character
     if self.wired then
-        if not PowerBank.perform(character, "runTreadmill", { source = PowerBank.positionOf(self.object), hours = hours }) then
+        -- Server code, which loads after this file.
+        if not RenewableEnergy.TreadmillSource.credit(self.object, hours) then
             return false
         end
     elseif not drew then
@@ -207,3 +205,5 @@ function Action:new(character, object)
     o.maxTime = o:getDuration()
     return o
 end
+
+return Action

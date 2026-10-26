@@ -4,9 +4,7 @@
 
 require "Vehicles/ISUI/ISVehicleMechanics"
 require "Vehicles/ISUI/ISVehiclePartMenu"
-require "RenewableEnergy/Biogas/Digester"
-
-local Digester = RenewableEnergy.Digester
+local Digester = require "RenewableEnergy/Biogas/Digester"
 
 -- The compressor `player` carries, if it can be plugged in where they stand, else nil. The offer
 -- and the click both ask this, so the click does what the offer promised.

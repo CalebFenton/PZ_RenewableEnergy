@@ -11,13 +11,13 @@ require "Vehicles/ISUI/ISVehicleMechanics"
 require "Vehicles/TimedActions/ISPathFindAction"
 require "Vehicles/TimedActions/ISOpenVehicleDoor"
 require "Vehicles/TimedActions/ISUnlockVehicleDoor"
-require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local Items = require "cf_commonlib/Items"
 
-RenewableEnergy = RenewableEnergy or {}
 local BatteryBoxLid = {}
 RenewableEnergy.BatteryBoxLid = BatteryBoxLid
-
-local Action = RenewableEnergyAction
 
 -- The lid's own text for each of vanilla's trunk texts it would show.
 local TEXTS = {
@@ -47,28 +47,18 @@ function BatteryBoxLid.padlockCutters(character, lid)
     if not (isLid(lid) and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
         return nil
     end
-    local held = character:getPrimaryHandItem()
-    if Action.isBoltCutters(held) then
-        return held
-    end
-    return character:getInventory():getFirstEvalRecurse(Action.isBoltCutters)
+    return Items.toolFor(character, VehicleJobs.isBoltCutters)
 end
 
 --- Walks to the box, takes the cutters in hand and cuts the padlock off, as vanilla's part jobs
 --- walk to the part's area and equip their tools (ISVehiclePartMenu).
 function BatteryBoxLid.cutPadlock(character, lid, cutters)
-    local vehicle = lid:getVehicle()
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, lid:getArea()))
-    local twoHands = instanceof(cutters, "HandWeapon") and cutters:isTwoHandWeapon()
-    ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), cutters, true, twoHands)
-    ISTimedActionQueue.add(Action:new(character, Action.CUT_PADLOCK, nil, nil, vehicle, cutters))
+    Action.queue(character:getPlayerNum(), "vehicle", VehicleJobs.CUT_PADLOCK, lid:getVehicle(), cutters)
 end
 
 --- Walks to the box and flips the lamps' switch inside it to `on`.
 function BatteryBoxLid.flipSwitch(character, vehicle, on)
-    local box = vehicle:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
-    ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, box:getArea()))
-    ISTimedActionQueue.add(Action:new(character, on and Action.BOARD_ON or Action.BOARD_OFF, nil, nil, vehicle))
+    Action.queue(character:getPlayerNum(), "vehicle", on and VehicleJobs.BOARD_ON or VehicleJobs.BOARD_OFF, vehicle)
 end
 
 -- Adds the switch's slice for a character standing at an arrow board's battery box: Switch Lamps

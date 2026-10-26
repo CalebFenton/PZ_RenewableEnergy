@@ -6,15 +6,12 @@
 -- places of the chargers it has seen, and charges them
 -- (server/RenewableEnergy/Gadgets/SolarCellChargerServer.lua).
 
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-local Squares = require "cf_commonlib/Squares"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Sprites = require "RenewableEnergy/Sprites"
 
-RenewableEnergy = RenewableEnergy or {}
 local SolarCellCharger = {}
 RenewableEnergy.SolarCellCharger = SolarCellCharger
-local Sprites = RenewableEnergy.Sprites
 
 SolarCellCharger.ITEM = "RenewableEnergy.SolarCellCharger"
 SolarCellCharger.BATTERY = "Base.Battery"
@@ -39,16 +36,12 @@ function SolarCellCharger.acceptItem(container, item)
     return SolarCellCharger.isCell(item) and container:getItems():size() < SolarCellCharger.SLOTS
 end
 
-function SolarCellCharger.findOn(square)
-    return Squares.findObjectOn(square, SolarCellCharger.isCharger)
-end
-
 local function adoptContainer(isoObject)
     RenewableEnergy.adoptContainer(isoObject:getContainer(), ACCEPT_FUNCTION)
 end
 
 -- Every side needs the filter, but only the authority charges, so only it keeps places.
-local chargers = RenewableEnergy.PlaceTracker.new({
+local chargers = PlaceTracker.new({
     sprites = { Sprites.cellCharger },
     matches = SolarCellCharger.isCharger,
     onFound = adoptContainer,

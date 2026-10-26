@@ -14,34 +14,22 @@ RenewableEnergy = RenewableEnergy or {}
 local Debug = {}
 RenewableEnergy.Debug = Debug
 
--- Every item this mod defines that a player can hold, in the order the README shows them.
-Debug.ITEMS = {
-    "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule", "RenewableEnergy.SolarCells",
-    "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWallWood", "RenewableEnergy.SolarWallMetal",
-    "RenewableEnergy.SolarRackWood", "RenewableEnergy.SolarRackMetal",
-    "RenewableEnergy.BatteryBoxWood", "RenewableEnergy.BatteryBoxMetal",
-    "RenewableEnergy.BatteryRackWood", "RenewableEnergy.BatteryRackMetal",
-    "RenewableEnergy.BatteryBankWood", "RenewableEnergy.BatteryBankMetal",
-    "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger",
-    "RenewableEnergy.MakeshiftInverter", "RenewableEnergy.HomemadeInverter", "RenewableEnergy.MicrowaveTransformer",
-    "RenewableEnergy.ChargeController", "RenewableEnergy.SolarFailsafe",
-    "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery",
-    "RenewableEnergy.CarBatteryCase", "RenewableEnergy.DeepCycleBatteryCase", "RenewableEnergy.L16BatteryCase",
-    "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlates", "RenewableEnergy.WoodenBatteryPlatePattern",
-    "RenewableEnergy.BatteryPlateMoldUnfired", "RenewableEnergy.BatteryPlateMold", "RenewableEnergy.BatteryElectrolyte",
-    "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger", "RenewableEnergy.SolarGardenLight",
-    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
-    "RenewableEnergy.CrowcallRoadMap", "RenewableEnergy.DixieTrailerParkMap",
-    "RenewableEnergy.WoodAsh", "RenewableEnergy.GasConversionKit", "RenewableEnergy.TarpGasBag", "RenewableEnergy.IronSponge",
-    "RenewableEnergy.SpentIronSponge", "RenewableEnergy.FridgeCompressor",
-    "RenewableEnergy.GasHeater", "RenewableEnergy.TarryPacking", "RenewableEnergy.FemaPamphlet",
-    "RenewableEnergy.TreadmillMotor", "RenewableEnergy.WoodenBlades", "RenewableEnergy.PipeBlades",
-    "RenewableEnergy.SteelBlades", "RenewableEnergy.BrokenWoodenBlades", "RenewableEnergy.BrokenPipeBlades",
-    "RenewableEnergy.BrokenSteelBlades", "RenewableEnergy.HomemadeAlternator", "RenewableEnergy.HomesteadPowerMag4",
-    "RenewableEnergy.CarAlternator",
-}
--- Items that only ever sit in a vehicle part.
-Debug.PART_ITEMS = { "RenewableEnergy.TrailerFrame" }
+-- Items that only ever sit in a vehicle part, by full type.
+Debug.PART_ITEMS = { ["RenewableEnergy.TrailerFrame"] = true }
+
+--- Every item of this mod's scripts by full type, sorted so the layouts come out the same each run.
+function Debug.items()
+    local found, items = {}, getScriptManager():getAllItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if item:getModuleName() == "RenewableEnergy" then
+            table.insert(found, item:getFullName())
+        end
+    end
+    table.sort(found)
+    return found
+end
+
 -- Inputs naming several items take the first listed here, else the harness's pick (T.inputItem),
 -- which for a tag can differ from run to run; so every tag input the recipes have is listed, and
 -- the QA layout, its toolboxes and the promo's recipe sheet come out the same each run.

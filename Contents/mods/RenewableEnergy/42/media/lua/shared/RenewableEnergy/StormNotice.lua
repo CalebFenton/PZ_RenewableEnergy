@@ -2,13 +2,9 @@
 -- (PanelSource, PanelStorms, ArrowBoard) on the authority, which tells every client where; each
 -- plays the sound there, if it has the square loaded, and tells its local players in earshot.
 
-require "RenewableEnergy/Specs"
+local Specs = require "RenewableEnergy/Specs"
 
-RenewableEnergy = RenewableEnergy or {}
 local StormNotice = {}
-RenewableEnergy.StormNotice = StormNotice
-
-local Specs = RenewableEnergy.Specs
 
 StormNotice.COMMAND_MODULE, StormNotice.DAMAGE_COMMAND = "RenewableEnergyStorm", "damage"
 -- What `what` names for a cracked module; any other is the material of blades that broke.

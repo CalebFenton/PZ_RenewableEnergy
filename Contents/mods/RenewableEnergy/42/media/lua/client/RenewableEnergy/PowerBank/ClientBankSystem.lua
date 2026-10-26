@@ -6,14 +6,11 @@
 -- sound runs), give the container its unsaved, unsent filter, and release the squares a running
 -- bank powered when it is removed.
 
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/PowerBank/PowerBank"
+local Sprites = require "RenewableEnergy/Sprites"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local ClientObjects = require "cf_commonlib/ClientObjects"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
-
-local PowerBank, PlaceTracker = RenewableEnergy.PowerBank, RenewableEnergy.PlaceTracker
-local Sprites = RenewableEnergy.Sprites
 
 local function adoptCopy(isoObject)
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)

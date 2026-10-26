@@ -5,18 +5,17 @@
 -- tile isn't there any more is dropped while the places are walked; MapObjects reports the tile
 -- again when its chunk loads. A tile leaving its square is dropped at once.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local PlaceTracker = {}
 PlaceTracker.__index = PlaceTracker
 RenewableEnergy.PlaceTracker = PlaceTracker
 
 -- Its own priority, apart from the systems' loaders of the same sprites (Sprites.LOAD_PRIORITY).
 -- Every tracker shares it, so no two trackers may take the same sprite.
-local LOAD_PRIORITY = RenewableEnergy.Sprites.LOAD_PRIORITY + 1
+local LOAD_PRIORITY = Sprites.LOAD_PRIORITY + 1
 -- World squares lie well under this in x and y, so a place key stays unique and exact in a double.
 local SPAN = 1e6
 

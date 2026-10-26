@@ -7,7 +7,7 @@ require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
+local handler, need = PZHarness.serverHandler, PZHarness.need
 
 -- Forgets the building's rural find roll so that it can be rolled again, and when the test ends
 -- puts the roll back and takes out the reading the test's rolls left (the gasifier's pamphlet,
@@ -26,8 +26,8 @@ local function forgetRoll(def, defer)
     store[key] = nil
 end
 
--- Where each placed find stands, and with `def` how far out from it; each is taken away when the
--- test ends.
+-- Where each placed find stands and how far out from the building `def`; each is taken away when
+-- the test ends.
 local function track(placed, defer, def)
     local positions = {}
     for kind, object in pairs(placed) do
@@ -35,31 +35,10 @@ local function track(placed, defer, def)
         local square = object:getSquare()
         local x, y = square:getX(), square:getY()
         positions[kind] = { x = x, y = y, z = square:getZ(), outdoors = square:isOutside() and square:getBuilding() == nil,
-            out = def and RenewableEnergy.RuralFinds.distanceOutside(def, x, y) }
+            out = RenewableEnergy.RuralFinds.distanceOutside(def, x, y) }
     end
     return positions
 end
-
--- The building near the character, its roll forgotten, is rolled for the find `args.kind` with
--- every roll at 0, which hits at any Solar Sites above 0, then rolled again. Answers where the find
--- stands, whether the roll was kept and how many finds the second roll placed.
-handler("ruralFind", function(player, args, defer)
-    local RuralFinds = RenewableEnergy.RuralFinds
-    local def = Helpers.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60)
-    if not def then
-        return nil, "a building near the character on the server"
-    end
-    forgetRoll(def, defer)
-    local restoreRoll = Helpers.forceRolls(defer, 0)
-    local found = track(RuralFinds.roll(def, { args.kind }), defer, def)
-    local again = track(RuralFinds.roll(def, { args.kind }), defer, def)
-    restoreRoll()
-    local rolled = RuralFinds.rolled(def)
-    if not found[args.kind] then
-        return nil, "a square for the " .. args.kind .. " by the building at " .. RenewableEnergy.BuildingWatch.key(def)
-    end
-    return { at = found[args.kind], kept = rolled ~= nil and rolled[args.kind] == true, again = Helpers.count(again) }
-end)
 
 -- The building at x, y of the map: { ready = false, why } until the world has rolled it, which it
 -- does once the building's surroundings have loaded here. Then the finds the world's roll gave it
@@ -77,7 +56,7 @@ handler("ruralFindAt", function(_, args, testDefer)
         return { ready = false, why = square and "no building at the square" or "the square not loaded" }
     end
     local def = building:getDef()
-    local worldRoll = RuralFinds.rolled(def)
+    local worldRoll = Helpers.buildingRoll(RuralFinds.MOD_DATA, def)
     if not worldRoll then
         return { ready = false, why = "the world never rolled the building at " .. RenewableEnergy.BuildingWatch.key(def) }
     end
@@ -99,9 +78,7 @@ handler("ruralFindAt", function(_, args, testDefer)
     forgetRoll(def, defer)
     local pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET)
     local magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE)
-    local restoreRoll = Helpers.forceRolls(defer, 0)
-    local found = track(RuralFinds.roll(def), defer, def)
-    restoreRoll()
+    local found = track(Helpers.withRolls(defer, 0, RuralFinds.roll, def), defer, def)
     local answer = { ready = true, world = world, standing = standing, qualifies = RuralFinds.findsFor(def), found = found,
         pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET) - pamphlets,
         magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE) - magazines,
@@ -110,31 +87,32 @@ handler("ruralFindAt", function(_, args, testDefer)
     return answer
 end)
 
--- The building near the character, its roll forgotten, rolled once for every find the way the
--- world rolls it, every roll set to `args.roll`. Answers each find's chance and how many the roll
--- placed.
+-- The building near the character, its roll forgotten, is rolled for the finds `args.kinds`
+-- (default every find) the way the world rolls it, then again, every roll at 0, which hits any
+-- chance above 0. Answers each find's chance, where each find the first roll placed stands and how
+-- many it placed, which finds the roll kept, and how many finds the second roll placed.
 handler("ruralFindsRoll", function(player, args, defer)
     local RuralFinds = RenewableEnergy.RuralFinds
-    local def = Helpers.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60)
-    if not def then
-        return nil, "a building near the character on the server"
-    end
+    local def = need(Helpers.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60),
+        "a building near the character on the server")
     forgetRoll(def, defer)
-    local kinds, chances = {}, {}
+    local kinds, chances = args.kinds or {}, {}
     for kind in pairs(RuralFinds.FINDS) do
-        table.insert(kinds, kind)
         chances[kind] = RuralFinds.chanceFor(kind)
+        if not args.kinds then
+            table.insert(kinds, kind)
+        end
     end
-    local restoreRoll = Helpers.forceRolls(defer, args.roll)
-    local placed = Helpers.count(track(RuralFinds.roll(def, kinds), defer))
-    restoreRoll()
-    return { chances = chances, placed = placed }
+    local found, again = Helpers.withRolls(defer, 0, function()
+        return track(RuralFinds.roll(def, kinds), defer, def), track(RuralFinds.roll(def, kinds), defer, def)
+    end)
+    return { chances = chances, found = found, placed = Helpers.count(found), kept = Helpers.buildingRoll(RuralFinds.MOD_DATA, def),
+        again = Helpers.count(again) }
 end)
 
 -- Empties the gasifier's filter at x, y, z, as a player taking out the spent packing would.
 handler("ruralFindEmptyFilter", function(_, args)
-    local _, object, missing = Helpers.recordAt({ kind = "gasifier", x = args.x, y = args.y, z = args.z })
-    if not object then return nil, missing end
+    local _, object = Helpers.recordAt({ kind = "gasifier", x = args.x, y = args.y, z = args.z })
     Helpers.emptyContainer(RenewableEnergy.Gasifier.filterOf(object))
     return {}
 end)

@@ -1,0 +1,129 @@
+-- The hands-on jobs at a vehicle: a Solar Maintainer clipped on or off, a car's alternator taken
+-- out or put back, and the arrow board trailer's switch, padlock and panels. What each takes of the
+-- character and what refuses it (cf_commonlib's Jobs); RenewableEnergy.JobSites.vehicle does them.
+-- A job at a vehicle reaches at waist height, from the area of the part it works on.
+
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Recipes = require "RenewableEnergy/Recipes"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
+local Items = require "cf_commonlib/Items"
+local Jobs = require "cf_commonlib/Jobs"
+
+local VehicleJobs = {}
+RenewableEnergy.VehicleJobs = VehicleJobs
+
+VehicleJobs.ATTACH_MAINTAINER = "AttachMaintainer"
+VehicleJobs.DETACH_MAINTAINER = "DetachMaintainer"
+VehicleJobs.TAKE_OUT_ALTERNATOR = "TakeOutAlternator"
+VehicleJobs.PUT_BACK_ALTERNATOR = "PutBackAlternator"
+VehicleJobs.BOARD_ON = "BoardOn"
+VehicleJobs.BOARD_OFF = "BoardOff"
+VehicleJobs.CUT_PADLOCK = "CutPadlock"
+VehicleJobs.SEAL_PANEL = "RepairPanel"
+
+function VehicleJobs.isBoltCutters(item)
+    return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and Items.notBroken(item)
+end
+
+-- ArrowBoard is server code (server/RenewableEnergy/World/ArrowBoard.lua), which every side loads
+-- after the shared files, so it is looked up when a job asks.
+local function arrowBoard()
+    return RenewableEnergy.ArrowBoard
+end
+
+-- The vehicle area of `vehicle`'s part `id`.
+local function areaOf(vehicle, id)
+    return vehicle:getPartById(id):getArea()
+end
+
+-- Where a maintainer clips on: the vehicle's battery.
+local function atBattery(vehicle)
+    return VehicleBattery.partOf(vehicle):getArea()
+end
+
+-- Where the arrow board's switch is: in its battery box.
+local function atBox(vehicle)
+    return areaOf(vehicle, arrowBoard().BATTERY_BOX)
+end
+
+-- The arrow board's switch set to `on`.
+local function boardJob(on)
+    return {
+        on = on, minutes = 0.5, position = "Mid", doneSound = "LightSwitch", area = atBox,
+        blocker = function(character, vehicle) return not arrowBoard().canSwitch(vehicle, on) and "can't switch" or nil end,
+    }
+end
+
+-- An alternator hangs on two bolts and a belt tensioner: a wrench, and a little more skill than
+-- the battery's screwdriver.
+local SKILL = { perk = "Mechanics", need = 2 }
+local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+
+-- Take Out and Put Back Alternator (RenewableEnergy.CarAlternator), worked as vanilla works on an
+-- engine-bay part (ISUninstallVehiclePart). A shut hood isn't the menu's blocker, as the menu
+-- opens it first, as vanilla's engine jobs do.
+local function alternatorJob(putBack)
+    return {
+        units = function(vehicle, item, character) return CarAlternator.units(character) end,
+        metabolics = Metabolics.MediumWork, anim = "VehicleWorkOnMid",
+        area = function(vehicle) return areaOf(vehicle, CarAlternator.ENGINE) end,
+        blocker = function(character, vehicle)
+            return CarAlternator.blocker(character, vehicle, putBack)
+                or not CarAlternator.hoodOpen(vehicle) and "Tooltip_RenewableEnergy_HoodShut" or nil
+        end,
+        materials = putBack and { SKILL, WRENCH, { item = CarAlternator.ITEM, need = 1, keep = true } } or { SKILL, WRENCH },
+    }
+end
+
+-- Every job, by name (Jobs.define); `with` is the maintainer, alternator or bolt cutters a job
+-- works with, or the panel part Seal Cracked Panel seals.
+VehicleJobs.JOBS = {
+    [VehicleJobs.ATTACH_MAINTAINER] = {
+        minutes = 1, position = "Mid", sound = "GeneratorConnect", area = atBattery,
+        blocker = function(character, vehicle) return not SolarMaintainer.canAttach(vehicle) and "can't attach" or nil end,
+        withRefusal = function(character, vehicle, item)
+            return not Jobs.carries(character, item, Items.ofType(SolarMaintainer.ITEM))
+                and "no maintainer" or nil
+        end,
+    },
+    [VehicleJobs.DETACH_MAINTAINER] = {
+        minutes = 1, position = "Mid", area = atBattery,
+        blocker = function(character, vehicle) return not SolarMaintainer.isAttached(vehicle) and "not attached" or nil end,
+    },
+    [VehicleJobs.TAKE_OUT_ALTERNATOR] = alternatorJob(false),
+    [VehicleJobs.PUT_BACK_ALTERNATOR] = alternatorJob(true),
+    [VehicleJobs.BOARD_ON] = boardJob(true),
+    [VehicleJobs.BOARD_OFF] = boardJob(false),
+    -- A squeeze of the handles, far quicker than unbolting the lid, as vanilla works on a part at
+    -- waist height (ISUninstallVehiclePart), ending in the sound of a lock giving way, as when a
+    -- character forces a locked window (OpenWindowState).
+    [VehicleJobs.CUT_PADLOCK] = {
+        units = 100, anim = "VehicleWorkOnMid", doneSound = "BreakLockOnWindow", wield = true,
+        area = function(vehicle) return areaOf(vehicle, arrowBoard().LID) end,
+        blocker = function(character, vehicle)
+            local ArrowBoard = arrowBoard()
+            local lid = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(ArrowBoard.LID)
+            return not (lid and ArrowBoard.isPadlocked(lid)) and "not padlocked" or nil
+        end,
+        withRefusal = function(character, vehicle, cutters)
+            return not Jobs.carries(character, cutters, VehicleJobs.isBoltCutters) and "no bolt cutters" or nil
+        end,
+    },
+    -- Seal Cracked Module's twin for a panel still on the trailer.
+    [VehicleJobs.SEAL_PANEL] = {
+        units = function(vehicle, partId, character) return Recipes.sealInPlaceUnits(character) end,
+        light = true, position = "Mid", sound = "GeneratorRepair", area = areaOf,
+        needs = Recipes.sealInPlaceNeeds,
+        blocker = function(character, vehicle, partId)
+            return not arrowBoard().sealablePanel(vehicle, partId) and "Tooltip_RenewableEnergy_PanelSealedFully" or nil
+        end,
+    },
+}
+
+Jobs.define(VehicleJobs, {
+    subjectOf = function(vehicle) return instanceof(vehicle, "BaseVehicle") and vehicle or nil end, missing = "no vehicle",
+})
+
+return VehicleJobs

@@ -6,17 +6,13 @@
 
 require "Moveables/ISMoveableDefinitions"
 require "Moveables/ISMoveableSpriteProps"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/Chance"
-
-local Specs, PowerBank = RenewableEnergy.Specs, RenewableEnergy.PowerBank
-local Treadmill, SolarGardenLight = RenewableEnergy.Treadmill, RenewableEnergy.SolarGardenLight
-local Sprites = RenewableEnergy.Sprites
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Chance = require "RenewableEnergy/Chance"
 
 -- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Other placed objects
 -- have no CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
@@ -95,9 +91,9 @@ function ISMoveableSpriteProps:getScrapItemsList(character)
     if items and self.scrappingMainTile ~= false then
         if Treadmill.isSprite(self.spriteName) then
             table.insert(items.usable, Treadmill.MOTOR)
-        elseif containerOf(self.sprite) == "fridge" and character and RenewableEnergy.Chance.hit(scrapChance(self, "Fridge", character)) then
-            table.insert(items.usable, RenewableEnergy.Digester.COMPRESSOR)
-        elseif containerOf(self.sprite) == "microwave" and character and RenewableEnergy.Chance.hit(scrapChance(self, "Electric", character)) then
+        elseif containerOf(self.sprite) == "fridge" and character and Chance.hit(scrapChance(self, "Fridge", character)) then
+            table.insert(items.usable, Digester.COMPRESSOR)
+        elseif containerOf(self.sprite) == "microwave" and character and Chance.hit(scrapChance(self, "Electric", character)) then
             table.insert(items.usable, TRANSFORMER)
         end
     end

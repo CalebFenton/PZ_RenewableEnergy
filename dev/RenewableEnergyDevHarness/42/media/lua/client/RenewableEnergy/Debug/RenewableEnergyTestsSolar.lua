@@ -1,16 +1,13 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Sun"
 
 -- Solar: the sun model (Sun.lua) and panels feeding a bank (PowerBank/PanelSource.lua, Sources.lua):
 -- module condition, panel slots, reconnecting, snow and roofs.
 
 local T = RenewableEnergyTest
-local test, expect, expectNear = T.test, T.expect, T.expectNear
+local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
 local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
-local CAR_BATTERY = "Base.CarBattery1"
-local HOMEMADE = "RenewableEnergy.HomemadeSolarModule"
 
 -- Sun -----------------------------------------------------------------------------------------
 
@@ -84,7 +81,7 @@ test("renewable_energy_solar_sun_noon_dawn_night", {
     validate = function(self)
         expectNear("noon elevation on the solstice", self.noon, 90 - LATITUDE + 23.44, 0.1)
         expectNear("sun height at sunset", self.sunset, 0, 0.001)
-        expectNear("light at midnight", self.night, 0, 0)
+        expectEqual("light at midnight", self.night, 0)
         expectNear("sun height at the game's dawn", self.dawn, 0, 0.01)
         expect(self.noonWatts > self.morningWatts and self.noonWatts < Sun.FULL_SUN, string.format(
             "noon light on a flat panel is %.1f W/m², two hours earlier %.1f", self.noonWatts, self.morningWatts))
@@ -131,9 +128,9 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
     validate = function(self)
         expect(self.real > 0 and self.real <= 50, "a 50 W module in full sun makes " .. self.real .. " W")
         expectNear("a module at x3 over x1", self.boosted / self.real, 3, 0.0001)
-        expectNear("the same under snow", self.snowed, 0, 0)
-        expectNear("a cell with no square", self.noSquare, 0, 0)
-        expectNear("a cell under a roof at noon", self.indoors, 0, 0)
+        expectEqual("the same under snow", self.snowed, 0)
+        expectEqual("a cell with no square", self.noSquare, 0)
+        expectEqual("a cell under a roof at noon", self.indoors, 0)
         expectNear("a cell in the open at noon", self.outdoors, self.flatWatts, 0.0001)
         expect(self.outdoors > 0, "a cell in the open at noon makes nothing")
     end,
@@ -146,12 +143,12 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
 -- shattered module what the whole one makes alone. The cracked panel says why it is low.
 test("renewable_energy_solar_module_condition_sets_watts", {
     run = function(self)
-        local bank = T.bank(self, "batteryRackMetal", { CAR_BATTERY, Specs.controller }, { charge = 0.1 })
+        local bank = T.bank(self, "batteryRackMetal", { T.CAR_BATTERY, Specs.controller }, { charge = 0.1 })
         if not bank then return end
         self.bank = bank
         local modules = {
             T.factoryModules(50),
-            { { type = HOMEMADE, condition = getScriptManager():getItem(HOMEMADE):getConditionMax() } },
+            { { type = T.HOMEMADE_MODULE, condition = getScriptManager():getItem(T.HOMEMADE_MODULE):getConditionMax() } },
             T.factoryModules(100, 0),
         }
         local sprites = { Sprites.flat, Sprites.flat, Sprites.rack.metal.S }
@@ -177,8 +174,8 @@ test("renewable_energy_solar_module_condition_sets_watts", {
         expectNear("a module at condition 50 over a whole one", cracked.watts / whole, 0.5, 0.01)
         local made = homemade.watts / whole
         expect(made > 0 and made < 1, "a homemade module at its best makes " .. made .. " of a whole factory one")
-        expect(cracked.reason == "cracked", "the half-cracked panel's reason is " .. tostring(cracked.reason))
-        expect(cracked.modules[1] and cracked.modules[1].condition == 50, "the status lost the module's condition")
+        expectEqual("the half-cracked panel's reason", cracked.reason, "cracked")
+        expectEqual("the half-cracked panel's module condition", cracked.modules[1] and cracked.modules[1].condition, 50)
     end,
 })
 
@@ -188,8 +185,8 @@ test("renewable_energy_solar_module_condition_sets_watts", {
 -- and a controller's slots not counted.
 test("renewable_energy_solar_panel_slots", {
     run = function(self)
-        local box = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.1 })
-        local batteryRack = box and T.bank(self, "batteryRackWood", { CAR_BATTERY, Specs.controller }, { charge = 0.1 })
+        local box = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.1 })
+        local batteryRack = box and T.bank(self, "batteryRackWood", { T.CAR_BATTERY, Specs.controller }, { charge = 0.1 })
         if not batteryRack then return end
         self.rack = batteryRack
         self.boxPanels, self.rackPanels = {}, {}
@@ -204,7 +201,7 @@ test("renewable_energy_solar_panel_slots", {
         T.batch(function()
             if not (connect(self.boxPanels, box, Specs.freeSlots + 1)
                 and connect(self.rackPanels, batteryRack, Specs.freeSlots + Specs.slotsPerController + 1)) then return end
-            T.server(self, "removePart", { bank = batteryRack.position, type = Specs.controller })
+            T.server(self, "bankPart", { bank = batteryRack.position, type = Specs.controller, remove = true })
             T.bankPass(self, batteryRack, 1000)
         end)
     end,
@@ -215,29 +212,22 @@ test("renewable_energy_solar_panel_slots", {
                     .. tostring(panels[i].reason) .. ")")
             end
             local extra = panels[slots + 1]
-            expect(not extra.connected and extra.reason == "Tooltip_RenewableEnergy_NoInputSlot",
-                what .. " took a panel past its " .. slots .. " slots (" .. tostring(extra.reason) .. ")")
+            expect(not extra.connected, what .. " took a panel past its " .. slots .. " slots")
+            expectEqual(what .. ": the refusal of a panel past its slots", extra.reason, "Tooltip_RenewableEnergy_NoInputSlot")
         end
         expectSlots(self.boxPanels, Specs.freeSlots, "a battery box without a controller")
         local withController = Specs.freeSlots + Specs.slotsPerController
         expectSlots(self.rackPanels, withController, "a battery rack with a controller")
         local status = self.rack.state.status
         local slots, last, past = status.inputSlots, status.sources[Specs.freeSlots], status.sources[Specs.freeSlots + 1]
-        if not expect(#status.sources == withController, #status.sources .. " panels stayed connected when the controller left, expected "
-            .. withController) then return end
-        expect(slots.used == withController and slots.total == Specs.freeSlots,
-            "panel slots read " .. slots.used .. " of " .. slots.total)
-        expect(past.watts == 0 and past.reason == "noController",
-            "a panel past the slots makes " .. past.watts .. " W, reason " .. tostring(past.reason))
+        if not expectEqual("panels still connected when the controller left", #status.sources, withController) then return end
+        expectEqual("panel slots used", slots.used, withController)
+        expectEqual("panel slots in all", slots.total, Specs.freeSlots)
+        expectEqual("watts of a panel past the slots", past.watts, 0)
+        expectEqual("the reason of a panel past the slots", past.reason, "noController")
         expect(last.watts > 0, "the last panel within the free slots stopped making power")
     end,
 })
-
--- The status entry of the panel handle `panel` in a bank state, or an empty one when the status
--- doesn't list it.
-local function entryOf(state, panel)
-    return T.stateSource(state, panel.position) or {}
-end
 
 -- Connecting a panel again to the bank it feeds leaves it as it was, snow included, and a bank
 -- whose panel slots are all taken doesn't turn its own panel away as if there were no room.
@@ -247,17 +237,14 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not panel then return end
         self.panel = panel
-        local args = { bank = bank.position, source = panel.position }
         -- A refresh after each try builds the status from the record again, whatever the try sent.
-        local function tryAgain(key)
-            T.performInto(self, key, "connectSource", args)
-            T.perform(self, "refresh", { bank = bank.position })
-            T.bankState(self, bank)
-            T.step(function() self[key].state = bank.state end)
+        local function tryAgain(label)
+            T.job(self, "source", RenewableEnergy.SourceJobs.CONNECT, panel.position, bank.position, label)
+            T.server(self, "refreshBank", { bank = bank.position })
+            T.bankState(self, bank, label .. "State")
         end
         T.batch(function()
-            T.snowfall(self, bank)
-            T.step(function() self.snowed = entryOf(bank.state, panel).snow end)
+            T.snowfall(self, bank, nil, "snowed")
             tryAgain("again")
             self.second = T.panel(self, Sprites.flat, { near = bank, connect = true })
             if not self.second then return end
@@ -265,18 +252,17 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
         end)
     end,
     validate = function(self)
-        if not expect(self.panel.connected and self.second.connected, "connecting the panels failed ("
-            .. tostring(self.panel.reason) .. ", " .. tostring(self.second.reason) .. ")") then return end
-        if not expect((self.snowed or 0) > 0, "a night of snowfall left no snow on the panel") then return end
-        for _, case in ipairs({ { self.again, 1, "a bank" }, { self.full, 2, "a full bank" } }) do
-            local reply, panels, what = case[1], case[2], case[3]
-            expect(reply.state.sources == panels, "connecting a panel to " .. what .. " it feeds left "
-                .. reply.state.sources .. " panels")
+        if not (T.expectConnected(self.panel) and T.expectConnected(self.second)) then return end
+        local snowed = (T.stateSource(self.reads.snowed, self.panel.position) or {}).snow or 0
+        if not expect(snowed > 0, "a night of snowfall left no snow on the panel") then return end
+        for _, case in ipairs({ { "again", 1, "a bank" }, { "full", 2, "a full bank" } }) do
+            local state, panels, what = self.reads[case[1] .. "State"], case[2], case[3]
+            expectEqual("panels after connecting one again to " .. what .. " it feeds", state.sources, panels)
             -- Connecting brings the bank up to now first, which may melt a trace of it.
-            expectNear("snow on a panel connected again to " .. what .. " it feeds", entryOf(reply.state, self.panel).snow or -1,
-                self.snowed, 0.01)
+            expectNear("snow on a panel connected again to " .. what .. " it feeds",
+                (T.stateSource(state, self.panel.position) or {}).snow or -1, snowed, 0.01)
         end
-        expect(self.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
+        expect(self.reads.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
             "a full bank turned its own panel away for want of a slot")
     end,
 })
@@ -296,22 +282,21 @@ end
 -- the sun melts it, the rack's tilt sheds it faster, and mild air takes the rest.
 test("renewable_energy_solar_snow_settles_dims_and_melts", {
     run = function(self)
-        local bank = T.bank(self, "batteryRackWood", { CAR_BATTERY, Specs.controller }, { charge = 0.2 })
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, Specs.controller }, { charge = 0.2 })
         self.flat = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         self.rack = self.flat and T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
         self.clean = self.rack and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.clean then return end
         self.bank = bank
+        T.give(self, "broom", { { type = "Base.Broom" } })
         T.batch(function()
-            T.snowfall(self, bank, 2)
-            T.step(function() self.night = bank.state end)
-            T.perform(self, "clearSnow", { source = self.clean.position })
+            T.snowfall(self, bank, 2, "night")
+            T.job(self, "source", RenewableEnergy.SourceJobs.CLEAR_SNOW, self.clean.position, { type = "Base.Broom" })
         end)
         T.waitFor(self, function() return showsSnow(self.flat) and showsSnow(self.rack) end,
             "this client's copies of the snowy panels showing snow")
         T.step(function() self.cleanShowed = showsSnow(self.clean) end)
-        T.bankPass(self, bank, Sun.FULL_SUN, { airC = -10 })
-        T.step(function() self.sunny = bank.state end)
+        T.bankPass(self, bank, Sun.FULL_SUN, { airC = -10, label = "sunny" })
         T.waitFor(self, function() return showsSnow(self.flat) and not showsSnow(self.rack) end,
             "this client's copy of the rack showing its snow shed")
         T.bankPass(self, bank, Sun.FULL_SUN, { hours = 10 })
@@ -320,22 +305,24 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
     validate = function(self)
         local connected = self.flat.connected and self.rack.connected and self.clean.connected
         if not expect(connected, "connecting the panels failed") then return end
-        local flat, rack = entryOf(self.night, self.flat), entryOf(self.night, self.rack)
-        expect((flat.snow or 0) > 0 and rack.snow == flat.snow, string.format(
-            "a frosty night of snowfall left %s on the flat panel and %s on the rack", tostring(flat.snow), tostring(rack.snow)))
+        local function entryOf(label, panel) return T.stateSource(self.reads[label], panel.position) or {} end
+        local flat, rack = entryOf("night", self.flat), entryOf("night", self.rack)
+        expect((flat.snow or 0) > 0, "a frosty night of snowfall left no snow on the flat panel")
+        expectEqual("snow on the rack after the night", rack.snow, flat.snow)
         expect(not self.cleanShowed, "this client's copy of the swept panel still shows snow")
-        flat, rack = entryOf(self.sunny, self.flat), entryOf(self.sunny, self.rack)
-        local clean = entryOf(self.sunny, self.clean)
+        local night = flat.snow
+        flat, rack = entryOf("sunny", self.flat), entryOf("sunny", self.rack)
+        local clean = entryOf("sunny", self.clean)
         if not expect((clean.watts or 0) > 0, "the swept panel made nothing in full sun") then return end
         -- Snow covers its share of the panel, and that share of the sun goes nowhere.
         expectNear("the snowy flat panel's watts against the swept one's", flat.watts / clean.watts, 1 - flat.snow, 1e-6)
-        expectNear("the snowy flat panel's share of full sun", flat.fullSunPct, round(100 * (1 - flat.snow)), 0)
-        expect(flat.snow > 0 and flat.snow < entryOf(self.night, self.flat).snow,
-            "an hour of full sun took the flat panel's snow from " .. entryOf(self.night, self.flat).snow .. " to " .. flat.snow)
+        expectEqual("the snowy flat panel's share of full sun", flat.fullSunPct, round(100 * (1 - flat.snow)))
+        expect(flat.snow > 0 and flat.snow < night,
+            "an hour of full sun took the flat panel's snow from " .. night .. " to " .. flat.snow)
         expect(rack.snow < flat.snow, "the rack, which sheds snow, kept " .. rack.snow .. " against the flat panel's " .. flat.snow)
-        local thawed = entryOf(self.bank.state, self.flat)
-        expectNear("snow on the flat panel after a mild sunny day", thawed.snow, 0, 0)
-        expectNear("the thawed panel's share of full sun", thawed.fullSunPct, 100, 0)
+        local thawed = T.stateSource(self.bank.state, self.flat.position) or {}
+        expectEqual("snow on the flat panel after a mild sunny day", thawed.snow, 0)
+        expectEqual("the thawed panel's share of full sun", thawed.fullSunPct, 100)
     end,
 })
 
@@ -344,26 +331,25 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
 -- panel checked for being outdoors only when it is connected.
 test("renewable_energy_solar_roofed_panel_makes_nothing", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY }, { charge = 0.5 })
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         T.batch(function()
             T.bankPass(self, bank, 1000)
-            T.bankState(self, bank)
-            T.step(function() self.open = bank.state end)
-            T.server(self, "roofOver", self.panel.position)
+            T.bankState(self, bank, "open")
+            T.read(self, "roofOver", self.panel.position, "roofOver")
             T.bankPass(self, bank, 1000)
-            T.bankState(self, bank)
-            T.step(function() self.roofed = bank.state end)
+            T.bankState(self, bank, "roofed")
         end)
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
-        expect(self.open.status.solarW > 0, "the panel in the open made nothing at 1000 W/m²")
-        expect(self.server.roofOver.outside == false, "a floor built above the panel left its square outdoors")
-        expect(self.roofed.sources == 0, "the roofed panel still feeds the bank")
-        expectNear("solar watts under the roof", self.roofed.status.solarW, 0, 0)
-        expect(self.roofed.storedWh <= self.open.storedWh, string.format(
-            "the bank gained %.2f Wh in the hour after its panel was roofed over", self.roofed.storedWh - self.open.storedWh))
+        local open, roofed = self.reads.open, self.reads.roofed
+        expect(open.status.solarW > 0, "the panel in the open made nothing at 1000 W/m²")
+        expectEqual("whether the roofed panel's square is outdoors", self.reads.roofOver.outside, false)
+        expectEqual("panels feeding the roofed bank", roofed.sources, 0)
+        expectEqual("solar watts under the roof", roofed.status.solarW, 0)
+        expect(roofed.storedWh <= open.storedWh, string.format(
+            "the bank gained %.2f Wh in the hour after its panel was roofed over", roofed.storedWh - open.storedWh))
     end,
 })

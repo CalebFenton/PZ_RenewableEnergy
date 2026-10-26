@@ -1,23 +1,16 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "ISUI/ISContextMenu"
-require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Menu"
-require "RenewableEnergy/UI/StatusWindow"
 
 -- Power bank tests: the bank's context menu (UI/Menu.lua), wiring, repair and renaming from it.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
-local test, expect, expectNear, player, stateItem, copyItem = T.test, T.expect, T.expectNear, T.player, T.stateItem, T.copyItem
-local Action = RenewableEnergyAction
-local Specs = RenewableEnergy.Specs
-local PowerBank = RenewableEnergy.PowerBank
-local Menu, StatusWindow = RenewableEnergy.Menu, RenewableEnergy.StatusWindow
-local CAR_BATTERY = RenewableEnergy.VehicleBattery.CAR_BATTERY
-local PLUG_IN_INVERTER, POWER_INVERTER = T.PLUG_IN_INVERTER, T.POWER_INVERTER
+local test, expect, expectEqual = T.test, T.expect, T.expectEqual
+local player, stateItem, copyItem = T.player, T.stateItem, T.copyItem
+local Specs, Menu = RenewableEnergy.Specs, RenewableEnergy.Menu
+local PowerBank, BankJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs
 
 -- Whether the option's tooltip lists the item `fullType` in the colour for what the character is
 -- short of.
@@ -55,12 +48,12 @@ test("renewable_energy_bank_menu_lists_bank_options", {
         local submenu = Menu.addBankOptions(0, context, self.bank.object)
         expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Status")) ~= nil, "the bank menu has no status option")
         expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Rename")) ~= nil, "the bank menu has no Rename")
-        local turnOn = T.optionNamed(submenu, getText("ContextMenu_Turn_On"))
-        expect(turnOn ~= nil, "a bank that is off offers no Turn On")
-        expect(turnOn == nil or turnOn.notAvailable, "a bank without an inverter offers to turn on")
-        local wireIn = T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_WireIn"))
-        expect(wireIn ~= nil and wireIn.notAvailable and T.tooltipOf(wireIn) == getText("Tooltip_RenewableEnergy_NothingToWire"),
-            "with no part carried, Wire In isn't unavailable with the reason")
+        T.noteOption(self, "Turn On without an inverter", T.optionNamed(submenu, getText("ContextMenu_Turn_On")))
+        T.expectOptionRefused(self, "Turn On without an inverter")
+        T.noteOption(self, "Wire In with no part carried", T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_WireIn")))
+        T.expectOptionRefused(self, "Wire In with no part carried")
+        expectEqual("Wire In with no part carried's tooltip", self.menu["Wire In with no part carried"].tooltip,
+            getText("Tooltip_RenewableEnergy_NothingToWire"))
         expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Unwire")) == nil, "an empty bank offers to unwire something")
         context:hideAndChildren()
     end,
@@ -75,7 +68,7 @@ test("renewable_energy_bank_menu_ignores_other_objects", {
         local context = T.newContext()
         local before = context.numOptions
         Menu.onFill(0, context, { floor }, false)
-        expect(context.numOptions == before, "a plain floor got " .. (context.numOptions - before) .. " options")
+        expectEqual("options a plain floor added", context.numOptions - before, 0)
         context:hideAndChildren()
     end,
 })
@@ -102,31 +95,29 @@ test("renewable_energy_bank_menu_wire_in_options", {
                 end
             end
             local plugIn = T.optionFor(menu, self.items.parts[3])
-            self.withoutTools = { unavailable = plugIn ~= nil and plugIn.notAvailable, reason = T.tooltipOf(plugIn),
-                screwdriverShort = marksShort(plugIn, "Base.Screwdriver"), wireShort = marksShort(plugIn, PowerBank.WIRE) }
+            T.noteOption(self, "Wire In of the inverter without tools", plugIn)
+            self.short = { screwdriver = marksShort(plugIn, "Base.Screwdriver"), wire = marksShort(plugIn, PowerBank.WIRE) }
             context:hideAndChildren()
         end)
         local wire = PowerBank.wiringFor("RenewableEnergy.PlugInInverter").wire
         T.give(self, "tools", { { type = "Base.Screwdriver" }, { type = PowerBank.WIRE, count = wire } })
         T.step(function()
             local context = T.newContext()
-            local plugIn = T.optionFor(Menu.addWireInOptions(0, context, self.bank.object), self.items.parts[3])
-            self.withTools = { available = plugIn ~= nil and not plugIn.notAvailable, reason = T.tooltipOf(plugIn) }
+            T.noteOption(self, "Wire In of the inverter with tools",
+                T.optionFor(Menu.addWireInOptions(0, context, self.bank.object), self.items.parts[3]))
             context:hideAndChildren()
         end)
     end,
     validate = function(self)
-        expectNear("Wire In options for two batteries of one type", self.batteryTypes, 1, 0)
+        expectEqual("Wire In options for two batteries of one type", self.batteryTypes, 1)
         local name = getItemNameFromFullType("Base.CarBattery2")
         local wanted = { getText("ContextMenu_RenewableEnergy_PartCondition", name, "80%"),
             getText("ContextMenu_RenewableEnergy_PartCondition", name, "30%") }
-        expect(#self.labels == 2 and self.labels[1] == wanted[1] and self.labels[2] == wanted[2],
-            "the battery type lists " .. table.concat(self.labels, ", ") .. ", not " .. table.concat(wanted, ", "))
-        expect(self.withoutTools.unavailable and self.withoutTools.screwdriverShort and self.withoutTools.wireShort,
-            "Wire In doesn't grey out an inverter marking both the screwdriver and the wire short ("
-            .. tostring(self.withoutTools.reason) .. ")")
-        expect(self.withTools.available, "with a screwdriver and wire, the inverter can't be wired in ("
-            .. tostring(self.withTools.reason) .. ")")
+        expectEqual("the battery type's list", table.concat(self.labels, " | "), table.concat(wanted, " | "))
+        T.expectOptionRefused(self, "Wire In of the inverter without tools")
+        expect(self.short.screwdriver and self.short.wire,
+            "Wire In doesn't mark both the screwdriver and the wire short for the inverter")
+        T.expectOffered(self, "Wire In of the inverter with tools")
     end,
 })
 
@@ -138,32 +129,29 @@ local REPAIRED_INVERTER = WORN_INVERTER + Specs.partRepair.condition
 test("renewable_energy_bank_menu_repair_part", {
     instant = true,
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { POWER_INVERTER }, { outdoors = true })
+        local bank = T.bank(self, "batteryBoxWood", { T.POWER_INVERTER }, { outdoors = true })
         if not bank then return end
         self.bank = bank
-        T.setPartCondition(self, bank, POWER_INVERTER, WORN_INVERTER)
+        T.bankPart(self, bank, T.POWER_INVERTER, { condition = WORN_INVERTER })
         T.waitFor(self, function()
-            local inverter = copyItem(bank, POWER_INVERTER)
+            local inverter = copyItem(bank, T.POWER_INVERTER)
             return inverter ~= nil and inverter:getCondition() == WORN_INVERTER
         end, "this client's copy of the worn inverter")
         T.step(function()
             local context = T.newContext()
-            local option = T.optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
-            self.withoutScrap = { unavailable = option ~= nil and option.notAvailable, reason = T.tooltipOf(option),
-                scrapShort = marksShort(option, PowerBank.SCRAP) }
+            local option = T.optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, T.POWER_INVERTER))
+            T.noteOption(self, "Repair without scrap", option)
+            self.scrapShort = marksShort(option, PowerBank.SCRAP)
             context:hideAndChildren()
         end)
         T.give(self, "scrap", { { type = PowerBank.SCRAP } })
         T.step(function()
             local context = T.newContext()
-            local option = T.optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, POWER_INVERTER))
+            local option = T.optionFor(Menu.addRepairOptions(0, context, bank.object), copyItem(bank, T.POWER_INVERTER))
             context:hideAndChildren()
-            self.offered = option ~= nil and not option.notAvailable
-            if not self.offered then return end
-            T.standNextTo(bank.square)
-            T.choose(option)
+            if not T.chooseOption(self, "Repair with scrap", option, bank.square) then return end
             T.waitFor(self, function()
-                local inverter = copyItem(bank, POWER_INVERTER)
+                local inverter = copyItem(bank, T.POWER_INVERTER)
                 return inverter ~= nil and inverter:getCondition() == REPAIRED_INVERTER
             end, "this client's copy of the repaired inverter")
             T.bankState(self, bank)
@@ -171,14 +159,14 @@ test("renewable_energy_bank_menu_repair_part", {
         end)
     end,
     validate = function(self)
-        expect(self.withoutScrap.unavailable and self.withoutScrap.scrapShort,
-            "Repair isn't greyed out with the scrap marked short (" .. tostring(self.withoutScrap.reason) .. ")")
-        if not expect(self.offered, "with scrap in hand, Repair isn't offered for a worn inverter") then return end
-        local inverter = stateItem(self.bank.state, POWER_INVERTER)
+        T.expectOptionRefused(self, "Repair without scrap")
+        expect(self.scrapShort, "Repair doesn't mark the scrap short")
+        if not T.expectOffered(self, "Repair with scrap") then return end
+        local inverter = stateItem(self.bank.state, T.POWER_INVERTER)
         if not expect(inverter ~= nil, "repairing took the inverter out of the bank") then return end
-        expectNear("inverter condition after the repair", inverter.condition, REPAIRED_INVERTER, 0)
-        expectNear("scrap left", self.counts.scrap[PowerBank.SCRAP], 0, 0)
-        expectNear("scrap left on this client", player():getInventory():getCountTypeRecurse(PowerBank.SCRAP), 0, 0)
+        expectEqual("inverter condition after the repair", inverter.condition, REPAIRED_INVERTER)
+        expectEqual("scrap left", self.counts.scrap[PowerBank.SCRAP], 0)
+        expectEqual("scrap left on this client", player():getInventory():getCountTypeRecurse(PowerBank.SCRAP), 0)
     end,
 })
 
@@ -192,7 +180,7 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
-        T.give(self, "parts", { { type = CAR_BATTERY }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE } })
+        T.give(self, "parts", { { type = T.CAR_BATTERY }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE } })
         T.step(function()
             local battery = self.items.parts[1]
             self.batteryId = battery:getID()
@@ -202,36 +190,30 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
             if not T.needActionTime(self) then return end
             local function wiringTime(level)
                 T.setPerk(self, Perks.Electricity, level)
-                return Action:new(p, Action.WIRE_IN, nil, bank.object, nil, battery).maxTime
+                return RenewableEnergyAction:new(p, "bank", BankJobs.WIRE_IN, bank.object, battery).maxTime
             end
             self.unskilled, self.skilled = wiringTime(0), wiringTime(10)
             p:setTimedActionInstantCheat(true)
             local context = T.newContext()
             local option = T.optionFor(Menu.addWireInOptions(0, context, bank.object), battery)
             context:hideAndChildren()
-            if not option or option.notAvailable then
-                self.refused = tostring(T.tooltipOf(option))
-                return
-            end
-            T.choose(option)
-            T.waitFor(self, function()
-                local status = T.clientStatus(bank)
-                return bank.object:getContainer():getItemWithID(self.batteryId) ~= nil and status ~= nil and #status.batteries == 1
+            if not T.chooseOption(self, "Wire In", option) then return end
+            T.waitForStatus(self, bank, function(status)
+                return #status.batteries == 1 and bank.object:getContainer():getItemWithID(self.batteryId) ~= nil
             end, "this client's copy of the bank with the battery wired in")
             T.bankState(self, bank)
         end)
     end,
     validate = function(self)
         expect(self.skilled < self.unskilled, string.format(
-            "wiring takes %s at Electricity 10 and %s at 0", tostring(self.skilled), tostring(self.unskilled)))
-        if not expect(self.refused == nil, "Wire In was refused: " .. tostring(self.refused)) then return end
+            "wiring takes %s at Electricity 10 and %s at 0", self.skilled, self.unskilled))
+        if not T.expectOffered(self, "Wire In") then return end
         local bank = self.bank.object
-        if not expect(self.bank.state ~= nil, "the queue stopped before the server's bank was read") then return end
         local held = {}
         for _, item in ipairs(self.bank.state.items) do
             table.insert(held, item.type)
         end
-        expect(stateItem(self.bank.state, CAR_BATTERY) ~= nil, "the wired battery isn't in the server's bank, which holds "
+        expect(stateItem(self.bank.state, T.CAR_BATTERY) ~= nil, "the wired battery isn't in the server's bank, which holds "
             .. (#held > 0 and table.concat(held, ", ") or "nothing"))
         local battery = bank:getContainer():getItemWithID(self.batteryId)
         expect(battery ~= nil, "the wired battery isn't in this client's copy of the bank")
@@ -239,8 +221,8 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
         expect(status ~= nil and #status.batteries == 1, "the bank's status doesn't list the wired battery")
         if not battery then return end
         local context = T.newContext()
-        local unwire = T.optionFor(Menu.addUnwireOptions(0, context, bank), battery)
-        expect(unwire ~= nil and not unwire.notAvailable, "the bank doesn't offer to unwire the battery wired in")
+        T.noteOption(self, "Unwire of the battery wired in", T.optionFor(Menu.addUnwireOptions(0, context, bank), battery))
+        T.expectOffered(self, "Unwire of the battery wired in")
         context:hideAndChildren()
     end,
 })
@@ -251,39 +233,35 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
     instant = true,
     run = function(self)
         local p = player()
-        local bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, CAR_BATTERY, PLUG_IN_INVERTER }, { outdoors = true })
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.CAR_BATTERY, T.PLUG_IN_INVERTER }, { outdoors = true })
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
         -- A screwdriver to unwire with, and one-kilogram stones up to room for one and a half
         -- batteries: one fits, the second doesn't.
         local inventory = p:getInventory()
-        local batteryKg = getScriptManager():FindItem(CAR_BATTERY):getActualWeight()
+        local batteryKg = getScriptManager():FindItem(T.CAR_BATTERY):getActualWeight()
         local screwdriverKg = getScriptManager():FindItem("Base.Screwdriver"):getActualWeight()
         local room = inventory:getEffectiveCapacity(p) - inventory:getCapacityWeight() - screwdriverKg
         T.give(self, "filler", { { type = "Base.Screwdriver" }, { type = "Base.Stone2", count = math.floor(room - 1.5 * batteryKg) } })
         T.step(function()
             local all = T.menuOption(Menu.addUnwireOptions, bank.object, getText("ContextMenu_RenewableEnergy_AllBatteries", 2))
-            self.offered = all ~= nil and not all.notAvailable
-            if not self.offered then return end
-            T.choose(all)
-            T.waitFor(self, function()
-                local status = T.clientStatus(bank)
-                return status ~= nil and #status.batteries == 0
-            end, "this client's status of the bank with no battery left")
+            if not T.chooseOption(self, "Unwire > All Batteries", all) then return end
+            T.waitForStatus(self, bank, function(status) return #status.batteries == 0 end,
+                "this client's status of the bank with no battery left")
             T.bankState(self, bank)
-            T.count(self, "carried", { CAR_BATTERY })
-            T.count(self, "carriedOrDropped", { CAR_BATTERY }, { dropped = true })
+            T.count(self, "carried", { T.CAR_BATTERY })
+            T.count(self, "carriedOrDropped", { T.CAR_BATTERY }, { dropped = true })
         end)
     end,
     validate = function(self)
-        if not expect(self.offered, "a bank with two batteries doesn't offer Unwire > All Batteries") then return end
+        if not T.expectOffered(self, "Unwire > All Batteries") then return end
         local state = self.bank.state
-        expect(stateItem(state, CAR_BATTERY) == nil, "a battery is still wired in")
-        expect(stateItem(state, PLUG_IN_INVERTER) ~= nil, "All Batteries unwired the inverter too")
-        local carried, total = self.counts.carried[CAR_BATTERY], self.counts.carriedOrDropped[CAR_BATTERY]
-        expect(carried == 1 and total == 2, "with room for one battery, " .. tostring(carried) .. " went into the inventory and "
-            .. tostring(total - carried) .. " onto the floor")
+        expect(stateItem(state, T.CAR_BATTERY) == nil, "a battery is still wired in")
+        expect(stateItem(state, T.PLUG_IN_INVERTER) ~= nil, "All Batteries unwired the inverter too")
+        local carried, total = self.counts.carried[T.CAR_BATTERY], self.counts.carriedOrDropped[T.CAR_BATTERY]
+        expectEqual("batteries unwired into the inventory with room for one", carried, 1)
+        expectEqual("batteries unwired onto the floor with room for one", total - carried, 1)
     end,
 })
 
@@ -299,37 +277,28 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
         self.slots = Specs.banks["RenewableEnergy.BatteryBoxWood"].maxBatteries
         if not T.need(self, self.slots == 2, "a battery box of two slots, which the three batteries overfill by one") then return end
         T.watch(self, bank)
-        T.give(self, "parts", { { type = CAR_BATTERY, condition = 60 }, { type = CAR_BATTERY, condition = 20 },
-            { type = CAR_BATTERY, condition = 90 }, { type = "Base.Screwdriver" },
-            { type = PowerBank.WIRE, count = 3 * PowerBank.wiringFor(CAR_BATTERY).wire } })
+        T.give(self, "parts", { { type = T.CAR_BATTERY, condition = 60 }, { type = T.CAR_BATTERY, condition = 20 },
+            { type = T.CAR_BATTERY, condition = 90 }, { type = "Base.Screwdriver" },
+            { type = PowerBank.WIRE, count = 3 * PowerBank.wiringFor(T.CAR_BATTERY).wire } })
         T.step(function()
             local all = T.menuOption(Menu.addWireInOptions, bank.object, getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots))
-            self.offered = all ~= nil and not all.notAvailable
-            if not self.offered then
-                self.refused = tostring(all and T.tooltipOf(all))
-                return
-            end
-            T.choose(all)
-            T.waitFor(self, function()
-                local status = T.clientStatus(bank)
-                return status ~= nil and #status.batteries == self.slots
-            end, "this client's status of the bank with its battery slots full")
+            if not T.chooseOption(self, "Wire In > All Batteries", all) then return end
+            T.waitForStatus(self, bank, function(status) return #status.batteries == self.slots end,
+                "this client's status of the bank with its battery slots full")
             T.bankState(self, bank)
-            T.count(self, "left", { CAR_BATTERY, PowerBank.WIRE })
+            T.count(self, "left", { T.CAR_BATTERY, PowerBank.WIRE })
         end)
     end,
     validate = function(self)
-        if not expect(self.offered, "carrying three batteries, Wire In doesn't offer All Batteries ("
-            .. tostring(self.slots) .. "): " .. tostring(self.refused)) then return end
+        if not T.expectOffered(self, "Wire In > All Batteries") then return end
         local wired = {}
         for _, item in ipairs(self.bank.state.items) do
             table.insert(wired, item.condition)
         end
         table.sort(wired)
-        expect(#wired == 2 and wired[1] == 60 and wired[2] == 90, "All Batteries wired in batteries at "
-            .. table.concat(wired, ", ") .. ", not the two best, at 60 and 90")
-        expectNear("batteries left carried", self.counts.left[CAR_BATTERY], 1, 0)
-        expectNear("wire left", self.counts.left[PowerBank.WIRE], PowerBank.wiringFor(CAR_BATTERY).wire, 0)
+        expectEqual("the conditions of the batteries All Batteries wired in", table.concat(wired, ", "), "60, 90")
+        expectEqual("batteries left carried", self.counts.left[T.CAR_BATTERY], 1)
+        expectEqual("wire left", self.counts.left[PowerBank.WIRE], PowerBank.wiringFor(T.CAR_BATTERY).wire)
     end,
 })
 
@@ -343,33 +312,28 @@ test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
         self.bank = bank
         T.step(function()
             if not T.walkTo(self, bank.square, "the bank") then return end
-            ISTimedActionQueue.add(Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "  Cellar  "))
+            ISTimedActionQueue.add(RenewableEnergyAction:new(player(), "bank", BankJobs.RENAME, bank.object, "  Cellar  "))
             T.waitFor(self, function() return Menu.bankLabel(bank.object) == "Cellar" end, "this client's label of the renamed bank")
+            -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
+            T.openWindow(self, bank)
             T.step(function()
-                -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
-                local window = StatusWindow:openOn(0, bank.object)
-                T.defer(self, function() window:close() end)
-                T.waitFor(self, function() return window.status ~= nil end, "the window's status of the renamed bank")
-                T.step(function()
-                    self.title = window.title
-                    window:close()
-                    local action = Action:new(player(), Action.RENAME, nil, bank.object, nil, nil, "")
-                    self.emptyAllowed = action:canPerform()
-                    ISTimedActionQueue.add(action)
-                    T.waitFor(self, function() return Menu.bankLabel(bank.object) ~= "Cellar" end,
-                        "this client's label of the bank renamed to nothing")
-                    T.bankState(self, bank)
-                end)
+                self.title = self.window.title
+                self.window:close()
+                local action = RenewableEnergyAction:new(player(), "bank", BankJobs.RENAME, bank.object, "")
+                self.emptyAllowed = action:canPerform()
+                ISTimedActionQueue.add(action)
+                T.waitFor(self, function() return Menu.bankLabel(bank.object) ~= "Cellar" end,
+                    "this client's label of the bank renamed to nothing")
+                T.bankState(self, bank)
             end)
         end)
     end,
     validate = function(self)
-        expect(self.title == "Cellar", "the window of the renamed bank is titled " .. tostring(self.title))
+        expectEqual("the renamed bank's window title", self.title, "Cellar")
         expect(self.emptyAllowed, "renaming to an empty name was refused")
-        local tier = getItemNameFromFullType("RenewableEnergy.BatteryRackMetal")
-        local label = Menu.bankLabel(self.bank.object)
-        expect(label == tier, "an empty name left the bank called " .. tostring(label))
-        expect(self.bank.state.name == "", "an empty name left the server's bank called " .. tostring(self.bank.state.name))
+        expectEqual("this client's label of the bank renamed to nothing", Menu.bankLabel(self.bank.object),
+            getItemNameFromFullType("RenewableEnergy.BatteryRackMetal"))
+        expectEqual("the server's name of the bank renamed to nothing", self.bank.state.name, "")
     end,
 })
 
@@ -383,12 +347,11 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
         local longest = PowerBank.NAME_LENGTH
         self.full = string.rep("y", longest)
         T.batch(function()
-            T.performInto(self, "named", "rename", { bank = bank.position, name = "Shed" })
-            T.performInto(self, "long", "rename", { bank = bank.position, name = string.rep("x", longest + 1) })
-            T.performInto(self, "twoLines", "rename", { bank = bank.position, name = "Shed\nbank" })
-            T.bankState(self, bank)
-            T.step(function() self.refusedState = bank.state end)
-            T.performInto(self, "fullLength", "rename", { bank = bank.position, name = self.full })
+            T.job(self, "bank", BankJobs.RENAME, bank.position, "Shed", "named")
+            T.job(self, "bank", BankJobs.RENAME, bank.position, string.rep("x", longest + 1), "long")
+            T.job(self, "bank", BankJobs.RENAME, bank.position, "Shed\nbank", "twoLines")
+            T.bankState(self, bank, "refused")
+            T.job(self, "bank", BankJobs.RENAME, bank.position, self.full, "fullLength")
             T.bankState(self, bank)
         end)
         T.step(function()
@@ -401,13 +364,13 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
         end)
     end,
     validate = function(self)
-        T.expectOk(self.named, "renaming the bank Shed")
-        expect(not self.long.ok, "the authority took a name longer than " .. PowerBank.NAME_LENGTH .. " characters")
-        expect(not self.twoLines.ok, "the authority took a name on two lines")
-        expect(self.refusedState.name == "Shed", "the refused names left the bank called " .. tostring(self.refusedState.name))
-        expect(self.fullLength.ok and self.bank.state.name == self.full, "a name of " .. PowerBank.NAME_LENGTH
-            .. " characters left the bank called " .. tostring(self.bank.state.name))
-        expect(#self.typed == PowerBank.NAME_LENGTH, "the rename box holds " .. #self.typed .. " characters, expected "
-            .. PowerBank.NAME_LENGTH)
+        local reads = self.reads
+        T.expectOk(reads.named, "renaming the bank Shed")
+        expect(not reads.long.ok, "the authority took a name longer than " .. PowerBank.NAME_LENGTH .. " characters")
+        expect(not reads.twoLines.ok, "the authority took a name on two lines")
+        expectEqual("the bank's name after the refused names", reads.refused.name, "Shed")
+        T.expectOk(reads.fullLength, "renaming the bank with a name of " .. PowerBank.NAME_LENGTH .. " characters")
+        expectEqual("the bank's name after a name of " .. PowerBank.NAME_LENGTH .. " characters", self.bank.state.name, self.full)
+        expectEqual("characters in the rename box", #self.typed, PowerBank.NAME_LENGTH)
     end,
 })

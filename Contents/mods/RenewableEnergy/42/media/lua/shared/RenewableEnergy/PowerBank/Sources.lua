@@ -2,19 +2,15 @@
 -- bank runs it (server/RenewableEnergy/PowerBank/<Family>Source.lua), and its row of Specs. A new
 -- kind needs only its Specs row and its sprites.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Treadmill"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local Sources = {}
 RenewableEnergy.Sources = Sources
-
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
-local PowerBank, Treadmill = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill
 
 -- Whether a source of each family must stand outdoors: a treadmill works under a roof.
 local OUTDOORS = { panel = true, wind = true, treadmill = false }
@@ -111,7 +107,7 @@ end
 
 --- Why the source `isoObject` can't be connected to the bank at `bankPosition` ({ x, y, z }) now,
 --- or nil: "out of reach" (or a square it can't work from), or "already connected" to that bank.
---- Whether the bank has the input slots is the authority's to say (BankJobs.connectSource).
+--- Whether the bank has the input slots is SourceJobs' to say, from counts the authority takes afresh.
 function Sources.connectRefusal(isoObject, bankPosition)
     local kind = Sources.kindOf(isoObject)
     if not (kind and Sources.squareOk(isoObject:getSquare(), kind)

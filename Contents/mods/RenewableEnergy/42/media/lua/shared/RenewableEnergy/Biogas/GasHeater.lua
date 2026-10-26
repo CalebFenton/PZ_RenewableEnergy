@@ -2,20 +2,16 @@
 -- It warms the one digester digesterNear picks, which does the burning in its own pass, so it keeps
 -- warm while unloaded too and puts the heater out when its gas runs out.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/GasLine/GasKit"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local Specs = require "RenewableEnergy/Specs"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local GasHeater = {}
 RenewableEnergy.GasHeater = GasHeater
-
-local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
-local Sprites, Specs = RenewableEnergy.Sprites, RenewableEnergy.Specs
 
 -- What a lit heater keeps its digester at, at least: as warm as vanilla's lit barbecue keeps its
 -- square (IsoBarbecue's heat source).
@@ -89,7 +85,6 @@ GasHeater.JOBS = {
 }
 
 Jobs.define(GasHeater, {
-    short = "short",
     subjectOf = function(heater)
         return Squares.onSquare(heater) and GasHeater.isHeater(heater) and heater or nil
     end,

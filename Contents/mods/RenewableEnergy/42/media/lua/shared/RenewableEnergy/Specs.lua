@@ -5,7 +5,8 @@
 -- line works out each pass ends in W (Bank:limitW, loadW), and watt-hours end in Wh. Saved fields
 -- (loadW, chargeWantW, a source's watts) keep their names.
 
-RenewableEnergy = RenewableEnergy or {}
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+
 local Specs = {}
 RenewableEnergy.Specs = Specs
 
@@ -198,7 +199,7 @@ Specs.banks = {
     ["RenewableEnergy.BatteryBankMetal"] = { sprite = "batteryBankMetal", maxBatteries = 16, maxInverters = 2, maxChargers = 2, maxControllers = 4 },
 }
 
--- Wiring each part kind into a bank: seconds at normal speed at Electricity 0 (RenewableEnergyAction),
+-- Wiring each part kind into a bank: seconds at normal speed at Electricity 0 (PowerBank.wiringUnits),
 -- Electric Wire (returned by Unwire), Electronics Scrap (kept by the part), tools (which unwiring
 -- takes too), Electricity level, and XP for the first time an item is ever wired.
 -- Inverters set skill/xp per type. Every part takes a screwdriver, as vanilla's battery, radio and

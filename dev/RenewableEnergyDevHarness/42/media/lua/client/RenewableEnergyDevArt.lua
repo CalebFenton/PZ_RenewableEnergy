@@ -2,7 +2,6 @@
 -- from art/models in the world: it builds one stage after another on the same open lot and saves
 -- each shot to <cachedir>/Screenshots as <name>.png.
 
-require "ISUI/ISPanel"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
@@ -397,15 +396,10 @@ local function buildTileStage(lot)
     placeTiles(lot, TILES)
 end
 
--- The mod's items in the README's order, then those that only sit in a vehicle part, after a
--- vanilla car battery for scale.
+-- Every item of the mod's, after a vanilla car battery for scale.
 local function itemTypes()
-    local names = { SCALE_ITEM }
-    for _, list in ipairs({ RenewableEnergy.Debug.ITEMS, RenewableEnergy.Debug.PART_ITEMS }) do
-        for _, fullType in ipairs(list) do
-            table.insert(names, fullType)
-        end
-    end
+    local names = RenewableEnergy.Debug.items()
+    table.insert(names, 1, SCALE_ITEM)
     return names
 end
 
@@ -421,38 +415,33 @@ local function dropItems(lot)
     end
 end
 
--- A sheet of every item's icon, the script's Icon at twice its size with the item's name under it.
-local IconSheet = ISPanel:derive("RenewableEnergyDevArtIcons")
-local ICON_SIZE, CELL_W, CELL_H, ICON_COLUMNS = 64, 190, 96, 10
-
-function IconSheet:render()
-    ISPanel.render(self)
-    for i, icon in ipairs(self.icons) do
-        local column, row = (i - 1) % ICON_COLUMNS, math.floor((i - 1) / ICON_COLUMNS)
-        local x, y = column * CELL_W, row * CELL_H + 6
-        if icon.texture then
-            self:drawTextureScaled(icon.texture, x + (CELL_W - ICON_SIZE) / 2, y, ICON_SIZE, ICON_SIZE, 1, 1, 1, 1)
-        end
-        self:drawTextCentre(icon.name, x + CELL_W / 2, y + ICON_SIZE + 2, 1, 1, 1, 1, UIFont.Small)
-    end
-end
-
-function IconSheet:new()
+-- Every item's icon as the crafting window draws it, for Run:addIconSheet.
+local function iconList()
     local icons = {}
     for _, fullType in ipairs(itemTypes()) do
-        table.insert(icons, { texture = Capture.iconTexture(fullType), name = getScriptManager():getItem(fullType):getName() })
+        local texture = Capture.iconTexture(fullType)
+        if texture then
+            table.insert(icons, { name = fullType, texture = texture })
+        else
+            print(MARK .. " missing icon " .. fullType)
+        end
     end
-    local rows = math.ceil(#icons / ICON_COLUMNS)
-    local sheet = ISPanel.new(self, 60, 160, ICON_COLUMNS * CELL_W, rows * CELL_H + 8)
-    sheet.icons = icons
-    sheet.backgroundColor = { r = 0.25, g = 0.25, b = 0.25, a = 1 }
-    return sheet
+    return icons
 end
 
 -- The steps that walk the character to a shot's spot, let it see around, zoom and save.
 local function addShot(run, player, lot, shot)
     Harness.addGoTo(run, player, { lotSquare(lot, shot.x, shot.y) }, shot.zoomSteps)
     run:addOpaque(shot.name, function() return {} end)
+end
+
+-- The steps that set `tiles` out on the emptied lot and shoot `shot` there.
+local function addTileShot(run, player, lot, tiles, shot)
+    run:add(function()
+        Harness.emptyLot(lot)
+        placeTiles(lot, tiles)
+    end)
+    addShot(run, player, lot, shot)
 end
 
 -- Cracked mounts, by lot square, and their modules' conditions in slot order: the metal walls and
@@ -513,7 +502,6 @@ end
 -- The tile, overlay, item, icon, fill, digester and wind shots, each on the lot cleared of the one
 -- before.
 local function addTileAndItemShots(run, player, lot)
-    local iconSheet = IconSheet:new()
     run:add(function()
         getGameTime():setTimeOfDay(NOON)
         Harness.removeTrees(lot.x, lot.y, lot.z)
@@ -526,39 +514,13 @@ local function addTileAndItemShots(run, player, lot)
         dropItems(lot)
     end)
     addShot(run, player, lot, SHOTS.items)
-    run:add(function()
-        iconSheet:addToUIManager()
-        return Capture.drawn(Capture.DRAW_FRAMES)
-    end)
-    run:add(function()
-        run:screenshot(run.prefix .. "icons")
-    end)
-    run:add(function()
-        iconSheet:removeFromUIManager()
-        return 1
-    end)
+    run:addIconSheet("icons", iconList)
     for _, facing in ipairs({ "S", "E", "N", "W" }) do
-        run:add(function()
-            Harness.emptyLot(lot)
-            placeTiles(lot, fillTiles(facing))
-        end)
-        addShot(run, player, lot, SHOTS.fill[facing])
+        addTileShot(run, player, lot, fillTiles(facing), SHOTS.fill[facing])
     end
-    run:add(function()
-        Harness.emptyLot(lot)
-        placeTiles(lot, digesterTiles())
-    end)
-    addShot(run, player, lot, SHOTS.digesters)
-    run:add(function()
-        Harness.emptyLot(lot)
-        placeTiles(lot, windTiles())
-    end)
-    addShot(run, player, lot, SHOTS.wind)
-    run:add(function()
-        Harness.emptyLot(lot)
-        placeTiles(lot, tallWindTiles())
-    end)
-    addShot(run, player, lot, SHOTS.windTall)
+    addTileShot(run, player, lot, digesterTiles(), SHOTS.digesters)
+    addTileShot(run, player, lot, windTiles(), SHOTS.wind)
+    addTileShot(run, player, lot, tallWindTiles(), SHOTS.windTall)
     addShot(run, player, lot, SHOTS.windBehind)
 end
 

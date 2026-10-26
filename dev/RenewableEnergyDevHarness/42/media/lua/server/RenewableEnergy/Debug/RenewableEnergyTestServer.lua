@@ -5,11 +5,13 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
-local overlaysOf, squareAt, bankRecordAt = PZHarness.Fixtures.overlaysOf, PZHarness.Fixtures.squareAt, Helpers.bankRecordAt
+local handler, need = PZHarness.serverHandler, PZHarness.need
+local overlaysOf, removePlaced = PZHarness.Fixtures.overlaysOf, PZHarness.Fixtures.removePlaced
+local squareAt, bankAt, bankRecord = Helpers.squareAt, Helpers.bankAt, Helpers.bankRecord
 
 -- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll gives `args.rolls` until
 -- the test ends (Helpers.forceRolls).
@@ -24,13 +26,6 @@ end)
 local function stateOf(record)
     local bank = record:getIsoObject()
     local square = bank and bank:getSquare()
-    local items = {}
-    local container = bank and bank:getContainer()
-    for i = 0, (container and container:getItems():size() or 0) - 1 do
-        local item = container:getItems():get(i)
-        table.insert(items, { type = item:getFullType(), id = item:getID(), condition = item:getCondition(),
-            uses = item:getCurrentUsesFloat() })
-    end
     -- What the status doesn't show of each source's record.
     local records = {}
     for _, source in ipairs(record.sources) do
@@ -44,32 +39,19 @@ local function stateOf(record)
         cycleDepth = record.cycleDepth, limitW = record:limitW(), drawW = record:drawW(),
         sources = #record.sources, batteries = #record.batteries, records = records,
         activated = bank ~= nil and bank:isActivated(), powered = square ~= nil and square:haveElectricity(),
-        items = items, overlays = overlaysOf(bank), status = record:buildStatus(), watchers = Helpers.count(record.watchers),
+        items = Helpers.itemsOf(bank and bank:getContainer()), overlays = overlaysOf(bank), status = record:buildStatus(), watchers = Helpers.count(record.watchers),
     }
-end
-
--- The state of the bank at `position`, or nil and what is missing, so that a test never indexes a
--- bank the server doesn't have.
-local function stateAt(position)
-    local record = bankRecordAt(position)
-    if not record then
-        return nil, "the bank's record on the server"
-    end
-    return stateOf(record)
 end
 
 -- Fixtures ---------------------------------------------------------------------------------------
 
 -- RenewableEnergyTest.bank's handler: the bank the world places (WorldSpawns.placeBankWith), of the
 -- Sprites field `args.kind` facing `args.facing` (S if nil), holding `args.items` with its
--- batteries at `args.charge`, and disconnected through the bank's own command when
+-- batteries at `args.charge`, and disconnected by the server's character's Disconnect Bank when
 -- `args.connected == false`. Answers the bank's position.
-handler("placeBank", function(_, args, defer)
+handler("placeBank", function(player, args, defer)
     local PowerBank, Battery = RenewableEnergy.PowerBank, RenewableEnergy.Battery
     local square = squareAt(args)
-    if not square then
-        return nil, "the bank's square loaded on the server"
-    end
     local items = args.items or {}
     local sprite = RenewableEnergy.Sprites[args.kind][args.facing or "S"]
     local bank = RenewableEnergy.WorldSpawns.placeBankWith(square, sprite, function(container)
@@ -83,20 +65,15 @@ handler("placeBank", function(_, args, defer)
     -- Whatever bank stands on the square when the test ends: a chunk loaded again, or a bank
     -- rebuilt, brings a new object.
     defer(function()
-        local current = PowerBank.findOn(squareAt(args))
+        local current = Helpers.findOn({ x = args.x, y = args.y, z = args.z, kind = "bank" })
         if current then
             current:getSquare():transmitRemoveItemFromSquare(current)
         end
     end)
-    if bank:getContainer():getItems():size() ~= #items then
-        return nil, "every item of " .. table.concat(items, ", ") .. " in the bank"
-    end
+    need(bank:getContainer():getItems():size() == #items, "every item of " .. table.concat(items, ", ") .. " in the bank")
     local position = PowerBank.positionOf(bank)
     if args.connected == false then
-        local ok, reason = PowerBank.perform(nil, "setBankConnected", { bank = position, connected = false })
-        if not ok then
-            return nil, "the bank disconnected (" .. tostring(reason) .. ")"
-        end
+        need(RenewableEnergyAction.completeJob(player, "bank", RenewableEnergy.BankJobs.DISCONNECT, bank), "the bank disconnected")
     end
     return position
 end)
@@ -106,22 +83,16 @@ end)
 -- charger is built in place and a treadmill is vanilla furniture, neither from an item of the mod,
 -- so their tile is put down bare, unless `args.built` builds the charger as its build-menu entity,
 -- as the world builds its finds (WorldSpawns.buildEntity); its blades come broken when `args.broken`. A
--- treadmill's comes wired by its wiring's owner when `args.wired`. Answers whether the source
--- connected and the refusal.
+-- treadmill's comes wired by its wiring's owner when `args.wired`. With `args.bank`, the server's
+-- character connects it to the bank there. Answers whether the source connected and the refusal.
 handler("placePanel", function(player, args, defer)
-    local PowerBank, Treadmill, TreadmillSource = RenewableEnergy.PowerBank, RenewableEnergy.Treadmill,
-        RenewableEnergy.TreadmillSource
+    local Treadmill, TreadmillSource = RenewableEnergy.Treadmill, RenewableEnergy.TreadmillSource
     local square = squareAt(args)
-    if not square then
-        return nil, "the panel's square loaded on the server"
-    end
     local panel
     if getSprite(args.sprite):getProperties():has("CustomItem") then
         RenewableEnergy.WorldSpawns.placePanel(square, args.sprite, args.modules)
-        panel = Squares.findObjectOn(square, function(object) return RenewableEnergy.Sprites.nameOf(object) == args.sprite end)
-        if not panel then
-            return nil, "a placed " .. args.sprite .. " on the server"
-        end
+        panel = need(Squares.findObjectOn(square, function(object) return RenewableEnergy.Sprites.nameOf(object) == args.sprite end),
+            "a placed " .. args.sprite .. " on the server")
     elseif args.built then
         panel = RenewableEnergy.WorldSpawns.buildEntity(square, args.sprite, RenewableEnergy.Wind.OnCreate)
     else
@@ -150,21 +121,29 @@ handler("placePanel", function(player, args, defer)
     if not args.bank then
         return { connected = false }
     end
-    local connected, reason = PowerBank.perform(player, "connectSource",
-        { bank = args.bank, source = PowerBank.positionOf(panel) })
-    return { connected = connected, reason = reason }
+    local Action, connect = RenewableEnergyAction, RenewableEnergy.SourceJobs.CONNECT
+    local bank = Helpers.find({ x = args.bank.x, y = args.bank.y, z = args.bank.z, kind = "bank" })
+    local connected = Action.completeJob(player, "source", connect, panel, bank)
+    return { connected = connected, reason = not connected and Action.jobsOf("source").refusal(player, connect, panel, bank) or nil }
 end)
 
--- Takes away, when the test ends, whatever source the test builds at x, y, z by other means (the
--- build menu), on whichever tile its OnCreate left it.
-handler("sourceTrack", function(_, args, defer)
+-- Takes away, when the test ends, whatever stands at x, y, z then drawn as `args.sprite`, else of
+-- the kind `args.kind` (Helpers.findOn): what the test builds by other means (the build menu), on
+-- whichever tile its OnCreate left it, or a copy a chunk that unloaded and loaded meanwhile holds.
+handler("trackAt", function(_, args, defer)
     defer(function()
-        local square = squareAt(args)
-        local source = square and RenewableEnergy.Sources.findOn(square)
-        if source then
-            PZHarness.Fixtures.removePlaced(source)
+        local object = Helpers.findOn(args)
+        if object then
+            removePlaced(object)
         end
     end)
+    return {}
+end)
+
+-- Takes what stands at x, y, z drawn as `args.sprite`, else of the kind `args.kind`, away the way the
+-- game does, as a player picking it up, a sledgehammer or a pickup would.
+handler("removeAt", function(_, args)
+    removePlaced(Helpers.find(args))
     return {}
 end)
 
@@ -173,17 +152,14 @@ end)
 -- square if `args.failsafe`. Both are removed when the test ends.
 handler("placeGenerator", function(_, args, defer)
     local square = squareAt(args)
-    if not square then
-        return nil, "the generator's square loaded on the server"
-    end
     local generator = IsoGenerator.new(instanceItem("Base.Generator"), square:getCell(), square)
-    defer(function() PZHarness.Fixtures.removePlaced(generator) end)
+    defer(function() removePlaced(generator) end)
     generator:setConnected(true)
     generator:setFuel(args.fuel or 10)
     generator:setCondition(100)
     if args.failsafe then
         local failsafe = PZHarness.Fixtures.newTile(square, RenewableEnergy.Sprites.failsafe)
-        defer(function() PZHarness.Fixtures.removePlaced(failsafe) end)
+        defer(function() removePlaced(failsafe) end)
     end
     if args.running then
         ISActivateGenerator.complete({ generator = generator, activate = true })
@@ -195,13 +171,10 @@ end)
 -- addFloor rechecks the roof below it (IsoCell.checkHaveRoof), which takes the square's exterior
 -- flag away. Answers whether the square below is still outdoors. Removed when the test ends.
 handler("roofOver", function(_, args, defer)
-    local above = getCell():createNewGridSquare(args.x, args.y, args.z + 1, true)
-    if not above then
-        return nil, "the square above loaded on the server"
-    end
+    local above = need(getCell():createNewGridSquare(args.x, args.y, args.z + 1, true), "the square above loaded on the server")
     local floor = above:addFloor("carpentry_02_58")
     defer(function()
-        PZHarness.Fixtures.removePlaced(floor)
+        removePlaced(floor)
         getCell():checkHaveRoof(args.x, args.y)
     end)
     return { outside = squareAt(args):isOutside() }
@@ -219,7 +192,7 @@ handler("ringOfTiles", function(_, args, defer)
                 local square = getSquare(x, y, args.level) or getCell():createNewGridSquare(x, y, args.level, true)
                 if square then
                     local tile = PZHarness.Fixtures.newTile(square, args.sprite)
-                    defer(function() PZHarness.Fixtures.removePlaced(tile) end)
+                    defer(function() removePlaced(tile) end)
                     placed = placed + 1
                 end
             end
@@ -230,27 +203,21 @@ end)
 
 -- Banks ------------------------------------------------------------------------------------------
 
--- The server's record of the bank at `args` (see stateOf).
+-- The server's record of the bank at `args.bank` (see stateOf), its last pass first put
+-- `args.hours` before now if given, as a bank looks after that long between passes.
 handler("bankState", function(_, args)
-    return stateAt(args)
+    local record = bankRecord(args.bank)
+    if args.hours then
+        record.lastHour = getGameTime():getWorldAgeHours() - args.hours
+    end
+    return stateOf(record)
 end)
-
--- Registers the handler `name` on the bank at `args.bank`: `fn(record, bank, args, player, defer)`
--- runs once the server's record of it and its tile are found.
-local function onBank(name, fn)
-    handler(name, function(player, args, defer)
-        local record, bank = bankRecordAt(args.bank)
-        if not bank then
-            return nil, "the bank's record and tile on the server"
-        end
-        return fn(record, bank, args, player, defer)
-    end)
-end
 
 -- RenewableEnergyTest.setCharge's handler: every battery in the bank at `args.bank` charged to
 -- `args.charge` by the batteries' own setter and sent, then the bank reads them again, as it does
 -- after anything changed its container. Answers the bank's state.
-onBank("setCharge", function(record, bank, args)
+handler("setCharge", function(_, args)
+    local record, bank = bankAt(args.bank)
     local Battery = RenewableEnergy.Battery
     local items = bank:getContainer():getItems()
     for i = 0, items:size() - 1 do
@@ -265,15 +232,33 @@ onBank("setCharge", function(record, bank, args)
     return stateOf(record)
 end)
 
--- Takes `args.points` of wear off the first `args.type` in the bank at `args.bank` by the mod's own
--- Wear.take, which keeps a fraction pending on the item, and sends it. Answers the bank's state.
-onBank("takePartWear", function(record, bank, args)
-    local item = bank:getContainer():getFirstType(args.type)
-    if not item then
-        return nil, "a " .. args.type .. " in the bank"
-    end
-    if RenewableEnergy.Wear.take(item, args.points) then
+-- The first `args.type` in the bank at `args.bank`, past the bank's own commands and sent to the
+-- clients: its condition set to `args.condition` (Wear.setCondition) and its repair count to
+-- `args.repaired`; `args.wear` points taken by the mod's Wear.take, which keeps a fraction pending
+-- on the item; or with `args.remove` taken out, as a part that disappeared would. With
+-- `args.recount` the bank reads its parts again. Answers the bank's state.
+handler("bankPart", function(_, args)
+    local Wear = RenewableEnergy.Wear
+    local record, bank = bankAt(args.bank)
+    local item = need(bank:getContainer():getFirstType(args.type), "a " .. tostring(args.type) .. " in the bank on the server")
+    if args.remove then
+        Items.removeItem(item)
+    else
+        if args.condition then
+            Wear.setCondition(item, args.condition)
+        end
+        if args.wear then
+            Wear.take(item, args.wear)
+        end
         sendItemStats(item)
+        if args.repaired then
+            item:setHaveBeenRepaired(args.repaired)
+            item:syncItemFields()
+        end
+    end
+    if args.recount then
+        record:recount()
+        record:sendStatus()
     end
     return stateOf(record)
 end)
@@ -288,10 +273,7 @@ local SNOWING = { cloud = 1, fog = 0, rain = 0, snowing = true, groundSnow = 0 }
 -- `args.airC` °C (mild if nil); `args.stormHours` of storm and a wind of `args.windKph`. A bank
 -- whose chunk is unloaded runs too. Answers the bank's state after the pass.
 handler("bankPass", function(_, args)
-    local record = bankRecordAt(args.bank)
-    if not record then
-        return nil, "the bank's record on the server"
-    end
+    local record = bankRecord(args.bank)
     local BankSystem = RenewableEnergy.BankSystem
     local light = args.light or 0
     local function irradiance() return light end
@@ -316,12 +298,8 @@ end)
 -- (BankSystem:initLuaObjects). Answers what the running generator at `args.generator` delivers
 -- (GasLines.loadOf) before and after, and the bank's charger watts.
 handler("saveAndLoadBank", function(_, args)
-    local record = bankRecordAt(args.bank)
-    local square = squareAt(args.generator)
-    local generator = square and square:getGenerator()
-    if not (record and generator) then
-        return nil, "the bank's record and the generator on the server"
-    end
+    local record = bankRecord(args.bank)
+    local generator = need(squareAt(args.generator):getGenerator(), "the generator on the server")
     local GasLines = RenewableEnergy.GasLines
     local reply = { loadBefore = GasLines.loadOf(generator), chargerW = record:chargerMaxW() }
     local saved, gone = {}, {}
@@ -341,16 +319,10 @@ handler("saveAndLoadBank", function(_, args)
     return reply
 end)
 
--- Puts the last pass of the bank at `args.bank` `args.hours` before now, as a bank looks after
--- that long between passes; answers its state.
-onBank("ageBank", function(record, _, args)
-    record.lastHour = getGameTime():getWorldAgeHours() - args.hours
-    return stateOf(record)
-end)
-
 -- RenewableEnergyTest.applyLoad's handler: the window tests' load, which is about how the window
 -- shows a load of given kinds, not how a pass measures one; answers the bank's state.
-onBank("applyLoad", function(record, _, args)
+handler("applyLoad", function(_, args)
+    local record = bankAt(args.bank)
     local Loads = RenewableEnergy.Loads
     local load = Loads.new()
     for _, appliance in ipairs(args.appliances or {}) do
@@ -363,88 +335,57 @@ onBank("applyLoad", function(record, _, args)
     return stateOf(record)
 end)
 
--- RenewableEnergyTest.setPartCondition's handler, which sends the item to the clients; answers the
--- bank's state.
-onBank("setPartCondition", function(record, bank, args)
-    local item = bank:getContainer():getFirstType(args.type)
-    if not item then
-        return nil, "a " .. tostring(args.type) .. " in the bank on the server"
+-- What a job a client's test names works with, found in the call's turn so that the call needn't
+-- wait for an earlier answer: for `with` { type, inBank }, the first such item the server's
+-- character carries, or with inBank the first in the bank `target`; for an { x, y, z } place, the
+-- bank there; else `with` itself (a name, a slot).
+local function withOf(player, with, target)
+    if type(with) ~= "table" then
+        return with
+    elseif not with.type then
+        return Helpers.findOn({ x = with.x, y = with.y, z = with.z, kind = "bank" })
     end
-    RenewableEnergy.Wear.setCondition(item, args.condition)
-    sendItemStats(item)
-    if args.repaired then
-        item:setHaveBeenRepaired(args.repaired)
-        item:syncItemFields()
-    end
-    if args.recount then
-        record:recount()
-        record:sendStatus()
-    end
-    return stateOf(record)
-end)
-
--- Takes the first `args.type` out of the bank at `args.bank`, past the bank's own commands, as a
--- part that disappeared would.
-onBank("removePart", function(record, bank, args)
-    local container = bank:getContainer()
-    local item = container:getFirstType(args.type)
-    if not item then
-        return nil, "a " .. tostring(args.type) .. " in the bank on the server"
-    end
-    container:Remove(item)
-    sendRemoveItemFromContainer(container, item)
-    return stateOf(record)
-end)
-
--- The first `item.type` the server's character carries, or with `item.inBank` the first in the bank
--- at `bank`: the item a client's command would name by id, found in the call's turn, so that the
--- call needn't wait for an earlier answer to learn the id.
-local function itemFor(player, item, bank)
-    if not item.inBank then
-        return player:getInventory():getFirstTypeRecurse(item.type)
-    end
-    local _, object = bankRecordAt(bank)
-    return object and object:getContainer():getFirstType(item.type)
+    local item = with.inBank and target:getContainer():getFirstType(with.type)
+        or not with.inBank and player:getInventory():getFirstTypeRecurse(with.type)
+    return need(item, "a " .. with.type .. (with.inBank and " in the bank" or " on the character") .. " on the server")
 end
 
--- Runs the bank system's command `args.command` with `args.args` as the server's character, the
--- way a timed action's complete() does, with `args.args.itemId` the id of `args.item` (itemFor) if
--- given. Answers whether it did, why not, and the character's Electricity XP before and after.
-handler("perform", function(player, args)
-    local commandArgs = args.args
-    if args.item then
-        local item = itemFor(player, args.item, commandArgs.bank)
-        if not item then
-            return nil, "a " .. tostring(args.item.type) .. (args.item.inBank and " in the bank" or " on the character")
-                .. " on the server"
-        end
-        commandArgs.itemId = item:getID()
+-- Does the job `args.job` of the action's feature `args.feature` at its target on the square at
+-- `args.at`, with `args.with` (withOf), as the server's character, the way the action's
+-- complete() does once the character is at the job (RenewableEnergyAction.completeJob). Answers
+-- whether it was done, else why the job module refuses it as the authority knows it after, and
+-- the character's Electricity XP before and after.
+handler("job", function(player, args)
+    local Action = RenewableEnergyAction
+    local at = args.at
+    -- A forged place with no such target is what the action's keeps() turns down before the job.
+    local target = Helpers.findOn({ x = at.x, y = at.y, z = at.z, kind = args.feature })
+    if not target then
+        return { ok = false, reason = "no " .. args.feature }
     end
+    local with = withOf(player, args.with, target)
     local xp = player:getXp():getXP(Perks.Electricity)
-    local ok, reason = RenewableEnergy.PowerBank.perform(player, args.command, commandArgs)
-    return { ok = ok == true, reason = reason, xpBefore = xp, xpAfter = player:getXp():getXP(Perks.Electricity) }
+    local done = Action.completeJob(player, args.feature, args.job, target, with)
+    return { ok = done, reason = not done and Action.jobsOf(args.feature).refusal(player, args.job, target, with) or nil,
+        xpBefore = xp, xpAfter = player:getXp():getXP(Perks.Electricity) }
+end)
+
+-- Brings the bank at `args.bank` up to date with its container, as opening its status window does.
+handler("refreshBank", function(_, args)
+    bankRecord(args.bank):refresh()
+    return {}
 end)
 
 -- Finishes a Rename action on the bank at `args.bank` as the server's character, the way the server
 -- finishes a client's timed action (ActionManager.update calls complete()). Answers whether it did.
-onBank("completeRename", function(_, bank, args, player)
-    local Action = RenewableEnergyAction
-    return { done = Action:new(player, Action.RENAME, nil, bank, nil, nil, args.name):complete() == true }
-end)
-
--- Takes the tile of `args.sprite` on the square at `args` away, as a player picking it up does,
--- such as a fridge out of a bank's reach.
-handler("removeTile", function(_, args)
-    local object, missing = Helpers.objectAt(args)
-    if not object then
-        return nil, missing
-    end
-    PZHarness.Fixtures.removePlaced(object)
-    return {}
+handler("completeRename", function(player, args)
+    local _, bank = bankAt(args.bank)
+    return { done = RenewableEnergyAction:new(player, "bank", RenewableEnergy.BankJobs.RENAME, bank, args.name):complete() }
 end)
 
 -- Takes the bank at `args.bank` away the way picking it up or destroying it does.
-onBank("removeBank", function(_, bank, args)
+handler("removeBank", function(_, args)
+    local _, bank = bankAt(args.bank)
     bank:getSquare():transmitRemoveItemFromSquare(bank)
     local square = squareAt(args.bank)
     return { powered = square:haveElectricity(),
@@ -458,9 +399,6 @@ handler("takeFloorItems", function(_, args)
     local items = {}
     for _, at in ipairs(args.squares or {}) do
         local square = squareAt(at)
-        if not square then
-            return nil, "the square " .. at.x .. "," .. at.y .. " loaded on the server"
-        end
         local objects = square:getWorldObjects()
         for i = objects:size() - 1, 0, -1 do
             local object = objects:get(i)
@@ -473,7 +411,7 @@ handler("takeFloorItems", function(_, args)
             end
             table.insert(items, { type = item:getFullType(), modData = modData,
                 uses = instanceof(item, "DrainableComboItem") and item:getCurrentUsesFloat() or nil })
-            Helpers.removeFloorItem(square, object)
+            removePlaced(object)
         end
     end
     return { items = items }
@@ -482,15 +420,14 @@ end)
 -- Takes the containers off the bank at `args.bank`, as a bank tile a map or a placement that failed
 -- halfway leaves, then loads its square the way its chunk loading does, which rebuilds it. Answers
 -- the rebuilt bank's state; placeBank's cleanup takes the rebuilt bank away.
-onBank("rebuildBank", function(_, bank, args)
+handler("rebuildBank", function(_, args)
+    local _, bank = bankAt(args.bank)
     bank:removeAllContainers()
     local square = squareAt(args.bank)
     MapObjects.loadGridSquare(square)
     local rebuilt = RenewableEnergy.PowerBank.findOn(square)
-    if not (rebuilt and rebuilt ~= bank and rebuilt:getContainer()) then
-        return nil, "a rebuilt bank with a container on the server"
-    end
-    return stateAt(args.bank)
+    need(rebuilt and rebuilt ~= bank and rebuilt:getContainer(), "a rebuilt bank with a container on the server")
+    return stateOf(bankRecord(args.bank))
 end)
 
 -- Loads -------------------------------------------------------------------------------------------
@@ -499,9 +436,6 @@ end)
 -- the count of each kind.
 handler("scanLoad", function(_, args)
     local square = squareAt(args)
-    if not square then
-        return nil, "the bank's square loaded on the server"
-    end
     local Payers = RenewableEnergy.Payers
     local payer = { x = args.x, y = args.y, z = args.z, key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z) }
     local load = RenewableEnergy.Loads.scan(square, payer, Payers.running())
@@ -565,25 +499,18 @@ end)
 -- Answers whether each cracked and the modules after.
 handler("stormCrack", function(_, args, defer)
     local PanelSource = RenewableEnergy.PanelSource
-    local results = {}
-    for i, trial in ipairs(args.trials) do
+    return { results = Helpers.eachTrial(defer, args.trials, function(trial)
+        return { Helpers.trialRoll(trial.roll, PanelSource.stormChance(panelRecord(trial.source), trial.hours)), 0 }
+    end, function(trial)
         local source = panelRecord(trial.source)
-        local roll = Helpers.trialRoll(trial.roll, PanelSource.stormChance(source, trial.hours))
-        local restore = Helpers.forceRolls(defer, { roll, 0 })
-        results[i] = { cracked = PanelSource.stormCrack(source, trial.hours), modules = source.modules }
-        restore()
-    end
-    return { results = results }
+        return { cracked = PanelSource.stormCrack(source, trial.hours), modules = source.modules }
+    end) }
 end)
 
 -- The modules the panel on the square at `args` records, and the overlays its tile shows.
 handler("panelState", function(_, args)
-    local PowerBank = RenewableEnergy.PowerBank
-    local panel = RenewableEnergy.Sources.findOn(squareAt(args))
-    if not panel then
-        return nil, "the panel on the server"
-    end
-    return { modules = panel:getModData()[PowerBank.MODULES_KEY], overlays = overlaysOf(panel) }
+    local panel = Helpers.find({ x = args.x, y = args.y, z = args.z, kind = "source" })
+    return { modules = panel:getModData()[RenewableEnergy.PowerBank.MODULES_KEY], overlays = overlaysOf(panel) }
 end)
 
 -- `args.hours` of storm over the world's panels that no bank runs (PanelStorms.pass), at the save's
@@ -592,10 +519,7 @@ handler("panelStorm", function(_, args)
     RenewableEnergy.PanelStorms.pass(args.hours)
     local modules = {}
     for i, position in ipairs(args.panels) do
-        local panel = RenewableEnergy.Sources.findOn(squareAt(position))
-        if not panel then
-            return nil, "the panel at " .. position.x .. "," .. position.y .. "," .. position.z .. " on the server"
-        end
+        local panel = Helpers.find({ x = position.x, y = position.y, z = position.z, kind = "source" })
         modules[i] = panel:getModData()[RenewableEnergy.PowerBank.MODULES_KEY]
     end
     return { modules = modules }

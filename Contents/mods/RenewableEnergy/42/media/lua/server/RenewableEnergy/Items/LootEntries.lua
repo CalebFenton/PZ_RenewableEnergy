@@ -1,15 +1,14 @@
 -- What spawns where: the entries Distributions.apply puts into the game's loot tables.
 
 require "Items/Distributions"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/Gadgets/CarAlternator"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 
 local subDist = SuburbsDistributions
-local Specs = RenewableEnergy.Specs
 
 --- Each entry is { weight, list } before the loot rarity option named by `option`. A list is
 --- "proc:<ProceduralDistributions list>", "proc:<list>.junk", "veh:<VehicleDistributions list>"
@@ -115,7 +114,7 @@ local items = {
         }),
     },
     {
-        fullType = RenewableEnergy.SolarMaintainer.ITEM,
+        fullType = SolarMaintainer.ITEM,
         option = "LRMMisc",
         entries = weighted({ { 1, SURVIVOR_CRATES } }, {
             -- Kept on the batteries of RVs, boats and seasonal tractors.
@@ -138,7 +137,7 @@ local items = {
         }),
     },
     {
-        fullType = RenewableEnergy.SolarCellCharger.ITEM,
+        fullType = SolarCellCharger.ITEM,
         option = "LRMMisc",
         entries = weighted({ { 1.5, SURVIVOR_CRATES } }, {
             { 2, "proc:ElectronicStoreMisc" },
@@ -157,7 +156,7 @@ local items = {
     {
         -- Sold by the boxful at garden centres and hardware stores in the early 1990s, and
         -- put away in sheds and garages once their batteries died.
-        fullType = RenewableEnergy.SolarGardenLight.ITEM,
+        fullType = SolarGardenLight.ITEM,
         option = "LRMMisc",
         entries = {
             { 6, "proc:GardenStoreMisc" },
@@ -416,7 +415,7 @@ local items = {
     {
         -- Wind: rebuilt alternators on the shelves of mechanics and auto parts stores, less often
         -- than the engine parts, brakes and batteries vanilla stocks there, which wear out sooner.
-        fullType = RenewableEnergy.CarAlternator.ITEM,
+        fullType = CarAlternator.ITEM,
         option = "LRMMisc",
         entries = {
             { 3, "proc:MechanicShelfElectric" },

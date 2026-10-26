@@ -7,20 +7,18 @@
 -- OnTest is asked about every candidate item of every input, tools included, so each one
 -- answers only for the items it is about and lets the rest through.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/Biogas/Digester"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local Digester = require "RenewableEnergy/Biogas/Digester"
 local Items = require "cf_commonlib/Items"
-local Materials = require "cf_commonlib/Materials"
 local RecipeLearning = require "cf_commonlib/RecipeLearning"
 
-RenewableEnergy = RenewableEnergy or {}
 local Recipes = {}
 RenewableEnergy.Recipes = Recipes
 
@@ -28,9 +26,6 @@ RenewableEnergy.Recipes = Recipes
 -- recipes only through this (cf_commonlib's RecipeLearning).
 RecipeLearning.register("RenewableEnergy_")
 
-local Specs, Battery, Wear, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.PowerBank
-local Sources = RenewableEnergy.Sources
-local SolarGardenLight, VehicleBattery = RenewableEnergy.SolarGardenLight, RenewableEnergy.VehicleBattery
 -- Case modData: the full type of the vanilla car battery it came out of.
 local CASE_BATTERY_KEY = "RenewableEnergy_batteryType"
 
@@ -352,8 +347,8 @@ function Recipes.sealInPlaceInputs(character)
     return paid, needs
 end
 
---- What Seal Cracked Panel takes of `character` (Materials.firstUnmet): the recipe
---- known, its skills, and its inputs but the module.
+--- What Seal Cracked Panel takes of `character`, as a job row's needs (cf_commonlib's Jobs): the
+--- recipe known, its skills, and its inputs but the module.
 function Recipes.sealInPlaceNeeds(character)
     local recipe = Recipes.moduleRepairRecipe()
     local needs = { { kind = "recipe", recipe = recipe, have = character:isRecipeKnown(recipe) and 1 or 0, need = 1 } }
@@ -368,10 +363,10 @@ function Recipes.sealInPlaceNeeds(character)
     return needs
 end
 
---- Why the character can't do Seal Cracked Panel, or nil when they can: the kind of the first
---- of sealInPlaceNeeds they are short of.
-function Recipes.sealInPlaceRefusal(character)
-    return Materials.unmetKind(Recipes.sealInPlaceNeeds(character))
+--- The action units Seal Cracked Panel takes `character`: as the crafting window times Seal
+--- Cracked Module (ISHandcraftAction).
+function Recipes.sealInPlaceUnits(character)
+    return Recipes.moduleRepairRecipe():getTime(character) * 5
 end
 
 --- Uses up what Recipes.sealInPlaceInputs picked; tools are kept and may wear as the recipe's
@@ -513,7 +508,7 @@ function Recipes.refillPropaneBottle(craftRecipeData, character)
     local bottle = craftRecipeData:getFirstCreatedItem()
     local old = craftRecipeData:getAllConsumedItems():get(0)
     local tank = craftRecipeData:getAllKeepInputItems():get(0)
-    local share, tankUse = RenewableEnergy.Digester.BOTTLE_SHARE, tank:getUseDelta()
+    local share, tankUse = Digester.BOTTLE_SHARE, tank:getUseDelta()
     local room = round((1 - old:getCurrentUsesFloat()) * share / tankUse)
     local taken = math.min(room, tank:getCurrentUses())
     bottle:setCurrentUsesFloat(old:getCurrentUsesFloat() + taken * tankUse / share)

@@ -4,16 +4,14 @@
 -- in and out of banks and the inventory shows it. Its condition is its health: capacity
 -- scales with it, and deep discharges wear it down.
 
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Wear"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
 
-RenewableEnergy = RenewableEnergy or {}
 local Battery = {}
 RenewableEnergy.Battery = Battery
-
-local Chance, Specs, Sun, Wear = RenewableEnergy.Chance, RenewableEnergy.Specs, RenewableEnergy.Sun, RenewableEnergy.Wear
 
 --- The Specs.batteries row for an item, or nil if it is no battery.
 function Battery.spec(item)

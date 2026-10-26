@@ -2,13 +2,10 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
-
-local SolarCellCharger = RenewableEnergy.SolarCellCharger
-local Battery, Specs, Sun = RenewableEnergy.Battery, RenewableEnergy.Specs, RenewableEnergy.Sun
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 
 --- Adds `hours` of the panel's output under `sky` (Sun.skyNow, now if nil) to the batteries in
 --- `charger`, one use at a time to the emptiest, so a set fills evenly. Returns the uses it added.

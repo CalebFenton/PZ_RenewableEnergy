@@ -1,5 +1,4 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
 
 -- Fixtures of the arrow board tests (RenewableEnergyTestsArrowBoard*.lua), added to
 -- RenewableEnergyTest. The trailer's state lives on the authority, so they go through the dev
@@ -9,8 +8,6 @@ require "RenewableEnergy/Specs"
 local T = RenewableEnergyTest
 local player = T.player
 
-local MODULE = RenewableEnergy.Specs.factoryModule
-
 local function trailer()
     return require "RenewableEnergy/Debug/RenewableEnergyTestServerTrailer"
 end
@@ -19,17 +16,13 @@ end
 -- A vehicle is a T.placeVehicle handle, spawned by the authority through Trailer.spawnVehicle,
 -- stocked as the world spawns it when `args.stocked` and whole when `args.repair`.
 
---- Queues reading the server's state of the vehicle into vehicle.state.
-function T.vehicleState(self, vehicle)
-    T.onVehicle(self, vehicle, "arrowBoardState")
-end
-
 --- Queues reading the server's state of the vehicle until `done(state)` holds, for what a
---- client's action changes there later.
-function T.awaitVehicleState(self, vehicle, done)
-    T.serverUntil(self, "arrowBoardState", function() return T.vehicleArgs(vehicle) end,
+--- client's action changes there later; the answer goes in self.reads[label or "vehicleState"].
+function T.awaitVehicleState(self, vehicle, done, label)
+    label = label or "vehicleState"
+    T.readUntil(self, "vehicleState", function() return T.vehicleArgs(vehicle) end, label,
         function(reply) return done(reply.state) end)
-    T.step(function() vehicle.state = self.server.arrowBoardState.state end)
+    T.step(function() vehicle.state = self.reads[label].state end)
 end
 
 --- This side's state of its copy of the vehicle, as Trailer.vehicleState reads it.
@@ -147,7 +140,8 @@ end
 
 -- setTrailer's `panels` with a factory module at `condition` on each panel.
 function T.modulesOnBothPanels(condition)
-    return { [LEFT] = { type = MODULE, condition = condition }, [RIGHT] = { type = MODULE, condition = condition } }
+    return { [LEFT] = { type = T.FACTORY_MODULE, condition = condition },
+        [RIGHT] = { type = T.FACTORY_MODULE, condition = condition } }
 end
 
 -- Puts the character at the middle of the vehicle's `area` (or `toSide` squares toward its side),

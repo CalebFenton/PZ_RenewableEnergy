@@ -8,15 +8,12 @@
 --
 -- Units: fuel in kilograms (an item's weight), time in game hours.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
 local GlobalObjects = require "cf_commonlib/GlobalObjects"
 
-RenewableEnergy = RenewableEnergy or {}
 local Gasifier = {}
 RenewableEnergy.Gasifier = Gasifier
-
-local Sprites = RenewableEnergy.Sprites
 
 Gasifier.SYSTEM_NAME = "renewable_energy_gasifier"
 Gasifier.CONTAINER = "RenewableEnergyGasifier"

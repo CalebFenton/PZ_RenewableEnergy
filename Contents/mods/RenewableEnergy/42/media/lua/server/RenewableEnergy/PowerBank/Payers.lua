@@ -14,27 +14,26 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
 require "TimedActions/ISActivateGenerator"
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Treadmill"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Sprites = require "RenewableEnergy/Sprites"
+local Specs = require "RenewableEnergy/Specs"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
+-- Loads and GasLines require this file, so a bill looks them up in the global table as it runs.
+
 local Payers = {}
 RenewableEnergy.Payers = Payers
 
-local PlaceTracker, PowerBank, Treadmill, Specs = RenewableEnergy.PlaceTracker, RenewableEnergy.PowerBank,
-    RenewableEnergy.Treadmill, RenewableEnergy.Specs
 local EPSILON = 1e-6
 
 local function generatorSprites()
     local sprites = {}
-    for name in pairs(RenewableEnergy.Sprites.gasKit.bySprite) do
+    for name in pairs(Sprites.gasKit.bySprite) do
         table.insert(sprites, name)
     end
     return sprites

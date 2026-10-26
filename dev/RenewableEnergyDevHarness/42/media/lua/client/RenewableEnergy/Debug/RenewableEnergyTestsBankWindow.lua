@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
+require "RenewableEnergy/PowerBank/BankJobs"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/StatusRows"
 require "RenewableEnergy/Recipes"
@@ -9,12 +9,10 @@ require "RenewableEnergy/Recipes"
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
-local test, expect, player = T.test, T.expect, T.player
+local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
 local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
-local Format = RenewableEnergy.Format
+local Format, BankJobs = RenewableEnergy.Format, RenewableEnergy.BankJobs
 local StatusRows = RenewableEnergy.StatusRows
-local CAR_BATTERY = RenewableEnergy.VehicleBattery.CAR_BATTERY
-local PLUG_IN_INVERTER, POWER_INVERTER, INVERTER_CHARGER, L16, JAR_BATTERY = T.PLUG_IN_INVERTER, T.POWER_INVERTER, T.INVERTER_CHARGER, T.L16, T.JAR_BATTERY
 
 -- `base` and then as many `kind` appliances as a bank limited to `limitW` carries, with `over` one
 -- more. Sums as the load does, so "carries" holds at the boundary.
@@ -33,9 +31,9 @@ end
 -- walk away, as vanilla's animal windows do: one left open would watch the bank's status forever.
 test("renewable_energy_bank_window_closes_once_walked_away", {
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY })
+        self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
         if not self.bank then return end
-        T.step(function() T.openWindow(self) end)
+        T.openWindow(self, self.bank)
         local function isOpen() return UIManager.getUI():contains(self.window.javaObject) end
         T.step(function()
             self.openAtBank = isOpen()
@@ -56,7 +54,7 @@ test("renewable_energy_bank_window_closes_once_walked_away", {
 test("renewable_energy_bank_window_empty_bank_lists_whats_missing", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
-        if self.bank then T.step(function() T.openWindow(self) end) end
+        if self.bank then T.openWindow(self, self.bank) end
     end,
     validate = function(self)
         local window = self.window
@@ -72,43 +70,36 @@ test("renewable_energy_bank_window_empty_bank_lists_whats_missing", {
 test("renewable_energy_bank_window_shows_grid_power", {
     run = function(self)
         T.setGrid(self, true)
-        local bare = T.bank(self, "batteryBoxWood", { CAR_BATTERY })
-        local charging = bare and T.bank(self, "batteryRackWood", { CAR_BATTERY, Specs.charger }, { charge = 0.5 })
+        local bare = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
+        local charging = bare and T.bank(self, "batteryRackWood", { T.CAR_BATTERY, Specs.charger }, { charge = 0.5 })
         if not charging then return end
         self.at = bare.position
         T.batch(function()
-            T.bankPass(self, bare, 0)
-            T.bankPass(self, charging, 0, { hours = 1 })
-            T.step(function() self.bareStatus, self.chargingStatus = bare.state.status, charging.state.status end)
+            T.bankPass(self, bare, 0, { label = "bare" })
+            T.bankPass(self, charging, 0, { hours = 1, label = "charging" })
         end)
         T.step(function() T.setGrid(self, false) end)
-        T.batch(function()
-            T.bankPass(self, charging, 0)
-            T.step(function() self.offStatus = charging.state.status end)
-        end)
+        T.bankPass(self, charging, 0, { label = "off" })
     end,
     validate = function(self)
         local label = getText("IGUI_RenewableEnergy_Grid")
-        local function gridRow(status)
-            return status and T.rowLabelled((StatusRows.rows(status, self.at)), label)
+        local function gridRow(key)
+            return T.rowLabelled((StatusRows.rows(self.reads[key].status, self.at)), label)
         end
-        local bare = gridRow(self.bareStatus)
-        expect(bare ~= nil and bare.value == getText("IGUI_RenewableEnergy_GridNoCharger"),
-            "a bank without an inverter or a charger on the grid reads " .. tostring(bare and bare.value))
-        local status = self.chargingStatus
-        local charging = gridRow(status)
-        expect(status ~= nil and status.chargerW > 0 and charging ~= nil
-            and charging.value == getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)),
-            "a bank charging from the grid reads " .. tostring(charging and charging.value))
-        expect(self.offStatus ~= nil and gridRow(self.offStatus) == nil, "the grid row stays once the grid is off")
+        local bare, charging, status = gridRow("bare"), gridRow("charging"), self.reads.charging.status
+        expectEqual("the grid row of a bank without an inverter or a charger", bare and bare.value,
+            getText("IGUI_RenewableEnergy_GridNoCharger"))
+        expect(status.chargerW > 0, "a bank's chargers on the grid make nothing")
+        expectEqual("the grid row of a bank charging from the grid", charging and charging.value,
+            getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)))
+        expect(gridRow("off") == nil, "the grid row stays once the grid is off")
     end,
 })
 
 -- Queues a wait until this client's status of `bank` has the load the server's last answer gave.
 local function waitForLoad(self, bank)
-    T.waitFor(self, function()
-        local status = T.clientStatus(bank)
-        return status ~= nil and status.loadW == bank.state.status.loadW and status.solarW == bank.state.status.solarW
+    T.waitForStatus(self, bank, function(status)
+        return status.loadW == bank.state.status.loadW and status.solarW == bank.state.status.solarW
     end, "this client's status with the load the server measured")
 end
 
@@ -120,7 +111,7 @@ test("renewable_energy_bank_window_reflects_status", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryRackWood",
-            { CAR_BATTERY, CAR_BATTERY, JAR_BATTERY, PLUG_IN_INVERTER,
+            { T.CAR_BATTERY, T.CAR_BATTERY, T.JAR_BATTERY, T.PLUG_IN_INVERTER,
                 Specs.controller, Specs.charger },
             { charge = 0.5 })
         if not bank then return end
@@ -129,24 +120,22 @@ test("renewable_energy_bank_window_reflects_status", {
         self.reconditionAt = Recipes.repairLimit(0) - Recipes.SERVICE_REPAIR - 1
         self.rebuildAt = Recipes.repairLimit(2)
         self.panelCount = Specs.freeSlots + 1
-        self.load = loadUpTo({ "light", "light" }, "television", Specs.inverters[PLUG_IN_INVERTER].watts, true)
+        self.load = loadUpTo({ "light", "light" }, "television", Specs.inverters[T.PLUG_IN_INVERTER].watts, true)
         T.watch(self, bank)
         T.batch(function()
-            T.setPartCondition(self, bank, Specs.charger, 0)
-            T.setPartCondition(self, bank, CAR_BATTERY, self.reconditionAt)
-            T.setPartCondition(self, bank, JAR_BATTERY, self.rebuildAt, false, 2)
+            T.bankPart(self, bank, Specs.charger, { condition = 0 })
+            T.bankPart(self, bank, T.CAR_BATTERY, { condition = self.reconditionAt })
+            T.bankPart(self, bank, T.JAR_BATTERY, { condition = self.rebuildAt, repaired = 2 })
             for _ = 1, self.panelCount do
                 if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
             end
         end)
-        T.waitFor(self, function()
-            local status = T.clientStatus(bank)
-            return status ~= nil and #status.sources == self.panelCount
-        end, "this client's status listing the panels")
+        T.waitForStatus(self, bank, function(status) return #status.sources == self.panelCount end,
+            "this client's status listing the panels")
         T.step(function() self.withControllerSummary = StatusRows.summary(T.clientStatus(bank)) end)
         T.batch(function()
-            T.server(self, "removePart", { bank = bank.position, type = Specs.controller })
-            T.perform(self, "setBankOn", { bank = bank.position, on = true })
+            T.server(self, "bankPart", { bank = bank.position, type = Specs.controller, remove = true })
+            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
             T.bankPass(self, bank, 1000)
             T.applyLoad(self, bank, self.load)
         end)
@@ -160,23 +149,23 @@ test("renewable_energy_bank_window_reflects_status", {
         local status = T.clientStatus(self.bank)
         if not expect(status ~= nil, "the bank sent no status") then return end
         local summary = StatusRows.summary(status)
-        local load, limit = T.applianceWatts(self.load), Specs.inverters[PLUG_IN_INVERTER].watts
+        local load, limit = T.applianceWatts(self.load), Specs.inverters[T.PLUG_IN_INVERTER].watts
         expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_Overloaded", Format.watts(load), Format.watts(limit))),
             "the window doesn't say the bank is overloaded with " .. load .. " W on " .. limit .. " W")
         expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_InputSlots", inputs, Specs.freeSlots)),
             "without its controller the slots line doesn't read " .. inputs .. " inputs of " .. Specs.freeSlots)
         local left, right = StatusRows.rows(status, self.bank.position)
         local lights = T.rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
-        expect(lights ~= nil and lights.value == Format.watts(T.applianceWatts({ "light", "light" })), "the window doesn't list 2 lights and their watts")
+        expectEqual("the row of 2 lights", lights and lights.value, Format.watts(T.applianceWatts({ "light", "light" })))
         local charger = T.rowLabelled(left, getItemNameFromFullType(Specs.charger))
-        expect(charger ~= nil and charger.color == "bad" and charger.value == getText("IGUI_RenewableEnergy_PartBroken", "0%"),
-            "a broken charger doesn't read broken (" .. tostring(charger and charger.value) .. ")")
+        expectEqual("the colour of a broken charger's row", charger and charger.color, "bad")
+        expectEqual("a broken charger's row", charger and charger.value, getText("IGUI_RenewableEnergy_PartBroken", "0%"))
         local function repairValue(fullType, condition, repair)
             return getText("IGUI_RenewableEnergy_BatteryValueRepair", Format.percent(status.charge),
                 Format.condition(fullType, condition), getText(repair))
         end
-        local batteryName = getItemNameFromFullType(CAR_BATTERY)
-        local recondition = repairValue(CAR_BATTERY, self.reconditionAt, "IGUI_RenewableEnergy_RepairRecondition")
+        local batteryName = getItemNameFromFullType(T.CAR_BATTERY)
+        local recondition = repairValue(T.CAR_BATTERY, self.reconditionAt, "IGUI_RenewableEnergy_RepairRecondition")
         local repairs, found, panels = {}, false, {}
         for _, r in ipairs(right) do
             if r.label == batteryName then
@@ -188,11 +177,10 @@ test("renewable_energy_bank_window_reflects_status", {
         end
         expect(found, "a battery further below its repair limit than a Service reaches doesn't suggest Recondition ("
             .. table.concat(repairs, "; ") .. ")")
-        local jar = T.rowLabelled(right, getItemNameFromFullType(JAR_BATTERY))
-        local rebuild = repairValue(JAR_BATTERY, self.rebuildAt, "IGUI_RenewableEnergy_RepairRebuild")
-        expect(jar ~= nil and jar.value == rebuild,
-            "a battery at its twice-repaired limit reads " .. tostring(jar and jar.value) .. ", expected " .. rebuild)
-        if not expect(#panels == self.panelCount, #panels .. " panel rows, expected " .. self.panelCount) then return end
+        local jar = T.rowLabelled(right, getItemNameFromFullType(T.JAR_BATTERY))
+        local rebuild = repairValue(T.JAR_BATTERY, self.rebuildAt, "IGUI_RenewableEnergy_RepairRebuild")
+        expectEqual("the row of a battery at its twice-repaired limit", jar and jar.value, rebuild)
+        if not expectEqual("panel rows", #panels, self.panelCount) then return end
         local noSlot = getText("IGUI_RenewableEnergy_ReasonNoController")
         local last = panels[#panels]
         expect(last.value:find(noSlot, 1, true) ~= nil and last.color == "bad", "the panel past the slots reads " .. last.value)
@@ -214,9 +202,8 @@ local function headers(rows)
 end
 
 local FULL_BANK = {
-    "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.DeepCycleBattery", L16,
-    L16, CAR_BATTERY, INVERTER_CHARGER, POWER_INVERTER,
-    "RenewableEnergy.ChargeController", "RenewableEnergy.ChargeController", "Base.CarBatteryCharger",
+    T.DEEP_CYCLE, T.DEEP_CYCLE, T.L16, T.L16, T.CAR_BATTERY, T.INVERTER_CHARGER, T.POWER_INVERTER,
+    Specs.controller, Specs.controller, Specs.charger,
 }
 local FULL_BANK_SOURCES = {
     { sprite = Sprites.flat, modules = T.factoryModules(100) },
@@ -235,16 +222,16 @@ test("renewable_energy_bank_window_lists_every_part", {
         self.bank = bank
         T.watch(self, bank)
         T.batch(function()
-            T.setPartCondition(self, bank, L16, 45)
+            T.bankPart(self, bank, T.L16, { condition = 45 })
             for _, source in ipairs(FULL_BANK_SOURCES) do
                 if not T.panel(self, source.sprite, { near = bank, modules = source.modules, connect = true }) then return end
             end
-            T.perform(self, "setBankOn", { bank = bank.position, on = true })
+            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
             T.bankPass(self, bank, 650)
             T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
         end)
         waitForLoad(self, bank)
-        T.step(function() T.openWindow(self) end)
+        T.openWindow(self, self.bank)
     end,
     validate = function(self)
         local window = self.window
@@ -258,7 +245,7 @@ test("renewable_energy_bank_window_lists_every_part", {
             "the window does not list " .. batteries .. " batteries; the status holds " .. #status.batteries)
         expect(found[getText("IGUI_RenewableEnergy_Sources", #FULL_BANK_SOURCES)],
             "the window does not list " .. #FULL_BANK_SOURCES .. " sources; the status holds " .. #status.sources)
-        for _, fullType in ipairs({ INVERTER_CHARGER, POWER_INVERTER, Specs.controller, Specs.charger }) do
+        for _, fullType in ipairs({ T.INVERTER_CHARGER, T.POWER_INVERTER, Specs.controller, Specs.charger }) do
             expect(T.rowLabelled(window.left, getItemNameFromFullType(fullType)) ~= nil, "the window does not list the " .. fullType)
         end
         expect(window.switchButton.enable, "the switch is disabled on a bank with an inverter")

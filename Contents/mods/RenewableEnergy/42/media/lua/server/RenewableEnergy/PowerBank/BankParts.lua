@@ -1,20 +1,15 @@
 -- The parts a bank holds: reading its container into the snapshot, writing the charge back into
 -- its batteries, what its working inverters, chargers and controllers add up to, and their wear.
--- Adds to Bank.lua's class, which requires this file once the class exists.
+-- Adds to Bank.lua's class.
 
 if isClient() then return end
 
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/PowerBank"
-
-RenewableEnergy = RenewableEnergy or {}
-local Specs, Battery, Wear, PowerBank, Sources = RenewableEnergy.Specs, RenewableEnergy.Battery, RenewableEnergy.Wear,
-    RenewableEnergy.PowerBank, RenewableEnergy.Sources
--- Not required: Bank.lua requires this file while it loads, so requiring it back would cycle.
-local Bank = RenewableEnergy.Bank
+local Specs = require "RenewableEnergy/Specs"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Bank = require "RenewableEnergy/PowerBank/Bank"
 
 local function partEntry(item)
     return { id = item:getID(), type = item:getFullType(), condition = item:getCondition() }

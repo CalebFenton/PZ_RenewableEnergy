@@ -12,7 +12,7 @@ local LibLoot = require "cf_commonlib/Loot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local check, saveOptions, countPairs = PZHarness.checkHandler, PZHarness.Fixtures.saveOptions, PZHarness.Fixtures.countPairs
-local squareAt, removePlaced = PZHarness.Fixtures.squareAt, PZHarness.Fixtures.removePlaced
+local removePlaced = PZHarness.Fixtures.removePlaced
 local Sprites = RenewableEnergy.Sprites
 
 -- The VehicleDistributions tables some vehicle's Normal or Specific distribution fills from.
@@ -86,7 +86,7 @@ check("lootListsInUse", function(expect)
     local procUsers = PZHarness.Loot.procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
-    local capacity = ItemContainer.new("crate", nil, nil):getCapacity()
+    local capacity = RenewableEnergy.Loot.newContainer(nil):getCapacity()
     PZHarness.Loot.withMeasureOptions(RenewableEnergy.Loot.MEASURE_OPTIONS, function()
         for _, spec in ipairs(D.items) do
             checkHandedOut(expect, spec, capacity)
@@ -245,10 +245,8 @@ end
 -- rolls its type's "all" table, here the probe's, and one of a corpse's type the corpse lists; a bag
 -- in each holds a battery. Vehicle fills are the arrow board tests'. `args` is a free outdoor square.
 check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
-    local square = squareAt(args)
-    if not square or square:getRoom() then
-        return "an outdoor square loaded on the server"
-    end
+    local square = Helpers.squareAt(args)
+    PZHarness.need(not square:getRoom(), "an outdoor square on the server")
     local Battery = RenewableEnergy.Battery
     local range = RenewableEnergy.Specs.foundCharge
     SuburbsDistributions.all[PROBE_CONTAINER] = PROBE_LOOT

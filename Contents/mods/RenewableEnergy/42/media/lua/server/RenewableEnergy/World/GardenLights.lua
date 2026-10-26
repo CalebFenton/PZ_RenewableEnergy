@@ -7,22 +7,16 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/World/WorldSpawns"
-require "RenewableEnergy/World/BuildingWatch"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Chance = require "RenewableEnergy/Chance"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 
-RenewableEnergy = RenewableEnergy or {}
 local GardenLights = {}
 RenewableEnergy.GardenLights = GardenLights
-
-local Sprites = RenewableEnergy.Sprites
-local WorldSpawns = RenewableEnergy.WorldSpawns
-local SolarGardenLight = RenewableEnergy.SolarGardenLight
-local BuildingWatch = RenewableEnergy.BuildingWatch
-local Chance = RenewableEnergy.Chance
 
 -- Global ModData, by building key: the number of lights a rolled house got, or PROMISED for a
 -- house a solar site promised lights that isn't rolled yet. Saved, so a promise outlives a quit
@@ -157,7 +151,7 @@ end
 -- Returns how many it placed.
 local function place(def)
     local count = Chance.between(GardenLights.COUNT.min, GardenLights.COUNT.max)
-    local charged = { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh }
+    local charged = { [SolarGardenLight.CHARGE_KEY] = Specs.gardenLight.wh }
     local squares = frontSquares(def, count)
     for _, square in ipairs(squares) do
         WorldSpawns.placeMoveable(square, Sprites.gardenLight.off, charged)

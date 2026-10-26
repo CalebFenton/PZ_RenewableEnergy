@@ -5,16 +5,12 @@
 -- strains audibly now and then, the warning to set the brake. The game's wind is the same on every
 -- client, and a charger's brake is in its modData, so nothing needs sending.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Wind"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Wind = require "RenewableEnergy/Wind"
 local Squares = require "cf_commonlib/Squares"
 
-local Specs, Sprites, Wind = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Wind
-
 local WindSpin = {}
-RenewableEnergy.WindSpin = WindSpin
 
 -- Turns a second: a slow start at the cut-in speed, faster with the wind, no faster than this.
 local START_TPS, TPS_PER_KPH, MAX_TPS = 0.3, 0.04, 2

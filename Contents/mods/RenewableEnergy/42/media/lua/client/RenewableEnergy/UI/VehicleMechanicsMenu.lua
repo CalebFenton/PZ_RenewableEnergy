@@ -16,19 +16,20 @@ require "Vehicles/TimedActions/ISPathFindAction"
 require "Vehicles/TimedActions/ISOpenVehicleDoor"
 require "Vehicles/TimedActions/ISCloseVehicleDoor"
 require "Vehicles/TimedActions/ISUnlockVehicleDoor"
-require "RenewableEnergy/Gadgets/CarAlternator"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Items = require "cf_commonlib/Items"
 local Needs = require "cf_commonlib/Needs"
 
-RenewableEnergy = RenewableEnergy or {}
 local CarAlternatorMenu = {}
 RenewableEnergy.CarAlternatorMenu = CarAlternatorMenu
 
-local Action = RenewableEnergyAction
-local CarAlternator = RenewableEnergy.CarAlternator
-local VehicleBattery = RenewableEnergy.VehicleBattery
+local function jobOf(putBack)
+    return putBack and VehicleJobs.PUT_BACK_ALTERNATOR or VehicleJobs.TAKE_OUT_ALTERNATOR
+end
 
 local function isWrench(item)
     return item:hasTag(ItemTag.WRENCH) and Items.notBroken(item)
@@ -54,8 +55,7 @@ function CarAlternatorMenu.queue(character, vehicle, item)
         end
         ISTimedActionQueue.add(ISOpenVehicleDoor:new(character, vehicle, hood))
     end
-    ISTimedActionQueue.add(Action:new(character, item and Action.PUT_BACK_ALTERNATOR or Action.TAKE_OUT_ALTERNATOR, nil, nil,
-        vehicle, item))
+    ISTimedActionQueue.add(Action:new(character, "vehicle", jobOf(item ~= nil), vehicle, item))
     if hood then
         ISTimedActionQueue.add(ISCloseVehicleDoor:new(character, vehicle, hood))
     end
@@ -72,7 +72,8 @@ function CarAlternatorMenu.addOption(context, character, vehicle)
     local item = putBack and character:getInventory():getFirstTypeRecurse(CarAlternator.ITEM) or nil
     local option = context:addOption(getText(putBack and "IGUI_RenewableEnergy_PutBackAlternator"
         or "IGUI_RenewableEnergy_TakeOutAlternator"), character, CarAlternatorMenu.queue, vehicle, item)
-    Needs.show(option, CarAlternator.needs(character, putBack), CarAlternator.blocker(character, vehicle, putBack))
+    Needs.show(option, VehicleJobs.needs(character, jobOf(putBack), vehicle, item),
+        CarAlternator.blocker(character, vehicle, putBack))
     return option
 end
 

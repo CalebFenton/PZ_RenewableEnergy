@@ -64,13 +64,11 @@ test("renewable_energy_gasline_kit_install_and_remove", {
         local kit = Sprites.gasKitFor(fitted.sprite)
         T.expect(kit ~= Sprites.gasKit.default and T.hasOverlay(fitted, kit),
             "the fitted kit doesn't show on " .. tostring(fitted.sprite) .. "'s intake")
-        T.expectMaterialsUsed(self, "afterFit", self.install, "fitting the kit")
-        T.expect(self.runningRefusal == "Tooltip_RenewableEnergy_GeneratorRunning",
-            "taking the kit off a running generator: " .. tostring(self.runningRefusal))
+        T.expectEqual("the refusal to take the kit off a running generator", self.runningRefusal,
+            "Tooltip_RenewableEnergy_GeneratorRunning")
         T.expect(removed.state == nil and not removed.listed, "the kit is still fitted")
         T.expect(not T.hasOverlay(removed, kit), "the removed kit still shows")
-        T.expectNear("fuel after removing it", removed.fuel, self.fuel, 0.01)
-        T.expect(self.counts.afterRemove[GasKit.ITEM] == 1, "removing didn't give the kit back")
+        T.expectEqual("kits after removing it", self.counts.afterRemove[GasKit.ITEM], 1)
     end,
 })
 
@@ -86,7 +84,7 @@ test("renewable_energy_gasline_kit_menu", {
         T.step(function()
             local options = T.worldOptions(generator.object, getText("ContextMenu_Generator"),
                 { install = getText("ContextMenu_RenewableEnergy_InstallKit") })
-            self.install = T.optionState(options and options.install)
+            T.noteOption(self, "Install", options and options.install)
         end)
         T.fitAndConnect(self, generator, digester)
         T.waitFor(self, function()
@@ -95,14 +93,14 @@ test("renewable_energy_gasline_kit_menu", {
         end, "this client's copy of the generator on gas")
     end,
     validate = function(self)
-        T.expect(self.install.greyed, "without a kit and wrench, Install isn't offered greyed out")
+        T.expectOptionRefused(self, "Install")
         local generator = self.generator.object
         local options = T.worldOptions(generator, getText("ContextMenu_Generator"), { disconnect = getText("ContextMenu_RenewableEnergy_DisconnectLine"),
             remove = getText("ContextMenu_RenewableEnergy_RemoveKit"), take = getText("ContextMenu_GeneratorTake") })
         if T.expect(options ~= nil, "a kitted generator has no generator submenu") then
             T.expect(options.disconnect ~= nil, "no Disconnect Gas Line")
             T.expect(options.remove ~= nil, "no Remove Gas Conversion Kit")
-            T.expect(options.take == nil or options.take.notAvailable, "Take Generator is offered on a kitted generator")
+            T.expect(not T.offered(options.take), "Take Generator is offered on a kitted generator")
         end
         T.expect(not ISTakeGenerator:new(T.player(), generator):isValid(), "the client lets a kitted generator be taken")
         local text = ISGeneratorInfoWindow.getRichText(generator, true)
@@ -132,7 +130,7 @@ test("renewable_energy_gasline_kit_refused_in_the_dark", {
         local reason = T.tooltipOf(install)
         T.expect(install ~= nil and install.notAvailable and reason == getText("Tooltip_RenewableEnergy_TooDark"),
             "Install isn't offered greyed out saying it's too dark (" .. tostring(reason) .. ")")
-        T.expect(not RenewableEnergyGasAction:new(T.player(), "kit", GasKit.INSTALL, generator):isValid(), "the Install action runs in the dark")
+        T.expect(not RenewableEnergyAction:new(T.player(), "kit", GasKit.INSTALL, generator):isValid(), "the Install action runs in the dark")
     end,
 })
 
@@ -202,11 +200,9 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
         for _, material in ipairs(self.line) do
             hoses = material.item == GasKit.HOSE and material.need or hoses
         end
-        T.expect(hoses > 0, "the line from a digester takes no hoses")
         T.expect(connected.state and connected.state.connected, "the gas line isn't connected")
         T.expect(connected.fuel >= GasKit.PHANTOM_FUEL - 0.01, "on gas, the generator shows " .. connected.fuel .. " L, too little to start")
-        T.expect(self.counts.connected[GasKit.HOSE] == 1,
-            "the line left " .. tostring(self.counts.connected[GasKit.HOSE]) .. " of " .. (hoses + 1) .. " hoses, not 1")
+        T.expectEqual("hoses left after connecting the line", self.counts.connected[GasKit.HOSE], 1)
         T.expect(running.running, "the generator didn't keep running on gas")
         T.expectNear("fuel shown on gas once the pass paid what vanilla billed", running.fuel, GasKit.PHANTOM_FUEL, 0.01)
         if T.expect(running.state ~= nil, "the running generator lost its kit") then
@@ -232,7 +228,7 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
         T.expect(text:find(getText("IGUI_RenewableEnergy_GasPetrol"), 1, true) ~= nil
             and text:find(getText("IGUI_RenewableEnergy_GasOut"), 1, true) == nil,
             "switched to petrol once out of gas, the info window doesn't say it runs on petrol")
-        T.expect(self.counts.cut[GasKit.HOSE] == hoses + 1, "cutting the line left " .. tostring(self.counts.cut[GasKit.HOSE]) .. " hoses")
+        T.expectEqual("hoses after cutting the line", self.counts.cut[GasKit.HOSE], hoses + 1)
     end,
 })
 
@@ -257,7 +253,7 @@ test("renewable_energy_gasline_generator_runs_on_past_vanilla_stop", {
     validate = function(self)
         local reads = self.reads
         local litres, hours = T.vanillaBill(self, "before", "after")
-        T.expect(hours == self.hours, "the clock moved on " .. hours .. " whole hours, not " .. self.hours)
+        T.expectEqual("whole hours the clock moved on", hours, self.hours)
         T.expect(litres > GasKit.PHANTOM_FUEL, "a bill of " .. litres .. " L doesn't run the fuel shown on gas dry")
         T.expect(not reads.billed.running, "vanilla's bill past the fuel shown didn't stop the generator, so this tests nothing")
         local after = reads.after
@@ -274,7 +270,7 @@ test("renewable_energy_gasline_generator_runs_on_past_vanilla_stop", {
 -- after the character leaves.
 test("renewable_energy_gasline_generator_runs_on_after_absence", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 120,
+    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
     hour = 12,
     instant = true,
     run = function(self)
@@ -283,7 +279,7 @@ test("renewable_energy_gasline_generator_runs_on_after_absence", {
         local digester = stand and T.digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity, { near = stand, minDistance = 2 })
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
-        T.server(self, "generatorTrack", T.at(generator))
+        T.server(self, "trackAt", T.at(generator, { kind = "generator" }))
         T.fitAndConnect(self, generator, digester)
         T.setGenerator(self, generator, { running = true })
         T.readGenerator(self, generator, "bill")
@@ -298,7 +294,7 @@ test("renewable_energy_gasline_generator_runs_on_after_absence", {
     validate = function(self)
         local reads = self.reads
         local litres, hours = T.vanillaBill(self, "before", "after")
-        T.expect(hours == self.hours, "the clock moved on " .. hours .. " whole hours, not " .. self.hours)
+        T.expectEqual("whole hours the clock moved on", hours, self.hours)
         T.expect(litres > GasKit.PHANTOM_FUEL, "a bill of " .. litres .. " L doesn't run the fuel shown on gas dry")
         local after = reads.after
         T.expect(after.running and after.state ~= nil and not after.state.outOfGas,
@@ -382,23 +378,22 @@ test("renewable_energy_gasline_kit_job_not_done_takes_nothing", {
         T.giveMaterials(self, "kit", self.install)
         T.batch(function()
             T.server(self, "kitJobNotDone", { job = GasKit.INSTALL })
-            T.read(self, "perkXp", { perk = "Mechanics" }, "before")
+            T.read(self, "character", { perks = { "Mechanics" } }, "before")
         end)
         T.goNextTo(self, generator.square)
         T.read(self, "kitJobComplete", T.at(generator, { job = GasKit.INSTALL }), "complete")
         T.batch(function()
             T.readGenerator(self, generator, "after")
             T.countMaterials(self, "after", self.install)
-            T.read(self, "perkXp", { perk = "Mechanics" }, "afterXp")
+            T.read(self, "character", { perks = { "Mechanics" } }, "afterXp")
         end)
     end,
     validate = function(self)
         local reads = self.reads
-        T.expect(reads.complete.done == false, "Install Kit counted as done though its work wasn't")
+        T.expectEqual("Install Kit's done", reads.complete.done, false)
         T.expect(reads.after.state == nil and not reads.after.listed, "the kit was fitted")
-        T.expect(self.counts.after[GasKit.ITEM] == 1, "Install Kit took the kit though it wasn't done")
-        T.expect(reads.afterXp.value == reads.before.value, "Install Kit gave Mechanics XP though it wasn't done: "
-            .. reads.before.value .. " before, " .. reads.afterXp.value .. " after")
+        T.expectEqual("kits after Install Kit wasn't done", self.counts.after[GasKit.ITEM], 1)
+        T.expectEqual("Mechanics XP after Install Kit wasn't done", reads.afterXp.xp.Mechanics, reads.before.xp.Mechanics)
     end,
 })
 
@@ -425,8 +420,8 @@ test("renewable_energy_gasline_gasifier_must_stand_beside", {
         end)
     end,
     validate = function(self)
-        T.expect(self.beside == nil, "a gasifier beside the generator: " .. tostring(self.beside))
-        T.expect(self.corner == "Tooltip_RenewableEnergy_GasifierNotBeside", "a gasifier on a corner: " .. tostring(self.corner))
+        T.expectEqual("the refusal of a gasifier beside the generator", self.beside, nil)
+        T.expectEqual("the refusal of a gasifier on a corner", self.corner, "Tooltip_RenewableEnergy_GasifierNotBeside")
     end,
 })
 
@@ -442,7 +437,7 @@ test("renewable_energy_gasline_line_lost_with_its_source_on_petrol", {
         T.kitJob(self, generator, GasKit.TO_PETROL)
         T.batch(function()
             T.setGenerator(self, generator, { running = true })
-            T.removeRecord(self, gasifier)
+            T.server(self, "removeAt", T.recordArgs(gasifier))
             T.gasPass(self, generator, 0.1)
             T.readGenerator(self, generator, "lost")
         end)

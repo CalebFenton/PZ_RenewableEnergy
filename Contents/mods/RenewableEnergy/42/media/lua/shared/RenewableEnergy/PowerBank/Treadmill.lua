@@ -1,18 +1,15 @@
 -- Vanilla's treadmill (Sprites.treadmill), two tiles. Unwired, a run on it draws its motor's watts
 -- like any appliance. Wired to feed a bank, a run on it banks watt-hours instead.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
-local Materials = require "cf_commonlib/Materials"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local Treadmill = {}
 RenewableEnergy.Treadmill = Treadmill
-
-local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
 
 -- Tile modData: the tile wired to feed a bank (one of the treadmill's two tiles).
 Treadmill.WIRED_KEY = "RenewableEnergy_treadmillWired"
@@ -79,36 +76,33 @@ function Treadmill.wiredHalf(tile)
     return nil
 end
 
---- What wiring a treadmill to feed a bank takes of `character` (Materials.firstUnmet), as
---- PowerBank.wiringNeeds does for a part.
-function Treadmill.wiringNeeds(character)
-    return PowerBank.wiringNeeds(character, Specs.treadmill.wiring)
-end
+Treadmill.WIRE = "WireTreadmill"
+Treadmill.UNWIRE = "UnwireTreadmill"
 
---- Why `character` can't wire the treadmill of `tile` now, or nil if they can: "already wired"
---- when either of its tiles is, else the kind of the first of Treadmill.wiringNeeds they are
---- short of. Every path that wires one asks it, so a treadmill is wired once.
-function Treadmill.wiringRefusal(character, tile)
-    if Treadmill.wiredHalf(tile) then
-        return "already wired"
-    end
-    return Materials.unmetKind(Treadmill.wiringNeeds(character))
-end
+local WIRING = Specs.treadmill.wiring
 
---- What unwiring a treadmill takes of `character` (Materials.firstUnmet): the tools wiring
---- it took, as PowerBank.unwiringNeeds says for a part.
-function Treadmill.unwiringNeeds(character)
-    return PowerBank.unwiringNeeds(character, Specs.treadmill.wiring)
-end
+-- The jobs at a treadmill's tile, by name (cf_commonlib's Jobs): wiring it to feed a bank, as a
+-- part is wired in, and unwiring it. RenewableEnergy.JobSites.treadmill does them.
+Treadmill.JOBS = {
+    -- Either tile wired already refuses it, so a treadmill is wired once.
+    [Treadmill.WIRE] = {
+        units = function(tile, with, character) return PowerBank.wiringUnits(character, WIRING) end,
+        light = true, sound = "GeneratorConnect",
+        blocker = function(character, tile) return Treadmill.wiredHalf(tile) and "already wired" or nil end,
+        materials = PowerBank.wiringMaterials(WIRING),
+    },
+    -- As a part comes out of a bank: quicker than wiring, with the same tools, the wire given back.
+    [Treadmill.UNWIRE] = {
+        units = function(tile, with, character) return PowerBank.wiringUnits(character, WIRING, 0.5) end,
+        light = true, sound = "GeneratorConnect",
+        blocker = function(character, tile) return not Treadmill.isWired(tile) and "not wired" or nil end,
+        materials = WIRING.tools,
+    },
+}
 
---- Why `character` can't unwire the treadmill tile `tile` now, or nil if they can: "not wired",
---- else the kind of the first of Treadmill.unwiringNeeds they are short of.
-function Treadmill.unwiringRefusal(character, tile)
-    if not Treadmill.isWiredTile(tile) then
-        return "not wired"
-    end
-    return Materials.unmetKind(Treadmill.unwiringNeeds(character))
-end
+Jobs.define(Treadmill, {
+    subjectOf = function(tile) return Treadmill.isTreadmill(tile) and tile or nil end, missing = "no treadmill",
+})
 
 --- Whether the treadmill of `tile` has power, from the grid or a generator, a bank included, as
 --- vanilla decides an appliance has (ItemContainer.isObjectPowered).

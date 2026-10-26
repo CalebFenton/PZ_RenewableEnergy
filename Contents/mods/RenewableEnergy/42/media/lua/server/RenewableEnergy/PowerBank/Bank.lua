@@ -11,27 +11,21 @@
 if isClient() then return end
 
 require "Map/SGlobalObject"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/PowerBank/WindSource"
-require "RenewableEnergy/PowerBank/TreadmillSource"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/PowerBank/Wear"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Payers"
-require "RenewableEnergy/GasLine/GasLines"
-require "RenewableEnergy/Fumes"
-require "RenewableEnergy/PowerBank/Loads"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
+local WindSource = require "RenewableEnergy/PowerBank/WindSource"
+local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
+local GasLines = require "RenewableEnergy/GasLine/GasLines"
+local Fumes = require "RenewableEnergy/Fumes"
+local Loads = require "RenewableEnergy/PowerBank/Loads"
 local Tiles = require "cf_commonlib/Tiles"
-
-RenewableEnergy = RenewableEnergy or {}
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
-local Battery, PowerBank, Sources = RenewableEnergy.Battery, RenewableEnergy.PowerBank, RenewableEnergy.Sources
-local Payers, PlaceTracker, Loads = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker, RenewableEnergy.Loads
 
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
 RenewableEnergy.Bank = Bank
@@ -50,9 +44,9 @@ Bank.SAVED_FIELDS = {
 -- `player` what connecting it first teaches; update(source, object, inSlot, hours, context) sets
 -- its watts and reason for a pass; and status(entry, source), if any, adds to its status entry.
 Bank.FAMILY = {
-    panel = RenewableEnergy.PanelSource,
-    wind = RenewableEnergy.WindSource,
-    treadmill = RenewableEnergy.TreadmillSource,
+    panel = PanelSource,
+    wind = WindSource,
+    treadmill = TreadmillSource,
 }
 -- Each family's watts now in the status, and its watt-hours today, saved; solarWhToday keeps its
 -- older name because saves hold it.
@@ -291,7 +285,7 @@ function Bank:chargeFrom(generators, hours, roomWh)
     end
     local watts = self.chargeWantW
     if generator then
-        watts = math.min(watts, RenewableEnergy.GasLines.chargerLimitW(generator, self) or watts)
+        watts = math.min(watts, GasLines.chargerLimitW(generator, self) or watts)
     end
     return watts
 end
@@ -332,7 +326,7 @@ function Bank:switchGenerator()
     if generator:isActivated() ~= run then
         -- setActivated sets the building toxic as a fuel generator's exhaust would
         -- (IsoGenerator.setActivated); a bank has no exhaust, so the building keeps its state.
-        local building = RenewableEnergy.Fumes.buildingOf(generator:getSquare())
+        local building = Fumes.buildingOf(generator:getSquare())
         local wasToxic = building and building:isToxic()
         generator:setActivated(run)
         if building and building:isToxic() ~= wasToxic then
@@ -456,8 +450,5 @@ function Bank:showBatteries()
     end
     Tiles.showOverlays(isoObject, Sprites.isOverlay, Sprites.bankOverlays(Sprites.nameOf(isoObject), types, self.charge))
 end
-
--- Last, so that the parts file finds the class to add to.
-require "RenewableEnergy/PowerBank/BankParts"
 
 return Bank

@@ -16,19 +16,14 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/PowerBank/Payers"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
-RenewableEnergy = RenewableEnergy or {}
 local Loads = {}
 RenewableEnergy.Loads = Loads
-
-local Specs = RenewableEnergy.Specs
-local Treadmill, Payers = RenewableEnergy.Treadmill, RenewableEnergy.Payers
 
 -- The other mods' consumers (Loads.addConsumer), in the order added.
 local consumers = {}

@@ -2,38 +2,22 @@
 -- window's: the hopper and the filter are its containers. The jobs' options are cf_commonlib's
 -- JobOptions'.
 
-require "ISUI/ISWorldObjectContextMenu"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/WoodGas/GasifierJobs"
-require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
-require "RenewableEnergy/UI/ObjectWindow"
-require "RenewableEnergy/UI/GasifierWindow"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
+local GasifierWindow = require "RenewableEnergy/UI/GasifierWindow"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
+local Tables = require "cf_commonlib/Tables"
 
-RenewableEnergy = RenewableEnergy or {}
 local GasifierMenu = {}
-RenewableEnergy.GasifierMenu = GasifierMenu
-
-local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
-local ObjectWindow, GasifierWindow = RenewableEnergy.ObjectWindow, RenewableEnergy.GasifierWindow
-local Action = RenewableEnergyGasAction
-
--- Adds the option for `job`, with `item` the container it drains into, named `label` or the job.
-local function addJob(menu, playerNum, job, gasifier, item, label)
-    local text = label or getText(Action.labelKey(job))
-    JobOptions.add(menu, playerNum, Action, "gasifier", job, gasifier, item, text)
-end
 
 -- The carried containers the condensate can go into now, by name.
 local function drainContainers(character, lit)
-    local found = {}
-    local items = character:getInventory():getAllEvalRecurse(function(item)
+    local found = Tables.fromList(character:getInventory():getAllEvalRecurse(function(item)
         return Gasifier.takesCondensate(item, lit)
-    end)
-    for i = 0, items:size() - 1 do
-        table.insert(found, items:get(i))
-    end
+    end))
     table.sort(found, function(a, b) return a:getDisplayName() < b:getDisplayName() end)
     return found
 end
@@ -48,9 +32,10 @@ local function addDrain(menu, character, playerNum, gasifier, summary)
     end
     local submenu = Needs.addSubMenu(menu, getText(Action.labelKey(job)))
     for _, item in ipairs(drainContainers(character, summary.lit)) do
-        addJob(submenu, playerNum, job, gasifier, item, item:getDisplayName())
+        JobOptions.add(submenu, playerNum, Action, "gasifier", job, gasifier, item, item:getDisplayName())
     end
-    addJob(submenu, playerNum, job, gasifier, nil, getText("ContextMenu_RenewableEnergy_OntoGround"))
+    JobOptions.add(submenu, playerNum, Action, "gasifier", job, gasifier, nil,
+        getText("ContextMenu_RenewableEnergy_OntoGround"))
 end
 
 --- Adds the gasifier's submenu to `context`. Returns the submenu, or nil while this side can't
@@ -62,23 +47,15 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
     local menu = Needs.addSubMenu(context, getText(Gasifier.nameKey(summary.tier)))
     menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, ObjectWindow.queueOpen, gasifier,
         GasifierWindow)
-    addJob(menu, playerNum, summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT, gasifier)
-    addJob(menu, playerNum, GasifierJobs.CLEAN_ASH, gasifier)
+    local fire = summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT
+    JobOptions.add(menu, playerNum, Action, "gasifier", fire, gasifier)
+    JobOptions.add(menu, playerNum, Action, "gasifier", GasifierJobs.CLEAN_ASH, gasifier)
     addDrain(menu, character, playerNum, gasifier, summary)
     return menu
 end
 
-function GasifierMenu.onFill(playerNum, context, worldobjects, test)
-    local gasifier = Needs.findClicked(worldobjects, Gasifier.isGasifier)
-    if not gasifier then
-        return
-    end
-    if test then
-        return ISWorldObjectContextMenu.setTest()
-    end
+JobOptions.onWorldMenu(Gasifier.isGasifier, function(context, playerNum, character, gasifier)
     GasifierMenu.addOptions(playerNum, context, gasifier)
-end
-
-Events.OnFillWorldObjectContextMenu.Add(GasifierMenu.onFill)
+end)
 
 return GasifierMenu

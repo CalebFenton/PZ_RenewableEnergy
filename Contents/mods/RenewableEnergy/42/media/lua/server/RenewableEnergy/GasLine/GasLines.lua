@@ -10,26 +10,22 @@
 if isClient() then return end
 
 require "TimedActions/ISTakeGenerator"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Payers"
-require "RenewableEnergy/Fumes"
-require "RenewableEnergy/Chance"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
+local Fumes = require "RenewableEnergy/Fumes"
+local Chance = require "RenewableEnergy/Chance"
 local Clock = require "cf_commonlib/Clock"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
-RenewableEnergy = RenewableEnergy or {}
 local GasLines = {}
 RenewableEnergy.GasLines = GasLines
-
-local GasKit, Gasifier, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Gasifier, RenewableEnergy.Sprites
-local Fumes, Chance = RenewableEnergy.Fumes, RenewableEnergy.Chance
 
 -- Global ModData: kitted generators by "x,y,z", each { x, y, z, source }; the source is kept so a
 -- gasifier's pipe can come off after the generator is gone.
@@ -148,12 +144,12 @@ end
 -- nearest first, the lower place on a tie (PlaceTracker.sortNearest).
 local function chargingBanks(generator)
     local list = {}
-    RenewableEnergy.PowerBank.eachBank(function(bank)
+    PowerBank.eachBank(function(bank)
         if bank:chargesFrom(generator) then
             table.insert(list, bank)
         end
     end)
-    RenewableEnergy.PlaceTracker.sortNearest(list, RenewableEnergy.PlaceTracker.objectPlace(generator))
+    PlaceTracker.sortNearest(list, PlaceTracker.objectPlace(generator))
     return list
 end
 
@@ -164,7 +160,7 @@ end
 -- generator can give. So chargers alone never take a line past its cap, and a full bank holds
 -- none of it back from the banks behind it.
 local function split(generator)
-    local load = RenewableEnergy.Payers.loadOf(generator)
+    local load = Payers.loadOf(generator)
     local powered = load.watts + load.backedW
     local cap = capOf(GasKit.stateOf(generator))
     local left = cap and math.max(0, cap - powered)

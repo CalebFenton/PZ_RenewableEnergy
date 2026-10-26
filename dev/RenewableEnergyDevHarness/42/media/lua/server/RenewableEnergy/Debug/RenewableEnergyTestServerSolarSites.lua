@@ -11,9 +11,8 @@ require "RenewableEnergy/Sprites"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
-local objectWithSprite = PZHarness.Fixtures.objectWithSprite
-local squareAt, removePlaced = PZHarness.Fixtures.squareAt, PZHarness.Fixtures.removePlaced
+local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
+local objectWithSprite, removePlaced = PZHarness.Fixtures.objectWithSprite, PZHarness.Fixtures.removePlaced
 local inRange, wearRange = Helpers.inRange, Helpers.wearRange
 local Sprites = RenewableEnergy.Sprites
 
@@ -35,9 +34,19 @@ local function siteNamed(name)
     return nil
 end
 
+local function sitesSystem()
+    return SGlobalObjects.getSystemByName(RenewableEnergy.SolarSites.SYSTEM_NAME)
+end
+
+-- The spot waiting at x, y, z, or nil: its global object's modData.
+local function spotAt(x, y, z)
+    local object = sitesSystem():getObjectAt(x, y, z)
+    return object and object:getModData()
+end
+
 -- Forgets the site spot at x, y, z, if one waits there.
 local function forgetSpot(x, y, z)
-    local system = SGlobalObjects.getSystemByName(RenewableEnergy.SolarSites.SYSTEM_NAME)
+    local system = sitesSystem()
     local object = system:getObjectAt(x, y, z)
     if object then
         system:removeObject(object)
@@ -103,7 +112,7 @@ local function armSite(site, defer)
     SolarSites.addSite(site)
     local spots = {}
     for _, at in ipairs(squares) do
-        local fields = SolarSites.spotAt(at[1], at[2], at[3])
+        local fields = spotAt(at[1], at[2], at[3])
         if fields then
             local spot = { x = at[1], y = at[2], z = at[3] }
             for _, key in ipairs({ "what", "siteKind", "mount", "facing", "stock", "source", "toX", "toY", "toZ" }) do
@@ -250,9 +259,6 @@ local SPOT_CHECKS = {
     -- packing all tarred, piped to the kitted generator.
     gasLine = function(expect, expectNear, at, spot, far)
         local record, object = Helpers.recordAt({ kind = spot.source, x = at:getX(), y = at:getY(), z = at:getZ() })
-        if not expect(record ~= nil, "no " .. spot.source .. " on the site's square") then
-            return
-        end
         local GasKit, Gasifier = RenewableEnergy.GasKit, RenewableEnergy.Gasifier
         if spot.source == "digester" then
             expect(record.sour and record:isTorn(), "the digester is found sour " .. tostring(record.sour) .. ", torn "
@@ -297,16 +303,12 @@ local SPOT_CHECKS = {
 }
 
 -- For each armed spot whose site waits there no more: what it left, recorded as SPOT_CHECKS says,
--- or that it was never placed. Answers what is missing while a square isn't loaded here.
+-- or that it was never placed. Ends the handler as missing a square that isn't loaded here.
 local function checkSpots(expect, expectNear, spots)
-    local SolarSites = RenewableEnergy.SolarSites
-    local _, notLoaded = spotSquaresLoaded(spots)
-    if notLoaded then
-        return notLoaded
-    end
+    need(spotSquaresLoaded(spots))
     for _, spot in ipairs(spots) do
         local where = spot.what .. " spot at " .. spot.x .. "," .. spot.y .. "," .. spot.z
-        if expect(SolarSites.spotAt(spot.x, spot.y, spot.z) == nil, "the " .. where .. " still waits (the log says why)")
+        if expect(spotAt(spot.x, spot.y, spot.z) == nil, "the " .. where .. " still waits (the log says why)")
             and expect(SPOT_CHECKS[spot.what] ~= nil, "no check for a " .. where) then
             local far = spot.toX and getSquare(spot.toX, spot.toY, spot.toZ)
             SPOT_CHECKS[spot.what](expect, expectNear, getSquare(spot.x, spot.y, spot.z), spot, far)
@@ -314,41 +316,30 @@ local function checkSpots(expect, expectNear, spots)
     end
 end
 
--- How many objects stand on the squares, and how many of them a site places.
-local function objectCounts(squares)
-    local count, placed = 0, 0
+-- The site whose armed spots are `args.spots`: { ready = false, why } until every spot's square and
+-- far end is loaded here, then how many of its spots still wait, how many objects stand on those
+-- squares and of them how many a site places.
+handler("siteSpots", function(_, args)
+    local squares, why = spotSquaresLoaded(args.spots)
+    if not squares then
+        return { ready = false, why = why }
+    end
+    local answer = { ready = true, waiting = 0, objects = 0, placed = 0 }
+    for _, spot in ipairs(args.spots) do
+        if spotAt(spot.x, spot.y, spot.z) then
+            answer.waiting = answer.waiting + 1
+        end
+    end
     for _, square in ipairs(squares) do
         local objects = square:getObjects()
-        count = count + objects:size()
+        answer.objects = answer.objects + objects:size()
         for i = 0, objects:size() - 1 do
             if isSiteObject(objects:get(i)) then
-                placed = placed + 1
+                answer.placed = answer.placed + 1
             end
         end
     end
-    return count, placed
-end
-
--- How many of the armed spots still wait.
-local function waitingSpots(spots)
-    local waiting = 0
-    for _, spot in ipairs(spots) do
-        if RenewableEnergy.SolarSites.spotAt(spot.x, spot.y, spot.z) then
-            waiting = waiting + 1
-        end
-    end
-    return waiting
-end
-
--- How many of the armed spots `args.spots` still wait, and how many objects stand on their
--- squares and far ends, loaded here, and of them what a site places.
-handler("siteSpots", function(_, args)
-    local squares, notLoaded = spotSquaresLoaded(args.spots)
-    if not squares then
-        return nil, notLoaded
-    end
-    local objects, placed = objectCounts(squares)
-    return { waiting = waitingSpots(args.spots), objects = objects, placed = placed }
+    return answer
 end)
 
 -- Open ground a wind charger may stand on (RuralFinds.canPlace) within reach of the bank's
@@ -373,11 +364,8 @@ end
 -- or the charger's square first. Answers the armed spots and that square; what the site placed is
 -- removed when the test ends.
 handler("siteArm", function(_, args, defer)
-    local bank = squareAt(args.bank)
-    local at = bank and chargerSquareFor(bank) or squareAt(args.at)
-    if not (at and (bank or not args.bank)) then
-        return nil, "the site's squares loaded on the server, open ground for a wind charger by the bank"
-    end
+    local bank = args.bank and Helpers.squareAt(args.bank)
+    local at = bank and need(chargerSquareFor(bank), "open ground for a wind charger by the bank") or Helpers.squareAt(args.at)
     local ends = { at:getX(), at:getY(), at:getZ() }
     local site
     if bank then
@@ -405,20 +393,9 @@ handler("siteArm", function(_, args, defer)
     return { spots = armSite(site, defer), at = { x = ends[1], y = ends[2], z = ends[3] } }
 end)
 
--- Takes the work table siteArm put on the square at `args` away.
-handler("siteUnblock", function(_, args)
-    local square = squareAt(args)
-    local blocker = square and objectWithSprite(square, PZHarness.Fixtures.WORK_TABLE_SPRITE)
-    if not blocker then
-        return nil, "the work table on the site's square"
-    end
-    removePlaced(blocker)
-    return {}
-end)
-
 -- The armed spots `args.spots` were placed by the world, each as its kind leaves it.
 check("sitePlaced", function(expect, expectNear, _, args)
-    return checkSpots(expect, expectNear, args.spots)
+    checkSpots(expect, expectNear, args.spots)
 end)
 
 -- A world saved while every site was rolled at once (`rolled` true) rolls a site added since,
@@ -428,7 +405,7 @@ end)
 -- and the world's rolls are put back when the test ends.
 check("siteRolledOnce", function(expect, _, _, args, defer)
     local SolarSites = RenewableEnergy.SolarSites
-    local modData = SGlobalObjects.getSystemByName(SolarSites.SYSTEM_NAME):getModData()
+    local modData = sitesSystem():getModData()
     local saved = modData.rolled
     defer(function() modData.rolled = saved end)
     local sites = {}
@@ -440,7 +417,7 @@ check("siteRolledOnce", function(expect, _, _, args, defer)
     end
     local function waits(i)
         local square = args.squares[i]
-        return SolarSites.spotAt(square.x, square.y, square.z) ~= nil
+        return spotAt(square.x, square.y, square.z) ~= nil
     end
     modData.rolled = true
     SolarSites.rollNew({ sites[1], sites[2] })
@@ -471,16 +448,13 @@ handler("sitesArm", function(_, args, defer)
     local RuralFinds = RenewableEnergy.RuralFinds
     local armed = {}
     for _, name in ipairs(args.names) do
-        local site = siteNamed(name)
-        if not site then
-            return nil, "a site named " .. tostring(name)
-        end
+        local site = need(siteNamed(name), "a site named " .. tostring(name))
         local kind, _, defs = findOf(site)
         local spots = armSite(site, defer)
         local claimed = {}
         for key, def in pairs(defs or {}) do
             local finds = {}
-            for found in pairs(RuralFinds.rolled(def) or {}) do
+            for found in pairs(Helpers.buildingRoll(RuralFinds.MOD_DATA, def) or {}) do
                 table.insert(finds, found)
             end
             claimed[key] = finds
@@ -490,23 +464,10 @@ handler("sitesArm", function(_, args, defer)
     return armed
 end)
 
--- The site whose armed spots are `args.spots`: { ready = false, why } until every spot's square is
--- loaded here, then how many of its spots still wait.
-handler("siteVisit", function(_, args)
-    local squares, notLoaded = spotSquaresLoaded(args.spots)
-    if not squares then
-        return { ready = false, why = notLoaded }
-    end
-    return { ready = true, waiting = waitingSpots(args.spots) }
-end)
-
 -- The site named `args.name` was placed by the world as its armed spots `args.spots` say, and no
 -- building that counts a homestead site's find got another find of that kind by it.
 check("siteVisited", function(expect, expectNear, _, args)
-    local missing = checkSpots(expect, expectNear, args.spots)
-    if missing then
-        return missing
-    end
+    checkSpots(expect, expectNear, args.spots)
     local kind, at, defs = findOf(siteNamed(args.name))
     if not kind then
         return
@@ -520,11 +481,7 @@ end)
 -- Takes away what the site named `args.name` placed on the squares of its armed spots `args.spots`
 -- and their far ends, and the pamphlets of its house, while they are loaded: the test moves on.
 handler("siteClear", function(_, args)
-    local squares, notLoaded = spotSquaresLoaded(args.spots)
-    if not squares then
-        return nil, notLoaded
-    end
-    for _, square in ipairs(squares) do
+    for _, square in ipairs(need(spotSquaresLoaded(args.spots))) do
         clearSquare(square)
     end
     local site = siteNamed(args.name)

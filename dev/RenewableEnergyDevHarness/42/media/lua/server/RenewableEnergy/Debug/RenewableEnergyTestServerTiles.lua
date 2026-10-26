@@ -5,10 +5,10 @@
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
+local Items = require "cf_commonlib/Items"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
-local objectAt, overlaysOf = Helpers.objectAt, PZHarness.Fixtures.overlaysOf
+local handler, need, Fixtures = PZHarness.serverHandler, PZHarness.need, PZHarness.Fixtures
 local Sprites = RenewableEnergy.Sprites
 
 -- The panel drawn as `args.sprite` on the square at `args`, changed by `args.change`, if given: its
@@ -16,10 +16,7 @@ local Sprites = RenewableEnergy.Sprites
 -- cracks shown as the mod shows them. Answers its overlays in drawing order.
 handler("panelCracks", function(_, args)
     local PanelSource = RenewableEnergy.PanelSource
-    local panel, missing = objectAt(args)
-    if not panel then
-        return nil, missing
-    end
+    local panel = Helpers.find(args)
     local change = args.change
     if change then
         if change.snow then
@@ -28,16 +25,12 @@ handler("panelCracks", function(_, args)
         PanelSource.writeModules(panel, change.modules)
     end
     PanelSource.showCracks(panel)
-    return { overlays = overlaysOf(panel) }
+    return { overlays = Fixtures.overlaysOf(panel) }
 end)
 
 -- The modData key `args.key` of the object drawn as `args.sprite` on the square at `args`.
 handler("objectModData", function(_, args)
-    local object, missing = objectAt(args)
-    if not object then
-        return nil, missing
-    end
-    return { value = object:getModData()[args.key] }
+    return { value = Helpers.find(args):getModData()[args.key] }
 end)
 
 -- The tiles of the object the tile `spriteName` is part of, each { square, sprite }, laid out so
@@ -65,12 +58,9 @@ end
 -- square at `args`, its containers looked in and empty, as vanilla dismantles only such an object
 -- (IsoObject.isObjectNoContainerOrEmpty). Removed when the test ends.
 handler("placeWhole", function(_, args, defer)
-    for _, tile in ipairs(tilesOf(PZHarness.Fixtures.squareAt(args), args.sprite)) do
-        if not tile.square then
-            return nil, "a loaded square for every tile of " .. args.sprite
-        end
-        local object = PZHarness.Fixtures.newTile(tile.square, tile.sprite)
-        defer(function() PZHarness.Fixtures.removePlaced(object) end)
+    for _, tile in ipairs(tilesOf(Helpers.squareAt(args), args.sprite)) do
+        local object = Fixtures.newTile(need(tile.square, "a loaded square for every tile of " .. args.sprite), tile.sprite)
+        defer(function() Fixtures.removePlaced(object) end)
         for i = 0, object:getContainerCount() - 1 do
             local container = object:getContainerByIndex(i)
             container:setExplored(true)
@@ -86,65 +76,50 @@ end)
 -- asks for that it lacks. Answers whether every tile went and how many `args.type` it gave, into
 -- the inventory or onto the object's squares; what the dismantling gave and the tools go away.
 handler("scrapItems", function(player, args)
-    local object, missing = objectAt(args)
-    if not object then
-        return nil, missing
-    end
+    local object = Helpers.find(args)
     local props = ISMoveableSpriteProps.fromObject(object)
     local tiles = tilesOf(object:getSquare(), args.sprite)
-    local inventory = player:getInventory()
-    -- The items in the inventory and lying on the object's squares, by ID, but those in `before`.
-    local function itemsBut(before)
-        local found = {}
-        local items = inventory:getItems()
+    local inventory, squares = player:getInventory(), {}
+    for _, tile in ipairs(tiles) do
+        table.insert(squares, tile.square)
+    end
+    -- The items lying on the object's squares and in the inventory, as a set.
+    local function held()
+        local found, items = Helpers.worldItems(squares), inventory:getItems()
         for i = 0, items:size() - 1 do
-            local item = items:get(i)
-            if not before[item:getID()] then
-                found[item:getID()] = { item = item }
-            end
-        end
-        for _, tile in ipairs(tiles) do
-            local objects = tile.square and tile.square:getWorldObjects()
-            for i = 0, (objects and objects:size() or 0) - 1 do
-                local item = objects:get(i):getItem()
-                if not before[item:getID()] then
-                    found[item:getID()] = { item = item, square = tile.square, object = objects:get(i) }
-                end
-            end
+            found[items:get(i)] = inventory
         end
         return found
     end
-    local before = itemsBut({})
+    local before = held()
     local def = ISMoveableDefinitions:getInstance().getScrapDefinition(props.material)
     for _, second in ipairs({ false, true }) do
         local tools = def and (second and def.tools2 or def.tools) or {}
         if not props:hasScrapTool(player, second) then
             for _, tool in ipairs(tools) do
                 if not tool:find("^Tag%.") then
-                    sendAddItemToContainer(inventory, inventory:AddItem(tool))
+                    Items.addItem(inventory, tool)
                     break
                 end
             end
         end
     end
     local can = props:canScrapObject(player)
-    if not can.canScrap then
-        return nil, string.format("a %s the character may dismantle (canScrap %s, valid %s, tools %s and %s, full %s)",
-            args.sprite, tostring(props.canScrap), tostring(can.craftValid), tostring(can.haveTool), tostring(can.haveTool2),
-            tostring(can.containerFull))
-    end
+    need(can.canScrap, string.format("a %s the character may dismantle (canScrap %s, valid %s, tools %s and %s, full %s)",
+        args.sprite, tostring(props.canScrap), tostring(can.craftValid), tostring(can.haveTool), tostring(can.haveTool2),
+        tostring(can.containerFull)))
     props:scrapObject(player)
     local count, scrapped = 0, true
     for _, tile in ipairs(tiles) do
-        scrapped = scrapped and PZHarness.Fixtures.objectWithSprite(tile.square, tile.sprite) == nil
+        scrapped = scrapped and Fixtures.objectWithSprite(tile.square, tile.sprite) == nil
     end
-    for _, new in pairs(itemsBut(before)) do
-        count = count + (new.item:getFullType() == args.type and 1 or 0)
-        if new.object then
-            Helpers.removeFloorItem(new.square, new.object)
+    for _, new in ipairs(Helpers.newSince(before, held())) do
+        local onFloor = instanceof(new, "IsoWorldInventoryObject")
+        count = count + ((onFloor and new:getItem() or new):getFullType() == args.type and 1 or 0)
+        if onFloor then
+            Fixtures.removePlaced(new)
         else
-            inventory:Remove(new.item)
-            sendRemoveItemFromContainer(inventory, new.item)
+            Items.removeItem(new)
         end
     end
     return { count = count, scrapped = scrapped }

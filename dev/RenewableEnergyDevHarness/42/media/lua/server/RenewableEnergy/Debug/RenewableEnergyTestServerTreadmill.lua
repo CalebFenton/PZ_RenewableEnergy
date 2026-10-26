@@ -4,11 +4,9 @@
 -- handlers work.
 
 require "PZHarness/ServerHandlers"
-require "PZHarness/Fixtures"
-local Squares = require "cf_commonlib/Squares"
+local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler = PZHarness.serverHandler
-local squareAt = PZHarness.Fixtures.squareAt
+local handler, need = PZHarness.serverHandler, PZHarness.need
 
 -- Completes the treadmill action `run` as the server finishes a client's action (complete()).
 -- Answers whether it settled, and the character's Fitness XP, endurance and thirst before and
@@ -26,13 +24,9 @@ end
 -- A whole Run on Treadmill on the wired treadmill tile at `args` as the server's character
 -- (completeRun).
 handler("completeTreadmillRun", function(player, args)
-    local tile = Squares.findObjectOn(squareAt(args), RenewableEnergy.Treadmill.isWiredTile)
-    if not tile then
-        return nil, "a wired treadmill on the server"
-    end
+    local tile = Helpers.find({ kind = "wiredTreadmill", x = args.x, y = args.y, z = args.z })
     return completeRun(player, RenewableEnergyTreadmillAction:new(player, tile))
 end)
-
 
 -- The runs startTreadmillRun started and completeStartedTreadmillRun has yet to finish, by the
 -- treadmill tile's position.
@@ -42,10 +36,7 @@ local treadmillRuns = {}
 -- multiplayer server starts a client's action (serverStart), and leaves it running until
 -- completeStartedTreadmillRun or the end of the test.
 handler("startTreadmillRun", function(player, args, defer)
-    local tile = RenewableEnergy.Treadmill.findOn(squareAt(args))
-    if not tile then
-        return nil, "a treadmill on the server"
-    end
+    local tile = Helpers.find({ kind = "treadmill", x = args.x, y = args.y, z = args.z })
     local run = RenewableEnergyTreadmillAction:new(player, tile)
     run:serverStart()
     local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
@@ -62,10 +53,7 @@ end)
 -- Finishes the run startTreadmillRun started on the tile at `args` (completeRun).
 handler("completeStartedTreadmillRun", function(player, args)
     local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
-    local run = treadmillRuns[key]
-    if not run then
-        return nil, "a run startTreadmillRun started on the server"
-    end
+    local run = need(treadmillRuns[key], "a run startTreadmillRun started on the server")
     treadmillRuns[key] = nil
     return completeRun(player, run)
 end)

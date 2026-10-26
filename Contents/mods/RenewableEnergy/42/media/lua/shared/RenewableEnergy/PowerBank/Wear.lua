@@ -2,7 +2,7 @@
 -- use. An item's condition is an integer, so wear smaller than one point is kept in its modData
 -- until it adds up to one.
 
-RenewableEnergy = RenewableEnergy or {}
+local RenewableEnergy = require "RenewableEnergy/Utilities"
 
 local Wear = {}
 RenewableEnergy.Wear = Wear

@@ -9,27 +9,25 @@ if isClient() then return end
 
 require "Map/SGlobalObjectSystem"
 require "TimedActions/ISDestroyStuffAction"
-require "RenewableEnergy/ObjectSystem"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/PanelSource"
-require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/PowerBank/TreadmillSource"
-require "RenewableEnergy/PowerBank/Payers"
-require "RenewableEnergy/PowerBank/Bank"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Sun = require "RenewableEnergy/Sun"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
+local Bank = require "RenewableEnergy/PowerBank/Bank"
+require "RenewableEnergy/PowerBank/BankParts"
 require "RenewableEnergy/PowerBank/Backup"
 require "RenewableEnergy/PowerBank/BankStatus"
 local Clock = require "cf_commonlib/Clock"
+local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
-RenewableEnergy = RenewableEnergy or {}
-local Sprites, Sun, PowerBank = RenewableEnergy.Sprites, RenewableEnergy.Sun, RenewableEnergy.PowerBank
-local Sources, PanelSource, Treadmill = RenewableEnergy.Sources, RenewableEnergy.PanelSource, RenewableEnergy.Treadmill
-local Bank = RenewableEnergy.Bank
-
-local BankSystem = RenewableEnergy.ObjectSystem.deriveSystem({
-    name = "Bank", owner = PowerBank, Object = Bank, isObject = PowerBank.isBank,
+local BankSystem = LibObjectSystem.deriveSystem({
+    prefix = "RenewableEnergy_", name = "Bank", owner = PowerBank, Object = Bank, isObject = PowerBank.isBank,
 })
 RenewableEnergy.BankSystem = BankSystem
 
@@ -53,7 +51,7 @@ function BankSystem:initSystem()
     end
     -- Billing comes after the pass, so it counts the banks as the pass left them: handlers run in
     -- the order added, and GameTime.update fires EveryHours before EveryTenMinutes.
-    Events.EveryTenMinutes.Add(RenewableEnergy.Payers.billGenerators)
+    Events.EveryTenMinutes.Add(Payers.billGenerators)
 end
 
 -- A status left in older saves is dropped.
@@ -161,7 +159,7 @@ function BankSystem:OnObjectAboutToBeRemoved(isoObject)
         -- becomes doesn't keep the wiring (ISMoveableSpriteProps keeps a plain tile's movableData
         -- alone).
         if Treadmill.isWiredTile(isoObject) then
-            RenewableEnergy.TreadmillSource.unwire(isoObject)
+            TreadmillSource.unwire(isoObject)
         end
     end
 end
@@ -220,7 +218,7 @@ function BankSystem:OnClientCommand(command, player, args)
     if command == "watch" and bank:inViewOf(player) then
         local new = bank:watch(player)
         if mayRefresh(bank, player) then
-            PowerBank.perform(player, "refresh", args)
+            bank:refresh()
         elseif new then
             -- A window closed and opened again within the wait still needs the status.
             bank:sendStatusTo(player)
@@ -251,7 +249,7 @@ for _, name in ipairs(PowerBank.bankSprites()) do
 end
 
 -- A panel's chunk loaded: its overlays are saved with it, but older saves may lack the cracks.
-for kind in pairs(RenewableEnergy.Specs.mounts) do
+for kind in pairs(Specs.mounts) do
     MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), PanelSource.showCracks, Sprites.LOAD_PRIORITY)
 end
 

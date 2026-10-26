@@ -7,20 +7,15 @@
 -- (`tank`) stays what it was, and an empty one shows a little fuel so the game lets it run (`set`,
 -- what the authority last put in).
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/PowerBank/PowerBank"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local GasKit = {}
 RenewableEnergy.GasKit = GasKit
-
-local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
-local Sprites = RenewableEnergy.Sprites
 
 GasKit.STATE_KEY = "RenewableEnergy_gas"
 GasKit.ITEM = "RenewableEnergy.GasConversionKit"
@@ -225,7 +220,6 @@ GasKit.JOBS = {
 }
 
 Jobs.define(GasKit, {
-    short = "short",
     subjectOf = function(generator)
         return RenewableEnergy.isGenerator(generator) and Squares.onSquare(generator) and generator or nil
     end,

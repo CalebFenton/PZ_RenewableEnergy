@@ -4,16 +4,11 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Fumes"
+local Sprites = require "RenewableEnergy/Sprites"
+local Fumes = require "RenewableEnergy/Fumes"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
-RenewableEnergy = RenewableEnergy or {}
 local ObjectSystem = {}
-RenewableEnergy.ObjectSystem = ObjectSystem
-
-local Sprites, Fumes = RenewableEnergy.Sprites, RenewableEnergy.Fumes
 
 -- Saves keep the system and record classes by their names, which start with this.
 local PREFIX = "RenewableEnergy_"
@@ -35,7 +30,7 @@ function Object:tierSpec()
     return self.luaSystem.owner.TIERS[self.tier]
 end
 
---- Says whether the object fills its building with fumes now (RenewableEnergy.Fumes).
+--- Says whether the object fills its building with fumes now (Fumes).
 function Object:setFuming(isFuming)
     local isoObject = self:getIsoObject()
     Fumes.set(self:key(), isoObject and Fumes.buildingOf(isoObject:getSquare()), isFuming)
@@ -47,19 +42,6 @@ function Object:aboutToRemoveFromSystem()
     Fumes.set(self:key(), nil, false)
 end
 
--- `spec` with the mod's prefix, for cf_commonlib's ObjectSystem.
-local function prefixed(spec)
-    return {
-        prefix = PREFIX, name = spec.name, owner = spec.owner, Object = spec.Object, isObject = spec.isObject,
-    }
-end
-
---- A system class RenewableEnergy_<name>System (cf_commonlib's ObjectSystem.deriveSystem), not
---- registered. `spec`: name, owner, Object, isObject.
-function ObjectSystem.deriveSystem(spec)
-    return LibObjectSystem.deriveSystem(prefixed(spec))
-end
-
 --- Defines and registers a feature's system (cf_commonlib's ObjectSystem.define), loaded with the
 --- tiles of its Sprites kind and given its record as the build menu's OnCreate builds one
 --- (scripts/RenewableEnergy/Entities.txt). `spec`: name (the class is
@@ -67,12 +49,11 @@ end
 --- accessors of GlobalObjects.addAccessors), Object (its record class, an ObjectSystem.Object),
 --- isObject. Returns the class.
 function ObjectSystem.define(spec)
-    local full = prefixed(spec)
-    full.sprites = Sprites.namesOf(spec.kind)
-    full.loadPriority = Sprites.LOAD_PRIORITY
-    full.longestPass = LONGEST_PASS
-    full.loadOnCreate = true
-    local System = LibObjectSystem.define(full)
+    local System = LibObjectSystem.define({
+        prefix = PREFIX, name = spec.name, owner = spec.owner, Object = spec.Object, isObject = spec.isObject,
+        sprites = Sprites.namesOf(spec.kind), loadPriority = Sprites.LOAD_PRIORITY, longestPass = LONGEST_PASS,
+        loadOnCreate = true,
+    })
     System.kind = spec.kind
     return System
 end

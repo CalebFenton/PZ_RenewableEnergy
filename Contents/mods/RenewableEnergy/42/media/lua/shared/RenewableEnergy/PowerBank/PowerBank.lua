@@ -6,17 +6,13 @@
 -- Object System under SYSTEM_NAME, which keeps each bank's state while its chunk is unloaded and
 -- copies its small `summary` to every client; the whole `status` goes only to players watching it.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-local Materials = require "cf_commonlib/Materials"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local PowerBank = {}
 RenewableEnergy.PowerBank = PowerBank
-
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
 -- The sendServerCommand module and command that carry a bank's status to the players watching it.
@@ -218,16 +214,26 @@ function PowerBank.wiringMaterials(wiring)
     return list
 end
 
---- What a wiring job of `wiring` (as Specs.wiring's) takes of `character`, for
---- Materials.firstUnmet.
-function PowerBank.wiringNeeds(character, wiring)
-    return Materials.needs(character, PowerBank.wiringMaterials(wiring))
+-- The share of its full time a wiring job takes at an Electricity level, falling in a straight
+-- line with skill.
+local function skillFactor(level)
+    return 1 - 0.095 * (level - 3)
 end
 
---- What undoing a wiring job of `wiring` takes of `character`: its tools, as vanilla takes a car
---- part's install tools to uninstall it. For Materials.firstUnmet.
-function PowerBank.unwiringNeeds(character, wiring)
-    return Materials.needs(character, wiring.tools)
+--- The share of its full time a wiring job takes `character`, by their Electricity.
+function PowerBank.skillFactor(character)
+    return skillFactor(character:getPerkLevel(Perks.Electricity))
+end
+
+--- Action units a wiring job of `wiring` (as Specs.wiring's) takes `character`: its seconds at
+--- Electricity 0, less with skill, times `share`. A part that is gone takes no time, and its job
+--- is refused.
+function PowerBank.wiringUnits(character, wiring, share)
+    if not wiring then
+        return 1
+    end
+    local seconds = wiring.seconds * PowerBank.skillFactor(character) / skillFactor(0) * (share or 1)
+    return seconds * RenewableEnergy.UNITS_PER_SECOND
 end
 
 --- How many more parts of `kind` (a PARTS key) the bank `bank` takes; 0 for no bank.
@@ -238,75 +244,6 @@ function PowerBank.freePartSlots(bank, kind)
         return 0
     end
     return math.max(0, tier.spec[PowerBank.PARTS[kind].max] - countParts(container, kind))
-end
-
---- What keeps anyone from wiring `item` into the bank `bank` now whatever they carry, as a
---- translation key, or nil. The light is the action's to check (RenewableEnergyAction.needsLight):
---- only the player's own side can see it (IsoPlayer.tooDarkToRead is false for a remote player).
-function PowerBank.wiringBlocker(bank, item)
-    local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
-    if not (kind and PowerBank.bankOfSprite(Sprites.nameOf(bank)) and bank:getContainer()) then
-        return "Tooltip_RenewableEnergy_NotAPart"
-    elseif PowerBank.freePartSlots(bank, kind) == 0 then
-        return "Tooltip_RenewableEnergy_NoSlot"
-    end
-    return nil
-end
-
---- Why `character` can't wire `item` into the bank `bank` now, or nil if they can: what
---- wiringBlocker says, else the kind of the first of the part's wiringNeeds they are short of.
-function PowerBank.wiringRefusal(character, bank, item)
-    return PowerBank.wiringBlocker(bank, item)
-        or Materials.unmetKind(PowerBank.wiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
-end
-
--- What repairing an inverter or controller takes, as a materials list (cf_commonlib's Materials).
-local REPAIR = { { perk = "Electricity", need = Specs.partRepair.skill }, { item = PowerBank.SCRAP, need = 1 } }
-
---- What repairing an inverter or controller uses up of `character`. Authority only.
-function PowerBank.consumeRepair(character)
-    Materials.consume(character, REPAIR)
-end
-
---- What repairing an inverter or controller takes of `character`, for Materials.firstUnmet.
-function PowerBank.repairNeeds(character)
-    return Materials.needs(character, REPAIR)
-end
-
---- What keeps anyone from repairing `item` with Electronics Scrap now whatever they carry, as a
---- translation key, or nil. The light is the action's to check, as for wiringBlocker.
-function PowerBank.repairBlocker(item)
-    if not (instanceof(item, "InventoryItem") and PowerBank.isRepairable(item:getFullType())) then
-        return "Tooltip_RenewableEnergy_NotRepairable"
-    elseif item:getCondition() >= item:getConditionMax() then
-        return "Tooltip_RenewableEnergy_NoRepairNeeded"
-    end
-    return nil
-end
-
---- Why `character` can't repair the inverter or controller `item` now, or nil if they can: what
---- repairBlocker says, else the kind of the first of repairNeeds they are short of.
-function PowerBank.repairRefusal(character, item)
-    return PowerBank.repairBlocker(item) or Materials.unmetKind(PowerBank.repairNeeds(character))
-end
-
---- What keeps anyone from unwiring `item` from the bank `bank` now whatever they carry, as a
---- translation key, or nil: it must be a part in the bank's container. The light is the action's
---- to check, as for wiringBlocker.
-function PowerBank.unwiringBlocker(bank, item)
-    local container = PowerBank.isBank(bank) and bank:getContainer()
-    if not (container and instanceof(item, "InventoryItem") and container:contains(item)
-        and PowerBank.partKind(item:getFullType())) then
-        return "Tooltip_RenewableEnergy_NotAPart"
-    end
-    return nil
-end
-
---- Why `character` can't unwire `item` from the bank `bank` now, or nil if they can: what
---- unwiringBlocker says, else the kind of the first of the part's unwiringNeeds they are short of.
-function PowerBank.unwiringRefusal(character, bank, item)
-    return PowerBank.unwiringBlocker(bank, item)
-        or Materials.unmetKind(PowerBank.unwiringNeeds(character, PowerBank.wiringFor(item:getFullType())))
 end
 
 --- The failsafe's thresholds, in percent of a bank's charge: below `start` it starts its generator,
@@ -330,9 +267,18 @@ function PowerBank.switchRefusal(summary, on)
     return nil
 end
 
---- Why `name` can't name a bank, or nil: a name is one line of at most NAME_LENGTH characters,
---- which the rename box holds it to.
+--- `name` without the spaces around it, as a bank keeps it.
+function PowerBank.trimName(name)
+    return (name:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+--- Why `name` can't name a bank, or nil: a name is one line of at most NAME_LENGTH characters once
+--- trimmed, which the rename box holds it to.
 function PowerBank.nameRefusal(name)
+    if type(name) ~= "string" then
+        return "no name"
+    end
+    name = PowerBank.trimName(name)
     if #name > PowerBank.NAME_LENGTH then
         return "name too long"
     elseif name:find("%c") then
@@ -388,6 +334,14 @@ end
 --- The summary of the bank `isoObject`, or nil.
 function PowerBank.summaryOf(isoObject)
     return PowerBank.summaryAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+end
+
+--- The summary of the bank `isoObject` as this side knows it now: the authority builds it from its
+--- record, which a job may have changed since the last summary went out; nil for no bank.
+function PowerBank.currentSummary(isoObject)
+    local system = PowerBank.serverSystem
+    local record = system and system:getLuaObjectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    return record and record:buildSummary() or PowerBank.summaryOf(isoObject)
 end
 
 --- The whole status of the bank `isoObject` (see Bank:buildStatus), or nil. It reaches only the

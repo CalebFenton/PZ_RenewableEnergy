@@ -12,6 +12,8 @@ require "PZHarness/StageLots"
 local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
 
+local Places = {}
+
 -- Every setup is a place (newPlace): a square its positions are measured from, and a frame, the
 -- directions a position's two numbers run in, `along` and `out`. An area of a place is the
 -- squares from along[1] to along[2] and out[1] to out[2]; with `sum` and `half`, only those whose
@@ -33,7 +35,7 @@ local SITES = {
 -- within a failsafe's reach of the bank. An insulated digester beside the generator feeds it gas
 -- through its kit, and a propeller wind charger stands at the far end of the wall, where its
 -- mast rises in front of the house rather than over the panels.
-local HOMESTEAD = {
+Places.HOMESTEAD = {
     inside = { 0, -1 },
     generator = { -1, 1 },
     digester = { -2, 1 },
@@ -47,13 +49,13 @@ local HOMESTEAD = {
 }
 -- The ground that must be clear (grass and weeds are cleared), and the plain wall the wall panels
 -- hang on.
-local OPEN = { along = { -2, 5 }, out = { 1, 5 } }
+Places.OPEN = { along = { -2, 5 }, out = { 1, 5 } }
 local AT_WALL = { 0, 2 }
 
 -- Stage 0, at another building: a battery box indoors beside a window, the character at the
 -- window, and the panels, a solar battery charger and a garden light outside in their sight.
 -- Positions are (along, out) from the square outside the window, as the homestead's.
-local STAGE0 = {
+Places.STAGE0 = {
     box = { 1, -1 },
     player = { 0, -1 },
     flatPanels = { { 0, 1 }, { 1, 2 } },
@@ -71,7 +73,7 @@ local SITE_DISTANCE = 12
 -- item lies on alone, at the closest zoom the game draws, which the zoom options leave out
 -- (Harness.pushClosestZoom). The character stands off to the side, (east, south) squares from the
 -- item, to its left on the screen.
-local STUDIO = {
+Places.STUDIO = {
     -- The open ground the patch needs, and how far around the studio square the asphalt goes
     -- where the ground is clear, and the plants go anyway, since the bigger items' shots reach
     -- past the patch.
@@ -89,7 +91,7 @@ local STUDIO = {
 -- the far side of the road from the camera, so a heading's frame runs `along` ahead and `out` to
 -- the side. Road cones taper across the lane behind the trailer, and the character stands on the
 -- far side of the trailer's battery box, where the arrow board hides none of them.
-local ROAD = {
+Places.ROAD = {
     -- The car faces north on a north-south road, else west on an east-west one, so that the
     -- arrow board on the trailer's back faces the camera.
     headings = { { facing = "N", along = { 0, -1 }, out = { -1, 0 } }, { facing = "W", along = { -1, 0 }, out = { 0, -1 } } },
@@ -107,7 +109,7 @@ local ROAD = {
 
 -- The garden lights shot, at night: lights on both sides of a house's front walk, the character
 -- at the door. Positions are (along, out) from the square outside the door, as the homestead's.
-local WALK = {
+Places.WALK = {
     -- The door stands on the square at out 0, so the open ground starts past it. It reaches a
     -- square past the lights, so that no fence stands between them and the camera.
     open = { along = { -1, 1 }, out = { 1, 4 } },
@@ -129,7 +131,7 @@ local WALK = {
 -- behind the window. Positions are (along, out) from the square outside the window, as the
 -- homestead's; each stands clear of the others on the screen, the racks across the middle, the
 -- dome and generator to their left, the turbine and the settler to their right.
-local POSTER = {
+Places.POSTER = {
     -- A wall with windows reads as a home rather than a shed.
     windows = { along = { -4, 4 }, count = 2 },
     rooms = 3,
@@ -155,7 +157,7 @@ local POSTER = {
 -- south) squares from the place found, and `shot` names the positions the shot frames. A yard lays
 -- its things out along a line across the screen, nearest the camera in front, so `open` is the
 -- band of squares that must be clear (trees may stand there; they go).
-local LAYOUTS = {
+Places.LAYOUTS = {
     -- Every digester, working and full of gas, the brick dome feeding a kitted generator through
     -- its hose, and a lit gas heater warming the steel barrel.
     biogas = {
@@ -230,7 +232,7 @@ end
 local WALL_FLAGS = { IsoFlagType.cutN, IsoFlagType.cutW, IsoFlagType.WallOverlay, IsoFlagType.attachedN,
     IsoFlagType.attachedW, IsoFlagType.attachedS, IsoFlagType.attachedE }
 
-local function isOnWall(object)
+function Places.isOnWall(object)
     local props = object:getProperties()
     if not props then
         return false
@@ -245,8 +247,8 @@ end
 
 -- Places -----------------------------------------------------------------------------------------
 
--- The places found, by the names of findPlaces' PLACES.
-local places = {}
+-- The places found, by the names of Places.find's PLACES.
+Places.places = {}
 
 -- A place (see GRID) on `origin` in `frame`: GRID, a SITES entry or a ROAD heading.
 local function newPlace(origin, frame)
@@ -254,7 +256,7 @@ local function newPlace(origin, frame)
 end
 
 -- The square at `position` ({ along, out }) of `place`, or nil where none is loaded.
-local function at(place, position)
+function Places.at(place, position)
     local origin, frame = place.origin, place.frame
     local along, out = position[1], position[2]
     return getCell():getGridSquare(origin:getX() + along * frame.along[1] + out * frame.out[1],
@@ -262,21 +264,21 @@ local function at(place, position)
 end
 
 -- The squares of `place` at the positions of each list of positions given, in order.
-local function squaresAt(place, ...)
+function Places.squaresAt(place, ...)
     local squares = {}
     for i = 1, select("#", ...) do
         for _, position in ipairs((select(i, ...))) do
-            table.insert(squares, at(place, position))
+            table.insert(squares, Places.at(place, position))
         end
     end
     return squares
 end
 
 -- The squares of `place` at `positions` that are loaded and, if given, pass `accepts(square)`.
-local function loadedSquares(place, positions, accepts)
+function Places.loadedSquares(place, positions, accepts)
     local squares = {}
     for _, position in ipairs(positions) do
-        local square = at(place, position)
+        local square = Places.at(place, position)
         if square and (not accepts or accepts(square)) then
             table.insert(squares, square)
         end
@@ -286,11 +288,11 @@ end
 
 -- Whether fn(square) holds for every square of `area` (see GRID) of `place`, stopping at the first
 -- that fails. From out `outFrom` rather than the area's own first if given.
-local function everyAreaSquare(place, area, fn, outFrom)
+function Places.everyAreaSquare(place, area, fn, outFrom)
     for along = area.along[1], area.along[2] do
         for out = outFrom or area.out[1], area.out[2] do
             local inBand = not area.sum or math.abs(along + out - area.sum) <= area.half
-            if inBand and not fn(at(place, { along, out })) then
+            if inBand and not fn(Places.at(place, { along, out })) then
                 return false
             end
         end
@@ -299,7 +301,7 @@ local function everyAreaSquare(place, area, fn, outFrom)
 end
 
 local function hasOpenGround(place, player, area)
-    return everyAreaSquare(place, area, function(square)
+    return Places.everyAreaSquare(place, area, function(square)
         return isUnoccupiedGround(square, player)
     end)
 end
@@ -307,9 +309,9 @@ end
 -- Outdoors, against a wall of a room. A panel hangs on a `plain` wall: not a door, a garage door
 -- or a window.
 local function isAtWall(place, along, plain)
-    local square, inside, wallNorth = at(place, { along, 0 }), at(place, { along, -1 }), place.frame.wallNorth
+    local square, inside, wallNorth = Places.at(place, { along, 0 }), Places.at(place, { along, -1 }), place.frame.wallNorth
     if not (square and inside and inside:getRoom() and square:getWall(wallNorth)
-        and Harness.isOpenGround(square, { allows = isOnWall })) then
+        and Harness.isOpenGround(square, { allows = Places.isOnWall })) then
         return false
     end
     return not plain or (square:getDoorOrWindow(wallNorth) == nil and square:getGarageDoor(wallNorth) == nil)
@@ -318,13 +320,13 @@ end
 -- Whether the outside wall at `along` has a door or window of class `class` ("IsoDoor",
 -- "IsoWindow") into a room.
 local function hasOpening(place, along, class)
-    local square, inside = at(place, { along, 0 }), at(place, { along, -1 })
+    local square, inside = Places.at(place, { along, 0 }), Places.at(place, { along, -1 })
     return square ~= nil and inside ~= nil and inside:getRoom() ~= nil and square:isOutside()
         and instanceof(square:getDoorOrWindow(place.frame.wallNorth), class)
 end
 
 local function isFreeIndoorsAt(place, position)
-    return RenewableEnergy.Debug.isFreeSquare(at(place, position), true)
+    return RenewableEnergy.Debug.isFreeSquare(Places.at(place, position), true)
 end
 
 -- North from `square` through its room to the room's north wall: a bank faces south, so it stands
@@ -353,7 +355,7 @@ local BANK_EAST_CLEAR = 4
 
 -- The squares of the bank shot: from the bank to the character, a square around the character,
 -- and the floor east of the bank.
-local function eachShotSquare(bank, player, fn)
+function Places.eachShotSquare(bank, player, fn)
     for y = bank:getY(), player:getY() + 1 do
         for x = math.min(bank:getX(), player:getX() - 1), math.max(bank:getX() + BANK_EAST_CLEAR, player:getX() + 1) do
             fn(getCell():getGridSquare(x, y, bank:getZ()))
@@ -366,7 +368,7 @@ end
 -- bank. A room may have a wall through it, which the shot would show the character in.
 local function isOpenShot(bank, player)
     local room, open = bank:getRoom(), true
-    eachShotSquare(bank, player, function(square)
+    Places.eachShotSquare(bank, player, function(square)
         local backWall = square and square:getY() == bank:getY() and square ~= bank
         if not (square and square:getRoom() == room) or square:getDoorOrWindow(false)
             or (square:getDoorOrWindow(true) and not backWall) then
@@ -388,7 +390,7 @@ end
 -- and the character. Nil if the room has no such place.
 local function bankPlace(place)
     for _, along in ipairs(ALONG_PANELS) do
-        local bank = againstNorthWall(at(place, { HOMESTEAD.inside[1] + along, HOMESTEAD.inside[2] }))
+        local bank = againstNorthWall(Places.at(place, { Places.HOMESTEAD.inside[1] + along, Places.HOMESTEAD.inside[2] }))
         if bank and PowerBank.canPlaceBank(bank) then
             for _, offset in ipairs(BESIDE_BANK) do
                 local player = getCell():getGridSquare(bank:getX() + offset[1], bank:getY() + offset[2], bank:getZ())
@@ -407,7 +409,7 @@ local function fitsHomestead(place, player)
             return false
         end
     end
-    return bankPlace(place) ~= nil and hasOpenGround(place, player, OPEN)
+    return bankPlace(place) ~= nil and hasOpenGround(place, player, Places.OPEN)
 end
 
 -- At a window if `needWindow`, else at any outside wall.
@@ -416,27 +418,27 @@ local function fitsStage0(place, player, needWindow)
     if (needWindow and not window) or not (window or isAtWall(place, 0, false)) then
         return false
     end
-    return isFreeIndoorsAt(place, STAGE0.box) and isFreeIndoorsAt(place, STAGE0.player)
-        and hasOpenGround(place, player, STAGE0.open)
+    return isFreeIndoorsAt(place, Places.STAGE0.box) and isFreeIndoorsAt(place, Places.STAGE0.player)
+        and hasOpenGround(place, player, Places.STAGE0.open)
 end
 
 -- A window into a house (a building with a bedroom and POSTER.rooms rooms), on a wall with
 -- POSTER.windows.count windows near it, with free floor for the bank behind it and open ground for
 -- the panels in front.
 local function fitsPoster(place, player)
-    if not (hasOpening(place, 0, "IsoWindow") and isFreeIndoorsAt(place, POSTER.bank)
-        and hasOpenGround(place, player, POSTER.open)) then
+    if not (hasOpening(place, 0, "IsoWindow") and isFreeIndoorsAt(place, Places.POSTER.bank)
+        and hasOpenGround(place, player, Places.POSTER.open)) then
         return false
     end
-    local building = at(place, { 0, -1 }):getBuilding()
-    if not (building and building:isResidential() and building:getDef():getRooms():size() >= POSTER.rooms) then
+    local building = Places.at(place, { 0, -1 }):getBuilding()
+    if not (building and building:isResidential() and building:getDef():getRooms():size() >= Places.POSTER.rooms) then
         return false
     end
     local windows = 0
-    for along = POSTER.windows.along[1], POSTER.windows.along[2] do
+    for along = Places.POSTER.windows.along[1], Places.POSTER.windows.along[2] do
         windows = windows + (hasOpening(place, along, "IsoWindow") and 1 or 0)
     end
-    return windows >= POSTER.windows.count
+    return windows >= Places.POSTER.windows.count
 end
 
 -- The markings and blends painted over a road's floor.
@@ -476,20 +478,20 @@ end
 -- Indoors, with free floor of one room for the treadmill, its battery box and the character beside
 -- it, nothing between them, and bare floor in front.
 local function fitsGym(place)
-    local gym, origin = LAYOUTS.gym, place.origin
+    local gym, origin = Places.LAYOUTS.gym, place.origin
     local room = origin:getRoom()
     if not room then
         return false
     end
     for _, key in ipairs(gym.shot) do
-        local square = at(place, gym[key])
+        local square = Places.at(place, gym[key])
         if not (square and square:getRoom() == room and RenewableEnergy.Debug.isFreeSquare(square, true)
             and not origin:isSomethingTo(square)) then
             return false
         end
     end
     for _, spot in ipairs(gym.front) do
-        if not isBareFloor(at(place, spot), room) then
+        if not isBareFloor(Places.at(place, spot), room) then
             return false
         end
     end
@@ -530,14 +532,14 @@ local function yard(name)
         missing = "open ground for the " .. name .. " shot",
         frames = { GRID },
         fits = function(place, player)
-            return everyAreaSquare(place, LAYOUTS[name].open, function(square)
+            return Places.everyAreaSquare(place, Places.LAYOUTS[name].open, function(square)
                 return isYardSquare(square, player)
             end)
         end,
     }
 end
 
--- Every place a group may need (Promo's GROUPS' `places`), in the order findPlaces looks for them: what the
+-- Every place a group may need (Promo's GROUPS' `places`), in the order Places.find looks for them: what the
 -- log calls it, what is missing when there is none, and either the `frames` to try in order and
 -- whether a place `fits(place, player)`, or `find(player, others)` returning the place or nil;
 -- `detail(place)` adds to its line in the log.
@@ -586,9 +588,9 @@ local PLACES = {
         name = "road",
         label = "trailer",
         missing = "stretch of open road for the trailer",
-        frames = ROAD.headings,
+        frames = Places.ROAD.headings,
         fits = function(place, player)
-            return everyAreaSquare(place, ROAD.open, function(square)
+            return Places.everyAreaSquare(place, Places.ROAD.open, function(square)
                 return isClearRoad(square, player)
             end)
         end,
@@ -599,7 +601,7 @@ local PLACES = {
         missing = "open ground for the item shots' floor",
         frames = { GRID },
         fits = function(place, player)
-            return hasOpenGround(place, player, STUDIO.open)
+            return hasOpenGround(place, player, Places.STUDIO.open)
         end,
     },
     {
@@ -608,13 +610,13 @@ local PLACES = {
         missing = "door with open ground in front, for the garden lights",
         frames = SITES,
         fits = function(place, player)
-            return hasOpening(place, 0, "IsoDoor") and hasOpenGround(place, player, WALK.open)
+            return hasOpening(place, 0, "IsoDoor") and hasOpenGround(place, player, Places.WALK.open)
         end,
     },
     {
         name = "poster",
         label = "poster",
-        missing = "wall with " .. POSTER.windows.count .. " windows and open ground in front, for the poster",
+        missing = "wall with " .. Places.POSTER.windows.count .. " windows and open ground in front, for the poster",
         frames = SITES,
         fits = fitsPoster,
     },
@@ -633,7 +635,7 @@ local PLACES = {
 -- Finds the places in `needs` into `places`, each clear of those found before it, logs them under
 -- `mark` and returns their origins, or nil and the first it can't find. A run of every group looks
 -- for all of them.
-local function findPlaces(player, needs, mark)
+function Places.find(player, needs, mark)
     local found, logged = {}, {}
     for _, spec in ipairs(PLACES) do
         if needs[spec.name] then
@@ -648,7 +650,7 @@ local function findPlaces(player, needs, mark)
             if not place then
                 return nil, spec.missing
             end
-            places[spec.name] = place
+            Places.places[spec.name] = place
             local origin, facing = place.origin, place.frame.facing
             table.insert(found, origin)
             table.insert(logged, string.format("%s %d,%d", spec.label, origin:getX(), origin:getY())
@@ -661,9 +663,4 @@ local function findPlaces(player, needs, mark)
     return found
 end
 
-return {
-    HOMESTEAD = HOMESTEAD, OPEN = OPEN, STAGE0 = STAGE0, STUDIO = STUDIO, ROAD = ROAD, WALK = WALK, POSTER = POSTER,
-    LAYOUTS = LAYOUTS, places = places, at = at, squaresAt = squaresAt, loadedSquares = loadedSquares,
-    everyAreaSquare = everyAreaSquare, eachShotSquare = eachShotSquare, isOnWall = isOnWall,
-    find = findPlaces,
-}
+return Places

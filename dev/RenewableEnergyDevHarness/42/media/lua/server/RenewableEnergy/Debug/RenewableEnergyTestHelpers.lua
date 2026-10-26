@@ -10,9 +10,11 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 
 local Helpers = {}
+local need, Fixtures = PZHarness.need, PZHarness.Fixtures
 
 -- The game's roll, kept while a test sets its own; and the rolls tests set, so that setting one
 -- over another still keeps the game's.
@@ -22,7 +24,7 @@ local setRolls = setmetatable({}, { __mode = "k" })
 --- Sets what Chance.roll gives until the test ends: `rolls` a number, every roll; or a list, the
 --- next rolls in order, and an error once they run out, so a draw the test didn't expect shows.
 --- The error puts the game's roll back first, so the draws after it, a pass's or a tick's, roll
---- as usual. Returns the function that puts the game's roll back; PZHarness.Fixtures.deferOnce
+--- as usual. Returns the function that puts the game's roll back; Fixtures.deferOnce
 --- says when it runs.
 function Helpers.forceRolls(defer, rolls)
     local Chance = RenewableEnergy.Chance
@@ -40,45 +42,54 @@ function Helpers.forceRolls(defer, rolls)
     end
     setRolls[roll] = true
     Chance.roll = roll
-    return PZHarness.Fixtures.deferOnce(defer, function() Chance.roll = gameRoll end)
+    return Fixtures.deferOnce(defer, function() Chance.roll = gameRoll end)
 end
 
---- The object drawn as `args.sprite` on the square at `args`, or nil and what is missing.
-function Helpers.objectAt(args)
-    local object = PZHarness.Fixtures.objectWithSprite(PZHarness.Fixtures.squareAt(args), args.sprite)
-    if not object then
-        return nil, "the placed " .. tostring(args.sprite) .. " on the server"
+--- Runs fn(...) with the rolls `rolls` (Helpers.forceRolls), then puts the game's roll back.
+--- Returns what fn returns.
+function Helpers.withRolls(defer, rolls, fn, ...)
+    local restore = Helpers.forceRolls(defer, rolls)
+    local results = { fn(...) }
+    restore()
+    return unpack(results)
+end
+
+--- Runs run(trial) for each of `trials` with the rolls rollsOf(trial) gives (Helpers.withRolls).
+--- Returns what each run returned, in order.
+function Helpers.eachTrial(defer, trials, rollsOf, run)
+    local results = {}
+    for i, trial in ipairs(trials) do
+        results[i] = Helpers.withRolls(defer, rollsOf(trial), run, trial)
     end
-    return object
+    return results
 end
 
---- The server's record of the bank at `position` ({ x, y, z }), and its tile.
-function Helpers.bankRecordAt(position)
-    local record = position and RenewableEnergy.PowerBank.serverSystem:getLuaObjectAt(position.x, position.y, position.z)
-    return record, record and record:getIsoObject()
+--- The loaded square at `at` ({ x, y, z }), or the handler ends as missing it.
+function Helpers.squareAt(at)
+    return need(Fixtures.squareAt(at), "the square " .. tostring(at and at.x) .. "," .. tostring(at and at.y) .. ","
+        .. tostring(at and at.z) .. " loaded on the server")
+end
+
+--- The server's record of the bank at `position` ({ x, y, z }), loaded or not, or the handler ends
+--- as missing it.
+function Helpers.bankRecord(position)
+    return need(position and RenewableEnergy.PowerBank.serverSystem:getLuaObjectAt(position.x, position.y, position.z),
+        "the bank's record on the server")
+end
+
+--- The server's record of the bank at `position` and its tile, or the handler ends as missing them.
+function Helpers.bankAt(position)
+    local record = Helpers.bankRecord(position)
+    return record, need(record:getIsoObject(), "the bank's tile on the server")
 end
 
 --- The vehicle `args` names ({ id, x, y, z }: RenewableEnergyTest.vehicleArgs; single player
---- finds it by the squares around x, y, z), or nil and what is missing when there is none or it
---- has been taken out of the world.
+--- finds it by the squares around x, y, z), or the handler ends as missing it when there is none or
+--- it has been taken out of the world.
 function Helpers.vehicleAt(args)
-    local vehicle = args and PZHarness.Fixtures.vehicleById(args.id, args)
-    if not vehicle or vehicle:isRemovedFromWorld() then
-        return nil, "vehicle " .. tostring(args and args.id) .. " on the server"
-    end
-    return vehicle
-end
-
---- Registers the handler `name` on the vehicle `args` names (RenewableEnergyTest.onVehicle):
---- `fn(vehicle, args, player, defer)` runs once it is found.
-function Helpers.onVehicle(name, fn)
-    PZHarness.serverHandler(name, function(player, args, defer)
-        local vehicle, missing = Helpers.vehicleAt(args)
-        if not vehicle then
-            return nil, missing
-        end
-        return fn(vehicle, args, player, defer)
-    end)
+    local vehicle = args and Fixtures.vehicleById(args.id, args)
+    return need(vehicle and not vehicle:isRemovedFromWorld() and vehicle,
+        "vehicle " .. tostring(args and args.id) .. " on the server")
 end
 
 --- How many keys `entries` holds; 0 for nil.
@@ -120,26 +131,53 @@ function Helpers.emptyContainer(container, fullType, count)
         end
         local item = items:get(i)
         if not fullType or item:getFullType() == fullType then
-            container:Remove(item)
-            sendRemoveItemFromContainer(container, item)
+            Items.removeItem(item)
             taken = taken + 1
         end
     end
 end
 
---- Takes the item `object` lying on `square` off the floor and tells the clients.
-function Helpers.removeFloorItem(square, object)
-    if isServer() then
-        square:transmitRemoveItemFromSquare(object)
+--- The items in `container` (nil for none) as plain values, in container order: { type, id,
+--- condition, uses, charge (a battery's) }.
+function Helpers.itemsOf(container)
+    local Battery, list = RenewableEnergy.Battery, {}
+    local items = container and container:getItems()
+    for i = 0, (items and items:size() or 0) - 1 do
+        local item = items:get(i)
+        table.insert(list, { type = item:getFullType(), id = item:getID(), condition = item:getCondition(),
+            uses = item:getCurrentUsesFloat(), charge = Battery.isBattery(item) and Battery.getCharge(item) or nil })
     end
-    square:removeWorldObject(object)
+    return list
+end
+
+--- The items lying on `squares` (a list), as a set of their world objects, each to its square.
+function Helpers.worldItems(squares)
+    local found = {}
+    for _, square in ipairs(squares) do
+        local objects = square:getWorldObjects()
+        for i = 0, objects:size() - 1 do
+            found[objects:get(i)] = square
+        end
+    end
+    return found
+end
+
+--- The keys of the set `now` that the set `before` lacks, as a list.
+function Helpers.newSince(before, now)
+    local new = {}
+    for key in pairs(now) do
+        if not before[key] then
+            table.insert(new, key)
+        end
+    end
+    return new
 end
 
 --- The def of the building nearest x, y on the ground level, within `radius` squares, that
 --- `accept(def)`, if given, takes; nil if there is none.
 function Helpers.buildingNear(x, y, radius, accept)
     for r = 0, radius do
-        for sx, sy in PZHarness.Fixtures.ring(x, y, r) do
+        for sx, sy in Fixtures.ring(x, y, r) do
             local square = getSquare(sx, sy, 0)
             local building = square and square:getBuilding()
             local def = building and building:getDef()
@@ -149,6 +187,11 @@ function Helpers.buildingNear(x, y, radius, accept)
         end
     end
     return nil
+end
+
+--- The roll of the building `def` that the ModData table `modDataName` holds (by BuildingWatch.key).
+function Helpers.buildingRoll(modDataName, def)
+    return ModData.getOrCreate(modDataName)[RenewableEnergy.BuildingWatch.key(def)]
 end
 
 --- Keeps the roll of the building `def` that the ModData table `modDataName` holds (by
@@ -232,7 +275,7 @@ function Helpers.takeReadingSince(def, fullType, before)
                 for i = items:size() - 1, 0, -1 do
                     local object = items:get(i)
                     if extra > 0 and object:getItem():getFullType() == fullType then
-                        Helpers.removeFloorItem(holder, object)
+                        Fixtures.removePlaced(object)
                         extra = extra - 1
                     end
                 end
@@ -289,38 +332,53 @@ local KINDS = {
 }
 Helpers.RECORD_KINDS = KINDS
 
---- The record of kind `args.kind` at x, y, z and its tile, or nil, nil and what is missing.
+-- What each kind of object the tests find by kind (Helpers.findOn) is: the mod's own lookup on a
+-- square, or a test on each object.
+local FIND = {
+    bank = function(square) return RenewableEnergy.PowerBank.findOn(square) end,
+    source = function(square) return RenewableEnergy.Sources.findOn(square) end,
+    charger = function(square) return Squares.findObjectOn(square, RenewableEnergy.SolarCellCharger.isCharger) end,
+    gardenLight = function(square) return RenewableEnergy.SolarGardenLight.findOn(square) end,
+    treadmill = function(square) return RenewableEnergy.Treadmill.findOn(square) end,
+    wiredTreadmill = function(square) return Squares.findObjectOn(square, RenewableEnergy.Treadmill.isWiredTile) end,
+    generator = function(square) return Squares.findObjectOn(square, RenewableEnergy.isGenerator) end,
+}
+for name, kind in pairs(KINDS) do
+    FIND[name] = function(square) return Squares.findObjectOn(square, kind.isObject) end
+end
+
+--- The object on the square at `at` ({ x, y, z }) drawn as `at.sprite`, else of the kind `at.kind`
+--- (a FIND key), or nil, also while the square isn't loaded.
+function Helpers.findOn(at)
+    local square = Fixtures.squareAt(at)
+    if at.sprite then
+        return Fixtures.objectWithSprite(square, at.sprite)
+    end
+    return FIND[at.kind](square)
+end
+
+--- Helpers.findOn's object, or the handler ends as missing it.
+function Helpers.find(at)
+    return need(Helpers.findOn(at), "a " .. tostring(at.sprite or at.kind) .. " at " .. tostring(at.x) .. ","
+        .. tostring(at.y) .. "," .. tostring(at.z) .. " on the server")
+end
+
+--- The record of kind `args.kind` at x, y, z and its tile, or the handler ends as missing them.
 function Helpers.recordAt(args)
-    local kind = KINDS[args.kind]
-    if not kind then
-        return nil, nil, "a record kind " .. tostring(args.kind)
-    end
-    local square = PZHarness.Fixtures.squareAt(args)
-    local object = square and Squares.findObjectOn(square, kind.isObject)
-    local record = object and kind.owner().recordOf(object)
-    if not record then
-        return nil, nil, "a " .. args.kind .. " at " .. tostring(args.x) .. "," .. tostring(args.y)
-    end
-    return record, object
+    local object = Helpers.find(args)
+    return need(KINDS[args.kind].owner().recordOf(object), "the record of the " .. args.kind .. " on the server"), object
 end
 
 --- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
 --- "barrel.MetalDrum", "standard") on `square` as the build menu does, through the builder rural
---- finds use (WorldSpawns.buildEntity), which sends it to the clients. Returns the thumpable, or nil and
---- what is missing.
+--- finds use (WorldSpawns.buildEntity), which sends it to the clients. Returns the thumpable.
 function Helpers.placeRecord(kind, tile, square)
-    local spec = KINDS[kind]
-    if not (spec and square) then
-        return nil, "a loaded square for a " .. tostring(kind)
-    end
     local sprite = RenewableEnergy.Sprites[kind]
     for part in string.gmatch(tile, "[^.]+") do
         sprite = sprite and sprite[part]
     end
-    if type(sprite) ~= "string" then
-        return nil, "the " .. kind .. " tile " .. tostring(tile)
-    end
-    return RenewableEnergy.WorldSpawns.buildEntity(square, sprite, spec.system().OnCreate)
+    need(type(sprite) == "string", "the " .. kind .. " tile " .. tostring(tile))
+    return RenewableEnergy.WorldSpawns.buildEntity(square, sprite, KINDS[kind].system().OnCreate)
 end
 
 --- The record of kind `kind` as plain values: its saved fields, its kind's extras and, while its
@@ -328,13 +386,13 @@ end
 --- builds.
 function Helpers.recordState(kind, record, object)
     local spec = KINDS[kind]
-    local state = PZHarness.Fixtures.fieldsOf(record, spec.object().SAVED_FIELDS)
+    local state = Fixtures.fieldsOf(record, spec.object().SAVED_FIELDS)
     state.loaded = object ~= nil
     if object then
         local building = object:getSquare():getBuilding()
         state.toxic = building ~= nil and building:isToxic()
         state.sprite = object:getSprite():getName()
-        state.overlays = PZHarness.Fixtures.overlaysOf(object)
+        state.overlays = Fixtures.overlaysOf(object)
         state.summary = spec.owner().currentSummary(object)
     end
     spec.extras(record, object, state)

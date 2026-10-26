@@ -3,14 +3,10 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/Bank"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Bank = require "RenewableEnergy/PowerBank/Bank"
 local ObjectSystem = require "cf_commonlib/ObjectSystem"
-
-RenewableEnergy = RenewableEnergy or {}
-local PowerBank, Sources, Bank = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Bank
 
 Bank.sendSummary = ObjectSystem.Object.sendSummary
 

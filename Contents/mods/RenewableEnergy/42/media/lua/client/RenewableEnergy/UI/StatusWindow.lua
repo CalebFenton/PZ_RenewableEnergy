@@ -3,21 +3,18 @@
 -- multiplayer. Menu requires this file, so the window looks Menu up when it needs it.
 
 require "ISUI/ISButton"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/ObjectWindow"
-require "RenewableEnergy/UI/StatusRows"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Format = require "RenewableEnergy/UI/Format"
+local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
+local StatusRows = require "RenewableEnergy/UI/StatusRows"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 
-RenewableEnergy = RenewableEnergy or {}
-local ObjectWindow = RenewableEnergy.ObjectWindow
 local StatusWindow = ObjectWindow:derive("RenewableEnergyStatusWindow")
 RenewableEnergy.StatusWindow = StatusWindow
 StatusWindow.windows = {}
 
-local Format = RenewableEnergy.Format
-local PowerBank, Sources = RenewableEnergy.PowerBank, RenewableEnergy.Sources
-local StatusRows = RenewableEnergy.StatusRows
 local PAD, COLORS, rgb = ObjectWindow.PAD, ObjectWindow.COLORS, ObjectWindow.rgb
 local lineHeight, measure = ObjectWindow.lineHeight, ObjectWindow.measure
 
@@ -80,7 +77,7 @@ function StatusWindow:createChildren()
 end
 
 function StatusWindow:onSwitch()
-    RenewableEnergy.Menu.queueBank(self.playerNum, self.switchJob, self.object)
+    Action.queue(self.playerNum, "bank", self.switchJob, self.object)
 end
 
 function StatusWindow:onRename()

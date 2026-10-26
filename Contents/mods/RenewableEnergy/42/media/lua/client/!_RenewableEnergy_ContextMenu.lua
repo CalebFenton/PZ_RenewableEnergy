@@ -2,10 +2,8 @@
 -- that takes the battery bank out of fetchVars.generator runs before other mods' hooks read it.
 
 require "ISUI/ISWorldObjectContextMenu"
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PowerBank/PowerBank"
-
-local PowerBank = RenewableEnergy.PowerBank
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 
 -- The generator vanilla would have offered its menu on had the bank not been there.
 --

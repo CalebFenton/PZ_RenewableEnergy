@@ -57,7 +57,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
         end
         local heater = T.placeTile(self, square, Sprites.gasHeater.off.S)
         T.giveMaterials(self, "light", GasHeater.materials(T.player(), GasHeater.LIGHT))
-        T.gasJob(self, "heater", heater, GasHeater.LIGHT)
+        T.actionJob(self, "heater", heater, GasHeater.LIGHT)
         T.batch(function()
             for i, handle in ipairs(self.digesters) do
                 T.runDigester(self, handle, 3, 0)
@@ -106,9 +106,9 @@ test("renewable_energy_biogas_heater_out_when_digester_gone", {
     run = function(self)
         local digester, heater, square = fedDigesterAndHeater(self, "W")
         if not digester then return end
-        T.gasJob(self, "heater", heater, GasHeater.LIGHT)
+        T.actionJob(self, "heater", heater, GasHeater.LIGHT)
         T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit.W end, "this client's copy of the heater lit")
-        T.removeRecord(self, digester)
+        T.server(self, "removeAt", T.recordArgs(digester))
         T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off.W end,
             "the heater going out on this client once its digester was gone")
     end,
@@ -142,10 +142,10 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
         -- Room for half the gas under the pump's limit, so it stops there with gas left.
         self.pumped = math.min(self.gas, Digester.PUMP_FILL * Digester.M3_PER_TANK) / 2
         T.give(self, "tools", { { type = Digester.PUMP }, { type = Digester.TANK, uses = Digester.PUMP_FILL - self.pumped / Digester.M3_PER_TANK } })
-        T.gasJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
         T.batch(function()
             T.readRecord(self, handle, "after")
-            T.server(self, "characterStats", { stats = { "ENDURANCE" } })
+            T.read(self, "character", { stats = { "ENDURANCE" } }, "endurance")
         end)
         T.readCarried(self, { Digester.TANK })
         T.waitFor(self, function() return self.items.tools[2]:getCurrentUsesFloat() >= Digester.PUMP_FILL - 0.001 end,
@@ -157,10 +157,10 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
             T.expectNear("tank after pumping", tank.uses, Digester.PUMP_FILL, 0.001)
         end
         T.expectNear("gas left", self.reads.after.gas, self.gas - self.pumped, 0.02)
-        T.expectNear("endurance after pumping " .. self.pumped .. " m³", self.server.characterStats.values.ENDURANCE,
+        T.expectNear("endurance after pumping " .. self.pumped .. " m³", self.reads.endurance.stats.ENDURANCE,
             1 - self.pumped * Digester.PUMP_ENDURANCE_PER_M3, 0.02)
         local refusal = DigesterJobs.refusal(T.player(), DigesterJobs.FILL_PUMP, self.digester.object, self.items.tools[2])
-        T.expect(refusal == "Tooltip_RenewableEnergy_PumpLimit", "a tank at the pump's limit still takes the pump: " .. tostring(refusal))
+        T.expectEqual("the pump's refusal for a tank at its limit", refusal, "Tooltip_RenewableEnergy_PumpLimit")
     end,
 })
 
@@ -199,7 +199,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         end)
         T.server(self, "takeItems", { type = bucket })
         T.giveMaterials(self, "scrubber", scrubber)
-        T.gasJob(self, "digester", handle, DigesterJobs.FIT_SCRUBBER)
+        T.actionJob(self, "digester", handle, DigesterJobs.FIT_SCRUBBER)
         T.readRecord(self, handle, "fitted")
         -- Fitting took the bucket; the charge's water comes in another.
         T.batch(function()
@@ -209,21 +209,21 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         end)
         -- Each job's action checks this client's copies, of the digester and the water.
         T.waitFor(self, function()
-            local summary = T.recordSummary(handle)
+            local summary = T.clientSummary(handle)
             return summary ~= nil and summary.scrubber and self.items.water[1]:getFluidContainer():getAmount() >= Digester.SCRUB_WATER
         end, "this client's copies of the fitted scrubber and the water")
-        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_LIME)
+        T.actionJob(self, "digester", handle, DigesterJobs.REFILL_LIME)
         T.readRecord(self, handle, "charged")
         T.waitForSummary(self, handle, function(summary) return summary.scrubCO2 > 0 end, "this client's summary of the charged scrubber")
-        T.gasJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[2] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[2] end)
         T.readRecord(self, handle, "filled")
         T.readCarried(self, { Digester.TANK })
     end,
     validate = function(self)
         local charged, filled = self.reads.charged, self.reads.filled
-        T.expect(self.brokenBucket == 0, "a broken bucket counts as the scrubber's: " .. tostring(self.brokenBucket))
-        T.expect(self.unscrubbed == "Tooltip_RenewableEnergy_NeedsScrubbed",
-            "the compressor without a scrubber, at the pump's share: " .. tostring(self.unscrubbed))
+        T.expectEqual("broken buckets counted as the scrubber's", self.brokenBucket, 0)
+        T.expectEqual("the compressor's refusal without a scrubber, at the pump's share", self.unscrubbed,
+            "Tooltip_RenewableEnergy_NeedsScrubbed")
         T.expect(charged.scrubber, "the scrubber wasn't fitted")
         T.expectNear("scrubber charge with lime", charged.scrubCO2, Digester.SCRUB_M3.lime, 0.01)
         T.expectNear("steel wool once fitted", charged.scrubWool, Digester.WOOL_M3, 0.01)
@@ -251,7 +251,7 @@ test("renewable_energy_biogas_pump_fills_torch", {
         T.setRecord(self, handle, T.matureDigester("dome", { gas = self.gas }))
         T.waitForGas(self, handle, self.gas)
         T.give(self, "tools", { { type = Digester.PUMP }, { type = "Base.BlowTorch", uses = 0 } })
-        T.gasJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
         T.batch(function()
             T.readRecord(self, handle, "after")
             T.readCarried(self, { "Base.BlowTorch" })
@@ -280,12 +280,12 @@ test("renewable_energy_biogas_iron_sponge_packing", {
         T.waitForSummary(self, handle, function(summary) return summary.scrubber end, "this client's summary of the scrubber")
         -- Short of a fresh sponge's packings, so they can only come from the sponge.
         T.give(self, "sponges", { { type = Digester.IRON_SPONGE, condition = 2 }, { type = Digester.IRON_SPONGE, condition = 1 } })
-        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_SPONGE, function() return self.items.sponges[1] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.REFILL_SPONGE, function() return self.items.sponges[1] end)
         T.readRecord(self, handle, "first")
-        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_SPONGE, function() return self.items.sponges[2] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.REFILL_SPONGE, function() return self.items.sponges[2] end)
         T.readCarried(self, { Digester.SPENT_SPONGE, Digester.IRON_SPONGE }, nil, "second")
         T.giveMaterials(self, "wool", DigesterJobs.materials(T.player(), DigesterJobs.REFILL_WOOL))
-        T.gasJob(self, "digester", handle, DigesterJobs.REFILL_WOOL)
+        T.actionJob(self, "digester", handle, DigesterJobs.REFILL_WOOL)
         T.batch(function()
             T.readRecord(self, handle, "wool")
             T.readCarried(self, { Digester.SPENT_SPONGE }, nil, "third")
@@ -293,11 +293,11 @@ test("renewable_energy_biogas_iron_sponge_packing", {
     end,
     validate = function(self)
         local first, wool = self.reads.first, self.reads.wool
-        T.expect(first.scrubSponge == 2, "the packed sponge's packings: " .. tostring(first.scrubSponge))
+        T.expectEqual("the packed sponge's packings", first.scrubSponge, 2)
         T.expectNear("packing from a sponge", first.scrubWool, Digester.WOOL_M3, 0.01)
         local spent = T.carriedItems(self, Digester.SPENT_SPONGE, "second")
-        T.expect(#spent == 1 and spent[1].condition == 2, "repacking gave back " .. #spent .. " spent sponges, the first at "
-            .. tostring(spent[1] and spent[1].condition))
+        T.expectEqual("spent sponges repacking gave back", #spent, 1)
+        T.expectEqual("the spent sponge's packings", spent[1] and spent[1].condition, 2)
         T.expect(#T.carriedItems(self, Digester.IRON_SPONGE, "second") == 0, "packing left an Iron Sponge in the inventory")
         T.expect(#T.carriedItems(self, Digester.SPENT_SPONGE, "third") == 1 and wool.scrubSponge == 0,
             "a sponge on its last packing didn't crumble")
@@ -370,7 +370,7 @@ T.craftTest("renewable_energy_biogas_air_out_iron_sponge", {
     end,
     validate = function(self)
         local sponge = T.carriedFirst(self, Digester.IRON_SPONGE)
-        T.expect(sponge ~= nil and sponge.condition == 1, "the aired sponge's packings: " .. tostring(sponge and sponge.condition))
+        T.expectEqual("the aired sponge's packings", sponge and sponge.condition, 1)
     end,
 })
 
@@ -451,8 +451,7 @@ test("renewable_energy_biogas_compressor_inflates_tires_where_plugged_in", {
     validate = function(self)
         T.expect(self.unpowered == nil, "a compressor with no power counts as a tire pump")
         T.expect(not self.carPowered, "the car stands where the generator reaches, so this tests nothing")
-        T.expect(self.offered and self.offered:getFullType() == Digester.COMPRESSOR, "a powered compressor doesn't count as a tire pump")
-        T.expect(self.inflate and self.inflate:getFullType() == Digester.COMPRESSOR,
-            "Inflate Tire with the compressor offered queued no inflating with it")
+        T.expectEqual("the tire pump a powered compressor counts as", self.offered and self.offered:getFullType(), Digester.COMPRESSOR)
+        T.expectEqual("the item Inflate Tire queued inflating with", self.inflate and self.inflate:getFullType(), Digester.COMPRESSOR)
     end,
 })

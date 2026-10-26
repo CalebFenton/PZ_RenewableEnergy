@@ -6,9 +6,7 @@
 -- (Bullet.onVehicleConstraintImpulse), so the client keeps watching, and the server keeps
 -- accepting the crash, for a moment after it comes unhitched nearby (CRASH.unhitched*).
 
-require "RenewableEnergy/World/ArrowBoard"
-
-local ArrowBoard = RenewableEnergy.ArrowBoard
+local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
 
 -- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` of real time, as a
 -- car stopping dead against a wall from that speed does. Hard braking sheds about 3 km/h in that
@@ -209,3 +207,5 @@ end
 if not CLIENT then
     Events.OnClientCommand.Add(onClientCommand)
 end
+
+return ArrowBoard

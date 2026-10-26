@@ -69,11 +69,12 @@ function T.startVisits(self)
 end
 
 --- Queues the character's move to x, y, a wait for this client to load it (`where` names it), and
---- the authority's handler `name` asked with `args` until `done(answer)` holds or ROLL_MS pass.
+--- the authority's handler `name` asked with `args` until `done(answer)` holds or ROLL_MS pass; the
+--- last answer lands in self.reads[where].
 function T.visitUntil(self, x, y, where, name, args, done)
     T.step(function() self.teleportTo(x + 0.5, y + 0.5, 0) end)
     T.waitFor(self, function() return getSquare(x, y, 0) ~= nil end, where .. " loaded on this client", T.CHUNK_MS)
-    T.serverUntil(self, name, args, done, ROLL_MS)
+    T.readUntil(self, name, args, where, done, ROLL_MS)
 end
 
 --- Queues the character's way back to self.home and a wait for the squares around it to load

@@ -1,9 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "Moveables/ISMoveableSpriteProps"
 require "Moveables/ISMoveableDefinitions"
 require "RenewableEnergy/Biogas/Digester"
 
@@ -11,7 +8,7 @@ require "RenewableEnergy/Biogas/Digester"
 -- overlays, tile properties, rotating, placing, picking up and scrapping.
 
 local T = RenewableEnergyTest
-local test, expect = T.test, T.expect
+local test, expect, expectEqual = T.test, T.expect, T.expectEqual
 
 local Sprites, Specs = RenewableEnergy.Sprites, RenewableEnergy.Specs
 local PowerBank, SolarGardenLight = RenewableEnergy.PowerBank, RenewableEnergy.SolarGardenLight
@@ -69,8 +66,7 @@ local function expectTurns(set, what)
     for facing, name in pairs(set) do
         local faces = ISMoveableSpriteProps.new(name):getFaces()
         for otherFacing, otherName in pairs(set) do
-            expect(faces[otherFacing] == otherName, string.format("%s (%s %s) turns %s to %s, expected %s",
-                name, what, facing, otherFacing, tostring(faces[otherFacing]), otherName))
+            expectEqual(string.format("what %s (%s %s) turns %s to", name, what, facing, otherFacing), faces[otherFacing], otherName)
         end
     end
 end
@@ -121,16 +117,14 @@ test("renewable_energy_tiles_fixed_tiles_work_as_their_twins", {
     validate = function(self)
         expect(self.twin ~= nil and self.fixed == nil, "an item carrying the fixed heater tile placed "
             .. (self.fixed and "the fixed tile" or "no heater"))
-        local batteries = { "RenewableEnergy.L16Battery" }
+        local batteries = { T.L16 }
         for fixed, twin in pairs(Sprites.fixedTiles) do
             expect(PowerBank.bankOfSprite(fixed) == PowerBank.bankOfSprite(twin), fixed .. " is another bank than " .. twin)
             local shown, twinShown = Sprites.bankOverlays(fixed, batteries, 0.5), Sprites.bankOverlays(twin, batteries, 0.5)
-            expect(table.concat(shown, ",") == table.concat(twinShown, ","), fixed .. " shows " .. table.concat(shown, ",")
-                .. ", its twin " .. table.concat(twinShown, ","))
+            expectEqual("what " .. fixed .. " shows", table.concat(shown, ","), table.concat(twinShown, ","))
             local item = ISMoveableSpriteProps.new(fixed):instanceItem()
-            expect(item ~= nil and item:getFullType() == properties(twin):get("CustomItem") and item:getWorldSprite() == twin,
-                fixed .. " picks up as " .. tostring(item and item:getFullType()) .. " placing "
-                    .. tostring(item and item:getWorldSprite()) .. ", expected its twin " .. twin)
+            expectEqual("the item " .. fixed .. " picks up as", item and item:getFullType(), properties(twin):get("CustomItem"))
+            expectEqual("the tile the item " .. fixed .. " picks up as places", item and item:getWorldSprite(), twin)
         end
     end,
 })
@@ -142,11 +136,10 @@ test("renewable_energy_tiles_fixed_tiles_work_as_their_twins", {
 test("renewable_energy_tiles_bank_overlays", {
     validate = function()
         local levels
-        local L16, DEEP_CYCLE = "RenewableEnergy.L16Battery", "RenewableEnergy.DeepCycleBattery"
         for itemType, bank in pairs(Specs.banks) do
             local cars = {}
             for i = 1, bank.maxBatteries + 1 do
-                cars[i] = "Base.CarBattery1"
+                cars[i] = T.CAR_BATTERY
             end
             for _, facing in ipairs({ "S", "E", "N", "W" }) do
                 local tile = Sprites[bank.sprite][facing]
@@ -161,14 +154,13 @@ test("renewable_energy_tiles_bank_overlays", {
                         what .. (meter and " shows a meter it hides" or " shows no meter"))
                     levels = levels or (meter and #meter)
                     for look, slots in pairs(fill.batteries) do
-                        expect(#slots == bank.maxBatteries, string.format("%s shows up to %d %s batteries but holds %d",
-                            what, #slots, look, bank.maxBatteries))
+                        expectEqual(string.format("%s's %s battery slots", what, look), #slots, bank.maxBatteries)
                     end
                     local shown = meter and 1 or 0
                     local full = Sprites.bankOverlays(tile, cars, 1)
                     expect(#full == bank.maxBatteries + shown and full[bank.maxBatteries] == fill.batteries.car[bank.maxBatteries]
                         and (not meter or full[#full] == meter[#meter]), "an overfull " .. what .. " shows " .. table.concat(full, ", "))
-                    local mixed = Sprites.bankOverlays(tile, { L16, DEEP_CYCLE }, 0)
+                    local mixed = Sprites.bankOverlays(tile, { T.L16, T.DEEP_CYCLE }, 0)
                     expect(#mixed == 2 + shown and mixed[1] == fill.batteries.l16[1] and mixed[2] == fill.batteries.deepCycle[2]
                         and (not meter or mixed[3] == meter[1]), "an empty L-16 and deep-cycle in " .. what .. " show "
                         .. table.concat(mixed, ", "))
@@ -178,14 +170,14 @@ test("renewable_energy_tiles_bank_overlays", {
         end
         if not levels then return end
         local seen, last, falls = {}, Sprites.meterLevel(0), nil
-        expect(last == 1, "no charge shows meter level " .. last)
+        expectEqual("the meter level of no charge", last, 1)
         for percent = 0, 100 do
             local level = Sprites.meterLevel(percent / 100)
             falls = falls or (level < last and percent)
             seen[level], last = true, level
         end
         expect(not falls, "the meter drops a level at " .. tostring(falls) .. "% charge")
-        expect(last == levels, "a full charge shows meter level " .. last .. " of " .. levels)
+        expectEqual("the meter level of a full charge", last, levels)
         for level = 1, levels do
             expect(seen[level], "no charge shows meter level " .. level)
         end
@@ -238,22 +230,19 @@ local function scrapTest(name, perk, fullType, cases, premise)
         run = function(self)
             local square = T.square(self, { accept = roomAround }, "a free square with free squares around it")
             if not square then return end
-            self.results = {}
-            for i, case in ipairs(cases) do
+            for _, case in ipairs(cases) do
                 T.step(function() T.setPerk(self, perk, case[3]) end)
                 T.forceRoll(self, case[4])
                 T.server(self, "placeWhole", T.at(square, { sprite = case[2] }))
-                T.server(self, "scrapItems", T.at(square, { sprite = case[2], type = fullType }))
-                T.step(function() self.results[i] = self.server.scrapItems end)
+                T.read(self, "scrapItems", T.at(square, { sprite = case[2], type = fullType }), case[1])
             end
         end,
         validate = function(self)
             if premise then premise() end
-            for i, case in ipairs(cases) do
-                local result = self.results[i] or {}
+            for _, case in ipairs(cases) do
+                local result = self.reads[case[1]]
                 expect(result.scrapped, case[1] .. " wasn't dismantled")
-                expect(result.count == case[5], case[1] .. " gave " .. tostring(result.count) .. " " .. fullType
-                    .. ", expected " .. case[5])
+                expectEqual(fullType .. " " .. case[1] .. " gave", result.count, case[5])
             end
         end,
     })
@@ -338,8 +327,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                 table.insert(self.results, result)
                 local handle = T.placeAsPlayer(self, square, item, sprite, carried and { [carried.key] = carried.value })
                 if carried then
-                    T.server(self, "objectModData", T.at(square, { sprite = sprite, key = carried.key }))
-                    T.step(function() result.placedData = describe(self.server.objectModData.value) end)
+                    T.read(self, "objectModData", T.at(square, { sprite = sprite, key = carried.key }), item)
                 end
                 T.pickUpAsPlayer(self, handle, sprite)
                 T.readCarried(self, { item })
@@ -357,12 +345,11 @@ test("renewable_energy_tiles_place_and_pick_up", {
         for _, r in ipairs(self.results) do
             expect(r.removed, r.what .. " was not picked up")
             -- The screwdriver stays.
-            expect(r.returned == 1 and r.items == 2,
-                r.what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them " .. r.item)
+            expectEqual("items carried after picking up " .. r.what .. ", the screwdriver too", r.items, 2)
+            expectEqual("copies of " .. r.item .. " picking up " .. r.what .. " gave back", r.returned, 1)
             if r.expected then
-                expect(r.placedData == r.expected, "placed " .. r.what .. " holds " .. tostring(r.placedData) .. ", expected " .. r.expected)
-                expect(r.pickedUpData == r.expected, "picked-up " .. r.what .. " holds " .. tostring(r.pickedUpData)
-                    .. ", expected " .. r.expected)
+                expectEqual("what placed " .. r.what .. " holds", describe(self.reads[r.item].value), r.expected)
+                expectEqual("what picked-up " .. r.what .. " holds", r.pickedUpData, r.expected)
             end
         end
     end,
@@ -415,25 +402,23 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
         end
     end,
     validate = function(self)
-        expect(#self.results == 3, "placed " .. #self.results .. " of the three banks")
         for _, r in ipairs(self.results) do
             local what = "the bank facing " .. r.facing
             expect(r.removed, what .. " was not picked up")
             -- The screwdriver stays.
-            expect(r.returned == 1 and r.items == 2,
-                what .. " gave back " .. tostring(r.items and r.items - 1) .. " items, " .. tostring(r.returned) .. " of them its own")
+            expectEqual("items carried after picking up " .. what .. ", the screwdriver too", r.items, 2)
+            expectEqual("banks picking up " .. what .. " gave back", r.returned, 1)
         end
     end,
 })
 
 -- A bank turned to face E or W shows its batteries, and facing E its meter, with that facing's
 -- overlays, on the authority and on this client.
-local L16 = T.L16
 test("renewable_energy_tiles_turned_banks_show_their_overlays", {
     run = function(self)
         self.banks = {}
         for _, facing in ipairs({ "E", "W" }) do
-            local bank = T.bank(self, "batteryRackWood", { L16, L16 }, { charge = 0.5, facing = facing, near = self.banks[1] })
+            local bank = T.bank(self, "batteryRackWood", { T.L16, T.L16 }, { charge = 0.5, facing = facing, near = self.banks[1] })
             if not bank then return end
             bank.facing = facing
             table.insert(self.banks, bank)
@@ -446,11 +431,11 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
     validate = function(self)
         for _, bank in ipairs(self.banks) do
             local tile = Sprites.batteryRackWood[bank.facing]
-            local expected = Sprites.bankOverlays(tile, { L16, L16 }, bank.state.charge)
-            local shown = table.concat(bank.state.overlays, ",")
-            expect(Sprites.nameOf(bank.object) == tile, "the bank facing " .. bank.facing .. " stands as " .. tostring(Sprites.nameOf(bank.object)))
-            expect(#expected == (bank.facing == "E" and 3 or 2) and shown == table.concat(expected, ","),
-                "the bank facing " .. bank.facing .. " shows " .. shown .. ", expected " .. table.concat(expected, ","))
+            local expected = Sprites.bankOverlays(tile, { T.L16, T.L16 }, bank.state.charge)
+            local what = "the bank facing " .. bank.facing
+            expectEqual("the tile of " .. what, Sprites.nameOf(bank.object), tile)
+            expectEqual("overlays " .. what .. " should show", #expected, bank.facing == "E" and 3 or 2)
+            expectEqual("what " .. what .. " shows", table.concat(bank.state.overlays, ","), table.concat(expected, ","))
         end
     end,
 })
@@ -458,8 +443,8 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
 -- A module just below each Specs.crackLooks threshold shows that look's cracks over its own slot,
 -- one at the light threshold shows whole, repair clears them, and snow stays drawn over cracks
 -- added under it; this client matches.
-local HEAVY_AT = T.conditionAt(Specs.factoryModule, Specs.crackLooks.heavyBelow) - 1
-local LIGHT_AT = T.conditionAt(Specs.factoryModule, Specs.crackLooks.lightBelow) - 1
+local HEAVY_AT = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.heavyBelow) - 1
+local LIGHT_AT = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.lightBelow) - 1
 local WHOLE_AT = LIGHT_AT + 1
 local HEAVY, LIGHT, SNOW = Sprites.cracks.heavy, Sprites.cracks.light, Sprites.snow
 local CRACKED = {
@@ -485,32 +470,29 @@ local CRACKED = {
 
 test("renewable_energy_tiles_cracked_modules_show", {
     run = function(self)
-        self.shown = {}
+        self.copies = {}
         -- Every case has a panel of its own, which the other cases' calls leave alone.
         T.batch(function()
             for _, case in ipairs(CRACKED) do
                 local panel = T.panel(self, case.sprite, { modules = case.modules })
                 if not panel then return end
                 local at = panel.position
-                T.server(self, "panelCracks", T.at(at, { sprite = case.sprite, change = case.change }))
+                T.read(self, "panelCracks", T.at(at, { sprite = case.sprite, change = case.change }), case.name)
                 T.waitFor(self, function()
                     return table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ",")
-                        == table.concat(self.server.panelCracks.overlays, ",")
+                        == table.concat(self.reads[case.name].overlays, ",")
                 end, "this client's overlays of " .. case.what)
                 T.step(function()
-                    self.shown[case.name] = {
-                        server = table.concat(self.server.panelCracks.overlays, ","),
-                        client = table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ","),
-                    }
+                    self.copies[case.name] = table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ",")
                 end)
             end
         end)
     end,
     validate = function(self)
         for _, case in ipairs(CRACKED) do
-            local shown = self.shown[case.name] or {}
-            expect(shown.server == case.shows, case.what .. " shows '" .. tostring(shown.server) .. "'")
-            expect(shown.client == shown.server, "this client's copy of " .. case.what .. " shows '" .. tostring(shown.client) .. "'")
+            local server = table.concat(self.reads[case.name].overlays, ",")
+            expectEqual("what " .. case.what .. " shows", server, case.shows)
+            expectEqual("what this client's copy of " .. case.what .. " shows", self.copies[case.name], server)
         end
     end,
 })

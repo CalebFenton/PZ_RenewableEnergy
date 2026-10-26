@@ -12,34 +12,19 @@ require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
-local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
-local squareAt, removePlaced = PZHarness.Fixtures.squareAt, PZHarness.Fixtures.removePlaced
+local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
+local removePlaced, withRolls = PZHarness.Fixtures.removePlaced, Helpers.withRolls
 local inRange, wearRange, UNDER = Helpers.inRange, Helpers.wearRange, Helpers.UNDER
 local Sprites = RenewableEnergy.Sprites
 
 local MODULE = RenewableEnergy.Specs.factoryModule
 
--- The batteries' charges and conditions, in container order.
-local function batteryStats(container)
-    local charges, conditions = {}, {}
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if RenewableEnergy.Battery.isBattery(item) then
-            table.insert(charges, RenewableEnergy.Battery.getCharge(item))
-            table.insert(conditions, item:getCondition())
-        end
-    end
-    return charges, conditions
-end
-
+-- The modules' conditions, in container order.
 local function moduleConditions(container)
     local conditions = {}
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:getFullType() == MODULE then
-            table.insert(conditions, item:getCondition())
+    for _, item in ipairs(Helpers.itemsOf(container)) do
+        if item.type == MODULE then
+            table.insert(conditions, item.condition)
         end
     end
     return conditions
@@ -50,11 +35,15 @@ end
 -- What a world spawn left in `container`: its batteries' charges and conditions, its modules'
 -- conditions and how many items it holds.
 local function stockOf(container)
-    local charges, conditions = batteryStats(container)
-    return {
-        charges = charges, batteryConditions = conditions, modules = moduleConditions(container),
-        items = container:getItems():size(), explored = container:isExplored(),
-    }
+    local stock = { charges = {}, batteryConditions = {}, modules = moduleConditions(container),
+        items = container:getItems():size(), explored = container:isExplored() }
+    for _, item in ipairs(Helpers.itemsOf(container)) do
+        if item.charge then
+            table.insert(stock.charges, item.charge)
+            table.insert(stock.batteryConditions, item.condition)
+        end
+    end
+    return stock
 end
 
 -- WorldSpawns.placeBank with BANK_STOCK[args.stock] on the square at `args`, as a room seen for the
@@ -62,10 +51,7 @@ end
 -- one, its tile and stock, and whether the stock's tile, in any facing, stands on the square.
 -- Removed when the test ends.
 handler("worldBank", function(_, args, defer)
-    local square = squareAt(args)
-    if not square then
-        return nil, "the bank's square loaded on the server"
-    end
+    local square = Helpers.squareAt(args)
     local restoreRoll = args.roll and Helpers.forceRolls(defer, args.roll)
     local bank = RenewableEnergy.WorldSpawns.placeBank(square, args.stock)
     if restoreRoll then restoreRoll() end
@@ -82,19 +68,15 @@ handler("worldBank", function(_, args, defer)
     return answer
 end)
 
--- The world items lying on the square at `square` and the squares around it, each to its square.
-local function itemsAround(square)
-    local found = {}
+-- The loaded squares of `square` and those around it.
+local function squaresAround(square)
+    local squares = {}
     for dx = -1, 1 do
         for dy = -1, 1 do
-            local near = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
-            local objects = near and near:getWorldObjects()
-            for i = 0, (objects and objects:size() or 0) - 1 do
-                found[objects:get(i)] = near
-            end
+            squares[#squares + 1] = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
         end
     end
-    return found
+    return squares
 end
 
 -- WorldSpawns.layModulesBeside for a BANK_STOCK[args.stock] bank on the square at `args`, with
@@ -102,19 +84,15 @@ end
 -- lie on the square and around it, their conditions and whether each lies in the square's room.
 -- Removed when the test ends.
 handler("bankModulesBeside", function(_, args, defer)
-    local square = squareAt(args)
-    if not square then
-        return nil, "the bank's square loaded on the server"
-    end
-    local before = itemsAround(square)
-    local restoreRoll = Helpers.forceRolls(defer, args.roll)
-    local laid = RenewableEnergy.WorldSpawns.layModulesBeside(square, args.stock)
-    restoreRoll()
+    local square = Helpers.squareAt(args)
+    local before = Helpers.worldItems(squaresAround(square))
+    local laid = withRolls(defer, args.roll, RenewableEnergy.WorldSpawns.layModulesBeside, square, args.stock)
+    local now = Helpers.worldItems(squaresAround(square))
     local answer = { laid = laid, conditions = {}, inRoom = true }
-    for object, near in pairs(itemsAround(square)) do
-        if not before[object] and object:getItem():getFullType() == MODULE then
+    for _, object in ipairs(Helpers.newSince(before, now)) do
+        if object:getItem():getFullType() == MODULE then
             table.insert(answer.conditions, object:getItem():getCondition())
-            answer.inRoom = answer.inRoom and near:getRoom() == square:getRoom()
+            answer.inRoom = answer.inRoom and now[object]:getRoom() == square:getRoom()
             defer(function() removePlaced(object) end)
         end
     end
@@ -139,43 +117,34 @@ end
 -- setting's RARITY. Answers, for each, the tiles it placed on the square and the modules it laid
 -- around it, all removed before the next.
 handler("seenRoom", function(_, args, defer)
-    local square = squareAt(args)
-    if not square then
-        return nil, "an indoor square loaded on the server"
-    end
+    local square = Helpers.squareAt(args)
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local restoreOptions = saveOptions(defer, { "BatteryBankSpawn" })
-    local results = {}
-    for i, trial in ipairs(args.trials) do
+    local function rollOf(trial)
+        if not trial.edge then
+            return trial.roll
+        end
+        local odds = trial.edge == "bank" and WorldSpawns.BANK_ROOMS[trial.room].odds or WorldSpawns.CRATE_ROOMS[trial.room]
+        return Helpers.trialRoll(trial.roll, 1 / (odds * WorldSpawns.RARITY[trial.setting]))
+    end
+    local results = Helpers.eachTrial(defer, args.trials, rollOf, function(trial)
         SandboxVars.RenewableEnergy.BatteryBankSpawn = trial.setting
         local room = { getName = function() return trial.room end, getRandomFreeSquare = function() return square end }
-        local roll = trial.roll
-        if trial.edge then
-            local odds = trial.edge == "bank" and WorldSpawns.BANK_ROOMS[trial.room].odds or WorldSpawns.CRATE_ROOMS[trial.room]
-            roll = Helpers.trialRoll(roll, 1 / (odds * WorldSpawns.RARITY[trial.setting]))
-        end
-        local objectsBefore, itemsBefore = tilesOn(square), itemsAround(square)
-        local restoreRoll = Helpers.forceRolls(defer, roll)
+        local tilesBefore, itemsBefore = tilesOn(square), Helpers.worldItems(squaresAround(square))
         triggerEvent("OnSeeNewRoom", room)
-        restoreRoll()
-        local result, placed = { tiles = {}, modules = 0 }, {}
-        for object in pairs(tilesOn(square)) do
-            if not objectsBefore[object] then
-                table.insert(result.tiles, object:getTextureName())
-                table.insert(placed, object)
-            end
-        end
-        for object in pairs(itemsAround(square)) do
-            if not itemsBefore[object] then
-                result.modules = result.modules + (object:getItem():getFullType() == MODULE and 1 or 0)
-                table.insert(placed, object)
-            end
-        end
-        for _, object in ipairs(placed) do
+        local tiles = Helpers.newSince(tilesBefore, tilesOn(square))
+        local items = Helpers.newSince(itemsBefore, Helpers.worldItems(squaresAround(square)))
+        local result = { tiles = {}, modules = 0 }
+        for _, object in ipairs(tiles) do
+            table.insert(result.tiles, object:getTextureName())
             removePlaced(object)
         end
-        results[i] = result
-    end
+        for _, object in ipairs(items) do
+            result.modules = result.modules + (object:getItem():getFullType() == MODULE and 1 or 0)
+            removePlaced(object)
+        end
+        return result
+    end)
     restoreOptions()
     return { results = results }
 end)
@@ -186,17 +155,14 @@ local PARTS = { "inverter", "controller", "charger" }
 -- What BANK_STOCK[stockName] puts in an emptied `container` with every roll at `roll`: how many of
 -- each of PARTS.
 local function bankPartsAt(container, stockName, roll, defer)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    local restoreRoll = Helpers.forceRolls(defer, roll)
     local found = { inverter = 0, controller = 0, charger = 0 }
-    local function stock(c) WorldSpawns.stockBank(c, stockName) end
-    for fullType, count in pairs(PZHarness.Loot.fillOnce(stock, container)) do
+    local function stock(c) RenewableEnergy.WorldSpawns.stockBank(c, stockName) end
+    for fullType, count in pairs(withRolls(defer, roll, PZHarness.Loot.fillOnce, stock, container)) do
         local kind = RenewableEnergy.PowerBank.partKind(fullType)
         if found[kind] then
             found[kind] = found[kind] + count
         end
     end
-    restoreRoll()
     return found
 end
 
@@ -282,9 +248,7 @@ check("batteryWear", function(expect, _, _, _, defer)
     end
     local function worn(name, rolls)
         local item = instanceItem("RenewableEnergy.DeepCycleBattery")
-        local restoreRoll = Helpers.forceRolls(defer, rolls)
-        WorldSpawns.wearFoundBattery(item, name)
-        restoreRoll()
+        withRolls(defer, rolls, WorldSpawns.wearFoundBattery, item, name)
         return { condition = item:getCondition(), repairs = item:getHaveBeenRepaired() }
     end
     for name, wear in pairs(WorldSpawns.BATTERY_WEAR) do
@@ -335,9 +299,7 @@ check("partWear", function(expect, _, _, _, defer)
     expect(not WorldSpawns.isWornPart(Specs.charger), Specs.charger .. " is worn when found")
     local function worn(fullType, rolls)
         local item = instanceItem(fullType)
-        local restoreRoll = Helpers.forceRolls(defer, rolls)
-        WorldSpawns.wearFoundPart(item)
-        restoreRoll()
+        withRolls(defer, rolls, WorldSpawns.wearFoundPart, item)
         return item:getCondition(), Wear.hasOwnCondition(item)
     end
     for _, fullType in ipairs(types) do
@@ -361,9 +323,7 @@ check("partWear", function(expect, _, _, _, defer)
     }
     for what, fill in pairs(fills) do
         container:removeAllItems()
-        local restoreRoll = Helpers.forceRolls(defer, 0.5)
-        fill(container)
-        restoreRoll()
+        withRolls(defer, 0.5, fill, container)
         local parts, items = 0, container:getItems()
         for i = 0, items:size() - 1 do
             local item = items:get(i)
@@ -383,9 +343,7 @@ end)
 -- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
 handler("bankStockCount", function(_, args, defer)
     local container = RenewableEnergy.Loot.newContainer(nil)
-    local restoreRoll = Helpers.forceRolls(defer, args.roll)
-    RenewableEnergy.WorldSpawns.stockBank(container, args.stock)
-    restoreRoll()
+    withRolls(defer, args.roll, RenewableEnergy.WorldSpawns.stockBank, container, args.stock)
     local count = container:getItems():size()
     container:removeAllItems()
     return { items = count }
@@ -394,16 +352,9 @@ end)
 -- WorldSpawns.placeCrate with CRATE_STOCK[args.stock] on the square at `args`. Answers its stock
 -- and the name of its overlay. Removed when the test ends.
 handler("worldCrate", function(_, args, defer)
-    local square = squareAt(args)
-    if not square then
-        return nil, "the crate's square loaded on the server"
-    end
-    local crate = RenewableEnergy.WorldSpawns.placeCrate(square, args.stock)
+    local crate = RenewableEnergy.WorldSpawns.placeCrate(Helpers.squareAt(args), args.stock)
     defer(function() removePlaced(crate) end)
-    local container, overlay = crate:getContainer(), crate:getOverlaySprite()
-    if not container then
-        return nil, "the crate's container"
-    end
+    local container, overlay = need(crate:getContainer(), "the crate's container"), crate:getOverlaySprite()
     return { stock = stockOf(container), overlay = overlay and overlay:getName() }
 end)
 
@@ -425,9 +376,7 @@ check("crackedModules", function(expect, _, _, _, defer)
     local container = RenewableEnergy.Loot.newContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         -- The chance's roll, then the cracked condition's, at the middle of its range.
-        local restoreRoll = Helpers.forceRolls(defer, { roll, 0.5 })
-        Distributions.addCrackedModules(roomName, containerType, container)
-        restoreRoll()
+        withRolls(defer, { roll, 0.5 }, Distributions.addCrackedModules, roomName, containerType, container)
         local conditions = moduleConditions(container)
         container:removeAllItems()
         return conditions

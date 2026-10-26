@@ -1,10 +1,17 @@
 -- Helpers that several of the mod's modules share; those any mod could use are cf_commonlib's.
 --
--- RenewableEnergy is the mod's one global table. The other globals are the timed action classes
--- (RenewableEnergy*Action), which the game looks up by name. Every file that adds to the table
--- creates it first if no file has yet, so files may load in any order.
+-- Every module ends `return X`, and a file takes what it uses with `local X = require "..."`,
+-- this table as `local RenewableEnergy = require "RenewableEnergy/Utilities"`. A file that adds
+-- to another module (Bank's parts, the *Server.lua files, ArrowBoard's) returns that module.
+-- RenewableEnergy is the mod's one global table: a module goes in it only when something finds it
+-- by name: a script's or container's Lua path, the dev mod, or a file that can't require it,
+-- because the module requires that file or is server Lua, which loads after shared and client
+-- Lua. Such a file reads the table when the function runs, never as it loads. The other globals
+-- are the timed action classes, which the game finds by name.
 
 RenewableEnergy = RenewableEnergy or {}
+
+-- PowerBank and Specs require this file, so the helpers below find them in the table as they run.
 
 -- Slack for float comparisons of kg, litres and m³, which sums and shares leave a hair off.
 RenewableEnergy.EPSILON = 1e-4

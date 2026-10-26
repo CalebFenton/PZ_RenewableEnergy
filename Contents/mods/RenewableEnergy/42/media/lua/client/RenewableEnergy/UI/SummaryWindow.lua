@@ -4,13 +4,10 @@
 -- player and multiplayer and needs no watching. A derived class sets `owner`, its shared module
 -- (nameKey, summaryOf), and defines rowsOf(summary).
 
-require "RenewableEnergy/UI/ObjectWindow"
+local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
 local Tables = require "cf_commonlib/Tables"
 
-RenewableEnergy = RenewableEnergy or {}
-local ObjectWindow = RenewableEnergy.ObjectWindow
 local SummaryWindow = ObjectWindow:derive("RenewableEnergySummaryWindow")
-RenewableEnergy.SummaryWindow = SummaryWindow
 
 local PAD = ObjectWindow.PAD
 local WIDTH = 300

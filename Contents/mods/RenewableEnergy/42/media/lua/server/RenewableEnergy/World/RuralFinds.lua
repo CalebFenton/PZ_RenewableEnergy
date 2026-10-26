@@ -10,28 +10,24 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Chance"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Wind"
-require "RenewableEnergy/PowerBank/WindSource"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/Biogas/DigesterSystem"
-require "RenewableEnergy/WoodGas/GasifierSystem"
-require "RenewableEnergy/World/WorldSpawns"
-require "RenewableEnergy/World/BuildingWatch"
 require "RandomizedWorldContent/StoryTable_Initialization"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Chance = require "RenewableEnergy/Chance"
+local Sprites = require "RenewableEnergy/Sprites"
+local Wind = require "RenewableEnergy/Wind"
+local WindSource = require "RenewableEnergy/PowerBank/WindSource"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local DigesterSystem = require "RenewableEnergy/Biogas/DigesterSystem"
+local GasifierSystem = require "RenewableEnergy/WoodGas/GasifierSystem"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
+local Tables = require "cf_commonlib/Tables"
 
-RenewableEnergy = RenewableEnergy or {}
 local RuralFinds = {}
 RenewableEnergy.RuralFinds = RuralFinds
-
-local Sprites, Wind, Gasifier = RenewableEnergy.Sprites, RenewableEnergy.Wind, RenewableEnergy.Gasifier
-local Digester = RenewableEnergy.Digester
-local BuildingWatch, Chance = RenewableEnergy.BuildingWatch, RenewableEnergy.Chance
 
 -- Global ModData: by building key, the finds each rolled building got ({ [kind] = true }).
 RuralFinds.MOD_DATA = "RenewableEnergyRuralFinds"
@@ -52,11 +48,6 @@ end
 
 local function store()
     return ModData.getOrCreate(RuralFinds.MOD_DATA)
-end
-
---- The finds a building has, or nil if it was never rolled.
-function RuralFinds.rolled(def)
-    return store()[BuildingWatch.key(def)]
 end
 
 local function hasRoom(def, names)
@@ -92,7 +83,7 @@ end
 
 -- Building
 
-local build = RenewableEnergy.WorldSpawns.buildEntity
+local build = WorldSpawns.buildEntity
 
 local function randomOf(entries)
     local list = {}
@@ -156,7 +147,6 @@ RuralFinds.FINDS = {
             local charger = build(square, randomOf(Sprites.windCharger.propeller.wood), Wind.OnCreate)
             -- After the clients have the charger: the setters send its modData, which names it by
             -- its index on the square.
-            local WindSource = RenewableEnergy.WindSource
             WindSource.setBroken(charger, true)
             WindSource.setBraked(charger, true)
             return charger
@@ -170,10 +160,9 @@ RuralFinds.FINDS = {
         reading = RuralFinds.BIOGAS_MAGAZINE,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
         place = function(square)
-            local System = RenewableEnergy.DigesterSystem
-            return build(square, randomOf(Sprites.digester.barrel), System.OnCreate,
+            return build(square, randomOf(Sprites.digester.barrel), DigesterSystem.OnCreate,
                 function(thumpable)
-                    local digester = System.instance:getLuaObjectOnSquare(square)
+                    local digester = DigesterSystem.instance:getLuaObjectOnSquare(square)
                     digester.holderCondition = 0
                     digester.acid = digester:acidLimit()
                     digester.sour = true
@@ -198,9 +187,8 @@ RuralFinds.FINDS = {
         reading = RuralFinds.PAMPHLET,
         -- Put away dirty: its filter packing all tarred and its ash pit full.
         place = function(square)
-            local System = RenewableEnergy.GasifierSystem
             return build(square, Sprites.gasifier.primitive,
-                System.OnCreate, function(thumpable)
+                GasifierSystem.OnCreate, function(thumpable)
                     local filter = Gasifier.filterOf(thumpable)
                     for _ = 1, 100 do
                         local tarry = instanceItem(Gasifier.TARRY)
@@ -210,7 +198,7 @@ RuralFinds.FINDS = {
                         end
                         filter:AddItem(tarry)
                     end
-                    local gasifier = System.instance:getLuaObjectOnSquare(square)
+                    local gasifier = GasifierSystem.instance:getLuaObjectOnSquare(square)
                     gasifier.ash = Gasifier.ASH_FULL
                     gasifier:afterChange()
                 end)
@@ -297,15 +285,11 @@ end
 --- map, so the buildings needn't be loaded.
 function RuralFinds.buildingsBy(kind, x, y)
     local qualifies, reach = RuralFinds.FINDS[kind].qualifies, BuildingWatch.REACH
-    local buildings, found = ArrayList.new(), {}
+    local buildings = ArrayList.new()
     getWorld():getMetaGrid():getBuildingsIntersecting(x - reach, y - reach, 2 * reach + 1, 2 * reach + 1, buildings)
-    for i = 0, buildings:size() - 1 do
-        local def = buildings:get(i)
-        if RuralFinds.distanceOutside(def, x, y) <= reach and qualifies(def) then
-            table.insert(found, def)
-        end
-    end
-    return found
+    return Tables.fromList(buildings, function(def)
+        return RuralFinds.distanceOutside(def, x, y) <= reach and qualifies(def)
+    end)
 end
 
 --- Counts a find of `kind` at x, y as the find of every building it stands by that could have one

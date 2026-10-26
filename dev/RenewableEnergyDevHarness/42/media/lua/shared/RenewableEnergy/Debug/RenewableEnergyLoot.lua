@@ -1,7 +1,7 @@
 -- Measures how often the mod's items spawn, with the game's own loot rolls on scratch containers
 -- that never enter the world, and how world banks and crates are stocked. Shared Lua so the loot
 -- tests can roll on a multiplayer server, whose loot tables alone hold the mod's entries.
--- The dev harness's --loot mode prints these reports. Debug mode only.
+-- The dev harness's --loot mode prints the report. Debug mode only.
 --
 -- The report rolls copies of the lists with only the mod's items: each entry rolls on its own,
 -- so the chances are the same, and rolling the whole lists thousands of times runs the client out
@@ -21,125 +21,22 @@ local PZLoot = PZHarness.Loot
 local PROBE_LIST = "RenewableEnergyLootProbe_"
 local MOD_PREFIX = "RenewableEnergy."
 
--- What each list fills, for the report. Corpse lists are labelled by their outfit.
-local LABELS = {
-    ["proc:ElectronicStoreMagazines"] = "Electronics store magazine racks",
-    ["proc:ElectronicStoreMisc"] = "Electronics store misc shelves",
-    ["proc:ElectricianTools"] = "Electronics store tool shelves",
-    ["proc:GigamartHouseElectronics"] = "Department store electronics",
-    ["proc:ToolStoreBooks"] = "Hardware store books",
-    ["proc:ToolStoreFarming"] = "Hardware store farming",
-    ["proc:ToolStoreMisc"] = "Hardware store misc shelves",
-    ["proc:GardenStoreMisc"] = "Garden centre misc shelves",
-    ["proc:GardenStoreTools"] = "Garden centre tools",
-    ["proc:CrateGardening"] = "Gardening crates",
-    ["proc:BookstoreBlueCollar"] = "Bookstore trade shelves",
-    ["proc:BookstoreMisc"] = "Bookstore misc shelves",
-    ["proc:BookstoreOutdoors"] = "Bookstore outdoors shelves",
-    ["proc:BookstoreFarming"] = "Bookstore farming shelves",
-    ["proc:CampingStoreBooks"] = "Camping and fishing store books",
-    ["proc:CampingStoreLighting"] = "Camping store lighting",
-    ["proc:CampingStoreGear"] = "Camping store gear",
-    ["proc:CrateCamping"] = "Camping crates",
-    ["proc:OutdoorSupplyMagazines"] = "Outdoor supply magazines",
-    ["proc:RangerMagazines"] = "Ranger station magazines",
-    ["proc:CarSupplyLiterature"] = "Auto parts store books",
-    ["proc:CarSupplyBatteries"] = "Auto parts store batteries",
-    ["proc:CarSupplyTools"] = "Auto parts store tools",
-    ["proc:GasStoreEmergency"] = "Gas station emergency supplies",
-    ["proc:MechanicShelfElectric"] = "Mechanics' electrical shelves",
-    ["proc:CrateMechanics"] = "Mechanic parts crates",
-    ["proc:MechanicShelfBrakes"] = "Mechanics' brake shelves",
-    ["proc:MechanicShelfMufflers"] = "Mechanics' muffler shelves",
-    ["proc:MechanicShelfSuspension"] = "Mechanics' suspension shelves",
-    ["proc:MechanicSpecial"] = "Mechanics' special parts",
-    ["proc:GarageMechanics"] = "Garage mechanics",
-    ["proc:GarageTools"] = "Garage tools",
-    ["proc:CrateMagazines"] = "Magazine crates",
-    ["proc:MagazineRackMixed"] = "Gas station and grocery magazine racks",
-    ["proc:PostOfficeMagazines"] = "Post office magazines",
-    ["proc:LibraryMagazines"] = "Library magazines",
-    ["proc:EngineerTools"] = "Engineers' tools",
-    ["proc:GeneratorRoom"] = "Generator and technical rooms",
-    ["proc:ControlRoomCounter"] = "Control room counters",
-    ["proc:RadioFactoryComponents"] = "Radio factory components",
-    ["proc:ArmyStorageElectronics"] = "Army storage electronics",
-    ["proc:ArmySurplusMisc"] = "Army surplus store",
-    ["proc:LivingRoomShelf"] = "Living room shelves",
-    ["proc:LivingRoomShelfClassy"] = "Living room shelves (classy)",
-    ["proc:LivingRoomShelfRedneck"] = "Living room shelves (redneck)",
-    ["proc:LivingRoomSideTable"] = "Living room side tables",
-    ["proc:LivingRoomSideTableClassy"] = "Living room side tables (classy)",
-    ["proc:LivingRoomSideTableRedneck"] = "Living room side tables (redneck)",
-    ["proc:LivingRoomWardrobe"] = "Living room wardrobes",
-    ["proc:RecRoomShelf"] = "Rec room shelves",
-    ["proc:ShelfGeneric"] = "Generic shelves",
-    ["proc:Hobbies"] = "Hobby shelves",
-    ["proc:KitchenRandom"] = "Kitchen junk drawers",
-    ["proc:ClosetShelfGeneric"] = "Closet shelves",
-    ["proc:OfficeDeskHome"] = "Home office desks",
-    ["proc:SurvivalGear"] = "Preppers' survival gear",
-    ["proc:Homesteading"] = "Homestead supplies",
-    ["proc:SafehouseLighting"] = "Survivor safehouse lighting",
-    ["proc:SafehouseLighting_Late"] = "Survivor safehouse lighting (late)",
-    ["proc:SafehouseBookShelf"] = "Survivor safehouse bookshelves",
-    ["proc:SafehouseFireplace"] = "Survivor safehouse hearths",
-    ["proc:SafehouseFireplace_Late"] = "Survivor safehouse hearths (late)",
-    ["proc:ToolCabinetFarming"] = "Farm tool cabinets",
-    ["proc:BarnTools"] = "Barn tools",
-    ["proc:FishingStoreGear"] = "Fishing store gear",
-    ["proc:CrateBatteries"] = "Battery plant crates",
-    ["proc:CrateElectronics"] = "Electronics crates",
-    ["proc:JunkHoard"] = "Junk hoards",
-    ["proc:RenewableEnergySolarKit"] = "Solar kit (RenewableEnergySolarKit)",
-    ["proc:RenewableEnergyBatteryStock"] = "Battery back stock (RenewableEnergyBatteryStock)",
-    ["veh:ElectricianTruckBed"] = "Electrician vans",
-    ["veh:RenewableEnergyTelecomTruckBed"] = "Knox Telecommunications vans",
-    ["veh:RenewableEnergyUtilityTruckBed"] = "Deer Valley Power vans",
-    ["veh:RadioTruckBed"] = "Radio station vans",
-    ["veh:CamperTruckBed"] = "Campers (station wagons, SUVs, vans)",
-    ["veh:CamperGloveBox"] = "Campers' glove boxes",
-    ["veh:GloveBox"] = "Glove boxes of ordinary cars and trucks",
-    ["veh:TrunkStandard"] = "Trunks of ordinary cars",
-    ["veh:TrunkHeavy"] = "Truck beds of ordinary pickups and vans",
-    ["veh:RenewableEnergyCamperTrailerTrunk"] = "Camper trailers",
-    ["veh:SurvivalistTruckBed"] = "Survivalist vehicles",
-    ["veh:RancherTruckBed"] = "Rancher trucks",
-    ["veh:FarmerTruckBed"] = "Farmer trucks",
-    ["veh:ConstructionWorkerTruckBed"] = "Construction trucks",
-    ["veh:RangerTruckBed"] = "Ranger trucks",
-    ["veh:FishermanTruckBed"] = "Fisherman trucks",
-    ["sub:SurvivorCache1.SurvivorCrate"] = "Survivor stash crates",
-    ["sub:SurvivorCache2.SurvivorCrate"] = "Survivor stash crates (8 rolls)",
-    ["sub:SurvivorCacheBigBuilding.SurvivorCrate"] = "Survivor stash crates (big buildings)",
-    ["proc:CrateFarming"] = "Farming crates",
-    ["proc:PoliceDesk"] = "Police desks",
-    ["proc:FireStorageTools"] = "Fire station tool storage",
-    ["proc:LibraryGeneralReference"] = "Library reference shelves",
-    ["proc:ArmySurplusLiterature"] = "Army surplus store books",
-}
 -- The solar crate of the mod's stash houses.
 local STASH_CRATE = "sub:" .. Stash.SPAWN_TABLE .. "." .. Stash.CRATE_TYPE
-LABELS[STASH_CRATE] = "Solar crate in the mod's stash houses"
-
-local function labelFor(reference)
-    local outfit = string.match(reference, "^sub:all%.Outfit_(.+)$")
-    return LABELS[reference] or (outfit and ("Corpses: " .. outfit)) or reference
-end
 
 -- Room containers that pick the mod's own lists among their vanilla lists, measured as a whole:
 -- the share of all such containers that hold the item.
 local ROOM_CONTAINERS = {
-    { room = "electronicsstorage", container = "other", label = "Electronics store storage room" },
-    { room = "campingstorage", container = "other", label = "Camping store storage room" },
-    { room = "farmstorage", container = "other", label = "Farm storage" },
-    { room = "toolstorestorage", container = "other", label = "Hardware store storage room" },
-    { room = "warehouse", container = "metal_shelves", label = "Warehouse metal shelves" },
-    { room = "storageunit", container = "other", label = "Storage units" },
-    { room = "garagestorage", container = "crate", label = "Garage crates" },
-    { room = "SafehouseLoot", container = "metal_shelves", label = "Survivor safehouse metal shelves" },
-    { room = Stash.SPAWN_TABLE, container = "crate", label = "Crates in the mod's stash houses" },
-    { room = Stash.SPAWN_TABLE, container = "metal_shelves", label = "Metal shelves in the mod's stash houses" },
+    { room = "electronicsstorage", container = "other" },
+    { room = "campingstorage", container = "other" },
+    { room = "farmstorage", container = "other" },
+    { room = "toolstorestorage", container = "other" },
+    { room = "warehouse", container = "metal_shelves" },
+    { room = "storageunit", container = "other" },
+    { room = "garagestorage", container = "crate" },
+    { room = "SafehouseLoot", container = "metal_shelves" },
+    { room = Stash.SPAWN_TABLE, container = "crate" },
+    { room = Stash.SPAWN_TABLE, container = "metal_shelves" },
 }
 
 --- Sandbox options while measuring (PZHarness.Loot.withMeasureOptions): a new default-preset
@@ -291,34 +188,57 @@ local function sortedKeys(t)
 end
 
 -- How WorldSpawns and the arrow board stock the containers they place, each into a scratch
--- container.
+-- container: { reference, fill } rows.
 local function worldStock()
     local WorldSpawns = RenewableEnergy.WorldSpawns
     local stocks = {}
-    local function add(label, reference, fill)
-        table.insert(stocks, { label = label, reference = reference, fill = fill })
-    end
     for _, name in ipairs(sortedKeys(WorldSpawns.BANK_STOCK)) do
-        add("World bank: " .. name .. " (" .. WorldSpawns.BANK_STOCK[name].sprite .. ")", "world:bank." .. name,
-            function(container) WorldSpawns.stockBank(container, name) end)
+        table.insert(stocks, { "world:bank." .. name, function(container) WorldSpawns.stockBank(container, name) end })
     end
     for _, name in ipairs(sortedKeys(WorldSpawns.CRATE_STOCK)) do
-        add("World crate: " .. name, "world:crate." .. name, function(container) WorldSpawns.stockCrate(container, name) end)
+        table.insert(stocks, { "world:crate." .. name, function(container) WorldSpawns.stockCrate(container, name) end })
     end
-    add("Arrow board battery box", "world:arrowBoard", function(container)
+    table.insert(stocks, { "world:arrowBoard", function(container)
         RenewableEnergy.ArrowBoard.stockBatteryBox(container)
         RenewableEnergy.Distributions.readyFoundItems(container)
-    end)
+    end })
     return stocks
 end
 
---- Measures every list the mod adds to, the stash crate, the room containers that pick the mod's
---- own lists, and the stock of world banks and crates, at the default loot rarity options. Returns
---- a list of { label, reference, samples, items = fullType -> { share, perContainer }, expected =
---- { [fullType] = true } }, with the loot multipliers it measured at in `settings`: { other = ...,
---- recipeResource = ... }. World stock counts vanilla items too.
-function Loot.report(samples)
-    return PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
+local function share(fraction)
+    return string.format("%.2f%% (1 in %.0f)", fraction * 100, 1 / fraction)
+end
+
+-- Prints how often `fill` put each item in `container` over `samples` fills, as `count` counts
+-- them, listing the `expected` items even when none came.
+local function printMeasured(reference, samples, fill, container, expected, count)
+    local items = fill and PZLoot.sample(fill, samples, container, count) or {}
+    local fullTypes = sortedKeys(expected)
+    for fullType in pairs(items) do
+        if not expected[fullType] then
+            table.insert(fullTypes, fullType)
+        end
+    end
+    table.sort(fullTypes)
+    local parts = {}
+    for _, fullType in ipairs(fullTypes) do
+        local measured = items[fullType]
+        local text = measured and share(measured.share) or "none"
+        if measured and measured.perContainer >= 1.05 then
+            text = text .. string.format(", %.1f each", measured.perContainer)
+        end
+        -- Drops the module, so vanilla items the world entries count read the same way.
+        table.insert(parts, (string.gsub(fullType, "^[^.]+%.", "")) .. " " .. text)
+    end
+    print(string.format("RELootReport %s [%d samples]: %s", reference, fill and samples or 0,
+        #parts > 0 and table.concat(parts, "; ") or "nothing"))
+end
+
+--- Prints how often the mod's items spawn in every list the mod adds to, the stash crate and the
+--- room containers that pick the mod's own lists, and what world banks and crates are stocked
+--- with, vanilla items included, each over `samples` fills at the default loot rarity options.
+function Loot.printReport(samples)
+    PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
         local targets = lootTargets()
         table.insert(targets, { reference = STASH_CRATE, items = {} })
         local function build()
@@ -328,36 +248,24 @@ function Loot.report(samples)
             end
             return containers, lists
         end
-        return withLoot(1, build, function(parsed)
-            local entries = {}
-            local function add(label, reference, fill, container, expected, everything)
-                table.insert(entries, {
-                    label = label,
-                    reference = reference,
-                    samples = fill and samples or 0,
-                    items = fill and PZLoot.sample(fill, samples, container, everything and PZLoot.countItems or countModItems) or {},
-                    expected = expected,
-                })
-            end
+        withLoot(1, build, function(parsed)
+            print(string.format("RELootReport settings: Other loot %.2f, Recipe Resources %.2f, loot rarity options 1, no zombie density bonus",
+                ItemPickerJava.getLootModifierFromType("Other"), ItemPickerJava.getLootModifierFromType("RecipeResource")))
             local container = Loot.newContainer(nil)
             for i, target in ipairs(targets) do
                 local list = parsed["t" .. i]
-                add(labelFor(target.reference), target.reference, list and PZLoot.rollFill(list), container, target.items)
+                printMeasured(target.reference, samples, list and PZLoot.rollFill(list), container, target.items, countModItems)
             end
             local square = PZLoot.squareOutsideRooms(getPlayer())
             local roomContainer = Loot.newContainer(square)
             for i, spec in ipairs(ROOM_CONTAINERS) do
                 local list = square and parsed["r" .. i]
-                add(spec.label, spec.room .. "." .. spec.container, list and PZLoot.rollFill(list), roomContainer, {})
+                printMeasured(spec.room .. "." .. spec.container, samples, list and PZLoot.rollFill(list), roomContainer, {},
+                    countModItems)
             end
             for _, stock in ipairs(worldStock()) do
-                add(stock.label, stock.reference, stock.fill, container, {}, true)
+                printMeasured(stock[1], samples, stock[2], container, {}, PZLoot.countItems)
             end
-            entries.settings = {
-                other = ItemPickerJava.getLootModifierFromType("Other"),
-                recipeResource = ItemPickerJava.getLootModifierFromType("RecipeResource"),
-            }
-            return entries
         end)
     end)
 end

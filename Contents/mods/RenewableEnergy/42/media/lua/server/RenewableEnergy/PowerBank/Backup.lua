@@ -3,20 +3,16 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PlaceTracker"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Payers"
-require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/GasLine/GasLines"
-require "RenewableEnergy/PowerBank/Bank"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Payers = require "RenewableEnergy/PowerBank/Payers"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local GasLines = require "RenewableEnergy/GasLine/GasLines"
+local Bank = require "RenewableEnergy/PowerBank/Bank"
 local Squares = require "cf_commonlib/Squares"
-
-RenewableEnergy = RenewableEnergy or {}
-local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
-local Payers, PlaceTracker, Bank = RenewableEnergy.Payers, RenewableEnergy.PlaceTracker, RenewableEnergy.Bank
 
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
 -- (IsoGenerator.update), so a relay, which nobody stands by, never starts one that worn.
@@ -65,7 +61,7 @@ end
 -- relay leaves it be, and only calls that off when it would stop it.
 local function runFailsafe(generator, wanted, charge)
     local startPercent, stopPercent = PowerBank.failsafeRange()
-    local gas = RenewableEnergy.GasKit.stateOf(generator)
+    local gas = GasKit.stateOf(generator)
     -- The charge comes back from whole battery uses (DrainableComboItem.getCurrentUsesFloat), a
     -- hair off the percent it was set to, so it is compared to two places.
     local percent = round(charge * 100, 2)
@@ -76,7 +72,7 @@ local function runFailsafe(generator, wanted, charge)
         end
     elseif gas and gas.stalled then
         if wantsOff then
-            RenewableEnergy.GasLines.cancelStall(generator)
+            GasLines.cancelStall(generator)
         end
     elseif wanted and percent < startPercent and generator:getFuel() > 0
         and generator:getCondition() > FIRE_CONDITION then

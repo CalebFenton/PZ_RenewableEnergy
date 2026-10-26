@@ -7,22 +7,18 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/ObjectSystem"
-require "RenewableEnergy/Fumes"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/Biogas/Stink"
-require "RenewableEnergy/Biogas/GasHeater"
-require "RenewableEnergy/GasLine/GasKit"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Sprites = require "RenewableEnergy/Sprites"
+local ObjectSystem = require "RenewableEnergy/ObjectSystem"
+local Fumes = require "RenewableEnergy/Fumes"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Stink = require "RenewableEnergy/Biogas/Stink"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
-RenewableEnergy = RenewableEnergy or {}
-local Digester, Stink, Sprites = RenewableEnergy.Digester, RenewableEnergy.Stink, RenewableEnergy.Sprites
-local GasHeater, GasKit, Fumes = RenewableEnergy.GasHeater, RenewableEnergy.GasKit, RenewableEnergy.Fumes
-
-local DigesterObject = RenewableEnergy.ObjectSystem.Object:derive("RenewableEnergy_Digester")
+local DigesterObject = ObjectSystem.Object:derive("RenewableEnergy_Digester")
 RenewableEnergy.DigesterObject = DigesterObject
 
 -- The fields the Global Object System saves with the world; a field renamed here is lost from
@@ -114,7 +110,7 @@ function DigesterObject:aboutToRemoveFromSystem()
     if heater then
         DigesterObject.showHeaterLit(heater, false)
     end
-    RenewableEnergy.ObjectSystem.Object.aboutToRemoveFromSystem(self)
+    ObjectSystem.Object.aboutToRemoveFromSystem(self)
 end
 
 --- The gas the holder stores, nothing once torn.

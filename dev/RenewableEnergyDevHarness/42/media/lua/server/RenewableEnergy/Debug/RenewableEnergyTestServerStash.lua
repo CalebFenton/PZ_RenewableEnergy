@@ -12,7 +12,7 @@ local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local EngineStash = Stash
 local Stash = require "RenewableEnergy/Stash"
 
-local handler, check, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.Fixtures.saveOptions
+local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
 local deferOnce = PZHarness.Fixtures.deferOnce
 local countPairs = PZHarness.Fixtures.countPairs
 
@@ -122,16 +122,11 @@ handler("stashRelist", function(_, args, defer)
     local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
     local houses = {}
     for stashMap in pairs(Stash.descriptions) do
-        local building = Stash.buildingOf(stashMap)
-        if not building then
-            return nil, "the building of " .. stashMap.name
-        end
+        local building = need(Stash.buildingOf(stashMap), "the building of " .. stashMap.name)
         table.insert(houses, { name = stashMap.name, building = building,
             visited = building:isHasBeenVisited(), read = alreadyRead:contains(stashMap.name) })
     end
-    if #houses == 0 then
-        return nil, "a stash house"
-    end
+    need(#houses > 0, "a stash house")
     local savedPossible = {}
     for i = 0, possible:size() - 1 do
         table.insert(savedPossible, possible:get(i))
@@ -190,9 +185,7 @@ handler("stashKnownOnStart", function(_, _, defer)
         end
         removePossibleStash(stashMap.name)
     end
-    local restoreRoll = Helpers.forceRolls(defer, 0)
-    Stash.stockFromStart()
-    restoreRoll()
+    Helpers.withRolls(defer, 0, Stash.stockFromStart)
     local houses = {}
     for stashMap, extra in pairs(Stash.descriptions) do
         local building = Stash.buildingOf(stashMap)

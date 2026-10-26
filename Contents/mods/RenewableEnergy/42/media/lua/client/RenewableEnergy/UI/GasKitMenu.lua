@@ -1,20 +1,15 @@
 -- The Gas Conversion Kit's options in a vanilla generator's right-click menu, the generator info
 -- window's fuel and gas lines, and Take Generator refused while a kit is fitted.
 
-require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISGeneratorInfoWindow"
 require "TimedActions/ISTakeGenerator"
-require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/TimedActions/RenewableEnergyGasAction"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
 
-RenewableEnergy = RenewableEnergy or {}
 local GasKitMenu = {}
-RenewableEnergy.GasKitMenu = GasKitMenu
-
-local GasKit = RenewableEnergy.GasKit
-local Action = RenewableEnergyGasAction
 
 -- "Barrel Digester (6 squares)": a source Connect Gas Line can run to, by its name and distance.
 local function sourceLabel(generator, source)
@@ -23,21 +18,15 @@ local function sourceLabel(generator, source)
         round(GasKit.lineLength(generator, source)))
 end
 
--- Adds the option for `job` (to `source`, for Connect Gas Line, named for it).
-local function addJob(menu, playerNum, job, generator, source)
-    local label = source and sourceLabel(generator, source) or getText(Action.labelKey(job))
-    JobOptions.add(menu, playerNum, Action, "kit", job, generator, source, label)
-end
-
 --- Adds the kit's options for `generator` to `menu`.
 function GasKitMenu.addOptions(playerNum, menu, generator)
     local state = GasKit.stateOf(generator)
     if not state then
-        addJob(menu, playerNum, GasKit.INSTALL, generator)
+        JobOptions.add(menu, playerNum, Action, "kit", GasKit.INSTALL, generator)
         return
     end
     if state.source then
-        addJob(menu, playerNum, GasKit.DISCONNECT, generator)
+        JobOptions.add(menu, playerNum, Action, "kit", GasKit.DISCONNECT, generator)
     else
         local sources = GasKit.sourcesNear(generator)
         local label = getText(Action.labelKey(GasKit.CONNECT))
@@ -46,29 +35,20 @@ function GasKitMenu.addOptions(playerNum, menu, generator)
         else
             local submenu = Needs.addSubMenu(menu, label)
             for _, source in ipairs(sources) do
-                addJob(submenu, playerNum, GasKit.CONNECT, generator, source)
+                JobOptions.add(submenu, playerNum, Action, "kit", GasKit.CONNECT, generator, source,
+                    sourceLabel(generator, source))
             end
         end
     end
     for _, job in ipairs({ GasKit.TO_GAS, GasKit.TO_PETROL, GasKit.REMOVE }) do
-        addJob(menu, playerNum, job, generator)
+        JobOptions.add(menu, playerNum, Action, "kit", job, generator)
     end
 end
 
 -- The kit's options go in vanilla's generator submenu, where the generator's other jobs are.
-local function generatorMenu(context)
-    return Needs.subMenuOf(context, getText("ContextMenu_Generator"))
-end
-
-function GasKitMenu.onFill(playerNum, context, worldobjects, test)
-    local generator = Needs.findClicked(worldobjects, RenewableEnergy.isGenerator)
-    if not generator then
-        return
-    end
-    if test then
-        return ISWorldObjectContextMenu.setTest()
-    end
-    local menu = generatorMenu(context) or Needs.addSubMenu(context, getText("ContextMenu_Generator"))
+JobOptions.onWorldMenu(RenewableEnergy.isGenerator, function(context, playerNum, character, generator)
+    local name = getText("ContextMenu_Generator")
+    local menu = Needs.subMenuOf(context, name) or Needs.addSubMenu(context, name)
     GasKitMenu.addOptions(playerNum, menu, generator)
     if GasKit.hasKit(generator) then
         local take = menu:getOptionFromName(getText("ContextMenu_GeneratorTake"))
@@ -76,9 +56,7 @@ function GasKitMenu.onFill(playerNum, context, worldobjects, test)
             Needs.refuse(take, "Tooltip_RenewableEnergy_RemoveKitFirst")
         end
     end
-end
-
-Events.OnFillWorldObjectContextMenu.Add(GasKitMenu.onFill)
+end)
 
 -- Take Generator is refused while a kit is fitted.
 

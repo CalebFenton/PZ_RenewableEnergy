@@ -49,11 +49,11 @@ local function stink(self, square, count)
 end
 
 -- Queues reading the corpse counts at which the game's smell levels start (Stink.LEVEL_CORPSES,
--- server only), then `fn(levels)` in a step, which queues what uses them.
+-- server only), into self.reads.levels, then `fn(levels)` in a step, which queues what uses them.
 local function withLevels(self, square, fn)
-    T.server(self, "stinkRead", T.at(square))
+    T.read(self, "stinkRead", T.at(square), "levels")
     T.step(function()
-        self.levels = T.need(self, self.server.stinkRead.levels, "the corpse counts of the smell levels")
+        self.levels = T.need(self, self.reads.levels.levels, "the corpse counts of the smell levels")
         if self.levels then
             fn(self.levels)
         end
@@ -61,16 +61,15 @@ local function withLevels(self, square, fn)
 end
 
 -- Queues reads of the authority's smell until two in a row, a server update apart, show `level`,
--- or SMELL_MS pass; the last read lands in self.smell[label]. A level that settles elsewhere ends in
+-- or SMELL_MS pass; the last read lands in self.reads[label]. A level that settles elsewhere ends in
 -- validate's failure.
 local function waitForAuthoritySmell(self, square, level, label)
     local last
-    T.serverUntil(self, "stinkRead", T.at(square), function(read)
+    T.readUntil(self, "stinkRead", T.at(square), label, function(read)
         local settled = read.level == last
         last = read.level
         return settled and read.level == level
     end, SMELL_MS)
-    T.step(function() self.smell[label] = self.server.stinkRead end)
 end
 
 -- Queues a wait until this client's smell moodle is at `level`, or SMELL_MS pass, then records the
@@ -89,7 +88,7 @@ end
 -- on their square; taking them away clears the smell.
 test("renewable_energy_biogas_stink_outdoors", {
     run = function(self)
-        self.smell, self.moodle = {}, {}
+        self.moodle = {}
         local _, source = standNearSource(self)
         if not source then return end
         withLevels(self, source, function(levels)
@@ -106,19 +105,20 @@ test("renewable_energy_biogas_stink_outdoors", {
         end)
     end,
     validate = function(self)
+        local reads = self.reads
         for i, count in ipairs(self.levels) do
-            local below, at = self.smell["below" .. i], self.smell["at" .. i]
-            T.expect(below and below.level == i - 1, (count - 1) .. " ghosts: smell level " .. tostring(below and below.level) .. ", not " .. (i - 1))
-            T.expect(at and at.level == i, count .. " ghosts: smell level " .. tostring(at and at.level) .. ", not " .. i)
+            local below, at = reads["below" .. i], reads["at" .. i]
+            T.expectEqual("the smell level of " .. (count - 1) .. " ghosts", below and below.level, i - 1)
+            T.expectEqual("the smell level of " .. count .. " ghosts", at and at.level, i)
         end
-        local top = self.smell["at" .. #self.levels]
+        local top = reads["at" .. #self.levels]
         if T.expect(top ~= nil, "no read at the top smell level") then
-            T.expect(top.bodies == 0, "the source's square holds " .. tostring(top.bodies) .. " corpses")
-            T.expect(top.objects == 0, "the source's square holds " .. tostring(top.objects) .. " moving objects")
+            T.expectEqual("corpses on the source's square", top.bodies, 0)
+            T.expectEqual("moving objects on the source's square", top.objects, 0)
         end
-        T.expect(self.moodle.top == #self.levels, "this client's moodle shows level " .. tostring(self.moodle.top) .. " at the top")
-        T.expect(self.smell.none and self.smell.none.level == 0, "with the ghosts gone the smell stayed")
-        T.expect(self.moodle.none == 0, "with the ghosts gone this client's moodle shows " .. tostring(self.moodle.none))
+        T.expectEqual("this client's moodle level at the top", self.moodle.top, #self.levels)
+        T.expectEqual("the smell level with the ghosts gone", reads.none and reads.none.level, 0)
+        T.expectEqual("this client's moodle level with the ghosts gone", self.moodle.none, 0)
     end,
 })
 
@@ -154,7 +154,6 @@ end
 -- three of those chunks', three east none.
 test("renewable_energy_biogas_stink_falls_off_with_distance", {
     run = function(self)
-        self.smell = {}
         local source = T.square(self, nil, "a free outdoor square for the source")
         if not source then return end
         self.stands = {}
@@ -164,9 +163,9 @@ test("renewable_energy_biogas_stink_falls_off_with_distance", {
         end
         withLevels(self, source, function(levels)
             local top = levels[#levels]
-            T.server(self, "stinkSpread", { count = top })
+            T.read(self, "stinkSpread", { count = top }, "spread")
             T.step(function()
-                local own, ring = self.server.stinkSpread.own, self.server.stinkSpread.ring
+                local own, ring = self.reads.spread.own, self.reads.spread.ring
                 self.wanted = { [0] = own + 8 * ring, own + 5 * ring, 3 * ring, 0 }
                 stink(self, source, top)
                 for dx = 0, 3 do
@@ -180,9 +179,9 @@ test("renewable_energy_biogas_stink_falls_off_with_distance", {
         local levels = self.levels
         local last
         for dx = 0, 3 do
-            local read, wanted = self.smell["east" .. dx], levelOf(levels, self.wanted[dx])
-            T.expect(read and read.level == wanted, dx .. " chunks east of the source: smell level "
-                .. tostring(read and read.level) .. ", not " .. wanted .. " (" .. self.wanted[dx] .. " corpses)")
+            local read, wanted = self.reads["east" .. dx], levelOf(levels, self.wanted[dx])
+            T.expectEqual("the smell level " .. dx .. " chunks east of the source (" .. self.wanted[dx] .. " corpses)",
+                read and read.level, wanted)
             if read and last then
                 T.expect(read.level < last, dx .. " chunks east the smell is no weaker than a chunk nearer")
             end
@@ -195,7 +194,6 @@ test("renewable_energy_biogas_stink_falls_off_with_distance", {
 -- Ghosts in a building smell only to a character in that building.
 test("renewable_energy_biogas_stink_indoors", {
     run = function(self)
-        self.smell = {}
         local outside = T.square(self, nil, "a free outdoor square to stand on")
         local source = outside and T.square(self, { indoors = true }, "a free indoor square for the source")
         local inside = source and T.square(self, { indoors = true, near = source, minDistance = 2 }, "another indoor square")
@@ -210,11 +208,9 @@ test("renewable_energy_biogas_stink_indoors", {
         end)
     end,
     validate = function(self)
-        local top = #self.levels
-        T.expect(self.smell.inside and self.smell.inside.level == top,
-            "inside, ghosts in the building smell at level " .. tostring(self.smell.inside and self.smell.inside.level) .. ", not " .. top)
-        T.expect(self.smell.outside and self.smell.outside.level == 0,
-            "outside, ghosts in a building smell at level " .. tostring(self.smell.outside and self.smell.outside.level))
+        local inside, outside = self.reads.inside, self.reads.outside
+        T.expectEqual("the smell level inside, of ghosts in the building", inside and inside.level, #self.levels)
+        T.expectEqual("the smell level outside, of ghosts in a building", outside and outside.level, 0)
     end,
 })
 
@@ -226,17 +222,17 @@ test("renewable_energy_biogas_stink_gas_mask", {
         if not source then return end
         T.give(self, "mask", { { type = "Base.Hat_GasMask", worn = true } })
         withLevels(self, source, function(levels)
-            self.before = self.server.stinkRead
             stink(self, source, levels[#levels])
             -- The filter drains only while the mask keeps corpse smell out (getCorpseSicknessDefense).
-            T.serverUntil(self, "stinkRead", T.at(source), function(read) return read.mask ~= nil and read.mask < 1 end, SMELL_MS)
+            T.readUntil(self, "stinkRead", T.at(source), "masked", function(read) return read.mask ~= nil and read.mask < 1 end,
+                SMELL_MS)
         end)
     end,
     validate = function(self)
-        local read, before = self.server.stinkRead, self.before
+        local read, before = self.reads.masked, self.reads.levels
         T.expect(read.mask and read.mask < 1, "the gas mask's filter is at " .. tostring(read.mask))
-        T.expect(read.rate == 0 and read.level <= before.level, "with a gas mask, the smell is at level " .. tostring(read.level)
-            .. " from " .. tostring(before.level) .. ", rate " .. tostring(read.rate))
+        T.expectEqual("the smell rate with a gas mask", read.rate, 0)
+        T.expect(read.level <= before.level, "with a gas mask, the smell rose to level " .. read.level .. " from " .. before.level)
     end,
 })
 
@@ -245,7 +241,7 @@ test("renewable_energy_biogas_stink_gas_mask", {
 -- multiplayer server keeps the chunk loaded long after the character leaves.
 test("renewable_energy_biogas_stink_chunk_reload", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 120,
+    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
     run = function(self)
         self.moodle = {}
         local _, source = standNearSource(self)
@@ -263,9 +259,9 @@ test("renewable_energy_biogas_stink_chunk_reload", {
     end,
     validate = function(self)
         local top = #self.levels
-        T.expect(self.moodle.before == top, "before: smell level " .. tostring(self.moodle.before))
-        T.expect(self.moodle.reloaded == top, "after the chunk loaded again: smell level " .. tostring(self.moodle.reloaded))
-        T.expect(self.moodle.cleared == 0, "cleared: smell level " .. tostring(self.moodle.cleared))
-        T.expect(self.moodle.again == 1, "the first level's ghosts after: smell level " .. tostring(self.moodle.again) .. ", not 1")
+        T.expectEqual("the smell level before", self.moodle.before, top)
+        T.expectEqual("the smell level after the chunk loaded again", self.moodle.reloaded, top)
+        T.expectEqual("the smell level cleared", self.moodle.cleared, 0)
+        T.expectEqual("the smell level of the first level's ghosts after", self.moodle.again, 1)
     end,
 })

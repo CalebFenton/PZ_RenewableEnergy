@@ -3,9 +3,7 @@
 -- The tiles are rendered from the same models as the item icons and ground models. Lua names tiles
 -- only through this file, so a new layout changes nothing else.
 
-require "RenewableEnergy/Specs"
-
-RenewableEnergy = RenewableEnergy or {}
+local RenewableEnergy = require "RenewableEnergy/Utilities"
 
 local Sprites = {}
 RenewableEnergy.Sprites = Sprites

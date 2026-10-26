@@ -3,10 +3,8 @@
 
 if isClient() then return end
 
-require "RenewableEnergy/Stash"
-require "RenewableEnergy/Chance"
-
-local Stash, Chance = RenewableEnergy.Stash, RenewableEnergy.Chance
+local Stash = require "RenewableEnergy/Stash"
+local Chance = require "RenewableEnergy/Chance"
 
 --- The house's building on the map, loaded or not, found as StashSystem finds it: the building of
 --- the ground floor room at its buildingX, buildingY. Nil if there is none.

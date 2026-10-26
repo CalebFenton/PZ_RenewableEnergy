@@ -12,8 +12,6 @@ require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/StatusWindow"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
 
@@ -78,11 +76,23 @@ end
 --- this client works out.
 T.UNDER = 1e-9
 
---- The parts and appliances the bank tests wire in and place.
+--- The parts, items and appliances the tests place, wire in and craft.
 T.PLUG_IN_INVERTER, T.POWER_INVERTER = "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter"
 T.INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
+T.CAR_BATTERY, T.DEEP_CYCLE = RenewableEnergy.VehicleBattery.CAR_BATTERY, RenewableEnergy.VehicleBattery.ITEM
 T.L16, T.JAR_BATTERY = "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery"
+T.FACTORY_MODULE, T.HOMEMADE_MODULE = RenewableEnergy.Specs.factoryModule, "RenewableEnergy.HomemadeSolarModule"
 T.MINI_FRIDGE = "appliances_refrigeration_01_25"
+
+--- The first entry of `list` whose field `key` is `value`, or nil.
+function T.findIn(list, key, value)
+    for _, entry in ipairs(list or {}) do
+        if entry[key] == value then
+            return entry
+        end
+    end
+    return nil
+end
 
 --- Fails the test unless timed actions take their time, for a test that times one.
 function T.needActionTime(self)
@@ -178,12 +188,12 @@ function T.panel(self, sprite, opts)
     return panel
 end
 
---- A panel's `modules` (T.panel's opts.modules): a factory module (RenewableEnergy.SolarModule)
---- at each condition given, in mount order.
+--- A panel's `modules` (T.panel's opts.modules): a T.FACTORY_MODULE at each condition given, in
+--- mount order.
 function T.factoryModules(...)
     local modules = {}
     for i, condition in ipairs({ ... }) do
-        modules[i] = { type = "RenewableEnergy.SolarModule", condition = condition }
+        modules[i] = { type = T.FACTORY_MODULE, condition = condition }
     end
     return modules
 end
@@ -253,6 +263,20 @@ function T.doJob(self, square, makeAction)
     end)
 end
 
+--- Queues the character doing the job `job` of `feature` (RenewableEnergyAction) on the tile of
+--- `handle` (a fixture or record handle), as its menu queues it, through T.doJob. `with` is what
+--- the job works with: an item, a name or slot, or a handle at the far end (its object is taken);
+--- or a function, called when the job is queued, returning one, for what the queue gives first.
+function T.actionJob(self, feature, handle, job, with)
+    T.doJob(self, handle.square, function()
+        local what = type(with) == "function" and with() or with
+        if type(what) == "table" then
+            what = what.object
+        end
+        return RenewableEnergyAction:new(T.player(), feature, job, handle.object, what)
+    end)
+end
+
 --- Queues a lit flashlight in the character's secondary hand: light to work by indoors, where the
 --- tests' daylight hour doesn't reach. A light in hand is never too dark (IsoPlayer.tooDarkToRead).
 function T.holdLight(self)
@@ -273,8 +297,9 @@ function T.vehicleBattery(vehicle)
 end
 
 --- Queues the server handler `name` on the vehicle with `args` (a table, or a function called
---- when the call goes out); leaves its answer in vehicle.answer and any state in vehicle.state.
-function T.onVehicle(self, vehicle, name, args)
+--- when the call goes out); its answer goes in self.reads[label] when given (T.read), and any
+--- state in it in vehicle.state, which waits on this client's copy compare against.
+function T.onVehicle(self, vehicle, name, args, label)
     local function allArgs()
         local all = T.vehicleArgs(vehicle)
         for key, value in pairs(type(args) == "function" and args() or args or {}) do
@@ -283,11 +308,8 @@ function T.onVehicle(self, vehicle, name, args)
         return all
     end
     -- Queued once the vehicle is placed, the call can go out ahead of its turn (T.server, T.batch).
-    T.server(self, name, (vehicle.id and type(args) ~= "function") and allArgs() or allArgs)
-    T.step(function()
-        vehicle.answer = self.server[name]
-        vehicle.state = vehicle.answer.state or vehicle.state
-    end)
+    T.read(self, name, (vehicle.id and type(args) ~= "function") and allArgs() or allArgs, label)
+    T.step(function() vehicle.state = self.server[name].state or vehicle.state end)
 end
 
 --- The shared T.placeVehicle, then, on the server, the battery replaced by a new `opts.battery`
@@ -308,34 +330,37 @@ end
 
 -- Banks ----------------------------------------------------------------------------------------
 
--- Queues the server handler `name` on `bank` and leaves the bank's state in bank.state.
-local function onBank(self, bank, name, args)
+-- Queues the server handler `name` on `bank`, its answer in self.reads[label] when given (T.read),
+-- and leaves the bank's state in bank.state, which waits on this client's copy compare against.
+local function onBank(self, bank, name, args, label)
     args.bank = bank.position
-    T.server(self, name, args)
+    T.read(self, name, args, label)
     T.step(function() bank.state = self.server[name] end)
 end
 
---- Queues reading the server's record of `bank` into bank.state.
-function T.bankState(self, bank)
-    T.server(self, "bankState", bank.position)
-    T.step(function() bank.state = self.server.bankState end)
+--- Queues reading the server's record of `bank` into bank.state and self.reads[label] (when
+--- given), its last pass first put `hours` before now if given, as a bank looks after that long
+--- between passes.
+function T.bankState(self, bank, label, hours)
+    onBank(self, bank, "bankState", { hours = hours }, label)
 end
 
 --- Queues the bank system's own pass of `bank` over the last `opts.hours` (1 if nil) on the
 --- server, with the sky the test sets: `light` W/m² on every mount, snow falling if
 --- `opts.snowing`, else clear, at `opts.airC` °C (mild if nil), `opts.stormHours` of storm and a
---- wind of `opts.windKph`. Runs a bank whose chunk is unloaded too.
+--- wind of `opts.windKph`. Runs a bank whose chunk is unloaded too. Its state lands as
+--- T.bankState's, in self.reads[opts.label] too when given.
 function T.bankPass(self, bank, light, opts)
     opts = opts or {}
-    T.server(self, "bankPass", { bank = bank.position, light = light, hours = opts.hours, stormHours = opts.stormHours,
-        windKph = opts.windKph, snowing = opts.snowing, airC = opts.airC })
-    T.step(function() bank.state = self.server.bankPass end)
+    onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours,
+        windKph = opts.windKph, snowing = opts.snowing, airC = opts.airC }, opts.label)
 end
 
 --- Queues a snowfall on `bank`'s panels on the server: its pass over the last `hours` (1 if nil)
---- of a frosty night with snow falling, which settles on every mount that holds snow.
-function T.snowfall(self, bank, hours)
-    T.bankPass(self, bank, 0, { hours = hours or 1, snowing = true, airC = -10 })
+--- of a frosty night with snow falling, which settles on every mount that holds snow. Its state
+--- lands as T.bankPass's, in self.reads[label] too when given.
+function T.snowfall(self, bank, hours, label)
+    T.bankPass(self, bank, 0, { hours = hours or 1, snowing = true, airC = -10, label = label })
 end
 
 --- The watts appliances of the kinds `names` draw together, at vanilla's figures
@@ -371,10 +396,11 @@ function T.setCharge(self, bank, charge)
     onBank(self, bank, "setCharge", { charge = charge })
 end
 
---- Queues setting the condition of the first `fullType` in `bank` on the server, and its repair
---- count if `repaired`, and letting the bank read its parts again if `recount`.
-function T.setPartCondition(self, bank, fullType, condition, recount, repaired)
-    onBank(self, bank, "setPartCondition", { type = fullType, condition = condition, recount = recount, repaired = repaired })
+--- Queues changing the first `fullType` in `bank` on the server (the "bankPart" handler):
+--- `changes` { condition, repaired, wear, remove, recount }.
+function T.bankPart(self, bank, fullType, changes)
+    changes.type = fullType
+    onBank(self, bank, "bankPart", changes)
 end
 
 --- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at a
@@ -385,15 +411,36 @@ function T.conditionAfterDischarge(fullType, depth)
     return max - math.floor(RenewableEnergy.Battery.cycleWear(battery, depth) * max)
 end
 
---- The summary of `bank` (a handle) as this client last received it, or nil.
-function T.clientSummary(bank)
-    return bank.object and PowerBank.summaryOf(bank.object)
+--- This client's summary of `handle`, a bank's or a gas record's (T.recordSummary), or nil.
+function T.clientSummary(handle)
+    if handle.kind then
+        return T.recordSummary(handle)
+    end
+    return handle.object and PowerBank.summaryOf(handle.object)
+end
+
+--- Queues a wait until this client's summary of `handle` (T.clientSummary) satisfies
+--- `check(summary)`; missing `what` if it never does.
+function T.waitForSummary(self, handle, check, what)
+    T.waitFor(self, function()
+        local summary = T.clientSummary(handle)
+        return summary ~= nil and check(summary)
+    end, what)
 end
 
 --- The whole status of `bank` as this client last received it, or nil. It comes only while this
 --- client watches the bank (T.watch, or an open status window).
 function T.clientStatus(bank)
     return bank.object and PowerBank.statusOf(bank.object)
+end
+
+--- Queues a wait until this client's status of `bank` satisfies `check(status)`; missing `what`
+--- if it never does.
+function T.waitForStatus(self, bank, check, what)
+    T.waitFor(self, function()
+        local status = T.clientStatus(bank)
+        return status ~= nil and check(status)
+    end, what)
 end
 
 --- Queues watching `bank`'s status as the status window does, until the test ends, and a wait
@@ -409,11 +456,7 @@ end
 
 --- The server's entry for the first `fullType` in a bank state's items, or nil.
 function T.stateItem(state, fullType)
-    for _, item in ipairs(state and state.items or {}) do
-        if item.type == fullType then
-            return item
-        end
-    end
+    return T.findIn(state and state.items, "type", fullType)
 end
 
 --- The condition of the first `fullType` in a bank state, or nil.
@@ -443,17 +486,15 @@ function T.copyUses(bank, fullType)
     return item and item:getCurrentUsesFloat() or -1
 end
 
---- Queues the bank system's command `command` on the authority as the server's character, the way
---- a timed action's complete() runs it: the server takes no such command from a client. With
---- `item` ({ type, inBank }), the server fills in args.itemId itself, so the call needs no earlier
---- answer and can go out in a T.batch. Its answer lands in self.server.perform.
-function T.perform(self, command, args, item)
-    T.server(self, "perform", { command = command, args = args, item = item })
-end
-
---- Queues T.perform and leaves its answer in self[key].
-function T.performInto(self, key, command, args, item)
-    T.serverInto(self, key, "perform", { command = command, args = args, item = item })
+--- Queues RenewableEnergyAction's job `job` of `feature` ("bank", "source" or "treadmill") at its
+--- target on the square `at` ({ x, y, z }), done on the authority by the server's character the
+--- way the action's complete() does it: the server takes no job from a client but as a timed
+--- action. `with` is a name or a slot as it is, the bank at an { x, y, z } place, or an item
+--- { type, inBank } the server finds itself, so the call needs no earlier answer and can go out in
+--- a T.batch. Its answer, { ok, reason, xpBefore, xpAfter }, lands in self.server.job and, when
+--- `label` is given, self.reads[label].
+function T.job(self, feature, job, at, with, label)
+    T.read(self, "job", { feature = feature, job = job, at = at, with = with }, label)
 end
 
 --- Checks that the panel fixture `panel` connected, saying why not.
@@ -472,14 +513,12 @@ function T.expectRefused(answer, reason, what)
     return T.expect(answer ~= nil and answer.ok ~= true and got == reason, what .. " (" .. tostring(got) .. ")")
 end
 
---- Queues switching `bank` on with the bank system's command, and a wait until this client's
---- summary says it is on, whatever the bank then does.
+--- Queues switching `bank` on with its Turn On, and a wait until this client's summary says it is
+--- on, whatever the bank then does.
 function T.switchOn(self, bank)
-    T.perform(self, "setBankOn", { bank = bank.position, on = true })
-    T.waitFor(self, function()
-        local summary = T.clientSummary(bank)
-        return summary ~= nil and summary.on == true
-    end, "this client's copy of the bank's summary, switched on")
+    T.job(self, "bank", RenewableEnergy.BankJobs.TURN_ON, bank.position)
+    T.waitForSummary(self, bank, function(summary) return summary.on == true end,
+        "this client's copy of the bank's summary, switched on")
 end
 
 -- Menus and the status window -----------------------------------------------------------------
@@ -507,34 +546,27 @@ function T.walkTo(self, square, what)
     return T.need(self, luautils.walkAdj(T.player(), square, true), "a walk to " .. what)
 end
 
---- Opens the status window on self.bank, closed when the test ends, and waits until it has drawn
---- the bank's status. The character stands next to the bank first, where the menu's Status walks
---- them, as the window closes once they are out of reach.
-function T.openWindow(self)
-    T.standNextTo(self.bank.square)
-    local window = RenewableEnergy.StatusWindow:openOn(0, self.bank.object)
-    self.window = window
-    T.defer(self, function() window:close() end)
-    T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
+--- Queues opening the status window on `bank`, closed when the test ends, and a wait until it has
+--- drawn the bank's status; the window lands in self.window. The character stands next to the
+--- bank first, where the menu's Status walks them, as the window closes once they are out of reach.
+function T.openWindow(self, bank)
+    T.step(function()
+        T.standNextTo(bank.square)
+        local window = RenewableEnergy.StatusWindow:openOn(0, bank.object)
+        self.window = window
+        T.defer(self, function() window:close() end)
+        T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
+    end)
 end
 
 --- Whether the status summary `lines` (StatusRows.summary, a window's summaryLines) hold `text`.
 function T.hasLine(lines, text)
-    for _, line in ipairs(lines or {}) do
-        if line.text == text then
-            return true
-        end
-    end
-    return false
+    return T.findIn(lines, "text", text) ~= nil
 end
 
 --- The status row labelled `label` in `rows` (StatusRows.rows' columns), or nil.
 function T.rowLabelled(rows, label)
-    for _, r in ipairs(rows or {}) do
-        if r.label == label then
-            return r
-        end
-    end
+    return T.findIn(rows, "label", label)
 end
 
 -- Crafting -------------------------------------------------------------------------------------
@@ -571,11 +603,43 @@ function T.waitForRepaired(self, fullType, repaired)
     end, "this client's " .. fullType .. " repaired " .. repaired .. "x")
 end
 
---- Queues setting the repair count of the carried `fullType` items on the authority, and a wait
---- until this client's copy has it.
-function T.setRepaired(self, fullType, repaired)
-    T.server(self, "setRepaired", { type = fullType, repaired = repaired })
-    T.waitForRepaired(self, fullType, repaired)
+--- Registers the craft test `name` of the repair `recipe` on a carried `fullType` set to
+--- condition `row.before`, repaired `row.repaired` times and, when given, charged to `row.uses`.
+--- validate expects the authority's at `row.after`, repaired `row.repairedAfter` times, as this
+--- client's copy is too (the tooltip reads it), and the game refusing the craft when
+--- `row.refused`. `row.prefer` adds to the inputs preferred, `row.counts` replaces the counts
+--- (one `fullType`), and `row.setup(self)` and `row.validate(self, item)` add to the test's.
+function T.repairCraftTest(name, recipe, fullType, row)
+    local prefer = { fullType }
+    for _, other in ipairs(row.prefer or {}) do
+        table.insert(prefer, other)
+    end
+    T.craftTest(name, {
+        recipe = recipe,
+        from = fullType,
+        prefer = prefer,
+        refused = row.refused,
+        setup = function(self)
+            T.changeItem(self, T.inputsOf(self, fullType)[1], { condition = row.before, repaired = row.repaired, uses = row.uses })
+            if row.setup then
+                row.setup(self)
+            end
+        end,
+        counts = row.counts or { [fullType] = 1 },
+        after = function(self)
+            T.readCarried(self, { fullType })
+            T.waitForRepaired(self, fullType, row.repairedAfter)
+        end,
+        validate = function(self)
+            local item = T.carriedFirst(self, fullType)
+            if not T.expect(item ~= nil, "the " .. fullType .. " is gone") then return end
+            T.expectEqual("its condition", item.condition, row.after)
+            T.expectEqual("its repairs", item.repaired, row.repairedAfter)
+            if row.validate then
+                row.validate(self, item)
+            end
+        end,
+    })
 end
 
 --- The condition at `share` of `fullType`'s ConditionMax, such as a Specs.crackLooks threshold.

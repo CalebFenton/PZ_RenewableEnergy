@@ -20,7 +20,8 @@
 
 if isClient() then return end
 
-RenewableEnergy = RenewableEnergy or {}
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+
 local Stink = {}
 RenewableEnergy.Stink = Stink
 

@@ -2,9 +2,7 @@
 -- (ContainerOverlays.updateContainerOverlaySprite) and its closed lid below that, in any room
 -- ("other"); ContainerOverlays reads tiles as { many items, few items }.
 
-require "RenewableEnergy/Sprites"
-
-local Sprites = RenewableEnergy.Sprites
+local Sprites = require "RenewableEnergy/Sprites"
 
 local overlayMap = { VERSION = 1 }
 overlayMap[Sprites.crate] = {

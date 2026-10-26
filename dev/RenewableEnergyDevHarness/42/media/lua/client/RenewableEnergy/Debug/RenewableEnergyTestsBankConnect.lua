@@ -1,7 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "ISUI/ISContextMenu"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
+require "RenewableEnergy/PowerBank/BankJobs"
+require "RenewableEnergy/PowerBank/SourceJobs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
@@ -10,13 +9,10 @@ require "RenewableEnergy/UI/Menu"
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
-local test, expect, player = T.test, T.expect, T.player
-local Action = RenewableEnergyAction
+local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
 local Sprites = RenewableEnergy.Sprites
-local PowerBank = RenewableEnergy.PowerBank
+local PowerBank, BankJobs, SourceJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs, RenewableEnergy.SourceJobs
 local Format, Menu = RenewableEnergy.Format, RenewableEnergy.Menu
-local CAR_BATTERY = RenewableEnergy.VehicleBattery.CAR_BATTERY
-local PLUG_IN_INVERTER, INVERTER_CHARGER, L16 = T.PLUG_IN_INVERTER, T.INVERTER_CHARGER, T.L16
 
 -- Connecting -----------------------------------------------------------------------------------
 
@@ -25,30 +21,27 @@ local PLUG_IN_INVERTER, INVERTER_CHARGER, L16 = T.PLUG_IN_INVERTER, T.INVERTER_C
 test("renewable_energy_bank_needs_connecting", {
     run = function(self)
         T.setGrid(self, false)
-        local bank = T.bank(self, "batteryRackWood", { L16, INVERTER_CHARGER }, { connected = false })
+        local bank = T.bank(self, "batteryRackWood", { T.L16, T.INVERTER_CHARGER }, { connected = false })
         if not bank then return end
         self.bank = bank
         self.near = T.square(self, { near = bank }, "a square near the bank")
         if not self.near then return end
         T.switchOn(self, bank)
-        T.bankState(self, bank)
-        T.step(function()
-            self.before = bank.state
-            self.nearBefore = self.near:haveElectricity()
-        end)
-        T.performInto(self, "connected", "setBankConnected", { bank = bank.position, connected = true })
+        T.bankState(self, bank, "before")
+        T.step(function() self.nearBefore = self.near:haveElectricity() end)
+        T.job(self, "bank", BankJobs.CONNECT, bank.position, nil, "connected")
         T.waitFor(self, function() return bank.square:haveElectricity() and self.near:haveElectricity() end,
             "power on the connected bank's square and the square near it here")
         T.bankState(self, bank)
     end,
     validate = function(self)
-        local before, after = self.before, self.bank.state
+        local before, after = self.reads.before, self.bank.state
         expect(before.on and not before.activated and not before.powered, "an unconnected bank that is on powered its square")
         expect(not self.nearBefore, "an unconnected bank that is on powered a square near it")
-        expect(before.status.state == "disconnected", "the unconnected bank's status says " .. tostring(before.status.state))
-        T.expectOk(self.connected, "connecting the bank")
+        expectEqual("the unconnected bank's state", before.status.state, "disconnected")
+        T.expectOk(self.reads.connected, "connecting the bank")
         expect(after.activated and after.powered, "the connected bank doesn't power its square")
-        expect(after.status.state == "on", "the connected bank's status says " .. tostring(after.status.state))
+        expectEqual("the connected bank's state", after.status.state, "on")
     end,
 })
 
@@ -89,24 +82,24 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         T.step(function()
             self.connect = T.optionState(T.menuOption(Menu.addBankOptions, self.unskilled.object,
                 getText("ContextMenu_RenewableEnergy_ConnectBank")))
-            self.canStart = Action:new(player(), Action.CONNECT_BANK, nil, self.unskilled.object):canPerform()
+            self.canStart = RenewableEnergyAction:new(player(), "bank", BankJobs.CONNECT, self.unskilled.object):canPerform()
         end)
-        T.performInto(self, "refused", "setBankConnected", { bank = self.unskilled.position, connected = true })
+        T.job(self, "bank", BankJobs.CONNECT, self.unskilled.position, nil, "refused")
         -- T.setPerk sets the level when called, so the later levels wait for their turn.
         T.step(function() T.setPerk(self, Perks.Electricity, 3) end)
-        T.performInto(self, "skilled", "setBankConnected", { bank = self.unskilled.position, connected = true })
+        T.job(self, "bank", BankJobs.CONNECT, self.unskilled.position, nil, "skilled")
         T.step(function() T.setPerk(self, Perks.Electricity, 2) end)
         T.knowRecipes(self, GENERATOR)
-        T.performInto(self, "withRecipe", "setBankConnected", { bank = self.magazine.position, connected = true })
+        T.job(self, "bank", BankJobs.CONNECT, self.magazine.position, nil, "withRecipe")
     end,
     validate = function(self)
-        expect(self.connect.greyed and self.connect.reason == getText("ContextMenu_GeneratorPlugTT"),
-            "at Electricity 2 Connect Bank isn't greyed out with vanilla's reason (" .. tostring(self.connect.reason) .. ")")
+        expect(self.connect.greyed, "at Electricity 2 Connect Bank isn't greyed out")
+        expectEqual("Connect Bank's tooltip at Electricity 2", self.connect.reason, getText("ContextMenu_GeneratorPlugTT"))
         expect(not self.canStart, "Connect Bank can start at Electricity 2 without the Generator recipe")
-        T.expectRefused(self.refused, "ContextMenu_GeneratorPlugTT",
+        T.expectRefused(self.reads.refused, "ContextMenu_GeneratorPlugTT",
             "the authority connected a bank at Electricity 2 without the Generator recipe")
-        T.expectOk(self.skilled, "connecting a bank at Electricity 3")
-        T.expectOk(self.withRecipe, "connecting a bank with the Generator recipe")
+        T.expectOk(self.reads.skilled, "connecting a bank at Electricity 3")
+        T.expectOk(self.reads.withRecipe, "connecting a bank with the Generator recipe")
     end,
 })
 
@@ -126,33 +119,32 @@ test("renewable_energy_bank_connect_and_disconnect", {
             return ISMoveableSpriteProps.new(object:getSprite():getName()):canPickUpMoveable(player(), bank.square, object)
         end
         T.step(function()
-            local option = T.menuOption(Menu.addBankOptions, bank.object, getText("ContextMenu_RenewableEnergy_ConnectBank"))
-            self.offered = option ~= nil and not option.notAvailable
-            if not self.offered then return end
-            T.standNextTo(bank.square)
-            T.choose(option)
+            if not T.chooseOption(self, "Connect Bank", T.menuOption(Menu.addBankOptions, bank.object,
+                getText("ContextMenu_RenewableEnergy_ConnectBank")), bank.square) then
+                return
+            end
             T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
             T.step(function()
                 self.connectedPickUp = canPickUp()
-                local option = T.menuOption(Menu.addBankOptions, bank.object, getText("ContextMenu_RenewableEnergy_DisconnectBank"))
-                self.disconnectOffered = option ~= nil and not option.notAvailable
-                if not self.disconnectOffered then return end
-                T.choose(option)
+                if not T.chooseOption(self, "Disconnect Bank", T.menuOption(Menu.addBankOptions, bank.object,
+                    getText("ContextMenu_RenewableEnergy_DisconnectBank"))) then
+                    return
+                end
                 T.waitFor(self, function() return not bank.object:isConnected() end, "this client's copy of the disconnected bank")
                 T.step(function() self.disconnectedPickUp = canPickUp() end)
             end)
         end)
     end,
     validate = function(self)
-        if not expect(self.offered, "an unconnected bank's menu offers no Connect Bank") then return end
+        if not T.expectOffered(self, "Connect Bank") then return end
         expect(not self.connectedPickUp, "a connected bank can be picked up")
-        if not expect(self.disconnectOffered, "a connected bank that is off offers no Disconnect Bank") then return end
+        if not T.expectOffered(self, "Disconnect Bank") then return end
         expect(self.disconnectedPickUp, "a disconnected empty bank can't be picked up")
     end,
 })
 
 local function canConnect(panel, bank)
-    return Action:new(player(), Action.CONNECT_SOURCE, panel.object, bank.object):canPerform()
+    return RenewableEnergyAction:new(player(), "source", SourceJobs.CONNECT, panel.object, bank.object):canPerform()
 end
 
 -- A source connects only to a bank that is connected itself. An unconnected bank in reach is still
@@ -161,11 +153,10 @@ end
 -- bank afterwards leaves the panel on it.
 test("renewable_energy_bank_sources_need_a_connected_bank", {
     run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { CAR_BATTERY, PLUG_IN_INVERTER }, { connected = false })
+        self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER }, { connected = false })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
         if not self.panel then return end
         local bank, panel = self.bank, self.panel
-        local args = { bank = bank.position, source = panel.position }
         -- Light to work by indoors, and the level Connect Bank takes.
         T.holdLight(self)
         T.setPerk(self, Perks.Electricity, 3)
@@ -173,35 +164,35 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
             self.unconnected = T.connectOptions(bank, panel, 1)
             self.unconnectedAction = canConnect(panel, bank)
         end)
-        T.performInto(self, "refused", "connectSource", args)
-        T.performInto(self, "bankConnected", "setBankConnected", { bank = bank.position, connected = true })
+        T.job(self, "source", SourceJobs.CONNECT, panel.position, bank.position, "refused")
+        T.job(self, "bank", BankJobs.CONNECT, bank.position, nil, "bankConnected")
         T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
         T.step(function()
             self.connected = T.connectOptions(bank, panel, 1)
             self.connectedAction = canConnect(panel, bank)
         end)
-        T.performInto(self, "accepted", "connectSource", args)
-        T.performInto(self, "bankDisconnected", "setBankConnected", { bank = bank.position, connected = false })
+        T.job(self, "source", SourceJobs.CONNECT, panel.position, bank.position, "accepted")
+        T.job(self, "bank", BankJobs.DISCONNECT, bank.position, nil, "bankDisconnected")
         T.bankState(self, bank)
     end,
     validate = function(self)
         local key = "Tooltip_RenewableEnergy_BankNotConnected"
         local before, after = self.unconnected, self.connected
         for name, option in pairs({ ["the panel's Connect"] = before.one, ["Connect Sources in Reach"] = before.all }) do
-            expect(option.shown and option.greyed and option.reason == getText(key),
-                name .. " isn't offered greyed out saying the bank isn't connected (" .. tostring(option.reason) .. ")")
+            expect(option.shown and option.greyed, name .. " isn't offered greyed out for a bank that isn't connected")
+            expectEqual(name .. "'s tooltip", option.reason, getText(key))
         end
         expect(not self.unconnectedAction, "the Connect action starts for a bank that isn't connected")
-        T.expectRefused(self.refused, key, "the authority connected a panel to a bank that isn't connected")
-        if not T.expectOk(self.bankConnected, "connecting the bank") then
+        T.expectRefused(self.reads.refused, key, "the authority connected a panel to a bank that isn't connected")
+        if not T.expectOk(self.reads.bankConnected, "connecting the bank") then
             return
         end
         for name, option in pairs({ ["the panel's Connect"] = after.one, ["Connect Sources in Reach"] = after.all }) do
             expect(option.shown and not option.greyed, name .. " isn't open for a connected bank (" .. tostring(option.reason) .. ")")
         end
         expect(self.connectedAction, "the Connect action doesn't start for a connected bank")
-        T.expectOk(self.accepted, "putting a panel on a connected bank")
-        T.expectOk(self.bankDisconnected, "disconnecting the bank")
+        T.expectOk(self.reads.accepted, "putting a panel on a connected bank")
+        T.expectOk(self.reads.bankDisconnected, "disconnecting the bank")
         expect(T.stateSource(self.bank.state, self.panel.position) ~= nil, "disconnecting the bank dropped its panel")
     end,
 })
@@ -224,7 +215,7 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
             end
             self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
-        T.performInto(self, "onBox", "connectSource", { bank = box.position, source = panel.position })
+        T.job(self, "source", SourceJobs.CONNECT, panel.position, box.position, "onBox")
         T.waitFor(self, function() return PowerBank.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
             "this client's summary of the box listing the panel")
         T.step(function()
@@ -238,7 +229,7 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         for name, option in pairs(self.offered) do
             expect(option.shown and not option.greyed, "the " .. name .. " isn't offered open (" .. tostring(option.reason) .. ")")
         end
-        T.expectOk(self.onBox, "putting the panel on the box")
+        T.expectOk(self.reads.onBox, "putting the panel on the box")
         local wired = self.wired
         expect(wired.wiredTo.shown, "a panel on the box doesn't say it is connected to the box")
         expect(not wired.box.shown, "a panel on the box offers to connect to the box again")

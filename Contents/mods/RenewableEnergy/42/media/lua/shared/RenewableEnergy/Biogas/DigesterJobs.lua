@@ -1,16 +1,15 @@
 -- The hands-on jobs at a digester: what each takes of the character and what refuses it
 -- (cf_commonlib's Jobs). DigesterSystem does them.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/WoodGas/Gasifier"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
+local Tables = require "cf_commonlib/Tables"
 
-RenewableEnergy = RenewableEnergy or {}
 local DigesterJobs = {}
 RenewableEnergy.DigesterJobs = DigesterJobs
-
-local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
 
 DigesterJobs.TAKE_SLUDGE = "TakeSludge"
 DigesterJobs.VENT = "VentGas"
@@ -61,29 +60,16 @@ end
 --- The part-filled compost bags, then the empty sacks, the character could fill with sludge, as
 --- vanilla's Get Compost lists them.
 function DigesterJobs.sludgeBags(character)
-    local inventory, bags = character:getInventory(), {}
-    local compost = inventory:getAllTypeRecurse(DigesterJobs.COMPOST_BAG)
-    for i = 0, compost:size() - 1 do
-        if takesSludge(compost:get(i)) then
-            table.insert(bags, compost:get(i))
-        end
-    end
-    local sacks = inventory:getAllEvalRecurse(takesSludge)
-    for i = 0, sacks:size() - 1 do
-        if sacks:get(i):getFullType() ~= DigesterJobs.COMPOST_BAG then
-            table.insert(bags, sacks:get(i))
-        end
-    end
-    return bags
+    local inventory = character:getInventory()
+    local bags = Tables.fromList(inventory:getAllTypeRecurse(DigesterJobs.COMPOST_BAG), takesSludge)
+    return Tables.fromList(inventory:getAllEvalRecurse(takesSludge), function(sack)
+        return sack:getFullType() ~= DigesterJobs.COMPOST_BAG
+    end, bags)
 end
 
 --- The Tarp Gas Bags the character carries.
 function DigesterJobs.tarpBags(character)
-    local found, bags = character:getInventory():getAllTypeRecurse(Digester.HOLDERS.tarp.item), {}
-    for i = 0, found:size() - 1 do
-        table.insert(bags, found:get(i))
-    end
-    return bags
+    return Tables.fromList(character:getInventory():getAllTypeRecurse(Digester.HOLDERS.tarp.item))
 end
 
 --- The Iron Sponge the character would pack a scrubber with: the one with the most packings left,
@@ -207,10 +193,7 @@ DigesterJobs.JOBS = {
             return summary.sludge < DigesterJobs.sludgePerUse() and "Tooltip_RenewableEnergy_NoSludge" or nil
         end,
         withRefusal = function(character, summary, bag)
-            if not (bag and character:getInventory():containsRecursive(bag) and takesSludge(bag)) then
-                return "Tooltip_RenewableEnergy_NeedsSack"
-            end
-            return nil
+            return not Jobs.carries(character, bag, takesSludge) and "Tooltip_RenewableEnergy_NeedsSack" or nil
         end,
     },
     [DigesterJobs.VENT] = { minutes = 1, position = "Mid", tooltip = "Tooltip_RenewableEnergy_VentGas", blocker = noGas },
@@ -225,10 +208,8 @@ DigesterJobs.JOBS = {
         minutes = 15, position = "Mid", holder = "tarp", tooltip = "Tooltip_RenewableEnergy_FitTarpGasBag",
         blocker = bagBlocker,
         withRefusal = function(character, summary, bag)
-            if not Jobs.carries(character, bag, function(item) return item:getFullType() == Digester.HOLDERS.tarp.item end) then
-                return "Tooltip_RenewableEnergy_NeedsTarpGasBag"
-            end
-            return nil
+            return not Jobs.carries(character, bag, Items.ofType(Digester.HOLDERS.tarp.item))
+                and "Tooltip_RenewableEnergy_NeedsTarpGasBag" or nil
         end,
     },
     [DigesterJobs.TAKE_OFF_BAG] = {
@@ -316,16 +297,14 @@ DigesterJobs.JOBS = {
         minutes = 5, position = "Mid", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberSponge",
         withRefusal = function(character, summary, sponge)
-            if not Jobs.carries(character, sponge, function(item) return item:getFullType() == Digester.IRON_SPONGE end) then
-                return "Tooltip_RenewableEnergy_NeedsIronSponge"
-            end
-            return nil
+            return not Jobs.carries(character, sponge, Items.ofType(Digester.IRON_SPONGE))
+                and "Tooltip_RenewableEnergy_NeedsIronSponge" or nil
         end,
     },
 }
 
 Jobs.define(DigesterJobs, {
-    short = "short", subjectOf = Digester.currentSummary, missing = "Tooltip_RenewableEnergy_NoDigester",
+    subjectOf = Digester.currentSummary, missing = "Tooltip_RenewableEnergy_NoDigester",
 })
 
 return DigesterJobs

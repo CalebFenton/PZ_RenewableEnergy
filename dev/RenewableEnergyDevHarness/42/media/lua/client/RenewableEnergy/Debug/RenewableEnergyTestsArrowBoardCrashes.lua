@@ -5,7 +5,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 -- stand-ins for the trailer and the car towing it.
 
 local T = RenewableEnergyTest
-local test, expect, player = T.test, T.expect, T.player
+local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
 
 -- The crash watcher (ArrowBoard.sampleCrash), fed a frame at a time the velocities a trailer would
 -- show, tells a crash from what isn't one: a speed change of a crash's worth within the window is
@@ -64,8 +64,8 @@ test("renewable_energy_world_arrow_board_crash_watch_tells_crashes", {
         hold(hits, { 0, -1.01 * crashMs }, math.ceil((crash.ms + crash.quietMs) / frame))
         table.insert(hits, stopped)
         local seen = crashes(hits)
-        expect(seen == "6," .. #hits, string.format("a crash, its rebound at frame %d and a crash at frame %d began crashes at frames %s",
-            rebound, #hits, seen))
+        expectEqual(string.format("the frames beginning crashes for a crash, its rebound at frame %d and a crash at frame %d",
+            rebound, #hits), seen, "6," .. #hits)
     end,
 })
 

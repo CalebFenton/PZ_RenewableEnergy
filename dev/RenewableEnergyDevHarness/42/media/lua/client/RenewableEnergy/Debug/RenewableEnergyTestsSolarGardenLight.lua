@@ -1,16 +1,14 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/Menu"
-require "Moveables/ISMoveableSpriteProps"
 
 -- The solar garden light (Gadgets/SolarGardenLight.lua, its options in UI/Menu.lua): it lights by
 -- night on what its cell stored by day, in the colour of its bulb. The authority runs it, so the
 -- tests drive it through T.server and check this client's copies.
 
 local T = RenewableEnergyTest
-local test, expect, expectNear = T.test, T.expect, T.expectNear
+local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
 local Sprites, Specs, SolarGardenLight = RenewableEnergy.Sprites, RenewableEnergy.Specs, RenewableEnergy.SolarGardenLight
 
 local NOON, MIDNIGHT = 12, 0
@@ -59,9 +57,10 @@ local function lampShines(square, fullType)
 end
 
 -- Queues running the light on the server through the gadget pass for `hours` of the clock, from
--- `charge` Wh if given, and a wait until this client's tile and lamp match the server's answer.
-local function runLight(self, light, charge, hours)
-    T.server(self, "gardenLightUpdate", T.at(light, { charge = charge, hours = hours }))
+-- `charge` Wh if given, and a wait until this client's tile and lamp match the server's answer,
+-- read under `label` when given.
+local function runLight(self, light, charge, hours, label)
+    T.read(self, "gardenLightUpdate", T.at(light, { kind = "gardenLight", charge = charge, hours = hours }), label)
     T.waitFor(self, function()
         local reply = self.server.gardenLightUpdate
         return light.object:getTextureName() == reply.sprite and lampOn(light.square) == reply.lit
@@ -100,30 +99,30 @@ local GARDEN_LIGHT_HOURS = {
 test("renewable_energy_gadgets_garden_light_update", {
     instant = true,
     run = function(self)
-        self.rows = {}
+        self.copies = {}
         local light = placeGardenLight(self, GARDEN_LIGHT_HOURS[1].charge)
         if not light then return end
         for _, row in ipairs(GARDEN_LIGHT_HOURS) do
             T.step(function() T.setTime(self, row.hour) end)
-            runLight(self, light, row.charge, row.hours)
+            runLight(self, light, row.charge, row.hours, row.what)
             T.step(function()
-                local reply = self.server.gardenLightUpdate
-                table.insert(self.rows, { row = row, lit = reply.lit, sprite = reply.sprite, charge = reply.charge,
-                    copySprite = light.object:getTextureName(), lamp = lampOn(light.square) })
+                self.copies[row.what] = { sprite = light.object:getTextureName(), lamp = lampOn(light.square) }
             end)
         end
     end,
     validate = function(self)
-        for _, r in ipairs(self.rows) do
-            local row = r.row
+        for _, row in ipairs(GARDEN_LIGHT_HOURS) do
+            local reply, copy = self.reads[row.what], self.copies[row.what]
             local sprite = row.lit and Sprites.gardenLight.lit or Sprites.gardenLight.off
-            expect(r.lit == row.lit and r.sprite == sprite and r.copySprite == sprite and r.lamp == row.lit,
-                string.format("a light %s: lit %s, sprite %s, this client's sprite %s, lamp %s; expected lit %s", row.what,
-                    tostring(r.lit), r.sprite, r.copySprite, tostring(r.lamp), tostring(row.lit)))
+            expectEqual("whether the server lights a light " .. row.what, reply.lit, row.lit)
+            expectEqual("the server's tile of a light " .. row.what, reply.sprite, sprite)
+            expectEqual("this client's tile of a light " .. row.what, copy.sprite, sprite)
+            expectEqual("whether this client draws the lamp of a light " .. row.what, copy.lamp, row.lit)
             if row.after then
-                expectNear("charge of a light " .. row.what, r.charge, row.after)
+                expectNear("charge of a light " .. row.what, reply.charge, row.after)
             else
-                expect(r.charge > row.low and r.charge <= row.high, "a light " .. row.what .. " ended at " .. r.charge .. " Wh")
+                expect(reply.charge > row.low and reply.charge <= row.high,
+                    "a light " .. row.what .. " ended at " .. reply.charge .. " Wh")
             end
         end
     end,
@@ -153,7 +152,7 @@ local function chooseBulbOption(self, light, bulbType)
             option = add and add:getOptionFromName(getItemName(bulbType))
         end
         context:hideAndChildren()
-        if not T.need(self, option and not option.notAvailable and option,
+        if not T.need(self, T.offered(option) and option,
             "the garden light's " .. (bulbType and "Add Light Bulb " .. bulbType or "Remove Light Bulb") .. " option") then
             return
         end
@@ -185,22 +184,20 @@ test("renewable_energy_gadgets_garden_light_remove_bulb", {
         waitForDark(self, light)
         T.step(function() self.darkMinute = gameMinute() end)
         T.count(self, "removed", { SolarGardenLight.PLAIN_BULB })
-        runLight(self, light, LIT_WH, 1)
+        runLight(self, light, LIT_WH, 1, "night")
         T.step(function()
-            self.night = self.server.gardenLightUpdate
             self.copyDarkAtNight = light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light.square)
         end)
     end,
     validate = function(self)
         if not expect(self.litBefore, "the light never lit") then return end
         expect(self.darkMinute == self.minute, "this client's lamp went out only at a later game minute")
-        expect(self.counts.removed[SolarGardenLight.PLAIN_BULB] == 1, "taking the bulb out gave "
-            .. tostring(self.counts.removed[SolarGardenLight.PLAIN_BULB]) .. " light bulbs, expected 1")
-        expect(self.night and not self.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")
-        expectNear("charge of a light without a bulb after an hour of night", self.night and self.night.charge, LIT_WH)
+        expectEqual("light bulbs taking the bulb out gave", self.counts.removed[SolarGardenLight.PLAIN_BULB], 1)
+        expect(not self.reads.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")
+        expectNear("charge of a light without a bulb after an hour of night", self.reads.night.charge, LIT_WH)
         local context, add, remove = bulbMenu(self.light)
         local plain = add and add:getOptionFromName(getItemName(SolarGardenLight.PLAIN_BULB))
-        expect(plain ~= nil and not plain.notAvailable, "the light without a bulb doesn't offer the carried bulb under Add Light Bulb")
+        expect(T.offered(plain), "the light without a bulb doesn't offer the carried bulb under Add Light Bulb")
         expect(remove == nil, "the light without a bulb offers Remove Light Bulb")
         context:hideAndChildren()
     end,
@@ -246,14 +243,13 @@ test("renewable_energy_gadgets_garden_light_bulb_swap_recolours_lamp", {
         if not light then return end
         runLight(self, light, LIT_WH, NIGHT_HOURS)
         T.step(function() self.litBefore = lampOn(light.square) end)
-        T.server(self, "gardenLightSwapBulb", T.at(light, { bulb = GREEN }))
+        T.read(self, "gardenLightSwapBulb", T.at(light, { kind = "gardenLight", bulb = GREEN }), "swap")
         T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green after the swap")
     end,
     validate = function(self)
         if not expect(self.litBefore, "the light never lit") then return end
-        local swap = self.server.gardenLightSwapBulb
-        expect(swap.lit and swap.bulb == GREEN, "after the swap the server's light is lit " .. tostring(swap.lit)
-            .. " with " .. tostring(swap.bulb))
+        expect(self.reads.swap.lit, "after the swap the server's light is unlit")
+        expectEqual("the server's bulb after the swap", self.reads.swap.bulb, GREEN)
     end,
 })
 
@@ -303,7 +299,7 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
         T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green placed again")
     end,
     validate = function(self)
-        expect(self.carriedBulb == GREEN, "the picked-up light holds " .. tostring(self.carriedBulb) .. ", expected " .. GREEN)
+        expectEqual("the picked-up light's bulb", self.carriedBulb, GREEN)
     end,
 })
 

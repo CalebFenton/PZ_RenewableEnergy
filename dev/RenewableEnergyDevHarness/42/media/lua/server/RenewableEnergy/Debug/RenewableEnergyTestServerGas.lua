@@ -8,7 +8,6 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
-local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
 local handler = PZHarness.serverHandler
@@ -16,12 +15,7 @@ local handler = PZHarness.serverHandler
 -- Generators ------------------------------------------------------------------------------------
 
 local function generatorOn(args)
-    local square = PZHarness.Fixtures.squareAt(args)
-    local generator = square and Squares.findObjectOn(square, RenewableEnergy.isGenerator)
-    if not generator then
-        return nil, "a generator at " .. tostring(args.x) .. "," .. tostring(args.y)
-    end
-    return generator
+    return Helpers.find({ x = args.x, y = args.y, z = args.z, kind = "generator" })
 end
 
 -- The generator at x, y, z: whether it runs, its fuel and condition, vanilla's idle bill an hour
@@ -30,8 +24,7 @@ end
 -- sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor), whether its building is
 -- toxic, and the world hour on the server as it was read (`hours`).
 handler("generatorRead", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
+    local generator = generatorOn(args)
     local GasKit = RenewableEnergy.GasKit
     local state = GasKit.stateOf(generator)
     local plain
@@ -59,8 +52,7 @@ end)
 -- rebuild the bills of the generators reaching it (`args.rebuild`). Answers the world update count
 -- it acted at (`frame`, see worldFrame).
 handler("generatorSet", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
+    local generator = generatorOn(args)
     if args.pour then
         generator:setFuel(math.min(generator:getMaxFuel(), generator:getFuel() + args.pour))
     end
@@ -85,22 +77,9 @@ end)
 
 -- Takes `args.litres` from the fuel of the generator at x, y, z, as vanilla's hourly bill
 -- (IsoGenerator.update) and a bank charging from it (Bank:chargeFrom) take it.
-handler("generatorBurn", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
+handler("burnFuel", function(player, args)
+    local generator = generatorOn(args)
     generator:setFuel(generator:getFuel() - args.litres)
-    return {}
-end)
-
--- Takes away, when the test ends, whatever generator stands at x, y, z then: one whose chunk
--- unloaded and loaded meanwhile is a new copy, which the generator fixture's own removal misses.
-handler("generatorTrack", function(player, args, defer)
-    defer(function()
-        local generator = generatorOn(args)
-        if generator then
-            PZHarness.Fixtures.removePlaced(generator)
-        end
-    end)
     return {}
 end)
 
@@ -113,23 +92,21 @@ end)
 -- Sets the wear chance of the item script of the generator at x, y, z to one in `args.oneIn` an
 -- hour it runs (its ConditionLowerChanceOneIn) until the test ends.
 handler("generatorWearChance", function(player, args, defer)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    local item = getScriptManager():getItem(generator:getGeneratorItemType())
-    if not item then return nil, "the item script of the generator at " .. args.x .. "," .. args.y end
+    local generator = generatorOn(args)
+    local item = PZHarness.need(getScriptManager():getItem(generator:getGeneratorItemType()),
+        "the item script of the generator at " .. args.x .. "," .. args.y)
     local was = item:getConditionLowerChance()
     item:setConditionLowerChance(args.oneIn)
     defer(function() item:setConditionLowerChance(was) end)
     return {}
 end)
 
--- Builds the gas action of `args.feature` and `args.job` at the generator at x, y, z as the server
+-- Builds the action of `args.feature` and `args.job` at the generator at x, y, z as the server
 -- builds the one a client asks for (NetTimedAction.parse calls the class's new, the class first).
 -- Answers whether that gave an action.
 handler("gasActionFrom", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    local action = RenewableEnergyGasAction.new(RenewableEnergyGasAction, player, args.feature, args.job, generator)
+    local generator = generatorOn(args)
+    local action = RenewableEnergyAction.new(RenewableEnergyAction, player, args.feature, args.job, generator)
     return { built = action ~= nil }
 end)
 
@@ -137,9 +114,8 @@ end)
 -- the one a client's action asks for once it ends: the action's complete(). Answers whether it was
 -- done; a client's own action that the server turns down stops its whole queue.
 handler("kitJobComplete", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    local action = RenewableEnergyGasAction:new(player, "kit", args.job, generator)
+    local generator = generatorOn(args)
+    local action = RenewableEnergyAction:new(player, "kit", args.job, generator)
     return { done = action:complete() }
 end)
 
@@ -161,10 +137,9 @@ end)
 -- Runs the gas pass as though `args.hours` had passed since the last of the kitted generator at
 -- x, y, z.
 handler("gasPass", function(player, args)
-    local generator, missing = generatorOn(args)
-    if not generator then return nil, missing end
-    local state = RenewableEnergy.GasKit.stateOf(generator)
-    if not state then return nil, "a kit on the generator at " .. args.x .. "," .. args.y end
+    local generator = generatorOn(args)
+    local state = PZHarness.need(RenewableEnergy.GasKit.stateOf(generator),
+        "a kit on the generator at " .. args.x .. "," .. args.y)
     state.lastHour = getGameTime():getWorldAgeHours() - args.hours
     RenewableEnergy.GasLines.updateAll()
     return {}
@@ -184,9 +159,8 @@ end)
 
 -- Burns `args.kg` in the gasifier record `args` (T.recordArgs), as a pass would, to leave its ash
 -- and tar.
-handler("gasifierBurn", function(player, args)
-    local record, _, missing = Helpers.recordAt(args)
-    if not record then return nil, missing end
+handler("burnGasifier", function(player, args)
+    local record = Helpers.recordAt(args)
     local burned = record:burn(args.kg)
     record:afterChange()
     return { burned = burned }
