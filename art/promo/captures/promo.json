@@ -1,64 +1,9 @@
 {
   "items": [
     {
-      "fullType": "RenewableEnergy.SolarModule",
-      "icon": "icon_RenewableEnergy_SolarModule",
-      "name": "Solar Module"
-    },
-    {
-      "fullType": "RenewableEnergy.HomemadeSolarModule",
-      "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-      "name": "Homemade Solar Module"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarCells",
-      "icon": "icon_RenewableEnergy_SolarCells",
-      "name": "Solar Cells"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarFlat",
-      "icon": "icon_RenewableEnergy_SolarFlat",
-      "name": "Flat Solar Panel"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarWallWood",
-      "icon": "icon_RenewableEnergy_SolarWallWood",
-      "name": "Wooden Wall-Mounted Solar Panel"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarWallMetal",
-      "icon": "icon_RenewableEnergy_SolarWallMetal",
-      "name": "Metal Wall-Mounted Solar Panel"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarRackWood",
-      "icon": "icon_RenewableEnergy_SolarRackWood",
-      "name": "Wooden Solar Ground Rack"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarRackMetal",
-      "icon": "icon_RenewableEnergy_SolarRackMetal",
-      "name": "Metal Solar Ground Rack"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryBoxWood",
-      "icon": "icon_RenewableEnergy_BatteryBoxWood",
-      "name": "Wooden Battery Box"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryBoxMetal",
-      "icon": "icon_RenewableEnergy_BatteryBoxMetal",
-      "name": "Metal Battery Box"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryRackWood",
-      "icon": "icon_RenewableEnergy_BatteryRackWood",
-      "name": "Wooden Battery Rack"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryRackMetal",
-      "icon": "icon_RenewableEnergy_BatteryRackMetal",
-      "name": "Metal Battery Rack"
+      "fullType": "RenewableEnergy.BatteryBankMetal",
+      "icon": "icon_RenewableEnergy_BatteryBankMetal",
+      "name": "Metal Battery Bank"
     },
     {
       "fullType": "RenewableEnergy.BatteryBankWood",
@@ -66,104 +11,14 @@
       "name": "Wooden Battery Bank"
     },
     {
-      "fullType": "RenewableEnergy.BatteryBankMetal",
-      "icon": "icon_RenewableEnergy_BatteryBankMetal",
-      "name": "Metal Battery Bank"
+      "fullType": "RenewableEnergy.BatteryBoxMetal",
+      "icon": "icon_RenewableEnergy_BatteryBoxMetal",
+      "name": "Metal Battery Box"
     },
     {
-      "fullType": "RenewableEnergy.PlugInInverter",
-      "icon": "icon_RenewableEnergy_PlugInInverter",
-      "name": "Plug-in Inverter"
-    },
-    {
-      "fullType": "RenewableEnergy.PowerInverter",
-      "icon": "icon_RenewableEnergy_PowerInverter",
-      "name": "Power Inverter"
-    },
-    {
-      "fullType": "RenewableEnergy.InverterCharger",
-      "icon": "icon_RenewableEnergy_InverterCharger",
-      "name": "Inverter/Charger"
-    },
-    {
-      "fullType": "RenewableEnergy.MakeshiftInverter",
-      "icon": "icon_RenewableEnergy_MakeshiftInverter",
-      "name": "Makeshift Inverter"
-    },
-    {
-      "fullType": "RenewableEnergy.HomemadeInverter",
-      "icon": "icon_RenewableEnergy_HomemadeInverter",
-      "name": "Homemade Inverter"
-    },
-    {
-      "fullType": "RenewableEnergy.MicrowaveTransformer",
-      "icon": "icon_RenewableEnergy_MicrowaveTransformer",
-      "name": "Microwave Transformer"
-    },
-    {
-      "fullType": "RenewableEnergy.ChargeController",
-      "icon": "icon_RenewableEnergy_ChargeController",
-      "name": "Charge Controller"
-    },
-    {
-      "fullType": "RenewableEnergy.SolarFailsafe",
-      "icon": "icon_RenewableEnergy_SolarFailsafe",
-      "name": "Solar Failsafe"
-    },
-    {
-      "fullType": "RenewableEnergy.DeepCycleBattery",
-      "icon": "icon_RenewableEnergy_DeepCycleBattery",
-      "name": "Deep Cycle Marine Battery"
-    },
-    {
-      "fullType": "RenewableEnergy.L16Battery",
-      "icon": "icon_RenewableEnergy_L16Battery",
-      "name": "L-16 Battery"
-    },
-    {
-      "fullType": "RenewableEnergy.JarBattery",
-      "icon": "icon_RenewableEnergy_JarBattery",
-      "name": "Jar Battery"
-    },
-    {
-      "fullType": "RenewableEnergy.CarBatteryCase",
-      "icon": "icon_RenewableEnergy_CarBatteryCase",
-      "name": "Car Battery Case"
-    },
-    {
-      "fullType": "RenewableEnergy.DeepCycleBatteryCase",
-      "icon": "icon_RenewableEnergy_DeepCycleBatteryCase",
-      "name": "Deep Cycle Battery Case"
-    },
-    {
-      "fullType": "RenewableEnergy.L16BatteryCase",
-      "icon": "icon_RenewableEnergy_L16BatteryCase",
-      "name": "L-16 Battery Case"
-    },
-    {
-      "fullType": "RenewableEnergy.WornBatteryPlates",
-      "icon": "icon_RenewableEnergy_WornBatteryPlates",
-      "name": "Worn Battery Plates"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryPlates",
-      "icon": "icon_RenewableEnergy_BatteryPlates",
-      "name": "Battery Plates"
-    },
-    {
-      "fullType": "RenewableEnergy.WoodenBatteryPlatePattern",
-      "icon": "icon_RenewableEnergy_WoodenBatteryPlatePattern",
-      "name": "Wooden Battery Plate Pattern"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryPlateMoldUnfired",
-      "icon": "icon_RenewableEnergy_BatteryPlateMoldUnfired",
-      "name": "Unfired Battery Plate Mold"
-    },
-    {
-      "fullType": "RenewableEnergy.BatteryPlateMold",
-      "icon": "icon_RenewableEnergy_BatteryPlateMold",
-      "name": "Battery Plate Mold"
+      "fullType": "RenewableEnergy.BatteryBoxWood",
+      "icon": "icon_RenewableEnergy_BatteryBoxWood",
+      "name": "Wooden Battery Box"
     },
     {
       "fullType": "RenewableEnergy.BatteryElectrolyte",
@@ -171,19 +26,104 @@
       "name": "Battery Electrolyte"
     },
     {
-      "fullType": "RenewableEnergy.SolarMaintainer",
-      "icon": "icon_RenewableEnergy_SolarMaintainer",
-      "name": "Solar Battery Maintainer"
+      "fullType": "RenewableEnergy.BatteryPlateMold",
+      "icon": "icon_RenewableEnergy_BatteryPlateMold",
+      "name": "Battery Plate Mold"
     },
     {
-      "fullType": "RenewableEnergy.SolarCellCharger",
-      "icon": "icon_RenewableEnergy_SolarCellCharger",
-      "name": "Solar Battery Charger"
+      "fullType": "RenewableEnergy.BatteryPlateMoldUnfired",
+      "icon": "icon_RenewableEnergy_BatteryPlateMoldUnfired",
+      "name": "Unfired Battery Plate Mold"
     },
     {
-      "fullType": "RenewableEnergy.SolarGardenLight",
-      "icon": "icon_RenewableEnergy_SolarGardenLight",
-      "name": "Solar Garden Light"
+      "fullType": "RenewableEnergy.BatteryPlates",
+      "icon": "icon_RenewableEnergy_BatteryPlates",
+      "name": "Battery Plates"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryRackMetal",
+      "icon": "icon_RenewableEnergy_BatteryRackMetal",
+      "name": "Metal Battery Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.BatteryRackWood",
+      "icon": "icon_RenewableEnergy_BatteryRackWood",
+      "name": "Wooden Battery Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.BrokenPipeBlades",
+      "icon": "icon_RenewableEnergy_BrokenPipeBlades",
+      "name": "Broken Pipe Blades"
+    },
+    {
+      "fullType": "RenewableEnergy.BrokenSteelBlades",
+      "icon": "icon_RenewableEnergy_BrokenSteelBlades",
+      "name": "Broken Steel Blades"
+    },
+    {
+      "fullType": "RenewableEnergy.BrokenWoodenBlades",
+      "icon": "icon_RenewableEnergy_BrokenWoodenBlades",
+      "name": "Broken Wooden Blades"
+    },
+    {
+      "fullType": "RenewableEnergy.CarAlternator",
+      "icon": "icon_RenewableEnergy_CarAlternator",
+      "name": "Car Alternator"
+    },
+    {
+      "fullType": "RenewableEnergy.CarBatteryCase",
+      "icon": "icon_RenewableEnergy_CarBatteryCase",
+      "name": "Car Battery Case"
+    },
+    {
+      "fullType": "RenewableEnergy.ChargeController",
+      "icon": "icon_RenewableEnergy_ChargeController",
+      "name": "Charge Controller"
+    },
+    {
+      "fullType": "RenewableEnergy.DeepCycleBattery",
+      "icon": "icon_RenewableEnergy_DeepCycleBattery",
+      "name": "Deep Cycle Marine Battery"
+    },
+    {
+      "fullType": "RenewableEnergy.DeepCycleBatteryCase",
+      "icon": "icon_RenewableEnergy_DeepCycleBatteryCase",
+      "name": "Deep Cycle Battery Case"
+    },
+    {
+      "fullType": "RenewableEnergy.FemaPamphlet",
+      "icon": "icon_RenewableEnergy_FemaPamphlet",
+      "name": "FEMA Wood Gas Generator Plans"
+    },
+    {
+      "fullType": "RenewableEnergy.FridgeCompressor",
+      "icon": "icon_RenewableEnergy_FridgeCompressor",
+      "name": "Fridge Compressor"
+    },
+    {
+      "fullType": "RenewableEnergy.GasConversionKit",
+      "icon": "icon_RenewableEnergy_GasConversionKit",
+      "name": "Gas Conversion Kit"
+    },
+    {
+      "fullType": "RenewableEnergy.GasHeater",
+      "icon": "icon_RenewableEnergy_GasHeater",
+      "name": "Gas Heater"
+    },
+    {
+      "fullType": "RenewableEnergy.HomemadeAlternator",
+      "icon": "icon_RenewableEnergy_HomemadeAlternator",
+      "name": "Homemade Alternator"
+    },
+    {
+      "fullType": "RenewableEnergy.HomemadeInverter",
+      "icon": "icon_RenewableEnergy_HomemadeInverter",
+      "name": "Homemade Inverter"
+    },
+    {
+      "fullType": "RenewableEnergy.HomemadeSolarModule",
+      "icon": "icon_RenewableEnergy_HomemadeSolarModule",
+      "name": "Homemade Solar Module"
     },
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag1",
@@ -201,44 +141,44 @@
       "name": "Homestead Power #3"
     },
     {
-      "fullType": "RenewableEnergy.WoodAsh",
-      "icon": "icon_RenewableEnergy_WoodAsh",
-      "name": "Wood Ash"
+      "fullType": "RenewableEnergy.HomesteadPowerMag4",
+      "icon": "icon_RenewableEnergy_HomesteadPowerMag4",
+      "name": "Homestead Power #4"
     },
     {
-      "fullType": "RenewableEnergy.GasConversionKit",
-      "icon": "icon_RenewableEnergy_GasConversionKit",
-      "name": "Gas Conversion Kit"
+      "fullType": "RenewableEnergy.InverterCharger",
+      "icon": "icon_RenewableEnergy_InverterCharger",
+      "name": "Inverter/Charger"
     },
     {
-      "fullType": "RenewableEnergy.FridgeCompressor",
-      "icon": "icon_RenewableEnergy_FridgeCompressor",
-      "name": "Fridge Compressor"
+      "fullType": "RenewableEnergy.IronSponge",
+      "icon": "icon_RenewableEnergy_IronSponge",
+      "name": "Iron Sponge"
     },
     {
-      "fullType": "RenewableEnergy.GasHeater",
-      "icon": "icon_RenewableEnergy_GasHeater",
-      "name": "Gas Heater"
+      "fullType": "RenewableEnergy.JarBattery",
+      "icon": "icon_RenewableEnergy_JarBattery",
+      "name": "Jar Battery"
     },
     {
-      "fullType": "RenewableEnergy.TarryPacking",
-      "icon": "icon_RenewableEnergy_TarryPacking",
-      "name": "Tarry Packing"
+      "fullType": "RenewableEnergy.L16Battery",
+      "icon": "icon_RenewableEnergy_L16Battery",
+      "name": "L-16 Battery"
     },
     {
-      "fullType": "RenewableEnergy.FemaPamphlet",
-      "icon": "icon_RenewableEnergy_FemaPamphlet",
-      "name": "FEMA Wood Gas Generator Plans"
+      "fullType": "RenewableEnergy.L16BatteryCase",
+      "icon": "icon_RenewableEnergy_L16BatteryCase",
+      "name": "L-16 Battery Case"
     },
     {
-      "fullType": "RenewableEnergy.TreadmillMotor",
-      "icon": "icon_RenewableEnergy_TreadmillMotor",
-      "name": "Treadmill Motor"
+      "fullType": "RenewableEnergy.MakeshiftInverter",
+      "icon": "icon_RenewableEnergy_MakeshiftInverter",
+      "name": "Makeshift Inverter"
     },
     {
-      "fullType": "RenewableEnergy.WoodenBlades",
-      "icon": "icon_RenewableEnergy_WoodenBlades",
-      "name": "Carved Wooden Blades"
+      "fullType": "RenewableEnergy.MicrowaveTransformer",
+      "icon": "icon_RenewableEnergy_MicrowaveTransformer",
+      "name": "Microwave Transformer"
     },
     {
       "fullType": "RenewableEnergy.PipeBlades",
@@ -246,39 +186,114 @@
       "name": "Plastic Pipe Blades"
     },
     {
+      "fullType": "RenewableEnergy.PlugInInverter",
+      "icon": "icon_RenewableEnergy_PlugInInverter",
+      "name": "Plug-in Inverter"
+    },
+    {
+      "fullType": "RenewableEnergy.PowerInverter",
+      "icon": "icon_RenewableEnergy_PowerInverter",
+      "name": "Power Inverter"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarCellCharger",
+      "icon": "icon_RenewableEnergy_SolarCellCharger",
+      "name": "Solar Battery Charger"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarCells",
+      "icon": "icon_RenewableEnergy_SolarCells",
+      "name": "Solar Cells"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarFailsafe",
+      "icon": "icon_RenewableEnergy_SolarFailsafe",
+      "name": "Solar Failsafe"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarFlat",
+      "icon": "icon_RenewableEnergy_SolarFlat",
+      "name": "Flat Solar Panel"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarGardenLight",
+      "icon": "icon_RenewableEnergy_SolarGardenLight",
+      "name": "Solar Garden Light"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarMaintainer",
+      "icon": "icon_RenewableEnergy_SolarMaintainer",
+      "name": "Solar Battery Maintainer"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarModule",
+      "icon": "icon_RenewableEnergy_SolarModule",
+      "name": "Solar Module"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarRackMetal",
+      "icon": "icon_RenewableEnergy_SolarRackMetal",
+      "name": "Metal Solar Ground Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarRackWood",
+      "icon": "icon_RenewableEnergy_SolarRackWood",
+      "name": "Wooden Solar Ground Rack"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarWallMetal",
+      "icon": "icon_RenewableEnergy_SolarWallMetal",
+      "name": "Metal Wall-Mounted Solar Panel"
+    },
+    {
+      "fullType": "RenewableEnergy.SolarWallWood",
+      "icon": "icon_RenewableEnergy_SolarWallWood",
+      "name": "Wooden Wall-Mounted Solar Panel"
+    },
+    {
+      "fullType": "RenewableEnergy.SpentIronSponge",
+      "icon": "icon_RenewableEnergy_SpentIronSponge",
+      "name": "Spent Iron Sponge"
+    },
+    {
       "fullType": "RenewableEnergy.SteelBlades",
       "icon": "icon_RenewableEnergy_SteelBlades",
       "name": "Forged Steel Blades"
     },
     {
-      "fullType": "RenewableEnergy.BrokenWoodenBlades",
-      "icon": "icon_RenewableEnergy_BrokenWoodenBlades",
-      "name": "Broken Wooden Blades"
+      "fullType": "RenewableEnergy.TarpGasBag",
+      "icon": "icon_RenewableEnergy_TarpGasBag",
+      "name": "Tarp Gas Bag"
     },
     {
-      "fullType": "RenewableEnergy.BrokenPipeBlades",
-      "icon": "icon_RenewableEnergy_BrokenPipeBlades",
-      "name": "Broken Pipe Blades"
+      "fullType": "RenewableEnergy.TarryPacking",
+      "icon": "icon_RenewableEnergy_TarryPacking",
+      "name": "Tarry Packing"
     },
     {
-      "fullType": "RenewableEnergy.BrokenSteelBlades",
-      "icon": "icon_RenewableEnergy_BrokenSteelBlades",
-      "name": "Broken Steel Blades"
+      "fullType": "RenewableEnergy.TreadmillMotor",
+      "icon": "icon_RenewableEnergy_TreadmillMotor",
+      "name": "Treadmill Motor"
     },
     {
-      "fullType": "RenewableEnergy.HomemadeAlternator",
-      "icon": "icon_RenewableEnergy_HomemadeAlternator",
-      "name": "Homemade Alternator"
+      "fullType": "RenewableEnergy.WoodAsh",
+      "icon": "icon_RenewableEnergy_WoodAsh",
+      "name": "Wood Ash"
     },
     {
-      "fullType": "RenewableEnergy.HomesteadPowerMag4",
-      "icon": "icon_RenewableEnergy_HomesteadPowerMag4",
-      "name": "Homestead Power #4"
+      "fullType": "RenewableEnergy.WoodenBatteryPlatePattern",
+      "icon": "icon_RenewableEnergy_WoodenBatteryPlatePattern",
+      "name": "Wooden Battery Plate Pattern"
     },
     {
-      "fullType": "RenewableEnergy.CarAlternator",
-      "icon": "icon_RenewableEnergy_CarAlternator",
-      "name": "Car Alternator"
+      "fullType": "RenewableEnergy.WoodenBlades",
+      "icon": "icon_RenewableEnergy_WoodenBlades",
+      "name": "Carved Wooden Blades"
+    },
+    {
+      "fullType": "RenewableEnergy.WornBatteryPlates",
+      "icon": "icon_RenewableEnergy_WornBatteryPlates",
+      "name": "Worn Battery Plates"
     },
     {
       "fullType": "Base.CarBattery1",
@@ -288,111 +303,12 @@
   ],
   "models": [
     {
-      "name": "model_RenewableEnergy_SolarModule",
+      "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
         105,
         105,
-        407,
-        182
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_HomemadeSolarModule",
-      "box": [
-        106,
-        106,
-        406,
-        181
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarCells",
-      "box": [
-        22,
-        22,
-        84,
-        50
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarFlat",
-      "box": [
-        105,
-        105,
-        407,
-        184
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarWallWood",
-      "box": [
-        105,
-        105,
-        407,
-        213
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarWallMetal",
-      "box": [
-        105,
-        105,
-        407,
-        205
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarRackWood",
-      "box": [
-        105,
-        105,
-        376,
+        316,
         407
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarRackMetal",
-      "box": [
-        105,
-        105,
-        375,
-        407
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryBoxWood",
-      "box": [
-        91,
-        91,
-        315,
-        352
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryBoxMetal",
-      "box": [
-        96,
-        96,
-        326,
-        369
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryRackWood",
-      "box": [
-        106,
-        106,
-        406,
-        405
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryRackMetal",
-      "box": [
-        105,
-        105,
-        407,
-        401
       ]
     },
     {
@@ -405,183 +321,21 @@
       ]
     },
     {
-      "name": "model_RenewableEnergy_BatteryBankMetal",
+      "name": "model_RenewableEnergy_BatteryBoxMetal",
       "box": [
-        105,
-        105,
+        96,
+        96,
+        326,
+        369
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_BatteryBoxWood",
+      "box": [
+        91,
+        91,
         315,
-        407
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_PlugInInverter",
-      "box": [
-        32,
-        32,
-        123,
-        64
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_PowerInverter",
-      "box": [
-        38,
-        38,
-        146,
-        93
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_InverterCharger",
-      "box": [
-        76,
-        76,
-        294,
-        197
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_MakeshiftInverter",
-      "box": [
-        27,
-        27,
-        103,
-        79
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_HomemadeInverter",
-      "box": [
-        39,
-        39,
-        150,
-        107
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_MicrowaveTransformer",
-      "box": [
-        18,
-        18,
-        70,
-        55
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_ChargeController",
-      "box": [
-        24,
-        24,
-        92,
-        67
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SolarFailsafe",
-      "box": [
-        49,
-        49,
-        189,
-        110
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_DeepCycleBattery",
-      "box": [
-        46,
-        46,
-        178,
-        166
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_L16Battery",
-      "box": [
-        59,
-        59,
-        209,
-        229
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_JarBattery",
-      "box": [
-        52,
-        52,
-        200,
-        165
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_CarBatteryCase",
-      "box": [
-        38,
-        38,
-        146,
-        145
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_DeepCycleBatteryCase",
-      "box": [
-        47,
-        47,
-        182,
-        164
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_L16BatteryCase",
-      "box": [
-        60,
-        60,
-        210,
-        232
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_WornBatteryPlates",
-      "box": [
-        24,
-        24,
-        78,
-        93
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryPlates",
-      "box": [
-        23,
-        23,
-        77,
-        90
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_WoodenBatteryPlatePattern",
-      "box": [
-        19,
-        19,
-        73,
-        53
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryPlateMoldUnfired",
-      "box": [
-        27,
-        27,
-        103,
-        87
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BatteryPlateMold",
-      "box": [
-        27,
-        27,
-        104,
-        87
+        352
       ]
     },
     {
@@ -594,156 +348,48 @@
       ]
     },
     {
-      "name": "model_RenewableEnergy_SolarMaintainer",
+      "name": "model_RenewableEnergy_BatteryPlateMold",
       "box": [
-        63,
-        63,
-        243,
-        156
+        27,
+        27,
+        104,
+        87
       ]
     },
     {
-      "name": "model_RenewableEnergy_SolarCellCharger",
+      "name": "model_RenewableEnergy_BatteryPlateMoldUnfired",
       "box": [
-        22,
-        22,
-        86,
-        53
+        27,
+        27,
+        103,
+        87
       ]
     },
     {
-      "name": "model_RenewableEnergy_SolarGardenLight",
+      "name": "model_RenewableEnergy_BatteryPlates",
       "box": [
-        59,
-        59,
-        227,
-        107
+        23,
+        23,
+        77,
+        90
       ]
     },
     {
-      "name": "model_RenewableEnergy_HomesteadPowerMag1",
-      "box": [
-        26,
-        26,
-        100,
-        75
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_HomesteadPowerMag2",
-      "box": [
-        26,
-        26,
-        100,
-        75
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_HomesteadPowerMag3",
-      "box": [
-        26,
-        26,
-        100,
-        75
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_WoodAsh",
-      "box": [
-        41,
-        41,
-        158,
-        100
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_GasConversionKit",
-      "box": [
-        45,
-        45,
-        173,
-        111
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_FridgeCompressor",
-      "box": [
-        42,
-        42,
-        144,
-        161
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_GasHeater",
-      "box": [
-        78,
-        78,
-        270,
-        300
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_TarryPacking",
-      "box": [
-        33,
-        33,
-        126,
-        81
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_FemaPamphlet",
-      "box": [
-        18,
-        18,
-        68,
-        58
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_TreadmillMotor",
-      "box": [
-        35,
-        35,
-        136,
-        78
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_WoodenBlades",
+      "name": "model_RenewableEnergy_BatteryRackMetal",
       "box": [
         105,
         105,
         407,
-        173
+        401
       ]
     },
     {
-      "name": "model_RenewableEnergy_PipeBlades",
+      "name": "model_RenewableEnergy_BatteryRackWood",
       "box": [
-        105,
-        105,
-        407,
-        161
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_SteelBlades",
-      "box": [
-        105,
-        105,
-        407,
-        143
-      ]
-    },
-    {
-      "name": "model_RenewableEnergy_BrokenWoodenBlades",
-      "box": [
-        80,
-        80,
-        308,
-        165
+        106,
+        106,
+        406,
+        405
       ]
     },
     {
@@ -765,12 +411,147 @@
       ]
     },
     {
+      "name": "model_RenewableEnergy_BrokenWoodenBlades",
+      "box": [
+        80,
+        80,
+        308,
+        165
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_CarAlternator",
+      "box": [
+        25,
+        25,
+        73,
+        97
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_CarBatteryCase",
+      "box": [
+        38,
+        38,
+        146,
+        145
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_ChargeController",
+      "box": [
+        24,
+        24,
+        92,
+        67
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_DeepCycleBattery",
+      "box": [
+        46,
+        46,
+        178,
+        166
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_DeepCycleBatteryCase",
+      "box": [
+        47,
+        47,
+        182,
+        164
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_FemaPamphlet",
+      "box": [
+        18,
+        18,
+        68,
+        58
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_FridgeCompressor",
+      "box": [
+        42,
+        42,
+        144,
+        161
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_GasConversionKit",
+      "box": [
+        45,
+        45,
+        173,
+        111
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_GasHeater",
+      "box": [
+        78,
+        78,
+        270,
+        300
+      ]
+    },
+    {
       "name": "model_RenewableEnergy_HomemadeAlternator",
       "box": [
         59,
         59,
         229,
         171
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomemadeInverter",
+      "box": [
+        39,
+        39,
+        150,
+        107
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomemadeSolarModule",
+      "box": [
+        106,
+        106,
+        406,
+        181
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomesteadPowerMag1",
+      "box": [
+        26,
+        26,
+        100,
+        76
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomesteadPowerMag2",
+      "box": [
+        26,
+        26,
+        100,
+        75
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_HomesteadPowerMag3",
+      "box": [
+        26,
+        26,
+        100,
+        75
       ]
     },
     {
@@ -783,12 +564,273 @@
       ]
     },
     {
-      "name": "model_RenewableEnergy_CarAlternator",
+      "name": "model_RenewableEnergy_InverterCharger",
       "box": [
-        25,
-        25,
+        76,
+        76,
+        294,
+        197
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_IronSponge",
+      "box": [
+        24,
+        24,
+        92,
+        61
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_JarBattery",
+      "box": [
+        52,
+        52,
+        200,
+        165
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_L16Battery",
+      "box": [
+        59,
+        59,
+        209,
+        229
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_L16BatteryCase",
+      "box": [
+        60,
+        60,
+        210,
+        232
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_MakeshiftInverter",
+      "box": [
+        27,
+        27,
+        103,
+        80
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_MicrowaveTransformer",
+      "box": [
+        18,
+        18,
+        70,
+        55
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_PipeBlades",
+      "box": [
+        105,
+        105,
+        407,
+        161
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_PlugInInverter",
+      "box": [
+        32,
+        32,
+        123,
+        64
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_PowerInverter",
+      "box": [
+        38,
+        38,
+        146,
+        93
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarCellCharger",
+      "box": [
+        22,
+        22,
+        86,
+        53
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarCells",
+      "box": [
+        19,
+        19,
+        72,
+        47
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarFailsafe",
+      "box": [
+        49,
+        49,
+        189,
+        110
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarFlat",
+      "box": [
+        105,
+        105,
+        407,
+        184
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarGardenLight",
+      "box": [
+        59,
+        59,
+        227,
+        107
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarMaintainer",
+      "box": [
+        63,
+        63,
+        243,
+        156
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarModule",
+      "box": [
+        105,
+        105,
+        407,
+        182
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarRackMetal",
+      "box": [
+        105,
+        105,
+        375,
+        407
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarRackWood",
+      "box": [
+        105,
+        105,
+        376,
+        407
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarWallMetal",
+      "box": [
+        105,
+        105,
+        407,
+        205
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SolarWallWood",
+      "box": [
+        105,
+        105,
+        407,
+        213
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SpentIronSponge",
+      "box": [
+        24,
+        24,
+        92,
+        61
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_SteelBlades",
+      "box": [
+        105,
+        105,
+        407,
+        143
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_TarpGasBag",
+      "box": [
+        69,
+        69,
+        265,
+        164
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_TarryPacking",
+      "box": [
+        33,
+        33,
+        126,
+        81
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_TreadmillMotor",
+      "box": [
+        35,
+        35,
+        136,
+        78
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_WoodAsh",
+      "box": [
+        41,
+        41,
+        158,
+        100
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_WoodenBatteryPlatePattern",
+      "box": [
+        19,
+        19,
         73,
-        97
+        53
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_WoodenBlades",
+      "box": [
+        105,
+        105,
+        407,
+        173
+      ]
+    },
+    {
+      "name": "model_RenewableEnergy_WornBatteryPlates",
+      "box": [
+        24,
+        24,
+        78,
+        93
       ]
     },
     {
@@ -1432,6 +1474,18 @@
               "fullType": "Base.Pipe",
               "icon": "icon_Base_Pipe",
               "name": "Plastic Pipe"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.LeadPipe",
+              "icon": "icon_Base_LeadPipe",
+              "name": "Lead Pipe"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
             }
           ],
           "keep": false,
@@ -1490,8 +1544,8 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #3",
-          "FEMA Wood Gas Generator Plans"
+          "FEMA Wood Gas Generator Plans",
+          "Homestead Power #3"
         ],
         "needed": true,
         "research": [
@@ -2610,6 +2664,89 @@
       ]
     },
     {
+      "id": "RenewableEnergy_SewTarpGasBag",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Needle",
+              "icon": "icon_Base_Needle",
+              "name": "Needle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Thread",
+              "icon": "icon_Base_Thread",
+              "name": "Thread"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": true
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Tarp",
+              "icon": "icon_Base_Tarp",
+              "name": "Tarp"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.DuctTape",
+              "icon": "icon_Base_DuctTape",
+              "name": "Duct Tape"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": true
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [],
+        "magazines": [],
+        "needed": false,
+        "research": []
+      },
+      "name": "Sew Tarp Gas Bag",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.TarpGasBag",
+          "icon": "icon_RenewableEnergy_TarpGasBag",
+          "name": "Tarp Gas Bag"
+        }
+      ],
+      "skills": [
+        {
+          "level": 2,
+          "name": "Tailoring"
+        }
+      ]
+    },
+    {
       "id": "RenewableEnergy_TakeApartSolarMaintainer",
       "inputs": [
         {
@@ -2724,6 +2861,60 @@
           "name": "Electrical"
         }
       ]
+    },
+    {
+      "id": "RenewableEnergy_AirOutIronSponge",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SpentIronSponge",
+              "icon": "icon_RenewableEnergy_SpentIronSponge",
+              "name": "Spent Iron Sponge"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 0.25,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [],
+        "magazines": [],
+        "needed": false,
+        "research": []
+      },
+      "name": "Air Out Iron Sponge",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.IronSponge",
+          "icon": "icon_RenewableEnergy_IronSponge",
+          "name": "Iron Sponge"
+        }
+      ],
+      "skills": []
     },
     {
       "id": "RenewableEnergy_ReconditionBattery",
@@ -3277,8 +3468,8 @@
           }
         ],
         "magazines": [
-          "Homestead Power #3",
           "FEMA Wood Gas Generator Plans",
+          "Homestead Power #3",
           "Homestead Power #4"
         ],
         "needed": true,
@@ -4260,9 +4451,15 @@
           "items": [
             {
               "count": 1,
-              "fullType": "Base.Pipe",
-              "icon": "icon_Base_Pipe",
-              "name": "Plastic Pipe"
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.ClayPipeSegment",
+              "icon": "icon_Base_ClayPipeSegment",
+              "name": "Clay Pipe Segment"
             }
           ],
           "keep": false,
@@ -5436,6 +5633,117 @@
         {
           "level": 2,
           "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_MakeIronSponge",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.File",
+              "icon": "icon_Base_File",
+              "name": "File"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.IronScrap",
+              "icon": "icon_Base_IronScrap",
+              "name": "Iron Scrap"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SteelScrap",
+              "icon": "icon_Base_SteelScrap",
+              "name": "Steel Scrap"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.ScrapMetal",
+              "icon": "icon_Base_ScrapMetal",
+              "name": "Scrap Metal"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.UnusableMetal",
+              "icon": "icon_Base_UnusableMetal",
+              "name": "Sheet Metal Scrap"
+            },
+            {
+              "count": 10,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Splinters",
+              "icon": "icon_Base_Splinters",
+              "name": "Wood Splinters"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "fluid": {
+            "litres": 0.5,
+            "name": "Water"
+          },
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.WaterBottle",
+              "icon": "icon_Base_WaterBottle",
+              "name": "Water Bottle"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [],
+        "magazines": [],
+        "needed": false,
+        "research": []
+      },
+      "name": "Make Iron Sponge",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.IronSponge",
+          "icon": "icon_RenewableEnergy_IronSponge",
+          "name": "Iron Sponge"
+        }
+      ],
+      "skills": [
+        {
+          "level": 1,
+          "name": "Welding"
         }
       ]
     },
@@ -6823,6 +7131,18 @@
               "fullType": "Base.ClayPipeSegment",
               "icon": "icon_Base_ClayPipeSegment",
               "name": "Clay Pipe Segment"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.LeadPipe",
+              "icon": "icon_Base_LeadPipe",
+              "name": "Lead Pipe"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
             }
           ],
           "keep": false,
@@ -8205,6 +8525,7 @@
       "icon_Base_ElectronicsScrap",
       "icon_Base_EmptyJar",
       "icon_Base_Epoxy",
+      "icon_Base_File",
       "icon_Base_Funnel",
       "icon_Base_Garbagebag",
       "icon_Base_GardeningSprayAphids",
@@ -8221,6 +8542,7 @@
       "icon_Base_HandDrill",
       "icon_Base_HayTuft",
       "icon_Base_IronBar",
+      "icon_Base_IronScrap",
       "icon_Base_JarCrafted",
       "icon_Base_KitchenKnife",
       "icon_Base_LeadPipe",
@@ -8234,6 +8556,7 @@
       "icon_Base_Mov_LightGreenBarrel",
       "icon_Base_Mov_OrangeBarrel",
       "icon_Base_Nails",
+      "icon_Base_Needle",
       "icon_Base_NormalBrake1",
       "icon_Base_NutsBolts",
       "icon_Base_Pipe",
@@ -8249,6 +8572,7 @@
       "icon_Base_RubberHose",
       "icon_Base_Sandbag",
       "icon_Base_Saw",
+      "icon_Base_ScrapMetal",
       "icon_Base_Screwdriver",
       "icon_Base_Screws",
       "icon_Base_SheetMetal",
@@ -8256,10 +8580,14 @@
       "icon_Base_SmallSheetMetal",
       "icon_Base_SmithingHammer",
       "icon_Base_Speaker",
+      "icon_Base_Splinters",
+      "icon_Base_SteelScrap",
       "icon_Base_Strainer",
       "icon_Base_Straw2",
       "icon_Base_Tarp",
+      "icon_Base_Thread",
       "icon_Base_Tongs",
+      "icon_Base_UnusableMetal",
       "icon_Base_WaterBottle",
       "icon_Base_WeldingMask",
       "icon_Base_WeldingRods",
@@ -8294,6 +8622,7 @@
       "icon_RenewableEnergy_HomesteadPowerMag3",
       "icon_RenewableEnergy_HomesteadPowerMag4",
       "icon_RenewableEnergy_InverterCharger",
+      "icon_RenewableEnergy_IronSponge",
       "icon_RenewableEnergy_JarBattery",
       "icon_RenewableEnergy_L16Battery",
       "icon_RenewableEnergy_L16BatteryCase",
@@ -8313,7 +8642,9 @@
       "icon_RenewableEnergy_SolarRackWood",
       "icon_RenewableEnergy_SolarWallMetal",
       "icon_RenewableEnergy_SolarWallWood",
+      "icon_RenewableEnergy_SpentIronSponge",
       "icon_RenewableEnergy_SteelBlades",
+      "icon_RenewableEnergy_TarpGasBag",
       "icon_RenewableEnergy_TarryPacking",
       "icon_RenewableEnergy_TreadmillMotor",
       "icon_RenewableEnergy_WoodAsh",
@@ -8366,6 +8697,7 @@
       "model_RenewableEnergy_HomesteadPowerMag3",
       "model_RenewableEnergy_HomesteadPowerMag4",
       "model_RenewableEnergy_InverterCharger",
+      "model_RenewableEnergy_IronSponge",
       "model_RenewableEnergy_JarBattery",
       "model_RenewableEnergy_L16Battery",
       "model_RenewableEnergy_L16BatteryCase",
@@ -8385,7 +8717,9 @@
       "model_RenewableEnergy_SolarRackWood",
       "model_RenewableEnergy_SolarWallMetal",
       "model_RenewableEnergy_SolarWallWood",
+      "model_RenewableEnergy_SpentIronSponge",
       "model_RenewableEnergy_SteelBlades",
+      "model_RenewableEnergy_TarpGasBag",
       "model_RenewableEnergy_TarryPacking",
       "model_RenewableEnergy_TreadmillMotor",
       "model_RenewableEnergy_WoodAsh",
