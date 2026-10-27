@@ -1,8 +1,3 @@
--- Battery banks as both sides see them: what an object is, what parts a bank takes, whether it can
--- carry a load, the sources connected to it, and the bank's summary and status as the server last
--- reported them. What each kind of source is lives in Sources; the jobs at a bank
--- in BankJobs.
---
 -- Both sides register a Global Object System under SYSTEM_NAME, which keeps each bank's state
 -- while its chunk is unloaded and copies its small `summary` to every client; the whole `status`
 -- goes only to players watching it.
@@ -82,7 +77,6 @@ PowerBank.PARTS = {
     controller = { types = { [Specs.controller] = {} }, field = "controllers", max = "maxControllers", repairable = true },
 }
 
--- Item type to its PARTS kind.
 local PART_KINDS = {}
 for kind, part in pairs(PowerBank.PARTS) do
     for fullType in pairs(part.types) do

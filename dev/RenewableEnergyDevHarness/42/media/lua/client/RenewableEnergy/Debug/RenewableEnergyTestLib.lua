@@ -24,15 +24,12 @@ local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (PZHarness/TestLib.lua explains the runner and the rules every helper keeps), plus fixtures
--- that know this mod's banks and panels. Generators are RenewableEnergyTestLibGenerators', the
--- craft helpers RenewableEnergyTestLibCraft's, and the gas, arrow board and world fixtures their
--- own libraries'.
+-- that know this mod's banks and panels.
 --
 -- Banks and panels live on the authority, so their fixtures are built through T.server by the
 -- dev mod's server handlers (RenewableEnergyTestServer.lua) and removed there when the test ends.
--- A fixture is a harness handle (T.where): its square is picked at once, so later fixtures can be
--- placed near it, and `object` is filled in once this client has its copy of what the server
--- built. A bank is a record of the harness's record kit, of kind "bank" (RenewableEnergyTestKinds).
+-- A fixture's square is picked at once, so later fixtures can be placed near it; its `object` is
+-- filled in once this client has its copy of what the server built.
 RenewableEnergyTest = setmetatable({}, { __index = PZHarness.Test })
 local T = RenewableEnergyTest
 

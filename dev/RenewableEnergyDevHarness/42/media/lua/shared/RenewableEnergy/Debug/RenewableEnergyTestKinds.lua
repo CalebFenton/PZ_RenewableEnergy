@@ -1,8 +1,6 @@
--- Development only, not published. What the dev mod's client test libraries and its server
--- handlers both know of the mod's things: the record kinds of the harness's record kit, how a
--- handler finds an object by kind, and the readers of plain values both sides compare. Shared, so
--- each side requires it at load; the mod's server modules load after shared Lua, and only on the
--- authority, so the readers that need one require it when they run.
+-- What the client test libraries and the server handlers both know of the mod's things. The mod's
+-- server modules load after shared Lua, and only on the authority, so the readers that need one
+-- require it when they run.
 
 require "PZHarness/Fixtures"
 local Squares = require "cf_commonlib/Squares"
@@ -55,8 +53,6 @@ function Kinds.itemsOf(container)
     return list
 end
 
--- Finding by kind --------------------------------------------------------------------------------
-
 -- Kinds of object a handler finds that are no job feature's target (RenewableEnergyAction.targetOn
 -- finds those by their feature's name).
 local FIND = {
@@ -84,8 +80,6 @@ function Kinds.find(at)
         .. tostring(at.y) .. "," .. tostring(at.z) .. " on the server")
 end
 
--- Record kinds ------------------------------------------------------------------------------------
-
 -- Builds a `kind` on the Sprites[kind] tile `tile` (a dotted path: "barrel.MetalDrum",
 -- "standard") on `square` as the build menu does, through the builder rural finds use
 -- (Place.entity), which sends it to the clients, with the kind's system's OnCreate.
@@ -101,33 +95,9 @@ local function buildEntity(kind, systemPath)
     end
 end
 
--- Whether the building of a loaded record's tile is toxic, which its gas makes it.
 local function addToxic(object, state)
     local building = object:getSquare():getBuilding()
     state.toxic = building ~= nil and building:isToxic()
-end
-
--- What the bank tests read of a bank besides its saved fields: the status it would send a watching
--- player now, how many players watch it, its tile and the parts in it, its limits, and the world
--- age and day.
-local function bankExtras(record, bank, state)
-    local square = bank and bank:getSquare()
-    -- What the status doesn't show of each source's record.
-    local records = {}
-    for _, source in ipairs(record.sources) do
-        table.insert(records, { x = source.x, y = source.y, z = source.z, kind = source.kind, blades = source.blades })
-    end
-    state.on, state.name, state.overloaded = record.on == true, record.name or "", record.overloaded == true
-    state.age, state.calendarDay = getGameTime():getWorldAgeHours(), getGameTime():getDay()
-    state.storedWh = record.charge * record.nominalWh
-    state.limitW, state.drawW, state.chargerMaxW = record:limitW(), record:drawW(), record:chargerMaxW()
-    state.sources, state.batteries, state.records = #record.sources, #record.batteries, records
-    state.activated = bank ~= nil and bank:isActivated()
-    state.powered = square ~= nil and square:haveElectricity()
-    state.items = Kinds.itemsOf(bank and bank:getContainer())
-    state.overlays = Fixtures.overlaysOf(bank)
-    state.status = record:buildStatus()
-    state.watchers = Kinds.count(record.watchers)
 end
 
 --- The record kinds of the harness's record kit (the `records` test setting).
@@ -141,7 +111,6 @@ Kinds.RECORDS = {
         extras = function(record, object, state)
             state.capacity = record:capacity()
             state.torn = record:isTorn()
-            state.acidLimit = record:acidLimit()
             state.ghosts = require("RenewableEnergy/Biogas/Stink").counted(record:key())
             state.eaten = Kinds.count(record.eaten)
             state.snapshot = #record.hopper
@@ -169,11 +138,28 @@ Kinds.RECORDS = {
     -- Placed with its parts by the bank handlers' placeBank.
     bank = {
         owner = function() return PowerBank end,
-        extras = bankExtras,
+        extras = function(record, bank, state)
+            local square = bank and bank:getSquare()
+            -- What the status doesn't show of each source's record.
+            local records = {}
+            for _, source in ipairs(record.sources) do
+                table.insert(records,
+                    { x = source.x, y = source.y, z = source.z, kind = source.kind, blades = source.blades })
+            end
+            state.on, state.name, state.overloaded = record.on == true, record.name or "", record.overloaded == true
+            state.age, state.calendarDay = getGameTime():getWorldAgeHours(), getGameTime():getDay()
+            state.storedWh = record.charge * record.nominalWh
+            state.limitW, state.drawW, state.chargerMaxW = record:limitW(), record:drawW(), record:chargerMaxW()
+            state.sources, state.batteries, state.records = #record.sources, #record.batteries, records
+            state.activated = bank ~= nil and bank:isActivated()
+            state.powered = square ~= nil and square:haveElectricity()
+            state.items = Kinds.itemsOf(bank and bank:getContainer())
+            state.overlays = Fixtures.overlaysOf(bank)
+            state.status = record:buildStatus()
+            state.watchers = Kinds.count(record.watchers)
+        end,
     },
 }
-
--- Vehicles ------------------------------------------------------------------------------------------
 
 -- The value of the Java field `name` of `object`, read by reflection (debug only), since nothing
 -- exposes a vehicle's model list (BaseVehicle.models) to Lua.

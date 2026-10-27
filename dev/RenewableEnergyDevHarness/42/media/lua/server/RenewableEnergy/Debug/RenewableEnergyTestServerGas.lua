@@ -1,8 +1,6 @@
 -- The authority's half of the gas line and wood gas tests (RenewableEnergyTestsGasLine.lua,
 -- RenewableEnergyTestsWoodGas.lua): generators with the Gas Conversion Kit, the load they carry,
--- burning a gasifier's wood, and vanilla's wood fires. The generator reads, settings and billing
--- serve the bank tests' generators too (RenewableEnergyTestsBankGenerators.lua). The harness's
--- record kit drives the gasifiers' records (RenewableEnergyTestKinds).
+-- burning a gasifier's wood, and vanilla's wood fires, and the bank tests' generators.
 -- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
 -- RenewableEnergyTestHelpers.lua says how these handlers work.
 
@@ -27,11 +25,8 @@ local function generatorOn(args)
     return Kinds.find({ x = args.x, y = args.y, z = args.z, kind = "generator" })
 end
 
--- The generator at x, y, z: whether it runs, its fuel and condition, vanilla's idle bill an hour
--- (`idle`) and its whole bill an hour (`bill`), its kit's state (nil without a kit) with whether a
--- line is connected and to what kind of source, its overlays and its
--- sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor), whether its building is
--- toxic, and the world hour on the server as it was read (`hours`).
+-- `idle` and `bill` are vanilla's idle and whole bills an hour; the sprite picks the kit's and
+-- pipe's overlays (Sprites.gasKitFor).
 local function generatorRead(generator)
     local state = GasKit.stateOf(generator)
     local plain
@@ -57,9 +52,7 @@ handler("generatorRead", function(player, args)
     return generatorRead(generatorOn(args))
 end)
 
--- A bank's charging demand and its generators' native bills, all read in one call: the bank's
--- read (the record kit's) and, in `generators`, each generator at `args.generators` as
--- generatorRead reads it, with whether the bank charges from it. A job's reads before and after
+-- A bank's read and its generators' reads in one call. A job's reads before and after
 -- (T.job's `reads`) bracket the job with it in the same call, so no tick or explicit billing can
 -- repair a missing job-boundary settlement between them.
 handler("bankSettlement", function(_, args)
@@ -75,10 +68,7 @@ handler("bankSettlement", function(_, args)
     return state
 end)
 
--- Pours `args.pour` litres into the generator at x, y, z, as a player pouring petrol does (onto
--- whatever it shows), switches it on or off (`args.running`), as a player does, and has vanilla
--- rebuild the bills of the generators reaching it (`args.rebuild`). Answers the world update count
--- it acted at (`frame`, the harness's PZHarness.worldFrame).
+-- Answers the world update count it acted at (`frame`, PZHarness.worldFrame).
 handler("generatorSet", function(player, args)
     local generator = generatorOn(args)
     if args.pour then

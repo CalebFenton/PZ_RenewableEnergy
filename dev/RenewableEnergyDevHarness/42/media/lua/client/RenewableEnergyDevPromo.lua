@@ -473,7 +473,11 @@ end
 -- Adds the step that dresses the character as the settler, or with `settler` false back in the
 -- clothes it came with and empty-handed.
 local function addOutfit(settler)
-    Harness.addOutfit(run, getPlayer(), settler and SETTLER or OWN_CLOTHES)
+    local player = getPlayer()
+    run:add(function()
+        Harness.dress(player, settler and SETTLER or OWN_CLOTHES)
+        return DRAW_FRAMES
+    end)
 end
 
 -- Logs each bank's status as the window would read it. The promo runs single player, where the

@@ -17,7 +17,7 @@ local T = RenewableEnergyTest
 local test, expect, expectEqual, expectNear, player = T.test, T.expect, T.expectEqual, T.expectNear, T.player
 local spawnTrailer, batchOnTrailer, waitForPanelsCopy, standIn = T.spawnTrailer, T.batchOnTrailer, T.waitForPanelsCopy, T.standIn
 local panelCondition, panelShown, boxItems, modulesOnBothPanels = T.panelCondition, T.panelShown, T.boxItems, T.modulesOnBothPanels
-local LEFT, RIGHT = T.BOARD_PANELS[1], T.BOARD_PANELS[2]
+local LEFT, RIGHT = ArrowBoard.PANELS[1], ArrowBoard.PANELS[2]
 
 -- Expects `state`'s panels at a found trailer's conditions (`ranges` from worldSpawnStock): the
 -- first weathered, the second weathered or cracked. Returns both conditions.
@@ -96,7 +96,7 @@ test("renewable_energy_world_arrow_board_plain_spawn_keeps_stock", {
     end,
     validate = function(self)
         local stock, state = self.reads.stock.stock, self.trailer.state
-        for _, id in ipairs(T.BOARD_PANELS) do
+        for _, id in ipairs(ArrowBoard.PANELS) do
             local condition = panelCondition(state, id)
             expect(stock[id] ~= nil, id .. " was stocked with no module")
             expectEqual(id .. "'s condition", condition, stock[id])
@@ -365,8 +365,7 @@ test("renewable_energy_world_arrow_board_repair_needs_light", {
     end,
 })
 
--- ArrowBoard.FRAME's front and back ids, copied for the reason T.lidOf gives.
-local FRAME_FRONT, FRAME_BACK = "EngineDoor", "TruckBed"
+local FRAME_FRONT, FRAME_BACK = ArrowBoard.FRAME[1].id, ArrowBoard.FRAME[2].id
 
 local function frameCondition(state, partId)
     local part = state and state.frame[partId]

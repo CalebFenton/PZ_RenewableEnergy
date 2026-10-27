@@ -320,7 +320,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                 table.insert(self.results, result)
                 local handle = T.placeAsPlayer(self, square, item, sprite, carried and { [carried.key] = carried.value })
                 if carried then
-                    T.readModData(self, square, sprite, carried.key, item)
+                    T.read(self, "PZHarness.objectModData", T.at(square, { sprite = sprite, key = carried.key }), item)
                 end
                 T.pickUpAsPlayer(self, handle, sprite)
                 T.readCarried(self, { item })

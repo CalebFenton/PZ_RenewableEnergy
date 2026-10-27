@@ -78,8 +78,6 @@ function BuildingWatch.surroundingsLoaded(def, reach)
     return true
 end
 
--- Waiting
-
 -- What waits, by key: { x, y, z, ready, run }.
 local waiting = {}
 
@@ -114,8 +112,6 @@ local function runReady()
         entry.run(getSquare(entry.x, entry.y, entry.z))
     end
 end
-
--- Buildings
 
 -- Each { ledger, isRolled, wants, roll, reach }.
 local watchers = {}

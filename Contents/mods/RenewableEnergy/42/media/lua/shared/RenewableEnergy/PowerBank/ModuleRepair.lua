@@ -89,18 +89,13 @@ function ModuleRepair.sealRecipe()
     return getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE)
 end
 
---- The action units a seal in place takes `character`: as the crafting window times Seal Cracked
---- Module (ISHandcraftAction).
-function ModuleRepair.sealUnits(character)
-    return ModuleRepair.sealRecipe():getTime(character) * 5
-end
-
 --- The job row (cf_commonlib's Jobs) of sealing a module in place: `sealable(subject, with)` says
 --- whether the module the job means can be sealed, else `refusal` refuses it; `extra` adds the
---- place's own fields, such as where a character stands.
+--- place's own fields, such as where a character stands. It takes as long as the crafting window
+--- takes for Seal Cracked Module (ISHandcraftAction).
 function ModuleRepair.sealRow(sealable, refusal, extra)
     local row = {
-        units = function(subject, with, character) return ModuleRepair.sealUnits(character) end,
+        units = function(subject, with, character) return ModuleRepair.sealRecipe():getTime(character) * 5 end,
         light = true, sound = "GeneratorRepair",
         materials = { ModuleRepair.SEAL },
         blocker = function(character, subject, with) return not sealable(subject, with) and refusal or nil end,

@@ -2,14 +2,10 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 
--- Fixtures of the world and loot tests. What they build and read lives on the authority, so they
--- go through the dev mod's server handlers (RenewableEnergyTestServer*.lua); the harness's
--- visits (T.startVisits) take the character to the far places they read.
+-- Fixtures of the world and loot tests.
 
 local T = RenewableEnergyTest
 
---- Whether `value` lies in `range` ({ min, max }), both ends included, as the server's handlers
---- judge it (RenewableEnergyTestKinds).
 T.inRange = Kinds.inRange
 
 --- Expects every charge of `charges` to be one a found battery holds (Battery.FOUND_CHARGE).

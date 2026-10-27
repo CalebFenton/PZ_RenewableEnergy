@@ -3,9 +3,6 @@ local Items = require "cf_commonlib/Items"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 
--- The craft tests' helpers, added to RenewableEnergyTest: their names, their given inputs, the
--- repair crafts and the conditions repairs reach.
-
 local T = RenewableEnergyTest
 
 -- `name` in snake case, for test names: "HomesteadPowerMag1" -> "homestead_power_mag1".
@@ -29,15 +26,6 @@ function T.inputsOf(self, fullType)
         end
     end
     return found
-end
-
---- Queues a wait until this client's copy of the carried `fullType` has been repaired `repaired`
---- times: the craft and the tooltip read this client's copy.
-function T.waitForRepaired(self, fullType, repaired)
-    T.waitFor(self, function()
-        local item = T.carried(fullType)
-        return item ~= nil and item:getHaveBeenRepaired() == repaired
-    end, "this client's " .. fullType .. " repaired " .. repaired .. "x")
 end
 
 --- Registers the craft test `name` of the repair `recipe` on a carried `fullType` set to
@@ -65,7 +53,10 @@ function T.repairCraftTest(name, recipe, fullType, row)
         counts = row.counts or { [fullType] = 1 },
         after = function(self)
             T.readCarried(self, { fullType })
-            T.waitForRepaired(self, fullType, row.repairedAfter)
+            T.waitFor(self, function()
+                local item = T.carried(fullType)
+                return item ~= nil and item:getHaveBeenRepaired() == row.repairedAfter
+            end, "this client's " .. fullType .. " repaired " .. row.repairedAfter .. "x")
         end,
         validate = function(self)
             local item = T.carriedFirst(self, fullType)

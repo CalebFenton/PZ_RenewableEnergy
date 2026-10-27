@@ -47,32 +47,15 @@ Finds.PART_WEAR = { mean = 85, halfWidth = 15, dud = 0.05 }
 -- A part dud: broken (0) or a scrap's repair from it (Specs.partRepair), so it needs mending first.
 Finds.PART_DUD = { min = 0, max = 10 }
 
--- Rarity
-
---- The mod's loot rarity option `option` as a multiplier, for what the mod places in the world
---- itself (banks, crates, trailers, site panels): the game's loot rolls never reach those, so its
---- own loot settings don't either.
-function Finds.placedRarity(option)
-    return SandboxVars.RenewableEnergy[option]
-end
-
---- The multiplier for `fullType` added to a container the game's loot just filled: the mod's
---- option `option` times the game's loot setting for the item's category, which is 0 for an item
---- on the server's loot removal list (ItemPickerJava.getLootModifier), as an entry of a loot list
---- would get.
-function Finds.lootScaled(fullType, option)
-    return ItemPickerJava.getLootModifier(fullType) * SandboxVars.RenewableEnergy[option]
-end
-
---- `count` × the placed rarity of `option`, rounded up or down at random so that the average
---- scales exactly: a rarity of 0.5 halves the items on average, even where the count is 1.
+--- `count` × the mod's loot rarity option `option`, rounded up or down at random so that the
+--- average scales exactly: a rarity of 0.5 halves the items on average, even where the count is 1.
+--- For what the mod places in the world itself (banks, crates, trailers, site panels): the game's
+--- loot rolls never reach those, so its own loot settings don't either.
 function Finds.scaled(count, option)
-    local expected = count * Finds.placedRarity(option)
+    local expected = count * SandboxVars.RenewableEnergy[option]
     local whole = math.floor(expected)
     return Chance.hit(expected - whole) and whole + 1 or whole
 end
-
--- Modules
 
 function Finds.crackedCondition()
     return Chance.between(Finds.CRACKED.min, Finds.CRACKED.max)
@@ -105,8 +88,6 @@ function Finds.newModule(condition)
     Wear.setCondition(item, condition)
     return item
 end
-
--- Batteries and parts
 
 -- The percent of new the wear profile `wear` gives a found item that isn't a dud: the mean of
 -- three rolls bunches it around the profile's mean like a bell curve with no tails past halfWidth;
@@ -181,8 +162,6 @@ function Finds.add(container, fullType, profile)
     return item
 end
 
--- Loot
-
 local OWN_CONTAINER = {}
 for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
     OWN_CONTAINER[containerType] = true
@@ -226,10 +205,9 @@ function Finds.readyFoundItems(container)
     readyItems(container, not OWN_CONTAINER[container:getType()], false)
 end
 
--- Cracked modules
 -- Modules whose glass broke lie around where people kept junk and spares. They are added when a
 -- container is filled rather than through the loot lists, so that they come with their cracked
--- condition and the lists' modules stay whole. Weights scale like a loot list's (Finds.lootScaled).
+-- condition and the lists' modules stay whole. Weights scale like a loot list's.
 
 -- Rooms, and the weight of each of their shelves, boxes, crates and cabinets.
 Finds.CRACKED_MODULE_ROOMS = {
@@ -258,9 +236,12 @@ local function crackedModuleWeight(roomName, containerType, container)
     return Finds.CRACKED_MODULE_CONTAINERS[containerType] and Finds.CRACKED_MODULE_ROOMS[roomName] or 0
 end
 
---- The chance that a container of this weight gets a cracked module, at the save's options.
+--- The chance that a container of this weight gets a cracked module, at the save's options: the
+--- mod's option times the game's loot setting for the module's category, which is 0 for an item on
+--- the server's loot removal list (ItemPickerJava.getLootModifier), as an entry of a loot list
+--- would get.
 function Finds.crackedModuleChance(weight)
-    return weight * Finds.lootScaled(MODULE, "LRMSolarPanels") / 100
+    return weight * ItemPickerJava.getLootModifier(MODULE) * SandboxVars.RenewableEnergy.LRMSolarPanels / 100
 end
 
 --- Maybe adds a cracked module to a freshly filled container, if its room or vehicle keeps them.

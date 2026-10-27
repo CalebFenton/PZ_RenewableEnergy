@@ -1,7 +1,5 @@
 -- The authority's half of the bank and panel tests: fixtures only the server's bank system
--- can build, and its passes, which a multiplayer client holds only copies of. A bank is a record
--- of the harness's record kit (RenewableEnergyTestKinds' "bank" kind); its handlers take its place,
--- x, y, z, and answer its read. Only registers handlers, so a --stay rerun loads it again
+-- can build, and its passes, which a multiplayer client holds only copies of. Only registers handlers, so a --stay rerun loads it again
 -- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
@@ -34,29 +32,23 @@ local WindSource = require "RenewableEnergy/PowerBank/WindSource"
 local handler, need = PZHarness.serverHandler, PZHarness.need
 local Fixtures, Records = PZHarness.Fixtures, PZHarness.Records
 
--- The bank at x, y, z of `args`: its record, loaded or not, and its tile while loaded.
 local function bankRecord(args)
     return Records.at({ kind = "bank", x = args.x, y = args.y, z = args.z })
 end
 
--- The bank's record and its tile, or the handler ends as missing the tile.
 local function bankAt(args)
     local record, bank = bankRecord(args)
     return record, need(bank, "the bank's tile on the server")
 end
 
--- The bank's read (RenewableEnergyTestKinds' bank extras).
 local function stateOf(record)
     return Records.read("bank", record, record:getIsoObject())
 end
 
 -- Fixtures ---------------------------------------------------------------------------------------
 
--- RenewableEnergyTest.bank's handler: a bank built and stocked by BankSystem.place, of the
--- Sprites field `args.kind` facing `args.facing` (S if nil), holding `args.items` with its
--- batteries at `args.charge`, and disconnected by the server's character's Disconnect Bank when
--- `args.connected == false`. Whatever bank stands on the square when the test ends goes, with its
--- record (Records.track): a chunk loaded again, or a bank rebuilt, brings a new object.
+-- RenewableEnergyTest.bank's handler. Whatever bank stands on the square when the test ends goes,
+-- with its record (Records.track): a chunk loaded again, or a bank rebuilt, brings a new object.
 handler("placeBank", function(player, args, defer)
     local square = PZHarness.squareAt(args)
     local items = args.items or {}
@@ -144,9 +136,7 @@ end)
 
 -- Banks ------------------------------------------------------------------------------------------
 
--- RenewableEnergyTest.setCharge's handler: every battery in the bank charged to `args.charge` by
--- the batteries' own setter and sent, then the bank reads them again, as it does after anything
--- changed its container. Answers the bank's read.
+-- RenewableEnergyTest.setCharge's handler. Answers the bank's read.
 handler("setCharge", function(_, args)
     local record, bank = bankAt(args)
     local items = bank:getContainer():getItems()
@@ -162,11 +152,8 @@ handler("setCharge", function(_, args)
     return stateOf(record)
 end)
 
--- The first `args.type` in the bank, past the bank's own commands and sent to the clients: its
--- condition set to `args.condition` (Wear.setCondition) and its repair count to `args.repaired`;
--- `args.wear` points taken by the mod's Wear.take, which keeps a fraction pending on the item; or
--- with `args.remove` taken out, as a part that disappeared would. With `args.recount` the bank
--- reads its parts again. Answers the bank's read.
+-- RenewableEnergyTest.bankPart's handler, past the bank's own commands. Wear.take keeps a fraction
+-- pending on the item. Answers the bank's read.
 handler("bankPart", function(_, args)
     local record, bank = bankAt(args)
     local item = need(bank:getContainer():getFirstType(args.type), "a " .. tostring(args.type) .. " in the bank on the server")
@@ -192,16 +179,11 @@ handler("bankPart", function(_, args)
     return stateOf(record)
 end)
 
--- Weather with snow falling hard.
 local SNOWING = { cloud = 1, fog = 0, rain = 0, snowing = true, groundSnow = 0 }
 
--- RenewableEnergyTest.bankPass's handler: the bank system's own pass of the bank (Bank:catchUp,
--- then Bank:afterChange) over the last `args.hours` (1 if nil), in the context the system builds
--- for it with the sky the test sets: `args.light` W/m² on every mount, with the sun above the
--- horizon only when there is light; snow falling at full strength if `args.snowing`, else clear;
--- `args.airC` °C (mild if nil); a wind of `args.windKph`. `args.stormHours` of storm go on the
--- world's storm clock first (PanelStorms.add). A bank whose chunk is unloaded runs too. Answers
--- the bank's read after the pass.
+-- RenewableEnergyTest.bankPass's handler: the bank system's own pass (Bank:catchUp, then
+-- Bank:afterChange) in the context the system builds, with the sky the test sets; the sun is above
+-- the horizon only when there is light. Answers the bank's read after the pass.
 handler("bankPass", function(_, args)
     local record = bankRecord(args)
     local light = args.light or 0
@@ -322,7 +304,6 @@ local function panelRecord(args)
     return source
 end
 
--- PanelStorms.stormChance for each trial { source, hours }, at the save's storm options.
 handler("stormChances", function(_, args)
     local chances = {}
     for i, trial in ipairs(args.trials) do
@@ -352,9 +333,6 @@ handler("panelState", function(_, args)
     return { modules = panel:getModData()[Panel.MODULES_KEY], overlays = Fixtures.overlaysOf(panel) }
 end)
 
--- `args.hours` of storm on the world's storm clock (PanelStorms.add), and every loaded panel that
--- no bank runs weathered (PanelSource.weatherLoaded), at the save's storm options. Answers the
--- modules each panel at `args.panels` records after.
 handler("panelStorm", function(_, args)
     PanelStorms.add(args.hours)
     PanelSource.weatherLoaded()

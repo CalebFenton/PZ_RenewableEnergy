@@ -2,15 +2,12 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 
--- Fixtures of the arrow board tests (RenewableEnergyTestsArrowBoard*.lua), added to
--- RenewableEnergyTest. The trailer's state lives on the authority, so they go through the dev
--- mod's server handlers (RenewableEnergyTestServerTrailer.lua); both sides read a vehicle's state
--- the same way (RenewableEnergyTestKinds).
+-- Fixtures of the arrow board tests. The trailer's state lives on the authority, so they go
+-- through RenewableEnergyTestServerTrailer.lua.
 
 local T = RenewableEnergyTest
 local player = T.player
 
--- Vehicles ----------------------------------------------------------------------------------------
 -- A vehicle is a T.placeVehicle handle, spawned by the authority through the spawnVehicle setting,
 -- stocked as the world spawns it when `args.stocked` and whole when `args.repair`.
 
@@ -74,9 +71,7 @@ end
 -- The squares an arrow board takes north and south of its centre.
 local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
--- The arrow board's panel parts.
-T.BOARD_PANELS = ArrowBoard.PANELS
-local LEFT, RIGHT = T.BOARD_PANELS[1], T.BOARD_PANELS[2]
+local LEFT, RIGHT = ArrowBoard.PANELS[1], ArrowBoard.PANELS[2]
 
 function T.lidOf(vehicle)
     return vehicle:getPartById(ArrowBoard.LID)
@@ -111,7 +106,7 @@ end
 
 -- Whether two states show the same panels: modules, conditions and models.
 local function samePanels(a, b)
-    for _, id in ipairs(T.BOARD_PANELS) do
+    for _, id in ipairs(ArrowBoard.PANELS) do
         if T.panelCondition(a, id) ~= T.panelCondition(b, id) or T.panelShown(a, id) ~= T.panelShown(b, id) then
             return false
         end

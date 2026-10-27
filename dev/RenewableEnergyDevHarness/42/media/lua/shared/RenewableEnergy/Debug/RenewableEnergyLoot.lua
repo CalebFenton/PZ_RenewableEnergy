@@ -179,9 +179,7 @@ local function sortedKeys(t)
     return keys
 end
 
---- How WorldSpawns and the arrow board stock the containers they place, each as fill(container)
---- for a scratch container: { banks = BANK_STOCK name -> fill, crates = CRATE_STOCK name -> fill,
---- arrowBoard = fill }.
+--- How WorldSpawns and the arrow board stock the containers they place, each as fill(container).
 function Loot.worldStocks()
     local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
     local stocks = { banks = {}, crates = {} }

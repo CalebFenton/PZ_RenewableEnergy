@@ -1,7 +1,3 @@
--- Wiring something to a bank by hand: a part into its container (Specs.wiring) or a treadmill's
--- motor to feed it (Treadmill.SPEC.wiring). What a wiring job takes and how long, and, on the
--- authority, the XP its first wiring teaches and the wire unwiring gives back.
-
 local Utilities = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"

@@ -2,12 +2,9 @@
 -- trailer whose panels charge the batteries in a padlocked box on its tongue, which light an
 -- arrow on its lamp board.
 --
--- RenewableEnergy.ArrowBoard is spread over three files, by concern: this one has the trailer,
--- its stock, lid, panels and frame, and the one per-frame watch of every loaded trailer; Power.lua
--- its charging, switch and lamps; Crashes.lua what a crash does to it. The vehicle script's part
--- functions are called on every side, so the files are shared; what only the authority may do
--- says so and takes its server modules when it runs, since a server file is empty on a
--- multiplayer client.
+-- The vehicle script's part functions are called on every side, so the ArrowBoard files are
+-- shared; what only the authority may do takes its server modules when it runs, since a server
+-- file is empty on a multiplayer client.
 --
 -- Each panel is a vehicle part holding a Solar Module, whose condition is the part's, shown by
 -- its Whole, LightCracked or Cracked model. Nothing in the game reports a part's condition
@@ -69,8 +66,6 @@ function ArrowBoard.isTrailer(vehicle)
     return vehicle ~= nil and vehicle:getScriptName() == ArrowBoard.SCRIPT
 end
 
--- Loaded trailers
---
 -- Every loaded trailer this game has seen, by vehicle, with what each concern watches of it each
 -- frame: the lid (`lid` and what it last showed), the lamps (`box`, while this game draws them,
 -- Power.lua) and crashes (`crash`, while this game runs its physics, Crashes.lua). Its part inits
@@ -87,8 +82,6 @@ function ArrowBoard.trailerEntry(vehicle)
     return entry
 end
 
--- Stock
-
 --- Stocks the battery box of a freshly spawned arrow board, scaled by the loot rarity options,
 --- every find readied (Finds). Authority only.
 ---@param container ItemContainer
@@ -99,7 +92,7 @@ function ArrowBoard.stockBatteryBox(container)
     for _ = 1, Finds.scaled(batteries, "LRMBatteries") do
         Finds.add(container, stock.battery, stock.batteryWear)
     end
-    if Chance.hit(stock.controllerChance * Finds.placedRarity("LRMMisc")) then
+    if Chance.hit(stock.controllerChance * SandboxVars.RenewableEnergy.LRMMisc) then
         Finds.add(container, Specs.controller)
     end
 end
@@ -453,8 +446,6 @@ function ArrowBoard.damagedFrame(vehicle)
     end
     return damaged
 end
-
--- Every frame
 
 local FLASHES = not isServer()
 

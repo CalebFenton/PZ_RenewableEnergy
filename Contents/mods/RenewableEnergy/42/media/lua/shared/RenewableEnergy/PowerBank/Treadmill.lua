@@ -1,7 +1,6 @@
 -- Vanilla's treadmill (Sprites.treadmill), two tiles. Unwired, a run on it draws its motor's watts
 -- like any appliance. Wired to feed a bank, a run on it banks watt-hours instead.
 
-local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
@@ -28,7 +27,8 @@ Treadmill.SPEC = {
     xpPerHour = { Fitness = 20, Sprinting = 15 },
 }
 
-local FACING_STEPS = Utilities.SIDE_STEPS
+-- The step in x and y to the square on each side, by compass letter: north is up the map, -y.
+local FACING_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
 -- Steps back from each end of the treadmill (Sprites.treadmill) to its rear end.
 local STEPS_TO_REAR = { rear = 0, console = 1 }
 

@@ -194,7 +194,8 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
             -- An action takes its duration when it is made, so these two are made with the instant
             -- cheat off and never queued.
             p:setTimedActionInstantCheat(false)
-            if not T.needActionTime(self) then return end
+            if not T.need(self, not p:isTimedActionInstant(),
+                "the debug option Cheats > Timed Action > Instant off, which makes every action instant") then return end
             local function wiringTime(level)
                 T.setPerk(self, Perks.Electricity, level)
                 return RenewableEnergyAction:new(p, "bank", BankJobs.WIRE_IN, bank.object, battery).maxTime

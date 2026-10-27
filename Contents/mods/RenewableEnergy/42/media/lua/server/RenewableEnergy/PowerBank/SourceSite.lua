@@ -122,12 +122,13 @@ SourceSite.source = {
     end,
 }
 
---- Connects a world source through the same preparation, mutation and publication as a source
---- job, without charging materials. The caller checked the placement and connection rules.
-function SourceSite.connectSource(character, object, isoObject)
+--- Connects the world source `object` to `bank` through the same preparation, mutation and
+--- publication as a source job, with no one doing it: no materials, no XP. The caller checked the
+--- placement and connection rules.
+function SourceSite.connectSource(object, bank)
     local site = SourceSite.source
-    local place = site.open(object, isoObject)
-    site.act(character, SourceJobs.CONNECT, place, SourceJobs.JOBS[SourceJobs.CONNECT], object, isoObject)
+    local place = site.open(object, bank)
+    site.act(nil, SourceJobs.CONNECT, place, SourceJobs.JOBS[SourceJobs.CONNECT], object, bank)
     site.tell(place)
 end
 

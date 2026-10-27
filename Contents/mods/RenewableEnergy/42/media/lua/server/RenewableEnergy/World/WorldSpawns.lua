@@ -159,7 +159,7 @@ WorldSpawns.CRATE_STOCK = {
 
 -- Adds one of `part`'s types with its chance × the Misc rarity, if the bank has a slot for it.
 local function maybeAddPart(container, part, slots)
-    if part and slots > 0 and Chance.hit(part.chance * Finds.placedRarity("LRMMisc")) then
+    if part and slots > 0 and Chance.hit(part.chance * SandboxVars.RenewableEnergy.LRMMisc) then
         Finds.add(container, Chance.pickWeighted(part.types))
     end
 end

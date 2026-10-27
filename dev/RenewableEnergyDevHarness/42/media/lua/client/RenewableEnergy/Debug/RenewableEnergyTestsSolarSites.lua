@@ -16,7 +16,7 @@ local T = RenewableEnergyTest
 local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, T.serverCheck
 
 
--- Game minutes to let pass once a spot's chunk is back: a spot that waits goes down at the next.
+-- Game minutes to let pass once a spot's chunk is back: a spot goes down by the next.
 local SETTLE_MINUTES = 2
 -- A wait on the game clock has no limit of its own: the test's time limit comes first.
 local CLOCK_MS = math.huge

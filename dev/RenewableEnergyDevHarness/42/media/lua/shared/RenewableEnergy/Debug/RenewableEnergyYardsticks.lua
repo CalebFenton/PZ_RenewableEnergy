@@ -1,6 +1,4 @@
--- Development only. The yardsticks the tests and the --loot town report measure power against:
--- a guessed weather mix, the south-facing mounts, vanilla's appliance draws, and a day of sun
--- added up over them.
+-- The yardsticks the tests and the --loot town report measure power against.
 
 local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"

@@ -1,8 +1,9 @@
 -- The authority's half of the solar site tests. The tests arm a site's spots with
 -- SolarSites.addSite and let the world place them: when the chunk that holds a spot loads, the
--- system's OnChunkLoaded places it, or queues it for the next game minute. Nothing here places a
--- spot by hand. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
--- RenewableEnergyTestHelpers.lua says how these handlers work.
+-- system's OnChunkLoaded places it, or queues it, a line for the next tick and a spot that waits
+-- for a later game minute. Nothing here places a spot by hand. Only registers handlers, so a
+-- --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
+-- handlers work.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"

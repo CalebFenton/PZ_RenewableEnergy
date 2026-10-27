@@ -11,7 +11,7 @@ local Specs = require "RenewableEnergy/Specs"
 local T = RenewableEnergyTest
 local test, expect, expectEqual, expectNear = T.test, T.expect, T.expectEqual, T.expectNear
 local spawnTrailer, batchOnTrailer, boxItems, modulesOnBothPanels = T.spawnTrailer, T.batchOnTrailer, T.boxItems, T.modulesOnBothPanels
-local LEFT, RIGHT = T.BOARD_PANELS[1], T.BOARD_PANELS[2]
+local LEFT, RIGHT = ArrowBoard.PANELS[1], ArrowBoard.PANELS[2]
 
 -- The panels charge the emptiest battery first, all of it while it has room; once all are full
 -- the rest goes unstored.

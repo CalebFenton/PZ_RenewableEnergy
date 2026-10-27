@@ -11,18 +11,19 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local ClientObjects = require "cf_commonlib/ClientObjects"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
+local Tiles = require "cf_commonlib/Tiles"
 
-local BankSystem = ClientObjects.define(PowerBank, {
-    adoptCopy = function(isoObject)
-        isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
-    end,
-})
+local BankSystem = ClientObjects.define(PowerBank)
 
--- A bank the server places reaches a client in an ordered packet (AddItemToMapPacket) and its
--- state after it in syncs, which are reliable but unordered (PacketTypes.SyncIsoObject), so a
--- sync can arrive first and be dropped for naming an object the client doesn't have yet. Once this
--- client has the bank, it asks the server for its state again.
 if isClient() then
+    Tiles.onLoad(PowerBank.feature.sprites, function(isoObject)
+        isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
+    end, { matches = PowerBank.feature.isObject, added = true })
+
+    -- A bank the server places reaches a client in an ordered packet (AddItemToMapPacket) and its
+    -- state after it in syncs, which are reliable but unordered (PacketTypes.SyncIsoObject), so a
+    -- sync can arrive first and be dropped for naming an object the client doesn't have yet. Once
+    -- this client has the bank, it asks the server for its state again.
     Events.OnObjectAdded.Add(function(isoObject)
         local player = getPlayer()
         if player and PowerBank.isBank(isoObject) then

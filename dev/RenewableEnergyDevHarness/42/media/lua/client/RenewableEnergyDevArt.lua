@@ -422,15 +422,13 @@ local function iconList()
     return catalog:iconList()
 end
 
-local addShot = Harness.addSpotShot
-
 -- The steps that set `tiles` out on the emptied lot and shoot `shot` there.
 local function addTileShot(run, player, lot, tiles, shot)
     run:add(function()
         Harness.emptyLot(lot)
         placeTiles(lot, tiles)
     end)
-    addShot(run, player, lot, shot)
+    Harness.addSpotShot(run, player, lot, shot)
 end
 
 -- Cracked mounts, by lot square, and their modules' conditions in slot order: the metal walls and
@@ -486,7 +484,7 @@ local function addCrackedShot(run, player, lot)
         ArrowBoard.setSwitch(trailer, false)
         return Stage.vehiclesAtRest({ trailer = trailer }, false)
     end)
-    addShot(run, player, lot, CRACKED_SHOT)
+    Harness.addSpotShot(run, player, lot, CRACKED_SHOT)
 end
 
 -- The tile, overlay, item, icon, fill, digester and wind shots, each on the lot cleared of the one
@@ -497,13 +495,13 @@ local function addTileAndItemShots(run, player, lot)
         Harness.removeTrees(lot.x, lot.y, lot.z)
         buildTileStage(lot)
     end)
-    addShot(run, player, lot, SHOTS.tiles)
-    addShot(run, player, lot, SHOTS.overlays)
+    Harness.addSpotShot(run, player, lot, SHOTS.tiles)
+    Harness.addSpotShot(run, player, lot, SHOTS.overlays)
     run:add(function()
         Harness.emptyLot(lot)
         dropItems(lot)
     end)
-    addShot(run, player, lot, SHOTS.items)
+    Harness.addSpotShot(run, player, lot, SHOTS.items)
     run:addIconSheet("icons", iconList)
     for _, facing in ipairs({ "S", "E", "N", "W" }) do
         addTileShot(run, player, lot, fillTiles(facing), SHOTS.fill[facing])
@@ -511,7 +509,7 @@ local function addTileAndItemShots(run, player, lot)
     addTileShot(run, player, lot, digesterTiles(), SHOTS.digesters)
     addTileShot(run, player, lot, windTiles(), SHOTS.wind)
     addTileShot(run, player, lot, tallWindTiles(), SHOTS.windTall)
-    addShot(run, player, lot, SHOTS.windBehind)
+    Harness.addSpotShot(run, player, lot, SHOTS.windBehind)
 end
 
 -- The trailer hitched to its car, then the rear in each of its states. The steps spawn the pair
@@ -527,7 +525,7 @@ local function addHitchedTrailerShots(run, player, lot, art)
         Stage.hitchTrailer(art.pair, player)
         return Stage.vehiclesAtRest(art.pair, true)
     end)
-    addShot(run, player, lot, SHOTS.trailer)
+    Harness.addSpotShot(run, player, lot, SHOTS.trailer)
     addStates(run, art, HITCHED_STATES)
 end
 
@@ -547,7 +545,7 @@ local function addLoneAndCrackedShots(run, player, lot, art)
         setBlood(art.pair.trailer, BLOOD_SIDES)
         return Stage.vehiclesAtRest(art.pair, false)
     end)
-    addShot(run, player, lot, SHOTS.trailerFront)
+    Harness.addSpotShot(run, player, lot, SHOTS.trailerFront)
     addStates(run, art, LONE_STATES)
     addCrackedShot(run, player, lot)
 end

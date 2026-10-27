@@ -34,7 +34,4 @@ function Utilities.teachOnce(character, holder, key, perk, xp)
     return true
 end
 
---- The step in x and y to the square on each side, by compass letter: north is up the map, -y.
-Utilities.SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
-
 return Utilities

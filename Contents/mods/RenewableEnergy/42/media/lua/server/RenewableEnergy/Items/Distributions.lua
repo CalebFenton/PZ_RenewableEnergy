@@ -166,23 +166,16 @@ Distributions.items = require "RenewableEnergy/Items/LootEntries"
 
 -- Applying
 
--- The mod's name in the log line of a loot list the game lacks (Loot.register).
-local MOD_NAME = "RenewableEnergy"
-
--- A row's multiplier: a stash map's is all or nothing, by whether the Stash Houses option drops
--- maps; every other row's its loot rarity option.
-local apply = Loot.register(MOD_NAME, Distributions.items, function(spec)
+--- Puts every entry of Distributions.items into their lists again at the save's options now,
+--- replacing the entries a load put there (Loot.register). A row's multiplier: a stash map's is
+--- all or nothing, by whether the Stash Houses option drops maps; every other row's its loot
+--- rarity option.
+Distributions.apply = Loot.register("RenewableEnergy", Distributions.items, function(spec)
     if spec.stashMap then
         return Stash.mapsInLoot() and 1 or 0
     end
     return SandboxVars.RenewableEnergy[spec.option]
 end)
-
---- Puts every entry of Distributions.items into their lists again at the save's options now,
---- replacing the entries a load put there (Loot.register).
-function Distributions.apply()
-    apply()
-end
 
 Events.OnPostDistributionMerge.Add(addOwnVehicleTables)
 Events.OnPostDistributionMerge.Add(addOwnContainersToRooms)

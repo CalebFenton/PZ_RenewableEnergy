@@ -216,12 +216,12 @@ local function wears(fullType)
     return Specs.batteries[fullType] ~= nil or Specs.modules[fullType] ~= nil
 end
 
--- A new item of `fullType` (PZHarness.QA.newItem), worn if `worn`.
-local function stockItem(fullType, fluid, worn)
-    local item = HarnessQA.newItem(fullType, fluid)
-    if item and worn and Specs.batteries[fullType] then
+-- A new item of a layGroups entry (PZHarness.QA.newItem), worn if `worn`.
+local function newStockItem(entry)
+    local item = HarnessQA.newItem(entry.type, entry.fluid)
+    if item and entry.worn and Specs.batteries[entry.type] then
         Wear.setCondition(item, WORN_BATTERY)
-    elseif item and worn then
+    elseif item and entry.worn then
         Wear.setCondition(item, CRACKED_MODULE)
     end
     return item
@@ -396,10 +396,6 @@ local function stockGroups(stock, summary)
         end
     end
     return groups
-end
-
-local function newStockItem(entry)
-    return stockItem(entry.type, entry.fluid, entry.worn)
 end
 
 --- Sets the scenario up around `player`, and prints what it laid out, and anything it couldn't,

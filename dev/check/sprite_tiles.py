@@ -120,7 +120,7 @@ def _tile_names(value):
         for key, inner in value.items():
             yield from _tile_names(key)
             yield from _tile_names(inner)
-    elif isinstance(value, (list, tuple)):
+    elif isinstance(value, list):
         for inner in value:
             yield from _tile_names(inner)
     elif isinstance(value, str) and value.startswith(TILE_PREFIX):

@@ -36,8 +36,8 @@ Action.REACH = 4.6
 -- A gas feature's objects stand on the floor, which luautils.walkAdj walks right up to.
 local GAS_REACH = 2.6
 
--- Each feature's job module (cf_commonlib's Jobs.define) and, where the shared files hold it, its
--- side of the jobs on the authority; the server files serve the rest (Action.serve). A job's
+-- Each feature's job module (cf_commonlib's Jobs.define); the server files serve the sides of the
+-- jobs on the authority (Action.serve), but the fire's, which the shared files hold. A job's
 -- `with` is what it works with, if anything: the inventory item it uses (a part, a tool, a bag, a
 -- tank), a second world object (the bank Connect Source wires to, the far end of Connect Gas
 -- Line), or what a client says (a bank's new name, a panel's module slot, a trailer's panel part).
@@ -50,9 +50,10 @@ JobAction.forFeatures(Action, {
     digester = { isTarget = Digester.isDigester, jobs = DigesterJobs, reach = GAS_REACH },
     heater = { isTarget = GasHeater.isHeater, jobs = GasHeater, reach = GAS_REACH },
     gasifier = { isTarget = Gasifier.isGasifier, jobs = GasifierJobs, reach = GAS_REACH },
-    fire = { isTarget = FireAsh.isFire, jobs = FireAsh, site = FireAsh.site },
+    fire = { isTarget = FireAsh.isFire, jobs = FireAsh },
     kit = { isTarget = GeneratorReach.isVanillaGenerator, jobs = GasKit, reach = GAS_REACH },
 })
+Action.serve({ fire = FireAsh.site })
 
 --- The translation key of `job`'s name in a menu.
 function Action.labelKey(job)

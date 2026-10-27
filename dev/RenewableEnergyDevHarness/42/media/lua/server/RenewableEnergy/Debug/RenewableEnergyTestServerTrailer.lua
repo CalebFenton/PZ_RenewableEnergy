@@ -1,8 +1,6 @@
 -- The authority's half of the arrow board tests: the trailer's panels, box and frame change only
--- where the authority runs them; the vehicle state every vehicle test reads is
--- RenewableEnergyTestKinds'. Only registers handlers, so a --stay rerun loads it again
--- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work. Returns the
--- `spawnVehicle` test setting's spawn (RenewableEnergyTestSettings.lua).
+-- where the authority runs them. Only registers handlers, so a --stay rerun loads it again
+-- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerFixtures"
@@ -39,10 +37,7 @@ local function spawnAtRoll(defer, script, square, facing, roll)
     return Rolls.with(defer, roll, addVehicleDebug, script, IsoDirections[facing], nil, square)
 end
 
---- T.placeVehicle's spawn, the `spawnVehicle` setting (RenewableEnergyTestSettings.lua): an arrow
---- board through ArrowBoard.spawn when `args.stocked`, as the world spawns one; with
---- `args.recordStock` a plain spawn recording its panels' stock conditions (arrowBoardStock); else
---- the harness's spawn; whole when `args.repair`. `defer` takes the undos of the rolls it sets.
+--- T.placeVehicle's spawn, the `spawnVehicle` setting (RenewableEnergyTestSettings.lua).
 function Trailer.spawnVehicle(script, square, facing, args, defer)
     local vehicle
     if args and args.stocked then

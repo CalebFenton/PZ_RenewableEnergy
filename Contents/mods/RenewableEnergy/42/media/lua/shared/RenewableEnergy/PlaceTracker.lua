@@ -21,8 +21,7 @@ end
 
 --- Starts tracking the tiles that `options.matches(isoObject)` accepts, which have the sprites
 --- `options.sprites`. `options.onFound(isoObject)`, if given, runs for each such tile as its chunk
---- loads or it is placed, and `options.onLost(key)` for each place dropped. With
---- `options.keepPlaces` false the tracker keeps no places, and only calls onFound.
+--- loads or it is placed, and `options.onLost(key)` for each place dropped.
 function PlaceTracker.new(options)
     local self = setmetatable({
         matches = options.matches,
@@ -30,11 +29,8 @@ function PlaceTracker.new(options)
         onLost = options.onLost,
         places = {},
     }, PlaceTracker)
-    local keep = options.keepPlaces ~= false
     local function found(isoObject)
-        if keep then
-            self:add(isoObject)
-        end
+        self:add(isoObject)
         if self.onFound then
             self.onFound(isoObject)
         end
@@ -45,13 +41,11 @@ function PlaceTracker.new(options)
             found(isoObject)
         end
     end)
-    if keep then
-        Events.OnObjectAboutToBeRemoved.Add(function(isoObject)
-            if self.matches(isoObject) then
-                forget(self, Places.key(isoObject:getX(), isoObject:getY(), isoObject:getZ()))
-            end
-        end)
-    end
+    Events.OnObjectAboutToBeRemoved.Add(function(isoObject)
+        if self.matches(isoObject) then
+            forget(self, Places.key(isoObject:getX(), isoObject:getY(), isoObject:getZ()))
+        end
+    end)
     return self
 end
 

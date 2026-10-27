@@ -6,13 +6,7 @@ local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Sprites = require "RenewableEnergy/Sprites"
 
--- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
--- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the rural find tests'
--- digesters and gasifiers (RenewableEnergyTestsRuralFinds.lua), added to RenewableEnergyTest.
--- Digesters and gasifiers are records of the Global Object System on the authority, which the
--- harness's record kit places, sets, fills, ages and reads (kinds "digester" and "gasifier",
--- RenewableEnergyTestKinds); the server handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua)
--- run what is the mod's own. Reads land in self.reads[label].
+-- Fixtures of the biogas, gas line and wood gas tests. Reads land in self.reads[label].
 
 local T = RenewableEnergyTest
 

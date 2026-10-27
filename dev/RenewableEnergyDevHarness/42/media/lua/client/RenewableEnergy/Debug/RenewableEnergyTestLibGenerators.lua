@@ -1,21 +1,16 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Vanilla generators in the tests, added to RenewableEnergyTest: placing, reading and setting them
--- on the authority (RenewableEnergyTestServer.lua, ...Gas.lua), their kit's gas passes and the
--- bills vanilla and the gas line run on them. The bank tests charge from them and the gas tests fit
--- kits to them.
-
 local T = RenewableEnergyTest
 
---- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
---- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
---- on its square if `opts.failsafe`. When the test ends the server removes it and this client lets
---- go of its squares (PZHarness.Fixtures.releaseGeneratorPower). Returns its handle (T.where),
---- whose object is this client's copy once it has one.
+--- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but not next to it,
+--- with `opts.fuel` litres, running if `opts.running`, with a failsafe on its square if
+--- `opts.failsafe`. When the test ends the server removes it and this client lets go of its squares
+--- (PZHarness.Fixtures.releaseGeneratorPower). Returns its handle (T.where), whose object is this
+--- client's copy once it has one.
 function T.generator(self, opts)
     opts = opts or {}
     local square = opts.square
-        or T.square(self, { near = opts.near, minDistance = opts.minDistance or 2 }, "a free square for a generator")
+        or T.square(self, { near = opts.near, minDistance = 2 }, "a free square for a generator")
     if not square then
         return nil
     end
@@ -53,7 +48,7 @@ end
 function T.setGenerator(self, generator, fields)
     T.server(self, "generatorSet", T.at(generator, { pour = fields.pour, running = fields.running, rebuild = fields.rebuild }))
     if fields.rebuild then
-        T.waitForFrameAfter(self, function() return self.server.generatorSet.frame end)
+        T.serverUntil(self, "PZHarness.worldFrame", {}, function(now) return now.frame > self.server.generatorSet.frame end)
     end
 end
 

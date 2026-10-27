@@ -139,11 +139,12 @@ end
 
 -- What a spot (its global object's modData) puts down on its square, by its `what`. A spot that
 -- `waits` is placed at a later minute once `ready(square, spot)`, if given, says all it needs is
--- loaded: vehicles can't safely join the world while their chunk is still loading, and a line's
--- two ends may lie in different chunks. `refuses(square, spot)`, if given, says why what stands
--- on its squares now keeps it out, or nil; on open ground that is RuralFinds' rule, indoors a free
--- floor. A mount on a roof or a wall goes where the map gives it. Its `place` returns whether the
--- game took it. A refused spot is kept and retried when its chunk next loads.
+-- loaded: vehicles can't safely join the world while their chunk is still loading. A `line` puts
+-- things down at both its ends, the far one (`toX`, `toY`, `toZ`) maybe in another chunk, once both
+-- are loaded (placeLines). `refuses(square, spot)`, if given, says why what stands on its squares
+-- now keeps it out, or nil; on open ground that is RuralFinds' rule, indoors a free floor. A mount
+-- on a roof or a wall goes where the map gives it. Its `place` returns whether the game took it. A
+-- refused spot is kept and retried when its chunk next loads.
 local SPOTS = {
     panel = {
         refuses = function(square, spot)
@@ -185,8 +186,7 @@ local SPOTS = {
     },
     -- The wind charger on its square and the bank it is wired to at the far end.
     windCharger = {
-        waits = true,
-        ready = function(_, spot) return farEnd(spot) ~= nil end,
+        line = true,
         refuses = function(square, spot)
             return RuralFinds.refusal("wind", square) or notFreeIndoors(farEnd(spot))
         end,
@@ -200,7 +200,7 @@ local SPOTS = {
                 if why then
                     print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
                 else
-                    SourceSite.connectSource(nil, charger, bank)
+                    SourceSite.connectSource(charger, bank)
                 end
             end
             return true
@@ -208,8 +208,7 @@ local SPOTS = {
     },
     -- The gas source (`source`, a RuralFinds find) on its square and its generator at the far end.
     gasLine = {
-        waits = true,
-        ready = function(_, spot) return farEnd(spot) ~= nil end,
+        line = true,
         refuses = function(square, spot)
             local why = RuralFinds.refusal(spot.source, square)
             if why then
@@ -359,7 +358,38 @@ local function waitToPlace(x, y, z, spot)
     end)
 end
 
--- Places and forgets every spot in the chunk that needn't wait.
+-- The lines whose chunk has loaded, each { x, y, z, spot } by "x,y,z", and whether any chunk has
+-- loaded since they were last tried.
+local lines, chunkLoaded = {}, false
+
+-- Places each line whose far end is loaded, on the tick after a chunk loads, and drops one whose
+-- square has unloaded, to come back when its chunk loads again. On a server that tick falls in the
+-- frame that loaded the chunk, before the server sends it to a client that asked for it
+-- (GameServer.main: ServerMap.preupdate loads, OnTick, then PlayerDownloadServer.update copies the
+-- chunk), so the client's copy holds the line. Placed in a later frame, a line's objects reach a
+-- client still loading that chunk as an AddItemToMap it drops (AddItemToMapPacket.processClient),
+-- and the copy it gets is older than them.
+local function placeLines()
+    if not chunkLoaded then
+        return
+    end
+    chunkLoaded = false
+    local tried = lines
+    lines = {}
+    for key, line in pairs(tried) do
+        local object = system:getObjectAt(line.x, line.y, line.z)
+        local square = getSquare(line.x, line.y, line.z)
+        if object and square then
+            if farEnd(line.spot) then
+                placeSpot(object, square, line.spot)
+            else
+                lines[key] = line
+            end
+        end
+    end
+end
+
+-- Places and forgets every spot in the chunk that needn't wait; a line waits for the next tick.
 local function placeChunk(wx, wy)
     local objects = system:getObjectsInChunk(wx, wy)
     for i = objects:size() - 1, 0, -1 do
@@ -368,7 +398,10 @@ local function placeChunk(wx, wy)
         -- A copy: removeObject wipes the object's modData (GlobalObject.Reset).
         local spot = copyTable(object:getModData())
         local square = getSquare(x, y, z)
-        if SPOTS[spot.what].waits then
+        local kind = SPOTS[spot.what]
+        if kind.line then
+            lines[x .. "," .. y .. "," .. z] = { x = x, y = y, z = z, spot = spot }
+        elseif kind.waits then
             waitToPlace(x, y, z, spot)
         elseif square then
             placeSpot(object, square, spot)
@@ -398,5 +431,8 @@ local function onSGlobalObjectSystemInit()
 end
 
 Events.OnSGlobalObjectSystemInit.Add(onSGlobalObjectSystemInit)
+-- Any chunk's: a line's far end may lie in a chunk without spots.
+Events.LoadChunk.Add(function() chunkLoaded = true end)
+Events.OnTick.Add(placeLines)
 
 return SolarSites
