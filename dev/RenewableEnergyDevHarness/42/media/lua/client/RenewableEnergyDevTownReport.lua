@@ -1,7 +1,8 @@
 -- Development only; the --loot mode (RenewableEnergyDevHarness.lua) prints this report. The
--- modules and batteries a thorough player finds in each town of RenewableEnergyDevTownCensus,
--- and the yardsticks that turn them into power. Client Lua: it requires WorldSpawns, SolarSites and
--- Finds as it runs, which a single player game, the only one --loot runs, has.
+-- modules, batteries and PART_TYPES a thorough player finds in each town of
+-- RenewableEnergyDevTownCensus, and the yardsticks that turn them into power. Client Lua: it
+-- requires WorldSpawns, SolarSites and Finds as it runs, which a single player game, the only one
+-- --loot runs, has.
 --
 -- A town's finds are dev/loot/census.py's counts of its container tiles, rooms and vehicle stalls,
 -- each times what it holds on average, plus what WorldSpawns' OnSeeNewRoom puts in its rooms
@@ -10,10 +11,10 @@
 -- so they are exact for the lists and approximate where the game picks among them: a procedural
 -- container picks a list by weightChance, at most `max` per room, and lists forced by zone, tile
 -- or room are left out. Car batteries in room loot are counted apart: vanilla's, and every car
--- carries one besides. World banks, kit crates and arrow boards' battery boxes hold the mean of
--- their own stocking functions over sampled fills (RenewableEnergyLoot's worldStocks), and a
--- container keeps the cracked modules Finds.addCrackedModules gives it the chance of, so
--- a change to either reaches the report without an edit here.
+-- carries one besides. World banks, garage kit crates and arrow boards' battery boxes hold the
+-- mean of their own stocking functions over sampled fills (RenewableEnergyLoot's worldStocks), and
+-- a container keeps the cracked modules Finds.addCrackedModules gives it the chance of, so a
+-- change to either reaches the report without an edit here.
 
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Sun = require "RenewableEnergy/Sun"
@@ -31,6 +32,19 @@ local TownReport = {}
 local MODULE = Specs.factoryModule
 local LOOSE_BATTERIES = { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery" }
 local CAR_BATTERIES = { "Base.CarBattery1", "Base.CarBattery2", "Base.CarBattery3" }
+
+-- The parts and magazines counted by full type alongside the modules and batteries, each with the
+-- sources most of a town's come from. Corpses, stash houses and RuralFinds aren't counted.
+local PART_TYPES = {
+    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.ChargeController",
+    "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger", "RenewableEnergy.SolarFailsafe",
+}
+local IS_PART = {}
+for _, fullType in ipairs(PART_TYPES) do
+    IS_PART[fullType] = true
+end
+-- How many of a part's largest sources in a town its line names.
+local PART_SOURCES = 5
 
 -- What a source holds on average: modules with their condition summed, as found and after one
 -- Seal Cracked Module on every module it helps, and batteries with their watt-hours as found.
@@ -87,7 +101,8 @@ local function mix(share, a, b)
 end
 
 -- What one fill of a container holds, for PZHarness.Loot.sample: its modules with their condition
--- as found and after Seal Cracked Module, and its batteries with their watt-hours after wear.
+-- as found and after Seal Cracked Module, its batteries with their watt-hours after wear, and each
+-- of PART_TYPES by full type.
 local function findsIn(container)
     local finds = {}
     local items = container:getItems()
@@ -98,6 +113,8 @@ local function findsIn(container)
             add(finds, { modules = 1, condition = condition, repaired = sealedCondition(item) })
         elseif Battery.isBattery(item) then
             add(finds, { batteries = 1, wh = Battery.nominalWh(item) })
+        elseif IS_PART[item:getFullType()] then
+            add(finds, { [item:getFullType()] = 1 })
         end
     end
     return finds
@@ -220,14 +237,23 @@ local function expectedInContainers(roomName, containerType, count, rooms, fullT
     return total
 end
 
--- Expected items of `fullType` in the room loot of a town of the census.
-local function expectedInTown(town, fullType)
-    local total = 0
+-- Expected items of `fullType` in the room loot of a town of the census, by room name.
+local function expectedInTownByRoom(town, fullType)
+    local byRoom = {}
     for roomName, byType in pairs(town.containers) do
         local rooms = math.max(1, town.rooms[roomName] or 0)
         for containerType, count in pairs(byType) do
-            total = total + expectedInContainers(roomName, containerType, count, rooms, fullType)
+            byRoom[roomName] = (byRoom[roomName] or 0) + expectedInContainers(roomName, containerType, count, rooms, fullType)
         end
+    end
+    return byRoom
+end
+
+-- Expected items of `fullType` in the room loot of a town of the census.
+local function expectedInTown(town, fullType)
+    local total = 0
+    for _, count in pairs(expectedInTownByRoom(town, fullType)) do
+        total = total + count
     end
     return total
 end
@@ -254,8 +280,8 @@ end
 -- What the rooms of a town hold: `listed`, the mod's items in room loot; `cracked`, cracked
 -- modules; `banks`, the world banks OnSeeNewRoom places, their batteries and the modules they lay
 -- beside them (WorldSpawns.layModulesBeside), `banksByRoom` how many by room name; `crates`, the
--- kit crates it places; and `cars`, car batteries in room loot. Banks and crates need Battery
--- Bank Spawn on.
+-- garage kit crates it places; and `cars`, car batteries in room loot. Banks and crates need
+-- Battery Bank Spawn on.
 local function roomFinds(town, kinds)
     local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
     local row = { listed = add(none(), kinds.intact, expectedInTown(town, MODULE)), cracked = none(), banks = none(),
@@ -284,7 +310,7 @@ local function roomFinds(town, kinds)
             end
         end
         for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
-            add(row.crates, kinds.crates.kit, (town.rooms[roomName] or 0) / (odds * rarity))
+            add(row.crates, kinds.crates.garageKit, (town.rooms[roomName] or 0) / (odds * rarity))
         end
     end
     return row
@@ -421,6 +447,9 @@ local function vehicleFinds(stalls, kinds)
                     for _, fullType in ipairs(LOOSE_BATTERIES) do
                         add(loot[script], batteriesOf(fullType, vehicleExpected(script, fullType)))
                     end
+                    for _, fullType in ipairs(PART_TYPES) do
+                        loot[script][fullType] = vehicleExpected(script, fullType)
+                    end
                 end
                 add(total, loot[script], vehicles)
                 add(total, kinds.cracked, vehicles * vehicleCrackedModules(script, zoneName))
@@ -555,6 +584,33 @@ local function batteriesText(finds)
     return string.format("%.1f (%.1f kWh)", finds.batteries, finds.wh / 1000)
 end
 
+-- Prints under `mark` how many of each of PART_TYPES the town holds on average, with its
+-- PART_SOURCES largest sources: room loot by room name, world banks, garage kit crates, vehicles
+-- (arrow boards' battery boxes included) and sites. `row` is the town's report row.
+local function printParts(mark, town, row)
+    for _, fullType in ipairs(PART_TYPES) do
+        local sources = expectedInTownByRoom(town, fullType)
+        sources["world banks"] = row.banks[fullType]
+        sources["garage kit crates"] = row.crates[fullType]
+        sources.vehicles = row.vehicles[fullType]
+        sources.sites = row.sites[fullType]
+        local total, ranked = 0, {}
+        for source, count in pairs(sources) do
+            if count > 0 then
+                total = total + count
+                table.insert(ranked, { source = source, count = count })
+            end
+        end
+        table.sort(ranked, function(a, b) return a.count > b.count end)
+        local largest = {}
+        for i = 1, math.min(PART_SOURCES, #ranked) do
+            table.insert(largest, string.format("%s %.2f", ranked[i].source, ranked[i].count))
+        end
+        print(string.format("%s %s in %s: %.1f; most from %s", mark, (string.gsub(fullType, "^[^.]+%.", "")),
+            town.name, total, table.concat(largest, ", ")))
+    end
+end
+
 local function printReport(census, samples, mark)
     local SolarSites = require "RenewableEnergy/World/SolarSites"
     local options = SandboxVars.RenewableEnergy
@@ -587,7 +643,7 @@ local function printReport(census, samples, mark)
             add(row.total, row[part])
         end
         rows[town.name] = row
-        print(string.format("%s modules in %s: room loot %s, cracked %s, world crates %s, beside world banks %s, vehicles %s, sites %s; total %s",
+        print(string.format("%s modules in %s: room loot %s, cracked %s, garage kit crates %s, beside world banks %s, vehicles %s, sites %s; total %s",
             mark, town.name, modulesText(row.listed), modulesText(row.cracked), modulesText(row.crates), modulesText(row.banks),
             modulesText(row.vehicles), modulesText(row.sites), modulesText(row.total)))
         local banks, byRoom = 0, {}
@@ -596,10 +652,11 @@ local function printReport(census, samples, mark)
             table.insert(byRoom, string.format("%s %.1f", roomName, placed))
         end
         table.sort(byRoom)
-        print(string.format("%s batteries in %s: room loot %s, world banks %.1f holding %s, kit crates %s, vehicles %s, sites %s; total %s; car batteries in room loot %.1f",
+        print(string.format("%s batteries in %s: room loot %s, world banks %.1f holding %s, garage kit crates %s, vehicles %s, sites %s; total %s; car batteries in room loot %.1f",
             mark, town.name, batteriesText(row.listed), banks, batteriesText(row.banks), batteriesText(row.crates),
             batteriesText(row.vehicles), batteriesText(row.sites), batteriesText(row.total), row.cars))
         print(string.format("%s world banks in %s by room: %s", mark, town.name, table.concat(byRoom, ", ")))
+        printParts(mark, town, row)
     end
     print(string.format("%s arrow boards per map: %.1f from vehicle zones, %.1f at sites", mark, zoneBoards, siteBoards))
     local stocks = {}
