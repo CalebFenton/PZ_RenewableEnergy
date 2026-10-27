@@ -170,8 +170,9 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
 })
 
 -- A storm cracks a panel out in the weather whether or not it feeds a bank: a loose panel outdoors
--- cracks, one indoors doesn't, and a connected one is its bank's to crack: the bank's catch-up at
--- the disconnect cracks it for the storm it missed, and the next storm cracks it loose.
+-- cracks, one indoors doesn't, and a connected one is its bank's to crack, at the bank's next pass;
+-- once disconnected, the next storm cracks it loose. A pass weathers every storm hour since the
+-- last at once, so the bank's pass is explicit to keep the count of passes fixed.
 test("renewable_energy_solar_storms_crack_loose_panels", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
@@ -186,6 +187,7 @@ test("renewable_energy_solar_storms_crack_loose_panels", {
         -- Every roll the lowest: each panel at risk cracks.
         T.forceRoll(self, 0)
         T.read(self, "panelStorm", { hours = 1, panels = panels }, "first")
+        T.bankPass(self, bank, 0, { hours = 1, label = "banked" })
         T.job(self, "source", RenewableEnergy.SourceJobs.DISCONNECT, connected.position, nil, "disconnected")
         T.read(self, "panelStorm", { hours = 1, panels = panels }, "second")
     end,
@@ -199,8 +201,10 @@ test("renewable_energy_solar_storms_crack_loose_panels", {
         expectEqual("the connected panel after a storm its bank didn't run", condition("first", 1), 100)
         expectEqual("the loose outdoor panel after a storm", condition("first", 2), 100 - crack)
         expectEqual("the loose indoor panel after a storm", condition("first", 3), 100)
+        expectEqual("the connected panel after its bank's pass", self.reads.banked.status.sources[1].modules[1].condition,
+            100 - crack)
         T.expectOk(self.reads.disconnected, "disconnecting the panel")
-        expectEqual("the disconnected panel after both storms", condition("second", 1), 100 - 2 * crack)
+        expectEqual("the disconnected panel after the next storm", condition("second", 1), 100 - 2 * crack)
         expectEqual("the loose outdoor panel after a second storm", condition("second", 2), 100 - 2 * crack)
         expectEqual("the loose indoor panel after a second storm", condition("second", 3), 100)
     end,
