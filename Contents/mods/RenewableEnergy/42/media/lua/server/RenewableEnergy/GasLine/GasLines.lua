@@ -13,8 +13,6 @@ local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local Fumes = require "RenewableEnergy/Fumes"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
@@ -28,33 +26,14 @@ local Tiles = require "cf_commonlib/Tiles"
 local GasLines = {}
 RenewableEnergy.GasLines = GasLines
 
--- Global ModData: kitted generators by "x,y,z", each { x, y, z, source }; the source is kept so a
--- gasifier's pipe can come off after the generator is gone.
-GasLines.MOD_DATA = "RenewableEnergyGasKits"
 -- Cap on one pass (a save loaded after the clock jumped). Time a generator spent unloaded is billed
 -- by vanilla to its fuel when it loads (IsoGenerator.update), and the next pass bills that to the gas.
 local LONGEST_PASS = 24
 local EPSILON = RenewableEnergy.EPSILON
 -- Vanilla's wear chance for a generator whose item script it can't find (IsoGenerator.update).
 local NO_SCRIPT_ONE_IN = 30
-
-local function keyOf(object)
-    return object:getX() .. "," .. object:getY() .. "," .. object:getZ()
-end
-
-local function store()
-    return ModData.getOrCreate(GasLines.MOD_DATA)
-end
-
---- Whether the gas pass lists `generator`, as Install Kit lists it.
-function GasLines.isListed(generator)
-    return store()[keyOf(generator)] ~= nil
-end
-
---- Takes `generator` off the gas pass's list.
-function GasLines.unlist(generator)
-    store()[keyOf(generator)] = nil
-end
+-- Global ModData older saves keep: kitted generators by "x,y,z", each { x, y, z, source }.
+local LEGACY_LIST = "RenewableEnergyGasKits"
 
 local function generatorAt(position)
     local square = getSquare(position.x, position.y, position.z)
@@ -74,12 +53,6 @@ end
 
 local isKitOverlay = Sprites.matcher(Sprites.gasKit)
 local isGeneratorPipeOverlay = Sprites.matcher(Sprites.gasifierPipeGen)
-
--- Sets the line's source, in the generator's state and its entry in the list.
-local function setSource(generator, state, source)
-    state.source = source
-    store()[keyOf(generator)].source = source
-end
 
 -- Takes the pipe off the piped source at `position`: its half of it.
 local function unpipeSource(position)
@@ -116,90 +89,10 @@ local function cutLine(generator, state)
         unpipeSource(state.source)
     end
     local line = state.line
-    setSource(generator, state, nil)
+    state.source = nil
     state.line = nil
     forgetGas(state)
     return line
-end
-
--- Stops the running generator. Vanilla clears its building's toxicity as it stops one indoors
--- (IsoGenerator.setActivated), whatever else fumes there, so the mod's own fumes go back at once.
-local function stop(generator)
-    if generator:isActivated() then
-        generator:setActivated(false)
-        Fumes.restore(Fumes.buildingOf(generator:getSquare()))
-    end
-end
-
--- The watts the line carries to the generator whose kit state is `state`: its source's cap, or the
--- kit's while the source is out of reach. Nil off gas, where nothing caps what it delivers.
-local function capOf(state)
-    if not (state and state.onGas) then
-        return nil
-    end
-    local record = recordAt(state.source)
-    return record and record:capW() or GasKit.CAP_W
-end
-
--- The banks whose chargers charge from `generator`, in the order they share what it can give:
--- nearest first, the lower place on a tie (PlaceTracker.sortNearest).
-local function chargingBanks(generator)
-    local list = {}
-    PowerBank.each(function(bank)
-        if bank:chargesFrom(generator) then
-            table.insert(list, bank)
-        end
-    end)
-    PlaceTracker.sortNearest(list, PlaceTracker.objectPlace(generator))
-    return list
-end
-
--- Allocate the chargers' wants from the headroom after appliances and backup loads. A total is
--- independent of priority, so only a request for one bank's share needs the nearest-first list.
--- Both queries use the same capped allocation; neither builds a table of everyone's shares.
-local function allocate(generator, cap, load, target)
-    local left = cap and math.max(0, cap - load.watts - load.backedW) or math.huge
-    local total, share = 0, 0
-    local function take(bank)
-        if not bank:chargesFrom(generator) then return end
-        local watts = math.min(bank.chargeWantW or 0, left)
-        left, total = left - watts, total + watts
-        if bank == target then share = watts end
-    end
-    if target then
-        for _, bank in ipairs(chargingBanks(generator)) do
-            take(bank)
-            if bank == target then return share end
-        end
-        return 0
-    end
-    PowerBank.each(take)
-    return total
-end
-
---- The watts the chargers of the battery banks that charge from `generator` draw (allocate).
---- Also returns the load measured for a gas cap, so billing reuses it with the same running
---- `payers` rather than scanning again. Off gas, no load measurement is needed.
-function GasLines.chargingW(generator, payers)
-    local cap = capOf(GasKit.stateOf(generator))
-    local load = cap and Payers.loadOf(generator, payers)
-    return allocate(generator, cap, load), load
-end
-
---- The watts `generator` delivers: its share of what it powers (Payers.loadOf), and the
---- chargers of the battery banks that charge from it.
-function GasLines.loadOf(generator)
-    local load = Payers.loadOf(generator)
-    return load.watts + load.backedW + allocate(generator, capOf(GasKit.stateOf(generator)), load)
-end
-
---- The most watts `bank`'s chargers draw from `generator`: its share of what the line's cap
---- leaves (allocate), nothing once the generator's own load takes it all. Nil when the generator
---- isn't on gas, so nothing but the chargers' rating limits them.
-function GasLines.chargerLimitW(generator, bank)
-    local cap = capOf(GasKit.stateOf(generator))
-    if not cap then return nil end
-    return allocate(generator, cap, Payers.loadOf(generator), bank)
 end
 
 -- Fuel the generator holds now: on gas, its tank or PHANTOM_FUEL, whichever is more; else its
@@ -313,26 +206,26 @@ function GasLines.run(generator, state, hours)
         record:afterChange()
     end
     if ranDry and hasGas then
-        generator:setActivated(true)
+        Fumes.setRunning(generator, true)
     end
     if record and state.onGas and not hasGas and (ranDry or generator:isActivated()) then
-        stop(generator)
+        Fumes.setRunning(generator, false)
         state.outOfGas = true
     end
     if generator:isActivated() and state.onGas then
-        local watts = GasLines.loadOf(generator)
+        local watts = Payers.deliveredW(generator)
         state.watts = watts
-        if watts > capOf(state) then
-            stop(generator)
+        if watts > GasKit.capW(generator) then
+            Fumes.setRunning(generator, false)
             state.stalled = true
         elseif record then
             wear(generator, state, record:wearFactor(), hours)
         end
     elseif state.stalled and hasGas and not generator:isActivated() then
-        local watts = GasLines.loadOf(generator)
+        local watts = Payers.deliveredW(generator)
         state.watts = watts
         if watts <= record:capW() then
-            generator:setActivated(true)
+            Fumes.setRunning(generator, true)
             state.stalled = false
         end
     end
@@ -351,28 +244,56 @@ local function catchUp(generator, state)
     GasLines.run(generator, state, Clock.hoursSince(state, LONGEST_PASS))
 end
 
---- Runs every kitted generator whose chunk is loaded. One gone from its loaded square or without
---- its kit leaves the list, and a gasifier's pipe to it comes off; an unloaded one waits.
-function GasLines.updateAll()
-    local gone = {}
-    for key, entry in pairs(store()) do
-        local loaded = getSquare(entry.x, entry.y, entry.z) ~= nil
-        local generator = loaded and generatorAt(entry)
-        local state = generator and GasKit.stateOf(generator)
-        if loaded and not state then
-            table.insert(gone, key)
-        elseif state then
-            catchUp(generator, state)
-            generator:transmitModData()
+-- A gasifier piped to a generator that the list of an older save still held after the generator
+-- was gone keeps its half of the pipe; the first pass that finds that square loaded takes it off,
+-- and the list goes once every entry is settled.
+local function settleLegacyList()
+    if not ModData.exists(LEGACY_LIST) then return end
+    local list = ModData.get(LEGACY_LIST)
+    local settled, waiting = {}, false
+    for key, entry in pairs(list) do
+        if not isPiped(entry.source) then
+            table.insert(settled, key)
+        elseif getSquare(entry.x, entry.y, entry.z) then
+            if not GasKit.hasKit(generatorAt(entry)) then
+                unpipeSource(entry.source)
+            end
+            table.insert(settled, key)
+        else
+            waiting = true
         end
     end
-    for _, key in ipairs(gone) do
-        unpipeSource(store()[key].source)
-        store()[key] = nil
+    if not waiting then
+        ModData.remove(LEGACY_LIST)
+        return
+    end
+    for _, key in ipairs(settled) do
+        list[key] = nil
     end
 end
 
+--- Runs every kitted generator whose chunk is loaded (Payers.eachGenerator); an unloaded one waits.
+function GasLines.updateAll()
+    settleLegacyList()
+    Payers.eachGenerator(function(generator)
+        local state = GasKit.stateOf(generator)
+        if state then
+            catchUp(generator, state)
+            generator:transmitModData()
+        end
+    end)
+end
+
 Events.EveryTenMinutes.Add(GasLines.updateAll)
+
+-- A kitted generator leaving the map, burnt or taken away, takes its half of a gasifier's pipe
+-- with it, so the gasifier's half comes off too.
+Events.OnObjectAboutToBeRemoved.Add(function(isoObject)
+    local state = GasKit.stateOf(isoObject)
+    if state then
+        unpipeSource(state.source)
+    end
+end)
 
 --- A failsafe relay calls off a stalled line's restart: clears `stalled` and sends the state.
 --- Nothing for a generator without a kit or not stalled.
@@ -392,7 +313,7 @@ local function disconnect(character, generator, state)
     end
     settleFuel(generator, state, false)
     if state.mode ~= "petrol" then
-        stop(generator)
+        Fumes.setRunning(generator, false)
     end
 end
 
@@ -402,14 +323,13 @@ local DO = {
     [GasKit.INSTALL] = function(character, state, row, generator)
         generator:getModData()[GasKit.STATE_KEY] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
             lastHour = getGameTime():getWorldAgeHours() }
-        store()[keyOf(generator)] = { x = generator:getX(), y = generator:getY(), z = generator:getZ() }
+        Payers.track(generator)
         Tiles.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
         return true
     end,
     [GasKit.REMOVE] = function(character, state, row, generator)
         disconnect(character, generator, state)
         generator:getModData()[GasKit.STATE_KEY] = nil
-        GasLines.unlist(generator)
         Tiles.showOverlay(generator, isKitOverlay, nil)
         Items.giveItems(character, GasKit.ITEM)
         return true
@@ -418,7 +338,7 @@ local DO = {
         local kind = GasKit.sourceKind(source)
         local spec = GasKit.SOURCES[kind]
         local line = spec.line(generator, source)
-        setSource(generator, state, { x = source:getX(), y = source:getY(), z = source:getZ(), kind = kind })
+        state.source = { x = source:getX(), y = source:getY(), z = source:getZ(), kind = kind }
         state.line = { item = line.item, count = line.need }
         if spec.piped then
             pipe(generator, source)

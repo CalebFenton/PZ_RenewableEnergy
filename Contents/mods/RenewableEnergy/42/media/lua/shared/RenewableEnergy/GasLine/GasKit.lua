@@ -111,6 +111,18 @@ function GasKit.sourceKind(object)
     return kind and GasKit.SOURCES[kind] and kind or nil
 end
 
+--- The watts the line carries to `generator` on the authority: its source's cap, or the kit's while
+--- the source is out of reach. Nil off gas, where nothing caps what it delivers.
+function GasKit.capW(generator)
+    local state = GasKit.stateOf(generator)
+    if not (state and state.onGas) then
+        return nil
+    end
+    local source = state.source
+    local record = source and GasKit.SOURCES[source.kind].owner.recordAt(source.x, source.y, source.z)
+    return record and record:capW() or GasKit.CAP_W
+end
+
 -- What keeps `source` from feeding `generator`, as a translation key, or nil: on the generator's
 -- level and in its reach.
 local function sourceBlocker(generator, source)

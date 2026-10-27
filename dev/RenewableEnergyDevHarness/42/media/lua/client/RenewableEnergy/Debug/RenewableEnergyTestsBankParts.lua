@@ -3,8 +3,10 @@ require "TimedActions/ISInventoryTransferAction"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/Menu"
-require "RenewableEnergy/Recipes"
+local BankMenu = require "RenewableEnergy/UI/BankMenu"
+local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
+local Wiring = require "RenewableEnergy/PowerBank/Wiring"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
 
 -- Power bank tests: wiring parts in and out, their wear and repair, and the crafted inverters.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
@@ -12,9 +14,9 @@ require "RenewableEnergy/Recipes"
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
 local player, stateItem = T.player, T.stateItem
-local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
+local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 local PowerBank, BankJobs, SourceJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs, RenewableEnergy.SourceJobs
-local Format, Menu = RenewableEnergy.Format, RenewableEnergy.Menu
+local Format = RenewableEnergy.Format
 
 -- Parts: wiring and wear -----------------------------------------------------------------------
 
@@ -53,7 +55,7 @@ test("renewable_energy_bank_container_refuses_transfers", {
 -- the first time an item is ever wired in; unwiring gives back the part and the wire.
 test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
     run = function(self)
-        local batteryWire, inverterWiring = PowerBank.wiringFor(T.CAR_BATTERY).wire, PowerBank.wiringFor(T.INVERTER_CHARGER)
+        local batteryWire, inverterWiring = Wiring.forPart(T.CAR_BATTERY).wire, Wiring.forPart(T.INVERTER_CHARGER)
         self.maxBatteries = Specs.banks["RenewableEnergy.BatteryBoxWood"].maxBatteries
         T.setPerk(self, Perks.Electricity, inverterWiring.skill - 1)
         local bank = T.bank(self, "batteryBoxWood", {})
@@ -67,16 +69,16 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         wire("noTool", T.CAR_BATTERY)
         T.giveBeforeCalls(self, "screwdriver", { { type = "Base.Screwdriver" } })
         wire("noWire", T.CAR_BATTERY)
-        T.giveBeforeCalls(self, "wire", { { type = PowerBank.WIRE, count = batteryWire } })
+        T.giveBeforeCalls(self, "wire", { { type = Wiring.WIRE, count = batteryWire } })
         wire("wired", T.CAR_BATTERY)
-        T.count(self, "wired", { PowerBank.WIRE })
+        T.count(self, "wired", { Wiring.WIRE })
         T.job(self, "bank", BankJobs.UNWIRE, bank.position, { type = T.CAR_BATTERY, inBank = true }, "unwired")
-        T.count(self, "unwired", { PowerBank.WIRE, T.CAR_BATTERY })
+        T.count(self, "unwired", { Wiring.WIRE, T.CAR_BATTERY })
         wire("rewired", T.CAR_BATTERY)
-        T.giveBeforeCalls(self, "inverter", { { type = PowerBank.WIRE, count = inverterWiring.wire }, { type = T.INVERTER_CHARGER } })
+        T.giveBeforeCalls(self, "inverter", { { type = Wiring.WIRE, count = inverterWiring.wire }, { type = T.INVERTER_CHARGER } })
         wire("skill", T.INVERTER_CHARGER)
         -- The rest of the slots, and one battery more.
-        T.giveBeforeCalls(self, "batteries", { { type = PowerBank.WIRE, count = self.maxBatteries * batteryWire },
+        T.giveBeforeCalls(self, "batteries", { { type = Wiring.WIRE, count = self.maxBatteries * batteryWire },
             { type = "Base.CarBattery2", count = self.maxBatteries } })
         for i = 2, self.maxBatteries do
             wire("fill" .. i, "Base.CarBattery2")
@@ -91,10 +93,10 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         T.expectRefused(reads.noWire, "item", "a battery was wired in without wire")
         T.expectOk(reads.wired, "wiring a battery in with a screwdriver and wire")
         expect(reads.wired.xpAfter > reads.wired.xpBefore, "the first wiring gave no Electricity XP")
-        expectEqual("wire left after wiring a battery in", self.counts.wired[PowerBank.WIRE], 0)
+        expectEqual("wire left after wiring a battery in", self.counts.wired[Wiring.WIRE], 0)
         T.expectOk(reads.unwired, "unwiring the battery")
         expectEqual("batteries back after unwiring", self.counts.unwired[T.CAR_BATTERY], 1)
-        expectEqual("wire back after unwiring", self.counts.unwired[PowerBank.WIRE], PowerBank.wiringFor(T.CAR_BATTERY).wire)
+        expectEqual("wire back after unwiring", self.counts.unwired[Wiring.WIRE], Wiring.forPart(T.CAR_BATTERY).wire)
         T.expectOk(reads.rewired, "wiring the battery in again")
         expectEqual("XP for wiring the same battery again", reads.rewired.xpAfter - reads.rewired.xpBefore, 0)
         T.expectRefused(reads.skill, "skill", "an Inverter/Charger was wired in a level below its skill")
@@ -118,7 +120,7 @@ test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
         end
         unwire("carBare", T.CAR_BATTERY)
         T.giveBeforeCalls(self, "screwdriver", { { type = "Base.Screwdriver" }, { type = T.L16 },
-            { type = PowerBank.WIRE, count = PowerBank.wiringFor(T.L16).wire } })
+            { type = Wiring.WIRE, count = Wiring.forPart(T.L16).wire } })
         T.job(self, "bank", BankJobs.WIRE_IN, bank.position, { type = T.L16 }, "l16InScrewdriver")
         unwire("l16Screwdriver", T.L16)
         unwire("carScrewdriver", T.CAR_BATTERY)
@@ -145,7 +147,7 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
         self.panel = T.panel(self, Sprites.flat, { near = self.bank })
         self.charger = self.panel and T.panel(self, Sprites.windCharger.propeller.wood.S, { near = self.bank })
         if not self.charger then return end
-        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = PowerBank.WIRE },
+        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = Wiring.WIRE },
             { type = "RenewableEnergy.WoodenBlades" } })
         T.step(function()
             -- Broken on this client's copy only: Replace Blades is the menu's to offer.
@@ -167,20 +169,20 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
             T.expectOptionRefused(self, label)
             expectEqual(label .. "'s tooltip", self.menu[label].tooltip, getText("Tooltip_RenewableEnergy_TooDark"))
         end
-        refusedDark("Wire In", T.optionFor(Menu.addWireInOptions(0, context, bank), battery))
-        local unwire = Menu.addUnwireOptions(0, context, bank)
+        refusedDark("Wire In", T.optionFor(BankMenu.addWireInOptions(0, context, bank), battery))
+        local unwire = BankMenu.addUnwireOptions(0, context, bank)
         expect(unwire ~= nil and #unwire.options > 0, "Unwire offers no part to refuse in the dark")
         for i, option in ipairs(unwire and unwire.options or {}) do
             refusedDark("Unwire " .. i, option)
         end
-        local bankMenu = Menu.addBankOptions(0, context, bank)
-        local sourceMenu = Menu.addSourceOptions(0, context, self.panel.object)
-        local chargerMenu = Menu.addSourceOptions(0, context, self.charger.object)
+        local bankMenu = BankMenu.addBankOptions(0, context, bank)
+        local sourceMenu = SourceMenu.addSourceOptions(0, context, self.panel.object)
+        local chargerMenu = SourceMenu.addSourceOptions(0, context, self.charger.object)
         local refused = {
             ["Connect Bank"] = T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectBank")),
             ["Connect Sources in Reach"] = T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", 2)),
             ["the panel's Connect"] = T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
-                Menu.bankLabel(bank), Format.away(self.panel.position, self.bank.position))),
+                BankMenu.bankLabel(bank), Format.away(self.panel.position, self.bank.position))),
             ["Replace Blades"] = T.optionNamed(chargerMenu, getText("ContextMenu_RenewableEnergy_ReplaceBlades")),
         }
         for name, option in pairs(refused) do
@@ -235,18 +237,18 @@ test("renewable_energy_bank_part_wear_and_repair", {
             wearPass(self, bank, "off")
             T.job(self, "bank", BankJobs.TURN_ON, bank.position)
             T.bankPart(self, bank, T.INVERTER_CHARGER, { condition = 50 })
-            T.give(self, "scrap", { { type = PowerBank.SCRAP } })
+            T.give(self, "scrap", { { type = Wiring.SCRAP } })
             repair(self, "unskilled", bank)
         end)
         T.step(function() T.setPerk(self, Perks.Electricity, Specs.partRepair.skill) end)
         T.batch(function()
             repair(self, "repaired", bank)
             T.bankState(self, bank, "afterRepair")
-            T.count(self, "scrap", { PowerBank.SCRAP })
+            T.count(self, "scrap", { Wiring.SCRAP })
             repair(self, "noScrap", bank)
             -- Past ConditionMax, which the setter keeps it to.
             T.bankPart(self, bank, T.INVERTER_CHARGER, { condition = 1000 })
-            T.give(self, "moreScrap", { { type = PowerBank.SCRAP } })
+            T.give(self, "moreScrap", { { type = Wiring.SCRAP } })
             repair(self, "whole", bank)
             T.bankPart(self, bank, T.INVERTER_CHARGER, { condition = 0 })
             T.server(self, "refreshBank", { bank = bank.position })
@@ -277,7 +279,7 @@ test("renewable_energy_bank_part_wear_and_repair", {
         T.expectOk(reads.repaired, "repairing a worn inverter with scrap")
         expectEqual("condition after one scrap", T.stateCondition(reads.afterRepair, T.INVERTER_CHARGER),
             50 + Specs.partRepair.condition)
-        expectEqual("scrap left", self.counts.scrap[PowerBank.SCRAP], 0)
+        expectEqual("scrap left", self.counts.scrap[Wiring.SCRAP], 0)
         T.expectRefused(reads.noScrap, "item", "a part was repaired without scrap")
         T.expectRefused(reads.whole, "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair")
         local broken = self.bank.state
@@ -353,7 +355,7 @@ for _, row in ipairs({ { "at_recipe_level", 0 }, { "two_levels_past", 2 }, { "fa
             if not expect(inverter ~= nil, "no makeshift inverter was made") then return end
             local cap = instanceItem(MAKESHIFT):getConditionMax()
             local level = math.min(10, self.required + past)
-            local expected = math.min(cap, cap - Recipes.CRAFTED_SHORTFALL + Recipes.CRAFTED_PER_LEVEL * (level - self.required))
+            local expected = math.min(cap, cap - Wear.CRAFTED_SHORTFALL + Wear.CRAFTED_PER_LEVEL * (level - self.required))
             expectEqual("the condition of an inverter made at Electricity " .. level, inverter.condition, expected)
             if past >= 10 then
                 expectEqual("the condition of an inverter made far past the recipe's level", inverter.condition, cap)

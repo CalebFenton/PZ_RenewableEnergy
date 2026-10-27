@@ -1,5 +1,5 @@
 -- The banks on the authority: the Global Object System that keeps them, the charge pass,
--- placing and removing banks, and the bank tiles' life in the map.
+-- placing and removing banks, the bank tiles' life in the map, and the jobs at a bank.
 --
 -- The vanilla Global Object System saves each bank's table with the world (not in the
 -- chunk), so a bank keeps charging and draining while nobody is near it, and its sync
@@ -13,17 +13,22 @@ local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Sun = require "RenewableEnergy/Sun"
+local Fumes = require "RenewableEnergy/Fumes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 require "RenewableEnergy/PowerBank/BankParts"
 require "RenewableEnergy/PowerBank/Backup"
 require "RenewableEnergy/PowerBank/BankStatus"
-local Clock = require "cf_commonlib/Clock"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local Items = require "cf_commonlib/Items"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
@@ -37,8 +42,8 @@ local EVERY_TEN_MINUTES = 1
 -- the sun's curve.
 local SUN_STEP = 1 / 6
 -- Longer gaps than this between passes (a save loaded after the clock jumped) count as
--- this long, so one pass never swings the charge by days of sun.
-BankSystem.LONGEST_PASS = 24
+-- this long, so one pass never swings the charge by days of sun (Bank:catchUp).
+BankSystem.longestPass = 24
 
 local deriveInitSystem, deriveInitLuaObjects = BankSystem.initSystem, BankSystem.initLuaObjects
 
@@ -97,28 +102,32 @@ local function makeBank(square, spriteName, index, from, fill)
         -- IsoGenerator.addToWorld doesn't build containers, unlike IsoObject's.
         generator:createContainersFromSpriteProperties()
     end
-    square:AddSpecialObject(generator, math.min(index, square:getObjects():size()))
-    container = generator:getContainer()
-    if container then
-        container:setExplored(true)
-    end
-    if fill then
-        fill(container)
-    end
-    generator:transmitCompleteItemToClients()
-    -- On a server each of these syncs the generator by its index on the square; a sync can reach a
-    -- client before the generator does and be dropped there, so a client asks again ("resync").
-    generator:setCondition(100)
-    generator:setFuel(10)
-    generator:setConnected(connected)
-    triggerEvent("OnObjectAdded", generator)
+    Tiles.addToWorld(square, generator, {
+        index = math.min(index, square:getObjects():size()),
+        beforeSend = function()
+            container = generator:getContainer()
+            if container then
+                container:setExplored(true)
+            end
+            if fill then
+                fill(container)
+            end
+        end,
+        -- On a server each of these syncs the generator by its index on the square; a sync can reach a
+        -- client before the generator does and be dropped there, so a client asks again ("resync").
+        afterSend = function()
+            generator:setCondition(100)
+            generator:setFuel(10)
+            generator:setConnected(connected)
+        end,
+    })
     return generator
 end
 
 --- A working bank of tile `spriteName` (a bank's tile in any facing) at `index` on the square, or
 --- on top when `index` is nil or negative. `fill(container)`, if given, stocks it before the
 --- complete object is sent and its record first reads the parts. Authority only.
-function PowerBank.place(square, spriteName, index, fill)
+function BankSystem.place(square, spriteName, index, fill)
     local top = square:getObjects():size()
     return makeBank(square, spriteName, (index and index >= 0) and index or top, nil, fill)
 end
@@ -140,9 +149,7 @@ end
 -- Squares stay powered by a running generator after it is removed, until
 -- setSurroundingElectricity runs on it switched off (IsoChunk.isGeneratorPoweringSquare).
 local function unpower(generator)
-    if generator:isActivated() then
-        generator:setActivated(false)
-    end
+    Fumes.setBankRunning(generator, false)
 end
 
 function BankSystem:OnObjectAboutToBeRemoved(isoObject)
@@ -175,7 +182,7 @@ local vanillaDestroyComplete = ISDestroyStuffAction.complete
 function ISDestroyStuffAction:complete()
     local bank = self.item and PowerBank.isBank(self.item) and BankSystem.instance:getLuaObjectOnSquare(self.item:getSquare())
     if bank then
-        BankSystem.updateBank(bank)
+        bank:update()
     end
     return vanillaDestroyComplete(self)
 end
@@ -253,9 +260,8 @@ for kind in pairs(Specs.mounts) do
     Tiles.onLoad(Sprites.namesOf(kind), PanelSource.showCracks)
 end
 
---- What every bank in this pass shares: the weather, the light on each mount averaged over
---- the `hours` up to now (and what it would be under a clear sky), and the hours of storm
---- that can crack modules.
+--- What every bank in this pass shares: the weather, and the light on each mount averaged over
+--- the `hours` up to now (and what it would be under a clear sky).
 function BankSystem.passContext(hours)
     local climate = getClimateManager()
     local weather = Sun.weatherNow()
@@ -292,7 +298,6 @@ function BankSystem.passContext(hours)
         airC = climate:getTemperature(),
         elevation = Sun.elevation(),
         windKph = climate:getWindspeedKph(),
-        stormHours = PanelSource.stormHours(hours),
         irradiance = averaged(weather),
         clearIrradiance = averaged(Sun.CLEAR_WEATHER),
     }
@@ -309,30 +314,94 @@ local function sharedContexts()
     end
 end
 
---- Bring one bank up to now. `contextFor(hours)`, optional, gives the pass context for the span
---- (BankSystem.passContext unless given). updateAll and bank jobs defer billing to their boundary.
-function BankSystem.updateBank(bank, contextFor, deferBilling)
-    local hours = Clock.hoursSince(bank, BankSystem.LONGEST_PASS)
-    if hours > 0 then
-        bank:update(hours, (contextFor or BankSystem.passContext)(hours), deferBilling)
-    end
-end
-
 --- Brings `bank` up to now, so what the source at x, y, z made counts, then takes the source off
---- the bank and sends its status.
+--- the bank and settles it.
 function BankSystem.dropSource(bank, x, y, z)
-    BankSystem.updateBank(bank)
+    bank:catchUp()
     bank:removeSource(x, y, z)
-    bank:sendStatus()
+    bank:afterChange()
 end
 
+--- Banks `hours` of a run, at most one run's, on the wired treadmill tile `tile` with the bank it
+--- feeds, for the passes to come (TreadmillSource.credit). Returns whether a bank took it.
+function BankSystem.creditTreadmill(tile, hours)
+    local x, y, z = tile:getX(), tile:getY(), tile:getZ()
+    local bank = Treadmill.isWired(tile) and BankSystem.bankOfSourceAt(x, y, z)
+    local source = bank and bank:findSource(x, y, z)
+    if not source then
+        return false
+    end
+    TreadmillSource.credit(source, hours)
+    return true
+end
+
+--- Every bank up to now in one pass sharing the contexts of their spans, then one bill for every
+--- change they made, then what each shows and tells.
 function BankSystem.updateAll()
     local contextFor = sharedContexts()
     PowerBank.each(function(bank)
-        BankSystem.updateBank(bank, contextFor, true)
+        bank:catchUp(contextFor)
     end)
     Payers.billGenerators()
+    PowerBank.each(function(bank)
+        bank:showBatteries()
+        bank:sendStatus()
+    end)
 end
+
+-- What each bank job does to the bank's record `bank` (its tile `isoObject`) beyond taking its
+-- materials and giving its XP, by its row of BankJobs.JOBS. Returns whether it was done.
+local DO = {
+    [BankJobs.TURN_ON] = function(character, bank, row)
+        bank.on = row.on
+        bank:powerUp()
+        return true
+    end,
+    -- setConnected syncs the generator to the clients.
+    [BankJobs.CONNECT] = function(character, bank, row, isoObject)
+        isoObject:setConnected(row.connected)
+        bank.connected = row.connected
+        bank:powerUp()
+        return true
+    end,
+    -- The bank's container filter refuses every transfer, so the part is moved here, past it.
+    [BankJobs.WIRE_IN] = function(character, bank, row, isoObject, item)
+        Items.takeItem(character, item)
+        Items.addItem(isoObject:getContainer(), item)
+        Wiring.teach(character, item, Wiring.PART_ONCE_KEY, Wiring.forPart(item:getFullType()))
+        bank:powerUp()
+        return true
+    end,
+    -- The battery leaves with the bank's shared charge as it is now.
+    [BankJobs.UNWIRE] = function(character, bank, row, isoObject, item)
+        bank:writeBatteries(isoObject:getContainer(), false)
+        Items.takeItem(character, item)
+        Items.giveItems(character, item)
+        Wiring.refund(character, Wiring.forPart(item:getFullType()))
+        bank:powerUp()
+        return true
+    end,
+    [BankJobs.REPAIR] = function(character, bank, row, isoObject, item)
+        Wear.setCondition(item, item:getCondition() + Specs.partRepair.condition)
+        sendItemStats(item)
+        bank:powerUp()
+        return true
+    end,
+    [BankJobs.RENAME] = function(character, bank, row, isoObject, name)
+        name = BankJobs.trimName(name)
+        bank.name = name ~= "" and name or nil
+        return true
+    end,
+}
+DO[BankJobs.TURN_OFF] = DO[BankJobs.TURN_ON]
+DO[BankJobs.DISCONNECT] = DO[BankJobs.CONNECT]
+
+--- The authority's side of the jobs at a bank (cf_commonlib's ObjectSystem.jobSite): the bank is
+--- caught up at its old state, the job changes it, then it settles once (Bank:afterChange), even
+--- when the job was refused, since the catch-up alone can change who runs. Activation never waits
+--- for the settlement.
+BankSystem.jobSite = LibObjectSystem.jobSite(PowerBank, DO)
+Action.serve({ bank = BankSystem.jobSite })
 
 SGlobalObjectSystem.RegisterSystemClass(BankSystem)
 

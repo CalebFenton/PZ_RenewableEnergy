@@ -53,7 +53,7 @@ local function holderText(summary)
         return getText("IGUI_RenewableEnergy_HolderTorn", name)
     end
     if Digester.HOLDERS[summary.holder].wearPerDay then
-        return name .. " " .. Format.percent(summary.holderCondition / 100)
+        return Format.withShare(name, summary.holderCondition / 100)
     end
     return name
 end

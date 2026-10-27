@@ -39,7 +39,7 @@ handler("startTreadmillRun", function(player, args, defer)
     local tile = Helpers.find({ kind = "treadmill", x = args.x, y = args.y, z = args.z })
     local run = RenewableEnergyTreadmillAction:new(player, tile)
     run:serverStart()
-    local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
+    local key = RenewableEnergy.Places.key(args.x, args.y, args.z)
     treadmillRuns[key] = run
     defer(function()
         if treadmillRuns[key] == run then
@@ -52,7 +52,7 @@ end)
 
 -- Finishes the run startTreadmillRun started on the tile at `args` (completeRun).
 handler("completeStartedTreadmillRun", function(player, args)
-    local key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z)
+    local key = RenewableEnergy.Places.key(args.x, args.y, args.z)
     local run = need(treadmillRuns[key], "a run startTreadmillRun started on the server")
     treadmillRuns[key] = nil
     return completeRun(player, run)

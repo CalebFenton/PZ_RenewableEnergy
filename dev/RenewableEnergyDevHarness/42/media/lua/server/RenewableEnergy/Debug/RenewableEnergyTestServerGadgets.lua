@@ -216,7 +216,7 @@ local function gadgetCharges(_, args)
     local record, car, trailer, charger, light = clockFixtures(args)
     local cellWh = storedWh(charger)
     for _, cell in ipairs(Helpers.itemsOf(charger:getContainer())) do
-        cellWh = cellWh + cell.uses * RenewableEnergy.Specs.cellChargerBatteryWh
+        cellWh = cellWh + cell.uses * RenewableEnergy.SolarCellCharger.BATTERY_WH
     end
     local function whIn(battery)
         return Battery.getCharge(battery) * Battery.nominalWh(battery)

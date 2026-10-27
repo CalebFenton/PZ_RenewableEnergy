@@ -1,6 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
+local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
 
 -- Power bank tests: the authority's commands and what it sends to whom, the bank's record, the
 -- clock, and banks whose chunk is unloaded.
@@ -97,8 +98,8 @@ test("renewable_energy_bank_client_commands_ignored", {
             system:sendCommand(p, "setBankOn", { bank = bank.position, on = true })
             system:sendCommand(p, "rename", { bank = bank.position, name = "Forged" })
             system:sendCommand(p, "unwire", { bank = bank.position, itemId = part and part.id or -1 })
-            PowerBank.watchStatus(p, bank.object)
-            T.defer(self, function() PowerBank.unwatchStatus(p, bank.object) end)
+            ClientBankSystem.watchStatus(p, bank.object)
+            T.defer(self, function() ClientBankSystem.unwatchStatus(p, bank.object) end)
         end)
         T.waitForStatus(self, bank, function(status) return #status.batteries == 1 end,
             "this client's status after the watch, with the battery taken out")
@@ -129,7 +130,7 @@ test("renewable_energy_bank_status_only_to_watchers", {
         T.bankPass(self, bank, 0, { label = "watched" })
         T.waitForStatus(self, bank, function(status) return status.solarW == 0 end,
             "this client's status of the watched bank's dark pass")
-        T.step(function() PowerBank.unwatchStatus(player(), bank.object) end)
+        T.step(function() ClientBankSystem.unwatchStatus(player(), bank.object) end)
         T.waitFor(self, function() return T.clientStatus(bank) == nil end, "this client letting go of the status it stopped watching")
         -- The unwatch and the pass's call are separate packets, which a server may take in either order.
         T.serverUntil(self, "bankState", { bank = bank.position }, function(state) return state.watchers == 0 end)
@@ -392,9 +393,9 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
         end
         local bankHours, gadgetHours = after.bankPassAge - before.bankPassAge, after.age - before.age
         charged("bank", "the bank with a connected panel", Specs.mounts.flat.modules * Specs.modules[Specs.factoryModule].watts, bankHours)
-        charged("car", "the car with a maintainer", Specs.maintainerWatts, gadgetHours)
-        charged("charger", "the solar battery charger", Specs.cellChargerWatts, gadgetHours)
-        charged("light", "the garden light", Specs.gardenLight.watts, gadgetHours)
+        charged("car", "the car with a maintainer", RenewableEnergy.SolarMaintainer.WATTS, gadgetHours)
+        charged("charger", "the solar battery charger", RenewableEnergy.SolarCellCharger.WATTS, gadgetHours)
+        charged("light", "the garden light", RenewableEnergy.SolarGardenLight.SPEC.watts, gadgetHours)
         -- A storm during the passes may have cracked a panel since.
         charged("trailer", "the arrow board's battery box", math.max(before.trailerWatts, after.trailerWatts), gadgetHours)
     end,

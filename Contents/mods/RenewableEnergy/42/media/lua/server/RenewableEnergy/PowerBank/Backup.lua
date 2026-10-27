@@ -4,9 +4,9 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
-local Specs = require "RenewableEnergy/Specs"
+local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
+local Fumes = require "RenewableEnergy/Fumes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
@@ -15,6 +15,9 @@ local Bank = require "RenewableEnergy/PowerBank/Bank"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
+-- A backup generator a failsafe can start is one plugged in within this many squares of its bank
+-- on either axis, on the bank's floor.
+local BACKUP_REACH = 3
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
 -- (IsoGenerator.update), so a relay, which nobody stands by, never starts one that worn.
 local FIRE_CONDITION = 20
@@ -24,37 +27,37 @@ local function isFailsafe(object)
 end
 
 local function generatorPlace(found)
-    return PlaceTracker.objectPlace(found.generator)
+    return Places.objectPlace(found.generator)
 end
 
--- Every plugged-in generator within backup reach (Specs.backupReach) on the bank's floor, nearest
--- first (PlaceTracker.sortNearest): { generator, failsafe }, `failsafe` whether one stands on its
+-- Every plugged-in generator within BACKUP_REACH on the bank's floor, nearest
+-- first (Places.sortNearest): { generator, failsafe }, `failsafe` whether one stands on its
 -- square.
 local function generatorsInReach(bank)
     local found = {}
-    Squares.eachAround(bank.x, bank.y, bank.z, Specs.backupReach, function(square)
+    Squares.eachAround(bank.x, bank.y, bank.z, BACKUP_REACH, function(square)
         local generator = square:getGenerator()
         if GeneratorReach.isVanillaGenerator(generator) and generator:isConnected() then
             Payers.track(generator)
             table.insert(found, { generator = generator, failsafe = Squares.findObjectOn(square, isFailsafe) ~= nil })
         end
     end)
-    PlaceTracker.sortNearest(found, bank.x, bank.y, bank.z, generatorPlace)
+    Places.sortNearest(found, bank.x, bank.y, bank.z, generatorPlace)
     return found
 end
 
 -- The bank a failsafe answers to: the nearest bank with its generator in backup reach, the lower
--- place on a tie (PlaceTracker.nearest). A relay is wired to one bank, so two banks beside it never
+-- place on a tie (Places.nearest). A relay is wired to one bank, so two banks beside it never
 -- switch it against each other.
 local function failsafeBank(generator)
-    local gx, gy, gz = PlaceTracker.objectPlace(generator)
-    local reach, banks = Specs.backupReach, {}
+    local gx, gy, gz = Places.objectPlace(generator)
+    local reach, banks = BACKUP_REACH, {}
     PowerBank.each(function(bank)
         if bank.z == gz and math.abs(bank.x - gx) <= reach and math.abs(bank.y - gy) <= reach then
             table.insert(banks, bank)
         end
     end)
-    return PlaceTracker.nearest(banks, gx, gy, gz)
+    return Places.nearest(banks, gx, gy, gz)
 end
 
 -- Start or stop a backup generator with a failsafe by the charge, as a generator auto-start relay
@@ -69,7 +72,7 @@ local function runFailsafe(generator, wanted, charge)
     local wantsOff = not wanted or percent >= stopPercent
     if generator:isActivated() then
         if wantsOff then
-            generator:setActivated(false)
+            Fumes.setRunning(generator, false)
         end
     elseif gas and gas.stalled then
         if wantsOff then
@@ -77,7 +80,7 @@ local function runFailsafe(generator, wanted, charge)
         end
     elseif wanted and percent < startPercent and generator:getFuel() > 0
         and generator:getCondition() > FIRE_CONDITION then
-        generator:setActivated(true)
+        Fumes.setRunning(generator, true)
     end
 end
 

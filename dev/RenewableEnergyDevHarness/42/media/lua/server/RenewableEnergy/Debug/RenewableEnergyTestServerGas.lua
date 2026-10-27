@@ -22,7 +22,7 @@ end
 
 -- The generator at x, y, z: whether it runs, its fuel and condition, vanilla's idle bill an hour
 -- (`idle`) and its whole bill an hour (`bill`), its kit's state (nil without a kit) with whether a
--- line is connected and to what kind of source, whether the gas pass lists it, its overlays and its
+-- line is connected and to what kind of source, its overlays and its
 -- sprite, which picks the kit's and pipe's overlays (Sprites.gasKitFor), whether its building is
 -- toxic, and the world hour on the server as it was read (`hours`).
 local function generatorRead(generator)
@@ -42,7 +42,6 @@ local function generatorRead(generator)
     return {
         running = generator:isActivated(), fuel = generator:getFuel(), idle = generator:getBasePowerConsumption(),
         bill = generator:getTotalPowerUsing(), condition = generator:getCondition(), state = plain,
-        listed = RenewableEnergy.GasLines.isListed(generator),
         overlays = PZHarness.Fixtures.overlaysOf(generator), sprite = RenewableEnergy.Sprites.nameOf(generator),
         toxic = building ~= nil and building:isToxic(), hours = getGameTime():getWorldAgeHours(),
     }
@@ -189,12 +188,12 @@ handler("gasPass", function(player, args)
 end)
 
 -- Makes every kitted generator deliver `args.watts` in place of what its scan finds, until the test
--- ends. GasLines.run looks loadOf up on every call.
+-- ends. GasLines.run looks Payers.deliveredW up on every call.
 handler("gasLoad", function(player, args, defer)
-    local GasLines = RenewableEnergy.GasLines
-    local scan = GasLines.loadOf
-    GasLines.loadOf = function() return args.watts end
-    defer(function() GasLines.loadOf = scan end)
+    local Payers = RenewableEnergy.Payers
+    local scan = Payers.deliveredW
+    Payers.deliveredW = function() return args.watts end
+    defer(function() Payers.deliveredW = scan end)
     return {}
 end)
 

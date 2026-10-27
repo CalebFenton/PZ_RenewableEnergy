@@ -9,6 +9,7 @@
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local VehicleParts = require "cf_commonlib/VehicleParts"
 
 local CarAlternator = {}
 RenewableEnergy.CarAlternator = CarAlternator
@@ -73,7 +74,7 @@ end
 
 --- Whether the engine bay is open to work in: the hood open, off or not there at all.
 function CarAlternator.hoodOpen(vehicle)
-    return RenewableEnergy.isPartOpen(vehicle, CarAlternator.HOOD)
+    return VehicleParts.isOpen(vehicle, CarAlternator.HOOD)
 end
 
 --- The hood part that has to be opened before the job, or nil when the bay is open.

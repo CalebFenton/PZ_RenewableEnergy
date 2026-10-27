@@ -7,9 +7,9 @@ require "Vehicles/TimedActions/ISPathFindAction"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Format = require "RenewableEnergy/UI/Format"
 local JobOptions = require "cf_commonlib/JobOptions"
-
--- ArrowBoard is server Lua, which loads after this file, so an option looks it up as the menu fills.
 
 local VehicleMenu = {}
 RenewableEnergy.VehicleMenu = VehicleMenu
@@ -26,7 +26,6 @@ end
 --- takes and greyed out when the character can't do it; a panel sealed as far as sealing goes,
 --- greyed out saying to reglaze its module, as a placed panel's Seal Cracked Module.
 function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
     if not ArrowBoard.isTrailer(vehicle) then
         return
     end
@@ -34,7 +33,7 @@ function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
         local part = vehicle:getPartById(partId)
         if part and ArrowBoard.crackLookOf(part) then
             JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.SEAL_PANEL, vehicle, partId,
-                getText("ContextMenu_RenewableEnergy_RepairPanel", getText("IGUI_VehiclePart" .. partId), part:getCondition()))
+                getText("ContextMenu_RenewableEnergy_RepairPanel", getText("IGUI_VehiclePart" .. partId), Format.partCondition(part)))
         end
     end
 end
@@ -42,11 +41,11 @@ end
 --- Repair Frame for each dented end of an arrow board trailer's frame: vanilla's fixing menu for
 --- the part, the one the mechanics window gives a car's body.
 function VehicleMenu.addFrameRepairOptions(playerNum, context, vehicle)
-    for _, frame in ipairs(RenewableEnergy.ArrowBoard.damagedFrame(vehicle)) do
+    for _, frame in ipairs(ArrowBoard.damagedFrame(vehicle)) do
         local part = frame.part
         local item = part:getInventoryItem()
         local submenu, option = JobOptions.addSubMenu(context,
-            getText("ContextMenu_RenewableEnergy_RepairFrame", getText(frame.name), part:getCondition()))
+            getText("ContextMenu_RenewableEnergy_RepairFrame", getText(frame.name), Format.partCondition(part)))
         local fixes = FixingManager.getFixes(item)
         for i = 0, fixes:size() - 1 do
             ISInventoryPaneContextMenu.buildFixingMenu(item, playerNum, fixes:get(i), i, option, submenu, part)

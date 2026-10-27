@@ -2,7 +2,7 @@
 -- summary lines across the top and the rows of its two columns.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Recipes = require "RenewableEnergy/Recipes"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Sun = require "RenewableEnergy/Sun"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
@@ -87,15 +87,9 @@ local function row(rows, label, value, colorName)
     table.insert(rows, { label = label, value = value, color = colorName })
 end
 
--- Each family of source's rows: its watts now and today (the Bank status fields), always for
--- panels and for the others once they have made anything today.
-local FAMILY_ROWS = {
-    { now = "solarW", today = "solarWhToday", nowKey = "IGUI_RenewableEnergy_PanelsNow",
-        todayKey = "IGUI_RenewableEnergy_PanelsToday", always = true },
-    { now = "windW", today = "windWhToday", nowKey = "IGUI_RenewableEnergy_WindNow", todayKey = "IGUI_RenewableEnergy_WindToday",
-        value = function(status) return Format.windOutput(status.windW, status.windKph) end },
-    { now = "runW", today = "runWhToday", nowKey = "IGUI_RenewableEnergy_TreadmillsNow",
-        todayKey = "IGUI_RenewableEnergy_TreadmillsToday" },
+-- How a family's watts now read, where not plain watts (Sources.FAMILIES).
+local NOW_VALUE = {
+    wind = function(status) return Format.windOutput(status.windW, status.windKph) end,
 }
 
 -- Grid power reaching the bank, whatever state the bank is in, and whether its chargers fill the
@@ -122,9 +116,10 @@ local function powerRows(rows, status)
     else
         row(rows, getText("IGUI_RenewableEnergy_Sunlight"), getText("IGUI_RenewableEnergy_Night"), "dim")
     end
-    for _, family in ipairs(FAMILY_ROWS) do
+    for _, family in ipairs(Sources.FAMILIES) do
         if family.always or status[family.now] > 0 or status[family.today] > 0 then
-            row(rows, getText(family.nowKey), family.value and family.value(status) or Format.watts(status[family.now]))
+            local value = NOW_VALUE[family.name]
+            row(rows, getText(family.nowKey), value and value(status) or Format.watts(status[family.now]))
             row(rows, getText(family.todayKey), Format.wattHours(status[family.today]))
         end
     end
@@ -237,23 +232,10 @@ local function partRows(rows, status)
     end
 end
 
--- The repair that makes the most of one of a battery's limited repairs, or nil for one in perfect
--- shape: Service where its step reaches the repair limit anyway (it keeps the charge),
--- Recondition further below it, and past the limit only a rebuild.
-local function batteryRepair(condition, repaired)
-    local limit = Recipes.repairLimit(repaired or 0)
-    if condition < limit then
-        return condition + Recipes.SERVICE_REPAIR >= limit and "IGUI_RenewableEnergy_RepairService"
-            or "IGUI_RenewableEnergy_RepairRecondition"
-    elseif condition < 100 then
-        return "IGUI_RenewableEnergy_RepairRebuild"
-    end
-end
-
 -- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
 local function batteryValue(battery)
     local charge, condition = Format.percent(battery.charge), Format.condition(battery.type, battery.condition)
-    local repair = batteryRepair(battery.condition, battery.repaired)
+    local repair = Battery.bestRepair(battery.condition, battery.repaired)
     if repair then
         return getText("IGUI_RenewableEnergy_BatteryValueRepair", charge, condition, getText(repair))
     end

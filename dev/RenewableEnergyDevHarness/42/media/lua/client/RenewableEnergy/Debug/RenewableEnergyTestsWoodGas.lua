@@ -69,7 +69,7 @@ test("renewable_energy_woodgas_gasifier_runs_generator", {
             T.ageRecord(self, gasifier, self.hours, "fed")
             T.readGenerator(self, generator, "running")
             -- More than the hopper and the firebox hold.
-            T.burnGasifier(self, gasifier, 2 * Gasifier.TIERS.standard.hopperKg)
+            T.burnGasifier(self, gasifier, 2 * T.hopperHolds("standard"))
             T.gasPass(self, generator, 0.1)
             T.readGenerator(self, generator, "out")
         end)
@@ -261,7 +261,7 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
         local gasifier = T.placeRecord(self, "gasifier", "primitive")
         if not gasifier then return end
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 2 } } })
-        T.give(self, "matches", { { type = Specs.FIRE_STARTER.item } })
+        T.give(self, "matches", { { type = RenewableEnergy.GasHeater.FIRE_STARTER.item } })
         T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
         T.step(function()
             self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.clientSummary(gasifier)))
@@ -464,7 +464,7 @@ test("renewable_energy_woodgas_drain_condensate", {
         if not gasifier then return end
         self.condensate = Gasifier.CONDENSATE_MAX
         T.batch(function()
-            T.setRecord(self, gasifier, { lit = true, fireKg = Gasifier.TIERS.primitive.hopperKg, condensate = self.condensate })
+            T.setRecord(self, gasifier, { lit = true, fireKg = T.hopperHolds("primitive"), condensate = self.condensate })
             T.give(self, "containers", { { type = "Base.WaterBottle" }, { type = "Base.Pot" } })
             T.fillCarried(self, "Base.WaterBottle")
             T.fillCarried(self, "Base.Pot")

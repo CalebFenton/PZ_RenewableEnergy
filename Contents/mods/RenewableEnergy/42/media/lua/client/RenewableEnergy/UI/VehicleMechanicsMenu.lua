@@ -21,6 +21,7 @@ local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local Format = require "RenewableEnergy/UI/Format"
 local Items = require "cf_commonlib/Items"
 local Needs = require "cf_commonlib/Needs"
 
@@ -103,7 +104,8 @@ local function addInstallOptions(mechanics, part)
     local itemMenu = ISContextMenu:getNew(subMenu)
     mechanics.context:addSubMenu(option, itemMenu)
     for _, item in ipairs(items) do
-        local itemOption = itemMenu:addOption(item:getDisplayName() .. " (" .. item:getCondition() .. "%)", character,
+        local itemOption = itemMenu:addOption(Format.withShare(item:getDisplayName(),
+            Format.conditionShare(item:getFullType(), item:getCondition())), character,
             ISVehiclePartMenu.onInstallPart, part, item)
         itemOption.itemForTexture = item
         mechanics:doMenuTooltip(part, itemOption, "install", fullType)

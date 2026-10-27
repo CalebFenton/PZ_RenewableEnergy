@@ -1,7 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 
--- The mod's loot (Distributions.lua, WorldSpawns.lua): its tables live only where loot is rolled,
--- so the checks run there (RenewableEnergyTestServerLoot.lua).
+-- The mod's loot (Distributions.lua, LootEntries.lua, Finds.lua): its tables live only where loot
+-- is rolled, so the checks run there (RenewableEnergyTestServerLoot.lua).
 
 local T = RenewableEnergyTest
 local test, serverCheck = T.test, T.serverCheck
@@ -46,6 +46,17 @@ test("renewable_energy_loot_found_batteries_part_charged", {
 -- Inverters and controllers that rooms hand out come worn, once: a later refill leaves a found or
 -- crafted part already there alone, and a bank's parts are never worn by a fill.
 serverCheck("renewable_energy_loot_found_parts_worn", "lootFoundParts")
+
+-- Safehouses and stash houses fill their containers without the event a room's fill fires, so the
+-- mod's items on their shelves are readied when the room is first seen, once.
+test("renewable_energy_loot_seen_room_finds_readied", {
+    run = function(self)
+        local square = T.square(self, nil, "a free outdoor square")
+        if not square then return end
+        T.read(self, "lootSeenRoomReadied", T.at(square), "seen")
+    end,
+    validate = function(self) T.expectNoFailures(self.reads.seen) end,
+})
 
 -- Containers the player owns --------------------------------------------------------------------
 

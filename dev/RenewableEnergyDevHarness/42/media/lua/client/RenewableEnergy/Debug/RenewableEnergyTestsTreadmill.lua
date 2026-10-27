@@ -1,6 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/PowerBank/BankJobs"
 require "RenewableEnergy/PowerBank/SourceJobs"
+local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 
 -- Treadmill (PowerBank/Treadmill.lua, TreadmillSource.lua, RenewableEnergyTreadmillAction, its menu):
 -- dismantling for the motor, wiring the motor, runs wired and unwired, unwiring and pickup.
@@ -25,17 +26,17 @@ end
 -- Queues the Electricity level wiring a treadmill takes and its parts, the scrap `sets` times
 -- over, with a screwdriver, which wiring uses up once this client has them.
 local function giveWiringParts(self, sets)
-    local wiring = Specs.treadmill.wiring
+    local wiring = Treadmill.SPEC.wiring
     T.setPerk(self, Perks.Electricity, wiring.skill)
-    T.giveBeforeCalls(self, "parts", { { type = PowerBank.WIRE, count = wiring.wire },
-        { type = PowerBank.SCRAP, count = sets * wiring.scrap }, { type = "Base.Screwdriver" } })
+    T.giveBeforeCalls(self, "parts", { { type = Wiring.WIRE, count = wiring.wire },
+        { type = Wiring.SCRAP, count = sets * wiring.scrap }, { type = "Base.Screwdriver" } })
 end
 
 -- Queues reading the wire and scrap the authority's character carries into self[key].
 local function carriedParts(self, key)
-    T.readCarried(self, { PowerBank.WIRE, PowerBank.SCRAP })
+    T.readCarried(self, { Wiring.WIRE, Wiring.SCRAP })
     T.step(function()
-        self[key] = { wire = #T.carriedItems(self, PowerBank.WIRE), scrap = #T.carriedItems(self, PowerBank.SCRAP) }
+        self[key] = { wire = #T.carriedItems(self, Wiring.WIRE), scrap = #T.carriedItems(self, Wiring.SCRAP) }
     end)
 end
 
@@ -100,7 +101,7 @@ test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
         giveWiringParts(self, 1)
         T.step(function()
             -- What the menu would show a character a level short, carrying everything.
-            local restore = PZHarness.Fixtures.setPerk(T.player(), Perks.Electricity, Specs.treadmill.wiring.skill - 1)
+            local restore = PZHarness.Fixtures.setPerk(T.player(), Perks.Electricity, Treadmill.SPEC.wiring.skill - 1)
             self.unskilled = Treadmill.refusal(T.player(), Treadmill.WIRE, treadmill.object)
             restore()
             self.looseWired = Treadmill.isWiredTile(treadmill.object)
@@ -109,7 +110,7 @@ test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
         T.waitFor(self, function() return Treadmill.isWiredTile(treadmill.object) end,
             "this client's copy of the wired treadmill")
         T.batch(function()
-            T.readCarried(self, { PowerBank.WIRE, PowerBank.SCRAP })
+            T.readCarried(self, { Wiring.WIRE, Wiring.SCRAP })
             T.job(self, "source", SourceJobs.CONNECT, treadmill.position, bank.position, "connected")
             T.job(self, "treadmill", Treadmill.WIRE, self.console.position, nil, "again")
         end)
@@ -117,8 +118,8 @@ test("renewable_energy_treadmill_wiring_uses_parts_and_connects", {
     validate = function(self)
         expect(not self.looseWired, "an unwired treadmill is already wired")
         T.expectEqual("the wiring refusal below the Electricity level", self.unskilled, "skill")
-        T.expectEqual("wire left after wiring", #T.carriedItems(self, PowerBank.WIRE), 0)
-        T.expectEqual("scrap left after wiring", #T.carriedItems(self, PowerBank.SCRAP), 0)
+        T.expectEqual("wire left after wiring", #T.carriedItems(self, Wiring.WIRE), 0)
+        T.expectEqual("scrap left after wiring", #T.carriedItems(self, Wiring.SCRAP), 0)
         T.expectOk(self.reads.connected, "connecting the wired treadmill")
         T.expectRefused(self.reads.again, "already wired", "wiring the treadmill's other tile too wasn't refused as already wired")
     end,
@@ -290,7 +291,7 @@ test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
     end,
     validate = function(self)
         local before, during, after = self.reads.before.status, self.reads.during.status, self.bank.state.status
-        local watts = Specs.wattsFromFuel(Specs.treadmill.drawFuel)
+        local watts = Specs.wattsFromFuel(Treadmill.SPEC.drawFuel)
         T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, watts, 0.01)
         T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
             watts / Specs.inverters[T.INVERTER_CHARGER].efficiency, 0.01)
@@ -481,7 +482,7 @@ test("renewable_energy_treadmill_pickup_drops_wire", {
         local took = self.beforeWiring.wire - self.afterWiring.wire
         local wire, wiredItems = 0, 0
         for _, item in ipairs(self.server.takeFloorItems.items) do
-            if item.type == PowerBank.WIRE then
+            if item.type == Wiring.WIRE then
                 wire = wire + 1
             elseif item.modData[Treadmill.WIRED_KEY] then
                 wiredItems = wiredItems + 1

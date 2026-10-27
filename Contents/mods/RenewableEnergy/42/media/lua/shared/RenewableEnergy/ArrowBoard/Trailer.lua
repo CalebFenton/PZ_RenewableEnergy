@@ -3,10 +3,11 @@
 -- arrow on its lamp board.
 --
 -- RenewableEnergy.ArrowBoard is spread over three files, by concern: this one has the trailer,
--- its stock, lid, panels and frame; ArrowBoardPower.lua its charging, switch and lamps;
--- ArrowBoardCrashes.lua what a crash does to it. The vehicle script's part functions are called
--- on every side, and a multiplayer client loads server Lua too (GameLoadingState.enter), so these
--- files have no isClient guard; what only the authority may do says so.
+-- its stock, lid, panels and frame, and the one per-frame watch of every loaded trailer; Power.lua
+-- its charging, switch and lamps; Crashes.lua what a crash does to it. The vehicle script's part
+-- functions are called on every side, so the files are shared; what only the authority may do
+-- says so and takes its server modules when it runs, since a server file is empty on a
+-- multiplayer client.
 --
 -- Each panel is a vehicle part holding a Solar Module, whose condition is the part's, shown by
 -- its Whole, LightCracked or Cracked model. Nothing in the game reports a part's condition
@@ -14,16 +15,12 @@
 -- every loaded trailer's panels again for the changes it didn't make (a failed uninstall, a debug
 -- tool).
 
-require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
-local Recipes = require "RenewableEnergy/Recipes"
 local StormNotice = require "RenewableEnergy/StormNotice"
-local Wear = require "RenewableEnergy/PowerBank/Wear"
-local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
-local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Chance = require "cf_commonlib/Chance"
 
 local ArrowBoard = {}
@@ -44,16 +41,16 @@ ArrowBoard.BOARD = "WindshieldRear"
 -- map's arrow boards stand in the pileups.
 local ZONE_WEIGHTS = { junkyard = 4, trafficjamn = 4 }
 
--- What a found trailer comes with. Its batteries are worn by years on the road, and
--- Distributions.readyFoundItems charges them. Crews padlocked these boxes because batteries
--- are what thieves take from a work zone, so more are locked than vanilla's trunks, and left the
--- boards running where they stood, so most are switched on.
+-- What a found trailer comes with. Its batteries are worn by years on the road (the Finds profile
+-- `batteryWear`). Crews padlocked these boxes because batteries are what thieves take from a work
+-- zone, so more are locked than vanilla's trunks, and left the boards running where they stood,
+-- so most are switched on.
 ArrowBoard.STOCK = {
     modules = 2,
     secondCrackedChance = 0.6,
     batteries = { min = 2, max = 4 },
     battery = "RenewableEnergy.DeepCycleBattery",
-    batteryCondition = { min = 0, max = 80 },
+    batteryWear = "road",
     controllerChance = 0.75,
     lockedChance = 0.75,
     switchedOnChance = 0.9,
@@ -67,40 +64,49 @@ for zone, weight in pairs(ZONE_WEIGHTS) do
     VehicleZoneDistribution[zone].vehicles[ArrowBoard.SCRIPT] = { index = -1, spawnChance = weight }
 end
 
--- An empty table for the box, so that randomizeContainers fills it and fires OnFillContainer.
-VehicleDistributions[1][VEHICLE] = {
-    Normal = { [ArrowBoard.BATTERY_BOX] = { rolls = 0, items = {} } },
-}
-
 function ArrowBoard.isTrailer(vehicle)
     return vehicle ~= nil and vehicle:getScriptName() == ArrowBoard.SCRIPT
 end
 
---- Stocks the battery box of a freshly spawned arrow board, scaled by the loot rarity options.
---- Authority only.
+-- Loaded trailers
+--
+-- Every loaded trailer this game has seen, by vehicle, with what each concern watches of it each
+-- frame: the lid (`lid` and what it last showed), the lamps (`box`, while this game draws them,
+-- Power.lua) and crashes (`crash`, while this game runs its physics, Crashes.lua). Its part inits
+-- fill an entry as the trailer loads; it goes when the trailer leaves the world.
+local trailers = {}
+
+--- This game's entry for the loaded trailer `vehicle` (see above), made on first ask.
+function ArrowBoard.trailerEntry(vehicle)
+    local entry = trailers[vehicle]
+    if not entry then
+        entry = {}
+        trailers[vehicle] = entry
+    end
+    return entry
+end
+
+-- Stock
+
+--- Stocks the battery box of a freshly spawned arrow board, scaled by the loot rarity options,
+--- every find readied (Finds). Authority only.
 ---@param container ItemContainer
 function ArrowBoard.stockBatteryBox(container)
-    local options = SandboxVars.RenewableEnergy
+    local Finds = require "RenewableEnergy/Items/Finds"
     local stock = ArrowBoard.STOCK
     local batteries = Chance.between(stock.batteries.min, stock.batteries.max)
-    for _ = 1, WorldSpawns.scaled(batteries, options.LRMBatteries) do
-        local battery = container:AddItem(stock.battery)
-        if battery then
-            Wear.setCondition(battery, Chance.between(stock.batteryCondition.min, stock.batteryCondition.max))
-        end
+    for _ = 1, Finds.scaled(batteries, "LRMBatteries") do
+        Finds.add(container, stock.battery, stock.batteryWear)
     end
-    if Chance.hit(stock.controllerChance * options.LRMMisc) then
-        local controller = container:AddItem(Specs.controller)
-        if controller then
-            WorldSpawns.wearFoundPart(controller)
-        end
+    if Chance.hit(stock.controllerChance * Finds.placedRarity("LRMMisc")) then
+        Finds.add(container, Specs.controller)
     end
 end
 
---- OnFillContainer: stocks the container if it is an arrow board's battery box, and sets the
---- switch in it.
-function ArrowBoard.stockIfBatteryBox(roomName, container)
-    local part = roomName == VEHICLE and container:getVehiclePart()
+-- OnFillContainer, which only the authority fires: stocks the container if it is an arrow board's
+-- battery box, and sets the switch in it.
+local function stockIfBatteryBox(roomName, containerType, container)
+    local part = roomName == VEHICLE and instanceof(container, "ItemContainer") and container:getVehiclePart()
     if part and part:getId() == ArrowBoard.BATTERY_BOX then
         ArrowBoard.stockBatteryBox(container)
         ArrowBoard.rollSwitch(part:getVehicle())
@@ -128,7 +134,7 @@ end
 --
 -- Vanilla swings a door only in the opener's game (ISOpenVehicleDoor:start); everyone else's copy
 -- keeps its held pose forever. So every game that draws the trailer swings the lid itself when it
--- sees the door's state change (watchLids).
+-- sees the door's state change (watchLid).
 --
 -- Nothing reports a door's lock changing, and installing the lid shows all its models
 -- (VehiclePart.setInventoryItem), so every side, the server included, watches the lid and shows
@@ -136,10 +142,6 @@ end
 
 ArrowBoard.LID = "TrunkDoor"
 local PADLOCK = "Padlock"
-
--- The lids of the trailers this game has loaded, by vehicle, with what each last showed and saw,
--- so that watchLids notices a change.
-local lids = {}
 
 --- Whether the lid's padlock holds: the lid is on, locked, and its lock isn't cut.
 function ArrowBoard.isPadlocked(part)
@@ -166,7 +168,8 @@ end
 --- Part `init` of the lid: runs on every side each time the trailer loads.
 function ArrowBoard.initLid(vehicle, part)
     showPadlock(part)
-    lids[vehicle] = lids[vehicle] or { lid = part }
+    local entry = ArrowBoard.trailerEntry(vehicle)
+    entry.lid = entry.lid or part
 end
 
 --- Cut Padlock: unlocks the lid and breaks its lock, everywhere. Vanilla saves and sends a broken
@@ -187,32 +190,23 @@ end
 
 local SWINGS_LIDS = not isServer()
 
--- OnTick: shows the padlock again on each loaded trailer whose lid or lock changed since this game
--- last looked and, except on a dedicated server, swings each lid seen opening or shutting. A lid
--- seen for the first time isn't swung: the game already holds its pose by the door's state.
--- Nothing the game fires reports these changes, so it must poll; allocates nothing.
-local function watchLids()
-    for vehicle, entry in pairs(lids) do
-        if vehicle:isRemovedFromWorld() then
-            lids[vehicle] = nil
-        else
-            local lid = entry.lid
-            local door = lid:getDoor()
-            local item, locked, broken = lid:getInventoryItem(), door:isLocked(), door:isLockBroken()
-            if item ~= entry.item or locked ~= entry.locked or broken ~= entry.broken then
-                showPadlock(lid)
-                entry.item, entry.locked, entry.broken = item, locked, broken
-            end
-            local open = door:isOpen()
-            if SWINGS_LIDS and entry.open ~= nil and open ~= entry.open then
-                vehicle:playPartAnim(lid, open and "SwingOpen" or "SwingClose")
-            end
-            entry.open = open
-        end
+-- Shows the padlock again if the lid or its lock changed since this game last looked and, except
+-- on a dedicated server, swings a lid seen opening or shutting. A lid seen for the first time
+-- isn't swung: the game already holds its pose by the door's state.
+local function watchLid(vehicle, entry)
+    local lid = entry.lid
+    local door = lid:getDoor()
+    local item, locked, broken = lid:getInventoryItem(), door:isLocked(), door:isLockBroken()
+    if item ~= entry.item or locked ~= entry.locked or broken ~= entry.broken then
+        showPadlock(lid)
+        entry.item, entry.locked, entry.broken = item, locked, broken
     end
+    local open = door:isOpen()
+    if SWINGS_LIDS and entry.open ~= nil and open ~= entry.open then
+        vehicle:playPartAnim(lid, open and "SwingOpen" or "SwingClose")
+    end
+    entry.open = open
 end
-
-Events.OnTick.Add(watchLids)
 
 -- Panels
 
@@ -221,15 +215,15 @@ local function isPanel(part)
     return id == ArrowBoard.PANELS[1] or id == ArrowBoard.PANELS[2]
 end
 
--- The panel model that shows each look of RenewableEnergy.crackLookOf, and the whole one.
+-- The panel model that shows each look of ModuleRepair.crackLookOf, and the whole one.
 local MODEL_OF_LOOK = { light = "LightCracked", heavy = "Cracked" }
 local PANEL_MODELS = { "Whole", "LightCracked", "Cracked" }
 
---- How the glass of the module on the panel `part` looks (RenewableEnergy.crackLookOf): nil
---- whole or without a module, else "light" or "heavy".
+--- How the glass of the module on the panel `part` looks (ModuleRepair.crackLookOf): nil whole
+--- or without a module, else "light" or "heavy".
 function ArrowBoard.crackLookOf(part)
     local item = part:getInventoryItem()
-    return item and RenewableEnergy.crackLookOf(item:getFullType(), part:getCondition())
+    return item and ModuleRepair.crackLookOf(item:getFullType(), part:getCondition())
 end
 
 -- Shows the model `shown` of the panel `part` and hides the others; nil hides every one.
@@ -274,14 +268,15 @@ local function stockPanels(vehicle)
         return
     end
     modData[ArrowBoard.PANELS_STOCKED_KEY] = true
+    local Finds = require "RenewableEnergy/Items/Finds"
     local stock = ArrowBoard.STOCK
-    local count = WorldSpawns.scaled(stock.modules, SandboxVars.RenewableEnergy.LRMSolarPanels)
+    local count = Finds.scaled(stock.modules, "LRMSolarPanels")
     local panels = {}
     for i, id in ipairs(ArrowBoard.PANELS) do
         local part = vehicle:getPartById(id)
         if part and i <= count and not part:getInventoryItem() then
             local cracked = i == 2 and Chance.hit(stock.secondCrackedChance)
-            local item = WorldSpawns.newModule(cracked and WorldSpawns.crackedCondition() or WorldSpawns.weatheredCondition())
+            local item = Finds.newModule(cracked and Finds.crackedCondition() or Finds.weatheredCondition())
             part:setInventoryItem(item)
             vehicle:transmitPartItem(part)
             table.insert(panels, { part = part, item = item, condition = item:getCondition() })
@@ -299,16 +294,13 @@ local function setPanelCondition(vehicle, part, condition)
     ArrowBoard.showPanel(part)
 end
 
--- OnTick: gives the modules stocked last tick their stock conditions back where something has
--- set them since. Authority only. Per tick it only finds the list empty: no event follows the
--- game's setting the conditions, so the next tick is the first moment after it.
+-- Gives the modules stocked last tick their stock conditions back where something has set them
+-- since. Authority only. No event follows the game's setting the conditions, so the next tick is
+-- the first moment after it.
 local function keepStockConditions()
-    if #justStocked == 0 then
-        return
-    end
-    local trailers = justStocked
+    local stocked = justStocked
     justStocked = {}
-    for _, trailer in ipairs(trailers) do
+    for _, trailer in ipairs(stocked) do
         for _, panel in ipairs(trailer.panels) do
             local part = panel.part
             if part:getInventoryItem() == panel.item and part:getCondition() ~= panel.condition then
@@ -322,10 +314,6 @@ local function keepStockConditions()
     end
 end
 
-if not isClient() then
-    Events.OnTick.Add(keepStockConditions)
-end
-
 --- Part `create` of the panels: runs once for each when the trailer first enters the world.
 function ArrowBoard.createPanel(vehicle, part)
     if not isClient() then
@@ -334,7 +322,7 @@ function ArrowBoard.createPanel(vehicle, part)
 end
 
 --- Part `init` of the panels: runs on every side each time the trailer loads. The trailer's
---- crashes are watched from then on (ArrowBoardCrashes.lua).
+--- crashes are watched from then on (Crashes.lua).
 function ArrowBoard.initPanel(vehicle, part)
     if not isClient() then
         stockPanels(vehicle)
@@ -364,14 +352,15 @@ local function installedPanels(vehicle)
     return panels
 end
 
---- A thunderstorm may crack each panel as it would a flat panel's module (PanelSource.stormCrack), over
---- `stormHours` of storm, telling the players in earshot (StormNotice). Authority only. Returns how
---- many cracked.
+--- A thunderstorm may crack each panel as it would a flat panel's module (PanelStorms.stormCrack),
+--- over `stormHours` of storm, telling the players in earshot (StormNotice). Authority only.
+--- Returns how many cracked.
 function ArrowBoard.stormCrack(vehicle, stormHours)
+    local PanelStorms = require "RenewableEnergy/PowerBank/PanelStorms"
     local cracked = 0
     for _, part in ipairs(installedPanels(vehicle)) do
         local source = { kind = "flat", modules = { { condition = part:getCondition() } } }
-        if PanelSource.stormCrack(source, stormHours) then
+        if PanelStorms.stormCrack(source, stormHours) then
             setPanelCondition(vehicle, part, source.modules[1].condition)
             cracked = cracked + 1
         end
@@ -393,10 +382,9 @@ end
 
 --- The watts its panels would make in full sun, as the same modules on a mount make.
 function ArrowBoard.panelWatts(vehicle)
-    local moduleWatts = PowerBank.moduleWatts
     local watts = 0
     for _, part in ipairs(installedPanels(vehicle)) do
-        watts = watts + moduleWatts(part:getInventoryItem():getFullType(), part:getCondition())
+        watts = watts + Panel.moduleWatts(part:getInventoryItem():getFullType(), part:getCondition())
     end
     return watts
 end
@@ -405,24 +393,22 @@ end
 function ArrowBoard.sealablePanel(vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
-    if item and ArrowBoard.crackLookOf(part) ~= nil and Recipes.isModuleBelowRepairCap(item) then
+    if item and ModuleRepair.sealable(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired()) then
         return part
     end
     return nil
 end
 
---- Seal Cracked Panel: Seal Cracked Module's inputs, skill, XP and effect on a module still
---- on the trailer. Authority only, once the job was checked (VehicleJobs).
-function ArrowBoard.sealPanel(character, vehicle, partId)
+--- Seal Cracked Panel's effect on a module still on the trailer (its inputs, skill and XP are the
+--- job's materials: ModuleRepair.SEAL). Authority only, once the job was checked (VehicleJobs).
+function ArrowBoard.sealPanel(vehicle, partId)
     local part = vehicle:getPartById(partId)
-    Recipes.useInputs(Recipes.sealInPlaceInputs(character), character)
     -- As vanilla's fixPart (VehicleCommands.lua): count the repair on the item, then send it.
     local item = part:getInventoryItem()
-    local condition = Recipes.repairedCondition(item)
-    item:setHaveBeenRepaired(item:getHaveBeenRepaired() + 1)
+    local condition, repaired = ModuleRepair.sealed(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired())
+    item:setHaveBeenRepaired(repaired)
     setPanelCondition(vehicle, part, condition)
     vehicle:transmitPartItem(part)
-    Recipes.moduleRepairRecipe():addXP(character)
     return true
 end
 
@@ -465,6 +451,52 @@ function ArrowBoard.damagedFrame(vehicle)
         end
     end
     return damaged
+end
+
+-- Every frame
+
+local FLASHES = not isServer()
+
+-- OnTick: puts back the stock conditions of the trailers stocked last tick, and for every loaded
+-- trailer watches its lid, flashes its lamps and samples its crashes, each where its entry has
+-- that part (see `trailers`). Nothing the game fires reports any of these, so it must poll;
+-- allocates nothing unless a lamppost moves.
+local function eachFrame()
+    if #justStocked > 0 then
+        keepStockConditions()
+    end
+    local now = getTimestampMs()
+    local flashLit = FLASHES and ArrowBoard.flashPhase(now)
+    for vehicle, entry in pairs(trailers) do
+        if vehicle:isRemovedFromWorld() then
+            ArrowBoard.forgetLamps(entry)
+            trailers[vehicle] = nil
+        else
+            if entry.lid then
+                watchLid(vehicle, entry)
+            end
+            if entry.box then
+                ArrowBoard.flashLamps(vehicle, entry, flashLit)
+            end
+            if entry.crash then
+                ArrowBoard.sampleTrailer(vehicle, entry.crash, now)
+            end
+        end
+    end
+end
+
+Events.OnTick.Add(eachFrame)
+
+-- Only the authority fills containers and parses the loot tables.
+if not isClient() then
+    -- An empty table for the box, so that randomizeContainers fills it and fires OnFillContainer.
+    -- VehicleDistributions is server Lua, which loads after this file; the merge comes after both.
+    Events.OnPostDistributionMerge.Add(function()
+        VehicleDistributions[1][VEHICLE] = {
+            Normal = { [ArrowBoard.BATTERY_BOX] = { rolls = 0, items = {} } },
+        }
+    end)
+    Events.OnFillContainer.Add(stockIfBatteryBox)
 end
 
 return ArrowBoard

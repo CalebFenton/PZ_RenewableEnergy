@@ -3,7 +3,8 @@ require "RenewableEnergy/PowerBank/BankJobs"
 require "RenewableEnergy/PowerBank/SourceJobs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/Menu"
+local BankMenu = require "RenewableEnergy/UI/BankMenu"
+local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local Squares = require "cf_commonlib/Squares"
 
 -- Power bank tests: connecting banks, and sources to them.
@@ -13,7 +14,7 @@ local T = RenewableEnergyTest
 local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
 local Sprites = RenewableEnergy.Sprites
 local PowerBank, BankJobs, SourceJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs, RenewableEnergy.SourceJobs
-local Format, Menu = RenewableEnergy.Format, RenewableEnergy.Menu
+local Format = RenewableEnergy.Format
 
 -- Connecting -----------------------------------------------------------------------------------
 
@@ -81,7 +82,7 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         T.knowRecipes(self, GENERATOR, false)
         T.setPerk(self, Perks.Electricity, 2)
         T.step(function()
-            self.connect = T.optionState(T.menuOption(Menu.addBankOptions, self.unskilled.object,
+            self.connect = T.optionState(T.menuOption(BankMenu.addBankOptions, self.unskilled.object,
                 getText("ContextMenu_RenewableEnergy_ConnectBank")))
             self.canStart = RenewableEnergyAction:new(player(), "bank", BankJobs.CONNECT, self.unskilled.object):canPerform()
         end)
@@ -120,14 +121,14 @@ test("renewable_energy_bank_connect_and_disconnect", {
             return ISMoveableSpriteProps.new(object:getSprite():getName()):canPickUpMoveable(player(), bank.square, object)
         end
         T.step(function()
-            if not T.chooseOption(self, "Connect Bank", T.menuOption(Menu.addBankOptions, bank.object,
+            if not T.chooseOption(self, "Connect Bank", T.menuOption(BankMenu.addBankOptions, bank.object,
                 getText("ContextMenu_RenewableEnergy_ConnectBank")), bank.square) then
                 return
             end
             T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
             T.step(function()
                 self.connectedPickUp = canPickUp()
-                if not T.chooseOption(self, "Disconnect Bank", T.menuOption(Menu.addBankOptions, bank.object,
+                if not T.chooseOption(self, "Disconnect Bank", T.menuOption(BankMenu.addBankOptions, bank.object,
                     getText("ContextMenu_RenewableEnergy_DisconnectBank"))) then
                     return
                 end
@@ -210,8 +211,8 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         T.holdLight(self)
         T.step(function()
             local here = panel.position
-            if not T.need(self, PowerBank.isInReach(box.position, here.x, here.y, here.z)
-                and PowerBank.isInReach(rack.position, here.x, here.y, here.z), "the box and the rack in reach of the panel") then
+            if not T.need(self, RenewableEnergy.Sources.isInReach(box.position, here.x, here.y, here.z)
+                and RenewableEnergy.Sources.isInReach(rack.position, here.x, here.y, here.z), "the box and the rack in reach of the panel") then
                 return
             end
             self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
@@ -221,7 +222,7 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
             "this client's summary of the box listing the panel")
         T.step(function()
             -- Each fresh context reuses the player's one context menu, so read this one first.
-            local wiredTo = T.optionState(T.menuOption(Menu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
+            local wiredTo = T.optionState(T.menuOption(SourceMenu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
                 Format.bankName(PowerBank.summaryOf(box.object)), Format.away(panel.position, box.position))))
             self.wired = { wiredTo = wiredTo, box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)

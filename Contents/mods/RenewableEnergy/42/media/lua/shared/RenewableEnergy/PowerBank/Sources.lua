@@ -1,10 +1,12 @@
 -- Every kind of source a bank takes, by its Sprites.kindOf kind: its family, which decides how a
--- bank runs it (server/RenewableEnergy/PowerBank/<Family>Source.lua), and its row of Specs. A new
--- kind needs only its Specs row and its sprites.
+-- bank runs it (server/RenewableEnergy/PowerBank/<Family>Source.lua), and its row of its owner's
+-- ratings (Specs.mounts, Wind.SPEC.turbines, Treadmill.SPEC). A new kind needs only its row and
+-- its sprites; a new family, its row of FAMILIES and its server module.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
+local Wind = require "RenewableEnergy/Wind"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Squares = require "cf_commonlib/Squares"
@@ -12,8 +14,27 @@ local Squares = require "cf_commonlib/Squares"
 local Sources = {}
 RenewableEnergy.Sources = Sources
 
--- Whether a source of each family must stand outdoors: a treadmill works under a roof.
-local OUTDOORS = { panel = true, wind = true, treadmill = false }
+-- How far a source may be from the bank it is connected to: a radius in tiles, and floors up or
+-- down.
+Sources.REACH = { tiles = 20, levels = 3 }
+
+-- Each family, in the order the status window lists them: whether its sources must stand outdoors
+-- (a treadmill works under a roof); the bank status fields of its watts now and its watt-hours
+-- today, saved, where solarWhToday keeps its older name because saves hold it; and the status
+-- window's labels for them, `always` shown or only once it made anything today.
+Sources.FAMILIES = {
+    { name = "panel", outdoors = true, now = "solarW", today = "solarWhToday",
+        nowKey = "IGUI_RenewableEnergy_PanelsNow", todayKey = "IGUI_RenewableEnergy_PanelsToday", always = true },
+    { name = "wind", outdoors = true, now = "windW", today = "windWhToday",
+        nowKey = "IGUI_RenewableEnergy_WindNow", todayKey = "IGUI_RenewableEnergy_WindToday" },
+    { name = "treadmill", outdoors = false, now = "runW", today = "runWhToday",
+        nowKey = "IGUI_RenewableEnergy_TreadmillsNow", todayKey = "IGUI_RenewableEnergy_TreadmillsToday" },
+}
+--- The row of FAMILIES by its name.
+Sources.FAMILY = {}
+for _, family in ipairs(Sources.FAMILIES) do
+    Sources.FAMILY[family.name] = family
+end
 
 -- Kind -> { family, spec, isPlaced }: isPlaced(isoObject), if any, whether a tile of the kind is
 -- a source yet.
@@ -21,11 +42,11 @@ local KINDS = {}
 for kind, spec in pairs(Specs.mounts) do
     KINDS[kind] = { family = "panel", spec = spec }
 end
-for kind, spec in pairs(Specs.wind.turbines) do
+for kind, spec in pairs(Wind.SPEC.turbines) do
     KINDS[kind] = { family = "wind", spec = spec }
 end
 -- A treadmill's tile is a source once it is wired to feed a bank.
-KINDS.treadmill = { family = "treadmill", spec = Specs.treadmill, isPlaced = Treadmill.isWired }
+KINDS.treadmill = { family = "treadmill", spec = Treadmill.SPEC, isPlaced = Treadmill.isWired }
 
 --- "panel", "wind" or "treadmill" for a source kind; nil for anything else.
 function Sources.familyOf(kind)
@@ -88,7 +109,14 @@ end
 --- Whether a source of `kind` may feed a bank from `square`: outdoors, unless its family works
 --- indoors.
 function Sources.squareOk(square, kind)
-    return square ~= nil and (square:isOutside() or not OUTDOORS[KINDS[kind].family])
+    return square ~= nil and (square:isOutside() or not Sources.FAMILY[KINDS[kind].family].outdoors)
+end
+
+--- Whether a source at x, y, z is within REACH of `bank`, anything with x, y and z.
+function Sources.isInReach(bank, x, y, z)
+    local reach = Sources.REACH
+    return IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) <= reach.tiles * reach.tiles
+        and math.abs(z - bank.z) <= reach.levels
 end
 
 --- The banks, as { x, y, z }, a source of `kind` at x, y, z may be connected to.
@@ -98,7 +126,7 @@ function Sources.banksInReach(x, y, z, kind)
         return found
     end
     PowerBank.each(function(bank)
-        if PowerBank.isInReach(bank, x, y, z) then
+        if Sources.isInReach(bank, x, y, z) then
             table.insert(found, { x = bank.x, y = bank.y, z = bank.z })
         end
     end)
@@ -111,7 +139,7 @@ end
 function Sources.connectRefusal(isoObject, bankPosition)
     local kind = Sources.kindOf(isoObject)
     if not (kind and Sources.squareOk(isoObject:getSquare(), kind)
-        and PowerBank.isInReach(bankPosition, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
+        and Sources.isInReach(bankPosition, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
         return "out of reach"
     elseif Squares.samePosition(PowerBank.connectedBank(isoObject), bankPosition) then
         return "already connected"
@@ -122,7 +150,7 @@ end
 --- The loaded sources the bank at `bankPosition` ({ x, y, z }) could take now
 --- (Sources.connectRefusal), those connected to another bank included.
 function Sources.sourcesInReach(bankPosition)
-    local reach = Specs.sourceReach
+    local reach = Sources.REACH
     local found = {}
     for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
         Squares.eachAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)

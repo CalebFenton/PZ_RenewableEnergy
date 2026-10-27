@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
 
--- The arrow board's power (World/ArrowBoardPower.lua): the panels charging the box, the lamps and
+-- The arrow board's power (ArrowBoard/Power.lua): the panels charging the box, the lamps and
 -- their flashing, and the box's discharge cycle.
 -- Authority state goes through RenewableEnergyTestServerTrailer.lua; player actions go through
 -- the vanilla and mod actions, checked on this client's copy.
@@ -54,7 +54,7 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
 
 -- Each installed panel makes power by its condition, a half-cracked one half what a whole one
 -- does and a homemade one some, and with no panels the trailer stores nothing. The trailer reads
--- a module's watts with the mounts' own PowerBank.moduleWatts, so the checks compare the passes
+-- a module's watts with the mounts' own Panel.moduleWatts, so the checks compare the passes
 -- with each other rather than with that function.
 test("renewable_energy_world_arrow_board_charge_scales_with_panel_condition", {
     hour = 12,
@@ -149,7 +149,7 @@ test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
     end,
 })
 
--- Lit, by day or night, the lamps drain Specs.arrowBoard.lampShare of a car battery an hour.
+-- Lit, by day or night, the lamps drain ArrowBoard.SPEC.lampShare of a car battery an hour.
 test("renewable_energy_world_arrow_board_lamps_drain_a_lightbars_share", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
@@ -173,7 +173,7 @@ test("renewable_energy_world_arrow_board_lamps_drain_a_lightbars_share", {
             local battery = boxItems(answer.state, T.CAR_BATTERY)[1]
             return battery and battery.charge or -1
         end
-        local share = 2 * RenewableEnergy.Specs.arrowBoard.lampShare
+        local share = 2 * RenewableEnergy.ArrowBoard.SPEC.lampShare
         expectNear("the car battery's charge after two hours lit by day", charge(self.reads.day), 0.8 - share, 2e-5)
         expectNear("the car battery's charge after two more hours lit at night", charge(self.reads.night), 0.8 - 2 * share, 3e-5)
     end,
@@ -186,7 +186,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
     hour = 12,
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
-        local trailer, spec = self.trailer, RenewableEnergy.Specs.arrowBoard
+        local trailer, spec = self.trailer, RenewableEnergy.ArrowBoard.SPEC
         local use = instanceItem(T.DEEP_CYCLE):getUseDelta()
         self.use, self.stages = use, {}
         local function stage(name, args, want) lampStage(self, trailer, name, args, false, want) end
@@ -207,7 +207,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
         end)
     end,
     validate = function(self)
-        local spec, wh = RenewableEnergy.Specs.arrowBoard, RenewableEnergy.Specs.batteries[T.DEEP_CYCLE].wh
+        local spec, wh = RenewableEnergy.ArrowBoard.SPEC, RenewableEnergy.Specs.batteries[T.DEEP_CYCLE].wh
         expectLampStages(self)
         -- A battery's charge is read back as a 32-bit float.
         local cut, chargedState = self.reads.cut.state, self.reads.charged.state
@@ -229,7 +229,7 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
-        local period = 60000 / RenewableEnergy.Specs.arrowBoard.flashesPerMinute
+        local period = 60000 / RenewableEnergy.ArrowBoard.SPEC.flashesPerMinute
         -- Queues counting the frames the board shows lit and dark into self[key], until `enough`
         -- of them are seen or `ms` pass.
         local function watch(key, ms, enough)

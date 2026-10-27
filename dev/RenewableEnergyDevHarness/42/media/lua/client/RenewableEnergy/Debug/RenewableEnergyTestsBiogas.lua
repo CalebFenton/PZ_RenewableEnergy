@@ -591,7 +591,8 @@ test("renewable_energy_biogas_digester_menu", {
     validate = function(self)
         local object = self.digester.object
         local function job(name, share)
-            return getText("ContextMenu_RenewableEnergy_" .. name) .. (share and " (" .. share .. ")" or "")
+            local label = getText("ContextMenu_RenewableEnergy_" .. name)
+            return share and getText("ContextMenu_RenewableEnergy_WithShare", label, share) or label
         end
         local options = T.worldOptions(object, getText("IGUI_RenewableEnergy_Digester_barrel"), { status = job("Status"),
             sludge = job(DigesterJobs.TAKE_SLUDGE, "0%"), vent = job(DigesterJobs.VENT, "0%"), bag = job("GasBag"),

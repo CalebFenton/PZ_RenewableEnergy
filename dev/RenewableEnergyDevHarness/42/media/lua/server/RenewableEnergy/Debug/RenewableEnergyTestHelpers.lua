@@ -372,14 +372,14 @@ end
 
 --- Builds a record of RECORD_KINDS kind `kind` on the Sprites[kind] tile `tile` (a dotted path:
 --- "barrel.MetalDrum", "standard") on `square` as the build menu does, through the builder rural
---- finds use (WorldSpawns.buildEntity), which sends it to the clients. Returns the thumpable.
+--- finds use (Place.entity), which sends it to the clients. Returns the thumpable.
 function Helpers.placeRecord(kind, tile, square)
     local sprite = RenewableEnergy.Sprites[kind]
     for part in string.gmatch(tile, "[^.]+") do
         sprite = sprite and sprite[part]
     end
     need(type(sprite) == "string", "the " .. kind .. " tile " .. tostring(tile))
-    return RenewableEnergy.WorldSpawns.buildEntity(square, sprite, KINDS[kind].system().OnCreate)
+    return RenewableEnergy.Place.entity(square, sprite, KINDS[kind].system().OnCreate)
 end
 
 --- The record of kind `kind` as plain values: its saved fields, its kind's extras and, while its

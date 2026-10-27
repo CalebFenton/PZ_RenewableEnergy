@@ -11,6 +11,7 @@
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local GlobalObjects = require "cf_commonlib/GlobalObjects"
+local Clock = require "cf_commonlib/Clock"
 
 local Gasifier = {}
 RenewableEnergy.Gasifier = Gasifier
@@ -19,14 +20,14 @@ Gasifier.SYSTEM_NAME = "renewable_energy_gasifier"
 Gasifier.CONTAINER = "RenewableEnergyGasifier"
 Gasifier.FILTER = "RenewableEnergyGasifierFilter"
 
--- hopperKg: wood the hopper holds (the tile's ContainerCapacity). filterCapacity: the filter
--- container's capacity. tarKgPerItem: wood burned for each packing item that turns tarry. ashPerKg:
--- percent of the ash pit each kg fills. Tuned so a home's usual load fills the ash pit and tars a
--- filter around once a week, more often on the cruder tiers.
+-- filterCapacity: the filter container's capacity. tarKgPerItem: wood burned for each packing item
+-- that turns tarry. ashPerKg: percent of the ash pit each kg fills. Tuned so a home's usual load
+-- fills the ash pit and tars a filter around once a week, more often on the cruder tiers. What the
+-- hopper holds is its tile's ContainerCapacity (tools/make_tiles.py).
 Gasifier.TIERS = {
-    primitive = { hopperKg = 8, filterCapacity = 1, tarKgPerItem = 0.5, ashPerKg = 30 },
-    standard = { hopperKg = 20, filterCapacity = 1, tarKgPerItem = 1, ashPerKg = 20 },
-    advanced = { hopperKg = 30, filterCapacity = 2, tarKgPerItem = 1, ashPerKg = 10 },
+    primitive = { filterCapacity = 1, tarKgPerItem = 0.5, ashPerKg = 30 },
+    standard = { filterCapacity = 1, tarKgPerItem = 1, ashPerKg = 20 },
+    advanced = { filterCapacity = 2, tarKgPerItem = 1, ashPerKg = 10 },
 }
 
 -- Wood a generator on wood gas burns for each litre of petrol vanilla bills it: FEMA's 20 lb of
@@ -134,17 +135,10 @@ end
 
 --- The filter's clean and tarry packing counts.
 function Gasifier.filterCounts(container)
-    local clean, tarry = 0, 0
-    local items = container and container:getItems()
-    for i = 0, (items and items:size() or 0) - 1 do
-        local item = items:get(i)
-        if item:getFullType() == Gasifier.TARRY then
-            tarry = tarry + 1
-        elseif Gasifier.isPacking(item) then
-            clean = clean + 1
-        end
+    if not container then
+        return 0, 0
     end
-    return clean, tarry
+    return container:getCountEval(Gasifier.isPacking), container:getCountType(Gasifier.TARRY)
 end
 
 --- Kilograms of fuel in the hopper.
@@ -186,7 +180,7 @@ end
 -- Whether lighting it takes bellows: out long enough to have gone cold (since the world hour
 -- `outSince`), or never lit.
 local function isCold(lit, outSince)
-    return not lit and (outSince == nil or getGameTime():getWorldAgeHours() - outSince > Gasifier.COLD_HOURS)
+    return not lit and (outSince == nil or Clock.now() - outSince > Gasifier.COLD_HOURS)
 end
 
 --- The tier of a gasifier tile, or nil for any other object.
@@ -207,23 +201,26 @@ end
 Gasifier.isLitOverlay = Sprites.matcher(Sprites.gasifierLit)
 Gasifier.isPipeOverlay = Sprites.matcher(Sprites.gasifierPipe)
 
-local SIDE_STEPS = RenewableEnergy.SIDE_STEPS
+-- The sides a pipe runs to, saved as these letters (GasifierObject `pipe`), each an IsoDirections.
+local SIDES = { "N", "E", "S", "W" }
 
 --- The side of (x, y) that (tx, ty), a square next to it, is on: "N", "E", "S" or "W", or nil if
 --- it isn't one of the four beside it.
 function Gasifier.sideOf(x, y, tx, ty)
-    for side, step in pairs(SIDE_STEPS) do
-        if tx == x + step[1] and ty == y + step[2] then
+    for _, side in ipairs(SIDES) do
+        local direction = IsoDirections[side]
+        if tx == x + direction:dx() and ty == y + direction:dy() then
             return side
         end
     end
     return nil
 end
 
---- The square on `side` (Gasifier.sideOf) of (x, y, z), or nil when it isn't loaded.
+--- The square on `side` (Gasifier.sideOf) of (x, y, z), or nil when that square isn't loaded,
+--- whether or not (x, y, z) is.
 function Gasifier.squareOnSide(x, y, z, side)
-    local step = SIDE_STEPS[side]
-    return getSquare(x + step[1], y + step[2], z)
+    local direction = IsoDirections[side]
+    return getSquare(x + direction:dx(), y + direction:dy(), z)
 end
 
 GlobalObjects.declare(Gasifier, {

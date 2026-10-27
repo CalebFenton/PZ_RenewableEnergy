@@ -60,7 +60,7 @@ local function shareOrder(generator, banks)
         local at = bank.position
         local dx, dy, dz = at.x - generator.x, at.y - generator.y, at.z - generator.z
         table.insert(order, { bank = bank, distance = dx * dx + dy * dy + dz * dz,
-            key = RenewableEnergy.PlaceTracker.key(at.x, at.y, at.z) })
+            key = RenewableEnergy.Places.key(at.x, at.y, at.z) })
     end
     table.sort(order, function(a, b)
         return a.distance < b.distance or (a.distance == b.distance and a.key < b.key)

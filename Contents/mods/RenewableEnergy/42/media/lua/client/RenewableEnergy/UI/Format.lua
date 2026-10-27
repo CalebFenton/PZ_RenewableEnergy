@@ -3,6 +3,7 @@
 -- character; see Format.cubicMetres).
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Items = require "cf_commonlib/Items"
 
 local Format = {}
 RenewableEnergy.Format = Format
@@ -67,10 +68,27 @@ function Format.cubicMetres(m3, places)
     return getText("IGUI_RenewableEnergy_CubicMetres", Format.number(m3, places))
 end
 
--- "72%": an item's condition as a share of its type's ConditionMax (vanilla's default when the
--- script names none, as for the Car Battery Charger).
+-- An item's condition as a share of its type's ConditionMax (vanilla's default when the script
+-- names none, as for the Car Battery Charger).
+function Format.conditionShare(fullType, condition)
+    return condition / Items.conditionMaxOf(fullType)
+end
+
+-- "72%": an item's or a record's condition (Format.conditionShare).
 function Format.condition(fullType, condition)
-    return Format.percent(condition / RenewableEnergy.conditionMaxOf(fullType))
+    return Format.percent(Format.conditionShare(fullType, condition))
+end
+
+-- "64%": a vehicle part's condition, which runs from 0 to 100 whatever its item's ConditionMax, as
+-- vanilla's mechanics window shows it.
+function Format.partCondition(part)
+    return Format.percent(part:getCondition() / 100)
+end
+
+-- "Get Compost (45%)": a name with a 0..1 share after it, as vanilla labels a bag by its fill or a
+-- part by its condition.
+function Format.withShare(name, share)
+    return getText("ContextMenu_RenewableEnergy_WithShare", name, Format.percent(share))
 end
 
 -- Vanilla translates both forms of each unit into every language.
@@ -130,6 +148,17 @@ end
 --- A bank's name from its summary or status: the one a player gave it, else its tier's.
 function Format.bankName(summary)
     return summary.name or getItemNameFromFullType(summary.bankType)
+end
+
+--- The name of a placed tile: the item it is (CustomItem), which picking it up gives back, else
+--- its moveable's name (CustomName, Moveables.json), as a wind charger has.
+function Format.tileName(isoObject)
+    local properties = isoObject:getProperties()
+    local item = properties:get("CustomItem")
+    if item then
+        return getItemNameFromFullType(item)
+    end
+    return Translator.getMoveableDisplayName(properties:get("CustomName"))
 end
 
 return Format

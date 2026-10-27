@@ -34,6 +34,25 @@ function Wear.setCondition(item, condition)
     item:setCondition(math.max(0, math.min(item:getConditionMax(), math.floor(condition))))
 end
 
+-- Each patch-up repair (a battery's Service or Recondition, a module's seal) counts on vanilla's
+-- per-item repair count ("Repaired: Nx") and lowers the most the next can bring the item to by
+-- this step, so patching runs out. Remaking it with fresh parts (Rebuild Battery, Reglaze Module)
+-- starts the count again.
+Wear.REPAIR_LIMIT_STEP = 10
+
+-- A crafted inverter comes out short of its ConditionMax by CRAFTED_SHORTFALL at the recipe's
+-- Electricity level, and each level past it makes up CRAFTED_PER_LEVEL, up to the cap: the more
+-- skilled the maker, the better the first build.
+Wear.CRAFTED_SHORTFALL = 20
+Wear.CRAFTED_PER_LEVEL = 5
+
+--- The condition an inverter of ConditionMax `conditionMax` comes out at, made at Electricity
+--- `level` by a recipe that needs `required`.
+function Wear.craftedInverterCondition(conditionMax, level, required)
+    local condition = conditionMax - Wear.CRAFTED_SHORTFALL + Wear.CRAFTED_PER_LEVEL * math.max(0, level - required)
+    return math.min(conditionMax, condition)
+end
+
 -- Item modData: the inverter or controller has a condition of its own (found and worn, or
 -- crafted), so a container refill such as loot respawn must not wear it as if just found.
 local OWN_CONDITION_KEY = "RenewableEnergy_ownCondition"

@@ -1,4 +1,5 @@
--- Buildings the mod's objects fill with fumes (a sour digester, a lit gasifier), on the authority.
+-- Buildings the mod's objects fill with fumes (a sour digester, a lit gasifier), on the authority,
+-- and the one place generators are switched, since switching one writes its building's toxicity.
 --
 -- Toxicity belongs to the whole building and isn't saved. Vanilla writes it too: a generator sets
 -- it as it starts indoors and clears it as it stops (IsoGenerator.setActivated), and while it runs
@@ -8,7 +9,9 @@
 
 if isClient() then return end
 
+require "TimedActions/ISActivateGenerator"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 local Fumes = {}
 
@@ -68,6 +71,44 @@ function Fumes.restore(building)
     if building and not building:isToxic() and stillFumed(building) then
         building:setToxic(true)
     end
+end
+
+--- Starts or stops the vanilla generator `generator`, as vanilla does, putting back the fumes of
+--- the mod's sources in its building that a stop clears. Billing is the caller's.
+function Fumes.setRunning(generator, on)
+    if generator:isActivated() == on then return end
+    generator:setActivated(on)
+    if not on then
+        Fumes.restore(Fumes.buildingOf(generator:getSquare()))
+    end
+end
+
+--- Starts or stops a battery bank's generator. A bank has no exhaust, so its building keeps the
+--- toxicity it had, which vanilla's switch would set or clear.
+function Fumes.setBankRunning(generator, on)
+    if generator:isActivated() == on then return end
+    local building = Fumes.buildingOf(generator:getSquare())
+    local wasToxic = building and building:isToxic()
+    generator:setActivated(on)
+    if building and building:isToxic() ~= wasToxic then
+        building:setToxic(wasToxic)
+    end
+end
+
+-- A player starting or stopping a generator: vanilla switches it (ISActivateGenerator.complete),
+-- so the fumes it cleared go back here, and who pays nearby changes at once.
+local vanillaComplete = ISActivateGenerator.complete
+function ISActivateGenerator:complete()
+    local result = vanillaComplete(self)
+    local generator = self.generator
+    if GeneratorReach.isVanillaGenerator(generator) then
+        if not generator:isActivated() then
+            Fumes.restore(Fumes.buildingOf(generator:getSquare()))
+        end
+        Payers.track(generator)
+        Payers.billGenerators()
+    end
+    return result
 end
 
 return Fumes

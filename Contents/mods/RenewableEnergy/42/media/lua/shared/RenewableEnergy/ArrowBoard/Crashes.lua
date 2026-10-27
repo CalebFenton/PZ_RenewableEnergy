@@ -6,7 +6,7 @@
 -- (Bullet.onVehicleConstraintImpulse), so the client keeps watching, and the server keeps
 -- accepting the crash, for a moment after it comes unhitched nearby (CRASH.unhitched*).
 
-local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 
 -- A hard crash: the trailer's velocity changing by at least `kmh` within `ms` of real time, as a
 -- car stopping dead against a wall from that speed does. Hard braking sheds about 3 km/h in that
@@ -21,11 +21,8 @@ local LIMIT_SQ = (CRASH.kmh / 3.6) ^ 2
 -- The client command a driver sends when the trailer they tow crashes.
 local COMMAND_MODULE, CRASH_COMMAND = "RenewableEnergyArrowBoard", "crashed"
 
--- The loaded trailers whose crashes this game watches, by vehicle. Recent velocities are kept in
--- a ring of SAMPLE_SLOTS so that watching allocates nothing each frame. On a multiplayer client
--- each also keeps the car of this game's player that last towed it, until its crashes stop counting.
-local watched = {}
--- Enough for CRASH.ms at a thousand frames a second; at a higher rate the oldest samples go
+-- Recent velocities are kept in a ring of SAMPLE_SLOTS so that watching allocates nothing each
+-- frame. Enough for CRASH.ms at a thousand frames a second; at a higher rate the oldest samples go
 -- early, which still leaves a crash's jolt well inside the window.
 local SAMPLE_SLOTS = 256
 
@@ -33,7 +30,8 @@ local CLIENT = isClient()
 -- A dedicated server runs no vehicle physics (BaseVehicle.createPhysics), so it watches nothing.
 local WATCHES = not isServer()
 
---- A new watch's velocity record, for ArrowBoard.sampleCrash.
+--- A new watch's velocity record, for ArrowBoard.sampleCrash. On a multiplayer client it also keeps
+--- the car of this game's player that last towed the trailer, until its crashes stop counting.
 function ArrowBoard.newCrashWatch()
     return { ms = {}, x = {}, y = {}, head = 1, count = 0, joltedAt = -math.huge }
 end
@@ -41,8 +39,9 @@ end
 --- Watches the trailer's crashes from now until it leaves the world, in a game that runs vehicle
 --- physics. Called from its panels' part `init`.
 function ArrowBoard.watchCrashes(vehicle)
-    if WATCHES and not watched[vehicle] then
-        watched[vehicle] = ArrowBoard.newCrashWatch()
+    if WATCHES then
+        local entry = ArrowBoard.trailerEntry(vehicle)
+        entry.crash = entry.crash or ArrowBoard.newCrashWatch()
     end
 end
 
@@ -53,46 +52,46 @@ end
 
 -- On a multiplayer client, the car this game's player drives that tows the trailer or towed it a
 -- moment ago, whose game runs the trailer's physics; nil if none.
-local function carTowingHere(vehicle, entry, now)
+local function carTowingHere(vehicle, watch, now)
     local tow = vehicle:getVehicleTowedBy()
     if tow and drivenHere(tow) then
-        entry.car, entry.carUntil = tow, now + CRASH.unhitchedMs
-    elseif entry.car and (now > entry.carUntil or tow or not drivenHere(entry.car)) then
-        entry.car = nil
+        watch.car, watch.carUntil = tow, now + CRASH.unhitchedMs
+    elseif watch.car and (now > watch.carUntil or tow or not drivenHere(watch.car)) then
+        watch.car = nil
     end
-    return entry.car
+    return watch.car
 end
 
 local velocity = Vector3f.new()
 
-local function record(entry, now, x, y)
-    local slot = (entry.head + entry.count - 1) % SAMPLE_SLOTS + 1
-    if entry.count == SAMPLE_SLOTS then
-        entry.head = entry.head % SAMPLE_SLOTS + 1
+local function record(watch, now, x, y)
+    local slot = (watch.head + watch.count - 1) % SAMPLE_SLOTS + 1
+    if watch.count == SAMPLE_SLOTS then
+        watch.head = watch.head % SAMPLE_SLOTS + 1
     else
-        entry.count = entry.count + 1
+        watch.count = watch.count + 1
     end
-    entry.ms[slot], entry.x[slot], entry.y[slot] = now, x, y
+    watch.ms[slot], watch.x[slot], watch.y[slot] = now, x, y
 end
 
---- Records in `entry` (ArrowBoard.newCrashWatch) the trailer's ground velocity `x`, `y` in m/s at
+--- Records in `watch` (ArrowBoard.newCrashWatch) the trailer's ground velocity `x`, `y` in m/s at
 --- real time `now` in ms, or that it is `atRest` (BaseVehicle.isAtRest), and returns whether a new
 --- crash began: the velocity changed by a crash's worth within CRASH.ms, CRASH.quietMs after the
 --- last jolt. A trailer at rest keeps one still sample, which is all a crash into it needs to be
 --- seen, so a parked trailer costs no scan.
-function ArrowBoard.sampleCrash(entry, now, x, y, atRest)
+function ArrowBoard.sampleCrash(watch, now, x, y, atRest)
     if atRest then
-        entry.head, entry.count = 1, 0
-        record(entry, now, 0, 0)
+        watch.head, watch.count = 1, 0
+        record(watch, now, 0, 0)
         return false
     end
-    local ms, xs, ys = entry.ms, entry.x, entry.y
-    while entry.count > 0 and now - ms[entry.head] > CRASH.ms do
-        entry.head = entry.head % SAMPLE_SLOTS + 1
-        entry.count = entry.count - 1
+    local ms, xs, ys = watch.ms, watch.x, watch.y
+    while watch.count > 0 and now - ms[watch.head] > CRASH.ms do
+        watch.head = watch.head % SAMPLE_SLOTS + 1
+        watch.count = watch.count - 1
     end
-    local jolted, slot = false, entry.head
-    for _ = 1, entry.count do
+    local jolted, slot = false, watch.head
+    for _ = 1, watch.count do
         local dx, dy = x - xs[slot], y - ys[slot]
         if dx * dx + dy * dy >= LIMIT_SQ then
             jolted = true
@@ -100,48 +99,44 @@ function ArrowBoard.sampleCrash(entry, now, x, y, atRest)
         end
         slot = slot % SAMPLE_SLOTS + 1
     end
-    record(entry, now, x, y)
+    record(watch, now, x, y)
     if not jolted then
         return false
     end
-    local newCrash = now - entry.joltedAt >= CRASH.quietMs
-    entry.joltedAt = now
+    local newCrash = now - watch.joltedAt >= CRASH.quietMs
+    watch.joltedAt = now
     return newCrash
 end
 
 -- The physics' x and z are the ground's.
-local function sampleCrash(vehicle, entry, now)
+local function sampleVelocity(vehicle, watch, now)
     if vehicle:isAtRest() then
-        return ArrowBoard.sampleCrash(entry, now, 0, 0, true)
+        return ArrowBoard.sampleCrash(watch, now, 0, 0, true)
     end
     vehicle:getLinearVelocity(velocity)
-    return ArrowBoard.sampleCrash(entry, now, velocity:x(), velocity:z(), false)
+    return ArrowBoard.sampleCrash(watch, now, velocity:x(), velocity:z(), false)
 end
 
 local cell
 
--- OnTick, except on a dedicated server: samples each watched trailer whose physics this game
--- runs, and cracks its panels, or asks the server to, when it crashes. Nothing the game fires on
--- a crash reaches Lua, so it must poll; parked trailers cost one isAtRest call. Allocates nothing.
-local function sampleTrailers()
-    local now = getTimestampMs()
+--- Each frame, in a game that runs vehicle physics: samples the trailer if this game runs its
+--- physics, and cracks its panels, or asks the server to, when it crashes. Parked trailers cost
+--- one isAtRest call. A vehicle joins the cell a frame after it enters the world, so one not yet
+--- in it waits; once in, it stays until it leaves the world, so the cell's list is searched only
+--- until then.
+function ArrowBoard.sampleTrailer(vehicle, watch, now)
     cell = cell or getCell()
-    -- A vehicle joins the cell a frame after it enters the world, so one not yet in it waits. Once
-    -- in, it stays until it leaves the world, so the cell's list is searched only until then.
-    for vehicle, entry in pairs(watched) do
-        if vehicle:isRemovedFromWorld() then
-            watched[vehicle] = nil
-        elseif entry.inCell or cell:getVehicles():contains(vehicle) then
-            entry.inCell = true
-            local car = CLIENT and carTowingHere(vehicle, entry, now)
-            if (car or not CLIENT) and sampleCrash(vehicle, entry, now) then
-                if CLIENT then
-                    -- From the driver, whom the server checks: in split screen, not always player 1.
-                    sendClientCommand(car:getDriver(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId(), car = car:getId() })
-                else
-                    ArrowBoard.crashCrack(vehicle)
-                end
-            end
+    if not (watch.inCell or cell:getVehicles():contains(vehicle)) then
+        return
+    end
+    watch.inCell = true
+    local car = CLIENT and carTowingHere(vehicle, watch, now)
+    if (car or not CLIENT) and sampleVelocity(vehicle, watch, now) then
+        if CLIENT then
+            -- From the driver, whom the server checks: in split screen, not always player 1.
+            sendClientCommand(car:getDriver(), COMMAND_MODULE, CRASH_COMMAND, { vehicle = vehicle:getId(), car = car:getId() })
+        else
+            ArrowBoard.crashCrack(vehicle)
         end
     end
 end
@@ -201,9 +196,6 @@ local function onClientCommand(module, command, player, args)
     end
 end
 
-if WATCHES then
-    Events.OnTick.Add(sampleTrailers)
-end
 if not CLIENT then
     Events.OnClientCommand.Add(onClientCommand)
 end

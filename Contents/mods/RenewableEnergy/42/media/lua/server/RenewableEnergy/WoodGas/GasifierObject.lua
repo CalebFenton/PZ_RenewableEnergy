@@ -15,6 +15,7 @@ local Fumes = require "RenewableEnergy/Fumes"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
+local Clock = require "cf_commonlib/Clock"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
@@ -142,7 +143,7 @@ end
 function GasifierObject:goOut()
     if self.lit then
         self.lit = false
-        self.outSince = getGameTime():getWorldAgeHours()
+        self.outSince = Clock.now()
     end
 end
 

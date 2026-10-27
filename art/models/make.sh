@@ -10,7 +10,9 @@
 #                32 x 32 item icons and the 48 x 48 build-menu icons (tools/textures)
 #   mod_icon.py  the mod list icon, drawn pixel by pixel with Pillow (the poster and the Workshop
 #                preview.png are in-game shots that art/promo/compose.py lays out)
-#   tools/make_tiles.py and tools/pack_textures.py   renewable_energy.tiles and the pack
+#   tools/make_tiles.py and tools/pack_textures.py   renewable_energy.tiles, tileGeometry.txt and
+#                lua/shared/RenewableEnergy/SpriteTiles.lua (every tile by meaning, for Lua), and
+#                the pack; make_tiles.py needs only Python, so a tile number change runs it alone
 #   preview.py   review sheets of all of it, and index.html naming each piece, read back from the
 #                written files
 #

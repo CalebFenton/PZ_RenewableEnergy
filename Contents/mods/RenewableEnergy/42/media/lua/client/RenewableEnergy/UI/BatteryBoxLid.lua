@@ -13,6 +13,7 @@ require "Vehicles/TimedActions/ISOpenVehicleDoor"
 require "Vehicles/TimedActions/ISUnlockVehicleDoor"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Items = require "cf_commonlib/Items"
 
@@ -26,10 +27,8 @@ local TEXTS = {
     IGUI_CloseTrunk = "IGUI_RenewableEnergy_CloseBatteryBox",
 }
 
--- Whether `part` is an arrow board's battery box lid. ArrowBoard is server Lua, which loads after
--- this file, so it is looked up only when a hook runs.
+-- Whether `part` is an arrow board's battery box lid.
 local function isLid(part)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
     return part ~= nil and part:getId() == ArrowBoard.LID and ArrowBoard.isTrailer(part:getVehicle())
 end
 
@@ -44,7 +43,7 @@ BatteryBoxLid.CUTTERS = "Base.BoltCutters"
 --- The bolt cutters `character` would cut the lid's padlock with, those in hand first, or nil when
 --- there is no padlock to cut or no working pair to cut it with.
 function BatteryBoxLid.padlockCutters(character, lid)
-    if not (isLid(lid) and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
+    if not (isLid(lid) and ArrowBoard.isPadlocked(lid)) then
         return nil
     end
     return Items.toolFor(character, VehicleJobs.isBoltCutters)
@@ -65,7 +64,6 @@ end
 -- On or Off, with vanilla's headlight icons, where the switch can be reached, else one that says
 -- why not and does nothing, as vanilla's radial does for what it can't do (ISVehicleMenu).
 local function addSwitchSlice(menu, character)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
     local vehicle = ISVehicleMenu.getVehicleToInteractWith(character)
     local box = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     if not (box and vehicle:isInArea(box:getArea(), character)) then
@@ -103,7 +101,7 @@ function ISVehicleMenu.showRadialMenuOutside(playerObj)
         end
     end
     addSwitchSlice(menu, playerObj)
-    if not (lid and RenewableEnergy.ArrowBoard.isPadlocked(lid)) then
+    if not (lid and ArrowBoard.isPadlocked(lid)) then
         return
     end
     local cutters = BatteryBoxLid.padlockCutters(playerObj, lid)
@@ -182,7 +180,7 @@ local vanillaUnlockStop = ISUnlockVehicleDoor.stop
 -- (HaloTextHelper.addBadText, as ISVehiclePartMenu does for a fuel inlet out of reach).
 function ISUnlockVehicleDoor:stop()
     vanillaUnlockStop(self)
-    if isLid(self.part) and RenewableEnergy.ArrowBoard.isPadlocked(self.part) then
+    if isLid(self.part) and ArrowBoard.isPadlocked(self.part) then
         HaloTextHelper.addBadText(self.character, getText("IGUI_RenewableEnergy_BoxLocked"))
     end
 end
@@ -198,7 +196,7 @@ function ISOpenVehicleDoor:selectContainerInLootWindow()
     if not isLid(self.part) then
         return vanillaSelectContainer(self)
     end
-    local vehicle, box = self.vehicle, RenewableEnergy.ArrowBoard.BATTERY_BOX
+    local vehicle, box = self.vehicle, ArrowBoard.BATTERY_BOX
     local trailer = setmetatable({
         getPartById = function(_, id)
             return vehicle:getPartById(id == "TruckBed" and box or id)

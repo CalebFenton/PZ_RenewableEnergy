@@ -2,22 +2,23 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "ISUI/ISContextMenu"
 require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Specs"
-require "RenewableEnergy/Recipes"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/Menu"
+local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Clock = require "cf_commonlib/Clock"
 local Squares = require "cf_commonlib/Squares"
 
--- Solar menus: the panel menus, actions and highlight (UI/Menu.lua, UI/StatusWindow.lua) and the
+-- Solar menus: the panel menus, actions and highlight (UI/SourceMenu.lua, UI/StatusWindow.lua) and the
 -- connect action's XP and time (TimedActions/RenewableEnergyAction.lua).
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual, player = T.test, T.expect, T.expectNear, T.expectEqual, T.player
-local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
+local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 local PowerBank, Sources, Format = RenewableEnergy.PowerBank, RenewableEnergy.Sources, RenewableEnergy.Format
-local Menu, SourceJobs = RenewableEnergy.Menu, RenewableEnergy.SourceJobs
-local MODULES_KEY = PowerBank.MODULES_KEY
+local SourceJobs = RenewableEnergy.SourceJobs
+local MODULES_KEY = Panel.MODULES_KEY
 
 -- Connecting a panel gives Electricity XP once per module, the first time that module is ever
 -- connected: a rack holding one module connected before gives the other one's share and marks
@@ -78,7 +79,7 @@ test("renewable_energy_solar_menu_panel_connect", {
             local panel = self.panel.object
             self.banksBefore = #Sources.banksInReach(panel:getX(), panel:getY(), panel:getZ(), Sources.kindOf(panel))
             local context = T.newContext()
-            local submenu = Menu.addSourceOptions(0, context, panel)
+            local submenu = SourceMenu.addSourceOptions(0, context, panel)
             local option = T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_ConnectToBank"))
             self.alone = T.optionState(option)
             self.alone.enabled = hasEnabledOption(submenu)
@@ -95,7 +96,7 @@ test("renewable_energy_solar_menu_panel_connect", {
         end
         local connect = T.connectOptions(self.bank, self.panel, 1).one
         expect(connect.shown and not connect.greyed, "a panel next to a bank offers no connection to it")
-        expect(T.menuOption(Menu.addSourceOptions, panel, getText("ContextMenu_RenewableEnergy_DisconnectSource")) == nil,
+        expect(T.menuOption(SourceMenu.addSourceOptions, panel, getText("ContextMenu_RenewableEnergy_DisconnectSource")) == nil,
             "a panel that isn't connected offers to disconnect")
     end,
 })
@@ -111,7 +112,7 @@ test("renewable_energy_solar_menu_panel_wired_to", {
             "this client's summary of the renamed bank")
     end,
     validate = function(self)
-        local wiredTo = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
+        local wiredTo = T.menuOption(SourceMenu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
             "Shed Bank", Format.away(self.panel.position, self.bank.position)))
         expect(wiredTo ~= nil, "a connected panel's menu doesn't name its renamed bank and how far away it stands")
     end,
@@ -156,7 +157,7 @@ test("renewable_energy_solar_disconnect_panel", {
         self.panel = self.bank and T.panel(self, Sprites.wall.wood.S, { near = self.bank, connect = true })
         if not self.panel then return end
         T.step(function()
-            local option = T.menuOption(Menu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_DisconnectSource"))
+            local option = T.menuOption(SourceMenu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_DisconnectSource"))
             if not T.chooseOption(self, "Disconnect", option, self.panel.square) then return end
             T.waitFor(self, function() return PowerBank.connectedBank(self.panel.object) == nil end, "this client's copy of the disconnection")
             T.bankState(self, self.bank)
@@ -199,26 +200,28 @@ test("renewable_energy_solar_disconnect_panel_dropped_during_catchup", {
 -- its mount as the recipe seals one in hand: up to its cap, lowered by the seal it already had,
 -- counting the seal and still showing cracked. The whole module isn't offered, and the bank's
 -- record takes the sealed module at once. Its tooltip names both adhesives, and with both
--- carried the seal takes the glue twin's uses of glue and leaves the epoxy (Recipes.lua,
--- MODULE_REPAIR_RECIPES).
+-- carried the seal takes the glue twin's uses of glue and leaves the epoxy (ModuleRepair.SEAL, a
+-- cf_commonlib Materials craft).
 test("renewable_energy_solar_seal_module_in_place", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         local cracked = { type = T.FACTORY_MODULE, condition = 20, repaired = 1 }
-        self.to = math.min(T.sealCap(T.FACTORY_MODULE, cracked.repaired), cracked.condition + Recipes.MODULE_REPAIR)
+        self.to = math.min(T.sealCap(T.FACTORY_MODULE, cracked.repaired), cracked.condition + ModuleRepair.SEAL_ADDS)
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
         if not self.panel then return end
         local bank = self.bank
-        T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
+        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
         T.step(function()
             self.items.inputs[1]:setFavorite(true, true)
             local context = T.newContext()
-            local menu = Menu.addSourceOptions(0, context, self.panel.object)
-            local whole = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 1, 100))
-            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 2, cracked.condition))
+            local menu = SourceMenu.addSourceOptions(0, context, self.panel.object)
+            local whole = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 1,
+                Format.condition(T.FACTORY_MODULE, 100)))
+            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", 2,
+                Format.condition(cracked.type, cracked.condition)))
             context:hideAndChildren()
             self.wholeOffered = whole ~= nil
             if not T.chooseOption(self, "Seal Cracked Module", option, self.panel.square) then return end
@@ -258,10 +261,11 @@ test("renewable_energy_solar_seal_module_in_place", {
 -- menu offers them now; nil for a module not offered.
 local function sealOptions(object)
     local context = T.newContext()
-    local menu = Menu.addSourceOptions(0, context, object)
+    local menu = SourceMenu.addSourceOptions(0, context, object)
     local options = {}
     for slot, module in ipairs(object:getModData()[MODULES_KEY] or {}) do
-        options[slot] = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", slot, math.floor(module.condition)))
+        options[slot] = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_SealModule", slot,
+            Format.condition(module.type, module.condition)))
     end
     context:hideAndChildren()
     return options
@@ -273,7 +277,7 @@ test("renewable_energy_solar_seal_respects_protected_inputs", {
     run = function(self)
         local panel = T.panel(self, Sprites.flat, { modules = T.factoryModules(20) })
         if not panel then return end
-        T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
+        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
         T.step(function()
             local tool, epoxy = self.items.inputs[1], self.items.inputs[2]
@@ -305,7 +309,7 @@ test("renewable_energy_solar_seal_each_module_in_place", {
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = T.factoryModules(self.conditions[1], self.conditions[2]) })
         if not self.panel then return end
-        T.setRecipeSkills(self, Recipes.moduleRepairRecipe())
+        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
         -- The options before each seal, and after the last.
         self.offers = {}
@@ -345,7 +349,7 @@ test("renewable_energy_solar_seal_each_module_in_place", {
         end
         local modules = self.reads.panel.modules
         for slot, condition in ipairs(self.conditions) do
-            local to = math.min(T.sealCap(T.FACTORY_MODULE, 0), condition + Recipes.MODULE_REPAIR)
+            local to = math.min(T.sealCap(T.FACTORY_MODULE, 0), condition + ModuleRepair.SEAL_ADDS)
             expect(to >= T.sealCap(T.FACTORY_MODULE, 1), "a seal leaves module " .. slot .. " sealable again: pick a higher condition")
             expectEqual("sealed module " .. slot .. "'s condition", modules[slot].condition, to)
             expectEqual("sealed module " .. slot .. "'s seals", modules[slot].repaired, 1)
@@ -355,7 +359,7 @@ test("renewable_energy_solar_seal_each_module_in_place", {
 
 -- The Clear Snow option on `panel`'s menu: whether it shows, whether it is greyed out, and why.
 local function clearSnowOption(panel)
-    return T.optionState(T.menuOption(Menu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_ClearSnow")))
+    return T.optionState(T.menuOption(SourceMenu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_ClearSnow")))
 end
 
 -- A snowy flat panel offers Clear Snow, greyed out saying why until the character carries a broom

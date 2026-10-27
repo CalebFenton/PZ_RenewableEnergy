@@ -37,7 +37,7 @@ test("renewable_energy_world_garden_lights_once_per_house", {
         for _, light in ipairs(answer.lights) do
             local key = light.x .. "," .. light.y
             expect(light.outdoors, "a light stands indoors at " .. key)
-            expectNear("a new light's charge", light.charge, RenewableEnergy.Specs.gardenLight.wh, 0.001)
+            expectNear("a new light's charge", light.charge, RenewableEnergy.SolarGardenLight.SPEC.wh, 0.001)
         end
     end,
 })

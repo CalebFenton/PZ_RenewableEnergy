@@ -1,10 +1,12 @@
 -- The hands-on jobs at a battery bank: what each takes of the character and what refuses it
--- (cf_commonlib's Jobs). JobSites.bank does them. Parts enter and leave a bank only through Wire
--- In and Unwire (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
+-- (cf_commonlib's Jobs). BankSystem.jobSite does them. Parts enter and leave a bank only through
+-- Wire In and Unwire (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local Jobs = require "cf_commonlib/Jobs"
 
 local BankJobs = {}
@@ -19,9 +21,89 @@ BankJobs.UNWIRE = "Unwire"
 BankJobs.REPAIR = "RepairPart"
 BankJobs.RENAME = "Rename"
 
+-- The longest name a bank takes.
+BankJobs.NAME_LENGTH = 32
+
 -- What wiring the part `item` in or out takes, or nil for no part.
 local function wiringOf(item)
-    return instanceof(item, "InventoryItem") and PowerBank.wiringFor(item:getFullType()) or nil
+    return instanceof(item, "InventoryItem") and Wiring.forPart(item:getFullType()) or nil
+end
+
+local function countParts(container, kind)
+    local count = 0
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        if PowerBank.partKind(items:get(i):getFullType()) == kind then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+--- How many more parts of `kind` (a PowerBank.PARTS key) the bank `bank` takes; 0 for no bank.
+function BankJobs.freePartSlots(bank, kind)
+    local tier = PowerBank.bankOfSprite(Sprites.nameOf(bank))
+    local container = tier and bank:getContainer()
+    if not container then
+        return 0
+    end
+    return math.max(0, tier.spec[PowerBank.PARTS[kind].max] - countParts(container, kind))
+end
+
+--- Why the bank whose summary or status is `summary` can't be switched `on` (true) or off now, or
+--- nil: "already on" or "already off", or, switching on, what keeps it from carrying a load that a
+--- player can mend (PowerBank.blocker): no working inverter, or no battery capacity.
+function BankJobs.switchRefusal(summary, on)
+    if summary.on == on then
+        return on and "already on" or "already off"
+    elseif on then
+        local _, refusal = PowerBank.blocker({ limitW = summary.limitW, capacityWh = summary.capacityWh, on = true })
+        return refusal
+    end
+    return nil
+end
+
+--- Turn On or Turn Off for a bank in `summary`'s state: its label key, its job, and why it is
+--- refused (nil when it isn't). The bank's menu and its status window both offer it.
+function BankJobs.switchOf(summary)
+    local on = summary.on == true
+    return on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On", on and BankJobs.TURN_OFF or BankJobs.TURN_ON,
+        BankJobs.switchRefusal(summary, not on)
+end
+
+--- `name` without the spaces around it, as a bank keeps it.
+function BankJobs.trimName(name)
+    return (name:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+--- Why `name` can't name a bank, or nil: a name is one line of at most NAME_LENGTH characters once
+--- trimmed, which the rename box holds it to.
+function BankJobs.nameRefusal(name)
+    if type(name) ~= "string" then
+        return "no name"
+    end
+    name = BankJobs.trimName(name)
+    if #name > BankJobs.NAME_LENGTH then
+        return "name too long"
+    elseif name:find("%c") then
+        return "name not one line"
+    end
+    return nil
+end
+
+--- Why `character` can't connect (`connect` true) or disconnect the bank `bank`, whose
+--- summary or status is `summary`, or nil. Vanilla's generator rules: connecting needs the generator
+--- Electricity level or the "Generator" recipe (ISWorldObjectContextMenuLogic.doGeneratorMenu), and
+--- only a switched-off one disconnects.
+function BankJobs.connectRefusal(character, bank, summary, connect)
+    if bank:isConnected() == connect then
+        return connect and "already connected" or "already disconnected"
+    elseif connect and character:getPerkLevel(Perks.Electricity) < 3 and not character:isRecipeActuallyKnown("Generator") then
+        return "ContextMenu_GeneratorPlugTT"
+    elseif not connect and summary.on then
+        return "already on"
+    end
+    return nil
 end
 
 -- Whether `item` is in the bank's container, of a type `isKind(fullType)` accepts.
@@ -39,7 +121,7 @@ end
 local function switchJob(on)
     return {
         on = on, minutes = 0.5, doneSound = "LightSwitch",
-        blocker = function(character, bank) return PowerBank.switchRefusal(PowerBank.currentSummary(bank), on) end,
+        blocker = function(character, bank) return BankJobs.switchRefusal(PowerBank.currentSummary(bank), on) end,
     }
 end
 
@@ -50,7 +132,7 @@ local function plugJob(connected)
     return {
         connected = connected, units = 300, light = true, sound = "GeneratorConnect",
         blocker = function(character, bank)
-            return PowerBank.connectRefusal(character, bank, PowerBank.currentSummary(bank), connected)
+            return BankJobs.connectRefusal(character, bank, PowerBank.currentSummary(bank), connected)
         end,
     }
 end
@@ -64,22 +146,22 @@ BankJobs.JOBS = {
     [BankJobs.DISCONNECT] = plugJob(false),
     -- A carried part into the bank.
     [BankJobs.WIRE_IN] = {
-        units = function(bank, item, character) return PowerBank.wiringUnits(character, wiringOf(item)) end,
+        units = function(bank, item, character) return Wiring.units(character, wiringOf(item)) end,
         light = true, sound = "GeneratorConnect",
         with = isPart, withMissing = "Tooltip_RenewableEnergy_NotAPart",
         blocker = function(character, bank, item)
             local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
-            return kind and PowerBank.freePartSlots(bank, kind) == 0 and "Tooltip_RenewableEnergy_NoSlot" or nil
+            return kind and BankJobs.freePartSlots(bank, kind) == 0 and "Tooltip_RenewableEnergy_NoSlot" or nil
         end,
         materials = function(character, bank, item)
             local wiring = wiringOf(item)
-            return wiring and PowerBank.wiringMaterials(wiring) or {}
+            return wiring and Wiring.materials(wiring) or {}
         end,
     },
     -- A part out of the bank, given back with its wire; it takes the tools that wired it in, as
     -- vanilla takes a car part's install tools to uninstall it.
     [BankJobs.UNWIRE] = {
-        units = function(bank, item, character) return PowerBank.wiringUnits(character, wiringOf(item), 0.5) end,
+        units = function(bank, item, character) return Wiring.units(character, wiringOf(item), 0.5) end,
         light = true, inTarget = true, sound = "GeneratorConnect",
         blocker = function(character, bank, item)
             return not inBank(bank, item, PowerBank.partKind) and "Tooltip_RenewableEnergy_NotAPart" or nil
@@ -100,13 +182,13 @@ BankJobs.JOBS = {
             end
             return item:getCondition() >= item:getConditionMax() and "Tooltip_RenewableEnergy_NoRepairNeeded" or nil
         end,
-        materials = { { perk = "Electricity", need = Specs.partRepair.skill }, { item = PowerBank.SCRAP, need = 1 } },
+        materials = { { perk = "Electricity", need = Specs.partRepair.skill }, { item = Wiring.SCRAP, need = 1 } },
         xp = { perk = "Electricity", amount = Specs.partRepair.xp },
     },
     -- An empty name gives the bank back its tier's.
     [BankJobs.RENAME] = {
         minutes = 0.5,
-        withRefusal = function(character, bank, name) return PowerBank.nameRefusal(name) end,
+        withRefusal = function(character, bank, name) return BankJobs.nameRefusal(name) end,
     },
 }
 
@@ -130,7 +212,7 @@ function BankJobs.batteryBatch(character, job, bank, parts)
         table.sort(batteries, function(a, b)
             return a:getCondition() / a:getConditionMax() > b:getCondition() / b:getConditionMax()
         end)
-        local free = PowerBank.freePartSlots(bank, "battery")
+        local free = BankJobs.freePartSlots(bank, "battery")
         while free > 0 and #batteries > free do
             table.remove(batteries)
         end

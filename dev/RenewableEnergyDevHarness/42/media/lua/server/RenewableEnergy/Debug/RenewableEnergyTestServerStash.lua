@@ -199,19 +199,30 @@ handler("stashKnownOnStart", function(_, _, defer)
     return { houses = houses }
 end)
 
+-- The stash maps' rows of the mod's loot entries (LootEntries.lua).
+local function stashMapRows()
+    local rows = {}
+    for _, spec in ipairs(RenewableEnergy.Distributions.items) do
+        if spec.stashMap then
+            table.insert(rows, spec)
+        end
+    end
+    return rows
+end
+
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
 -- and every loot list a map names exists.
 check("prepperMapTargets", function(expect)
     local lists = {}
-    for stashMap, added in pairs(Stash.descriptions) do
-        lists[stashMap.name] = {}
-        for _, entry in ipairs(LibLoot.entries(added.loot or {})) do
-            expect(LibLoot.resolveItemList(entry[2]) ~= nil, stashMap.name .. ": no loot list " .. entry[2])
-            lists[stashMap.name][entry[2]] = true
+    for _, spec in ipairs(stashMapRows()) do
+        lists[spec.fullType] = {}
+        for _, entry in ipairs(spec.entries) do
+            expect(LibLoot.resolveItemList(entry[2]) ~= nil, spec.fullType .. ": no loot list " .. entry[2])
+            lists[spec.fullType][entry[2]] = true
         end
     end
-    local prepper = lists.RenewableEnergy_CrowcallRoad
-    if not expect(prepper ~= nil, "no Crowcall Road stash") then
+    local prepper = lists["RenewableEnergy.CrowcallRoadMap"]
+    if not expect(prepper ~= nil, "no Crowcall Road map in the loot") then
         return
     end
     for key in pairs(SuburbsDistributions.all) do
@@ -221,8 +232,8 @@ check("prepperMapTargets", function(expect)
     end
 end)
 
--- The loot at each Stash Houses option: for every stash and loot list, how often its map is listed
--- and at what weight, against the weight the stash gives it there.
+-- The loot at each Stash Houses option: for every stash map and loot list, how often the map is
+-- listed and at what weight, against the weight its row gives it there.
 handler("stashMapsInCorpseLoot", function(_, _, defer)
     local D = RenewableEnergy.Distributions
     local options = SandboxVars.RenewableEnergy
@@ -232,11 +243,11 @@ handler("stashMapsInCorpseLoot", function(_, _, defer)
         options.StashMode = mode
         D.apply()
         D.apply()
-        for stashMap, added in pairs(Stash.descriptions) do
-            for _, entry in ipairs(LibLoot.entries(added.loot or {})) do
-                local count, weight = countPairs(LibLoot.resolveItemList(entry[2]), stashMap.item)
+        for _, spec in ipairs(stashMapRows()) do
+            for _, entry in ipairs(spec.entries) do
+                local count, weight = countPairs(LibLoot.resolveItemList(entry[2]), spec.fullType)
                 table.insert(found, {
-                    mode = mode, where = stashMap.name .. " in " .. entry[2], count = count, weight = weight, rarity = entry[1],
+                    mode = mode, where = spec.fullType .. " in " .. entry[2], count = count, weight = weight, rarity = entry[1],
                 })
             end
         end

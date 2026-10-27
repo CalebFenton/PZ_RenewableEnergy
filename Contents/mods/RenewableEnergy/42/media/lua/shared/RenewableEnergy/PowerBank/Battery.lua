@@ -1,4 +1,4 @@
--- Batteries, the mod's and vanilla's car batteries: capacity, charge and wear.
+-- Batteries, the mod's and vanilla's car batteries: capacity, charge, wear and repair.
 --
 -- A battery's charge is its drainable uses, 0 to 1, so that a battery carries its charge
 -- in and out of banks and the inventory shows it. Its condition is its health: capacity
@@ -29,6 +29,30 @@ local function health(item)
     return item:getCondition() / item:getConditionMax()
 end
 
+-- Service Battery adds a little to a tired battery; Recondition brings it to its repair limit,
+-- which falls by Wear.REPAIR_LIMIT_STEP with each repair until only a rebuild helps.
+Battery.SERVICE_REPAIR = 10
+Battery.REPAIR_LIMIT = 85
+
+--- The most a repair can bring a battery repaired this many times to.
+function Battery.repairLimit(timesRepaired)
+    return Battery.REPAIR_LIMIT - Wear.REPAIR_LIMIT_STEP * timesRepaired
+end
+
+--- The repair that makes the most of one of a battery's limited repairs, as the translation key
+--- that names it, or nil for one in perfect shape: Service where its step reaches the repair limit
+--- anyway (it keeps the charge), Recondition further below it, and past the limit only a rebuild.
+function Battery.bestRepair(condition, repaired)
+    local limit = Battery.repairLimit(repaired or 0)
+    if condition < limit then
+        return condition + Battery.SERVICE_REPAIR >= limit and "IGUI_RenewableEnergy_RepairService"
+            or "IGUI_RenewableEnergy_RepairRecondition"
+    elseif condition < 100 then
+        return "IGUI_RenewableEnergy_RepairRebuild"
+    end
+    return nil
+end
+
 --- Watt-hours the battery holds when full, after wear.
 function Battery.nominalWh(item)
     local spec = Battery.spec(item)
@@ -54,28 +78,90 @@ function Battery.hasCharge(item)
     return item:getModData()[HAS_CHARGE_KEY] == true
 end
 
+-- Batteries found in the world hold this fraction of a charge.
+Battery.FOUND_CHARGE = { min = 0.3, max = 0.8 }
+
 --- Gives a found battery a random part charge. Sends nothing: stocking callers publish the item.
 function Battery.setFoundCharge(item)
-    local range = Specs.foundCharge
+    local range = Battery.FOUND_CHARGE
     Battery.setCharge(item, Chance.within(range.min, range.max))
 end
 
---- The item in `container` with the lowest charge that isn't full, of those `accepts(item)`
---- takes, or nil. Any drainable will do, vanilla cells included. Full is counted in whole uses,
---- since float uses of a full drainable can read just under 1.
-function Battery.emptiestIn(container, accepts)
-    local emptiest, lowest
+--- Whether a charge going from `before` to `after` shows in the inventory, at two decimals: the
+--- server sends a charge only then, as vanilla's alternator charging does (Vehicles.Update.Battery).
+function Battery.changedVisibly(before, after)
+    return VehicleUtils.compareFloats(before, after, 2)
+end
+
+-- How many whole uses `item` is from the charge `target` on the side `direction` gives (1: below
+-- it, -1: above it). The game keeps a charge in uses and rounds a charge it is given to the nearest
+-- (InventoryItem.setCurrentUsesFloat), and reads it back as a float a hair off it (0.1 comes back
+-- as 0.09999999), so charges are compared in uses. Counted in `wholeUses`, full is the item's
+-- most uses, which can lie a use under a charge of 1 (DrainableComboItem.getMaxUses).
+local function usesFrom(item, target, direction, wholeUses)
+    local targetUses = math.floor(target / item:getUseDelta() + 0.5)
+    if wholeUses then
+        targetUses = math.min(targetUses, item:getMaxUses())
+    end
+    return (targetUses - item:getCurrentUses()) * direction
+end
+
+-- The item of `container` that `accepts(item)` takes furthest from `target` on the side
+-- `direction` gives, as a charge, and how many uses from it (usesFrom); nil if every one is there.
+-- The first of equally far ones.
+local function furthestFrom(container, target, direction, accepts, wholeUses)
+    local furthest, furthestUses, furthestGap
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        if accepts(item) and item:getCurrentUses() < item:getMaxUses() then
-            local charge = Battery.getCharge(item)
-            if not emptiest or charge < lowest then
-                emptiest, lowest = item, charge
+        if accepts(item) then
+            local uses = usesFrom(item, target, direction, wholeUses)
+            local gap = uses * item:getUseDelta()
+            if uses > 0 and (not furthest or gap > furthestGap) then
+                furthest, furthestUses, furthestGap = item, uses, gap
             end
         end
     end
-    return emptiest
+    return furthest, furthestUses
+end
+
+--- Moves up to `wh` watt-hours into (`direction` 1) or out of (-1) the items of `container` that
+--- `accepts(item)` takes, toward the charge `target`, each holding `capacityWhOf(item)` when full:
+--- the one furthest from it first, so that a mixed set evens out. Without `usesPerStep`, an item
+--- goes all the way to the target, landing on it exactly so that the next pick moves on, and the
+--- last step may be part of a use, which the item rounds to. With it, a pick moves at most that
+--- many whole uses and never part of one, so a set evens out a use at a time and what is short of
+--- a use stays unmoved. Sends an item whose charge shows a change (Battery.changedVisibly).
+--- Authority only. Returns the watt-hours moved, the whole uses moved, and whether an item is
+--- still short of the target.
+function Battery.shift(container, wh, target, direction, accepts, capacityWhOf, usesPerStep)
+    local moved, movedUses = 0, 0
+    local wholeUses = usesPerStep ~= nil
+    local item, uses = furthestFrom(container, target, direction, accepts, wholeUses)
+    while item and wh > 0 do
+        local before = Battery.getCharge(item)
+        local useWh = item:getUseDelta() * capacityWhOf(item)
+        local step, stepUses
+        if usesPerStep then
+            stepUses = math.min(uses, usesPerStep, math.floor(wh / useWh))
+            if stepUses <= 0 then
+                break
+            end
+            item:setCurrentUses(item:getCurrentUses() + direction * stepUses)
+            step = stepUses * useWh
+        else
+            local room = uses * useWh
+            step = math.min(wh, room)
+            stepUses = step == room and uses or 0
+            Battery.setCharge(item, step == room and target or before + direction * step / capacityWhOf(item))
+        end
+        if Battery.changedVisibly(before, Battery.getCharge(item)) then
+            sendItemStats(item)
+        end
+        wh, moved, movedUses = wh - step, moved + step, movedUses + stepUses
+        item, uses = furthestFrom(container, target, direction, accepts, wholeUses)
+    end
+    return moved, movedUses, item ~= nil
 end
 
 --- The batteries in `container` taken together, as batteries wired in parallel: their charge, 0

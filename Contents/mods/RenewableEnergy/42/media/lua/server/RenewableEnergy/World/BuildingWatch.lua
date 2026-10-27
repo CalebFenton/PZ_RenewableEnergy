@@ -1,14 +1,17 @@
--- Rolls buildings once their surroundings load, and judges the ground around them. A chunk that
--- loads brings in parts of buildings, not their surroundings, so a building waits until every
+-- Waiting for the world around something to load, and rolling buildings once theirs has. A chunk
+-- that loads brings in parts of buildings, not their surroundings, so a building waits until every
 -- chunk within its watcher's reach of it is loaded. The rules:
 --
+-- - Whatever waits (BuildingWatch.waitFor) waits in one queue, at a square of it. Each game minute,
+--   one whose square has unloaded leaves the queue: what put it there puts it back when its chunk
+--   loads again. One that is ready leaves the queue and runs. It leaves before it runs, so what it
+--   finds already done isn't kept.
 -- - Each chunk that loads offers its buildings, up to HIGHEST_LEVEL, to every watcher once; a
---   building the watcher `wants` waits in that watcher's queue, with a square of it in that chunk.
--- - Each game minute, a building whose square has unloaded leaves the queue: its chunk brings it
---   back when it loads again. A building whose surroundings are loaded leaves the queue and is
---   rolled. It leaves before its roll, so a building the roll finds already rolled isn't kept.
+--   building the watcher's ledger doesn't hold as rolled and the watcher `wants` waits, with a
+--   square of it in that chunk, until its surroundings are loaded, and is rolled then unless its
+--   ledger took it meanwhile.
 -- - The queue lives only in memory. Whatever must outlive a quit, such as a building promised
---   for certain, is the watcher's own saved state, which `wants` and the roll read.
+--   for certain, is the watcher's own saved ledger, which `wants` and the roll read.
 
 if isClient() then return end
 
@@ -26,12 +29,24 @@ BuildingWatch.HIGHEST_LEVEL = 1
 
 local CHUNK_SIZE = getChunkSizeInSquares()
 
--- Each { wants, roll, pending }, pending a building key -> { def, x, y, z }.
-local watchers = {}
-
 --- The key a building's saved rolls are filed under.
 function BuildingWatch.key(def)
     return def:getX() .. "," .. def:getY()
+end
+
+--- Calls `fn(square, x, y)` for each place on level `z` of the building's bounds and `reach`
+--- squares around them (square nil where it isn't loaded), until fn returns something, which it
+--- returns.
+function BuildingWatch.eachSquare(def, reach, z, fn)
+    for x = def:getX() - reach, def:getX2() + reach - 1 do
+        for y = def:getY() - reach, def:getY2() + reach - 1 do
+            local found = fn(getSquare(x, y, z), x, y)
+            if found ~= nil then
+                return found
+            end
+        end
+    end
+    return nil
 end
 
 -- No square flag marks a road; vanilla tells one by its floor tile too (BaseVehicle.isDoingOffroad).
@@ -65,10 +80,65 @@ function BuildingWatch.surroundingsLoaded(def, reach)
     return true
 end
 
---- Rolls, with `roll(def)`, each building a loading chunk brings in that `wants(def)`, once its
---- surroundings out to `reach` (default REACH) are loaded.
-function BuildingWatch.watch(wants, roll, reach)
-    table.insert(watchers, { wants = wants, roll = roll, reach = reach, pending = {} })
+-- Waiting
+
+-- What waits, by key: { x, y, z, ready, run }.
+local waiting = {}
+
+--- Runs `run(square)` at the next game minute that `ready(square)` holds for the loaded square
+--- x, y, z; drops it if that square unloads first. Waiting again under a key that waits already
+--- changes nothing.
+function BuildingWatch.waitFor(key, x, y, z, ready, run)
+    if not waiting[key] then
+        waiting[key] = { x = x, y = y, z = z, ready = ready, run = run }
+    end
+end
+
+-- Running one entry or its square unloading takes it off the queue, so they are collected first.
+local function runReady()
+    local gone, due
+    for key, entry in pairs(waiting) do
+        local square = getSquare(entry.x, entry.y, entry.z)
+        if not square then
+            gone = gone or {}
+            table.insert(gone, key)
+        elseif entry.ready(square) then
+            due = due or {}
+            table.insert(due, key)
+        end
+    end
+    for _, key in ipairs(gone or {}) do
+        waiting[key] = nil
+    end
+    for _, key in ipairs(due or {}) do
+        local entry = waiting[key]
+        waiting[key] = nil
+        entry.run(getSquare(entry.x, entry.y, entry.z))
+    end
+end
+
+-- Buildings
+
+-- Each { ledger, isRolled, wants, roll, reach }.
+local watchers = {}
+
+local function rolledIn(watcher, def)
+    return watcher.isRolled(ModData.getOrCreate(watcher.ledger)[BuildingWatch.key(def)])
+end
+
+local function rolledAtAll(value)
+    return value ~= nil
+end
+
+--- Rolls, with `spec.roll(def)`, each building a loading chunk brings in that `spec.wants(def)`,
+--- once its surroundings out to `spec.reach` (default REACH) are loaded. `spec.ledger` names the
+--- global ModData the watcher saves its rolls in, by BuildingWatch.key; a building whose entry
+--- there `spec.isRolled(value)` says was rolled (by default, any entry) is never offered.
+function BuildingWatch.watch(spec)
+    table.insert(watchers, {
+        ledger = spec.ledger, isRolled = spec.isRolled or rolledAtAll,
+        wants = spec.wants, roll = spec.roll, reach = spec.reach,
+    })
 end
 
 local function onLoadChunk(chunk)
@@ -83,9 +153,15 @@ local function onLoadChunk(chunk)
                 if def and not seen[def] then
                     seen[def] = true
                     local key = BuildingWatch.key(def)
-                    for _, watcher in ipairs(watchers) do
-                        if not watcher.pending[key] and watcher.wants(def) then
-                            watcher.pending[key] = { def = def, x = square:getX(), y = square:getY(), z = z }
+                    for i, watcher in ipairs(watchers) do
+                        if not rolledIn(watcher, def) and watcher.wants(def) then
+                            BuildingWatch.waitFor(i .. "|" .. key, square:getX(), square:getY(), z, function()
+                                return BuildingWatch.surroundingsLoaded(def, watcher.reach)
+                            end, function()
+                                if not rolledIn(watcher, def) then
+                                    watcher.roll(def)
+                                end
+                            end)
                         end
                     end
                 end
@@ -94,33 +170,8 @@ local function onLoadChunk(chunk)
     end
 end
 
--- Rolling a building and its chunk unloading both take it off the queue, so the buildings are
--- collected first.
-local function rollLoaded()
-    for _, watcher in ipairs(watchers) do
-        local ready, gone
-        for key, entry in pairs(watcher.pending) do
-            if not getSquare(entry.x, entry.y, entry.z) then
-                gone = gone or {}
-                table.insert(gone, key)
-            elseif BuildingWatch.surroundingsLoaded(entry.def, watcher.reach) then
-                ready = ready or {}
-                table.insert(ready, key)
-            end
-        end
-        for _, key in ipairs(gone or {}) do
-            watcher.pending[key] = nil
-        end
-        for _, key in ipairs(ready or {}) do
-            local def = watcher.pending[key].def
-            watcher.pending[key] = nil
-            watcher.roll(def)
-        end
-    end
-end
-
 Events.LoadChunk.Add(onLoadChunk)
 -- A minute is soon enough: buildings load at the edge of the loaded area, out of sight.
-Events.EveryOneMinute.Add(rollLoaded)
+Events.EveryOneMinute.Add(runReady)
 
 return BuildingWatch

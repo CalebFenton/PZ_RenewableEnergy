@@ -4,6 +4,7 @@ import math
 from art.kit import around, beam, box, cylinder, group, loft, mound, ring, tube
 from palette import M
 from parts import DRUM
+from tile_numbers import ROTOR_SPIN, SCOOP_SPIN
 
 # Wind ---------------------------------------------------------------------------------------------
 #
@@ -90,8 +91,8 @@ PROPELLER_HUB = 3.8  # the hub's height, a storey and a half up, on either pipe 
 PROPELLER_BLADE = (0.82, 0.13, 0.02)  # a blade's length past its root, its chord at the root, its thickness
 ALTERNATOR_HUB = 4.3
 ALTERNATOR_BLADE = (1.0, 0.14, 0.005)
-# The rotor turned a step at a time: three blades look the same after a third of a turn.
-ROTOR_SPINS = (0, 20, 40, 60, 80, 100)
+# The rotor turned a step at a time (tile_numbers.ROTOR_SPIN).
+ROTOR_SPINS = tuple(ROTOR_SPIN[0] * step for step in range(ROTOR_SPIN[1]))
 # The radius of the plastic pipe the pipe blades are sawn from: its curve is their airfoil.
 PIPE_BLADE_CURVE = 0.1
 
@@ -444,7 +445,7 @@ FACING_YAWS = {"N": 0, "E": -90, "S": 180, "W": 90}
 # their own way (_blade), and baked onto another set's shape they would leave its edges uncoloured.
 BLADE_SKINS = {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}, "Steel": {"blades": "steel"}}
 SPRITE_MODELS = {
-    "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): 30 * step for step in range(6)}},
+    "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): SCOOP_SPIN[0] * step for step in range(SCOOP_SPIN[1])}},
     "Propeller": {"model": propeller_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": PROPELLER_HUB},
     "CarAlternator": {"model": car_alternator_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS,
                       "hub": PROPELLER_HUB},

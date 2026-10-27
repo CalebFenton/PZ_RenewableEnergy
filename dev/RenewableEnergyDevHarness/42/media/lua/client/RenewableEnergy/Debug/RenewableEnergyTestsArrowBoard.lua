@@ -1,7 +1,9 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Items = require "cf_commonlib/Items"
 
--- Arrow board trailer (World/ArrowBoard.lua, Vehicles.txt): stock and its rolls, panels, repair
+-- Arrow board trailer (ArrowBoard/Trailer.lua, Vehicles.txt): stock and its rolls, panels, repair
 -- and frame. Its battery box, power and crashes are in RenewableEnergyTestsArrowBoard*.lua.
 -- Authority state goes through RenewableEnergyTestServerTrailer.lua; player actions go through
 -- the vanilla and mod actions, checked on this client's copy.
@@ -22,7 +24,7 @@ local function expectStockConditions(state, ranges, what)
     return left, right
 end
 
--- The model a panel shows for each look of RenewableEnergy.crackLookOf.
+-- The model a panel shows for each look of ModuleRepair.crackLookOf.
 local MODEL_OF_LOOK = { light = "LightCracked", heavy = "Cracked" }
 
 -- The model a panel holding a module at `condition` (nil: none) shows.
@@ -30,7 +32,7 @@ local function modelFor(condition)
     if not condition then
         return ""
     end
-    local look = RenewableEnergy.crackLookOf(T.FACTORY_MODULE, condition)
+    local look = ModuleRepair.crackLookOf(T.FACTORY_MODULE, condition)
     return look and MODEL_OF_LOOK[look] or "Whole"
 end
 
@@ -55,12 +57,14 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
             return
         end
         expectEqual("modules in the battery box", #boxItems(state, T.FACTORY_MODULE), 0)
+        local wear = self.reads.ranges.batteryWear[stock.batteryWear]
+        local worn = { min = wear.mean - wear.halfWidth, max = math.min(100, wear.mean + wear.halfWidth) }
         local batteries, charges = 0, {}
         for _, item in ipairs(boxItems(state)) do
             if item.charge then
                 batteries = batteries + 1
                 table.insert(charges, item.charge)
-                expect(T.inRange(item.condition, stock.batteryCondition), "a battery in the box is at " .. item.condition .. "%")
+                expect(T.inRange(item.condition, worn), "a battery in the box is at " .. item.condition .. "%")
             end
         end
         expect(batteries >= stock.batteries.min and batteries <= stock.batteries.max,
@@ -197,7 +201,7 @@ test("renewable_energy_world_arrow_board_panels_crack", {
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
         local Specs = RenewableEnergy.Specs
-        self.whole = RenewableEnergy.conditionMaxOf(T.FACTORY_MODULE)
+        self.whole = Items.conditionMaxOf(T.FACTORY_MODULE)
         -- Half a crack above the heavy look, so a crack takes it below.
         self.light = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.heavyBelow) + math.floor(Specs.storm.crack / 2)
         batchOnTrailer(function()
@@ -242,12 +246,12 @@ end
 
 -- Sets the character's skills to Seal Cracked Module's required levels.
 local function setSealSkills(self)
-    T.setRecipeSkills(self, RenewableEnergy.Recipes.moduleRepairRecipe())
+    T.setRecipeSkills(self, ModuleRepair.sealRecipe())
 end
 
 -- The uses of epoxy Seal Cracked Module takes.
 local function sealEpoxyUses()
-    local inputs = RenewableEnergy.Recipes.moduleRepairRecipe():getInputs()
+    local inputs = ModuleRepair.sealRecipe():getInputs()
     local epoxy = getScriptManager():FindItem("Base.Epoxy")
     for i = 0, inputs:size() - 1 do
         local input = inputs:get(i)
@@ -269,7 +273,7 @@ local function sealPanelOption(vehicle)
 end
 
 -- Seal Cracked Panel takes Seal Cracked Module's inputs (keeping the screwdriver), skill and XP,
--- and seals the module, sealed `repaired` times before, from `from(cap)` by Recipes.MODULE_REPAIR
+-- and seals the module, sealed `repaired` times before, from `from(cap)` by ModuleRepair.SEAL_ADDS
 -- up to its cap, still cracked, counting the seal; an uncracked module can't be sealed. The sealed
 -- panel keeps its option, greyed out saying to reglaze it once a seal can't bring it further.
 local function repairTest(name, repaired, fromBelowCap)
@@ -279,7 +283,7 @@ local function repairTest(name, repaired, fromBelowCap)
             if not spawnTrailer(self) then return end
             local trailer = self.trailer
             self.from = fromBelowCap(T.sealCap(T.FACTORY_MODULE, repaired))
-            self.to = math.min(T.sealCap(T.FACTORY_MODULE, repaired), self.from + RenewableEnergy.Recipes.MODULE_REPAIR)
+            self.to = math.min(T.sealCap(T.FACTORY_MODULE, repaired), self.from + ModuleRepair.SEAL_ADDS)
             self.epoxyNeeded = sealEpoxyUses()
             setSealSkills(self)
             self.wholeAt = T.conditionAt(T.FACTORY_MODULE, RenewableEnergy.Specs.crackLooks.lightBelow)
@@ -298,7 +302,7 @@ local function repairTest(name, repaired, fromBelowCap)
             T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
             T.read(self, "character", { perks = { "Electricity" } }, "after")
             -- What CraftRecipe.addXP gives this character for the recipe's xpAward.
-            T.read(self, "electricityAward", { xp = RenewableEnergy.Recipes.moduleRepairRecipe():getXPAward(0):getAmount() }, "award")
+            T.read(self, "electricityAward", { xp = ModuleRepair.sealRecipe():getXPAward(0):getAmount() }, "award")
             waitForPanelsCopy(self, trailer)
             T.step(function() self.after = sealPanelOption(trailer.vehicle) end)
         end,
@@ -327,7 +331,7 @@ local function repairTest(name, repaired, fromBelowCap)
 end
 -- One seal short of the cap, one under it, and one under a twice-sealed module's lower cap.
 repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 0,
-    function(cap) return cap - RenewableEnergy.Recipes.MODULE_REPAIR - 1 end)
+    function(cap) return cap - ModuleRepair.SEAL_ADDS - 1 end)
 repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 0, function(cap) return cap - 1 end)
 repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lower", 2, function(cap) return cap - 1 end)
 
@@ -441,8 +445,8 @@ test("renewable_energy_world_arrow_board_frame_welds", {
         end)
     end,
     validate = function(self)
-        local front = getText("ContextMenu_RenewableEnergy_RepairFrame", getText("IGUI_RenewableEnergy_FrameFront"), 20)
-        local back = getText("ContextMenu_RenewableEnergy_RepairFrame", getText("IGUI_RenewableEnergy_FrameBack"), 45)
+        local front = getText("ContextMenu_RenewableEnergy_RepairFrame", getText("IGUI_RenewableEnergy_FrameFront"), "20%")
+        local back = getText("ContextMenu_RenewableEnergy_RepairFrame", getText("IGUI_RenewableEnergy_FrameBack"), "45%")
         expect(self.labels[1] == front and self.labels[2] == back, "the menu offered " .. table.concat(self.labels, ", "))
         local state = self.trailer.state
         expectEqual("the welded front's condition", frameCondition(state, FRAME_FRONT), 100)

@@ -14,13 +14,15 @@ local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local Place = require "RenewableEnergy/World/Place"
+local Finds = require "RenewableEnergy/Items/Finds"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 local GardenLights = require "RenewableEnergy/World/GardenLights"
-local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local RuralFinds = require "RenewableEnergy/World/RuralFinds"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
-local JobSites = require "RenewableEnergy/JobSites"
+local SourceSite = require "RenewableEnergy/PowerBank/SourceSite"
 local GasLines = require "RenewableEnergy/GasLine/GasLines"
 local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
 local Chance = require "cf_commonlib/Chance"
@@ -138,7 +140,7 @@ local function notFreeIndoors(square)
 end
 
 -- What a spot (its global object's modData) puts down on its square, by its `what`. A spot that
--- `waits` is placed at the next minute once `ready(square, spot)`, if given, says all it needs is
+-- `waits` is placed at a later minute once `ready(square, spot)`, if given, says all it needs is
 -- loaded: vehicles can't safely join the world while their chunk is still loading, and a line's
 -- two ends may lie in different chunks. `refuses(square, spot)`, if given, says why what stands
 -- on its squares now keeps it out, or nil; on open ground that is RuralFinds' rule, indoors a free
@@ -152,8 +154,8 @@ local SPOTS = {
             end
         end,
         place = function(square, spot)
-            local modules = WorldSpawns.siteModules(moduleCount(spot.siteKind, spot.mount))
-            WorldSpawns.placePanel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
+            local modules = Finds.siteModules(moduleCount(spot.siteKind, spot.mount))
+            Place.panel(square, SolarSites.mountSprite(spot.mount, spot.facing), modules)
             return true
         end,
     },
@@ -200,7 +202,7 @@ local SPOTS = {
                 if why then
                     print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
                 else
-                    JobSites.connectSource(nil, charger, bank)
+                    SourceSite.connectSource(nil, charger, bank)
                 end
             end
             return true
@@ -230,7 +232,7 @@ local SPOTS = {
         waits = true,
         ready = function(square)
             local building = square:getBuilding()
-            return building == nil or BuildingWatch.surroundingsLoaded(building:getDef())
+            return building == nil or building:getDef():isFullyStreamedIn()
         end,
         place = function(square)
             local building = square:getBuilding()
@@ -345,24 +347,18 @@ function SolarSites.rollNew(sites)
     end
 end
 
--- The spots that wait for the next minute, each { x, y, z, spot }.
-local waiting = {}
-
--- Places each waiting spot that is ready. One whose square has unloaded leaves the queue until
--- its chunk loads again.
-local function placeWaiting()
-    for i = #waiting, 1, -1 do
-        local entry = waiting[i]
-        local object = system:getObjectAt(entry.x, entry.y, entry.z)
-        local square = getSquare(entry.x, entry.y, entry.z)
-        local kind = SPOTS[entry.spot.what]
-        if not (object and square) then
-            table.remove(waiting, i)
-        elseif not kind.ready or kind.ready(square, entry.spot) then
-            table.remove(waiting, i)
-            placeSpot(object, square, entry.spot)
+-- Puts a spot that waits in BuildingWatch's queue: placed once it is ready, dropped if its square
+-- unloads first, to come back when its chunk loads again.
+local function waitToPlace(x, y, z, spot)
+    local kind = SPOTS[spot.what]
+    BuildingWatch.waitFor("SolarSites|" .. x .. "," .. y .. "," .. z, x, y, z, function(square)
+        return system:getObjectAt(x, y, z) == nil or not kind.ready or kind.ready(square, spot)
+    end, function(square)
+        local object = system:getObjectAt(x, y, z)
+        if object then
+            placeSpot(object, square, spot)
         end
-    end
+    end)
 end
 
 -- Places and forgets every spot in the chunk that needn't wait.
@@ -375,7 +371,7 @@ local function placeChunk(wx, wy)
         local spot = copyTable(object:getModData())
         local square = getSquare(x, y, z)
         if SPOTS[spot.what].waits then
-            table.insert(waiting, { x = x, y = y, z = z, spot = spot })
+            waitToPlace(x, y, z, spot)
         elseif square then
             placeSpot(object, square, spot)
         end
@@ -404,6 +400,5 @@ local function onSGlobalObjectSystemInit()
 end
 
 Events.OnSGlobalObjectSystemInit.Add(onSGlobalObjectSystemInit)
-Events.EveryOneMinute.Add(placeWaiting)
 
 return SolarSites

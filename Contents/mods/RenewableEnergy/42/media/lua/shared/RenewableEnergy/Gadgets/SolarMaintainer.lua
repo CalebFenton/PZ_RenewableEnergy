@@ -13,6 +13,8 @@ local SolarMaintainer = {}
 RenewableEnergy.SolarMaintainer = SolarMaintainer
 
 SolarMaintainer.ITEM = "RenewableEnergy.SolarMaintainer"
+-- Its cell's rated watts.
+SolarMaintainer.WATTS = 10
 
 -- Battery part modData: set while a maintainer is attached.
 SolarMaintainer.ATTACHED_KEY = "RenewableEnergy_SolarMaintainer"

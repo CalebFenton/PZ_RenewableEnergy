@@ -3,6 +3,7 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "Moveables/ISMoveableDefinitions"
 require "RenewableEnergy/Biogas/Digester"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 
 -- The mod's tiles (Sprites.lua) and how its objects move (Moveables.lua, PlaceTracker.lua): pictures,
 -- overlays, tile properties, rotating, placing, picking up and scrapping.
@@ -291,8 +292,8 @@ local MODULES = {
     { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
 }
 local CARRIED = {
-    ["RenewableEnergy.SolarRackWood"] = { key = PowerBank.MODULES_KEY, value = MODULES },
-    ["RenewableEnergy.SolarFlat"] = { key = PowerBank.MODULES_KEY, value = { MODULES[1] } },
+    ["RenewableEnergy.SolarRackWood"] = { key = Panel.MODULES_KEY, value = MODULES },
+    ["RenewableEnergy.SolarFlat"] = { key = Panel.MODULES_KEY, value = { MODULES[1] } },
     [SolarGardenLight.ITEM] = { key = SolarGardenLight.CHARGE_KEY, value = 2.5 },
 }
 

@@ -16,7 +16,7 @@ local DigesterMenu = {}
 -- The job's name, with what it has to go on as an eyeball share, as vanilla's Get Compost (45%).
 local function label(job, share)
     local name = getText(Action.labelKey(job))
-    return share and name .. " (" .. Format.percent(share) .. ")" or name
+    return share and Format.withShare(name, share) or name
 end
 
 -- Take Sludge, into each bag that takes it, as vanilla's Get Compost lists them with the share of
@@ -26,7 +26,7 @@ local function addSludge(menu, playerNum, digester, summary)
     JobOptions.addEach(menu, playerNum, DigesterJobs, DigesterJobs.TAKE_SLUDGE, digester,
         DigesterJobs.sludgeBags(getSpecificPlayer(playerNum)), label(DigesterJobs.TAKE_SLUDGE, summary.sludge / 100),
         function(bag)
-            return bag:getDisplayName() .. " (" .. Format.percent(DigesterJobs.sludgeUses(bag, summary.sludge) * perUse / 100) .. ")"
+            return Format.withShare(bag:getDisplayName(), DigesterJobs.sludgeUses(bag, summary.sludge) * perUse / 100)
         end)
 end
 
@@ -41,7 +41,7 @@ local function addGasBag(menu, playerNum, digester, summary)
     end
     for _, tarp in ipairs(tarps) do
         local option = JobOptions.add(bagMenu, playerNum, DigesterJobs, DigesterJobs.FIT_TARP, digester, tarp,
-            label(DigesterJobs.FIT_TARP, tarp:getCondition() / tarp:getConditionMax()))
+            label(DigesterJobs.FIT_TARP, Format.conditionShare(tarp:getFullType(), tarp:getCondition())))
         option.itemForTexture = tarp
     end
     if summary.holder ~= "none" then
@@ -72,7 +72,7 @@ function DigesterMenu.addOptions(playerNum, context, digester)
     local vessels = DigesterJobs.toFill(character)
     for _, job in ipairs({ DigesterJobs.FILL_PUMP, DigesterJobs.FILL_COMPRESSOR }) do
         JobOptions.addEach(menu, playerNum, DigesterJobs, job, digester, vessels, label(job), function(vessel)
-            return vessel:getDisplayName() .. " (" .. Format.percent(vessel:getCurrentUsesFloat()) .. ")"
+            return Format.withShare(vessel:getDisplayName(), vessel:getCurrentUsesFloat())
         end)
     end
     if not summary.scrubber then

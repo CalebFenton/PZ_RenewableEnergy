@@ -6,7 +6,7 @@ if isClient() then return end
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
-local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Jobs = require "cf_commonlib/Jobs"
 
@@ -40,7 +40,7 @@ local DO = {
         return true
     end,
     [VehicleJobs.SEAL_PANEL] = function(character, row, vehicle, partId)
-        return ArrowBoard.sealPanel(character, vehicle, partId)
+        return ArrowBoard.sealPanel(vehicle, partId)
     end,
 }
 DO[VehicleJobs.BOARD_OFF] = DO[VehicleJobs.BOARD_ON]

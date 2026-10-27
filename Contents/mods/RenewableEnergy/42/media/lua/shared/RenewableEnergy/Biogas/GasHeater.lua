@@ -4,7 +4,6 @@
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
-local Specs = require "RenewableEnergy/Specs"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Jobs = require "cf_commonlib/Jobs"
@@ -12,6 +11,9 @@ local Squares = require "cf_commonlib/Squares"
 
 local GasHeater = {}
 RenewableEnergy.GasHeater = GasHeater
+
+-- Lighting a fire takes one use of a match or lighter, as a campfire does; a gasifier's firebox too.
+GasHeater.FIRE_STARTER = { tool = "START_FIRE", item = "Base.Matches", useOne = true }
 
 -- What a lit heater keeps its digester at, at least: as warm as vanilla's lit barbecue keeps its
 -- square (IsoBarbecue's heat source).
@@ -74,7 +76,7 @@ GasHeater.JOBS = {
             local summary = digester and Digester.currentSummary(digester)
             return not (summary and summary.gas > 0) and "Tooltip_RenewableEnergy_NoDigesterNear" or nil
         end,
-        materials = { Specs.FIRE_STARTER },
+        materials = { GasHeater.FIRE_STARTER },
     },
     [GasHeater.OFF] = {
         minutes = 1, lit = false,

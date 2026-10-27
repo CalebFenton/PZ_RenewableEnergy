@@ -5,7 +5,6 @@
 -- strains audibly now and then, the warning to set the brake. The game's wind is the same on every
 -- client, and a charger's brake is in its modData, so nothing needs sending.
 
-local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
 local Squares = require "cf_commonlib/Squares"
@@ -41,7 +40,7 @@ local function stateFor(name)
     local prefix, model = Sprites.windModelOf(name)
     if not prefix then return nil end
     local kind, _, material = Sprites.kindOf(name)
-    return { sprite = name, spec = Specs.wind.turbines[kind], blades = Wind.bladesOf(kind, material),
+    return { sprite = name, spec = Wind.SPEC.turbines[kind], blades = Wind.bladesOf(kind, material),
         model = model, names = modelNames(prefix, model), phase = 0, shown = 0, strainIn = 0 }
 end
 
@@ -75,7 +74,7 @@ local function strain(object, state, kph, seconds)
     state.strainIn = state.strainIn - seconds
     if state.strainIn <= 0 then
         state.strainIn = ZombRandFloat(STRAIN_MIN_SECONDS, STRAIN_MAX_SECONDS)
-        object:getSquare():playSound(Specs.wind.blades[state.blades].strainSound)
+        object:getSquare():playSound(Wind.SPEC.blades[state.blades].strainSound)
     end
 end
 

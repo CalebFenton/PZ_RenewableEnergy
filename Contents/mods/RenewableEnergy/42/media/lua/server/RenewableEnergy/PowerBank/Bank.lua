@@ -2,17 +2,20 @@
 -- chargers, controllers and sources, and the energy that moves between them each pass. Its backup
 -- generator is Backup.lua's, and what it tells the clients BankStatus.lua's; both add to this class.
 --
--- The table is the bank's global object (SGlobalObject), so every field in SAVED_FIELDS is saved
--- with the world and kept while the chunk is unloaded. While loaded, the container is the truth
--- about the parts and each battery's charge is the truth about the charge; while unloaded, the
--- snapshot in `batteries` and `charge` carries on, and it and the wear taken meanwhile are
--- written back into the parts when the chunk loads.
+-- The table is the bank's global object, a cf_commonlib ObjectSystem.Object record, so every field
+-- in SAVED_FIELDS is saved with the world and kept while the chunk is unloaded. While loaded, the
+-- container is the truth about the parts and each battery's charge is the truth about the charge;
+-- while unloaded, the snapshot in `batteries` and `charge` carries on, and it and the wear taken
+-- meanwhile are written back into the parts when the chunk loads.
+--
+-- A pass (catchUp, advance) switches the bank's generator at once, so the banks after it see who
+-- runs, but bills nothing and tells nobody: whoever ran the pass settles it once (afterChange), a
+-- job, a player's look at the bank or the system's pass over every bank.
 
 if isClient() then return end
 
-require "Map/SGlobalObject"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Places = require "RenewableEnergy/Places"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
@@ -22,12 +25,13 @@ local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
-local GasLines = require "RenewableEnergy/GasLine/GasLines"
-local Fumes = require "RenewableEnergy/Fumes"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
+local Fumes = require "RenewableEnergy/Fumes"
+local Clock = require "cf_commonlib/Clock"
+local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 local Tiles = require "cf_commonlib/Tiles"
 
-local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
+local Bank = LibObjectSystem.Object:derive("RenewableEnergy_Bank")
 RenewableEnergy.Bank = Bank
 
 -- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
@@ -39,27 +43,26 @@ Bank.SAVED_FIELDS = {
     "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
 }
 
--- How the bank runs each family of source (RenewableEnergy.Sources): connect(player, source,
--- isoObject, facing, material), if any, fills a newly connected source's record and teaches
--- `player` what connecting it first teaches; update(source, object, inSlot, hours, context) sets
--- its watts and reason for a pass; and status(entry, source), if any, adds to its status entry.
+-- How the bank runs each family of source (Sources.FAMILIES): connect(player, source, isoObject,
+-- facing, material), if any, fills a newly connected source's record and teaches `player` what
+-- connecting it first teaches; disconnect(source, object), if any, hands what the record kept back
+-- to its object (nil when gone); reconcile(source, object), if any, brings the record and its
+-- loaded object back into step; update(source, object, inSlot, hours, context) sets its watts and
+-- reason for a pass, reconciling first; and status(entry, source), if any, adds to its status entry.
 Bank.FAMILY = {
     panel = PanelSource,
     wind = WindSource,
     treadmill = TreadmillSource,
 }
--- Each family's watts now in the status, and its watt-hours today, saved; solarWhToday keeps its
--- older name because saves hold it.
-Bank.TOTALS = {
-    panel = { now = "solarW", today = "solarWhToday" },
-    wind = { now = "windW", today = "windWhToday" },
-    treadmill = { now = "runW", today = "runWhToday" },
-}
-local FAMILY, TOTALS = Bank.FAMILY, Bank.TOTALS
+local FAMILY = Bank.FAMILY
+
+local function familyOf(source)
+    return FAMILY[Sources.familyOf(source.kind)]
+end
 
 local function resetToday(bank)
-    for _, total in pairs(TOTALS) do
-        bank[total.today] = 0
+    for _, family in ipairs(Sources.FAMILIES) do
+        bank[family.today] = 0
     end
     bank.loadWhToday = 0
     bank.backupWhToday = 0
@@ -122,8 +125,7 @@ end
 function Bank:refresh()
     self:recount()
     self:switchGenerator()
-    self:showBatteries()
-    self:sendStatus()
+    self:afterChange()
 end
 
 function Bank:spec()
@@ -149,11 +151,20 @@ end
 function Bank:addSource(isoObject, player)
     local kind, facing, material = Sources.kindOf(isoObject)
     local source = { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ(), kind = kind, watts = 0 }
-    local connect = FAMILY[Sources.familyOf(kind)].connect
+    local connect = familyOf(source).connect
     if connect then
         connect(player, source, isoObject, facing, material)
     end
     table.insert(self.sources, source)
+end
+
+--- Brings the bank's record of a source and its loaded object `object` back into step, as a pass
+--- does, for a job that works on the source between passes.
+function Bank.reconcileSource(source, object)
+    local reconcile = familyOf(source).reconcile
+    if reconcile then
+        reconcile(source, object)
+    end
 end
 
 -- Takes the source at `index` off the bank. What it still owed the bank, a treadmill run not yet
@@ -161,10 +172,14 @@ end
 -- away forfeits nothing it made.
 local function dropSource(bank, index)
     local source = table.remove(bank.sources, index)
+    local disconnect = familyOf(source).disconnect
+    if disconnect then
+        disconnect(source, Sources.findOn(getSquare(source.x, source.y, source.z)))
+    end
     local wh = source.pendingWh
     if wh and bank.nominalWh > 0 then
         bank.charge = math.min(1, bank.charge + wh / bank.nominalWh)
-        local today = TOTALS[Sources.familyOf(source.kind)].today
+        local today = Sources.FAMILY[Sources.familyOf(source.kind)].today
         bank[today] = (bank[today] or 0) + wh
         -- Into the batteries too: the next pass's recount rereads the charge from them.
         local container = bank:container()
@@ -183,14 +198,14 @@ function Bank:removeSource(x, y, z)
     return false
 end
 
---- Every source's output over the pass, as watts by family (TOTALS). A source whose square is
+--- Every source's output over the pass, as watts by family name. A source whose square is
 --- loaded is checked for still being there, where its kind works and in reach; one that is gone
 --- is dropped. Each source takes its slots if they fit in what the sources before it in the
 --- list left free; one that doesn't fit stays wired and makes nothing.
 function Bank:updateSources(hours, context)
     local watts, slots, used = {}, self:inputSlots(), 0
-    for family in pairs(TOTALS) do
-        watts[family] = 0
+    for _, family in ipairs(Sources.FAMILIES) do
+        watts[family.name] = 0
     end
     -- A dropped source gives its place in the list, and so its slots, to the next one.
     local i = 1
@@ -199,7 +214,7 @@ function Bank:updateSources(hours, context)
         local square = getSquare(source.x, source.y, source.z)
         local object = Sources.findOn(square)
         if square and not (object and Sources.squareOk(square, source.kind)
-            and PowerBank.isInReach(self, source.x, source.y, source.z)) then
+            and Sources.isInReach(self, source.x, source.y, source.z)) then
             dropSource(self, i)
         else
             local size = Sources.slotsOf(source.kind)
@@ -207,8 +222,8 @@ function Bank:updateSources(hours, context)
             if inSlot then
                 used = used + size
             end
+            familyOf(source).update(source, object, inSlot, hours, context)
             local family = Sources.familyOf(source.kind)
-            FAMILY[family].update(source, object, inSlot, hours, context)
             watts[family] = watts[family] + source.watts
             i = i + 1
         end
@@ -216,12 +231,22 @@ function Bank:updateSources(hours, context)
     return watts
 end
 
+-- What the bank's state is, as PowerBank.blocker reads it.
+local function snapshot(bank)
+    return { indoors = bank.indoors == true, limitW = bank:limitW(), capacityWh = bank.nominalWh,
+        connected = bank.connected, on = bank.on, grid = bank.gridPowered }
+end
+
 --- Whether the bank can carry its load: connected, switched on, indoors, with a working inverter
---- and batteries that can hold a charge, and off the grid. `connected` is nil on banks saved before
---- it was recorded, and those were all connected.
+--- and batteries that can hold a charge, and off the grid (PowerBank.blocker). `connected` is nil
+--- on banks saved before it was recorded, and those were all connected.
 function Bank:canCarryLoad()
-    return self.connected ~= false and self.on and self.indoors and self:limitW() > 0 and self.nominalWh > 0
-        and not self.gridPowered
+    return PowerBank.blocker(snapshot(self)) == nil
+end
+
+--- What the bank is doing, for the status window.
+function Bank:state()
+    return PowerBank.blocker(snapshot(self)) or (self.overloaded and "overloaded") or (self.empty and "empty") or "on"
 end
 
 --- Measure what the bank pays for, and whether the grid powers its square. The load counts what is
@@ -235,7 +260,7 @@ function Bank:measure()
         return {}
     end
     self.gridPowered = square:hasGridPower()
-    local load = (self.on or self:chargerMaxW() > 0) and Loads.scan(square, Payers.ofBank(self), Payers.running(), true)
+    local load = (self.on or self:chargerMaxW() > 0) and Payers.scan(square, Payers.ofBank(self), Payers.running(), true)
         or Loads.new()
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)
@@ -246,20 +271,20 @@ local function hasFuel(generator)
     return generator:getFuel() > 0
 end
 
--- The nearest of `generators` with fuel to `bank` (PlaceTracker.nearest).
+-- The nearest of `generators` with fuel to `bank` (Places.nearest).
 local function fueled(bank, generators)
-    return PlaceTracker.nearest(generators, bank.x, bank.y, bank.z, PlaceTracker.objectPlace, hasFuel)
+    return Places.nearest(generators, bank.x, bank.y, bank.z, Places.objectPlace, hasFuel)
 end
 
 -- The place key of `generator`, as chargeSource names a charging generator.
 local function keyOf(generator)
-    return PlaceTracker.key(PlaceTracker.objectPlace(generator))
+    return Places.key(Places.objectPlace(generator))
 end
 
 --- What the chargers charge from, saved as `chargeSource`: "grid", the place key (keyOf) of the
 --- nearest fueled running generator whose reach covers the bank, or false. Saves as `chargeWantW`
 --- their watts, capped so they fill no more than `roomWh` over `hours`: a gas line splits its
---- cap by these wants (GasLines.chargerLimitW), so it must outlive the pass. Returns the watts put
+--- cap by these wants (Payers.chargerLimitW), so it must outlive the pass. Returns the watts put
 --- in: the want, capped by the gas line. A generator bills them with what it powers
 --- (Payers.billGenerators), so its fuel pays for them at its hour, and its window shows them.
 --- Unloaded, only the grid carries on, until it shuts down.
@@ -276,7 +301,7 @@ function Bank:chargeFrom(generators, hours, roomWh)
     if not charging then
         return 0
     end
-    return (generator and GasLines.chargerLimitW(generator, self)) or self.chargeWantW
+    return (generator and Payers.chargerLimitW(generator, self)) or self.chargeWantW
 end
 
 --- Whether the bank's chargers charge from `generator`. An older save's "generator" names none;
@@ -307,31 +332,24 @@ function Bank:shouldPower()
     return self:canCarryLoad() and not self.overloaded and not self.empty
 end
 
---- Run the bank's generator while the bank should; return whether activation changed. Outside a
---- bank pass, bill the changed payer set immediately. A pass settles once after all its changes.
-function Bank:switchGenerator(deferBilling)
+--- Run the bank's generator while the bank should; return whether activation changed. The caller
+--- settles the bill (afterChange).
+function Bank:switchGenerator()
     local generator = self:getIsoObject()
-    if not generator then return end
+    if not generator then return false end
     local run = self:shouldPower()
     if generator:isActivated() ~= run then
-        -- setActivated sets the building toxic as a fuel generator's exhaust would
-        -- (IsoGenerator.setActivated); a bank has no exhaust, so the building keeps its state.
-        local building = Fumes.buildingOf(generator:getSquare())
-        local wasToxic = building and building:isToxic()
-        generator:setActivated(run)
-        if building and building:isToxic() ~= wasToxic then
-            building:setToxic(wasToxic)
-        end
-        if not deferBilling then Payers.billGenerators() end
+        Fumes.setBankRunning(generator, run)
         return true
     elseif run then
         -- Chunks that loaded in reach since the last pass get their power here, which
         -- IsoGenerator.update does for generators it still processes.
         generator:setSurroundingElectricity()
     end
+    return false
 end
 
---- Reconcile a bank job's switch or parts mutation; JobSites.bank.tell owns its settlement.
+--- Reconcile a bank job's switch or parts mutation; the job site settles it (afterChange).
 function Bank:powerUp()
     self.empty = false
     self:recount()
@@ -340,7 +358,7 @@ function Bank:powerUp()
     self.chargeWantW = self.nominalWh > 0 and math.min(self.chargeWantW or 0, self:chargerMaxW()) or 0
     self:measure()
     self:checkOverload()
-    self:switchGenerator(true)
+    self:switchGenerator()
 end
 
 -- Follows the day's discharge cycle (Battery.trackCycle). A new day wears the batteries by the
@@ -368,10 +386,26 @@ function Bank:drawW()
     return self:inverterDrawW()
 end
 
---- One pass: `hours` of sun, load and charging up to now. Settle its changes before returning,
---- unless updateAll or a bank job owns the enclosing settlement.
+--- Brings the bank up to now: the hours since its last pass, at most its system's longestPass, in
+--- the pass context `contextFor(hours)` gives (default: its system's passContext). Settles nothing.
+function Bank:catchUp(contextFor)
+    local hours = Clock.hoursSince(self, self.luaSystem.longestPass)
+    if hours > 0 then
+        self:advance(hours, (contextFor or self.luaSystem.passContext)(hours))
+    end
+end
+
+--- Bills the generators whose payers the bank's changes moved, shows its batteries and tells the
+--- clients.
+function Bank:afterChange()
+    Payers.billGenerators()
+    self:showBatteries()
+    self:sendStatus()
+end
+
+--- One pass: `hours` of sun, load and charging up to now.
 ---@param context table see BankSystem.passContext
-function Bank:update(hours, context, deferBilling)
+function Bank:advance(hours, context)
     local container = self:container()
     self:recount()
 
@@ -412,8 +446,8 @@ function Bank:update(hours, context, deferBilling)
         self:addPartWear(container, hours, 0)
     end
 
-    for family, total in pairs(TOTALS) do
-        self[total.today] = (self[total.today] or 0) + watts[family] * hours
+    for _, family in ipairs(Sources.FAMILIES) do
+        self[family.today] = (self[family.today] or 0) + watts[family.name] * hours
     end
     self.loadWhToday = self.loadWhToday + self.loadW * hours * carried
     self.backupWhToday = (self.backupWhToday or 0) + backupW * hours
@@ -422,18 +456,13 @@ function Bank:update(hours, context, deferBilling)
         self:writeBatteries(container, false)
         self:recount()
     end
-    self:switchGenerator(true)
-    if not deferBilling then
-        Payers.billGenerators()
-    end
-    self:showBatteries()
+    self:switchGenerator()
 
     self.now = { chargerW = chargerW, drawW = drawW, irradiance = context.irradiance("flat"), elevation = context.elevation,
         windKph = context.windKph }
-    for family, total in pairs(TOTALS) do
-        self.now[total.now] = watts[family]
+    for _, family in ipairs(Sources.FAMILIES) do
+        self.now[family.now] = watts[family.name]
     end
-    self:sendStatus()
 end
 
 -- The bank's tile shows its batteries, each as its type, and its charge.

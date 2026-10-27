@@ -3,10 +3,11 @@
 -- packing are the loot window's.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Specs = require "RenewableEnergy/Specs"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
+local Tables = require "cf_commonlib/Tables"
 
 local GasifierJobs = {}
 RenewableEnergy.GasifierJobs = GasifierJobs
@@ -61,9 +62,9 @@ GasifierJobs.JOBS = {
         -- A cold one also takes bellows.
         materials = function(character, summary)
             if summary and summary.cold then
-                return { Specs.FIRE_STARTER, BELLOWS }
+                return { GasHeater.FIRE_STARTER, BELLOWS }
             end
-            return { Specs.FIRE_STARTER }
+            return { GasHeater.FIRE_STARTER }
         end,
     },
     [GasifierJobs.PUT_OUT] = {
@@ -91,5 +92,14 @@ GasifierJobs.JOBS = {
 Jobs.define(GasifierJobs, {
     subjectOf = Gasifier.currentSummary, missing = "Tooltip_RenewableEnergy_NoGasifier",
 })
+
+--- The carried containers Drain Condensate can fill now, from a gasifier `lit` or not, by name.
+function GasifierJobs.drainContainers(character, lit)
+    local found = Tables.fromList(character:getInventory():getAllEvalRecurse(function(item)
+        return Gasifier.takesCondensate(item, lit)
+    end))
+    table.sort(found, function(a, b) return a:getDisplayName() < b:getDisplayName() end)
+    return found
+end
 
 return GasifierJobs

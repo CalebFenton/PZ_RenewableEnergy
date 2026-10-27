@@ -3,6 +3,7 @@
 -- plays the sound there, if it has the square loaded, and tells its local players in earshot.
 
 local Specs = require "RenewableEnergy/Specs"
+local Wind = require "RenewableEnergy/Wind"
 
 local StormNotice = {}
 
@@ -14,7 +15,7 @@ StormNotice.CRACKED_MODULE = "module"
 local EARSHOT = 30
 
 local function noticeOf(what)
-    local blades = Specs.wind.blades[what]
+    local blades = Wind.SPEC.blades[what]
     if blades then
         return blades.breakSound, "IGUI_RenewableEnergy_BladesBroke"
     end
@@ -39,7 +40,7 @@ local function hear(args)
 end
 
 --- On the authority: a storm did `what` at x, y, z, breaking the blades of that material
---- (Specs.wind.blades) or cracking a module (StormNotice.CRACKED_MODULE).
+--- (Wind.SPEC.blades) or cracking a module (StormNotice.CRACKED_MODULE).
 function StormNotice.tell(what, x, y, z)
     local args = { what = what, x = x, y = y, z = z }
     if isServer() then

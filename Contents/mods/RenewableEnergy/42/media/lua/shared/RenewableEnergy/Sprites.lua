@@ -1,105 +1,62 @@
 -- The mod's tile sprites by what they show, and back.
 --
 -- The tiles are rendered from the same models as the item icons and ground models. Lua names tiles
--- only through this file, so a new layout changes nothing else.
+-- only through this file, so a new layout changes nothing else. Their names come from SpriteTiles,
+-- which tools/make_tiles.py writes from the art's tile numbers.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Tiles = require "RenewableEnergy/SpriteTiles"
 
 local Sprites = {}
 RenewableEnergy.Sprites = Sprites
 
-local TILESET = "renewable_energy_01"
--- The overlays of the banks' E, N and W tiles, which the first tileset can't also hold: a tileset
--- holds 512 tiles (IsoWorld.LoadTileDefinitions).
-local TURNED_TILESET = "renewable_energy_02"
-
-local function tile(index, tileset)
-    return (tileset or TILESET) .. "_" .. index
-end
-
--- `count` tiles numbered from `first`, in order.
-local function tiles(first, count, tileset)
-    local list = {}
-    for i = 1, count do
-        list[i] = tile(first + i - 1, tileset)
-    end
-    return list
-end
-
 -- Placed objects. Each tile's CustomItem is the item that picking it up gives back.
-Sprites.flat = tile(0)
--- Wall tiles hang on their square's north edge (attachedN, facing south) or its west edge
--- (attachedW, facing east): the only two edges a square's walls are on.
-Sprites.wall = {
-    wood = { S = tile(21), E = tile(22) },
-    metal = { S = tile(1), E = tile(2) },
-}
-Sprites.rack = {
-    wood = { S = tile(24), E = tile(25), N = tile(26), W = tile(27) },
-    metal = { S = tile(3), E = tile(4), N = tile(5), W = tile(6) },
-}
-Sprites.failsafe = tile(7)
-Sprites.cellCharger = tile(10)
+Sprites.flat = Tiles.flat
+-- Wall tiles by material and facing hang on their square's north edge (attachedN, facing south) or
+-- its west edge (attachedW, facing east): the only two edges a square's walls are on.
+Sprites.wall = Tiles.wall
+-- Racks by material and facing.
+Sprites.rack = Tiles.rack
+Sprites.failsafe = Tiles.failsafe
+Sprites.cellCharger = Tiles.cellCharger
 -- The cardboard crate of solar modules that world spawns and stashes place, and its overlays.
-Sprites.crate = tile(11)
-Sprites.crateOverlays = { full = tile(12), closed = tile(13) }
-Sprites.gardenLight = { off = tile(14), lit = tile(15) }
+Sprites.crate = Tiles.crate
+Sprites.crateOverlays = Tiles.crateOverlays
+Sprites.gardenLight = Tiles.gardenLight
 
 -- Banks, one tile per tier, material and facing. Specs.banks[itemType].sprite names the field. The
 -- placing cursor finds a facing's tile by its number in the same tileset, at most 96 away
 -- (ISMoveableSpriteProps.getFaces, IsoWorld.SetCustomPropertyValues), so each bank's four follow
 -- one another.
-Sprites.batteryBoxWood = { S = tile(340), E = tile(341), N = tile(342), W = tile(343) }
-Sprites.batteryBoxMetal = { S = tile(344), E = tile(345), N = tile(346), W = tile(347) }
-Sprites.batteryRackWood = { S = tile(348), E = tile(349), N = tile(350), W = tile(351) }
-Sprites.batteryRackMetal = { S = tile(352), E = tile(353), N = tile(354), W = tile(355) }
-Sprites.batteryBankWood = { S = tile(356), E = tile(357), N = tile(358), W = tile(359) }
-Sprites.batteryBankMetal = { S = tile(360), E = tile(361), N = tile(362), W = tile(363) }
+Sprites.batteryBoxWood = Tiles.batteryBoxWood
+Sprites.batteryBoxMetal = Tiles.batteryBoxMetal
+Sprites.batteryRackWood = Tiles.batteryRackWood
+Sprites.batteryRackMetal = Tiles.batteryRackMetal
+Sprites.batteryBankWood = Tiles.batteryBankWood
+Sprites.batteryBankMetal = Tiles.batteryBankMetal
 
 -- Biogas digesters, built in place, one facing each. A barrel digester looks like the barrel it was
 -- built from, so its tiles are keyed by that item's type (DigesterSystem.OnCreate).
-Sprites.digester = {
-    barrel = {
-        MetalDrum = tile(228),
-        Mov_OrangeBarrel = tile(229),
-        Mov_DarkGreenBarrel = tile(277),
-        Mov_LightGreenBarrel = tile(278),
-    },
-    insulated = tile(230),
-    dome = tile(231),
-}
+Sprites.digester = Tiles.digester
 -- Their gas holders, drawn over the digester's own tile: `bags` and `tarp` beside any barrel,
 -- from slack to taut, or torn; `drum` the insulated digester's floating drum, from low to risen
 -- highest.
-Sprites.digesterHolder = {
-    bags = tiles(232, 3),
-    bagsTorn = tile(235),
-    tarp = tiles(236, 3),
-    tarpTorn = tile(239),
-    drum = tiles(240, 4),
-}
+Sprites.digesterHolder = Tiles.digesterHolder
 -- The scrubber fitted to each digester, drawn over the digester's own tile, and the same scrubber
 -- spent (Digester.scrubLeft), its lid off and its bucket dry.
-Sprites.digesterScrubber = { barrel = tile(247), insulated = tile(248), dome = tile(249) }
-Sprites.digesterScrubberSpent = { barrel = tile(420), insulated = tile(421), dome = tile(422) }
+Sprites.digesterScrubber = Tiles.digesterScrubber
+Sprites.digesterScrubberSpent = Tiles.digesterScrubberSpent
 -- The foam a sour digester heaves up out of its feed funnel, drawn over its own tile.
-Sprites.digesterSour = { barrel = tile(417), insulated = tile(418), dome = tile(419) }
+Sprites.digesterSour = Tiles.digesterSour
 -- The homemade gas heater, off and lit, by facing; every tile gives the heater back.
-Sprites.gasHeater = {
-    off = { S = tile(364), E = tile(365), N = tile(366), W = tile(367) },
-    lit = { S = tile(368), E = tile(369), N = tile(370), W = tile(371) },
-}
+Sprites.gasHeater = Tiles.gasHeater
 -- Save compatibility: the S tiles banks and heaters stood on before they turned (commit 811e5f6),
 -- each to its turnable twin, which looks the same. No numbers within 96 of them are free for other
 -- facings, so they don't turn; they work as their twin, pick up as it (Moveables.lua), and an item
 -- still carrying one places it facing S. Remove this table, its uses and the old tiles once saves
 -- from before then needn't load (DEVELOPMENT.md, Save compatibility).
-Sprites.fixedTiles = {
-    [tile(8)] = Sprites.batteryBoxWood.S, [tile(23)] = Sprites.batteryBoxMetal.S,
-    [tile(32)] = Sprites.batteryRackWood.S, [tile(33)] = Sprites.batteryRackMetal.S,
-    [tile(34)] = Sprites.batteryBankWood.S, [tile(9)] = Sprites.batteryBankMetal.S,
-    [tile(244)] = Sprites.gasHeater.off.S, [tile(245)] = Sprites.gasHeater.lit.S,
-}
+Sprites.fixedTiles = Tiles.fixedTiles
 
 --- The tile a placed `spriteName` turns as: its turnable twin for one of Sprites.fixedTiles, else
 --- itself.
@@ -109,34 +66,11 @@ end
 
 -- The gas kit fitted to a generator and the generator's half of a gasifier's pipe, drawn over the
 -- game's own generator tile. The kit sits on each generator body's air intake, so both are drawn per
--- body and facing; `default` lies on the floor for a generator the game doesn't know (another mod's).
-Sprites.gasKit = { default = tile(246), bySprite = {} }
+-- body and facing, by the generator's sprite; `default` lies on the floor for a generator the game
+-- doesn't know (another mod's).
+Sprites.gasKit = Tiles.gasKit
 -- The pipe by the gasifier's direction from the generator.
-Sprites.gasifierPipeGen = { default = { N = tile(260), E = tile(261), S = tile(262), W = tile(263) }, bySprite = {} }
-do
-    local KIT_FIRST, PIPE_FIRST = 280, 292
-    local SIDES = { "N", "E", "S", "W" }
-    -- The game's generator sprites (appliances_misc_01) by body, in the order of their facings.
-    local BODIES = {
-        { first = { 0, 8 }, facings = { "E", "S", "W", "N" } },
-        { first = { 4 }, facings = { "E", "S", "W", "N" } },
-        { first = { 12 }, facings = { "S", "E", "N", "W" } },
-    }
-    for body, spec in ipairs(BODIES) do
-        for _, first in ipairs(spec.first) do
-            for offset, facing in ipairs(spec.facings) do
-                local name = "appliances_misc_01_" .. (first + offset - 1)
-                local fitting = (body - 1) * 4 + ({ N = 0, E = 1, S = 2, W = 3 })[facing]
-                Sprites.gasKit.bySprite[name] = tile(KIT_FIRST + fitting)
-                local pipes = {}
-                for side, letter in ipairs(SIDES) do
-                    pipes[letter] = tile(PIPE_FIRST + fitting * 4 + side - 1)
-                end
-                Sprites.gasifierPipeGen.bySprite[name] = pipes
-            end
-        end
-    end
-end
+Sprites.gasifierPipeGen = Tiles.gasifierPipeGen
 
 --- The gas kit's overlay for a generator whose sprite is `generatorSprite`.
 function Sprites.gasKitFor(generatorSprite)
@@ -151,44 +85,22 @@ end
 
 -- Wood gas generators, built in place, one facing each, and the glow at each one's door while lit,
 -- drawn over its own tile.
-Sprites.gasifier = { primitive = tile(250), standard = tile(251), advanced = tile(252) }
-Sprites.gasifierLit = { primitive = tile(253), standard = tile(254), advanced = tile(255) }
+Sprites.gasifier = Tiles.gasifier
+Sprites.gasifierLit = Tiles.gasifierLit
 -- The metal gas pipe from a gasifier to a generator on the next square, in two halves that meet at
 -- the squares' shared edge: `gasifierPipe` on the gasifier's tile, by the generator's direction from
 -- it, and the generator's half (Sprites.gasifierPipeGenFor) on the generator's tile with the kit.
-Sprites.gasifierPipe = { N = tile(256), E = tile(257), S = tile(258), W = tile(259) }
+Sprites.gasifierPipe = Tiles.gasifierPipe
 -- Wind charger tiles: the scoop rotor's, and each bladed kind's per blade material and rotor
 -- facing (propeller the treadmill wind charger, alternator the homebuilt wind turbine, as
--- Specs.wind.turbines). In play the game draws each as a sprite model instead (Sprites.windModels).
-Sprites.windScoop = tile(264)
-Sprites.windCharger = {
-    propeller = {
-        wood = { N = tile(265), E = tile(266), S = tile(267), W = tile(268) },
-        pipe = { N = tile(269), E = tile(270), S = tile(271), W = tile(272) },
-        steel = { N = tile(372), E = tile(373), S = tile(374), W = tile(375) },
-    },
-    carAlternator = {
-        wood = { N = tile(405), E = tile(406), S = tile(407), W = tile(408) },
-        pipe = { N = tile(409), E = tile(410), S = tile(411), W = tile(412) },
-        steel = { N = tile(413), E = tile(414), S = tile(415), W = tile(416) },
-    },
-    alternator = {
-        steel = { N = tile(273), E = tile(274), S = tile(275), W = tile(276) },
-        wood = { N = tile(397), E = tile(398), S = tile(399), W = tile(400) },
-        pipe = { N = tile(401), E = tile(402), S = tile(403), W = tile(404) },
-    },
-}
+-- Wind.SPEC.turbines). In play the game draws each as a sprite model instead (Sprites.windModels).
+Sprites.windScoop = Tiles.windScoop
+Sprites.windCharger = Tiles.windCharger
 -- Each wind charger kind's sprite models (scripts SpriteModels.txt): the name before the step
 -- number, suffixed with blade material and/or facing per the by* flags; `steps` models each turn
 -- the rotor one step, and stepsPerTurn is how many steps bring it back round (fewer for rotors that
 -- look the same after part of a turn).
-Sprites.windModels = {
-    scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
-    propeller = { name = "RenewableEnergy.Propeller", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
-    carAlternator = { name = "RenewableEnergy.CarAlternator", byMaterial = true, byFacing = true, steps = 6,
-        stepsPerTurn = 18 },
-    alternator = { name = "RenewableEnergy.Alternator", byMaterial = true, byFacing = true, steps = 6, stepsPerTurn = 18 },
-}
+Sprites.windModels = Tiles.windModels
 
 -- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles per facing, keyed by the way a runner
 -- faces: away from the tiles' Facing. The console tile is the one its depth geometry
@@ -201,82 +113,21 @@ Sprites.treadmill = {
 }
 
 -- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
-Sprites.snow = {
-    flat = tile(16),
-    rack = {
-        wood = { S = tile(28), E = tile(29), N = tile(30), W = tile(31) },
-        metal = { S = tile(17), E = tile(18), N = tile(19), W = tile(20) },
-    },
-}
+Sprites.snow = Tiles.snow
 
--- A cracked module's glass, drawn over its mount's tile, by the look RenewableEnergy.crackLookOf
+-- A cracked module's glass, drawn over its mount's tile, by the look ModuleRepair.crackLookOf
 -- gives it. A rack has one per module slot, slot 1 the lower module, so it shows only the modules
 -- that are cracked, each as it is cracked.
-Sprites.cracks = {
-    heavy = {
-        flat = tile(115),
-        wall = {
-            wood = { S = tile(118), E = tile(119) },
-            metal = { S = tile(116), E = tile(117) },
-        },
-        rack = {
-            wood = { S = tiles(128, 2), E = tiles(130, 2), N = tiles(132, 2), W = tiles(134, 2) },
-            metal = { S = tiles(120, 2), E = tiles(122, 2), N = tiles(124, 2), W = tiles(126, 2) },
-        },
-    },
-    light = {
-        flat = tile(376),
-        wall = {
-            wood = { S = tile(379), E = tile(380) },
-            metal = { S = tile(377), E = tile(378) },
-        },
-        rack = {
-            wood = { S = tiles(389, 2), E = tiles(391, 2), N = tiles(393, 2), W = tiles(395, 2) },
-            metal = { S = tiles(381, 2), E = tiles(383, 2), N = tiles(385, 2), W = tiles(387, 2) },
-        },
-    },
-}
+Sprites.cracks = Tiles.cracks
 
 -- Each bank tile's overlays, by the bank's Sprites field and facing: `batteries[look][n]` shows a
 -- battery of that look in slot n, linked to the one before it, and `meter[level]` its charge meter
 -- lit from 1 (empty) to the last level (full). A bank draws one battery overlay per battery it
 -- holds, in slot order, then its meter. The meter is on the bank's front, so facing N or W, away
--- from the camera, a bank shows none and has no `meter`.
-Sprites.bankFill = {
-    batteryBoxWood = { S = { batteries = { car = tiles(36, 2), deepCycle = tiles(136, 2), l16 = tiles(182, 2) },
-        meter = tiles(48, 5) } },
-    batteryBoxMetal = { S = { batteries = { car = tiles(38, 2), deepCycle = tiles(138, 2), l16 = tiles(184, 2) },
-        meter = tiles(53, 5) } },
-    batteryRackWood = { S = { batteries = { car = tiles(73, 6), deepCycle = tiles(140, 6), l16 = tiles(186, 6) },
-        meter = tiles(58, 5) } },
-    batteryRackMetal = { S = { batteries = { car = tiles(79, 8), deepCycle = tiles(146, 8), l16 = tiles(192, 8) },
-        meter = tiles(63, 5) } },
-    batteryBankWood = { S = { batteries = { car = tiles(87, 12), deepCycle = tiles(154, 12), l16 = tiles(200, 12) },
-        meter = tiles(68, 5) } },
-    batteryBankMetal = { S = { batteries = { car = tiles(99, 16), deepCycle = tiles(166, 16), l16 = tiles(212, 16) },
-        meter = tiles(40, 5) } },
-}
--- The other facings' overlays fill TURNED_TILESET from 0, facing by facing, bank by bank in this
--- order (art/models/tiles.py's STORAGE_TILES): each look's batteries by slot, then the meter if any.
-do
-    local BANK_ORDER = { "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood",
-        "batteryBankMetal" }
-    local nextTile = 0
-    local function take(count)
-        local list = tiles(nextTile, count, TURNED_TILESET)
-        nextTile = nextTile + count
-        return list
-    end
-    for _, facing in ipairs({ "E", "N", "W" }) do
-        for _, field in ipairs(BANK_ORDER) do
-            local south = Sprites.bankFill[field].S
-            local slots = #south.batteries.car
-            local fill = { batteries = { car = take(slots), deepCycle = take(slots), l16 = take(slots) } }
-            fill.meter = facing == "E" and take(#south.meter) or nil
-            Sprites.bankFill[field][facing] = fill
-        end
-    end
-end
+-- from the camera, a bank shows none and has no `meter`. The E, N and W overlays are in a second
+-- tileset: a tileset holds 512 tiles (IsoWorld.LoadTileDefinitions).
+Sprites.bankFill = Tiles.bankFill
+
 -- The look a battery's overlay draws it with, by item type: any other battery is drawn as a car
 -- battery.
 local BATTERY_LOOKS = { ["RenewableEnergy.DeepCycleBattery"] = "deepCycle", ["RenewableEnergy.L16Battery"] = "l16" }
@@ -405,7 +256,7 @@ Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.crateO
     Sprites.gasifierLit, Sprites.gasifierPipe, Sprites.gasifierPipeGen)
 
 --- The tile of a bladed wind charger of `kind` facing `facing` (Sprites.kindOf) with blades of
---- `material` (Specs.wind.blades), or nil for blades it has no tile for.
+--- `material` (Wind.SPEC.blades), or nil for blades it has no tile for.
 function Sprites.windTileOf(kind, facing, material)
     local facings = Sprites.windCharger[kind] and Sprites.windCharger[kind][material]
     return facings and facings[facing]
@@ -465,7 +316,7 @@ function Sprites.snowOverlay(kind, facing, material)
 end
 
 --- The crack overlays a mount's tile shows: one for each cracked module, by slot, of the look
---- RenewableEnergy.crackLookOf gives it.
+--- ModuleRepair.crackLookOf gives it.
 ---@param kind string "flat", "wall" or "rack" (see kindOf)
 ---@param facing string? the mount's facing, for walls and racks
 ---@param material string? "wood" or "metal", for walls and racks
@@ -476,7 +327,7 @@ function Sprites.crackOverlays(kind, facing, material, modules)
     -- Both looks have an overlay for every slot.
     for slot in ipairs(crackSlots("heavy", kind, facing, material)) do
         local module = modules[slot]
-        local look = module and RenewableEnergy.crackLookOf(module.type, module.condition)
+        local look = module and ModuleRepair.crackLookOf(module.type, module.condition)
         if look then
             table.insert(shown, crackSlots(look, kind, facing, material)[slot])
         end

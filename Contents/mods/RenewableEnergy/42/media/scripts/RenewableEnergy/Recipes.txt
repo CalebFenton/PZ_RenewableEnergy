@@ -474,7 +474,7 @@ module Base
        refuses a last use of epoxy (DEVELOPMENT.md, craftRecipe). MetaRecipe makes it known
        whenever Seal Cracked Module is, so what teaches that teaches this, in older saves too. Keep
        everything but the glue as Seal Cracked Module has it: the jobs in place take their skill,
-       time and XP from that one (Recipes.lua). */
+       time and XP from that one (ModuleRepair.lua). */
     craftRecipe RenewableEnergy_RepairCrackedModuleWithGlue
     {
         timedAction = MakingElectrical,
@@ -1079,7 +1079,7 @@ module Base
        switched by an amplifier's power transistors. A car battery charger's transformer is big
        enough for the makeshift one only; the homemade one takes a rewound microwave transformer
        and twice the transistors, on a heatsink. OnCreate sets the condition the maker's skill
-       gives (Recipes.craftedInverterCondition). */
+       gives (Wear.craftedInverterCondition). */
     craftRecipe RenewableEnergy_MakeMakeshiftInverter
     {
         timedAction = MakingElectrical,

@@ -22,7 +22,7 @@ local function expectHomesteadSpots(expect, metaGrid, site, kind)
     if kind.wind and outdoors("windCharger") then
         local at, bank = site.windCharger, site.bank
         if expect(bank ~= nil and metaGrid:getRoomAt(bank[1], bank[2], bank[3]) ~= nil, site.name .. "'s bank is in no room") then
-            expect(RenewableEnergy.PowerBank.isInReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
+            expect(RenewableEnergy.Sources.isInReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
                 site.name .. "'s wind charger is out of its bank's reach")
         end
     end

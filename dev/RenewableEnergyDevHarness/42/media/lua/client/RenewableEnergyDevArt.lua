@@ -462,7 +462,7 @@ local function addCrackedShot(run, player, lot)
             for slot, condition in ipairs(panel.conditions) do
                 modules[slot] = { type = RenewableEnergy.Specs.factoryModule, condition = condition }
             end
-            RenewableEnergy.WorldSpawns.placePanel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
+            RenewableEnergy.Place.panel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
         end
         Harness.recalcLot(lot)
     end)

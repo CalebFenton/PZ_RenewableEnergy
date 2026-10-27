@@ -3,7 +3,6 @@
 
 if isClient() then return end
 
-local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Sun = require "RenewableEnergy/Sun"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
@@ -32,7 +31,7 @@ end
 -- `bulbChanged` says its bulb has just changed, so that its lamp's colour reaches the clients even
 -- if it stays lit.
 local function run(light, hours, sky, bulbChanged)
-    local spec = Specs.gardenLight
+    local spec = SolarGardenLight.SPEC
     local night = Sun.isDark(sky)
     local hasBulb = SolarGardenLight.getBulb(light) ~= nil
     local chargeWh = SolarGardenLight.getChargeWh(light)

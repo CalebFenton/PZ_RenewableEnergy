@@ -16,6 +16,10 @@ RenewableEnergy.SolarCellCharger = SolarCellCharger
 SolarCellCharger.ITEM = "RenewableEnergy.SolarCellCharger"
 SolarCellCharger.BATTERY = "Base.Battery"
 SolarCellCharger.SLOTS = 4
+-- Its cell's rated watts, and the watt-hours that fill one of its batteries: a game figure, not a
+-- real cell's, sized so a full tray charges over a sunny day or two.
+SolarCellCharger.WATTS = 5
+SolarCellCharger.BATTERY_WH = 25
 -- Object modData: the charger's watt-hours not yet a whole use of a battery.
 SolarCellCharger.STORED_KEY = "RenewableEnergy_storedWh"
 

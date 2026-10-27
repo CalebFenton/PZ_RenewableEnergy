@@ -1,6 +1,6 @@
--- What a payer (RenewableEnergy.Payers) pays for: every switched-on appliance in its reach that no
--- running payer is nearer to, an unwired treadmill while a run draws power through it, and the
--- running generators whose reach covers the payer.
+-- What a payer (RenewableEnergy.Payers) pays for: every switched-on appliance in its reach that it
+-- pays for (Payers decides who, by `pays`), an unwired treadmill while a run draws power through it,
+-- and the running generators whose reach covers the payer.
 --
 -- getGeneratorPowerConsumption reads the appliance's own switch, powered or not, so a bank that
 -- cut its power still sees what would draw when it comes back. Its figure is generator fuel an
@@ -21,7 +21,6 @@ if isClient() then return end
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
-local Payers = require "RenewableEnergy/PowerBank/Payers"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 local Loads = {}
@@ -121,17 +120,14 @@ local function isRunningGenerator(object)
     return GeneratorReach.isVanillaGenerator(object) and object:isActivated()
 end
 
---- What `payer`, on `square`, pays for among `payers` (Payers.running), and the
---- running generators, banks aside, that power its square. With `gridGone`, what is switched on
---- in its reach whether or not the grid powers it now.
+--- What a payer on `square` pays for: each appliance in its reach for which `pays(object)` holds,
+--- and the running generators, banks aside, that power its square (`generators`). With `gridGone`,
+--- what is switched on in its reach whether or not the grid powers it now. A `vanilla` generator's
+--- scan leaves out other mods' draws: vanilla bills those to it already.
 ---@param square IsoGridSquare the payer's square
-function Loads.scan(square, payer, payers, gridGone)
+function Loads.scan(square, pays, gridGone, vanilla)
     local load = Loads.new()
     local allowExterior = SandboxVars.AllowExteriorGenerator
-    local sharers = Payers.sharers(payer, payers)
-    local function pays(object)
-        return #sharers == 1 or Payers.payerAt(sharers, object:getX(), object:getY(), object:getZ()) == payer
-    end
     GeneratorReach.eachSquare(square:getX(), square:getY(), square:getZ(), function(scanned)
         local objects = scanned:getObjects()
         local i = scanned:getNextNonItemObjectIndex(0)
@@ -146,12 +142,11 @@ function Loads.scan(square, payer, payers, gridGone)
                 end
             elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior, gridGone) then
                 if pays(object) then
-                    Loads.add(load, "treadmill", Specs.wattsFromFuel(Specs.treadmill.drawFuel))
+                    Loads.add(load, "treadmill", Specs.wattsFromFuel(Treadmill.SPEC.drawFuel))
                 end
             elseif isRunningGenerator(object) then
-                Payers.track(object)
                 table.insert(load.generators, object)
-            elseif not payer.generator then
+            elseif not vanilla then
                 local kind, fuel = GeneratorReach.drawOf(object)
                 if kind and offGrid(object, allowExterior, gridGone) and pays(object) then
                     Loads.add(load, kind, Specs.wattsFromFuel(fuel))

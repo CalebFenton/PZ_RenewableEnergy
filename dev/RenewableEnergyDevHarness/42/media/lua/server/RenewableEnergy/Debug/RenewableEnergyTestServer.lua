@@ -9,6 +9,7 @@ local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 
 local handler, need = PZHarness.serverHandler, PZHarness.need
 local overlaysOf, removePlaced = PZHarness.Fixtures.overlaysOf, PZHarness.Fixtures.removePlaced
@@ -46,16 +47,16 @@ end
 
 -- Fixtures ---------------------------------------------------------------------------------------
 
--- RenewableEnergyTest.bank's handler: a bank built and stocked by PowerBank.place, of the
+-- RenewableEnergyTest.bank's handler: a bank built and stocked by BankSystem.place, of the
 -- Sprites field `args.kind` facing `args.facing` (S if nil), holding `args.items` with its
 -- batteries at `args.charge`, and disconnected by the server's character's Disconnect Bank when
 -- `args.connected == false`. Answers the bank's position.
 handler("placeBank", function(player, args, defer)
-    local PowerBank, Battery = RenewableEnergy.PowerBank, RenewableEnergy.Battery
+    local BankSystem, Battery = RenewableEnergy.BankSystem, RenewableEnergy.Battery
     local square = squareAt(args)
     local items = args.items or {}
     local sprite = RenewableEnergy.Sprites[args.kind][args.facing or "S"]
-    local bank = PowerBank.place(square, sprite, nil, function(container)
+    local bank = BankSystem.place(square, sprite, nil, function(container)
         for _, fullType in ipairs(items) do
             local item = container:AddItem(fullType)
             if item and Battery.isBattery(item) then
@@ -80,10 +81,10 @@ handler("placeBank", function(player, args, defer)
 end)
 
 -- RenewableEnergyTest.panel's handler, for any source tile. A panel mount is placed from its item
--- the way the moveables cursor places it (WorldSpawns.placePanel), carrying `args.modules`. A wind
+-- the way the moveables cursor places it (Place.panel), carrying `args.modules`. A wind
 -- charger is built in place and a treadmill is vanilla furniture, neither from an item of the mod,
 -- so their tile is put down bare, unless `args.built` builds the charger as its build-menu entity,
--- as the world builds its finds (WorldSpawns.buildEntity); its blades come broken when `args.broken`. A
+-- as the world builds its finds (Place.entity); its blades come broken when `args.broken`. A
 -- treadmill's comes wired by its wiring's owner when `args.wired`. With `args.bank`, the server's
 -- character connects it to the bank there. Answers whether the source connected and the refusal.
 handler("placePanel", function(player, args, defer)
@@ -91,11 +92,11 @@ handler("placePanel", function(player, args, defer)
     local square = squareAt(args)
     local panel
     if getSprite(args.sprite):getProperties():has("CustomItem") then
-        RenewableEnergy.WorldSpawns.placePanel(square, args.sprite, args.modules)
+        RenewableEnergy.Place.panel(square, args.sprite, args.modules)
         panel = need(Squares.findObjectOn(square, function(object) return RenewableEnergy.Sprites.nameOf(object) == args.sprite end),
             "a placed " .. args.sprite .. " on the server")
     elseif args.built then
-        panel = RenewableEnergy.WorldSpawns.buildEntity(square, args.sprite, RenewableEnergy.Wind.OnCreate)
+        panel = RenewableEnergy.Place.entity(square, args.sprite, RenewableEnergy.Wind.OnCreate)
     else
         panel = PZHarness.Fixtures.newTile(square, args.sprite)
         -- As placing does: the mod's OnObjectAdded handlers see the new tile.
@@ -268,28 +269,30 @@ end)
 local SNOWING = { cloud = 1, fog = 0, rain = 0, snowing = true, groundSnow = 0 }
 
 -- RenewableEnergyTest.bankPass's handler: the bank system's own pass of the bank at `args.bank`
--- (BankSystem.updateBank) over the last `args.hours` (1 if nil), in the context the system builds
--- for it with the sky the test sets: `args.light` W/m² on every mount, with the sun above the
--- horizon only when there is light; snow falling at full strength if `args.snowing`, else clear;
--- `args.airC` °C (mild if nil); `args.stormHours` of storm and a wind of `args.windKph`. A bank
--- whose chunk is unloaded runs too. Answers the bank's state after the pass.
+-- (Bank:catchUp, then Bank:afterChange) over the last `args.hours` (1 if nil), in the context the
+-- system builds for it with the sky the test sets: `args.light` W/m² on every mount, with the sun
+-- above the horizon only when there is light; snow falling at full strength if `args.snowing`,
+-- else clear; `args.airC` °C (mild if nil); a wind of `args.windKph`. `args.stormHours` of storm
+-- go on the world's storm clock first (PanelStorms.add). A bank whose chunk is unloaded runs too.
+-- Answers the bank's state after the pass.
 handler("bankPass", function(_, args)
     local record = bankRecord(args.bank)
     local BankSystem = RenewableEnergy.BankSystem
     local light = args.light or 0
     local function irradiance() return light end
+    RenewableEnergy.PanelStorms.add(args.stormHours or 0)
     record.lastHour = getGameTime():getWorldAgeHours() - (args.hours or 1)
-    BankSystem.updateBank(record, function(hours)
+    record:catchUp(function(hours)
         local context = BankSystem.passContext(hours)
         context.irradiance, context.clearIrradiance = irradiance, irradiance
         context.elevation = light > 0 and 45 or -10
         context.weather = args.snowing and SNOWING or RenewableEnergy.Sun.CLEAR_WEATHER
         context.precipitation = args.snowing and 1 or 0
         context.airC = args.airC or 25
-        context.stormHours = args.stormHours or 0
         context.windKph = args.windKph or 0
         return context
     end)
+    record:afterChange()
     return stateOf(record)
 end)
 
@@ -297,12 +300,12 @@ end)
 -- the Global Object System saves only a record's SAVED_FIELDS (SGlobalObject.save), so every
 -- other field goes, and on load the bank system builds its records from what was saved
 -- (BankSystem:initLuaObjects). Answers what the running generator at `args.generator` delivers
--- (GasLines.loadOf) before and after, and the bank's charger watts.
+-- (Payers.deliveredW) before and after, and the bank's charger watts.
 handler("saveAndLoadBank", function(_, args)
     local record = bankRecord(args.bank)
     local generator = need(squareAt(args.generator):getGenerator(), "the generator on the server")
-    local GasLines = RenewableEnergy.GasLines
-    local reply = { loadBefore = GasLines.loadOf(generator), chargerW = record:chargerMaxW() }
+    local Payers = RenewableEnergy.Payers
+    local reply = { loadBefore = Payers.deliveredW(generator), chargerW = record:chargerMaxW() }
     local saved, gone = {}, {}
     for _, key in ipairs(RenewableEnergy.Bank.SAVED_FIELDS) do
         saved[key] = true
@@ -316,7 +319,7 @@ handler("saveAndLoadBank", function(_, args)
         record[key] = nil
     end
     RenewableEnergy.BankSystem.instance:initLuaObjects()
-    reply.loadAfter = GasLines.loadOf(generator)
+    reply.loadAfter = Payers.deliveredW(generator)
     return reply
 end)
 
@@ -332,7 +335,7 @@ handler("applyLoad", function(_, args)
     record.loadW, record.loadByKind = load.watts, Loads.byKind(load)
     record:checkOverload()
     record:switchGenerator()
-    record:sendStatus()
+    record:afterChange()
     return stateOf(record)
 end)
 
@@ -438,8 +441,8 @@ end)
 handler("scanLoad", function(_, args)
     local square = squareAt(args)
     local Payers = RenewableEnergy.Payers
-    local payer = { x = args.x, y = args.y, z = args.z, key = RenewableEnergy.PlaceTracker.key(args.x, args.y, args.z) }
-    local load = RenewableEnergy.Loads.scan(square, payer, Payers.running())
+    local payer = { x = args.x, y = args.y, z = args.z, key = RenewableEnergy.Places.key(args.x, args.y, args.z) }
+    local load = Payers.scan(square, payer, Payers.running())
     local counts = {}
     for name, kind in pairs(load.kinds) do
         counts[name] = kind.count
@@ -484,44 +487,46 @@ local function panelRecord(args)
     return source
 end
 
--- PanelSource.stormChance for each trial { source, hours }, at the save's storm options.
+-- PanelStorms.stormChance for each trial { source, hours }, at the save's storm options.
 handler("stormChances", function(_, args)
     local chances = {}
     for i, trial in ipairs(args.trials) do
-        chances[i] = RenewableEnergy.PanelSource.stormChance(panelRecord(trial.source), trial.hours)
+        chances[i] = RenewableEnergy.PanelStorms.stormChance(panelRecord(trial.source), trial.hours)
     end
     return { chances = chances }
 end)
 
--- A storm (PanelSource.stormCrack) on a panel record off the map for each trial { source, hours,
+-- A storm (PanelStorms.stormCrack) on a panel record off the map for each trial { source, hours,
 -- roll }, roll a number, or "under" or "at" for a roll just under or at the trial's own
 -- stormChance; worked out here, so the roll is exactly the chance the crack compares it with. A
 -- storm draws that roll and, when it cracks, one more to pick the module (the first, at 0).
 -- Answers whether each cracked and the modules after.
 handler("stormCrack", function(_, args, defer)
-    local PanelSource = RenewableEnergy.PanelSource
+    local PanelStorms = RenewableEnergy.PanelStorms
     return { results = Helpers.eachTrial(defer, args.trials, function(trial)
-        return { Helpers.trialRoll(trial.roll, PanelSource.stormChance(panelRecord(trial.source), trial.hours)), 0 }
+        return { Helpers.trialRoll(trial.roll, PanelStorms.stormChance(panelRecord(trial.source), trial.hours)), 0 }
     end, function(trial)
         local source = panelRecord(trial.source)
-        return { cracked = PanelSource.stormCrack(source, trial.hours), modules = source.modules }
+        return { cracked = PanelStorms.stormCrack(source, trial.hours), modules = source.modules }
     end) }
 end)
 
 -- The modules the panel on the square at `args` records, and the overlays its tile shows.
 handler("panelState", function(_, args)
     local panel = Helpers.find({ x = args.x, y = args.y, z = args.z, kind = "source" })
-    return { modules = panel:getModData()[RenewableEnergy.PowerBank.MODULES_KEY], overlays = overlaysOf(panel) }
+    return { modules = panel:getModData()[Panel.MODULES_KEY], overlays = overlaysOf(panel) }
 end)
 
--- `args.hours` of storm over the world's panels that no bank runs (PanelStorms.pass), at the save's
--- storm options. Answers the modules each panel at `args.panels` records after.
+-- `args.hours` of storm on the world's storm clock (PanelStorms.add), and every loaded panel that
+-- no bank runs weathered (PanelSource.weatherLoaded), at the save's storm options. Answers the
+-- modules each panel at `args.panels` records after.
 handler("panelStorm", function(_, args)
-    RenewableEnergy.PanelStorms.pass(args.hours)
+    RenewableEnergy.PanelStorms.add(args.hours)
+    RenewableEnergy.PanelSource.weatherLoaded()
     local modules = {}
     for i, position in ipairs(args.panels) do
         local panel = Helpers.find({ x = position.x, y = position.y, z = position.z, kind = "source" })
-        modules[i] = panel:getModData()[RenewableEnergy.PowerBank.MODULES_KEY]
+        modules[i] = panel:getModData()[Panel.MODULES_KEY]
     end
     return { modules = modules }
 end)

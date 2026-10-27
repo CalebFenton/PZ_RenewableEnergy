@@ -1,18 +1,21 @@
 -- How a bank runs a solar panel (the "panel" family of RenewableEnergy.Sources) on the authority:
--- its modules' watts in the sun, snow lying on it, and storms cracking its modules. The one
--- writer of a placed panel's module record (PowerBank.MODULES_KEY) and of its crack and snow overlays.
+-- its modules' watts in the sun, snow lying on it, and storms cracking its modules (PanelStorms),
+-- connected or loose. The one writer of a placed panel's module record (Panel.MODULES_KEY) and of
+-- its crack and snow overlays.
 
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local StormChance = require "RenewableEnergy/Chance"
+local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local StormNotice = require "RenewableEnergy/StormNotice"
 local Sun = require "RenewableEnergy/Sun"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
-local Chance = require "cf_commonlib/Chance"
+local PanelStorms = require "RenewableEnergy/PowerBank/PanelStorms"
+local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
 local PanelSource = {}
@@ -35,8 +38,8 @@ local LOW_SHARE = 0.7
 local function ratedWatts(source)
     local now, best = 0, 0
     for _, module in ipairs(source.modules) do
-        now = now + PowerBank.moduleWatts(module.type, module.condition)
-        best = best + PowerBank.moduleWatts(module.type, RenewableEnergy.conditionMaxOf(module.type))
+        now = now + Panel.moduleWatts(module.type, module.condition)
+        best = best + Panel.moduleWatts(module.type, Items.conditionMaxOf(module.type))
     end
     return now, best
 end
@@ -44,7 +47,7 @@ end
 --- Commits detached `modules` to a placed panel and its cracks, and adopts them in `source` when
 --- connected. The object's copy stays independent of the bank's simulated module records.
 function PanelSource.writeModules(isoObject, modules, source)
-    isoObject:getModData()[PowerBank.MODULES_KEY] = PowerBank.copyModules(modules)
+    isoObject:getModData()[Panel.MODULES_KEY] = Panel.copyModules(modules)
     if source then
         source.modules, source.modulesChanged = modules, nil
     end
@@ -70,12 +73,12 @@ local function showCracksOf(isoObject, kind, facing, material, modules)
 end
 
 --- Shows each of a placed panel's modules' cracked glass, light or heavy as
---- RenewableEnergy.crackLookOf has it, and none over the others, keeping the snow it shows on
+--- ModuleRepair.crackLookOf has it, and none over the others, keeping the snow it shows on
 --- top, and sends the overlays to clients if they changed. Does nothing for an object that is no panel.
 function PanelSource.showCracks(isoObject, modules)
     local kind, facing, material = Sources.kindOf(isoObject)
     if Sources.familyOf(kind) ~= "panel" then return end
-    showCracksOf(isoObject, kind, facing, material, modules or PowerBank.modulesOf(isoObject, kind))
+    showCracksOf(isoObject, kind, facing, material, modules or Panel.modulesOf(isoObject, kind))
 end
 
 -- Snow cover after `hours` of the weather in `context`.
@@ -113,57 +116,15 @@ function PanelSource.clearSnow(source, object)
     end
 end
 
--- A mount's stormShare (Specs.storm), times its material's.
-local function stormShare(mount, material)
-    local materialSpec = material and Specs.materials[material]
-    return Specs.mounts[mount].stormShare * (materialSpec and materialSpec.stormShare or 1)
-end
-
---- The hours of a pass of `hours`, ending now, in which a thunderstorm can crack modules: all
---- of them while one blows hard enough, else none.
-function PanelSource.stormHours(hours)
-    local climate = getClimateManager()
-    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.panelKph
-    return storming and hours or 0
-end
-
---- The chance that `stormHours` of thunderstorm crack a module of `source` (anything with a mount
---- kind and material), at the StormDamage options.
-function PanelSource.stormChance(source, stormHours)
-    return StormChance.stormDamage(Specs.storm.panelPerHour * stormShare(source.kind, source.material), stormHours)
-end
-
---- A thunderstorm may crack one of a panel's modules (`source`, anything with a mount kind,
---- material and module records). Returns whether it did.
-function PanelSource.stormCrack(source, stormHours)
-    local chance = PanelSource.stormChance(source, stormHours)
-    if chance <= 0 then
-        return false
-    end
-    local whole = {}
-    for _, module in ipairs(source.modules) do
-        if module.condition > 0 then
-            table.insert(whole, module)
-        end
-    end
-    if #whole == 0 or not Chance.hit(chance) then
-        return false
-    end
-    local module = Chance.pick(whole)
-    module.condition = math.max(0, module.condition - Specs.storm.crack)
-    return true
-end
-
 --- Keeps a panel's module record and the bank's copy `source` the same: a crack while the
 --- panel's square was unloaded goes to the object, otherwise the object (which unmounting and
 --- repairs change) is the truth. Either way the tile shows the cracks the record now holds.
-function PanelSource.syncModules(source, object)
+function PanelSource.reconcile(source, object)
     if source.modulesChanged then
         PanelSource.writeModules(object, source.modules, source)
         return
-    else
-        source.modules = PowerBank.modulesOf(object, source.kind)
     end
+    source.modules = Panel.modulesOf(object, source.kind)
     showCracksOf(object, source.kind, source.facing, source.material, source.modules)
 end
 
@@ -186,11 +147,12 @@ local function lowReason(source, inSlot, light, clearLight, condition, context)
     return reason
 end
 
---- A newly connected panel's record: its mount's facing and material, no snow, and the modules
---- it holds. Each module teaches a little the first time it is ever connected, and the module
---- record keeps that, through moves between banks and with the module when it comes off its mount.
+--- A newly connected panel's record: its mount's facing and material, no snow, the modules it
+--- holds, and the storms it weathered loose (PanelStorms.toRecord). Each module teaches a little
+--- the first time it is ever connected, and the module record keeps that, through moves between
+--- banks and with the module when it comes off its mount.
 function PanelSource.connect(player, source, isoObject, facing, material)
-    local modules = PowerBank.modulesOf(isoObject, source.kind)
+    local modules = Panel.modulesOf(isoObject, source.kind)
     local learned = 0
     for _, module in ipairs(modules) do
         if not module.connected then
@@ -203,17 +165,26 @@ function PanelSource.connect(player, source, isoObject, facing, material)
         addXp(player, Perks.Electricity, Specs.connectXp * learned)
     end
     source.facing, source.material, source.snow, source.modules = facing, material, 0, modules
+    PanelStorms.toRecord(source, isoObject)
+end
+
+--- The panel left its bank: its object, if still there, weathers on loose from where the record
+--- left off.
+function PanelSource.disconnect(source, object)
+    if object then
+        PanelStorms.toObject(source, object)
+    end
 end
 
 --- The panel's output over the pass, and why it is low. A storm cracking a module tells the
 --- players in earshot (StormNotice).
 function PanelSource.update(source, object, inSlot, hours, context)
-    if PanelSource.stormCrack(source, context.stormHours) then
+    if PanelStorms.weatherRecord(source) then
         source.modulesChanged = true
         StormNotice.tell(StormNotice.CRACKED_MODULE, source.x, source.y, source.z)
     end
     if object then
-        PanelSource.syncModules(source, object)
+        PanelSource.reconcile(source, object)
     end
     updateSnow(source, hours, context)
     if object then
@@ -236,5 +207,58 @@ function PanelSource.status(entry, source)
     entry.material, entry.facing, entry.fullSunPct = source.material, source.facing, source.fullSunPct or 0
     entry.snow, entry.modules = source.snow or 0, modules
 end
+
+--- Brings the loose panel `isoObject` up to the world's storm hours (PanelStorms.weatherObject),
+--- writing a crack to it. A connected panel weathers on its bank's record instead. Returns whether
+--- one cracked.
+function PanelSource.weather(isoObject)
+    if PowerBank.connectedBank(isoObject) then
+        return false
+    end
+    local kind, _, material = Sources.kindOf(isoObject)
+    local source = { kind = kind, material = material, modules = Panel.modulesOf(isoObject, kind) }
+    if not PanelStorms.weatherObject(isoObject, source) then
+        return false
+    end
+    PanelSource.writeModules(isoObject, source.modules)
+    StormNotice.tell(StormNotice.CRACKED_MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    return true
+end
+
+local function isPanel(isoObject)
+    return Sources.familyOf(Sources.kindOf(isoObject)) == "panel"
+end
+
+local function panelSprites()
+    local names = {}
+    for kind in pairs(Specs.mounts) do
+        for _, name in ipairs(Sprites.namesOf(kind)) do
+            table.insert(names, name)
+        end
+    end
+    return names
+end
+
+-- Every loaded panel, each weathered as its chunk loads or it is placed.
+local panels = PlaceTracker.new({ sprites = panelSprites(), matches = isPanel, onFound = PanelSource.weather })
+
+--- Weathers every loaded loose panel (PanelSource.weather). Returns how many cracked.
+function PanelSource.weatherLoaded()
+    local cracked = 0
+    panels:each(function(isoObject)
+        if PanelSource.weather(isoObject) then
+            cracked = cracked + 1
+        end
+    end)
+    return cracked
+end
+
+-- EveryTenMinutes fires at most once a tick however much game time passed, so the storm clock
+-- measures the time itself. Registered before any bank pass, so the passes of a tick read it.
+Events.EveryTenMinutes.Add(function()
+    if PanelStorms.advance() > 0 then
+        PanelSource.weatherLoaded()
+    end
+end)
 
 return PanelSource

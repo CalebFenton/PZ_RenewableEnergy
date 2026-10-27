@@ -1,4 +1,5 @@
--- What spawns where: the entries Distributions puts into the game's loot tables.
+-- What spawns where: the entries Distributions puts into the game's loot tables, the stash
+-- houses' maps (Stash.lua) included.
 
 require "Items/Distributions"
 local Specs = require "RenewableEnergy/Specs"
@@ -23,14 +24,20 @@ local SURVIVOR_CRATES = {
     "sub:SurvivorCacheBigBuilding.SurvivorCrate",
 }
 
--- Corpse loot of every survivalist outfit, with its _Mid and _Late variants.
-local SURVIVALIST_CORPSES = {}
-for key in pairs(subDist.all) do
-    if string.find(key, "^Outfit_Survivalist") then
-        table.insert(SURVIVALIST_CORPSES, "sub:all." .. key)
+-- Corpse loot of every outfit whose name starts with `prefix`, with its _Early, _Mid and _Late
+-- variants, as the game lists them, so a variant a game update adds is included.
+local function corpsesOf(prefix)
+    local lists = {}
+    for key in pairs(subDist.all) do
+        if string.find(key, "^" .. prefix) then
+            table.insert(lists, "sub:all." .. key)
+        end
     end
+    table.sort(lists)
+    return lists
 end
-table.sort(SURVIVALIST_CORPSES)
+local SURVIVALIST_CORPSES = corpsesOf("Outfit_Survivalist")
+local BANDIT_CORPSES = corpsesOf("Outfit_Bandit")
 
 -- Ordinary homes' shelves and side tables, where vanilla keeps its own how-to magazines
 -- (ElectronicsMag*, CookingMag*), in plain, classy and redneck furnishings.
@@ -427,6 +434,27 @@ local items = {
             { 1, "proc:MechanicSpecial" },
             { 0.5, "proc:GarageMechanics" },
         },
+    },
+    -- Stash houses' maps (Stash.lua), each as likely by itself whenever the Stash Houses option
+    -- drops maps (`stashMap`), never otherwise. The vanilla town maps that lead to the other
+    -- houses drop where vanilla puts them.
+    {
+        -- The prepper's farmhouse: survivalists and bandits carry it, and one prepper's cache
+        -- leads to another's.
+        fullType = "RenewableEnergy.CrowcallRoadMap",
+        stashMap = true,
+        entries = weighted({
+            { 2, SURVIVALIST_CORPSES }, { 2, BANDIT_CORPSES }, { 1, SURVIVOR_CRATES }, { 1, { "sub:Bag_SurvivorBag" } },
+        }),
+    },
+    {
+        -- The Dixie trailer: campers carry it, in their pockets and glove boxes; any corpse rarely.
+        fullType = "RenewableEnergy.DixieTrailerParkMap",
+        stashMap = true,
+        entries = weighted({
+            { 0.05, { "sub:all.inventoryfemale", "sub:all.inventorymale" } },
+            { 1, { "sub:all.Outfit_Camper", "veh:CamperGloveBox" } },
+        }),
     },
 }
 

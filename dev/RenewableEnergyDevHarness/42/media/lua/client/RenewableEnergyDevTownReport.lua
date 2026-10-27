@@ -12,10 +12,10 @@
 -- or room are left out. Car batteries in room loot are counted apart: vanilla's, and every car
 -- carries one besides. World banks, kit crates and arrow boards' battery boxes hold the mean of
 -- their own stocking functions over sampled fills (RenewableEnergyLoot's worldStocks), and a
--- container keeps the cracked modules Distributions.addCrackedModules gives it the chance of, so
+-- container keeps the cracked modules Finds.addCrackedModules gives it the chance of, so
 -- a change to either reaches the report without an edit here.
 
-require "RenewableEnergy/Recipes"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 require "RenewableEnergy/Sun"
 require "RenewableEnergy/PowerBank/Battery"
 require "PZHarness/Loot"
@@ -53,16 +53,25 @@ local function batteriesOf(fullType, count)
     return { batteries = count, wh = count * RenewableEnergy.Specs.batteries[fullType].wh }
 end
 
+-- What Seal Cracked Module brings the module item `item` to, or its condition where a seal can't
+-- help it.
+local function sealedCondition(item)
+    local fullType, condition, repaired = item:getFullType(), item:getCondition(), item:getHaveBeenRepaired()
+    if not ModuleRepair.sealable(fullType, condition, repaired) then
+        return condition
+    end
+    return (ModuleRepair.sealed(fullType, condition, repaired))
+end
+
 -- One module whose condition is uniform over the range. A scratch module takes each condition, so
--- Seal Cracked Module's own test and result price it.
+-- Seal Cracked Module's own rule prices it.
 local function moduleOver(range)
-    local Recipes = RenewableEnergy.Recipes
     local module = instanceItem(MODULE)
     local sum, repairedSum, n = 0, 0, 0
     for condition = range.min, range.max do
         RenewableEnergy.Wear.setCondition(module, condition)
         sum = sum + condition
-        repairedSum = repairedSum + (Recipes.isModuleBelowRepairCap(module) and Recipes.repairedCondition(module) or condition)
+        repairedSum = repairedSum + sealedCondition(module)
         n = n + 1
     end
     return { modules = 1, condition = sum / n, repaired = repairedSum / n }
@@ -77,15 +86,14 @@ end
 -- What one fill of a container holds, for PZHarness.Loot.sample: its modules with their condition
 -- as found and after Seal Cracked Module, and its batteries with their watt-hours after wear.
 local function findsIn(container)
-    local Recipes, Battery = RenewableEnergy.Recipes, RenewableEnergy.Battery
+    local Battery = RenewableEnergy.Battery
     local finds = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item:getFullType() == MODULE then
             local condition = item:getCondition()
-            add(finds, { modules = 1, condition = condition,
-                repaired = Recipes.isModuleBelowRepairCap(item) and Recipes.repairedCondition(item) or condition })
+            add(finds, { modules = 1, condition = condition, repaired = sealedCondition(item) })
         elseif Battery.isBattery(item) then
             add(finds, { batteries = 1, wh = Battery.nominalWh(item) })
         end
@@ -115,8 +123,8 @@ end
 -- The finds each source holds on average; banks and crates by their BANK_STOCK and CRATE_STOCK
 -- names, sampled over `samples` fills.
 local function findKinds(samples)
-    local WorldSpawns, ArrowBoard = RenewableEnergy.WorldSpawns, RenewableEnergy.ArrowBoard
-    local cracked, weathered = moduleOver(WorldSpawns.CRACKED), moduleOver(WorldSpawns.WEATHERED)
+    local Finds, ArrowBoard = RenewableEnergy.Finds, RenewableEnergy.ArrowBoard
+    local cracked, weathered = moduleOver(Finds.CRACKED), moduleOver(Finds.WEATHERED)
     local stocks, container = Loot.worldStocks(), PZLoot.scratchContainer(nil)
     local banks, crates = {}, {}
     for name, fill in pairs(stocks.banks) do
@@ -129,7 +137,7 @@ local function findKinds(samples)
     return {
         intact = { modules = 1, condition = 100, repaired = 100 },
         cracked = cracked,
-        site = mix(WorldSpawns.SITE_CRACKED_SHARE, cracked, weathered),
+        site = mix(Finds.SITE_CRACKED_SHARE, cracked, weathered),
         arrowBoard = add(panels, meanFinds(stocks.arrowBoard, samples, container)),
         banks = banks,
         crates = crates,
@@ -238,7 +246,7 @@ end
 
 -- The cracked modules a container of `containerType` in a room named `roomName` gets on average.
 local function roomCrackedModules(roomName, containerType, container)
-    return expectedHits(function() RenewableEnergy.Distributions.addCrackedModules(roomName, containerType, container) end)
+    return expectedHits(function() RenewableEnergy.Finds.addCrackedModules(roomName, containerType, container) end)
 end
 
 -- What the rooms of a town hold: `listed`, the mod's items in room loot; `cracked`, cracked
@@ -365,7 +373,7 @@ local function zoneVehicles(zoneName)
 end
 
 -- Stands in for the container of the part `partId` of a vehicle in the zone `zoneName`: all
--- Distributions.addCrackedModules asks of it, its vehicle's zone and its part's id.
+-- Finds.addCrackedModules asks of it, its vehicle's zone and its part's id.
 local function partContainer(zoneName, partId)
     local vehicle = { getZone = function() return zoneName end }
     local part = { getId = function() return partId end }
@@ -373,7 +381,7 @@ local function partContainer(zoneName, partId)
 end
 
 -- The cracked modules one vehicle of the script holds in the vehicle zone `zoneName`: each of its
--- containers that BaseVehicle.randomizeContainers fills rolls Distributions.addCrackedModules
+-- containers that BaseVehicle.randomizeContainers fills rolls Finds.addCrackedModules
 -- once. A part counts as a container when the script's loot names it, which leaves out its doors.
 local function vehicleCrackedModules(script, zoneName)
     local distribution = distributionOf(script)
@@ -387,7 +395,7 @@ local function vehicleCrackedModules(script, zoneName)
         local partId = vehicleScript:getPart(i):getId()
         if distribution.Normal[partId] then
             total = total + expectedHits(function()
-                RenewableEnergy.Distributions.addCrackedModules(roomName, partId, partContainer(zoneName, partId))
+                RenewableEnergy.Finds.addCrackedModules(roomName, partId, partContainer(zoneName, partId))
             end)
         end
     end

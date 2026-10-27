@@ -1,9 +1,9 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/UI/Menu"
+local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
 
--- The solar garden light (Gadgets/SolarGardenLight.lua, its options in UI/Menu.lua): it lights by
+-- The solar garden light (Gadgets/SolarGardenLight.lua, its options in UI/GardenLightMenu.lua): it lights by
 -- night on what its cell stored by day, in the colour of its bulb. The authority runs it, so the
 -- tests drive it through T.server and check this client's copies.
 
@@ -84,16 +84,17 @@ end
 -- At night a light stays lit while its battery holds any charge: a little more than the night
 -- draws leaves it lit, exactly that much puts it out. By day the cell charges it, never past full.
 local NIGHT_HOURS = 0.5
-local NIGHT_WH = Specs.gardenLight.nightWatts * NIGHT_HOURS
+local SPEC = RenewableEnergy.SolarGardenLight.SPEC
+local NIGHT_WH = SPEC.nightWatts * NIGHT_HOURS
 -- A full battery: lasts the night hours the tests run.
-local LIT_WH = Specs.gardenLight.wh
+local LIT_WH = SPEC.wh
 local GARDEN_LIGHT_HOURS = {
     { what = "with a little more than the night draws", hour = MIDNIGHT, charge = NIGHT_WH + 0.01, hours = NIGHT_HOURS,
         lit = true, after = 0.01 },
     { what = "with just what the night draws", hour = MIDNIGHT, charge = NIGHT_WH, hours = NIGHT_HOURS, lit = false, after = 0 },
-    { what = "empty at noon", hour = NOON, charge = 0, hours = 1, lit = false, low = 0, high = Specs.gardenLight.wh },
-    { what = "nearly full at noon", hour = NOON, charge = Specs.gardenLight.wh - 0.01, hours = 1, lit = false,
-        after = Specs.gardenLight.wh },
+    { what = "empty at noon", hour = NOON, charge = 0, hours = 1, lit = false, low = 0, high = SPEC.wh },
+    { what = "nearly full at noon", hour = NOON, charge = SPEC.wh - 0.01, hours = 1, lit = false,
+        after = SPEC.wh },
 }
 
 test("renewable_energy_gadgets_garden_light_update", {
@@ -136,7 +137,7 @@ local RED, GREEN = "Base.LightBulbRed", "Base.LightBulbGreen"
 -- once read, its Add Light Bulb submenu or nil, and its Remove Light Bulb option or nil.
 local function bulbMenu(light)
     local context = T.newContext()
-    local menu = RenewableEnergy.Menu.addGardenLightOptions(0, context, light.object)
+    local menu = GardenLightMenu.addOptions(0, context, light.object)
     return context, T.subMenu(context, menu:getOptionFromName(getText("ContextMenu_AddLightbulb"))),
         menu:getOptionFromName(getText("ContextMenu_RemoveLightbulb"))
 end

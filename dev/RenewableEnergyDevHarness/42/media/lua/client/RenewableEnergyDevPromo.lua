@@ -18,10 +18,13 @@ require "ISUI/ISWorldObjectContextMenu"
 require "RenewableEnergy/Debug/RenewableEnergyDebug"
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "RenewableEnergy/UI/StatusWindow"
-require "RenewableEnergy/UI/Menu"
+local BankMenu = require "RenewableEnergy/UI/BankMenu"
+require "RenewableEnergy/UI/SourceMenu"
+require "RenewableEnergy/UI/GardenLightMenu"
 require "RenewableEnergy/UI/DigesterWindow"
 require "RenewableEnergy/UI/GasifierWindow"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
@@ -143,7 +146,7 @@ end
 
 -- Places a bank and puts the parts straight into its container, as world spawns stock a bank.
 local function placeBank(square, sprite, items, charge)
-    return RenewableEnergy.PowerBank.place(square, sprite, nil, function(container)
+    return RenewableEnergy.BankSystem.place(square, sprite, nil, function(container)
         for _, fullType in ipairs(items) do
             local item = container:AddItem(fullType)
             if RenewableEnergy.Battery.isBattery(item) then
@@ -156,8 +159,8 @@ end
 -- Set out the way garden light spawns set one out, charged and unlit by day.
 local function placeGardenLight(square, bulb)
     local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    RenewableEnergy.WorldSpawns.placeMoveable(square, Sprites.gardenLight.off,
-        { [SolarGardenLight.CHARGE_KEY] = RenewableEnergy.Specs.gardenLight.wh, [SolarGardenLight.BULB_KEY] = bulb })
+    RenewableEnergy.Place.moveable(square, Sprites.gardenLight.off,
+        { [SolarGardenLight.CHARGE_KEY] = SolarGardenLight.SPEC.wh, [SolarGardenLight.BULB_KEY] = bulb })
 end
 
 local function connect(bank, source)
@@ -166,13 +169,13 @@ end
 
 -- Places a panel on each of `spots` ({ along, out, material }) of `place` and connects it to
 -- `bank`, in order: a `mount` ("wall" or "rack") of the spot's material facing the place's way, or
--- without one a flat panel. A mount holds the modules (a PowerBank.MODULES_KEY list) of its index in
+-- without one a flat panel. A mount holds the modules (a Panel.MODULES_KEY list) of its index in
 -- `modules` if given, else whole factory modules.
 local function placePanels(bank, place, spots, mount, modules)
     for i, spot in ipairs(spots) do
         local sprite = mount and Sprites[mount][spot[3]][place.frame.facing] or Sprites.flat
         local held = modules and modules[i]
-        connect(bank, Harness.placeTile(Harness.at(place, spot), sprite, held and { [PowerBank.MODULES_KEY] = held } or nil))
+        connect(bank, Harness.placeTile(Harness.at(place, spot), sprite, held and { [Panel.MODULES_KEY] = held } or nil))
     end
 end
 
@@ -390,8 +393,6 @@ end
 -- then one of a minute: the window shows the sun averaged over the last pass, which would
 -- otherwise be the last hour of the morning.
 local function chargeThroughMorning()
-    -- Server Lua, which loads after this file.
-    local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
     local system = PowerBank.serverSystem
     local banks = { system:getLuaObjectOnSquare(shown.homesteadBank:getSquare()), system:getLuaObjectOnSquare(shown.stage0Box:getSquare()) }
     local hours = {}
@@ -403,7 +404,7 @@ local function chargeThroughMorning()
     for _, hour in ipairs(hours) do
         getGameTime():setTimeOfDay(hour)
         for _, bank in ipairs(banks) do
-            BankSystem.updateBank(bank)
+            bank:update()
         end
     end
 end
@@ -587,7 +588,7 @@ local function addMenu()
         if switch then
             context:removeOptionByName(switch:getTileName())
         end
-        local bankLabel = RenewableEnergy.Menu.bankLabel(shown.homesteadBank)
+        local bankLabel = BankMenu.bankLabel(shown.homesteadBank)
         local wireInLabel = getText("ContextMenu_RenewableEnergy_WireIn")
         local bankMenu = Harness.openSubMenu(context, bankLabel)
         local wireIn = Harness.openSubMenu(bankMenu, wireInLabel)

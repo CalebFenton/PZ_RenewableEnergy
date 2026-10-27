@@ -2,9 +2,9 @@
 -- like any appliance. Wired to feed a bank, a run on it banks watt-hours instead.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
@@ -15,6 +15,19 @@ RenewableEnergy.Treadmill = Treadmill
 Treadmill.WIRED_KEY = "RenewableEnergy_treadmillWired"
 -- The item dismantling a treadmill gives.
 Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
+
+-- Wiring cost (as Specs.wiring), the input slots it takes in a bank, watts a runner puts in (an
+-- hour of running is roughly an hour of a fridge-freezer), run length, and an hour's cost and XP.
+-- Unwired, a run draws drawFuel: vanilla bills nothing for a treadmill, so it is billed like the
+-- other clothing appliances (IsoGenerator.ClothingAppliancePowerConsumption).
+Treadmill.SPEC = {
+    slots = 1,
+    wiring = { seconds = 90, wire = 2, scrap = 1, tools = { { tool = "SCREWDRIVER", item = "Base.Screwdriver" } },
+        skill = 2, xp = 10 },
+    watts = 240, runMinutes = 30, drawFuel = 0.09,
+    endurancePerHour = 0.6, thirstPerHour = 0.2,
+    xpPerHour = { Fitness = 20, Sprinting = 15 },
+}
 
 local FACING_STEPS = RenewableEnergy.SIDE_STEPS
 -- Steps back from each end of the treadmill (Sprites.treadmill) to its rear end.
@@ -79,21 +92,21 @@ end
 Treadmill.WIRE = "WireTreadmill"
 Treadmill.UNWIRE = "UnwireTreadmill"
 
-local WIRING = Specs.treadmill.wiring
+local WIRING = Treadmill.SPEC.wiring
 
 -- The jobs at a treadmill's tile, by name (cf_commonlib's Jobs): wiring it to feed a bank, as a
--- part is wired in, and unwiring it. JobSites.treadmill does them.
+-- part is wired in, and unwiring it. SourceSite does them.
 Treadmill.JOBS = {
     -- Either tile wired already refuses it, so a treadmill is wired once.
     [Treadmill.WIRE] = {
-        units = function(tile, with, character) return PowerBank.wiringUnits(character, WIRING) end,
+        units = function(tile, with, character) return Wiring.units(character, WIRING) end,
         light = true, sound = "GeneratorConnect",
         blocker = function(character, tile) return Treadmill.wiredHalf(tile) and "already wired" or nil end,
-        materials = PowerBank.wiringMaterials(WIRING),
+        materials = Wiring.materials(WIRING),
     },
     -- As a part comes out of a bank: quicker than wiring, with the same tools, the wire given back.
     [Treadmill.UNWIRE] = {
-        units = function(tile, with, character) return PowerBank.wiringUnits(character, WIRING, 0.5) end,
+        units = function(tile, with, character) return Wiring.units(character, WIRING, 0.5) end,
         light = true, sound = "GeneratorConnect",
         blocker = function(character, tile) return not Treadmill.isWired(tile) and "not wired" or nil end,
         materials = WIRING.tools,

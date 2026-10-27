@@ -190,10 +190,7 @@ function Loot.worldStocks()
     for name in pairs(WorldSpawns.CRATE_STOCK) do
         stocks.crates[name] = function(container) WorldSpawns.stockCrate(container, name) end
     end
-    stocks.arrowBoard = function(container)
-        RenewableEnergy.ArrowBoard.stockBatteryBox(container)
-        RenewableEnergy.Distributions.readyFoundItems(container)
-    end
+    stocks.arrowBoard = RenewableEnergy.ArrowBoard.stockBatteryBox
     return stocks
 end
 

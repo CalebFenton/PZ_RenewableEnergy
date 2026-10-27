@@ -1,16 +1,18 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Recipes"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Items = require "cf_commonlib/Items"
 
 -- Solar crafting: what a module shows through its life (Sprites.lua) and mount and module recipes
--- (Recipes.lua).
+-- (Recipes.lua, ModuleRepair.lua).
 
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, expectEqual, player = T.test, T.craftTest, T.expect, T.expectNear, T.expectEqual,
     T.player
 local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
-local PowerBank = RenewableEnergy.PowerBank
-local MODULES_KEY = PowerBank.MODULES_KEY
+local MODULES_KEY = Panel.MODULES_KEY
 local function craftName(recipe, behavior) return T.craftName("solar", recipe, behavior) end
 
 -- What a flat panel shows of a module through its life (Sprites.crackOverlays): whole when new,
@@ -34,17 +36,17 @@ test("renewable_energy_solar_crack_looks_follow_the_module", {
         end
         self.rows = {}
         local function reglazed(record)
-            local glass = Recipes.reglazedCondition(record.type, record.condition, record.repaired)
+            local glass = ModuleRepair.reglazedCondition(record.type, record.condition, record.repaired)
             return shows({ type = record.type, condition = math.max(record.condition, glass) })
         end
         for _, row in ipairs(LIFE_LOOKS) do
             local module, cracks = row[1], row[2]
-            local condition = RenewableEnergy.conditionMaxOf(module) - cracks * Specs.storm.crack
+            local condition = Items.conditionMaxOf(module) - cracks * Specs.storm.crack
             local record = { type = module, condition = condition, repaired = 0 }
             local sealed, sealedReglazed = nil, nil
-            if Recipes.canSealRecord(record) then
-                local copy = { type = module, condition = condition, repaired = 0 }
-                Recipes.sealRecord(copy)
+            if ModuleRepair.sealable(record.type, record.condition, record.repaired) then
+                local copy = { type = module }
+                copy.condition, copy.repaired = ModuleRepair.sealed(module, condition, 0)
                 sealed, sealedReglazed = shows(copy), reglazed(copy)
             end
             table.insert(self.rows, { row = row, condition = condition, cracked = shows(record), sealed = sealed,
@@ -159,14 +161,14 @@ for _, entry in ipairs(MOUNTS) do
                 local data = homemade.modData
                 expectEqual("the homemade module's condition", homemade.condition, MOUNTED_HOMEMADE.condition)
                 expectEqual("the homemade module's seals", homemade.repaired, MOUNTED_HOMEMADE.repaired)
-                expect(data[PowerBank.MOUNTED_ONCE_KEY] == true and data[PowerBank.CONNECTED_ONCE_KEY] == true,
+                expect(data[Panel.MOUNTED_ONCE_KEY] == true and data[Panel.CONNECTED_ONCE_KEY] == true,
                     "the homemade module came back without its mounted and connected marks")
             end
             local factory = T.carriedFirst(self, T.FACTORY_MODULE)
             if count == 2 and expect(factory ~= nil, "no factory module came back") then
                 expectEqual("the factory module's condition", factory.condition, PLAIN_FACTORY.condition)
                 expectEqual("the factory module's seals", factory.repaired, 0)
-                expect(factory.modData[PowerBank.MOUNTED_ONCE_KEY] ~= true, "the factory module came back marked as mounted before")
+                expect(factory.modData[Panel.MOUNTED_ONCE_KEY] ~= true, "the factory module came back marked as mounted before")
             end
         end,
     })
@@ -269,12 +271,12 @@ test("renewable_energy_solar_mount_xp_only_for_new_modules", {
 
 -- Solar modules -------------------------------------------------------------------------------
 
--- Seal Cracked Module adds Recipes.MODULE_REPAIR up to the module type's cap, lowered a step for
+-- Seal Cracked Module adds ModuleRepair.SEAL_ADDS up to the module type's cap, lowered a step for
 -- each earlier seal, and is refused at that limit with the module untouched. Each seal counts
 -- once, on this client's copy too, and a sealed module still shows cracked.
 -- Each row: the behaviour, the module, its seal count, and its condition before.
 local MODULE_REPAIRS = {
-    { "factory_adds_a_step", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) - Recipes.MODULE_REPAIR - 1 },
+    { "factory_adds_a_step", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) - ModuleRepair.SEAL_ADDS - 1 },
     { "factory_below_limit_stops_at_limit", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) - 1 },
     { "factory_at_limit_refused", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) },
     { "factory_after_two_seals_stops_at_lower_limit", T.FACTORY_MODULE, 2, T.sealCap(T.FACTORY_MODULE, 2) - 1 },
@@ -290,12 +292,12 @@ for _, entry in ipairs(MODULE_REPAIRS) do
     T.repairCraftTest(craftName(seal, behavior), seal, module, {
         before = before,
         repaired = repaired,
-        after = refused and before or math.min(limit, before + Recipes.MODULE_REPAIR),
+        after = refused and before or math.min(limit, before + ModuleRepair.SEAL_ADDS),
         repairedAfter = refused and repaired or repaired + 1,
         refused = refused,
         validate = function(_, item)
             -- The seal leaves the glass cracked, and the module showing it.
-            expect(RenewableEnergy.crackLookOf(module, item.condition) ~= nil, "a sealed module shows whole")
+            expect(ModuleRepair.crackLookOf(module, item.condition) ~= nil, "a sealed module shows whole")
         end,
     })
 end
@@ -305,8 +307,8 @@ end
 -- New glass on light cracks brings a module back to new; on heavy cracks, or on a sealed module, to
 -- the cells-cracked share of new. Each row: the behaviour, the module, its condition and seal count
 -- before, the condition after, and whether the game refuses.
-local REGLAZE, LOOKS = Recipes.REGLAZE, Specs.crackLooks
-local function share(module, part) return math.floor(RenewableEnergy.conditionMaxOf(module) * part) end
+local REGLAZE, LOOKS = ModuleRepair.REGLAZE, Specs.crackLooks
+local function share(module, part) return math.floor(Items.conditionMaxOf(module) * part) end
 local function heavy(module) return share(module, LOOKS.heavyBelow) - 1 end
 local function light(module) return share(module, (LOOKS.heavyBelow + LOOKS.lightBelow) / 2) end
 local function new(module) return share(module, REGLAZE.glassOnly) end
@@ -334,7 +336,7 @@ for _, entry in ipairs(REGLAZES) do
         counts = { [module] = 1, ["Base.GlassPanel"] = refused and 1 or 0 },
         validate = function(_, item)
             if not refused then
-                expect(RenewableEnergy.crackLookOf(module, item.condition) == nil, "a reglazed module shows cracked")
+                expect(ModuleRepair.crackLookOf(module, item.condition) == nil, "a reglazed module shows cracked")
             end
         end,
     })

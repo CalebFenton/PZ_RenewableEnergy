@@ -9,7 +9,7 @@ local Sun = require "RenewableEnergy/Sun"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainerServer"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellChargerServer"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLightServer"
-local ArrowBoard = require "RenewableEnergy/World/ArrowBoardPower"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local Clock = require "cf_commonlib/Clock"
 
 local GadgetCharging = {}

@@ -58,7 +58,7 @@ test("renewable_energy_gasline_kit_install_and_remove", {
     end,
     validate = function(self)
         local fitted, removed = self.reads.fitted, self.reads.removed
-        if T.expect(fitted.state ~= nil and fitted.listed, "the kit isn't fitted") then
+        if T.expect(fitted.state ~= nil, "the kit isn't fitted") then
             T.expectNear("tank with the kit", fitted.state.tank, self.fuel, 0.01)
         end
         -- On the game's own generator the kit sits on its air intake, not on the floor.
@@ -67,7 +67,7 @@ test("renewable_energy_gasline_kit_install_and_remove", {
             "the fitted kit doesn't show on " .. tostring(fitted.sprite) .. "'s intake")
         T.expectEqual("the refusal to take the kit off a running generator", self.runningRefusal,
             "Tooltip_RenewableEnergy_GeneratorRunning")
-        T.expect(removed.state == nil and not removed.listed, "the kit is still fitted")
+        T.expect(removed.state == nil, "the kit is still fitted")
         T.expect(not T.hasOverlay(removed, kit), "the removed kit still shows")
         T.expectEqual("kits after removing it", self.counts.afterRemove[GasKit.ITEM], 1)
     end,
@@ -394,7 +394,7 @@ test("renewable_energy_gasline_kit_job_not_done_takes_nothing", {
     validate = function(self)
         local reads = self.reads
         T.expectEqual("Install Kit's done", reads.complete.done, false)
-        T.expect(reads.after.state == nil and not reads.after.listed, "the kit was fitted")
+        T.expect(reads.after.state == nil, "the kit was fitted")
         T.expectEqual("kits after Install Kit wasn't done", self.counts.after[GasKit.ITEM], 1)
         T.expectEqual("Mechanics XP after Install Kit wasn't done", reads.afterXp.xp.Mechanics, reads.before.xp.Mechanics)
     end,
@@ -480,7 +480,7 @@ test("renewable_energy_gasline_fumes_clear_with_the_last_source", {
         T.batch(function()
             T.setRecord(self, digester, sour)
             T.readRecord(self, digester, "sour")
-            T.setRecord(self, gasifier, { lit = true, fireKg = Gasifier.TIERS.primitive.hopperKg })
+            T.setRecord(self, gasifier, { lit = true, fireKg = T.hopperHolds("primitive") })
             T.setRecord(self, digester, Fixtures.matureDigester("barrel"))
             T.readRecord(self, gasifier, "gasifierOnly")
             T.setRecord(self, digester, sour)
@@ -523,7 +523,7 @@ test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
         T.holdLight(self)
         T.fitAndConnect(self, generator, digester)
         T.batch(function()
-            T.setRecord(self, gasifier, { lit = true, fireKg = Gasifier.TIERS.primitive.hopperKg })
+            T.setRecord(self, gasifier, { lit = true, fireKg = T.hopperHolds("primitive") })
             T.setGenerator(self, generator, { running = true })
             T.setRecord(self, gasifier, { lit = false })
             T.readRecord(self, gasifier, "gasifierOut")

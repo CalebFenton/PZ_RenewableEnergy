@@ -1,13 +1,12 @@
 -- Run on Treadmill: the character runs in place on a treadmill. On one wired to a bank the belt
 -- turns its motor, and the run banks watt-hours; on an unwired one the motor turns the belt, on
 -- power, which the run draws from start to end (Treadmill.startDrawing). A run lasts
--- Specs.treadmill.runMinutes and stopping early counts the share run. The authority settles it:
+-- Treadmill.SPEC.runMinutes and stopping early counts the share run. The authority settles it:
 -- complete() a whole run, serverStop() (stop() in single player) part of one.
 -- A global, as the server finds the class by its Type (NetTimedAction.parse).
 
 require "TimedActions/ISBaseTimedAction"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Clock = require "cf_commonlib/Clock"
@@ -39,11 +38,11 @@ local function isOnTreadmill(self)
 end
 
 local function runHours()
-    return Specs.treadmill.runMinutes / 60
+    return Treadmill.SPEC.runMinutes / 60
 end
 
 function Action:units()
-    return Specs.treadmill.runMinutes * Clock.unitsPerMinute()
+    return Treadmill.SPEC.runMinutes * Clock.unitsPerMinute()
 end
 
 -- Timed as the jobs are, though not one (cf_commonlib's JobAction): the runner stands on the
@@ -151,10 +150,10 @@ local function settle(self, share)
     if hours <= 0 or not isOnTreadmill(self) then
         return false
     end
-    local spec, character = Specs.treadmill, self.character
+    local spec, character = Treadmill.SPEC, self.character
     if self.wired then
         -- Server code, which loads after this file.
-        if not RenewableEnergy.TreadmillSource.credit(self.object, hours) then
+        if not RenewableEnergy.BankSystem.creditTreadmill(self.object, hours) then
             return false
         end
     elseif not drew then

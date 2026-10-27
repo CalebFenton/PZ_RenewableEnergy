@@ -5,13 +5,7 @@ require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Specs = require "RenewableEnergy/Specs"
-local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Stash = require "RenewableEnergy/Stash"
-local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
-local ArrowBoard = require "RenewableEnergy/World/ArrowBoardPower"
-local Wear = require "RenewableEnergy/PowerBank/Wear"
-local Chance = require "cf_commonlib/Chance"
 local Loot = require "cf_commonlib/Loot"
 
 local Distributions = {}
@@ -177,141 +171,22 @@ Distributions.items = require "RenewableEnergy/Items/LootEntries"
 -- The mod's name in the log line of a loot list the game lacks (Loot.register).
 local MOD_NAME = "RenewableEnergy"
 
--- Each stash's map item, in the loot lists its description names.
-local stashMaps = {}
-for description, extra in pairs(Stash.descriptions) do
-    table.insert(stashMaps, { fullType = description.item, entries = Loot.entries(extra.loot or {}) })
-end
-
-local applyItems = Loot.register(MOD_NAME, Distributions.items, function(spec)
+-- A row's multiplier: a stash map's is all or nothing, by whether the Stash Houses option drops
+-- maps; every other row's its loot rarity option.
+local apply = Loot.register(MOD_NAME, Distributions.items, function(spec)
+    if spec.stashMap then
+        return Stash.mapsInLoot() and 1 or 0
+    end
     return SandboxVars.RenewableEnergy[spec.option]
 end)
--- The maps drop only while the Stash Houses option drops them.
-local applyStashMaps = Loot.register(MOD_NAME, stashMaps, function()
-    return Stash.mapsInLoot() and 1 or 0
-end)
 
---- Puts every entry of Distributions.items and the stash maps into their lists again at the
---- save's options now, replacing the entries a load put there (Loot.register).
+--- Puts every entry of Distributions.items into their lists again at the save's options now,
+--- replacing the entries a load put there (Loot.register).
 function Distributions.apply()
-    applyItems()
-    applyStashMaps()
-end
-
--- Found items
-
-local OWN_CONTAINER = {}
-for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
-    OWN_CONTAINER[containerType] = true
-end
-
--- An inverter or controller as loot rolls it: with no condition of its own. Its condition may be
--- anything: the game rolls a uniform one for 40% of the tools it puts outside shops
--- (ItemPickerJava.doRollItemInternal, randomizeGeneralCondition), which PART_WEAR replaces.
-local function isFreshPart(item)
-    return WorldSpawns.isWornPart(item:getFullType()) and not Wear.hasOwnCondition(item)
-end
-
-local function readyItems(container, wearParts)
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:IsInventoryContainer() then
-            readyItems(item:getInventory(), wearParts)
-        elseif item:getModule() == "RenewableEnergy" then
-            if Battery.isBattery(item) and not Battery.hasCharge(item) then
-                Battery.setFoundCharge(item)
-                sendItemStats(item)
-            elseif wearParts and isFreshPart(item) then
-                WorldSpawns.wearFoundPart(item)
-            end
-        end
-    end
-end
-
---- Readies the mod's items in a freshly filled container, bags included: batteries get a part
---- charge, inverters and controllers their wear (WorldSpawns.wearFoundPart). A refill (loot
---- respawn) fires this again over what players left there, so it passes over a battery that has
---- a charge of its own and a part that has a condition of its own. The mod's own containers, banks
---- among them, roll no loot, so no part in one is worn, marked or not. The game sends the filled
---- items after this (RequestItemsForContainerPacket, LootRespawn), condition included.
----@param container ItemContainer
-function Distributions.readyFoundItems(container)
-    readyItems(container, not OWN_CONTAINER[container:getType()])
-end
-
--- Cracked modules
--- Modules whose glass broke lie around where people kept junk and spares. They are added when a
--- container is filled rather than through the loot lists, so that they come with their cracked
--- condition and the lists' modules stay whole. Weights scale like a loot list's.
-
--- Rooms, and the weight of each of their shelves, boxes, crates and cabinets.
-Distributions.CRACKED_MODULE_ROOMS = {
-    garage = 1.5,
-    garagestorage = 1.5,
-    shed = 1.5,
-    farmstorage = 3,
-    electronicsstorage = 3,
-}
-Distributions.CRACKED_MODULE_CONTAINERS = {
-    crate = true, smallcrate = true, cardboardbox = true, smallbox = true, metal_shelves = true,
-    shelves = true, toolcabinet = true, counter = true,
-}
--- Weight for each trunk and truck bed of a vehicle in a junkyard (vanilla vehicle zone
--- "junkyard"): someone pulled the panel off an RV.
-Distributions.CRACKED_MODULE_JUNKYARD = 3
-
---- The cracked-module weight of a container of `containerType` in a room named `roomName`; 0 if
---- it keeps none.
-function Distributions.crackedModuleRoomWeight(roomName, containerType)
-    return Distributions.CRACKED_MODULE_CONTAINERS[containerType] and Distributions.CRACKED_MODULE_ROOMS[roomName] or 0
-end
-
---- The cracked-module weight of the container of the part `partId` of a vehicle in the vehicle
---- zone `zoneName`; 0 if it keeps none.
-function Distributions.crackedModuleVehicleWeight(zoneName, partId)
-    local isCargo = string.find(partId, "Trunk") or string.find(partId, "TruckBed")
-    return (zoneName == "junkyard" and isCargo) and Distributions.CRACKED_MODULE_JUNKYARD or 0
-end
-
-local function crackedModuleWeight(roomName, containerType, container)
-    local vehicle = container:getVehicle()
-    if vehicle then
-        local part = container:getVehiclePart()
-        return Distributions.crackedModuleVehicleWeight(vehicle:getZone(), part and part:getId() or "")
-    end
-    return Distributions.crackedModuleRoomWeight(roomName, containerType)
-end
-
---- The chance that a container of this weight gets a cracked module, at the save's options.
-function Distributions.crackedModuleChance(weight)
-    local multiplier = ItemPickerJava.getLootModifier(Specs.factoryModule)
-    return weight * multiplier * SandboxVars.RenewableEnergy.LRMSolarPanels / 100
-end
-
---- Maybe adds a cracked module to a freshly filled container, if its room or vehicle keeps them.
-function Distributions.addCrackedModules(roomName, containerType, container)
-    local weight = crackedModuleWeight(roomName, containerType, container)
-    if weight > 0 and Chance.hit(Distributions.crackedModuleChance(weight)) then
-        WorldSpawns.addModule(container, WorldSpawns.crackedCondition())
-    end
-end
-
--- Rooms, vehicles and corpses fire this after rolling their loot; vanilla's own drainable
--- randomizing (ItemPickerJava.rollItem) runs before it. ItemPickerJava's bag fills pass the bag's
--- loot table in place of a container. Stash and safehouse fills (fillContainerType) don't fire
--- it. The arrow board's battery box is stocked here, so that its batteries get their charge with
--- the rest.
-local function onFillContainer(roomName, containerType, container)
-    if instanceof(container, "ItemContainer") then
-        Distributions.addCrackedModules(roomName, containerType, container)
-        ArrowBoard.stockIfBatteryBox(roomName, container)
-        Distributions.readyFoundItems(container)
-    end
+    apply()
 end
 
 Events.OnPostDistributionMerge.Add(addOwnVehicleTables)
 Events.OnPostDistributionMerge.Add(addOwnContainersToRooms)
-Events.OnFillContainer.Add(onFillContainer)
 
 return Distributions

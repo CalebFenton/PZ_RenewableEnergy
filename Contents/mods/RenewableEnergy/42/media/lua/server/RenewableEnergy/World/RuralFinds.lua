@@ -19,7 +19,7 @@ local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local DigesterSystem = require "RenewableEnergy/Biogas/DigesterSystem"
 local GasifierSystem = require "RenewableEnergy/WoodGas/GasifierSystem"
-local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local Place = require "RenewableEnergy/World/Place"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 local Chance = require "cf_commonlib/Chance"
 local Items = require "cf_commonlib/Items"
@@ -83,7 +83,7 @@ end
 
 -- Building
 
-local build = WorldSpawns.buildEntity
+local build = Place.entity
 
 local function randomOf(entries)
     local list = {}
@@ -101,17 +101,17 @@ end
 function RuralFinds.leaveReading(def, fullType)
     local floors = {}
     for z = 0, BuildingWatch.HIGHEST_LEVEL do
-        for x = def:getX(), def:getX2() - 1 do
-            for y = def:getY(), def:getY2() - 1 do
-                local square = getSquare(x, y, z)
-                local holder = Squares.findObjectOn(square, keepsReading)
-                if holder then
-                    return Items.addItem(holder:getContainer(), fullType) ~= nil
-                end
-                if square and square:getRoom() and square:isFree(false) then
-                    table.insert(floors, square)
-                end
+        local holder = BuildingWatch.eachSquare(def, 0, z, function(square)
+            local found = Squares.findObjectOn(square, keepsReading)
+            if found then
+                return found
             end
+            if square and square:getRoom() and square:isFree(false) then
+                table.insert(floors, square)
+            end
+        end)
+        if holder then
+            return Items.addItem(holder:getContainer(), fullType) ~= nil
         end
     end
     if #floors == 0 then
@@ -227,15 +227,12 @@ end
 
 -- A random square the find `kind` may stand on within its reach of the building, or nil.
 local function squareFor(def, kind)
-    local found, reach = {}, RuralFinds.FINDS[kind].reach
-    for x = def:getX() - reach, def:getX2() + reach - 1 do
-        for y = def:getY() - reach, def:getY2() + reach - 1 do
-            local square = getSquare(x, y, 0)
-            if RuralFinds.canPlace(kind, square) then
-                table.insert(found, square)
-            end
+    local found = {}
+    BuildingWatch.eachSquare(def, RuralFinds.FINDS[kind].reach, 0, function(square)
+        if RuralFinds.canPlace(kind, square) then
+            table.insert(found, square)
         end
-    end
+    end)
     return #found > 0 and Chance.pick(found) or nil
 end
 
@@ -313,10 +310,13 @@ end
 -- Loading
 
 -- With the option at 0 no building is rolled, so turning it up later still finds them unrolled.
-BuildingWatch.watch(function(def)
-    return SandboxVars.RenewableEnergy.SolarSites > 0 and store()[BuildingWatch.key(def)] == nil
-        and #RuralFinds.findsFor(def) > 0
-end, function(def) RuralFinds.roll(def) end)
+BuildingWatch.watch({
+    ledger = RuralFinds.MOD_DATA,
+    wants = function(def)
+        return SandboxVars.RenewableEnergy.SolarSites > 0 and #RuralFinds.findsFor(def) > 0
+    end,
+    roll = function(def) RuralFinds.roll(def) end,
+})
 
 -- Story clutter
 
@@ -333,7 +333,7 @@ RuralFinds.CLUTTER = {
 }
 
 -- How many times the Java list holds `item`.
-function RuralFinds.countIn(list, item)
+local function countIn(list, item)
     local count = 0
     for i = 0, list:size() - 1 do
         if list:get(i) == item then
@@ -344,12 +344,12 @@ function RuralFinds.countIn(list, item)
 end
 
 -- How many times each item of `items` is listed.
-function RuralFinds.wanted(items)
-    local wanted = {}
+local function wanted(items)
+    local counts = {}
     for _, item in ipairs(items) do
-        wanted[item] = (wanted[item] or 0) + 1
+        counts[item] = (counts[item] or 0) + 1
     end
-    return wanted
+    return counts
 end
 
 -- An item already in a list was added by an earlier run since the list was last refilled.
@@ -358,8 +358,8 @@ local function addClutter()
     for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter] and base[getter](base)
         if list then
-            for item, count in pairs(RuralFinds.wanted(items)) do
-                if RuralFinds.countIn(list, item) == 0 then
+            for item, count in pairs(wanted(items)) do
+                if countIn(list, item) == 0 then
                     for _ = 1, count do
                         StoryTables.addItemToClutterTable(list, item)
                     end

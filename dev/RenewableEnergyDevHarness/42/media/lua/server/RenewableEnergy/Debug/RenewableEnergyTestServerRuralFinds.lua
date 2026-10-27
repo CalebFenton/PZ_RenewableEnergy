@@ -117,6 +117,17 @@ handler("ruralFindEmptyFilter", function(_, args)
     return {}
 end)
 
+-- How many times the Java list holds `item`.
+local function countIn(list, item)
+    local count = 0
+    for i = 0, list:size() - 1 do
+        if list:get(i) == item then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 -- Vanilla's barn, farm storeroom and survivalist camp story clutter lists hold the mod's additions,
 -- each as many times as vanilla's adder puts an item in for every time RuralFinds.CLUTTER lists it.
 PZHarness.checkHandler("ruralClutter", function(expect)
@@ -124,10 +135,14 @@ PZHarness.checkHandler("ruralClutter", function(expect)
     local base = getWorld():getRandomizedWorldBase()
     for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter](base)
-        for item, count in pairs(RuralFinds.wanted(items)) do
+        local listed = {}
+        for _, item in ipairs(items) do
+            listed[item] = (listed[item] or 0) + 1
+        end
+        for item, count in pairs(listed) do
             local once = ArrayList.new()
             StoryTables.addItemToClutterTable(once, item)
-            local held = RuralFinds.countIn(list, item)
+            local held = countIn(list, item)
             expect(held == count * once:size(), getter .. " holds " .. item .. " " .. held .. " times, not "
                 .. count .. " × " .. once:size())
         end

@@ -122,7 +122,7 @@ test("renewable_energy_gadgets_maintainer_charge", {
             local wh, after = reply.wh, reply.after
             if row.charges then
                 charged = reply
-                local most = fullSunWh(Specs.maintainerWatts, ROW_HOURS)
+                local most = fullSunWh(SolarMaintainer.WATTS, ROW_HOURS)
                 expect(wh > 0 and wh <= most and after > ROW_START,
                     "an hour at " .. row.what .. " added " .. wh .. " Wh, expected more than 0 and at most " .. most)
             else
@@ -227,8 +227,8 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
     validate = function(self)
         local noon, midnight, full = self.reads.noon, self.reads.midnight, self.reads.full
         local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
-        local useWh = useDelta * Specs.cellChargerBatteryWh
-        local most = fullSunWh(Specs.cellChargerWatts, CELL_HOURS)
+        local useWh = useDelta * SolarCellCharger.BATTERY_WH
+        local most = fullSunWh(SolarCellCharger.WATTS, CELL_HOURS)
         expect(noon.added > 0 and noon.added * useWh <= most, CELL_HOURS .. " hours of noon sun added " .. noon.added
             .. " uses of " .. useWh .. " Wh, expected more than 0 and at most " .. most .. " Wh")
         -- Each battery's uses, in the charger's order.

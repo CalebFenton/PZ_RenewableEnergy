@@ -11,6 +11,7 @@ require "RenewableEnergy/Sprites"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 
 local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
 local objectWithSprite, removePlaced = PZHarness.Fixtures.objectWithSprite, PZHarness.Fixtures.removePlaced
@@ -21,8 +22,8 @@ local MODULE = RenewableEnergy.Specs.factoryModule
 
 -- Whether a module's condition is one a site, crate or arrow board gives: cracked or weathered.
 local function isSiteCondition(condition)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    return inRange(condition, WorldSpawns.CRACKED) or inRange(condition, WorldSpawns.WEATHERED)
+    local Finds = RenewableEnergy.Finds
+    return inRange(condition, Finds.CRACKED) or inRange(condition, Finds.WEATHERED)
 end
 
 -- The site named `name` of this world's map, or nil.
@@ -132,15 +133,12 @@ local function isSiteObject(object)
         or Sprites.kindOfObject(object) ~= nil
 end
 
--- Removes what a site put on `square`, a generator out of the gas pass's list too.
+-- Removes what a site put on `square`.
 local function clearSquare(square)
     local objects = square:getObjects()
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
         if isSiteObject(object) then
-            if GeneratorReach.isVanillaGenerator(object) then
-                RenewableEnergy.GasLines.unlist(object)
-            end
             removePlaced(object)
         end
     end
@@ -164,7 +162,7 @@ end
 
 -- The kitted generator on `square` against the line it should have to the `kind` source at
 -- `source`: plugged in, off, run down and low on petrol as SolarSites.GENERATOR says, on gas with
--- its line connected and listed for the gas pass, its kit drawn on it. Answers the generator.
+-- its line connected, its kit drawn on it. Answers the generator.
 local function expectKittedGenerator(expect, expectNear, square, source, kind)
     local GasKit, SolarSites = RenewableEnergy.GasKit, RenewableEnergy.SolarSites
     local generator = Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator)
@@ -184,7 +182,6 @@ local function expectKittedGenerator(expect, expectNear, square, source, kind)
             and line.z == source:getZ(), "the generator's line doesn't run to the " .. kind)
         expectNear("the generator's tank as the kit keeps it", state.tank or -1, fuel, 0.01)
     end
-    expect(RenewableEnergy.GasLines.isListed(generator), "the gas pass doesn't list the generator")
     local overlays = PZHarness.Fixtures.overlaysOf(generator)
     local kit = Sprites.gasKitFor(Sprites.nameOf(generator))
     local hasKit = false
@@ -205,7 +202,7 @@ local SPOT_CHECKS = {
         if not expect(mount ~= nil, "no " .. spot.mount .. " mount on the panel spot") then
             return
         end
-        local modules = mount:getModData()[RenewableEnergy.PowerBank.MODULES_KEY] or {}
+        local modules = mount:getModData()[Panel.MODULES_KEY] or {}
         local range = SolarSites.KINDS[spot.siteKind].modules
         if range then
             expect(inRange(#modules, range), #modules .. " modules on the " .. spot.siteKind .. "'s mount, expected "
@@ -243,7 +240,7 @@ local SPOT_CHECKS = {
         local wired = PowerBank.bankOfSource(at:getX(), at:getY(), at:getZ())
         expect(wired ~= nil and Squares.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
             "the wind charger isn't wired to the site's bank")
-        local wear = WorldSpawns.BATTERY_WEAR[stock.batteries.wear]
+        local wear = RenewableEnergy.Finds.BATTERY_WEAR[stock.batteries.wear]
         local range = wearRange(wear)
         local batteries, items = 0, bank:getContainer():getItems()
         for i = 0, items:size() - 1 do
@@ -347,11 +344,11 @@ end)
 -- square, nearest first, or nil.
 local function chargerSquareFor(bank)
     local position = { x = bank:getX(), y = bank:getY(), z = bank:getZ() }
-    for r = 1, RenewableEnergy.Specs.sourceReach.tiles do
+    for r = 1, RenewableEnergy.Sources.REACH.tiles do
         for x, y in PZHarness.Fixtures.ring(position.x, position.y, r) do
             local square = getSquare(x, y, 0)
             if RenewableEnergy.RuralFinds.canPlace("wind", square)
-                and RenewableEnergy.PowerBank.isInReach(position, x, y, 0) then
+                and RenewableEnergy.Sources.isInReach(position, x, y, 0) then
                 return square
             end
         end

@@ -2,7 +2,8 @@
 -- side resolves all of a recipe's Lua calls when it sets up a craft (CraftRecipeData). OnCreate runs
 -- once on the authority, after the outputs were already sent to an MP client, so item changes are
 -- re-sent: outputs (in the inventory) with syncItemFields, inputs (maybe in a nearby container or on
--- the floor) with sendItemStats.
+-- the floor) with sendItemStats. The rules they apply are their owners': Battery's repairs,
+-- ModuleRepair's seals and new glass, Panel's module records, Wear's crafted condition.
 --
 -- OnTest is asked about every candidate item of every input, tools included, so each one
 -- answers only for the items it is about and lets the rest through.
@@ -10,8 +11,8 @@
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
-local Sources = require "RenewableEnergy/PowerBank/Sources"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
@@ -41,88 +42,6 @@ Recipes.MOUNTS = {
     ["RenewableEnergy.SolarRackMetal"] = { kind = "rack", xp = { Electricity = 20, MetalWelding = 10 } },
 }
 
--- Each patch-up repair counts on vanilla's per-item repair count ("Repaired: Nx") and lowers the
--- most the next can bring the item to by this step, so patching runs out. Remaking it with fresh
--- parts (Rebuild Battery, Reglaze Module) starts the count again.
-Recipes.REPAIR_LIMIT_STEP = 10
-
--- Seal Cracked Module (RenewableEnergy_RepairCrackedModule): condition it adds, and the most a
--- first seal brings each module type to. The caps stay below Specs.crackLooks.lightBelow of the
--- type's ConditionMax, and a first seal's at or above heavyBelow: sealed glass is still cracked
--- glass, and at best shows light cracks (RenewableEnergy.crackLookOf).
-Recipes.MODULE_REPAIR = 20
-Recipes.MODULE_REPAIR_CAP = {
-    [Specs.factoryModule] = 55,
-    ["RenewableEnergy.HomemadeSolarModule"] = 40,
-}
-
--- Reglaze Module's new glass, as shares of the module's ConditionMax: a module whose cracks stayed
--- in the glass comes back as new; one cracked heavily (RenewableEnergy.crackLookOf), or sealed,
--- since a crack that needed sealing ran deep enough to let the weather in, keeps the cells cracked
--- under it. Both shares stay at or above Specs.crackLooks.lightBelow, so new glass shows whole.
-Recipes.REGLAZE = { glassOnly = 1, cellsCracked = 0.9 }
-
---- The condition Reglaze Module brings a module of `fullType` at `condition`, sealed `repaired`
---- times, to; nil for a type that is no module.
-function Recipes.reglazedCondition(fullType, condition, repaired)
-    if not Specs.modules[fullType] then
-        return nil
-    end
-    local deep = (repaired or 0) > 0 or RenewableEnergy.crackLookOf(fullType, condition) == "heavy"
-    local share = deep and Recipes.REGLAZE.cellsCracked or Recipes.REGLAZE.glassOnly
-    return math.floor(RenewableEnergy.conditionMaxOf(fullType) * share)
-end
-
--- Service Battery adds a little to a tired battery; Recondition brings it to its repair limit.
-Recipes.SERVICE_REPAIR = 10
-Recipes.REPAIR_LIMIT = 85
-
--- The most a repair can bring a battery repaired this many times to.
-function Recipes.repairLimit(timesRepaired)
-    return Recipes.REPAIR_LIMIT - Recipes.REPAIR_LIMIT_STEP * timesRepaired
-end
-
--- The most Seal Cracked Module can bring a module of `fullType`, sealed `repaired` times, to; nil
--- for a type that is no module.
-local function sealCap(fullType, repaired)
-    local cap = Recipes.MODULE_REPAIR_CAP[fullType]
-    return cap and cap - Recipes.REPAIR_LIMIT_STEP * (repaired or 0)
-end
-
--- The most Seal Cracked Module can bring `module` to, or nil for an item that is no module.
-function Recipes.sealLimit(module)
-    return sealCap(module:getFullType(), module:getHaveBeenRepaired())
-end
-
---- Whether Seal Cracked Module can help the module record `module` (PowerBank.moduleRecord).
-function Recipes.canSealRecord(module)
-    local limit = sealCap(module.type, module.repaired)
-    return limit ~= nil and module.condition < limit
-end
-
---- The placed panel's module records (PowerBank.modulesOf), or nil for an object that is no panel.
-function Recipes.panelModules(panel)
-    local kind = Sources.kindOf(panel)
-    return Sources.familyOf(kind) == "panel" and PowerBank.modulesOf(panel, kind) or nil
-end
-
---- The module in `slot` of the placed panel `panel` if Seal Cracked Module can help it, else nil;
---- second, the panel's whole list of module records it was read from.
-function Recipes.sealableModule(panel, slot)
-    local modules = Recipes.panelModules(panel)
-    local module = modules and type(slot) == "number" and modules[slot]
-    if module and Recipes.canSealRecord(module) then
-        return module, modules
-    end
-    return nil
-end
-
---- Seals the module record `module` of a placed panel as Seal Cracked Module seals one in hand.
-function Recipes.sealRecord(module)
-    module.condition = math.min(sealCap(module.type, module.repaired), module.condition + Recipes.MODULE_REPAIR)
-    module.repaired = (module.repaired or 0) + 1
-end
-
 local function isModule(item)
     return Specs.modules[item:getFullType()] ~= nil
 end
@@ -146,7 +65,7 @@ function Recipes.mountModules(craftRecipeData, character)
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if isModule(item) then
-            local module = PowerBank.moduleRecord(item)
+            local module = Panel.moduleRecord(item)
             if not module.mounted then
                 module.mounted = true
                 new = new + 1
@@ -155,7 +74,7 @@ function Recipes.mountModules(craftRecipeData, character)
         end
     end
     local mount = craftRecipeData:getFirstCreatedItem()
-    mount:getModData()[PowerBank.MODULES_KEY] = modules
+    mount:getModData()[Panel.MODULES_KEY] = modules
     mount:syncItemFields()
     if new > 0 then
         for perk, xp in pairs(Recipes.MOUNTS[mount:getFullType()].xp) do
@@ -174,37 +93,36 @@ function Recipes.unmountModules(craftRecipeData, character)
     if not mount then
         return
     end
-    for _, module in ipairs(PowerBank.modulesOf(mount, Recipes.MOUNTS[mount:getFullType()].kind)) do
+    for _, module in ipairs(Panel.modulesOf(mount, Recipes.MOUNTS[mount:getFullType()].kind)) do
         local item = instanceItem(module.type)
         Wear.setCondition(item, module.condition)
-        PowerBank.markModule(item, module)
+        Panel.markModule(item, module)
         Items.giveItems(character, item)
     end
 end
 
--- OnTest of Seal Cracked Module: the module must be below what the seal brings it to.
+local function isSealType(item)
+    return ModuleRepair.SEAL_CAP[item:getFullType()] ~= nil
+end
+
+-- OnTest of Seal Cracked Module and its glue twin: a module must be one a seal can help.
 function Recipes.isModuleBelowRepairCap(item, character)
-    local limit = Recipes.sealLimit(item)
-    return limit == nil or item:getCondition() < limit
+    return not isSealType(item)
+        or ModuleRepair.sealable(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
 end
 
---- What Seal Cracked Module brings the module's condition to.
-function Recipes.repairedCondition(module)
-    return math.min(Recipes.sealLimit(module), module:getCondition() + Recipes.MODULE_REPAIR)
-end
-
--- OnCreate of Seal Cracked Module.
+-- OnCreate of Seal Cracked Module and its glue twin.
 function Recipes.repairModule(craftRecipeData, character)
-    local module = Items.firstInput(craftRecipeData, function(item)
-        return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
-    end)
-    Wear.setCondition(module, Recipes.repairedCondition(module))
-    countRepair(module)
+    local module = Items.firstInput(craftRecipeData, isSealType)
+    local condition, repaired = ModuleRepair.sealed(module:getFullType(), module:getCondition(),
+        module:getHaveBeenRepaired())
+    Wear.setCondition(module, condition)
+    setRepairs(module, repaired)
 end
 
--- What Reglaze Module brings the module item `item` to (Recipes.reglazedCondition), or nil.
+-- What Reglaze Module brings the module item `item` to (ModuleRepair.reglazedCondition), or nil.
 local function reglazedItem(item)
-    return Recipes.reglazedCondition(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
+    return ModuleRepair.reglazedCondition(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
 end
 
 -- OnTest of Reglaze Module: the module must be below what new glass brings it to.
@@ -220,146 +138,6 @@ function Recipes.reglazeModule(craftRecipeData, character)
     setRepairs(module, 0)
 end
 
--- Seal Cracked Panel seals a module still on the arrow board trailer, and Seal Cracked Module on a
--- placed panel one still on its mount, the way Seal Cracked Module seals one in hand. They read the
--- recipe's inputs, skill, time and XP from the recipe itself, so they can't drift apart; the module
--- input is the panel. Reglazing isn't offered in place: the module comes off to be reglazed, as
--- vanilla car glass is replaced, not repaired.
-local MODULE_REPAIR_RECIPE = "RenewableEnergy_RepairCrackedModule"
--- Seal Cracked Module and its glue twin (Recipes.txt says why there are two), in the order the
--- jobs in place try their inputs: glue first, the commoner tube, keeping epoxy for what only it
--- does, such as vanilla's Fix With Epoxy (recipes_fixing.txt). The twins list the same inputs in
--- the same order but the adhesive.
-local MODULE_REPAIR_RECIPES = { "RenewableEnergy_RepairCrackedModuleWithGlue", MODULE_REPAIR_RECIPE }
-
---- Seal Cracked Module: the recipe the jobs in place need known, and take their skill, time and
---- XP from; its glue twin has the same, and MetaRecipe makes it known with this one.
-function Recipes.moduleRepairRecipe()
-    return getScriptManager():getCraftRecipe(MODULE_REPAIR_RECIPE)
-end
-
--- As CraftRecipeData.processKeepInputItem wears kept tools: the factor for each MayDegrade flag.
-local function wearOf(input)
-    if input:mayDegradeHeavy() then return 1 end
-    if input:mayDegrade() then return 2 end
-    if input:mayDegradeLight() then return 3 end
-    if input:mayDegradeVeryLight() then return 6 end
-    return nil
-end
-
-local function isModuleInput(input)
-    return input:containsItem(getScriptManager():getItem(Specs.factoryModule))
-end
-
--- The rounding CraftRecipeData.consumeInputFromItems forgives when scaled uses pay an input.
-local PAID_TOLERANCE = 1e-5
-
--- What `recipe` takes of the character's inventory, bags included, but the module: the items that
--- pay its inputs, nil when one is missing, and each input as a need (see sealInPlaceInputs).
-local function recipeInputs(recipe, character)
-    local inputs = recipe:getInputs()
-    local picks, taken, needs, complete = {}, {}, {}, true
-    for i = 0, inputs:size() - 1 do
-        local input = inputs:get(i)
-        if not isModuleInput(input) then
-            local amount = input:getIntAmount()
-            local needed = amount
-            local candidates = character:getInventory():getAllEvalRecurse(function(item)
-                return not taken[item] and CraftRecipeManager.isItemValidForInputScript(input, item, character)
-            end)
-            for j = 0, candidates:size() - 1 do
-                if needed <= PAID_TOLERANCE then break end
-                local item = candidates:get(j)
-                if instanceof(item, "DrainableComboItem") then
-                    -- A line such as [Base.Epoxy;2:Base.Glue] takes more uses of some items.
-                    local scale = input:getRelativeScale(item:getFullType())
-                    local uses = math.min(item:getCurrentUses(), math.ceil(needed * scale))
-                    if uses > 0 then
-                        table.insert(picks, { item = item, uses = uses, keep = input:isKeep() })
-                        taken[item], needed = true, needed - uses / scale
-                    end
-                else
-                    table.insert(picks, { item = item, keep = input:isKeep(), wear = wearOf(input) })
-                    taken[item], needed = true, needed - 1
-                end
-            end
-            local paid = needed <= PAID_TOLERANCE
-            table.insert(needs, { kind = "item", input = input, have = paid and amount or math.floor(amount - needed), need = amount })
-            complete = complete and paid
-        end
-    end
-    return complete and picks or nil, needs
-end
-
---- The inventory items, bags included, that pay for a Seal Cracked Panel's inputs but the
---- module, each as { item, uses, keep, wear }: `uses` the drainable uses it takes (nil for a
---- whole item), `wear` the factor a kept tool's MayDegrade flag gives damageCheck; they pay the
---- first of MODULE_REPAIR_RECIPES the character carries every input of, and are nil when there is
---- none. Second, each of those inputs as a need (Materials.firstUnmet), `have` being how many
---- whole units of its amount the items found pay; an input the twins differ in is one need any of
---- theirs meets. Since they differ only in the adhesive, that need is met exactly when a twin is.
---- As CraftRecipeData.consumeInputFromItems and processDestroyAndUsedItems do, several part-used
---- drainables add up to one input, each giving the uses it has until the input is paid.
-function Recipes.sealInPlaceInputs(character)
-    local paid, byRecipe = nil, {}
-    for _, name in ipairs(MODULE_REPAIR_RECIPES) do
-        local picks, needs = recipeInputs(getScriptManager():getCraftRecipe(name), character)
-        paid = paid or picks
-        table.insert(byRecipe, needs)
-    end
-    local needs = {}
-    for i, need in ipairs(byRecipe[1]) do
-        local options, met, same = {}, false, true
-        for _, recipeNeeds in ipairs(byRecipe) do
-            local option = recipeNeeds[i]
-            table.insert(options, option)
-            met = met or option.have >= option.need
-            same = same and option.input:getOriginalLine() == need.input:getOriginalLine()
-        end
-        table.insert(needs, same and need or { kind = "item", anyOf = options, have = met and 1 or 0, need = 1 })
-    end
-    return paid, needs
-end
-
---- What Seal Cracked Panel takes of `character`, as a job row's needs (cf_commonlib's Jobs): the
---- recipe known, its skills, and its inputs but the module.
-function Recipes.sealInPlaceNeeds(character)
-    local recipe = Recipes.moduleRepairRecipe()
-    local needs = { { kind = "recipe", recipe = recipe, have = character:isRecipeKnown(recipe) and 1 or 0, need = 1 } }
-    for i = 0, recipe:getRequiredSkillCount() - 1 do
-        local skill = recipe:getRequiredSkill(i)
-        table.insert(needs, { kind = "skill", perk = skill:getPerk(), have = character:getPerkLevel(skill:getPerk()), need = skill:getLevel() })
-    end
-    local _, inputs = Recipes.sealInPlaceInputs(character)
-    for _, need in ipairs(inputs) do
-        table.insert(needs, need)
-    end
-    return needs
-end
-
---- The action units Seal Cracked Panel takes `character`: as the crafting window times Seal
---- Cracked Module (ISHandcraftAction).
-function Recipes.sealInPlaceUnits(character)
-    return Recipes.moduleRepairRecipe():getTime(character) * 5
-end
-
---- Uses up what Recipes.sealInPlaceInputs picked; tools are kept and may wear as the recipe's
---- craft wears them. Authority only.
-function Recipes.useInputs(picks, character)
-    local recipe = Recipes.moduleRepairRecipe()
-    for _, pick in ipairs(picks) do
-        if pick.keep and pick.wear then
-            local skill = recipe:getHighestRelevantSkillLevel(character) + pick.item:getMaintenanceMod(character)
-            pick.item:damageCheck(skill, pick.wear, false)
-            pick.item:syncItemFields()
-        elseif not pick.keep then
-            for _ = 1, pick.uses or 1 do
-                pick.item:UseAndSync()
-            end
-        end
-    end
-end
-
 -- OnTest of Take Apart Shattered Module: a module that still makes power stays whole.
 function Recipes.isShatteredModule(item, character)
     return item:getFullType() ~= Specs.factoryModule or item:getCondition() <= 0
@@ -371,20 +149,20 @@ end
 
 -- OnTest of Service Battery and Recondition Battery.
 function Recipes.canRepairBattery(item, character)
-    return not Battery.isBattery(item) or item:getCondition() < Recipes.repairLimit(item:getHaveBeenRepaired())
+    return not Battery.isBattery(item) or item:getCondition() < Battery.repairLimit(item:getHaveBeenRepaired())
 end
 
 -- OnCreate of Service Battery.
 function Recipes.serviceBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, math.min(Recipes.repairLimit(battery:getHaveBeenRepaired()), battery:getCondition() + Recipes.SERVICE_REPAIR))
+    Wear.setCondition(battery, math.min(Battery.repairLimit(battery:getHaveBeenRepaired()), battery:getCondition() + Battery.SERVICE_REPAIR))
     countRepair(battery)
 end
 
 -- OnCreate of Recondition Battery.
 function Recipes.reconditionBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, Recipes.repairLimit(battery:getHaveBeenRepaired()))
+    Wear.setCondition(battery, Battery.repairLimit(battery:getHaveBeenRepaired()))
     Battery.setCharge(battery, 0)
     countRepair(battery)
 end
@@ -422,24 +200,11 @@ function Recipes.rebuildCarBattery(craftRecipeData, character)
 end
 
 -- OnCreate of Make Charge Controller: a new controller has a condition of its own, so a loot
--- refill of the container it is kept in doesn't wear it as if found (Distributions.readyFoundItems).
+-- refill of the container it is kept in doesn't wear it as if found (Finds.readyFoundItems).
 function Recipes.makeChargeController(craftRecipeData, character)
     local controller = craftRecipeData:getFirstCreatedItem()
     Wear.markOwnCondition(controller)
     controller:syncItemFields()
-end
-
--- A crafted inverter comes out short of its ConditionMax by CRAFTED_SHORTFALL at the recipe's
--- Electricity level, and each level past it makes up CRAFTED_PER_LEVEL, up to the cap: the more
--- skilled the maker, the better the first build.
-Recipes.CRAFTED_SHORTFALL = 20
-Recipes.CRAFTED_PER_LEVEL = 5
-
---- The condition an inverter of ConditionMax `conditionMax` comes out at, made at Electricity
---- `level` by a recipe that needs `required`.
-function Recipes.craftedInverterCondition(conditionMax, level, required)
-    local condition = conditionMax - Recipes.CRAFTED_SHORTFALL + Recipes.CRAFTED_PER_LEVEL * math.max(0, level - required)
-    return math.min(conditionMax, condition)
 end
 
 -- The Electricity level `recipe` needs, 0 if none.
@@ -453,11 +218,12 @@ local function electricityRequired(recipe)
     return 0
 end
 
--- OnCreate of the inverter recipes: the maker's skill sets the new inverter's condition, and it
--- is marked as having a condition of its own, as a new controller is.
+-- OnCreate of the inverter recipes: the maker's skill sets the new inverter's condition
+-- (Wear.craftedInverterCondition), and it is marked as having a condition of its own, as a new
+-- controller is.
 function Recipes.makeInverter(craftRecipeData, character)
     local inverter = craftRecipeData:getFirstCreatedItem()
-    Wear.setCondition(inverter, Recipes.craftedInverterCondition(inverter:getConditionMax(),
+    Wear.setCondition(inverter, Wear.craftedInverterCondition(inverter:getConditionMax(),
         character:getPerkLevel(Perks.Electricity), electricityRequired(craftRecipeData:getRecipe())))
     Wear.markOwnCondition(inverter)
     inverter:syncItemFields()

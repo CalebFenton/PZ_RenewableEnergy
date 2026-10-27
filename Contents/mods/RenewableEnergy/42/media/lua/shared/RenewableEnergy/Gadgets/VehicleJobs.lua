@@ -4,7 +4,8 @@
 -- A job at a vehicle reaches at waist height, from the area of the part it works on.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Recipes = require "RenewableEnergy/Recipes"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
@@ -27,12 +28,6 @@ function VehicleJobs.isBoltCutters(item)
     return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and Items.notBroken(item)
 end
 
--- ArrowBoard is server code (server/RenewableEnergy/World/ArrowBoard.lua), which every side loads
--- after the shared files, so it is looked up when a job asks.
-local function arrowBoard()
-    return RenewableEnergy.ArrowBoard
-end
-
 -- The vehicle area of `vehicle`'s part `id`.
 local function areaOf(vehicle, id)
     return vehicle:getPartById(id):getArea()
@@ -45,14 +40,14 @@ end
 
 -- Where the arrow board's switch is: in its battery box.
 local function atBox(vehicle)
-    return areaOf(vehicle, arrowBoard().BATTERY_BOX)
+    return areaOf(vehicle, ArrowBoard.BATTERY_BOX)
 end
 
 -- The arrow board's switch set to `on`.
 local function boardJob(on)
     return {
         on = on, minutes = 0.5, position = "Mid", doneSound = "LightSwitch", area = atBox,
-        blocker = function(character, vehicle) return not arrowBoard().canSwitch(vehicle, on) and "can't switch" or nil end,
+        blocker = function(character, vehicle) return not ArrowBoard.canSwitch(vehicle, on) and "can't switch" or nil end,
     }
 end
 
@@ -98,23 +93,17 @@ VehicleJobs.JOBS = {
     -- character forces a locked window (OpenWindowState).
     [VehicleJobs.CUT_PADLOCK] = {
         units = 100, anim = "VehicleWorkOnMid", doneSound = "BreakLockOnWindow", wield = true,
-        area = function(vehicle) return areaOf(vehicle, arrowBoard().LID) end,
+        area = function(vehicle) return areaOf(vehicle, ArrowBoard.LID) end,
         blocker = function(character, vehicle)
-            local ArrowBoard = arrowBoard()
             local lid = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(ArrowBoard.LID)
             return not (lid and ArrowBoard.isPadlocked(lid)) and "not padlocked" or nil
         end,
         with = VehicleJobs.isBoltCutters, withMissing = "Tooltip_RenewableEnergy_NeedsBoltCutters",
     },
     -- Seal Cracked Module's twin for a panel still on the trailer.
-    [VehicleJobs.SEAL_PANEL] = {
-        units = function(vehicle, partId, character) return Recipes.sealInPlaceUnits(character) end,
-        light = true, position = "Mid", sound = "GeneratorRepair", area = areaOf,
-        needs = Recipes.sealInPlaceNeeds,
-        blocker = function(character, vehicle, partId)
-            return not arrowBoard().sealablePanel(vehicle, partId) and "Tooltip_RenewableEnergy_PanelSealedFully" or nil
-        end,
-    },
+    [VehicleJobs.SEAL_PANEL] = ModuleRepair.sealRow(function(vehicle, partId)
+        return ArrowBoard.sealablePanel(vehicle, partId) ~= nil
+    end, "Tooltip_RenewableEnergy_PanelSealedFully", { position = "Mid", area = areaOf }),
 }
 
 Jobs.define(VehicleJobs, {

@@ -9,6 +9,7 @@ require "Moveables/ISMoveableSpriteProps"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Digester = require "RenewableEnergy/Biogas/Digester"
@@ -144,7 +145,7 @@ end
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
 -- conditions and a garden light its charge and bulb.
 
-local CARRIED_KEYS = { PowerBank.MODULES_KEY, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
+local CARRIED_KEYS = { Panel.MODULES_KEY, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
 
 -- The object being picked up, until vanilla makes its item. Each pick-up makes one item, which
 -- takes it, so an error in vanilla's pick-up can't leave it for an unrelated item later.

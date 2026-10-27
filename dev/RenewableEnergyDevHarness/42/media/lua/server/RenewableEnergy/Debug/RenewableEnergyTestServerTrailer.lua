@@ -8,6 +8,7 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
 require "PZHarness/Loot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Chance = require "cf_commonlib/Chance"
 local Items = require "cf_commonlib/Items"
 
 local handler = PZHarness.serverHandler
@@ -19,21 +20,31 @@ local Trailer = {}
 -- by vehicle id: { [partId] = condition }.
 local stockedPanels = {}
 
--- Spawns `script` as the harness does (addVehicleDebug), an arrow board's stocked panels getting
--- the condition `roll(stockRoll)` returns for each, stockRoll being the roll stocking makes, in
--- ArrowBoard.PANELS order. No caller hands it a defer, so a pcall puts the rolls back before an
--- error goes on.
-local function spawnStocking(script, square, facing, roll)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    local weathered, cracked = WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition
-    WorldSpawns.weatheredCondition = function() return roll(weathered) end
-    WorldSpawns.crackedCondition = function() return roll(cracked) end
+-- A roll over the second panel's crack chance, so a trailer stocked at it gets two weathered
+-- modules; and one that gives weathered modules as good as new.
+local WEATHERED_ROLL, WHOLE_ROLL = 0.7, 1 - Helpers.UNDER
+
+-- Spawns `script` as the harness does (addVehicleDebug) with every Chance roll at `roll`, so an
+-- arrow board's stocking draws known conditions. No caller hands it a defer, so a pcall puts the
+-- game's roll back before an error goes on.
+local function spawnAtRoll(script, square, facing, roll)
+    local gameRoll = Chance.roll
+    Chance.roll = function() return roll end
     local ok, vehicle = pcall(addVehicleDebug, script, IsoDirections[facing], nil, square)
-    WorldSpawns.weatheredCondition, WorldSpawns.crackedCondition = weathered, cracked
+    Chance.roll = gameRoll
     if not ok then
         error(vehicle)
     end
     return vehicle
+end
+
+-- The weathered condition stocking gives a module at `roll`.
+local function weatheredAt(roll)
+    local gameRoll = Chance.roll
+    Chance.roll = function() return roll end
+    local condition = RenewableEnergy.Finds.weatheredCondition()
+    Chance.roll = gameRoll
+    return condition
 end
 
 --- T.placeVehicle's spawn, the `spawnVehicle` setting (RenewableEnergyTestSettings.lua): an arrow
@@ -46,17 +57,13 @@ function Trailer.spawnVehicle(script, square, facing, args)
     if args and args.stocked then
         vehicle = ArrowBoard.spawn(square, facing)
     elseif args and args.recordStock then
-        local rolled = {}
-        vehicle = spawnStocking(script, square, facing, function(stockRoll)
-            local condition = stockRoll()
-            table.insert(rolled, condition)
-            return condition
-        end)
-        stockedPanels[vehicle:getId()] = { [ArrowBoard.PANELS[1]] = rolled[1], [ArrowBoard.PANELS[2]] = rolled[2] }
+        vehicle = spawnAtRoll(script, square, facing, WEATHERED_ROLL)
+        local condition = weatheredAt(WEATHERED_ROLL)
+        stockedPanels[vehicle:getId()] = { [ArrowBoard.PANELS[1]] = condition, [ArrowBoard.PANELS[2]] = condition }
     elseif args and args.repair then
         -- The tick after stocking puts the stock conditions back over a repair in the same tick
-        -- (ArrowBoard.lua's keepStockConditions), so a whole trailer is stocked whole.
-        vehicle = spawnStocking(script, square, facing, function() return 100 end)
+        -- (Trailer.lua's keepStockConditions), so a whole trailer is stocked whole.
+        vehicle = spawnAtRoll(script, square, facing, WHOLE_ROLL)
     end
     if vehicle and args.repair then
         vehicle:repair()
@@ -358,10 +365,10 @@ end)
 
 -- Stocks the trailer's panels afresh, as its panels' part `create` does on a new trailer, for each
 -- of `args.rolls` (trialRoll of STOCK.secondCrackedChance), every roll at it, with the Solar Panels
--- loot option at 1. Answers each panel's condition after each stocking, and WorldSpawns' cracked
--- and weathered ranges.
+-- loot option at 1. Answers each panel's condition after each stocking, and Finds' cracked and
+-- weathered ranges.
 handler("arrowBoardPanelStockRolls", function(_, args, defer)
-    local ArrowBoard, WorldSpawns, vehicle = RenewableEnergy.ArrowBoard, RenewableEnergy.WorldSpawns, Helpers.vehicleAt(args)
+    local ArrowBoard, Finds, vehicle = RenewableEnergy.ArrowBoard, RenewableEnergy.Finds, Helpers.vehicleAt(args)
     local restoreOptions = PZHarness.Fixtures.saveOptions(defer, { "LRMSolarPanels" })
     SandboxVars.RenewableEnergy.LRMSolarPanels = 1
     local stocked = Helpers.eachTrial(defer, args.rolls, function(roll)
@@ -379,7 +386,7 @@ handler("arrowBoardPanelStockRolls", function(_, args, defer)
         return conditions
     end)
     restoreOptions()
-    return { stocked = stocked, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED }
+    return { stocked = stocked, cracked = Finds.CRACKED, weathered = Finds.WEATHERED }
 end)
 
 -- Stocks a scratch battery box (ArrowBoard.stockBatteryBox) for each trial { misc, roll }: the

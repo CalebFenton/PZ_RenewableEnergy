@@ -53,8 +53,7 @@ function Bank:writeBatteries(container, applyPending)
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if Battery.isBattery(item) and item:getCondition() > 0 then
-            -- Clients hear of the charge only once it changes at two decimals.
-            if VehicleUtils.compareFloats(Battery.getCharge(item), self.charge, 2) then
+            if Battery.changedVisibly(Battery.getCharge(item), self.charge) then
                 table.insert(charged, item)
             end
             Battery.setCharge(item, self.charge)

@@ -1,23 +1,20 @@
--- Storms on the panels no bank runs. A placed panel stands in the weather whether or not it is
--- connected, so disconnecting one before a storm doesn't spare it: a bank's pass cracks its own
--- panels (PanelSource.update), and this cracks every other outdoor panel the same way.
+-- Storms cracking panels' modules, on the authority: the one storm clock, and the rule each crack
+-- follows. A placed panel stands in the weather whether or not it is connected, so disconnecting one
+-- before a storm doesn't spare it.
 --
--- The world keeps a running total of storm hours (PanelSource.stormHours), and each panel the
--- total it has weathered, so a panel whose chunk was unloaded through a storm takes it when its
--- chunk next loads. A panel seen for the first time starts at the total: it was just placed, or is
--- from a save before this.
+-- The world keeps a running total of storm hours, and each panel the total it has weathered: a
+-- connected panel on its bank's record of it (`weathered`), which every bank pass brings up to
+-- the total (PanelSource.update), loaded or not; a loose panel on its object, brought up to it as
+-- its chunk loads and every pass while loaded (PanelSource). Connecting and disconnecting hand
+-- the mark between the two, so no storm counts twice or is skipped. A panel seen for the first
+-- time starts at the total: it was just placed, or is from a save before this.
 
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
-local Sprites = require "RenewableEnergy/Sprites"
-local StormNotice = require "RenewableEnergy/StormNotice"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
-local Sources = require "RenewableEnergy/PowerBank/Sources"
-local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
-local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
+local Chance = require "cf_commonlib/Chance"
 local Clock = require "cf_commonlib/Clock"
 
 local PanelStorms = {}
@@ -28,79 +25,106 @@ RenewableEnergy.PanelStorms = PanelStorms
 local MOD_DATA = "RenewableEnergy_storms"
 -- Panel modData: the world's storm hours the panel has weathered.
 local WEATHERED_KEY = "RenewableEnergy_stormHours"
+-- As a bank's pass (BankSystem.longestPass): a save loaded after the clock jumped never counts
+-- days of storm at once.
+local LONGEST_PASS = 24
 
 local function store()
     return ModData.getOrCreate(MOD_DATA)
 end
 
-local function isPanel(isoObject)
-    return Sources.familyOf(Sources.kindOf(isoObject)) == "panel"
+local function total()
+    return store().hours or 0
 end
 
---- Brings the placed panel `isoObject` up to the world's storm hours: if it stands outdoors and
---- feeds no bank, the storm hours since it last weathered may crack a module, as a bank's pass
---- would (PanelSource.stormCrack). Returns whether one cracked.
-function PanelStorms.weather(isoObject)
-    local total = store().hours or 0
-    local data = isoObject:getModData()
-    local weathered = data[WEATHERED_KEY]
-    if weathered == total then
+--- The hours of a stretch of `hours`, ending now, in which a thunderstorm can crack modules: all
+--- of them while one blows hard enough, else none.
+function PanelStorms.stormHours(hours)
+    local climate = getClimateManager()
+    local storming = climate:getIsThunderStorming() and climate:getWindspeedKph() >= Specs.storm.panelKph
+    return storming and hours or 0
+end
+
+--- Adds `stormHours` to the world's storm hours.
+function PanelStorms.add(stormHours)
+    if stormHours > 0 then
+        local storms = store()
+        storms.hours = (storms.hours or 0) + stormHours
+    end
+end
+
+--- Brings the world's storm hours up to now. Returns the storm hours it added.
+function PanelStorms.advance()
+    local stormHours = PanelStorms.stormHours(Clock.hoursSince(store(), LONGEST_PASS))
+    PanelStorms.add(stormHours)
+    return stormHours
+end
+
+-- A mount's stormShare (Specs.storm), times its material's.
+local function stormShare(mount, material)
+    local materialSpec = material and Specs.materials[material]
+    return Specs.mounts[mount].stormShare * (materialSpec and materialSpec.stormShare or 1)
+end
+
+--- The chance that `stormHours` of thunderstorm crack a module of `source` (anything with a mount
+--- kind and material), at the StormDamage options.
+function PanelStorms.stormChance(source, stormHours)
+    return StormChance.stormDamage(Specs.storm.panelPerHour * stormShare(source.kind, source.material), stormHours)
+end
+
+--- A thunderstorm may crack one of a panel's modules (`source`, anything with a mount kind,
+--- material and module records). Returns whether it did.
+function PanelStorms.stormCrack(source, stormHours)
+    local chance = PanelStorms.stormChance(source, stormHours)
+    if chance <= 0 then
         return false
     end
-    -- A connected panel keeps up too, so the storms its bank cracked it for don't count again
-    -- once it is disconnected.
-    data[WEATHERED_KEY] = total
-    if not weathered or PowerBank.connectedBank(isoObject) or not isoObject:getSquare():isOutside() then
+    local whole = {}
+    for _, module in ipairs(source.modules) do
+        if module.condition > 0 then
+            table.insert(whole, module)
+        end
+    end
+    if #whole == 0 or not Chance.hit(chance) then
         return false
     end
-    local kind, _, material = Sources.kindOf(isoObject)
-    local source = { kind = kind, material = material, modules = PowerBank.modulesOf(isoObject, kind) }
-    if not PanelSource.stormCrack(source, total - weathered) then
-        return false
-    end
-    PanelSource.writeModules(isoObject, source.modules)
-    StormNotice.tell(StormNotice.CRACKED_MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    local module = Chance.pick(whole)
+    module.condition = math.max(0, module.condition - Specs.storm.crack)
     return true
 end
 
-local function panelSprites()
-    local names = {}
-    for kind in pairs(Specs.mounts) do
-        for _, name in ipairs(Sprites.namesOf(kind)) do
-            table.insert(names, name)
-        end
-    end
-    return names
+-- The storm hours since `weathered` (nil: none, the first look), and the world's total.
+local function since(weathered)
+    local now = total()
+    return weathered and now - weathered or 0, now
 end
 
--- Every loaded panel, each weathered as its chunk loads or it is placed.
-local panels = PlaceTracker.new({ sprites = panelSprites(), matches = isPanel, onFound = PanelStorms.weather })
-
---- Adds `stormHours` to the world's storm hours and weathers every loaded panel. Returns how many
---- cracked.
-function PanelStorms.pass(stormHours)
-    if stormHours <= 0 then
-        return 0
-    end
-    local storms = store()
-    storms.hours = (storms.hours or 0) + stormHours
-    local cracked = 0
-    panels:each(function(isoObject)
-        if PanelStorms.weather(isoObject) then
-            cracked = cracked + 1
-        end
-    end)
-    return cracked
+--- Brings a bank's record of a connected panel up to the world's storm hours: those since it last
+--- weathered may crack one of its modules. Returns whether one cracked.
+function PanelStorms.weatherRecord(source)
+    local hours
+    hours, source.weathered = since(source.weathered)
+    return hours > 0 and PanelStorms.stormCrack(source, hours)
 end
 
--- EveryTenMinutes fires at most once a tick however much game time passed, so the pass measures
--- the time itself.
-local function update()
-    -- As a bank's pass: a save loaded after the clock jumped never counts days of storm at once.
-    local hours = Clock.hoursSince(store(), BankSystem.LONGEST_PASS)
-    PanelStorms.pass(PanelSource.stormHours(hours))
+--- Brings the loose panel `isoObject` up to the world's storm hours: those since it last weathered
+--- may crack one of `source`'s modules (its kind, material and the modules it holds) if it stands
+--- outdoors. Returns whether one cracked; the caller writes them to the panel.
+function PanelStorms.weatherObject(isoObject, source)
+    local data = isoObject:getModData()
+    local hours
+    hours, data[WEATHERED_KEY] = since(data[WEATHERED_KEY])
+    return hours > 0 and isoObject:getSquare():isOutside() and PanelStorms.stormCrack(source, hours)
 end
 
-Events.EveryTenMinutes.Add(update)
+--- A panel connecting: its bank's record `source` weathers on from where the object left off.
+function PanelStorms.toRecord(source, isoObject)
+    source.weathered = isoObject:getModData()[WEATHERED_KEY] or total()
+end
+
+--- A panel disconnecting: its object weathers on from where the bank's record `source` left off.
+function PanelStorms.toObject(source, isoObject)
+    isoObject:getModData()[WEATHERED_KEY] = source.weathered or total()
+end
 
 return PanelStorms

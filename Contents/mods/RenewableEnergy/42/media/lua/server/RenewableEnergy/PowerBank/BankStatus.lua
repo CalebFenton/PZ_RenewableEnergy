@@ -6,22 +6,6 @@ if isClient() then return end
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
-local ObjectSystem = require "cf_commonlib/ObjectSystem"
-
-Bank.sendSummary = ObjectSystem.Object.sendSummary
-
---- What the bank is doing, for the status window.
-function Bank:state()
-    if not self.indoors then return "outdoors" end
-    if self:limitW() <= 0 then return "noInverter" end
-    if self.nominalWh <= 0 then return "noBatteries" end
-    if self.connected == false then return "disconnected" end
-    if not self.on then return "off" end
-    if self.gridPowered then return "grid" end
-    if self.overloaded then return "overloaded" end
-    if self.empty then return "empty" end
-    return "on"
-end
 
 local function partStatus(parts, extra)
     local list = {}
@@ -68,8 +52,8 @@ function Bank:buildStatus()
     local capacity = self.nominalWh
     local stored = self.charge * capacity
     local inW = now.chargerW or 0
-    for _, total in pairs(Bank.TOTALS) do
-        inW = inW + (now[total.now] or 0)
+    for _, family in ipairs(Sources.FAMILIES) do
+        inW = inW + (now[family.now] or 0)
     end
     local drawW = now.drawW or 0
     local batteries = partStatus(self.batteries, function(entry, part)
@@ -111,9 +95,9 @@ function Bank:buildStatus()
             failsafe = self.generator.failsafe, controls = self.generator.controls, armed = self.generator.armed,
         } or nil,
     }
-    for _, total in pairs(Bank.TOTALS) do
-        status[total.now] = now[total.now] or 0
-        status[total.today] = self[total.today] or 0
+    for _, family in ipairs(Sources.FAMILIES) do
+        status[family.now] = now[family.now] or 0
+        status[family.today] = self[family.today] or 0
     end
     return status
 end

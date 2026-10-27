@@ -12,9 +12,9 @@ function T.inRange(value, range)
     return value >= range.min and value <= range.max
 end
 
---- Expects every charge of `charges` to be one a found battery holds (Specs.foundCharge).
+--- Expects every charge of `charges` to be one a found battery holds (Battery.FOUND_CHARGE).
 function T.expectFoundCharges(charges, what)
-    local range = RenewableEnergy.Specs.foundCharge
+    local range = RenewableEnergy.Battery.FOUND_CHARGE
     for _, charge in ipairs(charges) do
         T.expect(T.inRange(charge, range), what .. " holds a battery at " .. charge .. ", expected " .. range.min .. " to "
             .. range.max)

@@ -124,7 +124,7 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
 -- A CarBattery2, unlike the T.CAR_BATTERY other tests use: the rebuild below proves a case keeps its type.
 local CAR_BATTERY2 = "Base.CarBattery2"
 local START_CHARGE = 0.7
-local limit, step = Recipes.repairLimit, Recipes.SERVICE_REPAIR
+local limit, step = Battery.repairLimit, Battery.SERVICE_REPAIR
 -- The fewest repairs that leave no room for another, even at condition 1.
 local SPENT = 0
 while limit(SPENT) > 1 do SPENT = SPENT + 1 end

@@ -4,6 +4,7 @@ require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
 local Squares = require "cf_commonlib/Squares"
+local Sprites = require "RenewableEnergy/Sprites"
 local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 
 -- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
@@ -202,6 +203,11 @@ function T.gasifierBeside(self, tier, fuel)
     local square = T.need(self, T.squareBeside(generator.square), "a free square beside the generator")
     local gasifier = square and T.placeRecord(self, "gasifier", tier, { square = square })
     return gasifier and generator, gasifier
+end
+
+--- The kilograms of wood a gasifier of `tier`'s hopper holds: its tile's ContainerCapacity.
+function T.hopperHolds(tier)
+    return tonumber(getSprite(Sprites.gasifier[tier]):getProperties():get("ContainerCapacity"))
 end
 
 --- Queues lighting the gasifier once this client sees wood in it, with what that takes then given

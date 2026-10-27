@@ -9,7 +9,7 @@
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
-local Specs = require "RenewableEnergy/Specs"
+local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
 local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
@@ -18,6 +18,9 @@ local SolarGardenLight = {}
 RenewableEnergy.SolarGardenLight = SolarGardenLight
 
 SolarGardenLight.ITEM = "RenewableEnergy.SolarGardenLight"
+-- Its cell's rated watts, the watt-hours its battery holds, what its lamp draws at night, and the
+-- radius it lights.
+SolarGardenLight.SPEC = { watts = 1, wh = 3, nightWatts = 0.5, radius = 2 }
 -- Object modData: watt-hours in the light's battery. Picking the light up carries it along
 -- (Moveables.lua).
 SolarGardenLight.CHARGE_KEY = "RenewableEnergy_chargeWh"
@@ -70,6 +73,21 @@ end
 
 function SolarGardenLight.isBulb(item)
     return item ~= nil and BULBS[item:getFullType()] == true
+end
+
+--- The bulbs `character` carries, bags included, that Add Light Bulb could fit: the first of each
+--- type, in inventory order.
+function SolarGardenLight.bulbsOf(character)
+    local bulbs, seen = {}, {}
+    local found = character:getInventory():getAllEvalRecurse(SolarGardenLight.isBulb)
+    for i = 0, found:size() - 1 do
+        local bulb = found:get(i)
+        if not seen[bulb:getFullType()] then
+            seen[bulb:getFullType()] = true
+            table.insert(bulbs, bulb)
+        end
+    end
+    return bulbs
 end
 
 --- The full type of the bulb in `holder`, a placed light or its item, or nil if it has none.
@@ -133,7 +151,7 @@ end
 
 -- Gives the place x, y, z a lamp in the colour of `bulb`, or none if `bulb` is nil.
 local function drawLamp(x, y, z, bulb)
-    local key = PlaceTracker.key(x, y, z)
+    local key = Places.key(x, y, z)
     if not bulb then
         removeLamp(key)
         return
@@ -154,7 +172,7 @@ local function drawLamp(x, y, z, bulb)
         return
     end
     local r, g, b = lampColor(bulb)
-    lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, Specs.gardenLight.radius), bulb = bulb }
+    lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, SolarGardenLight.SPEC.radius), bulb = bulb }
 end
 
 --- Gives a lit light a lamp in its bulb's colour and takes an unlit one's away. Not on a

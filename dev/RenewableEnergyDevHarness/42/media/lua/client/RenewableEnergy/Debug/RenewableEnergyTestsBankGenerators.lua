@@ -13,13 +13,14 @@ local test, expect, expectNear, expectEqual, player = T.test, T.expect, T.expect
 local Specs, BankJobs = RenewableEnergy.Specs, RenewableEnergy.BankJobs
 local Format = RenewableEnergy.Format
 local StatusRows = RenewableEnergy.StatusRows
+local BACKUP_REACH = 3 -- PowerBank/Backup.lua's reach
 
 local function distanceSquared(a, b)
     return IsoUtils.DistanceToSquared(a:getX(), a:getY(), b:getX(), b:getY())
 end
 
 local function inBackupReach(a, b)
-    local reach = Specs.backupReach
+    local reach = BACKUP_REACH
     return math.abs(a:getX() - b:getX()) <= reach and math.abs(a:getY() - b:getY()) <= reach
 end
 
@@ -153,7 +154,7 @@ test("renewable_energy_settlement_unwire_charger_releases_generator_bill", {
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryRackWood",
             { T.CAR_BATTERY, T.POWER_INVERTER, Specs.charger }, { charge = 0.2 })
-        local square = bank and backupSquare(self, bank.square, Specs.backupReach)
+        local square = bank and backupSquare(self, bank.square, BACKUP_REACH)
         if not square then return end
         local generator = T.generator(self, { square = square, running = true })
         T.giveBeforeCalls(self, "tools", { { type = "Base.Screwdriver" }, { type = "Base.Wrench" } })
@@ -245,7 +246,7 @@ test("renewable_energy_bank_clock_settles_generator_chargers", {
 })
 
 -- A gas line counts the chargers of a bank charging from its generator into what the generator
--- delivers (GasLines.loadOf), and still does once the world is saved and loaded again, which keeps
+-- delivers (Payers.deliveredW), and still does once the world is saved and loaded again, which keeps
 -- only a bank's saved fields: otherwise, until the bank's next pass, the line would give the share
 -- of its cap the bank draws to the other banks charging from it.
 test("renewable_energy_bank_charging_generator_kept_through_save", {
@@ -277,7 +278,7 @@ test("renewable_energy_bank_failsafe_starts_generator", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
-        local backup = bank and backupSquare(self, bank.square, Specs.backupReach)
+        local backup = bank and backupSquare(self, bank.square, BACKUP_REACH)
         if not backup then return end
         local start, stop = SandboxVars.RenewableEnergy.FailsafeStartCharge / 100, SandboxVars.RenewableEnergy.FailsafeStopCharge / 100
         -- The failsafe acts on the charge before the pass's own drain, which the next setCharge undoes.
@@ -335,7 +336,7 @@ test("renewable_energy_bank_failsafe_waits_for_a_working_bank", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
-        local backup = bank and backupSquare(self, bank.square, Specs.backupReach)
+        local backup = bank and backupSquare(self, bank.square, BACKUP_REACH)
         if not backup then return end
         self.bank = bank
         local function lowPass(key)
@@ -368,7 +369,7 @@ test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
         T.setGrid(self, false)
         local parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER }
         local first = T.bank(self, "batteryBoxWood", parts)
-        local backup = first and backupSquare(self, first.square, Specs.backupReach)
+        local backup = first and backupSquare(self, first.square, BACKUP_REACH)
         local otherSquare = backup and T.square(self, { indoors = true, near = backup }, "a free indoor square for a second bank")
         if not otherSquare then return end
         local dFirst, dOther = distanceSquared(first.square, backup), distanceSquared(otherSquare, backup)
@@ -543,7 +544,7 @@ test("renewable_energy_bank_backup_load_kept_apart", {
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
-        local backup = fridge and backupSquare(self, bank.square, Specs.backupReach)
+        local backup = fridge and backupSquare(self, bank.square, BACKUP_REACH)
         if not backup then return end
         T.placeTile(self, fridge, T.MINI_FRIDGE)
         T.generator(self, { square = backup, running = true })

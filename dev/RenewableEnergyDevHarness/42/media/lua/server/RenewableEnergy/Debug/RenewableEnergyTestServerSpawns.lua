@@ -11,6 +11,7 @@ require "RenewableEnergy/Sprites"
 require "RenewableEnergy/Specs"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 
 local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
 local removePlaced, withRolls = PZHarness.Fixtures.removePlaced, Helpers.withRolls
@@ -129,7 +130,8 @@ handler("seenRoom", function(_, args, defer)
     end
     local results = Helpers.eachTrial(defer, args.trials, rollOf, function(trial)
         SandboxVars.RenewableEnergy.BatteryBankSpawn = trial.setting
-        local room = { getName = function() return trial.room end, getRandomFreeSquare = function() return square end }
+        local room = { getName = function() return trial.room end, getRandomFreeSquare = function() return square end,
+            getSquares = function() return ArrayList.new() end }
         local tilesBefore, itemsBefore = tilesOn(square), Helpers.worldItems(squaresAround(square))
         triggerEvent("OnSeeNewRoom", room)
         local tiles = Helpers.newSince(tilesBefore, tilesOn(square))
@@ -241,17 +243,19 @@ end
 -- highest, unrepaired; with a dud chance, a roll just under it makes a dud, at the dud's lowest
 -- and highest condition by the next roll, with the dud's repairs, and a roll at it doesn't.
 check("batteryWear", function(expect, _, _, _, defer)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    local dud = WorldSpawns.DUD
+    local WorldSpawns, Finds = RenewableEnergy.WorldSpawns, RenewableEnergy.Finds
+    local dud = Finds.DUD
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
-        expect(WorldSpawns.BATTERY_WEAR[stock.batteries.wear] ~= nil, stockName .. " batteries wear as " .. tostring(stock.batteries.wear))
+        expect(Finds.BATTERY_WEAR[stock.batteries.wear] ~= nil, stockName .. " batteries wear as " .. tostring(stock.batteries.wear))
     end
+    -- `rolls` wear it; one more gives its found charge.
     local function worn(name, rolls)
         local item = instanceItem("RenewableEnergy.DeepCycleBattery")
-        withRolls(defer, rolls, WorldSpawns.wearFoundBattery, item, name)
+        table.insert(rolls, 0.5)
+        withRolls(defer, rolls, Finds.ready, item, name)
         return { condition = item:getCondition(), repairs = item:getHaveBeenRepaired() }
     end
-    for name, wear in pairs(WorldSpawns.BATTERY_WEAR) do
+    for name, wear in pairs(Finds.BATTERY_WEAR) do
         -- A profile with duds rolls for one first; at the chance, it isn't one.
         local first = wear.dud and { wear.dud } or {}
         for _, case in ipairs(wearCases(wear)) do
@@ -280,26 +284,27 @@ end)
 -- middling, the parts of a bank's stock, a crate's and an arrow board's battery box come at the
 -- mean, marked.
 check("partWear", function(expect, _, _, _, defer)
-    local WorldSpawns, Specs, Wear = RenewableEnergy.WorldSpawns, RenewableEnergy.Specs, RenewableEnergy.Wear
-    local wear, dud = WorldSpawns.PART_WEAR, WorldSpawns.PART_DUD
+    local Finds, Specs, Wear = RenewableEnergy.Finds, RenewableEnergy.Specs, RenewableEnergy.Wear
+    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local wear, dud = Finds.PART_WEAR, Finds.PART_DUD
     local lowest = wearRange(wear).min
     expect(dud.min >= 0 and dud.min <= dud.max and dud.max < lowest,
         "a part dud's condition " .. dud.min .. " to " .. dud.max .. " overlaps a found part's from " .. lowest)
     local types = { Specs.controller }
     for fullType, spec in pairs(Specs.inverters) do
         if spec.homemade then
-            expect(not WorldSpawns.isWornPart(fullType), fullType .. ", crafted, is worn as if found")
+            expect(not Finds.isWornPart(fullType), fullType .. ", crafted, is worn as if found")
         else
             table.insert(types, fullType)
         end
     end
     for _, fullType in ipairs(types) do
-        expect(WorldSpawns.isWornPart(fullType), fullType .. " isn't worn when found")
+        expect(Finds.isWornPart(fullType), fullType .. " isn't worn when found")
     end
-    expect(not WorldSpawns.isWornPart(Specs.charger), Specs.charger .. " is worn when found")
+    expect(not Finds.isWornPart(Specs.charger), Specs.charger .. " is worn when found")
     local function worn(fullType, rolls)
         local item = instanceItem(fullType)
-        withRolls(defer, rolls, WorldSpawns.wearFoundPart, item)
+        withRolls(defer, rolls, Finds.ready, item)
         return item:getCondition(), Wear.hasOwnCondition(item)
     end
     for _, fullType in ipairs(types) do
@@ -327,7 +332,7 @@ check("partWear", function(expect, _, _, _, defer)
         local parts, items = 0, container:getItems()
         for i = 0, items:size() - 1 do
             local item = items:get(i)
-            if WorldSpawns.isWornPart(item:getFullType()) then
+            if Finds.isWornPart(item:getFullType()) then
                 parts = parts + 1
                 expect(item:getCondition() == wear.mean and Wear.hasOwnCondition(item), string.format(
                     "%s's %s has condition %d, marked %s, not %d", what, item:getFullType(), item:getCondition(),
@@ -361,10 +366,10 @@ end)
 -- A cracked module always reads worse than a weathered one, so players can tell which needs
 -- repair, and shows cracked glass.
 local function expectConditionRanges(expect)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    expect(WorldSpawns.CRACKED.max < WorldSpawns.WEATHERED.min, "cracked and weathered conditions overlap")
-    local best = WorldSpawns.CRACKED.max
-    expect(RenewableEnergy.crackLookOf(RenewableEnergy.Specs.factoryModule, best) ~= nil,
+    local Finds = RenewableEnergy.Finds
+    expect(Finds.CRACKED.max < Finds.WEATHERED.min, "cracked and weathered conditions overlap")
+    local best = Finds.CRACKED.max
+    expect(ModuleRepair.crackLookOf(RenewableEnergy.Specs.factoryModule, best) ~= nil,
         "a cracked module at " .. best .. " shows whole glass")
 end
 
@@ -372,11 +377,11 @@ end
 -- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
 -- follows the Solar Panels loot option.
 check("crackedModules", function(expect, _, _, _, defer)
-    local Distributions = RenewableEnergy.Distributions
+    local Finds = RenewableEnergy.Finds
     local container = PZHarness.Loot.scratchContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         -- The chance's roll, then the cracked condition's, at the middle of its range.
-        withRolls(defer, { roll, 0.5 }, Distributions.addCrackedModules, roomName, containerType, container)
+        withRolls(defer, { roll, 0.5 }, Finds.addCrackedModules, roomName, containerType, container)
         local conditions = moduleConditions(container)
         container:removeAllItems()
         return conditions
@@ -384,20 +389,20 @@ check("crackedModules", function(expect, _, _, _, defer)
     local options = SandboxVars.RenewableEnergy
     local restoreOptions = saveOptions(defer, { "LRMSolarPanels" })
     options.LRMSolarPanels = 1
-    local rooms = Distributions.CRACKED_MODULE_ROOMS
-    local chance = Distributions.crackedModuleChance(rooms.farmstorage)
+    local rooms = Finds.CRACKED_MODULE_ROOMS
+    local chance = Finds.crackedModuleChance(rooms.farmstorage)
     local under, at = modulesAt("farmstorage", "metal_shelves", chance - UNDER), modulesAt("farmstorage", "metal_shelves", chance)
     expect(#under == 1 and #at == 0, string.format("a farm storage shelf got %d cracked modules with a roll just under its chance %s and %d at it",
         #under, chance, #at))
     if under[1] then
-        expect(inRange(under[1], RenewableEnergy.WorldSpawns.CRACKED), "a cracked module is at condition " .. under[1])
+        expect(inRange(under[1], Finds.CRACKED), "a cracked module is at condition " .. under[1])
     end
     local elsewhere = #modulesAt("bedroom", "wardrobe", 0) + #modulesAt("garage", "fridge", 0)
     expect(elsewhere == 0, elsewhere .. " modules in a bedroom wardrobe and a garage fridge")
     options.LRMSolarPanels = 2
-    local doubled = Distributions.crackedModuleChance(rooms.farmstorage)
+    local doubled = Finds.crackedModuleChance(rooms.farmstorage)
     options.LRMSolarPanels = 0
-    local none = Distributions.crackedModuleChance(rooms.farmstorage)
+    local none = Finds.crackedModuleChance(rooms.farmstorage)
     restoreOptions()
     expect(math.abs(doubled - 2 * chance) < 1e-12 and none == 0,
         "a farm storage shelf's chance is " .. chance .. ", " .. doubled .. " at twice the option and " .. none .. " at 0")
@@ -423,6 +428,6 @@ handler("worldSpawnStock", function(_, args)
             crate[line[1]] = { min = line[2], max = line[3] }
         end
     end
-    return { banks = banks, crate = crate, cracked = WorldSpawns.CRACKED, weathered = WorldSpawns.WEATHERED,
-        batteryWear = WorldSpawns.BATTERY_WEAR }
+    return { banks = banks, crate = crate, cracked = RenewableEnergy.Finds.CRACKED, weathered = RenewableEnergy.Finds.WEATHERED,
+        batteryWear = RenewableEnergy.Finds.BATTERY_WEAR }
 end)

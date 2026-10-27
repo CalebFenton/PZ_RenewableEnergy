@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 
--- Arrow board crashes (World/ArrowBoardCrashes.lua): the crash watcher, and the server's gate on
+-- Arrow board crashes (ArrowBoard/Crashes.lua): the crash watcher, and the server's gate on
 -- the crash a driver's client reports. Both are fed their inputs: a trailer's velocities, and
 -- stand-ins for the trailer and the car towing it.
 

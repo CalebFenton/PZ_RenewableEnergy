@@ -13,9 +13,16 @@ require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/UI/StatusWindow"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
+local BankMenu = require "RenewableEnergy/UI/BankMenu"
+local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local Capture = require "PZHarness/Capture"
 local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
+local Items = require "cf_commonlib/Items"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (PZHarness/TestLib.lua explains the runner and the rules every helper keeps), plus fixtures
@@ -163,7 +170,7 @@ end
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
 --- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
 --- on its square if `opts.failsafe`. When the test ends the server removes it and this client lets go
---- of its squares (RenewableEnergy.PowerBank.releaseGeneratorPower). Returns { x, y, z, square, object }.
+--- of its squares (GeneratorReach.release). Returns { x, y, z, square, object }.
 function T.generator(self, opts)
     opts = opts or {}
     local square = opts.square
@@ -181,7 +188,7 @@ function T.generator(self, opts)
         -- powered until they load again.
         T.defer(self, function()
             if isClient() then
-                RenewableEnergy.PowerBank.releaseGeneratorPower(handle.x, handle.y, handle.z)
+                GeneratorReach.release(handle.x, handle.y, handle.z)
             end
         end)
     end)
@@ -410,8 +417,8 @@ end
 function T.watch(self, bank)
     T.step(function()
         local p = T.player()
-        PowerBank.watchStatus(p, bank.object)
-        T.defer(self, function() PowerBank.unwatchStatus(p, bank.object) end)
+        ClientBankSystem.watchStatus(p, bank.object)
+        T.defer(self, function() ClientBankSystem.unwatchStatus(p, bank.object) end)
     end)
     T.waitFor(self, function() return T.clientStatus(bank) ~= nil end, "this client's copy of the bank's status")
 end
@@ -488,13 +495,13 @@ end
 --- The panel's Connect to `bank` (`one`) and the bank's Connect Sources in Reach with `loose`
 --- sources in its reach (`all`), read from fresh menus on this client's copies, as T.optionState.
 function T.connectOptions(bank, panel, loose)
-    local Menu, Format = RenewableEnergy.Menu, RenewableEnergy.Format
+    local Format = RenewableEnergy.Format
     local context = T.newContext()
-    local sourceMenu = Menu.addSourceOptions(0, context, panel.object)
-    local bankMenu = Menu.addBankOptions(0, context, bank.object)
+    local sourceMenu = SourceMenu.addSourceOptions(0, context, panel.object)
+    local bankMenu = BankMenu.addBankOptions(0, context, bank.object)
     local options = {
         one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
-            Menu.bankLabel(bank.object), Format.away(panel.position, bank.position)))),
+            BankMenu.bankLabel(bank.object), Format.away(panel.position, bank.position)))),
         all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
     }
     context:hideAndChildren()
@@ -611,14 +618,13 @@ end
 
 --- The condition at `share` of `fullType`'s ConditionMax, such as a Specs.crackLooks threshold.
 function T.conditionAt(fullType, share)
-    return math.floor(share * RenewableEnergy.conditionMaxOf(fullType) + 0.5)
+    return math.floor(share * Items.conditionMaxOf(fullType) + 0.5)
 end
 
 --- The most a seal brings a `fullType` module sealed `repaired` times before to: its
---- Recipes.MODULE_REPAIR_CAP, a Recipes.REPAIR_LIMIT_STEP lower for each seal.
+--- ModuleRepair.SEAL_CAP, a Wear.REPAIR_LIMIT_STEP lower for each seal.
 function T.sealCap(fullType, repaired)
-    local Recipes = RenewableEnergy.Recipes
-    return Recipes.MODULE_REPAIR_CAP[fullType] - Recipes.REPAIR_LIMIT_STEP * repaired
+    return ModuleRepair.SEAL_CAP[fullType] - Wear.REPAIR_LIMIT_STEP * repaired
 end
 
 --- The places where rich text `text`, laid out as a tooltip lays it out, shows two runs of words

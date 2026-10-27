@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
 
--- The arrow board's battery box (World/ArrowBoard.lua, UI/BatteryBoxLid.lua, Vehicles.txt): its
+-- The arrow board's battery box (ArrowBoard/Trailer.lua, UI/BatteryBoxLid.lua, Vehicles.txt): its
 -- lid, padlock, loot window and lamp switch.
 -- Authority state goes through RenewableEnergyTestServerTrailer.lua; player actions go through
 -- the vanilla and mod actions, checked on this client's copy.

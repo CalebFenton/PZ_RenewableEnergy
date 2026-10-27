@@ -1,14 +1,17 @@
 -- The battery bank's status window, one per local player (ObjectWindow). It draws the status the
 -- server sends to the bank's watchers (StatusRows), so it reads the same in single player and
--- multiplayer. Menu requires this file, so the window looks Menu up when it needs it.
+-- multiplayer.
 
 require "ISUI/ISButton"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
+local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
 local Format = require "RenewableEnergy/UI/Format"
 local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
+local RenameBank = require "RenewableEnergy/UI/RenameBank"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Squares = require "cf_commonlib/Squares"
 
@@ -82,7 +85,7 @@ function StatusWindow:onSwitch()
 end
 
 function StatusWindow:onRename()
-    RenewableEnergy.Menu.askName(self.playerNum, self.object)
+    RenameBank.ask(self.playerNum, self.object)
 end
 
 -- Rebuilds the rows and the layout when a new snapshot arrives.
@@ -107,7 +110,7 @@ function StatusWindow:setStatus(status)
     local buttonY = self.columnsTop + math.max(left.height, right.height) + PAD
     local switchKey, refusal = "ContextMenu_Turn_On", nil
     if status then
-        switchKey, self.switchJob, refusal = RenewableEnergy.Menu.switchOf(status)
+        switchKey, self.switchJob, refusal = BankJobs.switchOf(status)
     end
     self.switchButton:setTitle(getText(switchKey))
     fitButton(self.switchButton, PAD, buttonY)
@@ -202,7 +205,7 @@ end
 function StatusWindow:close()
     self:clearHighlight()
     ObjectWindow.close(self)
-    PowerBank.unwatchStatus(getSpecificPlayer(self.playerNum), self.object)
+    ClientBankSystem.unwatchStatus(getSpecificPlayer(self.playerNum), self.object)
 end
 
 function StatusWindow:new(x, y, playerNum, bank)
@@ -216,7 +219,7 @@ end
 --- the one already open, and watches the bank's status until it closes.
 function StatusWindow:openOn(playerNum, bank)
     local window = ObjectWindow.openOn(self, playerNum, bank)
-    PowerBank.watchStatus(getSpecificPlayer(playerNum), bank)
+    ClientBankSystem.watchStatus(getSpecificPlayer(playerNum), bank)
     return window
 end
 

@@ -9,18 +9,8 @@ local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
 local GasifierWindow = require "RenewableEnergy/UI/GasifierWindow"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
-local Tables = require "cf_commonlib/Tables"
 
 local GasifierMenu = {}
-
--- The carried containers the condensate can go into now, by name.
-local function drainContainers(character, lit)
-    local found = Tables.fromList(character:getInventory():getAllEvalRecurse(function(item)
-        return Gasifier.takesCondensate(item, lit)
-    end))
-    table.sort(found, function(a, b) return a:getDisplayName() < b:getDisplayName() end)
-    return found
-end
 
 -- Drain Condensate: a choice of the containers that take it, and the ground.
 local function addDrain(menu, character, playerNum, gasifier, summary)
@@ -31,7 +21,7 @@ local function addDrain(menu, character, playerNum, gasifier, summary)
         return
     end
     local submenu = JobOptions.addSubMenu(menu, getText(Action.labelKey(job)))
-    for _, item in ipairs(drainContainers(character, summary.lit)) do
+    for _, item in ipairs(GasifierJobs.drainContainers(character, summary.lit)) do
         JobOptions.add(submenu, playerNum, GasifierJobs, job, gasifier, item, item:getDisplayName())
     end
     JobOptions.add(submenu, playerNum, GasifierJobs, job, gasifier, nil, getText("ContextMenu_RenewableEnergy_OntoGround"))

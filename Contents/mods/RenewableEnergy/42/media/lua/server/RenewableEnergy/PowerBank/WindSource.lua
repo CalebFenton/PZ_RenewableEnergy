@@ -7,13 +7,11 @@ if isClient() then return end
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
-local Sprites = require "RenewableEnergy/Sprites"
 local StormNotice = require "RenewableEnergy/StormNotice"
 local Wind = require "RenewableEnergy/Wind"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Chance = require "cf_commonlib/Chance"
-local Tiles = require "cf_commonlib/Tiles"
 
 local WindSource = {}
 RenewableEnergy.WindSource = WindSource
@@ -55,7 +53,7 @@ local function hasSolidWall(square)
 end
 
 -- Whether the column at (x, y) shelters a rotor turning on level `level`: a tree while the rotor is
--- no higher than the treetops (Specs.wind.treetopLevel), a building whose roof reaches the rotor
+-- no higher than the treetops (Wind.SPEC.treetopLevel), a building whose roof reaches the rotor
 -- (a roof stands a level above its top floor), or a solid wall on the rotor's own level, the map's
 -- or one a player built.
 local function blocks(x, y, level)
@@ -63,7 +61,7 @@ local function blocks(x, y, level)
     if not ground then
         return 0
     end
-    if level <= Specs.wind.treetopLevel and ground:HasTree() then
+    if level <= Wind.SPEC.treetopLevel and ground:HasTree() then
         return 1
     end
     local building = ground:getBuilding()
@@ -87,15 +85,15 @@ end
 
 -- The level the rotor of a charger of `kind` standing on level `z` turns on.
 local function rotorLevel(kind, z)
-    return z + Specs.wind.turbines[kind].rotorAbove
+    return z + Wind.SPEC.turbines[kind].rotorAbove
 end
 
--- The share of the ring of squares around (x, y) on the ground, out to Specs.wind.shelterRadius,
+-- The share of the ring of squares around (x, y) on the ground, out to Wind.SPEC.shelterRadius,
 -- that shelters the rotor of a charger of `kind` standing on level `z`: 0 in the open, 1 hemmed
 -- in. Shelter has no direction: the game's wind angle is a screen-space value for weather effects
 -- (ClimateManager.getWindAngleDegrees), so every side counts.
 local function shelterAt(kind, x, y, z)
-    local radius, level = Specs.wind.shelterRadius, rotorLevel(kind, z)
+    local radius, level = Wind.SPEC.shelterRadius, rotorLevel(kind, z)
     local blocked, count = 0, 0
     eachInRing(radius, function(dx, dy, distance)
         -- Nearer obstacles count for more.
@@ -107,10 +105,10 @@ local function shelterAt(kind, x, y, z)
 end
 
 -- The share of its wind the rotor of a charger of `kind` at x, y, z loses to the other chargers
--- whose rotors turn on its level within Specs.wind.crowdRadius (Wind.crowding). They stand on that
+-- whose rotors turn on its level within Wind.SPEC.crowdRadius (Wind.crowding). They stand on that
 -- level or the one below, as rotorAbove is 0 or 1. Only loaded ones count, as shelter does.
 local function crowdingAt(kind, x, y, z)
-    local radius, level = Specs.wind.crowdRadius, rotorLevel(kind, z)
+    local radius, level = Wind.SPEC.crowdRadius, rotorLevel(kind, z)
     local distances = {}
     for floor = level - 1, level do
         eachInRing(radius, function(dx, dy, distance)
@@ -147,19 +145,14 @@ function WindSource.setBroken(isoObject, broken, source)
     end
 end
 
---- Fits blades of `material` (Specs.wind.blades), which its kind takes, to the wind charger
+--- Fits blades of `material` (Wind.SPEC.blades), which its kind takes, to the wind charger
 --- `isoObject`, and to `source`, its bank's record, if it feeds one (else nil). Blades of another
---- material than it turns make it that material's tile for its facing, and so that tile's entity
---- (Tiles.setEntityTile), on every side.
+--- material than it turns make it that material's tile (Wind.setBladesTile), on every side.
 function WindSource.fitBlades(isoObject, material, source)
     if source then
         source.blades = material
     end
-    if Wind.bladesOfObject(isoObject) == material then return end
-    local kind, facing = Sources.kindOf(isoObject)
-    local tile = Sprites.windTileOf(kind, facing, material)
-    if not tile then return end
-    Tiles.setEntityTile(isoObject, tile)
+    if Wind.bladesOfObject(isoObject) == material or not Wind.setBladesTile(isoObject, material) then return end
     isoObject:transmitUpdatedSpriteToClients()
     -- After the tile, as DigesterObject:upgrade sends it: a client's SpriteConfig checks its new
     -- script against the tile it shows. Single player has no other copy.
@@ -168,7 +161,7 @@ function WindSource.fitBlades(isoObject, material, source)
     end
 end
 
--- The blades of the charger `source` (a Specs.wind.blades material, nil for none): the record's,
+-- The blades of the charger `source` (a Wind.SPEC.blades material, nil for none): the record's,
 -- else, for a record from before it kept them, the first its kind takes.
 local function bladesOf(source)
     return source.blades or Wind.bladesOf(source.kind)
@@ -179,11 +172,11 @@ end
 -- (StormChance.stormStrength), scaled by the StormDamage options: none while braked or broken
 -- already.
 local function breakChance(source, kph, hours)
-    local spec, blades = Specs.wind.turbines[source.kind], bladesOf(source)
+    local spec, blades = Wind.SPEC.turbines[source.kind], bladesOf(source)
     if source.braked or source.broken or not Wind.canBreak(spec, blades, kph) then
         return 0
     end
-    return StormChance.stormDamage(StormChance.stormPerHour(Specs.wind.blades[blades].stormShare),
+    return StormChance.stormDamage(StormChance.stormPerHour(Wind.SPEC.blades[blades].stormShare),
         hours * StormChance.stormStrength(Wind.breakKph(spec, blades), kph))
 end
 
@@ -203,32 +196,46 @@ function WindSource.connect(player, source, isoObject, _, material)
     source.blades = Wind.bladesOf(source.kind, material)
     source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
     source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
-    if player and RenewableEnergy.teachOnce(player, isoObject, PowerBank.CONNECTED_ONCE_KEY, Perks.Electricity,
+    if player and RenewableEnergy.teachOnce(player, isoObject, Panel.CONNECTED_ONCE_KEY, Perks.Electricity,
         Specs.connectXp * Sources.slotsOf(source.kind)) then
         isoObject:transmitModData()
     end
 end
 
+-- Its broken blades are the record's, which a gale may break while the object is unloaded, and go
+-- to the object when it is loaded.
+local function showBroken(source, object)
+    if Wind.isBroken(object) ~= (source.broken == true) then
+        WindSource.setBroken(object, source.broken == true, source)
+    end
+end
+
+--- Brings the record `source` and its loaded charger `object` into step: its brake and blades are
+--- the object's (setBraked sets both), its broken blades the record's (showBroken), and its
+--- shelter and crowding are counted again, since trees, buildings, walls and chargers around it
+--- change.
+function WindSource.reconcile(source, object)
+    source.braked = Wind.isBraked(object)
+    source.blades = Wind.bladesOfObject(object)
+    source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
+    source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
+    showBroken(source, object)
+end
+
 --- The charger's output over the pass, and why it makes nothing or little: in a gale that can
---- break its blades, braked, broken, calm, furled, sheltered or crowded. Its brake and blades are
---- the object's while it is loaded (setBraked sets both); its broken blades are the record's, which
---- a gale may break while the object is unloaded, and go to the object when it is loaded. Its
---- shelter and crowding are counted again then, since trees, buildings, walls and chargers around
---- it change. Blades breaking tell the players in earshot (StormNotice).
+--- break its blades, braked, broken, calm, furled, sheltered or crowded. Blades breaking tell the
+--- players in earshot (StormNotice).
 function WindSource.update(source, object, inSlot, hours, context)
-    local spec = Specs.wind.turbines[source.kind]
+    local spec = Wind.SPEC.turbines[source.kind]
     if object then
-        source.braked = Wind.isBraked(object)
-        source.blades = Wind.bladesOfObject(object)
-        source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
-        source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
+        WindSource.reconcile(source, object)
     end
     if breaks(source, context.windKph, hours) then
         source.broken = true
         StormNotice.tell(bladesOf(source), source.x, source.y, source.z)
-    end
-    if object and Wind.isBroken(object) ~= (source.broken == true) then
-        WindSource.setBroken(object, source.broken == true, source)
+        if object then
+            showBroken(source, object)
+        end
     end
     local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0, source.crowding)
     source.watts = (inSlot and not source.braked and not source.broken) and watts or 0
@@ -244,7 +251,7 @@ function WindSource.update(source, object, inSlot, hours, context)
         source.reason = "calm"
     elseif Wind.furled(spec, context.windKph) then
         source.reason = "furled"
-    elseif (source.shelter or 0) * Specs.wind.shelterLoss > Specs.wind.shelteredShare then
+    elseif (source.shelter or 0) * Wind.SPEC.shelterLoss > Wind.SPEC.shelteredShare then
         source.reason = "sheltered"
     elseif (source.crowding or 0) >= CROWDED_LOSS then
         source.reason = "crowded"

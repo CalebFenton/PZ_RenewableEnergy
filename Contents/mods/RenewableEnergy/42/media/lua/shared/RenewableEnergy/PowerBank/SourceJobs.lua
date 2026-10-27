@@ -1,13 +1,14 @@
 -- The hands-on jobs at a source a bank takes (RenewableEnergy.Sources): what each takes of the
--- character and what refuses it (cf_commonlib's Jobs). JobSites.source does them.
+-- character and what refuses it (cf_commonlib's Jobs). SourceSite does them.
 
 require "Util/BuildingHelper"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Specs = require "RenewableEnergy/Specs"
 local Wind = require "RenewableEnergy/Wind"
-local Recipes = require "RenewableEnergy/Recipes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
@@ -33,7 +34,7 @@ end
 -- Whether `item` is blades of any wind charger's.
 local function isBlades(item)
     local fullType = item:getFullType()
-    for _, blades in pairs(Specs.wind.blades) do
+    for _, blades in pairs(Wind.SPEC.blades) do
         if blades.item == fullType then
             return true
         end
@@ -41,8 +42,36 @@ local function isBlades(item)
     return false
 end
 
+--- The blades `character` would fit to the broken wind charger `source`: of its own material if
+--- carried, else the first other blades its kind takes that are carried, or nil; second, the
+--- names of all the blades its kind takes.
+function SourceJobs.bladesFor(character, source)
+    local own = Wind.bladesOfObject(source)
+    local turbine = Wind.SPEC.turbines[Sources.kindOf(source)]
+    local inventory = character:getInventory()
+    local blades = own and inventory:getFirstTypeRecurse(Wind.SPEC.blades[own].item)
+    local names = {}
+    for _, material in ipairs(turbine and turbine.blades or {}) do
+        local item = Wind.SPEC.blades[material].item
+        blades = blades or inventory:getFirstTypeRecurse(item)
+        table.insert(names, getItemNameFromFullType(item))
+    end
+    return blades, names
+end
+
+--- The module record in `slot` of the placed panel `panel` if a seal can help it, else nil;
+--- second, the panel's whole list of module records it was read from.
+function SourceJobs.sealableModule(panel, slot)
+    local modules = Panel.placedModules(panel)
+    local module = modules and type(slot) == "number" and modules[slot]
+    if module and ModuleRepair.sealable(module.type, module.condition, module.repaired) then
+        return module, modules
+    end
+    return nil
+end
+
 local function connectMinutes(character)
-    return SandboxVars.RenewableEnergy.ConnectPanelMin * PowerBank.skillFactor(character)
+    return SandboxVars.RenewableEnergy.ConnectPanelMin * Wiring.skillFactor(character)
 end
 
 -- A wind charger's brake, a lever or pin at the foot of the mast, set to `braked`.
@@ -63,7 +92,7 @@ end
 SourceJobs.JOBS = {
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
     -- snow and all. The authority counts the bank's input slots afresh first
-    -- (JobSites.source); a client has its summary's.
+    -- (SourceSite.source); a client has its summary's.
     [SourceJobs.CONNECT] = {
         minutes = function(source, bank, character) return connectMinutes(character) end,
         light = true, sound = "GeneratorConnect",
@@ -102,14 +131,7 @@ SourceJobs.JOBS = {
     },
     -- Seal Cracked Module's twin for a module on a placed panel, as long as the crafting window
     -- takes for it.
-    [SourceJobs.SEAL_MODULE] = {
-        units = function(source, slot, character) return Recipes.sealInPlaceUnits(character) end,
-        light = true, sound = "GeneratorRepair",
-        needs = Recipes.sealInPlaceNeeds,
-        blocker = function(character, source, slot)
-            return not Recipes.sealableModule(source, slot) and "Tooltip_RenewableEnergy_ModuleSealedFully" or nil
-        end,
-    },
+    [SourceJobs.SEAL_MODULE] = ModuleRepair.sealRow(SourceJobs.sealableModule, "Tooltip_RenewableEnergy_ModuleSealedFully"),
     [SourceJobs.BRAKE] = brakeJob(true),
     [SourceJobs.RELEASE_BRAKE] = brakeJob(false),
     -- Lowering the head, unbolting the broken blades and bolting new ones on.

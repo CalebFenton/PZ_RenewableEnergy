@@ -4,7 +4,6 @@
 if isClient() then return end
 
 require "Vehicles/Vehicles"
-local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
@@ -48,7 +47,7 @@ function SolarMaintainer.charge(vehicle, hours, sky)
         return 0
     end
     local capacityWh = Battery.nominalWh(battery)
-    local wh = Sun.squareWatts(vehicle:getSquare(), Specs.maintainerWatts, sky) * hours
+    local wh = Sun.squareWatts(vehicle:getSquare(), SolarMaintainer.WATTS, sky) * hours
     if capacityWh <= 0 or wh <= 0 then
         return 0
     end
@@ -56,9 +55,8 @@ function SolarMaintainer.charge(vehicle, hours, sky)
     Battery.setCharge(battery, before + wh / capacityWh)
     -- Read back: the charge is kept in whole uses.
     local after = Battery.getCharge(battery)
-    -- As vanilla's alternator charging does (Vehicles.Update.Battery): the server sends the
-    -- charge to clients only when it shows a change at two decimals.
-    if VehicleUtils.compareFloats(before, after, 2) then
+    -- Through the part, as vanilla's alternator charging sends it (Vehicles.Update.Battery).
+    if Battery.changedVisibly(before, after) then
         vehicle:transmitPartUsedDelta(part)
     end
     return (after - before) * capacityWh

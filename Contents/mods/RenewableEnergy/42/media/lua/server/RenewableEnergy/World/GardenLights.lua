@@ -8,10 +8,9 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
-local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+local Place = require "RenewableEnergy/World/Place"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 local Chance = require "cf_commonlib/Chance"
 
@@ -97,19 +96,16 @@ end
 -- Outdoor squares just outside the house's doors, each with the direction leading away.
 local function doorsteps(def)
     local found = {}
-    for x = def:getX() - 1, def:getX2() do
-        for y = def:getY() - 1, def:getY2() do
-            local square = getSquare(x, y, 0)
-            if square and square:getRoom() == nil then
-                for _, side in ipairs(SIDES) do
-                    local inside = getSquare(x - side[1], y - side[2], 0)
-                    if inHouse(inside, def) and square:getDoorTo(inside) then
-                        table.insert(found, { x = x, y = y, dx = side[1], dy = side[2] })
-                    end
+    BuildingWatch.eachSquare(def, 1, 0, function(square, x, y)
+        if square and square:getRoom() == nil then
+            for _, side in ipairs(SIDES) do
+                local inside = getSquare(x - side[1], y - side[2], 0)
+                if inHouse(inside, def) and square:getDoorTo(inside) then
+                    table.insert(found, { x = x, y = y, dx = side[1], dy = side[2] })
                 end
             end
         end
-    end
+    end)
     return found
 end
 
@@ -151,10 +147,10 @@ end
 -- Returns how many it placed.
 local function place(def)
     local count = Chance.between(GardenLights.COUNT.min, GardenLights.COUNT.max)
-    local charged = { [SolarGardenLight.CHARGE_KEY] = Specs.gardenLight.wh }
+    local charged = { [SolarGardenLight.CHARGE_KEY] = SolarGardenLight.SPEC.wh }
     local squares = frontSquares(def, count)
     for _, square in ipairs(squares) do
-        WorldSpawns.placeMoveable(square, Sprites.gardenLight.off, charged)
+        Place.moveable(square, Sprites.gardenLight.off, charged)
     end
     return #squares
 end
@@ -176,9 +172,14 @@ function GardenLights.roll(def)
 end
 
 -- Houses, and whatever a solar site promised lights, that haven't been rolled.
-BuildingWatch.watch(function(def)
-    local roll = store()[BuildingWatch.key(def)]
-    return roll == GardenLights.PROMISED or (roll == nil and def:isResidential())
-end, GardenLights.roll, GardenLights.REACH)
+BuildingWatch.watch({
+    ledger = GardenLights.MOD_DATA,
+    isRolled = function(value) return type(value) == "number" end,
+    wants = function(def)
+        return store()[BuildingWatch.key(def)] == GardenLights.PROMISED or def:isResidential()
+    end,
+    roll = GardenLights.roll,
+    reach = GardenLights.REACH,
+})
 
 return GardenLights

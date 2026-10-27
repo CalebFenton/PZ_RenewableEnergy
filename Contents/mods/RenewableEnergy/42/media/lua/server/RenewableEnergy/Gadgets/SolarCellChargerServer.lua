@@ -2,13 +2,17 @@
 
 if isClient() then return end
 
-local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 
+local function cellWh()
+    return SolarCellCharger.BATTERY_WH
+end
+
 --- Adds `hours` of the panel's output under `sky` (Sun.skyNow, now if nil) to the batteries in
---- `charger`, one use at a time to the emptiest, so a set fills evenly. Returns the uses it added.
+--- `charger`, one use at a time to the emptiest, so a set fills evenly (Battery.shift). Returns the
+--- uses it added.
 function SolarCellCharger.charge(charger, hours, sky)
     local container = charger:getContainer()
     if not container then
@@ -16,23 +20,10 @@ function SolarCellCharger.charge(charger, hours, sky)
     end
     local data = charger:getModData()
     local stored = (data[SolarCellCharger.STORED_KEY] or 0)
-        + Sun.squareWatts(charger:getSquare(), Specs.cellChargerWatts, sky) * hours
-    local added = 0
-    local battery = Battery.emptiestIn(container, SolarCellCharger.isCell)
-    while battery do
-        local useWh = battery:getUseDelta() * Specs.cellChargerBatteryWh
-        if stored < useWh then
-            break
-        end
-        battery:setCurrentUses(battery:getCurrentUses() + 1)
-        -- syncItemFields reaches only a player's inventory; this reaches a placed container.
-        sendItemStats(battery)
-        stored = stored - useWh
-        added = added + 1
-        battery = Battery.emptiestIn(container, SolarCellCharger.isCell)
-    end
+        + Sun.squareWatts(charger:getSquare(), SolarCellCharger.WATTS, sky) * hours
+    local moved, added, short = Battery.shift(container, stored, 1, 1, SolarCellCharger.isCell, cellWh, 1)
     -- Full batteries take nothing, and a panel stores nothing for later.
-    data[SolarCellCharger.STORED_KEY] = battery and stored or 0
+    data[SolarCellCharger.STORED_KEY] = short and stored - moved or 0
     return added
 end
 

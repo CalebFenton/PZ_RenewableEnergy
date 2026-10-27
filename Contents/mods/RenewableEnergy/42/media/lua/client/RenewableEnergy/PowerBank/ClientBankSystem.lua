@@ -6,7 +6,7 @@
 -- sound runs) and release the squares a running bank powered when it is removed. The container's
 -- filter is set on every side (PowerBank's declaration).
 
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
+local Places = require "RenewableEnergy/Places"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local ClientObjects = require "cf_commonlib/ClientObjects"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
@@ -31,13 +31,13 @@ if isClient() then
     end)
 end
 
--- The banks this game's players watch, by place (PlaceTracker.key), to { [player number] = true }.
+-- The banks this game's players watch, by place (Places.key), to { [player number] = true }.
 -- The server sends a bank's status only to its watchers, so once nobody here watches it, this
 -- client's copy goes rather than show stale when a window next opens.
 local watching = {}
 
 local function keyOf(position)
-    return PlaceTracker.key(position.x, position.y, position.z)
+    return Places.key(position.x, position.y, position.z)
 end
 
 -- This client's copy of the bank at `position`.
@@ -50,7 +50,7 @@ end
 --- fresh look at the bank, and after every change until unwatchStatus. The status window watches
 --- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; besides
 --- watching, the server takes no command from a client but "resync".
-function PowerBank.watchStatus(player, bank)
+function BankSystem.watchStatus(player, bank)
     local position = Squares.positionOf(bank)
     local key = keyOf(position)
     watching[key] = watching[key] or {}
@@ -59,7 +59,7 @@ function PowerBank.watchStatus(player, bank)
 end
 
 --- `player` stops watching the status of `bank`.
-function PowerBank.unwatchStatus(player, bank)
+function BankSystem.unwatchStatus(player, bank)
     local position = Squares.positionOf(bank)
     local key = keyOf(position)
     BankSystem.instance:sendCommand(player, "unwatch", { bank = position })
@@ -87,33 +87,13 @@ Events.OnServerCommand.Add(function(module, command, args)
     end
 end)
 
--- A running generator's position is listed in every chunk its reach touches
--- (IsoGenerator.setSurroundingElectricity, IsoChunk.addGeneratorPos).
-local CHUNK_SQUARES = getChunkSizeInSquares()
-
---- Lets this client's chunks go of the squares a generator at x, y, z powered, as the generator
---- switching off does (IsoGenerator.setSurroundingElectricity); otherwise they stay powered here
---- until their chunks reload.
-function PowerBank.releaseGeneratorPower(x, y, z)
-    local radius = GeneratorReach.range()
-    local cell = getCell()
-    for wx = math.floor((x - radius) / CHUNK_SQUARES), math.floor((x + radius) / CHUNK_SQUARES) do
-        for wy = math.floor((y - radius) / CHUNK_SQUARES), math.floor((y + radius) / CHUNK_SQUARES) do
-            local chunk = cell:getChunk(wx, wy)
-            if chunk then
-                chunk:removeGeneratorPos(x, y, z)
-            end
-        end
-    end
-end
-
 -- A server sends an object's removal before it removes its own copy (GameServer.RemoveItemFromMap),
 -- so the bank system there switches a running bank off only after this client has lost its copy,
 -- and the switch-off, which names the bank by its place on the square, finds nothing here. So the
 -- copy of a running bank leaving this client's square lets go of the squares it powers itself.
 local function releasePower(isoObject)
     if PowerBank.isBank(isoObject) and isoObject:isActivated() then
-        PowerBank.releaseGeneratorPower(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+        GeneratorReach.release(isoObject:getX(), isoObject:getY(), isoObject:getZ())
     end
 end
 

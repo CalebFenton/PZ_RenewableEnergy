@@ -1,12 +1,15 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
+local Panel = require "RenewableEnergy/PowerBank/Panel"
+local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local Items = require "cf_commonlib/Items"
 
 -- Solar storms: storms cracking panel modules (PowerBank/PanelSource.lua, Chance.lua).
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
 local Specs, Sprites, PowerBank = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.PowerBank
-local MODULES_KEY = PowerBank.MODULES_KEY
+local MODULES_KEY = Panel.MODULES_KEY
 
 -- The condition the panel object `panel` records for its first module, or nil.
 local function recordedCondition(panel)
@@ -90,7 +93,7 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
-        local whole = RenewableEnergy.conditionMaxOf(T.FACTORY_MODULE)
+        local whole = Items.conditionMaxOf(T.FACTORY_MODULE)
         self.crackedTo = whole - Specs.storm.crack
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole), connect = true })
         if not panel then return end
@@ -130,7 +133,7 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
         if not panel then return end
         self.bank, self.panel = bank, panel
         T.server(self, "trackAt", T.at(panel, { kind = "source" }))
-        T.setRecipeSkills(self, RenewableEnergy.Recipes.moduleRepairRecipe())
+        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
         T.snowfall(self, bank, 2)
         T.forceRoll(self, 0)
@@ -249,14 +252,14 @@ test("renewable_energy_solar_storms_worst_case_rule", {
             self.strengths = { Chance.stormStrength(from, from), Chance.stormStrength(from, (from + storm.fullKph) / 2),
                 Chance.stormStrength(from, storm.fullKph), Chance.stormStrength(from, storm.fullKph * 2) }
             self.blades = {}
-            for material, spec in pairs(Specs.wind.blades) do
+            for material, spec in pairs(RenewableEnergy.Wind.SPEC.blades) do
                 self.blades[material] = Chance.stormDamage(Chance.stormPerHour(spec.stormShare),
                     storm.worstHours * Chance.stormStrength(spec.breakKph, storm.fullKph))
             end
             self.order = {}
-            for kph = Specs.wind.blades.pipe.breakKph + 1, storm.fullKph do
+            for kph = RenewableEnergy.Wind.SPEC.blades.pipe.breakKph + 1, storm.fullKph do
                 local hourly = {}
-                for material, spec in pairs(Specs.wind.blades) do
+                for material, spec in pairs(RenewableEnergy.Wind.SPEC.blades) do
                     hourly[material] = Chance.stormPerHour(spec.stormShare) * Chance.stormStrength(spec.breakKph, kph)
                 end
                 if not (hourly.pipe > hourly.wood or hourly.wood == 0) or not (hourly.wood > hourly.steel or hourly.steel == 0) then

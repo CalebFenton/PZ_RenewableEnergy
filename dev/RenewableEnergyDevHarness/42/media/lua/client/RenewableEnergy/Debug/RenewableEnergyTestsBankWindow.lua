@@ -3,14 +3,14 @@ require "RenewableEnergy/Specs"
 require "RenewableEnergy/PowerBank/BankJobs"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/StatusRows"
-require "RenewableEnergy/Recipes"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
 
 -- Power bank tests: the status window (UI/StatusWindow.lua, UI/StatusRows.lua).
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
 local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
-local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
+local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
 local Format, BankJobs = RenewableEnergy.Format, RenewableEnergy.BankJobs
 local StatusRows = RenewableEnergy.StatusRows
 
@@ -117,8 +117,8 @@ test("renewable_energy_bank_window_reflects_status", {
         if not bank then return end
         self.bank = bank
         -- Further below its repair limit than a Service reaches.
-        self.reconditionAt = Recipes.repairLimit(0) - Recipes.SERVICE_REPAIR - 1
-        self.rebuildAt = Recipes.repairLimit(2)
+        self.reconditionAt = Battery.repairLimit(0) - Battery.SERVICE_REPAIR - 1
+        self.rebuildAt = Battery.repairLimit(2)
         self.panelCount = Specs.freeSlots + 1
         self.load = loadUpTo({ "light", "light" }, "television", Specs.inverters[T.PLUG_IN_INVERTER].watts, true)
         T.watch(self, bank)
