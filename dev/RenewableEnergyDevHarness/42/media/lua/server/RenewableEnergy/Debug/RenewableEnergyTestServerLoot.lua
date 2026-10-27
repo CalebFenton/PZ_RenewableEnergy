@@ -343,7 +343,7 @@ end)
 -- its own charge keeps it. `args` is a free outdoor square, standing in for the room's one square.
 check("lootSeenRoomReadied", function(expect, expectNear, _, args, defer)
     local Battery, Wear = RenewableEnergy.Battery, RenewableEnergy.Wear
-    local range = RenewableEnergy.Specs.foundCharge
+    local range = Battery.FOUND_CHARGE
     local square = Helpers.squareAt(args)
     local filled = containerInWorld(square, "metal_shelves", defer)
     filled:setExplored(true)
