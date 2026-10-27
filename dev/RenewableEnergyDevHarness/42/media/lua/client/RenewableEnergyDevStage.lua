@@ -25,9 +25,10 @@ function Stage.spawnTrailer(square, facing)
         square:getY() + behind[2] * Stage.TRAILER_GAP, square:getZ())
     local pair = {
         car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
-        -- The tests' spawn, which keeps a whole trailer's panels whole past stocking.
+        -- The tests' spawn, which keeps a whole trailer's panels whole past stocking. Outside a
+        -- test nothing outlives the call, and the spawn puts its forced rolls back itself.
         trailer = PZHarness.testSettings.spawnVehicle(ArrowBoard.SCRIPT, trailerSquare, facing,
-            { repair = true }),
+            { repair = true }, function() end),
         facing = facing,
     }
     pair.car:repair()

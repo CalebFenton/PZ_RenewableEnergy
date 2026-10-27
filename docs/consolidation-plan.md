@@ -8,7 +8,43 @@ Read this file before resuming consolidation work, including after context compa
 
 Reference: `/Users/caleb/repos/delphos-v2/docs/style-guides/engineering-lessons.md`. Central rules: find the existing owner; reconcile differing rules when merging; prefer native operations to approximations; remove production-unreachable scaffolding; verify consumer outcomes rather than wiring; measure frequency multiplied by work; report actual deletions separately from moves and tests.
 
-Current priority: [Structural mechanism audit](mechanism-audit.md). The user explicitly redirected this mission from adjacent-helper cleanup to complete mechanisms. Read that audit before selecting the next cutover. The latest cross-mod traces did not establish a large removable production framework. User review corrected T1's promotion: loot-analysis accuracy is a development-tool issue, not the next main mission or a reason to validate native probability mechanics. Find mod-owned duplication and native reimplementations; do not substitute more engine tests.
+Current priority: the structural restructure below landed on 2026-10-27 and supersedes this plan's "no large removable framework" conclusion and several rejections in [the mechanism audit](mechanism-audit.md) (named below). Its owner map is the first thing to read; the layers and evidence after it are history and preservation gates.
+
+## Structural restructure (2026-10-27)
+
+The user asked for an organization audit (ownership, duplication, mixed concerns, native APIs) of RE, its dev harness and cf_commonlib. Seven read-only audits (power, world, devices/UI, cf_commonlib, dev tools, test support, harness) fed three implementation waves, a pruning pass and a fix for the site-copy flake. Every wave passed the full SP and MP suites of RE, EI and HA.
+
+Owners after the restructure (paths under RE `media/lua/`):
+
+| Concept | Owner |
+| --- | --- |
+| A Global Object System feature's identity, accessors, container filters | cf_commonlib `GlobalObjects.declare`, `Containers` |
+| Sprite-load hooks for every mod | cf_commonlib `Tiles.onLoad` (mods pick no load priority) |
+| Generator exclusion and other mods' placed loads | cf_commonlib `GeneratorReach` registry (EI no longer reads RE globals) |
+| Rolls, loot registration, elapsed time | cf_commonlib `Chance`, `Loot.register/entries`, `Clock` |
+| Job rows, refusal order, menu options, job sites | cf_commonlib `Jobs` (`with =`, `verdict`), `JobOptions`, `Action.serve` from each feature's server file |
+| In-place craft payment (sealing) | cf_commonlib `Materials` craft material; RE `PowerBank/ModuleRepair` holds the seal rule |
+| Generator demand, charger allocation under a gas cap | `server/.../PowerBank/Payers` (Loads <- Payers <- Bank, GasLines, Fumes; no cycles) |
+| Bank lifecycle | `Bank` on cf_commonlib's `Object` (`catchUp/advance/afterChange`); `BankSystem.jobSite` |
+| Source and treadmill jobs | `PowerBank/SourceSite` (JobSites.lua is gone) |
+| Wiring, panel module records, battery repair advice | `PowerBank/Wiring`, `Panel`, `Battery.bestRepair` |
+| Storm clock | `PowerBank/PanelStorms` (one ledger; the bank record and the loose object hand a mark over) |
+| Generator start/stop and building fumes | `Fumes.setRunning` / `setBankRunning` |
+| Found-item wear, charge and rarity | `server/.../Items/Finds` |
+| Placing world objects | `World/Place`, cf_commonlib `Tiles.addToWorld` |
+| Arrow board | `shared/.../ArrowBoard/*` (one trailer registry, one OnTick) |
+| Nearest-place maths vs loaded-tile tracking | `Places` vs `PlaceTracker` |
+| Loot list entries incl. stash maps | `Items/LootEntries` |
+| Waiting for buildings and site spots to load | `World/BuildingWatch.waitFor`; two-ended site spots go down in the frame their chunk loads (`SolarSites` lines) |
+| Tile numbers | `art/models/tile_numbers.py` -> generated `SpriteTiles.lua`; `dev/check/sprite_tiles.py` checks scripts against it |
+| Menus | `client/.../UI/BankMenu`, `SourceMenu`, `GardenLightMenu`, `RenameBank` (Menu.lua is gone) |
+| The `RenewableEnergy` global | only modules a script, vehicle script or container filter names by path |
+| Test support | harness record kit (`ServerRecords`/`TestRecords`), job kit (`ServerJobs`/`TestJobs`), `Rolls`, `Fixtures.replace`, generic character/item/world helpers, square tracking in `T.build`; RE keeps kinds in `RenewableEnergyTestKinds` |
+| Test selection, results | harness `lib/tests.py` (tests select themselves by file), `lib/results.py` |
+
+Mechanism-audit decisions this overturns: the bank lifecycle now uses the common Object contract; JobSites forwarders and the site lambdas are gone; the arrow board is shared; SolarSites' waiting queue joined BuildingWatch's; HA-style "twelve-line" duplicates were judged by drift, not size. Still deferred: W7 (kit crates filled natively changes guaranteed contents), HA adopting cf_commonlib's Loot (adds a dependency to HA), M1 (resync), T1 (loot estimator).
+
+Verified bugs fixed on the way: a stopped generator cleared fumes a digester or gasifier still made (IsoGenerator.setActivated); safehouse and stash-room finds were never readied; a homemade module's seal label read item condition instead of its share; two-ended site spots could miss a client's chunk copy in MP.
 
 ## Layers and acceptance gates
 
@@ -146,4 +182,4 @@ Paths below are under Renewable Energy's `42/media/lua/`:
 1. **Select the next complete production operation, not another neighboring helper.** P1/P2 are fixed; do not repeat their investigation or expand them into a generic transfer/charging framework. Use the six original layers, mechanism map and recorded negative findings to identify the next mod-owned duplicate operation or native reimplementation. Before implementation, establish exactly which machinery disappears and which rules must survive. A large further production deletion target has not yet been proved; do not promote a bounded cleanup merely to keep making edits.
 2. **Keep verification on our side of the boundary.** Exercise mod decisions, mutations, resource conservation and integration outcomes through real engine paths. Trust native probability/timing algorithms. Use a bounded probe for unclear API semantics; retain a small regression only where it protects a concrete mod integration. T1's balance-report limitation stays documented, not promoted into a statistical engine-validation project.
 3. **Keep the production findings and blockers visible.** T2's HA loot migration needs dependency/install changes, positive base-weight filtering, retiree setup and an explicit append/replacement contract. Fixed jobs, held actions, persistent devices and electrical payer policies did not yield a large deletion in this audit. M1 remains blocked by native initialization; keep its repair exchange. Do not substitute T3/M4/helper cleanup for a failed structural proposal.
-4. **Verify and commit by coherent batch.** Use actual player/world paths and lifecycle outcomes, with temporary counters only for unanswered duplication questions. Keep SP/MP and unload/restart evidence distinct. Record actual deletions and remaining blockers. The earlier sealing and site-copy failures remain unresolved unless separately diagnosed.
+4. **Verify and commit by coherent batch.** Use actual player/world paths and lifecycle outcomes, with temporary counters only for unanswered duplication questions. Keep SP/MP and unload/restart evidence distinct. Record actual deletions and remaining blockers. The site-copy failure is diagnosed and fixed (see the restructure section); the earlier multi-module sealing failure remains undiagnosed.

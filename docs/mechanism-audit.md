@@ -1,5 +1,7 @@
 # Structural mechanism audit
 
+**Superseded in part (2026-10-27).** The structural restructure recorded in [the consolidation plan](consolidation-plan.md#structural-restructure-2026-10-27) moved banks onto the common Object lifecycle, dissolved JobSites, made the arrow board shared, merged SolarSites' queue into BuildingWatch, removed the GasLines ModData list, generated tile numbers, and fixed the gas-site-copy failure. Paths and line numbers below predate it; read the owner map there first. This file stays as the record of preservation gates and of what remains deferred (W7, HA loot, M1, T1).
+
 ## Purpose and selection rule
 
 This audit supersedes the adjacent-helper-first priority in [the consolidation plan](consolidation-plan.md), not its preservation gates or completed work. The user asked for ambitious structural simplification, landed incrementally, rather than a succession of small optimizations.
@@ -204,4 +206,4 @@ Native IsoMetaChunk exposes building/room intersection queries, but metadata roo
 3. Land complete behavior-preserving cutovers with all callers migrated. Batch related real-game checks after integration; do not run full suites after individual edits.
 4. Update this audit's status and the consolidation checkpoint with actual deleted mechanisms, production/development line changes and exercised evidence. No estimated savings presented as results.
 
-The world/device audit and M1 feasibility investigation are committed as `6fd2f43`; M2 as `32687fd`; M3 as `a0a942e`. The expanded audit was committed as `e598552`, with the engine-conformance priority correction in `d99de9b`. P1 is fixed in EI `562bb7c`; P2 in RE `8879d2c`, with the bounded SP/MP evidence above. Do not rediscover these fixes or describe them as completion of the reduction mission. T1 remains deferred, T2 conditional, T3/M4 bounded and M1 blocked. No large new production teardown was proved. Full process save/restart is not claimed. The earlier intermittent sealing and gas-site-copy failures remain undiagnosed. Native engine timing is not a mod acceptance criterion.
+The world/device audit and M1 feasibility investigation are committed as `6fd2f43`; M2 as `32687fd`; M3 as `a0a942e`. The expanded audit was committed as `e598552`, with the engine-conformance priority correction in `d99de9b`. P1 is fixed in EI `562bb7c`; P2 in RE `8879d2c`, with the bounded SP/MP evidence above. T1 remains deferred, T2 conditional and M1 blocked. Full process save/restart is not claimed. The intermittent sealing failure remains undiagnosed; the gas-site-copy failure is fixed (consolidation plan). Native engine timing is not a mod acceptance criterion.
