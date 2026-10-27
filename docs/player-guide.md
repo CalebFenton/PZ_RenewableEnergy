@@ -604,13 +604,13 @@ Think about who had this gear in 1993, and how far they'd have hauled it. Rarity
 | Car alternators | Mechanics' shelves and crates, auto parts battery shelves, garages; or take one out of a car | Uncommon |
 | Plug-in inverter | Auto parts stores, gas stations, electronics and department stores, garages, cars' glove boxes and trunks, truckers | Common |
 | Power inverter | Auto parts battery shelves, electricians, campers, survivalists' trucks, generator rooms | Uncommon |
-| Inverter/charger | Generator and control rooms, phone, power company and electricians' vans, camper trailers | Rare |
+| Inverter/charger | Generator and control rooms, phone, power company and electricians' vans, camper trailers, stash houses | Rare |
 | Charge controller | Electricians, phone, power company and radio vans, generator and control rooms, camper trailers | Uncommon |
-| Solar Failsafe | Generator rooms, now and then | Very rare: easier to build |
+| Solar Failsafe | Generator rooms and stash houses, now and then | Very rare: easier to build |
 | Solar battery maintainer | Auto parts stores, mechanics, farm supply and barns, fishing stores, campers, farmers' trucks | Uncommon |
 | Solar battery charger | Electronics stores, camping stores, army surplus and survival gear, survivors' hideouts | Uncommon |
 | Solar garden lights | Garden centres and hardware stores, garages and barns, and along front walks, more often in the nicer neighbourhoods | Common |
-| Homestead Power #1 | Electronics store magazine racks, bookstores, tool, outdoor and auto parts stores, post offices, libraries, living rooms, campers | Common |
+| Homestead Power #1 | Electronics store magazine racks, bookstores, tool, outdoor and auto parts stores, post offices, libraries, living rooms, campers, most crates of RV solar gear | Common |
 | Homestead Power #2 | Where #1 is, less often; electricians, utility and radio vans, generator and control rooms | Uncommon |
 | Homestead Power #3 | Hardware stores' farming shelves and book racks, farm supply and farm storerooms, the farming shelf of a bookstore, farmers' trucks, living rooms; in barns, on a table or beside an old digester | Uncommon: about half as often as #2 |
 | Homestead Power #4 | Hardware, electronics and farm supply stores, bookstores' farming shelves, electricians, hobby shelves, living rooms; on barn tables | Uncommon: about two thirds as often as #2 |
@@ -626,7 +626,7 @@ Folks put their panels where the sun is, which is usually up on the roof, and fe
 
 | What | Where | What you'll find |
 |---|---|---|
-| Stocked storerooms | Sheds, garages, storage units, farm storerooms and electronics store backrooms, the first time anyone sees them | A battery box or rack with a few batteries, sometimes an inverter; a box in a shed, garage or storage unit often has a panel or two lying beside it; in garages and storage units, now and then a crate of RV solar gear |
+| Stocked storerooms | Sheds, garages, storage units, farm storerooms and electronics store backrooms, the first time anyone sees them | A battery box or rack with a few batteries, sometimes an inverter; a box in a shed, garage or storage unit often has a panel or two lying beside it; in garages and storage units, now and then a crate of RV solar gear: always panels and batteries, usually Homestead Power #1 |
 | Stock tank pumps | Pastures across the farm country | A rack of panels by a water tank |
 | Off-grid farms | A few farms around Riverside, Rosewood and West Point | Panels on the roof, a battery box inside, garden lights |
 | Campers | Trailer parks, a summer camp, a trailer in the woods | A panel or two on the roof and a box with a deep cycle |
