@@ -324,7 +324,7 @@ check("partWear", function(expect, _, _, _, defer)
     SandboxVars.RenewableEnergy.LRMMisc = 1
     local fills = {
         ["the powerYard bank"] = function(c) WorldSpawns.stockBank(c, "powerYard") end,
-        ["the kit crate"] = function(c) WorldSpawns.stockCrate(c, "kit") end,
+        ["the garage kit crate"] = function(c) WorldSpawns.stockCrate(c, "garageKit") end,
         ["an arrow board's battery box"] = function(c) ArrowBoard.stockBatteryBox(c) end,
     }
     for what, fill in pairs(fills) do

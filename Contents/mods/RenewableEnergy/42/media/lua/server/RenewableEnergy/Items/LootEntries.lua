@@ -86,7 +86,7 @@ local items = {
             { 1, "veh:RenewableEnergyCamperTrailerTrunk" },
             { 1, "veh:SurvivalistTruckBed" },
             { 1, "sub:all.Outfit_Camper" },
-            { 8, "proc:RenewableEnergySolarKit.junk" },
+            { 24, "proc:RenewableEnergySolarGear.junk" },
         }),
     },
     {
@@ -203,7 +203,7 @@ local items = {
             { 2, "veh:RadioTruckBed" },
             { 2, "veh:RenewableEnergyTelecomTruckBed" },
             { 2, "veh:RenewableEnergyUtilityTruckBed" },
-            { 4, "proc:RenewableEnergySolarKit.junk" },
+            { 12, "proc:RenewableEnergySolarGear.junk" },
         }),
     },
     {
@@ -306,7 +306,7 @@ local items = {
             { 0.4, "proc:ArmyStorageElectronics" },
             { 0.2, "proc:CrateElectronics" },
             { 0.2, "proc:JunkHoard" },
-            { 48, "proc:RenewableEnergySolarKit" },
+            { 48, "proc:RenewableEnergySolarGear" },
         }),
     },
     {
@@ -326,7 +326,7 @@ local items = {
             { 1.5, "veh:RenewableEnergyCamperTrailerTrunk" },
             { 0.8, "veh:SurvivalistTruckBed" },
             { 0.5, "veh:RenewableEnergyUtilityTruckBed" },
-            { 16, "proc:RenewableEnergySolarKit.junk" },
+            { 16, "proc:RenewableEnergySolarGear.junk" },
         }),
     },
     {
@@ -346,7 +346,7 @@ local items = {
             { 0.3, "veh:RangerTruckBed" },
             { 0.8, "veh:RenewableEnergyCamperTrailerTrunk" },
             { 0.3, "veh:CamperTruckBed" },
-            { 16, "proc:RenewableEnergySolarKit" },
+            { 16, "proc:RenewableEnergySolarGear" },
         }),
     },
     {
@@ -366,7 +366,7 @@ local items = {
             { 2, "veh:RenewableEnergyCamperTrailerTrunk" },
             { 0.6, "veh:FishermanTruckBed" },
             { 0.5, "veh:SurvivalistTruckBed" },
-            { 36, "proc:RenewableEnergySolarKit" },
+            { 36, "proc:RenewableEnergySolarGear" },
             { 36, "proc:RenewableEnergyBatteryStock" },
         }),
     },
@@ -375,7 +375,7 @@ local items = {
         option = "LRMMisc",
         entries = {
             { 0.1, "proc:GeneratorRoom" },
-            { 0.5, "proc:RenewableEnergySolarKit.junk" },
+            { 2.5, "proc:RenewableEnergySolarGear.junk" },
         },
     },
     -- Homestead: the Inverter/Charger, L-16 batteries and battery acid
@@ -390,7 +390,7 @@ local items = {
             { 0.5, "veh:RenewableEnergyTelecomTruckBed" },
             { 0.3, "veh:RenewableEnergyUtilityTruckBed" },
             { 0.2, "veh:RenewableEnergyCamperTrailerTrunk" },
-            { 2, "proc:RenewableEnergySolarKit.junk" },
+            { 6, "proc:RenewableEnergySolarGear.junk" },
         }),
     },
     {

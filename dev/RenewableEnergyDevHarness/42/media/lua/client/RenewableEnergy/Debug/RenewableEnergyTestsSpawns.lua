@@ -233,16 +233,16 @@ test("renewable_energy_world_bank_modules_beside", {
 local FEW_ITEMS = 7
 
 -- A crate appears stocked with modules at cracked or weathered conditions and batteries at a part
--- charge, as many as CRATE_STOCK's kit says, explored, showing its full or closed lid by how much
--- it holds, and players see what it holds and its lid.
+-- charge, as many as CRATE_STOCK's garageKit says, explored, showing its full or closed lid by how
+-- much it holds, and players see what it holds and its lid.
 test("renewable_energy_world_crate_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
         local square = T.square(self, { indoors = true }, "a free indoor square")
         if not square then return end
         T.batch(function()
-            T.read(self, "worldCrate", T.at(square, { stock = "kit" }), "crate")
-            T.read(self, "worldSpawnStock", { names = {}, crate = "kit" }, "stock")
+            T.read(self, "worldCrate", T.at(square, { stock = "garageKit" }), "crate")
+            T.read(self, "worldSpawnStock", { names = {}, crate = "garageKit" }, "stock")
         end)
         T.waitFor(self, function()
             local crate = self.reads.crate

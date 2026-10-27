@@ -15,11 +15,12 @@ local vehDist = VehicleDistributions
 
 -- The mod's own lists
 
--- A crate of RV and cabin solar gear, which some storage rooms pick instead of their usual loot.
--- Its RenewableEnergy items come from Distributions.items, so the rarity options scale them. The
--- hardware ignores the zombie density bonus anyway, but the magazines don't, and a crate shouldn't
--- grow fuller because the town around it is crowded.
-procLists.RenewableEnergySolarKit = {
+-- Loose RV and cabin solar gear, which some storerooms, shelves and stash crates pick instead of
+-- their usual loot; WorldSpawns' garage kit crates are stocked apart. Its RenewableEnergy items
+-- come from Distributions.items, so the rarity options scale them. The hardware ignores the zombie
+-- density bonus anyway, but the magazines don't, and a shelf shouldn't grow fuller because the
+-- town around it is crowded.
+procLists.RenewableEnergySolarGear = {
     rolls = 4,
     ignoreZombieDensity = true,
     items = {},
@@ -58,41 +59,42 @@ end
 
 -- The spawn table of the mod's stash houses (Stash.lua). StashSystem.doBuildingStash
 -- refills each container of the house whose type is a key here; the house's other containers keep
--- the loot of their own rooms. The crate the stash places rolls the kit's lists, more times.
+-- the loot of their own rooms. The crate the stash places rolls the solar gear's lists, more times.
 local stashCache = copyTable(subDist.electronicsstorage)
 subDist[Stash.SPAWN_TABLE] = stashCache
 stashCache[Stash.CRATE_TYPE] = {
     rolls = 24,
     ignoreZombieDensity = true,
-    items = procLists.RenewableEnergySolarKit.items,
-    junk = procLists.RenewableEnergySolarKit.junk,
+    items = procLists.RenewableEnergySolarGear.items,
+    junk = procLists.RenewableEnergySolarGear.junk,
 }
 stashCache.crate = { procedural = true, procList = {} }
 stashCache.metal_shelves = { procedural = true, procList = {} }
 
--- Rooms that pick the kit or the battery stock. Rooms whose only vanilla entry has no weightChance
--- (it counts as 1) are left out, because any entry added there would take half the picks.
+-- Rooms that pick the solar gear or the battery stock. Rooms whose only vanilla entry has no
+-- weightChance (it counts as 1) are left out, because any entry added there would take half the
+-- picks.
 local function pick(listName, weight, max)
     return { name = listName, min = 0, max = max or 1, weightChance = weight }
 end
 local ROOM_PICKS = {
-    { "electronicsstorage", "other", pick("RenewableEnergySolarKit", 10) },
+    { "electronicsstorage", "other", pick("RenewableEnergySolarGear", 10) },
     { "electronicsstorage", "other", pick("RenewableEnergyBatteryStock", 5) },
-    { "campingstorage", "other", pick("RenewableEnergySolarKit", 10) },
-    { "farmstorage", "other", pick("RenewableEnergySolarKit", 5) },
-    { "toolstorestorage", "other", pick("RenewableEnergySolarKit", 10) },
-    { "warehouse", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
+    { "campingstorage", "other", pick("RenewableEnergySolarGear", 10) },
+    { "farmstorage", "other", pick("RenewableEnergySolarGear", 5) },
+    { "toolstorestorage", "other", pick("RenewableEnergySolarGear", 10) },
+    { "warehouse", "metal_shelves", pick("RenewableEnergySolarGear", 5) },
     { "warehouse", "metal_shelves", pick("RenewableEnergyBatteryStock", 5) },
-    { "storageunit", "other", pick("RenewableEnergySolarKit", 3) },
-    { "garagestorage", "crate", pick("RenewableEnergySolarKit", 3) },
+    { "storageunit", "other", pick("RenewableEnergySolarGear", 3) },
+    { "garagestorage", "crate", pick("RenewableEnergySolarGear", 3) },
     -- Randomized survivor safehouses switch to the _Mid and _Late tables as the world ages
     -- (RBSafehouse).
-    { "SafehouseLoot", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
-    { "SafehouseLoot_Mid", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
-    { "SafehouseLoot_Late", "metal_shelves", pick("RenewableEnergySolarKit", 5) },
-    { Stash.SPAWN_TABLE, "crate", pick("RenewableEnergySolarKit", 25, 3) },
+    { "SafehouseLoot", "metal_shelves", pick("RenewableEnergySolarGear", 5) },
+    { "SafehouseLoot_Mid", "metal_shelves", pick("RenewableEnergySolarGear", 5) },
+    { "SafehouseLoot_Late", "metal_shelves", pick("RenewableEnergySolarGear", 5) },
+    { Stash.SPAWN_TABLE, "crate", pick("RenewableEnergySolarGear", 25, 3) },
     { Stash.SPAWN_TABLE, "crate", pick("RenewableEnergyBatteryStock", 10) },
-    { Stash.SPAWN_TABLE, "metal_shelves", pick("RenewableEnergySolarKit", 20, 3) },
+    { Stash.SPAWN_TABLE, "metal_shelves", pick("RenewableEnergySolarGear", 20, 3) },
 }
 for _, roomPick in ipairs(ROOM_PICKS) do
     local room = subDist[roomPick[1]]

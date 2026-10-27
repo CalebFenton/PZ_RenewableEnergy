@@ -131,17 +131,18 @@ WorldSpawns.BANK_STOCK = {
 -- after use.
 WorldSpawns.CRATE_WEAR = "used"
 
--- What a crate holds, by stock name: lines of { item, min, max, loot rarity option } (count
--- scaled by the option; none: always the count). Modules get a site module's condition, and
--- batteries CRATE_WEAR's.
+-- What a crate holds, by stock name: lines of { item, min, max, loot rarity option, chance }
+-- (count scaled by the option; none: always the count), each line stocked at its chance (none:
+-- always). Modules get a site module's condition, and batteries CRATE_WEAR's.
 WorldSpawns.CRATE_STOCK = {
-    -- An RV or cabin solar kit someone put away in a garage or storage unit.
-    kit = {
+    -- An RV or cabin solar kit someone put away in a garage or storage unit: always panels and
+    -- batteries, and usually the magazine that tells how to set them up.
+    garageKit = {
         { MODULE, 1, 2, "LRMSolarPanels" },
         { "RenewableEnergy.DeepCycleBattery", 1, 2, "LRMBatteries" },
         { "RenewableEnergy.ChargeController", 0, 1, "LRMMisc" },
         { "RenewableEnergy.PowerInverter", 0, 1, "LRMMisc" },
-        { "RenewableEnergy.HomesteadPowerMag1", 0, 1, "LRMMisc" },
+        { "RenewableEnergy.HomesteadPowerMag1", 1, 1, "LRMMisc", 0.8 },
         { "Base.ElectricWire", 4, 8 },
         { "Base.Screws", 1, 2 },
     },
@@ -185,12 +186,14 @@ end
 ---@param stockName string a CRATE_STOCK key
 function WorldSpawns.stockCrate(container, stockName)
     for _, line in ipairs(WorldSpawns.CRATE_STOCK[stockName]) do
-        local count = Chance.between(line[2], line[3])
-        if line[4] then
-            count = Finds.scaled(count, line[4])
-        end
-        for _ = 1, count do
-            Finds.add(container, line[1], WorldSpawns.CRATE_WEAR)
+        if not line[5] or Chance.hit(line[5]) then
+            local count = Chance.between(line[2], line[3])
+            if line[4] then
+                count = Finds.scaled(count, line[4])
+            end
+            for _ = 1, count do
+                Finds.add(container, line[1], WorldSpawns.CRATE_WEAR)
+            end
         end
     end
 end
@@ -283,7 +286,7 @@ local function onSeeNewRoom(room)
     if crateOdds and oneIn(crateOdds * rarity) then
         local square = room:getRandomFreeSquare()
         if square then
-            WorldSpawns.placeCrate(square, "kit")
+            WorldSpawns.placeCrate(square, "garageKit")
         end
     end
 end
