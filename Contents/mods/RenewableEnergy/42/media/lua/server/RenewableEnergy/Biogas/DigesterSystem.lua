@@ -3,7 +3,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
@@ -16,6 +15,7 @@ local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 -- Its OnCreate is the build menu's (scripts/RenewableEnergy/Entities.txt).
 local DigesterSystem = LibObjectSystem.define(Digester, { Object = DigesterObject, loadOnCreate = true })
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.DigesterSystem = DigesterSystem
 
 -- A barrel digester is the entity of the barrel it was built from, which the build menu builds on

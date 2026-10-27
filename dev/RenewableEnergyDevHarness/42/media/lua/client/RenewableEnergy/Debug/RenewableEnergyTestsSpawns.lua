@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- World spawns (WorldSpawns.lua, Distributions.lua): banks, crates and cracked modules the world
 -- places and stocks on the authority (RenewableEnergyTestServerSpawns.lua). Arrow boards are in
@@ -7,7 +8,6 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 local T = RenewableEnergyTest
 local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, T.serverCheck
 
-local Sprites = RenewableEnergy.Sprites
 
 -- This client's copy of the first object of `sprite` on `square`, and how many items its
 -- container holds (nil without one).

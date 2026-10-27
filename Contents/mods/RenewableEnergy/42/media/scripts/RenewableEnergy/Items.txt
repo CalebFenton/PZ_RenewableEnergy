@@ -10,7 +10,7 @@
     base:ignorezombiedensity keeps the zombie density loot bonus, which is added to every entry
     whatever its weight, from swamping the hardware's small loot weights.
 
-    Moveables name the tile they place in WorldObjectSprite (RenewableEnergy.Sprites); each tile
+    Moveables name the tile they place in WorldObjectSprite (Lua: RenewableEnergy/Sprites); each tile
     names its item back in CustomItem, so picking it up returns this item.
 */
 module RenewableEnergy
@@ -326,7 +326,7 @@ module RenewableEnergy
         cantBeConsolided keeps two half-charged batteries from merging into one.
 
         The deep cycle battery also fits a vehicle's Battery part (Lua:
-        RenewableEnergy.VehicleBattery), where it runs the lights and radio longer with the engine
+        RenewableEnergy/Gadgets/VehicleBattery), where it runs the lights and radio longer with the engine
         off. The L-16 doesn't: it is a 6 V battery, and a car's starter and lights need 12 V.
     */
     item DeepCycleBattery
@@ -366,7 +366,7 @@ module RenewableEnergy
     /*
         Six 2 V glass-jar cells standing in a sand tray, wired as one 12 V battery: the farm
         light plant's battery, made at home. Open jars spill, so it never goes in a vehicle: only the
-        deep cycle battery is offered for one (RenewableEnergy.VehicleBattery).
+        deep cycle battery is offered for one (Lua: RenewableEnergy/Gadgets/VehicleBattery).
     */
     item JarBattery
     {
@@ -498,7 +498,7 @@ module RenewableEnergy
     }
 
     /**************************** Solar gadgets *****************************/
-    /* Clipped to a vehicle (Lua: RenewableEnergy.SolarMaintainer), it trickle-charges the battery. */
+    /* Clipped to a vehicle (Lua: RenewableEnergy/Gadgets/SolarMaintainer), it trickle-charges the battery. */
     item SolarMaintainer
     {
         DisplayCategory = Electronics,
@@ -528,7 +528,7 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
-    /* Placed outdoors, it charges by day and glows at night (Lua: RenewableEnergy.SolarGardenLight). */
+    /* Placed outdoors, it charges by day and glows at night (Lua: RenewableEnergy/Gadgets/SolarGardenLight). */
     item SolarGardenLight
     {
         DisplayCategory = Electronics,
@@ -805,7 +805,7 @@ module RenewableEnergy
     }
 
     /*
-        A car's own alternator (RenewableEnergy.CarAlternator), taken out of a car or cut from a
+        A car's own alternator (Lua: RenewableEnergy/Gadgets/CarAlternator), taken out of a car or cut from a
         smashed wreck: the generator of the car alternator wind charger. About as heavy as a real
         one.
     */
@@ -820,7 +820,7 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
-    /* Fitted to a vanilla generator, lets it run on gas from a digester or gasifier (RenewableEnergy.GasKit). */
+    /* Fitted to a vanilla generator, lets it run on gas from a digester or gasifier (Lua: RenewableEnergy/GasLine/GasKit). */
     item GasConversionKit
     {
         DisplayCategory = VehicleMaintenance,
@@ -886,7 +886,7 @@ module RenewableEnergy
         Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
     }
 
-    /* Placed beside a digester, burns its gas to keep it warm (RenewableEnergy.GasHeater). */
+    /* Placed beside a digester, burns its gas to keep it warm (Lua: RenewableEnergy/Biogas/GasHeater). */
     item GasHeater
     {
         DisplayCategory = Furniture,

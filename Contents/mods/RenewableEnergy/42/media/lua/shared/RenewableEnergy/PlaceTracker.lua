@@ -5,14 +5,12 @@
 -- tile isn't there any more is dropped while the places are walked; MapObjects reports the tile
 -- again when its chunk loads. A tile leaving its square is dropped at once.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Places = require "RenewableEnergy/Places"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
 local PlaceTracker = {}
 PlaceTracker.__index = PlaceTracker
-RenewableEnergy.PlaceTracker = PlaceTracker
 
 local function forget(tracker, key)
     tracker.places[key] = nil

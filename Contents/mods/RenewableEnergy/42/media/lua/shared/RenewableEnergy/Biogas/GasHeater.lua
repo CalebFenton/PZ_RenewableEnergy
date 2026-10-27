@@ -2,7 +2,6 @@
 -- It warms the one digester digesterNear picks, which does the burning in its own pass, so it keeps
 -- warm while unloaded too and puts the heater out when its gas runs out.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
@@ -10,7 +9,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
 local GasHeater = {}
-RenewableEnergy.GasHeater = GasHeater
 
 -- Lighting a fire takes one use of a match or lighter, as a campfire does; a gasifier's firebox too.
 GasHeater.FIRE_STARTER = { tool = "START_FIRE", item = "Base.Matches", useOne = true }

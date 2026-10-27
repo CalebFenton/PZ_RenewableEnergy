@@ -1,11 +1,14 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
+local Specs = require "RenewableEnergy/Specs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
 local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
 local RenameBank = require "RenewableEnergy/UI/RenameBank"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Power bank tests: the bank's context menu (UI/BankMenu.lua), wiring, repair and renaming from it.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
@@ -13,8 +16,6 @@ local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local T = RenewableEnergyTest
 local test, expect, expectEqual = T.test, T.expect, T.expectEqual
 local player, stateItem, copyItem = T.player, T.stateItem, T.copyItem
-local Specs = RenewableEnergy.Specs
-local PowerBank, BankJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs
 
 -- Whether the option's tooltip lists the item `fullType` in the colour for what the character is
 -- short of.
@@ -160,7 +161,7 @@ test("renewable_energy_bank_menu_repair_part", {
                 local inverter = copyItem(bank, T.POWER_INVERTER)
                 return inverter ~= nil and inverter:getCondition() == REPAIRED_INVERTER
             end, "this client's copy of the repaired inverter")
-            T.bankState(self, bank)
+            T.readRecord(self, bank)
             T.count(self, "scrap", { Wiring.SCRAP })
         end)
     end,
@@ -207,7 +208,7 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
             T.waitForStatus(self, bank, function(status)
                 return #status.batteries == 1 and bank.object:getContainer():getItemWithID(self.batteryId) ~= nil
             end, "this client's copy of the bank with the battery wired in")
-            T.bankState(self, bank)
+            T.readRecord(self, bank)
         end)
     end,
     validate = function(self)
@@ -255,7 +256,7 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
             if not T.chooseOption(self, "Unwire > All Batteries", all) then return end
             T.waitForStatus(self, bank, function(status) return #status.batteries == 0 end,
                 "this client's status of the bank with no battery left")
-            T.bankState(self, bank)
+            T.readRecord(self, bank)
             T.count(self, "carried", { T.CAR_BATTERY })
             T.count(self, "carriedOrDropped", { T.CAR_BATTERY }, { dropped = true })
         end)
@@ -295,7 +296,7 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
             if not T.chooseOption(self, "Wire In > All Batteries", all) then return end
             T.waitForStatus(self, bank, function(status) return #status.batteries == self.slots end,
                 "this client's status of the bank with its battery slots full")
-            T.bankState(self, bank)
+            T.readRecord(self, bank)
             T.count(self, "left", { T.CAR_BATTERY, T.L16, Wiring.WIRE, "Base.Screwdriver", "Base.Wrench" })
         end)
     end,
@@ -323,7 +324,7 @@ test("renewable_energy_bank_menu_connects_sources_that_fit", {
         local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
         if not bank then return end
         self.bank = bank
-        local sprites = RenewableEnergy.Sprites
+        local sprites = Sprites
         self.large = T.panel(self, sprites.windCharger.alternator.steel.N, { near = bank })
         self.small = T.panel(self, sprites.flat, { near = bank })
         if not (self.large and self.small) then return end
@@ -335,13 +336,13 @@ test("renewable_energy_bank_menu_connects_sources_that_fit", {
             if not T.chooseOption(self, "connect what fits", option) then return end
             T.waitForStatus(self, bank, function(status) return status.inputSlots.used == 1 end,
                 "the panel connected without the oversized turbine")
-            T.bankState(self, bank)
+            T.readRecord(self, bank)
         end)
     end,
     validate = function(self)
         if not T.expectOffered(self, "connect what fits") then return end
-        expect(T.stateSource(self.bank.state, self.small.position) ~= nil, "the fitting panel was not connected")
-        expect(T.stateSource(self.bank.state, self.large.position) == nil, "the oversized turbine was connected")
+        expect(T.stateSource(self.bank.state, self.small) ~= nil, "the fitting panel was not connected")
+        expect(T.stateSource(self.bank.state, self.large) == nil, "the oversized turbine was connected")
     end,
 })
 
@@ -367,7 +368,7 @@ test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
                 ISTimedActionQueue.add(action)
                 T.waitFor(self, function() return BankMenu.bankLabel(bank.object) ~= "Cellar" end,
                     "this client's label of the bank renamed to nothing")
-                T.bankState(self, bank)
+                T.readRecord(self, bank)
             end)
         end)
     end,
@@ -390,12 +391,12 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
         local longest = BankJobs.NAME_LENGTH
         self.full = string.rep("y", longest)
         T.batch(function()
-            T.job(self, "bank", BankJobs.RENAME, bank.position, "Shed", "named")
-            T.job(self, "bank", BankJobs.RENAME, bank.position, string.rep("x", longest + 1), "long")
-            T.job(self, "bank", BankJobs.RENAME, bank.position, "Shed\nbank", "twoLines")
-            T.bankState(self, bank, "refused")
-            T.job(self, "bank", BankJobs.RENAME, bank.position, self.full, "fullLength")
-            T.bankState(self, bank)
+            T.job(self, "bank", BankJobs.RENAME, bank, "Shed", "named")
+            T.job(self, "bank", BankJobs.RENAME, bank, string.rep("x", longest + 1), "long")
+            T.job(self, "bank", BankJobs.RENAME, bank, "Shed\nbank", "twoLines")
+            T.readRecord(self, bank, "refused")
+            T.job(self, "bank", BankJobs.RENAME, bank, self.full, "fullLength")
+            T.readRecord(self, bank)
         end)
         T.step(function()
             local box = RenameBank.ask(0, bank.object)

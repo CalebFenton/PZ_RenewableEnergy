@@ -3,7 +3,6 @@
 -- ratings (Specs.mounts, Wind.SPEC.turbines, Treadmill.SPEC). A new kind needs only its row and
 -- its sprites; a new family, its row of FAMILIES and its server module.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
@@ -12,7 +11,6 @@ local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Squares = require "cf_commonlib/Squares"
 
 local Sources = {}
-RenewableEnergy.Sources = Sources
 
 -- How far a source may be from the bank it is connected to: a radius in tiles, and floors up or
 -- down.

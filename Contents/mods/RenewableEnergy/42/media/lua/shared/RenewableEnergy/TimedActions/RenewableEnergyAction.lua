@@ -4,7 +4,6 @@
 -- A global, as the server finds the class by its Type (NetTimedAction.parse).
 
 require "Util/BuildingHelper"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"

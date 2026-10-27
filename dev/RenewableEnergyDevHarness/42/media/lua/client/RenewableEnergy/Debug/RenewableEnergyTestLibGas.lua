@@ -1,100 +1,36 @@
-require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/WoodGas/GasifierJobs"
-require "RenewableEnergy/GasLine/GasKit"
-local Squares = require "cf_commonlib/Squares"
-local Sprites = require "RenewableEnergy/Sprites"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibGenerators"
+local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
 -- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the rural find tests'
 -- digesters and gasifiers (RenewableEnergyTestsRuralFinds.lua), added to RenewableEnergyTest.
--- Digesters and gasifiers are records of the Global Object System on the authority; the server
--- handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua) build, drive and read them by kind
--- and place. A record handle is { x, y, z, square, kind }, and `object` is this client's copy of
--- its tile once it has its summary. Reads land in self.reads[label].
+-- Digesters and gasifiers are records of the Global Object System on the authority, which the
+-- harness's record kit places, sets, fills, ages and reads (kinds "digester" and "gasifier",
+-- RenewableEnergyTestKinds); the server handlers (RenewableEnergyTestServerBiogas.lua, ...Gas.lua)
+-- run what is the mod's own. Reads land in self.reads[label].
 
 local T = RenewableEnergyTest
-local Digester, GasKit, GasifierJobs = RenewableEnergy.Digester, RenewableEnergy.GasKit, RenewableEnergy.GasifierJobs
-
--- What a record kind's tile and summary are on this client: the server helper's RECORD_KINDS, whose
--- owner and tile test are shared code. The helper loads after client Lua, so it is required here.
-local function kindOf(handle)
-    local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
-    return Helpers.RECORD_KINDS[handle.kind]
-end
-
---- The server handlers' args for the record `handle`, with `extra`'s fields added.
-function T.recordArgs(handle, extra)
-    local args = T.at(handle, extra)
-    args.kind = handle.kind
-    return args
-end
-
---- Queues a record of `kind` ("digester", "gasifier") on the Sprites[kind] tile `tile` (a dotted
---- path: "barrel.MetalDrum", "standard"), built as the build menu builds it on `opts.square`, else on
---- a free square (outdoors unless `opts.indoors`) near `opts.near`, at least `opts.minDistance`
---- away. Returns its handle, or nil when there is no square.
-function T.placeRecord(self, kind, tile, opts)
-    opts = opts or {}
-    local square = opts.square or T.square(self, { indoors = opts.indoors, near = opts.near, minDistance = opts.minDistance },
-        "a free square for a " .. kind)
-    if not square then return nil end
-    local handle = T.at(square, { square = square, kind = kind })
-    T.server(self, "placeRecord", T.recordArgs(handle, { tile = tile }))
-    local spec = kindOf(handle)
-    local owner = spec.owner()
-    T.waitFor(self, function()
-        local object = Squares.findObjectOn(getSquare(handle.x, handle.y, handle.z), spec.isObject)
-        handle.object = object and owner.summaryOf(object) and object or nil
-        return handle.object ~= nil
-    end, "this client's copy of the " .. kind)
-    return handle
-end
 
 --- Queues building a record of `kind` from the build menu's entry of `entity` on a T.buildSite
---- (T.build with `prefer`), waiting for this client's copy of the tile `tile`. Its record lands in
---- self.reads.built. Returns the handle, or nil.
+--- (T.build with `prefer`, which takes away what it leaves when the test ends), waiting for this
+--- client's copy of the tile `tile`. Its record lands in self.reads.built. Returns the handle, or
+--- nil.
 function T.buildRecord(self, kind, entity, tile, prefer)
     local square = T.buildSite(self)
     if not square then return nil end
-    local handle = T.at(square, { square = square, kind = kind })
-    T.server(self, "trackAt", T.recordArgs(handle))
+    local handle = T.where(square)
+    handle.kind = kind
     if not T.build(self, entity, square, prefer, function() return T.objectWithSprite(square, tile) ~= nil end,
         "this client's copy of the " .. tostring(tile) .. " " .. kind) then
         return nil
     end
     T.readRecord(self, handle, "built")
     return handle
-end
-
---- Queues setting the record's saved fields `fields` as of now, and those of `ago` ({ [field] =
---- hours }) to the world hour that many hours before the server runs it.
-function T.setRecord(self, handle, fields, ago)
-    T.server(self, "setRecord", T.recordArgs(handle, { fields = fields, ago = ago }))
-end
-
---- Queues putting `items` in the record's containers as a player's transfer does: { hopper = { {
---- type, count, rotten } }, filter = ... }.
-function T.fillRecord(self, handle, items)
-    T.server(self, "fillRecord", T.recordArgs(handle, { items = items }))
-end
-
---- Queues the record's own pass, as though `hours` had passed since its last; its state lands in
---- self.reads[label] if given.
-function T.ageRecord(self, handle, hours, label)
-    T.read(self, "ageRecord", T.recordArgs(handle, { hours = hours }), label)
-end
-
---- Queues a read of the record's state (the server's Helpers.recordState) into self.reads[label].
-function T.readRecord(self, handle, label)
-    T.read(self, "readRecord", T.recordArgs(handle), label)
-end
-
---- The record's summary as this client has it, or nil; T.clientSummary's for a record handle.
-function T.recordSummary(handle)
-    return handle.object and kindOf(handle).owner().summaryOf(handle.object)
 end
 
 -- Materials -------------------------------------------------------------------------------------
@@ -164,7 +100,7 @@ end
 --- Queues running the digester for `hours` at the air temperature `air` (°C), without moving the
 --- clock, through its own pass (DigesterObject:run).
 function T.runDigester(self, handle, hours, air)
-    T.server(self, "runDigester", T.recordArgs(handle, { hours = hours, air = air }))
+    T.server(self, "runDigester", T.at(handle, { hours = hours, air = air }))
 end
 
 --- Queues a wait until this client's summary of the record shows `gas` m³, to the hundredth the
@@ -215,17 +151,17 @@ end
 function T.lightGasifier(self, gasifier)
     T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
     T.step(function()
-        T.giveMaterials(self, "light", GasifierJobs.materials(T.player(), GasifierJobs.LIGHT, T.clientSummary(gasifier)))
+        T.giveMaterials(self, "light", GasifierJobs.materials(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
     end)
     T.actionJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
 end
 
 --- Queues the gasifier burning `kg` of its wood at once.
 function T.burnGasifier(self, gasifier, kg)
-    T.server(self, "burnGasifier", T.recordArgs(gasifier, { kg = kg }))
+    T.server(self, "burnGasifier", T.at(gasifier, { kg = kg }))
 end
 
--- Generators -----------------------------------------------------------------------------------
+-- Gas lines -------------------------------------------------------------------------------------
 
 --- Queues a load the line feeding the running `generator` can't carry, a gas pass, and a read of
 --- the generator, stalled, into self.reads[label].
@@ -234,61 +170,6 @@ function T.stallLine(self, generator, label)
     T.gasLoad(self, GasKit.CAP_W + 1)
     T.gasPass(self, generator, 0.1)
     T.readGenerator(self, generator, label)
-end
-
---- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging
---- from it take it, but at once and with no pass running; the next gas pass or job bills them to a
---- line on gas.
-function T.burnFuel(self, generator, litres)
-    T.server(self, "burnFuel", T.at(generator, { litres = litres }))
-end
-
---- Queues the gas pass, as though `hours` had passed since the generator's last.
-function T.gasPass(self, generator, hours)
-    T.server(self, "gasPass", T.at(generator, { hours = hours }))
-end
-
---- Queues a gas pass, then reads of the generator and of the record `source` feeding it into
---- self.reads[label] and self.reads[label .. "Source"].
-function T.readBill(self, generator, source, label)
-    T.batch(function()
-        T.gasPass(self, generator, 0)
-        T.readGenerator(self, generator, label)
-        T.readRecord(self, source, label .. "Source")
-    end)
-end
-
---- Queues moving the clock on `hours`, so vanilla bills a running generator for each whole hour
---- that passes (IsoGenerator.update).
-function T.jumpClock(self, hours)
-    T.step(function() T.setTime(self, getGameTime():getTimeOfDay() + hours) end)
-end
-
--- How long vanilla may take to bill a generator after the clock moved, in ms: it bills in the
--- generator's next update.
-local BILL_MS = 5000
-
---- Queues a wait until vanilla has billed the generator since the read `label` (T.readBill): its
---- fuel fell, or a gas pass since saw it fall.
-function T.waitForBill(self, generator, label)
-    T.serverUntil(self, "generatorRead", T.at(generator), function(read)
-        local before = self.reads[label]
-        local billed, was = read.state and read.state.billedHour, before.state and before.state.billedHour
-        return read.fuel < before.fuel - 0.0001 or (billed ~= nil and was ~= nil and billed > was)
-    end, BILL_MS)
-end
-
---- The litres vanilla bills the generator between the reads `before` and `after` (T.readBill),
---- had it the fuel: its bill an hour (`bill`, the GeneratorFuelConsumption option applied) for
---- each whole world hour between them (IsoGenerator.update). Also returns those hours.
-function T.vanillaBill(self, before, after)
-    local hours = math.floor(self.reads[after].hours) - math.floor(self.reads[before].hours)
-    return hours * self.reads[before].bill, hours
-end
-
---- Queues every kitted generator delivering `watts`, whatever it powers, until the test ends.
-function T.gasLoad(self, watts)
-    T.server(self, "gasLoad", { watts = watts })
 end
 
 -- What this client's copy of a generator's kit state shows once each job is done.
@@ -333,7 +214,7 @@ local CORNERS = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } }
 function T.squareBeside(square, corner)
     for _, offset in ipairs(corner and CORNERS or SIDES) do
         local found = getSquare(square:getX() + offset[1], square:getY() + offset[2], square:getZ())
-        if RenewableEnergy.Debug.isFreeSquare(found, false) then
+        if Debug.isFreeSquare(found, false) then
             return found
         end
     end

@@ -1,5 +1,5 @@
 -- Scales vanilla's vehicle battery charging and draining by the installed battery's capacity
--- (RenewableEnergy.VehicleBattery.chargeScale), so a deep cycle battery's charge moves slower
+-- (VehicleBattery.chargeScale), so a deep cycle battery's charge moves slower
 -- than a car battery's for the same watts: the lights and radio run longer with the engine off,
 -- and the alternator takes longer to fill it.
 --

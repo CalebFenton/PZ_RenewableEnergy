@@ -2,16 +2,18 @@
 -- from art/models in the world: it builds one stage after another on the same open lot and saves
 -- each shot to <cachedir>/Screenshots as <name>.png.
 
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local Sprites = require "RenewableEnergy/Sprites"
+local HarnessQA = require "PZHarness/QA"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
 require "PZHarness/StageLots"
 local Capture = require "PZHarness/Capture"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Specs = require "RenewableEnergy/Specs"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 
 local Art = {}
 
-local Sprites = RenewableEnergy.Sprites
 local NOON = 12
 
 local SCALE_ITEM = "Base.CarBattery1"
@@ -239,7 +241,7 @@ local LID_SWING_MS = 1000
 
 --- Sets the lid open or shut on the lone trailer and returns a runSteps wait for its swing.
 local function swingLid(pair, open)
-    local door = pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):getDoor()
+    local door = pair.trailer:getPartById(ArrowBoard.LID):getDoor()
     -- Spawned trailers are often locked, and a locked lid wouldn't open in play.
     door:setLocked(false)
     door:setOpen(open)
@@ -249,7 +251,7 @@ end
 
 -- The lid shut and padlocked or not; ArrowBoard's lid watcher shows the padlock by the next frame.
 local function lockLid(pair, locked)
-    local door = pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):getDoor()
+    local door = pair.trailer:getPartById(ArrowBoard.LID):getDoor()
     door:setOpen(false)
     door:setLockBroken(false)
     door:setLocked(locked)
@@ -265,7 +267,6 @@ local FLASH_SHOT_MS = 500
 -- Returns a runSteps wait: at night until the lighting has settled on the dark and the board's
 -- lamppost, and for lit lamps until they are a little way into a flash.
 local function setLamps(pair, lit, night)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
     pair.trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer():removeAllItems()
     if night then
         getGameTime():setTimeOfDay(0)
@@ -294,7 +295,7 @@ local HITCHED_STATES = {
         name = "trailer_brake",
         set = function(pair)
             -- A towed trailer's brake lights follow its car's, which need charge in the car's battery.
-            local part = RenewableEnergy.VehicleBattery.partOf(pair.car)
+            local part = VehicleBattery.partOf(pair.car)
             local battery = part and part:getInventoryItem()
             if battery then
                 battery:setCurrentUsesFloat(1)
@@ -305,15 +306,15 @@ local HITCHED_STATES = {
     {
         name = "trailer_panel_cracked",
         set = function(pair)
-            pair.trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[RIGHT]):setCondition(30)
-            RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
+            pair.trailer:getPartById(ArrowBoard.PANELS[RIGHT]):setCondition(30)
+            ArrowBoard.showPanels(pair.trailer)
         end,
     },
     {
         name = "trailer_panel_removed",
         set = function(pair)
-            pair.trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[LEFT]):setInventoryItem(nil)
-            RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
+            pair.trailer:getPartById(ArrowBoard.PANELS[LEFT]):setInventoryItem(nil)
+            ArrowBoard.showPanels(pair.trailer)
         end,
     },
     { name = "trailer_rear_damage1", set = function(pair) setCondition(pair.trailer, { "TruckBed" }, STAGE_1) end },
@@ -328,7 +329,7 @@ local LONE_STATES = {
     { name = "trailer_damage2", set = function(pair) setCondition(pair.trailer, BODY_PARTS, STAGE_2) end },
     {
         name = "trailer_lid_removed",
-        set = function(pair) pair.trailer:getPartById(RenewableEnergy.ArrowBoard.LID):setInventoryItem(nil) end,
+        set = function(pair) pair.trailer:getPartById(ArrowBoard.LID):setInventoryItem(nil) end,
     },
     {
         name = "trailer_washed",
@@ -350,7 +351,7 @@ local function addStates(run, art, states)
             local pair = art.pair
             pair.trailer:repair()
             -- repair() mends the panels without anything showing their models again.
-            RenewableEnergy.ArrowBoard.showPanels(pair.trailer)
+            ArrowBoard.showPanels(pair.trailer)
             if pair.car then
                 pair.car:setStoplightsOn(false)
             end
@@ -397,7 +398,7 @@ end
 
 -- Every item of the mod's, after a vanilla car battery for scale.
 local function itemTypes()
-    local names = RenewableEnergy.Debug.items()
+    local names = HarnessQA.itemsOfModule("RenewableEnergy")
     table.insert(names, 1, SCALE_ITEM)
     return names
 end
@@ -454,15 +455,16 @@ local CRACKED_SHOT = { name = "cracked", x = 7, y = 7, zoomSteps = 2 }
 
 local function addCrackedShot(run, player, lot)
     run:add(function()
+        local Place = require "RenewableEnergy/World/Place"
         Harness.emptyLot(lot)
         clearVehicles(lot)
         placeTiles(lot, CRACKED_WALLS)
         for _, panel in ipairs(CRACKED_PANELS) do
             local modules = {}
             for slot, condition in ipairs(panel.conditions) do
-                modules[slot] = { type = RenewableEnergy.Specs.factoryModule, condition = condition }
+                modules[slot] = { type = Specs.factoryModule, condition = condition }
             end
-            RenewableEnergy.Place.panel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
+            Place.panel(lotSquare(lot, panel.x, panel.y), panel.sprite, modules)
         end
         Harness.recalcLot(lot)
     end)
@@ -472,16 +474,16 @@ local function addCrackedShot(run, player, lot)
     local trailer
     run:add(function()
         -- Row 4 keeps all of it on the cleared lot.
-        trailer = addVehicleDebug(RenewableEnergy.ArrowBoard.SCRIPT, IsoDirections.N, 0, lotSquare(lot, 6, 4))
+        trailer = addVehicleDebug(ArrowBoard.SCRIPT, IsoDirections.N, 0, lotSquare(lot, 6, 4))
         return 1
     end)
     run:add(function()
         trailer:repair()
-        trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[LEFT]):setCondition(30)
-        trailer:getPartById(RenewableEnergy.ArrowBoard.PANELS[RIGHT]):setCondition(100)
-        RenewableEnergy.ArrowBoard.showPanels(trailer)
+        trailer:getPartById(ArrowBoard.PANELS[LEFT]):setCondition(30)
+        trailer:getPartById(ArrowBoard.PANELS[RIGHT]):setCondition(100)
+        ArrowBoard.showPanels(trailer)
         -- Dark, as Stage.spawnTrailer leaves its trailers.
-        RenewableEnergy.ArrowBoard.setSwitch(trailer, false)
+        ArrowBoard.setSwitch(trailer, false)
         return Stage.vehiclesAtRest({ trailer = trailer }, false)
     end)
     addShot(run, player, lot, CRACKED_SHOT)

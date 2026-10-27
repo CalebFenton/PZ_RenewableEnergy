@@ -1,4 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Specs = require "RenewableEnergy/Specs"
 
 -- The arrow board's power (ArrowBoard/Power.lua): the panels charging the box, the lamps and
 -- their flashing, and the box's discharge cycle.
@@ -29,7 +32,6 @@ test("renewable_energy_world_arrow_board_panels_charge_the_emptiest_battery", {
         end)
     end,
     validate = function(self)
-        local Specs = RenewableEnergy.Specs
         local deepWh, l16Wh = Specs.batteries[T.DEEP_CYCLE].wh, Specs.batteries[T.L16].wh
         -- How watts follow condition is charge_scales_with_panel_condition's.
         local first, second = self.reads.first, self.reads.second
@@ -110,7 +112,7 @@ end
 test("renewable_energy_world_arrow_board_lamps_follow_switch_board_and_photocell", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
-        local trailer, board = self.trailer, RenewableEnergy.ArrowBoard.BOARD
+        local trailer, board = self.trailer, ArrowBoard.BOARD
         self.stages = {}
         local function stage(name, args, night, want) lampStage(self, trailer, name, args, night, want) end
         batchOnTrailer(function()
@@ -136,7 +138,7 @@ test("renewable_energy_world_arrow_board_lamps_stay_dark_without_batteries", {
         local trailer = self.trailer
         batchOnTrailer(function()
             T.onVehicle(self, trailer, "setTrailer", {
-                switchOn = true, box = { { type = RenewableEnergy.Specs.controller } }, panels = modulesOnBothPanels(100),
+                switchOn = true, box = { { type = Specs.controller } }, panels = modulesOnBothPanels(100),
             })
             T.onVehicle(self, trailer, "arrowBoardRun", { call = "update", with = { 1 } }, "update")
         end)
@@ -173,7 +175,7 @@ test("renewable_energy_world_arrow_board_lamps_drain_a_lightbars_share", {
             local battery = boxItems(answer.state, T.CAR_BATTERY)[1]
             return battery and battery.charge or -1
         end
-        local share = 2 * RenewableEnergy.ArrowBoard.SPEC.lampShare
+        local share = 2 * ArrowBoard.SPEC.lampShare
         expectNear("the car battery's charge after two hours lit by day", charge(self.reads.day), 0.8 - share, 2e-5)
         expectNear("the car battery's charge after two more hours lit at night", charge(self.reads.night), 0.8 - 2 * share, 3e-5)
     end,
@@ -186,7 +188,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
     hour = 12,
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
-        local trailer, spec = self.trailer, RenewableEnergy.ArrowBoard.SPEC
+        local trailer, spec = self.trailer, ArrowBoard.SPEC
         local use = instanceItem(T.DEEP_CYCLE):getUseDelta()
         self.use, self.stages = use, {}
         local function stage(name, args, want) lampStage(self, trailer, name, args, false, want) end
@@ -207,7 +209,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
         end)
     end,
     validate = function(self)
-        local spec, wh = RenewableEnergy.ArrowBoard.SPEC, RenewableEnergy.Specs.batteries[T.DEEP_CYCLE].wh
+        local spec, wh = ArrowBoard.SPEC, Specs.batteries[T.DEEP_CYCLE].wh
         expectLampStages(self)
         -- A battery's charge is read back as a 32-bit float.
         local cut, chargedState = self.reads.cut.state, self.reads.charged.state
@@ -229,7 +231,7 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
         local trailer = self.trailer
-        local period = 60000 / RenewableEnergy.ArrowBoard.SPEC.flashesPerMinute
+        local period = 60000 / ArrowBoard.SPEC.flashesPerMinute
         -- Queues counting the frames the board shows lit and dark into self[key], until `enough`
         -- of them are seen or `ms` pass.
         local function watch(key, ms, enough)
@@ -293,7 +295,7 @@ test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
     validate = function(self)
         local new = instanceItem(T.CAR_BATTERY)
         local full = new:getConditionMax()
-        local expected = full - math.floor(RenewableEnergy.Battery.cycleWear(new, 1) * full)
+        local expected = full - math.floor(Battery.cycleWear(new, 1) * full)
         if not expect(expected < full, "a flat day wears a car battery less than a point, so its wear can't show") then return end
         local evening = boxItems(self.reads.evening.state, T.CAR_BATTERY)[1]
         expectEqual("the battery's condition after the evening's passes", evening and evening.condition, full)

@@ -2,6 +2,12 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local Materials = require "cf_commonlib/Materials"
 local Squares = require "cf_commonlib/Squares"
 local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Wood gas: the gasifier, built from the build menu, burning wood for the generator it is piped to
 -- or idling, leaving ash, tar and condensate, and the jobs at it (WoodGas/Gasifier.lua,
@@ -12,8 +18,6 @@ local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
 local T = RenewableEnergyTest
 local test = T.test
 
-local GasKit, Specs, Sprites = RenewableEnergy.GasKit, RenewableEnergy.Specs, RenewableEnergy.Sprites
-local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
 
 -- A hopper load of wood, and a filter of clean packing.
 local WOOD = { { type = "Base.Plank", count = 6 } }
@@ -261,20 +265,20 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
         local gasifier = T.placeRecord(self, "gasifier", "primitive")
         if not gasifier then return end
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 2 } } })
-        T.give(self, "matches", { { type = RenewableEnergy.GasHeater.FIRE_STARTER.item } })
+        T.give(self, "matches", { { type = GasHeater.FIRE_STARTER.item } })
         T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
         T.step(function()
-            self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.clientSummary(gasifier)))
+            self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))
         end)
         T.give(self, "bellows", { { type = Gasifier.BELLOWS[1] } })
         T.actionJob(self, "gasifier", gasifier, GasifierJobs.LIGHT)
         T.actionJob(self, "gasifier", gasifier, GasifierJobs.PUT_OUT)
-        T.server(self, "takeItems", { type = Gasifier.BELLOWS[1] })
+        T.takeItems(self, nil, Gasifier.BELLOWS[1])
         T.waitForSummary(self, gasifier, function(summary) return not summary.lit end, "this client's summary of the gasifier put out")
         T.waitFor(self, function() return not T.player():getInventory():containsTypeRecurse(Gasifier.BELLOWS[1]) end,
             "this client's copy of the bellows gone")
         T.step(function()
-            self.outAt = T.clientSummary(gasifier).outSince
+            self.outAt = T.recordSummary(gasifier).outSince
             self.refusals = { justOut = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object) }
         end)
         local step = Gasifier.COLD_HOURS / 20
@@ -285,7 +289,7 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
                 "this client's summary of the gasifier out " .. case[2] .. " hours")
             T.step(function()
                 self.refusals[case[1]] = GasifierJobs.refusal(T.player(), GasifierJobs.LIGHT, gasifier.object)
-                self.outAt = T.clientSummary(gasifier).outSince
+                self.outAt = T.recordSummary(gasifier).outSince
             end)
         end
     end,

@@ -4,7 +4,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
@@ -12,7 +11,6 @@ local Distributions = require "RenewableEnergy/Items/Distributions"
 local Chance = require "cf_commonlib/Chance"
 
 local Finds = {}
-RenewableEnergy.Finds = Finds
 
 local MODULE = Specs.factoryModule
 

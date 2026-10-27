@@ -2,7 +2,6 @@
 -- (cf_commonlib's Jobs). BankSystem.jobSite does them. Parts enter and leave a bank only through
 -- Wire In and Unwire (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -10,7 +9,6 @@ local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local Jobs = require "cf_commonlib/Jobs"
 
 local BankJobs = {}
-RenewableEnergy.BankJobs = BankJobs
 
 BankJobs.TURN_ON = "TurnOn"
 BankJobs.TURN_OFF = "TurnOff"

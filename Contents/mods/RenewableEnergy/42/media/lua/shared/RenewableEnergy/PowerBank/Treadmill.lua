@@ -1,7 +1,7 @@
 -- Vanilla's treadmill (Sprites.treadmill), two tiles. Unwired, a run on it draws its motor's watts
 -- like any appliance. Wired to feed a bank, a run on it banks watt-hours instead.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
@@ -9,7 +9,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
 local Treadmill = {}
-RenewableEnergy.Treadmill = Treadmill
 
 -- Tile modData: the tile wired to feed a bank (one of the treadmill's two tiles).
 Treadmill.WIRED_KEY = "RenewableEnergy_treadmillWired"
@@ -29,7 +28,7 @@ Treadmill.SPEC = {
     xpPerHour = { Fitness = 20, Sprinting = 15 },
 }
 
-local FACING_STEPS = RenewableEnergy.SIDE_STEPS
+local FACING_STEPS = Utilities.SIDE_STEPS
 -- Steps back from each end of the treadmill (Sprites.treadmill) to its rear end.
 local STEPS_TO_REAR = { rear = 0, console = 1 }
 

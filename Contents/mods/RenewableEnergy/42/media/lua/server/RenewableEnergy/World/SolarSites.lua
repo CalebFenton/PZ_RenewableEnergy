@@ -9,7 +9,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -28,7 +27,6 @@ local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
 local Chance = require "cf_commonlib/Chance"
 
 local SolarSites = {}
-RenewableEnergy.SolarSites = SolarSites
 
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 

@@ -1,13 +1,14 @@
 -- Wind chargers: output from the game's wind (ClimateManager.getWindspeedKph, no day/night cycle),
 -- the power curve, height and shelter; plus the brake and broken-blade modData, written only on
--- the authority (RenewableEnergy.WindSource).
+-- the authority (WindSource).
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
 local Wind = {}
+-- Entities.txt names its OnCreate by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.Wind = Wind
 
 -- Wind chargers by kind: watts at ratedKph, starting at cutInKph, and the input slots each takes in

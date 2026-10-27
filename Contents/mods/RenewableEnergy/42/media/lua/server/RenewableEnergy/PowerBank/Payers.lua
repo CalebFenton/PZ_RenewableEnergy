@@ -15,7 +15,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -28,7 +27,6 @@ local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
 local Payers = {}
-RenewableEnergy.Payers = Payers
 
 local EPSILON = 1e-6
 

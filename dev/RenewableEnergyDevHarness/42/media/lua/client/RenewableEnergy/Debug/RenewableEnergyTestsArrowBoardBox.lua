@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
+local BatteryBoxLid = require "RenewableEnergy/UI/BatteryBoxLid"
 
 -- The arrow board's battery box (ArrowBoard/Trailer.lua, UI/BatteryBoxLid.lua, Vehicles.txt): its
 -- lid, padlock, loot window and lamp switch.
@@ -227,10 +228,10 @@ end
 -- takes) or "none".
 local function cutPadlockSlice()
     local needs = getText("IGUI_RenewableEnergy_CutPadlockNeeds",
-        getScriptManager():FindItem(RenewableEnergy.BatteryBoxLid.CUTTERS):getDisplayName())
+        getScriptManager():FindItem(BatteryBoxLid.CUTTERS):getDisplayName())
     local shown = "none"
     for _, slice in ipairs(radialSlices()) do
-        if slice.command[1] == RenewableEnergy.BatteryBoxLid.cutPadlock then
+        if slice.command[1] == BatteryBoxLid.cutPadlock then
             shown = "offered"
         elseif slice.command[1] == nil and slice.text == needs then
             shown = "unavailable"
@@ -244,7 +245,7 @@ end
 local function switchSlice()
     local shown = "none"
     for _, slice in ipairs(radialSlices()) do
-        if slice.command[1] == RenewableEnergy.BatteryBoxLid.flipSwitch then
+        if slice.command[1] == BatteryBoxLid.flipSwitch then
             shown = slice.command[4] and "on" or "off"
         elseif slice.command[1] == nil and slice.text == getText("IGUI_RenewableEnergy_LampsSwitchShut") then
             shown = "shut"
@@ -264,18 +265,18 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         padlockBox(self, trailer, { { type = T.DEEP_CYCLE, charge = 0.5 } })
         T.waitFor(self, function() return self.box:getItemContainer():getItems():size() == 1 end,
             "this client's copy of the battery in the box")
-        T.give(self, "cutters", { { type = RenewableEnergy.BatteryBoxLid.CUTTERS } })
+        T.give(self, "cutters", { { type = BatteryBoxLid.CUTTERS } })
         T.server(self, "arrowBoardKey", function() return T.vehicleArgs(trailer) end)
         T.step(function()
             local vehicle = trailer.vehicle
             standAtBox(vehicle)
             self.offered = cutPadlockSlice() == "offered"
             self.keyUnlocks = vehicle:canUnlockDoor(self.lid, p)
-            local cutters = RenewableEnergy.BatteryBoxLid.padlockCutters(p, self.lid)
+            local cutters = BatteryBoxLid.padlockCutters(p, self.lid)
             if cutters then
                 -- What the menu's Cut Padlock does, from where its walk would end.
                 standIn(vehicle, self.box:getArea())
-                RenewableEnergy.BatteryBoxLid.cutPadlock(p, self.lid, cutters)
+                BatteryBoxLid.cutPadlock(p, self.lid, cutters)
             end
         end)
         T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.lockBroken end, "cut")
@@ -305,7 +306,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         expectEqual("Cut Padlock in the menu on a cut lock", self.cutSlice, "none")
         expect(self.openAccess, "the box doesn't open once its padlock is cut")
         expectBatteryTaken(self)
-        expect(T.carried(RenewableEnergy.BatteryBoxLid.CUTTERS) ~= nil,
+        expect(T.carried(BatteryBoxLid.CUTTERS) ~= nil,
             "cutting used up the bolt cutters")
     end,
 })
@@ -326,7 +327,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
         end
         padlockBox(self, trailer)
         look("at a padlocked box without bolt cutters", "unavailable")
-        T.give(self, "cutters", { { type = RenewableEnergy.BatteryBoxLid.CUTTERS } })
+        T.give(self, "cutters", { { type = BatteryBoxLid.CUTTERS } })
         look("at a padlocked box with bolt cutters", "offered")
         unlockBox(self, trailer)
         look("at an unlocked box", "none")
@@ -396,7 +397,7 @@ test("renewable_energy_world_arrow_board_switch_works_only_in_the_open_box", {
             T.step(function()
                 -- From where the switch's walk would end.
                 standIn(trailer.vehicle, boxOf(trailer.vehicle):getArea())
-                RenewableEnergy.BatteryBoxLid.flipSwitch(p, trailer.vehicle, on)
+                BatteryBoxLid.flipSwitch(p, trailer.vehicle, on)
             end)
             local label = on and "onAgain" or "off"
             T.awaitVehicleState(self, trailer, function(state) return state.switchOn == on end, label)

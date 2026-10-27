@@ -2,7 +2,6 @@
 -- that takes the battery bank out of fetchVars.generator runs before other mods' hooks read it.
 
 require "ISUI/ISWorldObjectContextMenu"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 

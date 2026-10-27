@@ -8,7 +8,6 @@
 -- what the authority last put in).
 
 require "TimedActions/ISTakeGenerator"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
@@ -17,7 +16,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
 local GasKit = {}
-RenewableEnergy.GasKit = GasKit
 
 GasKit.STATE_KEY = "RenewableEnergy_gas"
 GasKit.ITEM = "RenewableEnergy.GasConversionKit"

@@ -1,7 +1,7 @@
 -- Development only; the --loot mode (RenewableEnergyDevHarness.lua) prints this report. The
 -- modules and batteries a thorough player finds in each town of RenewableEnergyDevTownCensus,
--- and the yardsticks that turn them into power. Client Lua: it reads WorldSpawns, SolarSites and
--- ArrowBoard as they run, which a single player game, the only one --loot runs, has.
+-- and the yardsticks that turn them into power. Client Lua: it requires WorldSpawns, SolarSites and
+-- Finds as it runs, which a single player game, the only one --loot runs, has.
 --
 -- A town's finds are dev/loot/census.py's counts of its container tiles, rooms and vehicle stalls,
 -- each times what it holds on average, plus what WorldSpawns' OnSeeNewRoom puts in its rooms
@@ -16,16 +16,19 @@
 -- a change to either reaches the report without an edit here.
 
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/Battery"
+local Sun = require "RenewableEnergy/Sun"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
 require "PZHarness/Loot"
-require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local Loot = require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Specs = require "RenewableEnergy/Specs"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
 
-local Loot, PZLoot = RenewableEnergy.Loot, PZHarness.Loot
+local PZLoot = PZHarness.Loot
 local TownReport = {}
 
-local MODULE = RenewableEnergy.Specs.factoryModule
+local MODULE = Specs.factoryModule
 local LOOSE_BATTERIES = { "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery" }
 local CAR_BATTERIES = { "Base.CarBattery1", "Base.CarBattery2", "Base.CarBattery3" }
 
@@ -50,7 +53,7 @@ end
 
 -- `count` new batteries of `fullType`.
 local function batteriesOf(fullType, count)
-    return { batteries = count, wh = count * RenewableEnergy.Specs.batteries[fullType].wh }
+    return { batteries = count, wh = count * Specs.batteries[fullType].wh }
 end
 
 -- What Seal Cracked Module brings the module item `item` to, or its condition where a seal can't
@@ -69,7 +72,7 @@ local function moduleOver(range)
     local module = instanceItem(MODULE)
     local sum, repairedSum, n = 0, 0, 0
     for condition = range.min, range.max do
-        RenewableEnergy.Wear.setCondition(module, condition)
+        Wear.setCondition(module, condition)
         sum = sum + condition
         repairedSum = repairedSum + sealedCondition(module)
         n = n + 1
@@ -86,7 +89,6 @@ end
 -- What one fill of a container holds, for PZHarness.Loot.sample: its modules with their condition
 -- as found and after Seal Cracked Module, and its batteries with their watt-hours after wear.
 local function findsIn(container)
-    local Battery = RenewableEnergy.Battery
     local finds = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
@@ -114,7 +116,6 @@ end
 -- ArrowBoard stocks them straight into the trailer's panel parts, which a scratch container can't
 -- stand in for, so they are counted from its STOCK.
 local function arrowBoardPanels(weathered, second)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
     local modules = math.min(#ArrowBoard.PANELS, ArrowBoard.STOCK.modules * SandboxVars.RenewableEnergy.LRMSolarPanels)
     local total = add(none(), weathered, math.min(1, modules))
     return add(total, second, math.max(0, modules - 1))
@@ -123,7 +124,7 @@ end
 -- The finds each source holds on average; banks and crates by their BANK_STOCK and CRATE_STOCK
 -- names, sampled over `samples` fills.
 local function findKinds(samples)
-    local Finds, ArrowBoard = RenewableEnergy.Finds, RenewableEnergy.ArrowBoard
+    local Finds = require "RenewableEnergy/Items/Finds"
     local cracked, weathered = moduleOver(Finds.CRACKED), moduleOver(Finds.WEATHERED)
     local stocks, container = Loot.worldStocks(), PZLoot.scratchContainer(nil)
     local banks, crates = {}, {}
@@ -246,7 +247,8 @@ end
 
 -- The cracked modules a container of `containerType` in a room named `roomName` gets on average.
 local function roomCrackedModules(roomName, containerType, container)
-    return expectedHits(function() RenewableEnergy.Finds.addCrackedModules(roomName, containerType, container) end)
+    local Finds = require "RenewableEnergy/Items/Finds"
+    return expectedHits(function() Finds.addCrackedModules(roomName, containerType, container) end)
 end
 
 -- What the rooms of a town hold: `listed`, the mod's items in room loot; `cracked`, cracked
@@ -255,7 +257,7 @@ end
 -- kit crates it places; and `cars`, car batteries in room loot. Banks and crates need Battery
 -- Bank Spawn on.
 local function roomFinds(town, kinds)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
     local row = { listed = add(none(), kinds.intact, expectedInTown(town, MODULE)), cracked = none(), banks = none(),
         banksByRoom = {}, crates = none(), cars = 0 }
     for _, fullType in ipairs(LOOSE_BATTERIES) do
@@ -389,13 +391,14 @@ local function vehicleCrackedModules(script, zoneName)
     if not (distribution and distribution.Normal and vehicleScript) then
         return 0
     end
+    local Finds = require "RenewableEnergy/Items/Finds"
     local roomName = string.gsub(script, "^Base%.", "")
     local total = 0
     for i = 0, vehicleScript:getPartCount() - 1 do
         local partId = vehicleScript:getPart(i):getId()
         if distribution.Normal[partId] then
             total = total + expectedHits(function()
-                RenewableEnergy.Finds.addCrackedModules(roomName, partId, partContainer(zoneName, partId))
+                Finds.addCrackedModules(roomName, partId, partContainer(zoneName, partId))
             end)
         end
     end
@@ -404,7 +407,7 @@ end
 
 -- What the vehicles of `stalls` hold, arrow boards included, and how many arrow boards they are.
 local function vehicleFinds(stalls, kinds)
-    local arrowBoard = RenewableEnergy.ArrowBoard.SCRIPT
+    local arrowBoard = ArrowBoard.SCRIPT
     local total, arrowBoards, loot = none(), 0, {}
     for zoneName, count in pairs(stalls) do
         for script, perStall in pairs(zoneVehicles(zoneName)) do
@@ -430,7 +433,7 @@ end
 -- What a site holds once placed: its panels' modules, its bank's batteries, its crate and its
 -- arrow board.
 local function siteFinds(site, kinds)
-    local SolarSites = RenewableEnergy.SolarSites
+    local SolarSites = require "RenewableEnergy/World/SolarSites"
     local kind = SolarSites.KINDS[site.kind]
     local total = none()
     if kind.panels then
@@ -438,7 +441,7 @@ local function siteFinds(site, kinds)
         local moduleSum = 0
         for _, panel in ipairs(site.panels) do
             local mount = SolarSites.mountKind(panel[4])
-            moduleSum = moduleSum + (kind.modules and midpoint(kind.modules) or RenewableEnergy.Specs.mounts[mount].modules)
+            moduleSum = moduleSum + (kind.modules and midpoint(kind.modules) or Specs.mounts[mount].modules)
         end
         add(total, kinds.site, placedPanels * moduleSum / #site.panels)
     end
@@ -466,7 +469,7 @@ end
 
 -- Yardsticks ------------------------------------------------------------------------------------
 
-local CLEAR_ONLY = { { 1, RenewableEnergy.Sun.CLEAR_WEATHER } }
+local CLEAR_ONLY = { { 1, Sun.CLEAR_WEATHER } }
 -- The 15th of July and of December, as days of the year.
 local MONTH_DAYS = { july = 196, december = 349 }
 -- Hours between the sun's positions a day is added up over.
@@ -478,7 +481,7 @@ local SUN_STEP = 0.5
 local function moduleDayWh(dayOfYear, mount, weather)
     local latitude = getClimateManager():getSeason():getLat()
     local light = Yardsticks.dayIrradiance(dayOfYear, mount, weather, latitude, SUN_STEP)
-    return RenewableEnergy.Sun.wattsFrom(RenewableEnergy.Specs.modules[MODULE].watts, light, 0)
+    return Sun.wattsFrom(Specs.modules[MODULE].watts, light, 0)
 end
 
 -- Each kind of battery a bank holds; the three car batteries are alike, so one stands for them.
@@ -489,7 +492,6 @@ local LIFE_BATTERIES = { "Base.CarBattery1", "RenewableEnergy.JarBattery", "Rene
 -- its new capacity every night, worn as a bank wears it (Battery.cycleWear at the Battery Wear
 -- option): the same load is a deeper share of what a worn battery holds. nil if wear is off.
 local function nightsToHalf(fullType, depth)
-    local Battery = RenewableEnergy.Battery
     local scale = Battery.wearScale()
     if scale <= 0 then
         return nil
@@ -544,7 +546,7 @@ local PARTS = { "listed", "cracked", "crates", "banks", "vehicles", "sites" }
 
 -- Modules as "count (watts as found / repaired)".
 local function modulesText(finds)
-    local watts = RenewableEnergy.Specs.modules[MODULE].watts / 100
+    local watts = Specs.modules[MODULE].watts / 100
     return string.format("%.1f (%.0f / %.0f W)", finds.modules, finds.condition * watts, finds.repaired * watts)
 end
 
@@ -554,7 +556,8 @@ local function batteriesText(finds)
 end
 
 local function printReport(census, samples, mark)
-    local options, SolarSites = SandboxVars.RenewableEnergy, RenewableEnergy.SolarSites
+    local SolarSites = require "RenewableEnergy/World/SolarSites"
+    local options = SandboxVars.RenewableEnergy
     local kinds = findKinds(samples)
     local sites, siteBoards = {}, 0
     print(mark .. " modules a thorough player finds, as count (watts as found / after Seal Cracked Module), and batteries, as count (kWh as found)")

@@ -2,11 +2,9 @@
 -- same in every language, so they are not translated (m³ is a translation key only for its
 -- character; see Format.cubicMetres).
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Items = require "cf_commonlib/Items"
 
 local Format = {}
-RenewableEnergy.Format = Format
 
 -- Whole units below a thousand, then one decimal: "95 W", "1.5 kW". Real 1993 setups run from
 -- tens of watts to a few kilowatts, so both ends stay readable.

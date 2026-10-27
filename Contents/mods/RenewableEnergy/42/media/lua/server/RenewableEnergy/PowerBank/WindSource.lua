@@ -1,10 +1,10 @@
--- How a bank runs a wind charger (the "wind" family of RenewableEnergy.Sources) on the authority:
+-- How a bank runs a wind charger (the "wind" family of Sources) on the authority:
 -- its output in the wind and its blades breaking in a gale. Sets a charger's brake and broken
 -- blades on the object and on its bank's record alike.
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local StormNotice = require "RenewableEnergy/StormNotice"
@@ -14,7 +14,6 @@ local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Chance = require "cf_commonlib/Chance"
 
 local WindSource = {}
-RenewableEnergy.WindSource = WindSource
 
 -- A charger losing at least this share to other chargers near it says so, when shelter doesn't.
 local CROWDED_LOSS = 0.15
@@ -196,7 +195,7 @@ function WindSource.connect(player, source, isoObject, _, material)
     source.blades = Wind.bladesOf(source.kind, material)
     source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
     source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
-    if player and RenewableEnergy.teachOnce(player, isoObject, Panel.CONNECTED_ONCE_KEY, Perks.Electricity,
+    if player and Utilities.teachOnce(player, isoObject, Panel.CONNECTED_ONCE_KEY, Perks.Electricity,
         Specs.connectXp * Sources.slotsOf(source.kind)) then
         isoObject:transmitModData()
     end

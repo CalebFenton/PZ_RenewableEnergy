@@ -11,14 +11,12 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local Chance = require "cf_commonlib/Chance"
 local Clock = require "cf_commonlib/Clock"
 
 local PanelStorms = {}
-RenewableEnergy.PanelStorms = PanelStorms
 
 -- World ModData: `hours`, the storm hours since the world began; `lastHour`, the world age at the
 -- last pass.

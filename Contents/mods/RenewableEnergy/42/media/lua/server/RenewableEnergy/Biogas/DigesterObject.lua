@@ -7,7 +7,7 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local ObjectSystem = require "RenewableEnergy/ObjectSystem"
 local Fumes = require "RenewableEnergy/Fumes"
@@ -19,7 +19,6 @@ local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
 local DigesterObject = ObjectSystem.Object:derive("RenewableEnergy_Digester")
-RenewableEnergy.DigesterObject = DigesterObject
 
 -- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
 -- ObjectSystem); a field renamed here is lost from existing saves.
@@ -489,7 +488,7 @@ end
 --- Gives the gas for `litres` of petrol the generator was billed. Returns whether there was enough.
 function DigesterObject:supply(litres)
     local need = GasKit.M3_PER_LITRE * litres
-    return self:takeGas(need) + RenewableEnergy.EPSILON >= need
+    return self:takeGas(need) + Utilities.EPSILON >= need
 end
 
 --- What every client keeps of the digester: what its menu checks and its status window shows,

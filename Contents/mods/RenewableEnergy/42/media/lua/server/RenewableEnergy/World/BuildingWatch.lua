@@ -15,11 +15,9 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 
 local BuildingWatch = {}
-RenewableEnergy.BuildingWatch = BuildingWatch
 
 -- Squares out from a building's bounds that a roll may place on, and that must be loaded first,
 -- unless the watcher names its own reach.

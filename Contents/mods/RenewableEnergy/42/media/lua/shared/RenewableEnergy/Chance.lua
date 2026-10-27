@@ -1,12 +1,10 @@
 -- The chances of storm damage, at the save's Storm Damage options. They are odds rather than draws:
 -- the draws that test them are cf_commonlib's Chance, whose roll a test can set.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local LibChance = require "cf_commonlib/Chance"
 
 local Chance = {}
-RenewableEnergy.Chance = Chance
 
 --- The chance that storm damage with a chance of `perHour` at the default rate happens in `hours`,
 --- at the StormDamage options: none while they turn it off.

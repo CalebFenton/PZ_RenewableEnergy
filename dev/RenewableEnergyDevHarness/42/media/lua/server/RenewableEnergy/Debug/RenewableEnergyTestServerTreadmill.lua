@@ -4,7 +4,9 @@
 -- handlers work.
 
 require "PZHarness/ServerHandlers"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
+local Places = require "RenewableEnergy/Places"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 
 local handler, need = PZHarness.serverHandler, PZHarness.need
 
@@ -24,7 +26,7 @@ end
 -- A whole Run on Treadmill on the wired treadmill tile at `args` as the server's character
 -- (completeRun).
 handler("completeTreadmillRun", function(player, args)
-    local tile = Helpers.find({ kind = "wiredTreadmill", x = args.x, y = args.y, z = args.z })
+    local tile = Kinds.find({ kind = "wiredTreadmill", x = args.x, y = args.y, z = args.z })
     return completeRun(player, RenewableEnergyTreadmillAction:new(player, tile))
 end)
 
@@ -36,15 +38,15 @@ local treadmillRuns = {}
 -- multiplayer server starts a client's action (serverStart), and leaves it running until
 -- completeStartedTreadmillRun or the end of the test.
 handler("startTreadmillRun", function(player, args, defer)
-    local tile = Helpers.find({ kind = "treadmill", x = args.x, y = args.y, z = args.z })
+    local tile = Kinds.find({ kind = "treadmill", x = args.x, y = args.y, z = args.z })
     local run = RenewableEnergyTreadmillAction:new(player, tile)
     run:serverStart()
-    local key = RenewableEnergy.Places.key(args.x, args.y, args.z)
+    local key = Places.key(args.x, args.y, args.z)
     treadmillRuns[key] = run
     defer(function()
         if treadmillRuns[key] == run then
             treadmillRuns[key] = nil
-            RenewableEnergy.Treadmill.stopDrawing(tile, run)
+            Treadmill.stopDrawing(tile, run)
         end
     end)
     return {}
@@ -52,7 +54,7 @@ end)
 
 -- Finishes the run startTreadmillRun started on the tile at `args` (completeRun).
 handler("completeStartedTreadmillRun", function(player, args)
-    local key = RenewableEnergy.Places.key(args.x, args.y, args.z)
+    local key = Places.key(args.x, args.y, args.z)
     local run = need(treadmillRuns[key], "a run startTreadmillRun started on the server")
     treadmillRuns[key] = nil
     return completeRun(player, run)

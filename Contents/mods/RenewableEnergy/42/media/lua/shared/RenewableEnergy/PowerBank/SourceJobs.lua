@@ -1,8 +1,7 @@
--- The hands-on jobs at a source a bank takes (RenewableEnergy.Sources): what each takes of the
+-- The hands-on jobs at a source a bank takes (Sources): what each takes of the
 -- character and what refuses it (cf_commonlib's Jobs). SourceSite does them.
 
 require "Util/BuildingHelper"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Wind = require "RenewableEnergy/Wind"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
@@ -14,7 +13,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
 local SourceJobs = {}
-RenewableEnergy.SourceJobs = SourceJobs
 
 SourceJobs.CONNECT = "ConnectSource"
 SourceJobs.DISCONNECT = "DisconnectSource"

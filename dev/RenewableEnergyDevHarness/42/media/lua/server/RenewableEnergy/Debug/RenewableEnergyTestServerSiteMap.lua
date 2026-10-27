@@ -2,10 +2,13 @@
 -- the metagrid says of each spot, read without loading it. Only registers a check, so a --stay
 -- rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how checks work.
 
-require "RenewableEnergy/Sprites"
+local Sprites = require "RenewableEnergy/Sprites"
 require "PZHarness/ServerChecks"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local SolarSites = require "RenewableEnergy/World/SolarSites"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
 
-local Sprites = RenewableEnergy.Sprites
 
 -- Site kinds that are an arrow board on the road and nothing else.
 local ARROW_BOARD_KINDS = { roadWorks = true, checkpoint = true }
@@ -22,7 +25,7 @@ local function expectHomesteadSpots(expect, metaGrid, site, kind)
     if kind.wind and outdoors("windCharger") then
         local at, bank = site.windCharger, site.bank
         if expect(bank ~= nil and metaGrid:getRoomAt(bank[1], bank[2], bank[3]) ~= nil, site.name .. "'s bank is in no room") then
-            expect(RenewableEnergy.Sources.isInReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
+            expect(Sources.isInReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
                 site.name .. "'s wind charger is out of its bank's reach")
         end
     end
@@ -30,10 +33,10 @@ local function expectHomesteadSpots(expect, metaGrid, site, kind)
         local source, generator = site[kind.gas], site.generator
         local sameLevel = source[3] == generator[3]
         if kind.gas == "gasifier" then
-            expect(sameLevel and RenewableEnergy.Gasifier.sideOf(generator[1], generator[2], source[1], source[2]) ~= nil,
+            expect(sameLevel and Gasifier.sideOf(generator[1], generator[2], source[1], source[2]) ~= nil,
                 site.name .. "'s generator isn't beside its gasifier")
         else
-            expect(sameLevel and IsoUtils.DistanceTo(generator[1], generator[2], source[1], source[2]) <= RenewableEnergy.GasKit.REACH,
+            expect(sameLevel and IsoUtils.DistanceTo(generator[1], generator[2], source[1], source[2]) <= GasKit.REACH,
                 site.name .. "'s generator is out of its " .. kind.gas .. "'s reach")
         end
     end
@@ -50,7 +53,6 @@ end
 -- place. Every name a world that rolled all sites at once stands for is a site's, since a renamed
 -- site would be rolled again in such worlds.
 PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
-    local SolarSites = RenewableEnergy.SolarSites
     local metaGrid = getWorld():getMetaGrid()
     local sites = SolarSites.sites()
     expect(#sites > 0, "this map has no solar sites")

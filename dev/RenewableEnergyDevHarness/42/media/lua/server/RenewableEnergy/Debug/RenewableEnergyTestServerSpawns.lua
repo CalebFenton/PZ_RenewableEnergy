@@ -7,23 +7,29 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "PZHarness/Loot"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Specs = require "RenewableEnergy/Specs"
 local Squares = require "cf_commonlib/Squares"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+require "PZHarness/ServerFixtures"
+require "PZHarness/Rolls"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Finds = require "RenewableEnergy/Items/Finds"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
 
 local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
-local removePlaced, withRolls = PZHarness.Fixtures.removePlaced, Helpers.withRolls
-local inRange, wearRange, UNDER = Helpers.inRange, Helpers.wearRange, Helpers.UNDER
-local Sprites = RenewableEnergy.Sprites
+local removePlaced, withRolls = PZHarness.Fixtures.removePlaced, PZHarness.Rolls.with
+local inRange, wearRange, UNDER = Kinds.inRange, Kinds.wearRange, PZHarness.Rolls.UNDER
 
-local MODULE = RenewableEnergy.Specs.factoryModule
+local MODULE = Specs.factoryModule
 
 -- The modules' conditions, in container order.
 local function moduleConditions(container)
     local conditions = {}
-    for _, item in ipairs(Helpers.itemsOf(container)) do
+    for _, item in ipairs(Kinds.itemsOf(container)) do
         if item.type == MODULE then
             table.insert(conditions, item.condition)
         end
@@ -38,7 +44,7 @@ end
 local function stockOf(container)
     local stock = { charges = {}, batteryConditions = {}, modules = moduleConditions(container),
         items = container:getItems():size(), explored = container:isExplored() }
-    for _, item in ipairs(Helpers.itemsOf(container)) do
+    for _, item in ipairs(Kinds.itemsOf(container)) do
         if item.charge then
             table.insert(stock.charges, item.charge)
             table.insert(stock.batteryConditions, item.condition)
@@ -52,14 +58,14 @@ end
 -- one, its tile and stock, and whether the stock's tile, in any facing, stands on the square.
 -- Removed when the test ends.
 handler("worldBank", function(_, args, defer)
-    local square = Helpers.squareAt(args)
-    local restoreRoll = args.roll and Helpers.forceRolls(defer, args.roll)
-    local bank = RenewableEnergy.WorldSpawns.placeBank(square, args.stock)
+    local square = PZHarness.squareAt(args)
+    local restoreRoll = args.roll and PZHarness.Rolls.force(defer, args.roll)
+    local bank = WorldSpawns.placeBank(square, args.stock)
     if restoreRoll then restoreRoll() end
     if bank then
         defer(function() removePlaced(bank) end)
     end
-    local kind = RenewableEnergy.WorldSpawns.BANK_STOCK[args.stock].sprite
+    local kind = WorldSpawns.BANK_STOCK[args.stock].sprite
     local onSquare = Squares.findObjectOn(square, function(object) return Sprites.kindOfObject(object) == kind end)
     local answer = { placed = bank ~= nil, boxOnSquare = onSquare ~= nil }
     if bank then
@@ -85,12 +91,12 @@ end
 -- lie on the square and around it, their conditions and whether each lies in the square's room.
 -- Removed when the test ends.
 handler("bankModulesBeside", function(_, args, defer)
-    local square = Helpers.squareAt(args)
-    local before = Helpers.worldItems(squaresAround(square))
-    local laid = withRolls(defer, args.roll, RenewableEnergy.WorldSpawns.layModulesBeside, square, args.stock)
-    local now = Helpers.worldItems(squaresAround(square))
+    local square = PZHarness.squareAt(args)
+    local before = PZHarness.Fixtures.worldItems(squaresAround(square))
+    local laid = withRolls(defer, args.roll, WorldSpawns.layModulesBeside, square, args.stock)
+    local now = PZHarness.Fixtures.worldItems(squaresAround(square))
     local answer = { laid = laid, conditions = {}, inRoom = true }
-    for _, object in ipairs(Helpers.newSince(before, now)) do
+    for _, object in ipairs(PZHarness.Fixtures.newSince(before, now)) do
         if object:getItem():getFullType() == MODULE then
             table.insert(answer.conditions, object:getItem():getCondition())
             answer.inRoom = answer.inRoom and now[object]:getRoom() == square:getRoom()
@@ -118,24 +124,23 @@ end
 -- setting's RARITY. Answers, for each, the tiles it placed on the square and the modules it laid
 -- around it, all removed before the next.
 handler("seenRoom", function(_, args, defer)
-    local square = Helpers.squareAt(args)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local square = PZHarness.squareAt(args)
     local restoreOptions = saveOptions(defer, { "BatteryBankSpawn" })
     local function rollOf(trial)
         if not trial.edge then
             return trial.roll
         end
         local odds = trial.edge == "bank" and WorldSpawns.BANK_ROOMS[trial.room].odds or WorldSpawns.CRATE_ROOMS[trial.room]
-        return Helpers.trialRoll(trial.roll, 1 / (odds * WorldSpawns.RARITY[trial.setting]))
+        return PZHarness.Rolls.trialRoll(trial.roll, 1 / (odds * WorldSpawns.RARITY[trial.setting]))
     end
-    local results = Helpers.eachTrial(defer, args.trials, rollOf, function(trial)
+    local results = PZHarness.Rolls.eachTrial(defer, args.trials, rollOf, function(trial)
         SandboxVars.RenewableEnergy.BatteryBankSpawn = trial.setting
         local room = { getName = function() return trial.room end, getRandomFreeSquare = function() return square end,
             getSquares = function() return ArrayList.new() end }
-        local tilesBefore, itemsBefore = tilesOn(square), Helpers.worldItems(squaresAround(square))
+        local tilesBefore, itemsBefore = tilesOn(square), PZHarness.Fixtures.worldItems(squaresAround(square))
         triggerEvent("OnSeeNewRoom", room)
-        local tiles = Helpers.newSince(tilesBefore, tilesOn(square))
-        local items = Helpers.newSince(itemsBefore, Helpers.worldItems(squaresAround(square)))
+        local tiles = PZHarness.Fixtures.newSince(tilesBefore, tilesOn(square))
+        local items = PZHarness.Fixtures.newSince(itemsBefore, PZHarness.Fixtures.worldItems(squaresAround(square)))
         local result = { tiles = {}, modules = 0 }
         for _, object in ipairs(tiles) do
             table.insert(result.tiles, object:getTextureName())
@@ -158,9 +163,9 @@ local PARTS = { "inverter", "controller", "charger" }
 -- each of PARTS.
 local function bankPartsAt(container, stockName, roll, defer)
     local found = { inverter = 0, controller = 0, charger = 0 }
-    local function stock(c) RenewableEnergy.WorldSpawns.stockBank(c, stockName) end
+    local function stock(c) WorldSpawns.stockBank(c, stockName) end
     for fullType, count in pairs(withRolls(defer, roll, PZHarness.Loot.fillOnce, stock, container)) do
-        local kind = RenewableEnergy.PowerBank.partKind(fullType)
+        local kind = PowerBank.partKind(fullType)
         if found[kind] then
             found[kind] = found[kind] + count
         end
@@ -182,7 +187,6 @@ end
 -- the option goes astray; and a battery box (a tile of `args.boxTiles`), which has no slot for a
 -- charge controller, never gets one, even from a stock that lists one.
 check("bankStockParts", function(expect, _, _, args, defer)
-    local WorldSpawns, PowerBank = RenewableEnergy.WorldSpawns, RenewableEnergy.PowerBank
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
         for _, kind in ipairs(PARTS) do
             local part = stock[kind]
@@ -218,7 +222,7 @@ check("bankStockParts", function(expect, _, _, args, defer)
     end
     for sprite, isBox in pairs(sprites) do
         WorldSpawns.BANK_STOCK[name] = { sprite = sprite, batteries = stock.batteries,
-            controller = { chance = 1, types = { { RenewableEnergy.Specs.controller, 1 } } } }
+            controller = { chance = 1, types = { { Specs.controller, 1 } } } }
         local controllers = bankPartsAt(container, name, 0, defer).controller
         expect(controllers == (isBox and 0 or 1), "a " .. sprite .. " bank listing a certain controller holds " .. controllers)
     end
@@ -243,7 +247,6 @@ end
 -- highest, unrepaired; with a dud chance, a roll just under it makes a dud, at the dud's lowest
 -- and highest condition by the next roll, with the dud's repairs, and a roll at it doesn't.
 check("batteryWear", function(expect, _, _, _, defer)
-    local WorldSpawns, Finds = RenewableEnergy.WorldSpawns, RenewableEnergy.Finds
     local dud = Finds.DUD
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
         expect(Finds.BATTERY_WEAR[stock.batteries.wear] ~= nil, stockName .. " batteries wear as " .. tostring(stock.batteries.wear))
@@ -284,8 +287,6 @@ end)
 -- middling, the parts of a bank's stock, a crate's and an arrow board's battery box come at the
 -- mean, marked.
 check("partWear", function(expect, _, _, _, defer)
-    local Finds, Specs, Wear = RenewableEnergy.Finds, RenewableEnergy.Specs, RenewableEnergy.Wear
-    local WorldSpawns = RenewableEnergy.WorldSpawns
     local wear, dud = Finds.PART_WEAR, Finds.PART_DUD
     local lowest = wearRange(wear).min
     expect(dud.min >= 0 and dud.min <= dud.max and dud.max < lowest,
@@ -324,7 +325,7 @@ check("partWear", function(expect, _, _, _, defer)
     local fills = {
         ["the powerYard bank"] = function(c) WorldSpawns.stockBank(c, "powerYard") end,
         ["the kit crate"] = function(c) WorldSpawns.stockCrate(c, "kit") end,
-        ["an arrow board's battery box"] = function(c) RenewableEnergy.ArrowBoard.stockBatteryBox(c) end,
+        ["an arrow board's battery box"] = function(c) ArrowBoard.stockBatteryBox(c) end,
     }
     for what, fill in pairs(fills) do
         container:removeAllItems()
@@ -348,7 +349,7 @@ end)
 -- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
 handler("bankStockCount", function(_, args, defer)
     local container = PZHarness.Loot.scratchContainer(nil)
-    withRolls(defer, args.roll, RenewableEnergy.WorldSpawns.stockBank, container, args.stock)
+    withRolls(defer, args.roll, WorldSpawns.stockBank, container, args.stock)
     local count = container:getItems():size()
     container:removeAllItems()
     return { items = count }
@@ -357,7 +358,7 @@ end)
 -- WorldSpawns.placeCrate with CRATE_STOCK[args.stock] on the square at `args`. Answers its stock
 -- and the name of its overlay. Removed when the test ends.
 handler("worldCrate", function(_, args, defer)
-    local crate = RenewableEnergy.WorldSpawns.placeCrate(Helpers.squareAt(args), args.stock)
+    local crate = WorldSpawns.placeCrate(PZHarness.squareAt(args), args.stock)
     defer(function() removePlaced(crate) end)
     local container, overlay = need(crate:getContainer(), "the crate's container"), crate:getOverlaySprite()
     return { stock = stockOf(container), overlay = overlay and overlay:getName() }
@@ -366,10 +367,9 @@ end)
 -- A cracked module always reads worse than a weathered one, so players can tell which needs
 -- repair, and shows cracked glass.
 local function expectConditionRanges(expect)
-    local Finds = RenewableEnergy.Finds
     expect(Finds.CRACKED.max < Finds.WEATHERED.min, "cracked and weathered conditions overlap")
     local best = Finds.CRACKED.max
-    expect(ModuleRepair.crackLookOf(RenewableEnergy.Specs.factoryModule, best) ~= nil,
+    expect(ModuleRepair.crackLookOf(Specs.factoryModule, best) ~= nil,
         "a cracked module at " .. best .. " shows whole glass")
 end
 
@@ -377,7 +377,6 @@ end
 -- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
 -- follows the Solar Panels loot option.
 check("crackedModules", function(expect, _, _, _, defer)
-    local Finds = RenewableEnergy.Finds
     local container = PZHarness.Loot.scratchContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         -- The chance's roll, then the cracked condition's, at the middle of its range.
@@ -414,7 +413,6 @@ end)
 -- conditions of crates; the battery wear profiles; and for the CRATE_STOCK name `args.crate`, if
 -- given, each item's count range.
 handler("worldSpawnStock", function(_, args)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
     local banks = {}
     for _, name in ipairs(args.names) do
         local stock = WorldSpawns.BANK_STOCK[name]
@@ -428,6 +426,6 @@ handler("worldSpawnStock", function(_, args)
             crate[line[1]] = { min = line[2], max = line[3] }
         end
     end
-    return { banks = banks, crate = crate, cracked = RenewableEnergy.Finds.CRACKED, weathered = RenewableEnergy.Finds.WEATHERED,
-        batteryWear = RenewableEnergy.Finds.BATTERY_WEAR }
+    return { banks = banks, crate = crate, cracked = Finds.CRACKED, weathered = Finds.WEATHERED,
+        batteryWear = Finds.BATTERY_WEAR }
 end)

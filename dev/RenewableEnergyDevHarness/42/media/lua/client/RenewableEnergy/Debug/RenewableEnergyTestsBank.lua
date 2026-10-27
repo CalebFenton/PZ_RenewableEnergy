@@ -1,9 +1,11 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/PowerBank/BankJobs"
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/StatusRows"
+local StatusRows = require "RenewableEnergy/UI/StatusRows"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Power bank tests (PowerBank/* and the bank rows of Specs.lua), split by topic across
 -- RenewableEnergyTestsBank*.lua; this file has charging, loads, inverters and turning on. Banks
@@ -13,9 +15,6 @@ require "RenewableEnergy/UI/StatusRows"
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual, player, stateItem, copyItem =
     T.test, T.expect, T.expectNear, T.expectEqual, T.player, T.stateItem, T.copyItem
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
-local PowerBank, BankJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs
-local StatusRows = RenewableEnergy.StatusRows
 local FRIDGE = "appliances_refrigeration_01_0"
 
 -- Charging and loads ---------------------------------------------------------------------------
@@ -29,7 +28,7 @@ test("renewable_energy_bank_panel_charges_bank", {
         if not self.panel then return end
         self.bank = bank
         T.watch(self, bank)
-        T.bankState(self, bank, "before")
+        T.readRecord(self, bank, "before")
         T.bankPass(self, bank, Sun.FULL_SUN)
         T.waitForStatus(self, bank, function(status)
             return math.abs(T.copyUses(bank, T.CAR_BATTERY) - bank.state.charge) < 0.001
@@ -62,7 +61,7 @@ test("renewable_energy_bank_powers_at_night", {
         if not fridge then return end
         self.bank = bank
         T.switchOn(self, bank)
-        T.bankState(self, bank, "on")
+        T.readRecord(self, bank, "on")
         T.waitFor(self, function() return bank.square:haveElectricity() end, "power on the switched-on bank's square here")
         T.bankPass(self, bank, 0, { label = "without" })
         -- A step, since single player places a tile at once.
@@ -129,14 +128,14 @@ test("renewable_energy_bank_scan_sees_load_while_off", {
         if not bank then return end
         local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
         if not squares then return end
-        T.read(self, "scanLoad", bank.position, "without")
-        T.server(self, "floorItem", T.at(squares[1], { type = "Base.Nails" }))
+        T.read(self, "scanLoad", T.at(bank), "without")
+        T.floorItem(self, squares[1], "Base.Nails")
         T.step(function()
             T.placeTile(self, squares[1], FRIDGE)
             T.placeTile(self, squares[2], T.MINI_FRIDGE)
-            T.read(self, "scanLoad", bank.position, "with")
-            T.server(self, "floorItem", T.at(squares[1], { type = "Base.Nails" }))
-            T.read(self, "scanLoad", bank.position, "withLoot")
+            T.read(self, "scanLoad", T.at(bank), "with")
+            T.floorItem(self, squares[1], "Base.Nails")
+            T.read(self, "scanLoad", T.at(bank), "withLoot")
         end)
     end,
     validate = function(self)
@@ -167,10 +166,10 @@ test("renewable_energy_bank_bills_another_mods_appliance", {
         local square = bank and T.square(self, { indoors = true, near = bank.square }, "a free indoor square for the appliance")
         if not square then return end
         T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = 0 }))
-        T.server(self, "floorItem", T.at(square, { type = "Base.Nails" }))
-        T.read(self, "scanLoad", bank.position, "off")
+        T.floorItem(self, square, "Base.Nails")
+        T.read(self, "scanLoad", T.at(bank), "off")
         T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = CONSUMER_FUEL }))
-        T.read(self, "scanLoad", bank.position, "on")
+        T.read(self, "scanLoad", T.at(bank), "on")
     end,
     validate = function(self)
         local on, off = self.reads.on, self.reads.off
@@ -194,8 +193,8 @@ test("renewable_energy_bank_refused_outdoors", {
         if not bank then return end
         self.bank = bank
         T.watch(self, bank)
-        T.job(self, "bank", BankJobs.TURN_ON, bank.position)
-        T.bankState(self, bank)
+        T.job(self, "bank", BankJobs.TURN_ON, bank)
+        T.readRecord(self, bank)
         T.waitForStatus(self, bank, function(status) return status.state == "outdoors" end, "this client's status of the outdoor bank saying it must go inside")
     end,
     validate = function(self)
@@ -216,9 +215,9 @@ test("renewable_energy_bank_removed_bank_leaves_no_power", {
         if not bank then return end
         self.bank = bank
         T.switchOn(self, bank)
-        T.bankState(self, bank)
+        T.readRecord(self, bank)
         T.waitFor(self, function() return bank.square:haveElectricity() end, "power on the switched-on bank's square here")
-        T.read(self, "removeBank", { bank = bank.position }, "removed")
+        T.read(self, "removeBank", T.at(bank), "removed")
         T.waitFor(self, function() return not bank.square:haveElectricity() and PowerBank.findOn(bank.square) == nil end,
             "the removed bank and its power gone from this client")
     end,
@@ -241,7 +240,7 @@ test("renewable_energy_bank_limit_sums_working_inverters", {
         self.bank = T.bank(self, "batteryBankWood", { T.CAR_BATTERY, T.POWER_INVERTER, T.POWER_INVERTER })
         if not self.bank then return end
         T.batch(function()
-            T.bankState(self, self.bank, "twoInverters")
+            T.readRecord(self, self.bank, "twoInverters")
             T.bankPart(self, self.bank, T.POWER_INVERTER, { condition = 0, recount = true })
         end)
         T.waitForSummary(self, self.bank, function(summary) return summary.limitW == self.bank.state.limitW end,
@@ -318,8 +317,8 @@ test("renewable_energy_bank_turn_on_refused_without_inverter", {
         self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
         if not self.bank then return end
         T.openWindow(self, self.bank)
-        T.job(self, "bank", BankJobs.TURN_ON, self.bank.position, nil, "refused")
-        T.bankState(self, self.bank)
+        T.job(self, "bank", BankJobs.TURN_ON, self.bank, nil, "refused")
+        T.readRecord(self, self.bank)
     end,
     validate = function(self)
         local bank, button, why = self.bank.object, self.window.switchButton, getText("Tooltip_RenewableEnergy_NoInverter")
@@ -349,10 +348,10 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
         end, "this client's copy of the dead battery")
         T.openWindow(self, self.bank)
         T.batch(function()
-            T.job(self, "bank", BankJobs.TURN_ON, self.empty.position, nil, "emptyRefused")
-            T.job(self, "bank", BankJobs.TURN_ON, self.dead.position, nil, "deadRefused")
-            T.bankState(self, self.empty)
-            T.bankState(self, self.dead)
+            T.job(self, "bank", BankJobs.TURN_ON, self.empty, nil, "emptyRefused")
+            T.job(self, "bank", BankJobs.TURN_ON, self.dead, nil, "deadRefused")
+            T.readRecord(self, self.empty)
+            T.readRecord(self, self.dead)
         end)
     end,
     validate = function(self)

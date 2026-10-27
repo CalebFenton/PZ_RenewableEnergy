@@ -1,7 +1,12 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Items = require "cf_commonlib/Items"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Specs = require "RenewableEnergy/Specs"
+local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local VehicleMenu = require "RenewableEnergy/UI/VehicleMenu"
 
 -- Arrow board trailer (ArrowBoard/Trailer.lua, Vehicles.txt): stock and its rolls, panels, repair
 -- and frame. Its battery box, power and crashes are in RenewableEnergyTestsArrowBoard*.lua.
@@ -47,7 +52,7 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
         waitForPanelsCopy(self, self.trailer)
     end,
     validate = function(self)
-        local stock = RenewableEnergy.ArrowBoard.STOCK
+        local stock = ArrowBoard.STOCK
         local state = self.trailer.state
         local left, right = expectStockConditions(state, self.reads.ranges, "the found trailer")
         for id, condition in pairs({ [LEFT] = left, [RIGHT] = right }) do
@@ -71,7 +76,7 @@ test("renewable_energy_world_arrow_board_spawns_stocked", {
             string.format("%d batteries in the battery box, expected %d to %d", batteries, stock.batteries.min, stock.batteries.max))
         expectEqual("stock batteries in the battery box", #boxItems(state, stock.battery), batteries)
         T.expectFoundCharges(charges, "the battery box")
-        local controllers = #boxItems(state, RenewableEnergy.Specs.controller)
+        local controllers = #boxItems(state, Specs.controller)
         expect(controllers <= 1, "the battery box has " .. controllers .. " charge controllers")
     end,
 })
@@ -155,7 +160,7 @@ test("renewable_energy_world_arrow_board_panels_come_off_and_go_on", {
     run = function(self)
         if not spawnTrailer(self) then return end
         local trailer, p = self.trailer, player()
-        local looks = RenewableEnergy.Specs.crackLooks
+        local looks = Specs.crackLooks
         self.offAt, self.onAt = T.conditionAt(T.FACTORY_MODULE, looks.heavyBelow) - 1, T.conditionAt(T.FACTORY_MODULE, looks.lightBelow)
         setPartSkills(self, trailer, LEFT, "uninstall")
         if isClient() then
@@ -200,7 +205,6 @@ test("renewable_energy_world_arrow_board_panels_crack", {
     run = function(self)
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
-        local Specs = RenewableEnergy.Specs
         self.whole = Items.conditionMaxOf(T.FACTORY_MODULE)
         -- Half a crack above the heavy look, so a crack takes it below.
         self.light = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.heavyBelow) + math.floor(Specs.storm.crack / 2)
@@ -222,7 +226,7 @@ test("renewable_energy_world_arrow_board_panels_crack", {
         T.onVehicle(self, trailer, "arrowBoardRun", { call = "stormCrack", with = { 1 } }, "calm")
     end,
     validate = function(self)
-        local crack, cracked = RenewableEnergy.Specs.storm.crack, self.reads.crack.state
+        local crack, cracked = Specs.storm.crack, self.reads.crack.state
         local left, right = panelCondition(cracked, LEFT), panelCondition(cracked, RIGHT)
         expectEqual("the condition a crack left the panel at " .. self.whole .. " at", left, self.whole - crack)
         expectEqual("the model the new panel cracked to " .. tostring(left) .. " shows", panelShown(cracked, LEFT), "LightCracked")
@@ -239,7 +243,7 @@ test("renewable_energy_world_arrow_board_panels_crack", {
 -- Queues a Seal Cracked Panel on the trailer's left panel, as the trailer's menu queues it.
 local function sealPanel(trailer)
     T.step(function()
-        ISTimedActionQueue.add(RenewableEnergyAction:new(player(), "vehicle", RenewableEnergy.VehicleJobs.SEAL_PANEL,
+        ISTimedActionQueue.add(RenewableEnergyAction:new(player(), "vehicle", VehicleJobs.SEAL_PANEL,
             trailer.vehicle, LEFT))
     end)
 end
@@ -266,7 +270,7 @@ end
 -- trailer may hold a cracked right panel too.
 local function sealPanelOption(vehicle)
     local context = T.newContext()
-    RenewableEnergy.VehicleMenu.addSealPanelOptions(0, context, vehicle)
+    VehicleMenu.addSealPanelOptions(0, context, vehicle)
     local shown = T.optionState(T.findIn(context.options, "param4", LEFT))
     context:closeAll()
     return shown
@@ -286,23 +290,23 @@ local function repairTest(name, repaired, fromBelowCap)
             self.to = math.min(T.sealCap(T.FACTORY_MODULE, repaired), self.from + ModuleRepair.SEAL_ADDS)
             self.epoxyNeeded = sealEpoxyUses()
             setSealSkills(self)
-            self.wholeAt = T.conditionAt(T.FACTORY_MODULE, RenewableEnergy.Specs.crackLooks.lightBelow)
+            self.wholeAt = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.lightBelow)
             T.onVehicle(self, trailer, "setTrailer", { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = self.wholeAt } } })
             waitForPanelsCopy(self, trailer)
-            T.step(function() self.wholeRepairable = RenewableEnergy.ArrowBoard.sealablePanel(trailer.vehicle, LEFT) ~= nil end)
+            T.step(function() self.wholeRepairable = ArrowBoard.sealablePanel(trailer.vehicle, LEFT) ~= nil end)
             T.onVehicle(self, trailer, "setTrailer",
                 { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = self.from, repaired = repaired } } })
             waitForPanelsCopy(self, trailer)
             T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
             -- Read the authority's XP: a client's copy may still be getting the last test's.
-            T.read(self, "character", { perks = { "Electricity" } }, "before")
+            T.readCharacter(self, "before", { perks = { "Electricity" } })
             T.step(function() self.epoxyUses = self.items.inputs[2]:getCurrentUses() end)
             sealPanel(trailer)
             T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= self.from end)
             T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
-            T.read(self, "character", { perks = { "Electricity" } }, "after")
+            T.readCharacter(self, "after", { perks = { "Electricity" } })
             -- What CraftRecipe.addXP gives this character for the recipe's xpAward.
-            T.read(self, "electricityAward", { xp = ModuleRepair.sealRecipe():getXPAward(0):getAmount() }, "award")
+            T.xpAward(self, "Electricity", ModuleRepair.sealRecipe():getXPAward(0):getAmount(), "award")
             waitForPanelsCopy(self, trailer)
             T.step(function() self.after = sealPanelOption(trailer.vehicle) end)
         end,
@@ -378,7 +382,7 @@ test("renewable_energy_world_arrow_board_old_trailer_gets_frame", {
     end,
     validate = function(self)
         local answer = self.reads.old
-        for _, frame in ipairs(RenewableEnergy.ArrowBoard.FRAME) do
+        for _, frame in ipairs(ArrowBoard.FRAME) do
             expect(frameCondition(answer.state, frame.id) ~= nil, "the old trailer's " .. frame.id .. " loaded empty")
         end
         expect(answer.state.colorSat == answer.forcedSat and answer.state.colorVal == answer.forcedVal,
@@ -408,7 +412,7 @@ test("renewable_energy_world_arrow_board_frame_welds", {
         -- The frame's options, and the first fix under each.
         local function frameOptions()
             local context = T.newContext()
-            RenewableEnergy.VehicleMenu.addFrameRepairOptions(0, context, trailer.vehicle)
+            VehicleMenu.addFrameRepairOptions(0, context, trailer.vehicle)
             local found = {}
             for _, option in ipairs(context.options) do
                 local submenu = T.subMenu(context, option)

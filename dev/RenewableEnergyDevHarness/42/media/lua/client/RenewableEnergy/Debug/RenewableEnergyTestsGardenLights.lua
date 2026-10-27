@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 
 -- Garden lights the world puts around houses (World/GardenLights.lua), rolled on the authority
 -- (RenewableEnergyTestServerGardenLights.lua).
@@ -16,7 +17,7 @@ test("renewable_energy_world_garden_lights_once_per_house", {
         local function copies()
             local found = 0
             for _, light in ipairs(self.reads.roll.lights) do
-                if RenewableEnergy.SolarGardenLight.findOn(getSquare(light.x, light.y, light.z)) then
+                if SolarGardenLight.findOn(getSquare(light.x, light.y, light.z)) then
                     found = found + 1
                 end
             end
@@ -37,7 +38,7 @@ test("renewable_energy_world_garden_lights_once_per_house", {
         for _, light in ipairs(answer.lights) do
             local key = light.x .. "," .. light.y
             expect(light.outdoors, "a light stands indoors at " .. key)
-            expectNear("a new light's charge", light.charge, RenewableEnergy.SolarGardenLight.SPEC.wh, 0.001)
+            expectNear("a new light's charge", light.charge, SolarGardenLight.SPEC.wh, 0.001)
         end
     end,
 })

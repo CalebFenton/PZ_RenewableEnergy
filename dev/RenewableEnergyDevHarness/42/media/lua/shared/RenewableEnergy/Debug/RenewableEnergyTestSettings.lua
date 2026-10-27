@@ -3,6 +3,11 @@
 -- server Lua, so the hooks look those modules up when they run.
 
 require "PZHarness/Fixtures"
+local Chance = require "cf_commonlib/Chance"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 
 PZHarness.registerTests({
     -- Daylight, so crafting and wiring can see and panels have sun.
@@ -15,16 +20,35 @@ PZHarness.registerTests({
     sandbox = "RenewableEnergy",
     recipePrefix = "RenewableEnergy_",
     isFreeSquare = function(square, indoors)
-        return RenewableEnergy.Debug.isFreeSquare(square, indoors)
+        return require("RenewableEnergy/Debug/RenewableEnergyDebug").isFreeSquare(square, indoors)
     end,
-    remove = function(object)
-        if not RenewableEnergy.PowerBank.isBank(object) then
+    remove = function(object, player)
+        if PowerBank.isBank(object) then
+            object:getSquare():transmitRemoveItemFromSquare(object)
+            return true
+        end
+        if not (Sources.kindOf(object) or Treadmill.isTreadmill(object) or Treadmill.isWiredTile(object)) then
             return false
         end
-        object:getSquare():transmitRemoveItemFromSquare(object)
+        -- A wired treadmill taken away drops its wire on its square (TreadmillSource.unwire), which
+        -- the tests that follow would find lying about; unwired first, it goes to the character,
+        -- whose inventory the next test empties.
+        if Treadmill.isWiredTile(object) and not isClient() then
+            require("RenewableEnergy/PowerBank/TreadmillSource").unwire(object, player)
+        end
+        -- Removing "safely" takes every tile of a whole multi-tile object, and refuses one tile of
+        -- one placed alone (a treadmill's, a wind charger's), which then goes on its own.
+        local square = object:getSquare()
+        if square:transmitRemoveItemFromSquare(object) == -1 then
+            square:transmitRemoveItemFromSquare(object, false)
+        end
         return true
     end,
-    spawnVehicle = function(script, square, facing, args)
-        return require("RenewableEnergy/Debug/RenewableEnergyTestServerTrailer").spawnVehicle(script, square, facing, args)
+    spawnVehicle = function(script, square, facing, args, defer)
+        return require("RenewableEnergy/Debug/RenewableEnergyTestServerTrailer").spawnVehicle(script, square, facing, args,
+            defer)
     end,
+    chance = function() return Chance end,
+    records = Kinds.RECORDS,
+    jobAction = function() return RenewableEnergyAction end,
 })

@@ -1,20 +1,20 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/PowerBank/BankJobs"
-require "RenewableEnergy/PowerBank/SourceJobs"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-require "RenewableEnergy/UI/Format"
+local Format = require "RenewableEnergy/UI/Format"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
 local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local Squares = require "cf_commonlib/Squares"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Power bank tests: connecting banks, and sources to them.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
 local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
-local Sprites = RenewableEnergy.Sprites
-local PowerBank, BankJobs, SourceJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs, RenewableEnergy.SourceJobs
-local Format = RenewableEnergy.Format
 
 -- Connecting -----------------------------------------------------------------------------------
 
@@ -29,12 +29,12 @@ test("renewable_energy_bank_needs_connecting", {
         self.near = T.square(self, { near = bank }, "a square near the bank")
         if not self.near then return end
         T.switchOn(self, bank)
-        T.bankState(self, bank, "before")
+        T.readRecord(self, bank, "before")
         T.step(function() self.nearBefore = self.near:haveElectricity() end)
-        T.job(self, "bank", BankJobs.CONNECT, bank.position, nil, "connected")
+        T.job(self, "bank", BankJobs.CONNECT, bank, nil, "connected")
         T.waitFor(self, function() return bank.square:haveElectricity() and self.near:haveElectricity() end,
             "power on the connected bank's square and the square near it here")
-        T.bankState(self, bank)
+        T.readRecord(self, bank)
     end,
     validate = function(self)
         local before, after = self.reads.before, self.bank.state
@@ -86,13 +86,13 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
                 getText("ContextMenu_RenewableEnergy_ConnectBank")))
             self.canStart = RenewableEnergyAction:new(player(), "bank", BankJobs.CONNECT, self.unskilled.object):canPerform()
         end)
-        T.job(self, "bank", BankJobs.CONNECT, self.unskilled.position, nil, "refused")
+        T.job(self, "bank", BankJobs.CONNECT, self.unskilled, nil, "refused")
         -- T.setPerk sets the level when called, so the later levels wait for their turn.
         T.step(function() T.setPerk(self, Perks.Electricity, 3) end)
-        T.job(self, "bank", BankJobs.CONNECT, self.unskilled.position, nil, "skilled")
+        T.job(self, "bank", BankJobs.CONNECT, self.unskilled, nil, "skilled")
         T.step(function() T.setPerk(self, Perks.Electricity, 2) end)
         T.knowRecipes(self, GENERATOR)
-        T.job(self, "bank", BankJobs.CONNECT, self.magazine.position, nil, "withRecipe")
+        T.job(self, "bank", BankJobs.CONNECT, self.magazine, nil, "withRecipe")
     end,
     validate = function(self)
         expect(self.connect.greyed, "at Electricity 2 Connect Bank isn't greyed out")
@@ -166,16 +166,16 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
             self.unconnected = T.connectOptions(bank, panel, 1)
             self.unconnectedAction = canConnect(panel, bank)
         end)
-        T.job(self, "source", SourceJobs.CONNECT, panel.position, bank.position, "refused")
-        T.job(self, "bank", BankJobs.CONNECT, bank.position, nil, "bankConnected")
+        T.job(self, "source", SourceJobs.CONNECT, panel, bank, "refused")
+        T.job(self, "bank", BankJobs.CONNECT, bank, nil, "bankConnected")
         T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
         T.step(function()
             self.connected = T.connectOptions(bank, panel, 1)
             self.connectedAction = canConnect(panel, bank)
         end)
-        T.job(self, "source", SourceJobs.CONNECT, panel.position, bank.position, "accepted")
-        T.job(self, "bank", BankJobs.DISCONNECT, bank.position, nil, "bankDisconnected")
-        T.bankState(self, bank)
+        T.job(self, "source", SourceJobs.CONNECT, panel, bank, "accepted")
+        T.job(self, "bank", BankJobs.DISCONNECT, bank, nil, "bankDisconnected")
+        T.readRecord(self, bank)
     end,
     validate = function(self)
         local key = "Tooltip_RenewableEnergy_BankNotConnected"
@@ -195,7 +195,7 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
         expect(self.connectedAction, "the Connect action doesn't start for a connected bank")
         T.expectOk(self.reads.accepted, "putting a panel on a connected bank")
         T.expectOk(self.reads.bankDisconnected, "disconnecting the bank")
-        expect(T.stateSource(self.bank.state, self.panel.position) ~= nil, "disconnecting the bank dropped its panel")
+        expect(T.stateSource(self.bank.state, self.panel) ~= nil, "disconnecting the bank dropped its panel")
     end,
 })
 
@@ -210,20 +210,19 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         local box, rack, panel = self.box, self.rack, self.panel
         T.holdLight(self)
         T.step(function()
-            local here = panel.position
-            if not T.need(self, RenewableEnergy.Sources.isInReach(box.position, here.x, here.y, here.z)
-                and RenewableEnergy.Sources.isInReach(rack.position, here.x, here.y, here.z), "the box and the rack in reach of the panel") then
+            if not T.need(self, Sources.isInReach(box, panel.x, panel.y, panel.z)
+                and Sources.isInReach(rack, panel.x, panel.y, panel.z), "the box and the rack in reach of the panel") then
                 return
             end
             self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
-        T.job(self, "source", SourceJobs.CONNECT, panel.position, box.position, "onBox")
-        T.waitFor(self, function() return Squares.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
+        T.job(self, "source", SourceJobs.CONNECT, panel, box, "onBox")
+        T.waitFor(self, function() return Squares.samePosition(PowerBank.connectedBank(panel.object), box) end,
             "this client's summary of the box listing the panel")
         T.step(function()
             -- Each fresh context reuses the player's one context menu, so read this one first.
             local wiredTo = T.optionState(T.menuOption(SourceMenu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
-                Format.bankName(PowerBank.summaryOf(box.object)), Format.away(panel.position, box.position))))
+                Format.bankName(PowerBank.summaryOf(box.object)), Format.away(panel, box))))
             self.wired = { wiredTo = wiredTo, box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
     end,

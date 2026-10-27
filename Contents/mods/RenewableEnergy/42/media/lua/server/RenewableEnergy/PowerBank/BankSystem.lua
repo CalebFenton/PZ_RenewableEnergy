@@ -9,7 +9,6 @@ if isClient() then return end
 
 require "Map/SGlobalObjectSystem"
 require "TimedActions/ISDestroyStuffAction"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Sun = require "RenewableEnergy/Sun"
@@ -34,7 +33,6 @@ local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
 local BankSystem = LibObjectSystem.deriveSystem(PowerBank, Bank)
-RenewableEnergy.BankSystem = BankSystem
 
 -- Values of the ChargeFreq sandbox option.
 local EVERY_TEN_MINUTES = 1

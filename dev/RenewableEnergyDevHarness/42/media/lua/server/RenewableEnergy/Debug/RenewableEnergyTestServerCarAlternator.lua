@@ -4,7 +4,9 @@
 
 require "PZHarness/ServerHandlers"
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+require "PZHarness/ServerFixtures"
+require "PZHarness/Rolls"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 
 local handler = PZHarness.serverHandler
 
@@ -12,12 +14,12 @@ local handler = PZHarness.serverHandler
 -- (VehicleUtils.RequiredKeyNotFound), both sent to the clients, as a player who got in would
 -- leave them.
 handler("openCarHood", function(_, args)
-    local vehicle = Helpers.vehicleAt(args)
+    local vehicle = PZHarness.vehicleAt(args)
     for i = 0, vehicle:getPartCount() - 1 do
         local part = vehicle:getPartByIndex(i)
         local door = part:getDoor()
         if door then
-            if part:getId() == RenewableEnergy.CarAlternator.HOOD then
+            if part:getId() == CarAlternator.HOOD then
                 door:setOpen(true)
             else
                 door:setLocked(false)
@@ -31,23 +33,23 @@ end)
 -- Takes the alternator out for the player straight away, as the job's complete() would; answers
 -- whether it gave one, which it mustn't once the alternator is out.
 handler("takeOutAlternatorAgain", function(player, args)
-    return { gave = RenewableEnergy.CarAlternator.takeOut(player, Helpers.vehicleAt(args)) }
+    return { gave = CarAlternator.takeOut(player, PZHarness.vehicleAt(args)) }
 end)
 
 -- Scraps the wreck as vanilla's blowtorch job completes it (ISRemoveBurntVehicle:complete), the
--- player's blowtorch a fresh one, rolling `args.roll` (Helpers.trialRoll) against the player's
+-- player's blowtorch a fresh one, rolling `args.roll` (PZHarness.Rolls.trialRoll) against the player's
 -- CarAlternator.scrapChance, and answers how many car alternators it left on the wreck's square
 -- and whether the wreck is gone. Everything the scrap dropped goes when the test ends.
 handler("scrapWreck", function(player, args, defer)
-    local CarAlternator, vehicle = RenewableEnergy.CarAlternator, Helpers.vehicleAt(args)
+    local vehicle = PZHarness.vehicleAt(args)
     local chance = CarAlternator.scrapChance(player:getPerkLevel(Perks.Mechanics), player:getPerkLevel(Perks.MetalWelding))
     local square = vehicle:getSquare()
-    local before = Helpers.worldItems({ square })
+    local before = PZHarness.Fixtures.worldItems({ square })
     local action = ISRemoveBurntVehicle:new(player, vehicle)
     action.item = instanceItem("Base.BlowTorch")
-    local done = Helpers.withRolls(defer, Helpers.trialRoll(args.roll, chance), action.complete, action)
+    local done = PZHarness.Rolls.with(defer, PZHarness.Rolls.trialRoll(args.roll, chance), action.complete, action)
     local alternators = 0
-    for _, object in ipairs(Helpers.newSince(before, Helpers.worldItems({ square }))) do
+    for _, object in ipairs(PZHarness.Fixtures.newSince(before, PZHarness.Fixtures.worldItems({ square }))) do
         defer(function() PZHarness.Fixtures.removePlaced(object) end)
         local item = object:getItem()
         if item and item:getFullType() == CarAlternator.ITEM then

@@ -7,7 +7,9 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 local LibLoot = require "cf_commonlib/Loot"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+require "PZHarness/Rolls"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
+local Distributions = require "RenewableEnergy/Items/Distributions"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
 local Stash = require "RenewableEnergy/Stash"
@@ -69,7 +71,7 @@ handler("stashRegister", function(_, _, defer)
         results[mode] = { registered = registered, count = count }
     end
     restoreOptions()
-    return { results = results, houses = Helpers.count(Stash.descriptions) }
+    return { results = results, houses = Kinds.count(Stash.descriptions) }
 end)
 
 -- The engine's own load and annotate path, which a found map takes, on a fresh copy of each stash
@@ -185,7 +187,7 @@ handler("stashKnownOnStart", function(_, _, defer)
         end
         removePossibleStash(stashMap.name)
     end
-    Helpers.withRolls(defer, 0, Stash.stockFromStart)
+    PZHarness.Rolls.with(defer, 0, Stash.stockFromStart)
     local houses = {}
     for stashMap, extra in pairs(Stash.descriptions) do
         local building = Stash.buildingOf(stashMap)
@@ -202,7 +204,7 @@ end)
 -- The stash maps' rows of the mod's loot entries (LootEntries.lua).
 local function stashMapRows()
     local rows = {}
-    for _, spec in ipairs(RenewableEnergy.Distributions.items) do
+    for _, spec in ipairs(Distributions.items) do
         if spec.stashMap then
             table.insert(rows, spec)
         end
@@ -235,7 +237,7 @@ end)
 -- The loot at each Stash Houses option: for every stash map and loot list, how often the map is
 -- listed and at what weight, against the weight its row gives it there.
 handler("stashMapsInCorpseLoot", function(_, _, defer)
-    local D = RenewableEnergy.Distributions
+    local D = Distributions
     local options = SandboxVars.RenewableEnergy
     local restoreOptions = saveOptions(defer, { "StashMode" }, D.apply)
     local found = {}

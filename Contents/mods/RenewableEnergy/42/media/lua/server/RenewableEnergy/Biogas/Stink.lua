@@ -20,10 +20,7 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
-
 local Stink = {}
-RenewableEnergy.Stink = Stink
 
 -- The corpses at which each smell level starts at the default corpse option: nothing below the
 -- first, the game's cap at the last (BodyDamage and MoodleStat).

@@ -3,15 +3,13 @@
 -- world around the character with, which only read it. RenewableEnergyDevPromo.lua builds and
 -- shoots them.
 
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local Sprites = require "RenewableEnergy/Sprites"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
 require "PZHarness/StageLots"
 
-local Sprites = RenewableEnergy.Sprites
-local PowerBank = RenewableEnergy.PowerBank
 
 local Places = {}
 
@@ -182,7 +180,7 @@ Places.LAYOUTS = {
     },
     -- The treadmill, wired to a battery box beside it, the character running on it across the
     -- screen, side on to the camera. The treadmill's two tiles, by the way its runner faces
-    -- (RenewableEnergy.Sprites): the rear tile the runner stands on, and the console in front. The
+    -- (Sprites): the rear tile the runner stands on, and the console in front. The
     -- box stands past the rear end, and the character waits beside the belt.
     gym = {
         rear = { 1, 0 },
@@ -250,7 +248,7 @@ local function hasOpening(place, along, class)
 end
 
 local function isFreeIndoorsAt(place, position)
-    return RenewableEnergy.Debug.isFreeSquare(Harness.at(place, position), true)
+    return Debug.isFreeSquare(Harness.at(place, position), true)
 end
 
 -- North from `square` through its room to the room's north wall: a bank faces south, so it stands
@@ -409,7 +407,7 @@ local function fitsGym(place)
     end
     for _, key in ipairs(gym.shot) do
         local square = Harness.at(place, gym[key])
-        if not (square and square:getRoom() == room and RenewableEnergy.Debug.isFreeSquare(square, true)
+        if not (square and square:getRoom() == room and Debug.isFreeSquare(square, true)
             and not origin:isSomethingTo(square)) then
             return false
         end

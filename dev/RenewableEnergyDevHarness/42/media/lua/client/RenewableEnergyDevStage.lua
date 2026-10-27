@@ -4,6 +4,8 @@
 
 require "PZHarness/Fixtures"
 require "PZHarness/Run"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
 
 local Stage = {}
 
@@ -24,14 +26,14 @@ function Stage.spawnTrailer(square, facing)
     local pair = {
         car = addVehicleDebug(TOWING_CAR, IsoDirections[facing], 0, square),
         -- The tests' spawn, which keeps a whole trailer's panels whole past stocking.
-        trailer = PZHarness.testSettings.spawnVehicle(RenewableEnergy.ArrowBoard.SCRIPT, trailerSquare, facing,
+        trailer = PZHarness.testSettings.spawnVehicle(ArrowBoard.SCRIPT, trailerSquare, facing,
             { repair = true }),
         facing = facing,
     }
     pair.car:repair()
     -- Most trailers are found switched on, and a shot of a flashing board would show it lit or dark
     -- by the moment it was taken; a shot of the lamps lights them itself.
-    RenewableEnergy.ArrowBoard.setSwitch(pair.trailer, false)
+    ArrowBoard.setSwitch(pair.trailer, false)
     return pair
 end
 
@@ -41,14 +43,14 @@ function Stage.hitchTrailer(pair, player)
     local car, trailer = pair.car, pair.trailer
     PZHarness.Fixtures.lineUpTrailer(car, trailer, pair.facing)
     car:addPointConstraint(player, trailer, "trailer", "trailer")
-    local lid = trailer:getPartById(RenewableEnergy.ArrowBoard.LID)
-    local box = trailer:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
+    local lid = trailer:getPartById(ArrowBoard.LID)
+    local box = trailer:getPartById(ArrowBoard.BATTERY_BOX)
     local container = box and box:getItemContainer()
     if lid and lid:getDoor() then
         lid:getDoor():setOpen(true)
     end
     if container then
-        container:AddItem(RenewableEnergy.ArrowBoard.STOCK.battery)
+        container:AddItem(ArrowBoard.STOCK.battery)
     end
     print(string.format("%s trailer towedBy=%s lid=%s container=%s items=%d", PZHarness.run.mark,
         tostring(trailer:getVehicleTowedBy() == car), tostring(lid ~= nil), tostring(container ~= nil),
@@ -95,10 +97,9 @@ end
 --- Switches the trailer on and sets its lamps as the clock's pass sets them, lighting the ground
 --- if `night`, after putting a battery charged to `charge` in its box if `charge` is given.
 function Stage.lightLamps(trailer, charge, night)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
     if charge then
         local container = trailer:getPartById(ArrowBoard.BATTERY_BOX):getItemContainer()
-        RenewableEnergy.Battery.setCharge(container:AddItem(ArrowBoard.STOCK.battery), charge)
+        Battery.setCharge(container:AddItem(ArrowBoard.STOCK.battery), charge)
     end
     ArrowBoard.setSwitch(trailer, true)
     ArrowBoard.runLamps(trailer, 0, night)

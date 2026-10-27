@@ -7,7 +7,6 @@
 -- lit tile it sees a lamp of its own, in its bulb's colour (this file). A server tells its clients
 -- when a light's lamp changes, so they draw it at once.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -15,7 +14,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
 local SolarGardenLight = {}
-RenewableEnergy.SolarGardenLight = SolarGardenLight
 
 SolarGardenLight.ITEM = "RenewableEnergy.SolarGardenLight"
 -- Its cell's rated watts, the watt-hours its battery holds, what its lamp draws at night, and the

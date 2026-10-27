@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Gadgets/CarAlternator"
-require "RenewableEnergy/UI/VehicleMechanicsMenu"
+local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
+local CarAlternatorMenu = require "RenewableEnergy/UI/VehicleMechanicsMenu"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 
@@ -11,7 +11,6 @@ local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 
 local T = RenewableEnergyTest
 local test, expect, expectEqual = T.test, T.expect, T.expectEqual
-local CarAlternator, CarAlternatorMenu = RenewableEnergy.CarAlternator, RenewableEnergy.CarAlternatorMenu
 
 local CAR = "Base.CarNormal"
 

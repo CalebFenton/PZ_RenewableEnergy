@@ -2,11 +2,9 @@
 -- panel on each mount makes of it. The pure functions take every input as an argument so tests
 -- can integrate a whole year without moving the game clock.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 
 local Sun = {}
-RenewableEnergy.Sun = Sun
 
 local rad, sin, cos, tan, acos, max, min = math.rad, math.sin, math.cos, math.tan, math.acos, math.max, math.min
 

@@ -4,86 +4,49 @@ require "PZHarness/TestChunks"
 require "PZHarness/TestBuild"
 require "PZHarness/TestLearning"
 require "PZHarness/TestReads"
-require "ISUI/ISRichTextPanel"
-require "ISUI/ISToolTip"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/PowerBank/PowerBank"
-require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/Gadgets/VehicleBattery"
-require "RenewableEnergy/UI/StatusWindow"
-local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
-local Wear = require "RenewableEnergy/PowerBank/Wear"
-local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
-local BankMenu = require "RenewableEnergy/UI/BankMenu"
-local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
+require "PZHarness/TestRecords"
+require "PZHarness/TestJobs"
 local Capture = require "PZHarness/Capture"
-local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
-local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
-local Items = require "cf_commonlib/Items"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local BankMenu = require "RenewableEnergy/UI/BankMenu"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
+local Format = require "RenewableEnergy/UI/Format"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Specs = require "RenewableEnergy/Specs"
+local StatusWindow = require "RenewableEnergy/UI/StatusWindow"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (PZHarness/TestLib.lua explains the runner and the rules every helper keeps), plus fixtures
--- that know this mod's objects.
+-- that know this mod's banks and panels. Generators are RenewableEnergyTestLibGenerators', the
+-- craft helpers RenewableEnergyTestLibCraft's, and the gas, arrow board and world fixtures their
+-- own libraries'.
 --
 -- Banks and panels live on the authority, so their fixtures are built through T.server by the
 -- dev mod's server handlers (RenewableEnergyTestServer.lua) and removed there when the test ends.
--- A fixture is a handle: its square is picked at once, so later fixtures can be placed near it,
--- and `object` is filled in once this client has its copy of what the server built.
+-- A fixture is a harness handle (T.where): its square is picked at once, so later fixtures can be
+-- placed near it, and `object` is filled in once this client has its copy of what the server
+-- built. A bank is a record of the harness's record kit, of kind "bank" (RenewableEnergyTestKinds).
 RenewableEnergyTest = setmetatable({}, { __index = PZHarness.Test })
 local T = RenewableEnergyTest
-
-local PowerBank = RenewableEnergy.PowerBank
-local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
-
---- Queues setting the authority's Chance.roll (cf_commonlib's) until the test ends: `rolls` a
---- number, every roll; or a list, the next rolls in order, failing the call that draws one more.
---- So a test checks either side of a chance (Chance.hit) in one try each.
-function T.forceRoll(self, rolls)
-    T.server(self, "forceRoll", { rolls = rolls })
-end
-
---- How far below a chance a roll that just hits it falls: the server's Helpers.UNDER, for rolls
---- this client works out.
-T.UNDER = 1e-9
 
 --- The parts, items and appliances the tests place, wire in and craft.
 T.PLUG_IN_INVERTER, T.POWER_INVERTER = "RenewableEnergy.PlugInInverter", "RenewableEnergy.PowerInverter"
 T.INVERTER_CHARGER = "RenewableEnergy.InverterCharger"
-T.CAR_BATTERY, T.DEEP_CYCLE = RenewableEnergy.VehicleBattery.CAR_BATTERY, RenewableEnergy.VehicleBattery.ITEM
+T.CAR_BATTERY, T.DEEP_CYCLE = VehicleBattery.CAR_BATTERY, VehicleBattery.ITEM
 T.L16, T.JAR_BATTERY = "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery"
-T.FACTORY_MODULE, T.HOMEMADE_MODULE = RenewableEnergy.Specs.factoryModule, "RenewableEnergy.HomemadeSolarModule"
+T.FACTORY_MODULE, T.HOMEMADE_MODULE = Specs.factoryModule, "RenewableEnergy.HomemadeSolarModule"
 T.MINI_FRIDGE = "appliances_refrigeration_01_25"
-
---- The first entry of `list` whose field `key` is `value`, or nil.
-function T.findIn(list, key, value)
-    for _, entry in ipairs(list or {}) do
-        if entry[key] == value then
-            return entry
-        end
-    end
-    return nil
-end
-
---- Fails the test unless timed actions take their time, for a test that times one.
-function T.needActionTime(self)
-    return T.need(self, not T.player():isTimedActionInstant(),
-        "the debug option Cheats > Timed Action > Instant off, which makes every action instant")
-end
 
 --- Expects the character to stand in the dark (IsoPlayer.tooDarkToRead), as T.makeDark leaves them.
 function T.expectDark()
     return T.expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands")
-end
-
---- Queues T.give, then an empty step: a T.server call with table args goes out ahead of T.give's
---- wait for this client's copies (sendAhead), so without the step a later call, or an action that
---- uses the items up, could run on the server before they arrive here.
-function T.giveBeforeCalls(self, name, items)
-    T.give(self, name, items)
-    T.step(function() end)
 end
 
 -- Fixtures -------------------------------------------------------------------------------------
@@ -102,7 +65,7 @@ end
 --- into its container as world spawns do, its batteries charged to `opts.charge`. It faces
 --- `opts.facing` (S if nil) and stands on `opts.square`, else near `opts.near`, indoors unless
 --- `opts.outdoors`. It comes connected, as a world bank does, unless `opts.connected == false`, as
---- a player's placed bank starts. Returns its handle { square, position, object }.
+--- a player's placed bank starts. Returns its record handle (T.where, kind "bank").
 function T.bank(self, kind, items, opts)
     opts = opts or {}
     local square = opts.square or T.square(self, { indoors = not opts.outdoors, near = opts.near },
@@ -110,7 +73,8 @@ function T.bank(self, kind, items, opts)
     if not square then
         return nil
     end
-    local bank = { square = square, position = T.at(square) }
+    local bank = T.where(square)
+    bank.kind = "bank"
     local count = #(items or {})
     local connected = opts.connected ~= false
     T.server(self, "placeBank",
@@ -129,9 +93,8 @@ end
 -- Whether this client has its copy of the panel and, if it was connected, sees the bank's summary
 -- list it.
 local function panelArrived(panel, bank)
-    local here = panel.position
     return placedOn(panel.square) ~= nil
-        and (not panel.connected or Squares.samePosition(PowerBank.bankOfSource(here.x, here.y, here.z), bank.position))
+        and (not panel.connected or Squares.samePosition(PowerBank.bankOfSource(panel.x, panel.y, panel.z), bank))
 end
 
 --- Queues a source tile of `sprite` (a panel mount, a wind charger, a treadmill) on
@@ -139,16 +102,17 @@ end
 --- condition } }) and placed as the moveables cursor places one. When `opts.connect`, the server's
 --- character connects it to the bank handle `opts.near`; the handle gets `connected` and `reason`
 --- (the refusal) from the server. A treadmill comes wired when `opts.wired`; a wind charger is its
---- build-menu entity when `opts.built`, and its blades come broken when `opts.broken`.
+--- build-menu entity when `opts.built`, and its blades come broken when `opts.broken`. Returns its
+--- handle (T.where).
 function T.panel(self, sprite, opts)
     opts = opts or {}
     local square = opts.square or T.square(self, { near = opts.near }, "a free outdoor square for a panel")
     if not square then
         return nil
     end
-    local panel = { square = square, position = T.at(square) }
+    local panel = T.where(square)
     local bank = opts.connect and opts.near
-    T.server(self, "placePanel", T.at(square, { sprite = sprite, modules = opts.modules, bank = bank and bank.position,
+    T.server(self, "placePanel", T.at(square, { sprite = sprite, modules = opts.modules, bank = bank and T.at(bank),
         wired = opts.wired, built = opts.built, broken = opts.broken }), function(reply)
         panel.connected, panel.reason = reply.connected, reply.reason
         panel.object = panelArrived(panel, bank) and placedOn(square) or nil
@@ -165,71 +129,6 @@ function T.factoryModules(...)
         modules[i] = { type = T.FACTORY_MODULE, condition = condition }
     end
     return modules
-end
-
---- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but at least
---- `opts.minDistance` away, with `opts.fuel` litres, running if `opts.running`, with a failsafe
---- on its square if `opts.failsafe`. When the test ends the server removes it and this client lets go
---- of its squares (GeneratorReach.release). Returns { x, y, z, square, object }.
-function T.generator(self, opts)
-    opts = opts or {}
-    local square = opts.square
-        or T.square(self, { near = opts.near, minDistance = opts.minDistance or 2 }, "a free square for a generator")
-    if not square then
-        return nil
-    end
-    local handle = T.at(square, { square = square })
-    T.server(self, "placeGenerator", T.at(square, { fuel = opts.fuel, running = opts.running, failsafe = opts.failsafe }))
-    T.step(function()
-        -- A multiplayer client lets its chunks go of the squares the generator powered before the
-        -- server's undo switches it off and removes it. That switch-off can miss this client's copy:
-        -- it names the generator by its place on the square and isn't ordered with the removal that
-        -- follows (SyncIsoObject against RemoveItemFromSquare), and the chunks then keep its squares
-        -- powered until they load again.
-        T.defer(self, function()
-            if isClient() then
-                GeneratorReach.release(handle.x, handle.y, handle.z)
-            end
-        end)
-    end)
-    T.waitFor(self, function()
-        handle.object = square:getGenerator()
-        return handle.object ~= nil
-    end, "this client's copy of the generator")
-    return handle
-end
-
---- Queues a read of the generator `generator` (a T.generator handle) into self.reads[label]:
---- running, fuel, condition, its bill, its kit's state, whether the gas pass lists it, its
---- overlays, its building's toxicity, the world hour.
-function T.readGenerator(self, generator, label)
-    T.read(self, "generatorRead", T.at(generator), label)
-end
-
---- Queues pouring `fields.pour` litres into the generator, switching it (`fields.running`) and,
---- with `fields.rebuild`, having vanilla rebuild the bills of the generators reaching it. A rebuild
---- happens in the generators' next update, which a multiplayer server runs on its own clock, so the
---- wait is for a later server frame rather than a count of this client's ticks; the shares Payers
---- sets after a rebuild stand by then too.
-function T.setGenerator(self, generator, fields)
-    T.server(self, "generatorSet", T.at(generator, { pour = fields.pour, running = fields.running, rebuild = fields.rebuild }))
-    if fields.rebuild then
-        T.serverUntil(self, "worldFrame", {}, function(now) return now.frame > self.server.generatorSet.frame end)
-    end
-end
-
---- Queues a job at `square`: the character goes next to it unless it already stands where the
---- last T.doJob put it, then `makeAction()`'s action is queued. Decided when the queue reaches it,
---- so a teleport between jobs counts.
-function T.doJob(self, square, makeAction)
-    T.step(function()
-        local p = T.player()
-        if self.jobSquare ~= square or self.jobStand ~= p:getCurrentSquare() then
-            T.goNextTo(self, square)
-            T.step(function() self.jobSquare, self.jobStand = square, T.player():getCurrentSquare() end)
-        end
-        T.step(function() ISTimedActionQueue.add(makeAction()) end)
-    end)
 end
 
 --- Queues the character doing the job `job` of `feature` (RenewableEnergyAction) on the tile of
@@ -261,7 +160,7 @@ end
 
 --- The battery in this client's copy of the vehicle of a T.placeVehicle handle, or nil.
 function T.vehicleBattery(vehicle)
-    local part = RenewableEnergy.VehicleBattery.partOf(vehicle.vehicle)
+    local part = VehicleBattery.partOf(vehicle.vehicle)
     return part and part:getInventoryItem()
 end
 
@@ -298,35 +197,22 @@ function T.placeVehicle(self, script, opts)
 end
 
 -- Banks ----------------------------------------------------------------------------------------
-
--- Queues the server handler `name` on `bank`, its answer in self.reads[label] when given (T.read),
--- and leaves the bank's state in bank.state, which waits on this client's copy compare against.
-local function onBank(self, bank, name, args, label)
-    args.bank = bank.position
-    T.read(self, name, args, label)
-    T.step(function() bank.state = self.server[name] end)
-end
-
---- Queues reading the server's record of `bank` into bank.state and self.reads[label] (when
---- given), its last pass first put `hours` before now if given, as a bank looks after that long
---- between passes.
-function T.bankState(self, bank, label, hours)
-    onBank(self, bank, "bankState", { hours = hours }, label)
-end
+-- A bank's reads (T.readRecord and the handlers below, through T.onRecord) land in bank.state,
+-- which waits on this client's copy compare against.
 
 --- Queues the bank system's own pass of `bank` over the last `opts.hours` (1 if nil) on the
 --- server, with the sky the test sets: `light` W/m² on every mount, snow falling if
 --- `opts.snowing`, else clear, at `opts.airC` °C (mild if nil), `opts.stormHours` of storm and a
---- wind of `opts.windKph`. Runs a bank whose chunk is unloaded too. Its state lands as
---- T.bankState's, in self.reads[opts.label] too when given.
+--- wind of `opts.windKph`. Runs a bank whose chunk is unloaded too. Its read lands as
+--- T.readRecord's, in self.reads[opts.label] too when given.
 function T.bankPass(self, bank, light, opts)
     opts = opts or {}
-    onBank(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours,
+    T.onRecord(self, bank, "bankPass", { light = light, hours = opts.hours, stormHours = opts.stormHours,
         windKph = opts.windKph, snowing = opts.snowing, airC = opts.airC }, opts.label)
 end
 
 --- Queues a snowfall on `bank`'s panels on the server: its pass over the last `hours` (1 if nil)
---- of a frosty night with snow falling, which settles on every mount that holds snow. Its state
+--- of a frosty night with snow falling, which settles on every mount that holds snow. Its read
 --- lands as T.bankPass's, in self.reads[label] too when given.
 function T.snowfall(self, bank, hours, label)
     T.bankPass(self, bank, 0, { hours = hours or 1, snowing = true, airC = -10, label = label })
@@ -356,20 +242,20 @@ function T.applyLoad(self, bank, names)
     for i, name in ipairs(names) do
         appliances[i] = { name = name, watts = T.applianceWatts({ name }) }
     end
-    onBank(self, bank, "applyLoad", { appliances = appliances })
+    T.onRecord(self, bank, "applyLoad", { appliances = appliances })
 end
 
 --- Queues charging every battery in `bank` to `charge` on the server, as the batteries carry their
 --- charge, and the bank reading them again.
 function T.setCharge(self, bank, charge)
-    onBank(self, bank, "setCharge", { charge = charge })
+    T.onRecord(self, bank, "setCharge", { charge = charge })
 end
 
 --- Queues changing the first `fullType` in `bank` on the server (the "bankPart" handler):
 --- `changes` { condition, repaired, wear, remove, recount }.
 function T.bankPart(self, bank, fullType, changes)
     changes.type = fullType
-    onBank(self, bank, "bankPart", changes)
+    T.onRecord(self, bank, "bankPart", changes)
 end
 
 --- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at a
@@ -377,24 +263,7 @@ end
 function T.conditionAfterDischarge(fullType, depth)
     local battery = instanceItem(fullType)
     local max = battery:getConditionMax()
-    return max - math.floor(RenewableEnergy.Battery.cycleWear(battery, depth) * max)
-end
-
---- This client's summary of `handle`, a bank's or a gas record's (T.recordSummary), or nil.
-function T.clientSummary(handle)
-    if handle.kind then
-        return T.recordSummary(handle)
-    end
-    return handle.object and PowerBank.summaryOf(handle.object)
-end
-
---- Queues a wait until this client's summary of `handle` (T.clientSummary) satisfies
---- `check(summary)`; missing `what` if it never does.
-function T.waitForSummary(self, handle, check, what)
-    T.waitFor(self, function()
-        local summary = T.clientSummary(handle)
-        return summary ~= nil and check(summary)
-    end, what)
+    return max - math.floor(Battery.cycleWear(battery, depth) * max)
 end
 
 --- The whole status of `bank` as this client last received it, or nil. It comes only while this
@@ -434,7 +303,7 @@ function T.stateCondition(state, fullType)
     return item and item.condition
 end
 
---- The status entry of the source at `position` in a bank state, or nil.
+--- The status entry of the source at `position` (a handle, or { x, y, z }) in a bank state, or nil.
 function T.stateSource(state, position)
     for _, source in ipairs(state and state.status and state.status.sources or {}) do
         if Squares.samePosition(source, position) then
@@ -455,37 +324,15 @@ function T.copyUses(bank, fullType)
     return item and item:getCurrentUsesFloat() or -1
 end
 
---- Queues RenewableEnergyAction's job `job` of `feature` ("bank", "source" or "treadmill") at its
---- target on the square `at` ({ x, y, z }), done on the authority by the server's character the
---- way the action's complete() does it: the server takes no job from a client but as a timed
---- action. `with` is a name or a slot as it is, the bank at an { x, y, z } place, or an item
---- { type, inBank } the server finds itself, so the call needs no earlier answer and can go out in
---- a T.batch. Its answer, { ok, reason, xpBefore, xpAfter }, lands in self.server.job and, when
---- `label` is given, self.reads[label].
-function T.job(self, feature, job, at, with, label)
-    T.read(self, "job", { feature = feature, job = job, at = at, with = with }, label)
-end
-
 --- Checks that the panel fixture `panel` connected, saying why not.
 function T.expectConnected(panel)
     return T.expect(panel.connected, "connecting the panel failed (" .. tostring(panel.reason) .. ")")
 end
 
---- Checks that the command answer `answer` ({ ok, reason }) succeeded: "`what` failed (reason)".
-function T.expectOk(answer, what)
-    return T.expect(answer ~= nil and answer.ok == true, what .. " failed (" .. tostring(answer and answer.reason) .. ")")
-end
-
---- Checks that the command answer `answer` was refused for `reason`: "`what` (reason)" if not.
-function T.expectRefused(answer, reason, what)
-    local got = answer and answer.reason
-    return T.expect(answer ~= nil and answer.ok ~= true and got == reason, what .. " (" .. tostring(got) .. ")")
-end
-
 --- Queues switching `bank` on with its Turn On, and a wait until this client's summary says it is
 --- on, whatever the bank then does.
 function T.switchOn(self, bank)
-    T.job(self, "bank", RenewableEnergy.BankJobs.TURN_ON, bank.position)
+    T.job(self, "bank", BankJobs.TURN_ON, bank)
     T.waitForSummary(self, bank, function(summary) return summary.on == true end,
         "this client's copy of the bank's summary, switched on")
 end
@@ -495,24 +342,16 @@ end
 --- The panel's Connect to `bank` (`one`) and the bank's Connect Sources in Reach with `loose`
 --- sources in its reach (`all`), read from fresh menus on this client's copies, as T.optionState.
 function T.connectOptions(bank, panel, loose)
-    local Format = RenewableEnergy.Format
     local context = T.newContext()
     local sourceMenu = SourceMenu.addSourceOptions(0, context, panel.object)
     local bankMenu = BankMenu.addBankOptions(0, context, bank.object)
     local options = {
         one = T.optionState(T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
-            BankMenu.bankLabel(bank.object), Format.away(panel.position, bank.position)))),
+            BankMenu.bankLabel(bank.object), Format.away(panel, bank)))),
         all = T.optionState(T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", loose))),
     }
     context:hideAndChildren()
     return options
-end
-
---- Stands the character next to `square` so vanilla's walkAdj has nowhere to go, then makes that
---- walk, as the menu does before an action: a multiplayer server refuses a job from afar.
-function T.walkTo(self, square, what)
-    T.standNextTo(square)
-    return T.need(self, luautils.walkAdj(T.player(), square, true), "a walk to " .. what)
 end
 
 --- Queues opening the status window on `bank`, closed when the test ends, and a wait until it has
@@ -522,7 +361,7 @@ end
 function T.openWindow(self, bank)
     T.step(function()
         T.standNextTo(bank.square)
-        local window = RenewableEnergy.StatusWindow:openOn(0, bank.object)
+        local window = StatusWindow:openOn(0, bank.object)
         self.window = window
         T.defer(self, function() window:close() end)
         local drawn
@@ -541,118 +380,6 @@ end
 --- The status row labelled `label` in `rows` (StatusRows.rows' columns), or nil.
 function T.rowLabelled(rows, label)
     return T.findIn(rows, "label", label)
-end
-
--- Crafting -------------------------------------------------------------------------------------
-
--- `name` in snake case, for test names: "HomesteadPowerMag1" -> "homestead_power_mag1".
-local function snake(name)
-    return string.lower((name:gsub("(%l)(%u)", "%1_%2"):gsub("(%d)(%u)", "%1_%2")))
-end
-
---- The test name for `recipe` in `system`'s tests: "solar", "RenewableEnergy_TakeApartSolarCellCharger",
---- "returns_x" -> "renewable_energy_solar_craft_take_apart_solar_cell_charger_returns_x".
-function T.craftName(system, recipe, behavior)
-    return "renewable_energy_" .. system .. "_craft_" .. snake((recipe:gsub("^RenewableEnergy_", "")))
-        .. (behavior and "_" .. behavior or "")
-end
-
---- The given inputs (T.craftTest's self.items.inputs) of `fullType`.
-function T.inputsOf(self, fullType)
-    local found = {}
-    for _, item in ipairs(self.items.inputs or {}) do
-        if item:getFullType() == fullType then
-            table.insert(found, item)
-        end
-    end
-    return found
-end
-
---- Queues a wait until this client's copy of the carried `fullType` has been repaired `repaired`
---- times: the craft and the tooltip read this client's copy.
-function T.waitForRepaired(self, fullType, repaired)
-    T.waitFor(self, function()
-        local item = T.carried(fullType)
-        return item ~= nil and item:getHaveBeenRepaired() == repaired
-    end, "this client's " .. fullType .. " repaired " .. repaired .. "x")
-end
-
---- Registers the craft test `name` of the repair `recipe` on a carried `fullType` set to
---- condition `row.before`, repaired `row.repaired` times and, when given, charged to `row.uses`.
---- validate expects the authority's at `row.after`, repaired `row.repairedAfter` times, as this
---- client's copy is too (the tooltip reads it), and the game refusing the craft when
---- `row.refused`. `row.prefer` adds to the inputs preferred, `row.counts` replaces the counts
---- (one `fullType`), and `row.setup(self)` and `row.validate(self, item)` add to the test's.
-function T.repairCraftTest(name, recipe, fullType, row)
-    local prefer = { fullType }
-    for _, other in ipairs(row.prefer or {}) do
-        table.insert(prefer, other)
-    end
-    T.craftTest(name, {
-        recipe = recipe,
-        from = fullType,
-        prefer = prefer,
-        refused = row.refused,
-        setup = function(self)
-            T.changeItem(self, T.inputsOf(self, fullType)[1], { condition = row.before, repaired = row.repaired, uses = row.uses })
-            if row.setup then
-                row.setup(self)
-            end
-        end,
-        counts = row.counts or { [fullType] = 1 },
-        after = function(self)
-            T.readCarried(self, { fullType })
-            T.waitForRepaired(self, fullType, row.repairedAfter)
-        end,
-        validate = function(self)
-            local item = T.carriedFirst(self, fullType)
-            if not T.expect(item ~= nil, "the " .. fullType .. " is gone") then return end
-            T.expectEqual("its condition", item.condition, row.after)
-            T.expectEqual("its repairs", item.repaired, row.repairedAfter)
-            if row.validate then
-                row.validate(self, item)
-            end
-        end,
-    })
-end
-
---- The condition at `share` of `fullType`'s ConditionMax, such as a Specs.crackLooks threshold.
-function T.conditionAt(fullType, share)
-    return math.floor(share * Items.conditionMaxOf(fullType) + 0.5)
-end
-
---- The most a seal brings a `fullType` module sealed `repaired` times before to: its
---- ModuleRepair.SEAL_CAP, a Wear.REPAIR_LIMIT_STEP lower for each seal.
-function T.sealCap(fullType, repaired)
-    return ModuleRepair.SEAL_CAP[fullType] - Wear.REPAIR_LIMIT_STEP * repaired
-end
-
---- The places where rich text `text`, laid out as a tooltip lays it out, shows two runs of words
---- with no gap between them, each as "before|after"; empty when none do. The game's rich text
---- ends a run at every tag and starts the next where the last one's letters end, dropping the
---- space before the tag (ISRichTextPanel.paginate), so a colour change mid-line runs the words
---- together unless a <SPACE> tag keeps them apart.
-function T.runTogether(text)
-    local panel = ISRichTextPanel:new(0, 0, 2000, 100)
-    panel.defaultFont = ISToolTip.GetFont()
-    panel.text = text
-    panel:paginate()
-    local count = 0
-    for i in pairs(panel.lines) do
-        count = math.max(count, i)
-    end
-    local touching, previous = {}, nil
-    for i = 1, count do
-        local run = panel.lines[i]
-        if run and run ~= "" then
-            local x, y = panel.lineX[i], panel.lineY[i]
-            if previous and previous.y == y and x <= previous.right then
-                table.insert(touching, previous.run .. "|" .. run)
-            end
-            previous = { run = run, y = y, right = x + getTextManager():MeasureStringX(panel.defaultFont, run) }
-        end
-    end
-    return touching
 end
 
 return T

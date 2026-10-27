@@ -1,14 +1,15 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
 local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
+local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Solar: the sun model (Sun.lua) and panels feeding a bank (PowerBank/PanelSource.lua, Sources.lua):
 -- module condition, panel slots, reconnecting, snow and roofs.
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
 
 -- Sun -----------------------------------------------------------------------------------------
 
@@ -190,7 +191,7 @@ test("renewable_energy_solar_panel_slots", {
         T.batch(function()
             if not (connect(self.boxPanels, box, Specs.freeSlots + 1)
                 and connect(self.rackPanels, batteryRack, Specs.freeSlots + Specs.slotsPerController + 1)) then return end
-            T.server(self, "bankPart", { bank = batteryRack.position, type = Specs.controller, remove = true })
+            T.server(self, "bankPart", T.at(batteryRack, { type = Specs.controller, remove = true }))
             T.bankPass(self, batteryRack, 1000)
         end)
     end,
@@ -228,9 +229,9 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
         self.panel = panel
         -- A refresh after each try builds the status from the record again, whatever the try sent.
         local function tryAgain(label)
-            T.job(self, "source", RenewableEnergy.SourceJobs.CONNECT, panel.position, bank.position, label)
-            T.server(self, "refreshBank", { bank = bank.position })
-            T.bankState(self, bank, label .. "State")
+            T.job(self, "source", SourceJobs.CONNECT, panel, bank, label)
+            T.server(self, "refreshBank", T.at(bank))
+            T.readRecord(self, bank, label .. "State")
         end
         T.batch(function()
             T.snowfall(self, bank, nil, "snowed")
@@ -242,14 +243,14 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
     end,
     validate = function(self)
         if not (T.expectConnected(self.panel) and T.expectConnected(self.second)) then return end
-        local snowed = (T.stateSource(self.reads.snowed, self.panel.position) or {}).snow or 0
+        local snowed = (T.stateSource(self.reads.snowed, self.panel) or {}).snow or 0
         if not expect(snowed > 0, "a night of snowfall left no snow on the panel") then return end
         for _, case in ipairs({ { "again", 1, "a bank" }, { "full", 2, "a full bank" } }) do
             local state, panels, what = self.reads[case[1] .. "State"], case[2], case[3]
             expectEqual("panels after connecting one again to " .. what .. " it feeds", state.sources, panels)
             -- Connecting brings the bank up to now first, which may melt a trace of it.
             expectNear("snow on a panel connected again to " .. what .. " it feeds",
-                (T.stateSource(state, self.panel.position) or {}).snow or -1, snowed, 0.01)
+                (T.stateSource(state, self.panel) or {}).snow or -1, snowed, 0.01)
         end
         expect(self.reads.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
             "a full bank turned its own panel away for want of a slot")
@@ -280,7 +281,7 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
         T.give(self, "broom", { { type = "Base.Broom" } })
         T.batch(function()
             T.snowfall(self, bank, 2, "night")
-            T.job(self, "source", RenewableEnergy.SourceJobs.CLEAR_SNOW, self.clean.position, { type = "Base.Broom" })
+            T.job(self, "source", SourceJobs.CLEAR_SNOW, self.clean, { type = "Base.Broom" })
         end)
         T.waitFor(self, function() return showsSnow(self.flat) and showsSnow(self.rack) end,
             "this client's copies of the snowy panels showing snow")
@@ -294,7 +295,7 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
     validate = function(self)
         local connected = self.flat.connected and self.rack.connected and self.clean.connected
         if not expect(connected, "connecting the panels failed") then return end
-        local function entryOf(label, panel) return T.stateSource(self.reads[label], panel.position) or {} end
+        local function entryOf(label, panel) return T.stateSource(self.reads[label], panel) or {} end
         local flat, rack = entryOf("night", self.flat), entryOf("night", self.rack)
         expect((flat.snow or 0) > 0, "a frosty night of snowfall left no snow on the flat panel")
         expectEqual("snow on the rack after the night", rack.snow, flat.snow)
@@ -309,7 +310,7 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
         expect(flat.snow > 0 and flat.snow < night,
             "an hour of full sun took the flat panel's snow from " .. night .. " to " .. flat.snow)
         expect(rack.snow < flat.snow, "the rack, which sheds snow, kept " .. rack.snow .. " against the flat panel's " .. flat.snow)
-        local thawed = T.stateSource(self.bank.state, self.flat.position) or {}
+        local thawed = T.stateSource(self.bank.state, self.flat) or {}
         expectEqual("snow on the flat panel after a mild sunny day", thawed.snow, 0)
         expectEqual("the thawed panel's share of full sun", thawed.fullSunPct, 100)
     end,
@@ -325,10 +326,10 @@ test("renewable_energy_solar_roofed_panel_makes_nothing", {
         if not self.panel then return end
         T.batch(function()
             T.bankPass(self, bank, 1000)
-            T.bankState(self, bank, "open")
-            T.read(self, "roofOver", self.panel.position, "roofOver")
+            T.readRecord(self, bank, "open")
+            T.floorAbove(self, self.panel, "roofOver")
             T.bankPass(self, bank, 1000)
-            T.bankState(self, bank, "roofed")
+            T.readRecord(self, bank, "roofed")
         end)
     end,
     validate = function(self)

@@ -1,13 +1,13 @@
 -- Battery banks as both sides see them: what an object is, what parts a bank takes, whether it can
 -- carry a load, the sources connected to it, and the bank's summary and status as the server last
--- reported them. What each kind of source is lives in RenewableEnergy.Sources; the jobs at a bank
+-- reported them. What each kind of source is lives in Sources; the jobs at a bank
 -- in BankJobs.
 --
 -- Both sides register a Global Object System under SYSTEM_NAME, which keeps each bank's state
 -- while its chunk is unloaded and copies its small `summary` to every client; the whole `status`
 -- goes only to players watching it.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
@@ -15,6 +15,8 @@ local GlobalObjects = require "cf_commonlib/GlobalObjects"
 local Squares = require "cf_commonlib/Squares"
 
 local PowerBank = {}
+-- A bank's containers name acceptItem by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.PowerBank = PowerBank
 
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
@@ -167,7 +169,7 @@ function PowerBank.connectedBank(isoObject)
 end
 
 GlobalObjects.declare(PowerBank, {
-    prefix = RenewableEnergy.CLASS_PREFIX, name = "Bank", isObject = PowerBank.isBank,
+    prefix = Utilities.CLASS_PREFIX, name = "Bank", isObject = PowerBank.isBank,
     sprites = PowerBank.bankSprites(), accept = "RenewableEnergy.PowerBank.acceptItem",
 })
 

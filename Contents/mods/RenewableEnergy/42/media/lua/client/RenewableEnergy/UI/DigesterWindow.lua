@@ -1,13 +1,11 @@
 -- A digester's status window: its summary (RenewableEnergy.Digester.summaryOf) as rows.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
 local Format = require "RenewableEnergy/UI/Format"
 local SummaryWindow = require "RenewableEnergy/UI/SummaryWindow"
 
 local DigesterWindow = SummaryWindow:derive("RenewableEnergyDigesterWindow")
-RenewableEnergy.DigesterWindow = DigesterWindow
 DigesterWindow.owner = Digester
 
 local row = SummaryWindow.row

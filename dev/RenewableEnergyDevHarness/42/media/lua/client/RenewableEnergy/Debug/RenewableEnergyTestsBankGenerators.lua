@@ -1,8 +1,10 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/BankJobs"
-require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/StatusRows"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibGenerators"
+local Specs = require "RenewableEnergy/Specs"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local Format = require "RenewableEnergy/UI/Format"
+local StatusRows = require "RenewableEnergy/UI/StatusRows"
+local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
 
 -- Power bank tests: chargers and backup generators (PowerBank/Backup.lua, World/Failsafe.lua),
 -- and which of the banks and generators reaching an appliance pays for it (PowerBank/Payers.lua).
@@ -10,9 +12,6 @@ require "RenewableEnergy/UI/StatusRows"
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual, player = T.test, T.expect, T.expectNear, T.expectEqual, T.player
-local Specs, BankJobs = RenewableEnergy.Specs, RenewableEnergy.BankJobs
-local Format = RenewableEnergy.Format
-local StatusRows = RenewableEnergy.StatusRows
 local BACKUP_REACH = 3 -- PowerBank/Backup.lua's reach
 
 local function distanceSquared(a, b)
@@ -67,7 +66,7 @@ test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
         local charge = 0.2
         local bank, backup = chargerBank(self, { charge = charge })
         if not bank then return end
-        self.at = bank.position
+        self.at = T.at(bank)
         -- For half the time the room left in the batteries takes to fill.
         self.chargersW = chargerBankWatts()
         local roomWh = (1 - charge) * 2 * Specs.batteries[T.CAR_BATTERY].wh
@@ -119,8 +118,8 @@ test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
             pass("room")
             T.setGenerator(self, generator, { rebuild = true })
             T.readGenerator(self, backup, "rebuilt")
-            T.server(self, "bankPart", { bank = bank.position, type = T.CAR_BATTERY, remove = true })
-            T.server(self, "bankPart", { bank = bank.position, type = T.CAR_BATTERY, remove = true })
+            T.server(self, "bankPart", T.at(bank, { type = T.CAR_BATTERY, remove = true }))
+            T.server(self, "bankPart", T.at(bank, { type = T.CAR_BATTERY, remove = true }))
             pass("empty")
         end)
     end,
@@ -157,21 +156,21 @@ test("renewable_energy_settlement_unwire_charger_releases_generator_bill", {
         local square = bank and backupSquare(self, bank.square, BACKUP_REACH)
         if not square then return end
         local generator = T.generator(self, { square = square, running = true })
-        T.giveBeforeCalls(self, "tools", { { type = "Base.Screwdriver" }, { type = "Base.Wrench" } })
+        T.give(self, "tools", { { type = "Base.Screwdriver" }, { type = "Base.Wrench" } })
         T.forceRoll(self, 1 - T.UNDER)
-        T.job(self, "bank", BankJobs.TURN_ON, bank.position, nil, "switched")
+        T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
         T.bankPass(self, bank, 0, { hours = 0.01 })
         -- Keep catch-up real without advancing the world into a periodic billing event.
-        T.bankState(self, bank, nil, 0.01)
-        T.read(self, "bankSettlement", { bank = bank.position, generators = { T.at(generator) },
-            job = BankJobs.UNWIRE, part = Specs.charger }, "unwired")
+        T.readRecord(self, bank, nil, 0.01)
+        T.job(self, "bank", BankJobs.UNWIRE, bank, { type = Specs.charger, inTarget = true }, "unwired",
+            { reads = { snapshot = { name = "bankSettlement", args = T.at(bank, { generators = { T.at(generator) } }) } } })
         T.setGenerator(self, generator, { rebuild = true })
-        T.read(self, "bankSettlement", { bank = bank.position, generators = { T.at(generator) } }, "rebuilt")
+        T.read(self, "bankSettlement", T.at(bank, { generators = { T.at(generator) } }), "rebuilt")
     end,
     validate = function(self)
         if not T.expectOk(self.reads.switched, "switching the charging bank on")
             or not T.expectOk(self.reads.unwired, "unwiring only the charger") then return end
-        local before, after = self.reads.unwired.before, self.reads.unwired.after
+        local before, after = self.reads.unwired.before.snapshot, self.reads.unwired.after.snapshot
         expect(before.activated and before.on, "the partial bank was not active before Unwire")
         expect(before.charge > 0 and before.charge < 1, "the charging bank was not partial")
         expect(before.chargeWantW > 0, "the normal pass did not establish charging demand")
@@ -257,15 +256,17 @@ test("renewable_energy_bank_charging_generator_kept_through_save", {
         T.generator(self, { square = backup, running = true })
         T.batch(function()
             T.bankPass(self, bank, 0, { hours = 0.1 })
-            T.read(self, "saveAndLoadBank", { bank = bank.position, generator = T.at(backup) }, "saved")
+            T.reloadRecord(self, bank, "saved", { load = { name = "generatorLoad", args = T.at(backup) },
+                bank = { name = "PZHarness.readRecord", args = T.at(bank, { kind = "bank" }) } })
         end)
     end,
     validate = function(self)
         local reply = self.reads.saved
+        local loadBefore, loadAfter, chargerW = reply.before.load.deliveredW, reply.after.load.deliveredW, reply.before.bank.chargerMaxW
         expectEqual("what the bank's chargers charge from", self.bank.state.status.chargeSource, "generator")
-        expect(reply.loadBefore >= reply.chargerW and reply.chargerW > 0, string.format(
-            "the generator delivers %.1f W, short of the %.1f W of the bank's chargers", reply.loadBefore, reply.chargerW))
-        expectNear("what the generator delivers after a save and load", reply.loadAfter, reply.loadBefore, 0.001)
+        expect(loadBefore >= chargerW and chargerW > 0, string.format(
+            "the generator delivers %.1f W, short of the %.1f W of the bank's chargers", loadBefore, chargerW))
+        expectNear("what the generator delivers after a save and load", loadAfter, loadBefore, 0.001)
     end,
 })
 
@@ -293,7 +294,7 @@ test("renewable_energy_bank_failsafe_starts_generator", {
         end
         T.batch(function()
             T.generator(self, { square = backup, failsafe = true })
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
+            T.job(self, "bank", BankJobs.TURN_ON, bank)
             at("atStart", start)
             at("belowStart", start - 0.01)
             at("belowStop", stop - 0.01)
@@ -319,7 +320,7 @@ end
 -- nil without one.
 local function failsafeRow(status, bank)
     local label = getText("IGUI_RenewableEnergy_Failsafe")
-    local left, right = StatusRows.rows(status, bank.position)
+    local left, right = StatusRows.rows(status, bank)
     local row = T.rowLabelled(left, label) or T.rowLabelled(right, label)
     return row and row.value
 end
@@ -346,7 +347,7 @@ test("renewable_energy_bank_failsafe_waits_for_a_working_bank", {
         end
         T.batch(function()
             T.generator(self, { square = backup, failsafe = true })
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
+            T.job(self, "bank", BankJobs.TURN_ON, bank)
             T.bankPart(self, bank, T.PLUG_IN_INVERTER, { condition = 0, recount = true })
             lowPass("broken")
             T.bankPart(self, bank, T.PLUG_IN_INVERTER, { condition = 100, recount = true })
@@ -382,8 +383,8 @@ test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
         self.nearBank, self.farBank = near, far
         T.batch(function()
             T.generator(self, { square = backup, failsafe = true })
-            T.job(self, "bank", BankJobs.TURN_ON, near.position)
-            T.job(self, "bank", BankJobs.TURN_ON, far.position)
+            T.job(self, "bank", BankJobs.TURN_ON, near)
+            T.job(self, "bank", BankJobs.TURN_ON, far)
             T.setCharge(self, far, belowFailsafeStart())
             T.bankPass(self, near, 0, { hours = 0.01, label = "nearBank" })
             T.bankPass(self, far, 0, { hours = 0.01, label = "farBank" })
@@ -403,7 +404,7 @@ test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
 -- generators are nearer B than A, the farther one is in A's backup reach and the nearer isn't.
 -- Nil, and missing, without such a line near the character.
 local function relayLine(self)
-    local isFree, origin = RenewableEnergy.Debug.isFreeSquare, player():getSquare()
+    local isFree, origin = Debug.isFreeSquare, player():getSquare()
     local z = origin:getZ()
     for radius = 1, 30 do
         for x, y in PZHarness.Fixtures.ring(origin:getX(), origin:getY(), radius) do
@@ -443,8 +444,8 @@ test("renewable_energy_bank_failsafe_runs_every_relay_answering_to_it", {
         T.batch(function()
             T.generator(self, { square = line.near, failsafe = true })
             T.generator(self, { square = line.far, failsafe = true })
-            T.job(self, "bank", BankJobs.TURN_ON, b.position)
-            T.job(self, "bank", BankJobs.TURN_ON, a.position)
+            T.job(self, "bank", BankJobs.TURN_ON, b)
+            T.job(self, "bank", BankJobs.TURN_ON, a)
             T.setCharge(self, b, belowFailsafeStart())
             T.bankPass(self, b, 0, { hours = 0.01, label = "bankB" })
             T.bankPass(self, a, 0, { hours = 0.01, label = "bankA" })
@@ -477,7 +478,7 @@ test("renewable_energy_settlement_bank_job_failsafe_reassigns_generator_bill", {
         local b = T.generator(self, { square = line.far, running = true, failsafe = true })
         local positions = { T.at(a), T.at(b) }
         local function snapshot(label)
-            T.read(self, "bankSettlement", { bank = bank.position, generators = positions }, label)
+            T.read(self, "bankSettlement", T.at(bank, { generators = positions }), label)
         end
         local function baseline(label)
             T.bankPass(self, bank, 0, { hours = 0.01 })
@@ -485,7 +486,7 @@ test("renewable_energy_settlement_bank_job_failsafe_reassigns_generator_bill", {
             snapshot(label)
         end
         T.forceRoll(self, 1 - T.UNDER)
-        T.job(self, "bank", BankJobs.TURN_ON, bank.position, nil, "switched")
+        T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
         -- Measure both payer sets without the added appliance so ambient building loads cancel.
         baseline("bothBare")
         T.setGenerator(self, b, { running = false })
@@ -493,9 +494,9 @@ test("renewable_energy_settlement_bank_job_failsafe_reassigns_generator_bill", {
         T.step(function() T.placeTile(self, line.a, T.MINI_FRIDGE) end)
         baseline("loaded")
         T.setCharge(self, bank, belowFailsafeStart())
-        T.bankState(self, bank, nil, 0.01)
-        T.read(self, "bankSettlement", { bank = bank.position, generators = positions,
-            job = BankJobs.RENAME, name = "Settlement bank" }, "renamed")
+        T.readRecord(self, bank, nil, 0.01)
+        T.job(self, "bank", BankJobs.RENAME, bank, "Settlement bank", "renamed",
+            { reads = { snapshot = { name = "bankSettlement", args = T.at(bank, { generators = positions }) } } })
         -- No bank pass or explicit bill after the job: only vanilla rebuilds and keepShares.
         T.setGenerator(self, a, { rebuild = true })
         snapshot("rebuilt")
@@ -504,7 +505,7 @@ test("renewable_energy_settlement_bank_job_failsafe_reassigns_generator_bill", {
         local reads = self.reads
         if not T.expectOk(reads.switched, "switching the failsafe bank on")
             or not T.expectOk(reads.renamed, "renaming the bank through standalone catch-up") then return end
-        local before, after = reads.renamed.before, reads.renamed.after
+        local before, after = reads.renamed.before.snapshot, reads.renamed.after.snapshot
         expect(reads.bothBare.generators[1].running and reads.bothBare.generators[2].running,
             "the two-running-generator baseline was not established")
         expect(before.generators[1].running and not before.generators[2].running,
@@ -549,8 +550,8 @@ test("renewable_energy_bank_backup_load_kept_apart", {
         T.placeTile(self, fridge, T.MINI_FRIDGE)
         T.generator(self, { square = backup, running = true })
         T.batch(function()
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position, nil, "switched")
-            T.bankState(self, bank, "before")
+            T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
+            T.readRecord(self, bank, "before")
             T.bankPass(self, bank, 0, { label = "after" })
         end)
     end,
@@ -603,7 +604,7 @@ test("renewable_energy_bank_nearest_bank_pays_shared_appliance", {
         passBoth(self, near, far, "before")
         T.step(function() T.placeTile(self, fridges[1], T.MINI_FRIDGE) end)
         passBoth(self, near, far, "shared")
-        T.job(self, "bank", BankJobs.TURN_OFF, near.position)
+        T.job(self, "bank", BankJobs.TURN_OFF, near)
         T.bankPass(self, far, 0, { hours = 0.01, label = "farAlone" })
         T.step(function() T.placeTile(self, fridges[2], T.MINI_FRIDGE) end)
         T.bankPass(self, far, 0, { hours = 0.01, label = "farAloneWithFridge" })
@@ -680,7 +681,7 @@ test("renewable_energy_bank_and_generator_nearest_pays", {
         pass("before")
         T.step(function() T.placeTile(self, fridges[1], T.MINI_FRIDGE) end)
         pass("shared")
-        T.job(self, "bank", BankJobs.TURN_OFF, bank.position)
+        T.job(self, "bank", BankJobs.TURN_OFF, bank)
         T.readGenerator(self, generator, "alone")
         T.step(function() T.placeTile(self, fridges[2], T.MINI_FRIDGE) end)
         T.setGenerator(self, generator, { rebuild = true })

@@ -1,9 +1,11 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Recipes"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
+local Specs = require "RenewableEnergy/Specs"
+local Recipes = require "RenewableEnergy/Recipes"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Items = require "cf_commonlib/Items"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Solar crafting: what a module shows through its life (Sprites.lua) and mount and module recipes
 -- (Recipes.lua, ModuleRepair.lua).
@@ -11,7 +13,6 @@ local Items = require "cf_commonlib/Items"
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, expectEqual, player = T.test, T.craftTest, T.expect, T.expectNear, T.expectEqual,
     T.player
-local Specs, Sprites, Recipes = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Recipes
 local MODULES_KEY = Panel.MODULES_KEY
 local function craftName(recipe, behavior) return T.craftName("solar", recipe, behavior) end
 
@@ -121,7 +122,7 @@ for _, entry in ipairs(MOUNTS) do
                 -- One of the two a homemade module instead. This client must have lost the
                 -- factory one before the craft picks its inputs from its own copy.
                 local taken = modules[2]:getID()
-                T.server(self, "takeItems", { ids = { taken } })
+                T.takeItems(self, { taken })
                 T.give(self, "homemade", { { type = T.HOMEMADE_MODULE, condition = USED_HOMEMADE.condition } })
                 T.waitFor(self, function() return player():getInventory():getItemById(taken) == nil end,
                     "this client losing the second factory module")
@@ -201,7 +202,7 @@ test("renewable_energy_solar_mount_xp_only_for_new_modules", {
         T.setPerk(self, Perks.Electricity, 3)
         T.setPerk(self, Perks.Woodwork, 4)
         local function readXp(label)
-            T.read(self, "character", { perks = { "Electricity" } }, label)
+            T.readCharacter(self, label, { perks = { "Electricity" } })
         end
         local function craft(recipe, fullType)
             T.waitForCarried(self, fullType, "this client's " .. fullType .. " to craft from")
@@ -242,16 +243,15 @@ test("renewable_energy_solar_mount_xp_only_for_new_modules", {
             -- What the game gives this character for each award, through the call CraftRecipe.addXP
             -- makes.
             local mounts = Recipes.MOUNTS
-            T.read(self, "electricityAward", { xp = mounts[flat].xp.Electricity }, "flatAward")
-            T.read(self, "electricityAward", { xp = mounts["RenewableEnergy.SolarRackWood"].xp.Electricity / 2 },
-                "rackShareAward")
+            T.xpAward(self, "Electricity", mounts[flat].xp.Electricity, "flatAward")
+            T.xpAward(self, "Electricity", mounts["RenewableEnergy.SolarRackWood"].xp.Electricity / 2, "rackShareAward")
             -- The rack's own xpAward for building the frame, given whatever the modules.
             local frame = 0
             for i = 0, recipes.rack:getXPAwardCount() - 1 do
                 local award = recipes.rack:getXPAward(i)
                 if award:getPerk() == Perks.Electricity then frame = frame + award:getAmount() end
             end
-            T.read(self, "electricityAward", { xp = frame }, "rackFrameAward")
+            T.xpAward(self, "Electricity", frame, "rackFrameAward")
         end)
     end,
     validate = function(self)

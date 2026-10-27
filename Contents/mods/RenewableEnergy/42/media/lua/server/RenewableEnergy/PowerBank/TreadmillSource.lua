@@ -1,4 +1,4 @@
--- How a bank runs a wired treadmill (the "treadmill" family of RenewableEnergy.Sources) on the
+-- How a bank runs a wired treadmill (the "treadmill" family of Sources) on the
 -- authority, and the one writer of a treadmill tile's wiring. A run banks its watt-hours when it
 -- ends (credit, through BankSystem.creditTreadmill), and the passes after it pay them out at no
 -- more than a runner puts in; what is left when the treadmill leaves its bank goes in at once. Its
@@ -6,14 +6,12 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 
 local SPEC = Treadmill.SPEC
 
 local TreadmillSource = {}
-RenewableEnergy.TreadmillSource = TreadmillSource
 
 -- Watt-hours left over below this are rounding, not a run.
 local LEFT_WH = 0.001

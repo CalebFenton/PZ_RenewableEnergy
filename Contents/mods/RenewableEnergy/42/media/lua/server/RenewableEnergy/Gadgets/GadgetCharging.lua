@@ -4,7 +4,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sun = require "RenewableEnergy/Sun"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainerServer"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellChargerServer"
@@ -13,7 +12,6 @@ local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local Clock = require "cf_commonlib/Clock"
 
 local GadgetCharging = {}
-RenewableEnergy.GadgetCharging = GadgetCharging
 
 -- Longest stretch one pass makes up for, since it charges at the sun of the moment.
 local LONGEST_PASS = 1

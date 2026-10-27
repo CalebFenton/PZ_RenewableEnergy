@@ -3,7 +3,6 @@
 -- character and what refuses it (cf_commonlib's Jobs); VehicleJobsServer does them.
 -- A job at a vehicle reaches at waist height, from the area of the part it works on.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
@@ -13,7 +12,6 @@ local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
 
 local VehicleJobs = {}
-RenewableEnergy.VehicleJobs = VehicleJobs
 
 VehicleJobs.ATTACH_MAINTAINER = "AttachMaintainer"
 VehicleJobs.DETACH_MAINTAINER = "DetachMaintainer"
@@ -56,7 +54,7 @@ end
 local SKILL = { perk = "Mechanics", need = 2 }
 local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
 
--- Take Out and Put Back Alternator (RenewableEnergy.CarAlternator), worked as vanilla works on an
+-- Take Out and Put Back Alternator (CarAlternator), worked as vanilla works on an
 -- engine-bay part (ISUninstallVehiclePart). A shut hood isn't the menu's blocker, as the menu
 -- opens it first, as vanilla's engine jobs do.
 local function alternatorJob(putBack)

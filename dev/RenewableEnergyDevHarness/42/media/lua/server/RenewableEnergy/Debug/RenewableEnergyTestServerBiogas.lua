@@ -1,22 +1,22 @@
--- The authority's half of the biogas tests: the stink, the digesters, propane on the floor, and the
--- Global Object System records both digesters and gasifiers are (Helpers.recordAt), which the wood
--- gas tests drive too. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
--- RenewableEnergyTestHelpers.lua says how these handlers work.
+-- The authority's half of the biogas tests: the stink and running a digester; the harness's record
+-- kit drives the digesters' records (RenewableEnergyTestKinds). Only registers handlers, so a
+-- --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
+-- handlers work.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
+require "PZHarness/ServerRecords"
 require "PZHarness/Fixtures"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Materials = require "cf_commonlib/Materials"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
+local Stink = require "RenewableEnergy/Biogas/Stink"
 
 local handler = PZHarness.serverHandler
-local removePlaced = PZHarness.Fixtures.removePlaced
-local need = PZHarness.need
-local Items = require "cf_commonlib/Items"
 
 -- Carried bags count as inventory for jobs, including water split across nested bags. The same
 -- selection must satisfy the menu's needs and consume fullest first without taking tainted water.
 PZHarness.checkHandler("baggedWaterMaterials", function(expect, expectNear, player)
-    local Materials = require "cf_commonlib/Materials"
     local inventory = player:getInventory()
     local outer = inventory:AddItem("Base.Bag_DuffelBag")
     local inner = outer:getInventory():AddItem("Base.Bag_DuffelBag")
@@ -45,10 +45,9 @@ end)
 
 -- Stink ------------------------------------------------------------------------------------------
 
--- Makes the source `args.key` at x, y, z smell like `args.count` corpses (RenewableEnergy.Stink),
+-- Makes the source `args.key` at x, y, z smell like `args.count` corpses (Stink.set),
 -- until the test ends.
 handler("stinkSet", function(player, args, defer)
-    local Stink = RenewableEnergy.Stink
     Stink.set(args.key, args.x, args.y, args.z, args.count)
     defer(function() Stink.set(args.key, args.x, args.y, args.z, 0) end)
     return {}
@@ -69,7 +68,7 @@ handler("stinkRead", function(player, args)
         end
     end
     local levels = {}
-    for i, count in ipairs(RenewableEnergy.Stink.LEVEL_CORPSES) do
+    for i, count in ipairs(Stink.LEVEL_CORPSES) do
         levels[i] = count
     end
     return {
@@ -85,15 +84,15 @@ end)
 -- How an outdoor source smelling like `args.count` corpses spreads its ghosts (Stink.spread),
 -- which a multiplayer client's Lua doesn't have.
 handler("stinkSpread", function(_, args)
-    local own, ring = RenewableEnergy.Stink.spread(args.count)
+    local own, ring = Stink.spread(args.count)
     return { own = own, ring = ring }
 end)
 
 -- The stink score's edges (Digester.SMELL_SCORES): none just below the first, then each smell
 -- level's corpses from its edge up to just below the next.
 PZHarness.checkHandler("digesterCorpsesFor", function(expect)
-    local corpsesFor = RenewableEnergy.DigesterObject.corpsesFor
-    local levels, scores = RenewableEnergy.Stink.LEVEL_CORPSES, RenewableEnergy.Digester.SMELL_SCORES
+    local corpsesFor = DigesterObject.corpsesFor
+    local levels, scores = Stink.LEVEL_CORPSES, Digester.SMELL_SCORES
     local below = 0.001
     local function band(score, lowest, under)
         local corpses = corpsesFor(score)
@@ -109,111 +108,14 @@ PZHarness.checkHandler("digesterCorpsesFor", function(expect)
     end
 end)
 
--- Records (digesters and gasifiers) -----------------------------------------------------------------
-
--- Builds the record of kind `args.kind` on the Sprites[kind] tile `args.tile` at x, y, z as the
--- build menu does (Helpers.placeRecord). Taken away when the test ends, the way the game removes
--- it, found again by its place, since a chunk that unloaded and loaded meanwhile holds a new copy.
-handler("placeRecord", function(player, args, defer)
-    local thumpable = Helpers.placeRecord(args.kind, args.tile, Helpers.squareAt(args))
-    defer(function() removePlaced(Helpers.findOn(args) or thumpable) end)
-    return {}
-end)
-
--- Sets the record's fields `args.fields` as of now, and each field of `args.ago` ({ [field] =
--- hours }) to the world hour that many hours before now, then shows and sends what changed. Each
--- must be one of its SAVED_FIELDS, the record's state: a misspelled one would sit beside the field
--- the code reads, and change nothing.
-handler("setRecord", function(player, args)
-    local record = Helpers.recordAt(args)
-    local saved = {}
-    for _, field in ipairs(Helpers.RECORD_KINDS[args.kind].object().SAVED_FIELDS) do
-        saved[field] = true
-    end
-    for _, fields in ipairs({ args.fields or {}, args.ago or {} }) do
-        for key in pairs(fields) do
-            need(saved[key], "a saved field " .. tostring(key) .. " of a " .. args.kind)
-        end
-    end
-    local now = getGameTime():getWorldAgeHours()
-    for key, value in pairs(args.fields or {}) do
-        record[key] = value
-    end
-    for key, hours in pairs(args.ago or {}) do
-        record[key] = now - hours
-    end
-    record.lastHour = now
-    record:afterChange()
-    return {}
-end)
-
--- Puts `args.items` ({ [container name] = { { type, count, rotten } } }, the names of
--- Helpers.RECORD_KINDS) in the record's containers, past their filters, as a player's transfer
--- would: the record hears of it only in its next pass.
-handler("fillRecord", function(player, args)
-    local _, object = Helpers.recordAt(args)
-    local containers = Helpers.RECORD_KINDS[args.kind].containers(object)
-    for name, entries in pairs(args.items) do
-        local container = need(containers[name], "a " .. name .. " on the " .. args.kind)
-        for _, entry in ipairs(entries) do
-            for _ = 1, entry.count or 1 do
-                local item = need(instanceItem(entry.type), "an item " .. tostring(entry.type))
-                if entry.rotten then
-                    item:setAge(item:getOffAgeMax() + 1)
-                end
-                Items.addItem(container, item)
-            end
-        end
-    end
-    return {}
-end)
-
--- Brings the record of kind `args.kind` at x, y, z up to now as its pass does, as though
--- `args.hours` had passed since its last, its chunk loaded or not. Answers its state
--- (Helpers.recordState), from the record alone while unloaded.
-handler("ageRecord", function(player, args)
-    local kind = Helpers.RECORD_KINDS[args.kind]
-    local record = need(kind and kind.owner().recordAt(args.x, args.y, args.z),
-        "a " .. tostring(args.kind) .. " record at " .. args.x .. "," .. args.y)
-    record.lastHour = getGameTime():getWorldAgeHours() - args.hours
-    record:update()
-    return Helpers.recordState(args.kind, record, record:getIsoObject())
-end)
-
--- The record's state (Helpers.recordState).
-handler("readRecord", function(player, args)
-    local record, object = Helpers.recordAt(args)
-    return Helpers.recordState(args.kind, record, object)
-end)
-
 -- Digesters -------------------------------------------------------------------------------------
 
 -- Runs the digester at x, y, z for `args.hours` at the air temperature `args.air` (°C), feeding
 -- from its hopper as its pass does, without moving the clock.
 handler("runDigester", function(player, args)
-    local record, object = Helpers.recordAt(args)
-    record:run(args.hours, object:getContainer(), args.air)
+    local record, object = PZHarness.Records.at({ kind = "digester", x = args.x, y = args.y, z = args.z })
+    record:run(args.hours, PZHarness.need(object, "the digester's tile loaded on the server"):getContainer(), args.air)
     record.lastHour = getGameTime():getWorldAgeHours()
     record:afterChange()
-    return {}
-end)
-
--- Propane --------------------------------------------------------------------------------------
-
--- Drops an `args.type` holding `args.uses` (its share of full) on the floor of the square at x, y,
--- z, as a player dropping it does, for everyone to see. Taken away when the test ends.
-handler("floorItem", function(player, args, defer)
-    local square = Helpers.squareAt(args)
-    local item = need(instanceItem(args.type), "an item " .. tostring(args.type))
-    if args.uses then
-        item:setCurrentUsesFloat(args.uses)
-    end
-    square:AddWorldInventoryItem(item, 0.5, 0.5, 0)
-    defer(function()
-        local world = item:getWorldItem()
-        if world then
-            removePlaced(world)
-        end
-    end)
     return {}
 end)

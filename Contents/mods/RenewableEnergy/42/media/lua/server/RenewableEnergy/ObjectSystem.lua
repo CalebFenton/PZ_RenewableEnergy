@@ -4,14 +4,14 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Fumes = require "RenewableEnergy/Fumes"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 local ObjectSystem = {}
 
 --- The base of the mod's records (cf_commonlib's ObjectSystem.Object). Saves keep its class name.
-local Object = LibObjectSystem.Object:derive(RenewableEnergy.CLASS_PREFIX .. "Object")
+local Object = LibObjectSystem.Object:derive(Utilities.CLASS_PREFIX .. "Object")
 ObjectSystem.Object = Object
 
 --- What the record goes by in session-only services (Stink, Fumes).

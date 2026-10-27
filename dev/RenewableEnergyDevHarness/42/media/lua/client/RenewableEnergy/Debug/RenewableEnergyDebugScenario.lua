@@ -1,4 +1,4 @@
-require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local QA = require "RenewableEnergyDevQA"
 local HarnessQA = require "PZHarness/QA"
 
@@ -13,7 +13,7 @@ debugScenarios.RenewableEnergyScenario = {
     onStart = function()
         -- Crafting needs light, and the panels need sun.
         getGameTime():setTimeOfDay(10)
-        RenewableEnergy.Debug.setupPlayer(getPlayer())
+        Debug.setupPlayer(getPlayer())
     end,
 }
 

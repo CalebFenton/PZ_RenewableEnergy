@@ -1,27 +1,28 @@
 -- Helpers that several of the mod's modules share; those any mod could use are cf_commonlib's.
 --
--- Every module ends `return X`, and a file takes what it uses with `local X = require "..."`,
--- this table as `local RenewableEnergy = require "RenewableEnergy/Utilities"`. A file that adds
--- to another module (Bank's parts, the *Server.lua files, ArrowBoard's) returns that module.
--- RenewableEnergy is the mod's one global table: a module goes in it only when something finds it
--- by name: a script's or container's Lua path, the dev mod, or a file that can't require it,
--- because the module requires that file or is server Lua, which loads after shared and client
--- Lua. Such a file reads the table when the function runs, never as it loads. The other globals
--- are the timed action classes, which the game finds by name.
+-- Every module ends `return X`, and a file takes what it uses with `local X = require "..."`. A
+-- file that adds to another module (Bank's parts, the *Server.lua files, ArrowBoard's) returns that
+-- module. Server Lua loads after shared and client Lua, and only on the authority, so shared and
+-- client code requires a server module inside the function that uses it, never as it loads.
+--
+-- The global table RenewableEnergy holds only what the game finds by a name in a script: OnCreate,
+-- OnTest and OnIsValid paths, vehicle script functions and container AcceptItemFunctions. A module
+-- named so registers itself there. The other globals are the timed action classes, which the game
+-- also finds by name.
 
-RenewableEnergy = RenewableEnergy or {}
+local Utilities = {}
 
 -- Slack for float comparisons of kg, litres and m³, which sums and shares leave a hair off.
-RenewableEnergy.EPSILON = 1e-4
+Utilities.EPSILON = 1e-4
 
 -- Saves keep the mod's Global Object System classes by names that start with this.
-RenewableEnergy.CLASS_PREFIX = "RenewableEnergy_"
+Utilities.CLASS_PREFIX = "RenewableEnergy_"
 
 --- Marks `holder` (an item or a placed object) under its modData `key` and, the first time it is
 --- marked, gives `character` (if any) `xp` of `perk`: a job teaches only the first time it is done
 --- on the thing. Returns whether this was the first time. Authority only; the caller sends a placed
 --- object's modData on.
-function RenewableEnergy.teachOnce(character, holder, key, perk, xp)
+function Utilities.teachOnce(character, holder, key, perk, xp)
     local data = holder:getModData()
     if data[key] then
         return false
@@ -34,6 +35,6 @@ function RenewableEnergy.teachOnce(character, holder, key, perk, xp)
 end
 
 --- The step in x and y to the square on each side, by compass letter: north is up the map, -y.
-RenewableEnergy.SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
+Utilities.SIDE_STEPS = { N = { 0, -1 }, E = { 1, 0 }, S = { 0, 1 }, W = { -1, 0 } }
 
-return RenewableEnergy
+return Utilities

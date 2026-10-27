@@ -2,7 +2,6 @@
 -- (cf_commonlib's Jobs). GasifierSystem does them. Loading wood and changing the filter's
 -- packing are the loot window's.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
@@ -10,7 +9,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Tables = require "cf_commonlib/Tables"
 
 local GasifierJobs = {}
-RenewableEnergy.GasifierJobs = GasifierJobs
 
 GasifierJobs.LIGHT = "LightGasifier"
 GasifierJobs.PUT_OUT = "PutOutGasifier"

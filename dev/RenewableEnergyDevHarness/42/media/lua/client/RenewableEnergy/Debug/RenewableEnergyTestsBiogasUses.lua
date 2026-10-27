@@ -1,6 +1,11 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
 local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local Squares = require "cf_commonlib/Squares"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- What the digester's gas is used for (Contents/.../RenewableEnergy/Biogas/*, the propane bottle
 -- refill in Recipes.lua): the gas heater, the tire pump, the compressor and propane.
@@ -8,8 +13,6 @@ local Squares = require "cf_commonlib/Squares"
 local T = RenewableEnergyTest
 local test = T.test
 
-local Digester, DigesterJobs, GasHeater = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs, RenewableEnergy.GasHeater
-local Sprites = RenewableEnergy.Sprites
 
 T.serverCheck("renewable_energy_biogas_water_in_nested_bags", "baggedWaterMaterials")
 
@@ -111,7 +114,7 @@ test("renewable_energy_biogas_heater_out_when_digester_gone", {
         if not digester then return end
         T.actionJob(self, "heater", heater, GasHeater.LIGHT)
         T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.lit.W end, "this client's copy of the heater lit")
-        T.server(self, "removeAt", T.recordArgs(digester))
+        T.server(self, "removeAt", T.at(digester, { kind = digester.kind }))
         T.waitFor(self, function() return heaterSprite(square) == Sprites.gasHeater.off.W end,
             "the heater going out on this client once its digester was gone")
     end,
@@ -139,7 +142,7 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
         local full = Fixtures.matureDigester("dome", { gas = self.gas })
         T.batch(function()
             T.setRecord(self, handle, full)
-            T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
+            T.setStat(self, "ENDURANCE", 1)
         end)
         T.waitForGas(self, handle, self.gas)
         -- Room for half the gas under the pump's limit, so it stops there with gas left.
@@ -148,7 +151,7 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
         T.actionJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
         T.batch(function()
             T.readRecord(self, handle, "after")
-            T.read(self, "character", { stats = { "ENDURANCE" } }, "endurance")
+            T.readCharacter(self, "endurance", { stats = { "ENDURANCE" } })
         end)
         T.readCarried(self, { Digester.TANK })
         T.waitFor(self, function() return self.items.tools[2]:getCurrentUsesFloat() >= Digester.PUMP_FILL - 0.001 end,
@@ -200,7 +203,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
                 end
             end
         end)
-        T.server(self, "takeItems", { type = bucket })
+        T.takeItems(self, nil, bucket)
         T.giveMaterials(self, "scrubber", scrubber)
         T.actionJob(self, "digester", handle, DigesterJobs.FIT_SCRUBBER)
         T.readRecord(self, handle, "fitted")
@@ -212,7 +215,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         end)
         -- Each job's action checks this client's copies, of the digester and the water.
         T.waitFor(self, function()
-            local summary = T.clientSummary(handle)
+            local summary = T.recordSummary(handle)
             return summary ~= nil and summary.scrubber and self.items.water[1]:getFluidContainer():getAmount() >= Digester.SCRUB_WATER
         end, "this client's copies of the fitted scrubber and the water")
         T.actionJob(self, "digester", handle, DigesterJobs.REFILL_LIME)
@@ -404,7 +407,7 @@ test("renewable_energy_biogas_propane_refill_from_floor_tank", {
         self.tankUses, self.bottleUses = 0.5, 0.5
         T.batch(function()
             T.give(self, "bottle", { { type = "Base.Propane_Refill", uses = self.bottleUses } })
-            T.server(self, "floorItem", T.at(here, { type = Digester.TANK, uses = self.tankUses }))
+            T.floorItem(self, here, Digester.TANK, self.tankUses)
         end)
         T.waitFor(self, function()
             self.tank = floorTank(here)

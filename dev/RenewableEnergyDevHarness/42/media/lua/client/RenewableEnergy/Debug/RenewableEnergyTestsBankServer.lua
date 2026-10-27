@@ -1,7 +1,15 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Sun"
+local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
 local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
+local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Power bank tests: the authority's commands and what it sends to whom, the bank's record, the
 -- clock, and banks whose chunk is unloaded.
@@ -10,9 +18,6 @@ local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
 local player, stateItem = T.player, T.stateItem
-local Specs, Sprites, Sun = RenewableEnergy.Specs, RenewableEnergy.Sprites, RenewableEnergy.Sun
-local PowerBank, BankJobs, SourceJobs = RenewableEnergy.PowerBank, RenewableEnergy.BankJobs, RenewableEnergy.SourceJobs
-local SolarGardenLight = RenewableEnergy.SolarGardenLight
 
 -- Commands and permissions ---------------------------------------------------------------------
 
@@ -26,45 +31,45 @@ test("renewable_energy_bank_commands_refuse_forged_arguments", {
         if not panel then return end
         self.bank, self.panel = bank, panel
         local function sourceSnowy()
-            local summary = T.clientSummary(bank)
+            local summary = T.recordSummary(bank)
             return summary and summary.sources[1] and summary.sources[1].snowy == true
         end
         T.snowfall(self, bank)
         T.waitFor(self, sourceSnowy, "this client's summary with the panel snowy")
         -- Each row: feature, job, the target's place, with.
         local forged = {
-            { "bank", "NoSuchJob", bank.position },
-            { "bank", BankJobs.TURN_ON, panel.position },
-            { "bank", BankJobs.WIRE_IN, bank.position, "nonsense" },
-            { "bank", BankJobs.RENAME, bank.position, 7 },
-            { "source", SourceJobs.CONNECT, bank.position, bank.position },
-            { "source", SourceJobs.CONNECT, panel.position },
+            { "bank", "NoSuchJob", bank },
+            { "bank", BankJobs.TURN_ON, panel },
+            { "bank", BankJobs.WIRE_IN, bank, "nonsense" },
+            { "bank", BankJobs.RENAME, bank, 7 },
+            { "source", SourceJobs.CONNECT, bank, bank },
+            { "source", SourceJobs.CONNECT, panel },
         }
         self.accepted = {}
-        T.giveBeforeCalls(self, "broom", { { type = "Base.Broom" } })
+        T.give(self, "broom", { { type = "Base.Broom" } })
         -- The forged jobs change nothing this client sees, so they and the clear go together.
         T.batch(function()
             for _, row in ipairs(forged) do
                 T.job(self, row[1], row[2], row[3], row[4])
                 T.step(function()
-                    if self.server.job.ok then
+                    if self.server["PZHarness.job"].ok then
                         table.insert(self.accepted, row[2])
                     end
                 end)
             end
-            T.job(self, "source", SourceJobs.CLEAR_SNOW, panel.position, { type = "Base.Broom" })
+            T.job(self, "source", SourceJobs.CLEAR_SNOW, panel, { type = "Base.Broom" })
         end)
         T.waitFor(self, function() return not sourceSnowy() end, "this client's summary with the snow cleared")
-        T.bankState(self, bank, "afterForged")
+        T.readRecord(self, bank, "afterForged")
         T.batch(function()
-            T.job(self, "source", SourceJobs.DISCONNECT, panel.position)
-            T.job(self, "bank", BankJobs.RENAME, bank.position, "  Shed bank  ")
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
+            T.job(self, "source", SourceJobs.DISCONNECT, panel)
+            T.job(self, "bank", BankJobs.RENAME, bank, "  Shed bank  ")
+            T.job(self, "bank", BankJobs.TURN_ON, bank)
         end)
         T.waitForSummary(self, bank, function(summary)
             return summary.on == true and summary.name == "Shed bank" and #summary.sources == 0
         end, "this client's summary of the renamed bank, switched on with no panel")
-        T.bankState(self, bank)
+        T.readRecord(self, bank)
     end,
     validate = function(self)
         local forged, state = self.reads.afterForged, self.bank.state
@@ -87,7 +92,7 @@ test("renewable_energy_bank_client_commands_ignored", {
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         if not bank then return end
         self.bank = bank
-        T.bankState(self, bank, "before")
+        T.readRecord(self, bank, "before")
         -- A battery taken out past the bank's commands shows in the status only once something makes
         -- the bank look again: here the watch sent after the forged commands, which the server
         -- handles in the order they came.
@@ -95,15 +100,15 @@ test("renewable_energy_bank_client_commands_ignored", {
         T.step(function()
             local p, part = player(), stateItem(self.reads.before, T.PLUG_IN_INVERTER)
             local system = PowerBank.clientSystem
-            system:sendCommand(p, "setBankOn", { bank = bank.position, on = true })
-            system:sendCommand(p, "rename", { bank = bank.position, name = "Forged" })
-            system:sendCommand(p, "unwire", { bank = bank.position, itemId = part and part.id or -1 })
+            system:sendCommand(p, "setBankOn", { bank = T.at(bank), on = true })
+            system:sendCommand(p, "rename", { bank = T.at(bank), name = "Forged" })
+            system:sendCommand(p, "unwire", { bank = T.at(bank), itemId = part and part.id or -1 })
             ClientBankSystem.watchStatus(p, bank.object)
             T.defer(self, function() ClientBankSystem.unwatchStatus(p, bank.object) end)
         end)
         T.waitForStatus(self, bank, function(status) return #status.batteries == 1 end,
             "this client's status after the watch, with the battery taken out")
-        T.bankState(self, bank)
+        T.readRecord(self, bank)
     end,
     validate = function(self)
         local after = self.bank.state
@@ -121,10 +126,10 @@ test("renewable_energy_bank_status_only_to_watchers", {
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not panel then return end
         self.bank = bank
-        T.step(function() self.summary = T.clientSummary(bank) end)
+        T.step(function() self.summary = T.recordSummary(bank) end)
         T.bankPass(self, bank, 1000, { label = "unwatched" })
         T.step(function()
-            self.unwatched = { status = T.clientStatus(bank), resent = T.clientSummary(bank) ~= self.summary }
+            self.unwatched = { status = T.clientStatus(bank), resent = T.recordSummary(bank) ~= self.summary }
         end)
         T.watch(self, bank)
         T.bankPass(self, bank, 0, { label = "watched" })
@@ -133,7 +138,7 @@ test("renewable_energy_bank_status_only_to_watchers", {
         T.step(function() ClientBankSystem.unwatchStatus(player(), bank.object) end)
         T.waitFor(self, function() return T.clientStatus(bank) == nil end, "this client letting go of the status it stopped watching")
         -- The unwatch and the pass's call are separate packets, which a server may take in either order.
-        T.serverUntil(self, "bankState", { bank = bank.position }, function(state) return state.watchers == 0 end)
+        T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state) return state.watchers == 0 end)
         T.bankPass(self, bank, 1000, { label = "stopped" })
         T.step(function() self.stoppedStatus = T.clientStatus(bank) end)
     end,
@@ -167,16 +172,16 @@ test("renewable_energy_bank_far_action_refused", {
         T.batch(function()
             for _, row in ipairs({ { "far", "Far" }, { "near", "Near" } }) do
                 local key, bank = row[1], self[row[1]]
-                T.read(self, "completeRename", { bank = bank.position, name = row[2] }, key .. "Rename")
-                T.bankState(self, bank, key)
+                T.job(self, "bank", BankJobs.RENAME, bank, row[2], key .. "Rename", { via = "complete" })
+                T.readRecord(self, bank, key)
             end
         end)
     end,
     validate = function(self)
         local reads = self.reads
-        expect(not reads.farRename.done, "an action from " .. FAR_TILES .. " squares away was done")
+        expect(not reads.farRename.ok, "an action from " .. FAR_TILES .. " squares away was done")
         expectEqual("the name of the bank renamed from " .. FAR_TILES .. " squares away", reads.far.name, "")
-        expect(reads.nearRename.done, "renaming the bank beside the character wasn't done")
+        expect(reads.nearRename.ok, "renaming the bank beside the character wasn't done")
         expectEqual("the name of the bank renamed beside the character", reads.near.name, "Near")
     end,
 })
@@ -192,8 +197,8 @@ test("renewable_energy_bank_rebuilt_bank_keeps_its_record", {
         if not panel then return end
         self.bank, self.panel = bank, panel
         T.batch(function()
-            T.job(self, "bank", BankJobs.RENAME, bank.position, "Cellar")
-            T.read(self, "rebuildBank", { bank = bank.position }, "rebuilt")
+            T.job(self, "bank", BankJobs.RENAME, bank, "Cellar")
+            T.read(self, "rebuildBank", T.at(bank), "rebuilt")
         end)
         T.waitFor(self, function()
             local rebuilt, summary = PowerBank.findOn(bank.square), PowerBank.summaryOf(bank.square)
@@ -220,9 +225,9 @@ test("renewable_energy_bank_connect_credits_from_connection", {
         local panel = bank and T.panel(self, Sprites.flat, { near = bank })
         if not panel then return end
         T.batch(function()
-            T.bankState(self, bank, nil, 1)
-            T.job(self, "source", SourceJobs.CONNECT, panel.position, bank.position, "connect")
-            T.bankState(self, bank, "connected")
+            T.readRecord(self, bank, nil, 1)
+            T.job(self, "source", SourceJobs.CONNECT, panel, bank, "connect")
+            T.readRecord(self, bank, "connected")
             T.bankPass(self, bank, 1000, { label = "passed" })
         end)
     end,
@@ -248,19 +253,19 @@ test("renewable_energy_bank_source_transfer_settles_both_ends", {
         T.watch(self, old)
         T.watch(self, new)
         T.batch(function()
-            T.bankState(self, old, nil, 1)
-            T.bankState(self, new, nil, 1)
-            T.job(self, "source", SourceJobs.CONNECT, panel.position, new.position, "transfer")
-            T.bankState(self, old, "oldTransferred")
-            T.bankState(self, new, "newTransferred")
+            T.readRecord(self, old, nil, 1)
+            T.readRecord(self, new, nil, 1)
+            T.job(self, "source", SourceJobs.CONNECT, panel, new, "transfer")
+            T.readRecord(self, old, "oldTransferred")
+            T.readRecord(self, new, "newTransferred")
         end)
         T.waitForStatus(self, old, function(status) return #status.sources == 0 end,
             "the watched old bank without the transferred panel")
         T.waitForStatus(self, new, function(status)
-            return T.stateSource({ status = status }, panel.position) ~= nil
+            return T.stateSource({ status = status }, panel) ~= nil
         end, "the watched destination with the transferred panel")
         T.bankPass(self, new, 1000)
-        T.bankState(self, old, "oldAfter")
+        T.readRecord(self, old, "oldAfter")
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) or not T.expectOk(self.reads.transfer, "transferring the panel") then return end
@@ -284,9 +289,9 @@ test("renewable_energy_bank_switch_on_bills_from_switch", {
         if not fridge then return end
         T.placeTile(self, fridge, T.MINI_FRIDGE)
         T.batch(function()
-            T.bankState(self, bank, nil, 1)
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position, nil, "switch")
-            T.bankState(self, bank, "switched")
+            T.readRecord(self, bank, nil, 1)
+            T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switch")
+            T.readRecord(self, bank, "switched")
             T.bankPass(self, bank, 0, { hours = 0.1, label = "passed" })
         end)
     end,
@@ -310,8 +315,8 @@ test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
         if not fridge then return end
         T.placeTile(self, fridge, T.MINI_FRIDGE)
         T.batch(function()
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position, nil, "switch")
-            T.bankState(self, bank, "before")
+            T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switch")
+            T.readRecord(self, bank, "before")
             T.bankPass(self, bank, 0, { label = "after" })
         end)
     end,
@@ -336,10 +341,10 @@ test("renewable_energy_bank_sledgehammer_settles_batteries", {
         if not bank then return end
         T.give(self, "sledgehammer", { { type = "Base.Sledgehammer", equip = "primary" } })
         T.switchOn(self, bank)
-        T.bankState(self, bank, "before", 1)
+        T.readRecord(self, bank, "before", 1)
         T.doJob(self, bank.square, function() return ISDestroyStuffAction:new(T.player(), bank.object) end)
         T.waitFor(self, function() return PowerBank.findOn(bank.square) == nil end, "the destroyed bank gone from this client")
-        T.read(self, "takeFloorItems", { squares = { T.at(bank.square) } }, "floor")
+        T.takeFloorItems(self, { bank }, "floor")
     end,
     validate = function(self)
         local battery, before = T.findIn(self.reads.floor.items, "type", T.CAR_BATTERY), self.reads.before
@@ -363,12 +368,12 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
         self.bank = bank
         T.watch(self, bank)
         local car = T.placeVehicle(self, "Base.CarNormal", { battery = T.CAR_BATTERY, charge = 0.5 })
-        local trailer = T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT)
-        local charger = T.placeAsPlayer(self, squares[1], RenewableEnergy.SolarCellCharger.ITEM, Sprites.cellCharger)
+        local trailer = T.placeVehicle(self, ArrowBoard.SCRIPT)
+        local charger = T.placeAsPlayer(self, squares[1], SolarCellCharger.ITEM, Sprites.cellCharger)
         local light = T.placeAsPlayer(self, squares[2], SolarGardenLight.ITEM, Sprites.gardenLight.off)
         local function fixtures()
-            return { bank = bank.position, car = T.vehicleArgs(car), trailer = T.vehicleArgs(trailer),
-                charger = T.at(charger, { kind = "charger" }), light = T.at(light, { kind = "gardenLight" }) }
+            return { bank = T.at(bank), car = T.vehicleArgs(car), trailer = T.vehicleArgs(trailer),
+                charger = T.at(charger, { kind = "charger" }), light = T.at(light, { kind = "light" }) }
         end
         T.read(self, "stockGadgets", fixtures, "before")
         T.step(function()
@@ -393,9 +398,9 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
         end
         local bankHours, gadgetHours = after.bankPassAge - before.bankPassAge, after.age - before.age
         charged("bank", "the bank with a connected panel", Specs.mounts.flat.modules * Specs.modules[Specs.factoryModule].watts, bankHours)
-        charged("car", "the car with a maintainer", RenewableEnergy.SolarMaintainer.WATTS, gadgetHours)
-        charged("charger", "the solar battery charger", RenewableEnergy.SolarCellCharger.WATTS, gadgetHours)
-        charged("light", "the garden light", RenewableEnergy.SolarGardenLight.SPEC.watts, gadgetHours)
+        charged("car", "the car with a maintainer", SolarMaintainer.WATTS, gadgetHours)
+        charged("charger", "the solar battery charger", SolarCellCharger.WATTS, gadgetHours)
+        charged("light", "the garden light", SolarGardenLight.SPEC.watts, gadgetHours)
         -- A storm during the passes may have cracked a panel since.
         charged("trailer", "the arrow board's battery box", math.max(before.trailerWatts, after.trailerWatts), gadgetHours)
     end,
@@ -436,7 +441,7 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
         local bank = stand and T.bank(self, "batteryRackMetal", parts, { near = stand })
         if not bank then return end
         self.bank, self.parts = bank, parts
-        local at = bank.position
+        local at = T.at(bank)
         T.step(function() T.setTime(self, 23.5) end)
         T.switchOn(self, bank)
         T.batch(function()
@@ -445,16 +450,16 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
             T.bankPass(self, bank, 0, { hours = 0.1 })
             T.setCharge(self, bank, 1)
             T.bankPart(self, bank, T.INVERTER_CHARGER, { wear = PRIMED_WEAR })
-            T.bankState(self, bank, "left")
+            T.readRecord(self, bank, "left")
         end)
         T.reloadChunk(self, at, function()
             T.step(function() T.setTime(self, 24.01) end)
-            T.serverUntil(self, "bankState", { bank = at }, function(state)
+            T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state)
                 return state ~= nil and state.calendarDay ~= self.reads.left.calendarDay
             end)
             T.bankPass(self, bank, 0, { hours = AWAY_HOURS, label = "away" })
         end)
-        T.bankState(self, bank)
+        T.readRecord(self, bank)
         T.waitFor(self, function()
             local copy = bankHere(at)
             local inverter = copy and copy:getContainer():getFirstType(T.INVERTER_CHARGER)
@@ -484,7 +489,7 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
         for _, item in ipairs(back.items) do
             check("the server's " .. item.type, item.type, item.condition, item.uses)
         end
-        local copy = bankHere(self.bank.position)
+        local copy = bankHere(self.bank)
         if not expect(copy ~= nil, "this client has no copy of the bank loaded again") then return end
         local items = copy:getContainer():getItems()
         for i = 0, items:size() - 1 do
@@ -507,7 +512,7 @@ test("renewable_energy_bank_unloaded_bank_carries_its_load_when_the_grid_goes", 
         local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
         if not fridge then return end
         self.bank = bank
-        local at = bank.position
+        local at = T.at(bank)
         T.switchOn(self, bank)
         T.step(function() self.fridge = T.placeTile(self, fridge, T.MINI_FRIDGE) end)
         T.bankPass(self, bank, 0, { label = "onGrid" })

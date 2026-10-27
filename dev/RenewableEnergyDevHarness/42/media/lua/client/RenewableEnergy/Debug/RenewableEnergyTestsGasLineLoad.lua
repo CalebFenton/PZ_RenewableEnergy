@@ -1,4 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Specs = require "RenewableEnergy/Specs"
 
 -- What a gas line carries (GasLine/GasLines.lua): a load past its cap stalls the generator on it,
 -- and the banks charging from it share what the cap leaves.
@@ -6,11 +9,10 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local T = RenewableEnergyTest
 local test = T.test
 
-local Digester, GasKit, Specs = RenewableEnergy.Digester, RenewableEnergy.GasKit, RenewableEnergy.Specs
-
--- How many banks of the real-load stall test, each with an inverter with a charger: their chargers
--- alone carry a line's whole cap, so beside any appliance the cap limits what they draw.
-local CHARGING_BANKS = math.ceil(GasKit.CAP_W / Specs.inverters[T.INVERTER_CHARGER].chargerWatts)
+-- The real-load stall test's banks, each with an inverter with a charger, stand outdoors on these
+-- rings (squares out from the generator in x or y), nearest first: a square of ring r is at most
+-- r√2 away, nearer than any square of ring 2r, so the order they share the line's cap in is this.
+local BANK_RINGS = { 2, 4, 8 }
 
 -- A load past what the line carries stalls the generator, at exactly that it runs, and once the
 -- load fits again it starts by itself. Cutting the line while stalled forgets the stall, so a new
@@ -52,41 +54,9 @@ test("renewable_energy_gasline_generator_stalls_over_cap", {
     end,
 })
 
--- The test's bank handles `banks` in the order a generator on gas shares its cap between them:
--- nearest first, the lower place on a tie (GasLines.lua's chargingBanks).
-local function shareOrder(generator, banks)
-    local order = {}
-    for _, bank in ipairs(banks) do
-        local at = bank.position
-        local dx, dy, dz = at.x - generator.x, at.y - generator.y, at.z - generator.z
-        table.insert(order, { bank = bank, distance = dx * dx + dy * dy + dz * dz,
-            key = RenewableEnergy.Places.key(at.x, at.y, at.z) })
-    end
-    table.sort(order, function(a, b)
-        return a.distance < b.distance or (a.distance == b.distance and a.key < b.key)
-    end)
-    local list = {}
-    for i, entry in ipairs(order) do
-        list[i] = entry.bank
-    end
-    return list
-end
-
--- What the banks charging from a generator on gas draw: `headroomW`, the cap less what the generator
--- powers, shared in shareOrder, each bank at most what it wants (`wants`, by bank; its chargers'
--- rating if not given). Answers each bank's watts.
-local function expectedShares(generator, banks, headroomW, wants)
-    local left, shares = math.max(0, headroomW), {}
-    for _, bank in ipairs(shareOrder(generator, banks)) do
-        shares[bank] = math.min(wants and wants[bank] or Specs.inverters[T.INVERTER_CHARGER].chargerWatts, left)
-        left = left - shares[bank]
-    end
-    return shares
-end
-
 -- The load a line carries is what the generator's scan finds and what the banks charging from it
--- draw. Beside a fridge, banks whose chargers alone carry the whole cap charge at what the cap leaves,
--- split between them, and the generator runs on through their passes; the nearest bank once full
+-- draw. Beside a fridge, three banks whose chargers alone carry the whole cap charge at what the cap
+-- leaves, nearest first, and the generator runs on through their passes; the nearest bank once full
 -- leaves its share to the banks behind it; fridges past the cap stall it, and the banks then draw
 -- nothing from it.
 test("renewable_energy_gasline_generator_stalls_on_real_load", {
@@ -104,9 +74,12 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
             T.readGenerator(self, generator, "alone")
         end)
         self.banks = {}
-        for i = 1, CHARGING_BANKS do
-            self.banks[i] = T.bank(self, "batteryBoxWood", { T.INVERTER_CHARGER, T.CAR_BATTERY },
-                { charge = 0.5, near = generator.square })
+        for i, ring in ipairs(BANK_RINGS) do
+            local square = T.square(self, { near = generator.square, minDistance = ring, accept = function(square)
+                return math.max(math.abs(square:getX() - generator.x), math.abs(square:getY() - generator.y)) == ring
+            end }, "a free outdoor square " .. ring .. " squares out from the generator")
+            self.banks[i] = square and T.bank(self, "batteryBoxWood", { T.INVERTER_CHARGER, T.CAR_BATTERY },
+                { charge = 0.5, square = square })
             if not self.banks[i] then return end
         end
         -- Every bank's pass, its state read as label .. i, then the line's. The first round names the
@@ -123,8 +96,7 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
         passes("charging")
         passes("shared")
         T.step(function()
-            self.nearest = shareOrder(generator, self.banks)[1]
-            T.setCharge(self, self.nearest, 1)
+            T.setCharge(self, self.banks[1], 1)
         end)
         passes("nearFull")
         -- Fridges whose load alone is past the cap, with the one already there.
@@ -153,37 +125,39 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
         local headroomW = GasKit.CAP_W - alone.state.watts
         T.expect(alone.state.watts > 0 and headroomW > 0,
             "the fridge alone makes a load of " .. alone.state.watts .. " W, not one the line carries")
-        T.expect(CHARGING_BANKS * Specs.inverters[T.INVERTER_CHARGER].chargerWatts > headroomW,
-            "the banks' chargers fit in what the cap leaves, so nothing limits them")
+        -- What the arrangement needs: the cap less the fridge fits two chargers and a little, not three.
+        local chargerW = Specs.inverters[T.INVERTER_CHARGER].chargerWatts
+        T.expect(2 * chargerW + chargerW / 100 < headroomW and headroomW < 3 * chargerW,
+            "with the fridge's " .. alone.state.watts .. " W the cap leaves " .. headroomW
+                .. " W, not between two and three chargers' worth")
         for _, label in ipairs({ "charging", "shared" }) do
             local read = reads[label]
             T.expect(read.running and read.state ~= nil and not read.state.stalled,
                 "after the " .. label .. " passes, the banks charging from the generator stalled it")
         end
-        local shares = expectedShares(self.generator, self.banks, headroomW)
+        -- Nearest first, each bank takes its chargers' rating while the cap leaves it: the near and
+        -- middle banks all of theirs, the far bank what is left.
+        local shares = { chargerW, chargerW, headroomW - 2 * chargerW }
         local sum = 0
-        for i, bank in ipairs(self.banks) do
+        for i in ipairs(self.banks) do
             local drawn = status("shared", i)
             T.expectEqual("bank " .. i .. "'s charge source", drawn.chargeSource, "generator")
-            T.expectNear("bank " .. i .. "'s share of what the cap leaves", drawn.chargerW or -1, shares[bank], 0.01)
+            T.expectNear("bank " .. i .. "'s share of what the cap leaves", drawn.chargerW or -1, shares[i], 0.01)
             sum = sum + (drawn.chargerW or 0)
         end
         T.expectNear("the banks' charge together", sum, headroomW, 0.01)
         T.expectNear("the generator's load with the banks charging", reads.shared.state and reads.shared.state.watts or 0,
             GasKit.CAP_W, 0.01)
-        -- Full, the nearest bank takes next to nothing, and the banks behind it what it leaves.
-        local fullW = -1
-        for i, bank in ipairs(self.banks) do
-            fullW = bank == self.nearest and status("nearFull", i).chargerW or fullW
-        end
-        T.expect(fullW >= 0 and fullW < Specs.inverters[T.INVERTER_CHARGER].chargerWatts / 100,
-            "the full nearest bank draws " .. fullW .. " W")
+        -- Full, the nearest bank takes next to nothing, and the banks behind it their whole rating,
+        -- which the cap now leaves them.
+        local fullW = status("nearFull", 1).chargerW or -1
+        T.expect(fullW >= 0 and fullW < chargerW / 100, "the full nearest bank draws " .. fullW .. " W")
         T.expect(reads.nearFull.running and reads.nearFull.state ~= nil and not reads.nearFull.state.stalled,
             "with the nearest bank full, the banks charging from the generator stalled it")
-        local nearFullShares = expectedShares(self.generator, self.banks, headroomW, { [self.nearest] = fullW })
-        for i, bank in ipairs(self.banks) do
+        local nearFullShares = { fullW, chargerW, chargerW }
+        for i in ipairs(self.banks) do
             T.expectNear("bank " .. i .. "'s share with the nearest bank full", status("nearFull", i).chargerW or -1,
-                nearFullShares[bank], 0.01)
+                nearFullShares[i], 0.01)
         end
         local overloaded = reads.overloaded
         if not T.expect(overloaded ~= nil and overloaded.state ~= nil, "no read of the generator past its cap") then return end
@@ -242,7 +216,8 @@ test("renewable_energy_settlement_gas_disconnect_pays_surviving_generator", {
         T.setGenerator(self, near, { rebuild = true })
         -- This is the real action's authority completion (Jobs.perform), not a fixture mutation.
         -- Its before/after snapshots cannot be separated by a periodic settlement, even in MP.
-        T.read(self, "kitJobComplete", T.at(near, { job = GasKit.DISCONNECT, payer = T.at(far) }), "disconnect")
+        T.job(self, "kit", GasKit.DISCONNECT, near, nil, "disconnect", { via = "complete",
+            reads = { generator = { name = "generatorRead", args = T.at(near) }, payer = { name = "generatorRead", args = T.at(far) } } })
         T.setGenerator(self, far, { rebuild = true })
         T.readGenerator(self, near, "nearRebuilt")
         T.readGenerator(self, far, "farRebuilt")
@@ -272,7 +247,7 @@ test("renewable_energy_settlement_gas_disconnect_pays_surviving_generator", {
         T.expectNear("fridge watts carried by the gas line",
             (reads.nearShared.state and reads.nearShared.state.watts or -1)
                 - (reads.nearEmpty.state and reads.nearEmpty.state.watts or 0), T.fridgeW(), 0.01)
-        T.expect(result.done, "the authority refused Disconnect Gas Line")
+        T.expect(result.ok, "the authority refused Disconnect Gas Line")
         for _, pair in ipairs({
             { near = after.generator, far = after.payer, label = "immediately after disconnect" },
             { near = reads.nearRebuilt, far = reads.farRebuilt, label = "after the native bill rebuild" },

@@ -2,10 +2,7 @@
 -- use. An item's condition is an integer, so wear smaller than one point is kept in its modData
 -- until it adds up to one.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
-
 local Wear = {}
-RenewableEnergy.Wear = Wear
 
 -- Item modData: condition lost but not yet taken off the integer condition.
 local PENDING_KEY = "RenewableEnergy_wear"

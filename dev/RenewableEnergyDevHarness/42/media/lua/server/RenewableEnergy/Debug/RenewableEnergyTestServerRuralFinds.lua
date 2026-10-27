@@ -5,7 +5,13 @@
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
+require "PZHarness/Rolls"
+require "PZHarness/ServerRecords"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
+local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local RuralFinds = require "RenewableEnergy/World/RuralFinds"
 
 local handler, need = PZHarness.serverHandler, PZHarness.need
 
@@ -13,7 +19,7 @@ local handler, need = PZHarness.serverHandler, PZHarness.need
 -- puts the roll back and takes out the reading the test's rolls left (the gasifier's pamphlet,
 -- the digester's magazine).
 local function forgetRoll(def, defer)
-    local RuralFinds, before = RenewableEnergy.RuralFinds, {}
+    local before = {}
     local store, key = Helpers.keepBuildingRoll(RuralFinds.MOD_DATA, def, defer)
     for _, fullType in ipairs({ RuralFinds.PAMPHLET, RuralFinds.BIOGAS_MAGAZINE }) do
         before[fullType] = Helpers.readingIn(def, fullType)
@@ -35,7 +41,7 @@ local function track(placed, defer, def)
         local square = object:getSquare()
         local x, y = square:getX(), square:getY()
         positions[kind] = { x = x, y = y, z = square:getZ(), outdoors = square:isOutside() and square:getBuilding() == nil,
-            out = RenewableEnergy.RuralFinds.distanceOutside(def, x, y) }
+            out = RuralFinds.distanceOutside(def, x, y) }
     end
     return positions
 end
@@ -49,7 +55,6 @@ end
 -- Everything that second roll did is put back before it answers, while the building is still
 -- loaded: the test moves on from it.
 handler("ruralFindAt", function(_, args, testDefer)
-    local RuralFinds = RenewableEnergy.RuralFinds
     local square = getSquare(args.x, args.y, args.z or 0)
     local building = square and square:getBuilding()
     if not building then
@@ -58,7 +63,7 @@ handler("ruralFindAt", function(_, args, testDefer)
     local def = building:getDef()
     local worldRoll = Helpers.buildingRoll(RuralFinds.MOD_DATA, def)
     if not worldRoll then
-        return { ready = false, why = "the world never rolled the building at " .. RenewableEnergy.BuildingWatch.key(def) }
+        return { ready = false, why = "the world never rolled the building at " .. BuildingWatch.key(def) }
     end
     local world = {}
     for kind in pairs(worldRoll) do
@@ -78,7 +83,7 @@ handler("ruralFindAt", function(_, args, testDefer)
     forgetRoll(def, defer)
     local pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET)
     local magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE)
-    local found = track(Helpers.withRolls(defer, 0, RuralFinds.roll, def), defer, def)
+    local found = track(PZHarness.Rolls.with(defer, 0, RuralFinds.roll, def), defer, def)
     local answer = { ready = true, world = world, standing = standing, qualifies = RuralFinds.findsFor(def), found = found,
         pamphlets = Helpers.readingTotal(def, RuralFinds.PAMPHLET) - pamphlets,
         magazines = Helpers.readingTotal(def, RuralFinds.BIOGAS_MAGAZINE) - magazines,
@@ -92,8 +97,7 @@ end)
 -- chance above 0. Answers each find's chance, where each find the first roll placed stands and how
 -- many it placed, which finds the roll kept, and how many finds the second roll placed.
 handler("ruralFindsRoll", function(player, args, defer)
-    local RuralFinds = RenewableEnergy.RuralFinds
-    local def = need(Helpers.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60),
+    local def = need(PZHarness.Fixtures.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60),
         "a building near the character on the server")
     forgetRoll(def, defer)
     local kinds, chances = args.kinds or {}, {}
@@ -103,17 +107,17 @@ handler("ruralFindsRoll", function(player, args, defer)
             table.insert(kinds, kind)
         end
     end
-    local found, again = Helpers.withRolls(defer, 0, function()
+    local found, again = PZHarness.Rolls.with(defer, 0, function()
         return track(RuralFinds.roll(def, kinds), defer, def), track(RuralFinds.roll(def, kinds), defer, def)
     end)
-    return { chances = chances, found = found, placed = Helpers.count(found), kept = Helpers.buildingRoll(RuralFinds.MOD_DATA, def),
-        again = Helpers.count(again) }
+    return { chances = chances, found = found, placed = Kinds.count(found), kept = Helpers.buildingRoll(RuralFinds.MOD_DATA, def),
+        again = Kinds.count(again) }
 end)
 
 -- Empties the gasifier's filter at x, y, z, as a player taking out the spent packing would.
 handler("ruralFindEmptyFilter", function(_, args)
-    local _, object = Helpers.recordAt({ kind = "gasifier", x = args.x, y = args.y, z = args.z })
-    Helpers.emptyContainer(RenewableEnergy.Gasifier.filterOf(object))
+    local _, object = PZHarness.Records.at({ kind = "gasifier", x = args.x, y = args.y, z = args.z })
+    Helpers.emptyContainer(Gasifier.filterOf(object))
     return {}
 end)
 
@@ -131,7 +135,6 @@ end
 -- Vanilla's barn, farm storeroom and survivalist camp story clutter lists hold the mod's additions,
 -- each as many times as vanilla's adder puts an item in for every time RuralFinds.CLUTTER lists it.
 PZHarness.checkHandler("ruralClutter", function(expect)
-    local RuralFinds = RenewableEnergy.RuralFinds
     local base = getWorld():getRandomizedWorldBase()
     for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter](base)

@@ -5,13 +5,11 @@
 if isClient() then return end
 
 require "Moveables/ISMoveableSpriteProps"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Tiles = require "cf_commonlib/Tiles"
 
 local Place = {}
-RenewableEnergy.Place = Place
 
 --- Places a moveable tile the way a player's placing it would, from the item its tile gives
 --- back, carrying `modData` (keys copied onto the item, which placing copies onto the object).

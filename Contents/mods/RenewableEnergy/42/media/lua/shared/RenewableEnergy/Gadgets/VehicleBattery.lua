@@ -9,11 +9,9 @@
 -- battery; VehicleBatteryCharging scales those fractions by capacity, so the bigger battery holds
 -- the same loads for longer and takes longer to fill.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 
 local VehicleBattery = {}
-RenewableEnergy.VehicleBattery = VehicleBattery
 
 -- The vehicle part id of the battery slot.
 VehicleBattery.PART = "Battery"

@@ -1,7 +1,6 @@
 -- The hands-on jobs at a digester: what each takes of the character and what refuses it
 -- (cf_commonlib's Jobs). DigesterSystem does them.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
@@ -9,7 +8,6 @@ local Jobs = require "cf_commonlib/Jobs"
 local Tables = require "cf_commonlib/Tables"
 
 local DigesterJobs = {}
-RenewableEnergy.DigesterJobs = DigesterJobs
 
 DigesterJobs.TAKE_SLUDGE = "TakeSludge"
 DigesterJobs.VENT = "VentGas"

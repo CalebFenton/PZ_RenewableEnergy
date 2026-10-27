@@ -3,7 +3,7 @@
 -- the small tools in toolboxes, and nearby, in rows by system, a square to each item type: the
 -- mod's items, enough inputs to make each recipe once, what the menu jobs take, the crafting
 -- stations, a treadmill, and a car towing the arrow board trailer.
-require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
 local Stage = require "RenewableEnergyDevStage"
 local Harness = require "PZHarness/Stage"
 require "PZHarness/StageLots"
@@ -19,6 +19,9 @@ local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local Specs = require "RenewableEnergy/Specs"
+local Sprites = require "RenewableEnergy/Sprites"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
 
 local QA = {}
 
@@ -210,16 +213,16 @@ end
 
 -- Whether items of `fullType` come worn when asked for worn: batteries and modules.
 local function wears(fullType)
-    return RenewableEnergy.Specs.batteries[fullType] ~= nil or RenewableEnergy.Specs.modules[fullType] ~= nil
+    return Specs.batteries[fullType] ~= nil or Specs.modules[fullType] ~= nil
 end
 
 -- A new item of `fullType` (PZHarness.QA.newItem), worn if `worn`.
 local function stockItem(fullType, fluid, worn)
     local item = HarnessQA.newItem(fullType, fluid)
-    if item and worn and RenewableEnergy.Specs.batteries[fullType] then
-        RenewableEnergy.Wear.setCondition(item, WORN_BATTERY)
+    if item and worn and Specs.batteries[fullType] then
+        Wear.setCondition(item, WORN_BATTERY)
     elseif item and worn then
-        RenewableEnergy.Wear.setCondition(item, CRACKED_MODULE)
+        Wear.setCondition(item, CRACKED_MODULE)
     end
     return item
 end
@@ -284,13 +287,13 @@ end
 -- take, the batteries and modules among them worn, and what the menu jobs take and work on.
 local function collectStock(player, summary)
     local stock = { byKey = {} }
-    for _, fullType in ipairs(RenewableEnergy.Debug.items()) do
-        if not RenewableEnergy.Debug.PART_ITEMS[fullType] then
+    for _, fullType in ipairs(HarnessQA.itemsOfModule("RenewableEnergy")) do
+        if not Debug.PART_ITEMS[fullType] then
             addStock(stock, fullType, 1, 0)
         end
     end
     local needs
-    needs, summary.unmatched = HarnessQA.materials(HarnessQA.modRecipeNames(), RenewableEnergy.Debug.PREFERRED_INPUTS)
+    needs, summary.unmatched = HarnessQA.materials(HarnessQA.modRecipeNames(), Debug.PREFERRED_INPUTS)
     for _, need in ipairs(needs) do
         addStock(stock, need.type, need.used, need.kept, need.fluid, true)
     end
@@ -332,8 +335,8 @@ local function placeTreadmill(layout, summary)
     end
     local rear = getCell():getGridSquare(console:getX() + 1, console:getY(), console:getZ())
     Harness.clearGroundCover(rear)
-    Harness.placeTile(console, RenewableEnergy.Sprites.treadmill.W.console)
-    Harness.placeTile(rear, RenewableEnergy.Sprites.treadmill.W.rear)
+    Harness.placeTile(console, Sprites.treadmill.W.console)
+    Harness.placeTile(rear, Sprites.treadmill.W.rear)
 end
 
 -- A car facing east with the arrow board trailer behind it (Stage.spawnTrailer), on a whole open
@@ -352,8 +355,8 @@ end
 local function placeShattered(layout)
     local square = layout:nextSquare()
     if square then
-        local module = instanceItem(RenewableEnergy.Specs.factoryModule)
-        RenewableEnergy.Wear.setCondition(module, 0)
+        local module = instanceItem(Specs.factoryModule)
+        Wear.setCondition(module, 0)
         square:AddWorldInventoryItem(module, 0.5, 0.5, 0)
     end
 end

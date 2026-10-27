@@ -7,28 +7,42 @@
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
-require "RenewableEnergy/Sprites"
+local Sprites = require "RenewableEnergy/Sprites"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
+require "PZHarness/ServerFixtures"
+require "PZHarness/ServerRecords"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
+local Finds = require "RenewableEnergy/Items/Finds"
+local GardenLights = require "RenewableEnergy/World/GardenLights"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local RuralFinds = require "RenewableEnergy/World/RuralFinds"
+local SolarSites = require "RenewableEnergy/World/SolarSites"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Specs = require "RenewableEnergy/Specs"
+local Wind = require "RenewableEnergy/Wind"
+local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
 
 local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
 local objectWithSprite, removePlaced = PZHarness.Fixtures.objectWithSprite, PZHarness.Fixtures.removePlaced
-local inRange, wearRange = Helpers.inRange, Helpers.wearRange
-local Sprites = RenewableEnergy.Sprites
+local inRange, wearRange = Kinds.inRange, Kinds.wearRange
 
-local MODULE = RenewableEnergy.Specs.factoryModule
+local MODULE = Specs.factoryModule
 
 -- Whether a module's condition is one a site, crate or arrow board gives: cracked or weathered.
 local function isSiteCondition(condition)
-    local Finds = RenewableEnergy.Finds
     return inRange(condition, Finds.CRACKED) or inRange(condition, Finds.WEATHERED)
 end
 
 -- The site named `name` of this world's map, or nil.
 local function siteNamed(name)
-    for _, site in ipairs(RenewableEnergy.SolarSites.sites()) do
+    for _, site in ipairs(SolarSites.sites()) do
         if site.name == name then
             return site
         end
@@ -37,7 +51,7 @@ local function siteNamed(name)
 end
 
 local function sitesSystem()
-    return SGlobalObjects.getSystemByName(RenewableEnergy.SolarSites.SYSTEM_NAME)
+    return SGlobalObjects.getSystemByName(SolarSites.SYSTEM_NAME)
 end
 
 -- The spot waiting at x, y, z, or nil: its global object's modData.
@@ -76,8 +90,8 @@ end
 -- The buildings by x, y that could have the find `kind` (RuralFinds.buildingsBy), added to `found`
 -- by key.
 local function buildingsOfFind(kind, x, y, found)
-    for _, def in ipairs(RenewableEnergy.RuralFinds.buildingsBy(kind, x, y)) do
-        found[RenewableEnergy.BuildingWatch.key(def)] = def
+    for _, def in ipairs(RuralFinds.buildingsBy(kind, x, y)) do
+        found[BuildingWatch.key(def)] = def
     end
     return found
 end
@@ -86,7 +100,7 @@ end
 -- could give the farm another: those by the find and, for a wind charger, by its bank. Nil for
 -- another site.
 local function findOf(site)
-    local kind = RenewableEnergy.SolarSites.KINDS[site.kind]
+    local kind = SolarSites.KINDS[site.kind]
     if kind.wind then
         local at, bank = site.windCharger, site.bank
         return "wind", at, buildingsOfFind("wind", bank[1], bank[2], buildingsOfFind("wind", at[1], at[2], {}))
@@ -102,14 +116,13 @@ end
 -- wrote into the rural find rolls of the buildings by its find. Answers the armed spots as plain
 -- values: each spot's fields with its x, y, z.
 local function armSite(site, defer)
-    local SolarSites = RenewableEnergy.SolarSites
     local squares = spotSquares(site)
     for _, at in ipairs(squares) do
         forgetSpot(at[1], at[2], at[3])
     end
     local _, _, defs = findOf(site)
     for _, def in pairs(defs or {}) do
-        Helpers.keepBuildingRoll(RenewableEnergy.RuralFinds.MOD_DATA, def, defer)
+        Helpers.keepBuildingRoll(RuralFinds.MOD_DATA, def, defer)
     end
     SolarSites.addSite(site)
     local spots = {}
@@ -129,7 +142,7 @@ end
 
 -- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
 local function isSiteObject(object)
-    return GeneratorReach.isVanillaGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
+    return GeneratorReach.isVanillaGenerator(object) or PowerBank.isBank(object)
         or Sprites.kindOfObject(object) ~= nil
 end
 
@@ -164,7 +177,6 @@ end
 -- `source`: plugged in, off, run down and low on petrol as SolarSites.GENERATOR says, on gas with
 -- its line connected, its kit drawn on it. Answers the generator.
 local function expectKittedGenerator(expect, expectNear, square, source, kind)
-    local GasKit, SolarSites = RenewableEnergy.GasKit, RenewableEnergy.SolarSites
     local generator = Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator)
     if not expect(generator ~= nil, "no generator at the site's far end") then
         return nil
@@ -197,7 +209,6 @@ end
 local SPOT_CHECKS = {
     -- A mount of its tile holding modules at site conditions, as many as its kind says.
     panel = function(expect, _, square, spot)
-        local SolarSites = RenewableEnergy.SolarSites
         local mount = objectWithSprite(square, SolarSites.mountSprite(spot.mount, spot.facing))
         if not expect(mount ~= nil, "no " .. spot.mount .. " mount on the panel spot") then
             return
@@ -216,8 +227,8 @@ local SPOT_CHECKS = {
         end
     end,
     bank = function(expect, _, square, spot)
-        local bank = RenewableEnergy.PowerBank.findOn(square)
-        local stock = RenewableEnergy.WorldSpawns.BANK_STOCK[spot.stock]
+        local bank = PowerBank.findOn(square)
+        local stock = WorldSpawns.BANK_STOCK[spot.stock]
         expect(bank ~= nil and Sprites.kindOfObject(bank) == stock.sprite, "no " .. spot.stock .. " bank on the bank spot")
     end,
     crate = function(expect, _, square)
@@ -225,7 +236,6 @@ local SPOT_CHECKS = {
     end,
     -- The wind charger braked with its blades broken, wired to a plugged-in rack of tired batteries.
     windCharger = function(expect, _, at, spot, far)
-        local Wind, PowerBank, WorldSpawns = RenewableEnergy.Wind, RenewableEnergy.PowerBank, RenewableEnergy.WorldSpawns
         local charger = Squares.findObjectOn(at, Wind.isCharger)
         local bank = PowerBank.findOn(far)
         if not (expect(charger ~= nil, "no wind charger on the site's square") and expect(bank ~= nil, "no bank on the site's bank square")) then
@@ -240,12 +250,12 @@ local SPOT_CHECKS = {
         local wired = PowerBank.bankOfSource(at:getX(), at:getY(), at:getZ())
         expect(wired ~= nil and Squares.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
             "the wind charger isn't wired to the site's bank")
-        local wear = RenewableEnergy.Finds.BATTERY_WEAR[stock.batteries.wear]
+        local wear = Finds.BATTERY_WEAR[stock.batteries.wear]
         local range = wearRange(wear)
         local batteries, items = 0, bank:getContainer():getItems()
         for i = 0, items:size() - 1 do
             local item = items:get(i)
-            if RenewableEnergy.Battery.isBattery(item) then
+            if Battery.isBattery(item) then
                 batteries = batteries + 1
                 expect(item:getFullType() == "RenewableEnergy.DeepCycleBattery" and inRange(item:getCondition(), range),
                     "the bank holds a " .. item:getFullType() .. " at condition " .. item:getCondition())
@@ -256,8 +266,7 @@ local SPOT_CHECKS = {
     -- The digester cold, torn and sour, or the primitive gasifier with a full ash pit and its
     -- packing all tarred, piped to the kitted generator.
     gasLine = function(expect, expectNear, at, spot, far)
-        local record, object = Helpers.recordAt({ kind = spot.source, x = at:getX(), y = at:getY(), z = at:getZ() })
-        local GasKit, Gasifier = RenewableEnergy.GasKit, RenewableEnergy.Gasifier
+        local record, object = PZHarness.Records.at({ kind = spot.source, x = at:getX(), y = at:getY(), z = at:getZ() })
         if spot.source == "digester" then
             expect(record.sour and record:isTorn(), "the digester is found sour " .. tostring(record.sour) .. ", torn "
                 .. tostring(record:isTorn()))
@@ -289,13 +298,12 @@ local SPOT_CHECKS = {
     end,
     pamphlet = function(expect, _, square)
         local building = square:getBuilding()
-        expect(building ~= nil and Helpers.readingTotal(building:getDef(), RenewableEnergy.RuralFinds.PAMPHLET) >= 1, "no pamphlet in the house")
+        expect(building ~= nil and Helpers.readingTotal(building:getDef(), RuralFinds.PAMPHLET) >= 1, "no pamphlet in the house")
     end,
     -- The house promised its lights, or rolled for them already.
     gardenLights = function(expect, _, square)
         local building = square:getBuilding()
-        local GardenLights = RenewableEnergy.GardenLights
-        local roll = building and ModData.getOrCreate(GardenLights.MOD_DATA)[RenewableEnergy.BuildingWatch.key(building:getDef())]
+        local roll = building and ModData.getOrCreate(GardenLights.MOD_DATA)[BuildingWatch.key(building:getDef())]
         expect(roll ~= nil, "the site's house was promised no garden lights")
     end,
 }
@@ -344,11 +352,11 @@ end)
 -- square, nearest first, or nil.
 local function chargerSquareFor(bank)
     local position = { x = bank:getX(), y = bank:getY(), z = bank:getZ() }
-    for r = 1, RenewableEnergy.Sources.REACH.tiles do
+    for r = 1, Sources.REACH.tiles do
         for x, y in PZHarness.Fixtures.ring(position.x, position.y, r) do
             local square = getSquare(x, y, 0)
-            if RenewableEnergy.RuralFinds.canPlace("wind", square)
-                and RenewableEnergy.Sources.isInReach(position, x, y, 0) then
+            if RuralFinds.canPlace("wind", square)
+                and Sources.isInReach(position, x, y, 0) then
                 return square
             end
         end
@@ -362,8 +370,8 @@ end
 -- or the charger's square first. Answers the armed spots and that square; what the site placed is
 -- removed when the test ends.
 handler("siteArm", function(_, args, defer)
-    local bank = args.bank and Helpers.squareAt(args.bank)
-    local at = bank and need(chargerSquareFor(bank), "open ground for a wind charger by the bank") or Helpers.squareAt(args.at)
+    local bank = args.bank and PZHarness.squareAt(args.bank)
+    local at = bank and need(chargerSquareFor(bank), "open ground for a wind charger by the bank") or PZHarness.squareAt(args.at)
     local ends = { at:getX(), at:getY(), at:getZ() }
     local site
     if bank then
@@ -402,7 +410,6 @@ end)
 -- sites are stock tank pumps whose spots wait on the outdoor squares `args.squares`; their spots
 -- and the world's rolls are put back when the test ends.
 check("siteRolledOnce", function(expect, _, _, args, defer)
-    local SolarSites = RenewableEnergy.SolarSites
     local modData = sitesSystem():getModData()
     local saved = modData.rolled
     defer(function() modData.rolled = saved end)
@@ -443,7 +450,6 @@ end)
 -- have given one, by key, with the finds their rolls count, read right after arming. Those rolls
 -- are put back when the test ends.
 handler("sitesArm", function(_, args, defer)
-    local RuralFinds = RenewableEnergy.RuralFinds
     local armed = {}
     for _, name in ipairs(args.names) do
         local site = need(siteNamed(name), "a site named " .. tostring(name))
@@ -471,7 +477,7 @@ check("siteVisited", function(expect, expectNear, _, args)
         return
     end
     for key, def in pairs(defs) do
-        local others = Helpers.findsAround(def, RenewableEnergy.RuralFinds.FINDS[kind].is, at)
+        local others = Helpers.findsAround(def, RuralFinds.FINDS[kind].is, at)
         expect(others == 0, args.name .. ": " .. others .. " more " .. kind .. " finds by the building at " .. key)
     end
 end)
@@ -485,7 +491,7 @@ handler("siteClear", function(_, args)
     local site = siteNamed(args.name)
     local house = site and site.house and getSquare(site.house[1], site.house[2], 0)
     if house and house:getBuilding() then
-        Helpers.takeReadingSince(house:getBuilding():getDef(), RenewableEnergy.RuralFinds.PAMPHLET, {})
+        Helpers.takeReadingSince(house:getBuilding():getDef(), RuralFinds.PAMPHLET, {})
     end
     return {}
 end)

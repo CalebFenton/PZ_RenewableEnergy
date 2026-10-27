@@ -4,12 +4,10 @@
 -- only through this file, so a new layout changes nothing else. Their names come from SpriteTiles,
 -- which tools/make_tiles.py writes from the art's tile numbers.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Tiles = require "RenewableEnergy/SpriteTiles"
 
 local Sprites = {}
-RenewableEnergy.Sprites = Sprites
 
 -- Placed objects. Each tile's CustomItem is the item that picking it up gives back.
 Sprites.flat = Tiles.flat

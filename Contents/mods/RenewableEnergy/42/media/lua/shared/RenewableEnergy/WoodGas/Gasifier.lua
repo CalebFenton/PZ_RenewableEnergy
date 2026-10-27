@@ -8,12 +8,14 @@
 --
 -- Units: fuel in kilograms (an item's weight), time in game hours.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local GlobalObjects = require "cf_commonlib/GlobalObjects"
 local Clock = require "cf_commonlib/Clock"
 
 local Gasifier = {}
+-- Its containers name acceptFuel and acceptPacking by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.Gasifier = Gasifier
 
 Gasifier.SYSTEM_NAME = "renewable_energy_gasifier"
@@ -224,7 +226,7 @@ function Gasifier.squareOnSide(x, y, z, side)
 end
 
 GlobalObjects.declare(Gasifier, {
-    prefix = RenewableEnergy.CLASS_PREFIX, name = "Gasifier", kind = "gasifier",
+    prefix = Utilities.CLASS_PREFIX, name = "Gasifier", kind = "gasifier",
     isObject = Gasifier.isGasifier, sprites = Sprites.namesOf("gasifier"), accept = ACCEPT,
     -- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
     -- containers and the clock: `hopperKg` (the hopper and the firebox), the filter's `clean` and

@@ -1,5 +1,9 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- The gas line: the Gas Conversion Kit on a vanilla generator and the line that runs it on a
 -- digester's or gasifier's gas (GasLine/GasKit.lua, GasLine/GasLines.lua, UI/GasKitMenu.lua), and
@@ -10,8 +14,6 @@ local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local T = RenewableEnergyTest
 local test = T.test
 
-local Digester, GasKit = RenewableEnergy.Digester, RenewableEnergy.GasKit
-local Gasifier, Sprites = RenewableEnergy.Gasifier, RenewableEnergy.Sprites
 
 -- What the clock tests that run a generator dry have vanilla bill it, in shares of the fuel it shows
 -- on gas: past that, so vanilla stops it, and little enough past for a dome's gas to pay.
@@ -280,7 +282,7 @@ test("renewable_energy_gasline_generator_runs_on_after_absence", {
         local digester = stand and T.digesterWithGas(self, "dome", Digester.HOLDERS.dome.capacity, { near = stand, minDistance = 2 })
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
-        T.server(self, "trackAt", T.at(generator, { kind = "generator" }))
+        T.trackSquare(self, generator)
         -- The adjacent working square may be shaded; this test is about fuel, not light.
         T.holdLight(self)
         T.fitAndConnect(self, generator, digester)
@@ -356,7 +358,7 @@ test("renewable_energy_gasline_unknown_job_refused", {
         local generator = T.generator(self, { fuel = 0 })
         if not generator then return end
         local function build(label, feature, job)
-            T.read(self, "gasActionFrom", T.at(generator, { feature = feature, job = job }), label)
+            T.job(self, feature, job, generator, nil, label, { build = true, targetOf = "kit" })
         end
         build("known", "kit", GasKit.INSTALL)
         build("noFeature", "NoSuchFeature", GasKit.INSTALL)
@@ -381,19 +383,19 @@ test("renewable_energy_gasline_kit_job_not_done_takes_nothing", {
         T.giveMaterials(self, "kit", self.install)
         T.batch(function()
             T.server(self, "kitJobNotDone", { job = GasKit.INSTALL })
-            T.read(self, "character", { perks = { "Mechanics" } }, "before")
+            T.readCharacter(self, "before", { perks = { "Mechanics" } })
         end)
         T.goNextTo(self, generator.square)
-        T.read(self, "kitJobComplete", T.at(generator, { job = GasKit.INSTALL }), "complete")
+        T.job(self, "kit", GasKit.INSTALL, generator, nil, "complete", { via = "complete" })
         T.batch(function()
             T.readGenerator(self, generator, "after")
             T.countMaterials(self, "after", self.install)
-            T.read(self, "character", { perks = { "Mechanics" } }, "afterXp")
+            T.readCharacter(self, "afterXp", { perks = { "Mechanics" } })
         end)
     end,
     validate = function(self)
         local reads = self.reads
-        T.expectEqual("Install Kit's done", reads.complete.done, false)
+        T.expectEqual("Install Kit's done", reads.complete.ok, false)
         T.expect(reads.after.state == nil, "the kit was fitted")
         T.expectEqual("kits after Install Kit wasn't done", self.counts.after[GasKit.ITEM], 1)
         T.expectEqual("Mechanics XP after Install Kit wasn't done", reads.afterXp.xp.Mechanics, reads.before.xp.Mechanics)
@@ -440,7 +442,7 @@ test("renewable_energy_gasline_line_lost_with_its_source_on_petrol", {
         T.kitJob(self, generator, GasKit.TO_PETROL)
         T.batch(function()
             T.setGenerator(self, generator, { running = true })
-            T.server(self, "removeAt", T.recordArgs(gasifier))
+            T.server(self, "removeAt", T.at(gasifier, { kind = gasifier.kind }))
             T.gasPass(self, generator, 0.1)
             T.readGenerator(self, generator, "lost")
         end)

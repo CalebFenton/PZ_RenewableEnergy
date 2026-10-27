@@ -1,11 +1,10 @@
--- How a bank runs a solar panel (the "panel" family of RenewableEnergy.Sources) on the authority:
+-- How a bank runs a solar panel (the "panel" family of Sources) on the authority:
 -- its modules' watts in the sun, snow lying on it, and storms cracking its modules (PanelStorms),
 -- connected or loose. The one writer of a placed panel's module record (Panel.MODULES_KEY) and of
 -- its crack and snow overlays.
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -19,7 +18,6 @@ local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 
 local PanelSource = {}
-RenewableEnergy.PanelSource = PanelSource
 
 -- Snow cover on a panel, as a share of the panel per hour: falling snow adds it, mild air and
 -- sun melt it, and a mount that sheds snow (Specs.mounts shedsSnow) sheds it in sun or mild air.

@@ -7,12 +7,10 @@
 -- has no such send (DEVELOPMENT.md, Vehicles). Taking it out, putting it back and the wreck's drop
 -- are the authority's: server/RenewableEnergy/Gadgets/CarAlternatorServer.lua.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local VehicleParts = require "cf_commonlib/VehicleParts"
 
 local CarAlternator = {}
-RenewableEnergy.CarAlternator = CarAlternator
 
 CarAlternator.ITEM = "RenewableEnergy.CarAlternator"
 CarAlternator.ENGINE = "Engine"

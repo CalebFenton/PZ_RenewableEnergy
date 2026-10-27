@@ -1,9 +1,13 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
-require "RenewableEnergy/Biogas/DigesterJobs"
-require "RenewableEnergy/PowerBank/SourceJobs"
-require "RenewableEnergy/Wind"
+local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
+local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
+local Wind = require "RenewableEnergy/Wind"
 local Squares = require "cf_commonlib/Squares"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Rural finds (World/RuralFinds.lua): wind chargers, digesters and gasifiers the world leaves by
 -- rural buildings, rolled on the authority (RenewableEnergyTestServerRuralFinds.lua).
@@ -11,10 +15,6 @@ local Squares = require "cf_commonlib/Squares"
 local T = RenewableEnergyTest
 local test, expect, serverCheck = T.test, T.expect, T.serverCheck
 
-local Sprites = RenewableEnergy.Sprites
-local Digester, DigesterJobs = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs
-local Gasifier, GasifierJobs = RenewableEnergy.Gasifier, RenewableEnergy.GasifierJobs
-local Wind, SourceJobs = RenewableEnergy.Wind, RenewableEnergy.SourceJobs
 
 -- Each rural find test rolls the building near the start for that find for certain, mends it
 -- with the usual jobs and sees it work; rolled again, the building gets nothing more.
@@ -32,9 +32,7 @@ local function rollFind(self, kind, isObject, recordKind)
     T.waitFor(self, function()
         local find = self.find
         local object = Squares.findObjectOn(find.square, isObject)
-        -- T.clientSummary reads the handle's object.
-        find.object = object
-        find.object = object and (not recordKind or T.clientSummary(find)) and object or nil
+        find.object = object and (not recordKind or T.recordSummary(find)) and object or nil
         return find.object ~= nil
     end, "this client's copy of the " .. kind)
 end
@@ -60,7 +58,7 @@ test("renewable_energy_world_rural_wind_charger", {
             local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER,
                 "RenewableEnergy.ChargeController" }, { near = find.square })
             if not bank then return end
-            T.job(self, "source", SourceJobs.CONNECT, T.at(find), bank.position, "connected")
+            T.job(self, "source", SourceJobs.CONNECT, T.at(find), bank, "connected")
             T.give(self, "blades", { { type = "RenewableEnergy.WoodenBlades" } })
             -- Replacing the blades takes light to see by, and the square the character was moved to
             -- out here lights up some frames after they arrive.
@@ -92,7 +90,7 @@ test("renewable_energy_world_rural_digester", {
         rollFind(self, "digester", Digester.isDigester, "digester")
         T.step(function()
             local find = self.find
-            self.found = T.clientSummary(find)
+            self.found = T.recordSummary(find)
             self.drum = find.object:getSprite():getName()
             -- Its drum's entity, or each load of it logs "Invalid SpriteConfig object!".
             local config = find.object:getSpriteConfig()

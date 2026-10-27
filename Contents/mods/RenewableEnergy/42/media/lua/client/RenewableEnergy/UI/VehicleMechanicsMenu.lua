@@ -5,7 +5,7 @@
 -- hand as a part's uninstall holds it (ISVehiclePartMenu.equipRequiredItems).
 -- For an empty battery slot: the deep cycle battery under Install, the way vanilla offers the car
 -- batteries the slot's script lists, which the deep cycle battery isn't among (see
--- RenewableEnergy.VehicleBattery). Picking one runs vanilla's own install
+-- VehicleBattery). Picking one runs vanilla's own install
 -- (ISVehiclePartMenu.onInstallPart), with the slot's tools, time and hood.
 
 require "ISUI/ISWorldObjectContextMenu"
@@ -16,7 +16,6 @@ require "Vehicles/TimedActions/ISPathFindAction"
 require "Vehicles/TimedActions/ISOpenVehicleDoor"
 require "Vehicles/TimedActions/ISCloseVehicleDoor"
 require "Vehicles/TimedActions/ISUnlockVehicleDoor"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
@@ -26,7 +25,6 @@ local Items = require "cf_commonlib/Items"
 local Needs = require "cf_commonlib/Needs"
 
 local CarAlternatorMenu = {}
-RenewableEnergy.CarAlternatorMenu = CarAlternatorMenu
 
 local function jobOf(putBack)
     return putBack and VehicleJobs.PUT_BACK_ALTERNATOR or VehicleJobs.TAKE_OUT_ALTERNATOR

@@ -3,11 +3,9 @@
 -- day, as the Stash Houses option chooses. StashSystem reads StashDescriptions on the server and
 -- in single player.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 
 local Stash = {}
-RenewableEnergy.Stash = Stash
 
 -- Values of the StashMode sandbox option.
 Stash.MODE = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }

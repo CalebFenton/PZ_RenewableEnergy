@@ -6,10 +6,7 @@
 -- line works out each pass ends in W (Bank:limitW, loadW), and watt-hours end in Wh. Saved fields
 -- (loadW, chargeWantW, a source's watts) keep their names.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
-
 local Specs = {}
-RenewableEnergy.Specs = Specs
 
 -- The tools wiring jobs take, as materials (cf_commonlib's Materials): a tag, and the item a
 -- tooltip names for it, as vanilla names the wrench its jobs take.
@@ -85,7 +82,7 @@ Specs.modules = {
 -- What a panel holds when nothing recorded its modules, and what world spawns place.
 Specs.factoryModule = "RenewableEnergy.SolarModule"
 
--- Panel mounts by kind (RenewableEnergy.Sprites.kindOf): input slots, modules held, tilt from flat,
+-- Panel mounts by kind (Sprites.kindOf): input slots, modules held, tilt from flat,
 -- and stormShare (Specs.storm), times its material's. Snow settles where holdsSnow and stays until
 -- it melts or is swept, unless shedsSnow lets it slide off in sun or mild air.
 Specs.mounts = {

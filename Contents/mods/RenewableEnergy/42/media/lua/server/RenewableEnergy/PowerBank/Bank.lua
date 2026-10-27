@@ -14,7 +14,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Places = require "RenewableEnergy/Places"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -32,7 +31,6 @@ local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 local Tiles = require "cf_commonlib/Tiles"
 
 local Bank = LibObjectSystem.Object:derive("RenewableEnergy_Bank")
-RenewableEnergy.Bank = Bank
 
 -- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
 -- ObjectSystem); a field renamed here is lost from existing saves.

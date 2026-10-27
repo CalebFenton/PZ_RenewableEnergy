@@ -1,9 +1,11 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/GasLine/GasKit"
-require "RenewableEnergy/Wind"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local Wind = require "RenewableEnergy/Wind"
 local Squares = require "cf_commonlib/Squares"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Solar sites (World/SolarSites.lua): the tests arm a site's spots on the authority as the world
 -- does when it rolls the site in (SolarSites.addSite), then let the world place them as their
@@ -13,9 +15,6 @@ local Squares = require "cf_commonlib/Squares"
 local T = RenewableEnergyTest
 local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, T.serverCheck
 
-local Sprites = RenewableEnergy.Sprites
-local Digester, Gasifier = RenewableEnergy.Digester, RenewableEnergy.Gasifier
-local Wind, PowerBank = RenewableEnergy.Wind, RenewableEnergy.PowerBank
 
 -- Game minutes to let pass once a spot's chunk is back: a spot that waits goes down at the next.
 local SETTLE_MINUTES = 2
@@ -165,7 +164,7 @@ local function siteCopiesArrived(spots)
             return on(spot.x, spot.y, spot.z, Wind.isCharger) and on(spot.toX, spot.toY, spot.toZ, PowerBank.isBank)
         end,
         gasLine = function(spot)
-            return on(spot.x, spot.y, spot.z, isSource) and on(spot.toX, spot.toY, spot.toZ, RenewableEnergy.GasKit.hasKit)
+            return on(spot.x, spot.y, spot.z, isSource) and on(spot.toX, spot.toY, spot.toZ, GasKit.hasKit)
         end,
     }
     for _, spot in ipairs(spots) do

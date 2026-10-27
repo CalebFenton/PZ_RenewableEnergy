@@ -1,19 +1,18 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local HarnessQA = require "PZHarness/QA"
 
 -- Item and recipe data as the game loaded it, for what the static check can't see. See
 -- RenewableEnergyTestLib.lua for the runner and the helpers.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
-local Debug = RenewableEnergy.Debug
 
 -- Items -----------------------------------------------------------------------------------------
 
 -- Every item of the mod's has a ground model.
 test("renewable_energy_items_have_ground_models", {
     validate = function()
-        for _, fullType in ipairs(Debug.items()) do
+        for _, fullType in ipairs(HarnessQA.itemsOfModule("RenewableEnergy")) do
             -- The static check proves a named model exists; nothing else asks for one.
             expect(getScriptManager():getItem(fullType):getWorldStaticModel() ~= nil, fullType .. " has no ground model")
         end
@@ -64,7 +63,7 @@ test("renewable_energy_items_taught_recipes_need_learning", {
             return recipe ~= nil and recipe:needToBeLearn()
         end
         local taught = 0
-        for _, fullType in ipairs(Debug.items()) do
+        for _, fullType in ipairs(HarnessQA.itemsOfModule("RenewableEnergy")) do
             local item = getScriptManager():getItem(fullType)
             local learned, researchable = item:getLearnedRecipes(), item:getResearchableRecipes()
             for i = 0, (learned and learned:size() or 0) - 1 do

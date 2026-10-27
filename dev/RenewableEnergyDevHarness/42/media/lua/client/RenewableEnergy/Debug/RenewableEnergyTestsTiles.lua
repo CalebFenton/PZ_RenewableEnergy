@@ -1,24 +1,26 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
+local Specs = require "RenewableEnergy/Specs"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "Moveables/ISMoveableDefinitions"
-require "RenewableEnergy/Biogas/Digester"
+local Digester = require "RenewableEnergy/Biogas/Digester"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
+local Sprites = require "RenewableEnergy/Sprites"
 
--- The mod's tiles (Sprites.lua) and how its objects move (Moveables.lua, PlaceTracker.lua): pictures,
--- overlays, tile properties, rotating, placing, picking up and scrapping.
+-- The mod's tiles (Sprites.lua) and how its objects move (Moveables.lua, PlaceTracker.lua): kinds,
+-- overlays, tile properties, rotating, placing, picking up and scrapping. That every tile exists
+-- and has a picture is the static check's (dev/check/sprite_tiles.py's tile-picture).
 
 local T = RenewableEnergyTest
 local test, expect, expectEqual = T.test, T.expect, T.expectEqual
-
-local Sprites, Specs = RenewableEnergy.Sprites, RenewableEnergy.Specs
-local PowerBank, SolarGardenLight = RenewableEnergy.PowerBank, RenewableEnergy.SolarGardenLight
 
 local MATERIALS = { "wood", "metal" }
 
 -- The items placed and picked up whole on any square: wall panels need a wall, and banks stand
 -- only indoors and are the power tests' business.
-local PLACED = { "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarFailsafe", RenewableEnergy.SolarCellCharger.ITEM,
+local PLACED = { "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarFailsafe", SolarCellCharger.ITEM,
     SolarGardenLight.ITEM, "RenewableEnergy.SolarRackWood", "RenewableEnergy.SolarRackMetal" }
 
 -- Every tile Sprites.lua names, as a key or a value at any depth: placed tiles and overlays.
@@ -39,16 +41,6 @@ local function properties(spriteName)
     local sprite = getSprite(spriteName)
     return sprite and sprite:getProperties()
 end
-
--- Every tile Sprites.lua names exists and has a picture in the pack.
-test("renewable_energy_tiles_have_pictures", {
-    validate = function()
-        for name in pairs(TILES) do
-            expect(getSprite(name) ~= nil, name .. " is not a tile in renewable_energy.tiles")
-            expect(getTexture(name) ~= nil, name .. " has no picture in the pack")
-        end
-    end,
-})
 
 -- Every tile Sprites.lua names is either a placed tile with a kind or an overlay, never both, so a
 -- tile added to Sprites.lua without its place in kindOf or isOverlay fails here.
@@ -255,7 +247,7 @@ end
 -- a Fridge, has none.
 -- The wide two-door fridge, two tiles.
 local FRIDGE, STOVE = "appliances_refrigeration_01_18", "appliances_cooking_01_0"
-scrapTest("renewable_energy_tiles_fridge_scraps_to_compressor", Perks.MetalWelding, RenewableEnergy.Digester.COMPRESSOR, {
+scrapTest("renewable_energy_tiles_fridge_scraps_to_compressor", Perks.MetalWelding, Digester.COMPRESSOR, {
     { "a fridge at Metalworking 0, rolling just under 10%", FRIDGE, 0, 0.1 - T.UNDER, 1 },
     { "a fridge at Metalworking 0, rolling 10%", FRIDGE, 0, 0.1, 0 },
     { "a fridge at Metalworking 4, rolling just under 50%", FRIDGE, 4, 0.5 - T.UNDER, 1 },
@@ -328,7 +320,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                 table.insert(self.results, result)
                 local handle = T.placeAsPlayer(self, square, item, sprite, carried and { [carried.key] = carried.value })
                 if carried then
-                    T.read(self, "objectModData", T.at(square, { sprite = sprite, key = carried.key }), item)
+                    T.readModData(self, square, sprite, carried.key, item)
                 end
                 T.pickUpAsPlayer(self, handle, sprite)
                 T.readCarried(self, { item })
@@ -338,7 +330,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                     result.returned, result.items = #items, self.reads.carried.total
                     result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
                 end)
-                T.server(self, "takeItems", { type = item })
+                T.takeItems(self, nil, item)
             end
         end)
     end,
@@ -399,7 +391,7 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
                 result.removed = T.objectWithSprite(square, tile) == nil
                 result.returned, result.items = #T.carriedItems(self, item), self.reads.carried.total
             end)
-            T.server(self, "takeItems", { type = item })
+            T.takeItems(self, nil, item)
         end
     end,
     validate = function(self)
@@ -423,7 +415,7 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
             if not bank then return end
             bank.facing = facing
             table.insert(self.banks, bank)
-            T.bankState(self, bank)
+            T.readRecord(self, bank)
             T.waitFor(self, function()
                 return bank.state ~= nil and table.concat(T.overlaysOf(bank.object), ",") == table.concat(bank.state.overlays, ",")
             end, "this client's copy of the overlays of the bank facing " .. facing)
@@ -477,8 +469,7 @@ test("renewable_energy_tiles_cracked_modules_show", {
             for _, case in ipairs(CRACKED) do
                 local panel = T.panel(self, case.sprite, { modules = case.modules })
                 if not panel then return end
-                local at = panel.position
-                T.read(self, "panelCracks", T.at(at, { sprite = case.sprite, change = case.change }), case.name)
+                T.read(self, "panelCracks", T.at(panel, { sprite = case.sprite, change = case.change }), case.name)
                 T.waitFor(self, function()
                     return table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ",")
                         == table.concat(self.reads[case.name].overlays, ",")

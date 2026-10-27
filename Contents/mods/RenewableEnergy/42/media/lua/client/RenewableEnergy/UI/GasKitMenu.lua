@@ -1,7 +1,6 @@
 -- The Gas Conversion Kit's options in a vanilla generator's right-click menu, and its Take
 -- Generator greyed out while a kit is fitted (GasKit refuses the action itself).
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"

@@ -1,32 +1,16 @@
 -- Setup helpers for the debug scenario, the tests and the dev harness. Debug mode only.
 
-require "RenewableEnergy/Utilities"
-require "RenewableEnergy/PowerBank/PowerBank"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/ClientBankSystem"
-require "RenewableEnergy/PowerBank/Sources"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
 require "PZHarness/TestCraft"
 require "PZHarness/QA"
 local Squares = require "cf_commonlib/Squares"
 
-RenewableEnergy = RenewableEnergy or {}
 local Debug = {}
-RenewableEnergy.Debug = Debug
 
 -- Items that only ever sit in a vehicle part, by full type.
 Debug.PART_ITEMS = { ["RenewableEnergy.TrailerFrame"] = true }
-
---- Every item of this mod's scripts by full type, sorted so the layouts come out the same each run.
-function Debug.items()
-    local found, items = {}, getScriptManager():getAllItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:getModuleName() == "RenewableEnergy" then
-            table.insert(found, item:getFullName())
-        end
-    end
-    table.sort(found)
-    return found
-end
 
 -- Inputs naming several items take the first listed here, before the harness's vanilla picks
 -- (T.VANILLA_PREFERRED), so the QA layout, its toolboxes and the promo's recipe sheet come out the
@@ -38,7 +22,7 @@ Debug.PREFERRED_INPUTS = {
 
 local function isContainerGeneratorOrSource(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
-        or RenewableEnergy.Sources.kindOf(object) ~= nil
+        or Sources.kindOf(object) ~= nil
 end
 
 -- Whether a test or the dev harness may put a bank or panel on `square`: free to walk on, with no
@@ -46,7 +30,7 @@ end
 -- indoors where a bank may stand if `indoors`, else outdoors.
 function Debug.isFreeSquare(square, indoors)
     return square ~= nil and square:isFree(false) and square:getVehicleContainer() == nil
-        and RenewableEnergy.PowerBank.canPlaceBank(square) == indoors and (indoors or square:isOutside())
+        and PowerBank.canPlaceBank(square) == indoors and (indoors or square:isOutside())
         and not Squares.findObjectOn(square, isContainerGeneratorOrSource)
 end
 

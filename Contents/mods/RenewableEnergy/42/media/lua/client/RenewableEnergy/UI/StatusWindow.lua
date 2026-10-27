@@ -3,7 +3,6 @@
 -- multiplayer.
 
 require "ISUI/ISButton"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
@@ -16,7 +15,6 @@ local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Squares = require "cf_commonlib/Squares"
 
 local StatusWindow = ObjectWindow:derive("RenewableEnergyStatusWindow")
-RenewableEnergy.StatusWindow = StatusWindow
 StatusWindow.windows = {}
 
 local PAD, COLORS, rgb = ObjectWindow.PAD, ObjectWindow.COLORS, ObjectWindow.rgb

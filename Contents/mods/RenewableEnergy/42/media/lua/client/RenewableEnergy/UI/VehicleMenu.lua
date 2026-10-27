@@ -4,7 +4,6 @@
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
 require "Vehicles/TimedActions/ISPathFindAction"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
@@ -12,7 +11,6 @@ local Format = require "RenewableEnergy/UI/Format"
 local JobOptions = require "cf_commonlib/JobOptions"
 
 local VehicleMenu = {}
-RenewableEnergy.VehicleMenu = VehicleMenu
 
 -- Walks to the frame part's end of the trailer, then fixes it as the mechanics window's Repair
 -- menu does (ISInventoryPaneContextMenu.onFix), which walks nowhere.

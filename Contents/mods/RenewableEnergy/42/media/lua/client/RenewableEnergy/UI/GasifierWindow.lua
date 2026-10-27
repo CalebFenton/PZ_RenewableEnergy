@@ -1,12 +1,10 @@
 -- A gasifier's status window: its summary (RenewableEnergy.Gasifier.summaryOf) as rows.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Format = require "RenewableEnergy/UI/Format"
 local SummaryWindow = require "RenewableEnergy/UI/SummaryWindow"
 
 local GasifierWindow = SummaryWindow:derive("RenewableEnergyGasifierWindow")
-RenewableEnergy.GasifierWindow = GasifierWindow
 GasifierWindow.owner = Gasifier
 
 local row = SummaryWindow.row

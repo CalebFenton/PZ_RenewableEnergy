@@ -1,7 +1,8 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
+local Specs = require "RenewableEnergy/Specs"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- The solar garden light (Gadgets/SolarGardenLight.lua, its options in UI/GardenLightMenu.lua): it lights by
 -- night on what its cell stored by day, in the colour of its bulb. The authority runs it, so the
@@ -9,7 +10,6 @@ local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
-local Sprites, Specs, SolarGardenLight = RenewableEnergy.Sprites, RenewableEnergy.Specs, RenewableEnergy.SolarGardenLight
 
 local NOON, MIDNIGHT = 12, 0
 
@@ -60,7 +60,7 @@ end
 -- `charge` Wh if given, and a wait until this client's tile and lamp match the server's answer,
 -- read under `label` when given.
 local function runLight(self, light, charge, hours, label)
-    T.read(self, "gardenLightUpdate", T.at(light, { kind = "gardenLight", charge = charge, hours = hours }), label)
+    T.read(self, "gardenLightUpdate", T.at(light, { kind = "light", charge = charge, hours = hours }), label)
     T.waitFor(self, function()
         local reply = self.server.gardenLightUpdate
         return light.object:getTextureName() == reply.sprite and lampOn(light.square) == reply.lit
@@ -84,7 +84,7 @@ end
 -- At night a light stays lit while its battery holds any charge: a little more than the night
 -- draws leaves it lit, exactly that much puts it out. By day the cell charges it, never past full.
 local NIGHT_HOURS = 0.5
-local SPEC = RenewableEnergy.SolarGardenLight.SPEC
+local SPEC = SolarGardenLight.SPEC
 local NIGHT_WH = SPEC.nightWatts * NIGHT_HOURS
 -- A full battery: lasts the night hours the tests run.
 local LIT_WH = SPEC.wh
@@ -244,7 +244,7 @@ test("renewable_energy_gadgets_garden_light_bulb_swap_recolours_lamp", {
         if not light then return end
         runLight(self, light, LIT_WH, NIGHT_HOURS)
         T.step(function() self.litBefore = lampOn(light.square) end)
-        T.read(self, "gardenLightSwapBulb", T.at(light, { kind = "gardenLight", bulb = GREEN }), "swap")
+        T.read(self, "gardenLightSwapBulb", T.at(light, { kind = "light", bulb = GREEN }), "swap")
         T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green after the swap")
     end,
     validate = function(self)

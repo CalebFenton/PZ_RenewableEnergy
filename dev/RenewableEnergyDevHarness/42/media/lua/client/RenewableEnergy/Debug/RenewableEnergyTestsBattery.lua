@@ -1,6 +1,8 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Recipes"
-require "RenewableEnergy/PowerBank/Wear"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
+local Recipes = require "RenewableEnergy/Recipes"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
 
 -- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua) and the battery recipes
 -- that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
@@ -9,7 +11,6 @@ require "RenewableEnergy/PowerBank/Wear"
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, expectEqual, player, stateItem = T.test, T.craftTest, T.expect, T.expectNear,
     T.expectEqual, T.player, T.stateItem
-local Battery, Wear, Recipes = RenewableEnergy.Battery, RenewableEnergy.Wear, RenewableEnergy.Recipes
 local function craftName(recipe, behavior) return T.craftName("battery", recipe, behavior) end
 
 -- Wear ----------------------------------------------------------------------------------------
@@ -67,7 +68,7 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         end)
         -- Past midnight: the clock's next step turns the day (GameTime.update).
         T.step(function() T.setTime(self, 24.01) end)
-        T.serverUntil(self, "bankState", { bank = bank.position }, function(state)
+        T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state)
             return state ~= nil and state.calendarDay ~= self.reads.evening.calendarDay
         end)
         T.bankPass(self, bank, 0, { hours = 0.1 })
@@ -172,7 +173,7 @@ test(craftName(REBUILD, "from_its_stripped_case"), {
         T.fillCarried(self, "RenewableEnergy.BatteryElectrolyte")
         T.step(function() T.startCraft(self, strip, T.inputsOf(self, CAR_BATTERY2)[1]) end)
         -- New plates in place of the worn, and water to top up.
-        T.server(self, "takeItems", { type = WORN })
+        T.takeItems(self, nil, WORN)
         T.give(self, "rebuild", { { type = PLATES }, { type = "Base.WaterBottle" } })
         T.fillCarried(self, "Base.WaterBottle", "Water", 1)
         T.waitForCarried(self, CASE, "this client's " .. CASE)

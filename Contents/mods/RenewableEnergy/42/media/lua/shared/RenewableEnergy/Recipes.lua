@@ -8,7 +8,7 @@
 -- OnTest is asked about every candidate item of every input, tools included, so each one
 -- answers only for the items it is about and lets the rest through.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
@@ -21,6 +21,8 @@ local Items = require "cf_commonlib/Items"
 local RecipeLearning = require "cf_commonlib/RecipeLearning"
 
 local Recipes = {}
+-- Recipes.txt names its OnTest and OnCreate functions by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.Recipes = Recipes
 
 -- The mod's craftRecipes and build recipes with an AutoLearn skill are learned by level, its build
@@ -249,7 +251,7 @@ function Recipes.refillPropaneBottle(craftRecipeData, character)
     local old = craftRecipeData:getAllConsumedItems():get(0)
     local tank = craftRecipeData:getAllKeepInputItems():get(0)
     local bottlePerTankUse = tank:getUseDelta() / (Digester.BOTTLE_SHARE * bottle:getUseDelta())
-    local room = math.floor((old:getMaxUses() - old:getCurrentUses()) / bottlePerTankUse + RenewableEnergy.EPSILON)
+    local room = math.floor((old:getMaxUses() - old:getCurrentUses()) / bottlePerTankUse + Utilities.EPSILON)
     local taken = math.min(room, tank:getCurrentUses())
     bottle:setCurrentUses(old:getCurrentUses() + round(taken * bottlePerTankUse))
     tank:setCurrentUses(tank:getCurrentUses() - taken)

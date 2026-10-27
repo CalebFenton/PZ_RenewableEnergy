@@ -7,26 +7,27 @@
 -- and the empty item floor too, so that lib/capture.py can find each item model by difference.
 
 require "PZHarness/Fixtures"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/Battery"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
-require "RenewableEnergy/Biogas/Digester"
-require "RenewableEnergy/WoodGas/Gasifier"
-require "RenewableEnergy/GasLine/GasKit"
+local Specs = require "RenewableEnergy/Specs"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Capture = require "PZHarness/Capture"
+local HarnessQA = require "PZHarness/QA"
 require "ISUI/ISWorldObjectContextMenu"
-require "RenewableEnergy/Debug/RenewableEnergyDebug"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/PowerBank/PowerBank"
+local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local Sprites = require "RenewableEnergy/Sprites"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
-require "RenewableEnergy/PowerBank/Treadmill"
-require "RenewableEnergy/Gadgets/SolarGardenLight"
-require "RenewableEnergy/UI/StatusWindow"
+local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local StatusWindow = require "RenewableEnergy/UI/StatusWindow"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
 require "RenewableEnergy/UI/SourceMenu"
 require "RenewableEnergy/UI/GardenLightMenu"
-require "RenewableEnergy/UI/DigesterWindow"
-require "RenewableEnergy/UI/GasifierWindow"
+local DigesterWindow = require "RenewableEnergy/UI/DigesterWindow"
+local GasifierWindow = require "RenewableEnergy/UI/GasifierWindow"
 require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Stage = require "RenewableEnergyDevStage"
@@ -36,6 +37,9 @@ local Squares = require "cf_commonlib/Squares"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Places = require "RenewableEnergyDevPromoPlaces"
 local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
+local Wind = require "RenewableEnergy/Wind"
 
 local Promo = {}
 
@@ -43,8 +47,6 @@ local Promo = {}
 -- Promo.capture makes them.
 local run, places
 
-local Sprites = RenewableEnergy.Sprites
-local PowerBank = RenewableEnergy.PowerBank
 
 local DRAW_FRAMES = Capture.DRAW_FRAMES
 
@@ -78,7 +80,7 @@ local MORNING, NOON = 8, 12
 
 -- The rack with a cracked module, connected early so that its row shows in the status window: the
 -- modules of HOMESTEAD.racks by index.
-local MODULE = RenewableEnergy.Specs.factoryModule
+local MODULE = Specs.factoryModule
 local HOMESTEAD_MODULES = { [1] = { { type = MODULE, condition = 30 }, { type = MODULE, condition = 100 } } }
 local HOMESTEAD_BANK = {
     "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery", "RenewableEnergy.L16Battery",
@@ -114,7 +116,7 @@ local function doJob(feature, job, target, with)
 end
 
 local function switchOn(bank)
-    doJob("bank", RenewableEnergy.BankJobs.TURN_ON, bank)
+    doJob("bank", BankJobs.TURN_ON, bank)
 end
 
 local function removeTrees(place)
@@ -146,11 +148,12 @@ end
 
 -- Places a bank and puts the parts straight into its container, as world spawns stock a bank.
 local function placeBank(square, sprite, items, charge)
-    return RenewableEnergy.BankSystem.place(square, sprite, nil, function(container)
+    local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
+    return BankSystem.place(square, sprite, nil, function(container)
         for _, fullType in ipairs(items) do
             local item = container:AddItem(fullType)
-            if RenewableEnergy.Battery.isBattery(item) then
-                RenewableEnergy.Battery.setCharge(item, charge)
+            if Battery.isBattery(item) then
+                Battery.setCharge(item, charge)
             end
         end
     end)
@@ -158,13 +161,13 @@ end
 
 -- Set out the way garden light spawns set one out, charged and unlit by day.
 local function placeGardenLight(square, bulb)
-    local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    RenewableEnergy.Place.moveable(square, Sprites.gardenLight.off,
+    local Place = require "RenewableEnergy/World/Place"
+    Place.moveable(square, Sprites.gardenLight.off,
         { [SolarGardenLight.CHARGE_KEY] = SolarGardenLight.SPEC.wh, [SolarGardenLight.BULB_KEY] = bulb })
 end
 
 local function connect(bank, source)
-    doJob("source", RenewableEnergy.SourceJobs.CONNECT, source, bank)
+    doJob("source", SourceJobs.CONNECT, source, bank)
 end
 
 -- Places a panel on each of `spots` ({ along, out, material }) of `place` and connects it to
@@ -239,12 +242,11 @@ local function placeGenerator(square, fuel)
     return generator
 end
 
--- A record of Helpers.RECORD_KINDS kind `kind` built on its Sprites tile `tile` on `square` by
--- Helpers.placeRecord, as the build menu builds one, clear of ground cover. Helpers is server Lua,
--- which loads after this file, so it is required here.
+-- A record of the record kind `kind` built on its Sprites tile `tile` on `square` by its kind's
+-- build (RenewableEnergyTestKinds), as the build menu builds one, clear of ground cover.
 local function placeRecord(kind, tile, square)
     Harness.clearGroundCover(square)
-    return require("RenewableEnergy/Debug/RenewableEnergyTestHelpers").placeRecord(kind, tile, square)
+    return require("RenewableEnergy/Debug/RenewableEnergyTestKinds").RECORDS[kind].build(square, tile)
 end
 
 -- A digester of the Sprites.digester tile `tile` ("barrel.MetalDrum", "dome", ...) built on
@@ -253,7 +255,7 @@ end
 -- makes a day, and its holder `full` of what it takes.
 local function placeDigester(square, tile, full, fields)
     local thumpable = placeRecord("digester", tile, square)
-    local record, working = RenewableEnergy.Digester.recordOf(thumpable), WORKING_DIGESTER
+    local record, working = Digester.recordOf(thumpable), WORKING_DIGESTER
     for _, fullType in ipairs(working.feed) do
         thumpable:getContainer():AddItem(fullType)
     end
@@ -274,7 +276,7 @@ end
 
 -- A gasifier of `tier` built on `square`, at work (WORKING_GASIFIER), lit if `lit`.
 local function placeGasifier(square, tier, lit)
-    local Gasifier, working = RenewableEnergy.Gasifier, WORKING_GASIFIER
+    local working = WORKING_GASIFIER
     local thumpable = placeRecord("gasifier", tier, square)
     for _ = 1, working.wood[2] do
         Gasifier.hopperOf(thumpable):AddItem(working.wood[1])
@@ -311,7 +313,6 @@ end
 -- Fits the gas kit to `generator` and runs its line to `source`, a digester or a gasifier, by
 -- the jobs a player does, the character holding what they take meanwhile.
 local function fitGasKit(generator, source)
-    local GasKit = RenewableEnergy.GasKit
     local player = getPlayer()
     local given, restores = {}, {}
     for _, job in ipairs({ GasKit.INSTALL, GasKit.CONNECT }) do
@@ -344,7 +345,7 @@ local tallSquares = {}
 local function placeWindCharger(square, spriteName)
     Harness.clearGroundCover(square)
     local object = Harness.placeTile(square, spriteName)
-    RenewableEnergy.Wind.OnCreate({ thumpable = object })
+    Wind.OnCreate({ thumpable = object })
     tallSquares[square] = true
     return object
 end
@@ -382,7 +383,7 @@ local function buildStage0()
         charger:createContainersFromSpriteProperties()
     end
     for _ = 1, CELL_BATTERIES do
-        local battery = charger:getContainer():AddItem(RenewableEnergy.SolarCellCharger.BATTERY)
+        local battery = charger:getContainer():AddItem(SolarCellCharger.BATTERY)
         battery:setCurrentUsesFloat(0.5)
     end
     placeGardenLight(Harness.at(stage0, Places.STAGE0.gardenLight))
@@ -458,8 +459,8 @@ local WIND_INTENSITY = 0.3
 -- annotated maps, which are loot rather than something to build with, and VANILLA_ITEMS.
 local function sheetItems()
     local fullTypes = {}
-    for _, fullType in ipairs(RenewableEnergy.Debug.items()) do
-        if not RenewableEnergy.Debug.PART_ITEMS[fullType] and getScriptManager():getItem(fullType):getMapID() == nil then
+    for _, fullType in ipairs(HarnessQA.itemsOfModule("RenewableEnergy")) do
+        if not Debug.PART_ITEMS[fullType] and getScriptManager():getItem(fullType):getMapID() == nil then
             table.insert(fullTypes, fullType)
         end
     end
@@ -564,7 +565,7 @@ end
 
 -- The homestead bank's status window, once it has laid its rows out from the bank's status.
 local function addStatus()
-    addWindowShot("status", RenewableEnergy.StatusWindow, function()
+    addWindowShot("status", StatusWindow, function()
         return PowerBank.findOn(places.homestead.bank)
     end, function(window)
         return window.status ~= nil
@@ -645,7 +646,6 @@ end
 
 -- Garden lights along a house's front walk, charged and lit at night, at the closest zoom.
 local function addGardenLights()
-    local SolarGardenLight = RenewableEnergy.SolarGardenLight
     local walk = places.walk
     addOutfit(false)
     run:add(function()
@@ -696,7 +696,7 @@ local function addPoster()
         buildPoster()
     end)
     local scouts = Harness.loadedSquares(poster, Places.POSTER.indoors, function(square)
-        return RenewableEnergy.Debug.isFreeSquare(square, true)
+        return Debug.isFreeSquare(square, true)
     end)
     for _, square in ipairs(Harness.loadedSquares(poster, Places.POSTER.scouts)) do
         table.insert(scouts, square)
@@ -742,7 +742,7 @@ local function goToPlace(name, stepsOut, standAt)
     Harness.addGoTo(run, getPlayer(), squares, stepsOut)
 end
 
--- The window of `windowClass` (RenewableEnergy.DigesterWindow or GasifierWindow) on what the shots
+-- The window of `windowClass` (DigesterWindow or GasifierWindow) on what the shots
 -- show under `key`, which lays its rows out from the summary as it draws.
 local function addGasWindow(name, windowClass, key)
     addWindowShot(name, windowClass, function()
@@ -774,7 +774,7 @@ local function addBiogas()
     run:addOpaque("biogas", function()
         return { Harness.centred("biogas", placeSquares("biogas"), FRAMING) }
     end)
-    addGasWindow("digester", RenewableEnergy.DigesterWindow, "digester")
+    addGasWindow("digester", DigesterWindow, "digester")
 end
 
 -- The gasifiers, the lit ones piped to running generators, a step out from the closest zoom,
@@ -803,7 +803,7 @@ local function addWoodgas()
     run:addOpaque("woodgas", function()
         return { Harness.centred("woodgas", placeSquares("woodgas"), FRAMING) }
     end)
-    addGasWindow("gasifier", RenewableEnergy.GasifierWindow, "standard")
+    addGasWindow("gasifier", GasifierWindow, "standard")
 end
 
 -- The wind chargers turning in the breeze, a step out from the closest zoom.
@@ -832,7 +832,7 @@ local function addTreadmill()
         local box = placeBank(here("box"), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
         local tiles = Sprites.treadmill[layout.facing]
         Harness.placeTile(here("rear"), tiles.rear)
-        shown.treadmill = Harness.placeTile(here("console"), tiles.console, { [RenewableEnergy.Treadmill.WIRED_KEY] = true })
+        shown.treadmill = Harness.placeTile(here("console"), tiles.console, { [Treadmill.WIRED_KEY] = true })
         connect(box, shown.treadmill)
         switchOn(box)
         return DRAW_FRAMES
@@ -901,7 +901,7 @@ function Promo.capture(selection, onDone)
         groups = GROUPS,
         places = Places.PLACES,
         gap = Places.GAP,
-        catalog = Capture.newCatalog({ prefer = RenewableEnergy.Debug.PREFERRED_INPUTS, fluidContainers = FLUID_CONTAINERS }),
+        catalog = Capture.newCatalog({ prefer = Debug.PREFERRED_INPUTS, fluidContainers = FLUID_CONTAINERS }),
         items = sheetItems(),
         data = { models = {}, strings = { modName = getText("Sandbox_RenewableEnergy") } },
         prepare = function(_, found, origins)

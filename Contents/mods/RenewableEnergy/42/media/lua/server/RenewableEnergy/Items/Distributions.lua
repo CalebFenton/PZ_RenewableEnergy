@@ -4,12 +4,10 @@
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Stash = require "RenewableEnergy/Stash"
 local Loot = require "cf_commonlib/Loot"
 
 local Distributions = {}
-RenewableEnergy.Distributions = Distributions
 
 local subDist = SuburbsDistributions
 local procLists = ProceduralDistributions.list

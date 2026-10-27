@@ -7,7 +7,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Place = require "RenewableEnergy/World/Place"
@@ -15,7 +14,6 @@ local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 local Chance = require "cf_commonlib/Chance"
 
 local GardenLights = {}
-RenewableEnergy.GardenLights = GardenLights
 
 -- Global ModData, by building key: the number of lights a rolled house got, or PROMISED for a
 -- house a solar site promised lights that isn't rolled yet. Saved, so a promise outlives a quit

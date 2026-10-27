@@ -5,15 +5,21 @@
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "PZHarness/Loot"
-require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Stash"
-require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local Sprites = require "RenewableEnergy/Sprites"
+local Stash = require "RenewableEnergy/Stash"
+local Loot = require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local LibLoot = require "cf_commonlib/Loot"
-local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
+require "PZHarness/ServerFixtures"
+require "PZHarness/Rolls"
+local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Distributions = require "RenewableEnergy/Items/Distributions"
+local Finds = require "RenewableEnergy/Items/Finds"
+local Recipes = require "RenewableEnergy/Recipes"
+local Specs = require "RenewableEnergy/Specs"
+local Wear = require "RenewableEnergy/PowerBank/Wear"
 
 local check, saveOptions, countPairs = PZHarness.checkHandler, PZHarness.Fixtures.saveOptions, PZHarness.Fixtures.countPairs
 local removePlaced = PZHarness.Fixtures.removePlaced
-local Sprites = RenewableEnergy.Sprites
 
 -- The VehicleDistributions tables some vehicle's Normal or Specific distribution fills from.
 local function vehicleTablesInUse()
@@ -37,7 +43,7 @@ end
 -- The spawn tables of every stash house, vanilla's and the mod's, registered or not.
 local function stashSpawnTables()
     local tables = {}
-    for description in pairs(RenewableEnergy.Stash.descriptions) do
+    for description in pairs(Stash.descriptions) do
         tables[description.spawnTable] = true
     end
     for _, description in ipairs(StashDescriptions or {}) do
@@ -63,7 +69,7 @@ end
 -- ItemPickerJava.tryAddItemToContainer hands out nothing for an unknown item or one heavier than
 -- the container holds, and getActualSpawnChance nothing at a loot multiplier of 0. An obsolete,
 -- disabled or debug-only script never loads (ScriptBucket), so it is no item either. The loot
--- multipliers are the default settings', as RenewableEnergy.Loot.MEASURE_OPTIONS sets them.
+-- multipliers are the default settings', as Loot.MEASURE_OPTIONS sets them.
 local function checkHandedOut(expect, spec, capacity)
     local option = getSandboxOptions():getOptionByName("RenewableEnergy." .. spec.option)
     if expect(option ~= nil, spec.fullType .. ": no sandbox option " .. tostring(spec.option)) then
@@ -93,12 +99,12 @@ local function optionRows(items)
 end
 
 check("lootListsInUse", function(expect)
-    local rows = optionRows(RenewableEnergy.Distributions.items)
+    local rows = optionRows(Distributions.items)
     local procUsers = PZHarness.Loot.procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
     local capacity = PZHarness.Loot.scratchContainer(nil):getCapacity()
-    PZHarness.Loot.withMeasureOptions(RenewableEnergy.Loot.MEASURE_OPTIONS, function()
+    PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
         for _, spec in ipairs(rows) do
             checkHandedOut(expect, spec, capacity)
         end
@@ -166,7 +172,7 @@ end)
 
 -- For each row of `args.rows`, applied twice: see renewable_energy_loot_rarity_options_scale_weights.
 check("lootRarityOptions", function(expect, expectNear, _, args, defer)
-    local D = RenewableEnergy.Distributions
+    local D = Distributions
     local options, names = SandboxVars.RenewableEnergy, {}
     for option in pairs(args.rows[1]) do
         table.insert(names, option)
@@ -231,12 +237,12 @@ end
 
 -- Whether the item is one of the mod's batteries.
 local function isModBattery(item)
-    return string.find(item:getFullType(), "^RenewableEnergy%.") ~= nil and RenewableEnergy.Battery.isBattery(item)
+    return string.find(item:getFullType(), "^RenewableEnergy%.") ~= nil and Battery.isBattery(item)
 end
 
 -- Whether the item is an inverter or a controller a find wears.
 local function isWornPart(item)
-    return RenewableEnergy.Finds.isWornPart(item:getFullType())
+    return Finds.isWornPart(item:getFullType())
 end
 
 -- A container of type `containerType` on a crate tile on the square, in the world, so that the game
@@ -256,9 +262,8 @@ end
 -- rolls its type's "all" table, here the probe's, and one of a corpse's type the corpse lists; a bag
 -- in each holds a battery. Vehicle fills are the arrow board tests'. `args` is a free outdoor square.
 check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
-    local square = Helpers.squareAt(args)
+    local square = PZHarness.squareAt(args)
     PZHarness.need(not square:getRoom(), "an outdoor square on the server")
-    local Battery = RenewableEnergy.Battery
     local range = Battery.FOUND_CHARGE
     SuburbsDistributions.all[PROBE_CONTAINER] = PROBE_LOOT
     ItemPickerJava.Parse()
@@ -302,13 +307,13 @@ end)
 -- as new and a crafted controller (its recipe's OnCreate); and a bank's container wears no part in
 -- it, marked or not.
 check("lootFoundParts", function(expect, _, _, _, defer)
-    local Wear, D = RenewableEnergy.Wear, RenewableEnergy.Finds
+    local D = Finds
     local mean = D.PART_WEAR.mean
-    local restoreRoll = Helpers.forceRolls(defer, 0.5)
+    local restoreRoll = PZHarness.Rolls.force(defer, 0.5)
     local container = PZHarness.Loot.scratchContainer(nil)
     container:AddItem("Base.Bag_DuffelBag"):getInventory():AddItem("RenewableEnergy.PowerInverter")
     container:AddItem("RenewableEnergy.PlugInInverter")
-    container:AddItem(RenewableEnergy.Specs.controller)
+    container:AddItem(Specs.controller)
     D.readyFoundItems(container)
     local found = itemsIn(container, isWornPart)
     expect(#found == 3, #found .. " parts in the container, not the 3 put there")
@@ -321,8 +326,8 @@ check("lootFoundParts", function(expect, _, _, _, defer)
     if asNew then
         Wear.setCondition(asNew, asNew:getConditionMax())
     end
-    local crafted = container:AddItem(RenewableEnergy.Specs.controller)
-    RenewableEnergy.Recipes.makeChargeController({ getFirstCreatedItem = function() return crafted end })
+    local crafted = container:AddItem(Specs.controller)
+    Recipes.makeChargeController({ getFirstCreatedItem = function() return crafted end })
     D.readyFoundItems(container)
     if asNew then
         expect(asNew:getCondition() == asNew:getConditionMax(), "a found part as good as new has condition " .. asNew:getCondition() .. " after a refill")
@@ -342,9 +347,8 @@ end)
 -- unexplored container is left to its own fill. Seen again, as a refill would, a battery that has
 -- its own charge keeps it. `args` is a free outdoor square, standing in for the room's one square.
 check("lootSeenRoomReadied", function(expect, expectNear, _, args, defer)
-    local Battery, Wear = RenewableEnergy.Battery, RenewableEnergy.Wear
     local range = Battery.FOUND_CHARGE
-    local square = Helpers.squareAt(args)
+    local square = PZHarness.squareAt(args)
     local filled = containerInWorld(square, "metal_shelves", defer)
     filled:setExplored(true)
     local battery = filled:AddItem("RenewableEnergy.DeepCycleBattery")
@@ -376,12 +380,11 @@ local VANILLA_ALL_ROOMS = { sodatruck = true }
 -- and a stash house is the only place that uses it. `args.sprites` are the Sprites fields of the
 -- tiles a player builds, a bank's in every facing.
 check("lootPlayerContainers", function(expect, _, _, args)
-    local D = RenewableEnergy.Distributions
-    local Stash = RenewableEnergy.Stash
+    local D = Distributions
     local own = {}
     for _, containerType in ipairs(D.OWN_CONTAINER_TYPES) do
         own[containerType] = true
-        expect(not RenewableEnergy.Finds.CRACKED_MODULE_CONTAINERS[containerType], containerType .. " gets cracked modules")
+        expect(not Finds.CRACKED_MODULE_CONTAINERS[containerType], containerType .. " gets cracked modules")
     end
     for _, field in ipairs(args.sprites) do
         local tiles = Sprites[field]

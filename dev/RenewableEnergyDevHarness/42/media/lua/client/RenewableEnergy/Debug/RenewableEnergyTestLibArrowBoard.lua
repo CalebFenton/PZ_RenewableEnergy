@@ -1,19 +1,17 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 
 -- Fixtures of the arrow board tests (RenewableEnergyTestsArrowBoard*.lua), added to
 -- RenewableEnergyTest. The trailer's state lives on the authority, so they go through the dev
--- mod's server handlers (RenewableEnergyTestServerTrailer.lua). Those load after client Lua, even
--- on a multiplayer client, so the trailer readers are required when a test runs.
+-- mod's server handlers (RenewableEnergyTestServerTrailer.lua); both sides read a vehicle's state
+-- the same way (RenewableEnergyTestKinds).
 
 local T = RenewableEnergyTest
 local player = T.player
 
-local function trailer()
-    return require "RenewableEnergy/Debug/RenewableEnergyTestServerTrailer"
-end
-
 -- Vehicles ----------------------------------------------------------------------------------------
--- A vehicle is a T.placeVehicle handle, spawned by the authority through Trailer.spawnVehicle,
+-- A vehicle is a T.placeVehicle handle, spawned by the authority through the spawnVehicle setting,
 -- stocked as the world spawns it when `args.stocked` and whole when `args.repair`.
 
 --- Queues reading the server's state of the vehicle until `done(state)` holds, for what a
@@ -25,14 +23,14 @@ function T.awaitVehicleState(self, vehicle, done, label)
     T.step(function() vehicle.state = self.reads[label].state end)
 end
 
---- This side's state of its copy of the vehicle, as Trailer.vehicleState reads it.
+--- This side's state of its copy of the vehicle, as the server reads its own (Kinds.vehicleState).
 function T.copyState(vehicle)
-    return trailer().vehicleState(vehicle.vehicle)
+    return Kinds.vehicleState(vehicle.vehicle)
 end
 
---- How this game draws the lid of its copy of the trailer, as Trailer.lidPose reads it.
+--- How this game draws the lid of its copy of the trailer (Kinds.lidPose).
 function T.lidPose(vehicle)
-    return trailer().lidPose(vehicle.vehicle)
+    return Kinds.lidPose(vehicle.vehicle)
 end
 
 --- Queues a wait until this side's copy of the vehicle matches `matches(state)`; fails the test
@@ -76,24 +74,23 @@ end
 -- The squares an arrow board takes north and south of its centre.
 local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
--- ArrowBoard.PANELS's ids, copied for the reason T.lidOf gives.
-T.BOARD_PANELS = { "RenewableEnergyPanelLeft", "RenewableEnergyPanelRight" }
+-- The arrow board's panel parts.
+T.BOARD_PANELS = ArrowBoard.PANELS
 local LEFT, RIGHT = T.BOARD_PANELS[1], T.BOARD_PANELS[2]
 
--- ArrowBoard.lua is a server file, loaded after this one, so part ids are read at run time.
 function T.lidOf(vehicle)
-    return vehicle:getPartById(RenewableEnergy.ArrowBoard.LID)
+    return vehicle:getPartById(ArrowBoard.LID)
 end
 
 function T.boxOf(vehicle)
-    return vehicle:getPartById(RenewableEnergy.ArrowBoard.BATTERY_BOX)
+    return vehicle:getPartById(ArrowBoard.BATTERY_BOX)
 end
 
 -- Queues an arrow board on open ground near the character, spawned with `args` and facing `facing`
 -- (default north). Leaves its T.placeVehicle handle in self.trailer and returns it.
 function T.spawnTrailer(self, args, facing)
     local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
-    self.trailer = square and T.placeVehicle(self, RenewableEnergy.ArrowBoard.SCRIPT, { square = square, args = args, facing = facing })
+    self.trailer = square and T.placeVehicle(self, ArrowBoard.SCRIPT, { square = square, args = args, facing = facing })
     return self.trailer
 end
 

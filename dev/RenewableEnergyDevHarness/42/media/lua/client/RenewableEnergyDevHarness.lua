@@ -8,7 +8,7 @@
 
 require "PZHarness/Runner"
 require "RenewableEnergy/Debug/RenewableEnergyDebugScenario"
-require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local Loot = require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Promo = require "RenewableEnergyDevPromo"
 local Art = require "RenewableEnergyDevArt"
 local TownReport = require "RenewableEnergyDevTownReport"
@@ -19,7 +19,7 @@ local LOOT_SAMPLES = 10000
 local function reportLoot(_, done)
     local mark = PZHarness.run.mark
     print(mark .. " START")
-    RenewableEnergy.Loot.printReport(LOOT_SAMPLES, mark)
+    Loot.printReport(LOOT_SAMPLES, mark)
     TownReport.print(LOOT_SAMPLES, mark)
     done()
 end

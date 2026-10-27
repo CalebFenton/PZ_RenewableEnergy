@@ -1,18 +1,16 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/PowerBank/BankJobs"
-require "RenewableEnergy/UI/Format"
-require "RenewableEnergy/UI/StatusRows"
+local Specs = require "RenewableEnergy/Specs"
+local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local Format = require "RenewableEnergy/UI/Format"
+local StatusRows = require "RenewableEnergy/UI/StatusRows"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Power bank tests: the status window (UI/StatusWindow.lua, UI/StatusRows.lua).
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
 local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
-local Specs, Sprites = RenewableEnergy.Specs, RenewableEnergy.Sprites
-local Format, BankJobs = RenewableEnergy.Format, RenewableEnergy.BankJobs
-local StatusRows = RenewableEnergy.StatusRows
 
 -- `base` and then as many `kind` appliances as a bank limited to `limitW` carries, with `over` one
 -- more. Sums as the load does, so "carries" holds at the boundary.
@@ -73,7 +71,7 @@ test("renewable_energy_bank_window_shows_grid_power", {
         local bare = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
         local charging = bare and T.bank(self, "batteryRackWood", { T.CAR_BATTERY, Specs.charger }, { charge = 0.5 })
         if not charging then return end
-        self.at = bare.position
+        self.at = T.at(bare)
         T.batch(function()
             T.bankPass(self, bare, 0, { label = "bare" })
             T.bankPass(self, charging, 0, { hours = 1, label = "charging" })
@@ -134,8 +132,8 @@ test("renewable_energy_bank_window_reflects_status", {
             "this client's status listing the panels")
         T.step(function() self.withControllerSummary = StatusRows.summary(T.clientStatus(bank)) end)
         T.batch(function()
-            T.server(self, "bankPart", { bank = bank.position, type = Specs.controller, remove = true })
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
+            T.server(self, "bankPart", T.at(bank, { type = Specs.controller, remove = true }))
+            T.job(self, "bank", BankJobs.TURN_ON, bank)
             T.bankPass(self, bank, 1000)
             T.applyLoad(self, bank, self.load)
         end)
@@ -154,7 +152,7 @@ test("renewable_energy_bank_window_reflects_status", {
             "the window doesn't say the bank is overloaded with " .. load .. " W on " .. limit .. " W")
         expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_InputSlots", inputs, Specs.freeSlots)),
             "without its controller the slots line doesn't read " .. inputs .. " inputs of " .. Specs.freeSlots)
-        local left, right = StatusRows.rows(status, self.bank.position)
+        local left, right = StatusRows.rows(status, self.bank)
         local lights = T.rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
         expectEqual("the row of 2 lights", lights and lights.value, Format.watts(T.applianceWatts({ "light", "light" })))
         local charger = T.rowLabelled(left, getItemNameFromFullType(Specs.charger))
@@ -226,7 +224,7 @@ test("renewable_energy_bank_window_lists_every_part", {
             for _, source in ipairs(FULL_BANK_SOURCES) do
                 if not T.panel(self, source.sprite, { near = bank, modules = source.modules, connect = true }) then return end
             end
-            T.job(self, "bank", BankJobs.TURN_ON, bank.position)
+            T.job(self, "bank", BankJobs.TURN_ON, bank)
             T.bankPass(self, bank, 650)
             T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
         end)

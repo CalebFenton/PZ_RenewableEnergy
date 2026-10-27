@@ -5,12 +5,13 @@
 -- also keeps the places of the chargers it has seen, and charges them
 -- (server/RenewableEnergy/Gadgets/SolarCellChargerServer.lua).
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Sprites = require "RenewableEnergy/Sprites"
 local Containers = require "cf_commonlib/Containers"
 
 local SolarCellCharger = {}
+-- Its container names acceptItem by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.SolarCellCharger = SolarCellCharger
 
 SolarCellCharger.ITEM = "RenewableEnergy.SolarCellCharger"

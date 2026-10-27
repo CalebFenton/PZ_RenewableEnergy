@@ -1,12 +1,14 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-require "RenewableEnergy/Sun"
-require "RenewableEnergy/Specs"
-require "RenewableEnergy/Gadgets/SolarMaintainer"
-require "RenewableEnergy/Gadgets/SolarCellCharger"
+local Sun = require "RenewableEnergy/Sun"
+local Specs = require "RenewableEnergy/Specs"
+local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
+local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 require "RenewableEnergy/UI/VehicleMechanicsMenu"
-require "RenewableEnergy/UI/VehicleMenu"
+local VehicleMenu = require "RenewableEnergy/UI/VehicleMenu"
 require "TimedActions/ISInventoryTransferAction"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
+local Sprites = require "RenewableEnergy/Sprites"
+local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 
 -- Gadgets: the solar battery maintainer, the solar battery charger and the deep cycle vehicle
 -- battery (Gadgets/*, UI/VehicleMechanicsMenu.lua, the maintainer option of UI/VehicleMenu.lua); the
@@ -15,9 +17,6 @@ local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
-local Sprites, Specs, Sun = RenewableEnergy.Sprites, RenewableEnergy.Specs, RenewableEnergy.Sun
-local SolarMaintainer, SolarCellCharger = RenewableEnergy.SolarMaintainer, RenewableEnergy.SolarCellCharger
-local VehicleBattery = RenewableEnergy.VehicleBattery
 
 local NOON, MIDNIGHT = 12, 0
 local CAR = "Base.CarNormal"
@@ -34,7 +33,7 @@ end
 local function chooseMaintainerOption(self, car, attached)
     T.step(function()
         local context = T.newContext()
-        local option = RenewableEnergy.VehicleMenu.addVehicleOptions(0, context, car.vehicle)
+        local option = VehicleMenu.addVehicleOptions(0, context, car.vehicle)
         context:hideAndChildren()
         if not T.need(self, option, "the maintainer option on the car's menu") then return end
         ISTimedActionQueue.add(RenewableEnergyAction:new(T.player(), option.param1, option.param2, option.param3, option.param4))
@@ -54,7 +53,7 @@ test("renewable_energy_gadgets_maintainer_attach_detach", {
         self.car = car
         T.step(function()
             local context = T.newContext()
-            self.offeredEmptyHanded = RenewableEnergy.VehicleMenu.addVehicleOptions(0, context, car.vehicle) ~= nil
+            self.offeredEmptyHanded = VehicleMenu.addVehicleOptions(0, context, car.vehicle) ~= nil
             context:hideAndChildren()
         end)
         T.give(self, "maintainer", { { type = SolarMaintainer.ITEM } })

@@ -1,7 +1,6 @@
 -- What the battery bank's status window (StatusWindow) shows of a Bank status snapshot: the
 -- summary lines across the top and the rows of its two columns.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Sun = require "RenewableEnergy/Sun"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -9,7 +8,6 @@ local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Format = require "RenewableEnergy/UI/Format"
 
 local StatusRows = {}
-RenewableEnergy.StatusRows = StatusRows
 
 -- The lines across the top, each { text = text, color = name }.
 

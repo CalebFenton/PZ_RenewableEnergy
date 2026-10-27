@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 
 -- Arrow board crashes (ArrowBoard/Crashes.lua): the crash watcher, and the server's gate on
 -- the crash a driver's client reports. Both are fed their inputs: a trailer's velocities, and
@@ -15,7 +16,6 @@ local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.pla
 test("renewable_energy_world_arrow_board_crash_watch_tells_crashes", {
     instant = true,
     validate = function()
-        local ArrowBoard = RenewableEnergy.ArrowBoard
         local crash = ArrowBoard.CRASH
         local crashMs, frame = crash.kmh / 3.6, 16
         local cruise, stopped = { 0, -30 / 3.6 }, { 0, 0 }
@@ -84,7 +84,7 @@ local function crashPair(driver)
         getTowingWorldPos = function() return worldPos(0, 0) end,
     }
     local trailer = { id = -getTimestampMs(), towed = true, behind = 0 }
-    function trailer:getScriptName() return RenewableEnergy.ArrowBoard.SCRIPT end
+    function trailer:getScriptName() return ArrowBoard.SCRIPT end
     function trailer:getId() return self.id end
     function trailer:getVehicleTowedBy() return self.towed and car or nil end
     function trailer:getTowedByWorldPos() return worldPos(0, self.behind) end
@@ -97,7 +97,7 @@ end
 test("renewable_energy_world_arrow_board_crash_command_from_the_driver", {
     instant = true,
     validate = function()
-        local ArrowBoard, p = RenewableEnergy.ArrowBoard, player()
+        local p = player()
         local crash = ArrowBoard.CRASH
         local trailer, car = crashPair(p)
         local now = getTimestampMs()
@@ -117,7 +117,6 @@ test("renewable_energy_world_arrow_board_crash_command_from_the_driver", {
 test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
     instant = true,
     validate = function()
-        local ArrowBoard = RenewableEnergy.ArrowBoard
         local trailer, car = crashPair("someone else")
         expect(not ArrowBoard.takesCrash(player(), trailer, car, getTimestampMs()),
             "the server took a crash from a player not driving the car")

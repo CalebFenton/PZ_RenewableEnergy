@@ -16,7 +16,6 @@
 -- tool).
 
 require "VehicleZoneDefinition"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local StormNotice = require "RenewableEnergy/StormNotice"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
@@ -24,6 +23,8 @@ local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Chance = require "cf_commonlib/Chance"
 
 local ArrowBoard = {}
+-- Vehicles.txt names its part functions by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.ArrowBoard = ArrowBoard
 
 -- Script name without its module, as VehicleDistributions and OnFillContainer name it.

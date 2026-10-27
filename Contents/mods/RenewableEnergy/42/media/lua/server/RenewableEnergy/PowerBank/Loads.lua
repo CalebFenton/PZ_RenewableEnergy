@@ -1,4 +1,4 @@
--- What a payer (RenewableEnergy.Payers) pays for: every switched-on appliance in its reach that it
+-- What a payer (Payers) pays for: every switched-on appliance in its reach that it
 -- pays for (Payers decides who, by `pays`), an unwired treadmill while a run draws power through it,
 -- and the running generators whose reach covers the payer.
 --
@@ -18,13 +18,11 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 local Loads = {}
-RenewableEnergy.Loads = Loads
 
 -- The kind of an object with a fridge or freezer container, as vanilla bills it: by its
 -- containers alone, so a mini fridge with its ice box is a fridge-freezer.

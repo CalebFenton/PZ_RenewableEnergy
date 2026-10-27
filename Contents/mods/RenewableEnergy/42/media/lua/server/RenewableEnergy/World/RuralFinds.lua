@@ -11,7 +11,7 @@
 if isClient() then return end
 
 require "RandomizedWorldContent/StoryTable_Initialization"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
 local WindSource = require "RenewableEnergy/PowerBank/WindSource"
@@ -27,7 +27,6 @@ local Squares = require "cf_commonlib/Squares"
 local Tables = require "cf_commonlib/Tables"
 
 local RuralFinds = {}
-RenewableEnergy.RuralFinds = RuralFinds
 
 -- Global ModData: by building key, the finds each rolled building got ({ [kind] = true }).
 RuralFinds.MOD_DATA = "RenewableEnergyRuralFinds"
@@ -193,7 +192,7 @@ RuralFinds.FINDS = {
                     for _ = 1, 100 do
                         local tarry = instanceItem(Gasifier.TARRY)
                         local weight = filter:getContentsWeight() + tarry:getUnequippedWeight()
-                        if weight > filter:getCapacity() + RenewableEnergy.EPSILON then
+                        if weight > filter:getCapacity() + Utilities.EPSILON then
                             break
                         end
                         filter:AddItem(tarry)

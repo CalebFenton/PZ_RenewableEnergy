@@ -1,10 +1,7 @@
 -- Places in the world as numbers, and the nearest of several: every choice between equally near
 -- places breaks the tie the same way, so whoever asks picks the same one.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
-
 local Places = {}
-RenewableEnergy.Places = Places
 
 -- World squares lie well under this in x and y, so a place key stays unique and exact in a double.
 local SPAN = 1e6

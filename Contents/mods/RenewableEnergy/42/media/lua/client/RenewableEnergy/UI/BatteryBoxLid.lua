@@ -11,14 +11,12 @@ require "Vehicles/ISUI/ISVehicleMechanics"
 require "Vehicles/TimedActions/ISPathFindAction"
 require "Vehicles/TimedActions/ISOpenVehicleDoor"
 require "Vehicles/TimedActions/ISUnlockVehicleDoor"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Items = require "cf_commonlib/Items"
 
 local BatteryBoxLid = {}
-RenewableEnergy.BatteryBoxLid = BatteryBoxLid
 
 -- The lid's own text for each of vanilla's trunk texts it would show.
 local TEXTS = {

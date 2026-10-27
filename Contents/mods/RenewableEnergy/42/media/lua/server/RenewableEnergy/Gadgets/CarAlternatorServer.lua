@@ -4,7 +4,7 @@
 if isClient() then return end
 
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 local Chance = require "cf_commonlib/Chance"
 local Items = require "cf_commonlib/Items"
@@ -17,7 +17,7 @@ function CarAlternator.takeOut(character, vehicle)
         return false
     end
     engine:getModData()[CarAlternator.OUT_KEY] = true
-    RenewableEnergy.teachOnce(character, engine, CarAlternator.XP_KEY, Perks.Mechanics, CarAlternator.XP)
+    Utilities.teachOnce(character, engine, CarAlternator.XP_KEY, Perks.Mechanics, CarAlternator.XP)
     vehicle:transmitPartModData(engine)
     Items.giveItems(character, CarAlternator.ITEM)
     return true

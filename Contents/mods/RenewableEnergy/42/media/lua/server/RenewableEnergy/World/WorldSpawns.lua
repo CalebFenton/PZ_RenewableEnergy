@@ -6,7 +6,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -18,7 +17,6 @@ local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 
 local WorldSpawns = {}
-RenewableEnergy.WorldSpawns = WorldSpawns
 
 local MODULE = Specs.factoryModule
 

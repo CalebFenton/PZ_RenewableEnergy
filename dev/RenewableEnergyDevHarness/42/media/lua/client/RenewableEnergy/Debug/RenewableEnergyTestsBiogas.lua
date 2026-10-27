@@ -1,5 +1,10 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
+local Digester = require "RenewableEnergy/Biogas/Digester"
+local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
+local DigesterWindow = require "RenewableEnergy/UI/DigesterWindow"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local Sprites = require "RenewableEnergy/Sprites"
 
 -- Biogas (Contents/.../RenewableEnergy/Biogas/*, UI/Digester*): digestion, the hopper's feed, the
 -- gas holder, the digester's jobs and build, and campfire wood ash. The stink is in
@@ -9,8 +14,6 @@ local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local T = RenewableEnergyTest
 local test = T.test
 
-local Digester, DigesterJobs = RenewableEnergy.Digester, RenewableEnergy.DigesterJobs
-local Sprites = RenewableEnergy.Sprites
 
 local FEED = "Base.Dung_Cow"
 
@@ -196,7 +199,7 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
                 T.readRecord(self, handle, case[1])
             end
             set(1 + step, true)
-            T.fillRecord(self, handle, { hopper = { { type = RenewableEnergy.Gasifier.WOOD_ASH } } })
+            T.fillRecord(self, handle, { hopper = { { type = Gasifier.WOOD_ASH } } })
             T.runDigester(self, handle, 1, 30)
             T.readRecord(self, handle, "ash")
             set(1 + step, true)
@@ -259,7 +262,7 @@ test("renewable_energy_biogas_digester_hopper_meters", {
         local function allowed(fullType)
             return container:isItemAllowed(instanceItem(fullType))
         end
-        T.expect(allowed(FEED) and allowed(RenewableEnergy.Gasifier.WOOD_ASH), "this client's hopper refuses manure or wood ash")
+        T.expect(allowed(FEED) and allowed(Gasifier.WOOD_ASH), "this client's hopper refuses manure or wood ash")
         T.expect(not allowed("Base.Apple") and not allowed("Base.Hammer"), "this client's hopper takes a fresh apple or a hammer")
         -- Every animal's dung, not only the farm animals the feed table names.
         local dung, refused = 0, {}
@@ -446,14 +449,14 @@ test("renewable_energy_biogas_digester_upgrade", {
         T.batch(function()
             T.setRecord(self, handle, Fixtures.matureDigester("barrel"))
             T.fillRecord(self, handle, { hopper = { { type = FEED, count = self.dung } } })
-            T.read(self, "character", { perks = { "Woodwork" } }, "xpBefore")
+            T.readCharacter(self, "xpBefore", { perks = { "Woodwork" } })
         end)
         T.giveMaterials(self, "materials", self.upgrade)
         T.actionJob(self, "digester", handle, DigesterJobs.UPGRADE)
         T.batch(function()
             T.readRecord(self, handle, "after")
             T.countMaterials(self, "left", self.upgrade)
-            T.read(self, "character", { perks = { "Woodwork" } }, "xpAfter")
+            T.readCharacter(self, "xpAfter", { perks = { "Woodwork" } })
         end)
         T.waitFor(self, function()
             local container = handle.object:getContainer()
@@ -496,7 +499,7 @@ local function useBarrelDigester(self, handle, tile, label)
         local config = object:getSpriteConfig()
         -- Where the menu's Status walks them: the window closes once they are out of reach.
         T.standNextTo(getSquare(handle.x, handle.y, handle.z))
-        local window = RenewableEnergy.DigesterWindow:openOn(0, object)
+        local window = DigesterWindow:openOn(0, object)
         window:prerender()
         self.views[label] = { title = window.title, configValid = config ~= nil and config:isValid(),
             master = object:getMasterObject() == object }
@@ -616,7 +619,7 @@ test("renewable_energy_biogas_digester_menu", {
                 "Upgrade isn't greyed out listing what it takes: missing " .. table.concat(unlisted, ", "))
         end
         T.standNextTo(object:getSquare())
-        local window = RenewableEnergy.DigesterWindow:openOn(0, object)
+        local window = DigesterWindow:openOn(0, object)
         window:prerender()
         T.expectEqual("the status window's title", window.title, getText("IGUI_RenewableEnergy_Digester_barrel"))
         T.expect(window.rowsToDraw and window.rowsToDraw[1].value == getText("IGUI_RenewableEnergy_DigesterEmpty"),

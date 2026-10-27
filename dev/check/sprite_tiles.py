@@ -4,6 +4,7 @@ art/models/tile_numbers.py (dev/harness/docs/static-check.md, "Plugins").
 | Check | What it catches |
 | --- | --- |
 | `sprite-tiles` | `SpriteTiles.lua` not what `tools/make_tiles.py` writes from the tile numbers now: run it. |
+| `tile-picture` | A tile `SpriteTiles.lua` names, overlays included, that isn't in the mod's tilesets or has no picture in its packs. |
 | `item-tile` | An item's `WorldObjectSprite` that isn't its first tile facing S: of the tiles whose `CustomItem` gives the item back, the lowest-numbered with `Facing = S`, or the lowest-numbered when none turns. |
 | `entity-tile` | An entity's `SpriteConfig` rows that aren't the tiles its meaning has (`ENTITY_TILES`), or an entity on the mod's tiles that `ENTITY_TILES` doesn't name. |
 """
@@ -111,3 +112,27 @@ def entity_tiles(mod, game, report):
                 line = min(value.line for value in rows.values())
                 report.fail("entity-tile", path, line, "%s stands on %s, but the tile numbers give it %s"
                             % (block.id, found, expected))
+
+
+def _tile_names(value):
+    """The mod's tiles `value`, part of make_tiles.sprite_tiles(), names, as keys or values at any depth."""
+    if isinstance(value, dict):
+        for key, inner in value.items():
+            yield from _tile_names(key)
+            yield from _tile_names(inner)
+    elif isinstance(value, (list, tuple)):
+        for inner in value:
+            yield from _tile_names(inner)
+    elif isinstance(value, str) and value.startswith(TILE_PREFIX):
+        yield value
+
+
+@check
+def tile_pictures(mod, game, report):
+    # Overlays have no tile properties, so the harness's tile-sprite rule never sees them.
+    for name in sorted(set(_tile_names(make_tiles.sprite_tiles()))):
+        report.saw("tile pictures")
+        if mod.tile(name) is None:
+            report.fail("tile-picture", make_tiles.LUA, None, "%s is no tile of the mod's tilesets" % name)
+        elif name not in mod.sprites:
+            report.fail("tile-picture", make_tiles.LUA, None, "%s has no picture in the mod's packs" % name)

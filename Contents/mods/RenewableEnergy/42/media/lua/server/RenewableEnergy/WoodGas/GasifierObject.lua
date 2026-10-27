@@ -8,7 +8,7 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local ObjectSystem = require "RenewableEnergy/ObjectSystem"
 local Fumes = require "RenewableEnergy/Fumes"
@@ -21,7 +21,6 @@ local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
 local GasifierObject = ObjectSystem.Object:derive("RenewableEnergy_Gasifier")
-RenewableEnergy.GasifierObject = GasifierObject
 
 -- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
 -- ObjectSystem); a field renamed here is lost from existing saves.
@@ -29,7 +28,7 @@ GasifierObject.SAVED_FIELDS = {
     "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "condensate", "outSince", "pipe",
 }
 
-local EPSILON = RenewableEnergy.EPSILON
+local EPSILON = Utilities.EPSILON
 
 function GasifierObject:initNew()
     self.lit = false

@@ -10,10 +10,9 @@
 
 require "PZHarness/Loot"
 local Stash = require "RenewableEnergy/Stash"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 
-RenewableEnergy = RenewableEnergy or {}
 local Loot = {}
-RenewableEnergy.Loot = Loot
 local PZLoot = PZHarness.Loot
 
 -- Prefix of the made-up ProceduralDistributions lists the room containers pick from.
@@ -55,27 +54,29 @@ local LRM_OPTIONS = { "LRMSolarPanels", "LRMBatteries", "LRMMisc" }
 --- Runs fn() with the mod's loot rarity options at `lrm` and the mod's loot applied for them, then
 --- restores the options and applies the loot again. ItemPickerJava.Parse is left to the caller.
 function Loot.withLootRarity(lrm, fn)
+    local Distributions = require "RenewableEnergy/Items/Distributions"
     local saved = {}
     for _, option in ipairs(LRM_OPTIONS) do
         saved[option] = SandboxVars.RenewableEnergy[option]
         SandboxVars.RenewableEnergy[option] = lrm
     end
     return PZLoot.restoring(function()
-        RenewableEnergy.Distributions.apply()
+        Distributions.apply()
         return fn()
     end, function()
         for option, value in pairs(saved) do
             SandboxVars.RenewableEnergy[option] = value
         end
-        RenewableEnergy.Distributions.apply()
+        Distributions.apply()
     end)
 end
 
--- The references in RenewableEnergy.Distributions.items with junk lists folded into their own,
+-- The references in Distributions.items with junk lists folded into their own,
 -- each with the set of item types it lists: { { reference = ..., items = { [fullType] = true } } }.
 local function lootTargets()
+    local Distributions = require "RenewableEnergy/Items/Distributions"
     local byReference, targets = {}, {}
-    for _, spec in ipairs(RenewableEnergy.Distributions.items) do
+    for _, spec in ipairs(Distributions.items) do
         for _, entry in ipairs(spec.entries) do
             local reference = string.gsub(entry[2], "%.junk$", "")
             local target = byReference[reference]
@@ -182,7 +183,7 @@ end
 --- for a scratch container: { banks = BANK_STOCK name -> fill, crates = CRATE_STOCK name -> fill,
 --- arrowBoard = fill }.
 function Loot.worldStocks()
-    local WorldSpawns = RenewableEnergy.WorldSpawns
+    local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
     local stocks = { banks = {}, crates = {} }
     for name in pairs(WorldSpawns.BANK_STOCK) do
         stocks.banks[name] = function(container) WorldSpawns.stockBank(container, name) end
@@ -190,7 +191,7 @@ function Loot.worldStocks()
     for name in pairs(WorldSpawns.CRATE_STOCK) do
         stocks.crates[name] = function(container) WorldSpawns.stockCrate(container, name) end
     end
-    stocks.arrowBoard = RenewableEnergy.ArrowBoard.stockBatteryBox
+    stocks.arrowBoard = ArrowBoard.stockBatteryBox
     return stocks
 end
 

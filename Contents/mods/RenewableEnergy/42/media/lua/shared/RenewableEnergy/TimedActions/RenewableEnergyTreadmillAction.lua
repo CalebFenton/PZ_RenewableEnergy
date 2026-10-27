@@ -153,7 +153,8 @@ local function settle(self, share)
     local spec, character = Treadmill.SPEC, self.character
     if self.wired then
         -- Server code, which loads after this file.
-        if not RenewableEnergy.BankSystem.creditTreadmill(self.object, hours) then
+        local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
+        if not BankSystem.creditTreadmill(self.object, hours) then
             return false
         end
     elseif not drew then

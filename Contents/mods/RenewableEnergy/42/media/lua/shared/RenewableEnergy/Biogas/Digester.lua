@@ -7,12 +7,14 @@
 -- Units: gas and the feed's potential in cubic metres of biogas, temperatures in degrees Celsius,
 -- time in game hours.
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GlobalObjects = require "cf_commonlib/GlobalObjects"
 
 local Digester = {}
+-- Entities.txt names OnIsValidDome, and its containers acceptItem, by Lua path.
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.Digester = Digester
 
 Digester.SYSTEM_NAME = "renewable_energy_digester"
@@ -254,7 +256,7 @@ function Digester.holderOverlay(holder, fill, torn)
 end
 
 GlobalObjects.declare(Digester, {
-    prefix = RenewableEnergy.CLASS_PREFIX, name = "Digester", kind = "digester",
+    prefix = Utilities.CLASS_PREFIX, name = "Digester", kind = "digester",
     isObject = Digester.isDigester, sprites = Sprites.namesOf("digester"),
     accept = "RenewableEnergy.Digester.acceptItem",
     -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's

@@ -6,6 +6,7 @@ if isClient() then return end
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
+local Clock = require "cf_commonlib/Clock"
 
 local function partStatus(parts, extra)
     local list = {}
@@ -72,7 +73,7 @@ function Bank:buildStatus()
         on = self.on,
         state = self:state(),
         powered = isoObject ~= nil and isoObject:isActivated() or (isoObject == nil and self:shouldPower()),
-        hour = getGameTime():getWorldAgeHours(),
+        hour = Clock.now(),
         sunElevation = now.elevation or 0,
         irradiance = now.irradiance or 0,
         windKph = now.windKph or 0,

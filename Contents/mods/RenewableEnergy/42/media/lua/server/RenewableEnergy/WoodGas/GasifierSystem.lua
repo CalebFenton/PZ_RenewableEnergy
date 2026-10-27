@@ -3,7 +3,6 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
 local GasifierObject = require "RenewableEnergy/WoodGas/GasifierObject"
@@ -13,6 +12,7 @@ local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 -- Its OnCreate is the build menu's (scripts/RenewableEnergy/Entities.txt).
 local GasifierSystem = LibObjectSystem.define(Gasifier, { Object = GasifierObject, loadOnCreate = true })
+RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.GasifierSystem = GasifierSystem
 
 -- What each job does to the gasifier's record `record` (its tile `isoObject`) beyond taking its

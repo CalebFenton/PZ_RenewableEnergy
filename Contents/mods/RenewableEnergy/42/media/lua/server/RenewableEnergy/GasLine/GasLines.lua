@@ -9,7 +9,7 @@
 
 if isClient() then return end
 
-local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
@@ -24,12 +24,11 @@ local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
 local GasLines = {}
-RenewableEnergy.GasLines = GasLines
 
 -- Cap on one pass (a save loaded after the clock jumped). Time a generator spent unloaded is billed
 -- by vanilla to its fuel when it loads (IsoGenerator.update), and the next pass bills that to the gas.
 local LONGEST_PASS = 24
-local EPSILON = RenewableEnergy.EPSILON
+local EPSILON = Utilities.EPSILON
 -- Vanilla's wear chance for a generator whose item script it can't find (IsoGenerator.update).
 local NO_SCRIPT_ONE_IN = 30
 -- Global ModData older saves keep: kitted generators by "x,y,z", each { x, y, z, source }.
@@ -165,7 +164,7 @@ local function dryBill(generator, state, hours)
     if not state.billedHour then
         return hours * generator:getTotalPowerUsing()
     end
-    return (math.floor(getGameTime():getWorldAgeHours()) - state.billedHour) * state.billLitres
+    return (math.floor(Clock.now()) - state.billedHour) * state.billLitres
 end
 
 -- Keeps track of vanilla's last bill of the generator running on gas, which Lua can't read: fuel
@@ -175,7 +174,7 @@ end
 local function trackBill(generator, state, litres)
     if generator:isActivated() and state.onGas then
         if not state.billedHour or litres > 0 then
-            state.billedHour = math.floor(getGameTime():getWorldAgeHours())
+            state.billedHour = math.floor(Clock.now())
         end
         state.billLitres = generator:getTotalPowerUsing()
     else
@@ -322,7 +321,7 @@ end
 local DO = {
     [GasKit.INSTALL] = function(character, state, row, generator)
         generator:getModData()[GasKit.STATE_KEY] = { kit = true, mode = "gas", tank = generator:getFuel(), onGas = false,
-            lastHour = getGameTime():getWorldAgeHours() }
+            lastHour = Clock.now() }
         Payers.track(generator)
         Tiles.showOverlay(generator, isKitOverlay, Sprites.gasKitFor(Sprites.nameOf(generator)))
         return true
