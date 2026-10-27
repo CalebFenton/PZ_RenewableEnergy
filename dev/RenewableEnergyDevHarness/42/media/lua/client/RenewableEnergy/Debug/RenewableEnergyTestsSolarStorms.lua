@@ -170,8 +170,8 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
 })
 
 -- A storm cracks a panel out in the weather whether or not it feeds a bank: a loose panel outdoors
--- cracks, one indoors doesn't, and a connected one is its bank's to crack until it is
--- disconnected, after which the next storm cracks it too.
+-- cracks, one indoors doesn't, and a connected one is its bank's to crack: the bank's catch-up at
+-- the disconnect cracks it for the storm it missed, and the next storm cracks it loose.
 test("renewable_energy_solar_storms_crack_loose_panels", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
@@ -200,7 +200,7 @@ test("renewable_energy_solar_storms_crack_loose_panels", {
         expectEqual("the loose outdoor panel after a storm", condition("first", 2), 100 - crack)
         expectEqual("the loose indoor panel after a storm", condition("first", 3), 100)
         T.expectOk(self.reads.disconnected, "disconnecting the panel")
-        expectEqual("the disconnected panel after the next storm", condition("second", 1), 100 - crack)
+        expectEqual("the disconnected panel after both storms", condition("second", 1), 100 - 2 * crack)
         expectEqual("the loose outdoor panel after a second storm", condition("second", 2), 100 - 2 * crack)
         expectEqual("the loose indoor panel after a second storm", condition("second", 3), 100)
     end,
