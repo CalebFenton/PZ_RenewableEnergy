@@ -9,7 +9,6 @@
 -- Java's (BaseVehicle.tryStartEngine) and stays unscaled.
 
 require "Vehicles/Vehicles"
-local Battery = require "RenewableEnergy/PowerBank/Battery"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
 
@@ -23,26 +22,12 @@ end
 
 local vanillaUpdateBattery = Vehicles.Update.Battery
 
--- Scales only a rise, which is the alternator's alone: the lightbar drain this update also runs
--- comes only with the engine off (Vehicles.Update.Lightbar), when the alternator adds nothing, and
--- went through chargeBattery, scaled already. A car whose alternator was taken out
--- (RenewableEnergy.CarAlternator) has nothing to make the rise, so it keeps none of it.
+-- Scale before native clamping and rounding. Engine-off lightbar drain is already scaled by
+-- chargeBattery; running the engine never drains it.
 function Vehicles.Update.Battery(vehicle, part, elapsedMinutes)
-    local item = part:getInventoryItem()
-    local before = item and Battery.getCharge(item)
+    if vehicle:isEngineRunning() then
+        local scale = CarAlternator.isOut(vehicle) and 0 or VehicleBattery.chargeScale(part:getInventoryItem())
+        elapsedMinutes = elapsedMinutes * scale
+    end
     vanillaUpdateBattery(vehicle, part, elapsedMinutes)
-    if not before then
-        return
-    end
-    local scale = CarAlternator.isOut(vehicle) and 0 or VehicleBattery.chargeScale(item)
-    local after = Battery.getCharge(item)
-    if scale == 1 or after <= before then
-        return
-    end
-    local scaled = before + (after - before) * scale
-    Battery.setCharge(item, scaled)
-    -- Vanilla may already have sent the unscaled charge; resend if the scaled one shows differently.
-    if VehicleUtils.compareFloats(after, scaled, 2) then
-        vehicle:transmitPartUsedDelta(part)
-    end
 end

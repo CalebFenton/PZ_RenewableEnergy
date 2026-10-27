@@ -314,11 +314,15 @@ end
 
 -- Queues the server handler `name` on a `script` vehicle each with a car battery and a deep cycle
 -- battery, with `args` plus the vehicle's T.vehicleArgs, each answer read under its battery's type.
-local function onBothBatteries(self, script, name, args)
+-- When `full`, also waits for the client's charge to arrive from the initially partial charge.
+local function onBothBatteries(self, script, name, args, full)
     for _, batteryType in ipairs({ T.CAR_BATTERY, VehicleBattery.ITEM }) do
-        local car = T.placeVehicle(self, script, { battery = batteryType })
+        local car = T.placeVehicle(self, script, { battery = batteryType, charge = args.uses })
         if not car then return end
         T.onVehicle(self, car, name, args, batteryType)
+        if full then
+            T.waitFor(self, function() return T.vehicleBattery(car):getCurrentUsesFloat() == 1 end, "this client's full " .. batteryType)
+        end
     end
 end
 
@@ -334,16 +338,20 @@ local VEHICLE_HOURS = {
         uses = 0.8, minutes = 600, change = "drop", none = "the lightbar didn't drain the car battery" },
     { behavior = "alternator_charge_scales_with_capacity", vehicle = CAR, handler = "alternatorCharge", uses = 0.2,
         change = "gain", none = "the alternator didn't charge the car battery" },
+    { behavior = "alternator_fills_near_full_battery", vehicle = CAR, handler = "alternatorCharge", uses = 0.99,
+        change = "gain", full = true },
 }
 for _, case in ipairs(VEHICLE_HOURS) do
     test("renewable_energy_gadgets_deep_cycle_battery_" .. case.behavior, {
         run = function(self)
-            onBothBatteries(self, case.vehicle, case.handler, { uses = case.uses, minutes = case.minutes or 60 })
+            onBothBatteries(self, case.vehicle, case.handler, { uses = case.uses, minutes = case.minutes or 60 }, case.full)
         end,
         validate = function(self)
             local car, deepCycle = self.reads[T.CAR_BATTERY], self.reads[VehicleBattery.ITEM]
             if not expectEqual("the deep cycle car's battery", deepCycle.type, VehicleBattery.ITEM) then return end
-            if expect(car[case.change] > 0, case.none) then
+            if case.full then
+                expectNear("the near-full deep cycle battery's final charge", case.uses + deepCycle.gain, 1, 0.0001)
+            elseif expect(car[case.change] > 0, case.none) then
                 expectNear("deep cycle " .. case.change .. " over car battery " .. case.change,
                     deepCycle[case.change] / car[case.change], capacityRatio(), 0.01)
             end
