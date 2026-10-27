@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local Squares = require "cf_commonlib/Squares"
 
 -- What the digester's gas is used for (Contents/.../RenewableEnergy/Biogas/*, the propane bottle
@@ -27,7 +28,7 @@ local function fedDigesterAndHeater(self, facing)
     local digester = T.placeRecord(self, "digester", "barrel.MetalDrum")
     local square = digester and T.square(self, { near = digester.square }, "a square beside the digester for a heater")
     if not square then return nil end
-    local fed = T.matureDigester("barrel", { gas = Digester.HOLDERS.bags.capacity })
+    local fed = Fixtures.matureDigester("barrel", { gas = Digester.HOLDERS.bags.capacity })
     T.setRecord(self, digester, fed)
     T.waitForGas(self, digester, fed.gas)
     local heater = T.placeTile(self, square, Sprites.gasHeater.off[facing or "S"])
@@ -52,7 +53,7 @@ test("renewable_energy_biogas_heater_warms_digester", {
         -- Gas for more than the warming hours and less than the whole run.
         self.temp, self.gas = 5, 4.5 * self.rate
         if not T.need(self, self.gas < Digester.HOLDERS.bags.capacity, "bags that hold four and a half hours of the heater's gas") then return end
-        local cold = T.matureDigester("barrel", { temp = self.temp, gas = self.gas })
+        local cold = Fixtures.matureDigester("barrel", { temp = self.temp, gas = self.gas })
         for _, handle in ipairs(self.digesters) do
             T.setRecord(self, handle, cold)
             T.waitForGas(self, handle, self.gas)
@@ -135,7 +136,7 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
         if not handle then return end
         self.digester = handle
         self.gas = Digester.HOLDERS.dome.capacity
-        local full = T.matureDigester("dome", { gas = self.gas })
+        local full = Fixtures.matureDigester("dome", { gas = self.gas })
         T.batch(function()
             T.setRecord(self, handle, full)
             T.server(self, "setCharacterStatUntilEnd", { stat = "ENDURANCE", value = 1 })
@@ -177,7 +178,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         -- Less than the dome, the charge, the wool or the tank's room above the pump's share holds.
         self.gas = math.min(Digester.HOLDERS.dome.capacity, Digester.SCRUB_M3.lime, Digester.WOOL_M3,
             (1 - Digester.PUMP_FILL) * Digester.M3_PER_TANK) / 2
-        T.setRecord(self, handle, T.matureDigester("dome", { gas = self.gas }))
+        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = self.gas }))
         -- A running generator powers the squares around it, outdoors too.
         if not T.generator(self, { near = handle.square, fuel = 10, running = true }) then return end
         T.give(self, "fill", { { type = Digester.COMPRESSOR }, { type = Digester.TANK, uses = Digester.PUMP_FILL } })
@@ -250,7 +251,7 @@ test("renewable_energy_biogas_pump_fills_torch", {
         local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
         self.gas = Digester.HOLDERS.dome.capacity
-        T.setRecord(self, handle, T.matureDigester("dome", { gas = self.gas }))
+        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = self.gas }))
         T.waitForGas(self, handle, self.gas)
         T.give(self, "tools", { { type = Digester.PUMP }, { type = "Base.BlowTorch", uses = 0 } })
         T.actionJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
@@ -278,7 +279,7 @@ test("renewable_energy_biogas_iron_sponge_packing", {
     run = function(self)
         local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
-        T.setRecord(self, handle, T.matureDigester("dome", { scrubber = true, scrubWool = 0, scrubSponge = 0 }))
+        T.setRecord(self, handle, Fixtures.matureDigester("dome", { scrubber = true, scrubWool = 0, scrubSponge = 0 }))
         T.waitForSummary(self, handle, function(summary) return summary.scrubber end, "this client's summary of the scrubber")
         -- Short of a fresh sponge's packings, so they can only come from the sponge.
         T.give(self, "sponges", { { type = Digester.IRON_SPONGE, condition = 2 }, { type = Digester.IRON_SPONGE, condition = 1 } })

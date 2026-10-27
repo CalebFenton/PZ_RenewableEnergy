@@ -39,7 +39,7 @@ end
 
 -- The first object within REACH of `object`'s square on its level that `matches`, or nil.
 local function findNear(object, matches)
-    return RenewableEnergy.eachSquareAround(object:getX(), object:getY(), object:getZ(), GasHeater.REACH, function(square)
+    return Squares.eachAround(object:getX(), object:getY(), object:getZ(), GasHeater.REACH, function(square)
         return Squares.findObjectOn(square, matches)
     end)
 end

@@ -4,7 +4,7 @@
 if isClient() then return end
 
 local Stash = require "RenewableEnergy/Stash"
-local Chance = require "RenewableEnergy/Chance"
+local Chance = require "cf_commonlib/Chance"
 
 --- The house's building on the map, loaded or not, found as StashSystem finds it: the building of
 --- the ground floor room at its buildingX, buildingY. Nil if there is none.

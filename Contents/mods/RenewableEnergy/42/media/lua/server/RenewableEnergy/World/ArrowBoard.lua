@@ -17,7 +17,6 @@
 require "Vehicles/VehicleDistributions"
 require "VehicleZoneDefinition"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local Recipes = require "RenewableEnergy/Recipes"
 local StormNotice = require "RenewableEnergy/StormNotice"
@@ -25,6 +24,7 @@ local Wear = require "RenewableEnergy/PowerBank/Wear"
 local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
 local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Chance = require "cf_commonlib/Chance"
 
 local ArrowBoard = {}
 RenewableEnergy.ArrowBoard = ArrowBoard

@@ -1,6 +1,6 @@
 -- The hands-on jobs at a vehicle: a Solar Maintainer clipped on or off, a car's alternator taken
 -- out or put back, and the arrow board trailer's switch, padlock and panels. What each takes of the
--- character and what refuses it (cf_commonlib's Jobs); RenewableEnergy.JobSites.vehicle does them.
+-- character and what refuses it (cf_commonlib's Jobs); VehicleJobsServer does them.
 -- A job at a vehicle reaches at waist height, from the area of the part it works on.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
@@ -83,10 +83,7 @@ VehicleJobs.JOBS = {
     [VehicleJobs.ATTACH_MAINTAINER] = {
         minutes = 1, position = "Mid", sound = "GeneratorConnect", area = atBattery,
         blocker = function(character, vehicle) return not SolarMaintainer.canAttach(vehicle) and "can't attach" or nil end,
-        withRefusal = function(character, vehicle, item)
-            return not Jobs.carries(character, item, Items.ofType(SolarMaintainer.ITEM))
-                and "no maintainer" or nil
-        end,
+        with = Items.ofType(SolarMaintainer.ITEM), withMissing = "Tooltip_RenewableEnergy_NeedsMaintainer",
     },
     [VehicleJobs.DETACH_MAINTAINER] = {
         minutes = 1, position = "Mid", area = atBattery,
@@ -107,9 +104,7 @@ VehicleJobs.JOBS = {
             local lid = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(ArrowBoard.LID)
             return not (lid and ArrowBoard.isPadlocked(lid)) and "not padlocked" or nil
         end,
-        withRefusal = function(character, vehicle, cutters)
-            return not Jobs.carries(character, cutters, VehicleJobs.isBoltCutters) and "no bolt cutters" or nil
-        end,
+        with = VehicleJobs.isBoltCutters, withMissing = "Tooltip_RenewableEnergy_NeedsBoltCutters",
     },
     -- Seal Cracked Module's twin for a panel still on the trailer.
     [VehicleJobs.SEAL_PANEL] = {

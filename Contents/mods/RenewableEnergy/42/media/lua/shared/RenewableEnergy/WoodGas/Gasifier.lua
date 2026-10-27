@@ -110,7 +110,7 @@ function Gasifier.isPacking(item)
     return PACKING[item:getFullType()] == true
 end
 
--- The containers' AcceptItemFunctions (Gasifier.adoptContainer).
+-- The containers' AcceptItemFunctions, by container type (GlobalObjects.declare below).
 function Gasifier.acceptFuel(container, item)
     return Gasifier.fuelKg(item) ~= nil
 end
@@ -123,19 +123,6 @@ local ACCEPT = {
     [Gasifier.CONTAINER] = "RenewableEnergy.Gasifier.acceptFuel",
     [Gasifier.FILTER] = "RenewableEnergy.Gasifier.acceptPacking",
 }
-
-function Gasifier.adoptContainer(container)
-    local accept = container and ACCEPT[container:getType()]
-    if accept then
-        RenewableEnergy.adoptContainer(container, accept)
-    end
-end
-
-function Gasifier.adoptContainers(isoObject)
-    for i = 0, isoObject:getContainerCount() - 1 do
-        Gasifier.adoptContainer(isoObject:getContainerByIndex(i))
-    end
-end
 
 function Gasifier.hopperOf(isoObject)
     return isoObject:getContainerByType(Gasifier.CONTAINER)
@@ -239,16 +226,20 @@ function Gasifier.squareOnSide(x, y, z, side)
     return getSquare(x + step[1], y + step[2], z)
 end
 
--- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
--- containers and the clock: `hopperKg` (the hopper and the firebox), the filter's `clean` and
--- `tarry` packing, the `output` share and `wear` factor they make, and whether it is `cold`.
-GlobalObjects.addAccessors(Gasifier, function(summary, isoObject)
-    local clean, tarry = Gasifier.filterCounts(Gasifier.filterOf(isoObject))
-    summary.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(isoObject)) + summary.fireKg
-    summary.clean, summary.tarry = clean, tarry
-    summary.output = Gasifier.outputShare(summary.ash, clean)
-    summary.wear = Gasifier.wearFactor(clean, tarry)
-    summary.cold = isCold(summary.lit, summary.outSince)
-end)
+GlobalObjects.declare(Gasifier, {
+    prefix = RenewableEnergy.CLASS_PREFIX, name = "Gasifier", kind = "gasifier",
+    isObject = Gasifier.isGasifier, sprites = Sprites.namesOf("gasifier"), accept = ACCEPT,
+    -- The summary (GasifierObject:buildSummary) gets what follows from this side's copies of the
+    -- containers and the clock: `hopperKg` (the hopper and the firebox), the filter's `clean` and
+    -- `tarry` packing, the `output` share and `wear` factor they make, and whether it is `cold`.
+    decorate = function(summary, isoObject)
+        local clean, tarry = Gasifier.filterCounts(Gasifier.filterOf(isoObject))
+        summary.hopperKg = Gasifier.hopperKg(Gasifier.hopperOf(isoObject)) + summary.fireKg
+        summary.clean, summary.tarry = clean, tarry
+        summary.output = Gasifier.outputShare(summary.ash, clean)
+        summary.wear = Gasifier.wearFactor(clean, tarry)
+        summary.cold = isCold(summary.lit, summary.outSince)
+    end,
+})
 
 return Gasifier

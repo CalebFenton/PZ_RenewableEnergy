@@ -1,18 +1,17 @@
--- Where the mod's items spawn, 1993 style. apply() puts Distributions.items into the game's loot
--- tables once the save's options are loaded (cf_commonlib's Loot), scaled by its loot rarity
--- options.
+-- Where the mod's items spawn, 1993 style. Distributions.items go into the game's loot tables once
+-- the save's options are loaded (cf_commonlib's Loot), scaled by its loot rarity options.
 
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
-local Chance = require "RenewableEnergy/Chance"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Stash = require "RenewableEnergy/Stash"
 local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
 local ArrowBoard = require "RenewableEnergy/World/ArrowBoardPower"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
+local Chance = require "cf_commonlib/Chance"
 local Loot = require "cf_commonlib/Loot"
 
 local Distributions = {}
@@ -175,24 +174,27 @@ Distributions.items = require "RenewableEnergy/Items/LootEntries"
 
 -- Applying
 
--- The mod's name in the log line of a loot list the game lacks (Loot.place).
+-- The mod's name in the log line of a loot list the game lacks (Loot.register).
 local MOD_NAME = "RenewableEnergy"
 
--- Puts each stash's map item into the loot lists its description names, if the Stash Houses
--- option drops maps.
-local function applyStashMaps()
-    local multiplier = Stash.mapsInLoot() and 1 or 0
-    for description, extra in pairs(Stash.descriptions) do
-        Loot.place(MOD_NAME, description.item, extra.loot or {}, multiplier)
-    end
+-- Each stash's map item, in the loot lists its description names.
+local stashMaps = {}
+for description, extra in pairs(Stash.descriptions) do
+    table.insert(stashMaps, { fullType = description.item, entries = Loot.entries(extra.loot or {}) })
 end
 
---- Puts every entry of Distributions.items into its list, weighted by the save's sandbox options,
---- and the stash maps into their lists, replacing the entries an earlier call made (Loot.place).
+local applyItems = Loot.register(MOD_NAME, Distributions.items, function(spec)
+    return SandboxVars.RenewableEnergy[spec.option]
+end)
+-- The maps drop only while the Stash Houses option drops them.
+local applyStashMaps = Loot.register(MOD_NAME, stashMaps, function()
+    return Stash.mapsInLoot() and 1 or 0
+end)
+
+--- Puts every entry of Distributions.items and the stash maps into their lists again at the
+--- save's options now, replacing the entries a load put there (Loot.register).
 function Distributions.apply()
-    for _, spec in ipairs(Distributions.items) do
-        Loot.place(MOD_NAME, spec.fullType, spec.entries, SandboxVars.RenewableEnergy[spec.option])
-    end
+    applyItems()
     applyStashMaps()
 end
 
@@ -307,10 +309,6 @@ local function onFillContainer(roomName, containerType, container)
         Distributions.readyFoundItems(container)
     end
 end
-
--- The save's options are loaded only after the distribution merge events; Loot runs this then and
--- has the tables parsed again.
-Loot.register(Distributions.apply)
 
 Events.OnPostDistributionMerge.Add(addOwnVehicleTables)
 Events.OnPostDistributionMerge.Add(addOwnContainersToRooms)

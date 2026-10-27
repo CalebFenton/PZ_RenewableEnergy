@@ -5,8 +5,8 @@ if isClient() then return end
 
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
+local Chance = require "cf_commonlib/Chance"
 local Items = require "cf_commonlib/Items"
 
 --- Takes the alternator out of `vehicle` and gives it to `character`, teaching Mechanics the

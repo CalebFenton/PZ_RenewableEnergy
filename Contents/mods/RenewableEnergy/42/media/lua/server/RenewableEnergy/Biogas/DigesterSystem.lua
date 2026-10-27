@@ -4,19 +4,18 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local ObjectSystem = require "RenewableEnergy/ObjectSystem"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
 local DigesterObject = require "RenewableEnergy/Biogas/DigesterObject"
 local Sprites = require "RenewableEnergy/Sprites"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Items = require "cf_commonlib/Items"
 local Tiles = require "cf_commonlib/Tiles"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
-local DigesterSystem = ObjectSystem.define({
-    name = "Digester", kind = "digester", owner = Digester, Object = DigesterObject, isObject = Digester.isDigester,
-})
+-- Its OnCreate is the build menu's (scripts/RenewableEnergy/Entities.txt).
+local DigesterSystem = LibObjectSystem.define(Digester, { Object = DigesterObject, loadOnCreate = true })
 RenewableEnergy.DigesterSystem = DigesterSystem
 
 -- A barrel digester is the entity of the barrel it was built from, which the build menu builds on
@@ -186,5 +185,7 @@ DigesterSystem.heaterSite = {
     end,
     tell = DigesterSystem.jobSite.tell,
 }
+
+Action.serve({ digester = DigesterSystem.jobSite, heater = DigesterSystem.heaterSite })
 
 return DigesterSystem

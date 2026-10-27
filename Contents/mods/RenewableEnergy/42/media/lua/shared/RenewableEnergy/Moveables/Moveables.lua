@@ -12,7 +12,7 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Digester = require "RenewableEnergy/Biogas/Digester"
-local Chance = require "RenewableEnergy/Chance"
+local Chance = require "cf_commonlib/Chance"
 
 -- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Other placed objects
 -- have no CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by

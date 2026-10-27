@@ -432,12 +432,6 @@ function Sprites.windModelOf(spriteName)
     return prefix, model
 end
 
--- The priority every loader of the mod's sprites passes to MapObjects.OnLoadWithSprite. MapObjects
--- keeps one function per sprite and priority, a later one silently replacing an earlier
--- (MapObjects.java), and single player loads the client and the server folders both; so a second
--- loader of the same sprites needs a priority of its own, as RenewableEnergy.PlaceTracker's has.
-Sprites.LOAD_PRIORITY = 6
-
 -- What a mount's tile shows of `byKind` (Sprites.snow or a look of Sprites.cracks): the kind's own
 -- entry, or for a kind that has one per material and facing, that one; nil for none.
 local function ofMount(byKind, kind, facing, material)

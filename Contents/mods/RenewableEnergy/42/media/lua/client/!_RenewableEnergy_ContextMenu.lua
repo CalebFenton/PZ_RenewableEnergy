@@ -4,6 +4,7 @@
 require "ISUI/ISWorldObjectContextMenu"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 -- The generator vanilla would have offered its menu on had the bank not been there.
 --
@@ -14,7 +15,7 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local function otherGenerator(worldobjects)
     local found, seen = nil, {}
     local function consider(object)
-        if RenewableEnergy.isGenerator(object) then
+        if GeneratorReach.isVanillaGenerator(object) then
             found = object
         end
     end

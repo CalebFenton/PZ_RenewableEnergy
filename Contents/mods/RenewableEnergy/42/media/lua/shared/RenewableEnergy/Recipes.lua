@@ -127,17 +127,6 @@ local function isModule(item)
     return Specs.modules[item:getFullType()] ~= nil
 end
 
-local function firstInput(craftRecipeData, matches)
-    local items = craftRecipeData:getAllInputItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if matches(item) then
-            return item
-        end
-    end
-    return nil
-end
-
 -- Sets the item's repair count; syncItemFields carries it to clients, sendItemStats the condition.
 local function setRepairs(item, count)
     item:setHaveBeenRepaired(count)
@@ -181,7 +170,7 @@ end
 
 -- OnCreate of the Unmount recipes: the modules come back as they went in.
 function Recipes.unmountModules(craftRecipeData, character)
-    local mount = firstInput(craftRecipeData, isMount)
+    local mount = Items.firstInput(craftRecipeData, isMount)
     if not mount then
         return
     end
@@ -206,7 +195,7 @@ end
 
 -- OnCreate of Seal Cracked Module.
 function Recipes.repairModule(craftRecipeData, character)
-    local module = firstInput(craftRecipeData, function(item)
+    local module = Items.firstInput(craftRecipeData, function(item)
         return Recipes.MODULE_REPAIR_CAP[item:getFullType()] ~= nil
     end)
     Wear.setCondition(module, Recipes.repairedCondition(module))
@@ -226,7 +215,7 @@ end
 
 -- OnCreate of Reglaze Module: new glass, so the seals on the old no longer count.
 function Recipes.reglazeModule(craftRecipeData, character)
-    local module = firstInput(craftRecipeData, isModule)
+    local module = Items.firstInput(craftRecipeData, isModule)
     Wear.setCondition(module, reglazedItem(module))
     setRepairs(module, 0)
 end
@@ -377,7 +366,7 @@ function Recipes.isShatteredModule(item, character)
 end
 
 local function inputBattery(craftRecipeData)
-    return firstInput(craftRecipeData, Battery.isBattery)
+    return Items.firstInput(craftRecipeData, Battery.isBattery)
 end
 
 -- OnTest of Service Battery and Recondition Battery.
@@ -424,7 +413,7 @@ end
 -- OnCreate of Rebuild Car Battery, which has no script output: it makes the car battery type
 -- the case came out of.
 function Recipes.rebuildCarBattery(craftRecipeData, character)
-    local case = firstInput(craftRecipeData, function(item)
+    local case = Items.firstInput(craftRecipeData, function(item)
         return item:getFullType() == "RenewableEnergy.CarBatteryCase"
     end)
     local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or VehicleBattery.CAR_BATTERY)
@@ -476,7 +465,7 @@ end
 
 -- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
 function Recipes.takeApartGardenLight(craftRecipeData, character)
-    local light = firstInput(craftRecipeData, function(item)
+    local light = Items.firstInput(craftRecipeData, function(item)
         return item:getFullType() == SolarGardenLight.ITEM
     end)
     local bulb = light and SolarGardenLight.getBulb(light)

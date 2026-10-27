@@ -21,12 +21,12 @@ local Tiles = require "cf_commonlib/Tiles"
 local DigesterObject = ObjectSystem.Object:derive("RenewableEnergy_Digester")
 RenewableEnergy.DigesterObject = DigesterObject
 
--- The fields the Global Object System saves with the world; a field renamed here is lost from
--- existing saves.
+-- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
+-- ObjectSystem); a field renamed here is lost from existing saves.
 DigesterObject.SAVED_FIELDS = {
     "tier", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
     "seedHours", "started", "gasHours", "sludge", "acid", "sour", "leakHours", "indoors", "inRoom",
-    "meterHours", "madePerDay", "hopper", "eaten", "lastHour", "scrubber", "scrubCO2", "scrubWool",
+    "meterHours", "madePerDay", "hopper", "eaten", "scrubber", "scrubCO2", "scrubWool",
     "scrubSponge", "heaterLit",
 }
 
@@ -70,7 +70,6 @@ function DigesterObject:initNew()
     self.scrubWool = 0
     self.scrubSponge = 0
     self.heaterLit = false
-    self.lastHour = getGameTime():getWorldAgeHours()
 end
 
 --- An object the system has not seen: a digester just built.
@@ -95,7 +94,6 @@ function DigesterObject:loaded(isoObject)
     local square = isoObject:getSquare()
     self.indoors = Fumes.buildingOf(square) ~= nil
     self.inRoom = square:isInARoom()
-    Digester.adoptContainer(isoObject:getContainer())
     self:snapshotHopper(isoObject:getContainer())
     self:show()
     self:sendSummary()

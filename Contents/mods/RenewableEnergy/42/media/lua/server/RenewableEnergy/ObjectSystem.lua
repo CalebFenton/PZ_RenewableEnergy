@@ -1,29 +1,22 @@
--- The mod's features kept in a Global Object System on the authority (digesters, gasifiers, banks),
--- defined through cf_commonlib's ObjectSystem with the mod's own names, tiles and pass cap, and the
--- base of their records with what the mod's session-only services ask of them.
+-- The base of the records of the mod's Global Object System features with tiers (digesters,
+-- gasifiers), on cf_commonlib's ObjectSystem.Object, with what the mod's session-only services ask
+-- of them. Each feature's system is cf_commonlib's ObjectSystem.define of its declared owner.
 
 if isClient() then return end
 
-local Sprites = require "RenewableEnergy/Sprites"
+local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Fumes = require "RenewableEnergy/Fumes"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 local ObjectSystem = {}
 
--- Saves keep the system and record classes by their names, which start with this.
-local PREFIX = "RenewableEnergy_"
-
--- Cap on one pass (a save loaded after the clock jumped). These objects run while unloaded, so time
--- away counts as digesting or burning.
-local LONGEST_PASS = 24 * 7
-
---- The base of the mod's records (cf_commonlib's ObjectSystem.Object).
-local Object = LibObjectSystem.Object:derive(PREFIX .. "Object")
+--- The base of the mod's records (cf_commonlib's ObjectSystem.Object). Saves keep its class name.
+local Object = LibObjectSystem.Object:derive(RenewableEnergy.CLASS_PREFIX .. "Object")
 ObjectSystem.Object = Object
 
 --- What the record goes by in session-only services (Stink, Fumes).
 function Object:key()
-    return self.luaSystem.kind .. ":" .. self.x .. "," .. self.y .. "," .. self.z
+    return self.luaSystem.owner.feature.kind .. ":" .. self.x .. "," .. self.y .. "," .. self.z
 end
 
 function Object:tierSpec()
@@ -40,22 +33,6 @@ end
 -- gone when its chunk loads (SGlobalObjectSystem:OnChunkLoaded), when there is no tile to ask.
 function Object:aboutToRemoveFromSystem()
     Fumes.set(self:key(), nil, false)
-end
-
---- Defines and registers a feature's system (cf_commonlib's ObjectSystem.define), loaded with the
---- tiles of its Sprites kind and given its record as the build menu's OnCreate builds one
---- (scripts/RenewableEnergy/Entities.txt). `spec`: name (the class is
---- RenewableEnergy_<name>System), kind, owner (its shared module: SYSTEM_NAME, TIERS, and the
---- accessors of GlobalObjects.addAccessors), Object (its record class, an ObjectSystem.Object),
---- isObject. Returns the class.
-function ObjectSystem.define(spec)
-    local System = LibObjectSystem.define({
-        prefix = PREFIX, name = spec.name, owner = spec.owner, Object = spec.Object, isObject = spec.isObject,
-        sprites = Sprites.namesOf(spec.kind), loadPriority = Sprites.LOAD_PRIORITY, longestPass = LONGEST_PASS,
-        loadOnCreate = true,
-    })
-    System.kind = spec.kind
-    return System
 end
 
 return ObjectSystem

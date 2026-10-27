@@ -1,14 +1,16 @@
 -- The hands-on jobs at a source a bank takes (RenewableEnergy.Sources): what each takes of the
--- character and what refuses it (cf_commonlib's Jobs). RenewableEnergy.JobSites.source does them.
+-- character and what refuses it (cf_commonlib's Jobs). JobSites.source does them.
 
 require "Util/BuildingHelper"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
+local Specs = require "RenewableEnergy/Specs"
 local Wind = require "RenewableEnergy/Wind"
 local Recipes = require "RenewableEnergy/Recipes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
+local Squares = require "cf_commonlib/Squares"
 
 local SourceJobs = {}
 RenewableEnergy.SourceJobs = SourceJobs
@@ -26,6 +28,17 @@ local SNOW_TOOLS = { ["Base.Broom"] = true, ["Base.Broom_Twig"] = true, ["Base.S
 
 function SourceJobs.isSnowTool(item)
     return item ~= nil and SNOW_TOOLS[item:getFullType()] == true and Items.notBroken(item)
+end
+
+-- Whether `item` is blades of any wind charger's.
+local function isBlades(item)
+    local fullType = item:getFullType()
+    for _, blades in pairs(Specs.wind.blades) do
+        if blades.item == fullType then
+            return true
+        end
+    end
+    return false
 end
 
 local function connectMinutes(character)
@@ -50,7 +63,7 @@ end
 SourceJobs.JOBS = {
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
     -- snow and all. The authority counts the bank's input slots afresh first
-    -- (RenewableEnergy.JobSites.source); a client has its summary's.
+    -- (JobSites.source); a client has its summary's.
     [SourceJobs.CONNECT] = {
         minutes = function(source, bank, character) return connectMinutes(character) end,
         light = true, sound = "GeneratorConnect",
@@ -59,7 +72,7 @@ SourceJobs.JOBS = {
             if not summary then
                 return "no bank"
             end
-            return Sources.connectRefusal(source, PowerBank.positionOf(bank)) or Sources.bankRefusal(bank:isConnected())
+            return Sources.connectRefusal(source, Squares.positionOf(bank)) or Sources.bankRefusal(bank:isConnected())
                 or Sources.slotRefusal(Sources.kindOf(source), summary.freeSlots)
         end,
     },
@@ -85,9 +98,7 @@ SourceJobs.JOBS = {
             end
             return not PowerBank.connectedBank(source) and "not connected" or nil
         end,
-        withRefusal = function(character, source, tool)
-            return not Jobs.carries(character, tool, SourceJobs.isSnowTool) and "Tooltip_RenewableEnergy_NeedSnowTool" or nil
-        end,
+        with = SourceJobs.isSnowTool, withMissing = "Tooltip_RenewableEnergy_NeedSnowTool",
     },
     -- Seal Cracked Module's twin for a module on a placed panel, as long as the crafting window
     -- takes for it.
@@ -107,9 +118,10 @@ SourceJobs.JOBS = {
         blocker = function(character, source)
             return not (Wind.isCharger(source) and Wind.isBroken(source)) and "not broken" or nil
         end,
+        with = isBlades, withMissing = "Tooltip_RenewableEnergy_NeedsFittingBlades",
         withRefusal = function(character, source, blades)
-            return not (Jobs.carries(character, blades) and Wind.bladesOfItem(Sources.kindOf(source), blades))
-                and "no blades" or nil
+            return not Wind.bladesOfItem(Sources.kindOf(source), blades) and "Tooltip_RenewableEnergy_NeedsFittingBlades"
+                or nil
         end,
     },
 }
@@ -122,10 +134,10 @@ Jobs.define(SourceJobs, {
 --- clear the whole queue, losing the sources that fit. Later jobs still recheck live slots.
 --- Also returns the refusal when none fit, and the total nearby count for the menu's label.
 function SourceJobs.connectBatch(character, bank)
-    local sources = Sources.sourcesInReach(PowerBank.positionOf(bank))
+    local sources = Sources.sourcesInReach(Squares.positionOf(bank))
     local count, ready, refusal = #sources, 0, "Tooltip_RenewableEnergy_NoSourcesInReach"
     for _, source in ipairs(sources) do
-        local blocker = SourceJobs.blocker(character, SourceJobs.CONNECT, source, bank)
+        local blocker = SourceJobs.refusalAt(character, SourceJobs.CONNECT, source, bank)
         if blocker then
             refusal = blocker
         else

@@ -8,6 +8,7 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Sprites"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
@@ -127,7 +128,7 @@ end
 
 -- Whether the object is one a site places: a tile of the mod's, a bank or a generator.
 local function isSiteObject(object)
-    return RenewableEnergy.isGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
+    return GeneratorReach.isVanillaGenerator(object) or RenewableEnergy.PowerBank.isBank(object)
         or Sprites.kindOfObject(object) ~= nil
 end
 
@@ -137,7 +138,7 @@ local function clearSquare(square)
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
         if isSiteObject(object) then
-            if RenewableEnergy.isGenerator(object) then
+            if GeneratorReach.isVanillaGenerator(object) then
                 RenewableEnergy.GasLines.unlist(object)
             end
             removePlaced(object)
@@ -166,7 +167,7 @@ end
 -- its line connected and listed for the gas pass, its kit drawn on it. Answers the generator.
 local function expectKittedGenerator(expect, expectNear, square, source, kind)
     local GasKit, SolarSites = RenewableEnergy.GasKit, RenewableEnergy.SolarSites
-    local generator = Squares.findObjectOn(square, RenewableEnergy.isGenerator)
+    local generator = Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator)
     if not expect(generator ~= nil, "no generator at the site's far end") then
         return nil
     end
@@ -240,7 +241,7 @@ local SPOT_CHECKS = {
         expect(Sprites.kindOfObject(bank) == stock.sprite, "the bank stands on " .. tostring(Sprites.nameOf(bank)))
         expect(bank:isConnected(), "the bank isn't plugged in")
         local wired = PowerBank.bankOfSource(at:getX(), at:getY(), at:getZ())
-        expect(wired ~= nil and PowerBank.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
+        expect(wired ~= nil and Squares.samePosition(wired, { x = far:getX(), y = far:getY(), z = far:getZ() }),
             "the wind charger isn't wired to the site's bank")
         local wear = WorldSpawns.BATTERY_WEAR[stock.batteries.wear]
         local range = wearRange(wear)

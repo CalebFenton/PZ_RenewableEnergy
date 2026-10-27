@@ -97,7 +97,7 @@ function Sources.banksInReach(x, y, z, kind)
     if not Sources.squareOk(getSquare(x, y, z), kind) then
         return found
     end
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         if PowerBank.isInReach(bank, x, y, z) then
             table.insert(found, { x = bank.x, y = bank.y, z = bank.z })
         end
@@ -113,7 +113,7 @@ function Sources.connectRefusal(isoObject, bankPosition)
     if not (kind and Sources.squareOk(isoObject:getSquare(), kind)
         and PowerBank.isInReach(bankPosition, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
         return "out of reach"
-    elseif PowerBank.samePosition(PowerBank.connectedBank(isoObject), bankPosition) then
+    elseif Squares.samePosition(PowerBank.connectedBank(isoObject), bankPosition) then
         return "already connected"
     end
     return nil
@@ -125,7 +125,7 @@ function Sources.sourcesInReach(bankPosition)
     local reach = Specs.sourceReach
     local found = {}
     for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
-        RenewableEnergy.eachSquareAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)
+        Squares.eachAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)
             local source = Sources.findOn(square)
             if source and not Sources.connectRefusal(source, bankPosition) then
                 table.insert(found, source)

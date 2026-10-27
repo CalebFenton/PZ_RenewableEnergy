@@ -157,9 +157,9 @@ test("renewable_energy_bank_scan_sees_load_while_off", {
 -- fuel an hour; the status lists a kind it doesn't know as other.
 local CONSUMER_KIND, CONSUMER_FUEL = "testConsumer", 0.2
 
--- Another mod's appliance in a bank's reach (Loads.addConsumer) is in the bank's load at the draw
--- its mod reports, under the mod's own kind, and not while it reports none. Catches a scan that
--- never asks another mod, or bills its appliance switched off.
+-- Another mod's appliance in a bank's reach (GeneratorReach.addDraw) is in the bank's load at the
+-- draw its mod reports, under the mod's own kind, and not while it reports none. Catches a scan
+-- that never asks another mod, or bills its appliance switched off.
 test("renewable_energy_bank_bills_another_mods_appliance", {
     run = function(self)
         T.setGrid(self, false)

@@ -42,7 +42,7 @@ end
 -- Generators found as their chunk loads, as a player starts one (ISActivateGenerator.complete), and
 -- as a bank comes on one in its reach. A generator dropped from the hands fires no event, so it is
 -- found once started.
-local generators = PlaceTracker.new({ sprites = generatorSprites(), matches = RenewableEnergy.isGenerator })
+local generators = PlaceTracker.new({ sprites = generatorSprites(), matches = GeneratorReach.isVanillaGenerator })
 
 --- Track `generator`, found running some other way.
 function Payers.track(generator)
@@ -80,7 +80,7 @@ function Payers.running()
             table.insert(list, ofGenerator(generator))
         end
     end)
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         if bankRuns(bank) then
             table.insert(list, Payers.ofBank(bank))
         end
@@ -114,9 +114,9 @@ end
 -- Watts of the loads of the banks the generator `payer` carries as their backup.
 local function backedW(payer)
     local watts = 0
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         local backup = bank.generator
-        if backup and backup.running and PowerBank.samePosition(backup, payer) and bank:shouldPower() then
+        if backup and backup.running and Squares.samePosition(backup, payer) and bank:shouldPower() then
             watts = watts + bank.loadW
         end
     end)
@@ -221,7 +221,7 @@ end
 local vanillaComplete = ISActivateGenerator.complete
 function ISActivateGenerator:complete()
     local result = vanillaComplete(self)
-    if RenewableEnergy.isGenerator(self.generator) then
+    if GeneratorReach.isVanillaGenerator(self.generator) then
         Payers.track(self.generator)
         Payers.billGenerators()
     end

@@ -9,6 +9,9 @@
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
+local Clock = require "cf_commonlib/Clock"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
+local GlobalObjects = require "cf_commonlib/GlobalObjects"
 local Squares = require "cf_commonlib/Squares"
 
 local PowerBank = {}
@@ -65,6 +68,9 @@ end
 function PowerBank.isBank(isoObject)
     return instanceof(isoObject, "IsoGenerator") and PowerBank.bankOfSprite(Sprites.nameOf(isoObject)) ~= nil
 end
+
+-- A bank is a generator to the game, but none of vanilla's.
+GeneratorReach.excludeGenerators(PowerBank.isBank)
 
 --- The working bank on a square, or nil.
 function PowerBank.findOn(square)
@@ -189,11 +195,6 @@ function PowerBank.acceptItem(container, item)
     return false
 end
 
---- Gives a bank's container its filter (RenewableEnergy.adoptContainer).
-function PowerBank.adoptContainer(container)
-    RenewableEnergy.adoptContainer(container, "RenewableEnergy.PowerBank.acceptItem")
-end
-
 --- What a wiring job of `wiring` (as Specs.wiring's) takes, as a materials list
 --- (cf_commonlib's Materials): its Electricity level, tools, wire and scrap, leaving out what it
 --- takes none of.
@@ -233,7 +234,7 @@ function PowerBank.wiringUnits(character, wiring, share)
         return 1
     end
     local seconds = wiring.seconds * PowerBank.skillFactor(character) / skillFactor(0) * (share or 1)
-    return seconds * RenewableEnergy.UNITS_PER_SECOND
+    return seconds * Clock.unitsPerSecond()
 end
 
 --- How many more parts of `kind` (a PARTS key) the bank `bank` takes; 0 for no bank.
@@ -302,69 +303,11 @@ function PowerBank.connectRefusal(character, bank, summary, connect)
     return nil
 end
 
--- The Global Object System of this side: the server's in single player, where both exist
--- and the server's is the live one.
-local function system()
-    return PowerBank.serverSystem or PowerBank.clientSystem
-end
-
---- Calls `fn(bank)` for each bank record this side has, until it returns true.
-function PowerBank.eachBank(fn)
-    local sys = system()
-    if not sys then return end
-    local objects = sys.system
-    for i = 0, objects:getObjectCount() - 1 do
-        local luaObject = objects:getObjectByIndex(i):getModData()
-        if fn(luaObject) then return end
-    end
-end
-
-local function recordAt(x, y, z)
-    local sys = system()
-    local globalObject = sys and sys.system:getObjectAt(x, y, z)
-    return globalObject and globalObject:getModData()
-end
-
---- What every client knows of the bank at x, y, z (see Bank:buildSummary), or nil.
-function PowerBank.summaryAt(x, y, z)
-    local bank = recordAt(x, y, z)
-    return bank and bank.summary
-end
-
---- The summary of the bank `isoObject`, or nil.
-function PowerBank.summaryOf(isoObject)
-    return PowerBank.summaryAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-end
-
---- The summary of the bank `isoObject` as this side knows it now: the authority builds it from its
---- record, which a job may have changed since the last summary went out; nil for no bank.
-function PowerBank.currentSummary(isoObject)
-    local system = PowerBank.serverSystem
-    local record = system and system:getLuaObjectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
-    return record and record:buildSummary() or PowerBank.summaryOf(isoObject)
-end
-
 --- The whole status of the bank `isoObject` (see Bank:buildStatus), or nil. It reaches only the
 --- players watching it, and the authority keeps it only while someone does.
 function PowerBank.statusOf(isoObject)
-    local bank = recordAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+    local bank = PowerBank.objectAt(isoObject:getX(), isoObject:getY(), isoObject:getZ())
     return bank and bank.status
-end
-
---- An object's square as { x, y, z }, the form commands and statuses name places in.
-function PowerBank.positionOf(isoObject)
-    return { x = isoObject:getX(), y = isoObject:getY(), z = isoObject:getZ() }
-end
-
---- Whether two { x, y, z } places are the same square; false if either is nil.
-function PowerBank.samePosition(a, b)
-    return a ~= nil and b ~= nil and a.x == b.x and a.y == b.y and a.z == b.z
-end
-
---- Whether `position` is a { x, y, z } place, as a command argument from a client must be.
-function PowerBank.isPosition(position)
-    return type(position) == "table" and type(position.x) == "number" and type(position.y) == "number"
-        and type(position.z) == "number"
 end
 
 --- Whether a source at x, y, z is within Specs.sourceReach of `bank`, anything with x, y and z.
@@ -379,7 +322,7 @@ end
 function PowerBank.bankOfSource(x, y, z)
     local found
     local authority = PowerBank.serverSystem ~= nil
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         local sources = authority and bank.sources or (bank.summary and bank.summary.sources)
         for _, source in ipairs(sources or {}) do
             if source.x == x and source.y == y and source.z == z then
@@ -395,5 +338,10 @@ end
 function PowerBank.connectedBank(isoObject)
     return PowerBank.bankOfSource(isoObject:getX(), isoObject:getY(), isoObject:getZ())
 end
+
+GlobalObjects.declare(PowerBank, {
+    prefix = RenewableEnergy.CLASS_PREFIX, name = "Bank", isObject = PowerBank.isBank,
+    sprites = PowerBank.bankSprites(), accept = "RenewableEnergy.PowerBank.acceptItem",
+})
 
 return PowerBank

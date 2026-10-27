@@ -1,6 +1,6 @@
 -- The hands-on jobs at a battery bank: what each takes of the character and what refuses it
--- (cf_commonlib's Jobs). RenewableEnergy.JobSites.bank does them. Parts enter and leave a bank
--- only through Wire In and Unwire (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
+-- (cf_commonlib's Jobs). JobSites.bank does them. Parts enter and leave a bank only through Wire
+-- In and Unwire (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
@@ -66,12 +66,10 @@ BankJobs.JOBS = {
     [BankJobs.WIRE_IN] = {
         units = function(bank, item, character) return PowerBank.wiringUnits(character, wiringOf(item)) end,
         light = true, sound = "GeneratorConnect",
+        with = isPart, withMissing = "Tooltip_RenewableEnergy_NotAPart",
         blocker = function(character, bank, item)
-            if not Jobs.carries(character, item, isPart) then
-                return "Tooltip_RenewableEnergy_NotAPart"
-            end
-            return PowerBank.freePartSlots(bank, PowerBank.partKind(item:getFullType())) == 0
-                and "Tooltip_RenewableEnergy_NoSlot" or nil
+            local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
+            return kind and PowerBank.freePartSlots(bank, kind) == 0 and "Tooltip_RenewableEnergy_NoSlot" or nil
         end,
         materials = function(character, bank, item)
             local wiring = wiringOf(item)
@@ -119,7 +117,8 @@ Jobs.define(BankJobs, {
 --- All Batteries uses the same jobs as individual wiring. Select before totaling needs: best
 --- condition first up to the free slots for Wire In, container order for Unwire. With no free
 --- slots keep the candidates so the ordinary blocker explains why the batch is unavailable.
---- Returns items, combined needs and blocker, or nil when fewer than two batteries qualify.
+--- Returns the items and the batch's verdict (BankJobs.verdict's shape: the first blocker, the
+--- combined needs, the first withRefusal), or nil when fewer than two batteries qualify.
 function BankJobs.batteryBatch(character, job, bank, parts)
     local batteries = {}
     for _, item in ipairs(parts) do
@@ -137,10 +136,12 @@ function BankJobs.batteryBatch(character, job, bank, parts)
         end
     end
     if #batteries < 2 then return nil end
-    local needs, byKind, blocker = {}, {}, nil
+    local batch, byKind = { needs = {} }, {}
     for _, item in ipairs(batteries) do
-        blocker = blocker or BankJobs.blocker(character, job, bank, item)
-        for _, need in ipairs(BankJobs.needs(character, job, bank, item)) do
+        local verdict = BankJobs.verdict(character, job, bank, item)
+        batch.blocker = batch.blocker or verdict.blocker
+        batch.withRefusal = batch.withRefusal or verdict.withRefusal
+        for _, need in ipairs(verdict.needs or {}) do
             local kind = byKind[need.kind] or {}
             byKind[need.kind] = kind
             local key = need.perk or need.tool or need.item
@@ -151,11 +152,11 @@ function BankJobs.batteryBatch(character, job, bank, parts)
                     or math.max(previous.need, need.need)
             else
                 kind[key] = need
-                table.insert(needs, need)
+                table.insert(batch.needs, need)
             end
         end
     end
-    return batteries, needs, blocker
+    return batteries, batch
 end
 
 return BankJobs

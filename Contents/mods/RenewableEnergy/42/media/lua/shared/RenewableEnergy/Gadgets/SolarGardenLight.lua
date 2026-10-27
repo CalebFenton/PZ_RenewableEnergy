@@ -90,19 +90,17 @@ SolarGardenLight.REMOVE_BULB = "RemoveBulb"
 SolarGardenLight.ADD_BULB = "AddBulb"
 
 -- The jobs at a light, by name (cf_commonlib's Jobs), each as long as vanilla's for a lamp's bulb
--- at the default day length (ISLightActions); `with` is the bulb Add Light Bulb puts in.
--- RenewableEnergy.JobSites.light does them.
+-- at the default day length (ISLightActions), and named as vanilla names them; `with` is the bulb
+-- Add Light Bulb puts in. SolarGardenLightServer does them.
 SolarGardenLight.JOBS = {
     [SolarGardenLight.REMOVE_BULB] = {
-        minutes = 1,
+        minutes = 1, label = "ContextMenu_RemoveLightbulb",
         blocker = function(character, light) return not SolarGardenLight.getBulb(light) and "no bulb" or nil end,
     },
     [SolarGardenLight.ADD_BULB] = {
-        minutes = 1,
+        minutes = 1, label = "ContextMenu_AddLightbulb",
         blocker = function(character, light) return SolarGardenLight.getBulb(light) and "has a bulb" or nil end,
-        withRefusal = function(character, light, bulb)
-            return not Jobs.carries(character, bulb, SolarGardenLight.isBulb) and "ContextMenu_AddLightbulb_RequiresBulb" or nil
-        end,
+        with = SolarGardenLight.isBulb, withMissing = "ContextMenu_AddLightbulb_RequiresBulb",
     },
 }
 

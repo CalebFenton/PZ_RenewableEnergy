@@ -19,6 +19,7 @@ local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
 local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local JobAction = require "cf_commonlib/JobAction"
 
 -- Kept across a reload of this file, so the actions already queued stay of this class.
@@ -36,71 +37,22 @@ Action.REACH = 4.6
 -- A gas feature's objects stand on the floor, which luautils.walkAdj walks right up to.
 local GAS_REACH = 2.6
 
--- Server code: it loads after the shared files, so each is looked up when a job completes.
-local function sites()
-    return RenewableEnergy.JobSites
-end
-
--- Each feature's job module (cf_commonlib's Jobs.define) and its side of the jobs on the
--- authority. A job's `with` is what it works with, if anything: the inventory item it uses (a
--- part, a tool, a bag, a tank), a second world object (the bank Connect Source wires to, the far
--- end of Connect Gas Line), or what a client says (a bank's new name, a panel's module slot, a
--- trailer's panel part).
+-- Each feature's job module (cf_commonlib's Jobs.define) and, where the shared files hold it, its
+-- side of the jobs on the authority; the server files serve the rest (Action.serve). A job's
+-- `with` is what it works with, if anything: the inventory item it uses (a part, a tool, a bag, a
+-- tank), a second world object (the bank Connect Source wires to, the far end of Connect Gas
+-- Line), or what a client says (a bank's new name, a panel's module slot, a trailer's panel part).
 JobAction.forFeatures(Action, {
-    bank = {
-        isTarget = PowerBank.isBank,
-        jobs = BankJobs,
-        site = function() return sites().bank end,
-    },
-    source = {
-        isTarget = Sources.kindOf,
-        jobs = SourceJobs,
-        site = function() return sites().source end,
-    },
-    treadmill = {
-        isTarget = Treadmill.isTreadmill,
-        jobs = Treadmill,
-        site = function() return sites().treadmill end,
-    },
-    light = {
-        isTarget = SolarGardenLight.isLight,
-        jobs = SolarGardenLight,
-        site = function() return sites().light end,
-    },
-    vehicle = {
-        isTarget = VehicleJobs.subjectOf,
-        jobs = VehicleJobs,
-        site = function() return sites().vehicle end,
-    },
-    digester = {
-        isTarget = Digester.isDigester,
-        jobs = DigesterJobs,
-        site = function() return RenewableEnergy.DigesterSystem.jobSite end,
-        reach = GAS_REACH,
-    },
-    heater = {
-        isTarget = GasHeater.isHeater,
-        jobs = GasHeater,
-        site = function() return RenewableEnergy.DigesterSystem.heaterSite end,
-        reach = GAS_REACH,
-    },
-    gasifier = {
-        isTarget = Gasifier.isGasifier,
-        jobs = GasifierJobs,
-        site = function() return RenewableEnergy.GasifierSystem.jobSite end,
-        reach = GAS_REACH,
-    },
-    fire = {
-        isTarget = FireAsh.isFire,
-        jobs = FireAsh,
-        site = function() return sites().fire end,
-    },
-    kit = {
-        isTarget = RenewableEnergy.isGenerator,
-        jobs = GasKit,
-        site = function() return RenewableEnergy.GasLines.jobSite end,
-        reach = GAS_REACH,
-    },
+    bank = { isTarget = PowerBank.isBank, jobs = BankJobs },
+    source = { isTarget = Sources.kindOf, jobs = SourceJobs },
+    treadmill = { isTarget = Treadmill.isTreadmill, jobs = Treadmill },
+    light = { isTarget = SolarGardenLight.isLight, jobs = SolarGardenLight },
+    vehicle = { isTarget = VehicleJobs.subjectOf, jobs = VehicleJobs },
+    digester = { isTarget = Digester.isDigester, jobs = DigesterJobs, reach = GAS_REACH },
+    heater = { isTarget = GasHeater.isHeater, jobs = GasHeater, reach = GAS_REACH },
+    gasifier = { isTarget = Gasifier.isGasifier, jobs = GasifierJobs, reach = GAS_REACH },
+    fire = { isTarget = FireAsh.isFire, jobs = FireAsh, site = FireAsh.site },
+    kit = { isTarget = GeneratorReach.isVanillaGenerator, jobs = GasKit, reach = GAS_REACH },
 })
 
 --- The translation key of `job`'s name in a menu.

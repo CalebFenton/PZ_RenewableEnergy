@@ -1,6 +1,7 @@
 -- Development only. Where the promo shots stand: the layouts of the setups and shots, measured from
--- a place, and the search of the world around the character for a place that fits each, which only
--- reads the world. RenewableEnergyDevPromo.lua builds and shoots them.
+-- a place (PZHarness/StageLots.lua's places), and the specs PZHarness.Stage.findPlaces searches the
+-- world around the character with, which only read it. RenewableEnergyDevPromo.lua builds and
+-- shoots them.
 
 require "RenewableEnergy/Sprites"
 require "RenewableEnergy/PowerBank/PowerBank"
@@ -14,12 +15,6 @@ local PowerBank = RenewableEnergy.PowerBank
 
 local Places = {}
 
--- Every setup is a place (newPlace): a square its positions are measured from, and a frame, the
--- directions a position's two numbers run in, `along` and `out`. An area of a place is the
--- squares from along[1] to along[2] and out[1] to out[2]; with `sum` and `half`, only those whose
--- along + out is within `half` of `sum`, a band across the screen.
--- The frame of places measured in (east, south) squares.
-local GRID = { along = { 1, 0 }, out = { 0, 1 } }
 -- Both setups stand at an outside wall that the camera sees: the north edge of a square south of
 -- a building (preferred: wall panels face south), or the west edge of one east of it. Positions
 -- are (along, out) from the square outside the wall: `along` runs along the wall, `out` away
@@ -67,25 +62,7 @@ Places.STAGE0 = {
 }
 
 -- Every setup stands at least this far from the others along x or y, out of each other's shots.
-local SITE_DISTANCE = 12
-
--- The item shots, on a patch of the road's own asphalt laid around the studio square that each
--- item lies on alone, at the closest zoom the game draws, which the zoom options leave out
--- (Harness.pushClosestZoom). The character stands off to the side, (east, south) squares from the
--- item, to its left on the screen.
-Places.STUDIO = {
-    -- The open ground the patch needs, and how far around the studio square the asphalt goes
-    -- where the ground is clear, and the plants go anyway, since the bigger items' shots reach
-    -- past the patch.
-    open = { along = { -3, 3 }, out = { -3, 3 } },
-    floor = { along = { -5, 5 }, out = { -5, 5 } },
-    player = { -1, 1 },
-    -- What extract.py searches for the item, in UI units around its square's floor centre: room
-    -- for the tallest models, and clear of the character.
-    window = { half = 360, up = 700, down = 300 },
-    -- Turned so that the long side of most models faces the camera.
-    rotation = 315,
-}
+Places.GAP = 12
 
 -- The trailer shot, on a road: positions are (ahead, side) squares from the car, `side` towards
 -- the far side of the road from the camera, so a heading's frame runs `along` ahead and `out` to
@@ -245,63 +222,10 @@ function Places.isOnWall(object)
     return false
 end
 
--- Places -----------------------------------------------------------------------------------------
-
--- The places found, by the names of Places.find's PLACES.
-Places.places = {}
-
--- A place (see GRID) on `origin` in `frame`: GRID, a SITES entry or a ROAD heading.
-local function newPlace(origin, frame)
-    return { origin = origin, frame = frame }
-end
-
--- The square at `position` ({ along, out }) of `place`, or nil where none is loaded.
-function Places.at(place, position)
-    local origin, frame = place.origin, place.frame
-    local along, out = position[1], position[2]
-    return getCell():getGridSquare(origin:getX() + along * frame.along[1] + out * frame.out[1],
-        origin:getY() + along * frame.along[2] + out * frame.out[2], origin:getZ())
-end
-
--- The squares of `place` at the positions of each list of positions given, in order.
-function Places.squaresAt(place, ...)
-    local squares = {}
-    for i = 1, select("#", ...) do
-        for _, position in ipairs((select(i, ...))) do
-            table.insert(squares, Places.at(place, position))
-        end
-    end
-    return squares
-end
-
--- The squares of `place` at `positions` that are loaded and, if given, pass `accepts(square)`.
-function Places.loadedSquares(place, positions, accepts)
-    local squares = {}
-    for _, position in ipairs(positions) do
-        local square = Places.at(place, position)
-        if square and (not accepts or accepts(square)) then
-            table.insert(squares, square)
-        end
-    end
-    return squares
-end
-
--- Whether fn(square) holds for every square of `area` (see GRID) of `place`, stopping at the first
--- that fails. From out `outFrom` rather than the area's own first if given.
-function Places.everyAreaSquare(place, area, fn, outFrom)
-    for along = area.along[1], area.along[2] do
-        for out = outFrom or area.out[1], area.out[2] do
-            local inBand = not area.sum or math.abs(along + out - area.sum) <= area.half
-            if inBand and not fn(Places.at(place, { along, out })) then
-                return false
-            end
-        end
-    end
-    return true
-end
+-- Fits -------------------------------------------------------------------------------------------
 
 local function hasOpenGround(place, player, area)
-    return Places.everyAreaSquare(place, area, function(square)
+    return Harness.everyAreaSquare(place, area, function(square)
         return isUnoccupiedGround(square, player)
     end)
 end
@@ -309,7 +233,7 @@ end
 -- Outdoors, against a wall of a room. A panel hangs on a `plain` wall: not a door, a garage door
 -- or a window.
 local function isAtWall(place, along, plain)
-    local square, inside, wallNorth = Places.at(place, { along, 0 }), Places.at(place, { along, -1 }), place.frame.wallNorth
+    local square, inside, wallNorth = Harness.at(place, { along, 0 }), Harness.at(place, { along, -1 }), place.frame.wallNorth
     if not (square and inside and inside:getRoom() and square:getWall(wallNorth)
         and Harness.isOpenGround(square, { allows = Places.isOnWall })) then
         return false
@@ -320,13 +244,13 @@ end
 -- Whether the outside wall at `along` has a door or window of class `class` ("IsoDoor",
 -- "IsoWindow") into a room.
 local function hasOpening(place, along, class)
-    local square, inside = Places.at(place, { along, 0 }), Places.at(place, { along, -1 })
+    local square, inside = Harness.at(place, { along, 0 }), Harness.at(place, { along, -1 })
     return square ~= nil and inside ~= nil and inside:getRoom() ~= nil and square:isOutside()
         and instanceof(square:getDoorOrWindow(place.frame.wallNorth), class)
 end
 
 local function isFreeIndoorsAt(place, position)
-    return RenewableEnergy.Debug.isFreeSquare(Places.at(place, position), true)
+    return RenewableEnergy.Debug.isFreeSquare(Harness.at(place, position), true)
 end
 
 -- North from `square` through its room to the room's north wall: a bank faces south, so it stands
@@ -390,7 +314,7 @@ end
 -- and the character. Nil if the room has no such place.
 local function bankPlace(place)
     for _, along in ipairs(ALONG_PANELS) do
-        local bank = againstNorthWall(Places.at(place, { Places.HOMESTEAD.inside[1] + along, Places.HOMESTEAD.inside[2] }))
+        local bank = againstNorthWall(Harness.at(place, { Places.HOMESTEAD.inside[1] + along, Places.HOMESTEAD.inside[2] }))
         if bank and PowerBank.canPlaceBank(bank) then
             for _, offset in ipairs(BESIDE_BANK) do
                 local player = getCell():getGridSquare(bank:getX() + offset[1], bank:getY() + offset[2], bank:getZ())
@@ -430,7 +354,7 @@ local function fitsPoster(place, player)
         and hasOpenGround(place, player, Places.POSTER.open)) then
         return false
     end
-    local building = Places.at(place, { 0, -1 }):getBuilding()
+    local building = Harness.at(place, { 0, -1 }):getBuilding()
     if not (building and building:isResidential() and building:getDef():getRooms():size() >= Places.POSTER.rooms) then
         return false
     end
@@ -444,7 +368,7 @@ end
 -- The markings and blends painted over a road's floor.
 local function isRoadPaint(object)
     local name = Sprites.nameOf(object)
-    return name ~= nil and (PZHarness.startsWith(name, "floors_overlay") or PZHarness.startsWith(name, "blends_"))
+    return name ~= nil and (luautils.stringStarts(name, "floors_overlay") or luautils.stringStarts(name, "blends_"))
 end
 
 local function isClearRoad(square, player)
@@ -484,45 +408,27 @@ local function fitsGym(place)
         return false
     end
     for _, key in ipairs(gym.shot) do
-        local square = Places.at(place, gym[key])
+        local square = Harness.at(place, gym[key])
         if not (square and square:getRoom() == room and RenewableEnergy.Debug.isFreeSquare(square, true)
             and not origin:isSomethingTo(square)) then
             return false
         end
     end
     for _, spot in ipairs(gym.front) do
-        if not isBareFloor(Places.at(place, spot), room) then
+        if not isBareFloor(Harness.at(place, spot), room) then
             return false
         end
     end
     return true
-end
-
--- Whether `square` stands at least SITE_DISTANCE from each of `others` along x or y.
-local function isApart(square, others)
-    for _, other in ipairs(others) do
-        if math.abs(square:getX() - other:getX()) < SITE_DISTANCE and math.abs(square:getY() - other:getY()) < SITE_DISTANCE then
-            return false
-        end
-    end
-    return true
-end
-
--- The place closest to the character, its origin clear of `others`, in the first of `frames` that
--- has one for which fits(place) holds; nil if none has.
-local function findPlace(player, others, frames, fits)
-    for _, frame in ipairs(frames) do
-        local best = Harness.closestSquare(player, function(origin)
-            return isApart(origin, others) and fits(newPlace(origin, frame))
-        end)
-        if best then
-            return newPlace(best, frame)
-        end
-    end
-    return nil
 end
 
 -- Finding the places ------------------------------------------------------------------------------
+
+-- The place closest to the character in the first of `frames` for which fits(place) holds, apart
+-- from the places `found` before it.
+local function closestPlace(player, found, frames, fits)
+    return Harness.closestPlace(player, frames, fits, found, Places.GAP)
+end
 
 -- A yard: a band of natural ground (LAYOUTS[name].open) clear for it.
 local function yard(name)
@@ -530,27 +436,25 @@ local function yard(name)
         name = name,
         label = name,
         missing = "open ground for the " .. name .. " shot",
-        frames = { GRID },
+        frames = { Harness.GRID },
         fits = function(place, player)
-            return Places.everyAreaSquare(place, Places.LAYOUTS[name].open, function(square)
+            return Harness.everyAreaSquare(place, Places.LAYOUTS[name].open, function(square)
                 return isYardSquare(square, player)
             end)
         end,
     }
 end
 
--- Every place a group may need (Promo's GROUPS' `places`), in the order Places.find looks for them: what the
--- log calls it, what is missing when there is none, and either the `frames` to try in order and
--- whether a place `fits(place, player)`, or `find(player, others)` returning the place or nil;
--- `detail(place)` adds to its line in the log.
-local PLACES = {
+--- Every place a group may need (Promo's GROUPS' `places`), as PZHarness.Stage.findPlaces specs,
+--- in the order they are looked for.
+Places.PLACES = {
     {
         name = "homestead",
         label = "homestead",
         missing = "plain building wall with open ground in front and a room behind it with open floor along its north wall",
-        find = function(player, others)
+        find = function(player, found)
             -- SITES[1], the south-facing wall: the bank stands against the north wall across from it.
-            local place = findPlace(player, others, { SITES[1] }, function(candidate)
+            local place = closestPlace(player, found, { SITES[1] }, function(candidate)
                 return fitsHomestead(candidate, player)
             end)
             if place then
@@ -568,9 +472,9 @@ local PLACES = {
         label = "stage 0",
         missing = "outside wall with free floor indoors behind it and open ground in front, for stage 0",
         -- At a window if any.
-        find = function(player, others)
+        find = function(player, found)
             for _, needWindow in ipairs({ true, false }) do
-                local place = findPlace(player, others, SITES, function(candidate)
+                local place = closestPlace(player, found, SITES, function(candidate)
                     return fitsStage0(candidate, player, needWindow)
                 end)
                 if place then
@@ -590,20 +494,12 @@ local PLACES = {
         missing = "stretch of open road for the trailer",
         frames = Places.ROAD.headings,
         fits = function(place, player)
-            return Places.everyAreaSquare(place, Places.ROAD.open, function(square)
+            return Harness.everyAreaSquare(place, Places.ROAD.open, function(square)
                 return isClearRoad(square, player)
             end)
         end,
     },
-    {
-        name = "studio",
-        label = "items",
-        missing = "open ground for the item shots' floor",
-        frames = { GRID },
-        fits = function(place, player)
-            return hasOpenGround(place, player, Places.STUDIO.open)
-        end,
-    },
+    Harness.STUDIO_PLACE,
     {
         name = "walk",
         label = "garden lights",
@@ -627,40 +523,9 @@ local PLACES = {
         name = "gym",
         label = "treadmill",
         missing = "room with free floor for the treadmill",
-        frames = { GRID },
+        frames = { Harness.GRID },
         fits = fitsGym,
     },
 }
-
--- Finds the places in `needs` into `places`, each clear of those found before it, logs them under
--- `mark` and returns their origins, or nil and the first it can't find. A run of every group looks
--- for all of them.
-function Places.find(player, needs, mark)
-    local found, logged = {}, {}
-    for _, spec in ipairs(PLACES) do
-        if needs[spec.name] then
-            local place
-            if spec.find then
-                place = spec.find(player, found)
-            else
-                place = findPlace(player, found, spec.frames, function(candidate)
-                    return spec.fits(candidate, player)
-                end)
-            end
-            if not place then
-                return nil, spec.missing
-            end
-            Places.places[spec.name] = place
-            local origin, facing = place.origin, place.frame.facing
-            table.insert(found, origin)
-            table.insert(logged, string.format("%s %d,%d", spec.label, origin:getX(), origin:getY())
-                .. (facing and " facing " .. facing or "") .. (spec.detail and spec.detail(place) or ""))
-        end
-    end
-    if #logged > 0 then
-        print(mark .. " " .. table.concat(logged, "; "))
-    end
-    return found
-end
 
 return Places

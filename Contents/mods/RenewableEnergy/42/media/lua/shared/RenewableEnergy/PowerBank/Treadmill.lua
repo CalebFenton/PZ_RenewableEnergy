@@ -70,7 +70,7 @@ function Treadmill.wiredHalf(tile)
         return nil
     end
     local foundRear, foundConsole = Treadmill.ends(found)
-    if PowerBank.samePosition(foundRear, rear) and PowerBank.samePosition(foundConsole, console) then
+    if Squares.samePosition(foundRear, rear) and Squares.samePosition(foundConsole, console) then
         return found
     end
     return nil
@@ -82,7 +82,7 @@ Treadmill.UNWIRE = "UnwireTreadmill"
 local WIRING = Specs.treadmill.wiring
 
 -- The jobs at a treadmill's tile, by name (cf_commonlib's Jobs): wiring it to feed a bank, as a
--- part is wired in, and unwiring it. RenewableEnergy.JobSites.treadmill does them.
+-- part is wired in, and unwiring it. JobSites.treadmill does them.
 Treadmill.JOBS = {
     -- Either tile wired already refuses it, so a treadmill is wired once.
     [Treadmill.WIRE] = {

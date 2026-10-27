@@ -1,11 +1,9 @@
--- Setup helpers for the debug scenario, the tests and the dev harness, and a count of the frames
--- each status window drew. Debug mode only.
+-- Setup helpers for the debug scenario, the tests and the dev harness. Debug mode only.
 
 require "RenewableEnergy/Utilities"
 require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/ClientBankSystem"
 require "RenewableEnergy/PowerBank/Sources"
-require "RenewableEnergy/UI/StatusWindow"
 require "PZHarness/TestCraft"
 require "PZHarness/QA"
 local Squares = require "cf_commonlib/Squares"
@@ -30,14 +28,12 @@ function Debug.items()
     return found
 end
 
--- Inputs naming several items take the first listed here, else the harness's pick (T.inputItem),
--- which for a tag can differ from run to run; so every tag input the recipes have is listed, and
--- the QA layout, its toolboxes and the promo's recipe sheet come out the same each run.
+-- Inputs naming several items take the first listed here, before the harness's vanilla picks
+-- (T.VANILLA_PREFERRED), so the QA layout, its toolboxes and the promo's recipe sheet come out the
+-- same each run.
 Debug.PREFERRED_INPUTS = {
-    "Base.EmptyJar", "Base.MetalDrum", "Base.Bucket", "Base.WaterBottle", "Base.Charcoal", "Base.HandDrill",
-    "Base.Screwdriver", "Base.Wrench", "Base.Hammer", "Base.SmithingHammer", "Base.Saw", "Base.KitchenKnife",
-    "Base.Pliers", "Base.Tongs", "Base.WeldingMask", "Base.Shovel2", "Base.MasonsTrowel", "Base.Matches",
-    "Base.Garbagebag", "Base.BucketConcreteFull", "Base.NormalBrake1", "Base.Needle", "Base.Thread", "Base.File",
+    "Base.EmptyJar", "Base.MetalDrum", "Base.Garbagebag", "Base.NormalBrake1", "Base.Needle", "Base.Thread",
+    "Base.File",
 }
 
 local function isContainerGeneratorOrSource(object)
@@ -63,17 +59,6 @@ function Debug.setupPlayer(player)
     PZHarness.QA.learnAllRecipes(player)
     player:getInventory():AddItem("Base.Screwdriver")
     PZHarness.Test.placeWorkTable(player)
-end
-
--- The tests and the promo shots wait on `renderedFrames`, the frames a status window drew a bank's
--- status in, so that they read and shoot a window that has its status and has drawn it.
-local StatusWindow = RenewableEnergy.StatusWindow
-local render = StatusWindow.render
-function StatusWindow:render()
-    render(self)
-    if not self.isCollapsed and self.status then
-        self.renderedFrames = (self.renderedFrames or 0) + 1
-    end
 end
 
 return Debug

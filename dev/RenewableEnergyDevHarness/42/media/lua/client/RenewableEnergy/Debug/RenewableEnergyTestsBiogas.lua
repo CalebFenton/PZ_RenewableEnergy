@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 
 -- Biogas (Contents/.../RenewableEnergy/Biogas/*, UI/Digester*): digestion, the hopper's feed, the
 -- gas holder, the digester's jobs and build, and campfire wood ash. The stink is in
@@ -26,7 +27,7 @@ test("renewable_energy_biogas_digester_stink_levels", {
         T.batch(function()
             T.read(self, "stinkRead", T.at(barrel), "stink")
             T.read(self, "digesterCorpsesFor", {}, "corpses")
-            T.setRecord(self, barrel, T.matureDigester("barrel"))
+            T.setRecord(self, barrel, Fixtures.matureDigester("barrel"))
             T.readRecord(self, barrel, "mature")
             T.setRecord(self, barrel, T.sourDigester("barrel"))
             T.readRecord(self, barrel, "sour")
@@ -124,11 +125,11 @@ test("renewable_energy_biogas_digester_temperature", {
         local temps = { coldest, coldest + 1, hottest - 1, hottest, self.plateau[1], self.plateau[#self.plateau] }
         T.batch(function()
             for _, temp in ipairs(temps) do
-                T.setRecord(self, handle, T.matureDigester("barrel", { temp = temp, gas = 0 }))
+                T.setRecord(self, handle, Fixtures.matureDigester("barrel", { temp = temp, gas = 0 }))
                 T.runDigester(self, handle, 1, temp)
                 T.readRecord(self, handle, "at" .. temp)
             end
-            T.setRecord(self, handle, T.matureDigester("barrel"))
+            T.setRecord(self, handle, Fixtures.matureDigester("barrel"))
             T.runDigester(self, handle, 72, 0)
             T.readRecord(self, handle, "cooled")
         end)
@@ -143,7 +144,7 @@ test("renewable_energy_biogas_digester_temperature", {
         end
         local first, last = self.plateau[1], self.plateau[#self.plateau]
         T.expectNear("gas at " .. last .. " °C against " .. first, reads["at" .. last].gas, reads["at" .. first].gas, 1e-6)
-        local start = T.matureDigester("barrel").temp
+        local start = Fixtures.matureDigester("barrel").temp
         T.expect(reads.cooled.temp < start / 2, "three days at 0 °C left the barrel at " .. reads.cooled.temp .. " °C from " .. start)
     end,
 })
@@ -156,7 +157,7 @@ test("renewable_energy_biogas_digester_multiplier_scales_gas", {
         local function runAt(multiplier, label)
             T.step(function() T.setSandbox(self, "BiogasMultiplier", multiplier) end)
             T.batch(function()
-                local state = T.matureDigester("barrel", { gas = 0 })
+                local state = Fixtures.matureDigester("barrel", { gas = 0 })
                 T.setRecord(self, handle, state)
                 T.runDigester(self, handle, 2, state.temp)
                 T.readRecord(self, handle, label)
@@ -180,7 +181,7 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
         if not handle then return end
         local limit = Digester.ACID_LIMIT * Digester.TIERS.barrel.potentialCap
         local function set(share, sour)
-            T.setRecord(self, handle, T.matureDigester("barrel", { acid = share * limit, sour = sour }))
+            T.setRecord(self, handle, Fixtures.matureDigester("barrel", { acid = share * limit, sour = sour }))
         end
         -- An hour's decay takes far less acid than the step, so each side stays on its side.
         local step = 0.01
@@ -314,7 +315,7 @@ test("renewable_energy_biogas_digester_holder", {
         local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local bags = Digester.HOLDERS.bags
-        local overfull = T.matureDigester("barrel", { gas = bags.capacity + 0.1 })
+        local overfull = Fixtures.matureDigester("barrel", { gas = bags.capacity + 0.1 })
         T.batch(function()
             T.setRecord(self, handle, overfull)
             T.runDigester(self, handle, 1, 30)
@@ -353,7 +354,7 @@ test("renewable_energy_biogas_digester_tarp_gas_bag", {
         local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         self.tarp = Digester.HOLDERS.tarp.item
-        T.setRecord(self, handle, T.matureDigester("barrel", { gas = 0.3 }))
+        T.setRecord(self, handle, Fixtures.matureDigester("barrel", { gas = 0.3 }))
         T.give(self, "tarp", { { type = self.tarp, condition = 6 } })
         T.waitForGas(self, handle, 0.3)
         T.step(function()
@@ -443,7 +444,7 @@ test("renewable_energy_biogas_digester_upgrade", {
         self.dung = 2
         -- At its cap, so it eats nothing from the hopper meanwhile.
         T.batch(function()
-            T.setRecord(self, handle, T.matureDigester("barrel"))
+            T.setRecord(self, handle, Fixtures.matureDigester("barrel"))
             T.fillRecord(self, handle, { hopper = { { type = FEED, count = self.dung } } })
             T.read(self, "character", { perks = { "Woodwork" } }, "xpBefore")
         end)
@@ -544,7 +545,7 @@ test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
         local ground
         for _, square in ipairs(T.squares(self, 24, { bare = true }) or {}) do
             local name = Sprites.nameOf(square:getFloor())
-            if name and PZHarness.startsWith(name, "blends_natural") then
+            if name and luautils.stringStarts(name, "blends_natural") then
                 ground = square
                 break
             end

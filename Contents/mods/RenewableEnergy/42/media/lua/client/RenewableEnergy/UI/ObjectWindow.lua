@@ -1,8 +1,8 @@
 -- The base of the status windows of an object: a bank's (StatusWindow), a digester's and a
 -- gasifier's (SummaryWindow). Each family keeps one window per local player in its class's
--- `windows`; a new one opens where the player's last one of the family stood, takes the
--- controller's focus, and closes with B, as vanilla's windows do. It closes once its object is
--- gone or the character walked away (cf_commonlib's OpenAction.inReach), as vanilla's animal
+-- `windows` (cf_commonlib's OpenAction.show); a new one opens where the player's last one of the
+-- family stood, takes the controller's focus, and closes with B, as vanilla's windows do. It closes
+-- once its object is gone or the character walked away (OpenAction.inReach), as vanilla's animal
 -- windows close. A derived class defines refresh(), which brings it up to date before each frame
 -- is drawn and returns false when there is nothing left to show.
 --
@@ -129,11 +129,7 @@ function ObjectWindow:prerender()
 end
 
 function ObjectWindow:close()
-    self.windows[self.playerNum] = nil
-    self:removeFromUIManager()
-    if JoypadState.players[self.playerNum + 1] then
-        setPrevFocusForPlayer(self.playerNum)
-    end
+    OpenAction.close(self.windows, self.playerNum, self)
 end
 
 function ObjectWindow:onJoypadDown(button)
@@ -155,17 +151,14 @@ end
 function ObjectWindow:openOn(playerNum, object)
     local open = self.windows[playerNum]
     local x, y = getPlayerScreenLeft(playerNum) + FIRST_OFFSET, getPlayerScreenTop(playerNum) + FIRST_OFFSET
+    -- Closed before the new one is made, which may watch what the old one stops watching.
     if open then
         x, y = open:getX(), open:getY()
         open:close()
     end
     local window = self:new(x, y, playerNum, object)
     window:initialise()
-    window:addToUIManager()
-    self.windows[playerNum] = window
-    if JoypadState.players[playerNum + 1] then
-        setJoypadFocus(playerNum, window)
-    end
+    OpenAction.show(self.windows, playerNum, window)
     return window
 end
 

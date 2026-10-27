@@ -6,7 +6,7 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
-require "RenewableEnergy/Debug/RenewableEnergyLoot"
+require "PZHarness/Loot"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local Items = require "cf_commonlib/Items"
 
@@ -391,7 +391,7 @@ handler("arrowBoardControllerRolls", function(_, args, defer)
     local controller = RenewableEnergy.Specs.controller
     local restoreOptions = PZHarness.Fixtures.saveOptions(defer, { "LRMBatteries", "LRMMisc" })
     options.LRMBatteries = 0
-    local container = RenewableEnergy.Loot.newContainer(nil)
+    local container = PZHarness.Loot.scratchContainer(nil)
     local controllers = Helpers.eachTrial(defer, args.trials, function(trial)
         return trialRoll(trial.roll, ArrowBoard.STOCK.controllerChance * trial.misc)
     end, function(trial)

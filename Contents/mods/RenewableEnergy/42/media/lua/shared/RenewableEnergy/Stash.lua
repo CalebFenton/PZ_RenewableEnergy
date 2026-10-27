@@ -49,9 +49,9 @@ local PREPPER_CACHES = {
 -- it. crateX, crateY, crateZ: an empty floor square in one of the house's rooms, since only
 -- containers in its rooms are stocked. map: the item that leads there. A mod item is a map of
 -- just mapArea (its west, north, east and south edges) found in the loot lists of `mapLoot`, as
--- { weight, list } pairs; a vanilla town map is found wherever vanilla puts it. Marks are drawn on
--- the map: a symbol of MapSymbolDefinitions, or note n, whose text is the translation
--- Stash_<name>_<n>.
+-- { weight, { list, ... } } groups (Loot.entries); a vanilla town map is found wherever vanilla
+-- puts it. Marks are drawn on the map: a symbol of MapSymbolDefinitions, or note n, whose text is
+-- the translation Stash_<name>_<n>.
 local HOUSES = {
     -- A prepper's farmhouse off Crowcall Road, south of Rosewood, with a bunker under its shed.
     -- Survivalists and bandits carry its map, and one prepper's cache leads to another's; it is
@@ -64,7 +64,7 @@ local HOUSES = {
         crateX = 7985, crateY = 12341, crateZ = 0,
         barricades = 90,
         traps = "1-3",
-        mapLoot = RenewableEnergy.weightedEntries({ { 2, SURVIVALISTS_AND_BANDITS }, { 1, PREPPER_CACHES } }),
+        mapLoot = { { 2, SURVIVALISTS_AND_BANDITS }, { 1, PREPPER_CACHES } },
         marks = {
             { symbol = "X", x = 7984, y = 12342, color = RED_MARKER },
             { note = 1, x = 7993, y = 12331 },
@@ -86,10 +86,8 @@ local HOUSES = {
         barricades = 70,
         knownOnStart = 90,
         mapLoot = {
-            { 0.05, "sub:all.inventoryfemale" },
-            { 0.05, "sub:all.inventorymale" },
-            { 1, "sub:all.Outfit_Camper" },
-            { 1, "veh:CamperGloveBox" },
+            { 0.05, { "sub:all.inventoryfemale", "sub:all.inventorymale" } },
+            { 1, { "sub:all.Outfit_Camper", "veh:CamperGloveBox" } },
         },
         marks = {
             { symbol = "X", x = 11714, y = 8792, color = RED_MARKER },

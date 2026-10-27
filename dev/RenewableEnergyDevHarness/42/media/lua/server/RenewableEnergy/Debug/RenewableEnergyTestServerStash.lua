@@ -205,7 +205,7 @@ check("prepperMapTargets", function(expect)
     local lists = {}
     for stashMap, added in pairs(Stash.descriptions) do
         lists[stashMap.name] = {}
-        for _, entry in ipairs(added.loot or {}) do
+        for _, entry in ipairs(LibLoot.entries(added.loot or {})) do
             expect(LibLoot.resolveItemList(entry[2]) ~= nil, stashMap.name .. ": no loot list " .. entry[2])
             lists[stashMap.name][entry[2]] = true
         end
@@ -233,7 +233,7 @@ handler("stashMapsInCorpseLoot", function(_, _, defer)
         D.apply()
         D.apply()
         for stashMap, added in pairs(Stash.descriptions) do
-            for _, entry in ipairs(added.loot or {}) do
+            for _, entry in ipairs(LibLoot.entries(added.loot or {})) do
                 local count, weight = countPairs(LibLoot.resolveItemList(entry[2]), stashMap.item)
                 table.insert(found, {
                     mode = mode, where = stashMap.name .. " in " .. entry[2], count = count, weight = weight, rarity = entry[1],

@@ -4,6 +4,7 @@ require "RenewableEnergy/WoodGas/Gasifier"
 require "RenewableEnergy/WoodGas/GasifierJobs"
 require "RenewableEnergy/GasLine/GasKit"
 local Squares = require "cf_commonlib/Squares"
+local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 
 -- Fixtures of the biogas, gas line and wood gas tests (RenewableEnergyTestsBiogas*.lua,
 -- RenewableEnergyTestsGasLine*.lua, RenewableEnergyTestsWoodGas*.lua) and of the rural find tests'
@@ -148,20 +149,10 @@ end
 
 -- Digesters ------------------------------------------------------------------------------------
 
---- Saved fields of a started, mature digester of tier `tier`, past its startup and settled down,
---- holding its tier's potential cap, with `fields`' fields over them.
-function T.matureDigester(tier, fields)
-    local state = { fed = true, started = true, gasHours = 1000, potential = Digester.TIERS[tier].potentialCap, temp = 30,
-        acid = 0, sour = false, sludge = 0 }
-    for key, value in pairs(fields or {}) do
-        state[key] = value
-    end
-    return state
-end
-
---- The same, soured: acid well past its limit, so the passes that run meanwhile keep it sour.
+--- Saved fields of a mature digester of tier `tier` (Fixtures.matureDigester), soured: acid well
+--- past its limit, so the passes that run meanwhile keep it sour.
 function T.sourDigester(tier, fields)
-    local state = T.matureDigester(tier)
+    local state = Fixtures.matureDigester(tier)
     state.sour, state.acid = true, 2 * Digester.ACID_LIMIT * state.potential
     for key, value in pairs(fields or {}) do
         state[key] = value

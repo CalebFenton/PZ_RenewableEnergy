@@ -86,7 +86,7 @@ check("lootListsInUse", function(expect)
     local procUsers = PZHarness.Loot.procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
-    local capacity = RenewableEnergy.Loot.newContainer(nil):getCapacity()
+    local capacity = PZHarness.Loot.scratchContainer(nil):getCapacity()
     PZHarness.Loot.withMeasureOptions(RenewableEnergy.Loot.MEASURE_OPTIONS, function()
         for _, spec in ipairs(D.items) do
             checkHandedOut(expect, spec, capacity)
@@ -294,7 +294,7 @@ check("lootFoundParts", function(expect, _, _, _, defer)
     local WorldSpawns, Wear, D = RenewableEnergy.WorldSpawns, RenewableEnergy.Wear, RenewableEnergy.Distributions
     local mean = WorldSpawns.PART_WEAR.mean
     local restoreRoll = Helpers.forceRolls(defer, 0.5)
-    local container = RenewableEnergy.Loot.newContainer(nil)
+    local container = PZHarness.Loot.scratchContainer(nil)
     container:AddItem("Base.Bag_DuffelBag"):getInventory():AddItem("RenewableEnergy.PowerInverter")
     container:AddItem("RenewableEnergy.PlugInInverter")
     container:AddItem(RenewableEnergy.Specs.controller)

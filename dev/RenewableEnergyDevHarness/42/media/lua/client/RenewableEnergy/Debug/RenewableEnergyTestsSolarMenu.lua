@@ -7,6 +7,7 @@ require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
 local Clock = require "cf_commonlib/Clock"
+local Squares = require "cf_commonlib/Squares"
 
 -- Solar menus: the panel menus, actions and highlight (UI/Menu.lua, UI/StatusWindow.lua) and the
 -- connect action's XP and time (TimedActions/RenewableEnergyAction.lua).
@@ -132,7 +133,7 @@ test("renewable_energy_solar_connect_panel", {
             if not T.walkTo(self, self.panel.square, "the panel") then return end
             ISTimedActionQueue.add(action)
             T.waitFor(self, function()
-                return PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position)
+                return Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position)
             end, "this client's copy of the connection")
             T.bankState(self, self.bank)
         end)
@@ -140,7 +141,7 @@ test("renewable_energy_solar_connect_panel", {
     validate = function(self)
         expect(self.valid, "connecting a panel next to a bank is refused")
         expectEqual("panels the server's bank lists", self.bank.state.sources, 1)
-        expect(PowerBank.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position),
+        expect(Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank.position),
             "this client's status of the bank does not list the connected panel")
         expect(not self.action:canPerform(), "a panel already on this bank can be connected again")
     end,

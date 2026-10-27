@@ -25,17 +25,16 @@ end
 -- Drain Condensate: a choice of the containers that take it, and the ground.
 local function addDrain(menu, character, playerNum, gasifier, summary)
     local job = GasifierJobs.DRAIN
-    local blocker = GasifierJobs.blocker(character, job, summary)
+    local blocker = GasifierJobs.verdict(character, job, summary).blocker
     if blocker then
         Needs.refuse(menu:addOption(getText(Action.labelKey(job))), blocker)
         return
     end
-    local submenu = Needs.addSubMenu(menu, getText(Action.labelKey(job)))
+    local submenu = JobOptions.addSubMenu(menu, getText(Action.labelKey(job)))
     for _, item in ipairs(drainContainers(character, summary.lit)) do
-        JobOptions.add(submenu, playerNum, Action, "gasifier", job, gasifier, item, item:getDisplayName())
+        JobOptions.add(submenu, playerNum, GasifierJobs, job, gasifier, item, item:getDisplayName())
     end
-    JobOptions.add(submenu, playerNum, Action, "gasifier", job, gasifier, nil,
-        getText("ContextMenu_RenewableEnergy_OntoGround"))
+    JobOptions.add(submenu, playerNum, GasifierJobs, job, gasifier, nil, getText("ContextMenu_RenewableEnergy_OntoGround"))
 end
 
 --- Adds the gasifier's submenu to `context`. Returns the submenu, or nil while this side can't
@@ -44,17 +43,17 @@ function GasifierMenu.addOptions(playerNum, context, gasifier)
     local summary = GasifierJobs.subjectOf(gasifier)
     if not summary then return end
     local character = getSpecificPlayer(playerNum)
-    local menu = Needs.addSubMenu(context, getText(Gasifier.nameKey(summary.tier)))
+    local menu = JobOptions.addSubMenu(context, getText(Gasifier.nameKey(summary.tier)))
     menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, ObjectWindow.queueOpen, gasifier,
         GasifierWindow)
     local fire = summary.lit and GasifierJobs.PUT_OUT or GasifierJobs.LIGHT
-    JobOptions.add(menu, playerNum, Action, "gasifier", fire, gasifier)
-    JobOptions.add(menu, playerNum, Action, "gasifier", GasifierJobs.CLEAN_ASH, gasifier)
+    JobOptions.add(menu, playerNum, GasifierJobs, fire, gasifier)
+    JobOptions.add(menu, playerNum, GasifierJobs, GasifierJobs.CLEAN_ASH, gasifier)
     addDrain(menu, character, playerNum, gasifier, summary)
     return menu
 end
 
-JobOptions.onWorldMenu(Gasifier.isGasifier, function(context, playerNum, character, gasifier)
+JobOptions.onWorldMenu(JobOptions.clicked(Gasifier.isGasifier), function(context, playerNum, character, gasifier)
     GasifierMenu.addOptions(playerNum, context, gasifier)
 end)
 

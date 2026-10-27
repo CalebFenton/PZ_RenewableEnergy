@@ -6,16 +6,13 @@
 -- again when its chunk loads. A tile leaving its square is dropped at once.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Sprites = require "RenewableEnergy/Sprites"
 local Squares = require "cf_commonlib/Squares"
+local Tiles = require "cf_commonlib/Tiles"
 
 local PlaceTracker = {}
 PlaceTracker.__index = PlaceTracker
 RenewableEnergy.PlaceTracker = PlaceTracker
 
--- Its own priority, apart from the systems' loaders of the same sprites (Sprites.LOAD_PRIORITY).
--- Every tracker shares it, so no two trackers may take the same sprite.
-local LOAD_PRIORITY = Sprites.LOAD_PRIORITY + 1
 -- World squares lie well under this in x and y, so a place key stays unique and exact in a double.
 local SPAN = 1e6
 
@@ -96,7 +93,7 @@ function PlaceTracker.new(options)
             self.onFound(isoObject)
         end
     end
-    MapObjects.OnLoadWithSprite(options.sprites, found, LOAD_PRIORITY)
+    Tiles.onLoad(options.sprites, found)
     Events.OnObjectAdded.Add(function(isoObject)
         if self.matches(isoObject) then
             found(isoObject)

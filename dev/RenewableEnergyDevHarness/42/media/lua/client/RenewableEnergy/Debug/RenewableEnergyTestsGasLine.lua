@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
+local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 
 -- The gas line: the Gas Conversion Kit on a vanilla generator and the line that runs it on a
 -- digester's or gasifier's gas (GasLine/GasKit.lua, GasLine/GasLines.lua, UI/GasKitMenu.lua), and
@@ -480,7 +481,7 @@ test("renewable_energy_gasline_fumes_clear_with_the_last_source", {
             T.setRecord(self, digester, sour)
             T.readRecord(self, digester, "sour")
             T.setRecord(self, gasifier, { lit = true, fireKg = Gasifier.TIERS.primitive.hopperKg })
-            T.setRecord(self, digester, T.matureDigester("barrel"))
+            T.setRecord(self, digester, Fixtures.matureDigester("barrel"))
             T.readRecord(self, gasifier, "gasifierOnly")
             T.setRecord(self, digester, sour)
             T.setRecord(self, gasifier, { lit = false })

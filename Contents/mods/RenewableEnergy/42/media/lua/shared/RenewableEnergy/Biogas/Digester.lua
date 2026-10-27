@@ -170,13 +170,9 @@ function Digester.feedOf(item)
     return { potential = FOOD_POTENTIAL_PER_KG * kg, acid = FOOD_ACID_PER_KG * kg, whole = true }
 end
 
---- The hopper's AcceptItemFunction: feed and neutralisers only (Digester.adoptContainer).
+--- The hopper's AcceptItemFunction: feed and neutralisers only.
 function Digester.acceptItem(container, item)
     return Digester.feedOf(item) ~= nil
-end
-
-function Digester.adoptContainer(container)
-    RenewableEnergy.adoptContainer(container, "RenewableEnergy.Digester.acceptItem")
 end
 
 --- The feeds waiting in the hopper `container`, in its order: the items, and each one's feed
@@ -257,11 +253,16 @@ function Digester.holderOverlay(holder, fill, torn)
     return levels[math.min(#levels, 1 + math.floor(fill * #levels))]
 end
 
--- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
--- copy of the hopper.
-GlobalObjects.addAccessors(Digester, function(summary, isoObject)
-    local _, feeds = Digester.feedsIn(isoObject:getContainer())
-    summary.hopper = #feeds
-end)
+GlobalObjects.declare(Digester, {
+    prefix = RenewableEnergy.CLASS_PREFIX, name = "Digester", kind = "digester",
+    isObject = Digester.isDigester, sprites = Sprites.namesOf("digester"),
+    accept = "RenewableEnergy.Digester.acceptItem",
+    -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
+    -- copy of the hopper.
+    decorate = function(summary, isoObject)
+        local _, feeds = Digester.feedsIn(isoObject:getContainer())
+        summary.hopper = #feeds
+    end,
+})
 
 return Digester

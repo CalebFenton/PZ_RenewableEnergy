@@ -1,16 +1,18 @@
 -- The Gas Conversion Kit, as both sides know it: which generators carry one, the gas line from a
--- digester or gasifier (its source) that feeds it, and what each job at the generator takes. The
--- authority does the jobs and runs the line (GasLines).
+-- digester or gasifier (its source) that feeds it, what each job at the generator takes, and Take
+-- Generator refused while one is fitted. The authority does the jobs and runs the line (GasLines).
 --
 -- A generator's kit and line live in its modData (GasKit.STATE_KEY), which the authority sends to
 -- the clients. On gas the generator runs on vanilla's own update on fuel the gas pays for: its tank
 -- (`tank`) stays what it was, and an empty one shows a little fuel so the game lets it run (`set`,
 -- what the authority last put in).
 
+require "TimedActions/ISTakeGenerator"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Jobs = require "cf_commonlib/Jobs"
 local Squares = require "cf_commonlib/Squares"
 
@@ -54,7 +56,7 @@ end
 --- watts, stalled, outOfGas, and while it runs on gas billedHour and billLitres, vanilla's last bill
 --- as the gas line sees it (GasLines.run) }.
 function GasKit.stateOf(generator)
-    local state = RenewableEnergy.isGenerator(generator) and generator:getModData()[GasKit.STATE_KEY]
+    local state = GeneratorReach.isVanillaGenerator(generator) and generator:getModData()[GasKit.STATE_KEY]
     return state and state.kit and state or nil
 end
 
@@ -74,8 +76,8 @@ end
 
 -- The sources a line runs from, by their tiles' kind (Sprites.kindOf), which the line keeps as its
 -- source's `kind`:
--- - owner: the source's shared module, whose recordAt gives the authority its record and whose
---   nameKey(tierOf(object)) names it in the menu.
+-- - owner: the source's shared module (GlobalObjects.declare), whose recordAt gives the authority
+--   its record, whose each lists the sources, and whose nameKey(tierOf(object)) names it in the menu.
 -- - inReach(generator, source): whether it may feed `generator`, else the key `tooFar` says why.
 -- - line(generator, source): what the line takes (an item of cf_commonlib's Materials).
 -- - piped: the line is a pipe drawn on both ends.
@@ -124,15 +126,19 @@ local function sourceBlocker(generator, source)
     return nil
 end
 
---- The sources that may feed `generator`, nearest first.
+--- The sources that may feed `generator`, nearest first: of the sources this side knows (their
+--- owners' each), the loaded ones on its level in reach.
 function GasKit.sourcesNear(generator)
-    local found = {}
-    RenewableEnergy.eachSquareAround(generator:getX(), generator:getY(), generator:getZ(), GasKit.REACH, function(square)
-        local source = Squares.findObjectOn(square, GasKit.sourceKind)
-        if source and not sourceBlocker(generator, source) then
-            table.insert(found, source)
-        end
-    end)
+    local found, z = {}, generator:getZ()
+    for _, spec in pairs(GasKit.SOURCES) do
+        spec.owner.each(function(object)
+            local source = object.z == z
+                and Squares.findObjectOn(getSquare(object.x, object.y, z), spec.owner.feature.isObject)
+            if source and not sourceBlocker(generator, source) then
+                table.insert(found, source)
+            end
+        end)
+    end
     table.sort(found, function(a, b)
         return GasKit.lineLength(generator, a) < GasKit.lineLength(generator, b)
     end)
@@ -221,9 +227,26 @@ GasKit.JOBS = {
 
 Jobs.define(GasKit, {
     subjectOf = function(generator)
-        return RenewableEnergy.isGenerator(generator) and Squares.onSquare(generator) and generator or nil
+        return GeneratorReach.isVanillaGenerator(generator) and Squares.onSquare(generator) and generator or nil
     end,
     missing = "Tooltip_RenewableEnergy_NoGenerator",
 })
+
+-- Taking up a kitted generator is refused: the kit would fall off (ISTakeGenerator copies only
+-- fuel and condition to the item) and with it what the tank really holds. isValid stops the action
+-- on the player's side at once; a server never asks it (NetTimedAction.isValid answers false
+-- without calling Lua), so complete() refuses it on the authority.
+local vanillaTakeIsValid = ISTakeGenerator.isValid
+function ISTakeGenerator:isValid()
+    return not GasKit.hasKit(self.generator) and vanillaTakeIsValid(self)
+end
+
+local vanillaTakeComplete = ISTakeGenerator.complete
+function ISTakeGenerator:complete()
+    if GasKit.hasKit(self.generator) then
+        return false
+    end
+    return vanillaTakeComplete(self)
+end
 
 return GasKit

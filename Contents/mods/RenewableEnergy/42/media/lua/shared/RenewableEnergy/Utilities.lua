@@ -11,19 +11,13 @@
 
 RenewableEnergy = RenewableEnergy or {}
 
--- PowerBank and Specs require this file, so the helpers below find them in the table as they run.
+-- Specs requires this file, so the helpers below find it in the table as they run.
 
 -- Slack for float comparisons of kg, litres and m³, which sums and shares leave a hair off.
 RenewableEnergy.EPSILON = 1e-4
 
---- Gives `container` the AcceptItemFunction `fnName` (a path from the global table, where
---- ItemContainer finds it) unless it has one. The filter is neither saved nor sent, so every side
---- sets it on its own copy whenever the object loads or is placed.
-function RenewableEnergy.adoptContainer(container, fnName)
-    if container and container:getAcceptItemFunction() == nil then
-        container:setAcceptItemFunction(fnName)
-    end
-end
+-- Saves keep the mod's Global Object System classes by names that start with this.
+RenewableEnergy.CLASS_PREFIX = "RenewableEnergy_"
 
 --- Whether the door part `partId` of `vehicle` leaves what it covers open: the door open, taken
 --- off, or no such part or door at all.
@@ -32,22 +26,6 @@ function RenewableEnergy.isPartOpen(vehicle, partId)
     local door = part and part:getDoor()
     return not (door and part:getInventoryItem()) or door:isOpen()
 end
-
---- Appends to `entries` (a new table when nil) a loot entry { weight, list } for each list of
---- each group { weight, lists } of `groups`, in order, and returns `entries`.
-function RenewableEnergy.weightedEntries(groups, entries)
-    entries = entries or {}
-    for _, group in ipairs(groups) do
-        for _, list in ipairs(group[2]) do
-            table.insert(entries, { group[1], list })
-        end
-    end
-    return entries
-end
-
---- Action units per real second at normal speed, whatever the day length: an in-game minute is
---- Clock.unitsPerMinute() units and lasts minutesPerDay / 24 real seconds.
-RenewableEnergy.UNITS_PER_SECOND = 48
 
 --- Marks `holder` (an item or a placed object) under its modData `key` and, the first time it is
 --- marked, gives `character` (if any) `xp` of `perk`: a job teaches only the first time it is done
@@ -63,12 +41,6 @@ function RenewableEnergy.teachOnce(character, holder, key, perk, xp)
         addXp(character, perk, xp)
     end
     return true
-end
-
---- Whether `object` is a vanilla generator: an IsoGenerator that isn't a battery bank, which is a
---- generator too (PowerBank.isBank).
-function RenewableEnergy.isGenerator(object)
-    return object ~= nil and instanceof(object, "IsoGenerator") and not RenewableEnergy.PowerBank.isBank(object)
 end
 
 -- Item ConditionMax by full type, read once from the item scripts.
@@ -94,21 +66,6 @@ function RenewableEnergy.crackLookOf(fullType, condition)
         return "heavy"
     elseif share < looks.lightBelow then
         return "light"
-    end
-    return nil
-end
-
---- Calls `fn(square)` for every loaded square on level `z` within `radius` squares of x, y on each
---- axis, x, y included, until one call returns a value other than nil, which this returns.
-function RenewableEnergy.eachSquareAround(x, y, z, radius, fn)
-    for squareX = x - radius, x + radius do
-        for squareY = y - radius, y + radius do
-            local square = getSquare(squareX, squareY, z)
-            local result = square and fn(square)
-            if result ~= nil then
-                return result
-            end
-        end
     end
     return nil
 end

@@ -9,12 +9,13 @@ require "Moveables/ISMoveableSpriteProps"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
-local Chance = require "RenewableEnergy/Chance"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 require "RenewableEnergy/PowerBank/BankSystem"
+local Chance = require "cf_commonlib/Chance"
 local Items = require "cf_commonlib/Items"
+local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
 
 local WorldSpawns = {}
@@ -415,12 +416,11 @@ function WorldSpawns.placePanel(square, spriteName, modules)
     WorldSpawns.placeMoveable(square, spriteName, { [PowerBank.MODULES_KEY] = modules })
 end
 
---- Builds the entity of the tile `sprite` (Tiles.tileEntity) as ISBuildIsoEntity:create
---- does: a thumpable with its entity's components on the square, then the entity's OnCreate, and
---- sends it to the clients. `wear(thumpable)`, if given, sets its worn state before they get it.
+--- Builds the entity of the tile `sprite` (Tiles.newEntity) as ISBuildIsoEntity:create does: a
+--- thumpable with its entity's components on the square, then the entity's OnCreate, and sends it
+--- to the clients. `wear(thumpable)`, if given, sets its worn state before they get it.
 function WorldSpawns.buildEntity(square, sprite, onCreate, wear)
-    local thumpable = IsoThumpable.new(square:getCell(), square, sprite, false, nil)
-    GameEntityFactory.CreateIsoObjectEntity(thumpable, Tiles.tileEntity(sprite), true)
+    local thumpable = Tiles.newEntity(square, sprite)
     square:AddSpecialObject(thumpable)
     thumpable:setExplored(true)
     onCreate({ thumpable = thumpable })
@@ -462,7 +462,7 @@ function WorldSpawns.layModulesBeside(square, stockName)
         return 0
     end
     local room, beside = square:getRoom(), {}
-    RenewableEnergy.eachSquareAround(square:getX(), square:getY(), square:getZ(), 1, function(near)
+    Squares.eachAround(square:getX(), square:getY(), square:getZ(), 1, function(near)
         if near ~= square and near:getRoom() == room and near:isFree(false) then
             table.insert(beside, near)
         end

@@ -8,7 +8,7 @@ require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "PZHarness/Loot"
 require "RenewableEnergy/Sprites"
-require "RenewableEnergy/Debug/RenewableEnergyLoot"
+require "RenewableEnergy/Specs"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 
@@ -172,7 +172,7 @@ end
 local function partsContainer(defer)
     local restoreOptions = saveOptions(defer, { "LRMBatteries", "LRMMisc" })
     SandboxVars.RenewableEnergy.LRMBatteries = 0
-    return RenewableEnergy.Loot.newContainer(nil), restoreOptions
+    return PZHarness.Loot.scratchContainer(nil), restoreOptions
 end
 
 -- Every stock's parts are of their line's kind; the bank `args.stock` holds a part when the roll
@@ -342,7 +342,7 @@ end)
 
 -- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
 handler("bankStockCount", function(_, args, defer)
-    local container = RenewableEnergy.Loot.newContainer(nil)
+    local container = PZHarness.Loot.scratchContainer(nil)
     withRolls(defer, args.roll, RenewableEnergy.WorldSpawns.stockBank, container, args.stock)
     local count = container:getItems():size()
     container:removeAllItems()
@@ -373,7 +373,7 @@ end
 -- follows the Solar Panels loot option.
 check("crackedModules", function(expect, _, _, _, defer)
     local Distributions = RenewableEnergy.Distributions
-    local container = RenewableEnergy.Loot.newContainer(nil)
+    local container = PZHarness.Loot.scratchContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         -- The chance's roll, then the cracked condition's, at the middle of its range.
         withRolls(defer, { roll, 0.5 }, Distributions.addCrackedModules, roomName, containerType, container)

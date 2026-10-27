@@ -13,7 +13,9 @@ require "RenewableEnergy/PowerBank/Sources"
 require "RenewableEnergy/PowerBank/Treadmill"
 require "RenewableEnergy/Gadgets/VehicleBattery"
 require "RenewableEnergy/UI/StatusWindow"
-require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local Capture = require "PZHarness/Capture"
+local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
+local Squares = require "cf_commonlib/Squares"
 
 -- Helpers for the RenewableEnergyTests*.lua files: the shared harness's test library
 -- (PZHarness/TestLib.lua explains the runner and the rules every helper keeps), plus fixtures
@@ -29,9 +31,9 @@ local T = RenewableEnergyTest
 local PowerBank = RenewableEnergy.PowerBank
 local Sources, Treadmill = RenewableEnergy.Sources, RenewableEnergy.Treadmill
 
---- Queues setting the authority's Chance.roll until the test ends: `rolls` a number, every roll;
---- or a list, the next rolls in order, failing the call that draws one more. So a test checks
---- either side of a chance (Chance.hit) in one try each.
+--- Queues setting the authority's Chance.roll (cf_commonlib's) until the test ends: `rolls` a
+--- number, every roll; or a list, the next rolls in order, failing the call that draws one more.
+--- So a test checks either side of a chance (Chance.hit) in one try each.
 function T.forceRoll(self, rolls)
     T.server(self, "forceRoll", { rolls = rolls })
 end
@@ -122,7 +124,7 @@ end
 local function panelArrived(panel, bank)
     local here = panel.position
     return placedOn(panel.square) ~= nil
-        and (not panel.connected or PowerBank.samePosition(PowerBank.bankOfSource(here.x, here.y, here.z), bank.position))
+        and (not panel.connected or Squares.samePosition(PowerBank.bankOfSource(here.x, here.y, here.z), bank.position))
 end
 
 --- Queues a source tile of `sprite` (a panel mount, a wind charger, a treadmill) on
@@ -324,11 +326,11 @@ function T.snowfall(self, bank, hours, label)
 end
 
 --- The watts appliances of the kinds `names` draw together, at vanilla's figures
---- (RenewableEnergy.Loot.applianceWatts).
+--- (Yardsticks.applianceWatts).
 function T.applianceWatts(names)
     local watts = 0
     for _, name in ipairs(names) do
-        watts = watts + RenewableEnergy.Loot.applianceWatts(name)
+        watts = watts + Yardsticks.applianceWatts(name)
     end
     return watts
 end
@@ -428,7 +430,7 @@ end
 --- The status entry of the source at `position` in a bank state, or nil.
 function T.stateSource(state, position)
     for _, source in ipairs(state and state.status and state.status.sources or {}) do
-        if PowerBank.samePosition(source, position) then
+        if Squares.samePosition(source, position) then
             return source
         end
     end
@@ -507,15 +509,20 @@ function T.walkTo(self, square, what)
 end
 
 --- Queues opening the status window on `bank`, closed when the test ends, and a wait until it has
---- drawn the bank's status; the window lands in self.window. The character stands next to the
---- bank first, where the menu's Status walks them, as the window closes once they are out of reach.
+--- laid its rows out from the bank's status and the UI has drawn them; the window lands in
+--- self.window. The character stands next to the bank first, where the menu's Status walks them,
+--- as the window closes once they are out of reach.
 function T.openWindow(self, bank)
     T.step(function()
         T.standNextTo(bank.square)
         local window = RenewableEnergy.StatusWindow:openOn(0, bank.object)
         self.window = window
         T.defer(self, function() window:close() end)
-        T.waitFor(self, function() return (window.renderedFrames or 0) > 0 end, "the status window drawing the bank's status")
+        local drawn
+        T.waitFor(self, function()
+            drawn = drawn or (window.status ~= nil and Capture.drawn(1))
+            return drawn and drawn()
+        end, "the status window drawing the bank's status")
     end)
 end
 

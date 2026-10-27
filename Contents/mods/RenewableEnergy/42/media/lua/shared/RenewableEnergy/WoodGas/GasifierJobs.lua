@@ -79,11 +79,11 @@ GasifierJobs.JOBS = {
         blocker = function(character, summary)
             return summary.condensate < MIN_CONDENSATE and "Tooltip_RenewableEnergy_NoCondensate" or nil
         end,
+        with = function(item) return item:getFluidContainer() ~= nil end, withOptional = true,
+        withMissing = "Tooltip_RenewableEnergy_WontTakeCondensate",
         withRefusal = function(character, summary, item)
-            if item and not (character:getInventory():containsRecursive(item) and Gasifier.takesCondensate(item, summary.lit)) then
-                return "Tooltip_RenewableEnergy_WontTakeCondensate"
-            end
-            return nil
+            return item and not Gasifier.takesCondensate(item, summary.lit) and "Tooltip_RenewableEnergy_WontTakeCondensate"
+                or nil
         end,
     },
 }

@@ -10,13 +10,19 @@
 -- so they are exact for the lists and approximate where the game picks among them: a procedural
 -- container picks a list by weightChance, at most `max` per room, and lists forced by zone, tile
 -- or room are left out. Car batteries in room loot are counted apart: vanilla's, and every car
--- carries one besides.
+-- carries one besides. World banks, kit crates and arrow boards' battery boxes hold the mean of
+-- their own stocking functions over sampled fills (RenewableEnergyLoot's worldStocks), and a
+-- container keeps the cracked modules Distributions.addCrackedModules gives it the chance of, so
+-- a change to either reaches the report without an edit here.
 
 require "RenewableEnergy/Recipes"
 require "RenewableEnergy/Sun"
+require "RenewableEnergy/PowerBank/Battery"
+require "PZHarness/Loot"
 require "RenewableEnergy/Debug/RenewableEnergyLoot"
+local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
-local Loot = RenewableEnergy.Loot
+local Loot, PZLoot = RenewableEnergy.Loot, PZHarness.Loot
 local TownReport = {}
 
 local MODULE = RenewableEnergy.Specs.factoryModule
@@ -42,13 +48,9 @@ local function midpoint(range)
     return (range.min + range.max) / 2
 end
 
-local function batteryWh(fullType)
-    return RenewableEnergy.Specs.batteries[fullType].wh
-end
-
--- `count` batteries of `fullType` at `share` of full charge.
-local function batteriesOf(fullType, count, share)
-    return { batteries = count, wh = count * batteryWh(fullType) * (share or 1) }
+-- `count` new batteries of `fullType`.
+local function batteriesOf(fullType, count)
+    return { batteries = count, wh = count * RenewableEnergy.Specs.batteries[fullType].wh }
 end
 
 -- One module whose condition is uniform over the range. A scratch module takes each condition, so
@@ -72,26 +74,65 @@ local function mix(share, a, b)
         repaired = share * a.repaired + (1 - share) * b.repaired }
 end
 
--- An arrow board's modules, as many as the panel rarity option gives, one a panel at most, and
--- its battery box, worn from years on the road.
-local function arrowBoardFinds(weathered, second)
-    local ArrowBoard = RenewableEnergy.ArrowBoard
-    local stock = ArrowBoard.STOCK
-    local modules = math.min(#ArrowBoard.PANELS, stock.modules * SandboxVars.RenewableEnergy.LRMSolarPanels)
-    local total = add(none(), weathered, math.min(1, modules))
-    add(total, second, math.max(0, modules - 1))
-    return add(total, batteriesOf(stock.battery, midpoint(stock.batteries) * SandboxVars.RenewableEnergy.LRMBatteries,
-        midpoint(stock.batteryCondition) / 100))
+-- What one fill of a container holds, for PZHarness.Loot.sample: its modules with their condition
+-- as found and after Seal Cracked Module, and its batteries with their watt-hours after wear.
+local function findsIn(container)
+    local Recipes, Battery = RenewableEnergy.Recipes, RenewableEnergy.Battery
+    local finds = {}
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if item:getFullType() == MODULE then
+            local condition = item:getCondition()
+            add(finds, { modules = 1, condition = condition,
+                repaired = Recipes.isModuleBelowRepairCap(item) and Recipes.repairedCondition(item) or condition })
+        elseif Battery.isBattery(item) then
+            add(finds, { batteries = 1, wh = Battery.nominalWh(item) })
+        end
+    end
+    return finds
 end
 
-local function findKinds()
-    local WorldSpawns = RenewableEnergy.WorldSpawns
+-- What `fill` puts in `container` on average over `samples` fills.
+local function meanFinds(fill, samples, container)
+    local means = none()
+    for key, measured in pairs(PZLoot.sample(fill, samples, container, findsIn)) do
+        means[key] = measured.share * measured.perContainer
+    end
+    return means
+end
+
+-- An arrow board's panel modules, as many as the panel rarity option gives, one cracked at most.
+-- ArrowBoard stocks them straight into the trailer's panel parts, which a scratch container can't
+-- stand in for, so they are counted from its STOCK.
+local function arrowBoardPanels(weathered, second)
+    local ArrowBoard = RenewableEnergy.ArrowBoard
+    local modules = math.min(#ArrowBoard.PANELS, ArrowBoard.STOCK.modules * SandboxVars.RenewableEnergy.LRMSolarPanels)
+    local total = add(none(), weathered, math.min(1, modules))
+    return add(total, second, math.max(0, modules - 1))
+end
+
+-- The finds each source holds on average; banks and crates by their BANK_STOCK and CRATE_STOCK
+-- names, sampled over `samples` fills.
+local function findKinds(samples)
+    local WorldSpawns, ArrowBoard = RenewableEnergy.WorldSpawns, RenewableEnergy.ArrowBoard
     local cracked, weathered = moduleOver(WorldSpawns.CRACKED), moduleOver(WorldSpawns.WEATHERED)
+    local stocks, container = Loot.worldStocks(), PZLoot.scratchContainer(nil)
+    local banks, crates = {}, {}
+    for name, fill in pairs(stocks.banks) do
+        banks[name] = meanFinds(fill, samples, container)
+    end
+    for name, fill in pairs(stocks.crates) do
+        crates[name] = meanFinds(fill, samples, container)
+    end
+    local panels = arrowBoardPanels(weathered, mix(ArrowBoard.STOCK.secondCrackedChance, cracked, weathered))
     return {
         intact = { modules = 1, condition = 100, repaired = 100 },
         cracked = cracked,
         site = mix(WorldSpawns.SITE_CRACKED_SHARE, cracked, weathered),
-        arrowBoard = arrowBoardFinds(weathered, mix(RenewableEnergy.ArrowBoard.STOCK.secondCrackedChance, cracked, weathered)),
+        arrowBoard = add(panels, meanFinds(stocks.arrowBoard, samples, container)),
+        banks = banks,
+        crates = crates,
     }
 end
 
@@ -182,59 +223,22 @@ local function expectedInTown(town, fullType)
     return total
 end
 
--- Rolls per side of the grid wearShare averages the three wear rolls over.
-local WEAR_GRID = 20
-
--- The mean share of full condition the BATTERY_WEAR profile `wearName` leaves a battery, duds
--- included: WorldSpawns.foundPercent averaged over a grid of midpoints of its three rolls.
-local function wearShare(wearName)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    local wear, dud = WorldSpawns.BATTERY_WEAR[wearName], WorldSpawns.DUD
-    local sum = 0
-    for a = 0, WEAR_GRID - 1 do
-        for b = 0, WEAR_GRID - 1 do
-            for c = 0, WEAR_GRID - 1 do
-                sum = sum + WorldSpawns.foundPercent(wear, (a + 0.5) / WEAR_GRID, (b + 0.5) / WEAR_GRID,
-                    (c + 0.5) / WEAR_GRID)
-            end
-        end
+-- The expected number of chances fn() comes up on: Chance.hit adds each chance it is asked
+-- instead of rolling it, and answers no, so fn adds nothing.
+local function expectedHits(fn)
+    local Chance = require "cf_commonlib/Chance"
+    local hit, expected = Chance.hit, 0
+    Chance.hit = function(chance)
+        expected = expected + math.max(0, math.min(1, chance))
+        return false
     end
-    local chance = wear.dud or 0
-    return ((1 - chance) * sum / WEAR_GRID ^ 3 + chance * midpoint(dud)) / 100
+    PZLoot.restoring(fn, function() Chance.hit = hit end)
+    return expected
 end
 
--- A world crate stocked from WorldSpawns.CRATE_STOCK[name], each line as stockCrate rolls and
--- scales it.
-local function crateFinds(name, kinds)
-    local WorldSpawns = RenewableEnergy.WorldSpawns
-    local total = none()
-    for _, line in ipairs(WorldSpawns.CRATE_STOCK[name]) do
-        local count = (line[2] + line[3]) / 2 * (line[4] and SandboxVars.RenewableEnergy[line[4]] or 1)
-        if line[1] == MODULE then
-            add(total, kinds.site, count)
-        elseif RenewableEnergy.Specs.batteries[line[1]] then
-            add(total, batteriesOf(line[1], count, wearShare(WorldSpawns.CRATE_WEAR)))
-        end
-    end
-    return total
-end
-
--- The batteries a bank stocked as BANK_STOCK[stockName] holds on average.
-local function bankBatteries(stockName)
-    local stock = RenewableEnergy.WorldSpawns.BANK_STOCK[stockName]
-    local cap = RenewableEnergy.PowerBank.bankOfSprite(RenewableEnergy.Sprites[stock.sprite].S).spec.maxBatteries
-    local counts, count = 0, 0
-    for rolled = stock.batteries.min, stock.batteries.max do
-        count = count + math.min(cap, rolled * SandboxVars.RenewableEnergy.LRMBatteries)
-        counts = counts + 1
-    end
-    count = count / counts
-    local weights, wh = 0, 0
-    for _, entry in ipairs(stock.batteries.types) do
-        weights = weights + entry[2]
-        wh = wh + entry[2] * batteryWh(entry[1])
-    end
-    return { batteries = count, wh = count * wh / weights * wearShare(stock.batteries.wear) }
+-- The cracked modules a container of `containerType` in a room named `roomName` gets on average.
+local function roomCrackedModules(roomName, containerType, container)
+    return expectedHits(function() RenewableEnergy.Distributions.addCrackedModules(roomName, containerType, container) end)
 end
 
 -- What the rooms of a town hold: `listed`, the mod's items in room loot; `cracked`, cracked
@@ -243,7 +247,7 @@ end
 -- kit crates it places; and `cars`, car batteries in room loot. Banks and crates need Battery
 -- Bank Spawn on.
 local function roomFinds(town, kinds)
-    local Distributions, WorldSpawns = RenewableEnergy.Distributions, RenewableEnergy.WorldSpawns
+    local WorldSpawns = RenewableEnergy.WorldSpawns
     local row = { listed = add(none(), kinds.intact, expectedInTown(town, MODULE)), cracked = none(), banks = none(),
         banksByRoom = {}, crates = none(), cars = 0 }
     for _, fullType in ipairs(LOOSE_BATTERIES) do
@@ -252,12 +256,10 @@ local function roomFinds(town, kinds)
     for _, fullType in ipairs(CAR_BATTERIES) do
         row.cars = row.cars + expectedInTown(town, fullType)
     end
+    local container = PZLoot.scratchContainer(nil)
     for roomName, byType in pairs(town.containers) do
         for containerType, count in pairs(byType) do
-            local weight = Distributions.crackedModuleRoomWeight(roomName, containerType)
-            if weight > 0 then
-                add(row.cracked, kinds.cracked, count * Distributions.crackedModuleChance(weight))
-            end
+            add(row.cracked, kinds.cracked, count * roomCrackedModules(roomName, containerType, container))
         end
     end
     local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
@@ -265,15 +267,14 @@ local function roomFinds(town, kinds)
         for roomName, bank in pairs(WorldSpawns.BANK_ROOMS) do
             local placed = (town.rooms[roomName] or 0) / (bank.odds * rarity)
             row.banksByRoom[roomName] = placed
-            add(row.banks, bankBatteries(bank.stock), placed)
+            add(row.banks, kinds.banks[bank.stock], placed)
             local beside = WorldSpawns.BANK_STOCK[bank.stock].modules
             if beside then
                 add(row.banks, kinds.site, placed * beside.chance * midpoint(beside) * SandboxVars.RenewableEnergy.LRMSolarPanels)
             end
         end
-        local kit = crateFinds("kit", kinds)
         for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
-            add(row.crates, kit, (town.rooms[roomName] or 0) / (odds * rarity))
+            add(row.crates, kinds.crates.kit, (town.rooms[roomName] or 0) / (odds * rarity))
         end
     end
     return row
@@ -363,21 +364,31 @@ local function zoneVehicles(zoneName)
     return result
 end
 
+-- Stands in for the container of the part `partId` of a vehicle in the zone `zoneName`: all
+-- Distributions.addCrackedModules asks of it, its vehicle's zone and its part's id.
+local function partContainer(zoneName, partId)
+    local vehicle = { getZone = function() return zoneName end }
+    local part = { getId = function() return partId end }
+    return { getVehicle = function() return vehicle end, getVehiclePart = function() return part end }
+end
+
 -- The cracked modules one vehicle of the script holds in the vehicle zone `zoneName`: each of its
 -- containers that BaseVehicle.randomizeContainers fills rolls Distributions.addCrackedModules
 -- once. A part counts as a container when the script's loot names it, which leaves out its doors.
 local function vehicleCrackedModules(script, zoneName)
-    local Distributions = RenewableEnergy.Distributions
     local distribution = distributionOf(script)
     local vehicleScript = getScriptManager():getVehicle(script)
     if not (distribution and distribution.Normal and vehicleScript) then
         return 0
     end
+    local roomName = string.gsub(script, "^Base%.", "")
     local total = 0
     for i = 0, vehicleScript:getPartCount() - 1 do
         local partId = vehicleScript:getPart(i):getId()
         if distribution.Normal[partId] then
-            total = total + Distributions.crackedModuleChance(Distributions.crackedModuleVehicleWeight(zoneName, partId))
+            total = total + expectedHits(function()
+                RenewableEnergy.Distributions.addCrackedModules(roomName, partId, partContainer(zoneName, partId))
+            end)
         end
     end
     return total
@@ -425,10 +436,10 @@ local function siteFinds(site, kinds)
     end
     local stock = site.bank and (kind.bank or kind.wind)
     if stock then
-        add(total, bankBatteries(stock))
+        add(total, kinds.banks[stock])
     end
     if kind.crate then
-        add(total, crateFinds(kind.crate, kinds))
+        add(total, kinds.crates[kind.crate])
     end
     if site.arrowBoard then
         add(total, kinds.arrowBoard)
@@ -447,24 +458,19 @@ end
 
 -- Yardsticks ------------------------------------------------------------------------------------
 
-local CLEAR_ONLY = { { 1, Loot.WEATHER_MIX[1][2] } }
+local CLEAR_ONLY = { { 1, RenewableEnergy.Sun.CLEAR_WEATHER } }
 -- The 15th of July and of December, as days of the year.
 local MONTH_DAYS = { july = 196, december = 349 }
+-- Hours between the sun's positions a day is added up over.
+local SUN_STEP = 0.5
 
 -- Watt-hours a factory module at full condition on `mount` banks over the day `dayOfYear` under
--- `weather` (Loot.WEATHER_MIX's rows), in half-hour steps, at the save's Sunlight Multiplier.
+-- `weather` (Yardsticks.WEATHER_MIX's shape) at the save's latitude and Sunlight Multiplier.
+-- Sun.wattsFrom is proportional to the light, so it takes the day's light at once.
 local function moduleDayWh(dayOfYear, mount, weather)
-    local Sun = RenewableEnergy.Sun
-    local rated = RenewableEnergy.Specs.modules[MODULE].watts
     local latitude = getClimateManager():getSeason():getLat()
-    local step, wh = 0.5, 0
-    for hour = -12, 12 - step, step do
-        local sun = Sun.position(dayOfYear, hour + step / 2, latitude)
-        for _, part in ipairs(weather) do
-            wh = wh + part[1] * Sun.wattsFrom(rated, Sun.planeIrradiance(sun, mount[1], mount[2], part[2]), 0) * step
-        end
-    end
-    return wh
+    local light = Yardsticks.dayIrradiance(dayOfYear, mount, weather, latitude, SUN_STEP)
+    return RenewableEnergy.Sun.wattsFrom(RenewableEnergy.Specs.modules[MODULE].watts, light, 0)
 end
 
 -- Each kind of battery a bank holds; the three car batteries are alike, so one stands for them.
@@ -490,36 +496,36 @@ local function nightsToHalf(fullType, depth)
     return nights
 end
 
--- Prints what turns the finds into hours, and returns the average watt-hours a new module banks
--- on a south rack in a day of each of MONTH_DAYS.
-local function printYardsticks()
+-- Prints under `mark` what turns the finds into hours, and returns the average watt-hours a new
+-- module banks on a south rack in a day of each of MONTH_DAYS.
+local function printYardsticks(mark)
     local options = SandboxVars.RenewableEnergy
     local rackWh = {}
     for _, month in ipairs({ "july", "december" }) do
         local wh = {}
-        for name, mount in pairs(Loot.SOUTH_MOUNTS) do
-            wh[name] = { average = moduleDayWh(MONTH_DAYS[month], mount, Loot.WEATHER_MIX),
+        for name, mount in pairs(Yardsticks.SOUTH_MOUNTS) do
+            wh[name] = { average = moduleDayWh(MONTH_DAYS[month], mount, Yardsticks.WEATHER_MIX),
                 clear = moduleDayWh(MONTH_DAYS[month], mount, CLEAR_ONLY) }
         end
         rackWh[month] = wh.rack.average
-        print(string.format("RELootReport yardstick: a new module banks a day in mid-%s, average (clear): flat %.0f (%.0f), south rack %.0f (%.0f), south wall %.0f (%.0f) Wh at Sunlight Multiplier %.2f",
-            month, wh.flat.average, wh.flat.clear, wh.rack.average, wh.rack.clear, wh.wall.average, wh.wall.clear,
+        print(string.format("%s yardstick: a new module banks a day in mid-%s, average (clear): flat %.0f (%.0f), south rack %.0f (%.0f), south wall %.0f (%.0f) Wh at Sunlight Multiplier %.2f",
+            mark, month, wh.flat.average, wh.flat.clear, wh.rack.average, wh.rack.clear, wh.wall.average, wh.wall.clear,
             options.SunlightMultiplier))
     end
     local appliances = {}
-    for name in pairs(Loot.APPLIANCE_FUEL) do
-        table.insert(appliances, string.format("%s %.0f", name, Loot.applianceWatts(name)))
+    for name in pairs(Yardsticks.APPLIANCE_FUEL) do
+        table.insert(appliances, string.format("%s %.0f", name, Yardsticks.applianceWatts(name)))
     end
     table.sort(appliances)
-    print("RELootReport yardstick: appliance watts as a bank bills them: " .. table.concat(appliances, ", "))
+    print(mark .. " yardstick: appliance watts as a bank bills them: " .. table.concat(appliances, ", "))
     local function years(nights) return nights and string.format("%.1f", nights / 365) or "never" end
     local lives = {}
     for _, fullType in ipairs(LIFE_BATTERIES) do
         table.insert(lives, string.format("%s %s (%s)", fullType:match("[^.]+$"), years(nightsToHalf(fullType, 0.5)),
             years(nightsToHalf(fullType, 0.25))))
     end
-    print(string.format("RELootReport yardstick: years a new battery lasts to half capacity under a nightly load of half (a quarter) its new capacity, at Battery Wear %d%%: %s",
-        options.BatteryWear, table.concat(lives, ", ")))
+    print(string.format("%s yardstick: years a new battery lasts to half capacity under a nightly load of half (a quarter) its new capacity, at Battery Wear %d%%: %s",
+        mark, options.BatteryWear, table.concat(lives, ", ")))
     return rackWh
 end
 
@@ -539,19 +545,19 @@ local function batteriesText(finds)
     return string.format("%.1f (%.1f kWh)", finds.batteries, finds.wh / 1000)
 end
 
-local function printReport(census)
+local function printReport(census, samples, mark)
     local options, SolarSites = SandboxVars.RenewableEnergy, RenewableEnergy.SolarSites
-    local kinds = findKinds()
+    local kinds = findKinds(samples)
     local sites, siteBoards = {}, 0
-    print("RELootReport modules a thorough player finds, as count (watts as found / after Seal Cracked Module), and batteries, as count (kWh as found)")
-    print(string.format("RELootReport Battery Bank Spawn %d, Solar Sites %d%%", options.BatteryBankSpawn, options.SolarSites))
+    print(mark .. " modules a thorough player finds, as count (watts as found / after Seal Cracked Module), and batteries, as count (kWh as found)")
+    print(string.format("%s Battery Bank Spawn %d, Solar Sites %d%%", mark, options.BatteryBankSpawn, options.SolarSites))
     for _, site in ipairs(SolarSites.sites()) do
         local entry = { site = site, finds = siteFinds(site, kinds), chance = SolarSites.siteChance(site) }
         table.insert(sites, entry)
         if site.arrowBoard then
             siteBoards = siteBoards + entry.chance
         end
-        print(string.format("RELootReport site %s (%s) when placed: modules %s, batteries %s; %.0f%% of worlds", site.name,
+        print(string.format("%s site %s (%s) when placed: modules %s, batteries %s; %.0f%% of worlds", mark, site.name,
             site.kind, modulesText(entry.finds), batteriesText(entry.finds), entry.chance * 100))
     end
     local rows, zoneBoards = {}, 0
@@ -570,8 +576,8 @@ local function printReport(census)
             add(row.total, row[part])
         end
         rows[town.name] = row
-        print(string.format("RELootReport modules in %s: room loot %s, cracked %s, world crates %s, beside world banks %s, vehicles %s, sites %s; total %s",
-            town.name, modulesText(row.listed), modulesText(row.cracked), modulesText(row.crates), modulesText(row.banks),
+        print(string.format("%s modules in %s: room loot %s, cracked %s, world crates %s, beside world banks %s, vehicles %s, sites %s; total %s",
+            mark, town.name, modulesText(row.listed), modulesText(row.cracked), modulesText(row.crates), modulesText(row.banks),
             modulesText(row.vehicles), modulesText(row.sites), modulesText(row.total)))
         local banks, byRoom = 0, {}
         for roomName, placed in pairs(row.banksByRoom) do
@@ -579,34 +585,35 @@ local function printReport(census)
             table.insert(byRoom, string.format("%s %.1f", roomName, placed))
         end
         table.sort(byRoom)
-        print(string.format("RELootReport batteries in %s: room loot %s, world banks %.1f holding %s, kit crates %s, vehicles %s, sites %s; total %s; car batteries in room loot %.1f",
-            town.name, batteriesText(row.listed), banks, batteriesText(row.banks), batteriesText(row.crates),
+        print(string.format("%s batteries in %s: room loot %s, world banks %.1f holding %s, kit crates %s, vehicles %s, sites %s; total %s; car batteries in room loot %.1f",
+            mark, town.name, batteriesText(row.listed), banks, batteriesText(row.banks), batteriesText(row.crates),
             batteriesText(row.vehicles), batteriesText(row.sites), batteriesText(row.total), row.cars))
-        print(string.format("RELootReport world banks in %s by room: %s", town.name, table.concat(byRoom, ", ")))
+        print(string.format("%s world banks in %s by room: %s", mark, town.name, table.concat(byRoom, ", ")))
     end
-    print(string.format("RELootReport arrow boards per map: %.1f from vehicle zones, %.1f at sites", zoneBoards, siteBoards))
+    print(string.format("%s arrow boards per map: %.1f from vehicle zones, %.1f at sites", mark, zoneBoards, siteBoards))
     local stocks = {}
-    for name in pairs(RenewableEnergy.WorldSpawns.BANK_STOCK) do
+    for name in pairs(kinds.banks) do
         table.insert(stocks, name)
     end
     table.sort(stocks)
     for _, name in ipairs(stocks) do
-        print(string.format("RELootReport batteries in a %s bank: %s", name, batteriesText(bankBatteries(name))))
+        print(string.format("%s batteries in a %s bank: %s", mark, name, batteriesText(kinds.banks[name])))
     end
-    local rackWh = printYardsticks()
+    local rackWh = printYardsticks(mark)
     for _, town in ipairs(census.towns) do
         local total = rows[town.name].total
         local newModules = total.condition / 100
-        print(string.format("RELootReport power in %s: batteries store %.1f kWh; modules as found are %.1f new ones, banking %.1f kWh a day on south racks in July, %.1f in December",
-            town.name, total.wh / 1000, newModules, newModules * rackWh.july / 1000, newModules * rackWh.december / 1000))
+        print(string.format("%s power in %s: batteries store %.1f kWh; modules as found are %.1f new ones, banking %.1f kWh a day on south racks in July, %.1f in December",
+            mark, town.name, total.wh / 1000, newModules, newModules * rackWh.july / 1000, newModules * rackWh.december / 1000))
     end
 end
 
---- Prints the report, at the default loot settings and loot rarity options 1.
-function TownReport.print()
+--- Prints the report under `mark`, at the default loot settings and loot rarity options 1, with
+--- what world banks, crates and battery boxes hold measured over `samples` fills each.
+function TownReport.print(samples, mark)
     local census = require "RenewableEnergyDevTownCensus"
-    PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
-        Loot.withLootRarity(1, function() printReport(census) end)
+    PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
+        Loot.withLootRarity(1, function() printReport(census, samples, mark) end)
     end)
 end
 

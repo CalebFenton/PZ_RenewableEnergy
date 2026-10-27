@@ -1,6 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Specs"
 require "RenewableEnergy/Sun"
+local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
 -- Solar: the sun model (Sun.lua) and panels feeding a bank (PowerBank/PanelSource.lua, Sources.lua):
 -- module condition, panel slots, reconnecting, snow and roofs.
@@ -15,28 +16,16 @@ local LATITUDE = 38
 local SOLSTICE = 172
 local CLEAR = Sun.CLEAR_WEATHER
 
--- Weather with no fog, rain or snow, and `cloud` cover from 0 to 1.
-local function cloudy(cloud)
-    return { cloud = cloud, fog = 0, rain = 0, snowing = false, groundSnow = 0 }
-end
-
 -- Light on each mount summed over a year (or the given months), under the yardsticks' guessed mix
--- of clear, broken and overcast days (Loot.WEATHER_MIX). One day a week at half-hour steps keeps
--- it cheap.
+-- of clear, broken and overcast days. One day a week at half-hour steps keeps it cheap.
 local function yearTotals(months)
-    local Loot = RenewableEnergy.Loot
     local totals = { flat = 0, rack = 0, wall = 0 }
     local dayStep, step = 7, 0.5
     for day = 1, 365, dayStep do
         local month = math.min(12, math.floor((day - 1) / 30.42) + 1)
         if not months or months[month] then
-            for hour = -12, 12 - step, step do
-                local sun = Sun.position(day, hour, LATITUDE)
-                for name, mount in pairs(Loot.SOUTH_MOUNTS) do
-                    for _, part in ipairs(Loot.WEATHER_MIX) do
-                        totals[name] = totals[name] + part[1] * Sun.planeIrradiance(sun, mount[1], mount[2], part[2]) * step * dayStep
-                    end
-                end
+            for name, mount in pairs(Yardsticks.SOUTH_MOUNTS) do
+                totals[name] = totals[name] + Yardsticks.dayIrradiance(day, mount, Yardsticks.WEATHER_MIX, LATITUDE, step) * dayStep
             end
         end
     end
@@ -92,7 +81,7 @@ test("renewable_energy_solar_sun_noon_dawn_night", {
 test("renewable_energy_solar_sun_clouds", {
     run = function(self)
         local sun = Sun.position(SOLSTICE, 0, LATITUDE)
-        local overcast = cloudy(1)
+        local overcast = Yardsticks.cloudy(1)
         local function ratio(kind, facing)
             return Sun.planeIrradiance(sun, kind, facing, overcast) / Sun.planeIrradiance(sun, kind, facing, CLEAR)
         end

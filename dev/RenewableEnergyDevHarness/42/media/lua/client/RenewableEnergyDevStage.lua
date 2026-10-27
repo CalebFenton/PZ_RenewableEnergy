@@ -3,6 +3,7 @@
 -- PZHarness/Capture.lua runs the steps.
 
 require "PZHarness/Fixtures"
+require "PZHarness/Run"
 
 local Stage = {}
 
@@ -35,8 +36,8 @@ function Stage.spawnTrailer(square, facing)
 end
 
 --- Lines up and hitches the trailer of Stage.spawnTrailer's `pair`, opens its battery box and puts
---- a battery in it, and logs under `mark` whether both worked.
-function Stage.hitchTrailer(pair, player, mark)
+--- a battery in it, and logs under the run's mark whether both worked.
+function Stage.hitchTrailer(pair, player)
     local car, trailer = pair.car, pair.trailer
     PZHarness.Fixtures.lineUpTrailer(car, trailer, pair.facing)
     car:addPointConstraint(player, trailer, "trailer", "trailer")
@@ -49,7 +50,7 @@ function Stage.hitchTrailer(pair, player, mark)
     if container then
         container:AddItem(RenewableEnergy.ArrowBoard.STOCK.battery)
     end
-    print(string.format("%s trailer towedBy=%s lid=%s container=%s items=%d", mark,
+    print(string.format("%s trailer towedBy=%s lid=%s container=%s items=%d", PZHarness.run.mark,
         tostring(trailer:getVehicleTowedBy() == car), tostring(lid ~= nil), tostring(container ~= nil),
         container and container:getItems():size() or 0))
 end

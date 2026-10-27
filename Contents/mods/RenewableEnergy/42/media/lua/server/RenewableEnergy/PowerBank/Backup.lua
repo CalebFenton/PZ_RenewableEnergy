@@ -12,6 +12,7 @@ local Payers = require "RenewableEnergy/PowerBank/Payers"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local GasLines = require "RenewableEnergy/GasLine/GasLines"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
@@ -31,9 +32,9 @@ end
 -- square.
 local function generatorsInReach(bank)
     local found = {}
-    RenewableEnergy.eachSquareAround(bank.x, bank.y, bank.z, Specs.backupReach, function(square)
+    Squares.eachAround(bank.x, bank.y, bank.z, Specs.backupReach, function(square)
         local generator = square:getGenerator()
-        if RenewableEnergy.isGenerator(generator) and generator:isConnected() then
+        if GeneratorReach.isVanillaGenerator(generator) and generator:isConnected() then
             Payers.track(generator)
             table.insert(found, { generator = generator, failsafe = Squares.findObjectOn(square, isFailsafe) ~= nil })
         end
@@ -48,7 +49,7 @@ end
 local function failsafeBank(generator)
     local gx, gy, gz = PlaceTracker.objectPlace(generator)
     local reach, banks = Specs.backupReach, {}
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         if bank.z == gz and math.abs(bank.x - gx) <= reach and math.abs(bank.y - gy) <= reach then
             table.insert(banks, bank)
         end

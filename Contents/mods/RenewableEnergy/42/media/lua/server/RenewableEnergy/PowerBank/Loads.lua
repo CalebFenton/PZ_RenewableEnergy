@@ -11,8 +11,10 @@
 --
 -- The engine knows nothing of a treadmill's draw: a run says when it draws (Treadmill.isDrawing),
 -- and it is billed on the same squares as an appliance. Nor of another mod's appliances, such as
--- Enhanced Irrigation's Pump Houses: the mod says what each draws (Loads.addConsumer), and they are
--- billed the same way.
+-- Enhanced Irrigation's Pump Houses: the mod says what each draws (GeneratorReach.addDraw), and
+-- they are billed the same way. It is asked of every placed object in reach that isn't a vanilla
+-- appliance, a treadmill or a generator, floor tiles included. A vanilla generator's scan doesn't
+-- ask: its bill is vanilla's own total, so that mod bills a generator itself.
 
 if isClient() then return end
 
@@ -24,34 +26,6 @@ local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 local Loads = {}
 RenewableEnergy.Loads = Loads
-
--- The other mods' consumers (Loads.addConsumer), in the order added.
-local consumers = {}
-
---- Bills another mod's placed appliances on a bank: `consumer(object)` is asked of every placed
---- object in a bank's reach that isn't a vanilla appliance, a treadmill or a generator. Floor tiles
---- are included, dropped inventory objects are not. It answers the kind the status lists it as and
---- the generator fuel an hour it would draw now, in vanilla's units (getGeneratorPowerConsumption's),
---- powered or not, as an appliance's switch answers; or nil while
---- it draws nothing. The kind is a key of StatusWindow's LOAD_KINDS or a translation key of the
---- mod's own (IGUI_...). A vanilla generator's scan doesn't ask: its bill is vanilla's own total,
---- which knows nothing of another mod's machines, so that mod bills a generator itself. Server
---- only: a mod calls it from its own server files, which load after this one.
----@param consumer fun(object: IsoObject): string?, number?
-function Loads.addConsumer(consumer)
-    table.insert(consumers, consumer)
-end
-
--- The first consumer's answer for `object` that draws: its kind and fuel an hour; or nil.
-local function consumerDraw(object)
-    for _, consumer in ipairs(consumers) do
-        local kind, fuel = consumer(object)
-        if kind and fuel and fuel > 0 then
-            return kind, fuel
-        end
-    end
-    return nil
-end
 
 -- The kind of an object with a fridge or freezer container, as vanilla bills it: by its
 -- containers alone, so a mini fridge with its ice box is a fridge-freezer.
@@ -144,7 +118,7 @@ local function generatorFuel(object, allowExterior, gridGone)
 end
 
 local function isRunningGenerator(object)
-    return RenewableEnergy.isGenerator(object) and object:isActivated()
+    return GeneratorReach.isVanillaGenerator(object) and object:isActivated()
 end
 
 --- What `payer`, on `square`, pays for among `payers` (Payers.running), and the
@@ -178,7 +152,7 @@ function Loads.scan(square, payer, payers, gridGone)
                 Payers.track(object)
                 table.insert(load.generators, object)
             elseif not payer.generator then
-                local kind, fuel = consumerDraw(object)
+                local kind, fuel = GeneratorReach.drawOf(object)
                 if kind and offGrid(object, allowExterior, gridGone) and pays(object) then
                     Loads.add(load, kind, Specs.wattsFromFuel(fuel))
                 end

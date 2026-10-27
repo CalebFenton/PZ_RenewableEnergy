@@ -5,13 +5,14 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
+local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local StormNotice = require "RenewableEnergy/StormNotice"
 local Wind = require "RenewableEnergy/Wind"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Chance = require "cf_commonlib/Chance"
 local Tiles = require "cf_commonlib/Tiles"
 
 local WindSource = {}
@@ -175,14 +176,15 @@ end
 
 -- The chance that a wind charger left running through `hours` of a wind of `kph` breaks its
 -- blades, at their stormShare and the wind's strength over their break speed on it
--- (Chance.stormStrength), scaled by the StormDamage options: none while braked or broken already.
+-- (StormChance.stormStrength), scaled by the StormDamage options: none while braked or broken
+-- already.
 local function breakChance(source, kph, hours)
     local spec, blades = Specs.wind.turbines[source.kind], bladesOf(source)
     if source.braked or source.broken or not Wind.canBreak(spec, blades, kph) then
         return 0
     end
-    return Chance.stormDamage(Chance.stormPerHour(Specs.wind.blades[blades].stormShare),
-        hours * Chance.stormStrength(Wind.breakKph(spec, blades), kph))
+    return StormChance.stormDamage(StormChance.stormPerHour(Specs.wind.blades[blades].stormShare),
+        hours * StormChance.stormStrength(Wind.breakKph(spec, blades), kph))
 end
 
 -- No roll when the blades can't break, so a test's set rolls go only to chances that can come up.

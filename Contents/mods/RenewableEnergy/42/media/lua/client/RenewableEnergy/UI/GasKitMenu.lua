@@ -1,11 +1,10 @@
--- The Gas Conversion Kit's options in a vanilla generator's right-click menu, the generator info
--- window's fuel and gas lines, and Take Generator refused while a kit is fitted.
+-- The Gas Conversion Kit's options in a vanilla generator's right-click menu, and its Take
+-- Generator greyed out while a kit is fitted (GasKit refuses the action itself).
 
-require "ISUI/ISGeneratorInfoWindow"
-require "TimedActions/ISTakeGenerator"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
 
@@ -22,33 +21,32 @@ end
 function GasKitMenu.addOptions(playerNum, menu, generator)
     local state = GasKit.stateOf(generator)
     if not state then
-        JobOptions.add(menu, playerNum, Action, "kit", GasKit.INSTALL, generator)
+        JobOptions.add(menu, playerNum, GasKit, GasKit.INSTALL, generator)
         return
     end
     if state.source then
-        JobOptions.add(menu, playerNum, Action, "kit", GasKit.DISCONNECT, generator)
+        JobOptions.add(menu, playerNum, GasKit, GasKit.DISCONNECT, generator)
     else
         local sources = GasKit.sourcesNear(generator)
         local label = getText(Action.labelKey(GasKit.CONNECT))
         if #sources == 0 then
             Needs.refuse(menu:addOption(label), "Tooltip_RenewableEnergy_NoDigesterInReach", GasKit.REACH)
         else
-            local submenu = Needs.addSubMenu(menu, label)
+            local submenu = JobOptions.addSubMenu(menu, label)
             for _, source in ipairs(sources) do
-                JobOptions.add(submenu, playerNum, Action, "kit", GasKit.CONNECT, generator, source,
-                    sourceLabel(generator, source))
+                JobOptions.add(submenu, playerNum, GasKit, GasKit.CONNECT, generator, source, sourceLabel(generator, source))
             end
         end
     end
     for _, job in ipairs({ GasKit.TO_GAS, GasKit.TO_PETROL, GasKit.REMOVE }) do
-        JobOptions.add(menu, playerNum, Action, "kit", job, generator)
+        JobOptions.add(menu, playerNum, GasKit, job, generator)
     end
 end
 
 -- The kit's options go in vanilla's generator submenu, where the generator's other jobs are.
-JobOptions.onWorldMenu(RenewableEnergy.isGenerator, function(context, playerNum, character, generator)
+JobOptions.onWorldMenu(JobOptions.clicked(GeneratorReach.isVanillaGenerator), function(context, playerNum, character, generator)
     local name = getText("ContextMenu_Generator")
-    local menu = Needs.subMenuOf(context, name) or Needs.addSubMenu(context, name)
+    local menu = JobOptions.subMenuOf(context, name) or JobOptions.addSubMenu(context, name)
     GasKitMenu.addOptions(playerNum, menu, generator)
     if GasKit.hasKit(generator) then
         local take = menu:getOptionFromName(getText("ContextMenu_GeneratorTake"))
@@ -57,48 +55,5 @@ JobOptions.onWorldMenu(RenewableEnergy.isGenerator, function(context, playerNum,
         end
     end
 end)
-
--- Take Generator is refused while a kit is fitted.
-
-local vanillaIsValid = ISTakeGenerator.isValid
-function ISTakeGenerator:isValid()
-    return not GasKit.hasKit(self.generator) and vanillaIsValid(self)
-end
-
--- Generator info window: fuel and gas lines.
-
-local vanillaGetRichText = ISGeneratorInfoWindow.getRichText
-function ISGeneratorInfoWindow.getRichText(object, displayStats)
-    local text = vanillaGetRichText(object, displayStats)
-    local state = GasKit.stateOf(object)
-    if not (state and displayStats) then
-        return text
-    end
-    if state.onGas then
-        local shown = getText("IGUI_Generator_FuelAmount", math.ceil(object:getFuelPercentage()))
-        local tank = getText("IGUI_Generator_FuelAmount", math.ceil(state.tank / object:getMaxFuel() * 100))
-        local at = string.find(text, shown, 1, true)
-        if at then
-            text = string.sub(text, 1, at - 1) .. tank .. string.sub(text, at + #shown)
-        end
-    end
-    -- Rich text drops the space before a tag (ISRichTextPanel.paginate): <SPACE> keeps the red
-    -- words apart from the label.
-    local line
-    if state.stalled then
-        line = " <SPACE> <RED> " .. getText("IGUI_RenewableEnergy_GasStalled")
-    elseif state.outOfGas then
-        line = " <SPACE> <RED> " .. getText("IGUI_RenewableEnergy_GasOut")
-    elseif state.mode == "petrol" then
-        line = getText("IGUI_RenewableEnergy_GasPetrol")
-    elseif state.onGas then
-        line = getText("IGUI_RenewableEnergy_GasOn")
-    elseif not state.source then
-        line = getText("IGUI_RenewableEnergy_GasNoLine")
-    else
-        line = getText("IGUI_RenewableEnergy_GasNone")
-    end
-    return getText("IGUI_RenewableEnergy_GasKit") .. ": " .. line .. " <LINE> <RGB:1,1,1> " .. text
-end
 
 return GasKitMenu

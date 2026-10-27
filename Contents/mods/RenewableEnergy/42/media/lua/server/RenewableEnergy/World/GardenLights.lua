@@ -10,10 +10,10 @@ if isClient() then return end
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
-local Chance = require "RenewableEnergy/Chance"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
+local Chance = require "cf_commonlib/Chance"
 
 local GardenLights = {}
 RenewableEnergy.GardenLights = GardenLights

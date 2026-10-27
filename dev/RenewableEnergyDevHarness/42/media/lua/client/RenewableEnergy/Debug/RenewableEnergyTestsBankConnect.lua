@@ -4,6 +4,7 @@ require "RenewableEnergy/PowerBank/SourceJobs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 require "RenewableEnergy/UI/Format"
 require "RenewableEnergy/UI/Menu"
+local Squares = require "cf_commonlib/Squares"
 
 -- Power bank tests: connecting banks, and sources to them.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
@@ -216,7 +217,7 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
             self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
         end)
         T.job(self, "source", SourceJobs.CONNECT, panel.position, box.position, "onBox")
-        T.waitFor(self, function() return PowerBank.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
+        T.waitFor(self, function() return Squares.samePosition(PowerBank.connectedBank(panel.object), box.position) end,
             "this client's summary of the box listing the panel")
         T.step(function()
             -- Each fresh context reuses the player's one context menu, so read this one first.

@@ -10,6 +10,8 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local Chance = require "cf_commonlib/Chance"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 
@@ -21,13 +23,12 @@ local need, Fixtures = PZHarness.need, PZHarness.Fixtures
 local gameRoll
 local setRolls = setmetatable({}, { __mode = "k" })
 
---- Sets what Chance.roll gives until the test ends: `rolls` a number, every roll; or a list, the
---- next rolls in order, and an error once they run out, so a draw the test didn't expect shows.
---- The error puts the game's roll back first, so the draws after it, a pass's or a tick's, roll
---- as usual. Returns the function that puts the game's roll back; Fixtures.deferOnce
---- says when it runs.
+--- Sets what cf_commonlib's Chance.roll, which every draw of the mod's chances goes through, gives
+--- until the test ends: `rolls` a number, every roll; or a list, the next rolls in order, and an
+--- error once they run out, so a draw the test didn't expect shows. The error puts the game's roll
+--- back first, so the draws after it, a pass's or a tick's, roll as usual. Returns the function
+--- that puts the game's roll back; Fixtures.deferOnce says when it runs.
 function Helpers.forceRolls(defer, rolls)
-    local Chance = RenewableEnergy.Chance
     if not setRolls[Chance.roll] then
         gameRoll = Chance.roll
     end
@@ -341,7 +342,7 @@ local FIND = {
     gardenLight = function(square) return RenewableEnergy.SolarGardenLight.findOn(square) end,
     treadmill = function(square) return RenewableEnergy.Treadmill.findOn(square) end,
     wiredTreadmill = function(square) return Squares.findObjectOn(square, RenewableEnergy.Treadmill.isWiredTile) end,
-    generator = function(square) return Squares.findObjectOn(square, RenewableEnergy.isGenerator) end,
+    generator = function(square) return Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator) end,
 }
 for name, kind in pairs(KINDS) do
     FIND[name] = function(square) return Squares.findObjectOn(square, kind.isObject) end

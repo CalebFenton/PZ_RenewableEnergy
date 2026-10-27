@@ -10,6 +10,7 @@
 -- handlers must leave it alone.
 
 local Sprites = require "RenewableEnergy/Sprites"
+local Tiles = require "cf_commonlib/Tiles"
 
 local FAILSAFE = Sprites.failsafe
 
@@ -26,11 +27,8 @@ local function moveToTop(failsafe)
     square:AddSpecialObject(failsafe, last)
 end
 
-local function onObjectAdded(isoObject)
-    if Sprites.nameOf(isoObject) == FAILSAFE then
-        moveToTop(isoObject)
-    end
+local function isFailsafe(isoObject)
+    return Sprites.nameOf(isoObject) == FAILSAFE
 end
 
-MapObjects.OnLoadWithSprite(FAILSAFE, moveToTop, Sprites.LOAD_PRIORITY)
-Events.OnObjectAdded.Add(onObjectAdded)
+Tiles.onLoad({ FAILSAFE }, moveToTop, { matches = isFailsafe, added = true })

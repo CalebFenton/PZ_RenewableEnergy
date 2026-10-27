@@ -1,14 +1,14 @@
 -- The Solar Battery Charger: a small panel over a tray of vanilla batteries (Base.Battery), the
 -- only cell that lamps, radios and flashlights take. Placed outdoors, it charges them in daylight.
 --
--- It is a placed tile with a container. The container's filter is not saved with it, so it is
--- set again whenever the tile loads or is placed, on every side; the authority also keeps the
--- places of the chargers it has seen, and charges them
+-- It is a placed tile with a container, whose filter every side sets (Containers); the authority
+-- also keeps the places of the chargers it has seen, and charges them
 -- (server/RenewableEnergy/Gadgets/SolarCellChargerServer.lua).
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Sprites = require "RenewableEnergy/Sprites"
+local Containers = require "cf_commonlib/Containers"
 
 local SolarCellCharger = {}
 RenewableEnergy.SolarCellCharger = SolarCellCharger
@@ -36,16 +36,12 @@ function SolarCellCharger.acceptItem(container, item)
     return SolarCellCharger.isCell(item) and container:getItems():size() < SolarCellCharger.SLOTS
 end
 
-local function adoptContainer(isoObject)
-    RenewableEnergy.adoptContainer(isoObject:getContainer(), ACCEPT_FUNCTION)
-end
+Containers.filter({ sprites = { Sprites.cellCharger }, isObject = SolarCellCharger.isCharger, accept = ACCEPT_FUNCTION })
 
--- Every side needs the filter, but only the authority charges, so only it keeps places.
-local chargers = PlaceTracker.new({
+-- Only the authority charges, so only it keeps places.
+local chargers = not isClient() and PlaceTracker.new({
     sprites = { Sprites.cellCharger },
     matches = SolarCellCharger.isCharger,
-    onFound = adoptContainer,
-    keepPlaces = not isClient(),
 })
 
 --- Calls `fn(charger)` for every loaded charger the authority has seen. Authority only.

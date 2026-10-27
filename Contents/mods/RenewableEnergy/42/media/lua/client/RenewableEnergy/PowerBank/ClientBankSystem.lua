@@ -3,24 +3,19 @@
 --
 -- A multiplayer client gets plain copies of bank generators and containers, so it does on its copy
 -- what the server does: keep the generator out of the cell's update (else a gas generator's engine
--- sound runs), give the container its unsaved, unsent filter, and release the squares a running
--- bank powered when it is removed.
+-- sound runs) and release the squares a running bank powered when it is removed. The container's
+-- filter is set on every side (PowerBank's declaration).
 
-local Sprites = require "RenewableEnergy/Sprites"
 local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local ClientObjects = require "cf_commonlib/ClientObjects"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
+local Squares = require "cf_commonlib/Squares"
 
-local function adoptCopy(isoObject)
-    isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
-    PowerBank.adoptContainer(isoObject:getContainer())
-end
-
-local BankSystem = ClientObjects.define({
-    prefix = "RenewableEnergy_", name = "Bank", owner = PowerBank, isObject = PowerBank.isBank,
-    sprites = PowerBank.bankSprites(), loadPriority = Sprites.LOAD_PRIORITY,
-    adoptCopy = adoptCopy, adoptContainer = PowerBank.adoptContainer,
+local BankSystem = ClientObjects.define(PowerBank, {
+    adoptCopy = function(isoObject)
+        isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
+    end,
 })
 
 -- A bank the server places reaches a client in an ordered packet (AddItemToMapPacket) and its
@@ -31,7 +26,7 @@ if isClient() then
     Events.OnObjectAdded.Add(function(isoObject)
         local player = getPlayer()
         if player and PowerBank.isBank(isoObject) then
-            BankSystem.instance:sendCommand(player, "resync", { bank = PowerBank.positionOf(isoObject) })
+            BankSystem.instance:sendCommand(player, "resync", { bank = Squares.positionOf(isoObject) })
         end
     end)
 end
@@ -56,7 +51,7 @@ end
 --- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; besides
 --- watching, the server takes no command from a client but "resync".
 function PowerBank.watchStatus(player, bank)
-    local position = PowerBank.positionOf(bank)
+    local position = Squares.positionOf(bank)
     local key = keyOf(position)
     watching[key] = watching[key] or {}
     watching[key][player:getPlayerNum()] = true
@@ -65,7 +60,7 @@ end
 
 --- `player` stops watching the status of `bank`.
 function PowerBank.unwatchStatus(player, bank)
-    local position = PowerBank.positionOf(bank)
+    local position = Squares.positionOf(bank)
     local key = keyOf(position)
     BankSystem.instance:sendCommand(player, "unwatch", { bank = position })
     local players = watching[key]

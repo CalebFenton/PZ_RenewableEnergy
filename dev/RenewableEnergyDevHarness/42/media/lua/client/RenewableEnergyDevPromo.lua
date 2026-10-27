@@ -1,10 +1,10 @@
 -- Development only; dev/run-debug-client.sh --promo runs it instead of the tests. It builds the
 -- setups near the scenario start and saves the raw art that art/promo/compose.py lays out:
--- promo_<shot>.png screenshots, and REPromo.json naming each screenshot's regions and the item,
--- recipe and skill names in the game's language.
--- PROMO=<group>,... shoots only those groups, building only the setups they need. Shots of
--- anything but the world are taken on black and on white (PZHarness/Capture.lua), and the empty
--- floor too, so that art/promo/extract.py can find each item by difference.
+-- promo_<shot>.png screenshots, and <mark>.json naming each screenshot's regions and the item,
+-- recipe and skill names in the game's language, which the harness's lib/capture.py turns into
+-- art/promo/captures. PROMO=<group>,... shoots only those groups, building only the setups they
+-- need. Shots of anything but the world are taken on black and on white (PZHarness/Capture.lua),
+-- and the empty item floor too, so that lib/capture.py can find each item model by difference.
 
 require "PZHarness/Fixtures"
 require "RenewableEnergy/Specs"
@@ -32,28 +32,28 @@ require "PZHarness/StageLots"
 local Squares = require "cf_commonlib/Squares"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Places = require "RenewableEnergyDevPromoPlaces"
+local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 
 local Promo = {}
+
+-- The run whose steps are being added, and the places it found (Places.PLACES by name);
+-- Promo.capture makes them.
+local run, places
 
 local Sprites = RenewableEnergy.Sprites
 local PowerBank = RenewableEnergy.PowerBank
 
--- What the promo prints its progress under.
-local MARK = "REPromo"
 local DRAW_FRAMES = Capture.DRAW_FRAMES
 
 -- A recipe line that takes or fills any fluid container shows this one, by the fluid's type.
 local FLUID_CONTAINERS = { Acid = "RenewableEnergy.BatteryElectrolyte", Water = "Base.WaterBottle",
     RenewableEnergy_WoodVinegar = "Base.BottleCrafted" }
--- The literature that teaches the mod's recipes, the build menu's among them.
-local MAGAZINES = { "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2",
-    "RenewableEnergy.HomesteadPowerMag3", "RenewableEnergy.FemaPamphlet", "RenewableEnergy.HomesteadPowerMag4" }
 -- Banks take vanilla car batteries as they are, so the item sheet shows one.
 local VANILLA_ITEMS = { "Base.CarBattery1" }
 
 -- What the character wears at the homestead, a settler long into the apocalypse: road leathers,
 -- armour pieced together from scrap metal and tyres, goggles, a scarf against the dust, and a
--- sawn-off in hand. Elsewhere it wears the clothes it came with.
+-- sawn-off in hand. Elsewhere it wears the clothes it came with (OWN_CLOTHES).
 local SETTLER = {
     clothes = {
         "Base.Tshirt_DefaultTEXTURE", "Base.Jacket_LeatherBlack", "Base.Trousers_LeatherBlack",
@@ -64,6 +64,7 @@ local SETTLER = {
     },
     weapon = "Base.ShotgunSawnoff",
 }
+local OWN_CLOTHES = { ownClothes = true }
 
 -- Setups -------------------------------------------------------------------------------------------
 -- The banks, their parts and sources, the generators, digesters, gasifiers and wind chargers, and
@@ -92,8 +93,8 @@ local STAGE0_BOX = { "Base.CarBattery1", "Base.CarBattery1", "RenewableEnergy.Pl
 local CELL_BATTERIES = 4
 
 -- A digester well into its working life: how long it has made gas, its warmth, the share of its
--- potential it holds, its sludge, and the manure waiting in its hopper.
-local WORKING_DIGESTER = { ageHours = 24 * 30, temp = 32, potential = 0.6, sludge = 30,
+-- tier's potential cap it holds, its sludge, and the manure waiting in its hopper.
+local WORKING_DIGESTER = { gasHours = 24 * 30, temp = 32, potential = 0.6, sludge = 30,
     feed = { "Base.Dung_Cow", "Base.Dung_Cow", "Base.Dung_Pig" } }
 -- A gasifier at work: wood in its hopper, its filter packed with hay, a little of it already
 -- tarry, a fire going if lit, its ash pit part full and some condensate waiting.
@@ -105,7 +106,7 @@ local WORKING_GASIFIER = { wood = { "Base.Firewood", 6 },
 local function doJob(feature, job, target, with)
     local Action, player = RenewableEnergyAction, getPlayer()
     if not Action.completeJob(player, feature, job, target, with) then
-        print(MARK .. " " .. job .. " refused: " .. tostring(Action.jobsOf(feature).refusal(player, job, target, with)))
+        print(run.mark .. " " .. job .. " refused: " .. tostring(Action.jobsOf(feature).refusal(player, job, target, with)))
     end
 end
 
@@ -121,7 +122,7 @@ end
 -- Clears the ground cover off `area` of `place`, and with `fromWall` off the row along its wall
 -- (out 0) too.
 local function clearArea(place, area, fromWall)
-    Places.everyAreaSquare(place, area, function(square)
+    Harness.everyAreaSquare(place, area, function(square)
         Harness.clearGroundCover(square)
         return true
     end, fromWall and 0 or nil)
@@ -171,7 +172,7 @@ local function placePanels(bank, place, spots, mount, modules)
     for i, spot in ipairs(spots) do
         local sprite = mount and Sprites[mount][spot[3]][place.frame.facing] or Sprites.flat
         local held = modules and modules[i]
-        connect(bank, Harness.placeTile(Places.at(place, spot), sprite, held and { [PowerBank.MODULES_KEY] = held } or nil))
+        connect(bank, Harness.placeTile(Harness.at(place, spot), sprite, held and { [PowerBank.MODULES_KEY] = held } or nil))
     end
 end
 
@@ -199,7 +200,7 @@ local function quietNeighbourhood(homesteadSquare, stage0Square)
             end
         end)
     end
-    print(string.format("%s switched off %d lights and took away %d fridges", MARK, lights, fridges))
+    print(string.format("%s switched off %d lights and took away %d fridges", run.mark, lights, fridges))
 end
 
 -- Switches on lights in the building around `square`, nearest first, out of reach of the bank
@@ -221,7 +222,7 @@ local function switchOnLights(square, otherBank)
             end
         end
     end
-    print(MARK .. " switched on " .. switched .. " lights")
+    print(run.mark .. " switched on " .. switched .. " lights")
 end
 
 -- Gas, wind and treadmill ------------------------------------------------------------------------
@@ -244,19 +245,20 @@ local function placeRecord(kind, tile, square)
 end
 
 -- A digester of the Sprites.digester tile `tile` ("barrel.MetalDrum", "dome", ...) built on
--- `square`. It is made one at work (WORKING_DIGESTER), its record's `fields` set over that, a day
--- passed so that it eats from its hopper and says what it makes a day, and its holder `full` of
--- what it takes.
+-- `square`. It is made a mature one at work (Fixtures.matureDigester with WORKING_DIGESTER), its
+-- record's `fields` set over that, a day passed so that it eats from its hopper and says what it
+-- makes a day, and its holder `full` of what it takes.
 local function placeDigester(square, tile, full, fields)
     local thumpable = placeRecord("digester", tile, square)
     local record, working = RenewableEnergy.Digester.recordOf(thumpable), WORKING_DIGESTER
     for _, fullType in ipairs(working.feed) do
         thumpable:getContainer():AddItem(fullType)
     end
-    record.fed, record.started, record.gasHours = true, true, working.ageHours
-    record.temp = working.temp
-    record.potential = record:tierSpec().potentialCap * working.potential
-    record.sludge = working.sludge
+    local state = Fixtures.matureDigester(record.tier, { gasHours = working.gasHours, temp = working.temp,
+        potential = record:tierSpec().potentialCap * working.potential, sludge = working.sludge })
+    for key, value in pairs(state) do
+        record[key] = value
+    end
     for key, value in pairs(fields or {}) do
         record[key] = value
     end
@@ -327,8 +329,8 @@ end
 -- A generator plugged in and waiting at `layout.generator` of `place`, with a gas kit on a digester
 -- of the Sprites.digester tile `tile` at `layout.digester`. Returns the generator.
 local function placeKittedGenerator(place, layout, tile)
-    local generator = placeGenerator(Places.at(place, layout.generator), 0.7)
-    fitGasKit(generator, (placeDigester(Places.at(place, layout.digester), tile, 1)))
+    local generator = placeGenerator(Harness.at(place, layout.generator), 0.7)
+    fitGasKit(generator, (placeDigester(Harness.at(place, layout.digester), tile, 1)))
     return generator
 end
 
@@ -349,8 +351,8 @@ end
 local shown = {}
 
 local function buildHomestead()
-    local home = Places.places.homestead
-    quietNeighbourhood(home.bank, Places.at(Places.places.stage0, Places.STAGE0.box))
+    local home = places.homestead
+    quietNeighbourhood(home.bank, Harness.at(places.stage0, Places.STAGE0.box))
     clearArea(home, Places.OPEN, true)
     clearBankShot(home.bank, home.beside)
     shown.homesteadBank = placeBank(home.bank, Sprites.batteryBankMetal.S, HOMESTEAD_BANK, MORNING_CHARGE)
@@ -361,18 +363,18 @@ local function buildHomestead()
     -- gas kit on the insulated digester beside it.
     local generator = placeKittedGenerator(home, Places.HOMESTEAD, "insulated")
     Harness.placeTile(generator:getSquare(), Sprites.failsafe)
-    shown.homesteadCharger = placeWindCharger(Places.at(home, Places.HOMESTEAD.windCharger), Sprites.windCharger.propeller.wood[home.frame.facing])
+    shown.homesteadCharger = placeWindCharger(Harness.at(home, Places.HOMESTEAD.windCharger), Sprites.windCharger.propeller.wood[home.frame.facing])
     connect(shown.homesteadBank, shown.homesteadCharger)
     switchOn(shown.homesteadBank)
-    switchOnLights(shown.homesteadBank:getSquare(), Places.at(Places.places.stage0, Places.STAGE0.box))
+    switchOnLights(shown.homesteadBank:getSquare(), Harness.at(places.stage0, Places.STAGE0.box))
 end
 
 local function buildStage0()
-    local stage0 = Places.places.stage0
+    local stage0 = places.stage0
     clearArea(stage0, Places.STAGE0.open)
-    shown.stage0Box = placeBank(Places.at(stage0, Places.STAGE0.box), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
+    shown.stage0Box = placeBank(Harness.at(stage0, Places.STAGE0.box), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
     placePanels(shown.stage0Box, stage0, Places.STAGE0.flatPanels)
-    local charger = Harness.placeTile(Places.at(stage0, Places.STAGE0.cellCharger), Sprites.cellCharger)
+    local charger = Harness.placeTile(Harness.at(stage0, Places.STAGE0.cellCharger), Sprites.cellCharger)
     if not charger:getContainer() then
         charger:createContainersFromSpriteProperties()
     end
@@ -380,7 +382,7 @@ local function buildStage0()
         local battery = charger:getContainer():AddItem(RenewableEnergy.SolarCellCharger.BATTERY)
         battery:setCurrentUsesFloat(0.5)
     end
-    placeGardenLight(Places.at(stage0, Places.STAGE0.gardenLight))
+    placeGardenLight(Harness.at(stage0, Places.STAGE0.gardenLight))
     switchOn(shown.stage0Box)
 end
 
@@ -419,7 +421,7 @@ local FRAMING = {
 
 -- What the yard shots show; the bank stands indoors behind the wall, out of them.
 local function homesteadSquares()
-    return Places.squaresAt(Places.places.homestead, { Places.HOMESTEAD.generator, Places.HOMESTEAD.player, Places.HOMESTEAD.digester, Places.HOMESTEAD.windCharger },
+    return Harness.squaresAt(places.homestead, { Places.HOMESTEAD.generator, Places.HOMESTEAD.player, Places.HOMESTEAD.digester, Places.HOMESTEAD.windCharger },
         Places.HOMESTEAD.wallPanels, Places.HOMESTEAD.racks, Places.HOMESTEAD.flatPanels)
 end
 
@@ -429,11 +431,11 @@ local function placeSquares(name)
     for _, key in ipairs(layout.shot) do
         table.insert(shot, layout[key])
     end
-    return Places.squaresAt(Places.places[name], layout.chargers or {}, shot)
+    return Harness.squaresAt(places[name], layout.chargers or {}, shot)
 end
 
 local function stage0Squares()
-    return Places.squaresAt(Places.places.stage0, { Places.STAGE0.box, Places.STAGE0.player, Places.STAGE0.cellCharger, Places.STAGE0.gardenLight }, Places.STAGE0.flatPanels)
+    return Harness.squaresAt(places.stage0, { Places.STAGE0.box, Places.STAGE0.player, Places.STAGE0.cellCharger, Places.STAGE0.gardenLight }, Places.STAGE0.flatPanels)
 end
 
 
@@ -451,10 +453,6 @@ local WIND_INTENSITY = 0.3
 
 -- Steps ------------------------------------------------------------------------------------------
 
--- The run whose steps are being added, and the item and recipe names its data holds; Promo.capture
--- makes them.
-local run, catalog
-
 -- The items the item sheet shows: the mod's, but those that only sit in a vehicle part and the
 -- annotated maps, which are loot rather than something to build with, and VANILLA_ITEMS.
 local function sheetItems()
@@ -470,37 +468,10 @@ local function sheetItems()
     return fullTypes
 end
 
-
--- The clothes the character came with, and the settler's, each made once.
-local ownClothes, settlerClothes, settlerWeapon
-
 -- Adds the step that dresses the character as the settler, or with `settler` false back in the
 -- clothes it came with and empty-handed.
 local function addOutfit(settler)
-    run:add(function()
-        local player = getPlayer()
-        if not ownClothes then
-            ownClothes, settlerClothes = {}, {}
-            local worn = player:getWornItems()
-            for i = 0, worn:size() - 1 do
-                table.insert(ownClothes, worn:get(i):getItem())
-            end
-            for _, fullType in ipairs(SETTLER.clothes) do
-                table.insert(settlerClothes, player:getInventory():AddItem(fullType))
-            end
-            settlerWeapon = player:getInventory():AddItem(SETTLER.weapon)
-        end
-        player:clearWornItems()
-        for _, item in ipairs(settler and settlerClothes or ownClothes) do
-            player:setWornItem(item:IsClothing() and item:getBodyLocation() or item:canBeEquipped(), item)
-        end
-        local held = settler and settlerWeapon or nil
-        player:setPrimaryHandItem(held)
-        player:setSecondaryHandItem(held and held:isTwoHandWeapon() and held or nil)
-        triggerEvent("OnClothingUpdated", player)
-        player:resetModelNextFrame()
-        return DRAW_FRAMES
-    end)
+    Harness.addOutfit(run, getPlayer(), settler and SETTLER or OWN_CLOTHES)
 end
 
 -- Logs each bank's status as the window would read it. The promo runs single player, where the
@@ -516,7 +487,7 @@ local function logBanks()
             table.insert(kinds, string.format("%d %s %.0f W", kind.count, kind.kind, kind.watts))
         end
         print(string.format("%s %s bank: %s, %.0f W in, %.0f W load of %.0f W (%s), %.0f%% charged,"
-            .. " %d of %d input slots, source reasons %s", MARK, name, status.state, status.inW, status.loadW, status.limitW,
+            .. " %d of %d input slots, source reasons %s", run.mark, name, status.state, status.inW, status.loadW, status.limitW,
             table.concat(kinds, ", "), status.charge * 100, status.inputSlots.used, status.inputSlots.total,
             table.concat(reasons, ",")))
     end
@@ -526,8 +497,8 @@ end
 local function addSetups()
     run:add(function()
         getGameTime():setTimeOfDay(MORNING)
-        removeTrees(Places.places.homestead)
-        removeTrees(Places.places.stage0)
+        removeTrees(places.homestead)
+        removeTrees(places.stage0)
         buildHomestead()
         buildStage0()
         chargeThroughMorning()
@@ -537,9 +508,9 @@ local function addSetups()
 end
 
 local function addWorld()
-    local home = Places.places.homestead
-    local scouts = Places.loadedSquares(home, Places.HOMESTEAD.scouts)
-    table.insert(scouts, Places.at(home, Places.HOMESTEAD.player))
+    local home = places.homestead
+    local scouts = Harness.loadedSquares(home, Places.HOMESTEAD.scouts)
+    table.insert(scouts, Harness.at(home, Places.HOMESTEAD.player))
     addOutfit(true)
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
     Harness.addGoTo(run, getPlayer(), scouts, 1)
@@ -569,7 +540,7 @@ local function addWorld()
     -- Stage 0 is small, so it gets the closest zoom too. The character sees the panels first from
     -- among them, then from the window, early on, in the clothes it came with.
     addOutfit(false)
-    Harness.addGoTo(run, getPlayer(), Places.squaresAt(Places.places.stage0, { Places.STAGE0.scout, Places.STAGE0.player }), 0)
+    Harness.addGoTo(run, getPlayer(), Harness.squaresAt(places.stage0, { Places.STAGE0.scout, Places.STAGE0.player }), 0)
     run:addOpaque("stage0", function()
         return { Harness.centred("stage0", stage0Squares(), FRAMING) }
     end)
@@ -590,12 +561,12 @@ local function addWindowShot(name, windowClass, objectOf, ready)
     })
 end
 
--- The homestead bank's status window, which lays its rows out from the bank's status as it draws.
+-- The homestead bank's status window, once it has laid its rows out from the bank's status.
 local function addStatus()
     addWindowShot("status", RenewableEnergy.StatusWindow, function()
-        return PowerBank.findOn(Places.places.homestead.bank)
+        return PowerBank.findOn(places.homestead.bank)
     end, function(window)
-        return (window.renderedFrames or 0) >= 2
+        return window.status ~= nil
     end)
 end
 
@@ -639,67 +610,10 @@ local function addMenu()
     end)
 end
 
--- Where extract.py looks for the item in a studio shot: STUDIO.window around the studio
--- square's floor centre, kept on the screen.
-local function studioWindow(name)
-    local x, y = Harness.onScreen(Places.places.studio.origin)
-    local window = Places.STUDIO.window
-    return Harness.screenRegion(name, x - window.half, y - window.up, x + window.half, y + window.down)
-end
-
--- Every item alone on the studio floor. `models` gets one entry per item.
-local function addModels(items, models)
-    local group = run.current
-    local studio = Places.places.studio
-    local floorSquare = studio.origin
-    run:add(function()
-        local asphalt = Places.places.road.origin:getFloor():getSprite():getName()
-        print(MARK .. " item floor " .. asphalt)
-        Places.everyAreaSquare(studio, Places.STUDIO.floor, function(square)
-            Harness.clearGroundCover(square)
-            if Harness.isOpenGround(square) then
-                square:addFloor(asphalt)
-            end
-            return true
-        end)
-        Harness.pushClosestZoom()
-        -- Every item at once, so that their models load while the character looks around: Lua
-        -- can't tell when a model has loaded, and a loaded one draws on the next frame.
-        for _, item in ipairs(items) do
-            floorSquare:AddWorldInventoryItem(instanceItem(item.fullType), 0.5, 0.5, 0)
-        end
-    end)
-    Harness.addGoTo(run, getPlayer(), { Places.at(studio, Places.STUDIO.player) }, 0)
-    local floor = run.prefix .. "models_floor"
-    run:add(function()
-        floorSquare:removeAllWorldObjects()
-        return DRAW_FRAMES
-    end)
-    run:add(function()
-        run:screenshot(floor)
-    end)
-    for _, item in ipairs(items) do
-        local name = "model_" .. string.gsub(item.fullType, "%.", "_")
-        run:add(function()
-            local placed = instanceItem(item.fullType)
-            placed:setWorldZRotation(Places.STUDIO.rotation)
-            floorSquare:AddWorldInventoryItem(placed, 0.5, 0.5, 0)
-            return DRAW_FRAMES
-        end)
-        run:add(function()
-            local file = run.prefix .. name
-            run:screenshot(file)
-            table.insert(models, { name = name, group = group, file = file, floor = floor, window = studioWindow(name) })
-            floorSquare:removeAllWorldObjects()
-        end)
-    end
-    run:add(Harness.popClosestZoom)
-end
-
 -- The arrow board trailer hitched to a car on the road, cones behind it, a step out from the
 -- closest zoom.
 local function addTrailer()
-    local road = Places.places.road
+    local road = places.road
     local pair
     addOutfit(false)
     run:add(function()
@@ -708,36 +622,36 @@ local function addTrailer()
         removeTrees(road)
         Harness.removeVehicles(x - reach, y - reach, x + reach, y + reach, z)
         for _, spot in ipairs(Places.ROAD.cones) do
-            Harness.placeTile(Places.at(road, spot), Places.ROAD.cone)
+            Harness.placeTile(Harness.at(road, spot), Places.ROAD.cone)
         end
         pair = Stage.spawnTrailer(carSquare, road.frame.facing)
         return Stage.vehiclesAtRest(pair, false)
     end)
     run:add(function()
-        Stage.hitchTrailer(pair, getPlayer(), MARK)
+        Stage.hitchTrailer(pair, getPlayer())
         -- Its arrow lit, as work zones leave them.
         Stage.holdLampsLit(pair.trailer)
         return Stage.vehiclesAtRest(pair, true)
     end)
     -- From the item floor first, as a full run's character has by now: the hedges and fences along
     -- a road hide what lies past them from the road itself.
-    Harness.addGoTo(run, getPlayer(), { Places.at(Places.places.studio, Places.STUDIO.player), Places.at(road, Places.ROAD.player) }, 1)
+    Harness.addGoTo(run, getPlayer(), { Harness.at(places.studio, Harness.STUDIO.player), Harness.at(road, Places.ROAD.player) }, 1)
     run:addOpaque("trailer", function()
         -- The car's nose, the trailer, the character and the cones.
-        return { Harness.centred("trailer", Places.squaresAt(road, { { 2, 0 }, Places.ROAD.trailer, Places.ROAD.player }, Places.ROAD.cones), FRAMING) }
+        return { Harness.centred("trailer", Harness.squaresAt(road, { { 2, 0 }, Places.ROAD.trailer, Places.ROAD.player }, Places.ROAD.cones), FRAMING) }
     end)
 end
 
 -- Garden lights along a house's front walk, charged and lit at night, at the closest zoom.
 local function addGardenLights()
     local SolarGardenLight = RenewableEnergy.SolarGardenLight
-    local walk = Places.places.walk
+    local walk = places.walk
     addOutfit(false)
     run:add(function()
         removeTrees(walk)
         clearArea(walk, Places.WALK.open)
         for _, spot in ipairs(Places.WALK.lights) do
-            placeGardenLight(Places.at(walk, spot), spot.bulb)
+            placeGardenLight(Harness.at(walk, spot), spot.bulb)
         end
         getGameTime():setTimeOfDay(Places.WALK.hour)
         -- The lighting takes most of a second to follow the clock.
@@ -748,9 +662,9 @@ local function addGardenLights()
         -- looks around.
         SolarGardenLight.updateAll(0)
     end)
-    Harness.addGoTo(run, getPlayer(), Places.squaresAt(walk, { Places.WALK.scout, Places.WALK.player }), 0)
+    Harness.addGoTo(run, getPlayer(), Harness.squaresAt(walk, { Places.WALK.scout, Places.WALK.player }), 0)
     run:addOpaque("gardenlights", function()
-        return { Harness.centred("gardenlights", Places.squaresAt(walk, { { 0, -1 }, Places.WALK.player }, Places.WALK.lights), FRAMING) }
+        return { Harness.centred("gardenlights", Harness.squaresAt(walk, { { 0, -1 }, Places.WALK.player }, Places.WALK.lights), FRAMING) }
     end)
 end
 
@@ -758,21 +672,21 @@ end
 -- and kitted generator on a brick dome's gas. What stands in the band in front of the yard goes
 -- down to the floor, as a clothesline or a shrub there would stand over the racks in the shot.
 local function buildPoster()
-    local poster = Places.places.poster
-    Places.everyAreaSquare(poster, Places.POSTER.front, function(square)
+    local poster = places.poster
+    Harness.everyAreaSquare(poster, Places.POSTER.front, function(square)
         Harness.clearToFloor(square)
         return true
     end)
     clearArea(poster, Places.POSTER.open, true)
-    local posterBank = placeBank(Places.at(poster, Places.POSTER.bank), Sprites.batteryBankMetal.S, HOMESTEAD_BANK, 1)
+    local posterBank = placeBank(Harness.at(poster, Places.POSTER.bank), Sprites.batteryBankMetal.S, HOMESTEAD_BANK, 1)
     placePanels(posterBank, poster, Places.POSTER.racks, "rack")
-    connect(posterBank, placeWindCharger(Places.at(poster, Places.POSTER.windCharger), Sprites.windCharger.alternator.steel[poster.frame.facing]))
+    connect(posterBank, placeWindCharger(Harness.at(poster, Places.POSTER.windCharger), Sprites.windCharger.alternator.steel[poster.frame.facing]))
     placeKittedGenerator(poster, Places.POSTER, "dome")
     switchOn(posterBank)
 end
 
 local function addPoster()
-    local poster = Places.places.poster
+    local poster = places.poster
     -- The settler in the yard at noon, after the garden lights' night.
     addOutfit(true)
     run:add(function()
@@ -780,13 +694,13 @@ local function addPoster()
         getGameTime():setTimeOfDay(NOON)
         buildPoster()
     end)
-    local scouts = Places.loadedSquares(poster, Places.POSTER.indoors, function(square)
+    local scouts = Harness.loadedSquares(poster, Places.POSTER.indoors, function(square)
         return RenewableEnergy.Debug.isFreeSquare(square, true)
     end)
-    for _, square in ipairs(Places.loadedSquares(poster, Places.POSTER.scouts)) do
+    for _, square in ipairs(Harness.loadedSquares(poster, Places.POSTER.scouts)) do
         table.insert(scouts, square)
     end
-    table.insert(scouts, Places.at(poster, Places.POSTER.player))
+    table.insert(scouts, Harness.at(poster, Places.POSTER.player))
     Harness.addGoTo(run, getPlayer(), scouts, Places.POSTER.zoomOut)
     -- The clock turned before the looking around, which outlasts the lighting's change.
     run:add(function()
@@ -794,7 +708,7 @@ local function addPoster()
     end)
     run:addOpaque("poster", function()
         -- The smallest square around the yard, kept on the screen.
-        return { Harness.squareRegion("poster", Places.squaresAt(Places.places.poster, Places.POSTER.racks,
+        return { Harness.squareRegion("poster", Harness.squaresAt(places.poster, Places.POSTER.racks,
             { Places.POSTER.player, Places.POSTER.generator, Places.POSTER.digester, Places.POSTER.windCharger }), FRAMING) }
     end)
 end
@@ -803,16 +717,16 @@ end
 
 -- A function giving the square of the place `name` at its LAYOUTS position `key`.
 local function spotsOf(name)
-    local place, layout = Places.places[name], Places.LAYOUTS[name]
+    local place, layout = places[name], Places.LAYOUTS[name]
     return function(key)
-        return Places.at(place, layout[key])
+        return Harness.at(place, layout[key])
     end
 end
 
 -- Clears the trees around the place `name` and the ground cover of its band.
 local function clearYard(name)
-    removeTrees(Places.places[name])
-    clearArea(Places.places[name], Places.LAYOUTS[name].open)
+    removeTrees(places[name])
+    clearArea(places[name], Places.LAYOUTS[name].open)
 end
 
 -- Has the character look around the place `name` from its scout square, if it has one,
@@ -820,9 +734,9 @@ end
 -- zoom.
 local function goToPlace(name, stepsOut, standAt)
     local layout = Places.LAYOUTS[name]
-    local squares = { Places.at(Places.places[name], layout[standAt or "player"]) }
+    local squares = { Harness.at(places[name], layout[standAt or "player"]) }
     if layout.scout then
-        table.insert(squares, 1, Places.at(Places.places[name], layout.scout))
+        table.insert(squares, 1, Harness.at(places[name], layout.scout))
     end
     Harness.addGoTo(run, getPlayer(), squares, stepsOut)
 end
@@ -897,7 +811,7 @@ local function addWind()
     run:add(function()
         clearYard("wind")
         for _, spot in ipairs(Places.LAYOUTS.wind.chargers) do
-            placeWindCharger(Places.at(Places.places.wind, spot), spot.sprite)
+            placeWindCharger(Harness.at(places.wind, spot), spot.sprite)
         end
         return DRAW_FRAMES
     end)
@@ -939,16 +853,34 @@ local function addTreadmill()
     end)
 end
 
--- The groups of dev/harness.conf's MODE_GROUPS_promo: the places of Places.find their steps use,
--- whether they need both setups built, and what adds their steps. A run looks only for its groups'
--- places, so that one group can't fail for want of a place another needs.
+-- Whether this run has built both setups: the first group that needs them builds them.
+local setupsBuilt
+
+-- `add` (a group's), after both setups are built.
+local function withSetups(add)
+    return function(data)
+        if not setupsBuilt then
+            addSetups()
+            setupsBuilt = true
+        end
+        add(data)
+    end
+end
+
+-- The groups of dev/harness.conf's MODE_GROUPS_promo but the harness's `icons`: the places of
+-- Places.PLACES their steps use, and what adds their steps.
 local GROUPS = {
-    world = { places = { "homestead", "stage0" }, setups = true, add = addWorld },
-    status = { places = { "homestead", "stage0" }, setups = true, add = addStatus },
-    menu = { places = { "homestead", "stage0" }, setups = true, add = addMenu },
-    icons = { places = {}, add = function() run:addIconSheet("icons", catalog:iconList()) end },
+    world = { places = { "homestead", "stage0" }, add = withSetups(addWorld) },
+    status = { places = { "homestead", "stage0" }, add = withSetups(addStatus) },
+    menu = { places = { "homestead", "stage0" }, add = withSetups(addMenu) },
     -- The item floor is the road's asphalt.
-    models = { places = { "road", "studio" }, add = function(data) addModels(data.items, data.models) end },
+    models = {
+        places = { "road", "studio" },
+        add = function(data)
+            Harness.addFloorModels(run, places.studio, data.items, data.models,
+                places.road.origin:getFloor():getSprite():getName())
+        end,
+    },
     -- The character looks around from the item floor first, as a full run's has by then.
     trailer = { places = { "road", "studio" }, add = addTrailer },
     biogas = { places = { "biogas" }, add = addBiogas },
@@ -959,47 +891,27 @@ local GROUPS = {
     poster = { places = { "poster" }, add = addPoster },
 }
 
--- Finds the places `chosen` groups need and adds the step that sets the world every shot is taken
--- in: noon without grid power, a breeze that turns the wind chargers, and no radio captions around
--- the places. Returns nil, or what it couldn't find.
-local function prepare(chosen)
-    local needs = Harness.groupNeeds(GROUPS, chosen, "places")
-    local origins, missing = Places.find(getPlayer(), needs, MARK)
-    if not origins then
-        return "within " .. Harness.SEARCH_RADIUS .. " squares, no " .. missing
-    end
-    run:add(function()
-        -- The grid would power the squares and leave the bank nothing to run.
-        PZHarness.Fixtures.setGrid(false)
-    end)
-    Harness.addWorldSettings(run, { hour = NOON, wind = WIND_INTENSITY, origins = origins })
-end
-
 --- Shoots the groups named in `selection`, comma-separated in the order to shoot them, which
 --- run-client.sh gives every group of MODE_GROUPS_promo when PROMO names none, and calls onDone.
+--- Every shot is taken at noon without grid power, in a breeze that turns the wind chargers.
 function Promo.capture(selection, onDone)
-    run = Capture.new(MARK)
-    catalog = Capture.newCatalog({ prefer = RenewableEnergy.Debug.PREFERRED_INPUTS, fluidContainers = FLUID_CONTAINERS,
-        literature = MAGAZINES })
-    -- The names come with every run, since they cost no shot.
-    local data = {
-        items = catalog:items(sheetItems()),
-        recipes = catalog:recipes(),
-        models = {},
-        strings = { modName = getText("Sandbox_RenewableEnergy") },
-    }
-    -- The first group that needs the setups builds them.
-    local adders, setupsBuilt = {}, false
-    for name, group in pairs(GROUPS) do
-        adders[name] = function()
-            if group.setups and not setupsBuilt then
-                addSetups()
-                setupsBuilt = true
-            end
-            group.add(data)
-        end
-    end
-    Harness.runGroups(run, selection, adders, prepare, data, onDone)
+    run, setupsBuilt = Capture.new(), false
+    Harness.runGroups(run, selection, {
+        groups = GROUPS,
+        places = Places.PLACES,
+        gap = Places.GAP,
+        catalog = Capture.newCatalog({ prefer = RenewableEnergy.Debug.PREFERRED_INPUTS, fluidContainers = FLUID_CONTAINERS }),
+        items = sheetItems(),
+        data = { models = {}, strings = { modName = getText("Sandbox_RenewableEnergy") } },
+        prepare = function(_, found, origins)
+            places = found
+            run:add(function()
+                -- The grid would power the squares and leave the bank nothing to run.
+                PZHarness.Fixtures.setGrid(false)
+            end)
+            Harness.addWorldSettings(run, { hour = NOON, wind = WIND_INTENSITY, origins = origins })
+        end,
+    }, onDone)
 end
 
 return Promo

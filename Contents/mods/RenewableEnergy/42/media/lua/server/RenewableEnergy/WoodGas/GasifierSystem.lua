@@ -4,16 +4,15 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local ObjectSystem = require "RenewableEnergy/ObjectSystem"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
 local GasifierObject = require "RenewableEnergy/WoodGas/GasifierObject"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Items = require "cf_commonlib/Items"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
-local GasifierSystem = ObjectSystem.define({
-    name = "Gasifier", kind = "gasifier", owner = Gasifier, Object = GasifierObject, isObject = Gasifier.isGasifier,
-})
+-- Its OnCreate is the build menu's (scripts/RenewableEnergy/Entities.txt).
+local GasifierSystem = LibObjectSystem.define(Gasifier, { Object = GasifierObject, loadOnCreate = true })
 RenewableEnergy.GasifierSystem = GasifierSystem
 
 -- What each job does to the gasifier's record `record` (its tile `isoObject`) beyond taking its
@@ -51,5 +50,7 @@ local DO = {
 --- The authority's side of the jobs at a record (Jobs.perform), whose `with` is the container
 --- Drain Condensate fills.
 GasifierSystem.jobSite = LibObjectSystem.jobSite(Gasifier, DO)
+
+Action.serve({ gasifier = GasifierSystem.jobSite })
 
 return GasifierSystem

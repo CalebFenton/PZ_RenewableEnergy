@@ -123,7 +123,7 @@ Sprite names in `RenewableEnergy/Sprites.lua`: tilesets `renewable_energy_01` (1
 ### Menus
 
 - Our options pass the bank, source, light, digester or gasifier as a parameter, so look mode keeps them. Refusals made with no arguments (cf_commonlib's `Needs.refuse(menu:addOption(label))`) survive only inside a submenu, and their tooltip reasons are lost.
-- Look mode targets one object. Our hooks find their object by scanning the square (`Needs.findClicked`), so aiming at another object on the same square (a generator under a failsafe, a vanilla object beside a bank) builds our options referencing our object, not the aimed one, and they are dropped.
+- Look mode targets one object. Our hooks find their object by scanning the square (`JobOptions.findClicked`), so aiming at another object on the same square (a generator under a failsafe, a vanilla object beside a bank) builds our options referencing our object, not the aimed one, and they are dropped.
 - Lost in look mode: Seal Cracked Panel, Repair Frame and Attach/Detach Solar Maintainer (`UI/Menu.lua`, found with `PickVehicle`). Kept: the trailer's radial slices (`UI/BatteryBoxLid.lua` uses the globals at call time and `addSlice`).
 - The hooks have no side effects (no commands, sounds or state), which matters because harvest runs them unseen and often.
 - The pre-fill hook in `!_RenewableEnergy_ContextMenu.lua` still runs, so banks keep hiding vanilla's generator menu.

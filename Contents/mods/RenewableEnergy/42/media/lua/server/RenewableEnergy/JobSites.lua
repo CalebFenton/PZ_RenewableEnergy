@@ -1,7 +1,6 @@
--- The authority's side of the hands-on jobs at banks, sources, treadmills, garden lights, vanilla
--- wood fires and vehicles (cf_commonlib's Jobs.perform), once RenewableEnergyAction's complete()
--- found the character at the job; the rules are each feature's job module's. Gas features keep
--- theirs on their systems.
+-- The authority's side of the hands-on jobs at banks, sources and treadmills (cf_commonlib's
+-- Jobs.perform), once RenewableEnergyAction's complete() found the character at the job; the rules
+-- are each feature's job module's. Other features serve theirs from their own files.
 --
 -- A bank runs in passes, each billing the hours since the last at the bank's state now. A job
 -- that changes that state first brings the bank up to now, so the change counts from the moment
@@ -24,21 +23,16 @@ local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local WindSource = require "RenewableEnergy/PowerBank/WindSource"
 local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
-local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
-local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
-local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
-local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
-local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
-local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
+local Squares = require "cf_commonlib/Squares"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 
 local JobSites = {}
-RenewableEnergy.JobSites = JobSites
 
 -- The bank brought up to now; bank jobs defer its bill until tell, after their mutation too.
 local function settledBank(isoObject, deferBilling)
-    local bank = BankSystem.bankAt(PowerBank.positionOf(isoObject))
+    local bank = BankSystem.bankAt(Squares.positionOf(isoObject))
     if bank then
         BankSystem.updateBank(bank, nil, deferBilling)
     end
@@ -226,12 +220,12 @@ end
 
 --- The authority's side of the jobs at a treadmill's tile.
 JobSites.treadmill = Jobs.targetSite({
-    [Treadmill.WIRE] = function(character, place, row, tile)
+    [Treadmill.WIRE] = function(character, row, tile)
         TreadmillSource.wire(tile, character)
         return true
     end,
     -- What its runs banked up to now counts.
-    [Treadmill.UNWIRE] = function(character, place, row, tile)
+    [Treadmill.UNWIRE] = function(character, row, tile)
         local bank = bankFedBy(tile)
         if bank then
             BankSystem.dropSource(bank, tile:getX(), tile:getY(), tile:getZ())
@@ -241,59 +235,6 @@ JobSites.treadmill = Jobs.targetSite({
     end,
 })
 
---- The authority's side of the jobs at a garden light.
-JobSites.light = Jobs.targetSite({
-    [SolarGardenLight.REMOVE_BULB] = function(character, place, row, light)
-        return SolarGardenLight.removeBulb(character, light)
-    end,
-    [SolarGardenLight.ADD_BULB] = function(character, place, row, light, bulb)
-        return SolarGardenLight.addBulb(character, light, bulb)
-    end,
-})
-
---- The authority's side of the jobs at a vanilla wood fire.
-JobSites.fire = Jobs.targetSite({
-    [FireAsh.CLEAN_ASH] = function(character, place, row, fire)
-        return FireAsh.cleanOut(character, fire)
-    end,
-})
-
--- What each vehicle job does, by its row of VehicleJobs.JOBS. Returns whether it was done.
-local VEHICLE = {
-    [VehicleJobs.ATTACH_MAINTAINER] = function(character, place, row, vehicle, item)
-        return SolarMaintainer.attach(character, vehicle, item)
-    end,
-    [VehicleJobs.DETACH_MAINTAINER] = function(character, place, row, vehicle)
-        return SolarMaintainer.detach(character, vehicle)
-    end,
-    [VehicleJobs.TAKE_OUT_ALTERNATOR] = function(character, place, row, vehicle)
-        return CarAlternator.takeOut(character, vehicle)
-    end,
-    [VehicleJobs.PUT_BACK_ALTERNATOR] = function(character, place, row, vehicle, item)
-        return CarAlternator.putBack(character, vehicle, item)
-    end,
-    [VehicleJobs.BOARD_ON] = function(character, place, row, vehicle)
-        return ArrowBoard.setSwitch(vehicle, row.on)
-    end,
-    -- The lid unlocked, its lock broken. The cutters wear as vanilla's cutting recipes wear them
-    -- (MayDegradeLight in CutUpTire, CraftRecipeData.processKeepInputItem), and a pair that breaks
-    -- leaves the hands as a broken weapon does (ISDestroyStuffAction).
-    [VehicleJobs.CUT_PADLOCK] = function(character, place, row, vehicle, cutters)
-        if not ArrowBoard.cutPadlock(vehicle) then
-            return false
-        end
-        if cutters:damageCheck(0, 3) then
-            ItemUtils.checkWeapon(character)
-        end
-        return true
-    end,
-    [VehicleJobs.SEAL_PANEL] = function(character, place, row, vehicle, partId)
-        return ArrowBoard.sealPanel(character, vehicle, partId)
-    end,
-}
-VEHICLE[VehicleJobs.BOARD_OFF] = VEHICLE[VehicleJobs.BOARD_ON]
-
---- The authority's side of the jobs at a vehicle.
-JobSites.vehicle = Jobs.targetSite(VEHICLE)
+Action.serve({ bank = JobSites.bank, source = JobSites.source, treadmill = JobSites.treadmill })
 
 return JobSites

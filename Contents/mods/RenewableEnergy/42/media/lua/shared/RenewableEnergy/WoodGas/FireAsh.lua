@@ -51,15 +51,17 @@ local function fed(object, minutes)
     object:transmitModData()
 end
 
---- Clean Out Ash at the fire `fire`: `character` gets its Wood Ash. Returns true, as it's done.
-function FireAsh.cleanOut(character, fire)
-    local count = FireAsh.ashItems(fire)
-    Items.giveItems(character, Gasifier.WOOD_ASH, count)
-    local modData = fire:getModData()
-    modData[FUEL_KEY] = modData[FUEL_KEY] - count * FireAsh.MINUTES_PER_ASH
-    fire:transmitModData()
-    return true
-end
+--- The authority's side of Clean Out Ash (Jobs.perform): `character` gets the fire's Wood Ash.
+FireAsh.site = Jobs.targetSite({
+    [FireAsh.CLEAN_ASH] = function(character, row, fire)
+        local count = FireAsh.ashItems(fire)
+        Items.giveItems(character, Gasifier.WOOD_ASH, count)
+        local modData = fire:getModData()
+        modData[FUEL_KEY] = modData[FUEL_KEY] - count * FireAsh.MINUTES_PER_ASH
+        fire:transmitModData()
+        return true
+    end,
+})
 
 FireAsh.JOBS = {
     [FireAsh.CLEAN_ASH] = GasifierJobs.cleanAshRow(FireAsh.ashItems),

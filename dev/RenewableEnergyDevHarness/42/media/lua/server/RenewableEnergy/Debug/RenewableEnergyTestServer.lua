@@ -5,6 +5,7 @@
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
@@ -13,8 +14,8 @@ local handler, need = PZHarness.serverHandler, PZHarness.need
 local overlaysOf, removePlaced = PZHarness.Fixtures.overlaysOf, PZHarness.Fixtures.removePlaced
 local squareAt, bankAt, bankRecord = Helpers.squareAt, Helpers.bankAt, Helpers.bankRecord
 
--- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll gives `args.rolls` until
--- the test ends (Helpers.forceRolls).
+-- RenewableEnergyTest.forceRoll's handler: the authority's Chance.roll (cf_commonlib's) gives
+-- `args.rolls` until the test ends (Helpers.forceRolls).
 handler("forceRoll", function(_, args, defer)
     Helpers.forceRolls(defer, args.rolls)
     return {}
@@ -71,7 +72,7 @@ handler("placeBank", function(player, args, defer)
         end
     end)
     need(bank:getContainer():getItems():size() == #items, "every item of " .. table.concat(items, ", ") .. " in the bank")
-    local position = PowerBank.positionOf(bank)
+    local position = Squares.positionOf(bank)
     if args.connected == false then
         need(RenewableEnergyAction.completeJob(player, "bank", RenewableEnergy.BankJobs.DISCONNECT, bank), "the bank disconnected")
     end
@@ -447,8 +448,8 @@ handler("scanLoad", function(_, args)
 end)
 
 -- Where the stand-in for another mod's appliance stands, its kind and the fuel an hour it draws,
--- read by the consumer drawAt adds to the scan (Loads.addConsumer) once, as a --stay rerun loads
--- this file again and the mod's consumers stay.
+-- read by the draw drawAt adds to the scan (GeneratorReach.addDraw) once, as a --stay rerun loads
+-- this file again and the mod's draws stay.
 RenewableEnergyTestConsumer = RenewableEnergyTestConsumer or {}
 
 -- The floor of the square at `args` draws `args.fuel` an hour as the kind `args.kind` until the
@@ -457,7 +458,7 @@ handler("drawAt", function(_, args, defer)
     local stub = RenewableEnergyTestConsumer
     if not stub.added then
         stub.added = true
-        RenewableEnergy.Loads.addConsumer(function(object)
+        GeneratorReach.addDraw(function(object)
             local at = stub.at
             local square = at and object:getSquare()
             if square and square:getX() == at.x and square:getY() == at.y and square:getZ() == at.z

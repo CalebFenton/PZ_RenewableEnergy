@@ -7,7 +7,9 @@ local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Sun = require "RenewableEnergy/Sun"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Items = require "cf_commonlib/Items"
+local Jobs = require "cf_commonlib/Jobs"
 local Tiles = require "cf_commonlib/Tiles"
 
 -- Swaps the tile to lit or unlit and gives the light the lamp that goes with it here and, on a
@@ -79,5 +81,16 @@ function SolarGardenLight.updateAll(hours)
         run(light, hours, sky, false)
     end)
 end
+
+Action.serve({
+    light = Jobs.targetSite({
+        [SolarGardenLight.REMOVE_BULB] = function(character, row, light)
+            return SolarGardenLight.removeBulb(character, light)
+        end,
+        [SolarGardenLight.ADD_BULB] = function(character, row, light, bulb)
+            return SolarGardenLight.addBulb(character, light, bulb)
+        end,
+    }),
+})
 
 return SolarGardenLight

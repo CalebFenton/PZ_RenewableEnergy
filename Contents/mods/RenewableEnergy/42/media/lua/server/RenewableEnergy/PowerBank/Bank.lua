@@ -30,12 +30,12 @@ local Tiles = require "cf_commonlib/Tiles"
 local Bank = SGlobalObject:derive("RenewableEnergy_Bank")
 RenewableEnergy.Bank = Bank
 
--- The fields the Global Object System saves with the world; a field renamed here is lost from
--- existing saves.
+-- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
+-- ObjectSystem); a field renamed here is lost from existing saves.
 Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
     "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "chargeSource", "chargeWantW",
-    "generator", "lastHour", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
+    "generator", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
     "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
 }
 
@@ -88,7 +88,6 @@ function Bank:initNew()
     self.pendingPartWear = { hours = 0, overloads = 0 }
     resetToday(self)
     self.empty = false
-    self.lastHour = getGameTime():getWorldAgeHours()
 end
 
 --- An object the bank system has not seen: a bank just placed, or one from a save whose

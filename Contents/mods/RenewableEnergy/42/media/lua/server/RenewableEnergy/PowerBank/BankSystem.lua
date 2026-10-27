@@ -25,10 +25,10 @@ require "RenewableEnergy/PowerBank/Backup"
 require "RenewableEnergy/PowerBank/BankStatus"
 local Clock = require "cf_commonlib/Clock"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
+local Squares = require "cf_commonlib/Squares"
+local Tiles = require "cf_commonlib/Tiles"
 
-local BankSystem = LibObjectSystem.deriveSystem({
-    prefix = "RenewableEnergy_", name = "Bank", owner = PowerBank, Object = Bank, isObject = PowerBank.isBank,
-})
+local BankSystem = LibObjectSystem.deriveSystem(PowerBank, Bank)
 RenewableEnergy.BankSystem = BankSystem
 
 -- Values of the ChargeFreq sandbox option.
@@ -101,7 +101,6 @@ local function makeBank(square, spriteName, index, from, fill)
     container = generator:getContainer()
     if container then
         container:setExplored(true)
-        PowerBank.adoptContainer(container)
     end
     if fill then
         fill(container)
@@ -188,7 +187,7 @@ local REFRESH_MS = 1000
 --- The bank at `position`, or nil, also when `position` isn't a { x, y, z } place.
 function BankSystem.bankAt(position)
     local system = PowerBank.serverSystem
-    if not (system and PowerBank.isPosition(position)) then
+    if not (system and Squares.isPosition(position)) then
         return nil
     end
     return system:getLuaObjectAt(position.x, position.y, position.z)
@@ -244,17 +243,14 @@ local function loadBank(isoObject)
         makeBank(isoObject:getSquare(), Sprites.nameOf(isoObject), isoObject:getObjectIndex(), isoObject)
         return
     end
-    PowerBank.adoptContainer(isoObject:getContainer())
     BankSystem.instance:loadIsoObject(isoObject)
 end
 
-for _, name in ipairs(PowerBank.bankSprites()) do
-    MapObjects.OnLoadWithSprite(name, loadBank, Sprites.LOAD_PRIORITY)
-end
+Tiles.onLoad(PowerBank.bankSprites(), loadBank, { first = true })
 
 -- A panel's chunk loaded: its overlays are saved with it, but older saves may lack the cracks.
 for kind in pairs(Specs.mounts) do
-    MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), PanelSource.showCracks, Sprites.LOAD_PRIORITY)
+    Tiles.onLoad(Sprites.namesOf(kind), PanelSource.showCracks)
 end
 
 --- What every bank in this pass shares: the weather, the light on each mount averaged over
@@ -332,7 +328,7 @@ end
 
 function BankSystem.updateAll()
     local contextFor = sharedContexts()
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         BankSystem.updateBank(bank, contextFor, true)
     end)
     Payers.billGenerators()

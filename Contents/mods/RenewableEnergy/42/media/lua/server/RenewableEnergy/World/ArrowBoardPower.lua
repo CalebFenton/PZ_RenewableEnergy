@@ -11,13 +11,13 @@
 -- steady lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
 local ArrowBoard = require "RenewableEnergy/World/ArrowBoard"
+local Chance = require "cf_commonlib/Chance"
 
 -- Battery box part modData. The box tracks its discharge cycle of the day as a bank tracks its
 -- own (Battery.trackCycle).

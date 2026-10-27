@@ -8,7 +8,7 @@
 import os
 import subprocess
 
-from rules import check
+from moddata import check
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

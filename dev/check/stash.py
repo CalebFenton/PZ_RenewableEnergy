@@ -7,13 +7,9 @@
 | `stash-crate` | A stash crate outside every room of that building: `doBuildingStash` stocks only containers in the house's rooms. |
 """
 import os
-import sys
 
-from rules import check
-
-# check.py loads plugins by path, which leaves their folder off the import path.
-sys.path.insert(0, os.path.dirname(__file__))
-import lotheader  # noqa: E402
+import lotheader
+from moddata import check
 
 
 class WorldMap:

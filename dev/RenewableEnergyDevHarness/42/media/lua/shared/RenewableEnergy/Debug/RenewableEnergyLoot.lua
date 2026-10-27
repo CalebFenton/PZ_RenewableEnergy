@@ -8,7 +8,6 @@
 -- of memory. It ignores that a container filled by vanilla items stops rolling, so real chances
 -- are a little lower in lists of heavy items.
 
-require "RenewableEnergy/Specs"
 require "PZHarness/Loot"
 local Stash = require "RenewableEnergy/Stash"
 
@@ -170,14 +169,6 @@ local function countModItems(container)
     return PZLoot.countItems(container, isModItem)
 end
 
---- A scratch crate. A procedural table rolls only into a container on a square; give those one
---- outside any room, because a container in a room counts toward the room's per-room list limits
---- and gets its forced lists.
----@param square IsoGridSquare?
-function Loot.newContainer(square)
-    return ItemContainer.new("crate", square, nil)
-end
-
 local function sortedKeys(t)
     local keys = {}
     for key in pairs(t) do
@@ -187,31 +178,28 @@ local function sortedKeys(t)
     return keys
 end
 
--- How WorldSpawns and the arrow board stock the containers they place, each into a scratch
--- container: { reference, fill } rows.
-local function worldStock()
+--- How WorldSpawns and the arrow board stock the containers they place, each as fill(container)
+--- for a scratch container: { banks = BANK_STOCK name -> fill, crates = CRATE_STOCK name -> fill,
+--- arrowBoard = fill }.
+function Loot.worldStocks()
     local WorldSpawns = RenewableEnergy.WorldSpawns
-    local stocks = {}
-    for _, name in ipairs(sortedKeys(WorldSpawns.BANK_STOCK)) do
-        table.insert(stocks, { "world:bank." .. name, function(container) WorldSpawns.stockBank(container, name) end })
+    local stocks = { banks = {}, crates = {} }
+    for name in pairs(WorldSpawns.BANK_STOCK) do
+        stocks.banks[name] = function(container) WorldSpawns.stockBank(container, name) end
     end
-    for _, name in ipairs(sortedKeys(WorldSpawns.CRATE_STOCK)) do
-        table.insert(stocks, { "world:crate." .. name, function(container) WorldSpawns.stockCrate(container, name) end })
+    for name in pairs(WorldSpawns.CRATE_STOCK) do
+        stocks.crates[name] = function(container) WorldSpawns.stockCrate(container, name) end
     end
-    table.insert(stocks, { "world:arrowBoard", function(container)
+    stocks.arrowBoard = function(container)
         RenewableEnergy.ArrowBoard.stockBatteryBox(container)
         RenewableEnergy.Distributions.readyFoundItems(container)
-    end })
+    end
     return stocks
 end
 
-local function share(fraction)
-    return string.format("%.2f%% (1 in %.0f)", fraction * 100, 1 / fraction)
-end
-
--- Prints how often `fill` put each item in `container` over `samples` fills, as `count` counts
--- them, listing the `expected` items even when none came.
-local function printMeasured(reference, samples, fill, container, expected, count)
+-- Prints under `mark` how often `fill` put each item in `container` over `samples` fills, as
+-- `count` counts them, listing the `expected` items even when none came.
+local function printMeasured(mark, reference, samples, fill, container, expected, count)
     local items = fill and PZLoot.sample(fill, samples, container, count) or {}
     local fullTypes = sortedKeys(expected)
     for fullType in pairs(items) do
@@ -223,21 +211,22 @@ local function printMeasured(reference, samples, fill, container, expected, coun
     local parts = {}
     for _, fullType in ipairs(fullTypes) do
         local measured = items[fullType]
-        local text = measured and share(measured.share) or "none"
+        local text = PZLoot.share(measured and measured.share or 0, 2, 0)
         if measured and measured.perContainer >= 1.05 then
             text = text .. string.format(", %.1f each", measured.perContainer)
         end
         -- Drops the module, so vanilla items the world entries count read the same way.
         table.insert(parts, (string.gsub(fullType, "^[^.]+%.", "")) .. " " .. text)
     end
-    print(string.format("RELootReport %s [%d samples]: %s", reference, fill and samples or 0,
+    print(string.format("%s %s [%d samples]: %s", mark, reference, fill and samples or 0,
         #parts > 0 and table.concat(parts, "; ") or "nothing"))
 end
 
---- Prints how often the mod's items spawn in every list the mod adds to, the stash crate and the
---- room containers that pick the mod's own lists, and what world banks and crates are stocked
---- with, vanilla items included, each over `samples` fills at the default loot rarity options.
-function Loot.printReport(samples)
+--- Prints under `mark` how often the mod's items spawn in every list the mod adds to, the stash
+--- crate and the room containers that pick the mod's own lists, and what world banks and crates
+--- are stocked with, vanilla items included, each over `samples` fills at the default loot rarity
+--- options.
+function Loot.printReport(samples, mark)
     PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
         local targets = lootTargets()
         table.insert(targets, { reference = STASH_CRATE, items = {} })
@@ -249,49 +238,31 @@ function Loot.printReport(samples)
             return containers, lists
         end
         withLoot(1, build, function(parsed)
-            print(string.format("RELootReport settings: Other loot %.2f, Recipe Resources %.2f, loot rarity options 1, no zombie density bonus",
-                ItemPickerJava.getLootModifierFromType("Other"), ItemPickerJava.getLootModifierFromType("RecipeResource")))
-            local container = Loot.newContainer(nil)
+            print(string.format("%s settings: Other loot %.2f, Recipe Resources %.2f, loot rarity options 1, no zombie density bonus",
+                mark, ItemPickerJava.getLootModifierFromType("Other"), ItemPickerJava.getLootModifierFromType("RecipeResource")))
+            local container = PZLoot.scratchContainer(nil)
             for i, target in ipairs(targets) do
                 local list = parsed["t" .. i]
-                printMeasured(target.reference, samples, list and PZLoot.rollFill(list), container, target.items, countModItems)
-            end
-            local square = PZLoot.squareOutsideRooms(getPlayer())
-            local roomContainer = Loot.newContainer(square)
-            for i, spec in ipairs(ROOM_CONTAINERS) do
-                local list = square and parsed["r" .. i]
-                printMeasured(spec.room .. "." .. spec.container, samples, list and PZLoot.rollFill(list), roomContainer, {},
+                printMeasured(mark, target.reference, samples, list and PZLoot.rollFill(list), container, target.items,
                     countModItems)
             end
-            for _, stock in ipairs(worldStock()) do
-                printMeasured(stock[1], samples, stock[2], container, {}, PZLoot.countItems)
+            local square = PZLoot.squareOutsideRooms(getPlayer())
+            local roomContainer = PZLoot.scratchContainer(square)
+            for i, spec in ipairs(ROOM_CONTAINERS) do
+                local list = square and parsed["r" .. i]
+                printMeasured(mark, spec.room .. "." .. spec.container, samples, list and PZLoot.rollFill(list), roomContainer,
+                    {}, countModItems)
             end
+            local stocks = Loot.worldStocks()
+            for _, name in ipairs(sortedKeys(stocks.banks)) do
+                printMeasured(mark, "world:bank." .. name, samples, stocks.banks[name], container, {}, PZLoot.countItems)
+            end
+            for _, name in ipairs(sortedKeys(stocks.crates)) do
+                printMeasured(mark, "world:crate." .. name, samples, stocks.crates[name], container, {}, PZLoot.countItems)
+            end
+            printMeasured(mark, "world:arrowBoard", samples, stocks.arrowBoard, container, {}, PZLoot.countItems)
         end)
     end)
-end
-
--- Yardsticks ------------------------------------------------------------------------------------
-
---- A guessed mix of clear, broken and overcast days: { share, weather } rows, the weather as
---- Sun.planeIrradiance takes it.
-Loot.WEATHER_MIX = {
-    { 0.4, { cloud = 0, fog = 0, rain = 0, snowing = false, groundSnow = 0 } },
-    { 0.3, { cloud = 0.5, fog = 0, rain = 0, snowing = false, groundSnow = 0 } },
-    { 0.3, { cloud = 1, fog = 0, rain = 0, snowing = false, groundSnow = 0 } },
-}
---- The mounts the light is measured on, by name: Sun.planeIrradiance's kind and facing.
-Loot.SOUTH_MOUNTS = { flat = { "flat" }, rack = { "rack", "S" }, wall = { "wall", "S" } }
-
--- Vanilla's generator fuel an hour for each appliance kind (IsoGenerator's *PowerConsumption
--- constants).
-Loot.APPLIANCE_FUEL = {
-    fridgeFreezer = 0.13, fridge = 0.08, light = 0.002, television = 0.03, radio = 0.01,
-    microwave = 0.09, range = 0.09, washer = 0.09, dryer = 0.09, batteryCharger = 0.05,
-}
-
---- The watts an appliance of the kind `name` (a Loot.APPLIANCE_FUEL key) draws as a bank bills it.
-function Loot.applianceWatts(name)
-    return RenewableEnergy.Specs.wattsFromFuel(Loot.APPLIANCE_FUEL[name])
 end
 
 return Loot

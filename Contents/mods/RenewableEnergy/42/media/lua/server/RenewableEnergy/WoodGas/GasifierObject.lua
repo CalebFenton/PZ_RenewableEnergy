@@ -14,6 +14,7 @@ local ObjectSystem = require "RenewableEnergy/ObjectSystem"
 local Fumes = require "RenewableEnergy/Fumes"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
@@ -21,10 +22,10 @@ local Tiles = require "cf_commonlib/Tiles"
 local GasifierObject = ObjectSystem.Object:derive("RenewableEnergy_Gasifier")
 RenewableEnergy.GasifierObject = GasifierObject
 
--- The fields the Global Object System saves with the world; a field renamed here is lost from
--- existing saves.
+-- The fields the Global Object System saves with the world, besides lastHour (cf_commonlib's
+-- ObjectSystem); a field renamed here is lost from existing saves.
 GasifierObject.SAVED_FIELDS = {
-    "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "condensate", "outSince", "pipe", "lastHour",
+    "tier", "lit", "fireKg", "fireCharcoal", "ash", "tarKg", "condensate", "outSince", "pipe",
 }
 
 local EPSILON = RenewableEnergy.EPSILON
@@ -36,7 +37,6 @@ function GasifierObject:initNew()
     self.ash = 0
     self.tarKg = 0
     self.condensate = 0
-    self.lastHour = getGameTime():getWorldAgeHours()
 end
 
 --- An object the system has not seen: a gasifier just built. It gets its filter.
@@ -61,7 +61,6 @@ end
 function GasifierObject:loaded(isoObject)
     local square = isoObject:getSquare()
     self.indoors = Fumes.buildingOf(square) ~= nil
-    Gasifier.adoptContainers(isoObject)
     self:afterChange()
 end
 
@@ -180,7 +179,7 @@ end
 --- Whether the generator its pipe leads to runs on its gas, so the gas line bills all it burns.
 function GasifierObject:feedsRunningGenerator()
     local square = self.pipe and Gasifier.squareOnSide(self.x, self.y, self.z, self.pipe)
-    local generator = Squares.findObjectOn(square, RenewableEnergy.isGenerator)
+    local generator = Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator)
     local state = generator and GasKit.stateOf(generator)
     return state ~= nil and state.onGas == true and generator:isActivated()
 end

@@ -1,12 +1,12 @@
--- What spawns where: the entries Distributions.apply puts into the game's loot tables.
+-- What spawns where: the entries Distributions puts into the game's loot tables.
 
 require "Items/Distributions"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
+local Loot = require "cf_commonlib/Loot"
 
 local subDist = SuburbsDistributions
 
@@ -40,7 +40,7 @@ local HOME_OTHER_SHELVES = { "proc:LivingRoomWardrobe", "proc:RecRoomShelf", "pr
 -- Randomized survivor safehouses' (RBSafehouse) bookshelves and hearths.
 local SAFEHOUSE_READING = { "proc:SafehouseFireplace", "proc:SafehouseFireplace_Late" }
 
-local weighted = RenewableEnergy.weightedEntries
+local weighted = Loot.entries
 
 local items = {
     -- Scavenger: the first magazine, plug-in power and the solar gadgets

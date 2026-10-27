@@ -173,7 +173,7 @@ local LOAD_KINDS = {
 }
 
 -- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`. Another mod's kind is its own
--- translation key (Loads.addConsumer).
+-- translation key (GeneratorReach.addDraw).
 local function loadLabel(entry)
     local key = LOAD_KINDS[entry.kind] or (entry.kind:find("^IGUI_") and entry.kind) or LOAD_KINDS.other
     local name = getText(key)

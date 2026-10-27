@@ -10,6 +10,7 @@ local Format = require "RenewableEnergy/UI/Format"
 local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local Squares = require "cf_commonlib/Squares"
 
 local StatusWindow = ObjectWindow:derive("RenewableEnergyStatusWindow")
 RenewableEnergy.StatusWindow = StatusWindow
@@ -92,7 +93,7 @@ function StatusWindow:setStatus(status)
         self.left, self.right = { { label = getText("IGUI_RenewableEnergy_Waiting"), value = "", color = "dim" } }, {}
     else
         self.summaryLines = StatusRows.summary(status)
-        self.left, self.right = StatusRows.rows(status, PowerBank.positionOf(self.object))
+        self.left, self.right = StatusRows.rows(status, Squares.positionOf(self.object))
     end
     self.title = status and Format.bankName(status) or getText("IGUI_RenewableEnergy_StatusTitle")
     local summary = measureSummary(self.summaryLines)
@@ -177,7 +178,7 @@ function StatusWindow:refresh()
 end
 
 function StatusWindow:isRowHighlighted(r)
-    return self.highlight ~= nil and PowerBank.samePosition(r.source, self.highlight.source)
+    return self.highlight ~= nil and Squares.samePosition(r.source, self.highlight.source)
 end
 
 function StatusWindow:drawSummary(x, y)

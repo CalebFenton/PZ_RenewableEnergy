@@ -10,7 +10,6 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
 local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -24,6 +23,7 @@ local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local JobSites = require "RenewableEnergy/JobSites"
 local GasLines = require "RenewableEnergy/GasLine/GasLines"
 local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
+local Chance = require "cf_commonlib/Chance"
 
 local SolarSites = {}
 RenewableEnergy.SolarSites = SolarSites
@@ -196,7 +196,7 @@ local SPOTS = {
             local bank = WorldSpawns.placeBank(bankSquare, spot.stock)
             if bank then
                 local charger = Sources.findOn(square)
-                local why = not charger and "no charger" or SourceJobs.blocker(nil, SourceJobs.CONNECT, charger, bank)
+                local why = not charger and "no charger" or SourceJobs.refusalAt(nil, SourceJobs.CONNECT, charger, bank)
                 if why then
                     print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
                 else

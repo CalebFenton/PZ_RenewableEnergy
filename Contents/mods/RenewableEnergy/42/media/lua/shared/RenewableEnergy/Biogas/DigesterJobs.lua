@@ -107,6 +107,11 @@ function DigesterJobs.toFill(character)
     return found
 end
 
+-- Whether `item` is a tank, torch or bottle a fill fills.
+local function isVessel(item)
+    return Digester.FILL_SHARES[item:getFullType()] ~= nil
+end
+
 -- The whole uses of `vessel` that make `share` of it. It holds whole uses, read back as a float
 -- that may fall a hair short (InventoryItem.getCurrentUsesFloat), so fills count in uses.
 local function usesAt(vessel, share)
@@ -167,10 +172,9 @@ local function fillJob(fields)
         end
         return math.max(fields.baseMinutes, fillAmount(fill, summary, vessel) * fill.minutesPerM3)
     end
+    fields.with = isVessel
+    fields.withMissing = "Tooltip_RenewableEnergy_NeedsVessel"
     fields.withRefusal = function(character, summary, vessel)
-        if not Jobs.carries(character, vessel, function(item) return Digester.FILL_SHARES[item:getFullType()] ~= nil end) then
-            return "Tooltip_RenewableEnergy_NeedsVessel"
-        end
         if fill.power and not Digester.compressorPowered(character) then
             return "Tooltip_RenewableEnergy_NoPower"
         end
@@ -195,9 +199,7 @@ DigesterJobs.JOBS = {
         blocker = function(character, summary)
             return summary.sludge < DigesterJobs.sludgePerUse() and "Tooltip_RenewableEnergy_NoSludge" or nil
         end,
-        withRefusal = function(character, summary, bag)
-            return not Jobs.carries(character, bag, takesSludge) and "Tooltip_RenewableEnergy_NeedsSack" or nil
-        end,
+        with = takesSludge, withMissing = "Tooltip_RenewableEnergy_NeedsSack",
     },
     [DigesterJobs.VENT] = { minutes = 1, position = "Mid", tooltip = "Tooltip_RenewableEnergy_VentGas", blocker = noGas },
     [DigesterJobs.FIT_BAGS] = {
@@ -210,10 +212,7 @@ DigesterJobs.JOBS = {
     [DigesterJobs.FIT_TARP] = {
         minutes = 15, position = "Mid", holder = "tarp", tooltip = "Tooltip_RenewableEnergy_FitTarpGasBag",
         blocker = bagBlocker,
-        withRefusal = function(character, summary, bag)
-            return not Jobs.carries(character, bag, Items.ofType(Digester.HOLDERS.tarp.item))
-                and "Tooltip_RenewableEnergy_NeedsTarpGasBag" or nil
-        end,
+        with = Items.ofType(Digester.HOLDERS.tarp.item), withMissing = "Tooltip_RenewableEnergy_NeedsTarpGasBag",
     },
     [DigesterJobs.TAKE_OFF_BAG] = {
         minutes = 10, position = "Mid", holder = "none", tooltip = "Tooltip_RenewableEnergy_TakeOffGasBag",
@@ -299,10 +298,7 @@ DigesterJobs.JOBS = {
     [DigesterJobs.REFILL_SPONGE] = {
         minutes = 5, position = "Mid", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberSponge",
-        withRefusal = function(character, summary, sponge)
-            return not Jobs.carries(character, sponge, Items.ofType(Digester.IRON_SPONGE))
-                and "Tooltip_RenewableEnergy_NeedsIronSponge" or nil
-        end,
+        with = Items.ofType(Digester.IRON_SPONGE), withMissing = "Tooltip_RenewableEnergy_NeedsIronSponge",
     },
 }
 

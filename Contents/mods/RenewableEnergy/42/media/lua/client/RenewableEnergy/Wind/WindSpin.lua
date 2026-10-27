@@ -9,6 +9,7 @@ local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
 local Squares = require "cf_commonlib/Squares"
+local Tiles = require "cf_commonlib/Tiles"
 
 local WindSpin = {}
 
@@ -118,7 +119,7 @@ local function spin()
 end
 
 for kind in pairs(Sprites.windModels) do
-    MapObjects.OnLoadWithSprite(Sprites.namesOf(kind), WindSpin.track, Sprites.LOAD_PRIORITY)
+    Tiles.onLoad(Sprites.namesOf(kind), WindSpin.track)
 end
 Events.OnObjectAdded.Add(WindSpin.track)
 Events.OnTick.Add(spin)

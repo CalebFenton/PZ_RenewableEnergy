@@ -1,5 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/PowerBank/SourceJobs"
+local Squares = require "cf_commonlib/Squares"
 
 -- Wind chargers (Wind.lua, PowerBank/WindSource.lua, client Wind/*): a bank source on the game's
 -- wind, with its power curve, brake, storm breakage, blades and model.
@@ -521,7 +522,7 @@ local function swapTest(name, what, bank, from, to, newBlades, brokenBlades)
             if not T.expectConnected(self.charger) then return end
             local blades
             for _, record in ipairs(self.bank.state and self.bank.state.records or {}) do
-                if PowerBank.samePosition(record, self.charger.position) then
+                if Squares.samePosition(record, self.charger.position) then
                     blades = record.blades
                 end
             end

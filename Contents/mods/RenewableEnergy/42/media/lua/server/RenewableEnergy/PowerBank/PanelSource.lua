@@ -5,13 +5,14 @@
 if isClient() then return end
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
+local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local StormNotice = require "RenewableEnergy/StormNotice"
 local Sun = require "RenewableEnergy/Sun"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Chance = require "cf_commonlib/Chance"
 local Tiles = require "cf_commonlib/Tiles"
 
 local PanelSource = {}
@@ -129,7 +130,7 @@ end
 --- The chance that `stormHours` of thunderstorm crack a module of `source` (anything with a mount
 --- kind and material), at the StormDamage options.
 function PanelSource.stormChance(source, stormHours)
-    return Chance.stormDamage(Specs.storm.panelPerHour * stormShare(source.kind, source.material), stormHours)
+    return StormChance.stormDamage(Specs.storm.panelPerHour * stormShare(source.kind, source.material), stormHours)
 end
 
 --- A thunderstorm may crack one of a panel's modules (`source`, anything with a mount kind,

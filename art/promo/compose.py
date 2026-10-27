@@ -3,17 +3,19 @@
 # requires-python = ">=3.10"
 # dependencies = ["pillow==12.3.0"]
 # ///
-"""Lays out the README and Workshop images from the captures that extract.py saved, with the
-harness's lib/promo.py (dev/harness/docs/workshop-page.md, "Laying out the images"). Rerun it after
-editing a layout; recapture only when the game's look or the mod's names change:
+"""Lays out the README and Workshop images from the captures `dev/run-debug-client.sh --promo`
+saved, with the harness's lib/promo.py (dev/harness/docs/workshop-page.md, "Laying out the
+images"). Rerun it after editing a layout; recapture only when the game's look or the mod's names
+change:
 
     art/promo/compose.py
 
 Writes images/{banner,setup,bank,biogas,woodgas,wind,treadmill,items,recipes,trailer,gardenlights}.png;
 the Workshop gallery, gallery/NN-<name>.jpg in upload order; and the mod's poster,
 Contents/mods/RenewableEnergy/42/poster.png, with the Workshop preview, preview.png. The item models
-are framed from the box extract.py found around each. Item, recipe and skill names come from
-captures/promo.json, which the game wrote in its own words; the setup captions are the README's.
+are framed from the box the harness's lib/capture.py found around each. Item, recipe and skill
+names come from captures/promo.json, which the game wrote in its own words; the setup captions are
+the README's.
 """
 import sys
 from pathlib import Path

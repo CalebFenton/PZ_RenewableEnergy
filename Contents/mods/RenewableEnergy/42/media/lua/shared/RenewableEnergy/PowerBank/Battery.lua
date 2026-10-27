@@ -5,10 +5,10 @@
 -- scales with it, and deep discharges wear it down.
 
 local RenewableEnergy = require "RenewableEnergy/Utilities"
-local Chance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
+local Chance = require "cf_commonlib/Chance"
 
 local Battery = {}
 RenewableEnergy.Battery = Battery

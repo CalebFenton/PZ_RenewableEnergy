@@ -9,7 +9,6 @@
 
 if isClient() then return end
 
-require "TimedActions/ISTakeGenerator"
 local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
@@ -18,8 +17,10 @@ local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local Fumes = require "RenewableEnergy/Fumes"
-local Chance = require "RenewableEnergy/Chance"
+local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
+local Chance = require "cf_commonlib/Chance"
 local Clock = require "cf_commonlib/Clock"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Tiles = require "cf_commonlib/Tiles"
@@ -57,7 +58,7 @@ end
 
 local function generatorAt(position)
     local square = getSquare(position.x, position.y, position.z)
-    return square and Squares.findObjectOn(square, RenewableEnergy.isGenerator)
+    return square and Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator)
 end
 
 -- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
@@ -144,7 +145,7 @@ end
 -- nearest first, the lower place on a tie (PlaceTracker.sortNearest).
 local function chargingBanks(generator)
     local list = {}
-    PowerBank.eachBank(function(bank)
+    PowerBank.each(function(bank)
         if bank:chargesFrom(generator) then
             table.insert(list, bank)
         end
@@ -172,7 +173,7 @@ local function allocate(generator, cap, load, target)
         end
         return 0
     end
-    PowerBank.eachBank(take)
+    PowerBank.each(take)
     return total
 end
 
@@ -464,6 +465,7 @@ GasLines.jobSite = {
         end
     end,
 }
+Action.serve({ kit = GasLines.jobSite })
 
 --- Fits the kit to `generator` and runs its line to `source`, as Install Kit and Connect Gas Line
 --- do, for a generator the world places rather than a player (SolarSites): nobody pays for them.
@@ -471,16 +473,6 @@ function GasLines.fit(generator, source)
     DO[GasKit.INSTALL](nil, nil, GasKit.JOBS[GasKit.INSTALL], generator)
     DO[GasKit.CONNECT](nil, GasKit.stateOf(generator), GasKit.JOBS[GasKit.CONNECT], generator, source)
     generator:transmitModData()
-end
-
--- Taking up a kitted generator is refused: the kit would fall off (ISTakeGenerator copies only
--- fuel and condition to the item) and with it what the tank really holds.
-local vanillaTakeComplete = ISTakeGenerator.complete
-function ISTakeGenerator:complete()
-    if GasKit.hasKit(self.generator) then
-        return false
-    end
-    return vanillaTakeComplete(self)
 end
 
 return GasLines

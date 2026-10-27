@@ -49,12 +49,6 @@ function Menu.bankLabel(bank)
     return summary and Format.bankName(summary) or Menu.nameOf(bank)
 end
 
--- "Too dark" while the character stands in the dark, for an option that queues several of a job
--- that needs light.
-local function tooDark(character, jobs, job)
-    return Needs.tooDark(character, jobs.needsLight(job), Action.TOO_DARK)
-end
-
 -- The bank job `job` with each of `items`, queued in order: each is refused or not on its own.
 local function queueEach(playerNum, job, bank, items)
     for _, item in ipairs(items) do
@@ -69,10 +63,10 @@ local function queueConnectAll(playerNum, bank, sources)
 end
 
 local function queueRun(playerNum, treadmill)
-    local character = Squares.walkTo(playerNum, treadmill:getSquare())
-    if character then
+    local character = getSpecificPlayer(playerNum)
+    Squares.queueBeside(character, treadmill:getSquare(), function()
         ISTimedActionQueue.add(TreadmillAction:new(character, treadmill))
-    end
+    end)
 end
 
 local function onNameEntered(target, button, playerNum, bank)
@@ -117,11 +111,11 @@ end
 -- Rendering and queueing only; the jobs select the batch and derive its combined requirements.
 local function addAllBatteries(playerNum, menu, job, bank, parts)
     local character = getSpecificPlayer(playerNum)
-    local batteries, needs, blocker = BankJobs.batteryBatch(character, job, bank, parts)
+    local batteries, batch = BankJobs.batteryBatch(character, job, bank, parts)
     if not batteries then return end
     local all = menu:addOption(getText("ContextMenu_RenewableEnergy_AllBatteries", #batteries), playerNum, queueEach, job,
         bank, batteries)
-    Needs.show(all, needs, tooDark(character, BankJobs, job) or blocker)
+    JobOptions.showVerdict(all, character, BankJobs, job, batch)
 end
 
 --- Wire In, as vanilla's mechanics menu offers parts to install: a submenu for each type of part
@@ -136,7 +130,7 @@ function Menu.addWireInOptions(playerNum, menu, bank)
         Needs.refuse(option, "Tooltip_RenewableEnergy_NothingToWire")
         return option
     end
-    local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_WireIn"))
+    local submenu = JobOptions.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_WireIn"))
     addAllBatteries(playerNum, submenu, BankJobs.WIRE_IN, bank, parts)
     local byType = {}
     for _, item in ipairs(parts) do
@@ -145,11 +139,11 @@ function Menu.addWireInOptions(playerNum, menu, bank)
         if not itemsMenu then
             local script = getScriptManager():FindItem(fullType)
             local typeOption
-            itemsMenu, typeOption = Needs.addSubMenu(submenu, getItemNameFromFullType(fullType))
+            itemsMenu, typeOption = JobOptions.addSubMenu(submenu, getItemNameFromFullType(fullType))
             typeOption.iconTexture = script and script:getNormalTexture()
             byType[fullType] = itemsMenu
         end
-        local option = JobOptions.add(itemsMenu, playerNum, Action, "bank", BankJobs.WIRE_IN, bank, item, partLabel(item))
+        local option = JobOptions.add(itemsMenu, playerNum, BankJobs, BankJobs.WIRE_IN, bank, item, partLabel(item))
         if option then
             option.itemForTexture = item
         end
@@ -166,10 +160,10 @@ function Menu.addUnwireOptions(playerNum, menu, bank)
     if #parts == 0 then
         return nil
     end
-    local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Unwire"))
+    local submenu = JobOptions.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Unwire"))
     addAllBatteries(playerNum, submenu, BankJobs.UNWIRE, bank, parts)
     for _, item in ipairs(parts) do
-        JobOptions.add(submenu, playerNum, Action, "bank", BankJobs.UNWIRE, bank, item, partLabel(item))
+        JobOptions.add(submenu, playerNum, BankJobs, BankJobs.UNWIRE, bank, item, partLabel(item))
     end
     return submenu
 end
@@ -181,9 +175,9 @@ function Menu.addRepairOptions(playerNum, menu, bank)
     if #parts == 0 then
         return nil
     end
-    local submenu = Needs.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Repair"))
+    local submenu = JobOptions.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Repair"))
     for _, item in ipairs(parts) do
-        JobOptions.add(submenu, playerNum, Action, "bank", BankJobs.REPAIR, bank, item, partLabel(item))
+        JobOptions.add(submenu, playerNum, BankJobs, BankJobs.REPAIR, bank, item, partLabel(item))
     end
     return submenu
 end
@@ -198,7 +192,7 @@ end
 
 function Menu.addBankOptions(playerNum, context, bank)
     local character = getSpecificPlayer(playerNum)
-    local menu = Needs.addSubMenu(context, Menu.bankLabel(bank))
+    local menu = JobOptions.addSubMenu(context, Menu.bankLabel(bank))
     menu:addOption(getText("ContextMenu_RenewableEnergy_Status"), playerNum, ObjectWindow.queueOpen, bank, StatusWindow)
 
     local summary = PowerBank.summaryOf(bank)
@@ -207,17 +201,18 @@ function Menu.addBankOptions(playerNum, context, bank)
         return menu
     end
     local switchKey, switchJob = Menu.switchOf(summary)
-    JobOptions.add(menu, playerNum, Action, "bank", switchJob, bank, nil, getText(switchKey))
+    JobOptions.add(menu, playerNum, BankJobs, switchJob, bank, nil, getText(switchKey))
     -- As vanilla's generator menu: Disconnect only while switched off.
     local connected = bank:isConnected()
     if not (connected and summary.on) then
-        JobOptions.add(menu, playerNum, Action, "bank", connected and BankJobs.DISCONNECT or BankJobs.CONNECT, bank)
+        JobOptions.add(menu, playerNum, BankJobs, connected and BankJobs.DISCONNECT or BankJobs.CONNECT, bank)
     end
 
     local sources, refusal, count = SourceJobs.connectBatch(character, bank)
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", count), playerNum,
         queueConnectAll, bank, sources)
-    Needs.refuse(connect, (count > 0 and tooDark(character, SourceJobs, SourceJobs.CONNECT)) or refusal)
+    local dark = Needs.tooDark(character, SourceJobs.needsLight(SourceJobs.CONNECT), Action.TOO_DARK)
+    Needs.refuse(connect, (count > 0 and dark) or refusal)
     Menu.addWireInOptions(playerNum, menu, bank)
     Menu.addUnwireOptions(playerNum, menu, bank)
     Menu.addRepairOptions(playerNum, menu, bank)
@@ -229,7 +224,7 @@ end
 local function sourceSummary(bankPosition, here)
     local summary = PowerBank.summaryAt(bankPosition.x, bankPosition.y, bankPosition.z)
     for _, entry in ipairs(summary and summary.sources or {}) do
-        if PowerBank.samePosition(entry, here) then
+        if Squares.samePosition(entry, here) then
             return entry
         end
     end
@@ -244,7 +239,7 @@ end
 -- character would use.
 local function addSnowOption(playerNum, menu, source, entry)
     if entry and entry.snowy and Sources.sweepable(Sources.kindOf(source)) then
-        JobOptions.add(menu, playerNum, Action, "source", SourceJobs.CLEAR_SNOW, source,
+        JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.CLEAR_SNOW, source,
             Items.toolFor(getSpecificPlayer(playerNum), SourceJobs.isSnowTool))
     end
 end
@@ -265,7 +260,7 @@ local function addBladesOption(playerNum, menu, source)
         table.insert(names, getItemNameFromFullType(item))
     end
     if blades then
-        JobOptions.add(menu, playerNum, Action, "source", SourceJobs.REPLACE_BLADES, source, blades)
+        JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.REPLACE_BLADES, source, blades)
     else
         Needs.refuse(menu:addOption(getText(Action.labelKey(SourceJobs.REPLACE_BLADES))), "Tooltip_RenewableEnergy_NeedBlades",
             table.concat(names, ", "))
@@ -278,24 +273,24 @@ end
 local function addSealOptions(playerNum, menu, source)
     for slot, module in ipairs(Recipes.panelModules(source) or {}) do
         if RenewableEnergy.crackLookOf(module.type, module.condition) then
-            JobOptions.add(menu, playerNum, Action, "source", SourceJobs.SEAL_MODULE, source, slot,
+            JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.SEAL_MODULE, source, slot,
                 getText("ContextMenu_RenewableEnergy_SealModule", slot, math.floor(module.condition)))
         end
     end
 end
 
 function Menu.addSourceOptions(playerNum, context, source)
-    local menu = Needs.addSubMenu(context, Menu.nameOf(source))
-    local here = PowerBank.positionOf(source)
+    local menu = JobOptions.addSubMenu(context, Menu.nameOf(source))
+    local here = Squares.positionOf(source)
     local connected = PowerBank.connectedBank(source)
     if connected then
         menu:addOption(getText("ContextMenu_RenewableEnergy_WiredTo", bankNameAt(connected), Format.away(here, connected)))
-        JobOptions.add(menu, playerNum, Action, "source", SourceJobs.DISCONNECT, source)
+        JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.DISCONNECT, source)
         addSnowOption(playerNum, menu, source, sourceSummary(connected, here))
     end
     -- A wind charger's brake, set or let go, connected or not.
     if Wind.isCharger(source) then
-        JobOptions.add(menu, playerNum, Action, "source", Wind.isBraked(source) and SourceJobs.RELEASE_BRAKE or SourceJobs.BRAKE,
+        JobOptions.add(menu, playerNum, SourceJobs, Wind.isBraked(source) and SourceJobs.RELEASE_BRAKE or SourceJobs.BRAKE,
             source)
     end
     addBladesOption(playerNum, menu, source)
@@ -306,7 +301,7 @@ function Menu.addSourceOptions(playerNum, context, source)
     for _, bankPosition in ipairs(Sources.banksInReach(here.x, here.y, here.z, kind)) do
         local bank = PowerBank.findOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
         if bank and not Sources.connectRefusal(source, bankPosition) then
-            JobOptions.add(menu, playerNum, Action, "source", SourceJobs.CONNECT, source, bank,
+            JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.CONNECT, source, bank,
                 getText("ContextMenu_RenewableEnergy_ConnectSource", Menu.bankLabel(bank), Format.away(here, bankPosition)))
             offered = true
         end
@@ -324,32 +319,31 @@ end
 local function addTreadmillJobs(playerNum, menu, treadmill, wired)
     local run = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
     Needs.refuse(run, Treadmill.runRefusal(treadmill))
-    JobOptions.add(menu, playerNum, Action, "treadmill", wired and Treadmill.UNWIRE or Treadmill.WIRE, treadmill)
+    JobOptions.add(menu, playerNum, Treadmill, wired and Treadmill.UNWIRE or Treadmill.WIRE, treadmill)
 end
 
 --- Remove Light Bulb for a light that has one, else Add Light Bulb with one option for each type
 --- of bulb the character carries, shown in its colour as vanilla shows a lamp's. Returns the
 --- light's submenu.
 function Menu.addGardenLightOptions(playerNum, context, light)
-    local menu = Needs.addSubMenu(context, Menu.nameOf(light))
+    local menu = JobOptions.addSubMenu(context, Menu.nameOf(light))
     if SolarGardenLight.getBulb(light) then
-        JobOptions.add(menu, playerNum, Action, "light", SolarGardenLight.REMOVE_BULB, light, nil,
-            getText("ContextMenu_RemoveLightbulb"))
+        JobOptions.add(menu, playerNum, SolarGardenLight, SolarGardenLight.REMOVE_BULB, light)
         return menu
     end
     local bulbs = getSpecificPlayer(playerNum):getInventory():getAllEvalRecurse(SolarGardenLight.isBulb)
     if bulbs:isEmpty() then
-        JobOptions.add(menu, playerNum, Action, "light", SolarGardenLight.ADD_BULB, light, nil, getText("ContextMenu_AddLightbulb"))
+        JobOptions.add(menu, playerNum, SolarGardenLight, SolarGardenLight.ADD_BULB, light)
         return menu
     end
-    local submenu = Needs.addSubMenu(menu, getText("ContextMenu_AddLightbulb"))
+    local submenu = JobOptions.addSubMenu(menu, getText("ContextMenu_AddLightbulb"))
     local seen = {}
     for i = 0, bulbs:size() - 1 do
         local bulb = bulbs:get(i)
         local fullType = bulb:getFullType()
         if not seen[fullType] then
             seen[fullType] = true
-            local option = JobOptions.add(submenu, playerNum, Action, "light", SolarGardenLight.ADD_BULB, light, bulb,
+            local option = JobOptions.add(submenu, playerNum, SolarGardenLight, SolarGardenLight.ADD_BULB, light, bulb,
                 bulb:getDisplayName())
             option.iconTexture = bulb:getTex()
             option.color = { r = bulb:getColorRed(), g = bulb:getColorGreen(), b = bulb:getColorBlue() }
@@ -358,18 +352,18 @@ function Menu.addGardenLightOptions(playerNum, context, light)
     return menu
 end
 
-local function isPowerObject(object)
+local powerObject = JobOptions.clicked(function(object)
     return PowerBank.isBank(object) or Sources.kindOf(object) ~= nil or SolarGardenLight.isLight(object)
         or Treadmill.isTreadmill(object)
-end
+end)
 
 -- A click may land on several of them at once, and on either tile of a treadmill, whose wired half
 -- is the source.
-Menu.onFill = JobOptions.onWorldMenu(isPowerObject, function(context, playerNum, character, object, worldobjects)
-    local bank = Needs.findClicked(worldobjects, PowerBank.isBank)
-    local source = Needs.findClicked(worldobjects, Sources.kindOf)
-    local light = Needs.findClicked(worldobjects, SolarGardenLight.isLight)
-    local treadmill = Needs.findClicked(worldobjects, Treadmill.isTreadmill)
+Menu.onFill = JobOptions.onWorldMenu(powerObject, function(context, playerNum, character, object, worldobjects)
+    local bank = JobOptions.findClicked(worldobjects, PowerBank.isBank)
+    local source = JobOptions.findClicked(worldobjects, Sources.kindOf)
+    local light = JobOptions.findClicked(worldobjects, SolarGardenLight.isLight)
+    local treadmill = JobOptions.findClicked(worldobjects, Treadmill.isTreadmill)
     if treadmill and not source then
         source = Treadmill.wiredHalf(treadmill)
     end
@@ -384,7 +378,7 @@ Menu.onFill = JobOptions.onWorldMenu(isPowerObject, function(context, playerNum,
         end
     end
     if treadmill and not wiredTreadmill then
-        addTreadmillJobs(playerNum, Needs.addSubMenu(context, Menu.nameOf(treadmill)), treadmill, false)
+        addTreadmillJobs(playerNum, JobOptions.addSubMenu(context, Menu.nameOf(treadmill)), treadmill, false)
     end
     if light then
         Menu.addGardenLightOptions(playerNum, context, light)

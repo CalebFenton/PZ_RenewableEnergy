@@ -12,7 +12,6 @@ local Capture = require "PZHarness/Capture"
 local Art = {}
 
 local Sprites = RenewableEnergy.Sprites
-local MARK = "REArt"
 local NOON = 12
 
 local SCALE_ITEM = "Base.CarBattery1"
@@ -410,30 +409,19 @@ local function dropItems(lot)
             local column, row = (i - 1) % ITEMS_PER_ROW, math.floor((i - 1) / ITEMS_PER_ROW)
             lotSquare(lot, column, 1 + row * 2):AddWorldInventoryItem(item, 0.5, 0.5, 0)
         else
-            print(MARK .. " missing item " .. fullType)
+            print(PZHarness.run.mark .. " missing item " .. fullType)
         end
     end
 end
 
 -- Every item's icon as the crafting window draws it, for Run:addIconSheet.
 local function iconList()
-    local icons = {}
-    for _, fullType in ipairs(itemTypes()) do
-        local texture = Capture.iconTexture(fullType)
-        if texture then
-            table.insert(icons, { name = fullType, texture = texture })
-        else
-            print(MARK .. " missing icon " .. fullType)
-        end
-    end
-    return icons
+    local catalog = Capture.newCatalog()
+    catalog:items(itemTypes())
+    return catalog:iconList()
 end
 
--- The steps that walk the character to a shot's spot, let it see around, zoom and save.
-local function addShot(run, player, lot, shot)
-    Harness.addGoTo(run, player, { lotSquare(lot, shot.x, shot.y) }, shot.zoomSteps)
-    run:addOpaque(shot.name, function() return {} end)
-end
+local addShot = Harness.addSpotShot
 
 -- The steps that set `tiles` out on the emptied lot and shoot `shot` there.
 local function addTileShot(run, player, lot, tiles, shot)
@@ -534,7 +522,7 @@ local function addHitchedTrailerShots(run, player, lot, art)
         return Stage.vehiclesAtRest(art.pair, false)
     end)
     run:add(function()
-        Stage.hitchTrailer(art.pair, player, MARK)
+        Stage.hitchTrailer(art.pair, player)
         return Stage.vehiclesAtRest(art.pair, true)
     end)
     addShot(run, player, lot, SHOTS.trailer)
@@ -563,7 +551,7 @@ local function addLoneAndCrackedShots(run, player, lot, art)
 end
 
 function Art.capture(_, onDone)
-    local run = Capture.new(MARK)
+    local run = Capture.new()
     local player = getPlayer()
     -- Bare ground, since the first stage is set on the lot as it was found.
     local lot = Harness.findLot(player, AREA.w, AREA.h, { bare = true })
@@ -571,7 +559,7 @@ function Art.capture(_, onDone)
         run:fail("no open lot within " .. Harness.SEARCH_RADIUS .. " squares")
         return
     end
-    print(string.format("%s stage at %d,%d", MARK, lot.x, lot.y))
+    print(string.format("%s stage at %d,%d", run.mark, lot.x, lot.y))
     local art = {}
     addTileAndItemShots(run, player, lot)
     addHitchedTrailerShots(run, player, lot, art)
