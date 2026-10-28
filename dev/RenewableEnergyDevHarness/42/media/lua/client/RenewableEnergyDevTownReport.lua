@@ -36,8 +36,10 @@ local CAR_BATTERIES = { "Base.CarBattery1", "Base.CarBattery2", "Base.CarBattery
 -- The parts and magazines counted by full type alongside the modules and batteries, each with the
 -- sources most of a town's come from. Corpses, stash houses and RuralFinds aren't counted.
 local PART_TYPES = {
-    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.ChargeController",
-    "RenewableEnergy.PowerInverter", "RenewableEnergy.InverterCharger", "RenewableEnergy.SolarFailsafe",
+    "RenewableEnergy.HomesteadPowerMag1", "RenewableEnergy.HomesteadPowerMag2", "RenewableEnergy.HomesteadPowerMag3",
+    "RenewableEnergy.HomesteadPowerMag4", "RenewableEnergy.FemaPamphlet", "RenewableEnergy.PlugInInverter",
+    "RenewableEnergy.PowerInverter", "RenewableEnergy.ChargeController", "RenewableEnergy.InverterCharger",
+    "RenewableEnergy.SolarFailsafe", "RenewableEnergy.SolarMaintainer", "RenewableEnergy.SolarCellCharger",
 }
 local IS_PART = {}
 for _, fullType in ipairs(PART_TYPES) do
@@ -45,6 +47,17 @@ for _, fullType in ipairs(PART_TYPES) do
 end
 -- How many of a part's largest sources in a town its line names.
 local PART_SOURCES = 5
+
+-- The rooms of a home. The report gives what they hold together per kitchen, one to a home.
+local HOME_ROOMS = {
+    "bathroom", "bedroom", "closet", "diningroom", "garage", "garagestorage", "hall", "kidsbedroom", "kitchen", "laundry",
+    "livingroom",
+}
+-- The shops and storerooms the report gives what one of holds on average.
+local VISIT_ROOMS = {
+    "electronicsstore", "electronicsstorage", "camping", "campingstorage", "toolstore", "toolstorestorage", "carsupply",
+    "gardenstore", "mechanic", "farmstorage", "warehouse", "storageunit", "garagestorage",
+}
 
 -- What a source holds on average: modules with their condition summed, as found and after one
 -- Seal Cracked Module on every module it helps, and batteries with their watt-hours as found.
@@ -207,32 +220,82 @@ local function pickWeight(pick)
     return math.max(1, pick.weightChance or 1)
 end
 
--- Expected items of `fullType` in `count` containers of `containerType` spread over `rooms` rooms
--- named `roomName`.
-local function expectedInContainers(roomName, containerType, count, rooms, fullType)
-    local room = SuburbsDistributions[roomName]
-    local entry = room and room[containerType] or SuburbsDistributions.all[containerType]
-    if type(entry) ~= "table" then
-        return 0
+-- Whether the room's first containers take `pick` before any other: rollProceduralItemInternal
+-- picks among the lists of min 1 that the room hasn't spawned yet, by weight, before the rest.
+local function isFirst(pick)
+    return not isForced(pick) and pick.min == 1
+end
+
+-- Container types that never take a room's `other` table (ItemPickerJava.initNoGenericLootContainers).
+local NO_GENERIC_LOOT = {}
+for _, containerType in ipairs({
+    "barbecue", "barbecuepropane", "bin", "brazier", "campfire", "cashregister", "clothingdryer", "clothingdryerbasic",
+    "clothingrack", "clothingwasher", "coffeemaker", "coffin", "composter", "dishwasher", "doghouse", "dumpster",
+    "fireplace", "freezer", "fridge", "icecream", "logs", "Mannequin", "medicine", "microwave", "newspaper_dispatch",
+    "newspaper_herald", "newspaper_knews", "newspaper_times", "plankstash", "postbox", "shelter", "stonefurnace", "stove",
+    "SurvivorCrate", "tent", "toaster", "trough", "vendingGt", "vendingpop", "vendingsnack", "woodstove",
+}) do
+    NO_GENERIC_LOOT[containerType] = true
+end
+
+-- The table a container of `containerType` in a room named `roomName` fills from, as
+-- ItemPickerJava.fillContainer chooses it: the room's own for the type, else the room's `other`,
+-- else the room's `all`; in a room with none of them, or none of its own, `all`'s for the type,
+-- else `all`'s `other`.
+local function containerTable(roomName, containerType)
+    local function from(room)
+        return room[containerType] or (not NO_GENERIC_LOOT[containerType] and room.other) or nil
     end
+    local room = SuburbsDistributions[roomName]
+    return room and (from(room) or room.all) or from(SuburbsDistributions.all)
+end
+
+-- Expected items of `fullType` in `count` containers that fill from the table `entry`, spread over
+-- `rooms` rooms. A room counts what its containers picked from a procedural table together, so a
+-- room's containers go first to the table's lists of min 1, one each, as far as they reach; the
+-- rest pick by weight, each list up to its max.
+local function expectedInTable(entry, count, rooms, fullType)
     if not entry.procedural then
         return count * expectedIn(entry, fullType)
     end
     local procList = entry.procList or {}
-    local totalWeight = 0
+    local totalWeight, firsts = 0, 0
     for _, pick in ipairs(procList) do
         if not isForced(pick) then
             totalWeight = totalWeight + pickWeight(pick)
         end
+        if isFirst(pick) then
+            firsts = firsts + 1
+        end
     end
     local perRoom = count / rooms
+    local firstShare = firsts > 0 and math.min(1, perRoom / firsts) or 0
+    local rest = math.max(0, perRoom - firsts)
     local total = 0
     for _, pick in ipairs(procList) do
         local list = ProceduralDistributions.list[pick.name]
         if not isForced(pick) and list then
-            local picked = perRoom * pickWeight(pick) / totalWeight
-            total = total + rooms * math.min(picked, pick.max or picked) * expectedIn(list, fullType)
+            local first = isFirst(pick) and firstShare or 0
+            local picked = first + math.min(rest * pickWeight(pick) / totalWeight, (pick.max or math.huge) - first)
+            total = total + rooms * picked * expectedIn(list, fullType)
         end
+    end
+    return total
+end
+
+-- Expected items of `fullType` in the containers of `byType` (container type -> count) of `rooms`
+-- rooms named `roomName`, those that fill from the same table counted together.
+local function expectedInRooms(roomName, byType, rooms, fullType)
+    local byTable = {}
+    for containerType, count in pairs(byType) do
+        local entry = containerTable(roomName, containerType)
+        if type(entry) == "table" then
+            byTable[entry] = (byTable[entry] or 0) + count
+        end
+    end
+    local total = 0
+    for entry, count in pairs(byTable) do
+        total = total + expectedInTable(entry, count, math.max(1, rooms), fullType)
     end
     return total
 end
@@ -241,10 +304,7 @@ end
 local function expectedInTownByRoom(town, fullType)
     local byRoom = {}
     for roomName, byType in pairs(town.containers) do
-        local rooms = math.max(1, town.rooms[roomName] or 0)
-        for containerType, count in pairs(byType) do
-            byRoom[roomName] = (byRoom[roomName] or 0) + expectedInContainers(roomName, containerType, count, rooms, fullType)
-        end
+        byRoom[roomName] = expectedInRooms(roomName, byType, town.rooms[roomName] or 0, fullType)
     end
     return byRoom
 end
@@ -611,6 +671,71 @@ local function printParts(mark, town, row)
     end
 end
 
+-- What the rooms named `roomNames` of `town` hold altogether, room loot and what OnSeeNewRoom
+-- places alike: `modules`, `batteries` (deep cycles and L-16s, a bank's car batteries too) and
+-- each of PART_TYPES by full type.
+local function roomsHold(town, roomNames, kinds)
+    local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+    local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
+    local total = none()
+    for _, roomName in ipairs(roomNames) do
+        local rooms = town.rooms[roomName] or 0
+        local function inLoot(fullType)
+            return expectedInRooms(roomName, town.containers[roomName] or {}, rooms, fullType)
+        end
+        total.modules = total.modules + inLoot(MODULE)
+        for _, fullType in ipairs(LOOSE_BATTERIES) do
+            total.batteries = total.batteries + inLoot(fullType)
+        end
+        for _, fullType in ipairs(PART_TYPES) do
+            total[fullType] = (total[fullType] or 0) + inLoot(fullType)
+        end
+        local bank = rarity and WorldSpawns.BANK_ROOMS[roomName]
+        if bank then
+            local placed = rooms / (bank.odds * rarity)
+            add(total, kinds.banks[bank.stock], placed)
+            local beside = WorldSpawns.BANK_STOCK[bank.stock].modules
+            if beside then
+                add(total, kinds.site, placed * beside.chance * midpoint(beside) * SandboxVars.RenewableEnergy.LRMSolarPanels)
+            end
+        end
+        local crateOdds = rarity and WorldSpawns.CRATE_ROOMS[roomName]
+        if crateOdds then
+            add(total, kinds.crates.garageKit, rooms / (crateOdds * rarity))
+        end
+    end
+    return total
+end
+
+-- Prints under `mark` what `total` holds over `count` of `what`, as each item's count per one and
+-- how many it takes on average to find one.
+local function printPerOne(mark, what, count, total)
+    local parts = {}
+    local keys = { "modules", "batteries" }
+    for _, fullType in ipairs(PART_TYPES) do
+        table.insert(keys, fullType)
+    end
+    for _, key in ipairs(keys) do
+        local each = (total[key] or 0) / count
+        if each > 0.0005 then
+            table.insert(parts, string.format("%s %.3f (1 in %.0f)", (string.gsub(key, "^[^.]+%.", "")), each, 1 / each))
+        end
+    end
+    print(string.format("%s per %s (%d): %s", mark, what, count, table.concat(parts, ", ")))
+end
+
+-- Prints under `mark` what a home of the whole map holds on average, and one of each of
+-- VISIT_ROOMS.
+local function printPerVisit(mark, map, kinds)
+    printPerOne(mark, "home", map.rooms.kitchen, roomsHold(map, HOME_ROOMS, kinds))
+    for _, roomName in ipairs(VISIT_ROOMS) do
+        local rooms = map.rooms[roomName] or 0
+        if rooms > 0 then
+            printPerOne(mark, roomName, rooms, roomsHold(map, { roomName }, kinds))
+        end
+    end
+end
+
 local function printReport(census, samples, mark)
     local SolarSites = require "RenewableEnergy/World/SolarSites"
     local options = SandboxVars.RenewableEnergy
@@ -659,6 +784,7 @@ local function printReport(census, samples, mark)
         printParts(mark, town, row)
     end
     print(string.format("%s arrow boards per map: %.1f from vehicle zones, %.1f at sites", mark, zoneBoards, siteBoards))
+    printPerVisit(mark, census.towns[#census.towns], kinds)
     local stocks = {}
     for name in pairs(kinds.banks) do
         table.insert(stocks, name)
