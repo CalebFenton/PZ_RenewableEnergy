@@ -83,7 +83,7 @@ Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling 
 
 ## Where to look
 
-Think about who had this in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers. Cracked modules are common, good ones aren't. Some places come already set up, their panels usually on the roof where the sun is, so bring what it takes to build your own way up. Now and then a barn or a hunting shack has something out back, worn and needing repair.
+Think about who had this in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers, and who sold it: electronics and camping stores. Cracked modules are common, good ones aren't. Some places come already set up, panels usually up on the roof, so bring a way up. Now and then a barn or a hunting shack has something out back, worn and needing repair.
 
 The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
 

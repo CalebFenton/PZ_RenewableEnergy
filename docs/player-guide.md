@@ -594,25 +594,27 @@ Think about who had this gear in 1993, and how far they'd have hauled it. Rarity
 
 ### Loot
 
+Stores are the sure places: most electronics stores have a power aisle of inverters, chargers and the magazines, and every electronics store back room and camping store keeps a shelf of panels and batteries. Homes reward a long search: about one home in thirty has Homestead Power #1.
+
 | What | Where to look | How often |
 |---|---|---|
 | Cracked solar modules | Crates, shelves and tool cabinets in home garages and sheds, more in farm storerooms and electronics store backrooms; trunks of junkyard cars | Common |
-| Solar modules | Camper trailers, camping cars, phone and power company vans, electricians' vans and shelves, survivalists' trucks, generator rooms | Rare |
-| Deep cycle batteries | Auto parts battery shelves (far fewer than car batteries), mechanics' shelves, camper trailers, electronics store backstock and warehouses; now and then farms, fishing stores and garages | Uncommon |
+| Solar modules | Electronics store back rooms and camping stores, every one; hardware store back rooms, often; camper trailers, camping cars, phone and power company vans, electricians' vans and shelves, survivalists' trucks, generator rooms | Rare, except where they were sold |
+| Deep cycle batteries | Electronics store back rooms and camping stores, auto parts battery shelves (far fewer than car batteries), mechanics' shelves, camper trailers, warehouses; now and then farms, fishing stores and garages | Uncommon |
 | L-16 batteries | Phone and power company vans, generator and control rooms, battery crates | Very rare |
 | Battery electrolyte | Auto parts stores, mechanics, garages | Common |
 | Car alternators | Mechanics' shelves and crates, auto parts battery shelves, garages; or take one out of a car | Uncommon |
 | Plug-in inverter | Auto parts stores, gas stations, electronics and department stores, garages, cars' glove boxes and trunks, truckers | Common |
-| Power inverter | Auto parts battery shelves, electricians, campers, survivalists' trucks, generator rooms | Uncommon |
-| Inverter/charger | Generator and control rooms, phone, power company and electricians' vans, camper trailers, stash houses | Rare |
-| Charge controller | Electricians, phone, power company and radio vans, generator and control rooms, camper trailers | Uncommon |
+| Power inverter | Electronics stores, auto parts battery shelves, electricians, campers, survivalists' trucks, generator rooms | Uncommon |
+| Inverter/charger | Generator and control rooms, phone, power company and electricians' vans, camper trailers, electronics store back rooms and camping stores now and then, stash houses | Rare |
+| Charge controller | Electronics stores and their back rooms, camping stores, electricians, phone, power company and radio vans, generator and control rooms, camper trailers | Uncommon |
 | Solar Failsafe | Generator rooms and stash houses, now and then | Very rare: easier to build |
-| Solar battery maintainer | Auto parts stores, mechanics, farm supply and barns, fishing stores, campers, farmers' trucks | Uncommon |
+| Solar battery maintainer | Auto parts stores, electronics stores, mechanics, farm supply and barns, fishing stores, campers, farmers' trucks | Uncommon |
 | Solar battery charger | Electronics stores, camping stores, army surplus and survival gear, survivors' hideouts | Uncommon |
 | Solar garden lights | Garden centres and hardware stores, garages and barns, and along front walks, more often in the nicer neighbourhoods | Common |
-| Homestead Power #1 | Electronics store magazine racks, bookstores, tool, outdoor and auto parts stores, post offices, libraries, living rooms, campers, most crates of RV solar gear | Common |
-| Homestead Power #2 | Where #1 is, less often; electricians, utility and radio vans, generator and control rooms | Uncommon |
-| Homestead Power #3 | Hardware stores' farming shelves and book racks, farm supply and farm storerooms, the farming shelf of a bookstore, farmers' trucks, living rooms; in barns, on a table or beside an old digester | Uncommon: about half as often as #2 |
+| Homestead Power #1 | Electronics stores, about every other one; bookstores, tool, outdoor and auto parts stores, post offices, libraries, campers, most crates of RV solar gear; about one home in thirty | Common |
+| Homestead Power #2 | Where #1 is, half as often; electricians, utility and radio vans, generator and control rooms | Uncommon |
+| Homestead Power #3 | Hardware stores' farming shelves and book racks, farm supply and farm storerooms, the farming shelf of a bookstore, farmers' trucks, living rooms; in barns, on a table or beside an old digester | Uncommon: nearly as often as #2 |
 | Homestead Power #4 | Hardware, electronics and farm supply stores, bookstores' farming shelves, electricians, hobby shelves, living rooms; on barn tables | Uncommon: about two thirds as often as #2 |
 | FEMA plans | Post offices, army surplus, police and fire stations, libraries, hardware store book racks, now and then a shelf at home; preppers, hunting shacks | Uncommon |
 | A bit of everything | Prepper caches, and survivalists dead or alive | |
