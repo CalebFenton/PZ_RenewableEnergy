@@ -43,6 +43,25 @@ procLists.RenewableEnergyBatteryStock = {
     items = {},
 }
 
+-- The power aisle of an electronics store: inverters, chargers, controllers and the Homestead Power
+-- magazines. Every electronics store fills one or two containers from it (ROOM_PICKS), so a player
+-- who wants electronics knows where to go.
+procLists.RenewableEnergyPowerAisle = {
+    rolls = 4,
+    ignoreZombieDensity = true,
+    items = {},
+    junk = {
+        rolls = 1,
+        items = {
+            "Base.Battery", 20,
+            "Base.BatteryBox", 5,
+            "Base.LightBulb", 10,
+            "Base.ElectricWire", 10,
+            "Base.HandTorch", 5,
+        },
+    },
+}
+
 -- Loot respawn refills any explored, looted container that isn't an IsoThumpable
 -- (LootRespawn.respawnInContainer), and a bank is an IsoGenerator, so the table a room gives these
 -- types is what a player's own bank, charger or crate would be refilled with. Empty tables refill
@@ -71,18 +90,33 @@ stashCache[Stash.CRATE_TYPE] = {
 stashCache.crate = { procedural = true, procList = {} }
 stashCache.metal_shelves = { procedural = true, procList = {} }
 
--- Rooms that pick the solar gear or the battery stock. Rooms whose only vanilla entry has no
--- weightChance (it counts as 1) are left out, because any entry added there would take half the
--- picks.
+-- Rooms that pick the solar gear, the battery stock or the power aisle. Rooms whose only vanilla
+-- entry has no weightChance (it counts as 1) are left out, because any entry added there would take
+-- half the picks.
 local function pick(listName, weight, max)
     return { name = listName, min = 0, max = max or 1, weightChance = weight }
 end
+-- A pick every such room fills a container from: rollProceduralItemInternal fills a room's first
+-- containers from the lists of min 1 it hasn't spawned yet, among them by weight, before any other.
+-- Then it competes by weight up to its max like any pick.
+local function stocked(listName, weight, max)
+    local entry = pick(listName, weight, max)
+    entry.min = 1
+    return entry
+end
 local ROOM_PICKS = {
-    { "electronicsstorage", "other", pick("RenewableEnergySolarGear", 10) },
+    -- Stores and their back rooms, where a player looks for what they sold.
+    { "electronicsstorage", "other", stocked("RenewableEnergySolarGear", 10) },
     { "electronicsstorage", "other", pick("RenewableEnergyBatteryStock", 5) },
-    { "campingstorage", "other", pick("RenewableEnergySolarGear", 10) },
+    -- electronicsstore is the same table as electronicstore (vanilla SuburbsDistributions.lua).
+    { "electronicstore", "shelves", stocked("RenewableEnergyPowerAisle", 40, 2) },
+    { "electronicstore", "counter", stocked("RenewableEnergyPowerAisle", 40, 2) },
+    { "electronicstore", "other", stocked("RenewableEnergyPowerAisle", 40, 2) },
+    { "camping", "other", stocked("RenewableEnergySolarGear", 10) },
+    { "campingstorage", "other", stocked("RenewableEnergySolarGear", 10) },
+    { "toolstorestorage", "other", pick("RenewableEnergySolarGear", 30) },
     { "farmstorage", "other", pick("RenewableEnergySolarGear", 5) },
-    { "toolstorestorage", "other", pick("RenewableEnergySolarGear", 10) },
+    -- Stock put away where it was used.
     { "warehouse", "metal_shelves", pick("RenewableEnergySolarGear", 5) },
     { "warehouse", "metal_shelves", pick("RenewableEnergyBatteryStock", 5) },
     { "storageunit", "other", pick("RenewableEnergySolarGear", 3) },

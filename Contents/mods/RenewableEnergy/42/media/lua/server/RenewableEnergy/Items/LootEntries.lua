@@ -52,14 +52,15 @@ local weighted = Loot.entries
 local items = {
     -- Scavenger: the first magazine, plug-in power and the solar gadgets
     {
-        -- The magazine that starts the mod, so it turns up in ordinary homes too: a few in a
-        -- town's worth of houses.
+        -- The magazine that starts the mod, so it turns up in ordinary homes too, about one in
+        -- thirty; an electronics store's power aisle is the sure place.
         fullType = "RenewableEnergy.HomesteadPowerMag1",
         option = "LRMMisc",
         entries = weighted({
-            { 0.5, SAFEHOUSE_READING }, { 0.6, HOME_OTHER_SHELVES }, { 0.4, HOME_SIDE_TABLES },
-            { 0.6, HOME_SHELVES }, { 1, SURVIVALIST_CORPSES }, { 2, SURVIVOR_CRATES },
+            { 0.5, SAFEHOUSE_READING }, { 0.4, HOME_OTHER_SHELVES }, { 0.3, HOME_SIDE_TABLES },
+            { 0.4, HOME_SHELVES }, { 1, SURVIVALIST_CORPSES }, { 2, SURVIVOR_CRATES },
         }, {
+            { 15, "proc:RenewableEnergyPowerAisle" },
             { 6, "proc:ElectronicStoreMagazines" },
             { 2, "proc:ToolStoreBooks" },
             { 2, "proc:BookstoreBlueCollar" },
@@ -95,6 +96,7 @@ local items = {
         fullType = "RenewableEnergy.PlugInInverter",
         option = "LRMMisc",
         entries = weighted({ { 1, SURVIVOR_CRATES } }, {
+            { 25, "proc:RenewableEnergyPowerAisle" },
             { 2, "proc:CarSupplyTools" },
             { 2, "proc:CarSupplyBatteries" },
             { 2, "proc:GasStoreEmergency" },
@@ -124,6 +126,7 @@ local items = {
         fullType = SolarMaintainer.ITEM,
         option = "LRMMisc",
         entries = weighted({ { 1, SURVIVOR_CRATES } }, {
+            { 6, "proc:RenewableEnergyPowerAisle" },
             -- Kept on the batteries of RVs, boats and seasonal tractors.
             { 2, "proc:CarSupplyBatteries" },
             { 1, "proc:CarSupplyTools" },
@@ -147,6 +150,7 @@ local items = {
         fullType = SolarCellCharger.ITEM,
         option = "LRMMisc",
         entries = weighted({ { 1.5, SURVIVOR_CRATES } }, {
+            { 8, "proc:RenewableEnergyPowerAisle" },
             { 2, "proc:ElectronicStoreMisc" },
             { 1, "proc:GigamartHouseElectronics" },
             { 2, "proc:CampingStoreLighting" },
@@ -177,13 +181,15 @@ local items = {
     },
     -- RV and cabin: the second magazine, modules, deep cycle batteries and their electronics
     {
-        -- Turns up wherever the first magazine does, homes included, but less often.
+        -- Turns up wherever the first magazine does, homes included (about one in sixty), but less
+        -- often.
         fullType = "RenewableEnergy.HomesteadPowerMag2",
         option = "LRMMisc",
         entries = weighted({
-            { 0.3, SAFEHOUSE_READING }, { 0.3, HOME_OTHER_SHELVES }, { 0.2, HOME_SIDE_TABLES },
-            { 0.3, HOME_SHELVES }, { 0.5, SURVIVALIST_CORPSES }, { 1.5, SURVIVOR_CRATES },
+            { 0.3, SAFEHOUSE_READING }, { 0.2, HOME_OTHER_SHELVES }, { 0.13, HOME_SIDE_TABLES },
+            { 0.2, HOME_SHELVES }, { 0.5, SURVIVALIST_CORPSES }, { 1.5, SURVIVOR_CRATES },
         }, {
+            { 7, "proc:RenewableEnergyPowerAisle" },
             { 3, "proc:ElectronicStoreMagazines" },
             { 1.5, "proc:BookstoreBlueCollar" },
             { 1, "proc:ToolStoreBooks" },
@@ -260,13 +266,14 @@ local items = {
     {
         -- Wind and the treadmill: about two thirds as common as #2, on farms, with electricians, in
         -- hobby shops and on the magazine racks of hardware and electronics stores; in homes, less
-        -- often, and with preppers.
+        -- often (about one in a hundred), and with preppers.
         fullType = "RenewableEnergy.HomesteadPowerMag4",
         option = "LRMMisc",
         entries = weighted({
-            { 0.3, SAFEHOUSE_READING }, { 0.2, HOME_OTHER_SHELVES }, { 0.13, HOME_SIDE_TABLES },
-            { 0.2, HOME_SHELVES }, { 0.3, SURVIVALIST_CORPSES }, { 1, SURVIVOR_CRATES },
+            { 0.3, SAFEHOUSE_READING }, { 0.13, HOME_OTHER_SHELVES }, { 0.09, HOME_SIDE_TABLES },
+            { 0.13, HOME_SHELVES }, { 0.3, SURVIVALIST_CORPSES }, { 1, SURVIVOR_CRATES },
         }, {
+            { 5, "proc:RenewableEnergyPowerAisle" },
             { 2, "proc:ElectronicStoreMagazines" },
             { 3, "proc:BookstoreFarming" },
             { 1, "proc:BookstoreBlueCollar" },
@@ -288,6 +295,7 @@ local items = {
         fullType = Specs.factoryModule,
         option = "LRMSolarPanels",
         entries = weighted({ { 2, SURVIVOR_CRATES } }, {
+            { 3, "proc:RenewableEnergyPowerAisle" },
             -- RV roofs, installers' stock, preppers, telecom repeaters and arrow boards. Twice what
             -- the batteries' lists give, against the banks and car batteries a player finds besides.
             { 2, "veh:CamperTruckBed" },
@@ -313,6 +321,7 @@ local items = {
         fullType = "RenewableEnergy.PowerInverter",
         option = "LRMMisc",
         entries = weighted({ { 1, SURVIVOR_CRATES } }, {
+            { 12, "proc:RenewableEnergyPowerAisle" },
             { 1, "proc:CarSupplyBatteries" },
             { 0.5, "proc:CarSupplyTools" },
             { 0.5, "proc:MechanicShelfElectric" },
@@ -333,6 +342,7 @@ local items = {
         fullType = "RenewableEnergy.ChargeController",
         option = "LRMMisc",
         entries = weighted({ { 0.8, SURVIVOR_CRATES } }, {
+            { 8, "proc:RenewableEnergyPowerAisle" },
             { 1, "proc:ElectricianTools" },
             { 0.5, "proc:GeneratorRoom" },
             { 0.5, "proc:ControlRoomCounter" },
