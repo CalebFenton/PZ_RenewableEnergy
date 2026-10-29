@@ -323,7 +323,7 @@ check("partWear", function(expect, _, _, _, defer)
     local container, restoreOptions = partsContainer(defer)
     SandboxVars.RenewableEnergy.LRMMisc = 1
     local fills = {
-        ["the powerYard bank"] = function(c) WorldSpawns.stockBank(c, "powerYard") end,
+        ["the relay bank"] = function(c) WorldSpawns.stockBank(c, "relay") end,
         ["the garage kit crate"] = function(c) WorldSpawns.stockCrate(c, "garageKit") end,
         ["an arrow board's battery box"] = function(c) ArrowBoard.stockBatteryBox(c) end,
     }

@@ -12,23 +12,26 @@ RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.Wind = Wind
 
 -- Wind chargers by kind: watts at ratedKph, starting at cutInKph, and the input slots each takes in
--- a bank. Game wind is ClimateManager's windPower × 120 km/h. The generator alone sets the power:
--- `blades` lists the blade materials (Wind.SPEC.blades) it takes, the first for a charger whose
--- sprite names none, and they decide only when it breaks. rotorAbove is how many levels above its
--- own the rotor turns (each mast charger's hub is a storey and a half up, art/models/wind.py), where
--- its shelter is counted. A turbine with furlKph swings its tail-hinged head out of strong wind and
--- holds furledShare of its rating, as a furling tail governs the rotor near its rated speed; turned
--- aside, its blades take less of the gale and break only furledBladeKph above their break speed.
+-- a bank. The watts are what such a charger built in 1993 really made, which the Wind Multiplier
+-- option scales (Wind.ratedWatts); a bladed one takes more slots than a bank has free, so it needs
+-- a charge controller. Game wind is ClimateManager's windPower × 120 km/h. The generator alone
+-- sets the power: `blades` lists the blade materials (Wind.SPEC.blades) it takes, the first for a
+-- charger whose sprite names none, and they decide only when it breaks. rotorAbove is how many
+-- levels above its own the rotor turns (each mast charger's hub is a storey and a half up,
+-- art/models/wind.py), where its shelter is counted. A turbine with furlKph swings its
+-- tail-hinged head out of strong wind and holds furledShare of its rating, as a furling tail
+-- governs the rotor near its rated speed; turned aside, its blades take less of the gale and
+-- break only furledBladeKph above their break speed.
 -- propeller is the treadmill wind charger, alternator the homebuilt wind turbine (their names in
 -- saved records and tiles from before they were renamed).
 Wind.SPEC = {
     turbines = {
-        scoop = { slots = 1, watts = 480, cutInKph = 8, ratedKph = 50, rotorAbove = 0 },
-        propeller = { slots = 2, watts = 1600, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
+        scoop = { slots = 1, watts = 100, cutInKph = 8, ratedKph = 50, rotorAbove = 0 },
+        propeller = { slots = 3, watts = 300, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
             blades = { "wood", "pipe", "steel" } },
-        carAlternator = { slots = 2, watts = 2000, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
+        carAlternator = { slots = 3, watts = 400, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
             blades = { "wood", "pipe", "steel" } },
-        alternator = { slots = 3, watts = 3200, cutInKph = 9, ratedKph = 40, rotorAbove = 1,
+        alternator = { slots = 3, watts = 800, cutInKph = 9, ratedKph = 40, rotorAbove = 1,
             furlKph = 55, furledShare = 0.85, furledBladeKph = 20, blades = { "steel", "wood", "pipe" } },
     },
     -- Blades by material: the item that makes and mends them, and the `broken` item a mend hands
@@ -134,10 +137,16 @@ function Wind.furled(spec, kph)
     return spec.furlKph ~= nil and kph >= spec.furlKph
 end
 
+--- The watts a turbine of `spec` (Wind.SPEC.turbines) makes at its rated speed: its rating at the
+--- Wind Multiplier option.
+function Wind.ratedWatts(spec)
+    return spec.watts * SandboxVars.RenewableEnergy.WindMultiplier
+end
+
 --- The watts a turbine of `spec` (Wind.SPEC.turbines) makes in a wind of `kph`, standing on level
 --- `z` with `shelter` (0 open .. 1 walled in) around it and `crowding` (the share other chargers
 --- take, Wind.crowding; nil for none): zero below cut-in, rising with the cube of the speed to its
---- rating at rated speed and flat above; furled, its furled share.
+--- rated watts (Wind.ratedWatts) at rated speed and flat above; furled, its furled share.
 function Wind.watts(spec, kph, z, shelter, crowding)
     local wind = SPEC
     if kph <= spec.cutInKph then
@@ -148,7 +157,7 @@ function Wind.watts(spec, kph, z, shelter, crowding)
         share = spec.furledShare
     end
     local height = 1 + wind.heightBonusPerLevel * math.min(math.max(z, 0), wind.maxBonusLevel)
-    return spec.watts * share * height * (1 - wind.shelterLoss * shelter) * (1 - (crowding or 0))
+    return Wind.ratedWatts(spec) * share * height * (1 - wind.shelterLoss * shelter) * (1 - (crowding or 0))
 end
 
 --- The share of its wind a charger loses to another whose rotor turns on its level `distance`

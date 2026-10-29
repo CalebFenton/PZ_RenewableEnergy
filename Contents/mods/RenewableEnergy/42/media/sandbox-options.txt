@@ -8,6 +8,15 @@ option RenewableEnergy.SunlightMultiplier {
 	type = double, min = 1, max = 5, default = 2.5,
 }
 /*
+    Wind multiplier: 1 is what the homebuilt wind chargers of 1993 really made on the mod's
+    ratings (Wind.SPEC). The default keeps wind a helper beside solar rather than a whole house's
+    power from one mast; about 5 gives back the ratings from before wind needed a controller.
+*/
+option RenewableEnergy.WindMultiplier {
+	page = RenewableEnergy, translation = RenewableEnergy_WindMultiplier,
+	type = double, min = 1, max = 6, default = 2,
+}
+/*
     Biogas multiplier: 1 is what a real digester makes from the feed. A generator on gas burns
     vanilla's own fuel bill (GasKit), so at 1 one cow's dung runs a fridge-freezer most of the day,
     and a small herd a house.

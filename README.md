@@ -55,7 +55,7 @@ The bank powers everything a generator in its spot would, the neighbours' lights
 
 ![A scoop rotor, a treadmill wind charger with carved blades, a car alternator wind charger with pipe blades and a homebuilt wind turbine on its tower, turning on open ground](art/promo/images/wind.png)
 
-Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, the homebuilt turbine twice the treadmill's. Put them up high, clear of trees and buildings and four squares apart, or they steal each other's wind.
+Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, most in winter, via a charge controller. Put them up high, clear of trees and buildings and four squares apart, or they steal each other's wind.
 
 When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from pipe, or forged steel that breaks last. The turbine swings itself out of the worst of it.
 

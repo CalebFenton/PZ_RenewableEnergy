@@ -20,28 +20,28 @@ local GardenLights = require "RenewableEnergy/World/GardenLights"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local RuralFinds = require "RenewableEnergy/World/RuralFinds"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
-local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local SourceSite = require "RenewableEnergy/PowerBank/SourceSite"
 local GasLines = require "RenewableEnergy/GasLine/GasLines"
 local LOCATIONS = require "RenewableEnergy/World/SolarSiteLocations"
 local Chance = require "cf_commonlib/Chance"
+local Squares = require "cf_commonlib/Squares"
 
 local SolarSites = {}
 
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 
 -- What each kind of site puts at its spots: how many of its panel spots it uses, how many
--- modules each panel holds (a mount's full load if not given), the BANK_STOCK of its bank, the
--- CRATE_STOCK of its crate, and whether its house gets garden lights. A homestead kind has a
--- RuralFinds find, worn as the countryside leaves one: `wind`, a wind charger wired to a bank of
--- that BANK_STOCK; `gas`, a gas source of that find piped to a generator with the Gas Conversion
--- Kit; and `pamphlet`, a FEMA pamphlet in a container of its house.
+-- modules each panel holds (a mount's full load if not given), the BANK_STOCK of its bank, and
+-- whether its house gets garden lights. A homestead kind has a RuralFinds find, worn as the
+-- countryside leaves one: `wind`, a wind charger wired to a bank of that BANK_STOCK; `gas`, a gas
+-- source of that find piped to a generator with the Gas Conversion Kit; and `pamphlet`, a FEMA
+-- pamphlet in a container of its house.
 SolarSites.KINDS = {
     stockTank = { panels = { min = 1, max = 1 }, modules = { min = 1, max = 2 } },
-    farmRoof = { panels = { min = 2, max = 4 }, bank = "farmHouse", gardenLights = true },
-    camper = { panels = { min = 1, max = 2 }, bank = "camper" },
+    farmRoof = { panels = { min = 3, max = 4 }, bank = "farmHouse", gardenLights = true },
+    camper = { panels = { min = 2, max = 2 }, bank = "camper" },
     relay = { panels = { min = 2, max = 2 }, bank = "relay" },
-    powerYard = { panels = { min = 2, max = 2 }, bank = "powerYard", crate = "powerYard" },
+    powerYard = { bank = "powerYard" },
     ranger = { panels = { min = 2, max = 4 }, bank = "ranger" },
     roadWorks = {},
     checkpoint = {},
@@ -162,6 +162,7 @@ local SPOTS = {
         refuses = notFreeIndoors,
         place = function(square, spot) return WorldSpawns.placeBank(square, spot.stock) ~= nil end,
     },
+    -- A crate a world armed at the power yard before the yard lost it (WorldSpawns.CRATE_STOCK).
     crate = {
         refuses = notFreeIndoors,
         place = function(square, spot)
@@ -184,7 +185,9 @@ local SPOTS = {
         waits = true,
         place = function(square, spot) return ArrowBoard.spawn(square, spot.facing) ~= nil end,
     },
-    -- The wind charger on its square and the bank it is wired to at the far end.
+    -- The wind charger on its square and the bank it is wired to at the far end. It was wired in
+    -- while its controller worked, so it is wired whether or not the bank has a slot for it now:
+    -- it makes nothing until the bank has (Bank:updateSources).
     windCharger = {
         line = true,
         refuses = function(square, spot)
@@ -196,7 +199,7 @@ local SPOTS = {
             local bank = WorldSpawns.placeBank(bankSquare, spot.stock)
             if bank then
                 local charger = Sources.findOn(square)
-                local why = not charger and "no charger" or SourceJobs.refusalAt(nil, SourceJobs.CONNECT, charger, bank)
+                local why = not charger and "no charger" or Sources.connectRefusal(charger, Squares.positionOf(bank))
                 if why then
                     print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
                 else
@@ -280,9 +283,6 @@ function SolarSites.addSite(site)
     end
     if kind.bank then
         addSpot(site.bank[1], site.bank[2], site.bank[3], { what = "bank", stock = kind.bank })
-    end
-    if kind.crate then
-        addSpot(site.crate[1], site.crate[2], site.crate[3], { what = "crate", stock = kind.crate })
     end
     if kind.gardenLights then
         addSpot(site.house[1], site.house[2], 0, { what = "gardenLights" })

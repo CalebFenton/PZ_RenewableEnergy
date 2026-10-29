@@ -1,14 +1,15 @@
 -- The named sites of SolarSites.lua, by the map they are on. Places where someone in 1993 would
 -- have had solar: stock tank pumps out in the pastures, farms off the grid, campers, telephone
--- relay sheds on the hills, the power company's yard, ranger stations, and arrow boards at road
--- works and at the army's checkpoints on the roads into Louisville. And the homestead power of the
--- countryside, left worn: old farm wind chargers, a dairy's biogas, a prepper's wood gas.
+-- relay sheds on the hills, ranger stations, and arrow boards at road works and at the army's
+-- checkpoints on the roads into Louisville; and the power company's substation battery. And the
+-- homestead power of the countryside, left worn: old farm wind chargers, a dairy's biogas, a
+-- prepper's wood gas.
 -- Coordinates were read off the map's lotheader and lotpack files.
 --
 -- A site lists the spots its kind (SolarSites.KINDS) may use:
 --   panels: { x, y, z, mount, facing }, mount "flat", "wallMetal", "rackMetal" or "rackWood";
 --     flats on a flat roof, wall panels on the outside of a south wall, racks on open ground;
---   bank and crate: { x, y, z }, an empty floor square of a room;
+--   bank: { x, y, z }, an empty floor square of a room;
 --   house: { x, y }, a square of the building that gets garden lights along its front, or whose
 --     containers hide a pamphlet;
 --   arrowBoard: { x, y, z, facing }, the middle of a road lane, facing along the road;
@@ -92,12 +93,8 @@ return {
             kind = "relay", name = "Relay station west of Riverside",
             panels = { { 4831, 6288, 0, "rackMetal", "S" }, { 4831, 6273, 0, "rackMetal", "S" } }, bank = { 4836, 6278, 0 },
         },
-        -- Deer Valley Power's substation west of Muldraugh, with the yard office.
-        {
-            kind = "powerYard", name = "Deer Valley Power yard",
-            panels = { { 10376, 10064, 0, "rackMetal", "S" }, { 10376, 10066, 0, "rackMetal", "S" } },
-            bank = { 10380, 10062, 0 }, crate = { 10382, 10062, 0 },
-        },
+        -- Deer Valley Power's substation west of Muldraugh: the station battery in the yard office.
+        { kind = "powerYard", name = "Deer Valley Power yard", bank = { 10380, 10062, 0 } },
         -- Ranger stations: wall panels on the south side, the battery box in the office.
         {
             kind = "ranger", name = "Deerhead Lake ranger station",

@@ -541,7 +541,8 @@ module Base
        turning a big pulley that a leather belt steps up to a car's alternator, which wants far
        more speed than a rotor turns. More power than the treadmill motor in any wind; brake it
        before a storm. Its skills sit between the treadmill charger's and the turbine's, with the
-       Mechanics of taking a car's alternator out and rigging its drive. */
+       Mechanics of taking a car's alternator out and rigging its drive, and the scrap of a
+       regulator that keeps it from cooking the batteries. */
     entity RenewableEnergy_CarAlternatorWood
     {
         component UiConfig
@@ -561,27 +562,26 @@ module Base
         component CraftRecipe
         {
             timedAction = BuildMetalStructureMedium,
-            time = 600,
+            time = 700,
             category = Welding,
             Tags = Welding,
             NeedToBeLearn = true,
-            AutoLearnAll = MetalWelding:6;Electricity:5;Mechanics:3,
-            SkillRequired = MetalWelding:4;Electricity:4;Mechanics:2,
-            xpAward = MetalWelding:40;Electricity:25;Mechanics:10,
+            AutoLearnAll = MetalWelding:7;Electricity:6;Mechanics:4,
+            SkillRequired = MetalWelding:5;Electricity:5;Mechanics:3,
+            xpAward = MetalWelding:50;Electricity:30;Mechanics:15,
             Tooltip = Tooltip_RenewableEnergy_CarAlternatorWindCharger,
             inputs
             {
                 item 1 tags[base:weldingmask] mode:keep,
-                item 5 [Base.BlowTorch] flags[DontRecordInput],
-                item 4 [Base.WeldingRods] flags[DontRecordInput],
+                item 6 [Base.BlowTorch] flags[DontRecordInput],
+                item 5 [Base.WeldingRods] flags[DontRecordInput],
                 item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
                 item 1 [RenewableEnergy.CarAlternator],
                 item 1 [Base.Belt2],
-                item 1 [Base.SheetMetal],
-                item 1 [Base.SmallSheetMetal],
-                item 6 [Base.MetalPipe],
+                item 2 [Base.SheetMetal],
+                item 8 [Base.MetalPipe],
                 item 3 [Base.ElectricWire],
-                item 1 [Base.ElectronicsScrap],
+                item 3 [Base.ElectronicsScrap],
             }
         }
     }
@@ -646,25 +646,25 @@ module Base
         component CraftRecipe
         {
             timedAction = BuildMetalStructureMedium,
-            time = 800,
+            time = 900,
             category = Welding,
             Tags = Welding,
             NeedToBeLearn = true,
-            AutoLearnAll = MetalWelding:7;Electricity:6,
-            SkillRequired = MetalWelding:5;Electricity:5,
-            xpAward = MetalWelding:50;Electricity:30,
+            AutoLearnAll = MetalWelding:8;Electricity:7,
+            SkillRequired = MetalWelding:6;Electricity:6,
+            xpAward = MetalWelding:60;Electricity:40,
             Tooltip = Tooltip_RenewableEnergy_WindTurbine,
             inputs
             {
                 item 1 tags[base:weldingmask] mode:keep,
-                item 6 [Base.BlowTorch] flags[DontRecordInput],
-                item 5 [Base.WeldingRods] flags[DontRecordInput],
+                item 8 [Base.BlowTorch] flags[DontRecordInput],
+                item 7 [Base.WeldingRods] flags[DontRecordInput],
                 item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
                 item 1 [RenewableEnergy.HomemadeAlternator],
-                item 2 [Base.SheetMetal],
-                item 8 [Base.MetalPipe],
+                item 3 [Base.SheetMetal],
+                item 12 [Base.MetalPipe],
                 item 4 [Base.ElectricWire],
-                item 2 [Base.ElectronicsScrap],
+                item 3 [Base.ElectronicsScrap],
             }
         }
     }

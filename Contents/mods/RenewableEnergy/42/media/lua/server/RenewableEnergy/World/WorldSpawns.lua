@@ -21,14 +21,16 @@ local WorldSpawns = {}
 local MODULE = Specs.factoryModule
 
 -- Rooms that may hold a bank, the bank's stock, and one in how many of them does at the
--- Uncommon setting. Garages are many, so theirs is rarer: a battery box in every few streets
--- reads as a bank on every corner.
+-- Uncommon setting. Off the grid is where people wired batteries to panels: farm storerooms,
+-- barns and sheds hold most of them. Garages and storage units are many, so theirs are rare: a
+-- battery box in every few streets reads as a bank on every corner. A store keeps its batteries
+-- on the shelf (Distributions), not wired into a rack.
 WorldSpawns.BANK_ROOMS = {
-    shed = { odds = 12, stock = "shed" },
-    garagestorage = { odds = 24, stock = "shed" },
-    storageunit = { odds = 12, stock = "storageUnit" },
-    farmstorage = { odds = 8, stock = "farmStorage" },
-    electronicsstorage = { odds = 3, stock = "electronicsStorage" },
+    shed = { odds = 5, stock = "shed" },
+    garagestorage = { odds = 60, stock = "shed" },
+    storageunit = { odds = 24, stock = "storageUnit" },
+    farmstorage = { odds = 5, stock = "farmStorage" },
+    barn = { odds = 10, stock = "farmStorage" },
 }
 WorldSpawns.CRATE_ROOMS = { garagestorage = 33, storageunit = 16 }
 -- The odds above are multiplied by these for each Battery Bank Spawn setting. Crates follow the
@@ -70,60 +72,59 @@ WorldSpawns.BANK_STOCK = {
         charger = { chance = 0.3, types = { { Specs.charger, 1 } } },
         modules = { chance = 0.6, min = 1, max = 2 },
     },
+    -- A farm storeroom's or barn's rack, which ran the farm's lights, fences or well pump, maybe
+    -- off the generator through an inverter/charger.
     farmStorage = {
         sprite = "batteryRackWood",
-        batteries = { min = 3, max = 5, wear = "worn", types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 21 } }) },
-        inverter = { chance = 0.5, types = { { "RenewableEnergy.PowerInverter", 1 } } },
+        batteries = { min = 2, max = 4, wear = "worn", types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 21 } }) },
+        inverter = { chance = 0.5, types = { { "RenewableEnergy.PowerInverter", 2 }, { "RenewableEnergy.InverterCharger", 1 } } },
         controller = { chance = 0.3, types = { { Specs.controller, 1 } } },
         charger = { chance = 0.4, types = { { Specs.charger, 1 } } },
+        modules = { chance = 0.5, min = 1, max = 2 },
     },
-    electronicsStorage = {
-        sprite = "batteryRackMetal",
-        batteries = { min = 4, max = 6, wear = "stock", types = {
-            { "RenewableEnergy.DeepCycleBattery", 7 }, { "RenewableEnergy.L16Battery", 2 },
-        } },
-        inverter = { chance = 0.5, types = {
-            { "RenewableEnergy.PowerInverter", 4 }, { "RenewableEnergy.InverterCharger", 1 },
-        } },
-        controller = { chance = 0.3, types = { { Specs.controller, 1 } } },
-        charger = { chance = 0.3, types = { { Specs.charger, 1 } } },
-    },
-    -- The named sites' banks.
+    -- The named sites' banks. An off-grid farm's rack, run through an inverter/charger as often
+    -- as not, so the generator could top it up.
     farmHouse = {
-        sprite = "batteryBoxWood",
-        batteries = { min = 1, max = 2, wear = "used", types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 9 } }) },
-        inverter = { chance = 0.7, types = { { "RenewableEnergy.PlugInInverter", 1 } } },
+        sprite = "batteryRackWood",
+        batteries = { min = 2, max = 4, wear = "used", types = withTypes(CAR_BATTERIES, { { "RenewableEnergy.DeepCycleBattery", 9 } }) },
+        inverter = { chance = 0.8, types = { { "RenewableEnergy.PowerInverter", 1 }, { "RenewableEnergy.InverterCharger", 1 } } },
+        controller = { chance = 0.6, types = { { Specs.controller, 1 } } },
         charger = { chance = 0.5, types = { { Specs.charger, 1 } } },
     },
+    -- An RV's house batteries and the converter that charged them on shore power.
     camper = {
         sprite = "batteryBoxWood",
-        batteries = { min = 1, max = 1, wear = "used", types = { { "RenewableEnergy.DeepCycleBattery", 1 } } },
+        batteries = { min = 2, max = 2, wear = "used", types = { { "RenewableEnergy.DeepCycleBattery", 1 } } },
         inverter = { chance = 0.6, types = { { "RenewableEnergy.PlugInInverter", 1 } } },
+        charger = { chance = 0.3, types = { { Specs.charger, 1 } } },
     },
     ranger = {
         sprite = "batteryBoxMetal",
         batteries = { min = 2, max = 2, wear = "used", types = { { "RenewableEnergy.DeepCycleBattery", 1 } } },
-        inverter = { chance = 0.8, types = { { "RenewableEnergy.PowerInverter", 1 } } },
+        inverter = { chance = 0.8, types = { { "RenewableEnergy.PowerInverter", 2 }, { "RenewableEnergy.InverterCharger", 1 } } },
         charger = { chance = 0.5, types = { { Specs.charger, 1 } } },
     },
+    -- A phone repeater ran on DC: its panels charged the batteries through a controller, with no
+    -- inverter.
     relay = {
         sprite = "batteryRackMetal",
-        batteries = { min = 4, max = 6, wear = "used", types = { { "RenewableEnergy.L16Battery", 1 } } },
-        inverter = { chance = 1, types = { { "RenewableEnergy.InverterCharger", 1 } } },
-        controller = { chance = 0.5, types = { { Specs.controller, 1 } } },
+        batteries = { min = 2, max = 4, wear = "used", types = { { "RenewableEnergy.L16Battery", 1 } } },
+        controller = { chance = 1, types = { { Specs.controller, 1 } } },
     },
+    -- A substation's station battery, which tripped its breakers when the lines went down, on the
+    -- charger the grid kept it floated by. No panels charged it.
     powerYard = {
         sprite = "batteryBankMetal",
-        batteries = { min = 6, max = 8, wear = "used", types = { { "RenewableEnergy.L16Battery", 1 } } },
-        inverter = { chance = 1, types = { { "RenewableEnergy.InverterCharger", 1 } } },
-        controller = { chance = 1, types = { { Specs.controller, 1 } } },
-        charger = { chance = 0.5, types = { { Specs.charger, 1 } } },
+        batteries = { min = 4, max = 6, wear = "used", types = { { "RenewableEnergy.L16Battery", 1 } } },
+        charger = { chance = 1, types = { { Specs.charger, 1 } } },
     },
-    -- A wind farm's rack, its batteries tired from years on an old wind charger.
+    -- A wind farm's rack, its batteries tired from years on an old wind charger, and the control
+    -- box that kept the charger from cooking them.
     windFarm = {
         sprite = "batteryRackWood",
         batteries = { min = 2, max = 4, wear = "tired", types = { { "RenewableEnergy.DeepCycleBattery", 1 } } },
         inverter = { chance = 0.6, types = { { "RenewableEnergy.PlugInInverter", 2 }, { "RenewableEnergy.PowerInverter", 1 } } },
+        controller = { chance = 0.7, types = { { Specs.controller, 1 } } },
     },
 }
 
@@ -146,13 +147,12 @@ WorldSpawns.CRATE_STOCK = {
         { "Base.ElectricWire", 4, 8 },
         { "Base.Screws", 1, 2 },
     },
-    -- The power company's spares for its pilot solar installations.
+    -- The substation's spares for its station battery and the lines: what the crate a world armed
+    -- at the power yard before the yard lost its crate (SolarSites.KINDS) holds once its chunk loads.
     powerYard = {
-        { MODULE, 3, 5, "LRMSolarPanels" },
-        { "RenewableEnergy.HomesteadPowerMag2", 1, 1, "LRMMisc" },
         { "RenewableEnergy.BatteryElectrolyte", 1, 3, "LRMBatteries" },
-        { "RenewableEnergy.ChargeController", 0, 1, "LRMMisc" },
         { "Base.ElectricWire", 6, 12 },
+        { "Base.Screws", 1, 2 },
     },
 }
 

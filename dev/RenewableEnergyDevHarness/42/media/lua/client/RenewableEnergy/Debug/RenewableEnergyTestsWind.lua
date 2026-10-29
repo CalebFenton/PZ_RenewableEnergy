@@ -120,7 +120,7 @@ test("renewable_energy_wind_walls_shelter_and_fences_dont", {
 -- above shelter it.
 test("renewable_energy_wind_mast_sheltered_only_at_its_blades", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER })
         self.mast = bank and T.panel(self, Sprites.windCharger.propeller.wood.S, { near = bank, connect = true })
         if not self.mast then return end
         local function pass(label)
@@ -200,12 +200,15 @@ test("renewable_energy_wind_chargers_close_together_crowd_each_other", {
 })
 
 -- Each charger's power curve: nothing at its cut-in speed, the cube of the wind on the way up,
--- its rating at its rated speed, more for standing higher only up to the height cap; the turbine
--- furls from its furl speed. Each blade material breaks from above its break speed, and on the
--- furling turbine only from furledBladeKph above that. The chargers rank in every wind: the car
--- alternator's never makes less than the treadmill motor's, nor the turbine, furled or not, less
--- than the car alternator's, from either's cut-in up to the game's strongest wind.
+-- its rating times the Wind Multiplier at its rated speed, more for standing higher only up to the
+-- height cap; the turbine furls from its furl speed. Each blade material breaks from above its
+-- break speed, and on the furling turbine only from furledBladeKph above that. Every bladed
+-- charger takes more input slots than a bank has free, so it needs a charge controller. The
+-- chargers rank in every wind: the car alternator's never makes less than the treadmill motor's,
+-- nor the turbine, furled or not, less than the car alternator's, from either's cut-in up to the
+-- game's strongest wind.
 test("renewable_energy_wind_power_curve_rule", {
+    sandbox = { WindMultiplier = 3 },
     validate = function()
         local wind = Wind.SPEC
         for kind, spec in pairs(wind.turbines) do
@@ -216,11 +219,14 @@ test("renewable_energy_wind_power_curve_rule", {
             local midway = (spec.cutInKph + spec.ratedKph) / 2
             if not Wind.furled(spec, midway) then
                 T.expectNear(kind .. " halfway to its rated speed, as an eighth of its rating",
-                    watts(midway), spec.watts / 8, 0.001)
+                    watts(midway), 3 * spec.watts / 8, 0.001)
             end
-            T.expectEqual(kind .. "'s watts at its rated speed", watts(spec.ratedKph), spec.watts)
+            T.expectEqual(kind .. "'s watts at its rated speed", watts(spec.ratedKph), 3 * spec.watts)
             if not spec.furlKph then
-                T.expectEqual(kind .. "'s watts at twice its rated speed", watts(spec.ratedKph * 2), spec.watts)
+                T.expectEqual(kind .. "'s watts at twice its rated speed", watts(spec.ratedKph * 2), 3 * spec.watts)
+            end
+            if spec.blades then
+                expect(spec.slots > Specs.freeSlots, kind .. " fits a bank's free slots without a controller")
             end
             local top = wind.maxBonusLevel
             expect(watts(spec.ratedKph, top) > watts(spec.ratedKph, 0), kind .. " makes no more standing higher")
@@ -535,7 +541,7 @@ local function swapTest(name, what, bank, from, to, newBlades, brokenBlades)
 end
 
 swapTest("renewable_energy_wind_blades_swap_material", "pipe treadmill charger",
-    { kind = "batteryBoxWood", parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER } },
+    { kind = "batteryRackWood", parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER } },
     Sprites.windCharger.propeller.wood.E, Sprites.windCharger.propeller.pipe.E, PIPE_BLADES, BROKEN_WOODEN_BLADES)
 swapTest("renewable_energy_wind_turbine_blades_swap_material", "wooden turbine",
     { kind = "batteryRackWood", parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER } },

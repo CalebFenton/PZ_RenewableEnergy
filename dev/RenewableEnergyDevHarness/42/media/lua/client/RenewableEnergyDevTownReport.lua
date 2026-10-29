@@ -25,6 +25,7 @@ local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local Specs = require "RenewableEnergy/Specs"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
+local Wind = require "RenewableEnergy/Wind"
 
 local PZLoot = PZHarness.Loot
 local TownReport = {}
@@ -519,8 +520,7 @@ local function vehicleFinds(stalls, kinds)
     return total, arrowBoards
 end
 
--- What a site holds once placed: its panels' modules, its bank's batteries, its crate and its
--- arrow board.
+-- What a site holds once placed: its panels' modules, its bank's batteries and its arrow board.
 local function siteFinds(site, kinds)
     local SolarSites = require "RenewableEnergy/World/SolarSites"
     local kind = SolarSites.KINDS[site.kind]
@@ -537,9 +537,6 @@ local function siteFinds(site, kinds)
     local stock = site.bank and (kind.bank or kind.wind)
     if stock then
         add(total, kinds.banks[stock])
-    end
-    if kind.crate then
-        add(total, kinds.crates[kind.crate])
     end
     if site.arrowBoard then
         add(total, kinds.arrowBoard)
@@ -571,6 +568,70 @@ local function moduleDayWh(dayOfYear, mount, weather)
     local latitude = getClimateManager():getSeason():getLat()
     local light = Yardsticks.dayIrradiance(dayOfYear, mount, weather, latitude, SUN_STEP)
     return Sun.wattsFrom(Specs.modules[MODULE].watts, light, 0)
+end
+
+-- Wind chargers in the order the wind yardstick lists them, with the names players know them by.
+local WIND_KINDS = {
+    { "scoop", "scoop rotor" }, { "propeller", "treadmill wind charger" },
+    { "carAlternator", "car alternator wind charger" }, { "alternator", "homebuilt wind turbine" },
+}
+local MONTH_LENGTHS = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+-- Years of the game's wind the yardstick averages: its noise wanders over weeks, so one July
+-- can be still and the next one gusty.
+local WIND_YEARS = 10
+
+-- The game's wind each hour of WIND_YEARS years from the save's, in km/h, by month (1 to 12):
+-- ClimateValues.pollDate's wind intensity × 120 (ClimateManager.getWindspeedKph). That leaves out
+-- the wind a weather front's storm adds while it blows, so it reads low.
+local function windByMonth()
+    local values = getClimateManager():getClimateValuesCopy()
+    local first = getGameTime():getYear()
+    local months = {}
+    for month = 1, 12 do
+        local hours = {}
+        for year = first, first + WIND_YEARS - 1 do
+            for day = 1, MONTH_LENGTHS[month] do
+                for hour = 0, 23 do
+                    values:pollDate(year, month - 1, day, hour)
+                    table.insert(hours, values:getWindIntensity() * 120)
+                end
+            end
+        end
+        months[month] = hours
+    end
+    return months
+end
+
+local function mean(list, of)
+    local total = 0
+    for _, value in ipairs(list) do
+        total = total + of(value)
+    end
+    return total / #list
+end
+
+-- Prints under `mark` the watts each wind charger averages on open ground, standing on the ground,
+-- in July, December and over the year.
+local function printWindYardsticks(mark)
+    local months = windByMonth()
+    local year = {}
+    for _, hours in ipairs(months) do
+        for _, kph in ipairs(hours) do
+            table.insert(year, kph)
+        end
+    end
+    local function kph(value) return value end
+    print(string.format("%s yardstick: the game's wind, storms left out, averages %.1f km/h in July, %.1f in December, %.1f over the year",
+        mark, mean(months[7], kph), mean(months[12], kph), mean(year, kph)))
+    local function dayKwh(watts) return watts * 24 / 1000 end
+    for _, row in ipairs(WIND_KINDS) do
+        local spec = Wind.SPEC.turbines[row[1]]
+        local function watts(value) return Wind.watts(spec, value, 0, 0) end
+        local july, december, average = mean(months[7], watts), mean(months[12], watts), mean(year, watts)
+        print(string.format("%s yardstick: a %s (%.0f W at %d km/h, %d input slots) on open ground averages %.0f W (%.1f kWh a day) in July, %.0f W (%.1f) in December, %.0f W (%.1f) over the year at Wind Multiplier %.2f",
+            mark, row[2], Wind.ratedWatts(spec), spec.ratedKph, spec.slots, july, dayKwh(july), december, dayKwh(december),
+            average, dayKwh(average), SandboxVars.RenewableEnergy.WindMultiplier))
+    end
 end
 
 -- Each kind of battery a bank holds; the three car batteries are alike, so one stands for them.
@@ -617,6 +678,7 @@ local function printYardsticks(mark)
     end
     table.sort(appliances)
     print(mark .. " yardstick: appliance watts as a bank bills them: " .. table.concat(appliances, ", "))
+    printWindYardsticks(mark)
     local function years(nights) return nights and string.format("%.1f", nights / 365) or "never" end
     local lives = {}
     for _, fullType in ipairs(LIFE_BATTERIES) do

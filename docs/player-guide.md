@@ -102,7 +102,7 @@ A usual climb:
 
 - **Two flat panels**, for summer days.
 - **Wall panels and ground racks** for winter, and a **scoop rotor** for a trickle at night.
-- A **treadmill wind charger** and a handful of panels, enough for a fridge around the clock.
+- A **charge controller**, then a **treadmill wind charger** to help the panels through winter nights.
 - A **car alternator wind charger**, then a **homebuilt wind turbine** on high, open ground.
 - A generator on biogas or wood gas as the backup, started by a **Solar Failsafe**.
 
@@ -157,8 +157,9 @@ A bank has 2 inputs of its own, and each working **Charge Controller** adds 7. E
 |---|---|
 | Any solar panel, including a ground rack's two modules | 1 |
 | Scoop rotor, treadmill | 1 |
-| Treadmill or car alternator wind charger | 2 |
-| Homebuilt wind turbine | 3 |
+| Treadmill or car alternator wind charger, homebuilt wind turbine | 3 |
+
+So a bladed wind charger always needs a controller.
 
 Inputs go in the order you connected the sources. Sources past the last input stay connected but make nothing, and the status window says "no free input". A broken controller loses its inputs, so check them when a source goes quiet.
 
@@ -225,7 +226,7 @@ Acid can't be made. It comes from auto parts stores and garages, or from batteri
 
 ### Found batteries
 
-A bank found in a room comes stocked, connected and switched off. Its batteries have been used, and the riskier the place, the better they are. Sheds and farm storerooms hold well-worn ones that are worth reconditioning. Homesteads, storage units and utility sites hold batteries at around four fifths, a few as good as new, and an electronics store's backroom stock is nearly new. Now and then one is a dud: nearly dead, and repaired too often for reconditioning to help. Strip it for a rebuild instead.
+A bank found in a room comes stocked, connected and switched off. Its batteries have been used, and the riskier the place, the better they are. Sheds and farm storerooms hold well-worn ones that are worth reconditioning. Homesteads, storage units and utility sites hold batteries at around four fifths, a few as good as new. Now and then one is a dud: nearly dead, and repaired too often for reconditioning to help. Strip it for a rebuild instead.
 
 ### Jar battery
 
@@ -289,21 +290,23 @@ A **Homemade Solar Module** is 16 solar cells under glass. Cells come from takin
 
 ## Wind chargers
 
-Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, pipe or steel, and stands with whichever set the build used.
+Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
 
 ### The four kinds
 
+The figures here are at the default **Wind Multiplier** of 2, which scales them all; 1 is what such homebuilt chargers really made.
+
 | Charger | Generator | Full output | Inputs | Breaks in storms |
 |---|---|---|---|---|
-| Scoop Rotor Wind Charger | Treadmill Motor | 480 W at 50 km/h | 1 | Never |
-| Treadmill Wind Charger | Treadmill Motor | 1600 W at 40 km/h | 2 | Yes |
-| Car Alternator Wind Charger | Car Alternator | 2000 W at 40 km/h | 2 | Yes |
-| Homebuilt Wind Turbine | Homemade Alternator | 3200 W at 40 km/h | 3 | Yes, but turns aside in a gale |
+| Scoop Rotor Wind Charger | Treadmill Motor | 200 W at 50 km/h | 1 | Never |
+| Treadmill Wind Charger | Treadmill Motor | 600 W at 40 km/h | 3 | Yes |
+| Car Alternator Wind Charger | Car Alternator | 800 W at 40 km/h | 3 | Yes |
+| Homebuilt Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
 
-- **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little.
+- **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller.
 - **Treadmill wind charger**: three blades high on a pipe mast. It's the first charger that makes real power.
-- **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a quarter more in any wind for the same inputs, a straight upgrade.
-- **Homebuilt wind turbine**: speaker magnets on a car's brake hub turning past hand-wound coils. It makes double the treadmill charger's power, and its tail swings it out of a gale.
+- **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a third more in any wind for the same inputs, a straight upgrade.
+- **Homebuilt wind turbine**: speaker magnets on a car's brake hub turning past hand-wound coils. It makes well over twice the treadmill charger's power, and its tail swings it out of a gale.
 
 ### How much the wind gives
 
@@ -311,13 +314,24 @@ A charger makes nothing below its starting speed, and output climbs with the cub
 
 | Wind | Scoop | Treadmill | Car alternator | Turbine |
 |---|---|---|---|---|
-| 20 km/h | 10 W | 60 W | 75 W | 145 W |
-| 25 km/h | 30 W | 200 W | 250 W | 440 W |
-| 30 km/h | 70 W | 475 W | 595 W | 995 W |
-| 35 km/h | 130 W | 925 W | 1160 W | 1890 W |
-| 40 km/h | 210 W | 1600 W | 2000 W | 3200 W |
+| 20 km/h | 5 W | 22 W | 30 W | 72 W |
+| 25 km/h | 13 W | 75 W | 100 W | 220 W |
+| 30 km/h | 29 W | 178 W | 237 W | 498 W |
+| 35 km/h | 53 W | 347 W | 463 W | 944 W |
+| 40 km/h | 88 W | 600 W | 800 W | 1600 W |
 
 That's in the open on the ground. The status window shows the wind in km/h next to each charger's output.
+
+The everyday wind averages about 12 km/h in July and 19 in December, so a charger in the open banks far more in winter. In an average day, before storms:
+
+| | July | December |
+|---|---|---|
+| Scoop rotor | 0.1 kWh | 0.5 kWh |
+| Treadmill wind charger | 0.5 kWh | 2.6 kWh |
+| Car alternator wind charger | 0.7 kWh | 3.5 kWh |
+| Homebuilt wind turbine | 1.5 kWh | 7.1 kWh |
+
+A fridge-freezer uses about 6 kWh a day, and a south rack's module banks about 1.5 kWh in July and 0.9 in December.
 
 ### Where to put one
 
@@ -606,7 +620,7 @@ Stores are the sure places: most electronics stores have a power aisle of invert
 | Car alternators | Mechanics' shelves and crates, auto parts battery shelves, garages; or take one out of a car | Uncommon |
 | Plug-in inverter | Auto parts stores, gas stations, electronics and department stores, garages, cars' glove boxes and trunks, truckers | Common |
 | Power inverter | Electronics stores, auto parts battery shelves, electricians, campers, survivalists' trucks, generator rooms | Uncommon |
-| Inverter/charger | Generator and control rooms, phone, power company and electricians' vans, camper trailers, electronics store back rooms and camping stores now and then, stash houses | Rare |
+| Inverter/charger | Battery racks on off-grid farms and in farm storerooms and barns, generator and control rooms, phone, power company and electricians' vans, camper trailers, electronics store back rooms and camping stores now and then, stash houses | Rare |
 | Charge controller | Electronics stores and their back rooms, camping stores, electricians, phone, power company and radio vans, generator and control rooms, camper trailers | Uncommon |
 | Solar Failsafe | Generator rooms and stash houses, now and then | Very rare: easier to build |
 | Solar battery maintainer | Auto parts stores, electronics stores, mechanics, farm supply and barns, fishing stores, campers, farmers' trucks | Uncommon |
@@ -628,14 +642,14 @@ Folks put their panels where the sun is, which is usually up on the roof, and fe
 
 | What | Where | What you'll find |
 |---|---|---|
-| Stocked storerooms | Sheds, garages, storage units, farm storerooms and electronics store backrooms, the first time anyone sees them | A battery box or rack with a few batteries, sometimes an inverter; a box in a shed, garage or storage unit often has a panel or two lying beside it; in garages and storage units, now and then a crate of RV solar gear: always panels and batteries, usually Homestead Power #1 |
+| Stocked storerooms | Farm storerooms, barns and sheds, and now and then garages and storage units, the first time anyone sees them | A battery box or rack with a few batteries, sometimes an inverter; a rack in a farm storeroom or barn, or a box in a shed, garage or storage unit, often has a panel or two lying beside it; in garages and storage units, now and then a crate of RV solar gear: always panels and batteries, usually Homestead Power #1 |
 | Stock tank pumps | Pastures across the farm country | A rack of panels by a water tank |
-| Off-grid farms | A few farms around Riverside, Rosewood and West Point | Panels on the roof, a battery box inside, garden lights |
-| Campers | Trailer parks, a summer camp, a trailer in the woods | A panel or two on the roof and a box with a deep cycle |
-| Phone company relay sheds | By the radio masts on the hills around Brandenburg, Irvington and Riverside | Racks of panels, a rack of L-16s and an inverter/charger |
-| The power company yard | A substation outside Muldraugh | The best single haul in the county |
+| Off-grid farms | A few farms around Riverside, Rosewood and West Point | Panels on the roof, a rack of batteries inside, often with an inverter/charger and a charge controller, garden lights |
+| Campers | Trailer parks, a summer camp, a trailer in the woods | Two panels on the roof and a box with two deep cycles |
+| Phone company relay sheds | By the radio masts on the hills around Brandenburg, Irvington and Riverside | Racks of panels, a few L-16s and a charge controller |
+| The power company yard | A substation outside Muldraugh | The station battery: a bank of L-16s and its charger |
 | Ranger stations | By the lakes in the parks | Wall panels, racks and a battery box |
-| Old wind farms | Farmland near Echo Creek and Ekron | A treadmill wind charger with broken blades, wired to a barn's tired batteries |
+| Old wind farms | Farmland near Echo Creek and Ekron | A treadmill wind charger with broken blades, wired to a barn's tired batteries, usually with a charge controller |
 | A dairy | Near Ekron | A sour digester piped to a run-down generator with a gas kit |
 | A prepper's cabin | In the woods near Echo Creek | A dirty gasifier piped to a generator, and the plans that built it |
 | Arrow board trailers | Road works around Muldraugh, Riverside and Rosewood, the checkpoints outside Louisville, and traffic jams and junkyards anywhere | Two panels, often one cracked, a box of worn deep cycles, usually a charge controller |

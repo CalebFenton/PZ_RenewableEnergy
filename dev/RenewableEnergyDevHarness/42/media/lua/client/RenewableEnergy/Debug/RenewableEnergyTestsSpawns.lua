@@ -18,7 +18,7 @@ local function copyOf(square, sprite)
 end
 
 -- Stock names of WorldSpawns.BANK_STOCK, one per bank tier.
-local SPAWNED_BANKS = { "shed", "electronicsStorage", "powerYard" }
+local SPAWNED_BANKS = { "shed", "farmStorage", "powerYard" }
 
 -- A bank appears stocked with era batteries at a part charge, explored so that neither its room's
 -- loot nor loot respawn ever adds to it, and players see what it holds. It was installed, so it is
@@ -146,7 +146,7 @@ serverCheck("renewable_energy_world_bank_stock_parts", "bankStockParts", { stock
 -- there is.
 test("renewable_energy_world_bank_stock_option_zero", {
     sandbox = { LRMBatteries = 0, LRMMisc = 0 },
-    run = function(self) T.read(self, "bankStockCount", { stock = "electronicsStorage", roll = 0 }, "count") end,
+    run = function(self) T.read(self, "bankStockCount", { stock = "farmStorage", roll = 0 }, "count") end,
     validate = function(self)
         expectEqual("items in a bank with the options at 0", self.reads.count.items, 0)
     end,
@@ -161,7 +161,7 @@ serverCheck("renewable_energy_world_part_wear", "partWear")
 
 -- A placed bank's batteries are worn by its own stock's profile: at middling rolls every battery is
 -- at that profile's mean, told apart by two stocks whose profiles' means differ.
-local WORN_STOCKS = { "farmStorage", "electronicsStorage" }
+local WORN_STOCKS = { "farmStorage", "storageUnit" }
 test("renewable_energy_world_bank_batteries_worn_by_stock", {
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -190,7 +190,7 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
             expect(#conditions > 0 and #wrong == 0, string.format("a %s bank holds %d batteries, of which %s aren't at its %s profile's %d",
                 stockName, #conditions, table.concat(wrong, ", "), wearName, condition))
         end
-        expect(means.farmStorage ~= means.electronicsStorage, "farm storerooms' and electronics stores' batteries "
+        expect(means.farmStorage ~= means.storageUnit, "farm storerooms' and storage units' batteries "
             .. "wear alike, so this can't tell whose profile a bank used")
     end,
 })
@@ -276,18 +276,19 @@ test("renewable_energy_world_crate_spawns_stocked", {
 serverCheck("renewable_energy_world_cracked_modules", "crackedModules")
 
 -- A room seen for the first time gets a bank of its room's stock (a shed's or garage's a wooden
--- battery box, a farm storeroom's a wooden rack) on a roll just under one in its odds × the Battery
--- Bank Spawn setting's rarity and none at it, and none at all at None or in a room not listed. A
--- garage gets a crate of solar gear on a roll just under its crate odds and none at it, while its
--- likelier bank comes up either way.
+-- battery box, a farm storeroom's or barn's a wooden rack) on a roll just under one in its odds ×
+-- the Battery Bank Spawn setting's rarity and none at it, and none at all at None or in a room not
+-- listed. A garage gets a crate of solar gear on a roll just under its crate odds and none at it,
+-- and its rarer bank on neither.
 local SEEN_ROOMS = {
     { trial = { room = "shed", setting = 3, edge = "bank", roll = "under" }, bank = "batteryBoxWood" },
     { trial = { room = "shed", setting = 3, edge = "bank", roll = "at" } },
     { trial = { room = "shed", setting = 1, roll = 0 } },
     { trial = { room = "farmstorage", setting = 4, roll = 0 }, bank = "batteryRackWood" },
+    { trial = { room = "barn", setting = 4, roll = 0 }, bank = "batteryRackWood" },
     { trial = { room = "kitchen", setting = 4, roll = 0 } },
-    { trial = { room = "garagestorage", setting = 2, edge = "crate", roll = "under" }, bank = "batteryBoxWood", crate = true },
-    { trial = { room = "garagestorage", setting = 2, edge = "crate", roll = "at" }, bank = "batteryBoxWood" },
+    { trial = { room = "garagestorage", setting = 2, edge = "crate", roll = "under" }, crate = true },
+    { trial = { room = "garagestorage", setting = 2, edge = "crate", roll = "at" } },
 }
 
 test("renewable_energy_world_bank_rooms_seen_first_time", {
