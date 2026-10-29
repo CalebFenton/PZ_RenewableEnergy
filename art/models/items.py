@@ -82,6 +82,7 @@ ITEMS = {
                        "icon_elevation": 40, "ground_scale": BATTERY_GROUND_SCALE},
     "WornBatteryPlates": {"model": lambda col: batteries.battery_plates(col, worn=True), "ground_scale": BATTERY_GROUND_SCALE},
     "BatteryPlates": {"model": batteries.battery_plates, "ground_scale": BATTERY_GROUND_SCALE},
+    "LeadDross": {"model": batteries.lead_dross, "icon_elevation": 35, "ground_scale": BATTERY_GROUND_SCALE},
     "WoodenBatteryPlatePattern": {"model": batteries.plate_pattern, "icon_elevation": 55, "ground_scale": BATTERY_GROUND_SCALE},
     "BatteryPlateMoldUnfired": {"model": batteries.plate_mold, "icon_elevation": 50, "ground_scale": BATTERY_GROUND_SCALE},
     "BatteryPlateMold": {"model": lambda col: batteries.plate_mold(col, fired=True), "icon_elevation": 50,

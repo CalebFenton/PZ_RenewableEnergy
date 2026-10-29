@@ -1,5 +1,6 @@
 """Batteries, the battery storage that holds them, and what rebuilding one takes."""
 import functools
+import math
 import random
 
 from art.kit import added, around, beam, box, cylinder, group, mound, prism, text, tube
@@ -503,6 +504,36 @@ def plate_mold(col, fired=False):
             (-outer_w / 2, outer_w / 2, plate_back + lug, outer_d / 2)]
     for x0, x1, y0, y1 in rims:
         box(col, "Mold_Rim", clay, (x1 - x0, y1 - y0, recess), at=((x0 + x1) / 2, (y0 + y1) / 2, height - recess))
+
+
+def lead_dross(col):
+    """Dross skimmed off a melt of plates and left to cool: a crumbly grey heap of lead oxide in
+    lumps, yellowed in patches where it burnt on to litharge, with beads of bright lead caught in
+    it."""
+    rx, ry, height = 0.09, 0.07, 0.04
+    mound(col, "Dross_Heap", M("dross"), (rx, ry, height), lumps=0.18, seed=61, segments=18, rings=5)
+    rng = random.Random(62)
+
+    def on_heap(spread):
+        # Clear of the heap's lumps, which raise its surface by up to a sixth.
+        return height * math.sqrt(1 - spread * spread) * 1.1
+    # Spread on a golden-angle spiral, so no side of the heap is bare.
+    for i in range(8):
+        spread = 0.8 * math.sqrt((i + 0.5) / 8)
+        u, v = around((0, 0), i * 137.5, spread)
+        mound(col, "Dross_Lump", M("dross"), (rng.uniform(0.018, 0.028), rng.uniform(0.014, 0.022), rng.uniform(0.012, 0.018)),
+              at=(u * rx, v * ry, on_heap(spread) - 0.01), rotate=(0, 0, rng.uniform(0, 180)), lumps=0.25, seed=63 + i,
+              segments=10, rings=3)
+    for i in range(5):
+        spread = 0.7 * math.sqrt((i + 0.3) / 5)
+        u, v = around((0, 0), 70 + i * 137.5, spread)
+        mound(col, "Dross_Litharge", M("litharge"), (rng.uniform(0.014, 0.022), rng.uniform(0.01, 0.016), 0.005),
+              at=(u * rx, v * ry, on_heap(spread) - 0.003), rotate=(0, 0, rng.uniform(0, 180)), segments=10, rings=2)
+    for i in range(4):
+        spread = 0.6 * math.sqrt((i + 0.6) / 4)
+        u, v = around((0, 0), 20 + i * 137.5, spread)
+        mound(col, "Dross_Bead", M("lead"), (0.006, 0.006, 0.005), at=(u * rx, v * ry, on_heap(spread) - 0.002), segments=10,
+              rings=3)
 
 
 def battery_electrolyte(col):

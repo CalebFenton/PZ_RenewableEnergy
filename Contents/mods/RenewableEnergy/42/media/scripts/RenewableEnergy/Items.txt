@@ -444,6 +444,18 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
+    /* A set's worth of lead burnt to oxide, skimmed off a recast; charcoal reduces it to plates. */
+    item LeadDross
+    {
+        DisplayCategory = Material,
+        ItemType = base:normal,
+        Weight = 3.0,
+        Icon = RenewableEnergy_LeadDross,
+        WorldStaticModel = RenewableEnergy.LeadDross_Ground,
+        Tooltip = Tooltip_RenewableEnergy_LeadDross,
+        Tags = base:ignorezombiedensity,
+    }
+
     /* The plate mold's chain follows vanilla's ingot mold: wooden pattern, pressed clay, kiln. */
     item WoodenBatteryPlatePattern
     {
@@ -567,7 +579,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag2_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeHomemadeInverter;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReglazeModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_StripJarBattery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_CastBatteryPlatesFromLeadPipe;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeJarBattery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
+        LearnedRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeHomemadeInverter;RenewableEnergy_MakeChargeController;RenewableEnergy_MakeSolarFailsafe;RenewableEnergy_MakeHomemadeSolarModule;RenewableEnergy_ReglazeModule;RenewableEnergy_ReconditionBattery;RenewableEnergy_StripCarBattery;RenewableEnergy_StripDeepCycleBattery;RenewableEnergy_StripL16Battery;RenewableEnergy_StripJarBattery;RenewableEnergy_RecastBatteryPlates;RenewableEnergy_ReduceLeadDross;RenewableEnergy_CastBatteryPlatesFromLeadPipe;RenewableEnergy_RebuildCarBattery;RenewableEnergy_RebuildDeepCycleBattery;RenewableEnergy_RebuildL16Battery;RenewableEnergy_MakeJarBattery;RenewableEnergy_MakeBatteryPlatePattern;RenewableEnergy_PressBatteryPlateMold;RenewableEnergy_FireBatteryPlateMold,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

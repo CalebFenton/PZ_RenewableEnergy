@@ -217,12 +217,15 @@ Once a game day, each battery wears by that day's deepest drop from its peak. We
 
 Batteries never last forever, but you can bring them back a few times before they need rebuilding:
 
-1. **Service Battery**: Electricity 1, water, and a rag or baking soda. A small boost, and it keeps its charge.
-2. **Recondition Battery** (learned from Homestead Power #2): water and baking soda bring it straight up to its ceiling, but leave it empty.
+1. **Service Battery**: Electricity 1, water, and a rag, baking soda or wood ash. A small boost, and it keeps its charge.
+2. **Recondition Battery** (learned from Homestead Power #2): water and baking soda or wood ash bring it straight up to its ceiling, but leave it empty.
 3. **The ceiling**: each service or recondition lowers how far the next one can bring it back. After a handful, it needs a rebuild.
-4. **Rebuild**: **Strip** the battery (gloves, and containers to catch the acid) for its case, worn plates and acid. Recast the plates at a furnace in a fired clay mold. Some lead burns off, so three worn sets make two, and a lead pipe can stand in for one set. Then rebuild with acid and water. The battery comes back like new, empty, with its repair count cleared.
+4. **Rebuild**: **Strip** the battery (gloves, and containers to catch the acid) for its case, worn plates and acid. Recast the plates at a furnace in a fired clay mold. A third of the lead skims off as **Lead Dross**, so three worn sets make two, and a lead pipe can stand in for one set. Then rebuild with acid and water. The battery comes back like new, empty, with its repair count cleared.
+5. **Reduce Lead Dross** (Blacksmith 5) at the furnace with charcoal and the mold: each dross makes one set of plates, so no lead is ever lost, only charcoal.
 
-Acid can't be made. It comes from auto parts stores and garages, or from batteries you strip. A rebuild keeps the battery's kind: a deep cycle or L-16 can only be rebuilt from its own case.
+Acid can't be made, and it needn't be: stripping a battery gives back exactly the acid rebuilding it takes. More comes from auto parts stores and garages, or from batteries you strip. A rebuild keeps the battery's kind: a deep cycle or L-16 can only be rebuilt from its own case.
+
+So the batteries themselves never run short of lead, acid or soda: water, wood ash and charcoal keep them going for as long as you play.
 
 ### Found batteries
 
@@ -510,7 +513,7 @@ Logs, branches, planks, firewood, twigs, pinecones, charcoal, and anything a cha
 
 ### Upkeep
 
-- **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel, trowel or broom gives **Wood Ash**, which settles a sour digester or goes in a scrubber's water.
+- **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel, trowel or broom gives **Wood Ash**, which settles a sour digester, goes in a scrubber's water, or stands in for baking soda when you service a battery.
 - **Filter.** The filter holds hay, straw, grass or splinters, which turn into **Tarry Packing** as it burns. Change the packing in time: once no clean packing is left, tar reaches the engine, for half the gas and fast wear. Tarry packing wears the generator faster even before then.
 - **Condensate.** Burning fills a condensate drain, and while it's full, tar builds up twice as fast. **Drain Condensate** into a metal or glass container while the gasifier is lit. It's wood vinegar: poisonous to drink, but mixed with water it makes mildew spray and aphid spray.
 
@@ -555,7 +558,7 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 
 ### What a recipe needs around it
 
-Most recipes need a table, and every one needs light to see by, as most of vanilla's do. Recasting plates needs a furnace, the plate mold a hand press and a kiln, and steel blades a forge.
+Most recipes need a table, and every one needs light to see by, as most of vanilla's do. Recasting plates and reducing dross need a furnace, the plate mold a hand press and a kiln, and steel blades a forge.
 
 Light is also needed for wiring and fittings: wiring parts in and out, wiring a treadmill, connecting or disconnecting a source or a bank, replacing blades, repairing parts and panels, and fitting or removing a Gas Conversion Kit or its gas line. Switches, valves, brakes, bulbs and chores like clearing snow or ash don't need it.
 

@@ -171,6 +171,11 @@
       "name": "L-16 Battery Case"
     },
     {
+      "fullType": "RenewableEnergy.LeadDross",
+      "icon": "icon_RenewableEnergy_LeadDross",
+      "name": "Lead Dross"
+    },
+    {
       "fullType": "RenewableEnergy.MakeshiftInverter",
       "icon": "icon_RenewableEnergy_MakeshiftInverter",
       "name": "Makeshift Inverter"
@@ -305,10 +310,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        105,
-        105,
+        106,
+        106,
         316,
-        407
+        406
       ]
     },
     {
@@ -344,7 +349,7 @@
         30,
         30,
         62,
-        116
+        117
       ]
     },
     {
@@ -380,7 +385,7 @@
         105,
         105,
         407,
-        401
+        402
       ]
     },
     {
@@ -395,10 +400,10 @@
     {
       "name": "model_RenewableEnergy_BrokenPipeBlades",
       "box": [
-        77,
-        77,
-        298,
-        150
+        78,
+        78,
+        300,
+        151
       ]
     },
     {
@@ -434,7 +439,7 @@
         38,
         38,
         146,
-        145
+        146
       ]
     },
     {
@@ -443,7 +448,7 @@
         24,
         24,
         92,
-        67
+        68
       ]
     },
     {
@@ -452,7 +457,7 @@
         46,
         46,
         178,
-        166
+        167
       ]
     },
     {
@@ -461,7 +466,7 @@
         47,
         47,
         182,
-        164
+        165
       ]
     },
     {
@@ -542,7 +547,7 @@
         26,
         26,
         100,
-        75
+        76
       ]
     },
     {
@@ -551,7 +556,7 @@
         26,
         26,
         100,
-        75
+        76
       ]
     },
     {
@@ -560,7 +565,7 @@
         26,
         26,
         100,
-        75
+        76
       ]
     },
     {
@@ -569,7 +574,7 @@
         76,
         76,
         294,
-        197
+        196
       ]
     },
     {
@@ -587,7 +592,7 @@
         52,
         52,
         200,
-        165
+        164
       ]
     },
     {
@@ -609,12 +614,21 @@
       ]
     },
     {
+      "name": "model_RenewableEnergy_LeadDross",
+      "box": [
+        25,
+        25,
+        97,
+        65
+      ]
+    },
+    {
       "name": "model_RenewableEnergy_MakeshiftInverter",
       "box": [
         27,
         27,
         103,
-        80
+        82
       ]
     },
     {
@@ -686,7 +700,7 @@
         105,
         105,
         407,
-        184
+        185
       ]
     },
     {
@@ -730,7 +744,7 @@
       "box": [
         105,
         105,
-        376,
+        377,
         407
       ]
     },
@@ -818,9 +832,9 @@
     {
       "name": "model_RenewableEnergy_WoodenBlades",
       "box": [
-        105,
-        105,
-        407,
+        106,
+        106,
+        406,
         173
       ]
     },
@@ -2187,6 +2201,12 @@
               "fullType": "Base.BakingSoda",
               "icon": "icon_Base_BakingSoda",
               "name": "Baking Soda"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WoodAsh",
+              "icon": "icon_RenewableEnergy_WoodAsh",
+              "name": "Wood Ash"
             }
           ],
           "keep": false,
@@ -2989,6 +3009,12 @@
               "fullType": "Base.BakingSoda",
               "icon": "icon_Base_BakingSoda",
               "name": "Baking Soda"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WoodAsh",
+              "icon": "icon_RenewableEnergy_WoodAsh",
+              "name": "Wood Ash"
             }
           ],
           "keep": false,
@@ -3396,6 +3422,88 @@
         {
           "level": 4,
           "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "id": "RenewableEnergy_ReduceLeadDross",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.BatteryPlateMold",
+              "icon": "icon_RenewableEnergy_BatteryPlateMold",
+              "name": "Battery Plate Mold"
+            }
+          ],
+          "keep": true,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.LeadDross",
+              "icon": "icon_RenewableEnergy_LeadDross",
+              "name": "Lead Dross"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.Charcoal",
+              "icon": "icon_Base_Charcoal",
+              "name": "Charcoal"
+            }
+          ],
+          "keep": false,
+          "tag": true,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [
+          {
+            "level": 7,
+            "name": "Electrical"
+          },
+          {
+            "level": 6,
+            "name": "Blacksmithing"
+          }
+        ],
+        "autoAll": [],
+        "magazines": [
+          "Homestead Power #2: Inverters & Control"
+        ],
+        "needed": true,
+        "research": [
+          "Battery Plates"
+        ]
+      },
+      "name": "Reduce Lead Dross",
+      "outputs": [
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.BatteryPlates",
+          "icon": "icon_RenewableEnergy_BatteryPlates",
+          "name": "Battery Plates"
+        }
+      ],
+      "skills": [
+        {
+          "level": 5,
+          "name": "Blacksmithing"
         }
       ]
     },
@@ -4600,7 +4708,8 @@
         ],
         "needed": true,
         "research": [
-          "Battery Plates"
+          "Battery Plates",
+          "Lead Dross"
         ]
       },
       "name": "Recast Battery Plates",
@@ -4610,6 +4719,12 @@
           "fullType": "RenewableEnergy.BatteryPlates",
           "icon": "icon_RenewableEnergy_BatteryPlates",
           "name": "Battery Plates"
+        },
+        {
+          "count": 1,
+          "fullType": "RenewableEnergy.LeadDross",
+          "icon": "icon_RenewableEnergy_LeadDross",
+          "name": "Lead Dross"
         }
       ],
       "skills": [
@@ -7203,10 +7318,10 @@
           "uses": false
         },
         {
-          "count": 6,
+          "count": 8,
           "items": [
             {
-              "count": 6,
+              "count": 8,
               "fullType": "Base.BlowTorch",
               "icon": "icon_Base_BlowTorch",
               "name": "Welding Torch"
@@ -7217,10 +7332,10 @@
           "uses": true
         },
         {
-          "count": 5,
+          "count": 7,
           "items": [
             {
-              "count": 5,
+              "count": 7,
               "fullType": "Base.WeldingRods",
               "icon": "icon_Base_WeldingRods",
               "name": "Welding Rods"
@@ -7271,10 +7386,10 @@
           "uses": false
         },
         {
-          "count": 2,
+          "count": 3,
           "items": [
             {
-              "count": 2,
+              "count": 3,
               "fullType": "Base.SheetMetal",
               "icon": "icon_Base_SheetMetal",
               "name": "Steel Sheet"
@@ -7285,10 +7400,10 @@
           "uses": false
         },
         {
-          "count": 8,
+          "count": 12,
           "items": [
             {
-              "count": 8,
+              "count": 12,
               "fullType": "Base.MetalPipe",
               "icon": "icon_Base_MetalPipe",
               "name": "Iron Pipe"
@@ -7313,10 +7428,10 @@
           "uses": false
         },
         {
-          "count": 2,
+          "count": 3,
           "items": [
             {
-              "count": 2,
+              "count": 3,
               "fullType": "Base.ElectronicsScrap",
               "icon": "icon_Base_ElectronicsScrap",
               "name": "Scrap Electronics"
@@ -7331,11 +7446,11 @@
         "auto": [],
         "autoAll": [
           {
-            "level": 7,
+            "level": 8,
             "name": "Welding"
           },
           {
-            "level": 6,
+            "level": 7,
             "name": "Electrical"
           }
         ],
@@ -7349,11 +7464,11 @@
       "outputs": [],
       "skills": [
         {
-          "level": 5,
+          "level": 6,
           "name": "Welding"
         },
         {
-          "level": 5,
+          "level": 6,
           "name": "Electrical"
         }
       ]
@@ -7688,10 +7803,10 @@
           "uses": false
         },
         {
-          "count": 5,
+          "count": 6,
           "items": [
             {
-              "count": 5,
+              "count": 6,
               "fullType": "Base.BlowTorch",
               "icon": "icon_Base_BlowTorch",
               "name": "Welding Torch"
@@ -7702,10 +7817,10 @@
           "uses": true
         },
         {
-          "count": 4,
+          "count": 5,
           "items": [
             {
-              "count": 4,
+              "count": 5,
               "fullType": "Base.WeldingRods",
               "icon": "icon_Base_WeldingRods",
               "name": "Welding Rods"
@@ -7770,10 +7885,10 @@
           "uses": false
         },
         {
-          "count": 1,
+          "count": 2,
           "items": [
             {
-              "count": 1,
+              "count": 2,
               "fullType": "Base.SheetMetal",
               "icon": "icon_Base_SheetMetal",
               "name": "Steel Sheet"
@@ -7784,24 +7899,10 @@
           "uses": false
         },
         {
-          "count": 1,
+          "count": 8,
           "items": [
             {
-              "count": 1,
-              "fullType": "Base.SmallSheetMetal",
-              "icon": "icon_Base_SmallSheetMetal",
-              "name": "Steel Sheet - Small"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 6,
-          "items": [
-            {
-              "count": 6,
+              "count": 8,
               "fullType": "Base.MetalPipe",
               "icon": "icon_Base_MetalPipe",
               "name": "Iron Pipe"
@@ -7826,10 +7927,10 @@
           "uses": false
         },
         {
-          "count": 1,
+          "count": 3,
           "items": [
             {
-              "count": 1,
+              "count": 3,
               "fullType": "Base.ElectronicsScrap",
               "icon": "icon_Base_ElectronicsScrap",
               "name": "Scrap Electronics"
@@ -7844,15 +7945,15 @@
         "auto": [],
         "autoAll": [
           {
-            "level": 6,
+            "level": 7,
             "name": "Welding"
           },
           {
-            "level": 5,
+            "level": 6,
             "name": "Electrical"
           },
           {
-            "level": 3,
+            "level": 4,
             "name": "Mechanics"
           }
         ],
@@ -7866,15 +7967,15 @@
       "outputs": [],
       "skills": [
         {
-          "level": 4,
+          "level": 5,
           "name": "Welding"
         },
         {
-          "level": 4,
+          "level": 5,
           "name": "Electrical"
         },
         {
-          "level": 2,
+          "level": 3,
           "name": "Mechanics"
         }
       ]
@@ -8626,6 +8727,7 @@
       "icon_RenewableEnergy_JarBattery",
       "icon_RenewableEnergy_L16Battery",
       "icon_RenewableEnergy_L16BatteryCase",
+      "icon_RenewableEnergy_LeadDross",
       "icon_RenewableEnergy_MakeshiftInverter",
       "icon_RenewableEnergy_MicrowaveTransformer",
       "icon_RenewableEnergy_PipeBlades",
@@ -8701,6 +8803,7 @@
       "model_RenewableEnergy_JarBattery",
       "model_RenewableEnergy_L16Battery",
       "model_RenewableEnergy_L16BatteryCase",
+      "model_RenewableEnergy_LeadDross",
       "model_RenewableEnergy_MakeshiftInverter",
       "model_RenewableEnergy_MicrowaveTransformer",
       "model_RenewableEnergy_PipeBlades",

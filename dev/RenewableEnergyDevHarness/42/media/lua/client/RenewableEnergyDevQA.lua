@@ -130,7 +130,8 @@ local GROUP_TYPES = {
     batteries = {
         "RenewableEnergy.DeepCycleBattery", "RenewableEnergy.L16Battery", "RenewableEnergy.JarBattery",
         "RenewableEnergy.CarBatteryCase", "RenewableEnergy.DeepCycleBatteryCase", "RenewableEnergy.L16BatteryCase",
-        "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlate*", "RenewableEnergy.WoodenBatteryPlatePattern",
+        "RenewableEnergy.WornBatteryPlates", "RenewableEnergy.BatteryPlate*", "RenewableEnergy.LeadDross",
+        "RenewableEnergy.WoodenBatteryPlatePattern",
         "RenewableEnergy.BatteryElectrolyte", "Base.CarBattery*", "Base.EmptyJar", "Base.JarCrafted",
         "Base.ClayJarGlazed", "Base.Sandbag", "Base.Clay", "Base.LeadPipe", "Base.BakingSoda", "Base.RippedSheets",
         "Base.Gloves_Dish",

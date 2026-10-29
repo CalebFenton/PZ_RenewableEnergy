@@ -40,6 +40,9 @@ PALETTE = {
     "white": lambda: material("RE_White", "#ecebe6", roughness=0.6, grime=0.08),
     "yellow": lambda: material("RE_Yellow", "#dcb22b", roughness=0.5, grime=0.1),
     "lead": lambda: material("RE_Lead", "#bbbdb9", roughness=0.45, metallic=0.8, grime=0.15),
+    # Dross skimmed off molten lead: dull grey oxide, yellowed where it turned to litharge.
+    "dross": lambda: material("RE_Dross", "#6b6a64", roughness=0.95, grime=0.3, scale=20, speckle=("#4f4e4a", 0.5)),
+    "litharge": lambda: material("RE_Litharge", "#c49a3e", roughness=0.95, grime=0.2, scale=20),
     "red": lambda: material("RE_Red", "#b8231f", roughness=0.5, grime=0.1),
     "plywood": lambda: material("RE_Plywood", "#b48d5c", roughness=0.8, grime=0.25, scale=12, grain="veneer"),
     "wood": lambda: material("RE_Wood", "#94693f", roughness=0.8, grime=0.3, scale=10, grain="board"),

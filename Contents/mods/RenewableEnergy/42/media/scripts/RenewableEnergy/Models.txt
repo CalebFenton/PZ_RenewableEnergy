@@ -199,6 +199,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_BatteryPlates,
         scale = 0.75,
     }
+    model LeadDross_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_LeadDross,
+        texture = WorldItems/RenewableEnergy_LeadDross,
+        scale = 0.75,
+    }
     model WoodenBatteryPlatePattern_Ground
     {
         mesh = WorldItems/RenewableEnergy_WoodenBatteryPlatePattern,

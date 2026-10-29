@@ -31,6 +31,7 @@
     "RenewableEnergy_StripL16Battery": "Strip L-16 Battery",
     "RenewableEnergy_StripJarBattery": "Strip Jar Battery",
     "RenewableEnergy_RecastBatteryPlates": "Recast Battery Plates",
+    "RenewableEnergy_ReduceLeadDross": "Reduce Lead Dross",
     "RenewableEnergy_CastBatteryPlatesFromLeadPipe": "Cast Battery Plates from Lead Pipe",
     "RenewableEnergy_RebuildCarBattery": "Rebuild Car Battery",
     "RenewableEnergy_RebuildDeepCycleBattery": "Rebuild Deep Cycle Battery",
