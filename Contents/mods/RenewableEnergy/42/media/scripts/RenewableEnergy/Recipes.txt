@@ -1515,10 +1515,12 @@ module Base
     }
 
     /* An axial-flux alternator: magnets from speakers on a car's brake hub, turning past coils
-       wound from electric wire, and a scrap-board rectifier to charge a battery. A portable
-       radio's speaker has a smaller magnet, so it takes twice as many; loose speakers are rare
-       and radios lie in every house. Without mode:destroy the craft leaves the radios behind
-       (DEVELOPMENT.md, craftRecipe). */
+       wound from electric wire, and a scrap-board rectifier to charge a battery. A ham radio's
+       built-in speaker, a speaker cabinet's and a guitar amplifier's each give about a loose
+       speaker's magnet; a portable radio's speaker has a smaller one, so it takes twice as many.
+       Loose speakers are rare and radios lie in every house. The makeshift radios are left out:
+       they are built from a dismantled speaker's amplifier. Without mode:destroy the craft leaves
+       the radios behind (DEVELOPMENT.md, craftRecipe). */
     craftRecipe RenewableEnergy_MakeHomemadeAlternator
     {
         timedAction = MakingElectrical,
@@ -1534,7 +1536,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:wrench] mode:keep flags[MayDegradeLight],
             item 1 tags[base:brake],
-            item 2 [Base.Speaker;4:Base.RadioRed;4:Base.RadioBlack] mode:destroy,
+            item 2 [Base.Speaker;Base.HamRadio1;Base.HamRadio2;Base.Mov_BlackSpeakerCabinet;Base.Mov_WoodSpeakerCabinet;Base.Mov_GuitarAmplifier;4:Base.RadioRed;4:Base.RadioBlack] mode:destroy,
             item 4 [Base.ElectricWire],
             item 2 [Base.ElectronicsScrap],
             item 1 [Base.SmallSheetMetal],

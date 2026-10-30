@@ -1277,6 +1277,36 @@
               "name": "Speaker"
             },
             {
+              "count": 2,
+              "fullType": "Base.HamRadio1",
+              "icon": "icon_Base_HamRadio1",
+              "name": "Premium Technologies Ham Radio"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.HamRadio2",
+              "icon": "icon_Base_HamRadio2",
+              "name": "US ARMY COMM. Ham Radio"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.Mov_BlackSpeakerCabinet",
+              "icon": "icon_Base_Mov_BlackSpeakerCabinet",
+              "name": "Black Speaker Cabinet"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.Mov_WoodSpeakerCabinet",
+              "icon": "icon_Base_Mov_WoodSpeakerCabinet",
+              "name": "Wood Speaker Cabinet"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.Mov_GuitarAmplifier",
+              "icon": "icon_Base_Mov_GuitarAmplifier",
+              "name": "Guitar Amplifier"
+            },
+            {
               "count": 4,
               "fullType": "Base.RadioRed",
               "icon": "icon_Base_RadioRed",
@@ -8639,6 +8669,8 @@
       "icon_Base_Gloves_LeatherGlovesBrown",
       "icon_Base_Gloves_Surgical",
       "icon_Base_Glue",
+      "icon_Base_HamRadio1",
+      "icon_Base_HamRadio2",
       "icon_Base_Hammer",
       "icon_Base_HandDrill",
       "icon_Base_HayTuft",
@@ -8653,9 +8685,12 @@
       "icon_Base_MetalDrum",
       "icon_Base_MetalPipe",
       "icon_Base_Mov_BinRound",
+      "icon_Base_Mov_BlackSpeakerCabinet",
       "icon_Base_Mov_DarkGreenBarrel",
+      "icon_Base_Mov_GuitarAmplifier",
       "icon_Base_Mov_LightGreenBarrel",
       "icon_Base_Mov_OrangeBarrel",
+      "icon_Base_Mov_WoodSpeakerCabinet",
       "icon_Base_Nails",
       "icon_Base_Needle",
       "icon_Base_NormalBrake1",

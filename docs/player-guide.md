@@ -368,7 +368,7 @@ From 55 km/h, the homebuilt turbine's tail swings its head out of the wind ("tur
 
 - **Treadmill Motor**: take a treadmill apart. Every one gives its motor.
 - **Car Alternator**: in the vehicle mechanics window, the engine's menu has **Take Out Alternator** (engine off, a wrench, Mechanics 2; it opens the hood if it's shut). Each car has one. The car still runs without it, but it stops charging its battery until you **Put Back Alternator**. Cutting up a smashed wreck gives one as often as it gives engine parts, more with Metalworking and Mechanics; a burnt wreck never does. Mechanics' shelves and auto parts stores have them too.
-- **Homemade Alternator**: a car's brake, two speakers (or four portable radios, for their smaller speakers' magnets), four lengths of wire, two Electronics Scrap and a small sheet of metal, with a screwdriver and a wrench, at Electricity 5 and Mechanics 3.
+- **Homemade Alternator**: a car's brake, magnets from two speakers, four lengths of wire, two Electronics Scrap and a small sheet of metal, with a screwdriver and a wrench, at Electricity 5 and Mechanics 3. The magnets come from two loose speakers, two ham radios, two speaker cabinets or two guitar amplifiers, or from four portable radios, whose speakers' magnets are smaller. A speaker cabinet or guitar amplifier counts whether you find it in a music store or pick it up off the floor.
 
 ## Treadmills
 

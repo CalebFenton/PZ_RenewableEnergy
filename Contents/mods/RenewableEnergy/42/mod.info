@@ -9,5 +9,6 @@ author=Caleb Fenton
 url=https://github.com/CalebFenton/PZ_RenewableEnergy
 pack=renewable_energy
 tiledef=renewable_energy 6142
+tiledef=renewable_energy_vanilla.patch 6143
 versionMin=42.20
 require=\cf_commonlib

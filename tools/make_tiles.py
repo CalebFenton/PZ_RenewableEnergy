@@ -1,5 +1,6 @@
 """Write renewable_energy.tiles, the properties of every tile in renewable_energy_01 and
-renewable_energy_02, tileGeometry.txt, and SpriteTiles.lua, every tile by meaning for Lua.
+renewable_energy_02, tileGeometry.txt, SpriteTiles.lua, every tile by meaning for Lua, and
+renewable_energy_vanilla.patch.tiles, what the mod adds to vanilla tiles.
 
     python3 tools/make_tiles.py
 
@@ -44,6 +45,22 @@ MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common"
 # Each tileset's name and rows, tilefile.COLUMNS tiles to a row; the file numbers them from 1 in
 # this order.
 TILESETS = (("renewable_energy_01", 53), ("renewable_energy_02", 56))
+# Vanilla's speaker cabinets and guitar amplifier, by the tile number of each facing in
+# recreational_01. Their items (Base.Mov_*), which music stores and band rooms stock, place as
+# these tiles, but the tiles have no CustomItem, so picking one up gives a Moveable typed after
+# the tile (ISMoveableSpriteProps:instanceItem), and a stocked one turns into that too when it is
+# next loaded (Moveable.load). The patch names each tile's item, as vanilla's ham radio tiles do,
+# so both stay the item the Homemade Alternator takes for its magnets. A file ending .patch.tiles
+# adds its properties to the game's tiles of those names (IsoWorld.LoadTileDefinitions), as the
+# game's own tiledefinitions_noiseworks.patch.tiles does; the item keeps the tile's name and
+# weight.
+SPEAKER_TILES = {
+    "Base.Mov_GuitarAmplifier": (72, 73, 74, 75),
+    "Base.Mov_WoodSpeakerCabinet": (76, 77, 78, 79),
+    "Base.Mov_BlackSpeakerCabinet": (80, 81, 82, 83),
+}
+VANILLA_PATCH = (("recreational_01", 11,
+                  {tile: {"CustomItem": item} for item, tiles in SPEAKER_TILES.items() for tile in tiles}),)
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -317,6 +334,7 @@ def main():
     # Only renewable_energy_01's tiles have properties: renewable_energy_02 is all overlays.
     tilefile.write(MEDIA, "renewable_energy.tiles",
                    [(name, rows, TILES if number == 1 else {}) for number, (name, rows) in enumerate(TILESETS, 1)])
+    tilefile.write(MEDIA, "renewable_energy_vanilla.patch.tiles", VANILLA_PATCH)
     with open(LUA, "w", newline="\n") as f:
         f.write(sprite_tiles_lua())
 
