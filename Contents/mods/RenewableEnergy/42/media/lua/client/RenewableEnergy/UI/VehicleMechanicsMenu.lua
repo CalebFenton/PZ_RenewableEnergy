@@ -3,10 +3,11 @@
 -- one goes about it as vanilla's engine jobs do (ISVehicleMechanics.onTakeEngineParts): out of the
 -- car, to the engine, the hood unlocked and opened if shut and closed again after, the wrench in
 -- hand as a part's uninstall holds it (ISVehiclePartMenu.equipRequiredItems).
--- For an empty battery slot: the deep cycle battery under Install, the way vanilla offers the car
--- batteries the slot's script lists, which the deep cycle battery isn't among (see
--- VehicleBattery). Picking one runs vanilla's own install
--- (ISVehiclePartMenu.onInstallPart), with the slot's tools, time and hood.
+-- For an empty battery slot: the deep cycle battery under Install while the character has one,
+-- beside the car battery the slot's script lists, which the deep cycle battery isn't (see
+-- VehicleBattery). Vanilla greys out the one battery its slot takes, and a second greyed line for a
+-- battery few players carry would only read as a slot that takes it instead. Picking one runs
+-- vanilla's own install (ISVehiclePartMenu.onInstallPart), with the slot's tools, time and hood.
 
 require "ISUI/ISWorldObjectContextMenu"
 require "ISUI/ISInventoryPaneContextMenu"
@@ -76,9 +77,9 @@ function CarAlternatorMenu.addOption(context, character, vehicle)
     return option
 end
 
--- Adds the deep cycle battery to the Install submenu that `mechanics:doPartContextMenu` built
--- for `part` in `mechanics.context`. Vanilla builds no submenu when the slot is full or can't
--- be worked on now, and then there is nothing to add to.
+-- Adds the deep cycle batteries `mechanics.chr` has to the Install submenu that
+-- `mechanics:doPartContextMenu` built for `part` in `mechanics.context`. Vanilla builds no submenu
+-- when the slot is full or can't be worked on now, and then there is nothing to add to.
 local function addInstallOptions(mechanics, part)
     if not VehicleBattery.isBatteryPart(part) or part:getInventoryItem() then
         return
@@ -90,15 +91,14 @@ local function addInstallOptions(mechanics, part)
     end
     local character = mechanics.chr
     local fullType = VehicleBattery.ITEM
+    local items = VehicleUtils.getItems(character:getPlayerNum())[fullType]
+    if not items then
+        return
+    end
     local script = getItem(fullType)
     local option = subMenu:addOption(getItemName(fullType), character, nil)
     option.iconTexture = script and script:getNormalTexture()
     mechanics:doMenuTooltip(part, option, "install", fullType)
-    local items = VehicleUtils.getItems(character:getPlayerNum())[fullType]
-    if not items then
-        option.notAvailable = true
-        return
-    end
     local itemMenu = ISContextMenu:getNew(subMenu)
     mechanics.context:addSubMenu(option, itemMenu)
     for _, item in ipairs(items) do

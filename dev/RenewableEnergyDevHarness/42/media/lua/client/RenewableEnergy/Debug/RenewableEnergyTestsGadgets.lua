@@ -263,9 +263,10 @@ local function mechanicsCheat(self)
     ISVehicleMechanics.cheat = true
 end
 
--- The mechanics menu of an empty battery slot installs a carried deep cycle battery. A real-time
--- action: an instant one fails vanilla's isValid on a multiplayer client when the server's slot
--- change arrives. Uninstalling is vanilla's alone (ISUninstallVehiclePart takes any item).
+-- The mechanics menu of an empty battery slot installs a carried deep cycle battery, and doesn't
+-- list one the character hasn't got. A real-time action: an instant one fails vanilla's isValid on a
+-- multiplayer client when the server's slot change arrives. Uninstalling is vanilla's alone
+-- (ISUninstallVehiclePart takes any item).
 test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu", {
     run = function(self)
         T.setPerk(self, Perks.Mechanics, 10)
@@ -273,9 +274,16 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
         if not car then return end
         T.onVehicle(self, car, "vehicleBattery", { empty = true })
         T.waitFor(self, function() return T.vehicleBattery(car) == nil end, "this client's car without a battery")
-        T.give(self, "battery", { { type = VehicleBattery.ITEM } })
         T.step(function()
             mechanicsCheat(self)
+            local context = T.partMenu(car.vehicle, VehicleBattery.partOf(car.vehicle))
+            local install = T.subMenu(context, context:getOptionFromName(getText("IGUI_Install")))
+            self.installWithout = install ~= nil
+            self.listedWithout = install ~= nil and install:getOptionFromName(getItemName(VehicleBattery.ITEM)) ~= nil
+            context:closeAll()
+        end)
+        T.give(self, "battery", { { type = VehicleBattery.ITEM } })
+        T.step(function()
             local context = T.partMenu(car.vehicle, VehicleBattery.partOf(car.vehicle))
             T.defer(self, function() context:closeAll() end)
             local installOption = context:getOptionFromName(getText("IGUI_Install"))
@@ -298,6 +306,8 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
         end)
     end,
     validate = function(self)
+        if not expect(self.installWithout, "the mechanics menu has no Install submenu without a deep cycle battery") then return end
+        expect(not self.listedWithout, "Install lists the deep cycle battery while the character has none")
         if not expect(self.offered, "the mechanics menu doesn't offer the deep cycle battery under Install: "
             .. tostring(self.offerProblem)) then return end
         local installed = self.reads.installed.state.battery
