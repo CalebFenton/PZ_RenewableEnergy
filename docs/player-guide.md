@@ -652,6 +652,7 @@ Folks put their panels where the sun is, which is usually up on the roof, and fe
 | Phone company relay sheds | By the radio masts on the hills around Brandenburg, Irvington and Riverside | Racks of panels, a few L-16s and a charge controller |
 | The power company yard | A substation outside Muldraugh | The station battery: a bank of L-16s and its charger |
 | Ranger stations | By the lakes in the parks | Wall panels, racks and a battery box |
+| Fire lookout towers | Up in the woods south of Riverside and by Doe Valley | Panels hung on the catwalk railing, and a battery box in the cab, usually with an inverter |
 | Old wind farms | Farmland near Echo Creek and Ekron | A treadmill wind charger with broken blades, wired to a barn's tired batteries, usually with a charge controller |
 | A dairy | Near Ekron | A sour digester piped to a run-down generator with a gas kit |
 | A prepper's cabin | In the woods near Echo Creek | A dirty gasifier piped to a generator, and the plans that built it |

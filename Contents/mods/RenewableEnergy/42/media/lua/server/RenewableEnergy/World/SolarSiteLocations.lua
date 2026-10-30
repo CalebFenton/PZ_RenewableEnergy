@@ -1,6 +1,6 @@
 -- The named sites of SolarSites.lua, by the map they are on. Places where someone in 1993 would
 -- have had solar: stock tank pumps out in the pastures, farms off the grid, campers, telephone
--- relay sheds on the hills, ranger stations, and arrow boards at road works and at the army's
+-- relay sheds on the hills, ranger stations and their fire towers, and arrow boards at road works and at the army's
 -- checkpoints on the roads into Louisville; and the power company's substation battery. And the
 -- homestead power of the countryside, left worn: old farm wind chargers, a dairy's biogas, a
 -- prepper's wood gas.
@@ -111,6 +111,24 @@ return {
                 { 6997, 6035, 0, "rackMetal", "S" }, { 7000, 6036, 0, "rackMetal", "S" },
             },
             bank = { 6998, 6025, 0 },
+        },
+        -- Fire lookout towers, kept by the same rangers: panels hung on the catwalk's south
+        -- railing, out from under the cab's roof, and the battery box in the cab.
+        {
+            kind = "ranger", name = "Fire tower by Doe Valley",
+            panels = {
+                { 6889, 6023, 5, "wallMetal", "S" }, { 6890, 6023, 5, "wallMetal", "S" },
+                { 6892, 6023, 5, "wallMetal", "S" }, { 6893, 6023, 5, "wallMetal", "S" },
+            },
+            bank = { 6891, 6018, 5 },
+        },
+        {
+            kind = "ranger", name = "Fire tower south of Riverside",
+            panels = {
+                { 6391, 5905, 5, "wallMetal", "S" }, { 6392, 5905, 5, "wallMetal", "S" },
+                { 6394, 5905, 5, "wallMetal", "S" }, { 6395, 5905, 5, "wallMetal", "S" },
+            },
+            bank = { 6393, 5900, 5 },
         },
         -- Road works with a solar arrow board.
         { kind = "roadWorks", name = "Road works north of Muldraugh", arrowBoard = { 10598, 9128, 0, "N" }, always = true },
