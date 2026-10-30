@@ -353,7 +353,7 @@ end)
 -- square, nearest first, or nil.
 local function chargerSquareFor(bank)
     local position = { x = bank:getX(), y = bank:getY(), z = bank:getZ() }
-    for r = 1, Sources.REACH.tiles do
+    for r = 1, Sources.reach().tiles do
         for x, y in PZHarness.Fixtures.ring(position.x, position.y, r) do
             local square = getSquare(x, y, 0)
             if RuralFinds.canPlace("wind", square)

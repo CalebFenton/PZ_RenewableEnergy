@@ -12,9 +12,12 @@ local Squares = require "cf_commonlib/Squares"
 
 local Sources = {}
 
--- How far a source may be from the bank it is connected to: a radius in tiles, and floors up or
--- down.
-Sources.REACH = { tiles = 20, levels = 3 }
+--- How far a source may be from the bank it is connected to, { tiles, levels }: as far as a
+--- generator powers (IsoGenerator), a radius of the Generator Tile Range option in tiles and the
+--- Generator Vertical Power Range option in floors up or down.
+function Sources.reach()
+    return { tiles = SandboxVars.GeneratorTileRange, levels = SandboxVars.GeneratorVerticalPowerRange }
+end
 
 -- Each family, in the order the status window lists them: whether its sources must stand outdoors
 -- (a treadmill works under a roof); the bank status fields of its watts now and its watt-hours
@@ -110,9 +113,9 @@ function Sources.squareOk(square, kind)
     return square ~= nil and (square:isOutside() or not Sources.FAMILY[KINDS[kind].family].outdoors)
 end
 
---- Whether a source at x, y, z is within REACH of `bank`, anything with x, y and z.
+--- Whether a source at x, y, z is within reach (Sources.reach) of `bank`, anything with x, y and z.
 function Sources.isInReach(bank, x, y, z)
-    local reach = Sources.REACH
+    local reach = Sources.reach()
     return IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) <= reach.tiles * reach.tiles
         and math.abs(z - bank.z) <= reach.levels
 end
@@ -148,7 +151,7 @@ end
 --- The loaded sources the bank at `bankPosition` ({ x, y, z }) could take now
 --- (Sources.connectRefusal), those connected to another bank included.
 function Sources.sourcesInReach(bankPosition)
-    local reach = Sources.REACH
+    local reach = Sources.reach()
     local found = {}
     for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
         Squares.eachAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)
