@@ -5,6 +5,7 @@
 - After every change: `dev/static-check.sh`, which compiles every Lua file with the game's compiler and cross-checks scripts, translations, textures and API names in seconds. After a change to `Contents/`, also `dev/validate-server.sh`.
 - Each in-game test run pays for a game start, so batch: commit each logical change on its own, then run `dev/run-debug-client.sh --test --changed` once per batch, not after each edit. Before pushing or merging: `dev/run-debug-client.sh --test`. Before a release, also `dev/run-debug-client.sh --test --mp`.
 - When agents work in parallel, they don't run the game; whoever merges their work runs the batch.
+- After committing a change to `Contents/` or the dev mod: `dev/package.sh`, which rebuilds `~/Nextcloud/ProjectZomboid/mods.zip`, every mod beside this one with its libraries and dev mods, which the user tests with. Never zip mods by hand.
 
 ## Rules
 
