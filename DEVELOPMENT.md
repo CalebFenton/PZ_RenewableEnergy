@@ -42,6 +42,15 @@ The scripts in `dev/` are entry points into the shared test harness in `dev/harn
 - In debug mode, vanilla logs errors about fonts, `FluidContainerScript` names, a mannequin zone, missing tiles, and missing icons. None come from this mod.
 - `getCore():TakeFullScreenshot("name.png")` writes to `<cachedir>/Screenshots/` without macOS Screen Recording permission.
 
+### Telemetry
+
+cf_commonlib's `Telemetry` channels print `TELEMETRY <channel> key=value ...` lines to `console.txt` (a dedicated server's `server-console.txt`), each off until a switch file names it. For a test run, `TELEMETRY=RenewableEnergy.bankPass dev/run-debug-client.sh --test` (comma-separated, or `*` for every channel) turns them on; for a player's game, a file `Zomboid/Lua/cf_telemetry.txt` with one channel name a line, read when the game starts. Check a channel's `on` before building a line, so it costs nothing while off. Add a channel where a question will come back, not for one bug.
+
+| Channel | One line per |
+|---|---|
+| `RenewableEnergy.bankPass` | Bank pass (`Bank:advance`): its span, charge before and after, sources, chargers and their source, load against the inverters' limit, its state, and the pass's milliseconds. |
+| `RenewableEnergy.bankSharing` | Sharing worked out among the banks and generators reaching each other's squares (`Payers`): the payers and their caps, appliances scanned, how many changed hands, banks that overloaded, whether it was cached for a whole pass, and its milliseconds. |
+
 ## Writing tests
 
 The harness docs (`dev/harness/docs/`) cover the runner, the fixtures and the server channel; this section has only the game's side.

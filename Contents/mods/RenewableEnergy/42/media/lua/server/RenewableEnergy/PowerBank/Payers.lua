@@ -29,6 +29,7 @@ local Loads = require "RenewableEnergy/PowerBank/Loads"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
+local Telemetry = require "cf_commonlib/Telemetry"
 
 local Payers = {}
 
@@ -161,11 +162,12 @@ local function overCap(payer, watts)
     return payer.capW ~= nil and watts > payer.capW + EPSILON
 end
 
--- Who of `payers` pays for each of `draws` (by draw), and each payer's watts (by key): the nearest
--- that reaches it; then each payer over its cap, in place order, hands its draws, the farthest
--- first, to the nearest other payer with room for each, until it fits.
+-- Who of `payers` pays for each of `draws` (by draw), each payer's watts (by key) and how many
+-- draws changed hands: the nearest that reaches it pays; then each payer over its cap, in place
+-- order, hands its draws, the farthest first, to the nearest other payer with room for each, until
+-- it fits.
 local function shareOnce(payers, draws)
-    local owner, watts = {}, {}
+    local owner, watts, moved = {}, {}, 0
     for _, payer in ipairs(payers) do
         watts[payer.key] = 0
     end
@@ -199,20 +201,22 @@ local function shareOnce(payers, draws)
                     owner[draw] = to
                     watts[payer.key] = watts[payer.key] - draw.watts
                     watts[to.key] = watts[to.key] + draw.watts
+                    moved = moved + 1
                 end
             end
         end
     end
-    return owner, watts
+    return owner, watts, moved
 end
 
 -- Who of `group` pays for each of `draws`: shareOnce, again without the banks it leaves over their
 -- cap, until every bank left fits. A bank left over its cap pays, as its overload, for what it held
--- when it dropped out.
+-- when it dropped out. Also the draws the last round moved, and the rounds it took.
 local function share(group, draws)
-    local payers, tripped = group, {}
+    local payers, tripped, rounds = group, {}, 0
     while true do
-        local owner, watts = shareOnce(payers, draws)
+        local owner, watts, moved = shareOnce(payers, draws)
+        rounds = rounds + 1
         local fitting = {}
         for _, payer in ipairs(payers) do
             if overCap(payer, watts[payer.key]) then
@@ -222,7 +226,7 @@ local function share(group, draws)
             end
         end
         if #fitting == #payers then
-            return owner, tripped
+            return owner, tripped, moved, rounds
         end
         payers = fitting
     end
@@ -249,17 +253,37 @@ local function groupKey(group)
     return table.concat(parts, ";")
 end
 
+-- One line per sharing worked out: the group, what it scanned, what changed hands and who
+-- overloaded, and how long it took.
+local sharingLog = Telemetry.channel("RenewableEnergy.bankSharing")
+
+local function placesOf(group, only)
+    local parts = {}
+    for _, member in ipairs(group) do
+        if not only or only[member.key] then
+            table.insert(parts, member.x .. "," .. member.y .. "," .. member.z
+                .. (member.generator and ":generator" or (":" .. string.format("%.0f", member.capW or -1))))
+        end
+    end
+    return table.concat(parts, ";")
+end
+
 -- The draws of `group`, the generators by member key, who pays for each draw and what each bank
 -- that overloaded held (share).
 local function sharingOf(group)
     local key = sharedThisPass and groupKey(group)
     local sharing = key and sharedThisPass[key]
     if not sharing then
+        local started = sharingLog.on and Telemetry.now()
         local draws, found = drawsOf(group)
-        local owner, tripped = share(group, draws)
+        local owner, tripped, moved, rounds = share(group, draws)
         sharing = { draws = draws, found = found, owner = owner, tripped = tripped }
         if key then
             sharedThisPass[key] = sharing
+        end
+        if started then
+            sharingLog:log("payers", placesOf(group), "draws", #draws, "moved", moved, "rounds", rounds,
+                "tripped", placesOf(group, tripped), "inPass", key ~= nil, "ms", Telemetry.now() - started)
         end
     end
     return sharing

@@ -28,7 +28,11 @@ local Loads = require "RenewableEnergy/PowerBank/Loads"
 local Fumes = require "RenewableEnergy/Fumes"
 local Clock = require "cf_commonlib/Clock"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
+local Telemetry = require "cf_commonlib/Telemetry"
 local Tiles = require "cf_commonlib/Tiles"
+
+-- One line per bank pass: what came in and went out, and how long the pass took.
+local passLog = Telemetry.channel("RenewableEnergy.bankPass")
 
 local Bank = LibObjectSystem.Object:derive("RenewableEnergy_Bank")
 
@@ -404,6 +408,7 @@ end
 --- One pass: `hours` of sun, load and charging up to now.
 ---@param context table see BankSystem.passContext
 function Bank:advance(hours, context)
+    local started = passLog.on and Telemetry.now()
     local container = self:container()
     self:recount()
 
@@ -460,6 +465,13 @@ function Bank:advance(hours, context)
         windKph = context.windKph }
     for _, family in ipairs(Sources.FAMILIES) do
         self.now[family.now] = watts[family.name]
+    end
+    if started then
+        passLog:log("bank", self.x .. "," .. self.y .. "," .. self.z, "hour", Clock.now(), "hours", hours,
+            "chargeBefore", capacity > 0 and before / capacity or 0, "chargeAfter", self.charge, "sourcesW", sourcesW,
+            "chargerW", chargerW, "chargeSource", self.chargeSource, "loadW", self.loadW, "limitW", self:limitW(),
+            "drawW", drawW, "backupW", backupW, "on", self.on, "overloaded", self.overloaded, "empty", self.empty,
+            "powering", powering, "ms", Telemetry.now() - started)
     end
 end
 
