@@ -149,14 +149,15 @@ function Sources.connectRefusal(isoObject, bankPosition)
 end
 
 --- The loaded sources the bank at `bankPosition` ({ x, y, z }) could take now
---- (Sources.connectRefusal), those connected to another bank included.
+--- (Sources.connectRefusal) and no bank has yet: one wired to another bank moves over only by its
+--- own Connect to that bank.
 function Sources.sourcesInReach(bankPosition)
     local reach = Sources.reach()
     local found = {}
     for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
         Squares.eachAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)
             local source = Sources.findOn(square)
-            if source and not Sources.connectRefusal(source, bankPosition) then
+            if source and not PowerBank.connectedBank(source) and not Sources.connectRefusal(source, bankPosition) then
                 table.insert(found, source)
             end
         end)

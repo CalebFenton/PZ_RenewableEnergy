@@ -347,6 +347,24 @@ test("renewable_energy_bank_menu_connects_sources_that_fit", {
     end,
 })
 
+-- Connect Sources in Reach leaves out a source another bank has: it counts only the loose one,
+-- while the wired panel's own menu still offers to move it over.
+test("renewable_energy_bank_menu_connect_all_skips_sources_of_other_banks", {
+    run = function(self)
+        self.home = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
+        self.wired = self.home and T.panel(self, Sprites.flat, { near = self.home, connect = true })
+        self.bank = self.wired and T.bank(self, "batteryBoxWood", {}, { outdoors = true, near = self.home })
+        self.loose = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
+    end,
+    validate = function(self)
+        if not self.loose then return end
+        expect(self.wired.connected, "the first panel wasn't connected to its bank: " .. tostring(self.wired.reason))
+        local options = T.connectOptions(self.bank, self.wired, 1)
+        expect(options.all.shown, "the second bank's Connect Sources in Reach doesn't count only the loose panel")
+        expect(options.one.shown and not options.one.greyed, "the wired panel's menu no longer offers to move it to the second bank")
+    end,
+})
+
 -- A rename goes through the bank trimmed and shows in its menu and window, and an empty name gives
 -- the tier's name back.
 test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
