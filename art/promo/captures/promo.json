@@ -7446,10 +7446,10 @@
           "uses": false
         },
         {
-          "count": 3,
+          "count": 5,
           "items": [
             {
-              "count": 3,
+              "count": 5,
               "fullType": "Base.SheetMetal",
               "icon": "icon_Base_SheetMetal",
               "name": "Steel Sheet"
@@ -7486,10 +7486,10 @@
           "uses": false
         },
         {
-          "count": 4,
+          "count": 10,
           "items": [
             {
-              "count": 4,
+              "count": 10,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
@@ -7500,13 +7500,41 @@
           "uses": false
         },
         {
-          "count": 3,
+          "count": 6,
           "items": [
             {
-              "count": 3,
+              "count": 6,
               "fullType": "Base.ElectronicsScrap",
               "icon": "icon_Base_ElectronicsScrap",
               "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 12,
+          "items": [
+            {
+              "count": 12,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.NutsBolts",
+              "icon": "icon_Base_NutsBolts",
+              "name": "Nuts and Bolts"
             }
           ],
           "keep": false,
@@ -8009,10 +8037,10 @@
           "uses": false
         },
         {
-          "count": 3,
+          "count": 6,
           "items": [
             {
-              "count": 3,
+              "count": 6,
               "fullType": "Base.ElectricWire",
               "icon": "icon_Base_ElectricWire",
               "name": "Electrical Wire"
@@ -8023,13 +8051,27 @@
           "uses": false
         },
         {
-          "count": 3,
+          "count": 5,
           "items": [
             {
-              "count": 3,
+              "count": 5,
               "fullType": "Base.ElectronicsScrap",
               "icon": "icon_Base_ElectronicsScrap",
               "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 8,
+          "items": [
+            {
+              "count": 8,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
             }
           ],
           "keep": false,
