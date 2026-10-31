@@ -580,8 +580,9 @@ module Base
                 item 1 [Base.Belt2],
                 item 2 [Base.SheetMetal],
                 item 8 [Base.MetalBar;Base.IronBar;Base.SteelBar],
-                item 3 [Base.ElectricWire],
-                item 3 [Base.ElectronicsScrap],
+                item 6 [Base.ElectricWire],
+                item 5 [Base.ElectronicsScrap],
+                item 8 [Base.Screws],
             }
         }
     }
@@ -661,10 +662,12 @@ module Base
                 item 7 [Base.WeldingRods] flags[DontRecordInput],
                 item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
                 item 1 [RenewableEnergy.HomemadeAlternator],
-                item 3 [Base.SheetMetal],
+                item 5 [Base.SheetMetal],
                 item 12 [Base.MetalBar;Base.IronBar;Base.SteelBar],
-                item 4 [Base.ElectricWire],
-                item 3 [Base.ElectronicsScrap],
+                item 10 [Base.ElectricWire],
+                item 6 [Base.ElectronicsScrap],
+                item 12 [Base.Screws],
+                item 4 [Base.NutsBolts],
             }
         }
     }
