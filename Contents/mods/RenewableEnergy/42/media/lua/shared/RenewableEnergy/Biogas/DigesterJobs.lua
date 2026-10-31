@@ -232,7 +232,8 @@ DigesterJobs.JOBS = {
             { perk = "Mechanics", need = 2 },
             { tool = "HAMMER", item = "Base.Hammer" },
             { tool = "SAW", item = "Base.Saw" },
-            { item = "Base.MetalDrum", need = 1 },
+            -- The barrels the Barrel Digester recipe takes (Entities.txt).
+            { item = "Base.MetalDrum", types = { "Base.MetalDrum", "Base.Mov_OrangeBarrel", "Base.Mov_DarkGreenBarrel", "Base.Mov_LightGreenBarrel" }, need = 1 },
             { item = "Base.Plank", need = 6 },
             { item = "Base.Nails", need = 12 },
             { item = "Base.Tarp", need = 1 },
